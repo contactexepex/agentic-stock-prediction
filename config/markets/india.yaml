@@ -6,9 +6,10 @@ calendar: XBOM            # exchange_calendars code (BSE and NSE share trading h
 timezone: Asia/Kolkata
 currency: INR
 premarket_quotes: false # NSE has no pre-market trading before the 09:00 pre-open
-# Extra closed days on top of exchange_calendars. XBOM 2026 matches NSE circular
-# NSE/CMTR/71775 (2025-12-12) plus the 2026-01-15 Maharashtra civic-poll holiday; the library
-# has no 2027 holidays yet. NSE publishes the 2027 list around mid-December 2026: replace these
+# Extra closed days on top of exchange_calendars. XBOM 2026 has 16 weekday holidays incl. the
+# 2026-01-15 Maharashtra civic-poll closure, matching the count and month split in Livemint,
+# 2026-01-15 ("a trading holiday for a total of 16 days in 2026", read via Bigdata.com); the
+# library has no 2027 holidays yet. NSE publishes the 2027 list around mid-December 2026: replace these
 # provisional fixed-date holidays (Republic Day, Good Friday, Ambedkar Jayanti) with that list.
 holidays: [2027-01-26, 2027-03-26, 2027-04-14]
 

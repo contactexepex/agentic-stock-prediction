@@ -123,7 +123,10 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 - India outlet RSS checked 2026-10-05 (Moneycontrol's feeds are frozen, now read via Google News).
   2027 calendars: NSE has not published its 2027 holiday list yet (expected mid-December 2026);
   `holidays:` in `config/markets/india.yaml` holds the fixed-date ones until then. Add the BLS 2027
-  CPI dates and the RBI FY2027-28 MPC dates to `config/events.yaml` when they are published.
+  CPI dates and the RBI FY2027-28 MPC dates to `config/events.yaml` when they are published,
+  and confirm the provisional 2027 FOMC dates (a six-meeting schedule has been proposed).
+  exchange_calendars covers XNYS only to one year after the run date (2027-10-05 when checked
+  on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
 - Not yet built from section 4: options-implied volatility (US option chains) in the width blend,
   index-then-stock beta split for the centre, past earnings-day moves, and ex-dividend price
   shift (needs the dividend amount). Today: EWMA width, empirical quantiles, earnings / event /

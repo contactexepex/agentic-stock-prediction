@@ -132,7 +132,10 @@ def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
     for rule in spec.get("rules", []):
         if market not in rule["markets"]:
             continue
+        skip = {s if isinstance(s, date) else date.fromisoformat(str(s)) for s in rule.get("skip") or []}
         for d in rule_dates(rule, start - timedelta(days=7), end + timedelta(days=7)):
+            if d in skip:  # known not to happen on (or before) this date
+                continue
             d = prev_session(cfg, d)  # holiday -> previous trading day
             if start <= d <= end:
                 out.append({"date": d, "type": rule["type"], "name": rule["name"],

@@ -1,7 +1,8 @@
 # Scheduled market events used for the regime (EVENT_HEAVY) and range widening.
 # Company earnings and ex-dividend dates are collected automatically (collect_events.py).
 # `major: true` events raise the regime to EVENT_HEAVY when within 2 calendar days.
-# If a rule date is not a trading day, the event moves to the previous trading day.
+# If a rule date is not a trading day, the event moves to the previous trading day; `skip`
+# lists rule dates that do not happen at all.
 # `release` = publication time for data released before the open; on those days the report
 # says the calls were made before the release (docs/DESIGN.md section 2).
 
@@ -9,11 +10,13 @@ rules:
   - {markets: [us], type: opex, rule: third_friday, name: US monthly options expiry, major: false}
   - {markets: [us], type: triple_witching, rule: third_friday, months: [3, 6, 9, 12],
      name: US triple witching, major: true}
-  # BLS Employment Situation: Nov 6 and Dec 4 2026 confirmed (bls.gov/schedule/news_release/empsit.htm).
-  # Check shifts: when the first Friday is a holiday (e.g. 2027-01-01) BLS usually publishes a week later.
-  - {markets: [us], type: jobs_report, rule: first_friday,
+  # BLS Employment Situation, usually the first Friday. The October report on 2026-11-06 is
+  # confirmed (Insurance Business America, 2026-10-02, read via Bigdata.com). 2027-01-01 is a
+  # holiday and BLS does not publish then (without the skip the rule would put it on
+  # 2026-12-31); see the provisional fixed date below.
+  - {markets: [us], type: jobs_report, rule: first_friday, skip: [2027-01-01],
      name: "US jobs report (usually first Friday; check for shifts)", major: true, release: "08:30 ET"}
-  - {markets: [india], type: jobs_report, rule: first_friday,
+  - {markets: [india], type: jobs_report, rule: first_friday, skip: [2027-01-01],
      name: "US jobs report (usually first Friday, 08:30 ET; check for shifts)", major: true}
   - {markets: [india], type: fno_expiry, rule: last_weekday, weekday: 1,
      name: NSE monthly F&O expiry (last Tuesday), major: true}
@@ -22,45 +25,65 @@ rules:
 
 # One-off dates. Verify each year and add index rebalance dates as they are announced.
 # FOMC decisions land at 14:00 ET, after India's close, so India feels them the next session.
+# Dates marked "provisional" were not confirmed by a source read for this file: they stay at
+# `major: false` (listed in the report, no EVENT_HEAVY) until confirmed. Re-check them monthly.
 fixed:
-  # FOMC 2026 and 2027 (Federal Reserve calendar, federalreserve.gov/monetarypolicy/fomccalendars.htm;
-  # 2027 dates are tentative until confirmed meeting by meeting). Decision = second meeting day.
+  # FOMC 2026 (in this file before the 2026-10-05 readiness pass). The Oct 27-28 meeting is
+  # confirmed by BTCManager, 2026-10-05 (read via Bigdata.com).
   - {date: 2026-10-28, markets: [us], type: fomc, name: FOMC rate decision, major: true}
   - {date: 2026-10-29, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
   - {date: 2026-12-09, markets: [us], type: fomc, name: FOMC rate decision, major: true}
   - {date: 2026-12-10, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-01-27, markets: [us], type: fomc, name: FOMC rate decision, major: true}
-  - {date: 2027-01-28, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-03-17, markets: [us], type: fomc, name: FOMC rate decision (with projections), major: true}
-  - {date: 2027-03-18, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-04-28, markets: [us], type: fomc, name: FOMC rate decision, major: true}
-  - {date: 2027-04-29, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-06-09, markets: [us], type: fomc, name: FOMC rate decision (with projections), major: true}
-  - {date: 2027-06-10, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-07-28, markets: [us], type: fomc, name: FOMC rate decision, major: true}
-  - {date: 2027-07-29, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-09-15, markets: [us], type: fomc, name: FOMC rate decision (with projections), major: true}
-  - {date: 2027-09-16, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-10-27, markets: [us], type: fomc, name: FOMC rate decision, major: true}
-  - {date: 2027-10-28, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
-  - {date: 2027-12-08, markets: [us], type: fomc, name: FOMC rate decision (with projections), major: true}
-  - {date: 2027-12-09, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
 
-  # US CPI, 08:30 ET (BLS CPI release schedule, bls.gov/schedule/news_release/cpi.htm).
-  # The 2027 schedule is not published yet (BLS posts it in the autumn): add it then.
+  # FOMC 2027: PROVISIONAL. The Fed has posted eight tentative 2027 dates (FXStreet, 2026-08-04),
+  # but Chair Warsh has proposed six meetings a year; the July minutes say no decision was made
+  # and any change would not affect the rest of 2026 (CNBC, 2026-08-19). Both read via
+  # Bigdata.com. Only Jan 26-27 was seen in a source read here (Zero Hedge, 2026-07-30, quoting
+  # the Fed calendar); the other seven dates come from search-result summaries.
+  # RE-CHECK the Fed's FOMC calendar before January 2027: fix the list, set major: true.
+  - {date: 2027-01-27, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-01-28, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-03-17, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-03-18, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-04-28, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-04-29, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-06-09, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-06-10, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-07-28, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-07-29, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-09-15, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-09-16, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-10-27, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-10-28, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+  - {date: 2027-12-08, markets: [us], type: fomc, name: FOMC rate decision (provisional), major: false}
+  - {date: 2027-12-09, markets: [india], type: fomc, name: FOMC rate decision (provisional; previous US evening), major: false}
+
+  # US jobs report for December 2026: PROVISIONAL date (the first Friday, 2027-01-01, is a
+  # holiday and BLS has not published its 2027 schedule). Fix it and set major: true then.
+  - {date: 2027-01-08, markets: [us], type: jobs_report, name: US jobs report (provisional date), major: false,
+     release: "08:30 ET"}
+  - {date: 2027-01-08, markets: [india], type: jobs_report, name: "US jobs report (provisional date, 08:30 ET)",
+     major: false}
+
+  # US CPI, 08:30 ET. Oct 14 is confirmed ("The BLS schedule sets September consumer price
+  # inflation for October 14": BTCManager, 2026-10-05, read via Bigdata.com). Nov 10 and Dec 10
+  # are PROVISIONAL (search-result summaries only): re-check the BLS CPI schedule, then set
+  # major: true. The 2027 schedule is not published yet (BLS posts it in the autumn).
   - {date: 2026-10-14, markets: [us], type: cpi, name: US CPI (September), major: true, release: "08:30 ET"}
-  - {date: 2026-11-10, markets: [us], type: cpi, name: US CPI (October), major: true, release: "08:30 ET"}
-  - {date: 2026-12-10, markets: [us], type: cpi, name: US CPI (November), major: true, release: "08:30 ET"}
+  - {date: 2026-11-10, markets: [us], type: cpi, name: US CPI (October; provisional date), major: false, release: "08:30 ET"}
+  - {date: 2026-12-10, markets: [us], type: cpi, name: US CPI (November; provisional date), major: false, release: "08:30 ET"}
 
   # RBI Monetary Policy Committee decisions (last meeting day, statement at 10:00 IST, during the
-  # session). FY2026-27 schedule from the RBI press release of 2026-03-23
-  # (rbi.org.in/scripts/BS_PressReleaseDisplay.aspx?prid=62422): Oct 5-7 and Dec 2-4 2026,
-  # Feb 3-5 2027. The FY2027-28 schedule is usually released in late March: add it then.
+  # session). FY2026-27: "The fifth meeting is scheduled for December 2, 3, and 4, 2026, and the
+  # final meeting of the cycle will be held on February 3, 4, and 5, 2027" (The Economic Times,
+  # 2026-03-23, "RBI releases meeting schedule of the Monetary Policy Committee for 2026-2027",
+  # read via Bigdata.com). Oct 7 at 10:00 IST: Livemint, 2026-10-05 (read via Bigdata.com).
+  # The FY2027-28 schedule is usually released in late March: add it then.
   - {date: 2026-10-07, markets: [india], type: rbi_policy, name: RBI policy decision, major: true}
   - {date: 2026-12-04, markets: [india], type: rbi_policy, name: RBI policy decision, major: true}
   - {date: 2027-02-05, markets: [india], type: rbi_policy, name: RBI policy decision, major: true}
 
-  # Union Budget 2027-28: presented on February 1 by convention since 2017; reported as expected
-  # on 2027-02-01 (Business Standard, 2026-09-23, on the pre-Budget meetings from Oct 12).
-  # Confirm the date when the Finance Ministry announces it in January.
+  # Union Budget 2027-28: "The Budget 2027-28 is likely to be presented on February 1"
+  # (Business Standard, 2026-09-23, "Finance Ministry to kick off month-long pre-Budget meetings
+  # from October 12", read via Bigdata.com). Confirm when the Finance Ministry announces it.
   - {date: 2027-02-01, markets: [india], type: budget, name: Union Budget 2027-28 (expected), major: true}

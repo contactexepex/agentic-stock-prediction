@@ -71,6 +71,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    then `python backtest.py --market india` and `--market us` (writes `reports/<market>/backtest-*.md`),
    commit, push. Then click **Run now** on each routine and read the transcript (a green
    status only means the session ran, not that the task succeeded).
+5. **After adding a symbol** to a market config, backfill it once the same way (bars already
+   stored are skipped, so only the new symbol's history is added). Pending one-off backfill:
+   the India sector indices `NIFTYBANK`, `NIFTYIT` and `NIFTYPHARMA` (added 2026-10-05; the
+   daily 1-month window gives them only ~18 bars, so their 20-day return is empty):
+   `cd scripts && python collect_prices.py --market india --period 2y`, then commit and push `data/`.
 
 ## Local development
 ```
