@@ -136,16 +136,21 @@ FROM holdings WHERE ticker IS NULL;
 -- 13F holdings: one row per (filer, ticker, period) of common shares (options excluded; the
 -- latest original filing per period wins), with the change against the filer's previous period.
 -- Zero rows (exits) exist only for complete filings, so an incomplete filing (combination
--- report, confidential or partial table) never fakes an exit; `complete` flags its rows.
+-- report, confidential or partial table) never fakes an exit. A change where either quarter
+-- comes from an incomplete filing is action 'incomplete' (a position moved to another
+-- manager would otherwise look like a trim) and is left out of holdings_quarter's change math.
 CREATE OR REPLACE VIEW holdings_change AS
 WITH h AS (
-    SELECT DISTINCT ON (filer_cik, ticker, period) * FROM holdings
-    WHERE put_call IS NULL AND ticker IS NOT NULL ORDER BY filer_cik, ticker, period, filing_date DESC, first_seen_at
+    SELECT DISTINCT ON (filer_cik, ticker, period) * EXCLUDE (complete), coalesce(complete, true) AS complete
+    FROM holdings WHERE put_call IS NULL AND ticker IS NOT NULL
+    ORDER BY filer_cik, ticker, period, filing_date DESC, first_seen_at
 )
 SELECT filer_cik, filer_name, ticker, period, shares, value_usd, complete,
+       lag(complete) OVER hw AS prev_complete,
        lag(period) OVER hw AS prev_period, lag(shares) OVER hw AS prev_shares,
        shares - lag(shares) OVER hw AS change_shares,
        CASE WHEN lag(shares) OVER hw IS NULL THEN 'first'
+            WHEN NOT complete OR NOT lag(complete) OVER hw THEN 'incomplete'
             WHEN lag(shares) OVER hw = 0 AND shares > 0 THEN 'new'
             WHEN lag(shares) OVER hw > 0 AND shares = 0 THEN 'exit'
             WHEN shares > lag(shares) OVER hw THEN 'add'
@@ -153,14 +158,18 @@ SELECT filer_cik, filer_name, ticker, period, shares, value_usd, complete,
             ELSE 'hold' END AS action
 FROM h WINDOW hw AS (PARTITION BY filer_cik, ticker ORDER BY period);
 
--- 13F by ticker and quarter across the tracked filers. change_pct compares the filers that
--- reported both this and their previous period.
+-- 13F by ticker and quarter across the tracked filers. Holdings (filers_holding, shares,
+-- value) count every filing; change_shares, change_pct and the action counts use only filers
+-- whose filings for this and their previous period are both complete. filers_incomplete
+-- counts the filers whose filing this quarter is incomplete (e.g. combination reports).
 CREATE OR REPLACE VIEW holdings_quarter AS
 SELECT ticker, period, count(*) AS filers_reporting,
        count(*) FILTER (WHERE shares > 0) AS filers_holding,
+       count(*) FILTER (WHERE NOT complete) AS filers_incomplete,
        sum(shares) AS shares, sum(value_usd) AS value_usd,
-       sum(change_shares) AS change_shares,
-       round(sum(change_shares) / nullif(sum(prev_shares) FILTER (WHERE change_shares IS NOT NULL), 0), 4) AS change_pct,
+       sum(change_shares) FILTER (WHERE action NOT IN ('first', 'incomplete')) AS change_shares,
+       round(sum(change_shares) FILTER (WHERE action NOT IN ('first', 'incomplete'))
+             / nullif(sum(prev_shares) FILTER (WHERE action NOT IN ('first', 'incomplete')), 0), 4) AS change_pct,
        count(*) FILTER (WHERE action = 'new') AS n_new, count(*) FILTER (WHERE action = 'exit') AS n_exit,
        count(*) FILTER (WHERE action = 'add') AS n_add, count(*) FILTER (WHERE action = 'trim') AS n_trim
 FROM holdings_change GROUP BY ticker, period;

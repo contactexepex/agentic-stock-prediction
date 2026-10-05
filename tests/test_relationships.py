@@ -120,6 +120,8 @@ def setup(tmp: Path) -> tuple[Path, Path]:
         789019: submissions("MICROSOFT CORP", [("0000789019-26-000001", "8-K", d1, "msft8k.htm", "")]),
         9999200: submissions("EXAMPLE CAPITAL", [
             ("0009999200-26-000003", "13F-HR/A", d1, "xslForm13F_X02/primary_doc.xml", str(q)),  # ignored
+            # a notice for the same period, listed first: the 13F-HR must win (no fixture for it)
+            ("0009999200-26-000004", "13F-NT", d1, "xslForm13F_X02/primary_doc.xml", str(q)),
             ("0009999200-26-000002", "13F-HR", d1, "xslForm13F_X02/primary_doc.xml", str(q)),
             ("0009999200-26-000001", "13F-HR", old, "xslForm13F_X02/primary_doc.xml", str(p)),
         ]),
@@ -287,6 +289,10 @@ def test_holdings_collect_changes_and_gate(tmp_path):
     assert ex[("AAPL", None)]["shares"] == 150 and ex[("AAPL", "PUT")]["shares"] == 20
     assert ex[("MSFT", None)]["shares"] == 0 and ex[("MSFT", None)]["n_lines"] == 0   # complete: exit is explicit
     assert ex[(None, None)]["complete"] is True and ex[(None, None)]["n_lines"] == 4
+    # the 13F-HR beat the 13F-NT filed for the same period
+    assert ex[(None, None)]["accession"] == "0009999200-26-000002"
+    assert ex[(None, None)]["report_type"] == "13F HOLDINGS REPORT"
+    assert not any(x["accession"] == "0009999200-26-000004" for x in got.values())
     combo, ph, part, nt = (filer_rows(c) for c in ("9999300", "9999400", "9999500", "9999600"))
     assert set(combo) == {(None, None), ("AAPL", None), ("AAPL", "PUT")}             # no MSFT zero row
     assert combo[(None, None)]["complete"] is False and "COMBINATION" in combo[(None, None)]["note"]
@@ -338,6 +344,16 @@ def test_views_cluster_buys_and_13f_actions(tmp_path, monkeypatch):
         {**h, "id": "q1-MSFT", "filer_cik": "1", "ticker": "MSFT", "period": "2026-03-31", "filing_date": "2026-05-10", "shares": 10},
         {**h, "id": "q2-MSFT", "filer_cik": "1", "ticker": "MSFT", "period": "2026-06-30", "filing_date": "2026-08-10", "shares": 0},
         {**h, "id": "q2-MSFT-dup", "filer_cik": "1", "ticker": "MSFT", "period": "2026-06-30", "filing_date": "2026-08-01", "shares": 99},
+        # filer 2: complete Q1, combination report (incomplete) Q2 with fewer shares -> not a trim
+        {**h, "id": "c1-AAPL", "filer_cik": "2", "ticker": "AAPL", "period": "2026-03-31", "filing_date": "2026-05-10",
+         "shares": 100, "complete": True},
+        {**h, "id": "c2-AAPL", "filer_cik": "2", "ticker": "AAPL", "period": "2026-06-30", "filing_date": "2026-08-10",
+         "shares": 60, "complete": False, "report_type": "13F COMBINATION REPORT"},
+        # filer 3: complete both quarters, a real add
+        {**h, "id": "d1-AAPL", "filer_cik": "3", "ticker": "AAPL", "period": "2026-03-31", "filing_date": "2026-05-10",
+         "shares": 100, "complete": True},
+        {**h, "id": "d2-AAPL", "filer_cik": "3", "ticker": "AAPL", "period": "2026-06-30", "filing_date": "2026-08-10",
+         "shares": 110, "complete": True},
     ])
     monkeypatch.setattr(common, "ROOT", root)
     con = common.connect(MARKET)
@@ -345,8 +361,16 @@ def test_views_cluster_buys_and_13f_actions(tmp_path, monkeypatch):
                                          "FROM insider_flow").fetchall()}
     assert flow["AAPL"][1:4] == (3, True, 3000.0) and flow["MSFT"][1:] == (1, False, -45.0, 1.0)
     assert con.execute("SELECT ticker, buyers_30d FROM insider_cluster_buys").fetchall() == [("AAPL", 3)]
-    actions = dict(con.execute("SELECT ticker, action FROM holdings_change WHERE period = '2026-06-30'").fetchall())
+    actions = dict(con.execute("SELECT ticker, action FROM holdings_change "
+                               "WHERE period = '2026-06-30' AND filer_cik = '1'").fetchall())
     assert actions == {"AAPL": "new", "MSFT": "exit"}                 # latest filing per period wins
+    by_filer = dict(con.execute("SELECT filer_cik, action FROM holdings_change "
+                                "WHERE period = '2026-06-30' AND ticker = 'AAPL'").fetchall())
+    assert by_filer == {"1": "new", "2": "incomplete", "3": "add"}
+    q = con.execute("SELECT filers_holding, filers_incomplete, change_shares, change_pct, n_new, n_add, n_trim "
+                    "FROM holdings_quarter WHERE ticker = 'AAPL' AND period = '2026-06-30'").fetchone()
+    # change math from filers 1 and 3 only: (10 + 10) / (0 + 100); filer 2's -40 is not a trim
+    assert q == (3, 1, 20.0, 0.2, 1, 1, 0)
 
 
 def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:
