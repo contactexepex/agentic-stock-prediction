@@ -45,9 +45,11 @@ def test_recorded_at_is_iso_utc():
 
 
 def test_rounds_increase_per_subject():
+    """Within one review cycle the round never goes back; round 1 starts a new cycle for the
+    same subject (e.g. a later end-to-end `integration` review of new work)."""
     last: dict[str, int] = {}
     for r in entries():
-        assert r["round"] >= last.get(r["subject"], 0), f"round went back for {r['subject']}"
+        assert r["round"] == 1 or r["round"] >= last.get(r["subject"], 0), f"round went back for {r['subject']}"
         last[r["subject"]] = r["round"]
 
 
