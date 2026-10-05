@@ -40,10 +40,11 @@ def as_dates(value) -> list[date]:
     return out
 
 
-def stored_events(market: str, days: int = 400) -> list[dict]:
-    """Rows of the last `days` daily event files (for de-duplication)."""
+def stored_events(market: str) -> list[dict]:
+    """Rows of every stored event file (for de-duplication). All files, not a recent window:
+    the backfill reaches years back, so a window would let old history ids be written again."""
     rows = []
-    for f in sorted((data_dir(market) / "events").glob("**/*.jsonl"))[-days:]:
+    for f in sorted((data_dir(market) / "events").glob("**/*.jsonl")):
         rows += [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines() if line.strip()]
     return rows
 

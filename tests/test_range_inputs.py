@@ -303,6 +303,19 @@ def test_switches_per_market_and_horizon():
     assert ri.enabled(rc, "d", "india", 5) and not ri.enabled(rc, "e", "us", 1)
 
 
+def test_event_dedupe_reads_every_file(tmp_path, monkeypatch):
+    """History ids written 450 run days ago are still seen, so the backfill never repeats them."""
+    base = tmp_path / "data" / MARKET
+    for i in range(450):
+        d = date(2025, 1, 1) + timedelta(days=i)
+        jsonl(base / "events" / f"{d:%Y}" / f"{d:%m}" / f"{d}.jsonl",
+              [{"id": f"AAPL-ex_dividend-{d}", "date": str(d), "type": "ex_dividend", "ticker": "AAPL",
+                "source": "yfinance_history", "amount": 0.25}])
+    monkeypatch.setattr(ce, "data_dir", lambda market: tmp_path / "data" / market)
+    ids = {r["id"] for r in ce.stored_events(MARKET)}
+    assert len(ids) == 450 and "AAPL-ex_dividend-2025-01-01" in ids
+
+
 def test_backtest_scores_inputs(tmp_path):
     root, cfg = setup(tmp_path)
     mfile = cfg / "markets" / f"{MARKET}.yaml"
