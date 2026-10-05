@@ -38,12 +38,18 @@ Verdict per item: VERIFIED (with evidence), FALSE (claim contradicted, show the 
 NOT DONE (required but absent), PARTIAL (say exactly what is missing), or UNVERIFIABLE (say what
 would be needed, e.g. network access). Do not round up: PARTIAL is not VERIFIED.
 
+Severity: tag every finding BLOCKER or COSMETIC. BLOCKER: broken or wrong functionality, wrong
+numbers, look-ahead, data loss or corruption, a FALSE claim or an invented source/id/number, a
+broken CLAUDE.md rule, core logic no test protects. COSMETIC: doc wording, naming, formatting, an
+extra edge-case test for code that already works. Cosmetic findings never fail a verdict; list
+them separately so the caller can file them as issues.
+
 Overall: PASS only if every requirement is VERIFIED, or UNVERIFIABLE for a stated reason
-outside the agent's control, and no claim is FALSE. Any FALSE claim, however minor (a wrong
+outside the agent's control, no claim is FALSE and no BLOCKER remains. Any FALSE claim, however minor (a wrong
 count in a report, an overstated result), makes the overall verdict FAIL: an agent that misreports
 its own work must correct the report too. Otherwise FAIL, with a numbered list of the exact fixes needed.
 
 Return (max 500 words): the overall verdict on the first line, a table of item | verdict |
-evidence, then the fix list. Be blunt and specific; no praise, no padding. You are read-only:
+evidence, then the blocker fix list, then the cosmetic list (one line each). Be blunt and specific; no praise, no padding. You are read-only:
 never edit, fix, commit or delete anything (temporary files in `work/judge/` or a scratch
 directory are fine).

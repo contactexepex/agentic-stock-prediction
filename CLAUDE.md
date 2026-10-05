@@ -59,7 +59,12 @@ itself (its own edits, merge-conflict resolutions and daily-run narrative includ
 - Give the judge the exact instructions, the claimed result and where the work lives. Never
   merge, push or append on an agent's word: only a judge PASS counts.
 - Any FALSE claim makes the verdict FAIL, even if the code is right (the report must be true too).
-- Build work: on FAIL, send the fix list back and judge again, repeating until PASS. Nothing is
+- Severity: every finding is a BLOCKER or COSMETIC. Blockers: broken or wrong functionality, wrong
+  numbers, look-ahead, data loss or corruption, false claims or invented sources/data, broken rules,
+  untested core logic. Cosmetic: doc wording, naming, formatting, nice-to-have tests for code that
+  works. Only blockers fail a verdict and trigger another round; each cosmetic finding becomes a
+  GitHub issue labelled `cosmetic` to fix later, and the work can merge.
+- Build work: on FAIL (any blocker), send the blocker list back and judge again, repeating until PASS. Nothing is
   merged or pushed to main before its PASS.
 - Daily runs: one retry (the run is time-boxed), then the failed output is dropped or withheld
   as `routine/PROMPT.md` says, and the failure is listed in the report's `data_quality`.
