@@ -42,10 +42,22 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `reports/<market>/<session_date>.md` the daily report linked from Slack; charts in
   `reports/<market>/charts/<session_date>/`; `config/settings.yaml` holds the repo URL and Slack channel
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
+- `judgments/log.jsonl` every judge verdict on build work (append-only)
 - `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
   graph-builder (monthly connection map; every edge cites a public source), and judge
   (independent verifier; every agent's output is judged before it is appended, committed or posted)
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
+
+## Judging every change
+Every change is reviewed by the `judge` subagent before it is merged, pushed to main, appended to
+`data/` or posted, whoever made it: a subagent, a build agent, or the orchestrating session
+itself (its own edits, merge-conflict resolutions and daily-run narrative included).
+- Give the judge the exact instructions, the claimed result and where the work lives. Never
+  merge or push on an agent's word; only a judge PASS (or failures listed openly) counts.
+- On FAIL, send the fix list back to the author and judge again. Repeat until PASS.
+- Record every verdict, PASS or FAIL, as one appended line in `judgments/log.jsonl` (subject,
+  work, commit, round, verdict, summary). The log is append-only like `data/`.
+- The daily routine's judge steps are in `routine/PROMPT.md`.
 
 ## Data rules
 1. Files under `data/` are append-only. Never edit, reorder or delete existing lines or files.
