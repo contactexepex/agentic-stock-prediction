@@ -26,6 +26,12 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/ranges.yaml`, off by default) and `graph.py` (connection map in `data/<market>/graph/`:
   `status`, `edges`, `hits` = second-order news, `add` = validate and append the graph-builder's edges,
   `attempt` = record the monthly refresh in `data/<market>/graph_runs/`)
+- Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
+  `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
+  `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.
+  Views `insider_flow`, `insider_cluster_buys`, `activist_stakes`, `holdings_filings`, `holdings_change` and
+  `holdings_quarter` feed the context pack's "Smart money" section and a range risk note
+  (`scripts/smart_money.py`; the widen `activist_13d_factor` in `config/ranges.yaml` stays off).
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

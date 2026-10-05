@@ -33,3 +33,9 @@ relation_widen:
   pledge_invoked: 0.15
   insider_sale: 0.05
   max: 0.20
+
+# Smart-money risk flag (scripts/smart_money.py): an original Schedule 13D (activist stake)
+# filed within activist_13d_days before as_of adds a note to the ticker's ranges. The factor
+# widens sigma only when > 1.0 (e.g. 1.05 = +5%); keep 1.0 until the weekly review shows value.
+activist_13d_days: 30
+activist_13d_factor: 1.0

@@ -88,3 +88,61 @@ news:
 filings: sec
 filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
 filing_lookback_days: 7
+
+# Relationships (docs/DESIGN.md phase 5) from SEC EDGAR: collect_insiders.py (Form 4),
+# collect_stakes.py (Schedule 13D/13G) and collect_holdings.py (13F).
+relationships:
+  insiders: {lookback_days: 7, forms: ["4", "4/A"]}
+  stakes: {lookback_days: 7, forms: ["SCHEDULE 13D", "SCHEDULE 13D/A", "SCHEDULE 13G", "SCHEDULE 13G/A"]}
+  holdings:
+    quarters: 2          # quarters loaded the first time a filer is seen
+    filers:              # 13F filers tracked, by SEC CIK (index giants, long-only, macro, activists)
+      1067983: Berkshire Hathaway
+      # The Vanguard Group (102909) files only a 13F-NT since Q1 2026, naming 10 Vanguard
+      # managers that report instead. Tracked: the five largest by Q2 2026 table value
+      # (~99% of it). Not tracked: Vanguard Investments Australia, Vanguard Advisers, Vanguard
+      # Personalized Indexing, Vanguard National Trust, Vanguard Marketing (~$80 bn together).
+      # Each counts as a separate filer in the 13F views.
+      2100119: Vanguard Capital Management
+      2100121: Vanguard Portfolio Management
+      933478: Vanguard Fiduciary Trust
+      1811242: Vanguard Global Advisers
+      1680208: Vanguard Asset Management
+      2012383: BlackRock
+      93751: State Street
+      315066: FMR (Fidelity)
+      1214717: Geode Capital
+      80255: T. Rowe Price Associates
+      1422848: Capital Research Global Investors
+      1374170: Norges Bank
+      1350694: Bridgewater Associates
+      1167483: Tiger Global
+      1656456: Appaloosa
+      2026053: Pershing Square Inc.   # Pershing Square Capital Mgmt (1336528) files a 13F-NT pointing here since Q2 2026
+      1040273: Third Point
+      1791786: Elliott Investment Management
+      1029160: Soros Fund Management
+      1345471: Trian Fund Management
+      1517137: Starboard Value
+      1418814: ValueAct
+    cusips:              # 13F tables identify securities by CUSIP (common stock / class A)
+      JPM: "46625H100"
+      BAC: "060505104"
+      NVDA: "67066G104"
+      AAPL: "037833100"
+      GOOGL: "02079K305"
+      META: "30303M102"
+      PGR: "743315103"
+      ALL: "020002101"
+      DAL: "247361702"
+      UAL: "910047109"
+      XOM: "30231G102"
+      CVX: "166764100"
+      LLY: "532457108"
+      MRK: "58933Y105"
+      TSLA: "88160R101"
+      GM: "37045V100"
+      WMT: "931142103"
+      COST: "22160K105"
+      CAT: "149123101"
+      DE: "244199105"

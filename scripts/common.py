@@ -107,6 +107,35 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
     }),
 }
 
+# Relationships (docs/DESIGN.md phase 5), US from SEC EDGAR: one row per Form 4 transaction
+# line (insiders), per Schedule 13D/13G filing (stakes), per 13F filing x watchlist ticker (holdings).
+SCHEMAS.update({
+    "insiders": ("jsonl", {
+        "id": "VARCHAR", "accession": "VARCHAR", "line": "INTEGER", "ticker": "VARCHAR",
+        "issuer_cik": "VARCHAR", "form": "VARCHAR", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ",
+        "insider_name": "VARCHAR", "insider_cik": "VARCHAR", "role": "VARCHAR",
+        "is_director": "BOOLEAN", "is_officer": "BOOLEAN", "is_ten_pct_owner": "BOOLEAN",
+        "derivative": "BOOLEAN", "security": "VARCHAR", "transaction_date": "DATE", "code": "VARCHAR",
+        "acquired_disposed": "VARCHAR", "shares": "DOUBLE", "price": "DOUBLE", "value": "DOUBLE",
+        "shares_after": "DOUBLE", "ownership": "VARCHAR", "plan_10b5_1": "BOOLEAN",
+        "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "stakes": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "issuer_cik": "VARCHAR", "form": "VARCHAR",
+        "kind": "VARCHAR", "amendment": "BOOLEAN", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ",
+        "event_date": "DATE", "filer_name": "VARCHAR", "filer_cik": "VARCHAR",
+        "reporting_persons": "VARCHAR[]", "percent": "DOUBLE", "shares": "DOUBLE",
+        "purpose": "VARCHAR", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "holdings": ("jsonl", {
+        "id": "VARCHAR", "accession": "VARCHAR", "filer_cik": "VARCHAR", "filer_name": "VARCHAR",
+        "period": "DATE", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ", "ticker": "VARCHAR",
+        "cusip": "VARCHAR", "issuer_name": "VARCHAR", "shares": "DOUBLE", "value_usd": "DOUBLE",
+        "put_call": "VARCHAR", "n_lines": "INTEGER", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        "report_type": "VARCHAR", "complete": "BOOLEAN", "note": "VARCHAR",
+    }),
+})
+
 # Relationships (DESIGN.md phase 5): India insider/promoter trades (SEBI PIT), bulk and block
 # deals, shareholding incl. promoter pledges (collect_relations_india.py), and the per-company
 # connection map for both markets (graph-builder agent, graph.py). Merged as a column union so a

@@ -9,6 +9,7 @@ from datetime import timedelta
 import events as ev
 import graph
 import relations
+import smart_money as sm
 from common import connect, market_arg, md_table, require_market, utc_today
 from features import local_today
 
@@ -123,6 +124,7 @@ def main() -> None:
     # Relationships (phase 5): India insider trades, deals, pledges and flags; connections (both markets).
     for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con)]:
         print(f"## {title}\n\n{body}")
+    print(sm.markdown(cfg, con))
 
 
 if __name__ == "__main__":

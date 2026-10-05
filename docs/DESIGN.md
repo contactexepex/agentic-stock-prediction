@@ -128,6 +128,9 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
      each monthly attempt recorded in `graph_runs/` so an empty run is not repeated daily;
      retractions are new rows). `graph.py hits` finds second-order news for the context pack
      and the news-analyst.
+   **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 23
+   tracked filers (`collect_insiders|stakes|holdings.py`), smart-money views and context
+   section, and a fresh-13D note on ranges (widen gated in `config/ranges.yaml`, off).
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 

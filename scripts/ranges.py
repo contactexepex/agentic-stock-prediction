@@ -20,6 +20,7 @@ import pandas as pd
 import events as ev
 import rangelib as rl
 import relations
+import smart_money as sm
 from common import (append_jsonl, connect, day_file, load_ranges_config, market_arg, require_market,
                     utc_now)
 from features import load_bars
@@ -64,6 +65,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     earnings = {t: d for t, k, d in company if k == "earnings"}
     rwiden = relations.widen_by_ticker(cfg, rc, con)   # {} unless relation_widen.enabled
+    smart = sm.range_flags(con, as_of, rc)   # risk flags (fresh activist 13D); widen off by default
     now, rows = now or utc_now(), []
     made = datetime.fromisoformat(now)
     first = target_date(cfg, as_of, 1)
@@ -101,6 +103,9 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
             if t in rwiden:
                 sigma_h *= 1 + rwiden[t][0]
                 notes.append(rwiden[t][1])
+            sm_factor, sm_notes = smart.get(t, (1.0, []))
+            sigma_h *= sm_factor
+            notes += sm_notes
             # centre: overnight cue + AI drift, capped
             center = 0.0
             cue = f.get("cue_change_pct")
