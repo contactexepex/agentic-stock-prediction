@@ -12,7 +12,15 @@ dates with `timing` (before_open / during / after_close) from yfinance's earning
 for SEC markets with SEC_USER_AGENT set, 8-K item 2.02 (results) acceptance times; for NSE
 markets (`relations.source: nse`) from NSE results filings (see nse_earnings), polled only for
 tickers that are due (see nse_due). Tickers whose SEC submissions or NSE requests fail are
-listed in the summary (`sec_failed`, `nse_failed`)."""
+listed in the summary (`sec_failed`, `nse_failed`; a failed SEC step as a whole in `sec_error`).
+
+yfinance hides most request errors behind empty answers, so `failed` lists the Yahoo gaps (with
+`what`): `calendar` (an error or an empty calendar), `dividends` (an error, or no dividends
+although some are stored for the ticker or its calendar lists an ex-dividend date in the backfill
+window) and `earnings_history` (both yfinance methods raised). The earnings-calendar page
+(finance.yahoo.com) is tried first; if it fails (e.g. a network that refuses the host) the
+screener fallback (query1) supplies the dates. `earnings_history_sources` counts which method was
+used."""
 from __future__ import annotations
 
 import json
@@ -76,24 +84,28 @@ def timing(cfg: dict, ts) -> tuple[date, str | None]:
     return d, "before_open" if t < open_ else ("after_close" if t >= close else "during")
 
 
-def yf_earnings(cfg: dict, tk, limit: int = 40) -> tuple[list[tuple[date, str | None, int]], str | None]:
-    """Past earnings (date, timing, priority) from yfinance: the earnings-calendar page, else the
-    screener endpoint. Report rows beat earnings-call rows (a call only times the release if
-    it is before the open)."""
-    df, used = None, None
+def yf_earnings(cfg: dict, tk, limit: int = 40) -> tuple[list[tuple[date, str | None, int]], str | None, list[str]]:
+    """Past earnings (date, timing, priority) from yfinance: the earnings-calendar page
+    (finance.yahoo.com), else the screener endpoint (query1). Report rows beat earnings-call rows
+    (a call only times the release if it is before the open). The third value lists each
+    method's error ("<method>: <error>") when every method tried raised, so nothing was learnt;
+    a method that answers with no rows is a real "no earnings dates", not an error."""
+    df, used, errors, answered = None, None, [], False
     for fn in ("get_earnings_dates", "_get_earnings_dates_using_screener"):
         f = getattr(tk, fn, None)
         if f is None:
             continue
         try:
             df = f(limit=limit)
-        except Exception:
+            answered = True
+        except Exception as exc:
             df = None
+            errors.append(f"{fn.strip('_')}: {str(exc)[:120]}")
         if df is not None and not df.empty:
             used = fn.strip("_")
             break
     if df is None or df.empty:
-        return [], None
+        return [], None, ([] if answered else errors)
     kinds = df["Event Type"] if "Event Type" in df.columns else pd.Series("Earnings", index=df.index)
     out = []
     for ts, kind in zip(df.index, kinds):
@@ -104,7 +116,16 @@ def yf_earnings(cfg: dict, tk, limit: int = 40) -> tuple[list[tuple[date, str | 
             out.append((d, tm if tm == "before_open" else None, 2))
         else:
             out.append((d, tm, 1))
-    return out, used
+    return out, used, []
+
+
+def dividends_expected(cal: dict | None, n_stored: int, since: date) -> str | None:
+    """Why this ticker should have dividends in the backfill window (some are stored for it, or
+    Yahoo's calendar lists an ex-dividend date inside the window), or None."""
+    if n_stored:
+        return f"{n_stored} stored"
+    listed = [d for d in as_dates((cal or {}).get("Ex-Dividend Date")) if d >= since]
+    return f"calendar lists ex-dividend {max(listed)}" if listed else None
 
 
 def sec_earnings(cfg: dict, tickers: dict,
@@ -297,11 +318,14 @@ def main() -> int:
     seen = {r["id"] for r in stored}
     hist_earn: dict[str, list[date]] = {}
     nse_dates: dict[str, list[date]] = {}
+    n_divs: dict[str, int] = {}
     for r in stored:
         if r.get("type") == "earnings" and str(r.get("source", "")).endswith("_history"):
             hist_earn.setdefault(r["ticker"], []).append(date.fromisoformat(str(r["date"])[:10]))
             if r.get("source") == "nse_history":
                 nse_dates.setdefault(r["ticker"], []).append(date.fromisoformat(str(r["date"])[:10]))
+        if r.get("type") == "ex_dividend":
+            n_divs[r["ticker"]] = n_divs.get(r["ticker"], 0) + 1
 
     sec: dict[str, list] = {}
     sec_error, sec_failed = None, []
@@ -343,14 +367,20 @@ def main() -> int:
         tk = yf.Ticker(meta["yahoo"])
         try:
             cal = tk.calendar or {}
+            if not cal:   # yfinance answers a failed request with {}; a listed stock has an earnings entry
+                failed.append({"ticker": key, "what": "calendar", "error": "empty calendar"})
         except Exception as exc:
-            failed.append({"ticker": key, "error": str(exc)[:200]})
+            failed.append({"ticker": key, "what": "calendar", "error": str(exc)[:200]})
             cal = None
-        try:
+        try:   # yfinance answers a failed price-history request with an empty series
             divs = tk.dividends
             divs = {ts.date(): round(float(a), 6) for ts, a in divs.items()} if divs is not None else {}
-        except Exception:
+            why = None if divs else dividends_expected(cal, n_divs.get(key, 0), since)
+            if why:
+                failed.append({"ticker": key, "what": "dividends", "error": f"no dividends returned ({why})"})
+        except Exception as exc:
             divs = {}
+            failed.append({"ticker": key, "what": "dividends", "error": str(exc)[:200]})
         last_div = divs[max(divs)] if divs else None
 
         # upcoming events (calendar), with the dividend amount
@@ -375,9 +405,11 @@ def main() -> int:
                 hist["ex_dividend"] += 1
 
         # past earnings days, timed where the source has a time
-        yfe, used = yf_earnings(cfg, tk)
+        yfe, used, yf_errors = yf_earnings(cfg, tk)
         if used:
             earn_sources[used] = earn_sources.get(used, 0) + 1
+        if yf_errors:
+            failed.append({"ticker": key, "what": "earnings_history", "error": "; ".join(yf_errors)})
         # a yfinance date between two NSE results dates a quarter apart is either the same report
         # or not a results release (no quarter is missing there)
         known_nse = nse_dates.get(key, []) + [d for d, _, _ in nse.get(key, [])]
@@ -397,7 +429,9 @@ def main() -> int:
                       "new_history": hist, "earnings_history_sources": earn_sources,
                       "sec_tickers": len(sec), "sec_error": sec_error, "sec_failed": sec_failed, **nse_info,
                       "failed": failed}, indent=2))
-    return 1 if failed and len(failed) == len(cfg["tickers"]) else 0
+    # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
+    no_calendar = {f["ticker"] for f in failed if f["what"] == "calendar"}
+    return 1 if no_calendar and len(no_calendar) == len(cfg["tickers"]) else 0
 
 
 if __name__ == "__main__":

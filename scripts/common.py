@@ -18,6 +18,9 @@ import yaml
 CODE = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("MB_ROOT", CODE))
 CONFIG = Path(os.environ.get("MB_CONFIG", CODE / "config"))
+# Yahoo collectors report a series as stale when its newest data is older than this many calendar
+# days (cues and factors on other exchanges; the market's own symbols use its previous session).
+STALE_DAYS = 7
 
 # Indicator columns written by features.py (formulas in indicators.py).
 FEATURE_COLS: dict[str, str] = {

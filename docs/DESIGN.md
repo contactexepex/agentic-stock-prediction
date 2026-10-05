@@ -23,7 +23,13 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Late runs (`market_status.py` `late_run`: started after the session's close): no calls;
-  `ranges.py` skips ranges whose target session has closed and ignores cues quoted after it.
+  `ranges.py` skips ranges whose target session has closed, labels the others late (never
+  scored) and ignores cues quoted after that session's open.
+- Mid-session runs (`in_session`: started after the session's open, before its close): no calls
+  and no 1-day ranges; 5-day ranges are published for the record, noted late, never scored (the
+  day is partly known, and every horizon covers it). Any range or call made at or after the open
+  of the first session it covers is never scored, and cues and option snapshots quoted after
+  that open are ignored for every horizon (an intraday quote is not an overnight cue).
 - US macro data at 08:30 ET (CPI, jobs): on those days the brief states "call made before release".
 - Priority: India (where capital is) first, US as a small trial. Paper only for weeks 1-6.
 
@@ -193,6 +199,24 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   and confirm the provisional 2027 FOMC dates (a six-meeting schedule has been proposed).
   exchange_calendars covers XNYS only to one year after the run date (2027-10-05 when checked
   on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
+- Yahoo hosts, checked 2026-10-05 (~19:00-19:16 UTC) through a Claude Code session's egress
+  proxy (US and India `collect_prices|quotes|events|options` into a scratch root, every HTTP
+  request counted by host). Only `finance.yahoo.com` was refused then (403 to CONNECT, also with
+  curl); it serves only yfinance's earnings-calendar page, which `collect_events.py` tries first:
+  all 20 tickers per market fell back to the screener on `query1.finance.yahoo.com` and got their
+  earnings dates (`earnings_history_sources`). `finance.yahoo.com` was allowlisted later that day:
+  on the rerun of `collect_events.py` (20:06 UTC, both markets) it answered HTTP 200 20 times per
+  market, the earnings page served all 20 tickers (`earnings_history_sources:
+  {get_earnings_dates: 20}`) and `failed` stayed empty. No Yahoo host the routine uses is refused
+  now. Prices, quotes and options used only `query1`/`query2`
+  plus `fc.yahoo.com` for the cookie (fresh cache). `consent.yahoo.com` and `guce.yahoo.com` were
+  not refused (HTTP 404 at the root) and not contacted. All data came back, but one run silently
+  lost BAC's dividend history (yfinance printed "possibly delisted; no price data found"; a rerun
+  returned 162 dividends): yfinance hides request errors behind empty frames, tuples and dicts.
+  The Yahoo collectors therefore list in `failed` an empty or stale price frame (stale: older
+  than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
+  a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
+  and earnings dates when every method raised.
 - Issue #9, done 2026-10-05 (no new network access needed):
   - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the
     close of the third Friday of March, June, September and December (the triple-witching day),
@@ -222,7 +246,8 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   - Yahoo web pages: `finance.yahoo.com`. yfinance worked without it on 2026-10-05 (daily bars,
     fund holdings and an option chain were fetched); its API hosts query1.finance.yahoo.com and
     query2.finance.yahoo.com, and consent.yahoo.com and fc.yahoo.com, all accepted a connection,
-    so only `finance.yahoo.com` needs adding.
+    so only `finance.yahoo.com` needs adding. (Allowlisted later on 2026-10-05: see the Yahoo
+    hosts note above.)
   - Index providers, to read rebalance notices directly: `www.spglobal.com` (S&P methodology and
     announcements), `www.niftyindices.com`. NSE's own nsearchives.nseindia.com (reachable) holds
     the Nifty methodology.

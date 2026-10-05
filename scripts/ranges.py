@@ -8,9 +8,13 @@ today's predictions (AI direction/confidence and optional `range_widen`). Switch
 ex-dividend shift, beta split of the overnight cue, and option-implied volatility (US; when
 switched off its horizon sigma is still recorded as the shadow value `iv_sigma_h`).
 Appends to data/<market>/ranges/; ids <as_of_date>-<ticker>-<h>d are written once.
-Late-run guard: a range whose target session had already closed at made_at is not published;
-other ranges note when the first target session had already closed, and an overnight cue (or
-option snapshot) quoted after that close is ignored (it would carry that session's outcome)."""
+Late and mid-session guard: once the first target session has opened at made_at (a manual run
+after the open, or a late run after the close), part of every horizon's outcome is public. The
+1-day range (its target is that session) is not published; a range whose target session had
+already closed is not published either; the other ranges are published for the record, noted
+"late" (scoring and the report treat them as late, never scored). For every horizon an overnight
+cue or option snapshot quoted after that open is ignored (an intraday quote is not an overnight
+cue, it carries part of the session's outcome)."""
 from __future__ import annotations
 
 import json
@@ -36,6 +40,10 @@ def target_date(cfg: dict, as_of, h: int):
 
 def first_target_close(cfg: dict, as_of):
     return ev.session_close_utc(cfg, target_date(cfg, as_of, 1))
+
+
+def first_target_open(cfg: dict, as_of):
+    return ev.session_open_utc(cfg, target_date(cfg, as_of, 1))
 
 
 def cue_times(con, feats: pd.DataFrame) -> dict:
@@ -73,7 +81,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     smart = sm.range_flags(con, as_of, rc, now)   # fresh activist 13D accepted by made_at; widen off by default
     made = datetime.fromisoformat(now)
     first = target_date(cfg, as_of, 1)
-    first_close = first_target_close(cfg, as_of)
+    first_open, first_close = first_target_open(cfg, as_of), first_target_close(cfg, as_of)
     cue_ts = cue_times(con, feats)
     # range inputs (range_inputs.py); switched per market and horizon in config/ranges.yaml
     mk = cfg["market"]
@@ -82,6 +90,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     sig = {t: rl.ewma_sigma(bars[t]["close"], rc["ewma_lambda"]) for t in cfg["tickers"] if t in bars}
     moves = {t: ri.past_moves(cfg, bars[t]["close"], sig[t], earn_ev.get(t, []), rc["warmup_bars"])
              for t in cfg["tickers"] if t in bars} if ri.enabled(rc, "earnings_history", mk) else {}
+    # a cue or option snapshot quoted after the first target session's open carries part of the
+    # outcome of every horizon (each covers that session): it is ignored
     index_cue, index_cue_note = None, None
     if ri.enabled(rc, "beta_split", mk) and (cfg.get("index_cue") or {}).get("symbol"):
         sym = cfg["index_cue"]["symbol"]
@@ -91,15 +101,15 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
                         "ORDER BY collected_at DESC LIMIT 1", [sym, at, at]).fetchone()
         cue_beta = ri.index_cue_beta(cfg, bars, rc, pd.Timestamp(as_of))
         if q and q[0] is not None and cue_beta is not None:
-            if pd.Timestamp(q[1]).to_pydatetime() > first_close:
-                index_cue_note = f"index cue ignored: {sym} quoted after {first} close"
+            if pd.Timestamp(q[1]).to_pydatetime() > first_open:
+                index_cue_note = f"index cue ignored: {sym} quoted after {first} open"
             else:
                 index_cue = cue_beta * math.log1p(float(q[0]))
     opts = pd.DataFrame()
     if cfg.get("options") and "implied_vol" in rc:   # applied if switched on, else a shadow value
         opts = con.execute("SELECT * FROM options_latest WHERE day >= ? AND collected_at <= ?",
                            [made.date() - timedelta(days=int(rc["implied_vol"]["max_age_days"])),
-                            min(made, first_close)]).df()
+                            min(made, first_open)]).df()
         if not opts.empty:
             opts["expiry"] = opts["expiry"].map(lambda d: pd.Timestamp(d).date())
             opts = opts.sort_values("day").drop_duplicates(["ticker", "expiry"], keep="last")
@@ -108,6 +118,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
         tgt = target_date(cfg, as_of, h)
         if made >= ev.session_close_utc(cfg, tgt):
             continue  # late run: the target session already closed, its outcome is public
+        if tgt == first and made >= first_open:
+            continue  # mid-session run: the 1-day target session has opened, its outcome is partly public
         mevents = ev.market_events(cfg, as_of + timedelta(days=1), tgt)
         major = [e for e in mevents if e["major"]]
         if h in cal.index:
@@ -156,6 +168,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
             iv_formula = width(True)[0] if iv is not None else None
             if made >= first_close:
                 notes.append(f"late: {first} closed before made_at")
+            elif made >= first_open:
+                notes.append(f"late: {first} opened before made_at")
             if t in rwiden:
                 sigma_h *= 1 + rwiden[t][0]
                 notes.append(rwiden[t][1])
@@ -166,8 +180,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
             center = 0.0
             cue = f.get("cue_change_pct")
             own = math.log1p(float(cue)) if cue is not None and not pd.isna(cue) else None
-            if own is not None and cue_ts.get(t) is not None and cue_ts[t] > first_close:
-                notes.append(f"cue ignored: quoted after {first} close")
+            if own is not None and cue_ts.get(t) is not None and cue_ts[t] > first_open:
+                notes.append(f"cue ignored: quoted after {first} open")
                 own = None
             beta = ri.clip_beta(f.get("beta_1y"), rc)
             if use["beta_split"] and index_cue_note:
@@ -233,9 +247,11 @@ def main() -> int:
     if rows:
         append_jsonl(day_file(cfg["market"], "ranges", pd.Timestamp(rows[0]["as_of_date"]).date()), rows)
     as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
-    late = datetime.fromisoformat(now) >= first_target_close(cfg, as_of)
+    made = datetime.fromisoformat(now)
+    late = made >= first_target_close(cfg, as_of)
+    in_session = first_target_open(cfg, as_of) <= made and not late   # no 1-day ranges; 5-day ones late
     print(json.dumps({"step": "ranges", "market": cfg["market"], "written": len(rows), "late": late,
-                      "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
+                      "in_session": in_session, "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
     return 0
 
 

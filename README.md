@@ -54,8 +54,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    in the network settings. (Routines created in the claude.ai UI can use the Slack connector instead.)
 2. **Cloud environment** (claude.ai/code → environment settings):
    - Network access: **Custom**, tick "Also include default list of common package managers", and allow:
-     `query1.finance.yahoo.com`, `query2.finance.yahoo.com`, `fc.yahoo.com`, `guce.yahoo.com`,
-     `finance.yahoo.com`, `consent.yahoo.com` (yfinance's cookie fallback when `fc.yahoo.com` fails),
+     `query1.finance.yahoo.com`, `query2.finance.yahoo.com` (all Yahoo data), `fc.yahoo.com` (cookie),
+     `guce.yahoo.com`, `consent.yahoo.com` (yfinance's cookie fallback when `fc.yahoo.com` fails),
+     `finance.yahoo.com` (only the earnings-calendar page `collect_events.py` reads first, with
+     dates, times and EPS; if it fails the query1 screener supplies the dates, see
+     docs/DESIGN.md section 11),
      `news.google.com`, `www.sec.gov`, `data.sec.gov`, `feeds.bbci.co.uk`,
      `economictimes.indiatimes.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
      (Moneycontrol and CNBC come in through Google News queries, so their own domains are not needed.)

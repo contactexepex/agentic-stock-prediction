@@ -296,7 +296,8 @@ def test_ranges_apply_inputs(tmp_path):
 
 def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
     """A run after the first target session's close: the 1d range is not published, and an index
-    cue or option snapshot taken after that close is not used (it would carry that session)."""
+    cue or option snapshot taken after that close (so after its open) is not used (it would carry
+    that session)."""
     root, cfg = setup(tmp_path)
     mfile = cfg / "markets" / f"{MARKET}.yaml"
     mfile.write_text(mfile.read_text() + "\noptions: yfinance\nindex_cue: {symbol: BENCH, beta: 1.0}\n")
@@ -336,7 +337,7 @@ def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
     assert not any(x["horizon_days"] == 1 for x in rows.values())      # target session closed
     for t in ("AAPL", "MSFT"):
         x = rows[f"{as_of}-{t}-5d"]
-        assert f"index cue ignored: BENCH quoted after {first} close" in x["notes"]
+        assert f"index cue ignored: BENCH quoted after {first} open" in x["notes"]   # cut at the open
         assert "beta_split" not in x["inputs"] and x["center"] == 0
         assert "implied_vol" not in x["inputs"] and x["iv_sigma_h"] is None
         assert f"late: {first} closed before made_at" in x["notes"]
@@ -613,7 +614,9 @@ def test_collect_events_summary_lists_sec_failures(tmp_path, monkeypatch, capsys
     cfg = {"market": "testsecev", "name": "Test", "calendar": "XNYS", "timezone": "America/New_York",
            "filings": "sec", "tickers": {"AAPL": {"yahoo": "AAPL", "name": "Apple"},
                                          "NVDA": {"yahoo": "NVDA", "name": "NVIDIA"}}}
-    s = run_events_main(monkeypatch, capsys, tmp_path, cfg, {}, date(2026, 10, 5))
+    # Yahoo answers with a calendar (an empty one for every ticker is a failed run, exit 1: issue 5)
+    yf_data = {t: {"calendar": {"Earnings Date": [date(2026, 10, 29)]}} for t in ("AAPL", "NVDA")}
+    s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))
     assert s["sec_tickers"] == 1 and s["sec_error"] is None
     assert [(f["ticker"], f["cik"]) for f in s["sec_failed"]] == [("NVDA", 1045810)]
     assert "nse_polled" not in s and s["new_history"]["earnings"] == 1

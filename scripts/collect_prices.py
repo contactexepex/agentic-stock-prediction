@@ -3,16 +3,42 @@
 for a market's tickers and market-level symbols (benchmark, vol index, cues, factors) into
 data/<market>/prices/YYYY/MM/<trading-date>.csv. One file per trading date; a bar is written
 once. Today's bar (UTC) is skipped because it may be incomplete.
-First run: --period 2y (needed for 1-year beta and the range backtest)."""
+First run: --period 2y (needed for 1-year beta and the range backtest).
+A symbol is listed in `failed` when Yahoo returns nothing, no completed bar, or only stale bars:
+the newest completed bar is older than the market's previous session (its stocks, benchmark, vol
+index and sector indices) or than STALE_DAYS calendar days (cues and factors on other exchanges).
+Stale bars are still stored; the entry says how old the newest one is."""
 from __future__ import annotations
 
 import csv
 import json
 import sys
+from datetime import date, timedelta
 
-from common import day_file, market_arg, require_market, utc_now, utc_today
+import events as ev
+from common import STALE_DAYS, day_file, market_arg, require_market, utc_now, utc_today
 
 FIELDS = ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume", "collected_at"]
+OWN_EXCHANGE = ("benchmark", "vol_index", "sector_etf")   # roles that follow the market's calendar
+
+
+def expected_bar(cfg: dict, key: str, today: date) -> date:
+    """Oldest acceptable newest bar for a symbol on a run on UTC date `today`."""
+    if key in cfg["tickers"] or cfg["symbols"].get(key, {}).get("role") in OWN_EXCHANGE:
+        return ev.prev_session(cfg, today, include=False)
+    return today - timedelta(days=STALE_DAYS)
+
+
+def frame_error(cfg: dict, key: str, df, today: date) -> str | None:
+    """Why a yfinance daily frame is no usable update (no data, no completed bar, stale), or None."""
+    if df is None or df.empty:
+        return "no data"
+    done = [idx.date() for idx, row in df.iterrows()
+            if idx.date() < today and not row.isna()[["Open", "High", "Low", "Close"]].any()]
+    if not done:
+        return "no completed bar"
+    newest, expected = max(done), expected_bar(cfg, key, today)
+    return f"stale: newest bar {newest}, expected {expected} or later" if newest < expected else None
 
 
 def main() -> int:
@@ -34,9 +60,11 @@ def main() -> int:
         except Exception as exc:  # network or symbol errors must not stop other symbols
             failed.append({"ticker": key, "yahoo": symbol, "error": str(exc)[:200]})
             continue
-        if df is None or df.empty:
-            failed.append({"ticker": key, "yahoo": symbol, "error": "no data"})
-            continue
+        error = frame_error(cfg, key, df, today)
+        if error:
+            failed.append({"ticker": key, "yahoo": symbol, "error": error})
+            if not error.startswith("stale"):
+                continue
         for idx, row in df.iterrows():
             d = idx.date()
             if d >= today or row.isna()[["Open", "High", "Low", "Close"]].any():

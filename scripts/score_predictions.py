@@ -2,9 +2,10 @@
 """Score open predictions and open price ranges whose horizon has passed. Horizons count
 trading days (price bars). Prediction base = last close on or before as_of_date; a range is
 scored on its target_date close. Writes outcome records; never edits predictions or ranges.
-Late records are never scored: a range or call made at or after the close of the first session
-after its as_of_date already knew part of its outcome (CLAUDE.md: nothing after made_at), so it
-stays out of the track record and is counted under `late_skipped`."""
+Late records are never scored: a range or call made at or after the open of the first session
+after its as_of_date (a mid-session or late run) already knew part of its outcome (CLAUDE.md:
+nothing after made_at), whatever its horizon, so it stays out of the track record and is counted
+under `late_skipped`."""
 from __future__ import annotations
 
 import json
@@ -20,12 +21,13 @@ from common import append_jsonl, connect, day_file, market_arg, require_market, 
 
 
 def is_late(cfg: dict, as_of, made_at) -> bool:
-    """True when made_at is at or after the close of the first session after as_of."""
+    """True when made_at is at or after the open of the first session after as_of (every
+    horizon covers that session, so from its open part of the outcome is public)."""
     if made_at is None or (not isinstance(made_at, str) and pd.isna(made_at)):
         return False
     d = as_of if isinstance(as_of, date) and not isinstance(as_of, datetime) else pd.Timestamp(as_of).date()
     first = ev.sessions_ahead(cfg, d + timedelta(days=1), 1)[-1]
-    return pd.Timestamp(made_at).to_pydatetime() >= ev.session_close_utc(cfg, first)
+    return pd.Timestamp(made_at).to_pydatetime() >= ev.session_open_utc(cfg, first)
 
 SQL = """
 WITH base AS (
