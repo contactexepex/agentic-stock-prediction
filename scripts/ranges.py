@@ -86,7 +86,10 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     # range inputs (range_inputs.py); switched per market and horizon in config/ranges.yaml
     mk = cfg["market"]
     evdf = ri.load_events(con)
-    earn_ev, divs = ri.earnings_events(evdf), ri.dividend_events(evdf)
+    # SEC 2.02 filings that are not results releases are dropped using the 10-Q/10-K reports
+    # accepted by made_at's local date (a replay with --now never uses a later one)
+    known_by = pd.Timestamp(made).tz_convert(cfg["timezone"]).date()
+    earn_ev, divs = ri.earnings_events(evdf, as_of=known_by), ri.dividend_events(evdf)
     sig = {t: rl.ewma_sigma(bars[t]["close"], rc["ewma_lambda"]) for t in cfg["tickers"] if t in bars}
     moves = {t: ri.past_moves(cfg, bars[t]["close"], sig[t], earn_ev.get(t, []), rc["warmup_bars"])
              for t in cfg["tickers"] if t in bars} if ri.enabled(rc, "earnings_history", mk) else {}

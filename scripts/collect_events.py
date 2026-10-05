@@ -9,9 +9,16 @@ Upcoming events come from the yfinance calendar; an ex-dividend row carries the 
 Unless --no-history, past events are backfilled for the range engine (source ending in
 "_history", read through the `event_history` view): dividends with amounts, and earnings
 dates with `timing` (before_open / during / after_close) from yfinance's earnings dates and,
-for SEC markets with SEC_USER_AGENT set, 8-K item 2.02 (results) acceptance times; for NSE
-markets (`relations.source: nse`) from NSE results filings (see nse_earnings), polled only for
-tickers that are due (see nse_due). Tickers whose SEC submissions or NSE requests fail are
+for SEC markets with SEC_USER_AGENT set, 8-K item 2.02 (results of operations) acceptance times;
+for SEC markets each 10-Q/10-K acceptance is also stored, as a `periodic_report` row with its
+`period_end`. Not every 2.02 is a quarter's results release (Tesla's quarterly delivery reports,
+pre-announcements, guidance updates): every 2.02 is stored as it was filed, and
+range_inputs.results_filter keeps one release per quarter when the dates are read, using only
+the reports accepted by the as-of date (so the walk-forward backtest never looks ahead); a
+past yfinance date within 45 days of a release that a 10-Q/10-K confirms loses to it (new report
+rows are counted as `sec_reports` in the summary). NSE markets (`relations.source: nse`) take
+earnings dates from NSE results filings (see nse_earnings), polled only for tickers that are due
+(see nse_due). Tickers whose SEC submissions or NSE requests fail are
 listed in the summary (`sec_failed`, `nse_failed`; a failed SEC step as a whole in `sec_error`).
 
 yfinance hides most request errors behind empty answers, so `failed` lists the Yahoo gaps (with
@@ -42,6 +49,7 @@ RESULTS_ANNOUNCEMENTS = ("Outcome of Board Meeting", "Financial Result Updates",
 RELEASE_WINDOW = timedelta(hours=36)  # such an announcement this long before the first XBRL filing = its release
 NSE_STALE_DAYS = 100  # poll a ticker with NSE results again when its newest past earnings date is this old
 QUARTER_GAP_DAYS = 120  # consecutive quarterly results are at most this far apart (45/60-day deadlines)
+REPORT_FORMS = ("10-Q", "10-K")  # periodic reports (not amendments) that date each quarter's results release
 
 
 def as_dates(value) -> list[date]:
@@ -128,9 +136,13 @@ def dividends_expected(cal: dict | None, n_stored: int, since: date) -> str | No
     return f"calendar lists ex-dividend {max(listed)}" if listed else None
 
 
-def sec_earnings(cfg: dict, tickers: dict,
-                 ua: str) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
-    """Past results releases from SEC EDGAR: 8-K filings with item 2.02, timed by acceptance.
+def sec_earnings(cfg: dict, tickers: dict, ua: str, reports: dict | None = None
+                 ) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
+    """Item 2.02 filings from SEC EDGAR: 8-K/6-K filings with item 2.02 (results of operations),
+    timed by acceptance. Not every one is a quarter's results release (Tesla's delivery reports,
+    pre-announcements, guidance updates also use 2.02): range_inputs.results_filter keeps one per
+    quarter when the dates are read, using the 10-Q/10-K reports. Given a dict, `reports`
+    receives those per ticker: (acceptance date, timing, form, period end).
     Returns (rows per ticker, tickers whose submissions request failed)."""
     from sec import Edgar  # shared SEC client: one throttle, backoff on 429/503, test fixtures
 
@@ -147,11 +159,19 @@ def sec_earnings(cfg: dict, tickers: dict,
         except Exception as exc:
             failed.append({"ticker": key, "cik": cik, "error": str(exc)[:200]})
             continue
-        items = recent.get("items") or [""] * len(recent["form"])
+        n = len(recent["form"])
+        items = recent.get("items") or [""] * n
+        period = recent.get("reportDate") or [None] * n
         for i, form in enumerate(recent["form"]):
-            if form in ("8-K", "6-K") and "2.02" in (items[i] or "") and recent["acceptanceDateTime"][i]:
+            if not recent["acceptanceDateTime"][i]:
+                continue
+            if form in ("8-K", "6-K") and "2.02" in (items[i] or ""):
                 d, tm = timing(cfg, pd.Timestamp(recent["acceptanceDateTime"][i]))
                 out.setdefault(key, []).append((d, tm, 0))
+            elif form in REPORT_FORMS and reports is not None:
+                d, tm = timing(cfg, pd.Timestamp(recent["acceptanceDateTime"][i]))
+                pe = date.fromisoformat(period[i][:10]) if period[i] else None
+                reports.setdefault(key, []).append((d, tm, form, pe))
     return out, failed
 
 
@@ -328,11 +348,12 @@ def main() -> int:
             n_divs[r["ticker"]] = n_divs.get(r["ticker"], 0) + 1
 
     sec: dict[str, list] = {}
+    sec_reports: dict[str, list] = {}
     sec_error, sec_failed = None, []
     ua = os.environ.get("SEC_USER_AGENT")
     if not args.no_history and cfg.get("filings") == "sec" and ua:
         try:
-            sec, sec_failed = sec_earnings(cfg, cfg["tickers"], ua)
+            sec, sec_failed = sec_earnings(cfg, cfg["tickers"], ua, sec_reports)
         except Exception as exc:
             sec_error = str(exc)[:200]
 
@@ -352,16 +373,26 @@ def main() -> int:
     rows, failed, hist = [], [], {"earnings": 0, "ex_dividend": 0}
     earn_sources: dict[str, int] = {}
 
-    def add(key, meta, etype, d, source, amount=None, tm=None, note=""):
+    def add(key, meta, etype, d, source, amount=None, tm=None, note="", extra=None):
         eid = f"{key}-{etype}-{d}"
         if eid in seen:
             return False
-        name = "earnings" if etype == "earnings" else "ex-dividend"
+        name = {"earnings": "earnings", "ex_dividend": "ex-dividend"}.get(etype, etype.replace("_", " "))
         rows.append({"id": eid, "date": d.isoformat(), "type": etype, "ticker": key,
                      "name": f"{meta['name']} {name}{note}", "source": source, "first_seen_at": now,
-                     "amount": amount, "timing": tm})
+                     "amount": amount, "timing": tm, **(extra or {})})
         seen.add(eid)
         return True
+
+    # SEC 10-Q/10-K acceptances with their period end: range_inputs.results_filter picks each
+    # quarter's results release among the 2.02 rows by them. Same window as the 2.02 rows.
+    n_reports = 0
+    for key, reps in sec_reports.items():
+        for d, tm, form, pe in sorted(reps, key=lambda x: x[0]):
+            if since <= d < today and add(key, cfg["tickers"][key], "periodic_report", d, "sec_history", tm=tm,
+                                          note=f" ({form}, period {pe})",
+                                          extra={"period_end": pe.isoformat() if pe else None}):
+                n_reports += 1
 
     for key, meta in cfg["tickers"].items():
         tk = yf.Ticker(meta["yahoo"])
@@ -425,9 +456,9 @@ def main() -> int:
                 hist_earn.setdefault(key, []).append(d)
 
     written = append_jsonl(day_file(market, "events", today), rows)
-    print(json.dumps({"collector": "events", "market": market, "new_events": written - sum(hist.values()),
+    print(json.dumps({"collector": "events", "market": market, "new_events": written - sum(hist.values()) - n_reports,
                       "new_history": hist, "earnings_history_sources": earn_sources,
-                      "sec_tickers": len(sec), "sec_error": sec_error, "sec_failed": sec_failed, **nse_info,
+                      "sec_tickers": len(sec), "sec_reports": n_reports, "sec_error": sec_error, "sec_failed": sec_failed, **nse_info,
                       "failed": failed}, indent=2))
     # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
     no_calendar = {f["ticker"] for f in failed if f["what"] == "calendar"}

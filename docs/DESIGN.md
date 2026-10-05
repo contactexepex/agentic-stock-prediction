@@ -266,6 +266,28 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   session with a fitted beta), and US option-implied vol (`collect_options.py`) in the width
   blend and as the implied earnings move. The range notes and the `inputs` column say which
   applied, so the weekly review can score each one live.
+  US earnings dates from SEC (2026-10-05): item 2.02 is not only the results release. Tesla files
+  its quarterly deliveries under it (about the 2nd of Jan/Apr/Jul/Oct), Allstate its catastrophe-loss
+  pre-announcements (to April 2024); Chevron an impairment (2024-01-02) and quarter guidance
+  (2026-04-09), Lilly a guidance update (2025-01-14), United a debt redemption (2025-07-09),
+  Caterpillar a director appointment (2024-10-11). A fresh backfill held 23 pairs of US earnings
+  dates under 45 days apart among 283. `collect_events.py` now also stores each 10-Q/10-K
+  acceptance (`periodic_report` rows with `period_end`), and
+  `range_inputs.results_filter` keeps, per report, the latest 2.02 after its period end and up to a
+  day after its acceptance; other 2.02s are not earnings. A 2.02 whose 10-Q is not filed yet still
+  counts, unless a year of releases is confirmed and it comes before the next period end or sooner
+  after it than 0.75 x the shortest confirmed lag (a delivery report two days after the quarter end
+  vs results 18+ days after). Only reports accepted by the as-of date are used: `ranges.py` uses
+  those accepted by made_at's date, `backtest.py` the ones accepted by each day d
+  (`earnings_versions`). Stored rows are never removed; the filter applies when the dates are read.
+  Where yfinance and SEC disagree, SEC wins: of the 210 past yfinance report dates between each
+  ticker's first and last confirmed SEC release, 208 are within 3 days of one; the two others are PGR 2023-10-31 (the 10-Q day;
+  +1.9% that day vs +8.1% on the 2023-10-13 release) and COST 2024-06-06 (the day after the 10-Q;
+  the press release is dated 2024-05-30), so a past yfinance date within 45 days of a confirmed
+  release is dropped. Result: 260 dates, no pair under 45 days. Backtest to 2026-10-02 (250
+  sessions), past moves vs the fixed x3: 1d 20.73 -> 20.20 (n 85) before, 20.90 -> 20.53 (n 80)
+  after, still improves (on); 5d 23.85 -> 24.03 (n 424) before, 23.90 -> 24.17 (n 400) after,
+  still worse (off).
 - Backtest of the inputs. **Rule** (section 7, one window): an input is on for a market and
   horizon only if `backtest.py` over the stated 250 sessions (to 2026-10-02 US, 2026-10-01
   India) lowers the 80% interval score (in % of price, scored only where the input applies) by
