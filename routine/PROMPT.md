@@ -117,6 +117,13 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     `config/ranges.yaml` changes are for a human to decide: never edit config in the routine.
     report.py links the review in the report and adds one Slack line on the day it is written.
 
+10b. Neo4j copy (optional, never blocks the run): `python scripts/neo4j_sync.py`. It only reads
+    `data/` and sends today's new and corrected records to Neo4j (a rebuildable copy; the repo
+    stays the source of truth). Exit 2 (`NEO4J_URI` not set): add the line "Neo4j sync skipped:
+    NEO4J_URI not set" to the report's `data_quality`. Exit 1 (server unreachable or a kind
+    failed): carry on, and add one `data_quality` line naming the failed kinds and the `error` from
+    its JSON summary (never the URI or password). Do not retry and never run `--full` in the routine.
+
 11. Charts and report: `python scripts/charts.py`, then `python scripts/report.py`. This writes
     `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
     `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
@@ -151,6 +158,12 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     `git diff --cached --quiet || git commit -m "<market> connection map TODAY"`.
     It runs after the brief so it never delays it; new edges feed the "Connections" section
     from the next run.
+
+15. Neo4j catch-up (final step, optional, non-blocking): `python scripts/neo4j_sync.py` again, so
+    the verdicts and connection-map edges appended after step 10b reach Neo4j today. Whatever it
+    returns, the run is finished: the report is already posted, so a failure here is not added to
+    it. Each kind's watermark advances only after it synced, so the next run's step 10b re-sends
+    anything this step missed and lists any failure in that run's `data_quality`.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.

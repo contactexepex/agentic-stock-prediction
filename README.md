@@ -32,8 +32,12 @@ Research only. Nothing here is investment advice, and the routines never trade.
     past ranges hit/miss, today's range cone with the call) plus an overview grid; the report
     and the Slack draft carry every number from the scripts, the agents add only narrative.
 11. **Save** to this repo (append-only data) and **notify** Slack with one message per market.
+12. **Neo4j copy** (optional, `neo4j_sync.py`): the same data and results as a graph (companies,
+    holders, news, events, trades, holdings, connections, predictions, ranges, outcomes) for
+    analysis. The repo stays the source of truth; `--full` rebuilds the graph from it.
 
 Storage is date-partitioned files under `data/<market>/`, queried with DuckDB. See `sql/views.sql`.
+The graph model and example Cypher queries are in [`docs/DESIGN.md`](docs/DESIGN.md) section 12.
 
 ## Coverage
 `config/markets/india.yaml` and `config/markets/us.yaml`: 10 sectors x 2 companies each, plus
@@ -63,6 +67,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
      `economictimes.indiatimes.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
      (Moneycontrol and CNBC come in through Google News queries, so their own domains are not needed.)
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
+   - Optional, Neo4j copy: `NEO4J_URI` (`neo4j+s://<id>.databases.neo4j.io`), `NEO4J_USER`,
+     `NEO4J_PASSWORD` (and `NEO4J_DATABASE` only if it is not the `<id>` in the host, as on Aura),
+     and allow the host `<id>.databases.neo4j.io` in the network settings. The sync uses the HTTPS
+     Query API (port 443), not Bolt. Check with `cd scripts && python neo4j_sync.py --market us --probe`,
+     load everything once with `--full`; the routine then syncs incrementally.
    - Setup script: `bash setup.sh`
 3. **Routines** (claude.ai/code/routines → New routine), one per market, both on this repo and environment:
    - **India**: prompt = `routine/PROMPT.md` with `MARKET=india`; schedule weekdays 08:10 Asia/Kolkata.

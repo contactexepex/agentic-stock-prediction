@@ -329,3 +329,150 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   same centre) so the weekly review can score it against `sigma_h` before switching it on.
   With every input off, `ranges.py` output equals the code before these inputs except the new
   `inputs` and `iv_sigma_h` fields (checked on the stored data of both markets).
+
+## 12. Neo4j projection (graph copy for analysis)
+All data and results are also loaded into a Neo4j database for graph questions (who is connected to
+whom, who traded before what, which evidence led to good calls). **The repo stays the source of
+truth**: `data/` is append-only and `scripts/neo4j_sync.py` only reads it (through the DuckDB views
+of `common.connect`). Neo4j is a derived copy; `--full` deletes one market's nodes and rebuilds them
+from the repo, so emptying or losing the database loses nothing.
+
+**Connection.** Environment variables `NEO4J_URI` (`neo4j+s://<id>.databases.neo4j.io`; only the
+host is used), `NEO4J_USER`, `NEO4J_PASSWORD`, optional `NEO4J_DATABASE`. Bolt is not reachable
+through the cloud session's HTTPS proxy, so statements go to the HTTPS Query API v2: `POST
+https://<host>/db/<database>/query/v2` with basic auth and `{statement, parameters}`. On Aura the
+database is named after the instance id, not `neo4j` (`/db/neo4j/...` answers 404
+`DatabaseNotFound`), so the default database is the first label of the host
+(`<id>.databases.neo4j.io` -> `<id>`); `NEO4J_DATABASE` overrides it, and a localhost or IP host
+defaults to `neo4j`. The host must be allowed in the environment's network settings. The password
+and URI are never printed; the summary shows the host only.
+
+**Model.** Every node id is prefixed with the market (`us:AAPL`, `india:<news id>`), so the two
+markets never share a node and `--full` for one market cannot touch the other.
+
+| Node | Key (`id`) | From |
+|---|---|---|
+| `Market` | `<market>` | config |
+| `Sector` | `<market>:<sector>` | config (`sector_etf` property) |
+| `Company` | `<market>:<ticker>` | config (`watchlist: true`); tickers seen only in data or as a graph target get `watchlist: false` |
+| `Holder` (+ `Person` when known) | `<market>:cik:<cik>` (SEC filers and insiders), else `<market>:name:<slug>`; `<market>:promoters:<ticker>` for an India promoter group | insiders, deal clients, 13D/13G and 13F filers, graph targets that are not tickers |
+| `Source` + `NewsItem` / `Filing` / `Announcement` | `<market>:<record id>` | news (+ latest `news_enriched`), SEC filings, NSE announcements (+ latest enrichment). A `Source` with `placeholder: true` is evidence a prediction cites that is not (yet) in the data |
+| `Event` | `<market>:<event id>` | events, first copy per id (as `event_history`); `current` = the latest known date per (ticker, type) (as `company_events`); market-wide events are always current |
+| `Prediction` | `<market>:<prediction id>` | predictions (first copy per id) |
+| `Range` | `<market>:<range id>` | `ranges_latest` |
+| `Outcome` | `<market>:call:<prediction id>` / `<market>:range:<range id>` (`kind` call or range) | outcomes / range_outcomes, first score per id (as `range_record`) |
+| `RegimeDay` | `<market>:<as_of_date>` | `regime_latest` |
+| `FeatureDay` | `<market>:<ticker>:<as_of_date>` | `features_latest` (close and every indicator) |
+| `Judgment` | `<market>:<judgment id>` | daily-run judge verdicts |
+| `FinancialPeriod` | `<market>:<ticker>:sec:<period_end>` (US) / `<market>:<ticker>:<basis>:<start>:<end>` (India) | `fundamentals_metrics` / `financials_latest` |
+| `FlowDay` | `<market>:<date>:<category>` | `flows_daily` (FII/DII) |
+| `SyncState` | `<market>:<kind>` | written by the sync: the incremental watermark per kind |
+
+| Relationship | Meaning and main properties |
+|---|---|
+| `(Company)-[:LISTED_ON]->(Market)`, `(Company)-[:IN_SECTOR]->(Sector)-[:IN_MARKET]->(Market)` | config |
+| `(NewsItem)-[:MENTIONS]->(Company)` | one per ticker tag: `day`, `sentiment`, `relevance`, `materiality`, `event_type`, `novelty`, `analyzed_at`, `prompt_version` (latest analysis wins) |
+| `(Company)-[:FILED]->(Filing or Announcement)` | SEC filings, NSE announcements |
+| `(Company or Market)-[:HAS_EVENT]->(Event)` | earnings, ex-dividend (`amount`), index and macro events |
+| `(Holder)-[:TRADED {id}]->(Company)` | `via` insider / bulk / block; `side` buy or sell (Form 4 code P/S, SEBI PIT transaction, deal side), `trade_date`, `shares`, `price`, `value`, `role`, `code`, `plan_10b5_1`, `disclosed_at` |
+| `(Holder)-[:HOLDS {id}]->(Company)` | `via` 13F (`period`, `shares`, `value_usd`, `action`, `change_shares`, `complete`, from `holdings_change`), 13D / 13G (`percent`, `shares`, `filing_date`, `purpose`), shareholding (India promoter group: `period`, `promoter_pct`, `pledged_pct_of_promoter`, q/q changes, from `pledge_changes`) |
+| `(Company)-[:CONNECTED_TO {id}]->(Company or Holder)` | graph edges: `relation`, `detail`, `weight`, `as_of`, `source_url`, `aliases`, `prompt_version`; a retracted edge (`status: removed`) is deleted |
+| `(Prediction)-[:PREDICTS]->(Company)` | `direction`, `confidence`, `horizon_days`, `as_of_date` |
+| `(Prediction)-[:CITES]->(Source)` | one per `evidence_ids` entry |
+| `(Prediction)-[:HAS_RANGE]->(Range)`, `(Range)-[:RANGE_FOR]->(Company)` | the published range for the call (same id) |
+| `(Prediction or Range)-[:SCORED_AS]->(Outcome)` | `hit`, or `hit50` / `hit80` |
+| `(Market)-[:HAS_REGIME]->(RegimeDay)`, `(Company)-[:HAS_FEATURES]->(FeatureDay)`, `(Company)-[:REPORTED]->(FinancialPeriod)`, `(Market)-[:HAS_JUDGMENT]->(Judgment)`, `(Market)-[:HAS_FLOW]->(FlowDay)` | time-indexed results |
+
+**Provenance.** Every node and relationship carries `market`, `source_kind` (the data kind, e.g.
+`news`, `insiders`, `holdings_13f`), `source_id` (the `id` in the JSONL line; for the derived US
+fundamentals metrics the view key, and for an India shareholding quarter the ids of the rows it
+combines), `recorded_at` (the record's own timestamp: `first_seen_at`, `analyzed_at`, `made_at`,
+`scored_at`, `computed_at`, `added_at` or `recorded_at`) and `synced_at`. Record nodes also keep
+`record_id` and all fields of the record. Dates and timestamps are Neo4j `DATE` / `DATETIME`
+values. Not projected (time series or bookkeeping that stay in DuckDB): prices and quotes (each
+`FeatureDay` carries the close), options, calibration, delivery, reviews (nested JSON; the review
+report is in `reports/`) and graph_runs.
+
+**Writes.** Statements are static Cypher; all values are parameters (`UNWIND $rows AS row`),
+batched 500 rows per request. Every write is a `MERGE` on an id (nodes) or on the two end nodes
+plus an id (`TRADED`, `HOLDS`, `CONNECTED_TO`), followed by `SET`, so re-running the same rows
+changes nothing. Uniqueness constraints on `id` for every label and indexes (ticker, market, event
+date, relationship ids) are created with `IF NOT EXISTS` on the first sync and skipped afterwards
+(a `SyncState {id: '_schema'}` node holds the schema version).
+
+**Corrections** follow the DuckDB views: a newer `news_enriched` row for the same id overwrites the
+sentiment on the `NewsItem` and its `MENTIONS`; a recomputed regime or feature row replaces the
+day's values; a retracted graph edge deletes the relationship; a moved earnings date makes the old
+`Event` `current: false`; a newer 13F filing for the same period or a revised India result updates
+the relationship or node in place.
+
+**Incremental mode** (default). Each kind reads the rows whose `recorded_at` is at or after its
+watermark minus 3 days (re-upserting the overlap is harmless) and, only after every batch of that
+kind succeeded, stores the newest `recorded_at` as the watermark in Neo4j (`SyncState`), so it
+survives the routine's fresh container. Kinds derived from history (13F changes, India
+shareholding changes, US fundamentals metrics, the events `current` flag) are re-sent in full each
+run. A failed kind keeps its old watermark, so the next run re-sends it. Rows appended later with a
+`recorded_at` more than 3 days before the watermark (e.g. a manual backfill) need `--full`.
+`--since <ISO time>` overrides every watermark; `--kinds a,b` limits the run.
+
+**Output.** One JSON summary: per kind `rows_read`, `upserted`, `failed` (and `since`,
+`watermark`, `error`), plus Neo4j's counters. Exit 0 = all synced, 1 = any failure, 2 =
+`NEO4J_URI` not set. `--dry-run` sends nothing: it writes every statement with its parameters to
+`work/neo4j_dryrun/<market>/NNNN-<kind>-....json`. `--probe` runs `RETURN 1`. In the routine the
+sync is optional and never blocks the brief (`routine/PROMPT.md` steps 10b and 15).
+
+**Status (2026-10-05).** Built and tested offline (`tests/test_neo4j_sync.py`: a fake Query API
+server; an optional test runs the same data through a real Neo4j 5 server when
+`NEO4J_TEST_QUERY_URL` points to a disposable one). A read-only probe (`--probe`, `RETURN 1`)
+against the user's Aura instance returned `[[1]]`. No live sync has been run yet: the first one,
+`python scripts/neo4j_sync.py --market <m> --full`, waits for the judge's PASS on this code.
+
+**Example queries** (Neo4j Browser or the Query API; replace the market and dates):
+
+1. Watchlist companies connected to a stock that had negative news on a day (second-order exposure):
+   ```cypher
+   MATCH (n:NewsItem)-[m:MENTIONS]->(hit:Company)
+   WHERE n.market = 'us' AND m.day = date('2026-10-05') AND m.sentiment <= -0.3
+   MATCH (hit)-[e:CONNECTED_TO]-(other:Company)
+   WHERE other.watchlist AND NOT (n)-[:MENTIONS]->(other)
+   RETURN other.ticker AS exposed, hit.ticker AS via, e.relation AS relation, e.source_url AS edge_source,
+          n.title AS headline, m.sentiment AS sentiment
+   ORDER BY sentiment, exposed
+   ```
+2. Insider sales in the 30 days before an earnings date (current dates and past earnings days):
+   ```cypher
+   MATCH (h:Holder)-[t:TRADED {via: 'insider', side: 'sell'}]->(c:Company)-[:HAS_EVENT]->(e:Event {type: 'earnings'})
+   WHERE c.market = 'us' AND (e.current OR e.source ENDS WITH '_history')
+     AND t.trade_date < e.date AND t.trade_date >= e.date - duration({days: 30})
+   RETURN c.ticker AS ticker, h.name AS insider, t.role AS role, t.trade_date AS sold_on, t.value AS value,
+          e.date AS earnings_date, duration.inDays(t.trade_date, e.date).days AS days_before
+   ORDER BY days_before
+   ```
+3. Call accuracy by the type of evidence cited:
+   ```cypher
+   MATCH (p:Prediction)-[:SCORED_AS]->(o:Outcome {kind: 'call'}) WHERE p.market = 'us'
+   MATCH (p)-[:CITES]->(s:Source)
+   WITH DISTINCT p, o, CASE WHEN s:NewsItem THEN 'news: ' + coalesce(s.event_type, 'not analysed')
+                            WHEN s:Filing THEN 'filing: ' + coalesce(s.form, '?')
+                            WHEN s:Announcement THEN 'announcement' ELSE 'not synced' END AS evidence
+   RETURN evidence, count(p) AS calls, round(avg(CASE WHEN o.hit THEN 1.0 ELSE 0.0 END), 3) AS hit_rate,
+          round(avg(p.confidence), 3) AS avg_confidence
+   ORDER BY calls DESC, evidence
+   ```
+4. Range coverage by regime and horizon:
+   ```cypher
+   MATCH (r:Range)-[:SCORED_AS]->(o:Outcome {kind: 'range'}) WHERE r.market = 'india'
+   RETURN r.regime AS regime, r.horizon_days AS horizon, count(*) AS n,
+          round(avg(CASE WHEN o.hit50 THEN 1.0 ELSE 0.0 END), 3) AS cover50,
+          round(avg(CASE WHEN o.hit80 THEN 1.0 ELSE 0.0 END), 3) AS cover80
+   ORDER BY regime, horizon
+   ```
+5. Who holds or traded each company, traced back to the JSONL record:
+   ```cypher
+   MATCH (h:Holder)-[x:HOLDS|TRADED]->(c:Company) WHERE c.market = 'us'
+   RETURN c.ticker AS ticker, type(x) AS link, x.via AS via, h.name AS holder,
+          x.source_kind AS kind, x.source_id AS record_id, x.recorded_at AS recorded_at
+   ORDER BY ticker, link, holder
+   ```
+   `kind` names the data kind (`holdings_13f` and `shareholding` read `data/<market>/holdings/`) and
+   `record_id` the line's `id`.

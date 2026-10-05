@@ -52,6 +52,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   "Fundamentals" section (`scripts/fundamentals.py`; no consensus estimates, so no "surprise").
   These views show today's knowledge (restatements replace originals); for anything as of a past
   time use the macros `fundamentals_latest_asof|quarterly_asof|metrics_asof(<timestamp>)`
+- Neo4j projection (DESIGN.md section 12): `neo4j_sync.py` copies each market's data and results
+  (companies, sectors, news with sentiment, filings, events, insider trades, deals, stakes and
+  holdings, the connection map, predictions, ranges, outcomes, regime, features, judgments,
+  fundamentals, flows) into Neo4j through the HTTPS Query API v2 (`NEO4J_URI`, `NEO4J_USER`,
+  `NEO4J_PASSWORD`; database = first host label unless `NEO4J_DATABASE`). It only reads `data/`
+  through DuckDB; Neo4j is a derived copy that `--full` rebuilds from the repo. Idempotent MERGE
+  batches, incremental by per-kind watermarks stored in Neo4j, `--dry-run` writes the statements to
+  `work/neo4j_dryrun/`. Optional and non-blocking in the routine.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
