@@ -1,0 +1,8 @@
+Synthetic NSE responses for tests/test_relations.py. They are hand-written, not saved from
+NSE: field names and shapes follow public open-source NSE scrapers (corporates-pit,
+historicalOR/bulk-block-short-deals, snapshot-capital-market-largedeal,
+corporate-share-holdings-master, corporate-pledgedata) and have NOT yet been checked against a
+live NSE response, because NSE was not reachable from the build environment. People, funds and
+numbers are invented test values. __Dn__ is replaced by the test with the date n days ago
+(dd-Mon-YYYY). Replace or extend these with real responses once www.nseindia.com is allowed.
+collect_relations_india.py --replay refuses to write replayed rows into the repo's own data/.

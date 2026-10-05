@@ -123,6 +123,7 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
      review shows flagged tickers miss more often.
    - **Connection map, both markets (built):** edges in `data/<market>/graph/` written monthly by
      the graph-builder agent through `graph.py add` (validated, each citing a source URL;
+     each monthly attempt recorded in `graph_runs/` so an empty run is not repeated daily;
      retractions are new rows). `graph.py hits` finds second-order news for the context pack
      and the news-analyst.
 

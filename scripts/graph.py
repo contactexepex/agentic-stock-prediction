@@ -10,7 +10,11 @@ and status "removed" retracts it (view graph_edges).
   graph.py status            JSON: edge counts, tickers without edges, refresh_due
   graph.py edges [--ticker]  Markdown table of current edges
   graph.py hits [--days N]   second-order news: articles about a linked entity, not the ticker
-  graph.py add FILE          validate a JSONL file of edges and append new or changed ones"""
+  graph.py add FILE          validate a JSONL file of edges and append new or changed ones
+  graph.py attempt [--note]  record a refresh attempt in data/<market>/graph_runs/ (run after
+                             every graph-builder run, even one that added nothing)
+A refresh is due when no attempt has been recorded in the current UTC month, so a run that
+finds nothing to add is not repeated until the next month."""
 from __future__ import annotations
 
 import json
@@ -131,16 +135,27 @@ def _same(a, b) -> bool:
 def status(cfg: dict, con) -> dict:
     edges = load_edges(con)
     last = con.execute("SELECT max(added_at) FROM graph").fetchone()[0]
-    today = utc_today()
+    last_run = con.execute("SELECT max(run_at) FROM graph_runs").fetchone()[0]
+    month = f"{utc_today():%Y-%m}"
     by_rel: dict[str, int] = {}
     for e in edges:
         by_rel[e["relation"]] = by_rel.get(e["relation"], 0) + 1
     covered = {e["ticker"] for e in edges}
-    # Due when the map is empty or was last refreshed in an earlier calendar month (UTC).
-    due = last is None or (last.year, last.month) < (today.year, today.month)
+    # Due until a refresh attempt is recorded for the current UTC month (edges or not).
+    attempted = con.execute("SELECT count(*) FROM graph_runs WHERE month = ?", [month]).fetchone()[0] > 0
     return {"market": cfg["market"], "edges": len(edges), "by_relation": by_rel,
             "tickers_without_edges": [t for t in cfg["tickers"] if t not in covered],
-            "last_added_at": last.isoformat() if last else None, "refresh_due": due}
+            "last_added_at": last.isoformat() if last else None,
+            "last_attempt_at": last_run.isoformat() if last_run else None, "refresh_due": not attempted}
+
+
+def attempt(cfg: dict, con, note: str | None = None) -> dict:
+    """Append one refresh-attempt record (current edge count) to data/<market>/graph_runs/."""
+    st, now = status(cfg, con), utc_now()
+    row = {"id": f"{cfg['market']}-graph-run-{now}", "run_at": now, "month": f"{utc_today():%Y-%m}",
+           "edges": st["edges"], "tickers_without_edges": len(st["tickers_without_edges"]), "note": note}
+    append_jsonl(day_file(cfg["market"], "graph_runs", utc_today()), [row])
+    return {"step": "graph_attempt", **row}
 
 
 def name_patterns(edges: list[dict]) -> list[tuple[dict, re.Pattern]]:
@@ -193,7 +208,7 @@ def context_section(cfg: dict, con, days: int = 1, limit: int = 40) -> tuple[str
     if not st["edges"]:
         return title, "_no connection map yet (graph-builder runs monthly)_\n"
     rows = hits(cfg, con, days)
-    head = (f"Map: {st['edges']} edges, last refreshed {str(st['last_added_at'])[:10]}"
+    head = (f"Map: {st['edges']} edges, last changed {str(st['last_added_at'])[:10]}"
             f"{', refresh due' if st['refresh_due'] else ''}.\n\n")
     if not rows:
         return title, head + "_none_\n"
@@ -209,7 +224,8 @@ def context_section(cfg: dict, con, days: int = 1, limit: int = 40) -> tuple[str
 
 def main() -> int:
     ap = market_arg(__doc__)
-    ap.add_argument("command", choices=["status", "edges", "hits", "add"])
+    ap.add_argument("command", choices=["status", "edges", "hits", "add", "attempt"])
+    ap.add_argument("--note", help="short note for `attempt`, e.g. tickers that could not be sourced")
     ap.add_argument("file", nargs="?", type=Path, help="JSONL edges for `add`")
     ap.add_argument("--ticker")
     ap.add_argument("--days", type=int, default=1)
@@ -223,6 +239,8 @@ def main() -> int:
                           "source_url FROM graph_edges" + (" WHERE ticker = ?" if args.ticker else "") +
                           " ORDER BY ticker, relation, target", [args.ticker] if args.ticker else [])
         print(md_table(cur))
+    elif args.command == "attempt":
+        print(json.dumps(attempt(cfg, con, args.note), indent=2))
     elif args.command == "hits":
         print(json.dumps({"market": cfg["market"], "days": args.days, "hits": hits(cfg, con, args.days)},
                          indent=2, default=str))

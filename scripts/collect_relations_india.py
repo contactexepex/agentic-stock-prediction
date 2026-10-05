@@ -8,8 +8,12 @@ summary; a source that fails gets a "failed" entry naming the host to allowlist.
 only if every source failed. Needs `relations.source: nse` in the market config.
 
 NSE serves these only to browser-like clients: the session first loads the home page for its
-cookies, then calls /api/... with a Referer. `--replay DIR` reads saved responses instead of
-the network (tests and debugging): <endpoint>[_<symbol or optionType>].json and <name>.csv."""
+cookies, then calls /api/... with a Referer. Field names follow public open-source NSE scrapers
+and are not yet checked against a live NSE response (NSE was not reachable when this was built).
+`--replay DIR` reads responses from local files instead of the network, named
+<endpoint>[_<symbol or optionType>].json and <name>.csv. The files in tests/fixtures/nse are
+synthetic (hand-written to match those field names), so replay refuses to write into the
+repo's own data/: point MB_ROOT at a scratch directory."""
 from __future__ import annotations
 
 import csv
@@ -26,7 +30,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
+from common import (CODE, ROOT, append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now,
+                    utc_today)
 
 IST = ZoneInfo("Asia/Kolkata")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -294,22 +299,17 @@ def nse_symbols(cfg: dict) -> dict[str, str]:
     return {meta.get("nse", meta["yahoo"].removesuffix(".NS")).upper(): t for t, meta in cfg["tickers"].items()}
 
 
-def main() -> int:
-    ap = market_arg(__doc__)
-    ap.add_argument("--replay", type=Path, help="read saved NSE responses from this directory")
-    ap.add_argument("--only", choices=["insiders", "deals", "holdings"], action="append",
-                    help="collect only these kinds (repeatable)")
-    args = ap.parse_args()
-    cfg = require_market(args)
+def replay_root_ok() -> bool:
+    """Replayed rows are synthetic: allow them only into a data root outside this repo's data/."""
+    repo_data = (CODE / "data").resolve()
+    target = (ROOT / "data").resolve()
+    return target != repo_data and repo_data not in target.parents
+
+
+def collect(cfg: dict, nse: Nse, kinds: list[str]) -> dict:
+    """Fetch, de-duplicate and append each kind; return the JSON summary."""
     market, rel = cfg["market"], cfg.get("relations") or {}
-    if rel.get("source") != "nse":
-        print(json.dumps({"collector": "relations_india", "market": market,
-                          "skipped": "no `relations.source: nse` in this market's config"}))
-        return 0
-    nse = Nse(rel.get("base", "https://www.nseindia.com"), rel.get("archives", "https://nsearchives.nseindia.com"),
-              args.replay, pause=0 if args.replay else 0.7)
     symbols, today, now = nse_symbols(cfg), utc_today(), utc_now()
-    kinds = args.only or ["insiders", "deals", "holdings"]
     new, failed, notes = {}, [], []
     for kind in kinds:
         try:
@@ -334,8 +334,33 @@ def main() -> int:
     summary = {"collector": "relations_india", "market": market, "new": new, "failed": failed, "notes": notes}
     if hosts:
         summary["allowlist_needed"] = hosts
+    return summary
+
+
+def main() -> int:
+    ap = market_arg(__doc__)
+    ap.add_argument("--replay", type=Path,
+                    help="read responses from files in this directory instead of NSE (offline tests and "
+                         "debugging; refuses to write into this repo's data/, set MB_ROOT to a scratch dir)")
+    ap.add_argument("--only", choices=["insiders", "deals", "holdings"], action="append",
+                    help="collect only these kinds (repeatable)")
+    args = ap.parse_args()
+    cfg = require_market(args)
+    market, rel = cfg["market"], cfg.get("relations") or {}
+    if rel.get("source") != "nse":
+        print(json.dumps({"collector": "relations_india", "market": market,
+                          "skipped": "no `relations.source: nse` in this market's config"}))
+        return 0
+    if args.replay and not replay_root_ok():
+        print(json.dumps({"collector": "relations_india", "market": market,
+                          "error": "--replay writes synthetic rows; refusing to write into the repo's data/. "
+                                   "Set MB_ROOT to a scratch directory."}))
+        return 2
+    nse = Nse(rel.get("base", "https://www.nseindia.com"), rel.get("archives", "https://nsearchives.nseindia.com"),
+              args.replay, pause=0 if args.replay else 0.7)
+    summary = collect(cfg, nse, args.only or ["insiders", "deals", "holdings"])
     print(json.dumps(summary, indent=2))
-    return 1 if all(v is None for v in new.values()) else 0
+    return 1 if all(v is None for v in summary["new"].values()) else 0
 
 
 if __name__ == "__main__":

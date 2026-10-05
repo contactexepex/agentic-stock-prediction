@@ -58,10 +58,14 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     `config/settings.yaml`) with the connector instead. Nothing else is posted.
 
 14. Connection map (monthly): if `python scripts/graph.py status` reports `refresh_due: true`
-    (first trading day of a month, or the map is empty), run the graph-builder subagent with the
-    market, then `git add data/<market>/graph && git commit -m "<market> connection map TODAY"`
-    and push as in step 12. It runs after the brief so it never delays it; new edges feed the
-    "Connections" section from the next run.
+    (no refresh attempt yet this month), run the graph-builder subagent with the market, then
+    always record the attempt, even if it added nothing:
+    `python scripts/graph.py attempt --note "<one line from its summary>"`. Then commit only what
+    exists and changed, and push as in step 12:
+    `git add data/<market>/graph_runs; [ -d data/<market>/graph ] && git add data/<market>/graph;`
+    `git diff --cached --quiet || git commit -m "<market> connection map TODAY"`.
+    It runs after the brief so it never delays it; new edges feed the "Connections" section
+    from the next run.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.

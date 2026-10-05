@@ -24,7 +24,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   trades, bulk and block deals, shareholding and promoter pledges -> `data/india/insiders|deals|holdings/`),
   `relations.py` (risk flags: big deals, pledge rises, insider sales; optional range widening in
   `config/ranges.yaml`, off by default) and `graph.py` (connection map in `data/<market>/graph/`:
-  `status`, `edges`, `hits` = second-order news, `add` = validate and append the graph-builder's edges)
+  `status`, `edges`, `hits` = second-order news, `add` = validate and append the graph-builder's edges,
+  `attempt` = record the monthly refresh in `data/<market>/graph_runs/`)
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

@@ -138,6 +138,11 @@ RELATION_SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "detail": "VARCHAR", "weight": "DOUBLE", "status": "VARCHAR", "as_of": "DATE",
         "source_url": "VARCHAR", "added_at": "TIMESTAMPTZ", "prompt_version": "VARCHAR",
     }),
+    # One row per connection-map refresh attempt (graph.py attempt), even when no edge changed.
+    "graph_runs": ("jsonl", {
+        "id": "VARCHAR", "run_at": "TIMESTAMPTZ", "month": "VARCHAR", "edges": "INTEGER",
+        "tickers_without_edges": "INTEGER", "note": "VARCHAR",
+    }),
 }
 for _kind, (_ext, _cols) in RELATION_SCHEMAS.items():
     SCHEMAS[_kind] = (SCHEMAS[_kind][0], {**_cols, **SCHEMAS[_kind][1]}) if _kind in SCHEMAS else (_ext, _cols)

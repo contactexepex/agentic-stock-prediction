@@ -1,6 +1,8 @@
-"""Offline tests for phase 5 relationships: the India relations collector (replaying saved NSE
-responses from tests/fixtures/nse), risk flags and optional range widening, the connection map
-(validation, append-only updates, second-order news hits) and the context-pack sections.
+"""Offline tests for phase 5 relationships: the India relations collector (replaying synthetic,
+hand-written NSE responses from tests/fixtures/nse that match public scraper field names but are
+not yet checked against a live NSE response), its failure path when NSE is unreachable, risk
+flags and optional range widening, the connection map (validation, append-only updates,
+monthly refresh attempts, second-order news hits) and the context-pack sections.
 Run: pytest -q"""
 from __future__ import annotations
 
@@ -74,7 +76,7 @@ def run(script: str, root: Path, cfg: Path, *args: str) -> subprocess.CompletedP
 def replay_dir(tmp: Path) -> Path:
     """Copy the NSE fixtures, replacing __Dn__ with the IST date n days ago (NSE format)."""
     out = tmp / "nse"
-    out.mkdir()
+    out.mkdir(parents=True)
     today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
     for f in (FIXTURES / "nse").iterdir():
         text = f.read_text()
@@ -174,7 +176,9 @@ def test_graph_add_hits_and_retract(tmp_path):
     assert (again["written"], again["unchanged"]) == (0, 3)                       # unchanged edges not re-appended
 
     st = json.loads(run("graph.py", root, cfg, "status").stdout)
-    assert st["edges"] == 3 and st["refresh_due"] is False and "HDFCBANK" in st["tickers_without_edges"]
+    assert st["edges"] == 3 and st["refresh_due"] is True and "HDFCBANK" in st["tickers_without_edges"]
+    assert json.loads(run("graph.py", root, cfg, "attempt").stdout)["edges"] == 3    # only an attempt clears it
+    assert json.loads(run("graph.py", root, cfg, "status").stdout)["refresh_due"] is False
 
     hits = json.loads(run("graph.py", root, cfg, "hits").stdout)["hits"]
     got = {(h["ticker"], h["news_id"]) for h in hits}
@@ -193,3 +197,64 @@ def test_graph_add_hits_and_retract(tmp_path):
     assert {(h["ticker"], h["news_id"]) for h in hits} == {("TCS", "n2")}
     files = list((root / "data" / MARKET / "graph").glob("**/*.jsonl"))
     assert len(files) == 1 and len(files[0].read_text().splitlines()) == 4        # appended, never rewritten
+
+
+def test_replay_refuses_to_write_into_repo_data(tmp_path):
+    _, cfg = setup(tmp_path)
+    target = REPO / "data" / MARKET
+    assert not target.exists()
+    for i, root in enumerate((REPO, REPO / "data" / "..")):
+        r = run("collect_relations_india.py", root, cfg, "--replay", str(replay_dir(tmp_path / f"r{i}")))
+        assert r.returncode == 2 and "refusing" in json.loads(r.stdout)["error"]
+    assert not target.exists()                                                    # nothing written
+
+
+def test_live_failure_reports_hosts_to_allowlist(monkeypatch):
+    """No network: the HTTP opener raises like the egress proxy does; nothing may be written."""
+    import urllib.error
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import collect_relations_india as cri
+
+    def no_write(*a, **k):
+        raise AssertionError("nothing should be written when every source fails")
+    monkeypatch.setattr(cri, "append_jsonl", no_write)
+    cfg = {"market": MARKET, "relations": {"source": "nse"},
+           "tickers": {"INFY": {"yahoo": "INFY.NS"}, "RELIANCE": {"yahoo": "RELIANCE.NS"}}}
+
+    def proxy_denied(req, timeout=None):
+        raise urllib.error.URLError(OSError("Tunnel connection failed: 403 Forbidden"))
+    nse = cri.Nse("https://www.nseindia.com", "https://nsearchives.nseindia.com", pause=0)
+    monkeypatch.setattr(nse.opener, "open", proxy_denied)
+    out = cri.collect(cfg, nse, ["insiders", "deals", "holdings"])
+    assert out["new"] == {"insiders": None, "deals": None, "holdings": None}
+    assert out["allowlist_needed"] == ["nsearchives.nseindia.com", "www.nseindia.com"]
+    sources = {f["source"] for f in out["failed"]}
+    assert {"insiders", "deals:bulk:nse_archive", "deals:block:nse_historical"} <= sources
+    assert sum(s.startswith("holdings:") for s in sources) == 1                   # fails fast per host
+    assert all("egress proxy denied" in f["error"] and f["allowlist"] for f in out["failed"])
+
+    def nse_refuses(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
+    nse = cri.Nse("https://www.nseindia.com", "https://nsearchives.nseindia.com", pause=0)
+    monkeypatch.setattr(nse.opener, "open", nse_refuses)
+    out = cri.collect(cfg, nse, ["insiders"])
+    assert out["new"] == {"insiders": None} and "allowlist_needed" not in out
+    assert "HTTP 403" in out["failed"][0]["error"]
+
+
+def test_graph_refresh_due_once_per_month(tmp_path):
+    root, cfg = setup(tmp_path)
+    assert json.loads(run("graph.py", root, cfg, "status").stdout)["refresh_due"] is True
+    a = run("graph.py", root, cfg, "attempt", "--note", "no sources found")
+    assert a.returncode == 0, a.stderr
+    assert json.loads(a.stdout)["edges"] == 0
+    st = json.loads(run("graph.py", root, cfg, "status").stdout)
+    assert st["refresh_due"] is False and st["edges"] == 0 and st["last_attempt_at"]   # empty map, not repeated
+
+    root2, cfg2 = setup(tmp_path / "old")
+    last_month = datetime.now(timezone.utc).replace(day=1) - timedelta(days=1)
+    f = root2 / "data" / MARKET / "graph_runs" / f"{last_month:%Y}" / f"{last_month:%m}" / f"{last_month:%Y-%m-%d}.jsonl"
+    f.parent.mkdir(parents=True)
+    f.write_text(json.dumps({"id": "x", "run_at": last_month.isoformat(), "month": f"{last_month:%Y-%m}",
+                             "edges": 5, "tickers_without_edges": 0, "note": None}) + "\n")
+    assert json.loads(run("graph.py", root2, cfg2, "status").stdout)["refresh_due"] is True
