@@ -23,11 +23,13 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Late runs (`market_status.py` `late_run`: started after the session's close): no calls;
-  `ranges.py` skips ranges whose target session has closed and ignores cues quoted after it.
-- Mid-session runs (`in_session`: started after the session's open, before its close): no 1-day
-  calls or ranges (an intraday quote is not an overnight cue, and the day is partly known);
-  1-day records made after the open are never scored, and for the 1-day horizon a cue quoted
-  after the open is ignored. 5-day ranges keep the close as their cut-off.
+  `ranges.py` skips ranges whose target session has closed, labels the others late (never
+  scored) and ignores cues quoted after that session's open.
+- Mid-session runs (`in_session`: started after the session's open, before its close): no calls
+  and no 1-day ranges; 5-day ranges are published for the record, noted late, never scored (the
+  day is partly known, and every horizon covers it). Any range or call made at or after the open
+  of the first session it covers is never scored, and cues and option snapshots quoted after
+  that open are ignored for every horizon (an intraday quote is not an overnight cue).
 - US macro data at 08:30 ET (CPI, jobs): on those days the brief states "call made before release".
 - Priority: India (where capital is) first, US as a small trial. Paper only for weeks 1-6.
 

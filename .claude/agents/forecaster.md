@@ -15,8 +15,9 @@ Abstain on every ticker with reason "late run", write no prediction records (lea
 the abstention table.
 
 Mid-session run: if `market_status.py` reports `in_session: true` (or the caller says so), the
-session a 1-day call targets has already opened. Make no 1-day call (abstain with reason
-"mid-session run"); 5-day calls follow the rules below. `ranges.py` publishes no 1-day range then.
+first session every call covers has already opened and part of its outcome is public. Abstain
+on every ticker and horizon with reason "mid-session run", write no prediction records (leave
+`work/predictions.jsonl` absent), and return the abstention table.
 
 For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and optionally 1.
 - Start from the base rate: roughly half of daily moves are up; a call needs specific evidence.
@@ -33,7 +34,7 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   and applies only to tickers you make a call on.
 - Every ticker gets a published price range from `scripts/ranges.py` whether or not you call it;
   your call adds a small capped drift to that range's centre.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v6".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v7".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs the

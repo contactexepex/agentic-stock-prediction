@@ -181,10 +181,9 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
             base = (a or b).base_close
             made = [(h, x) for h, x in ((1, a), (5, b)) if x is not None and x.direction in ("up", "down")]
             call = " · ".join(f"{h}d {fmt_call(x.direction, x.confidence)}" for h, x in made) or "no call"
-            # made at/after the first target session's close (a 1-day range: its open): shown for
-            # the record, never scored
-            late = any(is_late(cfg, getattr(x, "as_of_date", None), getattr(x, "made_at", None), h)
-                       for h, x in ((1, a), (5, b)) if x is not None)
+            # made at/after the first target session's open: shown for the record, never scored
+            late = any(is_late(cfg, getattr(x, "as_of_date", None), getattr(x, "made_at", None))
+                       for x in (a, b) if x is not None)
             n_late += late
             if late:
                 call = "late: not a forecast, never scored"
@@ -237,9 +236,9 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
           *([release_line, ""] if release_line else []),
           f"![Overview]({charts}/overview.png)", "",
           table(["Ticker", "Sector", "Close", "Next day 80%", "Next day 50%", "5 days 80%", "Call", "Cue", "Notes"], today_rows),
-          *([f"{n_late} stock(s) have ranges made after the session they target had closed (a late run; "
-             "for a next-day range, after it had opened): they are shown for the record, are not forecasts "
-             "and are never scored.", ""] if n_late else []),
+          *([f"{n_late} stock(s) have ranges made after the first session they cover had opened (a "
+             "mid-session or late run): they are shown for the record, are not forecasts and are never "
+             "scored.", ""] if n_late else []),
           "<!-- AGENT:calls -->", "",
           "### Overnight cues and global factors", "", table(["Symbol", "Name", "Last", "Change"], cue_rows),
           *(["### ADRs (US-listed shares, previous US session)", "", table(["Ticker", "ADR", "Last", "Change"], adr_rows)]

@@ -2,10 +2,10 @@
 """Score open predictions and open price ranges whose horizon has passed. Horizons count
 trading days (price bars). Prediction base = last close on or before as_of_date; a range is
 scored on its target_date close. Writes outcome records; never edits predictions or ranges.
-Late records are never scored: a range or call made at or after the close of the first session
-after its as_of_date already knew part of its outcome (CLAUDE.md: nothing after made_at), so it
-stays out of the track record and is counted under `late_skipped`. A 1-day record (its target is
-that first session) is late from the session's open: made mid-session, it saw part of the day."""
+Late records are never scored: a range or call made at or after the open of the first session
+after its as_of_date (a mid-session or late run) already knew part of its outcome (CLAUDE.md:
+nothing after made_at), whatever its horizon, so it stays out of the track record and is counted
+under `late_skipped`."""
 from __future__ import annotations
 
 import json
@@ -20,15 +20,14 @@ import rangelib as rl
 from common import append_jsonl, connect, day_file, market_arg, require_market, utc_now, utc_today
 
 
-def is_late(cfg: dict, as_of, made_at, horizon_days=None) -> bool:
-    """True when made_at is at or after the close of the first session after as_of, or, for a
-    1-day horizon (whose target is that session), at or after its open."""
+def is_late(cfg: dict, as_of, made_at) -> bool:
+    """True when made_at is at or after the open of the first session after as_of (every
+    horizon covers that session, so from its open part of the outcome is public)."""
     if made_at is None or (not isinstance(made_at, str) and pd.isna(made_at)):
         return False
     d = as_of if isinstance(as_of, date) and not isinstance(as_of, datetime) else pd.Timestamp(as_of).date()
     first = ev.sessions_ahead(cfg, d + timedelta(days=1), 1)[-1]
-    edge = ev.session_open_utc if horizon_days is not None and int(horizon_days) == 1 else ev.session_close_utc
-    return pd.Timestamp(made_at).to_pydatetime() >= edge(cfg, first)
+    return pd.Timestamp(made_at).to_pydatetime() >= ev.session_open_utc(cfg, first)
 
 SQL = """
 WITH base AS (
@@ -37,7 +36,7 @@ WITH base AS (
     FROM open_predictions p
     ASOF JOIN bars b ON p.ticker = b.ticker AND p.as_of_date >= b.date
 )
-SELECT base.id, base.as_of_date, base.made_at, base.horizon_days, base.base_date, base.base_close, t.date, t.close,
+SELECT base.id, base.as_of_date, base.made_at, base.base_date, base.base_close, t.date, t.close,
        t.close / base.base_close - 1 AS ret,
        CASE WHEN base.direction = 'up' THEN t.close > base.base_close
             ELSE t.close < base.base_close END AS hit
@@ -54,7 +53,7 @@ FROM open_ranges r JOIN ohlc b ON b.ticker = r.ticker AND b.date = r.target_date
 def score_ranges(cfg: dict, con, now: str) -> tuple[list[dict], int]:
     out, late = [], 0
     for r in con.execute(RANGE_SQL).df().itertuples():
-        if is_late(cfg, r.as_of_date, r.made_at, r.horizon_days):
+        if is_late(cfg, r.as_of_date, r.made_at):
             late += 1
             continue
         y, base = float(r.actual), float(r.base_close)
@@ -82,8 +81,8 @@ def main() -> int:
     con = connect(market)
     now = utc_now()
     rows, late_calls = [], 0
-    for pid, as_of, made_at, h, bd, bc, td, tc, ret, hit in con.execute(SQL).fetchall():
-        if is_late(cfg, as_of, made_at, h):
+    for pid, as_of, made_at, bd, bc, td, tc, ret, hit in con.execute(SQL).fetchall():
+        if is_late(cfg, as_of, made_at):
             late_calls += 1
             continue
         rows.append({"prediction_id": pid, "scored_at": now, "base_date": str(bd), "base_close": bc,

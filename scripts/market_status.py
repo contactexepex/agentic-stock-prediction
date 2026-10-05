@@ -5,8 +5,8 @@ The routine uses this to post a one-line "market closed" message on holidays.
 `session_date` (e.g. the pre-open routine started after the close): the forecaster then
 abstains, because any call would be scored on an outcome that is already public.
 `in_session` is true between the open (`session_open_utc`) and the close of `session_date` (a
-manual mid-session run): that session's outcome is partly public, so no 1-day call is made,
-ranges.py publishes no 1-day range and 1-day records made then are never scored."""
+manual mid-session run): that session's outcome is partly public, so no call is made, ranges.py
+publishes no 1-day range, and every range or call made then is late (never scored)."""
 from __future__ import annotations
 
 import json

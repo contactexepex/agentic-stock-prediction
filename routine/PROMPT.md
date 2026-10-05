@@ -47,12 +47,13 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    (exit code 2 = no webhook: use the Slack connector as in step 13) and stop. If `late_run` is
    true (the run started after the close of `session_date`, at `session_close_utc`), carry on,
    but tell the forecaster it is a late run: it abstains on every ticker with reason "late run".
-   `ranges.py` then skips ranges whose target session has closed and ignores cues quoted after
-   it. Say so in the report's `data_quality` section. If `in_session` is true (a manual run
+   `ranges.py` then skips ranges whose target session has closed, labels the others late (never
+   scored) and ignores cues quoted after that session's open. Say so in the report's `data_quality` section. If `in_session` is true (a manual run
    after the open of `session_date`, at `session_open_utc`), carry on, but tell the forecaster
-   it is a mid-session run: it makes no 1-day calls (reason "mid-session run"). `ranges.py`
-   then publishes no 1-day ranges (5-day ranges as usual), and 1-day records made after the open
-   are never scored. Say so in `data_quality` too.
+   it is a mid-session run: it abstains on every ticker and horizon with reason "mid-session run".
+   `ranges.py` then publishes no 1-day ranges and labels the 5-day ranges late (shown for the
+   record, never scored), and ignores cues and option snapshots quoted after the open. Say so in
+   `data_quality` too.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py`, `collect_filings.py` and `collect_options.py` (all in `scripts/`;

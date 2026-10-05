@@ -295,7 +295,8 @@ def test_ranges_apply_inputs(tmp_path):
 
 def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
     """A run after the first target session's close: the 1d range is not published, and an index
-    cue or option snapshot taken after that close is not used (it would carry that session)."""
+    cue or option snapshot taken after that close (so after its open) is not used (it would carry
+    that session)."""
     root, cfg = setup(tmp_path)
     mfile = cfg / "markets" / f"{MARKET}.yaml"
     mfile.write_text(mfile.read_text() + "\noptions: yfinance\nindex_cue: {symbol: BENCH, beta: 1.0}\n")
@@ -335,7 +336,7 @@ def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
     assert not any(x["horizon_days"] == 1 for x in rows.values())      # target session closed
     for t in ("AAPL", "MSFT"):
         x = rows[f"{as_of}-{t}-5d"]
-        assert f"index cue ignored: BENCH quoted after {first} close" in x["notes"]
+        assert f"index cue ignored: BENCH quoted after {first} open" in x["notes"]   # cut at the open
         assert "beta_split" not in x["inputs"] and x["center"] == 0
         assert "implied_vol" not in x["inputs"] and x["iv_sigma_h"] is None
         assert f"late: {first} closed before made_at" in x["notes"]
