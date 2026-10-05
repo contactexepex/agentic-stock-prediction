@@ -2,3 +2,4 @@
 repo_url: https://github.com/contactexepex/agentic-stock-prediction
 branch: main
 slack_channel: "#market-brief"
+slack_channel_id: C0C6REB7QS2   # post via the Slack connector; no token needed

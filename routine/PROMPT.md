@@ -49,7 +49,8 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     and push again. Pushing to main is intended: the next run must see today's data.
 
 13. Notify: post the filled `work/slack_<market>.md` as ONE message to the Slack channel
-    #market-brief. Nothing else is posted.
+    #market-brief (channel id in `config/settings.yaml`) using the Slack connector. Nothing
+    else is posted.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.
