@@ -225,19 +225,27 @@ def arm_summary(res: pd.DataFrame, arm: str) -> dict:
             "score80": round(float(res[f"{arm}_is80"].mean()), 4)}
 
 
-def compare_inputs(res: pd.DataFrame) -> dict:
+def verdict(off: dict, on: dict, min_gain: float) -> str:
+    """DESIGN section 7 rule: improves only if the interval score drops by more than min_gain
+    (relative); a change within it is noise."""
+    if not off.get("n"):
+        return "no data"
+    a, b = off["score80"], on["score80"]
+    if a == b:
+        return "same"
+    gain = (a - b) / a
+    return "improves" if gain > min_gain else ("worse" if gain < -min_gain else "noise")
+
+
+def compare_inputs(res: pd.DataFrame, min_gain: float = 0.005) -> dict:
     out = {}
     for name, (off, on, col) in INPUTS.items():
         sub = res[res[col]] if col in res.columns else res.iloc[0:0]
         a, b = arm_summary(sub, off), arm_summary(sub, on)
-        verdict = "no data" if not a["n"] else ("improves" if b["score80"] < a["score80"] else
-                                                ("same" if b["score80"] == a["score80"] else "worse"))
-        out[name] = {"applies": a["n"], "off": a, "on": b, "verdict": verdict}
+        out[name] = {"applies": a["n"], "off": a, "on": b, "verdict": verdict(a, b, min_gain)}
     if len(res):
-        out["all_inputs"] = {"applies": int(len(res)), "off": arm_summary(res, "current"),
-                             "on": arm_summary(res, "configured")}
-        out["all_inputs"]["verdict"] = ("improves" if out["all_inputs"]["on"]["score80"]
-                                        < out["all_inputs"]["off"]["score80"] else "worse")
+        a, b = arm_summary(res, "current"), arm_summary(res, "configured")
+        out["all_inputs"] = {"applies": int(len(res)), "off": a, "on": b, "verdict": verdict(a, b, min_gain)}
     out["implied_vol"] = {"verdict": "live only (no stored option history)"}
     return out
 
@@ -252,17 +260,17 @@ def run(cfg: dict, rc: dict, eval_sessions: int) -> dict:
     evdf = ri.load_events(con)
     extra = {"earnings": ri.earnings_events(evdf), "dividends": ri.dividend_events(evdf), "bench": bench,
              "index_cue": index_cue_series(cfg, bars, rc)}
-    use = {k: ri.enabled(rc, k, cfg["market"]) for k in INPUTS}
     out = {"market": cfg["market"], "as_of_date": str(bench.index[-1].date()), "horizons": {}, "by_ticker": {},
            "inputs": {}, "event_history": {"earnings": sum(map(len, extra["earnings"].values())),
                                            "dividends": sum(map(len, extra["dividends"].values()))}}
     for h in rc["horizons"]:
+        use = {k: ri.enabled(rc, k, cfg["market"], h) for k in INPUTS}
         res = evaluate(observations(bars, cfg["tickers"], h, rc, rank, cfg, extra), h, rc, eval_sessions, use)
         out["horizons"][h] = {"all": summarize(res),
                               "last_60_days": summarize(res[res["rank"] > res["rank"].max() - 60]) if len(res) else {"n": 0}}
         if len(res):
             out["by_ticker"][h] = {t: summarize(g) for t, g in res.groupby("ticker")}
-            out["inputs"][h] = compare_inputs(res)
+            out["inputs"][h] = compare_inputs(res, float(rc.get("backtest_min_gain", 0.005)))
     return out
 
 

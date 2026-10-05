@@ -152,20 +152,27 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   session with a fitted beta), and US option-implied vol (`collect_options.py`) in the width
   blend and as the implied earnings move. The range notes and the `inputs` column say which
   applied, so the weekly review can score each one live.
-- Backtest of the inputs (`backtest.py`, 250 sessions to 2026-10-02/01, 80% interval score in %
-  of price where the input applies, lower is better; off -> on):
+- Backtest of the inputs. **Rule** (section 7, one window): an input is on for a market and
+  horizon only if `backtest.py` over the stated 250 sessions (to 2026-10-02 US, 2026-10-01
+  India) lowers the 80% interval score (in % of price, scored only where the input applies) by
+  more than `backtest_min_gain` = 0.5% relative; a smaller change either way is noise and stays
+  off. Switches are per market and horizon in `config/ranges.yaml`. Off -> on, verdict:
 
-  | Input | US 1d | US 5d | India 1d | India 5d | Default |
-  |---|---|---|---|---|---|
-  | Past earnings moves (vs fixed x3) | 21.11 -> 20.72 (n 82) | 24.23 -> 24.53 (n 409) | no data | no data | US on, India off |
-  | Ex-dividend shift | 7.45 -> 6.55 (n 72) | 13.60 -> 13.08 (n 359) | 4.93 -> 4.22 (n 27) | 12.79 -> 12.10 (n 138) | on |
-  | Beta split (vs direct cue) | same | same | 5.50 -> 5.45 | 11.92 -> 11.92 | India on, US off |
-  | All defaults (vs before) | 6.41 -> 6.41 | 15.01 -> 14.99 | 5.50 -> 5.45 | 11.92 -> 11.90 | |
+  | Input | US 1d | US 5d | India 1d | India 5d |
+  |---|---|---|---|---|
+  | Past earnings moves (vs fixed x3) | 21.11 -> 20.72, n 82, improves: **on** | 24.23 -> 24.53, n 409, worse: off | no data: off | no data: off |
+  | Ex-dividend shift | 7.45 -> 6.55, n 72, improves: **on** | 13.60 -> 13.08, n 359, improves: **on** | 4.93 -> 4.22, n 27, improves: **on** | 12.79 -> 12.10, n 138, improves: **on** |
+  | Beta split (vs direct cue) | same, n 5000: off | same, n 5000: off | 5.497 -> 5.454, n 5000, improves: **on** | 11.924 -> 11.916, n 5000, noise: off |
+  | Implied vol | no history: off | no history: off | no chains | no chains |
 
-  Over 440 sessions past earnings moves improve both US horizons (1d 22.77 -> 22.33, 5d
-  26.53 -> 26.48): a small gain, kept for the US. India has no free earnings dates after mid-2025
-  and only 2y of bars, so it stays on the fixed multiplier until stored events build up; that
-  multiplier looks too wide for India (1d earnings ranges covered 97% of 38). In the US every
-  stock has its own pre-market cue, so with equal weights the beta split equals the direct cue;
-  US cue history is a proxy (next open gap, which flatters cues in absolute terms). Implied
-  vol has no stored history: live only, judged by the weekly review.
+  Checks outside the rule (440 sessions): US earnings moves 1d 22.77 -> 22.33, 5d 26.53 -> 26.48
+  (noise); India beta split 1d 5.373 -> 5.345, 5d 12.059 -> 12.061 (slightly worse, so 5d stays
+  off). India has no free earnings dates after mid-2025 and only 2y of bars; it stays on the
+  fixed multiplier, which looks too wide there (1d earnings ranges covered 97% of 38 at 440
+  sessions). In the US every stock has its own pre-market cue, so with equal weights the beta
+  split equals the direct cue; US cue history is a proxy (next open gap, which flatters cues in
+  absolute terms). Implied vol cannot be backtested: it is off, `collect_options.py` keeps
+  collecting, and each range row stores the sigma the IV blend would have given (`iv_sigma_h`,
+  same centre) so the weekly review can score it against `sigma_h` before switching it on.
+  With every input off, `ranges.py` output equals the code before these inputs except the new
+  `inputs` and `iv_sigma_h` fields (checked on the stored data of both markets).
