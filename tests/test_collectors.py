@@ -82,6 +82,8 @@ class FakeTicker:
 
     @property
     def dividends(self):
+        if isinstance(self.s.get("dividends"), Exception):
+            raise self.s["dividends"]
         return self.s.get("dividends", pd.Series(dtype=float))
 
     def _earn(self, key):
@@ -261,7 +263,41 @@ def test_events_no_dividend_payer_is_fine_but_a_stored_payer_is_not(env, monkeyp
 def test_events_exit_code_when_every_calendar_fails(env, monkeypatch, capsys):
     FakeTicker.specs.update({t: {"calendar": RuntimeError("boom"), "page": earnings_frame([])}
                              for t in ("AAPL", "MSFT")})
+    FakeTicker.specs["MSFT"]["dividends"] = RuntimeError("divs down")
     code, out = run_main(collect_events, monkeypatch, capsys, "--no-history")
     assert code == 1
     assert [(f["ticker"], f["what"], f["error"]) for f in out["failed"]] == [
-        ("AAPL", "calendar", "boom"), ("MSFT", "calendar", "boom")]
+        ("AAPL", "calendar", "boom"), ("MSFT", "calendar", "boom"), ("MSFT", "dividends", "divs down")]
+
+
+def test_events_sec_errors_are_failures(env, monkeypatch, capsys):
+    class Edgar:
+        def __init__(self, ua):
+            pass
+
+        def cik_map(self):
+            return {"AAPL": "320193", "MSFT": "789019"}
+
+        def recent(self, cik):
+            if cik == "789019":
+                raise OSError("HTTP 503")
+            return {"form": ["8-K"], "items": ["2.02"], "acceptanceDateTime": ["2026-07-30T16:30:00-04:00"]}
+
+    import sec
+    monkeypatch.setattr(sec, "Edgar", Edgar)
+    errors: dict = {}
+    us = {"market": "us", "calendar": "XNYS", "timezone": NY}
+    out = collect_events.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "t t@example.com", errors)
+    assert list(out) == ["AAPL"] and errors == {"MSFT": "HTTP 503"}
+    path = common.CONFIG / "markets" / f"{MARKET}.yaml"
+    path.write_text(path.read_text() + "filings: sec\n")
+    monkeypatch.setenv("SEC_USER_AGENT", "t t@example.com")
+    shot = earnings_frame(["2026-07-22 16:05"])
+    FakeTicker.specs.update({t: {"calendar": {"Earnings Date": [date(2026, 10, 28)]}, "page": shot}
+                             for t in ("AAPL", "MSFT")})
+    code, out = run_main(collect_events, monkeypatch, capsys)
+    assert out["failed"] == [{"ticker": "MSFT", "what": "sec_earnings", "error": "HTTP 503"}]
+    monkeypatch.setattr(sec, "Edgar", None)                       # the whole SEC step fails
+    code, out = run_main(collect_events, monkeypatch, capsys)
+    assert [(f["ticker"], f["what"]) for f in out["failed"]] == [(None, "sec_earnings")]
+    assert out["sec_error"] == out["failed"][0]["error"]

@@ -384,6 +384,36 @@ def test_ranges_holiday_and_early_close(market):
     assert all("late: 2026-11-27 closed before made_at" in r["notes"] for r in closed.values())
 
 
+def test_context_and_report_label_a_mid_session_1d_range_late(market):
+    """An old-code range row for 1 day made after the open (14:00 UTC) is labelled late, the 5-day
+    one made then is not."""
+    root, cfg_dir, cfg, rc = market
+    quotes(root, "2026-10-05T10:55:00+00:00")
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    rows = build(cfg, rc, "2026-10-05T11:30:00+00:00")
+    for r in rows.values():
+        r["made_at"] = "2026-10-05T14:00:00+00:00"
+    jsonl(root, "ranges", AS_OF, [r for r in rows.values() if r["ticker"] == "AAPL" or r["horizon_days"] == 5])
+    r = run("context.py", root, cfg_dir)
+    assert r.returncode == 0, r.stderr
+    sec = r.stdout.split("## Price ranges published", 1)[1].split("\n## ", 1)[0]
+    late = {" | ".join(x.split(" | ")[:2]): x.rstrip(" |").endswith("late: not a forecast, never scored")
+            for x in sec.splitlines() if x.startswith("| AAPL") or x.startswith("| MSFT")}
+    assert late == {"| AAPL | 1": True, "| AAPL | 5": False, "| MSFT | 5": False}
+    jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
+                                   "computed_at": "2026-10-05T11:05:00+00:00", "regime": "CALM",
+                                   "vol_level": 15.0, "vol_change_1d": 0.0, "bench_ret_5d": 0.0,
+                                   "bench_vol_10d": 0.1, "major_event": False, "major_event_names": [],
+                                   "stress": False, "notes": []}])
+    r = run("report.py", root, cfg_dir, "--force")
+    assert r.returncode == 0, r.stderr
+    text = (root / "reports" / MARKET / f"{DAY}.md").read_text()
+    line = {t: next(x for x in text.splitlines() if x.startswith(f"| {t} |")) for t in ("AAPL", "MSFT")}
+    assert "late: not a forecast, never scored" in line["AAPL"] and "late:" not in line["MSFT"]
+    assert "1 stock(s) have ranges made after the session they target had closed (a late run; " \
+           "for a next-day range, after it had opened)" in text
+
+
 def test_ranges_cli_in_session_flag(market):
     root, cfg_dir, _, _ = market
     snapshot(root, "2026-10-05T11:00:00+00:00")
