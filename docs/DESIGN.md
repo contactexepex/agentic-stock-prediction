@@ -135,7 +135,10 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
      (quarter, half year, nine months, year; standalone and consolidated; Ind AS, banking and
      life-insurance taxonomies), FII/DII provisional flows and delivery % into
      `data/india/announcements|financials|flows|delivery/`; `nse_context.py` adds them to the
-     context pack. Delivery % is context only, not yet an indicator column.
+     context pack. The news-analyst's scores for announcements (news_enriched rows with
+     `nse-ann-` ids) feed its brief and the `announcements_enriched` view, which the context
+     pack's announcement section shows (sentiment, materiality). Delivery % is context only,
+     not yet an indicator column.
    - **Connection map, both markets (built):** edges in `data/<market>/graph/` written monthly by
      the graph-builder agent through `graph.py add` (validated, each citing a source URL;
      each monthly attempt recorded in `graph_runs/` so an empty run is not repeated daily;
@@ -157,7 +160,8 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   exchange_calendars covers XNYS only to one year after the run date (2027-10-05 when checked
   on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
 - Done 2026-10-05: NSE field mappings checked against live responses. PIT moved to the
-  `corporates-pit-gg` filing index plus per-filing XBRL (the old feed stopped in April 2026);
+  `corporates-pit-gg` filing index plus per-filing XBRL (the old feed dwindled in April 2026;
+  last rows 2 May 2026);
   the pledge dataset's promoter % is depository-flagged data (`sdd_promoter_pct`), not the
   shareholding pattern; market-wide historical deals are capped at 70 rows, so the snapshot is
   used daily and per-ticker backfill on demand. Earlier note, kept for history:

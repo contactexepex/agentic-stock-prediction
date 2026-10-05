@@ -74,7 +74,11 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
 
 6. Context: `python scripts/context.py > work/context.md`.
 
-7. News: run the news-analyst subagent on today's `data/<market>/news/` file. Keep its brief.
+7. News: run the news-analyst subagent on today's `data/<market>/news/` file and, for India,
+   also today's `data/india/announcements/YYYY/MM/<today>.jsonl` (NSE exchange filings; ids
+   `nse-ann-<seq_id>`, the one exception to the 16-character news id). Keep its brief. Give the
+   judge both input files: `work/enriched.jsonl` should hold one record per new news id plus
+   one per new `nse-ann-` id, and nothing else.
 
 8. Debate: run bull-researcher and bear-researcher in parallel, passing each the market and
    the news brief.

@@ -21,7 +21,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/c
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v4"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v5"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually

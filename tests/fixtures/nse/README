@@ -32,8 +32,13 @@ synthetic/  Hand-written SYNTHETIC files for cases the real responses on that da
        IT_SYNTH_*.xml, in the PIT V2 XBRL shape), a big HDFCBANK bulk deal and an ICICIBANK block
        deal (snapshot-capital-market-largedeal.json), and a promoter pledge rising between two
        quarters (corporate-pledgedata_RELIANCE.json; the live dataset only holds the latest
-       quarter, so a rise needs stored history). People, funds and numbers are invented. __Dn__
-       is replaced by the tests with the date n days ago (dd-Mon-YYYY).
+       quarter, so a rise needs stored history). corporate-share-holdings-master_RELIANCE.json
+       and _INFY.json are synthetic companions to that pledge file: invented promoter figures
+       (RELIANCE 50.30 -> 50.10, INFY 14.43; the real 30-Jun-2026 values are 50.48 and 13.82)
+       with filing dates relative to the test run (__D5__), so the shareholding rows pair with the
+       synthetic pledge quarters and stay inside the risk-flag window (pledge_filed_days) whatever
+       day the tests run; the real responses carry fixed 2026 filing dates. People, funds and
+       numbers are invented. __Dn__ is replaced by the tests with the date n days ago (dd-Mon-YYYY).
 
 Replay (--replay DIR) writes only to an explicit scratch MB_ROOT (one holding a .scratch-ok file,
 with no .git, CLAUDE.md or price files; no write target may resolve outside its own data/ or into
