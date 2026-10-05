@@ -1,7 +1,8 @@
 """SEC EDGAR helpers for the relationship collectors (collect_insiders, collect_stakes,
 collect_holdings). Free endpoints only. SEC requires a descriptive User-Agent with contact
 info (SEC_USER_AGENT="your-name your@email.com") and at most 10 requests/second; every request
-here goes through one throttle (MIN_INTERVAL) and backs off on 429/503.
+here goes through one throttle (MIN_INTERVAL) and backs off on 429/503. The throttle is per
+process, so the SEC collectors must run one after another, never in parallel.
 
 Tests run offline: with MB_SEC_FIXTURES=<dir>, URLs are served from <dir>/urls.json
 ({url: file path, absolute or relative to <dir>}) instead of the network."""

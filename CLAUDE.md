@@ -23,7 +23,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
   `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
   `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.
-  Views `insider_flow`, `insider_cluster_buys`, `activist_stakes`, `holdings_change` and
+  Views `insider_flow`, `insider_cluster_buys`, `activist_stakes`, `holdings_filings`, `holdings_change` and
   `holdings_quarter` feed the context pack's "Smart money" section and a range risk note
   (`scripts/smart_money.py`; the widen `activist_13d_factor` in `config/ranges.yaml` stays off).
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,

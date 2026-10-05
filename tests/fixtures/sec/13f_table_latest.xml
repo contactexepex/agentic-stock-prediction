@@ -1,3 +1,6 @@
+<!-- Hand-made test fixture (fictional filer EXAMPLE CAPITAL, CIK 9999200), shaped like a real 13F
+     information table; the ALLY line copies a line of Berkshire Hathaway's Q2 2026 table
+     (accession 0001193125-26-352200). Watched lines: AAPL 100 + 50 shares and a 20-share put. -->
 <informationTable xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">
   <infoTable>
     <nameOfIssuer>APPLE INC</nameOfIssuer>

@@ -113,7 +113,7 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,
    group companies, suppliers, customers, competitors) refreshed monthly. Used for
    second-order news, smart-money signals and range-widening risk flags.
-   **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 19
+   **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 23
    tracked filers (`collect_insiders|stakes|holdings.py`), smart-money views and context
    section, and a fresh-13D note on ranges (widen gated in `config/ranges.yaml`, off).
 

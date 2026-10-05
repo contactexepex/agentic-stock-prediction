@@ -98,7 +98,16 @@ relationships:
     quarters: 2          # quarters loaded the first time a filer is seen
     filers:              # 13F filers tracked, by SEC CIK (index giants, long-only, macro, activists)
       1067983: Berkshire Hathaway
+      # The Vanguard Group (102909) files only a 13F-NT since Q1 2026, naming 10 Vanguard
+      # managers that report instead. Tracked: the five largest by Q2 2026 table value
+      # (~99% of it). Not tracked: Vanguard Investments Australia, Vanguard Advisers, Vanguard
+      # Personalized Indexing, Vanguard National Trust, Vanguard Marketing (~$80 bn together).
+      # Each counts as a separate filer in the 13F views.
       2100119: Vanguard Capital Management
+      2100121: Vanguard Portfolio Management
+      933478: Vanguard Fiduciary Trust
+      1811242: Vanguard Global Advisers
+      1680208: Vanguard Asset Management
       2012383: BlackRock
       93751: State Street
       315066: FMR (Fidelity)
@@ -109,7 +118,7 @@ relationships:
       1350694: Bridgewater Associates
       1167483: Tiger Global
       1656456: Appaloosa
-      1336528: Pershing Square
+      2026053: Pershing Square Inc.   # Pershing Square Capital Mgmt (1336528) files a 13F-NT pointing here since Q2 2026
       1040273: Third Point
       1791786: Elliott Investment Management
       1029160: Soros Fund Management

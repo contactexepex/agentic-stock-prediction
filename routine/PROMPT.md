@@ -16,6 +16,9 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`
    (Form 4) and `collect_stakes.py` (13D/13G) every day, and `collect_holdings.py` (13F): it
    downloads only when a new quarter's 13F filings exist and otherwise prints `skipped`.
+   Run the four SEC collectors (`collect_filings`, `collect_insiders`, `collect_stakes`,
+   `collect_holdings`) one after another, never in parallel: each throttles only its own
+   requests, and together they must stay under SEC's 10 requests/second.
 
 4. Score: `python scripts/score_predictions.py`.
 

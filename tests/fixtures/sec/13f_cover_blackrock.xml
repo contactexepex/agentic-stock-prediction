@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xsi:schemaLocation="http://www.sec.gov/edgar/thirteenffiler eis_13F_Filer.xsd" xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:ns1="http://www.sec.gov/edgar/common" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <schemaVersion>X0202</schemaVersion>
+  <headerData>
+    <submissionType>13F-HR</submissionType>
+    <filerInfo>
+      <liveTestFlag>LIVE</liveTestFlag>
+      <filer>
+        <credentials>
+          <cik>0002012383</cik>
+          <ccc>XXXXXXXX</ccc>
+        </credentials>
+      </filer>
+      <periodOfReport>06-30-2026</periodOfReport>
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPage>
+      <reportCalendarOrQuarter>06-30-2026</reportCalendarOrQuarter>
+      <filingManager>
+        <name>BlackRock, Inc.</name>
+        <address>
+          <ns1:street1>50 Hudson Yards</ns1:street1>
+          <ns1:city>New York</ns1:city>
+          <ns1:stateOrCountry>NY</ns1:stateOrCountry>
+          <ns1:zipCode>10001</ns1:zipCode>
+        </address>
+      </filingManager>
+      <reportType>13F COMBINATION REPORT</reportType>
+      <form13FFileNumber>028-24466</form13FFileNumber>
+      <otherManagersInfo>
+        <otherManager>
+          <crdNumber>000109391</crdNumber>
+          <secFileNumber>801-56370</secFileNumber>
+          <name>Nationwide Mutual Funds/Nationwide Fund Advisors</name>
+        </otherManager>
+        <otherManager>
+          <crdNumber>000109391</crdNumber>
+          <secFileNumber>801-56370</secFileNumber>
+          <name>Nationwide Variable Insurance Trust and Nationwide Fund Advisors</name>
+        </otherManager>
+        <otherManager>
+          <name>RUSSELL FRANK CO</name>
+        </otherManager>
+      </otherManagersInfo>
+      <provideInfoForInstruction5>Y</provideInfoForInstruction5>
+      <additionalInformation>BlackRock, Inc. is the parent holding company of certain institutional investment managers. For purposes of the reporting requirements under Section 13(f) of the Securities Exchange Act of 1934 (the Act), and the rules promulgated thereunder, BlackRock, Inc. itself does not exercise, and therefore disclaims, investment discretion with respect to any Section 13(f) securities positions over which its investment operating subsidiaries exercise such discretion. To the extent, however, that BlackRock Inc.'s ownership interest in such subsidiaries may nevertheless give rise to a Form 13F obligation on behalf of BlackRock, Inc., the information required by Form 13F is reported herein on behalf of all such subsidiaries.</additionalInformation>
+    </coverPage>
+    <signatureBlock>
+      <name>/s/ Spencer Fleming</name>
+      <title>Attorney-In-Fact pursuant to PoA date January 2025</title>
+      <phone>212-810-5300</phone>
+      <signature>/s/ Spencer Fleming</signature>
+      <city>New York</city>
+      <stateOrCountry>NY</stateOrCountry>
+      <signatureDate>08-07-2026</signatureDate>
+    </signatureBlock>
+    <summaryPage>
+      <otherIncludedManagersCount>30</otherIncludedManagersCount>
+      <tableEntryTotal>49968</tableEntryTotal>
+      <tableValueTotal>6729538649155</tableValueTotal>
+      <isConfidentialOmitted>false</isConfidentialOmitted>
+      <otherManagers2Info>
+        <otherManager2>
+          <sequenceNumber>2</sequenceNumber>
+          <otherManager>
+            <cik>0001086363</cik>
+            <form13FFileNumber>028-04293</form13FFileNumber>
+            <crdNumber>000107105</crdNumber>
+            <secFileNumber>801-48433</secFileNumber>
+            <name>BLACKROCK FINANCIAL MANAGEMENT INC/DE</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>3</sequenceNumber>
+          <otherManager>
+            <cik>0001512561</cik>
+            <form13FFileNumber>028-14241</form13FFileNumber>
+            <name>BlackRock Investment Management (Taiwan) Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>4</sequenceNumber>
+          <otherManager>
+            <cik>0001461626</cik>
+            <form13FFileNumber>028-13496</form13FFileNumber>
+            <name>BlackRock Investment Management (Australia) Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>7</sequenceNumber>
+          <otherManager>
+            <cik>0001050459</cik>
+            <form13FFileNumber>028-06608</form13FFileNumber>
+            <crdNumber>000162262</crdNumber>
+            <secFileNumber>802-76230</secFileNumber>
+            <name>BlackRock Asset Management Canada Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>13</sequenceNumber>
+          <otherManager>
+            <cik>0001559921</cik>
+            <form13FFileNumber>028-15053</form13FFileNumber>
+            <crdNumber>000164594</crdNumber>
+            <secFileNumber>801-76926</secFileNumber>
+            <name>BLACKROCK (SINGAPORE) LTD.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>15</sequenceNumber>
+          <otherManager>
+            <cik>0001579409</cik>
+            <form13FFileNumber>028-15566</form13FFileNumber>
+            <crdNumber>000165482</crdNumber>
+            <secFileNumber>801-77343</secFileNumber>
+            <name>BlackRock Asset Management North Asia Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>16</sequenceNumber>
+          <otherManager>
+            <cik>0001579408</cik>
+            <form13FFileNumber>028-15558</form13FFileNumber>
+            <name>BlackRock Brasil Gestora de Investimentos Ltd.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>18</sequenceNumber>
+          <otherManager>
+            <cik>0001305227</cik>
+            <form13FFileNumber>028-12016</form13FFileNumber>
+            <crdNumber>000108928</crdNumber>
+            <secFileNumber>801-56972</secFileNumber>
+            <name>BlackRock Investment Management, LLC</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>19</sequenceNumber>
+          <otherManager>
+            <cik>0001086364</cik>
+            <form13FFileNumber>028-04295</form13FFileNumber>
+            <crdNumber>000106614</crdNumber>
+            <secFileNumber>801-47710</secFileNumber>
+            <name>BLACKROCK ADVISORS LLC</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>21</sequenceNumber>
+          <otherManager>
+            <cik>0001006249</cik>
+            <form13FFileNumber>028-13359</form13FFileNumber>
+            <crdNumber>000105247</crdNumber>
+            <secFileNumber>801-22609</secFileNumber>
+            <name>BlackRock Fund Advisors</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>22</sequenceNumber>
+          <otherManager>
+            <cik>0000913414</cik>
+            <form13FFileNumber>028-03946</form13FFileNumber>
+            <name>BlackRock Institutional Trust Company, N.A.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>23</sequenceNumber>
+          <otherManager>
+            <cik>0001085635</cik>
+            <form13FFileNumber>028-04109</form13FFileNumber>
+            <name>BlackRock Japan Co. Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>24</sequenceNumber>
+          <otherManager>
+            <cik>0001003283</cik>
+            <form13FFileNumber>028-05116</form13FFileNumber>
+            <name>BlackRock Group LTD</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>25</sequenceNumber>
+          <otherManager>
+            <cik>0001388402</cik>
+            <form13FFileNumber>028-12195</form13FFileNumber>
+            <name>BlackRock Fund Managers Ltd.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>26</sequenceNumber>
+          <otherManager>
+            <cik>0001388401</cik>
+            <form13FFileNumber>028-12194</form13FFileNumber>
+            <crdNumber>000162379</crdNumber>
+            <secFileNumber>802-76129</secFileNumber>
+            <name>BlackRock Investment Management (UK) Ltd.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>28</sequenceNumber>
+          <otherManager>
+            <cik>0001388399</cik>
+            <form13FFileNumber>028-12198</form13FFileNumber>
+            <name>BlackRock (Netherlands) B.V.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>29</sequenceNumber>
+          <otherManager>
+            <cik>0001426459</cik>
+            <form13FFileNumber>028-12736</form13FFileNumber>
+            <crdNumber>000106843</crdNumber>
+            <secFileNumber>801-51087</secFileNumber>
+            <name>BlackRock International, Ltd.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>30</sequenceNumber>
+          <otherManager>
+            <cik>0001503309</cik>
+            <form13FFileNumber>028-14028</form13FFileNumber>
+            <name>BlackRock Asset Management Ireland Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>31</sequenceNumber>
+          <otherManager>
+            <cik>0001034551</cik>
+            <form13FFileNumber>028-06128</form13FFileNumber>
+            <crdNumber>000162380</crdNumber>
+            <secFileNumber>802-76133</secFileNumber>
+            <name>BlackRock Advisors (UK) Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>32</sequenceNumber>
+          <otherManager>
+            <cik>0001415064</cik>
+            <form13FFileNumber>028-12608</form13FFileNumber>
+            <name>BlackRock Asset Management Deutschland AG</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>34</sequenceNumber>
+          <otherManager>
+            <cik>0001426606</cik>
+            <form13FFileNumber>028-13739</form13FFileNumber>
+            <name>BlackRock (Luxembourg) S.A.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>35</sequenceNumber>
+          <otherManager>
+            <cik>0001512562</cik>
+            <form13FFileNumber>028-14240</form13FFileNumber>
+            <name>Ishares(DE) InvAG mit Teilgesellschaftsvermogen</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>36</sequenceNumber>
+          <otherManager>
+            <cik>0001549649</cik>
+            <form13FFileNumber>028-14948</form13FFileNumber>
+            <name>BlackRock Life Ltd</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>37</sequenceNumber>
+          <otherManager>
+            <cik>0001559920</cik>
+            <form13FFileNumber>028-15054</form13FFileNumber>
+            <name>BLACKROCK FUND MANAGEMENT CO. S.A.</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>40</sequenceNumber>
+          <otherManager>
+            <cik>0001654470</cik>
+            <form13FFileNumber>028-17023</form13FFileNumber>
+            <crdNumber>000161987</crdNumber>
+            <secFileNumber>801-78476</secFileNumber>
+            <name>BlackRock Asset Management Schweiz AG</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>42</sequenceNumber>
+          <otherManager>
+            <cik>0001169553</cik>
+            <form13FFileNumber>028-11240</form13FFileNumber>
+            <crdNumber>000113203</crdNumber>
+            <secFileNumber>801-60384</secFileNumber>
+            <name>TENNENBAUM CAPITAL PARTNERS LLC</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>43</sequenceNumber>
+          <otherManager>
+            <cik>0001364615</cik>
+            <form13FFileNumber>028-11964</form13FFileNumber>
+            <crdNumber>000111616</crdNumber>
+            <secFileNumber>801-57184</secFileNumber>
+            <name>Aperio Group, LLC</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>44</sequenceNumber>
+          <otherManager>
+            <cik>0001717705</cik>
+            <form13FFileNumber>028-19078</form13FFileNumber>
+            <crdNumber>000290336</crdNumber>
+            <secFileNumber>801-112118</secFileNumber>
+            <name>BlackRock Capital Investment Advisors, LLC</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>47</sequenceNumber>
+          <otherManager>
+            <cik>0001703301</cik>
+            <form13FFileNumber>028-18017</form13FFileNumber>
+            <crdNumber>000171992</crdNumber>
+            <secFileNumber>801-80178</secFileNumber>
+            <name>SpiderRock Advisors, LLC</name>
+          </otherManager>
+        </otherManager2>
+        <otherManager2>
+          <sequenceNumber>48</sequenceNumber>
+          <otherManager>
+            <cik>0001670185</cik>
+            <form13FFileNumber>028-19403</form13FFileNumber>
+            <secFileNumber>801-107234</secFileNumber>
+            <name>HPS Investment Partners, LLC</name>
+          </otherManager>
+        </otherManager2>
+      </otherManagers2Info>
+    </summaryPage>
+  </formData>
+</edgarSubmission>

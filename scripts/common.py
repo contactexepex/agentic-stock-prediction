@@ -132,6 +132,7 @@ SCHEMAS.update({
         "period": "DATE", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ", "ticker": "VARCHAR",
         "cusip": "VARCHAR", "issuer_name": "VARCHAR", "shares": "DOUBLE", "value_usd": "DOUBLE",
         "put_call": "VARCHAR", "n_lines": "INTEGER", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        "report_type": "VARCHAR", "complete": "BOOLEAN", "note": "VARCHAR",
     }),
 })
 

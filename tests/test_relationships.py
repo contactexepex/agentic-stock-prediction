@@ -1,7 +1,9 @@
 """Offline tests for the SEC relationship collectors (Form 4 insiders, 13D/13G stakes, 13F
 holdings), their views, the context pack's Smart money section and the range risk flag.
-SEC responses come from tests/fixtures/sec (real filings plus small hand-made ones) through
-MB_SEC_FIXTURES; submission lists are generated with dates relative to today.
+SEC responses come from tests/fixtures/sec through MB_SEC_FIXTURES: real sec.gov documents
+and hand-made ones with fictional filers (provenance of each file in tests/fixtures/sec/README.md).
+Submission lists are generated here with dates relative to today, and some fixture URLs are
+synthetic (a real document served under another company's folder).
 Run: pytest -q"""
 from __future__ import annotations
 
@@ -48,7 +50,8 @@ relationships:
   stakes: {lookback_days: 7}
   holdings:
     quarters: 2
-    filers: {9999200: Example Capital}
+    filers: {9999200: Example Capital, 9999300: Combo Capital, 9999400: Placeholder Capital,
+              9999500: Partial Capital, 9999600: Notice Capital}
     cusips: {AAPL: "037833100", MSFT: ["594918104"]}
 """
 NOSEC_YAML = """
@@ -108,6 +111,7 @@ def setup(tmp: Path) -> tuple[Path, Path]:
             ("0009999001-26-000001", "4", d1, "xslF345X05/doc4.xml", ""),
             ("0002100119-26-000139", "SCHEDULE 13G", d1, "xslSCHEDULE_13G_X02/primary_doc.xml", ""),
             ("0009999100-26-000001", "SCHEDULE 13D", str(TODAY), "xslSCHEDULE_13D_X02/primary_doc.xml", ""),
+            # real JPM 13D/A on another issuer, served under Apple's folder (synthetic URL)
             ("0001193125-26-410213", "SCHEDULE 13D/A", d1, "xslSCHEDULE_13D_X02/primary_doc.xml", ""),
             ("0000320193-26-000050", "SCHEDULE 13G/A", d1, "xslSCHEDULE_13G_X02/primary_doc.xml", ""),  # as investor
             ("0000320193-26-000010", "4", old, "xslF345X06/old.xml", ""),                                 # too old
@@ -119,6 +123,10 @@ def setup(tmp: Path) -> tuple[Path, Path]:
             ("0009999200-26-000002", "13F-HR", d1, "xslForm13F_X02/primary_doc.xml", str(q)),
             ("0009999200-26-000001", "13F-HR", old, "xslForm13F_X02/primary_doc.xml", str(p)),
         ]),
+        9999300: submissions("COMBO CAPITAL", [("0009999300-26-000001", "13F-HR", d1, "x/primary_doc.xml", str(q))]),
+        9999400: submissions("PLACEHOLDER CAPITAL", [("0009999400-26-000001", "13F-HR", d1, "x/primary_doc.xml", str(q))]),
+        9999500: submissions("PARTIAL CAPITAL", [("0009999500-26-000001", "13F-HR", d1, "x/primary_doc.xml", str(q))]),
+        9999600: submissions("NOTICE CAPITAL", [("0009999600-26-000001", "13F-NT", d1, "x/primary_doc.xml", str(q))]),
     }
     urls = {"https://www.sec.gov/files/company_tickers.json": str(FIX / "company_tickers.json")}
     for cik, body in subs.items():
@@ -131,10 +139,17 @@ def setup(tmp: Path) -> tuple[Path, Path]:
         f"{ARCH}/320193/000999910026000001/primary_doc.xml": str(FIX / "schedule13d.xml"),
         f"{ARCH}/320193/000119312526410213/primary_doc.xml": str(FIX / "schedule13d_other_issuer.xml"),
     })
-    for acc, table in (("000999920026000002", "13f_table_latest.xml"), ("000999920026000001", "13f_table_previous.xml")):
-        urls[f"{ARCH}/9999200/{acc}/index.json"] = str(FIX / "13f_index.json")
-        urls[f"{ARCH}/9999200/{acc}/primary_doc.xml"] = str(FIX / "13f_cover.xml")
-        urls[f"{ARCH}/9999200/{acc}/infotable.xml"] = str(FIX / table)
+    for folder, cover, table in (
+            ("9999200/000999920026000002", "13f_cover.xml", "13f_table_latest.xml"),
+            ("9999200/000999920026000001", "13f_cover.xml", "13f_table_previous.xml"),
+            ("9999300/000999930026000001", "13f_cover_combination.xml", "13f_table_latest.xml"),
+            ("9999400/000999940026000001", "13f_cover_partial.xml", "13f_table_norges_placeholder.xml"),
+            ("9999500/000999950026000001", "13f_cover_partial.xml", "13f_table_latest.xml")):
+        urls[f"{ARCH}/{folder}/index.json"] = str(FIX / "13f_index.json")
+        urls[f"{ARCH}/{folder}/primary_doc.xml"] = str(FIX / cover)
+        urls[f"{ARCH}/{folder}/infotable.xml"] = str(FIX / table)
+    # a 13F notice has only a cover page (real Pershing Square 13F-NT, synthetic folder)
+    urls[f"{ARCH}/9999600/000999960026000001/primary_doc.xml"] = str(FIX / "13f_notice_pershing.xml")
     (fx / "urls.json").write_text(json.dumps(urls, indent=1))
     return root, cfg
 
@@ -174,14 +189,33 @@ def test_parse_schedule13_13d_and_13g():
 
 def test_parse_info_table_and_quarter_end():
     with (FIX / "13f_table_latest.xml").open("rb") as f:
-        agg, n = ch.parse_info_table(f, {"037833100": "AAPL", "594918104": "MSFT"})
-    assert n == 4
+        agg, n, placeholder = ch.parse_info_table(f, {"037833100": "AAPL", "594918104": "MSFT"})
+    assert n == 4 and not placeholder
+    with (FIX / "13f_table_norges_placeholder.xml").open("rb") as f:
+        assert ch.parse_info_table(f, {"037833100": "AAPL"}) == ({}, 1, True)
     assert agg[("AAPL", None)]["shares"] == 150 and agg[("AAPL", None)]["n_lines"] == 2
     assert agg[("AAPL", None)]["value_usd"] == 37500 and agg[("AAPL", "PUT")]["shares"] == 20
     assert ("MSFT", None) not in agg
     assert ch.quarter_end(date(2026, 10, 5)) == date(2026, 9, 30)
     assert ch.quarter_end(date(2026, 1, 15)) == date(2025, 12, 31)
     assert ch.quarter_end(date(2026, 6, 30)) == date(2026, 3, 31)
+
+
+def test_13f_cover_and_completeness():
+    norges = ch.parse_cover((FIX / "13f_cover_norges.xml").read_bytes())
+    assert (norges["report_type"], norges["entry_total"], norges["confidential"]) == ("13F HOLDINGS REPORT", 1507, True)
+    blk = ch.parse_cover((FIX / "13f_cover_blackrock.xml").read_bytes())
+    assert (blk["report_type"], blk["entry_total"], blk["confidential"]) == ("13F COMBINATION REPORT", 49968, False)
+    nt = ch.parse_cover((FIX / "13f_notice_pershing.xml").read_bytes())
+    assert (nt["report_type"], nt["entry_total"], nt["other_managers"]) == ("13F NOTICE", None, ["PERSHING SQUARE INC."])
+
+    ok = {"report_type": "13F HOLDINGS REPORT", "entry_total": 4, "confidential": False, "other_managers": []}
+    assert ch.incomplete_reason(ok, 4, False) is None
+    assert ch.incomplete_reason({**ok, "entry_total": None}, 4, False) is None
+    assert ch.incomplete_reason({**ok, "entry_total": 1507}, 1, False) == "table has 1 of 1507 lines"
+    assert "placeholder" in ch.incomplete_reason({**ok, "entry_total": 1}, 1, True)
+    assert "confidential" in ch.incomplete_reason({**ok, "confidential": True}, 4, False)
+    assert "COMBINATION" in ch.incomplete_reason({**ok, "report_type": "13F COMBINATION REPORT"}, 4, False)
 
 
 def test_range_flags_note_and_gated_widen():
@@ -241,12 +275,25 @@ def test_holdings_collect_changes_and_gate(tmp_path):
     r = run("collect_holdings.py", root, cfg)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
-    assert out["new_rows"] == 5 and out["failed"] == [] and out["waiting_on"] == []
+    # Example 4+3 rows, Combo 3, Placeholder 1, Partial 3, Notice 1 (each filing has a ticker-null filing row)
+    assert out["new_rows"] == 15 and out["failed"] == [] and out["waiting_on"] == []
+    assert out["reported_by_other_manager"] == [f"Notice Capital {ch.quarter_end(TODAY)}: reported by PERSHING SQUARE INC."]
     got = rows(root, "holdings")
     q = str(ch.quarter_end(TODAY))
-    latest = {(x["ticker"], x["put_call"]): x for x in got.values() if x["period"] == q}
-    assert latest[("AAPL", None)]["shares"] == 150 and latest[("AAPL", "PUT")]["shares"] == 20
-    assert latest[("MSFT", None)]["shares"] == 0 and latest[("MSFT", None)]["n_lines"] == 0   # exit is explicit
+
+    def filer_rows(cik):
+        return {(x["ticker"], x["put_call"]): x for x in got.values() if x["period"] == q and x["filer_cik"] == cik}
+    ex = filer_rows("9999200")
+    assert ex[("AAPL", None)]["shares"] == 150 and ex[("AAPL", "PUT")]["shares"] == 20
+    assert ex[("MSFT", None)]["shares"] == 0 and ex[("MSFT", None)]["n_lines"] == 0   # complete: exit is explicit
+    assert ex[(None, None)]["complete"] is True and ex[(None, None)]["n_lines"] == 4
+    combo, ph, part, nt = (filer_rows(c) for c in ("9999300", "9999400", "9999500", "9999600"))
+    assert set(combo) == {(None, None), ("AAPL", None), ("AAPL", "PUT")}             # no MSFT zero row
+    assert combo[(None, None)]["complete"] is False and "COMBINATION" in combo[(None, None)]["note"]
+    assert set(ph) == {(None, None)} and "placeholder" in ph[(None, None)]["note"]
+    assert set(part) == {(None, None), ("AAPL", None), ("AAPL", "PUT")}
+    assert part[(None, None)]["note"] == "table has 4 of 1507 lines" and part[("AAPL", None)]["complete"] is False
+    assert set(nt) == {(None, None)} and nt[(None, None)]["report_type"] == "13F NOTICE"
     # every filer has the latest quarter: no network at all
     again = json.loads(run("collect_holdings.py", root, cfg).stdout)
     assert again["skipped"].startswith("up to date")
@@ -260,7 +307,7 @@ def test_holdings_collect_changes_and_gate(tmp_path):
     assert ctx.returncode == 0, ctx.stderr
     text = ctx.stdout.split("## Smart money")[1]
     for needle in ("| AAPL | 250500.0 | 806496.0 | -555996.0 |", "Doe John", "Example Activist Partners LP",
-                   f"| AAPL | {q} | 1 |", "| 50.0 |"):
+                   f"| AAPL | {q} | 3 |", "| 50.0 |", f"| MSFT | {q} | 0 | 0.0 | -100.0 | 0 | 1 |"):
         assert needle in text, needle
     nosec = run("context.py", root, cfg, market="nosec")
     assert nosec.returncode == 0 and "Smart money" not in nosec.stdout

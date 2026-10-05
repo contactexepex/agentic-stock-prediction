@@ -127,14 +127,22 @@ CREATE OR REPLACE VIEW activist_stakes AS
 SELECT ticker, filing_date, event_date, filer_name, percent, shares, purpose, url, id
 FROM stake_filings WHERE kind = '13D' AND NOT amendment;
 
+-- 13F filings processed (one row each): report type, completeness and notes such as
+-- "reported by <manager>" for a 13F notice or why a filing cannot show exits.
+CREATE OR REPLACE VIEW holdings_filings AS
+SELECT filer_cik, filer_name, period, filing_date, accession, report_type, n_lines, complete, note, url
+FROM holdings WHERE ticker IS NULL;
+
 -- 13F holdings: one row per (filer, ticker, period) of common shares (options excluded; the
 -- latest original filing per period wins), with the change against the filer's previous period.
+-- Zero rows (exits) exist only for complete filings, so an incomplete filing (combination
+-- report, confidential or partial table) never fakes an exit; `complete` flags its rows.
 CREATE OR REPLACE VIEW holdings_change AS
 WITH h AS (
     SELECT DISTINCT ON (filer_cik, ticker, period) * FROM holdings
-    WHERE put_call IS NULL ORDER BY filer_cik, ticker, period, filing_date DESC, first_seen_at
+    WHERE put_call IS NULL AND ticker IS NOT NULL ORDER BY filer_cik, ticker, period, filing_date DESC, first_seen_at
 )
-SELECT filer_cik, filer_name, ticker, period, shares, value_usd,
+SELECT filer_cik, filer_name, ticker, period, shares, value_usd, complete,
        lag(period) OVER hw AS prev_period, lag(shares) OVER hw AS prev_shares,
        shares - lag(shares) OVER hw AS change_shares,
        CASE WHEN lag(shares) OVER hw IS NULL THEN 'first'

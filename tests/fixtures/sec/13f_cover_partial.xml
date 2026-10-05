@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Hand-made test fixture (fictional filer EXAMPLE CAPITAL, CIK 9999200), shaped like a real
-     13F-HR cover page (primary_doc.xml): a complete holdings report with 4 table lines. -->
+<!-- Hand-made test fixture (fictional filer), shaped like a real 13F-HR cover page: a holdings
+     report, not flagged confidential, announcing 1507 table lines (as Norges Bank's Q1 2026
+     cover did) so a shorter or placeholder table is detected as incomplete. -->
 <edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:com="http://www.sec.gov/edgar/common">
   <schemaVersion>X0202</schemaVersion>
   <headerData>
@@ -8,12 +9,12 @@
   </headerData>
   <formData>
     <coverPage>
-      <filingManager><name>EXAMPLE CAPITAL</name></filingManager>
+      <filingManager><name>PARTIAL CAPITAL</name></filingManager>
       <reportType>13F HOLDINGS REPORT</reportType>
     </coverPage>
     <summaryPage>
       <otherIncludedManagersCount>0</otherIncludedManagersCount>
-      <tableEntryTotal>4</tableEntryTotal>
+      <tableEntryTotal>1507</tableEntryTotal>
       <isConfidentialOmitted>false</isConfidentialOmitted>
     </summaryPage>
   </formData>

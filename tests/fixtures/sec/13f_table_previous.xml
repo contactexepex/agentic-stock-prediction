@@ -1,3 +1,5 @@
+<!-- Hand-made test fixture (fictional filer EXAMPLE CAPITAL, CIK 9999200), shaped like a real 13F
+     information table for the previous quarter: AAPL 100 shares, MSFT 50, two unwatched lines. -->
 <informationTable xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">
   <infoTable>
     <nameOfIssuer>APPLE INC</nameOfIssuer>
@@ -16,5 +18,23 @@
     <shrsOrPrnAmt><sshPrnamt>50</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
     <investmentDiscretion>SOLE</investmentDiscretion>
     <votingAuthority><Sole>50</Sole><Shared>0</Shared><None>0</None></votingAuthority>
+  </infoTable>
+  <infoTable>
+    <nameOfIssuer>ALLY FINL INC</nameOfIssuer>
+    <titleOfClass>COM</titleOfClass>
+    <cusip>02005N100</cusip>
+    <value>500000000</value>
+    <shrsOrPrnAmt><sshPrnamt>12000000</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+    <investmentDiscretion>DFND</investmentDiscretion>
+    <votingAuthority><Sole>12000000</Sole><Shared>0</Shared><None>0</None></votingAuthority>
+  </infoTable>
+  <infoTable>
+    <nameOfIssuer>EXAMPLE CORP</nameOfIssuer>
+    <titleOfClass>NOTE 2.0% 2030</titleOfClass>
+    <cusip>999999AA0</cusip>
+    <value>1000000</value>
+    <shrsOrPrnAmt><sshPrnamt>1000000</sshPrnamt><sshPrnamtType>PRN</sshPrnamtType></shrsOrPrnAmt>
+    <investmentDiscretion>SOLE</investmentDiscretion>
+    <votingAuthority><Sole>0</Sole><Shared>0</Shared><None>0</None></votingAuthority>
   </infoTable>
 </informationTable>
