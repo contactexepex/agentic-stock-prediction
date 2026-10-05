@@ -40,3 +40,10 @@ Write records to `work/enriched.jsonl`, then append:
 Return to the caller (max 300 words): for each ticker the up-to-3 most material events with
 their ids and sentiment, clusters of articles covering the same event, and 3 notable
 macro/category items (for India include FII/DII flow reports when present).
+
+Second-order news: the context pack's "Connections" section (or `python scripts/graph.py hits`)
+lists articles that name a linked company or person (supplier, customer, group company,
+competitor, board member, promoter) of a watchlist ticker without being tagged with it. Score
+such an item as usual; in your brief, list material ones under the linked ticker marked
+"(via <relation>: <entity>)" with the sentiment for that ticker, which can differ from the
+article's own (a competitor's loss may help). Do not add the ticker to the stored news record.

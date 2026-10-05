@@ -1,0 +1,6 @@
+{"as_on_date": "__D1__", "BULK_DEALS_DATA": [],
+ "BLOCK_DEALS_DATA": [
+  {"date": "__D1__", "symbol": "ICICIBANK", "name": "ICICI Bank Limited", "clientName": "TEST INSURANCE CO", "buySell": "SELL",
+   "qty": "120000", "watp": "1250.00", "remarks": "-"}
+ ],
+ "SHORT_DEALS_DATA": []}

@@ -21,3 +21,15 @@ earnings_vol_multiple: 3.0  # an earnings day moves like this many normal days (
 major_event_factor: 1.15    # market-wide major event inside the horizon
 regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.1, UNSTABLE: 1.25}
 max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow it
+
+# Relationship risk flags (scripts/relations.py; markets with a `relations:` block). Extra width
+# per flag type, summed per ticker and capped. Off by default: switch on only if the weekly
+# review shows flagged tickers' ranges miss more often than the rest.
+relation_widen:
+  enabled: false
+  big_deal: 0.10
+  pledge_increase: 0.10
+  pledge_created: 0.05
+  pledge_invoked: 0.15
+  insider_sale: 0.05
+  max: 0.20

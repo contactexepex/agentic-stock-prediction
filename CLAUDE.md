@@ -20,6 +20,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
   Schemas live in `scripts/common.py`.
+- Relationships (DESIGN.md phase 5): `collect_relations_india` (NSE: SEBI PIT insider/promoter
+  trades, bulk and block deals, shareholding and promoter pledges -> `data/india/insiders|deals|holdings/`),
+  `relations.py` (risk flags: big deals, pledge rises, insider sales; optional range widening in
+  `config/ranges.yaml`, off by default) and `graph.py` (connection map in `data/<market>/graph/`:
+  `status`, `edges`, `hits` = second-order news, `add` = validate and append the graph-builder's edges)
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
@@ -27,7 +32,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `summaries/<market>/daily|weekly|monthly/` layered narrative memory written by Claude
 - `reports/<market>/<session_date>.md` the daily report linked from Slack; charts in
   `reports/<market>/charts/<session_date>/`; `config/settings.yaml` holds the repo URL and Slack channel
-- `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster
+- `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
+  graph-builder (monthly connection map; every edge cites a public source)
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
 
 ## Data rules

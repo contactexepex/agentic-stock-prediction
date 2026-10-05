@@ -16,6 +16,7 @@ import pandas as pd
 
 import events as ev
 import rangelib as rl
+import relations
 from common import (append_jsonl, connect, day_file, load_ranges_config, market_arg, require_market,
                     utc_now)
 from features import load_bars
@@ -41,6 +42,7 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
     bars = load_bars(con)
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     earnings = {t: d for t, k, d in company if k == "earnings"}
+    rwiden = relations.widen_by_ticker(cfg, rc, con)   # {} unless relation_widen.enabled
     now, rows = utc_now(), []
 
     for h in rc["horizons"]:
@@ -67,6 +69,9 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
             e = earnings.get(t)
             sigma_h, wnotes = rl.horizon_sigma(sd, h, bool(e and e <= tgt), rc, reg["regime"], bool(major))
             notes += wnotes
+            if t in rwiden:
+                sigma_h *= 1 + rwiden[t][0]
+                notes.append(rwiden[t][1])
             # centre: overnight cue + AI drift, capped
             center = 0.0
             cue = f.get("cue_change_pct")

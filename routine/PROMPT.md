@@ -11,8 +11,11 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
    and stop.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
-   `collect_news.py` and `collect_filings.py` (all in `scripts/`). Keep each JSON summary.
-   A failed collector is not fatal: continue and report what failed.
+   `collect_news.py` and `collect_filings.py` (all in `scripts/`), and for India also
+   `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
+   pledges from NSE). Keep each JSON summary.
+   A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
+   entry names a domain the environment's network settings must allow).
 
 4. Score: `python scripts/score_predictions.py`.
 
@@ -53,6 +56,12 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     exits with code 2 (no webhook configured) and a Slack connector is available in this
     session, post the same text as one message to #market-brief (channel id in
     `config/settings.yaml`) with the connector instead. Nothing else is posted.
+
+14. Connection map (monthly): if `python scripts/graph.py status` reports `refresh_due: true`
+    (first trading day of a month, or the map is empty), run the graph-builder subagent with the
+    market, then `git add data/<market>/graph && git commit -m "<market> connection map TODAY"`
+    and push as in step 12. It runs after the brief so it never delays it; new edges feed the
+    "Connections" section from the next run.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.
