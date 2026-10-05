@@ -126,6 +126,67 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
   synthetic series. About 22 s per market for five years of bars.
 
+**AI replay harness** (`scripts/ai_replay.py`): the table above keeps AI judgement out of backtests
+because the model may have seen past outcomes. Days after its training data (as-of dates after
+2026-06-30) are a fair test, so the agents can be replayed there, strictly as of the day. The
+script is deterministic and never runs an LLM; the orchestrating session runs the agents.
+- `dates --market M`: the sample, every 5th exchange trading day from 2026-07-01 to 2026-09-25
+  (13 per market), each with its next session and cutoff.
+- `backfill --market M --source S --since 2026-06-01`: S is a scratch source root (the repo, its
+  `data/`, anything inside or above them, or another checkout's `data/` are refused). It copies
+  `data/<M>/` and `config/` to S, lengthens the lookbacks in S's config only (US:
+  `filing_lookback_days`, `relationships.insiders|stakes.lookback_days`), and runs the existing
+  collectors into S one after another (SEC: one throttled client per collector, `SEC_USER_AGENT`;
+  NSE: one paced session per collector): US `collect_filings`, `collect_insiders`, `collect_stakes`,
+  `collect_events`; India `collect_nse_india --only announcements --only financials --since`,
+  `collect_relations_india --only insiders --only deals --since`, `collect_events`. The NSE
+  collectors' `--since` (new; default behaviour unchanged) asks the announcement and PIT indexes one
+  week at a time, polls every ticker's results filings broadcast since then, and sets the per-ticker
+  deals backfill. Rows keep their real publication/acceptance times (`first_seen_at` = the
+  backfill time), which is what `prepare` filters on. Summary in `S/backfill-<M>.json`.
+- `prepare --market M --date D --root R [--source S]`: cutoff = the routine's start on the session after D
+  (08:15 ET, 08:10 IST; section 2). R gets copies of `config/`, `sql/`, `templates/` and
+  `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
+  (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
+  time; events first seen by the cutoff plus backfilled past events dated <= D; predictions,
+  ranges, outcomes and snapshots by their own made/scored/computed time; bulk/block deals by trade
+  date <= D (assumed: NSE publishes them after the close; listed under `assumptions`); kinds with
+  only an observation date (macro, shorts, FPI, indices, flows, delivery) only if first seen by the
+  cutoff. Upcoming earnings: only rows first seen by the cutoff count. `--assume-earnings-known DAYS`
+  (off by default) adds the actual earnings dates within DAYS after D as events labelled "ASSUMED
+  known in advance", as `replay.py` treats past event dates; stored rows never say when a date was
+  announced. News is dropped (stored news starts with live collection), and so are `summaries/` and
+  `reports/`. Then `features`, `calibrate`, `context` (`R/work/context.md`, plus a list of the
+  citable filing/announcement ids) and `ranges` run with `MB_ROOT=R` and `MB_NOW` = the cutoff:
+  `common.clock()` freezes every "now"/"today" and `connect()` rewrites DuckDB's `current_date`.
+  A JSON summary lists every kind kept or dropped and the context pack's size.
+- `record`: validates forecaster records (schema `predictions`, id format, as_of_date = D,
+  horizon 1/5, confidence 0.50-0.90, `range_widen` <= 0.5, rationale <= 40 words, evidence ids
+  present in R's news/filings/announcements, no BLOCKED ticker, no `days_to_earnings` <= 1 in R)
+  and appends the valid ones to `<results>/<M>/calls.jsonl` (`replay: true`, `made_at` = cutoff),
+  never to `data/`; each day once.
+- `score`: on the real stored closes (hit as `score_predictions.py`): hit rate by horizon and
+  confidence band with Wilson 95% intervals and an exact binomial test, stated vs actual
+  confidence, always-up and `replay.py`'s rule baselines on the same ticker-days, abstention rate;
+  a novice-first HTML page (three sentences, four numbers, two charts, details collapsed) and JSON.
+- Tests (`tests/test_ai_replay.py`): perturbing every row after the cutoff leaves the context pack,
+  ranges, indicators, regime and calibration byte-identical (changing D's close does not);
+  record's rejections; scoring on synthetic series; the date list; `prepare --source`; the
+  earnings assumption is opt-in and labelled; `backfill` refuses the repo and any real `data/`
+  and changes only the scratch config; the NSE collectors' `--since` (weekly windows, deals
+  backfill) and their unchanged default (one call over the configured lookback).
+- Evidence: the repo's own data has zero citable ids on every sample day (stored SEC filings start
+  2026-09-28, news 2026-10-02/04, no NSE announcements), so replays read a `backfill` source. With
+  `--since 2026-06-01` (run 2026-10-05) every sample day has 36-94 citable SEC filing ids (US, mostly
+  Form 4) and 89-186 NSE announcement ids (India) public in the 14 days before the cutoff.
+- Upcoming earnings, honestly as of D: none of the stored sources says when a date was announced.
+  yfinance (upcoming and past dates), SEC 8-K item 2.02 and NSE results filings give the actual
+  release dates, known only once they happen; NSE board-meeting intimations are a separate NSE feed
+  that is not collected, and only a few announcements (earnings-call intimations) mention a coming
+  results date in their text. In strict mode `days_to_earnings` is therefore empty on every sample
+  day; `--assume-earnings-known 14` fills it from the actual dates, labelled as an assumption. There
+  is also no stored history of overnight quotes.
+
 ## 8. Output
 Processing data and presentation are separate. Processing data is what the next run reads:
 append-only JSONL under `data/`, the context pack and the summaries; presentation never writes
