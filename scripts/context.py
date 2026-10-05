@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import events as ev
+import fundamentals as fu
 import graph
 import nse_context
 import relations
@@ -142,6 +143,7 @@ def main() -> None:
                         *nse_context.context_sections(cfg, con)]:
         print(f"## {title}\n\n{body}")
     print(sm.markdown(cfg, con))
+    print(fu.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (no consensus, no "surprise")
 
 
 if __name__ == "__main__":

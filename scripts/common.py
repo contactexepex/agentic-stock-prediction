@@ -163,6 +163,16 @@ SCHEMAS.update({
     }),
 })
 
+# Fundamentals, US from SEC XBRL company facts (collect_fundamentals.py): one row per ticker x
+# tag x period x filing that first reported the value or changed it (prev_value = earlier value).
+SCHEMAS["fundamentals"] = ("jsonl", {
+    "id": "VARCHAR", "ticker": "VARCHAR", "cik": "VARCHAR", "concept": "VARCHAR", "tag": "VARCHAR",
+    "tag_rank": "INTEGER", "unit": "VARCHAR", "period_start": "DATE", "period_end": "DATE",
+    "period": "VARCHAR", "fiscal_year": "INTEGER", "fiscal_period": "VARCHAR", "form": "VARCHAR",
+    "accession": "VARCHAR", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ", "value": "DOUBLE",
+    "prev_value": "DOUBLE", "first_seen_at": "TIMESTAMPTZ",
+})
+
 # Relationships (DESIGN.md phase 5): India insider/promoter trades (SEBI PIT), bulk and block
 # deals, shareholding incl. promoter pledges (collect_relations_india.py), and the per-company
 # connection map for both markets (graph-builder agent, graph.py). Merged as a column union so a

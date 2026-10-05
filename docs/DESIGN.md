@@ -147,6 +147,40 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 23
    tracked filers (`collect_insiders|stakes|holdings.py`), smart-money views and context
    section, and a fresh-13D note on ranges (widen gated in `config/ranges.yaml`, off).
+6. Fundamentals (US built; India from NSE results, separate collector): quarterly, half-yearly
+   (H1 year to date) and annual 10-Q/10-K values from SEC's free XBRL company facts API
+   (`collect_fundamentals.py`, daily; downloads only when a new 10-Q/10-K is listed). Standard
+   concepts are read from a short priority list of us-gaap/dei tags per concept; a value is stored
+   once per filing that first reports it or changes it, so restatements and split adjustments
+   are new rows and the views take the newest filing. Fiscal Q4 (rarely tagged) is derived as
+   FY - 9M and quarterly cash flows from year-to-date totals, marked derived (a derived EPS is
+   approximate: AAPL Q4 FY2025 derives to 1.84 vs 1.85 reported). The context pack shows the last
+   reported quarter (YoY growth, margins, FCF, filed date, `new` if filed in the last 5 days) and
+   the latest balance sheet. No consensus estimates are available for free, so there is no
+   earnings "surprise". Gaps, counted on the live data of 2026-10-05 (all quarters since late 2023
+   in `fundamentals_metrics`, 10-12 per ticker):
+   - Banks and insurers (ALL, BAC, JPM, PGR) tag no gross or operating profit: both margins blank.
+   - Operating margin is also blank for CVX, DE, LLY, MRK and XOM (no `OperatingIncomeLoss`).
+   - Gross margin is also blank for DAL, DE, GM, UAL and XOM (no gross profit and no cost of revenue
+     among the collected tags).
+   - FCF is blank for BAC and JPM (no capex tagged). DAL tags capex only in parts in its Q2 2026
+     10-Q, so its latest quarter has no capex or FCF (9 of 10 quarters have them). ALL, NVDA and WMT
+     lack capex only in their first quarter in the window (no earlier year-to-date total to subtract).
+   - Total debt on the latest balance sheet is blank for CAT, DE and GM (debt tagged only in parts
+     or custom tags).
+   - META has no company-total shares-outstanding fact in company facts (likely because it reports
+     class A and B shares separately), so its `shares_out` is blank.
+   - Where no gross profit is tagged but a cost of revenue is (CAT, COST, CVX, GOOGL, LLY, META, MRK,
+     WMT), gross margin is computed as (revenue - cost of revenue) / revenue and marked `c`: a
+     uniform formula, not the company's own measure. It misleads for some: CVX's "cost" is purchased
+     crude and products (47.8% for Q2 2026, not an oil major's margin), CAT's revenue includes
+     financial-services revenue, and WMT's and COST's includes membership fees.
+
+   **Not point in time:** the plain views (`fundamentals_latest`, `_quarterly`, `_metrics`) use every
+   stored filing, so a restated or split-adjusted value replaces the original. A backtest or any
+   as-of question must use the macros `fundamentals_latest_asof(ts)`, `fundamentals_quarterly_asof(ts)`
+   and `fundamentals_metrics_asof(ts)`, which see only filings known by `ts` (`known_at` =
+   acceptance time, or the end of the filing date in UTC when SEC's list no longer holds it).
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 
