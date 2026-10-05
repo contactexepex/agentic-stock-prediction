@@ -28,14 +28,22 @@ def target_date(cfg: dict, as_of, h: int):
     return ev.sessions_ahead(cfg, as_of + timedelta(days=1), h)[-1]
 
 
+def first_target_close(cfg: dict, as_of):
+    return ev.session_close_utc(cfg, target_date(cfg, as_of, 1))
+
+
 def cue_times(con, feats: pd.DataFrame) -> dict:
-    """When each ticker's cue was quoted: the quote features.py used (ADR first, same UTC day)."""
-    if feats.empty:
-        return {}
-    day = pd.Timestamp(feats["computed_at"].max()).date()
-    rows = con.execute("SELECT symbol, coalesce(ts, collected_at) FROM quotes_latest WHERE day = ?", [day]).fetchall()
-    quoted = {s: pd.Timestamp(t).to_pydatetime() for s, t in rows if t is not None}
-    return {t: quoted.get(f"{t}:ADR") or quoted.get(t) for t in feats.index}
+    """When each ticker's cue was quoted: the quote features.py used, i.e. the latest one collected
+    on the snapshot's UTC day no later than its computed_at (ADR first)."""
+    out = {}
+    for t, f in feats.iterrows():
+        at = pd.Timestamp(f["computed_at"]).to_pydatetime()
+        row = con.execute("SELECT coalesce(ts, collected_at) FROM quotes WHERE symbol IN (?, ?) "
+                          "AND CAST(collected_at AS DATE) = CAST(? AS DATE) AND collected_at <= ? "
+                          "ORDER BY symbol = ? DESC, collected_at DESC LIMIT 1",
+                          [f"{t}:ADR", t, at, at, f"{t}:ADR"]).fetchone()
+        out[t] = pd.Timestamp(row[0]).to_pydatetime() if row and row[0] is not None else None
+    return out
 
 
 def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
@@ -57,7 +65,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     now, rows = now or utc_now(), []
     made = datetime.fromisoformat(now)
     first = target_date(cfg, as_of, 1)
-    first_close = ev.session_close_utc(cfg, first)
+    first_close = first_target_close(cfg, as_of)
     cue_ts = cue_times(con, feats)
 
     for h in rc["horizons"]:
@@ -128,12 +136,19 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
 
 
 def main() -> int:
-    cfg = require_market(market_arg(__doc__).parse_args())
+    ap = market_arg(__doc__)
+    ap.add_argument("--now", help="made_at as ISO 8601 UTC with offset instead of now (tests only)")
+    args = ap.parse_args()
+    cfg = require_market(args)
+    now = args.now or utc_now()
+    if datetime.fromisoformat(now).tzinfo is None:
+        raise SystemExit("--now needs a UTC offset, e.g. 2026-10-05T02:40:00+00:00")
     rc, con = load_ranges_config(), connect(cfg["market"])
-    rows = build(cfg, rc, con)
+    rows = build(cfg, rc, con, now)
     if rows:
         append_jsonl(day_file(cfg["market"], "ranges", pd.Timestamp(rows[0]["as_of_date"]).date()), rows)
-    late = any(n.startswith("late:") for r in rows for n in r["notes"])
+    as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
+    late = datetime.fromisoformat(now) >= first_target_close(cfg, as_of)
     print(json.dumps({"step": "ranges", "market": cfg["market"], "written": len(rows), "late": late,
                       "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
     return 0
