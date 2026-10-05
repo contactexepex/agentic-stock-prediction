@@ -1,0 +1,4 @@
+# Where reports are published and announced.
+repo_url: https://github.com/contactexepex/agentic-stock-prediction
+branch: main
+slack_channel: "#market-brief"

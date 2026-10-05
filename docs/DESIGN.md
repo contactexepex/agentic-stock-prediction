@@ -105,7 +105,8 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 ## 10. Build phases
 1. Markets config, extra inputs, PASDS indicators, regime, event calendar. **(built)**
 2. Range engine, self-calibration, scoring against baselines; backtest of range formulas. **(built)**
-3. Charts, new report layout, Slack message, two routines.
+3. Charts, new report layout, Slack message, two routines. **(built; routines to be created once the
+   environment's network access is set)**
 4. Weekly review: what improved coverage, what to drop.
 5. Relationships (knowledge graph, public data only): insider trades (US Form 4, India SEBI
    disclosures), big-investor stakes (US 13D/13G, India bulk and block deals), holdings (US

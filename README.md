@@ -28,7 +28,10 @@ Research only. Nothing here is investment advice, and the routines never trade.
    the AI call. Scored daily against a naive baseline; `backtest.py` checks the formula
    walk-forward on history.
 9. **Remember**: daily summaries, rolled up into weekly and monthly ones, per market.
-10. **Save** to this repo (append-only data) and **notify** Slack once per market.
+10. **Charts and report** (`charts.py`, `report.py`): one chart per stock (60 days of prices,
+    past ranges hit/miss, today's range cone with the call) plus an overview grid; the report
+    and the Slack draft carry every number from the scripts, the agents add only narrative.
+11. **Save** to this repo (append-only data) and **notify** Slack with one message per market.
 
 Storage is date-partitioned files under `data/<market>/`, queried with DuckDB. See `sql/views.sql`.
 

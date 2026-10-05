@@ -38,17 +38,18 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
    - If `monthly/<previous month, e.g. 2026-09>.md` does not exist and weekly or daily
      summaries exist for that month, write it (max 600 words).
 
-11. Report: write `reports/<market>/TODAY.md` following `templates/report.md`.
+11. Charts and report: `python scripts/charts.py`, then `python scripts/report.py`. This writes
+    `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
+    `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
+    `templates/report.md`, then delete the markers. Never change a number, table or chart
+    link written by the script.
 
 12. Save: `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
 
-13. Notify: post ONE message to the Slack channel #market-brief, at most 12 lines: market name
-    and regime, a 1-line headline, the 1-day 80% ranges for the tickers with calls (ticker,
-    range, direction, confidence), yesterday's ranges hit/miss (80% and 50%), the 2 most
-    material news items, failed collectors if any, and the link
-    https://github.com/contactexepex/agentic-stock-prediction/blob/main/reports/<market>/TODAY.md
+13. Notify: post the filled `work/slack_<market>.md` as ONE message to the Slack channel
+    #market-brief. Nothing else is posted.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.

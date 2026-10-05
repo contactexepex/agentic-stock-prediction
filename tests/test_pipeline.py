@@ -62,7 +62,8 @@ def setup(tmp: Path) -> tuple[Path, Path]:
                          ("Apple raises guidance", "duplicate in same feed")]))
     (cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML % feed)
     (cfg / "events.yaml").write_text((REPO / "config" / "events.yaml").read_text().replace("[us]", "[us, testmkt]"))
-    (cfg / "ranges.yaml").write_text((REPO / "config" / "ranges.yaml").read_text())
+    for name in ("ranges.yaml", "settings.yaml"):
+        (cfg / name).write_text((REPO / "config" / name).read_text())
     return root, cfg
 
 
@@ -250,6 +251,25 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
     assert "Price ranges" in ctx.stdout and "Range scorecard" in ctx.stdout
+
+    ch = run("charts.py", root, cfg)
+    assert ch.returncode == 0, ch.stderr
+    charts = json.loads(ch.stdout)
+    assert set(charts["tickers"]) == {"AAPL", "MSFT"}
+    for f in [charts["overview"], *charts["tickers"].values()]:
+        assert (root / f).stat().st_size > 2000
+
+    rep = run("report.py", root, cfg)
+    assert rep.returncode == 0, rep.stderr
+    out = json.loads(rep.stdout)
+    text = (root / out["report"]).read_text()
+    for needle in ("## Today", "<!-- AGENT:headline -->", "/overview.png)", "/AAPL.png)", "80% hit 2/2",
+                   "## Track record", "<!-- AGENT:sector:Tech -->"):
+        assert needle in text, needle
+    slack = (root / out["slack_draft"]).read_text()
+    assert "• AAPL ▲ up 80% (5 days) · $" in slack
+    assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.md") and out["url"] in slack
+    assert len(slack.strip().splitlines()) <= 12
 
 
 def test_backtest_coverage_is_calibrated(tmp_path):
