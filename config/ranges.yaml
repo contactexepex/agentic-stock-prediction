@@ -18,6 +18,7 @@ max_center_shift_sigma: 0.5 # hard cap on total centre shift, in horizon sigmas
 
 # Width adjustments.
 earnings_vol_multiple: 3.0  # an earnings day moves like this many normal days (variance add)
+earnings_vol_multiple_by_market: {india: 2.0}  # per-market override; India x2: backtest, DESIGN section 11
 major_event_factor: 1.15    # market-wide major event inside the horizon
 regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.1, UNSTABLE: 1.25}
 max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow it
@@ -31,7 +32,7 @@ max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow 
 # value `iv_sigma_h` for the weekly review.
 backtest_min_gain: 0.005    # 0.5% of the interval score
 earnings_history:           # size the earnings widening from the stock's past earnings-day moves
-  enabled: {us: [1]}        # US 5d worse at 250 sessions; India: no earnings dates to test
+  enabled: {us: [1]}        # US 5d worse at 250 sessions; India 1d and 5d worse than its fixed x2
   min_events: 2             # fewer past reactions -> fixed earnings_vol_multiple
   prior_events: 4           # shrink towards earnings_vol_multiple as if it were this many events
   lookback_events: 12       # most recent reactions used

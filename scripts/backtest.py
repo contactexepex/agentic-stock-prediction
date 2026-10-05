@@ -324,7 +324,7 @@ def main() -> int:
     ap.add_argument("--out", help="write the report here instead of reports/<market>/")
     args = ap.parse_args()
     cfg = require_market(args)
-    rc = load_ranges_config()
+    rc = load_ranges_config(cfg["market"])
     s = run(cfg, rc, args.eval_sessions)
     path = Path(args.out) if args.out else ROOT / "reports" / cfg["market"] / f"backtest-{s['as_of_date']}.md"
     path.parent.mkdir(parents=True, exist_ok=True)

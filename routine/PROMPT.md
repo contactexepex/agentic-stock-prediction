@@ -68,7 +68,9 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    Run the five SEC collectors (`collect_filings`, `collect_insiders`, `collect_stakes`,
    `collect_holdings`, `collect_fundamentals`) one after another, never in parallel: each
    throttles only its own requests, and together they must stay under SEC's 10 requests/second. `collect_events`
-   also reads SEC (US earnings-date backfill), so never run it alongside them either.
+   also reads SEC (US earnings-date backfill) and, for India, NSE results filings (earnings dates;
+   only tickers that are due), so never run it alongside the SEC or NSE collectors either. List its
+   `sec_failed` / `nse_failed` tickers in `data_quality`.
 
 4. Score: `python scripts/score_predictions.py`.
 
