@@ -23,8 +23,11 @@ and list each FAIL with its reason in the report's `data_quality` section and th
    closed and ignores cues quoted after it. Say so in the report's `data_quality` section.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
-   `collect_news.py` and `collect_filings.py` (all in `scripts/`). Keep each JSON summary.
-   A failed collector is not fatal: continue and report what failed.
+   `collect_news.py` and `collect_filings.py` (all in `scripts/`), and for India also
+   `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
+   pledges from NSE). Keep each JSON summary.
+   A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
+   entry names a domain the environment's network settings must allow).
 
 4. Score: `python scripts/score_predictions.py`.
 
@@ -65,6 +68,16 @@ and list each FAIL with its reason in the report's `data_quality` section and th
     exits with code 2 (no webhook configured) and a Slack connector is available in this
     session, post the same text as one message to #market-brief (channel id in
     `config/settings.yaml`) with the connector instead. Nothing else is posted.
+
+14. Connection map (monthly): if `python scripts/graph.py status` reports `refresh_due: true`
+    (no refresh attempt yet this month), run the graph-builder subagent with the market, then
+    always record the attempt, even if it added nothing:
+    `python scripts/graph.py attempt --note "<one line from its summary>"`. Then commit only what
+    exists and changed, and push as in step 12:
+    `git add data/<market>/graph_runs; [ -d data/<market>/graph ] && git add data/<market>/graph;`
+    `git diff --cached --quiet || git commit -m "<market> connection map TODAY"`.
+    It runs after the brief so it never delays it; new edges feed the "Connections" section
+    from the next run.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.

@@ -79,3 +79,41 @@ FROM ranges_latest r JOIN (SELECT DISTINCT ON (range_id) * FROM range_outcomes O
 
 CREATE OR REPLACE VIEW calibration_latest AS
 SELECT DISTINCT ON (horizon_days) * FROM calibration ORDER BY horizon_days, as_of_date DESC, computed_at DESC;
+
+-- Relationships (DESIGN.md phase 5). India: collect_relations_india.py; graph: graph-builder.
+CREATE OR REPLACE VIEW insider_trades AS
+SELECT DISTINCT ON (id) * FROM insiders ORDER BY id, first_seen_at;
+
+-- Bulk/block deals sized against the stock's average volume over the 20 sessions before.
+CREATE OR REPLACE VIEW deals_scored AS
+WITH adv AS (
+    SELECT ticker, date, avg(volume) OVER (PARTITION BY ticker ORDER BY date
+                                           ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS adv20
+    FROM ohlc
+), d AS (SELECT DISTINCT ON (id) * FROM deals ORDER BY id, first_seen_at)
+SELECT d.*, round(d.value / 1e7, 2) AS value_crore, round(d.shares / nullif(adv.adv20, 0), 3) AS adv_ratio
+FROM d ASOF LEFT JOIN adv ON d.ticker = adv.ticker AND d.date >= adv.date;
+
+-- One row per ticker and quarter: promoter holding and pledge (latest filing per source wins).
+CREATE OR REPLACE VIEW holdings_quarterly AS
+WITH h AS (
+    SELECT DISTINCT ON (ticker, period_end, source) * FROM holdings
+    WHERE promoter_pct IS NOT NULL OR pledged_pct_of_promoter IS NOT NULL
+    ORDER BY ticker, period_end, source, filed_at DESC NULLS LAST, first_seen_at DESC
+)
+SELECT ticker, period_end,
+       coalesce(max(promoter_pct) FILTER (WHERE source = 'nse_shp'), max(promoter_pct)) AS promoter_pct,
+       max(public_pct) AS public_pct, max(pledged_pct_of_promoter) AS pledged_pct_of_promoter,
+       max(pledged_pct_of_total) AS pledged_pct_of_total, max(filed_at) AS filed_at
+FROM h GROUP BY ticker, period_end;
+
+CREATE OR REPLACE VIEW pledge_changes AS
+SELECT *, lag(period_end) OVER wq AS prev_period,
+       pledged_pct_of_promoter - lag(pledged_pct_of_promoter) OVER wq AS pledge_change_pp,
+       promoter_pct - lag(promoter_pct) OVER wq AS promoter_change_pp
+FROM holdings_quarterly WINDOW wq AS (PARTITION BY ticker ORDER BY period_end);
+
+-- Connection map: latest version of each edge; an edge retracted with status 'removed' drops out.
+CREATE OR REPLACE VIEW graph_edges AS
+SELECT * FROM (SELECT DISTINCT ON (id) * FROM graph ORDER BY id, added_at DESC)
+WHERE coalesce(status, 'active') = 'active';

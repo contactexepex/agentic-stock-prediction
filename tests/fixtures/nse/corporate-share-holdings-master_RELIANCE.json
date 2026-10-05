@@ -1,0 +1,8 @@
+[
+  {"symbol": "RELIANCE", "name": "Reliance Industries Limited", "pr_and_prgrp": "50.10", "public_val": "49.90", "employeeTrusts": "0",
+   "date": "30-JUN-2026", "submissionDate": "__D5__", "broadcastDate": "__D5__ 16:28:46", "revisedData": "N",
+   "xbrl": "https://nsearchives.nseindia.com/corporate/xbrl/SHP_TEST_2.xml", "recordId": "2"},
+  {"symbol": "RELIANCE", "name": "Reliance Industries Limited", "pr_and_prgrp": "50.30", "public_val": "49.70", "employeeTrusts": "0",
+   "date": "31-MAR-2026", "submissionDate": "20-APR-2026", "broadcastDate": "20-APR-2026 17:00:00", "revisedData": "N",
+   "xbrl": "https://nsearchives.nseindia.com/corporate/xbrl/SHP_TEST_1.xml", "recordId": "1"}
+]

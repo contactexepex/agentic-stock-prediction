@@ -115,12 +115,27 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,
    group companies, suppliers, customers, competitors) refreshed monthly. Used for
    second-order news, smart-money signals and range-widening risk flags.
+   - **India (built; waiting for network access):** `collect_relations_india.py` reads NSE's
+     public JSON (SEBI PIT disclosures, bulk/block deals with snapshot and archive-CSV fallbacks,
+     shareholding master and pledge data) into `data/india/insiders|deals|holdings/`. Needs
+     `www.nseindia.com` and `nsearchives.nseindia.com` allowed in the cloud environment.
+     `relations.py` turns them into context-pack risk flags (deal >= INR 250 cr or 0.5x 20-day
+     volume, promoter pledge +1 pp q/q, new or invoked pledges, insider sales >= INR 10 cr);
+     the range widening from these flags is in `config/ranges.yaml` and off until the weekly
+     review shows flagged tickers miss more often.
+   - **Connection map, both markets (built):** edges in `data/<market>/graph/` written monthly by
+     the graph-builder agent through `graph.py add` (validated, each citing a source URL;
+     each monthly attempt recorded in `graph_runs/` so an empty run is not repeated daily;
+     retractions are new rows). `graph.py hits` finds second-order news for the context pack
+     and the news-analyst.
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 
 ## 11. Open items
 - Watchlists: decided (20 per market, 10 sectors x 2), see `config/markets/`.
 - Verify the India outlet RSS URLs and the 2027 India holiday calendar once live.
+- On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
+  against live responses (NSE changes field names; built from public scrapers, not yet seen live).
 - Not yet built from section 4: options-implied volatility (US option chains) in the width blend,
   index-then-stock beta split for the centre, past earnings-day moves, and ex-dividend price
   shift (needs the dividend amount). Today: EWMA width, empirical quantiles, earnings / event /

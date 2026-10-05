@@ -7,6 +7,8 @@ from __future__ import annotations
 from datetime import timedelta
 
 import events as ev
+import graph
+import relations
 from common import connect, market_arg, md_table, require_market, utc_today
 from features import local_today
 
@@ -118,6 +120,9 @@ def main() -> None:
         if title.startswith("SEC") and cfg.get("filings") != "sec":
             continue
         print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
+    # Relationships (phase 5): India insider trades, deals, pledges and flags; connections (both markets).
+    for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con)]:
+        print(f"## {title}\n\n{body}")
 
 
 if __name__ == "__main__":

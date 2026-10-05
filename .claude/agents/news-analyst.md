@@ -46,3 +46,10 @@ Cite every item by its real `id` from the news file: the 16-character hex string
 record's `id` field (e.g. `3f9a0c1b7d2e4a65`), copied exactly. Never cite line numbers,
 ordinals or positions ("item 12", "#3", "line 40"); the researchers and the forecaster copy
 these ids into `evidence_ids`, so anything else breaks the audit trail.
+
+Second-order news: the context pack's "Connections" section (or `python scripts/graph.py hits`)
+lists articles that name a linked company or person (supplier, customer, group company,
+competitor, board member, promoter) of a watchlist ticker without being tagged with it. Score
+such an item as usual; in your brief, list material ones under the linked ticker marked
+"(via <relation>: <entity>)" with the sentiment for that ticker, which can differ from the
+article's own (a competitor's loss may help). Do not add the ticker to the stored news record.
