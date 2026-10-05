@@ -264,6 +264,19 @@ def test_replay_scratch_root_rules(tmp_path):
     refused(whole, "outside")
     assert _tree(real) == []
 
+    # hard-linked target file: same inode as a file in a real data tree, survives resolve()
+    today = datetime.now(timezone.utc).date()
+    rel = Path(MARKET) / "insiders" / f"{today:%Y}" / f"{today:%m}" / f"{today:%Y-%m-%d}.jsonl"
+    real_file = tmp_path / "realrepo2" / "data" / rel
+    real_file.parent.mkdir(parents=True)
+    real_file.write_text('{"id": "real-row"}\n')
+    hl = scratch("hl")
+    (hl / "data" / rel).parent.mkdir(parents=True)
+    os.link(real_file, hl / "data" / rel)
+    r = run("collect_relations_india.py", hl, cfg, "--replay", str(replay), "--only", "insiders")
+    assert r.returncode == 2 and "hard-linked" in json.loads(r.stdout)["error"], r.stdout
+    assert real_file.read_text() == '{"id": "real-row"}\n'                        # linked file unchanged
+
     # a proper scratch root still works
     ok = scratch("ok")
     r = run("collect_relations_india.py", ok, cfg, "--replay", str(replay))

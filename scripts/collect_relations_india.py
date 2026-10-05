@@ -15,7 +15,7 @@ and are not yet checked against a live NSE response (NSE was not reachable when 
 synthetic (hand-written to match those field names), so replay only writes to an explicit
 scratch root: MB_ROOT must contain a `.scratch-ok` file, must not look like a repo checkout or a
 real data store (.git, CLAUDE.md, price files), and every write target must resolve inside
-MB_ROOT's own data/ (no symlinks out) and outside any repo checkout."""
+MB_ROOT's own data/ (no symlinks out), outside any repo checkout, and not be a hard-linked file."""
 from __future__ import annotations
 
 import csv
@@ -333,6 +333,13 @@ def replay_problem(root: Path, targets: list[Path]) -> str | None:
         for parent in r.parents:             # never inside any repo checkout's data
             if any((parent / m).exists() for m in REPO_MARKERS):
                 return f"write target {t} resolves into a repo checkout ({parent})"
+        if r.exists():                       # hard links survive resolve(): check the inode itself
+            st = r.stat()
+            if st.st_nlink > 1:
+                return f"write target {t} is hard-linked ({st.st_nlink} links); replay never appends to it"
+            real_inodes = {(s.st_dev, s.st_ino) for f in real.rglob("*") if f.is_file() for s in [f.stat()]}
+            if (st.st_dev, st.st_ino) in real_inodes:
+                return f"write target {t} is the same file as one in this checkout's data/"
     return None
 
 

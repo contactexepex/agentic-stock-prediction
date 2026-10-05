@@ -6,5 +6,7 @@ live NSE response, because NSE was not reachable from the build environment. Peo
 numbers are invented test values. __Dn__ is replaced by the test with the date n days ago
 (dd-Mon-YYYY). Replace or extend these with real responses once www.nseindia.com is allowed.
 collect_relations_india.py --replay writes only to an explicit scratch MB_ROOT (one holding a
-.scratch-ok file, with no .git, CLAUDE.md or price files, and no write target resolving outside
-its own data/ or into a repo checkout), so these rows can never reach a real data/ tree.
+.scratch-ok file, with no .git, CLAUDE.md or price files; no write target may resolve outside
+its own data/ or into a repo checkout, be hard-linked, or share an inode with a file in the
+code checkout's data/). These checks guard against accidental writes into a real data/ tree;
+they are not a security boundary against someone deliberately constructing a scratch root.
