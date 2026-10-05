@@ -27,6 +27,9 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
     case_name = "CASE symbol " + " ".join(f"WHEN '{k}' THEN '{v.replace(chr(39), '')}'" for k, v in names.items()) + " ELSE symbol END"
     case_role = "CASE symbol " + " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in roles.items()) + " ELSE 'ticker' END"
     sector = "CASE ticker " + " ".join(f"WHEN '{k}' THEN '{v.get('sector') or ''}'" for k, v in cfg["tickers"].items()) + " END"
+    etf_of = "CASE ticker " + " ".join(f"WHEN '{k}' THEN '{v.get('sector_etf') or ''}'" for k, v in cfg["tickers"].items()) + " END"
+    covers = {k: ", ".join(v.get("sectors") or []).replace("'", "") for k, v in cfg["symbols"].items()}
+    case_covers = "CASE ticker " + " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in covers.items()) + " ELSE '' END"
     tickers = list(cfg["tickers"])
     return [
         ("Market regime (latest)", """
@@ -39,13 +42,14 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
                    round(change_pct * 100, 2) AS change_pct, ts
             FROM quotes_latest WHERE day = current_date ORDER BY role, symbol""", []),
         ("Sector ETFs and indices (latest bar; returns in %)", f"""
-            SELECT ticker, {case_name.replace('symbol', 'ticker')} AS name, date, round(close, 2) AS close,
+            SELECT ticker, {case_name.replace('symbol', 'ticker')} AS name, {case_covers} AS watchlist_sectors,
+                   date, round(close, 2) AS close,
                    round(ret_1d * 100, 2) AS d1, round(ret_5d * 100, 2) AS d5, round(ret_20d * 100, 2) AS d20
             FROM returns WHERE list_contains(?, ticker)
             QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY date DESC) = 1
             ORDER BY ticker""", [[k for k, v in cfg["symbols"].items() if v.get("role") == "sector_etf"] or [""]]),
         ("Indicators (latest snapshot; returns and vol in %)", f"""
-            SELECT ticker, {sector} AS sector, quality, round(close, 2) AS close,
+            SELECT ticker, {sector} AS sector, {etf_of} AS sector_etf, quality, round(close, 2) AS close,
                    round(ret_1d * 100, 2) AS d1, round(ret_5d * 100, 2) AS d5, round(ret_20d * 100, 2) AS d20,
                    round(rsi_14, 0) AS rsi, round(ema_ratio, 3) AS ema_r, round(price_vs_20d_high, 3) AS vs_20d_hi,
                    round(atr_pct * 100, 2) AS atr_pct, round(ewma_vol * 100, 1) AS ewma_vol,
@@ -108,6 +112,12 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
     ]
 
 
+def sector_gaps(cfg: dict) -> str:
+    """Watchlist sectors that no sector ETF or index stands for (empty when all are mapped)."""
+    gaps = [s for s in cfg.get("sectors") or {} if s not in cfg.get("sector_etfs", {})]
+    return f"Watchlist sectors without a sector ETF or index: {', '.join(gaps)}\n" if gaps else ""
+
+
 def upcoming_events(cfg: dict, con) -> str:
     start = local_today(cfg)
     session = ev.next_session(cfg, start)
@@ -161,6 +171,8 @@ def main() -> None:
         if title.startswith("SEC") and cfg.get("filings") != "sec":
             continue
         print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
+        if title.startswith("Sector ETFs") and sector_gaps(cfg):
+            print(sector_gaps(cfg))
     # Relationships (phase 5): India insider trades, deals, pledges and flags; connections (both markets).
     # India primary sources from NSE (flows, announcements, results, delivery); empty elsewhere.
     for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con),

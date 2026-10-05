@@ -41,11 +41,11 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | Implied volatility | Option chains (yfinance): ATM IV, implied earnings move | India VIX (index level only) |
 | Global factors | US 10Y `^TNX`, dollar `DX-Y.NYB`, crude `CL=F`, gold `GC=F` | Same, plus USD/INR `INR=X` |
 | Flows | (none) | FII/DII net flows, read from news |
-| Sectors | 10 SPDR sector ETFs | Nifty sector indices |
+| Sectors | One ETF per watchlist sector (10): eight SPDR sector ETFs, JETS (airlines), IAK (insurance) | Nifty Bank, IT and Pharma indices (none for the other seven sectors; see `config/markets/india.yaml`) |
 | News sources | Google News (US), CNBC, BBC | Google News (IN), Economic Times, Moneycontrol, Livemint |
 
 **Event calendar:** earnings, ex-dividend, F&O expiry, Fed/FOMC, RBI policy, CPI/jobs releases,
-index rebalances.
+index rebalances (S&P 500 quarterly, Nifty 50 semi-annual; listed, not major).
 
 **PASDS indicators (Python):** returns 1/3/5/20d, EMA(9)/EMA(21) ratio, RSI(14), ROC(10),
 price vs 20-day high, ATR(14), 10-day realized vol, Bollinger width, OBV trend, volume ratio.
@@ -211,6 +211,39 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
   a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
   and earnings dates when every method raised.
+- Issue #9, done 2026-10-05 (no new network access needed):
+  - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the
+    close of the third Friday of March, June, September and December (the triple-witching day),
+    and the Nifty 50 semi-annual rebalance at the close of the session before the last trading
+    session of March and September (new rule `month_end` with `session_offset: -1`). Both are
+    listed with `major: false`: they are announced weeks ahead and their volume sits in the
+    closing auction of the changed names, so they do not raise EVENT_HEAVY or widen ranges on
+    their own (the S&P day is EVENT_HEAVY anyway through triple witching). The sources are cited
+    in the file; the S&P date when the third Friday is a holiday (Juneteenth 2026 and 2027) is provisional.
+  - US sector ETFs: one per watchlist sector (10): the eight SPDR funds plus JETS (Airlines) and
+    IAK (Insurance). Each sector ETF lists the watchlist sectors it stands for (`sectors:` in
+    `config/markets/<market>.yaml`); the context pack shows the mapping in the sector ETF table
+    and a `sector_etf` column in the indicators, and names the sectors that have none (India:
+    seven of ten; only Nifty Bank, IT and Pharma are configured, see `config/markets/india.yaml`).
+    JETS and IAK returned two years of daily bars through yfinance on 2026-10-05.
+- Issue #9, waiting on network access. The cloud environment's egress proxy refused a connection
+  (CONNECT answered 403) to each domain in backticks below on 2026-10-05, except the ones marked
+  reachable; allow them in the environment's network settings before building the collector
+  (none exists yet, so the exact endpoints are chosen then):
+  - BSE announcements and results: `www.bseindia.com`, `api.bseindia.com`
+  - Business Standard: `www.business-standard.com`; BusinessLine: `www.thehindubusinessline.com`
+  - US press-release wires: `www.prnewswire.com`, `www.businesswire.com`, `www.globenewswire.com`
+  - Treasury yields: `home.treasury.gov`; FRED: `fred.stlouisfed.org`, `api.stlouisfed.org`
+  - FINRA short volume: `www.finra.org`, `cdn.finra.org`, `api.finra.org`
+  - CBOE put/call ratios: `www.cboe.com`, `cdn.cboe.com`
+  - AMFI mutual-fund flows: `www.amfiindia.com`, `portal.amfiindia.com`; NSDL FPI flows: `www.fpi.nsdl.co.in`
+  - Yahoo web pages: `finance.yahoo.com`. yfinance worked without it on 2026-10-05 (daily bars,
+    fund holdings and an option chain were fetched); its API hosts query1.finance.yahoo.com and
+    query2.finance.yahoo.com, and consent.yahoo.com and fc.yahoo.com, all accepted a connection,
+    so only `finance.yahoo.com` needs adding.
+  - Index providers, to read rebalance notices directly: `www.spglobal.com` (S&P methodology and
+    announcements), `www.niftyindices.com`. NSE's own nsearchives.nseindia.com (reachable) holds
+    the Nifty methodology.
 - Done 2026-10-05: NSE field mappings checked against live responses. PIT moved to the
   `corporates-pit-gg` filing index plus per-filing XBRL (the old feed dwindled in April 2026;
   last rows 2 May 2026);

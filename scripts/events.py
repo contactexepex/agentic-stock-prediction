@@ -131,10 +131,21 @@ def rule_dates(rule: dict, start: date, end: date) -> list[date]:
                 out.append(nth_weekday(y, m, 4, 1))
             elif kind == "last_weekday":
                 out.append(last_weekday(y, m, rule["weekday"]))
+            elif kind == "month_end":  # last calendar day; market_events moves it to the last session
+                out.append(date(y, m, pycal.monthrange(y, m)[1]))
             else:
                 raise ValueError(f"unknown event rule {kind!r}")
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
     return [d for d in out if start <= d <= end]
+
+
+def session_offset(rule: dict) -> int:
+    """Trading sessions to step back after the holiday shift (`session_offset: -1` = the session
+    before). Only 0 or a small negative offset is allowed."""
+    off = int(rule.get("session_offset") or 0)
+    if not -5 <= off <= 0:
+        raise ValueError(f"session_offset must be between -5 and 0, got {off}")
+    return off
 
 
 def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
@@ -145,10 +156,13 @@ def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
         if market not in rule["markets"]:
             continue
         skip = {s if isinstance(s, date) else date.fromisoformat(str(s)) for s in rule.get("skip") or []}
+        off = session_offset(rule)
         for d in rule_dates(rule, start - timedelta(days=7), end + timedelta(days=7)):
             if d in skip:  # known not to happen on (or before) this date
                 continue
             d = prev_session(cfg, d)  # holiday -> previous trading day
+            for _ in range(-off):     # e.g. the session before the last session of the month
+                d = prev_session(cfg, d, include=False)
             if start <= d <= end:
                 out.append({"date": d, "type": rule["type"], "name": rule["name"],
                             "major": bool(rule.get("major")), "ticker": None, "release": rule.get("release")})

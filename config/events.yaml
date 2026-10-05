@@ -2,7 +2,9 @@
 # Company earnings and ex-dividend dates are collected automatically (collect_events.py).
 # `major: true` events raise the regime to EVENT_HEAVY when within 2 calendar days.
 # If a rule date is not a trading day, the event moves to the previous trading day; `skip`
-# lists rule dates that do not happen at all.
+# lists rule dates that do not happen at all. `session_offset: -N` then steps N sessions back.
+# Rules: third_friday, first_friday, last_weekday (weekday 0 = Monday), weekly, month_end (last
+# calendar day of the month, so after the shift the month's last trading session).
 # `release` = publication time for data released before the open; on those days the report
 # says the calls were made before the release (docs/DESIGN.md section 2).
 
@@ -23,7 +25,62 @@ rules:
   - {markets: [india], type: weekly_expiry, rule: weekly, weekday: 1,
      name: Nifty weekly options expiry (Tuesday), major: false}
 
-# One-off dates. Verify each year and add index rebalance dates as they are announced.
+  # Index rebalances. Each is listed on the session whose CLOSE index funds trade at; the new
+  # index applies from the next session. Both stay `major: false` (listed in the report, no
+  # EVENT_HEAVY, no range widening): the changes are announced weeks ahead, the extra volume sits
+  # in the closing auction of the changed names, and EVENT_HEAVY would lower confidence and widen
+  # every range in the market for it. The US day is already a major event (triple witching); in
+  # India the day fell on the monthly F&O expiry in Mar 2025 (expiry was then on Thursdays) and
+  # Sep 2026 but not in Mar 2026 (sources below). Revisit if the weekly review shows ranges
+  # missing more often on these days.
+  #
+  # S&P 500 quarterly rebalance: after the close of the third Friday of Mar/Jun/Sep/Dec, the same
+  # day as triple (quad) witching. Sources: S&P Dow Jones Indices release of 2026-09-04 (via
+  # PRNewswire/PubT, read via Bigdata.com: app.bigdata.com/documents/93BD67A34F3A4997581D9EDB61A67986):
+  # index changes "effective prior to the open of trading on Monday, September 21, 2026, to
+  # coincide with the quarterly rebalance" (the third Friday was 2026-09-18). Jefferies 424B2 of
+  # 2026-09-18 describing the S&P 500 (search excerpt, Bigdata.com, app.bigdata.com/documents/
+  # C42085ACD072B2A46D8A3473F1D0335F): share changes under 5% "are accumulated and made quarterly
+  # on the third Friday of March, June, September, and December". S&P's own methodology PDF on
+  # www.spglobal.com is blocked by this environment's egress proxy (2026-10-05) and was not read.
+  # When the third Friday is an exchange holiday (Juneteenth: 2026-06-19, 2027-06-18 observed) the
+  # rule moves it to the previous session like triple witching (2026-06-18, 2027-06-17). Not
+  # checked against an S&P notice: PROVISIONAL for those dates.
+  - {markets: [us], type: index_rebalance, rule: third_friday, months: [3, 6, 9, 12],
+     name: S&P 500 quarterly rebalance (at the close; with triple witching), major: false}
+  # Nifty 50 semi-annual review: changes effective from the last working day of March and
+  # September, so funds trade at the close of the session before it (`month_end` = last calendar
+  # day, moved to the last session, then `session_offset: -1`). Official source: NSE Indices,
+  # "Methodology Document for Equity Indices", June 2026, printed page 19 (opened 2026-10-05 at
+  # https://nsearchives.nseindia.com/content/indices/Method_NIFTY_Equity_Indices.pdf): "The review
+  # of Nifty 50 is undertaken semi-annually based on data for six months ending January and July.
+  # The replacement of stocks in Nifty 50 (if any) is implemented from the last trading day of
+  # March and September. In case of any replacement in the index, a four weeks' prior notice is
+  # given to the market participants." That the funds trade at the previous session's close, and
+  # the dates, come from these reports, all read via Bigdata.com:
+  # - ET Now via MSN, 2026-09-30 (app.bigdata.com/documents/1D23BDE4BA07239AA092A9D622AB9252):
+  #   "The reconstitution takes effect on the last working day of March and September.
+  #   Accordingly, the latest changes become effective from September 30, 2026", and "September 29
+  #   was the last trading session before the rejig took effect".
+  # - The Economic Times, 2026-03-27 (app.bigdata.com/documents/CB9CA502E1166AFAC9F56BCD18AB0E81):
+  #   rebalancing on March 27, "changes becoming effective from March 30, the last trading session
+  #   of the month, as March 31 will remain a holiday for Mahavir Jayanti".
+  # - The Economic Times, 2025-03-27 (app.bigdata.com/documents/F94ADFD880696B33FF8DDD852636D4AD):
+  #   "effective from March 28, 2025 (close of March 27, 2025)" (JM Financial), and "The reshuffle,
+  #   which coincides with Nifty's derivatives expiry".
+  # F&O expiry: no rule ties the two; they coincide when the session before the month's last
+  # session is the expiry day. Business Standard (Capital Market feed, read via Bigdata.com):
+  # 2026-09-29 (app.bigdata.com/documents/F69B89ED227C2A2D34B9710A7BCD7BB3) "The September 2026
+  # F&O contracts will expire on 29 September 2026", the rebalance day; 2026-03-02
+  # (app.bigdata.com/documents/92BF87EBF96A694B2E3E17AA939DE342) "The March 2026 F&O contracts
+  # will expire on 30 March 2026", a session after that rebalance (2026-03-27).
+  # 2027 dates depend on NSE's 2027 holiday list (not published yet; see `holidays` in
+  # config/markets/india.yaml).
+  - {markets: [india], type: index_rebalance, rule: month_end, months: [3, 9], session_offset: -1,
+     name: Nifty 50 semi-annual rebalance (at the close; effective next session), major: false}
+
+# One-off dates. Verify each year. (Index rebalances are rules above; add a fixed date here only
+# for an off-cycle rebalance.)
 # FOMC decisions land at 14:00 ET, after India's close, so India feels them the next session.
 # Dates marked "provisional" were not confirmed by a source read for this file: they stay at
 # `major: false` (listed in the report, no EVENT_HEAVY) until confirmed. Re-check them monthly.

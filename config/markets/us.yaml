@@ -22,14 +22,21 @@ symbols:
   DXY:     {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
   WTI:     {yahoo: "CL=F", role: factor, name: WTI crude}
   GOLD:    {yahoo: "GC=F", role: factor, name: Gold}
-  XLF:     {yahoo: XLF, role: sector_etf, name: Financials}
-  XLK:     {yahoo: XLK, role: sector_etf, name: Technology}
-  XLC:     {yahoo: XLC, role: sector_etf, name: Communication services}
-  XLE:     {yahoo: XLE, role: sector_etf, name: Energy}
-  XLV:     {yahoo: XLV, role: sector_etf, name: Health care}
-  XLY:     {yahoo: XLY, role: sector_etf, name: Consumer discretionary}
-  XLP:     {yahoo: XLP, role: sector_etf, name: Consumer staples}
-  XLI:     {yahoo: XLI, role: sector_etf, name: Industrials}
+  # Sector ETFs: `sectors` = the watchlist sectors (under `sectors:` below) each one stands for;
+  # every watchlist sector has one (tests/test_signals.py). Eight SPDR sector ETFs plus JETS
+  # (airlines; no SPDR fund) and IAK (iShares U.S. Insurance; XLF is mostly banks and payments).
+  # Checked 2026-10-05 with yfinance: each returns daily bars (2 years for JETS and IAK), and each
+  # fund's top-10 holdings (yfinance funds_data) include both watchlist tickers of its sector.
+  XLF:     {yahoo: XLF, role: sector_etf, name: Financials, sectors: [Banks]}
+  XLK:     {yahoo: XLK, role: sector_etf, name: Technology, sectors: [Tech]}
+  XLC:     {yahoo: XLC, role: sector_etf, name: Communication services, sectors: [Internet]}
+  IAK:     {yahoo: IAK, role: sector_etf, name: US insurance (iShares), sectors: [Insurance]}
+  JETS:    {yahoo: JETS, role: sector_etf, name: US airlines (U.S. Global Jets), sectors: [Airlines]}
+  XLE:     {yahoo: XLE, role: sector_etf, name: Energy, sectors: [Energy]}
+  XLV:     {yahoo: XLV, role: sector_etf, name: Health care, sectors: [Pharma]}
+  XLY:     {yahoo: XLY, role: sector_etf, name: Consumer discretionary, sectors: [Autos]}
+  XLP:     {yahoo: XLP, role: sector_etf, name: Consumer staples, sectors: [Retail]}
+  XLI:     {yahoo: XLI, role: sector_etf, name: Industrials, sectors: [Industrials]}
 
 # Regime thresholds (PASDS file 07).
 regime:

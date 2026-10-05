@@ -142,6 +142,82 @@ def test_scheduled_macro_events():
     assert around == [(date(2027, 1, 8), False)]
 
 
+def test_index_rebalance_dates():
+    india, us = load_market("india"), load_market("us")
+    # S&P 500: the third Friday of Mar/Jun/Sep/Dec (2026-09-18: changes effective before the
+    # open of Monday 2026-09-21), the same day as triple witching, also when a holiday moves it
+    us_evs = ev.market_events(us, date(2026, 1, 1), date(2027, 12, 31))
+    reb = [e for e in us_evs if e["type"] == "index_rebalance"]
+    assert [e["date"] for e in reb if e["date"].year == 2026] == \
+        [date(2026, 3, 20), date(2026, 6, 18), date(2026, 9, 18), date(2026, 12, 18)]   # Jun 19: Juneteenth
+    assert [e["date"] for e in reb] == [e["date"] for e in us_evs if e["type"] == "triple_witching"]
+    assert not any(e["major"] for e in reb)
+    # Nifty 50: at the close of the session before the last session of March and September
+    # (2025-03-27; 2026-03-27 because 2026-03-31 was a holiday; 2026-09-29, also the F&O expiry)
+    in_evs = ev.market_events(india, date(2025, 1, 1), date(2026, 12, 31))
+    nifty = [e for e in in_evs if e["type"] == "index_rebalance"]
+    assert [e["date"] for e in nifty] == [date(2025, 3, 27), date(2025, 9, 29), date(2026, 3, 27), date(2026, 9, 29)]
+    assert not any(e["major"] for e in nifty)
+    fno = {e["date"] for e in in_evs if e["type"] == "fno_expiry"}
+    assert date(2026, 9, 29) in fno and date(2026, 3, 27) not in fno and date(2026, 3, 30) in fno
+    # not major: alone it does not raise EVENT_HEAVY (2026-03-27: the expiry is 3 days later)
+    assert ev.major_events_near(in_evs, date(2026, 3, 27)) == []
+
+
+def test_month_end_rule_and_session_offset(tmp_path):
+    assert ev.rule_dates({"rule": "month_end", "months": [3, 9]}, date(2026, 1, 1), date(2026, 12, 31)) == \
+        [date(2026, 3, 31), date(2026, 9, 30)]
+    assert ev.rule_dates({"rule": "month_end"}, date(2024, 2, 1), date(2024, 2, 29)) == [date(2024, 2, 29)]
+    spec = tmp_path / "events.yaml"
+    spec.write_text("rules:\n"
+                    "  - {markets: [t], type: a, rule: month_end, months: [10], name: A}\n"
+                    "  - {markets: [t], type: b, rule: month_end, months: [10], session_offset: -1, name: B}\n"
+                    "  - {markets: [t], type: c, rule: month_end, months: [10], session_offset: -2, name: C}\n")
+    # 2026-10-31 is a Saturday and 2026-10-30 a configured holiday: last session Thu 2026-10-29
+    cfg = {"market": "t", "calendar": "XNYS", "holidays": ["2026-10-30"]}
+    got = {e["type"]: e["date"] for e in ev.market_events(cfg, date(2026, 10, 1), date(2026, 11, 30), path=spec)}
+    assert got == {"a": date(2026, 10, 29), "b": date(2026, 10, 28), "c": date(2026, 10, 27)}
+    spec.write_text("rules:\n  - {markets: [t], type: a, rule: month_end, session_offset: 1, name: A}\n")
+    with pytest.raises(ValueError):
+        ev.market_events(cfg, date(2026, 10, 1), date(2026, 10, 31), path=spec)
+
+
+def test_sector_etfs_cover_the_watchlist():
+    from common import sector_etf_problems
+    india, us = load_market("india"), load_market("us")
+    for cfg in (india, us):
+        assert sector_etf_problems(cfg) == []
+        assert all(cfg["symbols"][k]["role"] == "sector_etf" for k in cfg["sector_etfs"].values())
+        assert all(m["sector_etf"] == cfg["sector_etfs"].get(m["sector"]) for m in cfg["tickers"].values())
+    # US: every watchlist sector has its own ETF (10 sectors, 10 ETFs), Airlines -> JETS
+    assert set(us["sector_etfs"]) == set(us["sectors"]) and len(set(us["sector_etfs"].values())) == 10
+    assert us["sector_etfs"]["Airlines"] == "JETS" and us["sector_etfs"]["Insurance"] == "IAK"
+    assert us["tickers"]["DAL"]["sector_etf"] == "JETS" and us["symbols"]["JETS"]["yahoo"] == "JETS"
+    # India: only three Nifty sector indices have daily history on Yahoo
+    assert india["sector_etfs"] == {"Banks": "NIFTYBANK", "IT": "NIFTYIT", "Pharma": "NIFTYPHARMA"}
+
+
+def test_sector_etf_config_mistakes_are_reported_not_fatal():
+    from common import sector_etf_map, sector_etf_problems
+    cfg = {"sectors": {"Tech": ["A"], "Energy": ["B"]},
+           "symbols": {"T1": {"role": "sector_etf", "sectors": ["Tech"]},
+                       "T2": {"role": "sector_etf", "sectors": ["Tech", "Tehc"]},
+                       "BM": {"role": "benchmark", "sectors": ["Energy"]}}}
+    assert sector_etf_map(cfg) == {"Tech": "T1"}               # first wins; typo and non-ETF skipped
+    assert sector_etf_problems(cfg) == ["sector 'Tech' is mapped to both T1 and T2",
+                                        "symbol T2: unknown sector 'Tehc'",
+                                        "symbol BM: `sectors` is only for role sector_etf"]
+
+
+def test_context_lists_sectors_without_an_etf():
+    import context
+    india = load_market("india")
+    gaps = context.sector_gaps(india)
+    for s in ("Insurance", "Transport", "Energy", "Autos", "Consumer goods", "Construction", "Metals"):
+        assert s in gaps
+    assert "Banks" not in gaps and context.sector_gaps(load_market("us")) == ""
+
+
 def test_market_events_shift_to_previous_session():
     india = load_market("india")
     evs = ev.market_events(india, date(2026, 10, 1), date(2026, 10, 31))

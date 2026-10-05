@@ -30,9 +30,11 @@ symbols:
   DXY:      {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
   # Nifty sector indices (sector context). Only these three have daily history on Yahoo; Auto,
   # FMCG, Metal, Energy, Infra and Financial Services return just the latest day (checked 2026-10-05).
-  NIFTYBANK:   {yahoo: "^NSEBANK", role: sector_etf, name: Nifty Bank}
-  NIFTYIT:     {yahoo: "^CNXIT", role: sector_etf, name: Nifty IT}
-  NIFTYPHARMA: {yahoo: "^CNXPHARMA", role: sector_etf, name: Nifty Pharma}
+  # `sectors` = the watchlist sectors each index stands for; the other seven watchlist sectors
+  # have none (the context pack lists them).
+  NIFTYBANK:   {yahoo: "^NSEBANK", role: sector_etf, name: Nifty Bank, sectors: [Banks]}
+  NIFTYIT:     {yahoo: "^CNXIT", role: sector_etf, name: Nifty IT, sectors: [IT]}
+  NIFTYPHARMA: {yahoo: "^CNXPHARMA", role: sector_etf, name: Nifty Pharma, sectors: [Pharma]}
 
 # Regime thresholds (PASDS file 07, scaled for India VIX which usually sits lower than US VIX).
 regime:
