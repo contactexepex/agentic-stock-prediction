@@ -45,7 +45,7 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | Flows | FINRA short-sale volume and short interest; Cboe put/call ratios | NSE FII/DII provisional flows; NSDL FPI investment (equity, debt) |
 | Macro | Treasury par yield curve (10y-2y, 10y-3m), FRED high-yield and IG credit spreads, 10y breakeven | NSE index closes with P/E, P/B, dividend yield; Nifty 10y G-Sec index |
 | Sectors | One ETF per watchlist sector (10): eight SPDR sector ETFs, JETS (airlines), IAK (insurance) | Nifty Bank, IT and Pharma indices (none for the other seven sectors; see `config/markets/india.yaml`) |
-| News sources | Google News (US), CNBC, BBC; PR Newswire and Business Wire earnings releases (watchlist names only) | Google News (IN), Economic Times, Moneycontrol, Livemint, Business Standard, BusinessLine |
+| News sources | Google News (US), CNBC, BBC; PR Newswire, Business Wire earnings and GlobeNewswire releases (watchlist names only) | Google News (IN), Economic Times, Moneycontrol, Livemint, Business Standard, BusinessLine |
 
 **Event calendar:** earnings, ex-dividend, F&O expiry, Fed/FOMC, RBI policy, CPI/jobs releases,
 index rebalances (S&P 500 quarterly, Nifty 50 semi-annual; listed, not major).
@@ -269,17 +269,21 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     say nothing about 1- or 5-day stock moves, and AMFI's monthly net-flow figures come as monthly
     PDF/Excel reports about ten days after month end); BSE announcements: `www.bseindia.com`
     answers HTTP 200, but `api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w` and
-    `.../AnnGetData/w` answer HTTP 403 "Access Denied" (Akamai) to Python and to curl, with or
-    without the BSE home-page cookies, Referer/Origin `https://www.bseindia.com` and a browser
-    User-Agent, so India announcements stay NSE-only.
+    `.../AnnGetData/w` answer HTTP 403 "Access Denied" (Akamai) with Referer/Origin
+    `https://www.bseindia.com` and a browser User-Agent, to Python (with and without the BSE
+    home-page cookies) and to curl, so India announcements stay NSE-only.
   - News feeds added to `config/markets/*.yaml` (each answered HTTP 200 with fresh items):
     Business Standard markets and companies, BusinessLine markets and companies (India); PR
-    Newswire all releases and Business Wire earnings (`feed.businesswire.com`, feed id
+    Newswire all releases, Business Wire earnings (`feed.businesswire.com`, feed id
     `G1QFDERJXkJeEF9YXA==`; the home feed `G1QFDERJXkJeEFpRWQ==` says "deactivated by the
-    administrator") for the US, with `watchlist_only: true`: only releases naming a watchlist
-    company (case-sensitive) are stored. GlobeNewswire closed the connection without an answer
-    on every URL tried (home page, RSS by subject and by org class), so it is not configured;
-    `www.businesswire.com` and `www.spglobal.com` refuse cloud traffic (site-side 403).
+    administrator") and GlobeNewswire's public-companies RSS (`RssFeed/orgclass/1`) for the US,
+    each with `watchlist_only: true`: only releases naming a watchlist company are stored
+    (case-insensitive whole words on each ticker's `wire_names`, full company names, after
+    removing the `news.wire_exclude` phrases such as "Apple Hospitality", "Merck KGaA",
+    "meta-analysis"). GlobeNewswire is erratic by client: feedparser (the collector's path) got
+    HTTP 200 with 20 items, and so did urllib with an RSS Accept header, but curl (HTTP/2 reset
+    or empty reply) and several earlier urllib requests got the connection closed without an
+    answer. `www.businesswire.com` and `www.spglobal.com` refuse cloud traffic (site-side 403).
 - Issue #9, history: before 2026-10-05 ~21:30 UTC the cloud environment's egress proxy refused a
   connection (CONNECT answered 403) to each domain in backticks below, except the ones marked
   reachable:

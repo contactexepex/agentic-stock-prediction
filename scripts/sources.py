@@ -121,6 +121,16 @@ def stored_rows(market: str, kind: str, files: int = 400) -> dict[str, dict]:
     return out
 
 
+def complete_days(market: str, kind: str, key_col: str, required: set[str]) -> set[str]:
+    """Dates whose stored rows (latest per id) cover every required key with `complete` true.
+    Any other date (missing, partial, truncated) is fetched again while it is in the lookback."""
+    have: dict[str, set[str]] = {}
+    for r in stored_rows(market, kind).values():
+        if r.get("complete") and r.get(key_col) in required:
+            have.setdefault(r["date"], set()).add(r[key_col])
+    return {d for d, keys in have.items() if keys >= required}
+
+
 def store_changed(market: str, kind: str, rows: list[dict], today: date, value_cols: list[str]) -> int:
     """Append rows whose id is new, or whose values differ from the latest stored row with that id
     (a revision is a new record, never an edit). Duplicates within `rows` keep the last one."""

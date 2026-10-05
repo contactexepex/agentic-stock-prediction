@@ -42,11 +42,12 @@ def _us_macro(con) -> str:
 
 def _us_shorts(con, tickers: list[str]) -> str:
     return ("Daily short-sale volume is FINRA-reported (off-exchange) volume only: compare with the ticker's "
-            "own average, not across tickers. Short interest settles twice a month and is published about "
-            "a week later.\n\n" + md_table(con.execute("""
+            "own average, not across tickers. prior_avg_pct = average of the up to 20 sessions before the "
+            "latest; prior_n says how many (below 20 = a shorter, less reliable baseline). Short interest "
+            "settles twice a month and is published about a week later.\n\n" + md_table(con.execute("""
         SELECT coalesce(v.ticker, s.ticker) AS ticker, v.date, round(v.short_pct, 1) AS short_pct,
-               round(v.short_pct_5d, 1) AS avg5_pct, round(v.short_pct_avg20, 1) AS avg20_pct,
-               round(v.short_pct_5d - v.short_pct_avg20, 1) AS avg5_vs_avg20_pp, v.n_prior AS avg20_n,
+               round(v.short_pct_5d, 1) AS avg5_pct, round(v.short_pct_prior_avg, 1) AS prior_avg_pct,
+               v.n_prior AS prior_n, round(v.short_pct_5d - v.short_pct_prior_avg, 1) AS avg5_vs_prior_pp,
                s.settlement_date AS si_settled, round(s.short_interest / 1e6, 2) AS short_interest_m,
                round(s.change_pct, 1) AS si_chg_pct, s.days_to_cover
         FROM shorts_latest v FULL JOIN short_interest_latest s USING (ticker)

@@ -10,8 +10,9 @@ config; markets without one print `skipped`):
   short_interest  FINRA consolidated short interest (api.finra.org, twice a month, published about
                   a week after the settlement date) -> data/<market>/short_interest/
 Append-only; ids are finra-shvol-<date>-<ticker> and finra-si-<settlement date>-<ticker>; a
-revised value is a new row. Prints a JSON summary: `failed` lists every file or call that could
-not be read, a session file missing before the latest completed session, a truncated file (row
+revised value is a new row; a day file that is truncated or misses a watchlist ticker is
+stored with `complete` false and fetched again on the next run. Prints a JSON summary: `failed`
+lists every file or call that could not be read, a session file missing before the latest completed session, a truncated file (row
 count differs from FINRA's trailer) and a watchlist ticker missing from a file. Exit code 1 only
 if both kinds failed."""
 from __future__ import annotations
@@ -22,7 +23,7 @@ from datetime import date, timedelta
 
 from common import market_arg, require_market, utc_now, utc_today
 from sources import (Client, FetchError, not_published, num, recent_sessions, stale_cutoff, store_changed,
-                     stored_rows, summary)
+                     complete_days, summary)
 
 VOLUME_URL = "https://cdn.finra.org/equity/regsho/daily/CNMSshvol{day:%Y%m%d}.txt"
 SI_URL = "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
@@ -69,7 +70,7 @@ def parse_volume(text: str, day: date, symbols: dict[str, str], now: str) -> tup
 
 def daily_volume(client, cfg: dict, today: date, conf: dict, now: str, failed: list, notes: list) -> tuple[list, int]:
     market, symbols = cfg["market"], finra_symbols(cfg)
-    have = {r["date"] for r in stored_rows(market, "shorts").values()}
+    have = complete_days(market, "shorts", "ticker", set(symbols.values()))
     cutoff, rows, ok = stale_cutoff(cfg, today), [], 0
     for d in recent_sessions(cfg, today, int(conf.get("lookback_days", 10))):
         if str(d) in have:
@@ -93,6 +94,8 @@ def daily_volume(client, cfg: dict, today: date, conf: dict, now: str, failed: l
         if missing:
             failed.append({"source": "finra_short_volume", "date": str(d), "url": url,
                            "error": f"no row for watchlist tickers {missing}"})
+        for r in got:   # an incomplete day is stored but fetched again next run (complete_days)
+            r["complete"] = not problem and not missing
         ok += 1
         rows += got
     return rows, ok
@@ -146,7 +149,7 @@ def collect(cfg: dict, client, today: date, now: str) -> dict:
     if (conf.get("daily_volume") or {}).get("enabled", True):
         rows, ok = daily_volume(client, cfg, today, conf.get("daily_volume") or {}, now, failed, notes)
         new["shorts"] = store_changed(market, "shorts", rows, today,
-                                      ["short_volume", "short_exempt_volume", "total_volume"]) if ok else None
+                                      ["short_volume", "short_exempt_volume", "total_volume", "complete"]) if ok else None
     if (conf.get("short_interest") or {}).get("enabled", True):
         try:
             rows = short_interest(client, cfg, today, conf.get("short_interest") or {}, now, failed, notes)

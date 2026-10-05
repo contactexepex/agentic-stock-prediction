@@ -1,4 +1,4 @@
-Real responses fetched on 2026-10-05 (~21:45-22:10 UTC) through the session's egress proxy, trimmed
+Real responses fetched on 2026-10-05 (~21:45-22:40 UTC) through the session's egress proxy, trimmed
 for size, for tests/test_sources.py. Nothing here is synthetic except where trimmed as noted.
 
 treasury_2026.csv           home.treasury.gov daily-treasury-rates.csv/2026/all?type=daily_treasury_yield_curve
@@ -23,3 +23,5 @@ bs_markets.rss              www.business-standard.com/rss/markets-106.rss (chann
 businessline_companies.rss  www.thehindubusinessline.com/companies/feeder/default.rss (head + first 6 items)
 prnewswire_all.rss          www.prnewswire.com/rss/news-releases-list.rss (head + first 6 items)
 businesswire_earnings.rss   feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeEF9YXA== (head + first 6 items)
+globenewswire_public.rss    www.globenewswire.com/RssFeed/orgclass/1/... (public companies; head + first 6
+                            items; fetched ~22:40 UTC with urllib and an RSS Accept header)

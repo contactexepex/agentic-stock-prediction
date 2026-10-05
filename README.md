@@ -14,7 +14,7 @@ Research only. Nothing here is investment advice, and the routines never trade.
    vol index, cues and global factors), `collect_quotes.py` (overnight / pre-market snapshot:
    futures, Asian markets, ADRs, pre-market gaps), `collect_events.py` (earnings, ex-dividend),
    `collect_news.py` (Google News + outlet RSS, incl. Business Standard and BusinessLine for India,
-   PR Newswire and Business Wire earnings releases for the US), `collect_filings.py` (SEC, US
+   PR Newswire, Business Wire earnings and GlobeNewswire releases for the US), `collect_filings.py` (SEC, US
    only), `collect_macro.py` (US: Treasury yield curve, FRED credit spreads, Cboe put/call),
    `collect_shorts.py` (US: FINRA short-sale volume and short interest) and
    `collect_flows_india.py` (India: NSDL FPI flows, NSE sector index closes and valuations).
@@ -68,7 +68,7 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
      Macro, flows and press releases (issue #9): `home.treasury.gov`, `fred.stlouisfed.org`,
      `cdn.cboe.com`, `cdn.finra.org`, `api.finra.org`, `fpi.nsdl.co.in`, `nsearchives.nseindia.com`,
      `www.business-standard.com`, `www.thehindubusinessline.com`, `www.prnewswire.com`,
-     `feed.businesswire.com`.
+     `feed.businesswire.com`, `www.globenewswire.com`.
      (Moneycontrol and CNBC come in through Google News queries, so their own domains are not needed.)
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
    - Setup script: `bash setup.sh`

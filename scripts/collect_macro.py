@@ -8,7 +8,8 @@ series and observation date:
   cboe      Cboe daily options statistics (cdn.cboe.com JSON per session): put/call ratios,
             series CBOE_PC_<name>; sessions in the lookback not yet stored are fetched
 Append-only: a row is written when its id (<series>-<date>) is new or its value changed (a
-revision is a new row; the view macro_series keeps the newest). Prints a JSON summary: `failed`
+revision is a new row; the view macro_series keeps the newest). A Cboe session file missing a
+configured ratio is stored with `complete` false and fetched again on the next run. Prints a JSON summary: `failed`
 lists every source or session that could not be read (HTTP status, or the host to allowlist),
 a per-session file missing before the latest completed session is a failure, the latest one a
 note (publishing lag). Exit code 1 only if every source failed."""
@@ -22,20 +23,21 @@ import sys
 from datetime import date, datetime, timedelta
 
 from common import market_arg, require_market, utc_now, utc_today
-from sources import (Client, FetchError, not_published, num, recent_sessions, stale_cutoff, store_changed,
-                     stored_rows, summary)
+from sources import (Client, FetchError, complete_days, not_published, num, recent_sessions, stale_cutoff,
+                     store_changed, summary)
 
 TREASURY_URL = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
                 "daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve"
                 "&field_tdr_date_value={year}&page&_format=csv")
 FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}"
 CBOE_URL = "https://cdn.cboe.com/data/us/options/market_statistics/daily/{day}_daily_options"
-VALUE_COLS = ["value"]
+VALUE_COLS = ["value", "complete"]
 
 
-def row(series: str, day: date, value: float, unit: str, name: str, source: str, now: str) -> dict:
+def row(series: str, day: date, value: float, unit: str, name: str, source: str, now: str,
+        complete: bool = True) -> dict:
     return {"id": f"{series}-{day}", "date": str(day), "series": series, "name": name, "value": value,
-            "unit": unit, "source": source, "first_seen_at": now}
+            "unit": unit, "source": source, "first_seen_at": now, "complete": complete}
 
 
 # ---------- Treasury ----------
@@ -95,21 +97,20 @@ def parse_fred(text: str, sid: str, since: date, unit: str, name: str, now: str)
 
 # ---------- Cboe ----------
 
-def parse_cboe(payload: dict, day: date, wanted: dict[str, str], now: str) -> list[dict]:
-    """`ratios` list -> rows for the configured ratio names ({name in Cboe's file: series})."""
+def parse_cboe(payload: dict, day: date, wanted: dict[str, str], now: str) -> tuple[list[dict], list[str]]:
+    """`ratios` list -> (rows for the configured ratio names ({name in Cboe's file: series}),
+    configured names absent or without a number). Rows are `complete` only when none is missing."""
     by_name = {(r.get("name") or "").strip().upper(): num(r.get("value")) for r in payload.get("ratios") or []}
-    rows = []
-    for cboe_name, series in wanted.items():
-        v = by_name.get(cboe_name.upper())
-        if v is not None:
-            rows.append(row(series, day, v, "ratio", f"Cboe {cboe_name}", "cboe", now))
-    return rows
+    found = {n: by_name.get(n.upper()) for n in wanted}
+    missing = sorted(n for n, v in found.items() if v is None)
+    rows = [row(series, day, found[n], "ratio", f"Cboe {n}", "cboe", now, complete=not missing)
+            for n, series in wanted.items() if found[n] is not None]
+    return rows, missing
 
 
 def cboe(client, cfg: dict, today: date, conf: dict, market: str, now: str, failed: list, notes: list) -> tuple[list, int]:
     wanted = conf.get("ratios") or {}
-    first = next(iter(wanted.values()), None)
-    have = {r["date"] for r in stored_rows(market, "macro").values() if r.get("series") == first}
+    have = complete_days(market, "macro", "series", set(wanted.values()))
     cutoff, rows, ok = stale_cutoff(cfg, today), [], 0
     for d in recent_sessions(cfg, today, int(conf.get("lookback_days", 7))):
         if str(d) in have:
@@ -126,9 +127,8 @@ def cboe(client, cfg: dict, today: date, conf: dict, market: str, now: str, fail
             if exc.host or exc.status is None:   # host unreachable: the other days fail the same way
                 break
             continue
-        got = parse_cboe(payload, d, wanted, now)
-        if len(got) < len(wanted):
-            missing = sorted(set(wanted) - {r["name"].upper() for r in got})
+        got, missing = parse_cboe(payload, d, wanted, now)
+        if missing:
             failed.append({"source": "cboe", "date": str(d), "url": url,
                            "error": f"ratios missing from the file: {missing}"})
         ok += 1

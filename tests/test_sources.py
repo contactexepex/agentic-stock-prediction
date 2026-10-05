@@ -97,7 +97,7 @@ def test_treasury_parse_maps_tenors_and_dates():
 def test_fred_parse_skips_missing_marker_and_reads_both_headers():
     got = cm.parse_fred((FIX / "fred_T10YIE.csv").read_text(), "T10YIE", date(2026, 9, 1), "pct", "BE", NOW)
     assert got and got[0] == {"id": "T10YIE-2026-09-21", "date": "2026-09-21", "series": "T10YIE", "name": "BE",
-                              "value": 2.34, "unit": "pct", "source": "fred", "first_seen_at": NOW}
+                              "value": 2.34, "unit": "pct", "source": "fred", "first_seen_at": NOW, "complete": True}
     old = "DATE,DGS10\n2026-10-01,4.10\n2026-10-02,.\n"
     assert [r["value"] for r in cm.parse_fred(old, "DGS10", date(2026, 1, 1), "pct", "x", NOW)] == [4.10]
     # a file for another id has no values for this one
@@ -108,8 +108,12 @@ def test_cboe_parse_ratios():
     payload = json.loads((FIX / "cboe_2026-10-02_daily_options.json").read_text())
     wanted = {"TOTAL PUT/CALL RATIO": "CBOE_PC_TOTAL", "EQUITY PUT/CALL RATIO": "CBOE_PC_EQUITY",
               "SPX + SPXW PUT/CALL RATIO": "CBOE_PC_SPX", "NOT A RATIO": "X"}
-    got = {r["series"]: r["value"] for r in cm.parse_cboe(payload, date(2026, 10, 2), wanted, NOW)}
-    assert got == {"CBOE_PC_TOTAL": 0.78, "CBOE_PC_EQUITY": 0.58, "CBOE_PC_SPX": 1.15}
+    rows_, missing = cm.parse_cboe(payload, date(2026, 10, 2), wanted, NOW)
+    assert {r["series"]: r["value"] for r in rows_} == {"CBOE_PC_TOTAL": 0.78, "CBOE_PC_EQUITY": 0.58, "CBOE_PC_SPX": 1.15}
+    assert missing == ["NOT A RATIO"]                      # only the absent one, not the present ones
+    assert all(r["complete"] is False for r in rows_)
+    full, none_missing = cm.parse_cboe(payload, date(2026, 10, 2), {"TOTAL PUT/CALL RATIO": "CBOE_PC_TOTAL"}, NOW)
+    assert none_missing == [] and full[0]["complete"] is True
 
 
 def test_finra_volume_parse_and_trailer_check():
@@ -362,11 +366,13 @@ def test_news_outlets_utc_dedupe_and_watchlist_only(root, monkeypatch, capsys, t
     (cfg_dir / "markets").mkdir(parents=True)
     import yaml
     doc = yaml.safe_load((REPO / "config" / "markets" / "us.yaml").read_text())
-    doc["news"] = {"outlets": [
+    doc["news"] = {"wire_exclude": doc["news"]["wire_exclude"], "outlets": [
         {"name": "Business Standard Markets", "url": "bs_markets.rss", "category": "general"},
         {"name": "BusinessLine Companies", "url": "businessline_companies.rss", "category": "company"},
         {"name": "PR Newswire", "url": "prnewswire_all.rss", "category": "company", "watchlist_only": True},
-        {"name": "Business Wire Earnings", "url": "businesswire_earnings.rss", "category": "company", "watchlist_only": True}]}
+        {"name": "Business Wire Earnings", "url": "businesswire_earnings.rss", "category": "company", "watchlist_only": True},
+        {"name": "GlobeNewswire Public Companies", "url": "globenewswire_public.rss", "category": "company",
+         "watchlist_only": True}]}
     (cfg_dir / "markets" / "us.yaml").write_text(yaml.safe_dump(doc))
     monkeypatch.setattr(common, "CONFIG", cfg_dir)
     real_parse = feedparser.parse
@@ -382,10 +388,11 @@ def test_news_outlets_utc_dedupe_and_watchlist_only(root, monkeypatch, capsys, t
     for r in got:
         by_feed.setdefault(r["feed"], []).append(r)
     assert len(by_feed["Business Standard Markets"]) == 6 and len(by_feed["BusinessLine Companies"]) == 6
-    # wires keep only items that name a watchlist company (case-sensitive)
-    wires = by_feed.get("PR Newswire", []) + by_feed.get("Business Wire Earnings", [])
+    # wires keep only items that name a watchlist company (wire_names, minus wire_exclude)
+    wire_feeds = ("PR Newswire", "Business Wire Earnings", "GlobeNewswire Public Companies")
+    wires = [r for f in wire_feeds for r in by_feed.get(f, [])]
     assert all(r["tickers"] for r in wires)
-    assert out["skipped_off_watchlist"] == 12 - len(wires)
+    assert out["skipped_off_watchlist"] == 18 - len(wires)
     # published_at is UTC: Business Standard's pubDate "Mon, 05 Oct 2026 20:39:25 +0530"
     bs = next(r for r in got if r["published_at"] == "2026-10-05T15:09:25+00:00")
     assert bs["source"] == "Business Standard Markets"
@@ -395,10 +402,105 @@ def test_news_outlets_utc_dedupe_and_watchlist_only(root, monkeypatch, capsys, t
     assert json.loads(capsys.readouterr().out)["new_items"] == 0 and len(rows(root, "us", "news")) == len(got)
 
 
-def test_news_watchlist_only_matching_is_case_sensitive():
-    wl = {"tickers": {"PGR": {"name": "Progressive"}, "META": {"name": "Meta Platforms", "aliases": ["Meta"]}}}
-    strict, loose = cn.alias_patterns(wl, 0), cn.alias_patterns(wl)
-    text = "A progressive approach: meta-analysis results"
-    assert not any(p.search(text) for p in strict.values())
-    assert loose["PGR"].search(text) and loose["META"].search(text)
-    assert strict["PGR"].search("Progressive Corp reports September results")
+WIRE_CASES = [
+    ("NVIDIA Announces Financial Results for Third Quarter Fiscal 2027", {"NVDA"}),
+    ("JPMORGAN CHASE REPORTS THIRD-QUARTER 2026 NET INCOME", {"JPM"}),
+    ("DELTA AIR LINES ANNOUNCES SEPTEMBER QUARTER 2026 FINANCIAL RESULTS", {"DAL"}),
+    ("The Progressive Corporation Reports September Results", {"PGR"}),
+    ("Merck & Co. to Hold Third-Quarter 2026 Sales and Earnings Conference Call", {"MRK"}),
+    ("Meta Platforms, Inc. to Announce Third Quarter Results", {"META"}),
+    ("Apple Hospitality REIT Reports Results of Operations", set()),
+    ("New Meta-Analysis Shows Benefit of Early Treatment", set()),
+    ("Phase 3 Trial in Progressive Supranuclear Palsy Meets Primary Endpoint", set()),
+    ("Merck KGaA, Darmstadt, Germany, Opens New Facility", set()),
+    ("The new app is available on iPhone and Android", set()),
+    ("Acme Widgets wins award. Follow us on Facebook and Instagram", set()),
+]
+
+
+@pytest.mark.parametrize("text,expected", WIRE_CASES)
+def test_news_wire_matching(text, expected):
+    """watchlist_only feeds: case-insensitive whole-word wire_names, wire_exclude phrases removed."""
+    cfg = common.load_market("us")
+    pats, exclude = cn.wire_patterns(cfg), cn.wire_exclusions(cfg["news"])
+    assert cn.wire_tickers(text, pats, exclude) == expected
+
+
+# ---------- incomplete days are fetched again; the views prefer the complete version ----------
+
+def test_incomplete_finra_day_is_refetched(root):
+    cfg = us_cfg()
+    cfg["shorts"]["daily_volume"]["lookback_days"] = 4          # sessions 10-01, 10-02, 10-05
+    lines = [ln for ln in (FIX / "CNMSshvol20261002.txt").read_text().splitlines() if "|NVDA|" not in ln]
+    cut = ("\n".join(lines[:-1] + [str(len(lines) - 2)]) + "\n").encode()
+    first = cs.collect(cfg, FakeClient([("CNMSshvol20261001", "CNMSshvol20261001.txt"),
+                                        ("CNMSshvol20261002", cut)]), TODAY, NOW)
+    assert any("['NVDA']" in f["error"] for f in first["failed"])
+    assert all(r["complete"] is False for r in rows(root, "us", "shorts") if r["date"] == "2026-10-02")
+    # same incomplete file again: fetched again, reported again, nothing appended twice
+    c2 = FakeClient([("CNMSshvol20261002", cut)])
+    again = cs.collect(cfg, c2, TODAY, NOW)
+    assert any("CNMSshvol20261002" in u for u in c2.calls) and not any("CNMSshvol20261001" in u for u in c2.calls)
+    assert any("['NVDA']" in f["error"] for f in again["failed"]) and again["new"]["shorts"] == 0
+    # the whole file arrives: every ticker is stored complete and the day is not fetched again
+    c3 = FakeClient([("CNMSshvol20261002", "CNMSshvol20261002.txt")])
+    fixed = cs.collect(cfg, c3, TODAY, NOW)
+    assert fixed["new"]["shorts"] == 20 and not [f for f in fixed["failed"] if f.get("date") == "2026-10-02"]
+    c4 = FakeClient([])
+    cs.collect(cfg, c4, TODAY, NOW)
+    assert not any("CNMSshvol20261002" in u for u in c4.calls)
+    con = common.connect("us")
+    assert con.execute("SELECT count(*), bool_and(complete) FROM shorts_daily WHERE date = '2026-10-02'").fetchone() == (20, True)
+
+
+def test_truncated_finra_file_is_incomplete(root):
+    cfg = us_cfg()
+    cfg["shorts"]["daily_volume"]["lookback_days"] = 4
+    text = (FIX / "CNMSshvol20261002.txt").read_text().splitlines()
+    truncated = ("\n".join(text[:-1] + ["12465"]) + "\n").encode()
+    out = cs.collect(cfg, FakeClient([("CNMSshvol20261002", truncated)]), TODAY, NOW)
+    assert any("trailer says 12465" in f["error"] for f in out["failed"])
+    c2 = FakeClient([("CNMSshvol20261002", "CNMSshvol20261002.txt")])
+    assert cs.collect(cfg, c2, TODAY, NOW)["new"]["shorts"] == 20       # same values, now complete
+    assert any("CNMSshvol20261002" in u for u in c2.calls)
+
+
+def test_incomplete_index_and_cboe_days_are_refetched(root):
+    india = common.load_market("india")
+    india["india_flows"] = {"fpi": False, "indices": {**india["india_flows"]["indices"], "lookback_days": 1}}
+    text = (FIX / "ind_close_all_05102026.csv").read_text().splitlines()
+    partial = ("\n".join(ln for ln in text if not ln.startswith("Nifty Metal")) + "\n").encode()
+    out = cfi.collect(india, FakeClient([("ind_close_all_05102026", partial)]), TODAY, NOW)
+    assert any("['Nifty Metal']" in f["error"] for f in out["failed"]) and out["new"]["indices"] == 13
+    c2 = FakeClient([("ind_close_all_05102026", "ind_close_all_05102026.csv")])
+    assert cfi.collect(india, c2, TODAY, NOW)["new"]["indices"] == 14 and c2.calls
+    c3 = FakeClient([])
+    cfi.collect(india, c3, TODAY, NOW)
+    assert c3.calls == []
+    assert common.connect("india").execute("SELECT count(*), bool_and(complete) FROM indices_daily").fetchone() == (14, True)
+
+    us = us_cfg()
+    us["macro"] = {"treasury": False, "cboe": {**us["macro"]["cboe"], "lookback_days": 3}}   # 10-02, 10-05
+    payload = json.loads((FIX / "cboe_2026-10-02_daily_options.json").read_text())
+    payload["ratios"] = [r for r in payload["ratios"] if r["name"] != "EQUITY PUT/CALL RATIO"]
+    out = cm.collect(us, FakeClient([("2026-10-02_daily_options", json.dumps(payload).encode())]), TODAY, NOW)
+    assert [f["error"] for f in out["failed"]] == ["ratios missing from the file: ['EQUITY PUT/CALL RATIO']"]
+    c2 = FakeClient([("2026-10-02_daily_options", "cboe_2026-10-02_daily_options.json")])
+    assert cm.collect(us, c2, TODAY, NOW)["new"]["macro"] == 5 and c2.calls
+    c3 = FakeClient([])
+    cm.collect(us, c3, TODAY, NOW)
+    assert not any("2026-10-02" in u for u in c3.calls)
+
+
+def test_fpi_unreadable_numbers_and_missing_equity_are_failures(root):
+    page = (FIX / "nsdl_fpi_latest.html").read_text()
+    bad = page.replace("<td align='right'>108.28</td>", "<td align='right'>n/a</td>", 1)
+    got, problem = cfi.parse_fpi(bad, NOW)
+    assert "1 table rows with unreadable numbers" in problem and "Debt-General Limit | Stock Exchange" in problem
+    assert len(got) == 24
+    # no Equity sub-total: reported as a failure, never a StopIteration
+    no_equity = page.replace(">Equity<", ">Equities<")
+    cfg = common.load_market("india")
+    out = cfi.collect({**cfg, "india_flows": {"fpi": True}},
+                      FakeClient([("fpi.nsdl.co.in", no_equity.encode())]), TODAY, NOW)
+    assert "without an Equity sub-total" in out["failed"][0]["error"] and out["new"]["fpi"] > 0

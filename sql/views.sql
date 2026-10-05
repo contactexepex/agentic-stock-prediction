@@ -419,10 +419,10 @@ FROM a LEFT JOIN lab USING (ticker, accession)
 ORDER BY a.ticker, a.filing_date DESC, a.period_end DESC NULLS LAST;
 
 -- ---------- Free market-wide sources (issue #9; collect_macro, collect_shorts, collect_flows_india) ----------
--- Newest value per series and date (a revised value is a newer row), plus two Treasury curve
--- spreads derived from the same day's par yields (10y-2y, 10y-3m; source 'derived').
+-- Per series and date the complete row first, then the newest (a revision is a newer row),
+-- plus two Treasury curve spreads from the same day's par yields (10y-2y, 10y-3m; source 'derived').
 CREATE OR REPLACE VIEW macro_series AS
-WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro ORDER BY series, date, first_seen_at DESC),
+WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro ORDER BY series, date, complete DESC NULLS LAST, first_seen_at DESC),
 s AS (SELECT date, max(value) FILTER (WHERE series = 'UST_10Y') AS y10, max(value) FILTER (WHERE series = 'UST_2Y') AS y2,
              max(value) FILTER (WHERE series = 'UST_3M') AS m3, max(first_seen_at) AS first_seen_at
       FROM m WHERE source = 'treasury' GROUP BY date)
@@ -444,15 +444,16 @@ FROM r a LEFT JOIN r b ON b.series = a.series AND b.k = 2
          LEFT JOIN r c ON c.series = a.series AND c.k = 6
 WHERE a.k = 1;
 
--- FINRA daily short-sale volume: newest row per session and ticker; the latest session per ticker
--- with the 5-session average and the average of the 20 sessions before it (short_pct in %).
+-- FINRA daily short-sale volume: per session and ticker the complete row first, then the newest;
+-- the latest session per ticker with the 5-session average and the average of the up to 20
+-- sessions before it (n_prior = how many there were; short_pct in %).
 CREATE OR REPLACE VIEW shorts_daily AS
-SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, first_seen_at DESC;
+SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, complete DESC NULLS LAST, first_seen_at DESC;
 
 CREATE OR REPLACE VIEW shorts_latest AS
 WITH d AS (
     SELECT *, avg(short_pct) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS short_pct_5d,
-           avg(short_pct) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS short_pct_avg20,
+           avg(short_pct) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS short_pct_prior_avg,
            count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS n_prior
     FROM shorts_daily)
 SELECT * FROM d QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY date DESC) = 1;
@@ -472,10 +473,10 @@ ORDER BY reporting_date, asset_class, route, first_seen_at DESC;
 CREATE OR REPLACE VIEW fpi_latest AS
 SELECT * FROM fpi_daily WHERE reporting_date = (SELECT max(reporting_date) FROM fpi_daily);
 
--- NSE index closes: newest row per session and index; the latest session per index with the
--- return versus 1 and 5 stored sessions earlier (in %).
+-- NSE index closes: per session and index the complete row first, then the newest; the latest
+-- session per index with the return versus 1 and 5 stored sessions earlier (in %).
 CREATE OR REPLACE VIEW indices_daily AS
-SELECT DISTINCT ON (date, index_name) * FROM indices ORDER BY date, index_name, first_seen_at DESC;
+SELECT DISTINCT ON (date, index_name) * FROM indices ORDER BY date, index_name, complete DESC NULLS LAST, first_seen_at DESC;
 
 CREATE OR REPLACE VIEW indices_latest AS
 WITH r AS (SELECT *, row_number() OVER (PARTITION BY index_name ORDER BY date DESC) AS k FROM indices_daily)

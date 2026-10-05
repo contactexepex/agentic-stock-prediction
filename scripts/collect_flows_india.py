@@ -13,9 +13,11 @@ config; markets without one print `skipped`):
            index and session in the lookback not yet stored -> data/india/indices/. The configured
            sector indices stand for the watchlist sectors that have no Yahoo index history.
 Append-only; ids are nsdl-fpi-<reporting date>-<asset>-<route> and nse-idx-<date>-<index>; a
-revised value is a new row. Prints a JSON summary with `failed` (every page or file that could
-not be read or parsed, a session file missing before the latest completed session, a
-configured index absent from a file). Exit code 1 only if both kinds failed. NSE throttles per
+revised value is a new row; an index file missing a configured index (or holding another date)
+is stored with `complete` false and fetched again on the next run. Prints a JSON summary with
+`failed` (every page or file that could not be read or parsed, FPI table rows with unreadable
+numbers, a session file missing before the latest completed session, a configured index absent
+from a file). Exit code 1 only if both kinds failed. NSE throttles per
 client: run it after collect_nse_india.py, never alongside the NSE collectors."""
 from __future__ import annotations
 
@@ -28,8 +30,8 @@ import sys
 from datetime import date, datetime
 
 from common import market_arg, require_market, utc_now, utc_today
-from sources import (Client, FetchError, not_published, num, recent_sessions, stale_cutoff, store_changed,
-                     stored_rows, summary)
+from sources import (Client, FetchError, complete_days, not_published, num, recent_sessions, stale_cutoff,
+                     store_changed, summary)
 
 FPI_URL = "https://fpi.nsdl.co.in/web/Reports/Latest.aspx"
 INDEX_URL = "https://nsearchives.nseindia.com/content/indices/ind_close_all_{day:%d%m%Y}.csv"
@@ -54,7 +56,7 @@ def parse_fpi(page: str, now: str) -> tuple[list[dict], str | None]:
     reporting = datetime.strptime(m.group(1), "%d-%b-%Y").date()
     end = page.find("Daily Trends in FPI Derivative", m.end())
     body = page[m.end(): end if end > 0 else len(page)]
-    rows, asset, usd_inr = [], None, None
+    rows, bad, asset, usd_inr = [], [], None, None
     for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", body, re.S):
         cells = _cells(tr)
         nums = [num(c) for c in cells]
@@ -69,14 +71,19 @@ def parse_fpi(page: str, now: str) -> tuple[list[dict], str | None]:
         else:
             continue
         if asset is None or any(v is None for v in values):
+            bad.append(" | ".join(cells)[:120])   # a data-shaped row we cannot read: reported, not skipped
             continue
         rows.append({"id": f"nsdl-fpi-{reporting}-{slug(asset)}-{slug(route)}", "reporting_date": str(reporting),
                      "asset_class": asset, "route": route, "gross_purchases_cr": values[0],
                      "gross_sales_cr": values[1], "net_cr": values[2], "net_usd_mn": values[3],
                      "usd_inr": usd_inr, "source": "nsdl_fpi_daily", "first_seen_at": now})
-    if not any(r["asset_class"] == "Equity" for r in rows) or not any(r["asset_class"] == "Total" for r in rows):
-        return rows, f"parsed {len(rows)} rows without an Equity and a Total line (layout changed?)"
-    return rows, None
+    problems = []
+    if bad:
+        problems.append(f"{len(bad)} table rows with unreadable numbers: {bad[:3]}")
+    if not any(r["asset_class"] == "Equity" and r["route"].lower() == "sub-total" for r in rows) \
+            or not any(r["asset_class"] == "Total" for r in rows):
+        problems.append(f"parsed {len(rows)} rows without an Equity sub-total and a Total line (layout changed?)")
+    return rows, "; ".join(problems) or None
 
 
 def fpi(client, now: str, failed: list, notes: list) -> list[dict] | None:
@@ -88,10 +95,11 @@ def fpi(client, now: str, failed: list, notes: list) -> list[dict] | None:
     rows, problem = parse_fpi(page, now)
     if problem:
         failed.append({"source": "nsdl_fpi", "url": FPI_URL, "error": problem})
-        return rows or None
-    eq = next(r for r in rows if r["asset_class"] == "Equity" and r["route"].lower() == "sub-total")
-    notes.append(f"fpi: report {rows[0]['reporting_date']}, {len(rows)} rows, equity net {eq['net_cr']:+,.2f} cr")
-    return rows
+    eq = next((r for r in rows if r["asset_class"] == "Equity" and r["route"].lower() == "sub-total"), None)
+    if rows:
+        notes.append(f"fpi: report {rows[0]['reporting_date']}, {len(rows)} rows"
+                     + (f", equity net {eq['net_cr']:+,.2f} cr" if eq else ", no equity sub-total"))
+    return rows or None
 
 
 # ---------- NSE index closes ----------
@@ -128,7 +136,7 @@ def parse_indices(text: str, day: date, names: dict, now: str) -> tuple[list[dic
 
 def indices(client, cfg: dict, today: date, conf: dict, now: str, failed: list, notes: list) -> tuple[list, int]:
     names = conf.get("names") or {}
-    have = {r["date"] for r in stored_rows(cfg["market"], "indices").values()}
+    have = complete_days(cfg["market"], "indices", "index_name", set(names))
     cutoff, rows, ok = stale_cutoff(cfg, today), [], 0
     for d in recent_sessions(cfg, today, int(conf.get("lookback_days", 7))):
         if str(d) in have:
@@ -151,6 +159,8 @@ def indices(client, cfg: dict, today: date, conf: dict, now: str, failed: list, 
         if missing:
             failed.append({"source": "nse_indices", "date": str(d), "url": url,
                            "error": f"configured indices not in the file: {missing}"})
+        for r in got:   # an incomplete day is stored but fetched again next run (complete_days)
+            r["complete"] = not problem and not missing
         ok += 1
         rows += got
     return rows, ok
@@ -165,7 +175,8 @@ def collect(cfg: dict, client, today: date, now: str) -> dict:
             market, "fpi", rows, today, ["gross_purchases_cr", "gross_sales_cr", "net_cr"])
     if conf.get("indices"):
         rows, ok = indices(client, cfg, today, conf["indices"], now, failed, notes)
-        new["indices"] = store_changed(market, "indices", rows, today, ["close", "pe", "pb", "div_yield"]) if ok else None
+        new["indices"] = store_changed(market, "indices", rows, today,
+                                       ["close", "pe", "pb", "div_yield", "complete"]) if ok else None
     return summary("flows_india", market, new, failed, notes, warnings, client)
 
 
