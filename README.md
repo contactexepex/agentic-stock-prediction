@@ -107,6 +107,28 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    the India sector indices `NIFTYBANK`, `NIFTYIT` and `NIFTYPHARMA` (added 2026-10-05; the
    daily 1-month window gives them only ~18 bars, so their 20-day return is empty):
    `cd scripts && python collect_prices.py --market india --period 2y`, then commit and push `data/`.
+6. **AI replay before going live** (optional; `scripts/ai_replay.py`, docs/DESIGN.md section 7). It
+   tests the AI agents on past days after the model's training data (as-of dates after 2026-06-30),
+   strictly as of that day. The script never runs an LLM: the orchestrating session runs the agents.
+   ```
+   cd scripts
+   python ai_replay.py dates --market us                        # the sample: every 5th trading day, 2026-07-01..09-25
+   python ai_replay.py prepare --market us --date 2026-07-01 --root ../work/replay/us-2026-07-01
+   #  -> as-of copy of data/us (only what was public before the next session's pre-open start), then
+   #     features, calibrate, context (work/context.md in the root) and ranges as of that time;
+   #     prints what was kept or dropped. Run the agents with MB_ROOT=<root> and that context pack;
+   #     the forecaster writes <root>/work/predictions.jsonl (an empty file = it abstained on all).
+   python ai_replay.py record --market us --date 2026-07-01 --root ../work/replay/us-2026-07-01 \
+       --calls ../work/replay/us-2026-07-01/work/predictions.jsonl --results ../work/ai_replay
+   python ai_replay.py score --market us --results ../work/ai_replay --out ../work/ai_replay/us.html
+   ```
+   `record` validates every call (schema and CLAUDE.md prediction rules, evidence ids must exist in
+   the as-of root) and stores the valid ones in `<results>/<market>/calls.jsonl` with `replay: true`,
+   never in `data/`. `score` checks them against the real stored closes and writes a plain-language
+   HTML page and a `.json` next to it. Known gap: stored SEC filings start 2026-09-28, stored news
+   2026-10-02 (US) / 2026-10-04 (India), and no NSE announcements are stored yet, so on the sample
+   days there is nothing citable and the forecaster can only abstain until filings/announcements
+   history is backfilled.
 
 ## Local development
 ```

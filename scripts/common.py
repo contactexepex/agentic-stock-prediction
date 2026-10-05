@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -298,12 +299,25 @@ for _kind, (_ext, _cols) in RELATION_SCHEMAS.items():
     SCHEMAS[_kind] = (SCHEMAS[_kind][0], {**_cols, **SCHEMAS[_kind][1]}) if _kind in SCHEMAS else (_ext, _cols)
 
 
+def clock() -> datetime:
+    """Now as an aware UTC datetime. MB_NOW (ISO 8601 with a UTC offset) freezes it, so an as-of
+    replay (scripts/ai_replay.py) runs features, calibrate, context and ranges as of that time;
+    connect() then also freezes DuckDB's current_date. Unset in live runs."""
+    fixed = os.environ.get("MB_NOW")
+    if not fixed:
+        return datetime.now(timezone.utc)
+    t = datetime.fromisoformat(fixed.replace("Z", "+00:00"))
+    if t.tzinfo is None:
+        raise SystemExit(f"MB_NOW needs a UTC offset, e.g. 2026-07-02T12:15:00+00:00 (got {fixed!r})")
+    return t.astimezone(timezone.utc)
+
+
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return clock().replace(microsecond=0).isoformat()
 
 
 def utc_today() -> date:
-    return datetime.now(timezone.utc).date()
+    return clock().date()
 
 
 # ---------- markets ----------
@@ -433,9 +447,41 @@ def recent_ids(market: str, kind: str, days: int, key: str = "id") -> set[str]:
     return ids
 
 
+_CLOCK_SQL = [(re.compile(r"\bcurrent_date\b(\s*\(\s*\))?", re.I), "DATE '{d}'"),
+              (re.compile(r"\b(?:now|get_current_timestamp|current_timestamp)\s*\(\s*\)|\bcurrent_timestamp\b", re.I),
+               "TIMESTAMPTZ '{t}'")]
+
+
+def freeze_sql(sql: str, at: datetime) -> str:
+    """SQL with DuckDB's clock functions replaced by the literal time `at` (UTC)."""
+    for pattern, lit in _CLOCK_SQL:
+        sql = pattern.sub(lit.format(d=at.date().isoformat(), t=at.isoformat()), sql)
+    return sql
+
+
+class FrozenClockConnection:
+    """A DuckDB connection whose SQL sees `at` as the current date and time (MB_NOW). Every other
+    attribute is the wrapped connection's; execute() returns that connection, as DuckDB's does."""
+
+    def __init__(self, con: duckdb.DuckDBPyConnection, at: datetime):
+        self._con, self._at = con, at
+
+    def execute(self, query: str, *args, **kwargs):
+        return self._con.execute(freeze_sql(query, self._at), *args, **kwargs)
+
+    def sql(self, query: str, *args, **kwargs):
+        return self._con.sql(freeze_sql(query, self._at), *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._con, name)
+
+
 def connect(market: str) -> duckdb.DuckDBPyConnection:
-    """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql."""
+    """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql.
+    With MB_NOW set, the connection's SQL sees that time as now (FrozenClockConnection)."""
     con = duckdb.connect()
+    if os.environ.get("MB_NOW"):
+        con = FrozenClockConnection(con, clock())
     con.execute("SET TimeZone = 'UTC'")
     base = data_dir(market)
     for name, (ext, cols) in SCHEMAS.items():

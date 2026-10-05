@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -18,12 +18,12 @@ import pandas as pd
 import events as ev
 import indicators as ind
 import regime as rg
-from common import (FEATURE_COLS, append_jsonl, benchmark_key, connect, day_file, market_arg,
+from common import (FEATURE_COLS, append_jsonl, benchmark_key, clock, connect, day_file, market_arg,
                     require_market, utc_now, utc_today, vol_index_key)
 
 
 def local_today(cfg: dict) -> date:
-    return datetime.now(ZoneInfo(cfg["timezone"])).date()
+    return clock().astimezone(ZoneInfo(cfg["timezone"])).date()
 
 
 def load_bars(con) -> dict[str, pd.DataFrame]:

@@ -126,6 +126,42 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
   synthetic series. About 22 s per market for five years of bars.
 
+**AI replay harness** (`scripts/ai_replay.py`): the table above keeps AI judgement out of backtests
+because the model may have seen past outcomes. Days after its training data (as-of dates after
+2026-06-30) are a fair test, so the agents can be replayed there, strictly as of the day. The
+script is deterministic and never runs an LLM; the orchestrating session runs the agents.
+- `dates --market M`: the sample, every 5th exchange trading day from 2026-07-01 to 2026-09-25
+  (13 per market), each with its next session and cutoff.
+- `prepare --market M --date D --root R`: cutoff = the routine's start on the session after D
+  (08:15 ET, 08:10 IST; section 2). R gets copies of `config/`, `sql/`, `templates/` and
+  `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
+  (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
+  time; events first seen by the cutoff plus backfilled past events dated <= D; predictions,
+  ranges, outcomes and snapshots by their own made/scored/computed time; kinds with only an
+  observation date (macro, shorts, FPI, indices, deals, flows, delivery) only if first seen by the
+  cutoff. News is dropped (stored news starts with live collection), and so are `summaries/` and
+  `reports/`. Then `features`, `calibrate`, `context` (`R/work/context.md`, plus a list of the
+  citable filing/announcement ids) and `ranges` run with `MB_ROOT=R` and `MB_NOW` = the cutoff:
+  `common.clock()` freezes every "now"/"today" and `connect()` rewrites DuckDB's `current_date`.
+  A JSON summary lists every kind kept or dropped and the context pack's size.
+- `record`: validates forecaster records (schema `predictions`, id format, as_of_date = D,
+  horizon 1/5, confidence 0.50-0.90, `range_widen` <= 0.5, rationale <= 40 words, evidence ids
+  present in R's news/filings/announcements, no BLOCKED ticker, no `days_to_earnings` <= 1 in R)
+  and appends the valid ones to `<results>/<M>/calls.jsonl` (`replay: true`, `made_at` = cutoff),
+  never to `data/`; each day once.
+- `score`: on the real stored closes (hit as `score_predictions.py`): hit rate by horizon and
+  confidence band with Wilson 95% intervals and an exact binomial test, stated vs actual
+  confidence, always-up and `replay.py`'s rule baselines on the same ticker-days, abstention rate;
+  a novice-first HTML page (three sentences, four numbers, two charts, details collapsed) and JSON.
+- Tests (`tests/test_ai_replay.py`): perturbing every row after the cutoff leaves the context pack,
+  ranges, indicators, regime and calibration byte-identical (changing D's close does not);
+  record's rejections; scoring on synthetic series; the date list.
+- Gap found on 2026-10-05: the stored US SEC filings start 2026-09-28 (acceptance time), stored
+  news was first seen 2026-10-05 (oldest publication 2026-10-02 US, 2026-10-04 India), and no NSE
+  announcements are stored yet, so every sample day has zero citable ids and the forecaster can
+  only abstain until filings/announcements history is backfilled. There is also no stored history of
+  overnight quotes, and upcoming earnings dates are only known from rows first seen before the cutoff.
+
 ## 8. Output
 Processing data and presentation are separate. Processing data is what the next run reads:
 append-only JSONL under `data/`, the context pack and the summaries; presentation never writes
