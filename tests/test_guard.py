@@ -176,3 +176,37 @@ def test_ranges_cli_late_flag(market):
             for x in f.read_text().splitlines()]
     assert {r["made_at"] for r in rows} == {"2026-10-05T20:40:00+00:00", "2026-10-05T11:30:00+00:00"}
     assert run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00").returncode != 0   # needs an offset
+
+
+# ---------- scoring never counts late records ----------
+
+def test_scoring_skips_records_made_after_the_first_session_closed(market):
+    """A range or call made at/after the close of the first session after as_of (DAY closes
+    20:00 UTC) already knew part of its outcome: it is never scored. On-time ones are."""
+    root, cfg_dir, cfg, rc = market
+    quotes(root, "2026-10-05T10:55:00+00:00")
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    rows = build(cfg, rc, "2026-10-05T11:30:00+00:00")
+    for r in rows.values():                                     # MSFT published late, AAPL on time
+        if r["ticker"] == "MSFT":
+            r["made_at"] = "2026-10-05T20:40:00+00:00"
+    jsonl(root, "ranges", AS_OF, list(rows.values()))
+    jsonl(root, "predictions", AS_OF, [
+        {"id": f"{AS_OF}-{t}-1d", "made_at": made, "as_of_date": str(AS_OF), "ticker": t, "horizon_days": 1,
+         "direction": "up", "confidence": 0.6, "rationale": "test", "evidence_ids": ["x"],
+         "prompt_version": "test"}
+        for t, made in (("AAPL", "2026-10-05T11:30:00+00:00"), ("MSFT", "2026-10-05T20:00:00+00:00"))])
+    days = [AS_OF - timedelta(days=i) for i in range(60) if (AS_OF - timedelta(days=i)).weekday() < 5][::-1]
+    write_bars(root, {"AAPL": [150 + i * 0.1 for i in range(len(days) + 1)],
+                      "MSFT": [300 - i * 0.1 for i in range(len(days) + 1)],
+                      "BENCH": [100.0] * (len(days) + 1)}, days + [DAY])
+    r = run("score_predictions.py", root, cfg_dir)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["late_skipped"] == {"calls": 1, "ranges": 1}       # MSFT 1d call (made at the close) and range
+    assert (out["scored"], out["ranges_scored"]) == (1, 1)         # AAPL only; 5d targets have no bar yet
+    con = common.connect(MARKET)
+    assert [x for (x,) in con.execute("SELECT prediction_id FROM outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
+    assert [x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
+    again = json.loads(run("score_predictions.py", root, cfg_dir).stdout)  # late ones are not "open" either
+    assert (again["scored"], again["ranges_scored"], again["still_open"]) == (0, 0, 0)

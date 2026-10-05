@@ -15,4 +15,7 @@ For each ticker, give the strongest honest case for a rise: the 2-3 best pieces 
 (cite news or filing ids and context numbers: trend, RSI, volume, sector peer, overnight
 cue, events), what is already priced in, and what would invalidate the case. If the bull case
 is weak, say so plainly. Max 80 words per ticker; skip tickers with quality BLOCKED.
-Never invent numbers or events.
+Never invent numbers or events. Every fact must come from `work/context.md`, the news brief,
+stored data (DuckDB) or a web page you opened in this run (cite its URL). No background from
+memory (e.g. "earlier reports date to April"), and no cause the cited headline does not state:
+cite an id only for what its headline or summary actually says. The judge checks every one.
