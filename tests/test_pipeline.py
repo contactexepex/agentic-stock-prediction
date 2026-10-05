@@ -190,6 +190,29 @@ def test_features_regime_and_context(tmp_path):
     assert "SEC filings" not in ctx.stdout
 
 
+def test_context_shows_sector_etf_mapping(tmp_path):
+    root, cfg = setup(tmp_path)
+    path = cfg / "markets" / f"{MARKET}.yaml"
+    path.write_text(path.read_text().replace(
+        "  VOLX: {role: vol_index, name: Vol index}\n",
+        "  VOLX: {role: vol_index, name: Vol index}\n"
+        "  SECT: {role: sector_etf, name: Tech fund, sectors: [Tech]}\n"))
+    rng = np.random.default_rng(3)
+    days = weekdays(date.today() - timedelta(days=60), 30)
+    walk = lambda s: list(s * np.exp(np.cumsum(rng.normal(0, 0.01, len(days)))))  # noqa: E731
+    write_bars(root, {"BENCH": walk(100), "AAPL": walk(150), "MSFT": walk(300), "SECT": walk(50),
+                      "VOLX": [14.0] * len(days)}, days)
+    assert run("features.py", root, cfg).returncode == 0
+    ctx = run("context.py", root, cfg)
+    assert ctx.returncode == 0, ctx.stderr
+    etf = ctx.stdout.split("## Sector ETFs and indices")[1].split("##")[0]
+    assert "| ticker | name | watchlist_sectors | date |" in etf and "| SECT | Tech fund | Tech | " in etf
+    assert "without a sector ETF" not in ctx.stdout           # the only sector is mapped
+    ind = ctx.stdout.split("## Indicators")[1].split("##")[0]
+    assert "| ticker | sector | sector_etf | quality |" in ind
+    assert "| AAPL | Tech | SECT | " in ind and "| MSFT | Tech | SECT | " in ind
+
+
 def test_context_on_empty_repo(tmp_path):
     root, cfg = setup(tmp_path)
     r = run("context.py", root, cfg)

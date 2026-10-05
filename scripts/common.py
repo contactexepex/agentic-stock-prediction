@@ -273,7 +273,41 @@ def load_market(name: str) -> dict:
     sector_of = {t: s for s, ts in cfg.get("sectors", {}).items() for t in ts}
     for key, meta in cfg["tickers"].items():
         meta.setdefault("sector", sector_of.get(key))
+    cfg["sector_etfs"] = sector_etf_map(cfg)
+    for key, meta in cfg["tickers"].items():
+        meta.setdefault("sector_etf", cfg["sector_etfs"].get(meta.get("sector")))
     return cfg
+
+
+def sector_etf_map(cfg: dict) -> dict[str, str]:
+    """Watchlist sector -> the sector_etf symbol that stands for it (the symbol's `sectors` list).
+    A sector named by no symbol is absent. Config mistakes (see sector_etf_problems) are skipped
+    here, so a typo never stops a daily run; tests/test_signals.py checks the real configs."""
+    known, out = set(cfg.get("sectors") or {}), {}
+    for key, meta in cfg["symbols"].items():
+        if meta.get("role") != "sector_etf":
+            continue
+        for sector in meta.get("sectors") or []:
+            if sector in known:
+                out.setdefault(sector, key)  # the first symbol listed wins
+    return out
+
+
+def sector_etf_problems(cfg: dict) -> list[str]:
+    """Mistakes in the symbols' `sectors` lists: an unknown sector, a sector claimed by two
+    symbols, or `sectors` on a symbol whose role is not sector_etf."""
+    known, seen, out = set(cfg.get("sectors") or {}), {}, []
+    for key, meta in cfg["symbols"].items():
+        if meta.get("sectors") and meta.get("role") != "sector_etf":
+            out.append(f"symbol {key}: `sectors` is only for role sector_etf")
+        for sector in meta.get("sectors") or []:
+            if sector not in known:
+                out.append(f"symbol {key}: unknown sector {sector!r}")
+            elif sector in seen:
+                out.append(f"sector {sector!r} is mapped to both {seen[sector]} and {key}")
+            else:
+                seen[sector] = key
+    return out
 
 
 def market_arg(description: str | None = None) -> argparse.ArgumentParser:
