@@ -199,7 +199,7 @@ def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:
 def test_calibrate_ranges_and_scoring(tmp_path):
     root, cfg = setup(tmp_path)
     rng = np.random.default_rng(11)
-    days = weekdays(date(2024, 6, 3), 520)
+    days = weekdays(date.today() - timedelta(days=720), 520)   # ends after today: no target has closed yet
     series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "AAPL": fat_tailed_walk(rng, 520, 150, 0.015),
               "MSFT": fat_tailed_walk(rng, 520, 300, 0.012), "VOLX": [15.0] * 520}
     write_bars(root, series, days)
@@ -222,6 +222,7 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     r = run("ranges.py", root, cfg)
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["written"] == 4                 # 2 tickers x 2 horizons
+    assert json.loads(r.stdout)["late"] is False
     assert json.loads(run("ranges.py", root, cfg).stdout)["written"] == 0   # written once
     rows = {x["id"]: x for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
             for x in map(json.loads, f.read_text().splitlines())}

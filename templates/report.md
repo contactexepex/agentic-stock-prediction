@@ -16,6 +16,8 @@ Report markers:
 - `sector:<name>`: 2-3 lines per sector pair: what moved each stock, bull vs bear in one line,
   whether both moved together (sector news) or apart (company news).
 - `data_quality`: failed collectors and feeds from the run's JSON summaries; "none" if clean.
+  On a late run (`market_status.py` `late_run: true`) say so first: the run started after the
+  session closed, so no calls were made and closed-session ranges were not published.
 
 Slack draft markers (the whole message stays at most 12 lines):
 - `headline`: one line.

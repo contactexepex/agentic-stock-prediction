@@ -21,7 +21,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/c
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v2"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v3"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually
@@ -40,3 +40,7 @@ Write records to `work/enriched.jsonl`, then append:
 Return to the caller (max 300 words): for each ticker the up-to-3 most material events with
 their ids and sentiment, clusters of articles covering the same event, and 3 notable
 macro/category items (for India include FII/DII flow reports when present).
+Cite every item by its real `id` from the news file: the 16-character hex string in the
+record's `id` field (e.g. `3f9a0c1b7d2e4a65`), copied exactly. Never cite line numbers,
+ordinals or positions ("item 12", "#3", "line 40"); the researchers and the forecaster copy
+these ids into `evidence_ids`, so anything else breaks the audit trail.

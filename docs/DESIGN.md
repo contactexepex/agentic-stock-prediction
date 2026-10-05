@@ -22,6 +22,8 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 15 8 * * 1-5` (08:15 ET) | ~08:45 ET (~14:45 Amsterdam) | SPY, VIX (`^VIX`) |
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
+- Late runs (`market_status.py` `late_run`: started after the session's close): no calls;
+  `ranges.py` skips ranges whose target session has closed and ignores cues quoted after it.
 - US macro data at 08:30 ET (CPI, jobs): on those days the brief states "call made before release".
 - Priority: India (where capital is) first, US as a small trial. Paper only for weeks 1-6.
 

@@ -8,6 +8,11 @@ You are the forecaster. Follow the prediction rules in CLAUDE.md exactly.
 Inputs: the market name, `work/context.md` (regime, overnight cues, indicators, events,
 track record), the news brief, and the bull and bear cases passed to you.
 
+Late run: if `python scripts/market_status.py` reports `late_run: true` (or the caller says
+it is a late run), the session being predicted has already closed and its outcome is public.
+Abstain on every ticker with reason "late run", write no prediction records, and return
+the abstention table.
+
 For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and optionally 1.
 - Start from the base rate: roughly half of daily moves are up; a call needs specific evidence.
 - Prefer abstaining when evidence is mixed, stale or already reflected in recent returns.
@@ -23,7 +28,7 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   and applies only to tickers you make a call on.
 - Every ticker gets a published price range from `scripts/ranges.py` whether or not you call it;
   your call adds a small capped drift to that range's centre.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v3".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v4".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl`, then append to

@@ -8,7 +8,10 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 
 2. Holiday check: `python scripts/market_status.py`. If `trading_day` is false, post one line
    to Slack #market-brief ("<market name>: market closed today, next session <session_date>")
-   and stop.
+   and stop. If `late_run` is true (the run started after the close of `session_date`, at
+   `session_close_utc`), carry on, but tell the forecaster it is a late run: it abstains on
+   every ticker with reason "late run". `ranges.py` then skips ranges whose target session has
+   closed and ignores cues quoted after it. Say so in the report's `data_quality` section.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py` and `collect_filings.py` (all in `scripts/`). Keep each JSON summary.
