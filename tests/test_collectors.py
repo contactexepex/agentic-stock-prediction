@@ -270,7 +270,9 @@ def test_events_exit_code_when_every_calendar_fails(env, monkeypatch, capsys):
         ("AAPL", "calendar", "boom"), ("MSFT", "calendar", "boom"), ("MSFT", "dividends", "divs down")]
 
 
-def test_events_sec_errors_are_failures(env, monkeypatch, capsys):
+def test_events_sec_errors_are_reported_beside_the_yahoo_failures(env, monkeypatch, capsys):
+    """SEC errors use the `sec_failed` / `sec_error` keys (build/india-earnings interface); Yahoo
+    gaps stay in `failed` with `what`. Both show in one run."""
     class Edgar:
         def __init__(self, ua):
             pass
@@ -285,19 +287,20 @@ def test_events_sec_errors_are_failures(env, monkeypatch, capsys):
 
     import sec
     monkeypatch.setattr(sec, "Edgar", Edgar)
-    errors: dict = {}
     us = {"market": "us", "calendar": "XNYS", "timezone": NY}
-    out = collect_events.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "t t@example.com", errors)
-    assert list(out) == ["AAPL"] and errors == {"MSFT": "HTTP 503"}
+    rows, failed = collect_events.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "t t@example.com")
+    assert list(rows) == ["AAPL"] and failed == [{"ticker": "MSFT", "cik": "789019", "error": "HTTP 503"}]
     path = common.CONFIG / "markets" / f"{MARKET}.yaml"
     path.write_text(path.read_text() + "filings: sec\n")
     monkeypatch.setenv("SEC_USER_AGENT", "t t@example.com")
     shot = earnings_frame(["2026-07-22 16:05"])
-    FakeTicker.specs.update({t: {"calendar": {"Earnings Date": [date(2026, 10, 28)]}, "page": shot}
-                             for t in ("AAPL", "MSFT")})
+    FakeTicker.specs.update({"AAPL": {"calendar": {"Earnings Date": [date(2026, 10, 28)]}, "page": shot},
+                             "MSFT": {"calendar": {}, "page": shot}})          # plus one Yahoo gap
     code, out = run_main(collect_events, monkeypatch, capsys)
-    assert out["failed"] == [{"ticker": "MSFT", "what": "sec_earnings", "error": "HTTP 503"}]
+    assert out["sec_failed"] == [{"ticker": "MSFT", "cik": "789019", "error": "HTTP 503"}]
+    assert out["sec_error"] is None and out["sec_tickers"] == 1
+    assert out["failed"] == [{"ticker": "MSFT", "what": "calendar", "error": "empty calendar"}]
     monkeypatch.setattr(sec, "Edgar", None)                       # the whole SEC step fails
     code, out = run_main(collect_events, monkeypatch, capsys)
-    assert [(f["ticker"], f["what"]) for f in out["failed"]] == [(None, "sec_earnings")]
-    assert out["sec_error"] == out["failed"][0]["error"]
+    assert out["sec_error"] and out["sec_failed"] == []
+    assert out["failed"] == [{"ticker": "MSFT", "what": "calendar", "error": "empty calendar"}]

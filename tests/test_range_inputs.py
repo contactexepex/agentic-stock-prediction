@@ -204,6 +204,7 @@ def test_ranges_apply_inputs(tmp_path):
     rc.update(ALL_ON)
     rc["regime_factor"] = {}            # no regime or market-event widening: exact sigmas below
     rc["major_event_factor"] = 1.0
+    rc["earnings_vol_multiple_by_market"] = {MARKET: 2.5, "othermarket": 9.0}   # this market's prior: x2.5
     (cfg / "ranges.yaml").write_text(yaml.safe_dump(rc))
 
     rng = np.random.default_rng(21)
@@ -267,8 +268,8 @@ def test_ranges_apply_inputs(tmp_path):
     c = pd.Series(aapl)
     sig = rl.ewma_sigma(c, rc["ewma_lambda"])
     moves = [(math.log(c[i] / c[i - 1]), float(sig[i - 1]), 1) for i in earn_idx]
-    m, k = rl.earnings_multiple(moves, 3.0, 2, 4, 8.0)
-    assert k == len(earn_idx) and m > 3.5
+    m, k = rl.earnings_multiple(moves, 2.5, 2, 4, 8.0)
+    assert k == len(earn_idx) and m > 3.5 and m != rl.earnings_multiple(moves, 3.0, 2, 4, 8.0)[0]
     assert abs(a1["sigma_h"] - sd["AAPL"] * m) < 2e-6                 # h=1: variance sd^2 * m^2
     assert set(a1["inputs"]) == {"earnings_history", "beta_split"}
     assert any(f"x{round(m, 2)} day, {k} past moves" in x for x in a1["notes"])
@@ -342,6 +343,24 @@ def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
         assert f"late: {first} closed before made_at" in x["notes"]
 
 
+def test_ranges_config_per_market_override(tmp_path, monkeypatch):
+    import common
+    (tmp_path / "ranges.yaml").write_text("earnings_vol_multiple: 3.0\nearnings_vol_multiple_by_market: {india: 2.0}\n")
+    monkeypatch.setattr(common, "CONFIG", tmp_path)
+    assert common.load_ranges_config("india")["earnings_vol_multiple"] == 2.0
+    assert common.load_ranges_config("us")["earnings_vol_multiple"] == 3.0
+    assert common.load_ranges_config()["earnings_vol_multiple"] == 3.0
+    monkeypatch.setattr(common, "CONFIG", Path(__file__).resolve().parents[1] / "config")   # the shipped defaults
+    assert common.load_ranges_config("india")["earnings_vol_multiple"] == 2.0
+    assert common.load_ranges_config("us")["earnings_vol_multiple"] == 3.0
+    # every script loads the settings of the market it runs for (review's replay, calibrate, ...)
+    import re
+    calls = {f"{f.name}:{m}" for f in sorted((Path(__file__).resolve().parents[1] / "scripts").glob("*.py"))
+             if f.name != "common.py" for m in re.findall(r"load_ranges_config\(([^)]*)\)", f.read_text())}
+    assert {c.split(":")[0] for c in calls} >= {"backtest.py", "calibrate.py", "ranges.py", "relations.py", "review.py"}
+    assert all(c.endswith(':cfg["market"]') for c in calls), calls
+
+
 def test_switches_per_market_and_horizon():
     rc = {"a": {"enabled": {"us": [1]}}, "b": {"enabled": {"india": True}}, "c": {"enabled": ["us"]},
           "d": {"enabled": True}}
@@ -408,3 +427,196 @@ def test_backtest_scores_inputs(tmp_path):
     assert s["inputs"]["1"]["earnings_history"]["verdict"] == "improves"   # 8% moves need > x3
     assert "## Range inputs" in out_md.read_text()
     assert not (root / "reports").exists()
+
+    # the fixed multiple is per market: only this market's override changes the fixed arm
+    def fixed_arm(by_market: dict) -> dict:
+        (cfg / "ranges.yaml").write_text(yaml.safe_dump({**rc, "earnings_vol_multiple_by_market": by_market}))
+        r2 = run("backtest.py", root, cfg, "--eval-sessions", "300", "--out", str(out_md))
+        assert r2.returncode == 0, r2.stderr
+        return json.loads(r2.stdout)["inputs"]["1"]["earnings_history"]["off"]
+    x3 = s["inputs"]["1"]["earnings_history"]["off"]
+    assert fixed_arm({"othermarket": 2.0}) == x3
+    assert fixed_arm({MARKET: 2.0})["width80_pct"] < x3["width80_pct"]
+
+
+# ---------- earnings dates from NSE results filings (collect_events.py) ----------
+
+NSE_FIX = Path(__file__).resolve().parent / "fixtures" / "nse" / "earnings"
+XBOM = {"market": "x", "calendar": "XBOM", "timezone": "Asia/Kolkata"}
+IST_TZ = "Asia/Kolkata"
+INDIA = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "markets" / "india.yaml").read_text())
+INFY_DATES = [(date(2023, 10, 12), "after_close"), (date(2024, 1, 11), "after_close"), (date(2024, 4, 19), "during"),
+              (date(2024, 7, 18), "after_close"), (date(2024, 10, 17), "after_close"),
+              (date(2025, 1, 16), "after_close"), (date(2025, 4, 17), "after_close"),
+              (date(2025, 7, 23), "after_close"), (date(2025, 10, 16), "after_close"),
+              (date(2026, 1, 14), "after_close"), (date(2026, 4, 23), "after_close"), (date(2026, 7, 23), "after_close")]
+MARUTI_DATES = [(date(2025, 4, 25), "during"), (date(2025, 7, 31), "during"), (date(2025, 10, 31), "during"),
+                (date(2026, 1, 28), "during"), (date(2026, 4, 28), "during"), (date(2026, 7, 31), "after_close")]
+
+
+def replay_nse():
+    from nse import Nse
+    return Nse(replay=NSE_FIX, pause=0)
+
+
+def ist(s: str) -> datetime:
+    return pd.Timestamp(s, tz=IST_TZ).tz_convert("UTC").to_pydatetime()
+
+
+def test_nse_earnings_from_real_results_filings():
+    """Real NSE responses: INFY backfill (Integrated Filing from the March 2025 quarter, the older
+    financial-results list before it, both bases), MARUTI incremental (quarters after its newest
+    stored date). MARUTI's XBRL is filed after the close but its results announcement comes
+    during the session, so the announcement time sets the timing."""
+    out, failed, notes = ce.nse_earnings(INDIA, replay_nse(), {"INFY": None, "MARUTI": date(2025, 1, 29)},
+                                         date(2023, 10, 1), date(2026, 10, 5))
+    assert failed == [] and notes == []
+    assert [(d, tm) for d, tm, _ in out["INFY"]] == INFY_DATES
+    assert [(d, tm) for d, tm, _ in out["MARUTI"]] == MARUTI_DATES
+    assert {p for rows in out.values() for _, _, p in rows} == {0}          # filings beat yfinance
+    # a ticker with stored history only takes quarters filed after it
+    out, _, _ = ce.nse_earnings(INDIA, replay_nse(), {"INFY": date(2026, 1, 14)}, date(2023, 10, 1), date(2026, 10, 5))
+    assert [(d, tm) for d, tm, _ in out["INFY"]] == INFY_DATES[-2:]
+    # 2019 in the window: the March 2019 quarter was first filed in September (late XBRL), not used
+    out, _, notes = ce.nse_earnings(INDIA, replay_nse(), {"INFY": None}, date(2019, 1, 1), date(2026, 10, 5))
+    assert [(d, tm) for d, tm, _ in out["INFY"]] == [(date(2019, 10, 11), None)] + INFY_DATES   # calendar from 2020
+    assert notes == ["INFY: 1 quarter(s) first filed after the SEBI deadline, not used"]
+    # a symbol without responses is a failure for that ticker only
+    out, failed, _ = ce.nse_earnings(INDIA, replay_nse(), {"HDFCBANK": None, "INFY": date(2026, 1, 14)},
+                                     date(2023, 10, 1), date(2026, 10, 5))
+    assert [f["source"] for f in failed] == ["nse_earnings:HDFCBANK"] and list(out) == ["INFY"]
+
+
+def test_nse_reports_release_window_and_deadline():
+    filings = [(date(2026, 6, 30), ist("2026-07-23 18:00")), (date(2026, 6, 30), ist("2026-07-23 17:40")),
+               (date(2026, 3, 31), ist("2026-06-15 10:00")),                         # 76 days: late XBRL
+               (date(2025, 12, 31), ist("2026-01-14 08:00"))]                        # before the open
+    releases = [ist("2026-07-23 13:30"),          # results PDF during the session, 4h10 before the XBRL
+                ist("2026-07-20 11:00")]          # board outcome 3 days earlier: another meeting
+    rows, late = ce.nse_reports(XBOM, filings, releases)
+    assert late == 1
+    assert rows == [(date(2026, 1, 14), "before_open", 0), (date(2026, 7, 23), "during", 0)]
+    rows, _ = ce.nse_reports(XBOM, filings, [ist("2026-07-21 23:00")])   # outside the 36h window
+    assert rows[-1] == (date(2026, 7, 23), "after_close", 0)
+    rows, late = ce.nse_reports(XBOM, filings, releases, after=date(2026, 1, 14))
+    assert rows == [(date(2026, 7, 23), "during", 0)] and late == 1
+    assert ce.max_filing_lag(date(2026, 3, 31)) == 63 and ce.max_filing_lag(date(2026, 6, 30)) == 48
+
+
+def test_nse_due_polls_only_what_needs_it():
+    def row(t, d, src):
+        return {"id": f"{t}-earnings-{d}", "ticker": t, "type": "earnings", "date": d, "source": src}
+    stored = [row("A", "2026-07-20", "nse_history"), row("A", "2026-10-20", "yfinance"),      # next one ahead
+              row("B", "2026-07-01", "nse_history"), row("B", "2026-10-01", "yfinance"),      # passed
+              row("C", "2026-06-20", "nse_history"),                                          # 107 days old
+              row("D", "2026-07-15", "yfinance_history"),                                     # no NSE yet
+              row("F", "2026-07-20", "nse_history"), row("F", "2026-09-20", "yfinance_history"),
+              row("G", "2026-07-20", "nse_history"), row("G", "2026-07-22", "yfinance"),      # same report
+              {"id": "A-ex_dividend-2026-10-02", "ticker": "A", "type": "ex_dividend", "date": "2026-10-02",
+               "source": "yfinance"}]
+    due = ce.nse_due(stored, ["A", "B", "C", "D", "E", "F", "G"], date(2026, 10, 5))
+    assert due == {"B": date(2026, 7, 1), "C": date(2026, 6, 20), "D": None, "E": None}
+
+
+def test_between_quarters():
+    nse = [date(2024, 5, 22), date(2024, 8, 1), date(2025, 1, 10), date(2025, 4, 20)]
+    assert ce.between_quarters(date(2024, 7, 11), nse)          # 71 days apart: no quarter missing
+    assert ce.between_quarters(date(2024, 8, 1), nse)           # the report itself
+    assert not ce.between_quarters(date(2024, 10, 30), nse)     # 162-day gap: a quarter NSE lacks
+    assert not ce.between_quarters(date(2025, 5, 1), nse) and not ce.between_quarters(date(2024, 1, 1), nse)
+    assert not ce.between_quarters(date(2024, 7, 11), [])
+
+
+class FakeTicker:
+    def __init__(self, data: dict):
+        self.data = data
+
+    @property
+    def calendar(self):
+        return self.data.get("calendar", {})
+
+    @property
+    def dividends(self):
+        return pd.Series(dtype=float)
+
+    def get_earnings_dates(self, limit=40):
+        idx = pd.DatetimeIndex([pd.Timestamp(t, tz=IST_TZ) for t in self.data.get("earnings", [])])
+        return pd.DataFrame({"Event Type": ["Earnings"] * len(idx)}, index=idx)
+
+
+def run_events_main(monkeypatch, capsys, tmp_path, cfg: dict, yf_data: dict, today: date) -> dict:
+    """collect_events.main() in-process: fake yfinance, NSE replayed from NSE_FIX, data under tmp_path."""
+    import types
+
+    import common
+    fake = types.ModuleType("yfinance")
+    fake.Ticker = lambda sym: FakeTicker(yf_data.get(sym, {}))
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+    monkeypatch.setattr(ce, "require_market", lambda args: cfg)
+    monkeypatch.setattr(ce, "data_dir", lambda m: tmp_path / "data" / m)
+    monkeypatch.setattr(common, "data_dir", lambda m: tmp_path / "data" / m)
+    monkeypatch.setattr(ce, "utc_today", lambda: today)
+    monkeypatch.setattr(ce, "nse_client", lambda c: replay_nse())
+    monkeypatch.setattr(sys, "argv", ["collect_events.py"])
+    assert ce.main() == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_collect_events_nse_backfill_is_append_only_and_idempotent(tmp_path, monkeypatch, capsys):
+    cfg = {"market": "testnse", "name": "Test NSE", "calendar": "XBOM", "timezone": IST_TZ,
+           "relations": {"source": "nse", "pause_seconds": 0},
+           "tickers": {"INFY": {"yahoo": "INFY.NS", "name": "Infosys"},
+                       "MARUTI": {"yahoo": "MARUTI.NS", "name": "Maruti Suzuki"},
+                       "HDFCBANK": {"yahoo": "HDFCBANK.NS", "name": "HDFC Bank"}}}
+    today = date(2026, 10, 5)
+    base = tmp_path / "data" / "testnse" / "events"
+    old = base / "2025" / "02" / "2025-02-01.jsonl"
+    jsonl(old, [{"id": "MARUTI-earnings-2025-01-29", "date": "2025-01-29", "type": "earnings", "ticker": "MARUTI",
+                 "name": "Maruti Suzuki earnings", "source": "nse_history", "first_seen_at": "2025-02-01T00:00:00+00:00",
+                 "amount": None, "timing": "during"}])
+    before = old.read_bytes()
+    yf_data = {"INFY.NS": {"calendar": {"Earnings Date": [date(2026, 10, 23)]},
+                           "earnings": ["2025-07-24 12:00",            # same report as NSE 2025-07-23: NSE wins
+                                        "2024-08-30 12:00",            # between two NSE quarters: not a release
+                                        "2026-09-01 12:00"]},          # after NSE's last date: kept
+               "HDFCBANK.NS": {"earnings": ["2026-07-18 13:00"]}}      # NSE fails for HDFCBANK: yfinance row kept
+    s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, today)
+    assert (s["nse_polled"], s["nse_backfill"], s["nse_tickers"]) == (3, 2, 2)
+    assert [f["source"] for f in s["nse_failed"]] == ["nse_earnings:HDFCBANK"]
+    assert s["new_history"]["earnings"] == 12 + 6 + 2 and s["new_events"] == 1
+    new = base / "2026" / "10" / "2026-10-05.jsonl"
+    rows = [json.loads(x) for x in new.read_text().splitlines()]
+    hist = {(r["ticker"], r["date"], r["timing"], r["source"]) for r in rows if r["source"].endswith("_history")}
+    assert hist == ({("INFY", str(d), tm, "nse_history") for d, tm in INFY_DATES}
+                    | {("MARUTI", str(d), tm, "nse_history") for d, tm in MARUTI_DATES}
+                    | {("INFY", "2026-09-01", "during", "yfinance_history"),
+                       ("HDFCBANK", "2026-07-18", "before_open", "yfinance_history")})
+    assert old.read_bytes() == before
+    # second run: nothing new; only the failed backfill (HDFCBANK, no NSE rows yet) is polled again
+    s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, today)
+    assert (s["nse_polled"], s["nse_backfill"], s["new_history"]["earnings"], s["new_events"]) == (1, 1, 0, 0)
+    assert len(new.read_text().splitlines()) == len(rows)
+
+
+def test_collect_events_summary_lists_sec_failures(tmp_path, monkeypatch, capsys):
+    """Issue 11: a ticker whose SEC submissions request fails is listed in the JSON summary."""
+    fx = tmp_path / "sec"
+    fx.mkdir()
+    sub = {"name": "Apple", "filings": {"recent": {"form": ["8-K"], "items": ["2.02,9.01"],
+                                                   "acceptanceDateTime": ["2026-07-30T20:31:00.000Z"]}}}
+    (fx / "sub.json").write_text(json.dumps(sub))
+    (fx / "urls.json").write_text(json.dumps({
+        "https://www.sec.gov/files/company_tickers.json": str(Path(__file__).resolve().parent / "fixtures" / "sec"
+                                                              / "company_tickers.json"),
+        "https://data.sec.gov/submissions/CIK0000320193.json": "sub.json"}))   # NVDA: no fixture
+    monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
+    monkeypatch.setenv("SEC_USER_AGENT", "market-brief tests test@example.com")
+    cfg = {"market": "testsecev", "name": "Test", "calendar": "XNYS", "timezone": "America/New_York",
+           "filings": "sec", "tickers": {"AAPL": {"yahoo": "AAPL", "name": "Apple"},
+                                         "NVDA": {"yahoo": "NVDA", "name": "NVIDIA"}}}
+    # Yahoo answers with a calendar (an empty one for every ticker is a failed run, exit 1: issue 5)
+    yf_data = {t: {"calendar": {"Earnings Date": [date(2026, 10, 29)]}} for t in ("AAPL", "NVDA")}
+    s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))
+    assert s["sec_tickers"] == 1 and s["sec_error"] is None
+    assert [(f["ticker"], f["cik"]) for f in s["sec_failed"]] == [("NVDA", 1045810)]
+    assert "nse_polled" not in s and s["new_history"]["earnings"] == 1

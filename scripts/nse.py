@@ -39,6 +39,7 @@ PAGES = {  # Referer per API: NSE checks that the call comes from its own page
     "corporate-pledgedata": "/companies-listing/corporate-filings-pledged-data",
     "corporate-announcements": "/companies-listing/corporate-filings-announcements",
     "integrated-filing-results": "/companies-listing/corporate-integrated-filing",
+    "corporates-financial-results": "/companies-listing/corporate-filings-financial-results",
     "fiidiiTradeReact": "/reports/fii-dii",
 }
 ARCHIVES_HOST = "nsearchives.nseindia.com"

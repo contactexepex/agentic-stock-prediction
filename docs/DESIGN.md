@@ -256,8 +256,8 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   against live responses (NSE changes field names; built from public scrapers, not yet seen live).
 - Section 4 range inputs: **built** (`scripts/range_inputs.py`, switches in `config/ranges.yaml`):
   past earnings-day moves (dates and before-open/after-close timing from yfinance and, US, SEC
-  8-K item 2.02; backfilled by `collect_events.py`), ex-dividend shift (dividend amounts now
-  collected), index-then-stock beta split of the overnight cue (US: `ES`; India: previous `SPX`
+  8-K item 2.02, India, NSE results filings; backfilled by `collect_events.py`), ex-dividend
+  shift (dividend amounts now collected), index-then-stock beta split of the overnight cue (US: `ES`; India: previous `SPX`
   session with a fitted beta), and US option-implied vol (`collect_options.py`) in the width
   blend and as the implied earnings move. The range notes and the `inputs` column say which
   applied, so the weekly review can score each one live.
@@ -269,16 +269,33 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 
   | Input | US 1d | US 5d | India 1d | India 5d |
   |---|---|---|---|---|
-  | Past earnings moves (vs fixed x3) | 21.11 -> 20.72, n 82, improves: **on** | 24.23 -> 24.53, n 409, worse: off | no data: off | no data: off |
+  | Past earnings moves (vs the fixed multiple: US x3, India x2) | 21.11 -> 20.72, n 82, improves: **on** | 24.23 -> 24.53, n 409, worse: off | 9.74 -> 9.97, n 78, worse: off | 14.97 -> 15.15, n 391, worse: off |
+  | India fixed earnings multiple x3 -> x2 | not tested: x3 | not tested: x3 | 11.54 -> 9.74, n 78, improves: **x2** | 15.445 -> 14.97, n 391, improves: **x2** |
   | Ex-dividend shift | 7.45 -> 6.55, n 72, improves: **on** | 13.60 -> 13.08, n 359, improves: **on** | 4.93 -> 4.22, n 27, improves: **on** | 12.79 -> 12.10, n 138, improves: **on** |
   | Beta split (vs direct cue) | same, n 5000: off | same, n 5000: off | 5.497 -> 5.454, n 5000, improves: **on** | 11.924 -> 11.916, n 5000, noise: off |
   | Implied vol | no history: off | no history: off | no chains | no chains |
 
   Checks outside the rule (440 sessions): US earnings moves 1d 22.77 -> 22.33, 5d 26.53 -> 26.48
   (noise); India beta split 1d 5.373 -> 5.345, 5d 12.059 -> 12.061 (slightly worse, so 5d stays
-  off). India has no free earnings dates after mid-2025 and only 2y of bars; it stays on the
-  fixed multiplier, which looks too wide there (1d earnings ranges covered 97% of 38 at 440
-  sessions). In the US every stock has its own pre-market cue, so with equal weights the beta
+  off). India earnings dates (2026-10-05): yfinance's stop at 2025-05-22, so `collect_events.py`
+  takes them from NSE results filings (Integrated Filing from the March 2025 quarter, the older
+  financial-results list before it; the earliest filing per quarter, moved to the results
+  announcement up to 36 hours earlier, timed in IST; quarters first filed after the SEBI deadline
+  are dropped): 228 reports from 2023-10-11 to 2026-08-07, 12 per ticker except the insurers
+  HDFCLIFE and SBILIFE (6 each from April 2025; NSE's older list gave no rows for them in the
+  window, so yfinance supplies their 6 earlier ones), timed 29 before the open, 74 during, 125
+  after the close. With
+  these dates the fixed x3 was too wide (1d earnings ranges covered 91.0% of 78, 5d 85.4% of 391).
+  Past moves at x3 passed the rule (1d 11.54 -> 10.57, 5d 15.445 -> 15.10), but a lower fixed
+  multiple beat both: the fixed arm scored 1d 10.48 / 9.74 / 9.73 and 5d 15.01 / 14.97 / 15.36 at
+  x2.5 / x2 / x1.5 (x3: 11.54, 15.445). x2 is the only value best or within noise of best at both
+  horizons, so India uses `earnings_vol_multiple_by_market: {india: 2.0}`, and against x2 past
+  moves are worse at both horizons (off). The value was picked from these four on the same window;
+  the 440-session check agrees (fixed 1d x3 11.42, x2.5 10.45, x2 9.95, x1.5 10.09; 5d 15.61,
+  15.11, 15.04, 15.37; past moves vs x2 1d 9.95 -> 10.07, 5d 15.04 -> 15.12, worse). At x2 the 5d
+  earnings ranges cover 73.4% (1d 83.3%): the interval score is lower, but the weekly review
+  should watch 5d earnings coverage. Before the NSE dates the India backtest had no earnings
+  rows at 250 sessions and 38 at 440 (1d covered 97.4%). In the US every stock has its own pre-market cue, so with equal weights the beta
   split equals the direct cue; US cue history is a proxy (next open gap, which flatters cues in
   absolute terms). Implied vol cannot be backtested: it is off, `collect_options.py` keeps
   collecting, and each range row stores the sigma the IV blend would have given (`iv_sigma_h`,

@@ -242,7 +242,7 @@ def main() -> int:
     now = args.now or utc_now()
     if datetime.fromisoformat(now).tzinfo is None:
         raise SystemExit("--now needs a UTC offset, e.g. 2026-10-05T02:40:00+00:00")
-    rc, con = load_ranges_config(), connect(cfg["market"])
+    rc, con = load_ranges_config(cfg["market"]), connect(cfg["market"])
     rows = build(cfg, rc, con, now)
     if rows:
         append_jsonl(day_file(cfg["market"], "ranges", pd.Timestamp(rows[0]["as_of_date"]).date()), rows)

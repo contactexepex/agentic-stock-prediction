@@ -1,4 +1,4 @@
-NSE replay fixtures for tests/test_relations.py and tests/test_nse_india.py.
+NSE replay fixtures for tests/test_relations.py, tests/test_nse_india.py and tests/test_range_inputs.py.
 
 real/  Trimmed REAL responses, fetched live on 2026-10-05 (about 16:00-16:30 UTC) through the
        collectors' own session (scripts/nse.py). Only rows were dropped; every kept row and
@@ -26,6 +26,21 @@ real/  Trimmed REAL responses, fetched live on 2026-10-05 (about 16:00-16:30 UTC
        sec_bhavdata_full_<DDMMYYYY>.csv                nsearchives.nseindia.com/products/content/sec_bhavdata_full_<DDMMYYYY>.csv
                                                        (29-09, 01-10 and 02-10-2026: header + the 20 watchlist rows + 2 others;
                                                        02-10 was a holiday and NSE served the 01-10 file under that name)
+
+earnings/  REAL responses for collect_events.py's NSE earnings dates (tests/test_range_inputs.py),
+       fetched live on 2026-10-05 (about 19:00-19:15 UTC) through scripts/nse.py. Only rows were
+       dropped; kept rows are as NSE served them (JSON re-serialised with indentation).
+       File (replay name)                              Source URL (www.nseindia.com/api/...)
+       integrated-filing-results_<SYM>.json            integrated-filing-results?index=equities&symbol=<SYM>&type=Integrated Filing- Financials
+                                                       (INFY, MARUTI; whole responses, 12 rows each)
+       corporates-financial-results_INFY.json          corporates-financial-results?index=equities&period=Quarterly&symbol=INFY
+                                                       (15 of 144 rows: the 12 broadcast from Oct 2023 to Jan 2025, and 3 from 2019)
+       corporate-announcements_<SYM>.json              corporate-announcements?index=equities&symbol=<SYM>&from_date=..&to_date=05-10-2026
+                                                       (INFY from 01-10-2023: the 16 results-type rows + the first 5 others of 767;
+                                                       MARUTI from 01-04-2025: the 6 results-type rows + the first 5 others of 245)
+       MARUTI announced five of these six quarters during market hours (14:11-14:58 IST; the July
+       2026 one at 16:39, after the close) and filed each quarter's first XBRL after the close
+       (18:26-20:28 IST), so it shows why the announcement time is used.
 
 synthetic/  Hand-written SYNTHETIC files for cases the real responses on that day cannot show:
        a director's large market sale and a promoter pledge creation (corporates-pit-gg.json +

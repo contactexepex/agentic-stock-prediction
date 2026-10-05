@@ -12,7 +12,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `config/events.yaml` scheduled market events (rules and fixed dates)
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
   Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
-  days and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
+  days, India from NSE results filings, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` and `report`
   (report skeleton + Slack draft with every number; agents fill only the `AGENT` markers,

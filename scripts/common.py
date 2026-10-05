@@ -254,8 +254,15 @@ def utc_today() -> date:
 
 # ---------- markets ----------
 
-def load_ranges_config() -> dict:
-    return yaml.safe_load((CONFIG / "ranges.yaml").read_text())
+def load_ranges_config(market: str | None = None) -> dict:
+    """config/ranges.yaml. With a market, a setting `<key>_by_market: {market: value}` replaces
+    `<key>` for that market (e.g. earnings_vol_multiple_by_market)."""
+    rc = yaml.safe_load((CONFIG / "ranges.yaml").read_text())
+    if market:
+        for key in [k for k in rc if k.endswith("_by_market")]:
+            if market in (rc[key] or {}):
+                rc[key.removesuffix("_by_market")] = rc[key][market]
+    return rc
 
 
 def market_names() -> list[str]:

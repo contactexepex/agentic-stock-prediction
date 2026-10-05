@@ -72,7 +72,7 @@ def compute(cfg: dict, rc: dict, con, bars: dict[str, pd.DataFrame]) -> list[dic
 
 def main() -> int:
     cfg = require_market(market_arg(__doc__).parse_args())
-    rc, con = load_ranges_config(), connect(cfg["market"])
+    rc, con = load_ranges_config(cfg["market"]), connect(cfg["market"])
     bars = load_bars(con)
     if benchmark_key(cfg) not in bars:
         raise SystemExit("no benchmark bars; run collect_prices.py first")
