@@ -9,7 +9,10 @@ Upcoming events come from the yfinance calendar; an ex-dividend row carries the 
 Unless --no-history, past events are backfilled for the range engine (source ending in
 "_history", read through the `event_history` view): dividends with amounts, and earnings
 dates with `timing` (before_open / during / after_close) from yfinance's earnings dates and,
-for SEC markets with SEC_USER_AGENT set, 8-K item 2.02 (results) acceptance times."""
+for SEC markets with SEC_USER_AGENT set, 8-K item 2.02 (results) acceptance times; for NSE
+markets (`relations.source: nse`) from NSE results filings (see nse_earnings), polled only for
+tickers that are due (see nse_due). Tickers whose SEC submissions or NSE requests fail are
+listed in the summary (`sec_failed`, `nse_failed`)."""
 from __future__ import annotations
 
 import json
@@ -22,9 +25,15 @@ import pandas as pd
 
 import events as ev
 from common import append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
+from nse import IST, FetchError, Nse, nse_symbols, parse_day, parse_ts, pick, rows_of
 
 FIELDS = {"Earnings Date": "earnings", "Ex-Dividend Date": "ex_dividend"}
 NEAR_DAYS = 3  # earnings dates this close together are the same report
+# NSE announcement categories that carry a results release (the PDF filed after the board meeting)
+RESULTS_ANNOUNCEMENTS = ("Outcome of Board Meeting", "Financial Result Updates", "Integrated Filing- Financial")
+RELEASE_WINDOW = timedelta(hours=36)  # such an announcement this long before the first XBRL filing = its release
+NSE_STALE_DAYS = 100  # poll a ticker with NSE results again when its newest past earnings date is this old
+QUARTER_GAP_DAYS = 120  # consecutive quarterly results are at most this far apart (45/60-day deadlines)
 
 
 def as_dates(value) -> list[date]:
@@ -98,31 +107,175 @@ def yf_earnings(cfg: dict, tk, limit: int = 40) -> tuple[list[tuple[date, str | 
     return out, used
 
 
-def sec_earnings(cfg: dict, tickers: dict, ua: str) -> dict[str, list[tuple[date, str | None, int]]]:
-    """Past results releases from SEC EDGAR: 8-K filings with item 2.02, timed by acceptance."""
+def sec_earnings(cfg: dict, tickers: dict,
+                 ua: str) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
+    """Past results releases from SEC EDGAR: 8-K filings with item 2.02, timed by acceptance.
+    Returns (rows per ticker, tickers whose submissions request failed)."""
     from sec import Edgar  # shared SEC client: one throttle, backoff on 429/503, test fixtures
 
     edgar = Edgar(ua)
     cik_by_ticker = edgar.cik_map()
     out: dict[str, list] = {}
+    failed: list[dict] = []
     for key, meta in tickers.items():
         cik = cik_by_ticker.get(meta.get("sec_ticker", key).upper())
         if cik is None:
             continue
         try:
             recent = edgar.recent(cik)
-        except Exception:
+        except Exception as exc:
+            failed.append({"ticker": key, "cik": cik, "error": str(exc)[:200]})
             continue
         items = recent.get("items") or [""] * len(recent["form"])
         for i, form in enumerate(recent["form"]):
             if form in ("8-K", "6-K") and "2.02" in (items[i] or "") and recent["acceptanceDateTime"][i]:
                 d, tm = timing(cfg, pd.Timestamp(recent["acceptanceDateTime"][i]))
                 out.setdefault(key, []).append((d, tm, 0))
-    return out
+    return out, failed
+
+
+# ---------- NSE (India): results filings ----------
+
+def max_filing_lag(period_end: date) -> int:
+    """SEBI LODR regulation 33: quarterly results within 45 days of the quarter end, the annual
+    (March quarter) results within 60. A first filing later than that (plus 3 days' grace) is a
+    late XBRL upload, not the release, so its date is not used."""
+    return 63 if period_end.month == 3 else 48
+
+
+def nse_results_filings(nse: Nse, symbol: str, backfill: bool) -> tuple[list[tuple[date, datetime]], list[str]]:
+    """(period end, broadcast time UTC) of each results filing NSE lists for a symbol: SEBI
+    Integrated Filing (Financials), used from the March 2025 quarter on, and, when backfilling,
+    the older financial-results list (quarters to December 2024). Returns (filings, notes)."""
+    notes = []
+    payload = nse.json("integrated-filing-results", {"index": "equities", "symbol": symbol,
+                                                     "type": "Integrated Filing- Financials"})
+    rows = rows_of(payload)
+    total = payload.get("totalCount") if isinstance(payload, dict) else None
+    if isinstance(total, int) and total > len(rows):
+        notes.append(f"{symbol}: integrated filings list {len(rows)} of {total} rows")
+    out = [(parse_day(pick(r, "qe_Date")), parse_ts(pick(r, "broadcast_Date", "creation_Date"))) for r in rows]
+    if backfill:
+        rows = rows_of(nse.json("corporates-financial-results", {"index": "equities", "period": "Quarterly",
+                                                               "symbol": symbol}))
+        out += [(parse_day(pick(r, "toDate")), parse_ts(pick(r, "broadCastDate", "exchdisstime", "filingDate")))
+                for r in rows]
+    return [(pe, ts) for pe, ts in out if pe and ts], notes
+
+
+def nse_release_times(nse: Nse, symbol: str, start: date, today: date) -> list[datetime]:
+    """Times (UTC) of the symbol's results-type announcements (board meeting outcome, results
+    PDF) from start to today: the first public release, usually before the XBRL filing."""
+    rows = rows_of(nse.json("corporate-announcements", {"index": "equities", "symbol": symbol,
+                                                      "from_date": f"{start:%d-%m-%Y}",
+                                                      "to_date": f"{today:%d-%m-%Y}"}))
+    return [ts for r in rows if pick(r, "desc") in RESULTS_ANNOUNCEMENTS
+            and (ts := parse_ts(pick(r, "an_dt", "exchdisstime", "sort_date")))]
+
+
+def nse_reports(cfg: dict, filings: list[tuple[date, datetime]], releases: list[datetime],
+                after: date | None = None) -> tuple[list[tuple[date, str | None, int]], int]:
+    """One (date, timing, priority 0) per reported quarter: the earliest filing for the period
+    end (standalone or consolidated, original or revised), moved earlier to a results
+    announcement up to RELEASE_WINDOW before it. Only quarters first filed after `after` (IST).
+    Returns (rows, quarters dropped because their first filing came after the SEBI deadline)."""
+    first: dict[date, datetime] = {}
+    for pe, ts in filings:
+        first[pe] = min(first.get(pe, ts), ts)
+    out, late = [], 0
+    for pe, ts in sorted(first.items()):
+        filed = ts.astimezone(IST).date()
+        if after is not None and filed <= after:
+            continue
+        if not 0 < (filed - pe).days <= max_filing_lag(pe):
+            late += 1
+            continue
+        release = min([a for a in releases if ts - RELEASE_WINDOW <= a <= ts] + [ts])
+        d, tm = timing(cfg, pd.Timestamp(release))
+        out.append((d, tm, 0))
+    return out, late
+
+
+def nse_due(stored: list[dict], tickers: list[str], today: date) -> dict[str, date | None]:
+    """Tickers to poll -> newest stored past earnings date (a `_history` row of any source), or
+    None = no NSE results stored yet: backfill (retried on the next run if it fails). A ticker
+    with NSE results is due when an upcoming earnings date stored earlier has passed since its
+    newest past date, or when that date is NSE_STALE_DAYS old. Otherwise it is not polled, so a
+    quiet day costs no NSE calls."""
+    last: dict[str, date] = {}
+    has_nse: set[str] = set()
+    known: dict[str, list[date]] = {}
+    for r in stored:
+        if r.get("type") != "earnings" or r.get("ticker") not in tickers:
+            continue
+        d = date.fromisoformat(str(r["date"])[:10])
+        known.setdefault(r["ticker"], []).append(d)
+        if str(r.get("source", "")).endswith("_history"):
+            last[r["ticker"]] = max(last.get(r["ticker"], d), d)
+        if r.get("source") == "nse_history":
+            has_nse.add(r["ticker"])
+    due: dict[str, date | None] = {}
+    for t in tickers:
+        if t not in has_nse:
+            due[t] = None
+        elif (today - last[t]).days >= NSE_STALE_DAYS or any(
+                last[t] + timedelta(days=NEAR_DAYS) < d <= today for d in known.get(t, [])):
+            due[t] = last[t]
+    return due
+
+
+def nse_earnings(cfg: dict, nse: Nse, due: dict[str, date | None], since: date,
+                 today: date) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict], list[str]]:
+    """Past results releases from NSE for the due tickers (see nse_due), dated and timed by the
+    results filings and refined by the results announcements. A backfill reaches back to
+    `since`; a ticker with stored history only takes quarters filed more than NEAR_DAYS after
+    its newest stored date. Returns (rows per ticker, failures, notes); a host the
+    egress proxy refuses stops the remaining calls."""
+    symbol_of = {t: s for s, t in nse_symbols(cfg).items()}
+    out: dict[str, list] = {}
+    failed: list[dict] = []
+    notes: list[str] = []
+    for ticker, last in due.items():
+        symbol = symbol_of[ticker]
+        after = None if last is None else last + timedelta(days=NEAR_DAYS)
+        try:
+            filings, n = nse_results_filings(nse, symbol, backfill=last is None)
+            notes += n
+            filings = [(pe, ts) for pe, ts in filings if ts.astimezone(IST).date() >= since]
+            new = [ts for _, ts in filings if after is None or ts.astimezone(IST).date() > after]
+            releases = nse_release_times(nse, symbol, min(new).astimezone(IST).date() - timedelta(days=2),
+                                         today) if new else []
+            rows, late = nse_reports(cfg, filings, releases, after)
+        except FetchError as exc:
+            failed.append(exc.entry(f"nse_earnings:{ticker}"))
+            if exc.host:
+                break
+            continue
+        if late:
+            notes.append(f"{ticker}: {late} quarter(s) first filed after the SEBI deadline, not used")
+        if rows:
+            out[ticker] = rows
+    return out, failed, notes
+
+
+def between_quarters(d: date, nse_dates: list[date]) -> bool:
+    """Is d between two consecutive NSE results dates at most QUARTER_GAP_DAYS apart? Then the
+    filings list that quarter and d adds nothing (a later gap, e.g. a quarter whose first filing
+    missed the SEBI deadline, is left for other sources to fill)."""
+    before = max((x for x in nse_dates if x <= d), default=None)
+    after = min((x for x in nse_dates if x >= d), default=None)
+    return before is not None and after is not None and (after - before).days <= QUARTER_GAP_DAYS
+
+
+def nse_client(cfg: dict) -> Nse:
+    """One NSE session for the run (scripts/nse.py), paced as the market config says."""
+    rel = cfg.get("relations") or {}
+    return Nse(rel.get("base", "https://www.nseindia.com"), rel.get("archives", "https://nsearchives.nseindia.com"),
+               pause=float(rel.get("pause_seconds", 0.7)))
 
 
 def merge_near(cands: list[tuple[date, str | None, int]]) -> list[tuple[date, str | None, int]]:
-    """One row per report: best source first (SEC, then yfinance report, then call)."""
+    """One row per report: best source first (SEC or NSE filings, then yfinance report, then call)."""
     kept: list[tuple[date, str | None, int]] = []
     for c in sorted(cands, key=lambda x: (x[2], x[0])):
         if all(abs((c[0] - k[0]).days) > NEAR_DAYS for k in kept):
@@ -143,18 +296,34 @@ def main() -> int:
     stored = stored_events(market)
     seen = {r["id"] for r in stored}
     hist_earn: dict[str, list[date]] = {}
+    nse_dates: dict[str, list[date]] = {}
     for r in stored:
         if r.get("type") == "earnings" and str(r.get("source", "")).endswith("_history"):
             hist_earn.setdefault(r["ticker"], []).append(date.fromisoformat(str(r["date"])[:10]))
+            if r.get("source") == "nse_history":
+                nse_dates.setdefault(r["ticker"], []).append(date.fromisoformat(str(r["date"])[:10]))
 
     sec: dict[str, list] = {}
-    sec_error = None
+    sec_error, sec_failed = None, []
     ua = os.environ.get("SEC_USER_AGENT")
     if not args.no_history and cfg.get("filings") == "sec" and ua:
         try:
-            sec = sec_earnings(cfg, cfg["tickers"], ua)
+            sec, sec_failed = sec_earnings(cfg, cfg["tickers"], ua)
         except Exception as exc:
             sec_error = str(exc)[:200]
+
+    nse: dict[str, list] = {}
+    nse_info: dict = {}
+    if not args.no_history and (cfg.get("relations") or {}).get("source") == "nse":
+        due = nse_due(stored, list(cfg["tickers"]), today)
+        nse_info = {"nse_polled": len(due), "nse_backfill": sum(v is None for v in due.values()),
+                    "nse_failed": [], "nse_notes": []}
+        if due:
+            client = nse_client(cfg)
+            nse, nse_info["nse_failed"], nse_info["nse_notes"] = nse_earnings(cfg, client, due, since, today)
+            nse_info["nse_requests"] = client.requests
+        nse_info["nse_tickers"] = len(nse)
+    primary = "nse_history" if nse_info else "sec_history"   # the filings source (priority 0) of this market
 
     rows, failed, hist = [], [], {"earnings": 0, "ex_dividend": 0}
     earn_sources: dict[str, int] = {}
@@ -209,12 +378,16 @@ def main() -> int:
         yfe, used = yf_earnings(cfg, tk)
         if used:
             earn_sources[used] = earn_sources.get(used, 0) + 1
-        for d, tm, prio in merge_near(sec.get(key, []) + yfe):
+        # a yfinance date between two NSE results dates a quarter apart is either the same report
+        # or not a results release (no quarter is missing there)
+        known_nse = nse_dates.get(key, []) + [d for d, _, _ in nse.get(key, [])]
+        yfe = [c for c in yfe if not between_quarters(c[0], known_nse)]
+        for d, tm, prio in merge_near(sec.get(key, []) + nse.get(key, []) + yfe):
             if not (since <= d < today):
                 continue
             if any(abs((d - k).days) <= NEAR_DAYS for k in hist_earn.get(key, [])):
                 continue
-            src = "sec_history" if prio == 0 else "yfinance_history"
+            src = primary if prio == 0 else "yfinance_history"
             if add(key, meta, "earnings", d, src, tm=tm):
                 hist["earnings"] += 1
                 hist_earn.setdefault(key, []).append(d)
@@ -222,7 +395,8 @@ def main() -> int:
     written = append_jsonl(day_file(market, "events", today), rows)
     print(json.dumps({"collector": "events", "market": market, "new_events": written - sum(hist.values()),
                       "new_history": hist, "earnings_history_sources": earn_sources,
-                      "sec_tickers": len(sec), "sec_error": sec_error, "failed": failed}, indent=2))
+                      "sec_tickers": len(sec), "sec_error": sec_error, "sec_failed": sec_failed, **nse_info,
+                      "failed": failed}, indent=2))
     return 1 if failed and len(failed) == len(cfg["tickers"]) else 0
 
 

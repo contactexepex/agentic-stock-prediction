@@ -132,9 +132,9 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
 
 def main() -> int:
     cfg = require_market(market_arg(__doc__).parse_args())
-    con = connect(cfg["market"])
+    con, rc = connect(cfg["market"]), load_ranges_config(cfg["market"])
     print(json.dumps({"market": cfg["market"], "flags": risk_flags(cfg, con),
-                      "widen": {t: w for t, (w, _) in widen_by_ticker(cfg, load_ranges_config(), con).items()}},
+                      "widen": {t: w for t, (w, _) in widen_by_ticker(cfg, rc, con).items()}},
                      indent=2))
     return 0
 
