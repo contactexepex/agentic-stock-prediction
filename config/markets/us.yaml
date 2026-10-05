@@ -94,6 +94,12 @@ filings: sec
 filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
 filing_lookback_days: 7
 
+# Range engine inputs (docs/DESIGN.md section 4). options: implied vol from yfinance option chains
+# (collect_options.py). index_cue: the overnight cue for the benchmark's expected move, used by
+# the beta split of the range centre; beta = benchmark move per 1% cue move.
+options: yfinance
+index_cue: {symbol: ES, beta: 1.0}
+
 # Relationships (docs/DESIGN.md phase 5) from SEC EDGAR: collect_insiders.py (Form 4),
 # collect_stakes.py (Schedule 13D/13G) and collect_holdings.py (13F).
 relationships:

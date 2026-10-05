@@ -22,6 +22,35 @@ major_event_factor: 1.15    # market-wide major event inside the horizon
 regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.1, UNSTABLE: 1.25}
 max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow it
 
+# Range inputs (docs/DESIGN.md sections 4 and 11). `enabled`: true, false, a list of markets, or
+# market -> true/false or a list of horizons ({us: [1]} = US 1-day ranges only).
+# Rule for the defaults (DESIGN section 7): on for a market and horizon only if scripts/backtest.py
+# over the stated 250 sessions lowers the 80% interval score where the input applies by more
+# than backtest_min_gain (relative; smaller changes are noise). Implied vol has no stored
+# history, so it cannot pass the rule: off, and ranges.py records its horizon sigma as the shadow
+# value `iv_sigma_h` for the weekly review.
+backtest_min_gain: 0.005    # 0.5% of the interval score
+earnings_history:           # size the earnings widening from the stock's past earnings-day moves
+  enabled: {us: [1]}        # US 5d worse at 250 sessions; India: no earnings dates to test
+  min_events: 2             # fewer past reactions -> fixed earnings_vol_multiple
+  prior_events: 4           # shrink towards earnings_vol_multiple as if it were this many events
+  lookback_events: 12       # most recent reactions used
+  max_multiple: 8.0         # cap on the earnings-day multiple (also caps the options-implied one)
+ex_dividend:                # shift the centre down by dividends going ex inside the horizon
+  enabled: true
+beta_split:                 # centre = beta x index cue + own cue net of beta x index cue
+  enabled: {india: [1]}     # India 5d: noise at 250, worse at 440; US: same as the direct cue
+  index_weight: 0.5         # share of the expected index move applied
+  own_weight: 0.5           # share of the stock's own cue (ADR / pre-market) beyond beta x index
+  beta_clip: [0.0, 2.5]
+  fit_sessions: 250         # index_cue beta "fit": regression window
+implied_vol:                # US option chains (collect_options.py); no backtest -> shadow only
+  enabled: false
+  weight: 0.5               # share of implied variance in the daily volatility blend
+  max_age_days: 1           # snapshot must be from the run day or the day before (UTC)
+  max_expiry_days: 30       # use the first expiry on/after the target date, at most this far out
+  use_for_earnings: true    # earnings before that expiry: IV sets the earnings multiple instead
+
 # Relationship risk flags (scripts/relations.py; markets with a `relations:` block). Extra width
 # per flag type, summed per ticker and capped. Off by default: switch on only if the weekly
 # review shows flagged tickers' ranges miss more often than the rest.

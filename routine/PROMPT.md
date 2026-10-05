@@ -43,7 +43,8 @@ Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/
    it. Say so in the report's `data_quality` section.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
-   `collect_news.py` and `collect_filings.py` (all in `scripts/`), and for India also
+   `collect_news.py`, `collect_filings.py` and `collect_options.py` (all in `scripts/`;
+   options are US only, India skips), and for India also
    `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
    pledges from NSE). Keep each JSON summary.
    A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
@@ -53,7 +54,8 @@ Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/
    downloads only when a new quarter's 13F filings exist and otherwise prints `skipped`.
    Run the four SEC collectors (`collect_filings`, `collect_insiders`, `collect_stakes`,
    `collect_holdings`) one after another, never in parallel: each throttles only its own
-   requests, and together they must stay under SEC's 10 requests/second.
+   requests, and together they must stay under SEC's 10 requests/second. `collect_events`
+   also reads SEC (US earnings-date backfill), so never run it alongside them either.
 
 4. Score: `python scripts/score_predictions.py`.
 

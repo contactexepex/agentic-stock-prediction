@@ -186,15 +186,15 @@ def test_backtest_scale_widens_ranges():
     rank = {d: i for i, d in enumerate(idx)}
     obs = bt.observations(bars, ["A", "B"], 1, RC, rank)
     plain = bt.evaluate(obs, 1, RC, 40)
-    ones = bt.evaluate(obs, 1, RC, 40, {i: 1.0 for i in range(320)})
-    double = bt.evaluate(obs, 1, RC, 40, {i: 2.0 for i in range(320)})
+    ones = bt.evaluate(obs, 1, RC, 40, scale={i: 1.0 for i in range(320)})
+    double = bt.evaluate(obs, 1, RC, 40, scale={i: 2.0 for i in range(320)})
     assert len(plain) == 80 and plain.equals(ones)                          # no scale = the formula as before
     ratio = double["width80"] / plain["width80"]
     assert ratio.between(1.95, 2.05).all() and (ratio != 1).all()           # log-width doubles exactly
     assert double["hit80"].mean() >= plain["hit80"].mean()
     assert not np.allclose(double["is80"], plain["is80"])
     # scale applies per start day only
-    half = bt.evaluate(obs, 1, RC, 40, {int(plain["rank"].max()): 2.0})
+    half = bt.evaluate(obs, 1, RC, 40, scale={int(plain["rank"].max()): 2.0})
     changed = half["width80"] != plain["width80"]
     assert set(half.loc[changed, "rank"]) == {int(plain["rank"].max())}
 
