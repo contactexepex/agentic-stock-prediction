@@ -226,6 +226,7 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     assert cal[1]["q10"] < cal[1]["q25"] < 0 < cal[1]["q75"] < cal[1]["q90"]
 
     as_of = days[-1]
+    made_at = f"{as_of}T23:00:00+00:00"                 # after the as-of close, before the next session's
     pred = {"id": f"{as_of}-AAPL-5d", "made_at": "2026-01-01T00:00:00+00:00", "as_of_date": str(as_of),
             "ticker": "AAPL", "horizon_days": 5, "direction": "up", "confidence": 0.8, "rationale": "t",
             "evidence_ids": ["x"], "prompt_version": "test", "range_widen": 0.3}
@@ -233,10 +234,11 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     p.parent.mkdir(parents=True)
     p.write_text(json.dumps(pred) + "\n")
 
-    r = run("ranges.py", root, cfg)
+    r = run("ranges.py", root, cfg, "--now", made_at)
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["written"] == 4                 # 2 tickers x 2 horizons
-    assert json.loads(run("ranges.py", root, cfg).stdout)["written"] == 0   # written once
+    assert json.loads(r.stdout)["late"] is False
+    assert json.loads(run("ranges.py", root, cfg, "--now", made_at).stdout)["written"] == 0   # written once
     rows = {x["id"]: x for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
             for x in map(json.loads, f.read_text().splitlines())}
     a5, m5 = rows[f"{as_of}-AAPL-5d"], rows[f"{as_of}-MSFT-5d"]

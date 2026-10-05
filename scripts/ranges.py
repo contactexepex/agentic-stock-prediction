@@ -4,13 +4,16 @@
 Run after features.py, calibrate.py and the forecaster. Inputs (all stored, never live APIs):
 latest indicator snapshot and regime, latest calibration quantiles, upcoming events, and
 today's predictions (AI direction/confidence and optional `range_widen`).
-Appends to data/<market>/ranges/; ids <as_of_date>-<ticker>-<h>d are written once."""
+Appends to data/<market>/ranges/; ids <as_of_date>-<ticker>-<h>d are written once.
+Late-run guard: a range whose target session had already closed at made_at is not published;
+other ranges note when the first target session had already closed, and an overnight cue
+quoted after that close is ignored (it would carry that session's outcome)."""
 from __future__ import annotations
 
 import json
 import math
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -25,7 +28,25 @@ def target_date(cfg: dict, as_of, h: int):
     return ev.sessions_ahead(cfg, as_of + timedelta(days=1), h)[-1]
 
 
-def build(cfg: dict, rc: dict, con) -> list[dict]:
+def first_target_close(cfg: dict, as_of):
+    return ev.session_close_utc(cfg, target_date(cfg, as_of, 1))
+
+
+def cue_times(con, feats: pd.DataFrame) -> dict:
+    """When each ticker's cue was quoted: the quote features.py used, i.e. the latest one collected
+    on the snapshot's UTC day no later than its computed_at (ADR first)."""
+    out = {}
+    for t, f in feats.iterrows():
+        at = pd.Timestamp(f["computed_at"]).to_pydatetime()
+        row = con.execute("SELECT coalesce(ts, collected_at) FROM quotes WHERE symbol IN (?, ?) "
+                          "AND CAST(collected_at AS DATE) = CAST(? AS DATE) AND collected_at <= ? "
+                          "ORDER BY symbol = ? DESC, collected_at DESC LIMIT 1",
+                          [f"{t}:ADR", t, at, at, f"{t}:ADR"]).fetchone()
+        out[t] = pd.Timestamp(row[0]).to_pydatetime() if row and row[0] is not None else None
+    return out
+
+
+def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     reg = con.execute("SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1").df()
     if reg.empty:
         raise SystemExit("no regime snapshot; run features.py first")
@@ -41,10 +62,16 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
     bars = load_bars(con)
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     earnings = {t: d for t, k, d in company if k == "earnings"}
-    now, rows = utc_now(), []
+    now, rows = now or utc_now(), []
+    made = datetime.fromisoformat(now)
+    first = target_date(cfg, as_of, 1)
+    first_close = first_target_close(cfg, as_of)
+    cue_ts = cue_times(con, feats)
 
     for h in rc["horizons"]:
         tgt = target_date(cfg, as_of, h)
+        if made >= ev.session_close_utc(cfg, tgt):
+            continue  # late run: the target session already closed, its outcome is public
         mevents = ev.market_events(cfg, as_of + timedelta(days=1), tgt)
         major = [e for e in mevents if e["major"]]
         if h in cal.index:
@@ -67,12 +94,17 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
             e = earnings.get(t)
             sigma_h, wnotes = rl.horizon_sigma(sd, h, bool(e and e <= tgt), rc, reg["regime"], bool(major))
             notes += wnotes
+            if made >= first_close:
+                notes.append(f"late: {first} closed before made_at")
             # centre: overnight cue + AI drift, capped
             center = 0.0
             cue = f.get("cue_change_pct")
             if cue is not None and not pd.isna(cue):
-                center += rc["cue_weight"] * math.log1p(float(cue))
-                notes.append(f"cue {float(cue):+.2%} x{rc['cue_weight']}")
+                if cue_ts.get(t) is not None and cue_ts[t] > first_close:
+                    notes.append(f"cue ignored: quoted after {first} close")
+                else:
+                    center += rc["cue_weight"] * math.log1p(float(cue))
+                    notes.append(f"cue {float(cue):+.2%} x{rc['cue_weight']}")
             p = pred.get((t, h))
             direction = confidence = None
             if p is not None and p.direction in ("up", "down") and not pd.isna(p.confidence):
@@ -104,12 +136,20 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
 
 
 def main() -> int:
-    cfg = require_market(market_arg(__doc__).parse_args())
+    ap = market_arg(__doc__)
+    ap.add_argument("--now", help="made_at as ISO 8601 UTC with offset instead of now (tests only)")
+    args = ap.parse_args()
+    cfg = require_market(args)
+    now = args.now or utc_now()
+    if datetime.fromisoformat(now).tzinfo is None:
+        raise SystemExit("--now needs a UTC offset, e.g. 2026-10-05T02:40:00+00:00")
     rc, con = load_ranges_config(), connect(cfg["market"])
-    rows = build(cfg, rc, con)
+    rows = build(cfg, rc, con, now)
     if rows:
         append_jsonl(day_file(cfg["market"], "ranges", pd.Timestamp(rows[0]["as_of_date"]).date()), rows)
-    print(json.dumps({"step": "ranges", "market": cfg["market"], "written": len(rows),
+    as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
+    late = datetime.fromisoformat(now) >= first_target_close(cfg, as_of)
+    print(json.dumps({"step": "ranges", "market": cfg["market"], "written": len(rows), "late": late,
                       "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
     return 0
 

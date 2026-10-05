@@ -27,7 +27,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `summaries/<market>/daily|weekly|monthly/` layered narrative memory written by Claude
 - `reports/<market>/<session_date>.md` the daily report linked from Slack; charts in
   `reports/<market>/charts/<session_date>/`; `config/settings.yaml` holds the repo URL and Slack channel
-- `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster
+- `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster, and
+  judge (independent verifier; every agent's output is judged before it is appended, committed or posted)
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
 
 ## Data rules
