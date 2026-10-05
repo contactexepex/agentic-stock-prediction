@@ -419,3 +419,71 @@ SELECT DISTINCT ON (a.ticker) a.ticker, a.form, a.accession, a.filing_date, a.ac
        lab.fiscal_year, lab.fiscal_period, current_date - a.filing_date AS days_since_filed
 FROM a LEFT JOIN lab USING (ticker, accession)
 ORDER BY a.ticker, a.filing_date DESC, a.period_end DESC NULLS LAST;
+
+-- ---------- Free market-wide sources (issue #9; collect_macro, collect_shorts, collect_flows_india) ----------
+-- Per series and date the complete row first, then the newest (a revision is a newer row),
+-- plus two Treasury curve spreads from the same day's par yields (10y-2y, 10y-3m; source 'derived').
+CREATE OR REPLACE VIEW macro_series AS
+WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro ORDER BY series, date, complete DESC NULLS LAST, first_seen_at DESC),
+s AS (SELECT date, max(value) FILTER (WHERE series = 'UST_10Y') AS y10, max(value) FILTER (WHERE series = 'UST_2Y') AS y2,
+             max(value) FILTER (WHERE series = 'UST_3M') AS m3, max(first_seen_at) AS first_seen_at
+      FROM m WHERE source = 'treasury' GROUP BY date)
+SELECT date, series, name, value, unit, source, first_seen_at FROM m
+UNION ALL
+SELECT date, 'UST_10Y_2Y', 'Treasury 10y minus 2y', round(y10 - y2, 4), 'pct', 'derived', first_seen_at
+FROM s WHERE y10 IS NOT NULL AND y2 IS NOT NULL
+UNION ALL
+SELECT date, 'UST_10Y_3M', 'Treasury 10y minus 3m', round(y10 - m3, 4), 'pct', 'derived', first_seen_at
+FROM s WHERE y10 IS NOT NULL AND m3 IS NOT NULL;
+
+-- Latest value per series with its change versus 1 and 5 observations earlier (the series' own
+-- previous dates, i.e. sessions for daily series); chg_* are in the series' unit.
+CREATE OR REPLACE VIEW macro_latest AS
+WITH r AS (SELECT *, row_number() OVER (PARTITION BY series ORDER BY date DESC) AS k FROM macro_series)
+SELECT a.series, a.name, a.unit, a.source, a.date, a.value,
+       a.value - b.value AS chg_1, b.date AS date_1, a.value - c.value AS chg_5, c.date AS date_5
+FROM r a LEFT JOIN r b ON b.series = a.series AND b.k = 2
+         LEFT JOIN r c ON c.series = a.series AND c.k = 6
+WHERE a.k = 1;
+
+-- FINRA daily short-sale volume: per session and ticker the complete row first, then the newest;
+-- the latest session per ticker with the 5-session average and the average of the up to 20
+-- sessions before it (n_prior = how many there were; short_pct in %).
+CREATE OR REPLACE VIEW shorts_daily AS
+SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, complete DESC NULLS LAST, first_seen_at DESC;
+
+CREATE OR REPLACE VIEW shorts_latest AS
+WITH d AS (
+    SELECT *, avg(short_pct) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS short_pct_5d,
+           avg(short_pct) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS short_pct_prior_avg,
+           count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS n_prior
+    FROM shorts_daily)
+SELECT * FROM d QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY date DESC) = 1;
+
+-- FINRA short interest: newest row per settlement and ticker; the latest settlement per ticker.
+CREATE OR REPLACE VIEW short_interest_daily AS
+SELECT DISTINCT ON (settlement_date, ticker) * FROM short_interest ORDER BY settlement_date, ticker, first_seen_at DESC;
+
+CREATE OR REPLACE VIEW short_interest_latest AS
+SELECT * FROM short_interest_daily QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY settlement_date DESC) = 1;
+
+-- NSDL FPI investment: newest row per report, asset class and route; the latest report.
+CREATE OR REPLACE VIEW fpi_daily AS
+SELECT DISTINCT ON (reporting_date, asset_class, route) * FROM fpi
+ORDER BY reporting_date, asset_class, route, first_seen_at DESC;
+
+CREATE OR REPLACE VIEW fpi_latest AS
+SELECT * FROM fpi_daily WHERE reporting_date = (SELECT max(reporting_date) FROM fpi_daily);
+
+-- NSE index closes: per session and index the complete row first, then the newest; the latest
+-- session per index with the return versus 1 and 5 stored sessions earlier (in %).
+CREATE OR REPLACE VIEW indices_daily AS
+SELECT DISTINCT ON (date, index_name) * FROM indices ORDER BY date, index_name, complete DESC NULLS LAST, first_seen_at DESC;
+
+CREATE OR REPLACE VIEW indices_latest AS
+WITH r AS (SELECT *, row_number() OVER (PARTITION BY index_name ORDER BY date DESC) AS k FROM indices_daily)
+SELECT a.* EXCLUDE (k), (a.close / b.close - 1) * 100 AS ret_1_pct, b.date AS date_1,
+       (a.close / c.close - 1) * 100 AS ret_5_pct, c.date AS date_5
+FROM r a LEFT JOIN r b ON b.index_name = a.index_name AND b.k = 2
+         LEFT JOIN r c ON c.index_name = a.index_name AND c.k = 6
+WHERE a.k = 1;

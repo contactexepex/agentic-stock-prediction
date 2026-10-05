@@ -1,0 +1,27 @@
+Real responses fetched on 2026-10-05 (~21:45-22:40 UTC) through the session's egress proxy, trimmed
+for size, for tests/test_sources.py. Nothing here is synthetic except where trimmed as noted.
+
+treasury_2026.csv           home.treasury.gov daily-treasury-rates.csv/2026/all?type=daily_treasury_yield_curve
+                            (header + the 8 newest rows)
+fred_BAMLH0A0HYM2.csv,
+fred_BAMLC0A0CM.csv,
+fred_T10YIE.csv             fred.stlouisfed.org/graph/fredgraph.csv?id=<id>&cosd=2026-09-20 (complete)
+cboe_2026-10-0[12]_daily_options.json
+                            cdn.cboe.com/data/us/options/market_statistics/daily/<date>_daily_options (complete)
+CNMSshvol2026100[12].txt    cdn.finra.org/equity/regsho/daily/CNMSshvol<date>.txt: header, the 20 watchlist
+                            symbols plus AA and SPY; the trailer line (FINRA's row count, 12465 in the full
+                            2026-10-02 file) is replaced by the number of rows kept, 22
+finra_short_interest.json   POST api.finra.org/data/group/otcMarket/name/consolidatedShortInterest for the
+                            20 watchlist symbols, settlements 2026-08-20..2026-10-05 (complete answer)
+nsdl_fpi_latest.html        fpi.nsdl.co.in/web/Reports/Latest.aspx: the investment table only (report of
+                            05-Oct-2026), wrapped in <html><body>
+ind_close_all_<DDMMYYYY>.csv
+                            nsearchives.nseindia.com/content/indices/ind_close_all_<date>.csv for 25, 29, 30
+                            Sep and 1, 5 Oct 2026: header + the 14 indices in india.yaml plus Nifty Media and
+                            India VIX (2 Oct was a holiday; 28 Sep was not fetched)
+bs_markets.rss              www.business-standard.com/rss/markets-106.rss (channel head + first 6 items)
+businessline_companies.rss  www.thehindubusinessline.com/companies/feeder/default.rss (head + first 6 items)
+prnewswire_all.rss          www.prnewswire.com/rss/news-releases-list.rss (head + first 6 items)
+businesswire_earnings.rss   feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeEF9YXA== (head + first 6 items)
+globenewswire_public.rss    www.globenewswire.com/RssFeed/orgclass/1/... (public companies; head + first 6
+                            items; fetched ~22:40 UTC with urllib and an RSS Accept header)

@@ -60,22 +60,26 @@ sectors:
   Retail: [WMT, COST]
   Industrials: [CAT, DE]
 
+# wire_names: the names `watchlist_only` (press-release wire) feeds match, case-insensitively and
+# as whole words (scripts/collect_news.py): full company names where the name or an alias is a
+# common word ("Apple", "Meta", "Progressive", "iPhone", "Facebook"). Default: name and aliases.
 tickers:
-  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, Jamie Dimon]}
+  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, Jamie Dimon], wire_names: [JPMorgan Chase, JPMorgan, J.P. Morgan]}
   BAC:   {name: Bank of America}
-  NVDA:  {name: Nvidia, aliases: [Jensen Huang]}
-  AAPL:  {name: Apple, aliases: [iPhone, Tim Cook]}
-  GOOGL: {name: Alphabet, aliases: [Google]}
-  META:  {name: Meta Platforms, aliases: [Meta, Facebook, Instagram]}
-  PGR:   {name: Progressive, queries: ['"Progressive Corp" stock', '"Progressive insurance" stock']}
+  NVDA:  {name: Nvidia, aliases: [NVIDIA Corporation, Jensen Huang], wire_names: [Nvidia, NVIDIA Corporation]}
+  AAPL:  {name: Apple, aliases: [iPhone, Tim Cook], wire_names: [Apple Inc]}
+  GOOGL: {name: Alphabet, aliases: [Google], wire_names: [Alphabet Inc, Google LLC, Google Cloud]}
+  META:  {name: Meta Platforms, aliases: [Meta, Facebook, Instagram], wire_names: [Meta Platforms]}
+  PGR:   {name: Progressive, queries: ['"Progressive Corp" stock', '"Progressive insurance" stock'],
+          wire_names: [Progressive Corporation, Progressive Corp, Progressive Insurance]}
   ALL:   {name: Allstate}
   DAL:   {name: Delta Air Lines}
   UAL:   {name: United Airlines}
   XOM:   {name: ExxonMobil, aliases: [Exxon]}
   CVX:   {name: Chevron}
-  LLY:   {name: Eli Lilly, aliases: [Lilly]}
-  MRK:   {name: Merck}
-  TSLA:  {name: Tesla, aliases: [Elon Musk]}
+  LLY:   {name: Eli Lilly, aliases: [Lilly], wire_names: [Eli Lilly]}
+  MRK:   {name: Merck, wire_names: [Merck & Co, Merck]}   # Merck KGaA (Germany) is excluded below
+  TSLA:  {name: Tesla, aliases: [Elon Musk], wire_names: [Tesla]}
   GM:    {name: General Motors}
   WMT:   {name: Walmart}
   COST:  {name: Costco}
@@ -96,6 +100,22 @@ news:
     markets: ["stock market today site:cnbc.com"]   # CNBC headlines via Google News
   outlets:   # CNBC's own RSS returns 403 to cloud servers (rechecked 2026-10-05), see `markets` above
     - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
+    # Press-release wires (checked 2026-10-05). They carry hundreds of small-company releases a
+    # day, so `watchlist_only` keeps just the items that name a watchlist company (`wire_names`
+    # above, minus `wire_exclude` below). www.businesswire.com refuses cloud traffic; Business
+    # Wire's feed host works, but its home feed (G1QFDERJXkJeEFpRWQ==) is deactivated, so the
+    # earnings feed is used. GlobeNewswire answers feedparser (HTTP 200, 20 items); curl and some
+    # plain urllib requests got the connection closed without an answer.
+    - {name: PR Newswire, url: "https://www.prnewswire.com/rss/news-releases-list.rss", category: company, watchlist_only: true}
+    - {name: Business Wire Earnings, url: "https://feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeEF9YXA==", category: company, watchlist_only: true}
+    - {name: GlobeNewswire Public Companies, url: "https://www.globenewswire.com/RssFeed/orgclass/1/feedTitle/GlobeNewswire%20-%20News%20about%20Public%20Companies", category: company, watchlist_only: true}
+  wire_exclude:   # regexes removed from wire text before matching: other companies, non-company uses
+    - 'Apple Hospitality'
+    - 'Merck KGaA'
+    - 'meta[- ]analys[ie]s'
+    - 'Progressive Supranuclear Palsy'
+    - '(?:available|follow us|find us|download(?:able)?) on (?:the )?(?:iPhone|Facebook|Instagram|Google Play)'
+    - 'Google Play'
 
 filings: sec
 filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G"]  # new-format 13D/13G since Dec 2024
@@ -106,6 +126,32 @@ filing_lookback_days: 7
 # the beta split of the range centre; beta = benchmark move per 1% cue move.
 options: yfinance
 index_cue: {symbol: ES, beta: 1.0}
+
+# Macro (collect_macro.py; issue #9): market-wide series -> data/us/macro/. Treasury par yields
+# (home.treasury.gov CSV) also cover FRED's DGS2/DGS10/T10Y2Y (same H.15 data), so FRED adds
+# only what Treasury and Yahoo (^VIX, DX-Y.NYB) do not: credit spreads and the breakeven.
+macro:
+  lookback_days: 30      # Treasury and FRED observations kept per run (de-duplicated)
+  pause_seconds: 1.0
+  treasury: true
+  fred:                  # fredgraph.csv, no API key
+    BAMLH0A0HYM2: {name: US high-yield OAS (ICE BofA), unit: pct}
+    BAMLC0A0CM: {name: US investment-grade OAS (ICE BofA), unit: pct}
+    T10YIE: {name: 10-year breakeven inflation, unit: pct}
+  cboe:                  # cdn.cboe.com daily options statistics (one JSON per session)
+    lookback_days: 10     # >= 6 sessions, for the 5-observation change
+    ratios:              # name in Cboe's file -> series
+      TOTAL PUT/CALL RATIO: CBOE_PC_TOTAL
+      EQUITY PUT/CALL RATIO: CBOE_PC_EQUITY
+      INDEX PUT/CALL RATIO: CBOE_PC_INDEX
+      SPX + SPXW PUT/CALL RATIO: CBOE_PC_SPX
+      CBOE VOLATILITY INDEX (VIX) PUT/CALL RATIO: CBOE_PC_VIX
+
+# Short selling (collect_shorts.py; issue #9) from FINRA -> data/us/shorts/ and short_interest/.
+shorts:
+  pause_seconds: 0.5
+  daily_volume: {lookback_days: 10}    # Reg SHO consolidated daily short-sale volume files
+  short_interest: {lookback_days: 45}  # settlements twice a month, published ~a week later
 
 # Fundamentals (collect_fundamentals.py): 10-Q/10-K financial data from SEC XBRL company facts.
 fundamentals:

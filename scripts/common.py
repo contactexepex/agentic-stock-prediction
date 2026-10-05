@@ -179,6 +179,47 @@ SCHEMAS["fundamentals"] = ("jsonl", {
     "prev_value": "DOUBLE", "first_seen_at": "TIMESTAMPTZ",
 })
 
+# Free market-wide sources (issue #9; HTTP and storage in sources.py). A revised value is a new
+# row with the same id; the *_daily/_series views keep a complete row over an incomplete one,
+# then the newest first_seen_at. A per-session file stored incomplete (`complete` false) is
+# fetched again on the next run while it is in the lookback.
+SCHEMAS.update({
+    # US macro (collect_macro.py): one row per series and observation date. unit: pct | ratio | index.
+    "macro": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "series": "VARCHAR", "name": "VARCHAR", "value": "DOUBLE",
+        "unit": "VARCHAR", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        "complete": "BOOLEAN",  # Cboe: the session file had every configured ratio (Treasury, FRED: true)
+    }),
+    # US FINRA Reg SHO daily short-sale volume (collect_shorts.py); short_pct in percent of the
+    # FINRA-reported (off-exchange) volume, not of all trading.
+    "shorts": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "ticker": "VARCHAR", "short_volume": "DOUBLE",
+        "short_exempt_volume": "DOUBLE", "total_volume": "DOUBLE", "short_pct": "DOUBLE",
+        "markets": "VARCHAR", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        "complete": "BOOLEAN",  # the day file was whole (trailer count matched) and had every watchlist ticker
+    }),
+    # US FINRA consolidated short interest, twice a month (collect_shorts.py); change_pct in percent.
+    "short_interest": ("jsonl", {
+        "id": "VARCHAR", "settlement_date": "DATE", "ticker": "VARCHAR", "short_interest": "DOUBLE",
+        "prev_short_interest": "DOUBLE", "change_pct": "DOUBLE", "avg_daily_volume": "DOUBLE",
+        "days_to_cover": "DOUBLE", "revised": "BOOLEAN", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    # India NSDL daily FPI investment by asset class and route, INR crore (collect_flows_india.py).
+    "fpi": ("jsonl", {
+        "id": "VARCHAR", "reporting_date": "DATE", "asset_class": "VARCHAR", "route": "VARCHAR",
+        "gross_purchases_cr": "DOUBLE", "gross_sales_cr": "DOUBLE", "net_cr": "DOUBLE",
+        "net_usd_mn": "DOUBLE", "usd_inr": "DOUBLE", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    # India NSE index closes with valuation (collect_flows_india.py); sector = watchlist sector it stands for.
+    "indices": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "index_name": "VARCHAR", "sector": "VARCHAR", "open": "DOUBLE",
+        "high": "DOUBLE", "low": "DOUBLE", "close": "DOUBLE", "change_pct": "DOUBLE", "volume": "DOUBLE",
+        "turnover_cr": "DOUBLE", "pe": "DOUBLE", "pb": "DOUBLE", "div_yield": "DOUBLE",
+        "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        "complete": "BOOLEAN",  # the session file had every configured index for the right date
+    }),
+})
+
 # Relationships (DESIGN.md phase 5): India insider/promoter trades (SEBI PIT), bulk and block
 # deals, shareholding incl. promoter pledges (collect_relations_india.py), and the per-company
 # connection map for both markets (graph-builder agent, graph.py). Merged as a column union so a

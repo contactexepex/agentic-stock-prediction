@@ -47,9 +47,10 @@ de-duplicated by accession number in `sec.ticker_submissions` (issue #23).
 | Overnight / pre-open cue | Index futures `ES=F`, `NQ=F`; per-stock pre-market gap | Previous US close, Nikkei `^N225`, Hang Seng `^HSI`, US ADRs (`INFY`, `HDB`, `IBN`, `WIT`) |
 | Implied volatility | Option chains (yfinance): ATM IV, implied earnings move | India VIX (index level only) |
 | Global factors | US 10Y `^TNX`, dollar `DX-Y.NYB`, crude `CL=F`, gold `GC=F` | Same, plus USD/INR `INR=X` |
-| Flows | (none) | FII/DII net flows, read from news |
+| Flows | FINRA short-sale volume and short interest; Cboe put/call ratios | NSE FII/DII provisional flows; NSDL FPI investment (equity, debt) |
+| Macro | Treasury par yield curve (10y-2y, 10y-3m), FRED high-yield and IG credit spreads, 10y breakeven | NSE index closes with P/E, P/B, dividend yield; Nifty 10y G-Sec index |
 | Sectors | One ETF per watchlist sector (10): eight SPDR sector ETFs, JETS (airlines), IAK (insurance) | Nifty Bank, IT and Pharma indices (none for the other seven sectors; see `config/markets/india.yaml`) |
-| News sources | Google News (US), CNBC, BBC | Google News (IN), Economic Times, Moneycontrol, Livemint |
+| News sources | Google News (US), CNBC, BBC; PR Newswire, Business Wire earnings and GlobeNewswire releases (watchlist names only) | Google News (IN), Economic Times, Moneycontrol, Livemint, Business Standard, BusinessLine |
 
 **Event calendar:** earnings, ex-dividend, F&O expiry, Fed/FOMC, RBI policy, CPI/jobs releases,
 index rebalances (S&P 500 quarterly, Nifty 50 semi-annual; listed, not major).
@@ -257,10 +258,60 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     and a `sector_etf` column in the indicators, and names the sectors that have none (India:
     seven of ten; only Nifty Bank, IT and Pharma are configured, see `config/markets/india.yaml`).
     JETS and IAK returned two years of daily bars through yfinance on 2026-10-05.
-- Issue #9, waiting on network access. The cloud environment's egress proxy refused a connection
-  (CONNECT answered 403) to each domain in backticks below on 2026-10-05, except the ones marked
-  reachable; allow them in the environment's network settings before building the collector
-  (none exists yet, so the exact endpoints are chosen then):
+- Issue #9, remaining free sources: **built 2026-10-05** after the hosts were allowlisted (checked
+  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in `sources.py`:
+  identifying User-Agent, 0.5-1 s between requests, up to 3 attempts on a dropped connection, none
+  on an HTTP error; every unread source or session file is listed in `failed`):
+  - `collect_macro.py` (US): Treasury par yield curve CSV (`home.treasury.gov`, HTTP 200);
+    FRED `fredgraph.csv` (no key) for `BAMLH0A0HYM2`, `BAMLC0A0CM`, `T10YIE`. FRED answered
+    HTTP 200 to Python's urllib (the live collector runs), but curl got an empty reply or an
+    HTTP/2 stream reset on every try, and one single-attempt urllib request was dropped without
+    an answer between successful ones: hence the retries. DGS2/DGS10/T10Y2Y are not fetched (Treasury's own par yields are the same H.15
+    data; the view `macro_series` derives 10y-2y and 10y-3m), nor VIXCLS and DTWEXBGS (Yahoo
+    `^VIX`, `DX-Y.NYB` already). Cboe daily options statistics JSON
+    (`cdn.cboe.com/data/us/options/market_statistics/daily/<date>_daily_options`, HTTP 200; a day
+    without a file answers 403) gives the put/call ratios. Cboe's VIX/VIX3M/VIX9D history CSVs
+    (`cdn.cboe.com/api/global/us_indices/daily_prices/*_History.csv`) redirect (307) to
+    `cdn-api.cboe.com`, which the egress proxy refuses (CONNECT 403), so there is no VIX term
+    structure; `www.cboe.com` answers 302 to its pages.
+  - `collect_shorts.py` (US): FINRA Reg SHO consolidated daily short-sale volume
+    (`cdn.finra.org/equity/regsho/daily/CNMSshvol<YYYYMMDD>.txt`, HTTP 200; a day without a file
+    answers 403; the trailer line's row count is checked) and consolidated short interest
+    (`api.finra.org` POST with symbol and settlement-date filters, HTTP 200, no key). The daily
+    file covers FINRA-reported (off-exchange) volume only, so the context pack compares each
+    ticker with its own average.
+  - `collect_flows_india.py` (India): NSDL "Daily Trends in FPI Investments"
+    (`fpi.nsdl.co.in/web/Reports/Latest.aspx`, HTTP 200; `www.fpi.nsdl.co.in` is refused by the
+    proxy) and NSE's daily index close file (`nsearchives.nseindia.com/content/indices/
+    ind_close_all_<DDMMYYYY>.csv`, HTTP 200; 404 on a holiday) for 14 configured indices, one per
+    watchlist sector, so the seven sectors without a Yahoo index get level, 1- and 5-session
+    change and valuation in the context pack (not in the indicators: the stored history starts
+    with the first run's 10-day lookback). `www.niftyindices.com` answers HTTP 200, but its data endpoints
+    (`Backpage.aspx/getHistoricaldatatabletoString`, `.../getpepbHistoricaldataDBtoString`)
+    return the home page and `Daily_Snapshot/ind_close_all_*.csv` its 404 page, so NSE's
+    archive is used instead.
+  - Not built: AMFI (`portal.amfiindia.com/spages/NAVAll.txt` answers HTTP 200, but scheme NAVs
+    say nothing about 1- or 5-day stock moves, and AMFI's monthly net-flow figures come as monthly
+    PDF/Excel reports about ten days after month end); BSE announcements: `www.bseindia.com`
+    answers HTTP 200, but `api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w` and
+    `.../AnnGetData/w` answer HTTP 403 "Access Denied" (Akamai) with Referer/Origin
+    `https://www.bseindia.com` and a browser User-Agent, to Python (with and without the BSE
+    home-page cookies) and to curl, so India announcements stay NSE-only.
+  - News feeds added to `config/markets/*.yaml` (each answered HTTP 200 with fresh items):
+    Business Standard markets and companies, BusinessLine markets and companies (India); PR
+    Newswire all releases, Business Wire earnings (`feed.businesswire.com`, feed id
+    `G1QFDERJXkJeEF9YXA==`; the home feed `G1QFDERJXkJeEFpRWQ==` says "deactivated by the
+    administrator") and GlobeNewswire's public-companies RSS (`RssFeed/orgclass/1`) for the US,
+    each with `watchlist_only: true`: only releases naming a watchlist company are stored
+    (case-insensitive whole words on each ticker's `wire_names`, full company names, after
+    removing the `news.wire_exclude` phrases such as "Apple Hospitality", "Merck KGaA",
+    "meta-analysis"). GlobeNewswire is erratic by client: feedparser (the collector's path) got
+    HTTP 200 with 20 items, and so did urllib with an RSS Accept header, but curl (HTTP/2 reset
+    or empty reply) and several earlier urllib requests got the connection closed without an
+    answer. `www.businesswire.com` and `www.spglobal.com` refuse cloud traffic (site-side 403).
+- Issue #9, history: before 2026-10-05 ~21:30 UTC the cloud environment's egress proxy refused a
+  connection (CONNECT answered 403) to each domain in backticks below, except the ones marked
+  reachable:
   - BSE announcements and results: `www.bseindia.com`, `api.bseindia.com`
   - Business Standard: `www.business-standard.com`; BusinessLine: `www.thehindubusinessline.com`
   - US press-release wires: `www.prnewswire.com`, `www.businesswire.com`, `www.globenewswire.com`
