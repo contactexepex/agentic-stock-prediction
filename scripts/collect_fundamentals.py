@@ -27,7 +27,8 @@ downloaded only for a ticker never loaded before, or when a 10-Q/10-K filed in t
 `recheck_days` is not stored yet (the XBRL API can lag a filing by a few hours, so it is
 retried on the next run). The first load stores periods ending in the last `history_years`.
 Settings: `fundamentals:` in config/markets/<market>.yaml (history_years, recheck_days,
-predecessor_ciks for a ticker whose history sits under an earlier registrant).
+predecessor_ciks for a ticker whose history sits under an earlier registrant; their submission
+lists are read too, so a 10-Q/10-K filed under a predecessor CIK triggers a download).
 Only for markets with `filings: sec`. Requires SEC_USER_AGENT (see scripts/sec.py)."""
 from __future__ import annotations
 
@@ -207,17 +208,17 @@ def main() -> int:
     today = utc_today()
     since = str(today - timedelta(days=round(365.25 * float(fc.get("history_years", 3)))))
     recheck = today - timedelta(days=int(fc.get("recheck_days", 10)))
-    predecessors = {t: [int(c) for c in cs] for t, cs in (fc.get("predecessor_ciks") or {}).items()}
+    predecessors = sec.related_ciks(cfg)
 
     ids, accs = stored(market)
     edgar, now = sec.Edgar(ua), utc_now()
     ciks, skipped = sec.watch_ciks(cfg, edgar)
     rows, loaded, up_to_date, new_filings, not_in_xbrl, failed = [], [], [], [], [], []
     for ticker, cik in ciks.items():
-        try:
-            recent = edgar.recent(cik)
-        except Exception as exc:
-            failed.append({"ticker": ticker, "error": str(exc)[:200]})
+        # 10-Q/10-K listed under the mapped CIK or a predecessor CIK (each once) trigger a reload
+        recent, errors = sec.ticker_submissions(edgar, ticker, cik, predecessors)
+        if errors:   # a ticker is loaded only with every one of its submission lists
+            failed += errors
             continue
         periodic = sec.filings(recent, PERIODIC_FORMS)
         accepted = {f["accession"]: f["accepted_at"] for f in periodic}
@@ -228,7 +229,7 @@ def main() -> int:
             continue
         try:
             facts = []
-            for c in [cik, *predecessors.get(ticker, [])]:
+            for c in [cik, *[p for p in predecessors.get(ticker.upper(), []) if p != cik]]:
                 facts += extract(edgar.json(facts_url(c)), c)
         except Exception as exc:
             failed.append({"ticker": ticker, "error": str(exc)[:200]})

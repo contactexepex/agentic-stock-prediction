@@ -36,6 +36,11 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 ## 3. Inputs (all free)
 **Per company:** daily OHLCV (yfinance), news (RSS), earnings and ex-dividend dates.
 **US filings:** SEC EDGAR (already built). India filings: from news at first.
+A ticker's SEC filings are read from the CIK in SEC's ticker map plus any earlier or related
+registrant still filing for it (`fundamentals.predecessor_ciks`; XOM maps to ExxonMobil Holdings
+2115436 since 2026-07-01, while Exxon Mobil Corp 34088 still lists filings: an 8-K on 2026-07-01, the
+Q2 10-Q jointly, Form 4s, a 13G, and the item 2.02 results releases up to May 2026), merged and
+de-duplicated by accession number in `sec.ticker_submissions` (issue #23).
 
 | Signal | US | India |
 |---|---|---|

@@ -11,7 +11,8 @@ free-text "SC 13D"/"SC 13G" forms are not parsed. A company's submission list al
 the document (or a self-filed accession number) and skipped.
 
 Only for markets with `filings: sec`. Settings: relationships.stakes in
-config/markets/<market>.yaml (lookback_days, forms). Requires SEC_USER_AGENT."""
+config/markets/<market>.yaml (lookback_days, forms). A ticker's filings come from its mapped CIK
+plus `fundamentals.predecessor_ciks` (sec.ticker_submissions). Requires SEC_USER_AGENT."""
 from __future__ import annotations
 
 import json
@@ -79,21 +80,22 @@ def main() -> int:
     seen = recent_ids(market, "stakes", days=120)
     edgar, now = sec.Edgar(ua), utc_now()
     ciks, skipped = sec.watch_ciks(cfg, edgar)
+    related = sec.related_ciks(cfg)
 
     rows, failed, read, as_investor = [], [], 0, 0
     for ticker, cik in ciks.items():
-        try:
-            recent = edgar.recent(cik)
-        except Exception as exc:
-            failed.append({"ticker": ticker, "error": str(exc)[:200]})
+        recent, errors = sec.ticker_submissions(edgar, ticker, cik, related)
+        failed += errors
+        if recent is None:
             continue
+        own = {int(cik), *related.get(ticker.upper(), [])}   # the mapped CIK and its predecessor/related CIKs
         for f in sec.filings(recent, forms, since):
             if f["accession"] in seen:
                 continue
-            if int(f["accession"].split("-")[0]) == cik:   # self-filed: the company as an investor
+            if int(f["accession"].split("-")[0]) in own:   # self-filed: the company as an investor
                 as_investor += 1
                 continue
-            url = sec.archive_url(cik, f["accession"], sec.raw_doc(f["primary_doc"]))
+            url = sec.archive_url(f["cik"], f["accession"], sec.raw_doc(f["primary_doc"]))
             try:
                 parsed = parse_schedule13(edgar.get(url))
             except Exception as exc:
@@ -101,7 +103,7 @@ def main() -> int:
                 continue
             read += 1
             seen.add(f["accession"])
-            if not parsed["issuer_cik"] or int(parsed["issuer_cik"]) != cik:
+            if not parsed["issuer_cik"] or int(parsed["issuer_cik"]) not in own:
                 as_investor += 1
                 continue
             rows.append(to_row(f, parsed, ticker, url, now))

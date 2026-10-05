@@ -10,7 +10,8 @@ exercise, F tax withholding, G gift, D disposition to the issuer, C conversion, 
 an in-the-money option. Only P and S are discretionary trades; the views in sql/views.sql use them.
 
 Only for markets with `filings: sec` (India insider disclosures come from the India collector).
-Settings: relationships.insiders in config/markets/<market>.yaml (lookback_days, forms).
+Settings: relationships.insiders in config/markets/<market>.yaml (lookback_days, forms). A ticker's
+filings come from its mapped CIK plus `fundamentals.predecessor_ciks` (sec.ticker_submissions).
 Requires SEC_USER_AGENT (see scripts/sec.py)."""
 from __future__ import annotations
 
@@ -100,18 +101,19 @@ def main() -> int:
     seen = {i.rsplit("-", 1)[0] for i in recent_ids(market, "insiders", days=120)}
     edgar, now = sec.Edgar(ua), utc_now()
     ciks, skipped = sec.watch_ciks(cfg, edgar)
+    related = sec.related_ciks(cfg)
 
     rows, failed, read, other_issuer = [], [], 0, 0
     for ticker, cik in ciks.items():
-        try:
-            recent = edgar.recent(cik)
-        except Exception as exc:
-            failed.append({"ticker": ticker, "error": str(exc)[:200]})
+        recent, errors = sec.ticker_submissions(edgar, ticker, cik, related)
+        failed += errors
+        if recent is None:
             continue
+        own = {int(cik), *related.get(ticker.upper(), [])}   # the mapped CIK and its predecessor/related CIKs
         for f in sec.filings(recent, forms, since):
             if f["accession"] in seen:
                 continue
-            url = sec.archive_url(cik, f["accession"], sec.raw_doc(f["primary_doc"]))
+            url = sec.archive_url(f["cik"], f["accession"], sec.raw_doc(f["primary_doc"]))
             try:
                 parsed = parse_form4(edgar.get(url))
             except Exception as exc:
@@ -120,7 +122,7 @@ def main() -> int:
             read += 1
             seen.add(f["accession"])
             # the company itself may file Form 4s as an owner of another issuer: keep only its own stock
-            if not parsed["issuer_cik"] or int(parsed["issuer_cik"]) != cik:
+            if not parsed["issuer_cik"] or int(parsed["issuer_cik"]) not in own:
                 other_issuer += 1
                 continue
             rows += to_rows(f, parsed, ticker, url, now)

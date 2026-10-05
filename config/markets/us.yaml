@@ -111,7 +111,8 @@ index_cue: {symbol: ES, beta: 1.0}
 fundamentals:
   history_years: 3     # first load: periods ending in the last N years
   recheck_days: 10     # a 10-Q/10-K filed in the last N days and not yet stored triggers a download
-  predecessor_ciks:    # earlier registrants whose filings hold a ticker's history
+  predecessor_ciks:    # earlier/related registrants whose filings also belong to a ticker; every SEC
+                       # collector (filings, events, insiders, stakes, fundamentals) reads them too
     XOM: [34088]       # Exxon Mobil Corp; the holding company ExxonMobil Holdings Corp (2115436) files from Q2 2026
 
 # Relationships (docs/DESIGN.md phase 5) from SEC EDGAR: collect_insiders.py (Form 4),
