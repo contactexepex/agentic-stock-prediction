@@ -209,3 +209,7 @@ SELECT ticker, period, count(*) AS filers_reporting,
        count(*) FILTER (WHERE action = 'new') AS n_new, count(*) FILTER (WHERE action = 'exit') AS n_exit,
        count(*) FILTER (WHERE action = 'add') AS n_add, count(*) FILTER (WHERE action = 'trim') AS n_trim
 FROM holdings_change GROUP BY ticker, period;
+
+-- Weekly reviews (review.py): latest record per ISO week; a rerun appends a newer record.
+CREATE OR REPLACE VIEW review_latest AS
+SELECT DISTINCT ON (id) * FROM reviews ORDER BY id, computed_at DESC;

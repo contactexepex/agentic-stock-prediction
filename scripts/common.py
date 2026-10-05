@@ -105,6 +105,16 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "bench_vol_10d": "DOUBLE", "major_event": "BOOLEAN", "major_event_names": "VARCHAR[]",
         "stress": "BOOLEAN", "notes": "VARCHAR[]",
     }),
+    # Weekly review (review.py): headline numbers as columns, tables and proposals as JSON.
+    "reviews": ("jsonl", {
+        "id": "VARCHAR", "week": "VARCHAR", "week_start": "DATE", "week_end": "DATE",
+        "computed_at": "TIMESTAMPTZ", "report": "VARCHAR",
+        "n_ranges_week": "INTEGER", "n_ranges_30d": "INTEGER", "n_ranges_all": "INTEGER",
+        "n_calls_week": "INTEGER", "n_calls_all": "INTEGER",
+        "cover50_all": "DOUBLE", "cover80_all": "DOUBLE", "score80_all": "DOUBLE",
+        "naive_score80_all": "DOUBLE", "call_hit_all": "DOUBLE", "always_up_all": "DOUBLE",
+        "low_sample": "BOOLEAN", "n_proposals": "INTEGER", "proposals": "JSON", "detail": "JSON",
+    }),
 }
 
 # Relationships (docs/DESIGN.md phase 5), US from SEC EDGAR: one row per Form 4 transaction

@@ -41,7 +41,9 @@ def observations(bars, tickers, h: int, rc: dict, rank: dict) -> pd.DataFrame:
     return df[np.isfinite(df["z"])]
 
 
-def evaluate(obs: pd.DataFrame, h: int, rc: dict, eval_sessions: int) -> pd.DataFrame:
+def evaluate(obs: pd.DataFrame, h: int, rc: dict, eval_sessions: int,
+             scale: dict[int, float] | None = None) -> pd.DataFrame:
+    """`scale` optionally widens sigma per start rank (regime/event factors replayed by review.py)."""
     last = int(obs["rank"].max())
     start = last - eval_sessions + 1
     z_all, r_all = obs["z"].to_numpy(), obs["rank"].to_numpy()
@@ -55,7 +57,7 @@ def evaluate(obs: pd.DataFrame, h: int, rc: dict, eval_sessions: int) -> pd.Data
         q10, q25, q75, q90 = (rl.weighted_quantile(z, w, p) for p in (0.10, 0.25, 0.75, 0.90))
         today = obs[obs["rank"] == d]
         for o in today.itertuples():
-            base, sh = o.close, o.sigma * math.sqrt(h)
+            base, sh = o.close, o.sigma * math.sqrt(h) * (scale.get(d, 1.0) if scale else 1.0)
             y = base * math.exp(o.fwd)
             lo50, hi50 = base * math.exp(q25 * sh), base * math.exp(q75 * sh)
             lo80, hi80 = base * math.exp(q10 * sh), base * math.exp(q90 * sh)
@@ -67,6 +69,8 @@ def evaluate(obs: pd.DataFrame, h: int, rc: dict, eval_sessions: int) -> pd.Data
                 "width80": 100 * (hi80 - lo80) / base, "naive_width80": 100 * (n80[1] - n80[0]) / base,
                 "is80": 100 * rl.interval_score(lo80, hi80, y, 0.8) / base,
                 "naive_is80": 100 * rl.interval_score(n80[0], n80[1], y, 0.8) / base,
+                "is50": 100 * rl.interval_score(lo50, hi50, y, 0.5) / base,
+                "naive_is50": 100 * rl.interval_score(n50[0], n50[1], y, 0.5) / base,
             })
     return pd.DataFrame(rows)
 

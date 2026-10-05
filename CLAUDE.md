@@ -19,6 +19,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   see `templates/report.md`). `backtest` evaluates the
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
+  `review` is the weekly review (coverage, calls, input ablations; thresholds in
+  `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them.
   Schemas live in `scripts/common.py`.
 - Relationships (DESIGN.md phase 5): `collect_relations_india` (NSE: SEBI PIT insider/promoter
   trades, bulk and block deals, shareholding and promoter pledges -> `data/india/insiders|deals|holdings/`),
@@ -39,6 +41,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `summaries/<market>/daily|weekly|monthly/` layered narrative memory written by Claude
 - `reports/<market>/<session_date>.md` the daily report linked from Slack; charts in
   `reports/<market>/charts/<session_date>/`; `config/settings.yaml` holds the repo URL and Slack channel
+- `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
   graph-builder (monthly connection map; every edge cites a public source), and judge
   (independent verifier; every agent's output is judged before it is appended, committed or posted)

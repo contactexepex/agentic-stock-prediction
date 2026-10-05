@@ -84,7 +84,7 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 |---|---|
 | Range formulas (no AI) | Walk-forward backtest on the **last 1-2 years only**, recent days weighted more; each step sees only data up to that date. Sets starting parameters. An input is kept only if it improves range accuracy. |
 | AI judgement | **Live forward testing only.** Never backtested, because the model may have seen past outcomes during training. |
-| Verdict | Live results after 4-6 weeks (several hundred scored ranges). Weekly review adjusts parameters. |
+| Verdict | Live results after 4-6 weeks (several hundred scored ranges). Weekly review (`review.py`) proposes parameter changes; a human applies them. |
 
 ## 8. Output
 - `reports/<market>/YYYY-MM-DD.md`: yesterday (market and each stock, calls scored), today
@@ -109,7 +109,14 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 2. Range engine, self-calibration, scoring against baselines; backtest of range formulas. **(built)**
 3. Charts, new report layout, Slack message, two routines. **(built; routines to be created once the
    environment's network access is set)**
-4. Weekly review: what improved coverage, what to drop.
+4. Weekly review: what improved coverage, what to drop. **(built: `scripts/review.py`, run by the
+   routine on the first trading day of each ISO week)** Coverage, interval score and width vs
+   naive by window (week, 30 days, since start), horizon, regime, sector and widening note;
+   call hit rate vs always-up and by confidence band; ablation of each range input by replaying
+   the stored live ranges (cue, AI drift and widening, earnings/event/regime widening, centre
+   cap) and walk-forward on stored prices (width parameters, regime and event widening).
+   Below the minimum n in `config/review.yaml` it flags and proposes nothing. Proposed
+   `config/ranges.yaml` changes go in `reports/<market>/review-YYYY-Www.md`; a human applies them.
 5. Relationships (knowledge graph, public data only): insider trades (US Form 4, India SEBI
    disclosures), big-investor stakes (US 13D/13G, India bulk and block deals), holdings (US
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,
