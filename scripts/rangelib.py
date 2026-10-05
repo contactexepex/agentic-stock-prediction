@@ -91,7 +91,7 @@ def horizon_sigma(sigma_daily: float, h: int, earnings_in_horizon: bool, cfg: di
     if earnings_in_horizon:
         m = earnings_multiple if earnings_multiple is not None else cfg["earnings_vol_multiple"]
         var += (m ** 2 - 1) * sigma_daily ** 2
-        notes.append(f"earnings in horizon (x{m:.3g} day{earnings_note})")
+        notes.append(f"earnings in horizon (x{m if earnings_multiple is None else round(m, 2)} day{earnings_note})")
     s = math.sqrt(var)
     rf = cfg["regime_factor"].get(regime, 1.0)
     if rf != 1.0:

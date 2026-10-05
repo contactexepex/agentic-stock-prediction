@@ -2,8 +2,8 @@
 the overnight index cue for the beta split, and option-implied volatility.
 
 Shared by ranges.py (live) and backtest.py (walk-forward), so both use the same rules. The math
-is in rangelib.py; switches and settings are in config/ranges.yaml (`enabled` is true/false or a
-list of markets)."""
+is in rangelib.py; switches and settings are in config/ranges.yaml. `enabled` is true/false, a
+list of markets, or a mapping market -> true/false or a list of horizons (e.g. {us: [1]})."""
 from __future__ import annotations
 
 import math
@@ -20,8 +20,17 @@ NEAR_DAYS = 3     # earnings dates this close together are the same report
 MOVED_DAYS = 45   # an upcoming date superseded by a newer one this close was moved
 
 
-def enabled(rc: dict, name: str, market: str) -> bool:
+INPUTS = ("earnings_history", "ex_dividend", "beta_split", "implied_vol")
+
+
+def enabled(rc: dict, name: str, market: str, horizon: int | None = None) -> bool:
+    """Is an input on for this market (and horizon)? Without a horizon: on for any horizon."""
     on = (rc.get(name) or {}).get("enabled", False)
+    if isinstance(on, dict):
+        on = on.get(market, False)
+        if isinstance(on, list):
+            return bool(on) if horizon is None else int(horizon) in [int(x) for x in on]
+        return bool(on)
     return market in on if isinstance(on, list) else bool(on)
 
 

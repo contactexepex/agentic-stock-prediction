@@ -77,7 +77,8 @@ def test_horizon_sigma_earnings_override():
     s_fixed, _ = rl.horizon_sigma(0.01, 1, True, cfg, "CALM", False)
     s_hist, notes = rl.horizon_sigma(0.01, 1, True, cfg, "CALM", False, 5.0, ", 4 past moves")
     assert abs(s_fixed - 0.03) < 1e-12 and abs(s_hist - 0.05) < 1e-12
-    assert notes == ["earnings in horizon (x5 day, 4 past moves)"]
+    assert notes == ["earnings in horizon (x5.0 day, 4 past moves)"]
+    assert rl.horizon_sigma(0.01, 1, True, cfg, "CALM", False)[1] == ["earnings in horizon (x3.0 day)"]
 
 
 # ---------- calendars and history ----------
@@ -189,63 +190,117 @@ def jsonl(path: Path, rows: list[dict]) -> None:
         f.writelines(json.dumps(r) + "\n" for r in rows)
 
 
+def ranges_rows(root: Path) -> dict:
+    return {x["id"]: x for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
+            for x in map(json.loads, f.read_text().splitlines())}
+
+
 def test_ranges_apply_inputs(tmp_path):
+    """Exact centre and width of ranges with every input on (and the IV shadow with it off)."""
     root, cfg = setup(tmp_path)
     mfile = cfg / "markets" / f"{MARKET}.yaml"
     mfile.write_text(mfile.read_text() + "\noptions: yfinance\nindex_cue: {symbol: BENCH, beta: 1.0}\n")
     rc = yaml.safe_load((cfg / "ranges.yaml").read_text())
     rc.update(ALL_ON)
+    rc["regime_factor"] = {}            # no regime or market-event widening: exact sigmas below
+    rc["major_event_factor"] = 1.0
     (cfg / "ranges.yaml").write_text(yaml.safe_dump(rc))
 
     rng = np.random.default_rng(21)
     n = 520
     days = weekdays(date(2024, 6, 3), n)
+    xnys = {"calendar": "XNYS"}
+    earn_idx = [i for i in (200, 263, 326, 389, 452) if ev.is_session(xnys, days[i])]
     br = rng.normal(0.0003, 0.01, n)
-    bench = 100 * np.exp(np.cumsum(br))
-    aapl = 150 * np.exp(np.cumsum(1.2 * br + rng.normal(0, 0.01, n)))
+    ar = 1.2 * br + rng.normal(0, 0.01, n)
+    for i in earn_idx:
+        ar[i] += 0.07                   # 7% earnings-day jumps: far more than x3 a normal day
+    bench, aapl = 100 * np.exp(np.cumsum(br)), 150 * np.exp(np.cumsum(ar))
     write_bars(root, {"BENCH": list(bench), "AAPL": list(aapl), "MSFT": fat_tailed_walk(rng, n, 300, 0.012),
                       "VOLX": [15.0] * n}, days)
+    as_of = days[-1]
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    today = datetime.now(timezone.utc).date()
+    # index cue quoted before the features run, timestamped before the next session's close
+    jsonl(root / "data" / MARKET / "quotes" / f"{today:%Y}" / f"{today:%m}" / f"{today}.jsonl",
+          [{"symbol": "BENCH", "yahoo": "BENCH", "ts": f"{as_of}T22:00:00+00:00", "price": 101,
+            "prev_close": 100, "change_pct": 0.01, "collected_at": now}])
     assert run("features.py", root, cfg).returncode == 0
     assert run("calibrate.py", root, cfg).returncode == 0
 
-    as_of = days[-1]
-    nxt = ev.next_session({"calendar": "XNYS"}, as_of, include=False)
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    ev_rows = [{"id": f"AAPL-earnings-{d}", "date": str(d), "type": "earnings", "ticker": "AAPL",
+    nxt = ev.next_session(xnys, as_of, include=False)
+    ev_rows = [{"id": f"AAPL-earnings-{days[i]}", "date": str(days[i]), "type": "earnings", "ticker": "AAPL",
                 "name": "Apple earnings", "source": "sec_history", "first_seen_at": now, "timing": "before_open"}
-               for d in (days[200], days[263], days[326], days[389], days[452])]
+               for i in earn_idx]
     ev_rows += [{"id": f"AAPL-earnings-{nxt}", "date": str(nxt), "type": "earnings", "ticker": "AAPL",
                  "name": "Apple earnings", "source": "yfinance", "first_seen_at": now},
                 {"id": f"MSFT-ex_dividend-{nxt}", "date": str(nxt), "type": "ex_dividend", "ticker": "MSFT",
                  "name": "Microsoft ex-dividend", "source": "yfinance", "first_seen_at": now, "amount": 3.0}]
     jsonl(root / "data" / MARKET / "events" / "2026" / "01" / "2026-01-01.jsonl", ev_rows)
-    today = datetime.now(timezone.utc).date()
-    jsonl(root / "data" / MARKET / "quotes" / f"{today:%Y}" / f"{today:%m}" / f"{today}.jsonl",
-          [{"symbol": "BENCH", "yahoo": "BENCH", "ts": now, "price": 101, "prev_close": 100,
-            "change_pct": 0.01, "collected_at": now}])
-    expiry = str(nxt + timedelta(days=14))
-    jsonl(root / "data" / MARKET / "options" / f"{today:%Y}" / f"{today:%m}" / f"{today}.jsonl",
-          [{"id": f"{today}-MSFT-{expiry}", "ticker": "MSFT", "collected_at": now, "expiry": expiry,
-            "days_to_expiry": 14, "spot": 300, "strike": 300, "call_iv": 0.6, "put_iv": 0.6, "atm_iv": 0.6,
-            "straddle": 20, "straddle_pct": 0.067, "source": "yfinance"}])
+    expiry = nxt + timedelta(days=14)
+    jsonl(root / "data" / MARKET / "options" / f"{as_of:%Y}" / f"{as_of:%m}" / f"{as_of}.jsonl",
+          [{"id": f"{as_of}-MSFT-{expiry}", "ticker": "MSFT", "collected_at": f"{as_of}T21:00:00+00:00",
+            "expiry": str(expiry), "days_to_expiry": 14, "spot": 300, "strike": 300, "call_iv": 0.6,
+            "put_iv": 0.6, "atm_iv": 0.6, "straddle": 20, "straddle_pct": 0.067, "source": "yfinance"}])
 
-    r = run("ranges.py", root, cfg)
+    # a copy with implied vol switched off, for the shadow value
+    import shutil
+    root_off, cfg_off = tmp_path / "repo_off", tmp_path / "config_off"
+    shutil.copytree(root, root_off)
+    shutil.copytree(cfg, cfg_off)
+    rc_off = {**rc, "implied_vol": {**ALL_ON["implied_vol"], "enabled": False}}
+    (cfg_off / "ranges.yaml").write_text(yaml.safe_dump(rc_off))
+
+    made_at = f"{as_of}T23:00:00+00:00"
+    r = run("ranges.py", root, cfg, "--now", made_at)
     assert r.returncode == 0, r.stderr
-    rows = {x["id"]: x for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
-            for x in map(json.loads, f.read_text().splitlines())}
-    a1, m1, m5 = rows[f"{as_of}-AAPL-1d"], rows[f"{as_of}-MSFT-1d"], rows[f"{as_of}-MSFT-5d"]
-    assert "earnings_history" in a1["inputs"] and "beta_split" in a1["inputs"]
-    assert any("past moves" in x for x in a1["notes"]) and a1["center"] > 0      # positive beta x +1% cue
-    for m in (m1, m5):
-        assert {"implied_vol", "ex_dividend"} <= set(m["inputs"])
-        assert m["lo80"] < m["lo50"] < m["hi50"] < m["hi80"]
-    # 60% IV against ~19% realized: the blend widens the range well beyond EWMA alone
-    feats = [x for f in (root / "data" / MARKET / "features").glob("**/*.jsonl")
-             for x in map(json.loads, f.read_text().splitlines()) if x["ticker"] == "MSFT"]
-    sd = feats[-1]["ewma_vol"] / math.sqrt(252)
-    assert m1["sigma_h"] > 1.5 * sd
-    # the ex-dividend drop is applied on top of the (capped) cue drift
-    assert m1["center"] < 0.5 * m1["sigma_h"] + math.log(1 - 3.0 / m1["base_close"]) + 1e-9
+    rows = ranges_rows(root)
+    a1, m1 = rows[f"{as_of}-AAPL-1d"], rows[f"{as_of}-MSFT-1d"]
+    feats = {x["ticker"]: x for f in (root / "data" / MARKET / "features").glob("**/*.jsonl")
+             for x in map(json.loads, f.read_text().splitlines())}
+    beta = {t: min(max(feats[t]["beta_1y"], 0.0), 2.5) for t in ("AAPL", "MSFT")}
+    sd = {t: feats[t]["ewma_vol"] / math.sqrt(252) for t in ("AAPL", "MSFT")}
+    index_cue = math.log1p(0.01)
+    assert 0.8 < beta["AAPL"] < 1.6
+
+    # AAPL 1d: earnings tomorrow sized from the 5 past reactions (independent recomputation)
+    c = pd.Series(aapl)
+    sig = rl.ewma_sigma(c, rc["ewma_lambda"])
+    moves = [(math.log(c[i] / c[i - 1]), float(sig[i - 1]), 1) for i in earn_idx]
+    m, k = rl.earnings_multiple(moves, 3.0, 2, 4, 8.0)
+    assert k == len(earn_idx) and m > 3.5
+    assert abs(a1["sigma_h"] - sd["AAPL"] * m) < 2e-6                 # h=1: variance sd^2 * m^2
+    assert set(a1["inputs"]) == {"earnings_history", "beta_split"}
+    assert any(f"x{round(m, 2)} day, {k} past moves" in x for x in a1["notes"])
+    # centre = index weight x clipped beta x expected index move (AAPL has no own cue)
+    assert abs(a1["center"] - 0.5 * beta["AAPL"] * index_cue) < 2e-6
+
+    # MSFT 1d: implied vol blended into the width, dividend going ex shifts the centre down
+    sessions = sum(ev.is_session(xnys, as_of + timedelta(days=d)) for d in range(1, (expiry - as_of).days + 1))
+    iv_var = 0.6 ** 2 * (expiry - as_of).days / 365 / sessions
+    s_msft = math.sqrt(0.5 * sd["MSFT"] ** 2 + 0.5 * iv_var)
+    assert abs(m1["sigma_h"] - s_msft) < 2e-6 and m1["sigma_h"] > 1.5 * sd["MSFT"]
+    drift = min(0.5 * beta["MSFT"] * index_cue, 0.5 * m1["sigma_h"])
+    assert abs(m1["center"] - (drift + math.log(1 - 3.0 / m1["base_close"]))) < 2e-6
+    assert {"implied_vol", "ex_dividend"} <= set(m1["inputs"]) and m1["iv_sigma_h"] == m1["sigma_h"]
+    assert a1["iv_sigma_h"] is None                                   # no chain for AAPL
+
+    # implied vol off: EWMA width, and the IV width kept as the shadow value
+    r = run("ranges.py", root_off, cfg_off, "--now", made_at)
+    assert r.returncode == 0, r.stderr
+    m1_off = ranges_rows(root_off)[f"{as_of}-MSFT-1d"]
+    assert abs(m1_off["sigma_h"] - sd["MSFT"]) < 2e-6
+    assert "implied_vol" not in m1_off["inputs"] and abs(m1_off["iv_sigma_h"] - m1["sigma_h"]) < 2e-6
+
+
+def test_switches_per_market_and_horizon():
+    rc = {"a": {"enabled": {"us": [1]}}, "b": {"enabled": {"india": True}}, "c": {"enabled": ["us"]},
+          "d": {"enabled": True}}
+    assert ri.enabled(rc, "a", "us", 1) and not ri.enabled(rc, "a", "us", 5)
+    assert ri.enabled(rc, "a", "us") and not ri.enabled(rc, "a", "india", 1)
+    assert ri.enabled(rc, "b", "india", 5) and not ri.enabled(rc, "b", "us")
+    assert ri.enabled(rc, "c", "us", 5) and not ri.enabled(rc, "c", "india", 1)
+    assert ri.enabled(rc, "d", "india", 5) and not ri.enabled(rc, "e", "us", 1)
 
 
 def test_backtest_scores_inputs(tmp_path):

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/schedule13D" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <schemaVersion>X0202</schemaVersion>
+<headerData>
+    <submissionType>SCHEDULE 13D/A</submissionType>
+    <filerInfo>
+      <filer>
+        <filerCredentials>
+          <cik>0000019617</cik>
+          <ccc>XXXXXXXX</ccc>
+        </filerCredentials>
+      </filer>
+      <liveTestFlag>LIVE</liveTestFlag>
+
+
+
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPageHeader>
+      <amendmentNo>3</amendmentNo>
+      <securitiesClassTitle>VARIABLE RATE MUNI TERM PREFERRED SHARES</securitiesClassTitle>
+      <dateOfEvent>09/28/2026</dateOfEvent>
+      <previouslyFiledFlag>false</previouslyFiledFlag>
+      <issuerInfo>
+        <issuerCIK>0001034665</issuerCIK>
+        <issuerCusips>
+          <issuerCusipNumber>09253N609</issuerCusipNumber>
+        </issuerCusips>
+        <issuerName>BLACKROCK MUNIHOLDINGS FUND, INC.</issuerName>
+        <address>
+          <street1 xmlns="http://www.sec.gov/edgar/common">100 Bellevue Parkway</street1>
+          <city xmlns="http://www.sec.gov/edgar/common">Wilmington</city>
+          <stateOrCountry xmlns="http://www.sec.gov/edgar/common">DE</stateOrCountry>
+          <zipCode xmlns="http://www.sec.gov/edgar/common">19809</zipCode>
+        </address>
+      </issuerInfo>
+      <authorizedPersons>
+        <notificationInfo>
+          <personName>Michael Lees</personName>
+          <personPhoneNum>(212) 270-6000</personPhoneNum>
+          <personAddress>
+            <street1 xmlns="http://www.sec.gov/edgar/common">JPMorgan Chase &amp; Co.</street1>
+            <street2 xmlns="http://www.sec.gov/edgar/common">270 Park Avenue</street2>
+            <city xmlns="http://www.sec.gov/edgar/common">New York</city>
+            <stateOrCountry xmlns="http://www.sec.gov/edgar/common">NY</stateOrCountry>
+            <zipCode xmlns="http://www.sec.gov/edgar/common">10017</zipCode>
+          </personAddress>
+        </notificationInfo>
+      </authorizedPersons>
+    </coverPageHeader>
+    <reportingPersons>
+      <reportingPersonInfo>
+        <reportingPersonCIK>0000019617</reportingPersonCIK>
+        <reportingPersonNoCIK>N</reportingPersonNoCIK>
+        <reportingPersonName>JPMorgan Chase &amp; Co.</reportingPersonName>
+        <fundType>OO</fundType>
+        <legalProceedings>Y</legalProceedings>
+        <citizenshipOrOrganization>DE</citizenshipOrOrganization>
+        <soleVotingPower>0</soleVotingPower>
+        <sharedVotingPower>7178</sharedVotingPower>
+        <soleDispositivePower>0</soleDispositivePower>
+        <sharedDispositivePower>7178</sharedDispositivePower>
+        <aggregateAmountOwned>7178</aggregateAmountOwned>
+        <isAggregateExcludeShares>N</isAggregateExcludeShares>
+        <percentOfClass>100</percentOfClass>
+        <typeOfReportingPerson>HC</typeOfReportingPerson>
+        <typeOfReportingPerson>CO</typeOfReportingPerson>
+      </reportingPersonInfo>
+      <reportingPersonInfo>
+        <reportingPersonCIK>0002005954</reportingPersonCIK>
+        <reportingPersonNoCIK>N</reportingPersonNoCIK>
+        <reportingPersonName>DNT Asset Trust</reportingPersonName>
+        <fundType>OO</fundType>
+        <legalProceedings>N</legalProceedings>
+        <citizenshipOrOrganization>DE</citizenshipOrOrganization>
+        <soleVotingPower>0</soleVotingPower>
+        <sharedVotingPower>7178</sharedVotingPower>
+        <soleDispositivePower>0</soleDispositivePower>
+        <sharedDispositivePower>7178</sharedDispositivePower>
+        <aggregateAmountOwned>7178</aggregateAmountOwned>
+        <isAggregateExcludeShares>N</isAggregateExcludeShares>
+        <percentOfClass>100</percentOfClass>
+        <typeOfReportingPerson>OO</typeOfReportingPerson>
+      </reportingPersonInfo>
+    </reportingPersons>
+    <items1To7>
+      <item1>
+        <securityTitle>VARIABLE RATE MUNI TERM PREFERRED SHARES</securityTitle>
+        <issuerName>BLACKROCK MUNIHOLDINGS FUND, INC.</issuerName>
+        <issuerPrincipalAddress>
+          <street1 xmlns="http://www.sec.gov/edgar/common">100 Bellevue Parkway</street1>
+          <city xmlns="http://www.sec.gov/edgar/common">Wilmington</city>
+          <stateOrCountry xmlns="http://www.sec.gov/edgar/common">DE</stateOrCountry>
+          <zipCode xmlns="http://www.sec.gov/edgar/common">19809</zipCode>
+        </issuerPrincipalAddress>
+        <commentText>This Amendment No. 3 (this "Amendment") amends, as set forth below, the statement on Schedule 13D, dated December 20, 2023 and filed with the SEC on January 2, 2024 (the "Original Schedule 13D"), as amended by that certain Amendment No. 1 dated as of February 09, 2026, and filed with the SEC on February 26, 2026, and as amended by that certain Amendment No. 2 dated as of June 2, 2026, and filed with the SEC on June 4, 2026, for JPMorgan Chase &amp; Co. ("JPMC") and DNT Asset Trust ("DNT Trust") (collectively, the "Reporting Persons") with respect to certain Variable Rate Muni Term Preferred Shares ("Preferred Shares") of BLACKROCK MUNIHOLDINGS FUND, INC. (the "Issuer").
+
+This Amendment is being filed in relation to the amendment to the Amended and Restated Variable Rate Muni Term Preferred Shares Purchase and Exchange Agreement, dated as of February 9, 2026 and the amendment to the Amended and Restated Registration Rights Agreement, dated February 9, 2026, each relating to the Preferred Shares of the Issuer.</commentText>
+      </item1>
+      <item2>
+        <filingPersonName>This information is not changed by this Amendment.</filingPersonName>
+        <principalBusinessAddress>This information is not changed by this Amendment.</principalBusinessAddress>
+        <principalJob>Item 2 of the Original Schedule 13D is hereby amended by deleting Schedule A and Schedule B referenced therein and replacing them with Schedule A and Schedule B included with this Amendment and attached as an Exhibit hereto.</principalJob>
+        <hasBeenConvicted>Item 2 of the Original Schedule 13D is hereby amended by deleting Schedule A and Schedule B referenced therein and replacing them with Schedule A and Schedule B included with this Amendment and attached as an Exhibit hereto.</hasBeenConvicted>
+        <convictionDescription>Item 2 of the Original Schedule 13D is hereby amended by deleting Schedule A and Schedule B referenced therein and replacing them with Schedule A and Schedule B included with this Amendment and attached as an Exhibit hereto.</convictionDescription>
+        <citizenship>Item 2 of the Original Schedule 13D is hereby amended by deleting Schedule A and Schedule B referenced therein and replacing them with Schedule A and Schedule B included with this Amendment and attached as an Exhibit hereto.</citizenship>
+      </item2>
+      <item5>
+        <percentageOfClassSecurities>This information is not changed by this Amendment.</percentageOfClassSecurities>
+        <numberOfShares>This information is not changed by this Amendment.</numberOfShares>
+        <transactionDesc>The responses of the Reporting Persons in Item 3 and Item 4 of this Statement are incorporated herein by reference.  On June 2, 2026, JPMorgan Chase &amp; Co. ("JPMC") deposited 7,178 Variable Rate Muni Term Preferred Shares of the Issuer (CUSIP No. 09253N609) into a tender option bond trust arrangement designated as JPM PD Series 5114 Trust (the "TOB Trust"). The TOB Trust has title to such 7,178 Preferred Shares but does not independently have the power to dispose or direct the disposition of the Preferred Shares. JPMC, through its interests in and contractual rights with respect to the TOB Trust, retains an indirect beneficial ownership in the Preferred Shares, including with respect to the voting rights on the Preferred Shares, which additionally remain subject to the Voting Trust.</transactionDesc>
+        <listOfShareholders>This information is not changed by this Amendment.</listOfShareholders>
+        <date5PercentOwnership>This information is not changed by this Amendment.</date5PercentOwnership>
+      </item5>
+      <item6>
+        <contractDescription>Item 6 of the Original Schedule 13D is hereby amended by adding the following language after the last paragraph thereof:
+
+On June 2, 2026, JPMorgan Chase &amp; Co. ("JPMC") deposited 7,178 Variable Rate Muni Term Preferred Shares of the Issuer (CUSIP No. 09253N609) into a tender option bond trust arrangement designated as JPM PD Series 5114 Trust (the "TOB Trust"). The TOB Trust has title to such 7,178 Preferred Shares but does not independently have the power to dispose or direct the disposition of the Preferred Shares. JPMC, through its interests in and contractual rights with respect to the TOB Trust, retains an indirect beneficial ownership in the Preferred Shares, including with respect to the voting rights on the Preferred Shares, which additionally remain subject to the Voting Trust.
+</contractDescription>
+      </item6>
+      <item7>
+        <filedExhibits>Item 7 of the Original Schedule 13D is hereby amended by deleting Exhibit 99.1 and Exhibit 99.5 thereto and inserting the following exhibits in thier place:
+"Exhibit   Description of Exhibit
+99.1      Joint Filing Agreement
+99.5      Amended and Restated Schedule A and Schedule B
+99.8      Amendment to Amended and Restated Variable Rate Muni Term Preferred Shares Purchase and Exchange Agreement, dated as of September 28, 2026
+99.9      Amendment to the Amended and Restated Registration Rights Agreement, dated September 28, 2026"</filedExhibits>
+      </item7>
+    </items1To7>
+    <signatureInfo>
+      <signaturePerson>
+        <signatureReportingPerson>JPMorgan Chase &amp; Co.</signatureReportingPerson>
+        <signatureDetails>
+          <signature>/s/ Michael Lees</signature>
+          <title>Michael Lees, Executive Director</title>
+          <date>10/01/2026</date>
+        </signatureDetails>
+      </signaturePerson>
+      <signaturePerson>
+        <signatureReportingPerson>DNT Asset Trust</signatureReportingPerson>
+        <signatureDetails>
+          <signature>/s/ Sean Saroya</signature>
+          <title>Sean Saroya, Authorized Officer</title>
+          <date>10/01/2026</date>
+        </signatureDetails>
+      </signaturePerson>
+      <commentText>Please note that Item 2 of the Original Schedule 13D is hereby amended by deleting Schedule A and Schedule B referenced therein and replacing them with the amended and restated Schedule A and Schedule B attached to this Amendment.</commentText>
+    </signatureInfo>
+  </formData>
+
+</edgarSubmission>

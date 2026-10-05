@@ -22,6 +22,8 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 15 8 * * 1-5` (08:15 ET) | ~08:45 ET (~14:45 Amsterdam) | SPY, VIX (`^VIX`) |
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
+- Late runs (`market_status.py` `late_run`: started after the session's close): no calls;
+  `ranges.py` skips ranges whose target session has closed and ignores cues quoted after it.
 - US macro data at 08:30 ET (CPI, jobs): on those days the brief states "call made before release".
 - Priority: India (where capital is) first, US as a small trial. Paper only for weeks 1-6.
 
@@ -113,12 +115,30 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,
    group companies, suppliers, customers, competitors) refreshed monthly. Used for
    second-order news, smart-money signals and range-widening risk flags.
+   - **India (built; waiting for network access):** `collect_relations_india.py` reads NSE's
+     public JSON (SEBI PIT disclosures, bulk/block deals with snapshot and archive-CSV fallbacks,
+     shareholding master and pledge data) into `data/india/insiders|deals|holdings/`. Needs
+     `www.nseindia.com` and `nsearchives.nseindia.com` allowed in the cloud environment.
+     `relations.py` turns them into context-pack risk flags (deal >= INR 250 cr or 0.5x 20-day
+     volume, promoter pledge +1 pp q/q, new or invoked pledges, insider sales >= INR 10 cr);
+     the range widening from these flags is in `config/ranges.yaml` and off until the weekly
+     review shows flagged tickers miss more often.
+   - **Connection map, both markets (built):** edges in `data/<market>/graph/` written monthly by
+     the graph-builder agent through `graph.py add` (validated, each citing a source URL;
+     each monthly attempt recorded in `graph_runs/` so an empty run is not repeated daily;
+     retractions are new rows). `graph.py hits` finds second-order news for the context pack
+     and the news-analyst.
+   **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 23
+   tracked filers (`collect_insiders|stakes|holdings.py`), smart-money views and context
+   section, and a fresh-13D note on ranges (widen gated in `config/ranges.yaml`, off).
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 
 ## 11. Open items
 - Watchlists: decided (20 per market, 10 sectors x 2), see `config/markets/`.
 - Verify the India outlet RSS URLs and the 2027 India holiday calendar once live.
+- On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
+  against live responses (NSE changes field names; built from public scrapers, not yet seen live).
 - Section 4 range inputs: **built** (`scripts/range_inputs.py`, switches in `config/ranges.yaml`):
   past earnings-day moves (dates and before-open/after-close timing from yfinance and, US, SEC
   8-K item 2.02; backfilled by `collect_events.py`), ex-dividend shift (dividend amounts now

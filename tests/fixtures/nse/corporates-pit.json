@@ -1,0 +1,18 @@
+{"acqNameList": [], "data": [
+  {"symbol": "INFY", "company": "Infosys Limited", "anex": "7(2)", "acqName": "Test Director One", "date": "__D1__ 19:05:11",
+   "secType": "Equity Shares", "secAcq": "200000", "tdpTransactionType": "Sell", "xbrl": "https://nsearchives.nseindia.com/corporate/xbrl/IT_TEST_1.xml",
+   "befAcqSharesNo": "500000", "befAcqSharesPer": "0.01", "secVal": "300000000", "afterAcqSharesNo": "300000", "afterAcqSharesPer": "0.01",
+   "acqfromDt": "__D2__", "acqtoDt": "__D2__", "intimDt": "__D1__", "acqMode": "Market Sale", "derivativeType": "-",
+   "exchange": "NSE", "remarks": "-", "personCategory": "Director"},
+  {"symbol": "RELIANCE", "company": "Reliance Industries Limited", "anex": "7(2)", "acqName": "Test Promoter Holdings Pvt Ltd", "date": "__D1__ 20:10:00",
+   "secType": "Equity Shares", "secAcq": "1,000,000", "tdpTransactionType": "Pledge Creation", "xbrl": "-",
+   "befAcqSharesPer": "1.20", "secVal": "-", "afterAcqSharesPer": "1.20", "acqfromDt": "__D2__", "acqtoDt": "__D2__",
+   "intimDt": "__D1__", "acqMode": "Pledge", "personCategory": "Promoter Group"},
+  {"symbol": "TCS", "company": "Tata Consultancy Services Limited", "acqName": "Test Trust", "date": "__D2__ 18:00:00",
+   "secType": "Equity Shares", "secAcq": "1000", "tdpTransactionType": "Buy", "secVal": "4000000",
+   "befAcqSharesPer": "0.00", "afterAcqSharesPer": "0.00", "acqfromDt": "__D3__", "acqtoDt": "__D3__",
+   "intimDt": "__D2__", "acqMode": "Market Purchase", "personCategory": "Promoter Group"},
+  {"symbol": "NOTWATCHED", "company": "Other Ltd", "acqName": "Someone", "date": "__D1__ 10:00:00",
+   "secType": "Equity Shares", "secAcq": "10", "tdpTransactionType": "Buy", "secVal": "1000",
+   "acqfromDt": "__D2__", "acqtoDt": "__D2__", "acqMode": "Market Purchase", "personCategory": "Director"}
+]}

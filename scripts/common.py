@@ -96,6 +96,7 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "direction": "VARCHAR", "confidence": "DOUBLE", "regime": "VARCHAR",
         "calibration_id": "VARCHAR", "notes": "VARCHAR[]",
         "inputs": "VARCHAR[]",  # range inputs applied: earnings_history, ex_dividend, beta_split, implied_vol
+        "iv_sigma_h": "DOUBLE",  # shadow: sigma_h with option-implied vol applied (same centre)
     }),
     "range_outcomes": ("jsonl", {
         "range_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "target_date": "DATE",
@@ -117,6 +118,75 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "stress": "BOOLEAN", "notes": "VARCHAR[]",
     }),
 }
+
+# Relationships (docs/DESIGN.md phase 5), US from SEC EDGAR: one row per Form 4 transaction
+# line (insiders), per Schedule 13D/13G filing (stakes), per 13F filing x watchlist ticker (holdings).
+SCHEMAS.update({
+    "insiders": ("jsonl", {
+        "id": "VARCHAR", "accession": "VARCHAR", "line": "INTEGER", "ticker": "VARCHAR",
+        "issuer_cik": "VARCHAR", "form": "VARCHAR", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ",
+        "insider_name": "VARCHAR", "insider_cik": "VARCHAR", "role": "VARCHAR",
+        "is_director": "BOOLEAN", "is_officer": "BOOLEAN", "is_ten_pct_owner": "BOOLEAN",
+        "derivative": "BOOLEAN", "security": "VARCHAR", "transaction_date": "DATE", "code": "VARCHAR",
+        "acquired_disposed": "VARCHAR", "shares": "DOUBLE", "price": "DOUBLE", "value": "DOUBLE",
+        "shares_after": "DOUBLE", "ownership": "VARCHAR", "plan_10b5_1": "BOOLEAN",
+        "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "stakes": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "issuer_cik": "VARCHAR", "form": "VARCHAR",
+        "kind": "VARCHAR", "amendment": "BOOLEAN", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ",
+        "event_date": "DATE", "filer_name": "VARCHAR", "filer_cik": "VARCHAR",
+        "reporting_persons": "VARCHAR[]", "percent": "DOUBLE", "shares": "DOUBLE",
+        "purpose": "VARCHAR", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "holdings": ("jsonl", {
+        "id": "VARCHAR", "accession": "VARCHAR", "filer_cik": "VARCHAR", "filer_name": "VARCHAR",
+        "period": "DATE", "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ", "ticker": "VARCHAR",
+        "cusip": "VARCHAR", "issuer_name": "VARCHAR", "shares": "DOUBLE", "value_usd": "DOUBLE",
+        "put_call": "VARCHAR", "n_lines": "INTEGER", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        "report_type": "VARCHAR", "complete": "BOOLEAN", "note": "VARCHAR",
+    }),
+})
+
+# Relationships (DESIGN.md phase 5): India insider/promoter trades (SEBI PIT), bulk and block
+# deals, shareholding incl. promoter pledges (collect_relations_india.py), and the per-company
+# connection map for both markets (graph-builder agent, graph.py). Merged as a column union so a
+# market-specific collector can share a kind (e.g. US Form 4 rows in `insiders`): read_json fills
+# columns a row does not have with NULL, and an existing column keeps its type.
+RELATION_SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
+    "insiders": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "source": "VARCHAR", "person": "VARCHAR",
+        "person_category": "VARCHAR", "security_type": "VARCHAR", "transaction": "VARCHAR",
+        "mode": "VARCHAR", "shares": "DOUBLE", "value": "DOUBLE",
+        "holding_before_pct": "DOUBLE", "holding_after_pct": "DOUBLE",
+        "trade_from": "DATE", "trade_to": "DATE", "disclosed_at": "TIMESTAMPTZ",
+        "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "deals": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "ticker": "VARCHAR", "deal_type": "VARCHAR",
+        "client": "VARCHAR", "side": "VARCHAR", "shares": "DOUBLE", "price": "DOUBLE",
+        "value": "DOUBLE", "remarks": "VARCHAR", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "holdings": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "period_end": "DATE", "source": "VARCHAR",
+        "promoter_pct": "DOUBLE", "public_pct": "DOUBLE", "employee_trust_pct": "DOUBLE",
+        "pledged_pct_of_promoter": "DOUBLE", "pledged_pct_of_total": "DOUBLE",
+        "filed_at": "TIMESTAMPTZ", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "graph": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "relation": "VARCHAR", "target": "VARCHAR",
+        "target_kind": "VARCHAR", "target_ticker": "VARCHAR", "aliases": "VARCHAR[]",
+        "detail": "VARCHAR", "weight": "DOUBLE", "status": "VARCHAR", "as_of": "DATE",
+        "source_url": "VARCHAR", "added_at": "TIMESTAMPTZ", "prompt_version": "VARCHAR",
+    }),
+    # One row per connection-map refresh attempt (graph.py attempt), even when no edge changed.
+    "graph_runs": ("jsonl", {
+        "id": "VARCHAR", "run_at": "TIMESTAMPTZ", "month": "VARCHAR", "edges": "INTEGER",
+        "tickers_without_edges": "INTEGER", "note": "VARCHAR",
+    }),
+}
+for _kind, (_ext, _cols) in RELATION_SCHEMAS.items():
+    SCHEMAS[_kind] = (SCHEMAS[_kind][0], {**_cols, **SCHEMAS[_kind][1]}) if _kind in SCHEMAS else (_ext, _cols)
 
 
 def utc_now() -> str:

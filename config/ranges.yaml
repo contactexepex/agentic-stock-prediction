@@ -22,7 +22,8 @@ major_event_factor: 1.15    # market-wide major event inside the horizon
 regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.1, UNSTABLE: 1.25}
 max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow it
 
-# Range inputs (docs/DESIGN.md sections 4 and 11). `enabled`: true, false, or a list of markets.
+# Range inputs (docs/DESIGN.md sections 4 and 11). `enabled`: true, false, a list of markets, or
+# market -> true/false or a list of horizons ({us: [1]} = US 1-day ranges only).
 # Defaults follow scripts/backtest.py: an input stays on only if it improved range accuracy
 # (interval score) where it applies. Implied vol has no history, so it is live-only.
 earnings_history:           # size the earnings widening from the stock's past earnings-day moves
@@ -45,3 +46,21 @@ implied_vol:                # US option chains (collect_options.py); live only
   max_age_days: 1           # snapshot must be from the run day or the day before (UTC)
   max_expiry_days: 30       # use the first expiry on/after the target date, at most this far out
   use_for_earnings: true    # earnings before that expiry: IV sets the earnings multiple instead
+
+# Relationship risk flags (scripts/relations.py; markets with a `relations:` block). Extra width
+# per flag type, summed per ticker and capped. Off by default: switch on only if the weekly
+# review shows flagged tickers' ranges miss more often than the rest.
+relation_widen:
+  enabled: false
+  big_deal: 0.10
+  pledge_increase: 0.10
+  pledge_created: 0.05
+  pledge_invoked: 0.15
+  insider_sale: 0.05
+  max: 0.20
+
+# Smart-money risk flag (scripts/smart_money.py): an original Schedule 13D (activist stake)
+# filed within activist_13d_days before as_of adds a note to the ticker's ranges. The factor
+# widens sigma only when > 1.0 (e.g. 1.05 = +5%); keep 1.0 until the weekly review shows value.
+activist_13d_days: 30
+activist_13d_factor: 1.0

@@ -90,3 +90,124 @@ SELECT DISTINCT ON (horizon_days) * FROM calibration ORDER BY horizon_days, as_o
 CREATE OR REPLACE VIEW options_latest AS
 SELECT DISTINCT ON (ticker, expiry, CAST(collected_at AS DATE)) *, CAST(collected_at AS DATE) AS day
 FROM options ORDER BY ticker, expiry, CAST(collected_at AS DATE), collected_at DESC;
+
+-- Relationships (DESIGN.md phase 5). India: collect_relations_india.py; graph: graph-builder.
+CREATE OR REPLACE VIEW insider_trades AS
+SELECT DISTINCT ON (id) * FROM insiders ORDER BY id, first_seen_at;
+
+-- Bulk/block deals sized against the stock's average volume over the 20 sessions before.
+CREATE OR REPLACE VIEW deals_scored AS
+WITH adv AS (
+    SELECT ticker, date, avg(volume) OVER (PARTITION BY ticker ORDER BY date
+                                           ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS adv20
+    FROM ohlc
+), d AS (SELECT DISTINCT ON (id) * FROM deals ORDER BY id, first_seen_at)
+SELECT d.*, round(d.value / 1e7, 2) AS value_crore, round(d.shares / nullif(adv.adv20, 0), 3) AS adv_ratio
+FROM d ASOF LEFT JOIN adv ON d.ticker = adv.ticker AND d.date >= adv.date;
+
+-- One row per ticker and quarter: promoter holding and pledge (latest filing per source wins).
+CREATE OR REPLACE VIEW holdings_quarterly AS
+WITH h AS (
+    SELECT DISTINCT ON (ticker, period_end, source) * FROM holdings
+    WHERE promoter_pct IS NOT NULL OR pledged_pct_of_promoter IS NOT NULL
+    ORDER BY ticker, period_end, source, filed_at DESC NULLS LAST, first_seen_at DESC
+)
+SELECT ticker, period_end,
+       coalesce(max(promoter_pct) FILTER (WHERE source = 'nse_shp'), max(promoter_pct)) AS promoter_pct,
+       max(public_pct) AS public_pct, max(pledged_pct_of_promoter) AS pledged_pct_of_promoter,
+       max(pledged_pct_of_total) AS pledged_pct_of_total, max(filed_at) AS filed_at
+FROM h GROUP BY ticker, period_end;
+
+CREATE OR REPLACE VIEW pledge_changes AS
+SELECT *, lag(period_end) OVER wq AS prev_period,
+       pledged_pct_of_promoter - lag(pledged_pct_of_promoter) OVER wq AS pledge_change_pp,
+       promoter_pct - lag(promoter_pct) OVER wq AS promoter_change_pp
+FROM holdings_quarterly WINDOW wq AS (PARTITION BY ticker ORDER BY period_end);
+
+-- Connection map: latest version of each edge; an edge retracted with status 'removed' drops out.
+CREATE OR REPLACE VIEW graph_edges AS
+SELECT * FROM (SELECT DISTINCT ON (id) * FROM graph ORDER BY id, added_at DESC)
+WHERE coalesce(status, 'active') = 'active';
+
+-- ---------- Smart money (phase 5): insiders (Form 4), stakes (13D/13G), holdings (13F) ----------
+-- insider_trades (one row per transaction line, first copy wins) is defined above.
+
+-- Open-market insider flow per ticker (code P = purchase, S = sale; awards, exercises, tax
+-- withholding and gifts are not discretionary and are left out). Values in USD, by trade date.
+-- cluster_buy: 3 or more different insiders bought in the last 30 days.
+CREATE OR REPLACE VIEW insider_flow AS
+WITH t AS (
+    SELECT *, transaction_date >= current_date - 30 AS d30, transaction_date >= current_date - 90 AS d90
+    FROM insider_trades WHERE NOT derivative AND code IN ('P', 'S')
+)
+SELECT ticker,
+       coalesce(sum(value) FILTER (WHERE code = 'P' AND d30), 0) AS buy_value_30d,
+       coalesce(sum(value) FILTER (WHERE code = 'S' AND d30), 0) AS sell_value_30d,
+       coalesce(sum(CASE code WHEN 'P' THEN value ELSE -value END) FILTER (WHERE d30), 0) AS net_value_30d,
+       coalesce(sum(CASE code WHEN 'P' THEN value ELSE -value END) FILTER (WHERE d90), 0) AS net_value_90d,
+       count(DISTINCT insider_name) FILTER (WHERE code = 'P' AND d30) AS buyers_30d,
+       count(DISTINCT insider_name) FILTER (WHERE code = 'S' AND d30) AS sellers_30d,
+       round(coalesce(sum(value) FILTER (WHERE code = 'S' AND d30 AND plan_10b5_1), 0)
+             / nullif(sum(value) FILTER (WHERE code = 'S' AND d30), 0), 2) AS planned_sell_share_30d,
+       count(DISTINCT insider_name) FILTER (WHERE code = 'P' AND d30) >= 3 AS cluster_buy,
+       max(transaction_date) FILTER (WHERE code = 'P') AS last_buy,
+       max(transaction_date) FILTER (WHERE code = 'S') AS last_sale
+FROM t WHERE d90 GROUP BY ticker;
+
+-- Cluster buys over history: each purchase date on which 3+ different insiders of the same
+-- company had bought within the 30 days up to that date.
+CREATE OR REPLACE VIEW insider_cluster_buys AS
+WITH b AS (SELECT DISTINCT ticker, insider_name, transaction_date FROM insider_trades
+           WHERE code = 'P' AND NOT derivative)
+SELECT b1.ticker, b1.transaction_date AS window_end, count(DISTINCT b2.insider_name) AS buyers_30d,
+       list(DISTINCT b2.insider_name) AS insiders
+FROM b b1 JOIN b b2 ON b2.ticker = b1.ticker
+     AND b2.transaction_date BETWEEN b1.transaction_date - 30 AND b1.transaction_date
+GROUP BY b1.ticker, b1.transaction_date HAVING count(DISTINCT b2.insider_name) >= 3;
+
+-- 13D/13G filings naming a watchlist company (first copy wins). kind 13D = active holder.
+CREATE OR REPLACE VIEW stake_filings AS
+SELECT DISTINCT ON (id) * FROM stakes ORDER BY id, first_seen_at;
+
+-- New activist stakes: original Schedule 13D filings (amendments excluded).
+CREATE OR REPLACE VIEW activist_stakes AS
+SELECT ticker, filing_date, event_date, filer_name, percent, shares, purpose, url, id
+FROM stake_filings WHERE kind = '13D' AND NOT amendment;
+
+-- 13F filings processed (one row each): report type, completeness and notes such as
+-- "reported by <manager>" for a 13F notice or why a filing cannot show exits.
+CREATE OR REPLACE VIEW holdings_filings AS
+SELECT filer_cik, filer_name, period, filing_date, accession, report_type, n_lines, complete, note, url
+FROM holdings WHERE ticker IS NULL;
+
+-- 13F holdings: one row per (filer, ticker, period) of common shares (options excluded; the
+-- latest original filing per period wins), with the change against the filer's previous period.
+-- Zero rows (exits) exist only for complete filings, so an incomplete filing (combination
+-- report, confidential or partial table) never fakes an exit; `complete` flags its rows.
+CREATE OR REPLACE VIEW holdings_change AS
+WITH h AS (
+    SELECT DISTINCT ON (filer_cik, ticker, period) * FROM holdings
+    WHERE put_call IS NULL AND ticker IS NOT NULL ORDER BY filer_cik, ticker, period, filing_date DESC, first_seen_at
+)
+SELECT filer_cik, filer_name, ticker, period, shares, value_usd, complete,
+       lag(period) OVER hw AS prev_period, lag(shares) OVER hw AS prev_shares,
+       shares - lag(shares) OVER hw AS change_shares,
+       CASE WHEN lag(shares) OVER hw IS NULL THEN 'first'
+            WHEN lag(shares) OVER hw = 0 AND shares > 0 THEN 'new'
+            WHEN lag(shares) OVER hw > 0 AND shares = 0 THEN 'exit'
+            WHEN shares > lag(shares) OVER hw THEN 'add'
+            WHEN shares < lag(shares) OVER hw THEN 'trim'
+            ELSE 'hold' END AS action
+FROM h WINDOW hw AS (PARTITION BY filer_cik, ticker ORDER BY period);
+
+-- 13F by ticker and quarter across the tracked filers. change_pct compares the filers that
+-- reported both this and their previous period.
+CREATE OR REPLACE VIEW holdings_quarter AS
+SELECT ticker, period, count(*) AS filers_reporting,
+       count(*) FILTER (WHERE shares > 0) AS filers_holding,
+       sum(shares) AS shares, sum(value_usd) AS value_usd,
+       sum(change_shares) AS change_shares,
+       round(sum(change_shares) / nullif(sum(prev_shares) FILTER (WHERE change_shares IS NOT NULL), 0), 4) AS change_pct,
+       count(*) FILTER (WHERE action = 'new') AS n_new, count(*) FILTER (WHERE action = 'exit') AS n_exit,
+       count(*) FILTER (WHERE action = 'add') AS n_add, count(*) FILTER (WHERE action = 'trim') AS n_trim
+FROM holdings_change GROUP BY ticker, period;

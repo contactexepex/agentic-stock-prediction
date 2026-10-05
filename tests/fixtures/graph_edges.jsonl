@@ -1,0 +1,4 @@
+{"ticker": "INFY", "relation": "competitor", "target": "Wipro", "target_kind": "company", "target_ticker": null, "aliases": ["Wipro Ltd"], "detail": "IT services peer named in annual report", "weight": null, "as_of": "2026-06-30", "source_url": "https://example.com/infy-annual-report-2026.pdf"}
+{"ticker": "TCS", "relation": "competitor", "target": "Infosys", "target_kind": "company", "target_ticker": "INFY", "aliases": [], "detail": "IT services peer", "weight": null, "as_of": "2026-06-30", "source_url": "https://example.com/tcs-annual-report-2026.pdf"}
+{"ticker": "RELIANCE", "relation": "board", "target": "Mukesh Ambani", "target_kind": "person", "target_ticker": null, "aliases": [], "detail": "Chairman and Managing Director", "weight": null, "as_of": "2026-06-30", "source_url": "https://example.com/ril-board"}
+{"ticker": "RELIANCE", "relation": "friend", "target": "Somebody", "target_kind": "person", "aliases": [], "as_of": "2026-06-30", "source_url": ""}

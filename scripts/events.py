@@ -8,14 +8,16 @@
 from __future__ import annotations
 
 import calendar as pycal
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 import yaml
 
 from common import CONFIG
 
 MAJOR_WINDOW_DAYS = 2  # PASDS: a major event within 2 calendar days -> EVENT_HEAVY
+DEFAULT_CLOSE = time(16, 0)  # local close assumed only when the exchange calendar is unavailable
 
 
 @lru_cache(maxsize=None)
@@ -54,6 +56,19 @@ def prev_session(cfg: dict, d: date, include: bool = True) -> date:
     while not is_session(cfg, d):
         d -= timedelta(days=1)
     return d
+
+
+def session_close_utc(cfg: dict, d: date) -> datetime:
+    """Regular close of session d as an aware UTC datetime (exchange calendar, early closes
+    included). Outside the calendar's range, its regular local close time is applied to d."""
+    try:
+        cal = _xcal(cfg["calendar"])
+        if calendar_covers(cfg, d) and cal.is_session(d.isoformat()):
+            return cal.session_close(d.isoformat()).to_pydatetime().astimezone(timezone.utc)
+        tz, close = ZoneInfo(str(cal.tz)), cal.close_times[-1][1]
+    except Exception:
+        tz, close = ZoneInfo(cfg["timezone"]), DEFAULT_CLOSE
+    return datetime.combine(d, close, tz).astimezone(timezone.utc)
 
 
 def sessions_ahead(cfg: dict, start: date, n: int) -> list[date]:

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-made test fixture (fictional filer), shaped like a real 13F-HR cover page: a
+     COMBINATION report (other managers report part of the holdings) whose 4 table lines match
+     tableEntryTotal, so only the report type makes it incomplete. -->
+<edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:com="http://www.sec.gov/edgar/common">
+  <schemaVersion>X0202</schemaVersion>
+  <headerData>
+    <submissionType>13F-HR</submissionType>
+  </headerData>
+  <formData>
+    <coverPage>
+      <filingManager><name>COMBO CAPITAL</name></filingManager>
+      <reportType>13F COMBINATION REPORT</reportType>
+      <otherManagersInfo>
+        <otherManager><cik>0009999301</cik><form13FFileNumber>028-99999</form13FFileNumber><name>COMBO ADVISERS LLC</name></otherManager>
+      </otherManagersInfo>
+    </coverPage>
+    <summaryPage>
+      <otherIncludedManagersCount>0</otherIncludedManagersCount>
+      <tableEntryTotal>4</tableEntryTotal>
+      <isConfidentialOmitted>false</isConfidentialOmitted>
+    </summaryPage>
+  </formData>
+</edgarSubmission>

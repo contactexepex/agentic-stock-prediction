@@ -90,3 +90,21 @@ filings: none             # SEC filings only exist for US companies
 # benchmark's expected move (beta split of the range centre). beta: fit = regress Nifty's daily
 # return on the cue's previous session return over the last year of stored bars.
 index_cue: {symbol: SPX, beta: fit}
+
+# Relationships (DESIGN.md phase 5), collected by scripts/collect_relations_india.py from NSE's
+# public JSON endpoints (browser-like headers plus a cookie from the home page). The cloud
+# environment must allow www.nseindia.com and nsearchives.nseindia.com. NSE symbol = the Yahoo
+# symbol without ".NS" unless a ticker sets `nse:`.
+relations:
+  source: nse
+  base: https://www.nseindia.com
+  archives: https://nsearchives.nseindia.com
+  insider_lookback_days: 14   # SEBI PIT disclosures by broadcast date
+  deal_lookback_days: 5       # bulk and block deals
+  flags:                      # risk flags in the context pack (scripts/relations.py)
+    window_days: 5            # deals and insider trades this recent are flagged
+    big_deal_crore: 250       # bulk/block deal value at or above this (1 crore = INR 1e7) ...
+    big_deal_adv: 0.5         # ... or shares at or above this x 20-day average volume
+    insider_sale_crore: 10    # promoter/director sale at or above this value
+    pledge_increase_pp: 1.0   # promoter pledge (% of promoter holding) up this many points q/q
+    pledge_filed_days: 60     # flag a pledge rise only while that filing is this recent
