@@ -18,7 +18,8 @@ import yaml
 from common import CONFIG
 
 MAJOR_WINDOW_DAYS = 2  # PASDS: a major event within 2 calendar days -> EVENT_HEAVY
-DEFAULT_CLOSE = time(16, 0)  # local close assumed only when the exchange calendar is unavailable
+DEFAULT_OPEN = time(9, 30)   # local open and close assumed only when the exchange calendar
+DEFAULT_CLOSE = time(16, 0)  # is unavailable
 
 
 @lru_cache(maxsize=None)
@@ -65,17 +66,28 @@ def prev_session(cfg: dict, d: date, include: bool = True) -> date:
     return d
 
 
-def session_close_utc(cfg: dict, d: date) -> datetime:
-    """Regular close of session d as an aware UTC datetime (exchange calendar, early closes
-    included). Outside the calendar's range, its regular local close time is applied to d."""
+def _session_edge_utc(cfg: dict, d: date, edge: str) -> datetime:
     try:
         cal = _xcal(cfg["calendar"])
         if calendar_covers(cfg, d) and cal.is_session(d.isoformat()):
-            return cal.session_close(d.isoformat()).to_pydatetime().astimezone(timezone.utc)
-        tz, close = ZoneInfo(str(cal.tz)), cal.close_times[-1][1]
+            at = cal.session_open(d.isoformat()) if edge == "open" else cal.session_close(d.isoformat())
+            return at.to_pydatetime().astimezone(timezone.utc)
+        tz, t = ZoneInfo(str(cal.tz)), (cal.open_times if edge == "open" else cal.close_times)[-1][1]
     except Exception:
-        tz, close = ZoneInfo(cfg["timezone"]), DEFAULT_CLOSE
-    return datetime.combine(d, close, tz).astimezone(timezone.utc)
+        tz, t = ZoneInfo(cfg["timezone"]), DEFAULT_OPEN if edge == "open" else DEFAULT_CLOSE
+    return datetime.combine(d, t, tz).astimezone(timezone.utc)
+
+
+def session_open_utc(cfg: dict, d: date) -> datetime:
+    """Regular open of session d as an aware UTC datetime (exchange calendar, late opens
+    included). Outside the calendar's range, its regular local open time is applied to d."""
+    return _session_edge_utc(cfg, d, "open")
+
+
+def session_close_utc(cfg: dict, d: date) -> datetime:
+    """Regular close of session d as an aware UTC datetime (exchange calendar, early closes
+    included). Outside the calendar's range, its regular local close time is applied to d."""
+    return _session_edge_utc(cfg, d, "close")
 
 
 def sessions_ahead(cfg: dict, start: date, n: int) -> list[date]:

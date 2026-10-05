@@ -10,7 +10,12 @@ switched off its horizon sigma is still recorded as the shadow value `iv_sigma_h
 Appends to data/<market>/ranges/; ids <as_of_date>-<ticker>-<h>d are written once.
 Late-run guard: a range whose target session had already closed at made_at is not published;
 other ranges note when the first target session had already closed, and an overnight cue (or
-option snapshot) quoted after that close is ignored (it would carry that session's outcome)."""
+option snapshot) quoted after that close is ignored (it would carry that session's outcome).
+Mid-session guard: the 1-day range targets the first session, so once that session has opened
+(a manual run after the open) it is not published, and for it a cue quoted after the open is
+ignored (an intraday quote is not an overnight cue). Option snapshots are read only up to
+made_at, so a published 1-day range never uses one from after the open. Longer horizons keep
+the close as their cut-off."""
 from __future__ import annotations
 
 import json
@@ -36,6 +41,10 @@ def target_date(cfg: dict, as_of, h: int):
 
 def first_target_close(cfg: dict, as_of):
     return ev.session_close_utc(cfg, target_date(cfg, as_of, 1))
+
+
+def first_target_open(cfg: dict, as_of):
+    return ev.session_open_utc(cfg, target_date(cfg, as_of, 1))
 
 
 def cue_times(con, feats: pd.DataFrame) -> dict:
@@ -73,7 +82,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     smart = sm.range_flags(con, as_of, rc, now)   # fresh activist 13D accepted by made_at; widen off by default
     made = datetime.fromisoformat(now)
     first = target_date(cfg, as_of, 1)
-    first_close = first_target_close(cfg, as_of)
+    first_open, first_close = first_target_open(cfg, as_of), first_target_close(cfg, as_of)
     cue_ts = cue_times(con, feats)
     # range inputs (range_inputs.py); switched per market and horizon in config/ranges.yaml
     mk = cfg["market"]
@@ -82,7 +91,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     sig = {t: rl.ewma_sigma(bars[t]["close"], rc["ewma_lambda"]) for t in cfg["tickers"] if t in bars}
     moves = {t: ri.past_moves(cfg, bars[t]["close"], sig[t], earn_ev.get(t, []), rc["warmup_bars"])
              for t in cfg["tickers"] if t in bars} if ri.enabled(rc, "earnings_history", mk) else {}
-    index_cue, index_cue_note = None, None
+    index_q = None   # (log change, quoted at, beta) of the index cue
     if ri.enabled(rc, "beta_split", mk) and (cfg.get("index_cue") or {}).get("symbol"):
         sym = cfg["index_cue"]["symbol"]
         at = pd.Timestamp(reg["computed_at"]).to_pydatetime()
@@ -91,10 +100,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
                         "ORDER BY collected_at DESC LIMIT 1", [sym, at, at]).fetchone()
         cue_beta = ri.index_cue_beta(cfg, bars, rc, pd.Timestamp(as_of))
         if q and q[0] is not None and cue_beta is not None:
-            if pd.Timestamp(q[1]).to_pydatetime() > first_close:
-                index_cue_note = f"index cue ignored: {sym} quoted after {first} close"
-            else:
-                index_cue = cue_beta * math.log1p(float(q[0]))
+            index_q = (math.log1p(float(q[0])), pd.Timestamp(q[1]).to_pydatetime(), cue_beta)
     opts = pd.DataFrame()
     if cfg.get("options") and "implied_vol" in rc:   # applied if switched on, else a shadow value
         opts = con.execute("SELECT * FROM options_latest WHERE day >= ? AND collected_at <= ?",
@@ -108,6 +114,18 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
         tgt = target_date(cfg, as_of, h)
         if made >= ev.session_close_utc(cfg, tgt):
             continue  # late run: the target session already closed, its outcome is public
+        if tgt == first and made >= first_open:
+            continue  # mid-session run: the 1-day target session has opened, its outcome is partly public
+        # a cue quoted after this carries part of the outcome: the first session's open for the
+        # 1-day horizon (its target), its close for longer ones. Option snapshots need no extra cut:
+        # they are collected by made_at, which for a published 1-day range is before the open.
+        edge, cut = ("open", first_open) if tgt == first else ("close", first_close)
+        index_cue = index_cue_note = None
+        if index_q is not None:
+            if index_q[1] > cut:
+                index_cue_note = f"index cue ignored: {sym} quoted after {first} {edge}"
+            else:
+                index_cue = index_q[2] * index_q[0]
         mevents = ev.market_events(cfg, as_of + timedelta(days=1), tgt)
         major = [e for e in mevents if e["major"]]
         if h in cal.index:
@@ -166,8 +184,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
             center = 0.0
             cue = f.get("cue_change_pct")
             own = math.log1p(float(cue)) if cue is not None and not pd.isna(cue) else None
-            if own is not None and cue_ts.get(t) is not None and cue_ts[t] > first_close:
-                notes.append(f"cue ignored: quoted after {first} close")
+            if own is not None and cue_ts.get(t) is not None and cue_ts[t] > cut:
+                notes.append(f"cue ignored: quoted after {first} {edge}")
                 own = None
             beta = ri.clip_beta(f.get("beta_1y"), rc)
             if use["beta_split"] and index_cue_note:
@@ -233,9 +251,11 @@ def main() -> int:
     if rows:
         append_jsonl(day_file(cfg["market"], "ranges", pd.Timestamp(rows[0]["as_of_date"]).date()), rows)
     as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
-    late = datetime.fromisoformat(now) >= first_target_close(cfg, as_of)
+    made = datetime.fromisoformat(now)
+    late = made >= first_target_close(cfg, as_of)
+    in_session = first_target_open(cfg, as_of) <= made and not late   # no 1-day ranges
     print(json.dumps({"step": "ranges", "market": cfg["market"], "written": len(rows), "late": late,
-                      "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
+                      "in_session": in_session, "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
     return 0
 
 

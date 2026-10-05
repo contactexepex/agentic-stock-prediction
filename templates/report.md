@@ -21,7 +21,9 @@ Report markers:
 - `data_quality`: failed collectors and feeds (and `stale` news feeds) from the run's JSON
   summaries; "none" if clean.
   On a late run (`market_status.py` `late_run: true`) say so first: the run started after the
-  session closed, so no calls were made and closed-session ranges were not published.
+  session closed, so no calls were made and closed-session ranges were not published. On a
+  mid-session run (`in_session: true`) say first that the run started after the session opened,
+  so no 1-day calls or ranges were made.
   Then the judge's verdicts: one line per agent (PASS, or FAIL with the reason and what was dropped).
   Then one line per row of the context pack's "Judge FAILs from the previous run not yet in a
   report" section (e.g. the monthly graph-builder, judged after the previous brief was posted):

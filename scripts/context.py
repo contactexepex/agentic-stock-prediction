@@ -148,10 +148,10 @@ def main() -> None:
     cfg = require_market(market_arg(__doc__).parse_args())
     con = connect(cfg["market"])
     print(f"# Context pack: {cfg['name']}, {utc_today()} (UTC)\n")
-    # ranges made at/after the close of the first session after as_of: shown, never scored
-    latest = con.execute("SELECT id, as_of_date, made_at FROM ranges_latest "
+    # ranges made at/after the close of the first session after as_of (1-day: its open): shown, never scored
+    latest = con.execute("SELECT id, as_of_date, made_at, horizon_days FROM ranges_latest "
                          "WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)").fetchall()
-    late = [rid for rid, as_of, made in latest if is_late(cfg, as_of, made)]
+    late = [rid for rid, as_of, made, h in latest if is_late(cfg, as_of, made, h)]
     con.execute("CREATE OR REPLACE TEMP TABLE late_ranges AS SELECT unnest(?::VARCHAR[]) AS id", [late])
     blocks = sections(cfg)
     for title, sql, params in blocks[:2]:
