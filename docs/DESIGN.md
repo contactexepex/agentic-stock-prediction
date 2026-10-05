@@ -119,7 +119,27 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 ## 11. Open items
 - Watchlists: decided (20 per market, 10 sectors x 2), see `config/markets/`.
 - Verify the India outlet RSS URLs and the 2027 India holiday calendar once live.
-- Not yet built from section 4: options-implied volatility (US option chains) in the width blend,
-  index-then-stock beta split for the centre, past earnings-day moves, and ex-dividend price
-  shift (needs the dividend amount). Today: EWMA width, empirical quantiles, earnings / event /
-  regime widening, cue and AI drift.
+- Section 4 range inputs: **built** (`scripts/range_inputs.py`, switches in `config/ranges.yaml`):
+  past earnings-day moves (dates and before-open/after-close timing from yfinance and, US, SEC
+  8-K item 2.02; backfilled by `collect_events.py`), ex-dividend shift (dividend amounts now
+  collected), index-then-stock beta split of the overnight cue (US: `ES`; India: previous `SPX`
+  session with a fitted beta), and US option-implied vol (`collect_options.py`) in the width
+  blend and as the implied earnings move. The range notes and the `inputs` column say which
+  applied, so the weekly review can score each one live.
+- Backtest of the inputs (`backtest.py`, 250 sessions to 2026-10-02/01, 80% interval score in %
+  of price where the input applies, lower is better; off -> on):
+
+  | Input | US 1d | US 5d | India 1d | India 5d | Default |
+  |---|---|---|---|---|---|
+  | Past earnings moves (vs fixed x3) | 21.11 -> 20.72 (n 82) | 24.23 -> 24.53 (n 409) | no data | no data | US on, India off |
+  | Ex-dividend shift | 7.45 -> 6.55 (n 72) | 13.60 -> 13.08 (n 359) | 4.93 -> 4.22 (n 27) | 12.79 -> 12.10 (n 138) | on |
+  | Beta split (vs direct cue) | same | same | 5.50 -> 5.45 | 11.92 -> 11.92 | India on, US off |
+  | All defaults (vs before) | 6.41 -> 6.41 | 15.01 -> 14.99 | 5.50 -> 5.45 | 11.92 -> 11.90 | |
+
+  Over 440 sessions past earnings moves improve both US horizons (1d 22.77 -> 22.33, 5d
+  26.53 -> 26.48): a small gain, kept for the US. India has no free earnings dates after mid-2025
+  and only 2y of bars, so it stays on the fixed multiplier until stored events build up; that
+  multiplier looks too wide for India (1d earnings ranges covered 97% of 38). In the US every
+  stock has its own pre-market cue, so with equal weights the beta split equals the direct cue;
+  US cue history is a proxy (next open gap, which flatters cues in absolute terms). Implied
+  vol has no stored history: live only, judged by the weekly review.

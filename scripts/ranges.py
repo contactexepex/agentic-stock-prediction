@@ -3,7 +3,9 @@
 
 Run after features.py, calibrate.py and the forecaster. Inputs (all stored, never live APIs):
 latest indicator snapshot and regime, latest calibration quantiles, upcoming events, and
-today's predictions (AI direction/confidence and optional `range_widen`).
+today's predictions (AI direction/confidence and optional `range_widen`). Switchable inputs
+(config/ranges.yaml, logic in range_inputs.py): past earnings-day moves, ex-dividend shift,
+beta split of the overnight cue, and option-implied volatility (US).
 Appends to data/<market>/ranges/; ids <as_of_date>-<ticker>-<h>d are written once."""
 from __future__ import annotations
 
@@ -15,9 +17,10 @@ from datetime import timedelta
 import pandas as pd
 
 import events as ev
+import range_inputs as ri
 import rangelib as rl
 from common import (append_jsonl, connect, day_file, load_ranges_config, market_arg, require_market,
-                    utc_now)
+                    utc_now, utc_today)
 from features import load_bars
 
 
@@ -39,8 +42,27 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
     pred = {(r.ticker, int(r.horizon_days)): r for r in preds.itertuples()}
     existing = set(con.execute("SELECT id FROM ranges").df()["id"])
     bars = load_bars(con)
-    company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
-    earnings = {t: d for t, k, d in company if k == "earnings"}
+    evdf = ri.load_events(con)
+    earn_ev, divs = ri.earnings_events(evdf), ri.dividend_events(evdf)
+    mk = cfg["market"]
+    use = {k: ri.enabled(rc, k, mk) for k in ("earnings_history", "ex_dividend", "beta_split", "implied_vol")}
+    sig = {t: rl.ewma_sigma(bars[t]["close"], rc["ewma_lambda"]) for t in cfg["tickers"] if t in bars}
+    moves = {t: ri.past_moves(cfg, bars[t]["close"], sig[t], earn_ev.get(t, []), rc["warmup_bars"])
+             for t in cfg["tickers"] if t in bars} if use["earnings_history"] else {}
+    index_cue = cue_beta = None
+    if use["beta_split"] and (cfg.get("index_cue") or {}).get("symbol"):
+        q = con.execute("SELECT change_pct FROM quotes_latest WHERE symbol = ? AND day = CAST(? AS DATE)",
+                        [cfg["index_cue"]["symbol"], str(reg["computed_at"])[:10]]).fetchone()
+        cue_beta = ri.index_cue_beta(cfg, bars, rc, pd.Timestamp(as_of))
+        if q and q[0] is not None and cue_beta is not None:
+            index_cue = cue_beta * math.log1p(float(q[0]))
+    opts = pd.DataFrame()
+    if use["implied_vol"]:
+        opts = con.execute("SELECT * FROM options_latest WHERE day >= ?",
+                           [utc_today() - timedelta(days=int(rc["implied_vol"]["max_age_days"]))]).df()
+        if not opts.empty:
+            opts["expiry"] = opts["expiry"].map(lambda d: pd.Timestamp(d).date())
+            opts = opts.sort_values("day").drop_duplicates(["ticker", "expiry"], keep="last")
     now, rows = utc_now(), []
 
     for h in rc["horizons"]:
@@ -63,15 +85,37 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
             if f["quality"] == "BLOCKED" or pd.isna(f["ewma_vol"]) or pd.isna(f["close"]):
                 continue
             base, sd = float(f["close"]), float(f["ewma_vol"]) / math.sqrt(rl.TRADING_DAYS)
-            notes = []
-            e = earnings.get(t)
-            sigma_h, wnotes = rl.horizon_sigma(sd, h, bool(e and e <= tgt), rc, reg["regime"], bool(major))
+            notes, inputs = [], []
+            tev = earn_ev.get(t, [])
+            in_h = ri.earnings_in_horizon(cfg, tev, as_of, tgt)
+            mult, enote = None, ""
+            if use["implied_vol"] and not opts.empty:
+                sd2, m_iv, ivn = ri.implied_sigma(cfg, opts[opts["ticker"] == t], as_of, tgt, sd, tev, rc)
+                if sd2 != sd or (m_iv is not None and in_h):
+                    sd, mult, notes, inputs = sd2, m_iv if in_h else None, notes + ivn, inputs + ["implied_vol"]
+                    enote = ", options-implied" if mult is not None else ""
+            if in_h and mult is None and use["earnings_history"]:
+                m, n, med = ri.earnings_stats(moves.get(t, []), rc, as_of)
+                if n >= rc["earnings_history"]["min_events"]:
+                    mult, enote = m, f", {n} past moves, median {med:.1%}"
+                    inputs.append("earnings_history")
+            sigma_h, wnotes = rl.horizon_sigma(sd, h, in_h, rc, reg["regime"], bool(major), mult, enote)
             notes += wnotes
-            # centre: overnight cue + AI drift, capped
+            # centre: overnight cue (beta split or direct) + AI drift, capped
             center = 0.0
             cue = f.get("cue_change_pct")
-            if cue is not None and not pd.isna(cue):
-                center += rc["cue_weight"] * math.log1p(float(cue))
+            own = math.log1p(float(cue)) if cue is not None and not pd.isna(cue) else None
+            beta = ri.clip_beta(f.get("beta_1y"), rc)
+            if use["beta_split"] and index_cue is not None and beta is not None:
+                bs = rc["beta_split"]
+                center += rl.beta_split_center(beta, index_cue, own, bs["index_weight"], bs["own_weight"],
+                                               rc["cue_weight"])
+                notes.append(f"index {index_cue:+.2%} expected from {cfg['index_cue']['symbol']}, "
+                             f"x beta {beta:.2f} x{bs['index_weight']}"
+                             + (f", own cue {float(cue):+.2%} net x{bs['own_weight']}" if own is not None else ""))
+                inputs.append("beta_split")
+            elif own is not None:
+                center += rc["cue_weight"] * own
                 notes.append(f"cue {float(cue):+.2%} x{rc['cue_weight']}")
             p = pred.get((t, h))
             direction = confidence = None
@@ -86,6 +130,12 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
                     notes.append(f"AI widened +{widen:.0%}")
             cap = rc["max_center_shift_sigma"] * sigma_h
             center = max(-cap, min(cap, center))
+            if use["ex_dividend"]:   # a known price drop, outside the drift cap
+                amounts = ri.dividends_in_horizon(cfg, divs.get(t, []), as_of, tgt)
+                if amounts:
+                    center += rl.ex_dividend_shift(base, amounts)
+                    notes.append(f"ex-dividend {sum(amounts):g} ({sum(amounts) / base:.2%})")
+                    inputs.append("ex_dividend")
             band = lambda zq: round(base * math.exp(center + zq * sigma_h), 4)  # noqa: E731
             close = bars[t]["close"] if t in bars else None
             s20 = rl.realized_sigma(close[close.index <= pd.Timestamp(as_of)]) if close is not None else None
@@ -98,7 +148,7 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
                 "lo50": band(q["q25"]), "hi50": band(q["q75"]), "lo80": band(q["q10"]), "hi80": band(q["q90"]),
                 "naive_lo50": n50[0], "naive_hi50": n50[1], "naive_lo80": n80[0], "naive_hi80": n80[1],
                 "direction": direction, "confidence": confidence, "regime": reg["regime"],
-                "calibration_id": cal_id, "notes": notes,
+                "calibration_id": cal_id, "notes": notes, "inputs": inputs,
             })
     return rows
 

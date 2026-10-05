@@ -11,14 +11,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (benchmark, vol index, cues, factors), regime thresholds, sectors, tickers, news feeds
 - `config/events.yaml` scheduled market events (rules and fixed dates)
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
-  Collectors: `collect_prices`, `collect_quotes`, `collect_events`, `collect_news`,
-  `collect_filings`. Then `score_predictions` (calls and ranges), `features` (indicators +
+  Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
+  days and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
+  implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` and `report`
   (report skeleton + Slack draft with every number; agents fill only the `AGENT` markers,
   then `notify_slack` posts the draft through `SLACK_WEBHOOK_URL`;
   see `templates/report.md`). `backtest` evaluates the
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
-  `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
+  `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
+  `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
+  switchable in `config/ranges.yaml`).
   Schemas live in `scripts/common.py`.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)

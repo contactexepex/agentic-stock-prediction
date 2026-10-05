@@ -11,7 +11,8 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
    and stop.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
-   `collect_news.py` and `collect_filings.py` (all in `scripts/`). Keep each JSON summary.
+   `collect_news.py`, `collect_filings.py` and `collect_options.py` (all in `scripts/`;
+   options are US only, India skips). Keep each JSON summary.
    A failed collector is not fatal: continue and report what failed.
 
 4. Score: `python scripts/score_predictions.py`.

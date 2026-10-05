@@ -21,3 +21,27 @@ earnings_vol_multiple: 3.0  # an earnings day moves like this many normal days (
 major_event_factor: 1.15    # market-wide major event inside the horizon
 regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.1, UNSTABLE: 1.25}
 max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow it
+
+# Range inputs (docs/DESIGN.md sections 4 and 11). `enabled`: true, false, or a list of markets.
+# Defaults follow scripts/backtest.py: an input stays on only if it improved range accuracy
+# (interval score) where it applies. Implied vol has no history, so it is live-only.
+earnings_history:           # size the earnings widening from the stock's past earnings-day moves
+  enabled: [us]             # India: no earnings dates after mid-2025 from free sources yet, untested
+  min_events: 2             # fewer past reactions -> fixed earnings_vol_multiple
+  prior_events: 4           # shrink towards earnings_vol_multiple as if it were this many events
+  lookback_events: 12       # most recent reactions used
+  max_multiple: 8.0         # cap on the earnings-day multiple (also caps the options-implied one)
+ex_dividend:                # shift the centre down by dividends going ex inside the horizon
+  enabled: true
+beta_split:                 # centre = beta x index cue + own cue net of beta x index cue
+  enabled: [india]          # US: same as the direct cue whenever a pre-market quote exists (no gain)
+  index_weight: 0.5         # share of the expected index move applied
+  own_weight: 0.5           # share of the stock's own cue (ADR / pre-market) beyond beta x index
+  beta_clip: [0.0, 2.5]
+  fit_sessions: 250         # index_cue beta "fit": regression window
+implied_vol:                # US option chains (collect_options.py); live only
+  enabled: [us]
+  weight: 0.5               # share of implied variance in the daily volatility blend
+  max_age_days: 1           # snapshot must be from the run day or the day before (UTC)
+  max_expiry_days: 30       # use the first expiry on/after the target date, at most this far out
+  use_for_earnings: true    # earnings before that expiry: IV sets the earnings multiple instead
