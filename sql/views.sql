@@ -48,9 +48,15 @@ SELECT ticker, date, open, high, low, close, volume
 FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC);
 
 -- Latest known date per (ticker, event type); a moved date is a newer row.
+-- Past events backfilled for the range engine (source ending in "_history") are left out here.
 CREATE OR REPLACE VIEW company_events AS
 SELECT DISTINCT ON (ticker, type) * FROM events
-WHERE ticker IS NOT NULL ORDER BY ticker, type, first_seen_at DESC, date;
+WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history')
+ORDER BY ticker, type, first_seen_at DESC, date;
+
+-- Every company event ever seen, once per id (past earnings days and dividends for ranges).
+CREATE OR REPLACE VIEW event_history AS
+SELECT DISTINCT ON (id) * FROM events WHERE ticker IS NOT NULL ORDER BY id, first_seen_at;
 
 -- Latest quote per symbol per UTC day.
 CREATE OR REPLACE VIEW quotes_latest AS
@@ -79,3 +85,8 @@ FROM ranges_latest r JOIN (SELECT DISTINCT ON (range_id) * FROM range_outcomes O
 
 CREATE OR REPLACE VIEW calibration_latest AS
 SELECT DISTINCT ON (horizon_days) * FROM calibration ORDER BY horizon_days, as_of_date DESC, computed_at DESC;
+
+-- Latest implied-volatility snapshot per ticker, expiry and UTC day (collect_options.py).
+CREATE OR REPLACE VIEW options_latest AS
+SELECT DISTINCT ON (ticker, expiry, CAST(collected_at AS DATE)) *, CAST(collected_at AS DATE) AS day
+FROM options ORDER BY ticker, expiry, CAST(collected_at AS DATE), collected_at DESC;

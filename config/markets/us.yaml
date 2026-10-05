@@ -88,3 +88,9 @@ news:
 filings: sec
 filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
 filing_lookback_days: 7
+
+# Range engine inputs (docs/DESIGN.md section 4). options: implied vol from yfinance option chains
+# (collect_options.py). index_cue: the overnight cue for the benchmark's expected move, used by
+# the beta split of the range centre; beta = benchmark move per 1% cue move.
+options: yfinance
+index_cue: {symbol: ES, beta: 1.0}

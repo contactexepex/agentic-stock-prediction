@@ -72,6 +72,16 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
     "events": ("jsonl", {
         "id": "VARCHAR", "date": "DATE", "type": "VARCHAR", "ticker": "VARCHAR",
         "name": "VARCHAR", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        # amount: dividend per share (ex_dividend); timing: before_open | during | after_close
+        # (earnings, when the source has a time). Past events carry a source ending in "_history".
+        "amount": "DOUBLE", "timing": "VARCHAR",
+    }),
+    # Near-the-money implied volatility per ticker and expiry (collect_options.py, US only).
+    "options": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "collected_at": "TIMESTAMPTZ", "expiry": "DATE",
+        "days_to_expiry": "INTEGER", "spot": "DOUBLE", "strike": "DOUBLE", "call_iv": "DOUBLE",
+        "put_iv": "DOUBLE", "atm_iv": "DOUBLE", "straddle": "DOUBLE", "straddle_pct": "DOUBLE",
+        "source": "VARCHAR",
     }),
     "features": ("jsonl", {
         "id": "VARCHAR", "as_of_date": "DATE", "ticker": "VARCHAR", "computed_at": "TIMESTAMPTZ",
@@ -85,6 +95,7 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "naive_lo50": "DOUBLE", "naive_hi50": "DOUBLE", "naive_lo80": "DOUBLE", "naive_hi80": "DOUBLE",
         "direction": "VARCHAR", "confidence": "DOUBLE", "regime": "VARCHAR",
         "calibration_id": "VARCHAR", "notes": "VARCHAR[]",
+        "inputs": "VARCHAR[]",  # range inputs applied: earnings_history, ex_dividend, beta_split, implied_vol
     }),
     "range_outcomes": ("jsonl", {
         "range_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "target_date": "DATE",
