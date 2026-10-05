@@ -148,14 +148,25 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    approximate: AAPL Q4 FY2025 derives to 1.84 vs 1.85 reported). The context pack shows the last
    reported quarter (YoY growth, margins, FCF, filed date, `new` if filed in the last 5 days) and
    the latest balance sheet. No consensus estimates are available for free, so there is no
-   earnings "surprise". Gaps: banks and insurers tag no gross or operating profit; some companies
-   tag debt or capex only in parts or custom tags (e.g. CAT, DE, GM debt; DAL capex), left blank.
-   META has no company-total shares-outstanding fact in company facts (likely because it reports
-   class A and B shares separately), so its `shares_out` is blank. Where no gross profit is tagged,
-   gross margin is computed as (revenue - cost of revenue) / revenue and marked `c`: a uniform
-   formula, not the company's own measure. It misleads for some: CVX's "cost" is purchased crude
-   and products (47.8% for Q2 2026, not an oil major's margin), CAT's and DE's revenue includes
-   financial-services revenue, and WMT's and COST's includes membership fees.
+   earnings "surprise". Gaps, counted on the live data of 2026-10-05 (all quarters since late 2023
+   in `fundamentals_metrics`, 10-12 per ticker):
+   - Banks and insurers (ALL, BAC, JPM, PGR) tag no gross or operating profit: both margins blank.
+   - Operating margin is also blank for CVX, DE, LLY, MRK and XOM (no `OperatingIncomeLoss`).
+   - Gross margin is also blank for DAL, DE, GM, UAL and XOM (no gross profit and no cost of revenue
+     among the collected tags).
+   - FCF is blank for BAC and JPM (no capex tagged). DAL tags capex only in parts in its Q2 2026
+     10-Q, so its latest quarter has no capex or FCF (9 of 10 quarters have them). ALL, NVDA and WMT
+     lack capex only in their first quarter in the window (no earlier year-to-date total to subtract).
+   - Total debt on the latest balance sheet is blank for CAT, DE and GM (debt tagged only in parts
+     or custom tags).
+   - META has no company-total shares-outstanding fact in company facts (likely because it reports
+     class A and B shares separately), so its `shares_out` is blank.
+   - Where no gross profit is tagged but a cost of revenue is (CAT, COST, CVX, GOOGL, LLY, META, MRK,
+     WMT), gross margin is computed as (revenue - cost of revenue) / revenue and marked `c`: a
+     uniform formula, not the company's own measure. It misleads for some: CVX's "cost" is purchased
+     crude and products (47.8% for Q2 2026, not an oil major's margin), CAT's revenue includes
+     financial-services revenue, and WMT's and COST's includes membership fees.
+
    **Not point in time:** the plain views (`fundamentals_latest`, `_quarterly`, `_metrics`) use every
    stored filing, so a restated or split-adjusted value replaces the original. A backtest or any
    as-of question must use the macros `fundamentals_latest_asof(ts)`, `fundamentals_quarterly_asof(ts)`
