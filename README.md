@@ -28,10 +28,13 @@ Research only. Nothing here is investment advice, and the routines never trade.
    the AI call. Scored daily against a naive baseline; `backtest.py` checks the formula
    walk-forward on history.
 9. **Remember**: daily summaries, rolled up into weekly and monthly ones, per market.
-10. **Charts and report** (`charts.py`, `report.py`): one chart per stock (60 days of prices,
-    past ranges hit/miss, today's range cone with the call) plus an overview grid; the report
-    and the Slack draft carry every number from the scripts, the agents add only narrative.
-11. **Save** to this repo (append-only data) and **notify** Slack with one message per market.
+10. **Charts and report** (`charts.py`, `report.py`, `html_report.py`): three single-purpose
+    chart images (price ranges, sector moves, track record); the markdown report and the Slack
+    draft carry every number from the scripts, the agents add only narrative; after the judge
+    passes, a self-contained HTML report per day (filters by sector and company, a price chart,
+    plain-language range and reasons per company) is built from the filled report and the data.
+11. **Save** to this repo (append-only data) and **notify** Slack: one thread per market (summary,
+    chart images, the HTML file).
 
 Storage is date-partitioned files under `data/<market>/`, queried with DuckDB. See `sql/views.sql`.
 
@@ -52,6 +55,10 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    From scratch), turn on **Incoming Webhooks**, **Add New Webhook to Workspace**, pick `#market-brief`,
    and copy the webhook URL into the environment variable `SLACK_WEBHOOK_URL`. Allow `hooks.slack.com`
    in the network settings. (Routines created in the claude.ai UI can use the Slack connector instead.)
+   For the threaded post with chart images and the HTML file, add bot scopes `chat:write` and
+   `files:write`, install the app, invite the bot to `#market-brief`, put its token in
+   `SLACK_BOT_TOKEN` and allow `slack.com` and `files.slack.com`. The channel id is
+   `slack_channel_id` in `config/settings.yaml`. Without the token the webhook text post is used.
 2. **Cloud environment** (claude.ai/code → environment settings):
    - Network access: **Custom**, tick "Also include default list of common package managers", and allow:
      `query1.finance.yahoo.com`, `query2.finance.yahoo.com` (all Yahoo data), `fc.yahoo.com` (cookie),

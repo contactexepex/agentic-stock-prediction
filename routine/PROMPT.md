@@ -44,7 +44,7 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
 2. Holiday check: `python scripts/market_status.py`. If `trading_day` is false, post one line
    to Slack #market-brief with
    `python scripts/notify_slack.py --text "<market name>: market closed today, next session <session_date>"`
-   (exit code 2 = no webhook: use the Slack connector as in step 13) and stop. If `late_run` is
+   (exit code 2 = no bot token and no webhook: use the Slack connector as in step 13) and stop. If `late_run` is
    true (the run started after the close of `session_date`, at `session_close_utc`), carry on,
    but tell the forecaster it is a late run: it abstains on every ticker with reason "late run".
    `ranges.py` then skips ranges whose target session has closed, labels the others late (never
@@ -117,9 +117,11 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     `config/ranges.yaml` changes are for a human to decide: never edit config in the routine.
     report.py links the review in the report and adds one Slack line on the day it is written.
 
-11. Charts and report: `python scripts/charts.py`, then `python scripts/report.py`. This writes
-    `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
-    `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
+11. Charts and report: `python scripts/charts.py` (single-purpose PNGs: price ranges, sector
+    moves, track record), then `python scripts/report.py`. This writes
+    `reports/<market>/<session_date>.md` (all numbers, tables and charts; the agent-editable
+    source) and the Slack draft `work/slack_<market>.md` (the thread's short summary message:
+    regime, top 3, number of calls, link). Fill every `<!-- AGENT:... -->` marker in both files following
     `templates/report.md`, then delete the markers. Never change a number, table or chart
     link written by the script, and keep the `<!-- report-data: ... -->` line. In `data_quality`,
     copy every row of the context pack's "Judge FAILs from the previous run not yet in a report"
@@ -129,16 +131,27 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative
     only where it still holds.
 
+11a. HTML report: only after the judge passed the filled report and Slack draft (or each failed
+    section was replaced as above), run `python scripts/html_report.py`. It refuses a report that
+    still has AGENT markers. It builds `reports/<market>/<session_date>.html` (the reader's view:
+    filters by sector and company, a price chart and plain-language range per company, reasons,
+    track record) and `reports/<market>/index.html` from the judged report plus the stored data,
+    and lists the files for Slack in `work/slack_<market>_files.json`. It adds no narrative of its
+    own (numbers come from the data, text is copied from the judged report), so it needs no
+    further judging. If it fails, list the failure in the Slack failures line and post anyway.
+
 12. Save (only after the judge passed the summaries, report and Slack draft, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
 
-13. Notify: run `python scripts/notify_slack.py`. It posts the filled `work/slack_<market>.md`
-    as ONE message to #market-brief through the incoming webhook in `SLACK_WEBHOOK_URL`. If it
-    exits with code 2 (no webhook configured) and a Slack connector is available in this
-    session, post the same text as one message to #market-brief (channel id in
-    `config/settings.yaml`) with the connector instead. Nothing else is posted.
+13. Notify: run `python scripts/notify_slack.py`. With `SLACK_BOT_TOKEN` set it posts a thread
+    to #market-brief (channel id in `config/settings.yaml`): the filled `work/slack_<market>.md`
+    as the first message, then the chart images as one reply, then the HTML report file as a
+    reply. Without the token it posts the summary text as ONE message through the incoming
+    webhook in `SLACK_WEBHOOK_URL`. If it exits with code 2 (neither configured) and a Slack
+    connector is available in this session, post the same text as one message to #market-brief
+    with the connector instead. Nothing else is posted.
 
 14. Connection map (monthly): if `python scripts/graph.py status` reports `refresh_due: true`
     (no refresh attempt yet this month), delete `work/graph.jsonl`, run the graph-builder subagent

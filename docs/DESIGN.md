@@ -93,14 +93,34 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 | Verdict | Live results after 4-6 weeks (several hundred scored ranges). Weekly review (`review.py`) proposes parameter changes; a human applies them. |
 
 ## 8. Output
-- `reports/<market>/YYYY-MM-DD.md`: yesterday (market and each stock, calls scored), today
-  (table: ticker, T+1 and T+5 ranges, direction, confidence), tomorrow/week (events and risks),
-  charts, data quality.
-- **One chart per company** (PNG): last 60 days of price, yesterday's range vs the actual price,
-  today's T+1/T+5 range as a cone with direction and confidence.
-- One **overview grid** image per market.
-- **Slack:** one message per market per day: headline, calls table, yesterday's hit/miss,
-  link to the report. Nothing else is posted.
+Processing data and presentation are separate. Processing data is what the next run reads:
+append-only JSONL under `data/`, the context pack and the summaries; presentation never writes
+to it. Presentation is for a novice reader: clean, single-purpose, not verbose. `view_data.py`
+reads the stored data once into a "view" that both the HTML and the chart images use, so they
+always show the same numbers.
+- `reports/<market>/YYYY-MM-DD.md`: the agent-editable source (`report.py` skeleton, agents fill
+  the `AGENT` markers): yesterday (market and each stock, calls scored), top 3, today (table:
+  ticker, T+1 and T+5 ranges, direction, confidence), tomorrow/week (events and risks), sector
+  notes with bull and bear, track record tables, data quality.
+- `reports/<market>/YYYY-MM-DD.html` (`html_report.py`, after the judge passes the md): one
+  self-contained file (inline CSS/JS, data embedded as JSON, light and dark, phone-friendly).
+  A short summary (market mood in plain words, top 3, number of calls, data-quality warnings and
+  a "How to read this" glossary collapsed); one filter row (all companies, a sector, or one
+  company by search/select); then per company: price range and time period ("by Fri 9 Oct"),
+  "80% chance between X and Y" and the 50% band, the call or "no call", its track record ("not
+  enough history yet" below 10 checked cases) and the reasons (cited evidence and recent news
+  as headline links, upcoming earnings/ex-dividend/market events, the sector's bull and bear
+  points). Late ranges are labelled "late, not a forecast" and never phrased as a chance.
+  Charts, each single-purpose and drawn as inline SVG: a price-and-fan chart per company (one
+  % scale shared by every company), a range-per-company chart, a sector-move bar chart and a
+  promised-vs-actual track-record chart once something was scored. `index.html` lists all days.
+- **Chart images** (`charts.py`, PNG): `ranges.png`, `sectors.png` and `track_record.png` (when
+  scored data exists), the same views as the HTML charts, embedded in the md and posted to Slack.
+  The old per-company PNGs and the overview collage are no longer drawn.
+- **Slack:** one thread per market per day: a short summary (mood, top 3, number of calls,
+  yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
+  another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
+  bot token the summary is posted alone through the webhook. Nothing else is posted.
 
 ## 9. Repo changes needed
 - `config/markets.yaml` (exchange, timezone, benchmark, regime index, holidays) and per-market
