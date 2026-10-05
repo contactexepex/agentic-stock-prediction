@@ -55,8 +55,10 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
 2. **Cloud environment** (claude.ai/code → environment settings):
    - Network access: **Custom**, tick "Also include default list of common package managers", and allow:
      `query1.finance.yahoo.com`, `query2.finance.yahoo.com`, `fc.yahoo.com`, `guce.yahoo.com`,
+     `finance.yahoo.com`, `consent.yahoo.com` (yfinance's cookie fallback when `fc.yahoo.com` fails),
      `news.google.com`, `www.sec.gov`, `data.sec.gov`, `feeds.bbci.co.uk`,
-     `economictimes.indiatimes.com`, `www.moneycontrol.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
+     `economictimes.indiatimes.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
+     (Moneycontrol and CNBC come in through Google News queries, so their own domains are not needed.)
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
    - Setup script: `bash setup.sh`
 3. **Routines** (claude.ai/code/routines → New routine), one per market, both on this repo and environment:
@@ -69,6 +71,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    then `python backtest.py --market india` and `--market us` (writes `reports/<market>/backtest-*.md`),
    commit, push. Then click **Run now** on each routine and read the transcript (a green
    status only means the session ran, not that the task succeeded).
+5. **After adding a symbol** to a market config, backfill it once the same way (bars already
+   stored are skipped, so only the new symbol's history is added). Pending one-off backfill:
+   the India sector indices `NIFTYBANK`, `NIFTYIT` and `NIFTYPHARMA` (added 2026-10-05; the
+   daily 1-month window gives them only ~18 bars, so their 20-day return is empty):
+   `cd scripts && python collect_prices.py --market india --period 2y`, then commit and push `data/`.
 
 ## Local development
 ```

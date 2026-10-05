@@ -34,6 +34,12 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
             SELECT symbol, {case_name} AS name, {case_role} AS role, price, prev_close,
                    round(change_pct * 100, 2) AS change_pct, ts
             FROM quotes_latest WHERE day = current_date ORDER BY role, symbol""", []),
+        ("Sector ETFs and indices (latest bar; returns in %)", f"""
+            SELECT ticker, {case_name.replace('symbol', 'ticker')} AS name, date, round(close, 2) AS close,
+                   round(ret_1d * 100, 2) AS d1, round(ret_5d * 100, 2) AS d5, round(ret_20d * 100, 2) AS d20
+            FROM returns WHERE list_contains(?, ticker)
+            QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY date DESC) = 1
+            ORDER BY ticker""", [[k for k, v in cfg["symbols"].items() if v.get("role") == "sector_etf"] or [""]]),
         ("Indicators (latest snapshot; returns and vol in %)", f"""
             SELECT ticker, {sector} AS sector, quality, round(close, 2) AS close,
                    round(ret_1d * 100, 2) AS d1, round(ret_5d * 100, 2) AS d5, round(ret_20d * 100, 2) AS d20,

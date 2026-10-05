@@ -16,11 +16,13 @@ and list each FAIL with its reason in the report's `data_quality` section and th
    `pip install -q -r requirements.txt`.
 
 2. Holiday check: `python scripts/market_status.py`. If `trading_day` is false, post one line
-   to Slack #market-brief ("<market name>: market closed today, next session <session_date>")
-   and stop. If `late_run` is true (the run started after the close of `session_date`, at
-   `session_close_utc`), carry on, but tell the forecaster it is a late run: it abstains on
-   every ticker with reason "late run". `ranges.py` then skips ranges whose target session has
-   closed and ignores cues quoted after it. Say so in the report's `data_quality` section.
+   to Slack #market-brief with
+   `python scripts/notify_slack.py --text "<market name>: market closed today, next session <session_date>"`
+   (exit code 2 = no webhook: use the Slack connector as in step 13) and stop. If `late_run` is
+   true (the run started after the close of `session_date`, at `session_close_utc`), carry on,
+   but tell the forecaster it is a late run: it abstains on every ticker with reason "late run".
+   `ranges.py` then skips ranges whose target session has closed and ignores cues quoted after
+   it. Say so in the report's `data_quality` section.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py` and `collect_filings.py` (all in `scripts/`), and for India also
@@ -63,7 +65,11 @@ and list each FAIL with its reason in the report's `data_quality` section and th
     `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
     `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
     `templates/report.md`, then delete the markers. Never change a number, table or chart
-    link written by the script.
+    link written by the script, and keep the `<!-- report-data: ... -->` line. If report.py
+    prints `"report_kept": true` (today's report was already filled by an earlier run from the
+    same data), keep that report and fill only the Slack draft. If it prints a `warning` with
+    `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative
+    only where it still holds.
 
 12. Save (only after the judge passed the report, or its failures are listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
