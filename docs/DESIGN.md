@@ -122,7 +122,7 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,
    group companies, suppliers, customers, competitors) refreshed monthly. Used for
    second-order news, smart-money signals and range-widening risk flags.
-   - **India (built; waiting for network access):** `collect_relations_india.py` reads NSE's
+   - **India (built; live since 2026-10-05):** `collect_relations_india.py` reads NSE's
      public JSON (SEBI PIT disclosures, bulk/block deals with snapshot and archive-CSV fallbacks,
      shareholding master and pledge data) into `data/india/insiders|deals|holdings/`. Needs
      `www.nseindia.com` and `nsearchives.nseindia.com` allowed in the cloud environment.
@@ -130,6 +130,15 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
      volume, promoter pledge +1 pp q/q, new or invoked pledges, insider sales >= INR 10 cr);
      the range widening from these flags is in `config/ranges.yaml` and off until the weekly
      review shows flagged tickers miss more often.
+   - **India primary sources (built 2026-10-05):** `collect_nse_india.py` stores NSE
+     announcements (scored by the news-analyst as primary sources), Integrated Filing results
+     (quarter, half year, nine months, year; standalone and consolidated; Ind AS, banking and
+     life-insurance taxonomies), FII/DII provisional flows and delivery % into
+     `data/india/announcements|financials|flows|delivery/`; `nse_context.py` adds them to the
+     context pack. The news-analyst's scores for announcements (news_enriched rows with
+     `nse-ann-` ids) feed its brief and the `announcements_enriched` view, which the context
+     pack's announcement section shows (sentiment, materiality). Delivery % is context only,
+     not yet an indicator column.
    - **Connection map, both markets (built):** edges in `data/<market>/graph/` written monthly by
      the graph-builder agent through `graph.py add` (validated, each citing a source URL;
      each monthly attempt recorded in `graph_runs/` so an empty run is not repeated daily;
@@ -150,6 +159,12 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   and confirm the provisional 2027 FOMC dates (a six-meeting schedule has been proposed).
   exchange_calendars covers XNYS only to one year after the run date (2027-10-05 when checked
   on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
+- Done 2026-10-05: NSE field mappings checked against live responses. PIT moved to the
+  `corporates-pit-gg` filing index plus per-filing XBRL (the old feed dwindled in April 2026;
+  last rows 2 May 2026);
+  the pledge dataset's promoter % is depository-flagged data (`sdd_promoter_pct`), not the
+  shareholding pattern; market-wide historical deals are capped at 70 rows, so the snapshot is
+  used daily and per-ticker backfill on demand. Earlier note, kept for history:
 - On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
   against live responses (NSE changes field names; built from public scrapers, not yet seen live).
 - Section 4 range inputs: **built** (`scripts/range_inputs.py`, switches in `config/ranges.yaml`):

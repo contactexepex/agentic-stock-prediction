@@ -1,0 +1,29 @@
+{
+ "data": [
+  {
+   "attFileSize": "0 Bytes",
+   "audited": "Un-Audited",
+   "broadcast_Date": "24-Jul-2026 16:53:11",
+   "cmName": "SBI Life Insurance Company Limited",
+   "consolidated": "Standalone",
+   "creation_Date": "24-Jul-2026 16:53:12",
+   "diff": "00:00:01",
+   "ixbrl": "https://nsearchives.nseindia.com/corporate/ixbrl/INTEGRATED_FILING_LI_177854_24072026165312_iXBRL_WEB.html",
+   "ixbrlFileSize": "74.78 KB",
+   "pdf_attach": "https://nsearchives.nseindia.com/corporate/null",
+   "qe_Date": "30-JUN-2026",
+   "revised_Date": null,
+   "revision_Remark": null,
+   "seq_Id": "177854",
+   "smName": "SBI Life Insurance Company Limited",
+   "symbol": "SBILIFE",
+   "type": "Integrated Filing- Financials",
+   "type_Sub": "Original",
+   "xbrl": "https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_LI_1700867_24072026045312_WEB.xml",
+   "xbrlFileSize": "104.24 KB"
+  }
+ ],
+ "size": 20,
+ "page": -1,
+ "totalCount": 6
+}

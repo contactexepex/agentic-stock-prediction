@@ -111,10 +111,13 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
                    adv_ratio AS x_20d_vol
             FROM deals_scored WHERE date >= ? AND list_contains(?, ticker)
             ORDER BY date DESC, value DESC NULLS LAST LIMIT 30""", [today - timedelta(days=deal_days), tickers]))),
-        ("Promoter holding and pledge (latest quarter per ticker; change in percentage points)", md_table(con.execute("""
+        ("Promoter holding and pledge (latest quarter per ticker; changes in percentage points). promoter_pct: "
+         "company-filed shareholding pattern; encumbered_*: promoter shares encumbered (depository data); "
+         "depo_pledged_pct: all holders' pledges as % of demat shares", md_table(con.execute("""
             SELECT ticker, period_end, promoter_pct, round(promoter_change_pp, 2) AS promoter_chg,
-                   pledged_pct_of_promoter AS pledged_of_promoter_pct, round(pledge_change_pp, 2) AS pledge_chg,
-                   pledged_pct_of_total AS pledged_of_total_pct, CAST(filed_at AS DATE) AS filed
+                   pledged_pct_of_promoter AS encumbered_of_promoter_pct, round(pledge_change_pp, 2) AS pledge_chg,
+                   pledged_pct_of_total AS encumbered_of_total_pct, depository_pledged_pct AS depo_pledged_pct,
+                   CAST(filed_at AS DATE) AS filed
             FROM pledge_changes WHERE list_contains(?, ticker)
             QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY period_end DESC) = 1
             ORDER BY ticker""", [tickers]))),

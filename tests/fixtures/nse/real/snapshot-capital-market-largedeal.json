@@ -1,0 +1,72 @@
+{
+ "as_on_date": "05-Oct-2026",
+ "BULK_DEALS_DATA": [
+  {
+   "buySell": "BUY",
+   "clientName": "NK SECURITIES RESEARCH PRIVATE LIMITED",
+   "date": "05-Oct-2026",
+   "name": "AceVector Limited",
+   "qty": "3235183",
+   "remarks": "-",
+   "symbol": "ACEVECTOR",
+   "watp": "25.99"
+  },
+  {
+   "buySell": "BUY",
+   "clientName": "GRT STRATEGIC VENTURES LLP",
+   "date": "05-Oct-2026",
+   "name": "AceVector Limited",
+   "qty": "2890953",
+   "remarks": "-",
+   "symbol": "ACEVECTOR",
+   "watp": "25.65"
+  },
+  {
+   "buySell": "BUY",
+   "clientName": "NEGEN CAPITAL SERVICES PRIVATE LIMITED",
+   "date": "05-Oct-2026",
+   "name": "AceVector Limited",
+   "qty": "11856282",
+   "remarks": "-",
+   "symbol": "ACEVECTOR",
+   "watp": "25.12"
+  }
+ ],
+ "BULK_DEALS": "180",
+ "SHORT_DEALS": "115",
+ "BLOCK_DEALS": "6",
+ "SHORT_DEALS_DATA": [
+  {
+   "buySell": null,
+   "clientName": null,
+   "date": "01-Oct-2026",
+   "name": "360 ONE WAM LIMITED",
+   "qty": "55",
+   "remarks": null,
+   "symbol": "360ONE",
+   "watp": null
+  }
+ ],
+ "BLOCK_DEALS_DATA": [
+  {
+   "buySell": "BUY",
+   "clientName": "PABRAI WAGONS ETF",
+   "date": "01-Oct-2026",
+   "name": "Edelweiss Fin Serv Ltd",
+   "qty": "14572000",
+   "remarks": null,
+   "symbol": "EDELWEISS",
+   "watp": "142.73"
+  },
+  {
+   "buySell": "BUY",
+   "clientName": "INRE FUND II",
+   "date": "01-Oct-2026",
+   "name": "Nirlon Ltd.",
+   "qty": "2325000",
+   "remarks": null,
+   "symbol": "NIRLON",
+   "watp": "615"
+  }
+ ]
+}

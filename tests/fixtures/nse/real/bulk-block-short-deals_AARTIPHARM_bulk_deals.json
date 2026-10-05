@@ -1,0 +1,114 @@
+{
+ "data": [
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "JUNOMONETA FINSOL PRIVATE LIMITED",
+   "BD_BUY_SELL": "SELL",
+   "BD_QTY_TRD": 455661,
+   "BD_TP_WATP": 902.03,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "JUNOMONETA FINSOL PRIVATE LIMITED",
+   "BD_BUY_SELL": "BUY",
+   "BD_QTY_TRD": 457940,
+   "BD_TP_WATP": 901.69,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "MICROCURVES TRADING PRIVATE LIMITED",
+   "BD_BUY_SELL": "SELL",
+   "BD_QTY_TRD": 717028,
+   "BD_TP_WATP": 904.35,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "MICROCURVES TRADING PRIVATE LIMITED",
+   "BD_BUY_SELL": "BUY",
+   "BD_QTY_TRD": 717028,
+   "BD_TP_WATP": 903.94,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "NK SECURITIES RESEARCH PRIVATE LIMITED",
+   "BD_BUY_SELL": "BUY",
+   "BD_QTY_TRD": 640416,
+   "BD_TP_WATP": 903.39,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "NK SECURITIES RESEARCH PRIVATE LIMITED",
+   "BD_BUY_SELL": "SELL",
+   "BD_QTY_TRD": 640653,
+   "BD_TP_WATP": 903.73,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "QE SECURITIES LLP",
+   "BD_BUY_SELL": "SELL",
+   "BD_QTY_TRD": 570009,
+   "BD_TP_WATP": 902.18,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "11-AUG-2026",
+   "BD_DT_ORDER": "2026-08-10T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "QE SECURITIES LLP",
+   "BD_BUY_SELL": "BUY",
+   "BD_QTY_TRD": 576747,
+   "BD_TP_WATP": 899.52,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "18-SEP-2026",
+   "BD_DT_ORDER": "2026-09-17T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "JASMINE FAMILY TRUST",
+   "BD_BUY_SELL": "SELL",
+   "BD_QTY_TRD": 627500,
+   "BD_TP_WATP": 820.02,
+   "BD_REMARKS": "-"
+  },
+  {
+   "BD_DT_DATE": "21-SEP-2026",
+   "BD_DT_ORDER": "2026-09-20T18:30:00.000Z",
+   "BD_SYMBOL": "AARTIPHARM",
+   "BD_SCRIP_NAME": "Aarti Pharmalabs Limited",
+   "BD_CLIENT_NAME": "UNIFI CAPITAL PRIVATE LIMITED",
+   "BD_BUY_SELL": "BUY",
+   "BD_QTY_TRD": 915000,
+   "BD_TP_WATP": 820,
+   "BD_REMARKS": "-"
+  }
+ ]
+}

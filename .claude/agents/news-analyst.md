@@ -21,7 +21,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/c
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v4"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v5"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually
@@ -53,3 +53,10 @@ competitor, board member, promoter) of a watchlist ticker without being tagged w
 such an item as usual; in your brief, list material ones under the linked ticker marked
 "(via <relation>: <entity>)" with the sentiment for that ticker, which can differ from the
 article's own (a competitor's loss may help). Do not add the ticker to the stored news record.
+
+NSE announcements (India): also score today's `data/india/announcements/YYYY/MM/<today>.jsonl`
+(skip ids already in `news_enriched`). They are the companies' own exchange filings (results,
+board outcomes, orders won, penalties, meets), so treat them as primary sources: judge from
+`category` and `subject`, and fetch the linked PDF (`url`) only for a high-materiality item
+whose subject is ambiguous (within the 5-fetch limit). Their ids are `nse-ann-<seq_id>`, the one
+exception to the 16-character rule: copy them exactly into enrichment records and the brief.

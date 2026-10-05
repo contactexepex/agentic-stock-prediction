@@ -105,17 +105,23 @@ WITH adv AS (
 SELECT d.*, round(d.value / 1e7, 2) AS value_crore, round(d.shares / nullif(adv.adv20, 0), 3) AS adv_ratio
 FROM d ASOF LEFT JOIN adv ON d.ticker = adv.ticker AND d.date >= adv.date;
 
--- One row per ticker and quarter: promoter holding and pledge (latest filing per source wins).
+-- One row per ticker and quarter (latest record per source wins). promoter_pct is the
+-- company-filed shareholding pattern (nse_shp); the pledge dataset (nse_pledge) is depository
+-- system-driven data whose own promoter figure is kept apart as sdd_promoter_pct.
 CREATE OR REPLACE VIEW holdings_quarterly AS
 WITH h AS (
     SELECT DISTINCT ON (ticker, period_end, source) * FROM holdings
-    WHERE promoter_pct IS NOT NULL OR pledged_pct_of_promoter IS NOT NULL
-    ORDER BY ticker, period_end, source, filed_at DESC NULLS LAST, first_seen_at DESC
+    WHERE source IN ('nse_shp', 'nse_pledge')
+    ORDER BY ticker, period_end, source, first_seen_at DESC, filed_at DESC NULLS LAST
 )
 SELECT ticker, period_end,
-       coalesce(max(promoter_pct) FILTER (WHERE source = 'nse_shp'), max(promoter_pct)) AS promoter_pct,
-       max(public_pct) AS public_pct, max(pledged_pct_of_promoter) AS pledged_pct_of_promoter,
-       max(pledged_pct_of_total) AS pledged_pct_of_total, max(filed_at) AS filed_at
+       max(promoter_pct) FILTER (WHERE source = 'nse_shp') AS promoter_pct,
+       max(public_pct) FILTER (WHERE source = 'nse_shp') AS public_pct,
+       max(pledged_pct_of_promoter) AS pledged_pct_of_promoter,
+       max(pledged_pct_of_total) AS pledged_pct_of_total, max(sdd_promoter_pct) AS sdd_promoter_pct,
+       max(depository_pledged_pct) AS depository_pledged_pct,
+       -- the shareholding filing date; the pledge dataset re-stamps its date on every daily refresh
+       coalesce(max(filed_at) FILTER (WHERE source = 'nse_shp'), max(filed_at)) AS filed_at
 FROM h GROUP BY ticker, period_end;
 
 CREATE OR REPLACE VIEW pledge_changes AS
@@ -224,3 +230,40 @@ FROM holdings_change GROUP BY ticker, period;
 -- Weekly reviews (review.py): latest record per ISO week; a rerun appends a newer record.
 CREATE OR REPLACE VIEW review_latest AS
 SELECT DISTINCT ON (id) * FROM reviews ORDER BY id, computed_at DESC;
+
+-- ---------- India primary sources from NSE (collect_nse_india.py) ----------
+CREATE OR REPLACE VIEW announcements_latest AS
+SELECT DISTINCT ON (id) * FROM announcements ORDER BY id, first_seen_at;
+
+-- Announcements with the news-analyst's latest enrichment (news_enriched rows keyed by the same
+-- nse-ann-<seq_id> id); NULL until the analyst has scored the item.
+CREATE OR REPLACE VIEW announcements_enriched AS
+SELECT a.*, e.sentiment, e.relevance, e.materiality, e.event_type, e.urgency, e.summary AS analyst_summary,
+       e.analyzed_at, e.prompt_version
+FROM announcements_latest a LEFT JOIN enriched_latest e USING (id);
+
+-- Latest filing per ticker, basis and period (a revised filing is a newer row).
+CREATE OR REPLACE VIEW financials_latest AS
+SELECT DISTINCT ON (ticker, basis, period_start, period_end) * FROM financials
+ORDER BY ticker, basis, period_start, period_end, filed_at DESC NULLS LAST, first_seen_at DESC;
+
+-- Quarterly results with the same quarter a year earlier (same basis) for y/y growth.
+CREATE OR REPLACE VIEW financials_quarterly_yoy AS
+SELECT q.*, p.revenue AS revenue_prev_year, p.net_profit AS net_profit_prev_year,
+       q.revenue / nullif(p.revenue, 0) - 1 AS revenue_yoy,
+       q.net_profit / nullif(abs(p.net_profit), 0) - sign(p.net_profit) AS net_profit_yoy
+FROM financials_latest q
+LEFT JOIN financials_latest p ON p.ticker = q.ticker AND p.basis = q.basis AND p.period_type = 'quarterly'
+     AND p.period_end = q.period_end - INTERVAL 1 YEAR
+WHERE q.period_type = 'quarterly';
+
+CREATE OR REPLACE VIEW flows_daily AS
+SELECT DISTINCT ON (date, category) * FROM flows ORDER BY date, category, first_seen_at DESC;
+
+-- Delivery % per ticker and session, with the 20-session average before it.
+CREATE OR REPLACE VIEW delivery_stats AS
+WITH d AS (SELECT DISTINCT ON (date, ticker) * FROM delivery ORDER BY date, ticker, first_seen_at DESC)
+SELECT *, avg(delivery_pct) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING)
+          AS delivery_pct_avg20,
+       count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS n_prior
+FROM d;

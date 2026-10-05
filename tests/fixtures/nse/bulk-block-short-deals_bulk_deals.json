@@ -1,6 +1,0 @@
-{"data": [
-  {"_id": "1", "BD_DT_DATE": "__D1__", "BD_SYMBOL": "HDFCBANK", "BD_SCRIP_NAME": "HDFC Bank Limited", "BD_CLIENT_NAME": "TEST GLOBAL FUND",
-   "BD_BUY_SELL": "BUY", "BD_QTY_TRD": 5000000, "BD_TP_WATP": 1600.5, "BD_REMARKS": "-"},
-  {"_id": "2", "BD_DT_DATE": "__D1__", "BD_SYMBOL": "NOTWATCHED", "BD_CLIENT_NAME": "X", "BD_BUY_SELL": "SELL", "BD_QTY_TRD": 10, "BD_TP_WATP": 5},
-  {"_id": "3", "BD_DT_DATE": "__D20__", "BD_SYMBOL": "HDFCBANK", "BD_CLIENT_NAME": "OLD DEAL LLP", "BD_BUY_SELL": "SELL", "BD_QTY_TRD": 100, "BD_TP_WATP": 1500}
-]}

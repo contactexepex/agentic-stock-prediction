@@ -1,12 +1,47 @@
-Synthetic NSE responses for tests/test_relations.py. They are hand-written, not saved from
-NSE: field names and shapes follow public open-source NSE scrapers (corporates-pit,
-historicalOR/bulk-block-short-deals, snapshot-capital-market-largedeal,
-corporate-share-holdings-master, corporate-pledgedata) and have NOT yet been checked against a
-live NSE response, because NSE was not reachable from the build environment. People, funds and
-numbers are invented test values. __Dn__ is replaced by the test with the date n days ago
-(dd-Mon-YYYY). Replace or extend these with real responses once www.nseindia.com is allowed.
-collect_relations_india.py --replay writes only to an explicit scratch MB_ROOT (one holding a
-.scratch-ok file, with no .git, CLAUDE.md or price files; no write target may resolve outside
-its own data/ or into a repo checkout, be hard-linked, or share an inode with a file in the
-code checkout's data/). These checks guard against accidental writes into a real data/ tree;
-they are not a security boundary against someone deliberately constructing a scratch root.
+NSE replay fixtures for tests/test_relations.py and tests/test_nse_india.py.
+
+real/  Trimmed REAL responses, fetched live on 2026-10-05 (about 16:00-16:30 UTC) through the
+       collectors' own session (scripts/nse.py). Only rows were dropped; every kept row and
+       field is as NSE served it (JSON re-serialised with indentation; CSVs keep their original
+       lines; XBRL files are whole and unmodified). Replay with --today 2026-10-05.
+       File (replay name)                              Source URL (www.nseindia.com/api/... unless noted)
+       corporates-pit-gg.json                          corporates-pit-gg?index=equities&from_date=28-09-2026&to_date=05-10-2026 (3 of 220 rows)
+       IT_180_WebXMLFile_20260928_153455146.xml        nsearchives.nseindia.com/corporate/xbrl/IT_180_WebXMLFile_20260928_153455146.xml
+       snapshot-capital-market-largedeal.json          snapshot-capital-market-largedeal (rows: 3 of 180 bulk, 2 of 6 block,
+                                                       1 of 115 short; the count fields are left as served)
+       bulk.csv, block.csv                             nsearchives.nseindia.com/content/equities/bulk.csv (3 of 180 rows),
+                                                       .../block.csv (whole file: "NO RECORDS")
+       bulk-block-short-deals_AARTIPHARM_bulk_deals.json  historicalOR/bulk-block-short-deals?optionType=bulk_deals&symbol=AARTIPHARM
+                                                       &from=01-07-2026&to=05-10-2026 (whole response)
+       corporate-share-holdings-master_<SYM>.json      corporate-share-holdings-master?index=equities&symbol=<SYM>
+                                                       (RELIANCE, HDFCBANK, INFY; latest 4 of 20-22 quarters)
+       corporate-pledgedata_<SYM>.json                 corporate-pledgedata?index=equities&symbol=<SYM>
+                                                       (RELIANCE, HDFCBANK, INFY, SUNPHARMA; whole responses)
+       corporate-announcements.json                    corporate-announcements?index=equities&from_date=03-10-2026&to_date=05-10-2026
+                                                       (the 7 watchlist rows + 3 others of 656)
+       integrated-filing-results_<SYM>.json            integrated-filing-results?index=equities&symbol=<SYM>&type=Integrated Filing- Financials
+                                                       (INFY 3, HDFCBANK 1, SBILIFE 1 of 12/12/6 rows: those whose XBRL is kept)
+       INTEGRATED_FILING_*.xml                         nsearchives.nseindia.com/corporate/xbrl/<same name> (Ind AS, banking, life insurance)
+       fiidiiTradeReact.json                           fiidiiTradeReact (whole response)
+       sec_bhavdata_full_<DDMMYYYY>.csv                nsearchives.nseindia.com/products/content/sec_bhavdata_full_<DDMMYYYY>.csv
+                                                       (29-09, 01-10 and 02-10-2026: header + the 20 watchlist rows + 2 others;
+                                                       02-10 was a holiday and NSE served the 01-10 file under that name)
+
+synthetic/  Hand-written SYNTHETIC files for cases the real responses on that day cannot show:
+       a director's large market sale and a promoter pledge creation (corporates-pit-gg.json +
+       IT_SYNTH_*.xml, in the PIT V2 XBRL shape), a big HDFCBANK bulk deal and an ICICIBANK block
+       deal (snapshot-capital-market-largedeal.json), and a promoter pledge rising between two
+       quarters (corporate-pledgedata_RELIANCE.json; the live dataset only holds the latest
+       quarter, so a rise needs stored history). corporate-share-holdings-master_RELIANCE.json
+       and _INFY.json are synthetic companions to that pledge file: invented promoter figures
+       (RELIANCE 50.30 -> 50.10, INFY 14.43; the real 30-Jun-2026 values are 50.48 and 13.82)
+       with filing dates relative to the test run (__D5__), so the shareholding rows pair with the
+       synthetic pledge quarters and stay inside the risk-flag window (pledge_filed_days) whatever
+       day the tests run; the real responses carry fixed 2026 filing dates. People, funds and
+       numbers are invented. __Dn__ is replaced by the tests with the date n days ago (dd-Mon-YYYY).
+
+Replay (--replay DIR) writes only to an explicit scratch MB_ROOT (one holding a .scratch-ok file,
+with no .git, CLAUDE.md or price files; no write target may resolve outside its own data/ or into
+a repo checkout, be hard-linked, or share an inode with a file in the code checkout's data/).
+These checks guard against accidental writes into a real data/ tree; they are not a security
+boundary against someone deliberately constructing a scratch root.

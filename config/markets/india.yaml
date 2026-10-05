@@ -105,16 +105,23 @@ filings: none             # SEC filings only exist for US companies
 # return on the cue's previous session return over the last year of stored bars.
 index_cue: {symbol: SPX, beta: fit}
 
-# Relationships (DESIGN.md phase 5), collected by scripts/collect_relations_india.py from NSE's
-# public JSON endpoints (browser-like headers plus a cookie from the home page). The cloud
-# environment must allow www.nseindia.com and nsearchives.nseindia.com. NSE symbol = the Yahoo
-# symbol without ".NS" unless a ticker sets `nse:`.
+# NSE data (session code in scripts/nse.py): relationships from collect_relations_india.py
+# (DESIGN.md phase 5) and primary sources from collect_nse_india.py. NSE's public JSON needs
+# browser-like headers plus a cookie from the home page. The cloud environment must allow
+# www.nseindia.com and nsearchives.nseindia.com. NSE symbol = the Yahoo symbol without ".NS"
+# unless a ticker sets `nse:`.
 relations:
   source: nse
   base: https://www.nseindia.com
   archives: https://nsearchives.nseindia.com
-  insider_lookback_days: 14   # SEBI PIT disclosures by broadcast date
-  deal_lookback_days: 5       # bulk and block deals
+  pause_seconds: 0.7          # between NSE requests (one session per collector run)
+  insider_lookback_days: 14   # SEBI PIT filings by broadcast date
+  deal_lookback_days: 5       # bulk and block deals kept from the snapshot / backfill
+  symbol_calls_per_run: 10    # per-ticker polls (shareholding, pledges, results) per kind per run;
+                              # only tickers missing the latest quarter are polled (--full: all)
+  financial_filings_per_ticker: 4   # newest unseen results filings parsed per ticker (--full: all)
+  announcement_lookback_days: 2
+  delivery_lookback_days: 5   # sessions of security-wise bhavcopy to catch up
   flags:                      # risk flags in the context pack (scripts/relations.py)
     window_days: 5            # deals and insider trades this recent are flagged
     big_deal_crore: 250       # bulk/block deal value at or above this (1 crore = INR 1e7) ...

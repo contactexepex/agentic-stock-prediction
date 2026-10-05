@@ -53,7 +53,10 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    `collect_news.py`, `collect_filings.py` and `collect_options.py` (all in `scripts/`;
    options are US only, India skips), and for India also
    `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
-   pledges from NSE). Keep each JSON summary.
+   pledges from NSE) and then `collect_nse_india.py` (announcements, quarterly results, FII/DII
+   flows, delivery %), one after the other, never in parallel (NSE throttles each session).
+   Keep each JSON summary; list its `warnings` (an endpoint that returned nothing at all) in
+   the report's `data_quality` section.
    A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
    entry names a domain the environment's network settings must allow).
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`
@@ -71,7 +74,11 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
 
 6. Context: `python scripts/context.py > work/context.md`.
 
-7. News: run the news-analyst subagent on today's `data/<market>/news/` file. Keep its brief.
+7. News: run the news-analyst subagent on today's `data/<market>/news/` file and, for India,
+   also today's `data/india/announcements/YYYY/MM/<today>.jsonl` (NSE exchange filings; ids
+   `nse-ann-<seq_id>`, the one exception to the 16-character news id). Keep its brief. Give the
+   judge both input files: `work/enriched.jsonl` should hold one record per new news id plus
+   one per new `nse-ann-` id, and nothing else.
 
 8. Debate: run bull-researcher and bear-researcher in parallel, passing each the market and
    the news brief.

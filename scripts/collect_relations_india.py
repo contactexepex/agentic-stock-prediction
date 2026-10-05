@@ -1,208 +1,116 @@
 #!/usr/bin/env python3
-"""Collect India relationship data for watchlist tickers from NSE's public JSON endpoints:
-  insiders  SEBI PIT insider/promoter trading disclosures   -> data/india/insiders/
-  deals     bulk and block deals                             -> data/india/deals/
-  holdings  quarterly shareholding (promoter %) and promoter pledges -> data/india/holdings/
+"""Collect India relationship data for watchlist tickers from NSE (session code in nse.py):
+  insiders  SEBI PIT disclosures: the filing index `corporates-pit-gg` (the older `corporates-pit`
+            feed dwindled in April 2026; its last rows are dated 2 May 2026) plus each new watchlist filing's
+            XBRL with one record per disclosed trade              -> data/india/insiders/
+  deals     bulk and block deals from the large-deal snapshot (complete for the latest session),
+            falling back to the archive CSVs; `--deals-backfill N` also asks the historical API
+            per ticker for the last N days (market-wide calls are capped at 70 rows)
+                                                                  -> data/india/deals/
+  holdings  quarterly shareholding pattern (company-filed promoter %) and the depository
+            pledge/encumbrance dataset, per ticker, polled only while the latest quarter is
+            missing (at most `symbol_calls_per_run` tickers per run unless --full)
+                                                                  -> data/india/holdings/
 Append-only, de-duplicated by id; files are dated by the UTC collection day. Prints a JSON
-summary; a source that fails gets a "failed" entry naming the host to allowlist. Exit code 1
-only if every source failed. Needs `relations.source: nse` in the market config.
+summary; a source that fails gets a "failed" entry naming the host to allowlist, and an
+endpoint that answers with no rows at all for the whole market gets a "warnings" entry (so a
+retired or blocked endpoint is not mistaken for a quiet day); "notes" give market-wide versus
+watchlist row counts. Exit code 1 only if every kind failed. Needs `relations.source: nse` in the market config.
 
-NSE serves these only to browser-like clients: the session first loads the home page for its
-cookies, then calls /api/... with a Referer. Field names follow public open-source NSE scrapers
-and are not yet checked against a live NSE response (NSE was not reachable when this was built).
-`--replay DIR` reads responses from local files instead of the network, named
-<endpoint>[_<symbol or optionType>].json and <name>.csv. The files in tests/fixtures/nse are
-synthetic (hand-written to match those field names), so replay only writes to an explicit
-scratch root: MB_ROOT must contain a `.scratch-ok` file, must not look like a repo checkout or a
-real data store (.git, CLAUDE.md, price files), and every write target must resolve inside
-MB_ROOT's own data/ (no symlinks out), outside any repo checkout, and not be a hard-linked file."""
+Pledge dataset fields (NSE "Pledged data", SEBI system-driven disclosures of encumbrance): its
+promoter holding counts only demat accounts flagged as promoter in the depositories' records,
+so it differs from the company-filed shareholding pattern and is stored as `sdd_promoter_pct`,
+never as `promoter_pct`. `percPromoterShares` = promoter shares encumbered as % of that promoter
+holding; `percTotShares` = the same as % of all shares; `percSharesPledged` = every pledge in
+the depository system (any holder, e.g. margin pledges) as % of demat shares."""
 from __future__ import annotations
 
 import csv
-import hashlib
-import http.cookiejar
 import io
-import json
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
-from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
-from zoneinfo import ZoneInfo
+from datetime import date, timedelta
 
-from common import (CODE, ROOT, SCHEMAS, append_jsonl, data_dir, day_file, market_arg, recent_ids,
-                    require_market, utc_now, utc_today)
+from nse import (FetchError, Nse, collector_main, coverage, iso, nse_symbols, num, parse_day, parse_ts, pick,  # noqa: F401
+                 recent_ids, replay_problem, rows_of, short_hash, store, summary_of, write_target, xbrl)
 
-IST = ZoneInfo("Asia/Kolkata")
-UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-      "Chrome/126.0 Safari/537.36")
-PAGES = {  # Referer per API: NSE checks that the call comes from its own page
-    "corporates-pit": "/companies-listing/corporate-filings-insider-trading",
-    "bulk-block-short-deals": "/report-detail/display-bulk-and-block-deals",
-    "snapshot-capital-market-largedeal": "/market-data/large-deals",
-    "corporate-share-holdings-master": "/companies-listing/corporate-filings-shareholding-pattern",
-    "corporate-pledgedata": "/companies-listing/corporate-filings-pledged-data",
-}
-KEEP_QUARTERS = 4   # shareholding periods kept per ticker (enough for a q/q pledge change)
+KEEP_QUARTERS = 4   # shareholding periods kept per ticker on a first fetch (enough for q/q changes)
+KINDS = ["insiders", "deals", "holdings"]
 
 
-class FetchError(Exception):
-    def __init__(self, url: str, error: str, host: str | None = None):
-        super().__init__(error)
-        self.url, self.error, self.host = url, error, host
-
-    def entry(self, source: str) -> dict:
-        e = {"source": source, "url": self.url, "error": self.error[:200]}
-        if self.host:
-            e["allowlist"] = self.host
-        return e
+def latest_quarter_end(today: date) -> date:
+    """The most recent calendar quarter end strictly before today."""
+    q = date(today.year, ((today.month - 1) // 3) * 3 + 1, 1) - timedelta(days=1)
+    return q
 
 
-class Nse:
-    """Minimal NSE client: cookie warm-up, browser headers, polite pacing."""
-
-    def __init__(self, base: str, archives: str, replay: Path | None = None, pause: float = 0.7):
-        self.base, self.archives, self.replay, self.pause = base.rstrip("/"), archives.rstrip("/"), replay, pause
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-        self.warm_error: FetchError | None = None
-        self.warmed = False
-
-    def _open(self, url: str, accept: str, referer: str | None = None) -> bytes:
-        headers = {"User-Agent": UA, "Accept": accept, "Accept-Language": "en-US,en;q=0.9,en-IN;q=0.8"}
-        if referer:
-            headers["Referer"] = referer
-        host = urllib.parse.urlsplit(url).hostname
-        try:
-            with self.opener.open(urllib.request.Request(url, headers=headers), timeout=30) as resp:
-                return resp.read()
-        except urllib.error.HTTPError as exc:
-            raise FetchError(url, f"HTTP {exc.code} from {host} (NSE refused: cookie/headers or rate limit)") from exc
-        except (urllib.error.URLError, OSError) as exc:
-            reason = str(getattr(exc, "reason", exc))
-            if "Tunnel connection failed" in reason or "403" in reason:
-                raise FetchError(url, f"egress proxy denied {host}: {reason}", host) from exc
-            raise FetchError(url, f"{host} unreachable: {reason}", host) from exc
-        finally:
-            time.sleep(self.pause)
-
-    def _warm(self) -> None:
-        if not self.warmed:
-            self.warmed = True
-            try:
-                self._open(self.base + "/", "text/html,application/xhtml+xml")
-            except FetchError as exc:
-                self.warm_error = exc
-        if self.warm_error and self.warm_error.host:   # host not reachable at all: fail fast
-            raise self.warm_error
-
-    def json(self, endpoint: str, params: dict | None = None):
-        params = params or {}
-        if self.replay:
-            key = params.get("symbol") or params.get("optionType")
-            name = endpoint.rsplit("/", 1)[-1] + (f"_{key}" if key else "")
-            return self._replay(name + ".json", json.loads)
-        url = f"{self.base}/api/{endpoint}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
-        self._warm()
-        referer = self.base + PAGES.get(endpoint.rsplit("/", 1)[-1], "/")
-        try:
-            return json.loads(self._open(url, "application/json, text/plain, */*", referer))
-        except json.JSONDecodeError as exc:
-            raise FetchError(url, f"not JSON (likely an NSE block page): {exc}") from exc
-
-    def text(self, path: str) -> str:
-        if self.replay:
-            return self._replay(path.rsplit("/", 1)[-1], lambda s: s)
-        return self._open(self.archives + path, "text/csv,*/*", self.base + "/").decode("utf-8", "replace")
-
-    def _replay(self, name: str, parse):
-        f = self.replay / name
-        if not f.exists():
-            raise FetchError(f"replay:{name}", "no replay file")
-        return parse(f.read_text(encoding="utf-8"))
+def due_tickers(stored: dict[str, str], tickers: list[str], today: date, limit: int | None) -> list[str]:
+    """Tickers whose latest stored period is before the latest quarter end, capped per run so a
+    filing season spreads its calls over several runs: tickers with nothing stored come first
+    (oldest stored period first), ties rotated by a daily hash."""
+    q = str(latest_quarter_end(today))
+    due = [t for t in tickers if stored.get(t, "") < q]
+    due.sort(key=lambda t: (stored.get(t, ""), short_hash(t, today)))
+    return due if limit is None else due[:limit]
 
 
-# ---------- parsing helpers (NSE fields are strings; "-", "" and "Nil" mean missing) ----------
+# ---------- insiders: SEBI PIT ----------
 
-def num(x) -> float | None:
-    if x is None or isinstance(x, bool):
-        return None
-    if isinstance(x, (int, float)):
-        return float(x)
-    s = str(x).replace(",", "").replace("%", "").strip()
-    try:
-        return float(s)
-    except ValueError:
-        return None
-
-
-def pick(row: dict, *keys):
-    for k in keys:
-        v = row.get(k)
-        if v not in (None, "", "-", "Nil", "NA"):
-            return v.strip() if isinstance(v, str) else v
-    return None
-
-
-def parse_ts(s) -> datetime | None:
-    """NSE dates/times (IST) -> aware UTC datetime."""
-    if not s:
-        return None
-    s = str(s).strip()
-    for fmt in ("%d-%b-%Y %H:%M:%S", "%d-%b-%Y %H:%M", "%d-%b-%Y", "%d-%m-%Y", "%Y-%m-%d",
-                "%d %b %Y", "%d-%B-%Y", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            return datetime.strptime(s, fmt).replace(tzinfo=IST).astimezone(timezone.utc)
-        except ValueError:
-            continue
-    return None
-
-
-def parse_day(s) -> date | None:
-    ts = parse_ts(s)
-    return ts.astimezone(IST).date() if ts else None
-
-
-def rows_of(payload, key: str | None = None) -> list[dict]:
-    if isinstance(payload, dict):
-        payload = payload.get(key) if key else payload.get("data", [])
-    return [r for r in payload or [] if isinstance(r, dict)]
-
-
-def short_hash(*parts) -> str:
-    return hashlib.sha256("|".join("" if p is None else str(p) for p in parts).encode()).hexdigest()[:12]
-
-
-def iso(x) -> str | None:
-    return x.isoformat() if x else None
-
-
-# ---------- sources ----------
-
-def insiders(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now: str) -> list[dict]:
-    payload = nse.json("corporates-pit", {"index": "equities", "from_date": f"{today - timedelta(days=lookback):%d-%m-%Y}",
-                                          "to_date": f"{today:%d-%m-%Y}"})
+def pit_rows(xml: str, ticker: str, app: str, disclosed, url: str, now: str) -> list[dict]:
+    """One record per disclosure context in a PIT V2 XBRL instance."""
+    _, facts = xbrl(xml)
     out = []
-    for r in rows_of(payload):
-        ticker = symbols.get((r.get("symbol") or "").strip().upper())
-        if not ticker:
+    for ctx, f in sorted(facts.items()):
+        if "NameOfThePerson" not in f:
             continue
-        person, txn = pick(r, "acqName"), pick(r, "tdpTransactionType")
-        t_from, t_to = parse_day(pick(r, "acqfromDt")), parse_day(pick(r, "acqtoDt"))
-        shares, disclosed = num(pick(r, "secAcq")), parse_ts(pick(r, "date", "intimDt"))
+        pct = lambda k: round(v * 100, 4) if (v := num(f.get(k))) is not None else None  # noqa: E731
         out.append({
-            "id": "nse-pit-" + short_hash(ticker, person, txn, pick(r, "secType"), t_from, t_to, shares, disclosed),
-            "ticker": ticker, "source": "nse_pit", "person": person,
-            "person_category": pick(r, "personCategory"), "security_type": pick(r, "secType"),
-            "transaction": txn, "mode": pick(r, "acqMode"), "shares": shares,
-            "value": num(pick(r, "secVal")) or num(pick(r, "buyValue")) or num(pick(r, "sellValue")),
-            "holding_before_pct": num(pick(r, "befAcqSharesPer")), "holding_after_pct": num(pick(r, "afterAcqSharesPer")),
-            "trade_from": iso(t_from), "trade_to": iso(t_to), "disclosed_at": iso(disclosed),
-            "url": pick(r, "xbrl"), "first_seen_at": now,
+            "id": f"nse-pit-{ticker}-{app}-{ctx}", "ticker": ticker, "source": "nse_pit",
+            "person": f.get("NameOfThePerson"), "person_category": f.get("CategoryOfPerson"),
+            "security_type": f.get("TypeOfInstrument"),
+            "transaction": f.get("SecuritiesAcquiredOrDisposedTransactionType"),
+            "mode": f.get("ModeOfAcquisitionOrDisposal"),
+            "shares": num(f.get("SecuritiesAcquiredOrDisposedNumberOfSecurity")),
+            "value": num(f.get("SecuritiesAcquiredOrDisposedValueOfSecurity")),
+            # XBRL "pure" values are fractions (0.0019 = 0.19%); stored as percent
+            "holding_before_pct": pct("SecuritiesHeldPriorToAcquisitionOrDisposalPercentageOfShareholding"),
+            "holding_after_pct": pct("SecuritiesHeldPostAcquistionOrDisposalPercentageOfShareholding"),
+            "trade_from": f.get("DateOfAllotmentAdviceOrAcquisitionOfSharesOrSaleOfSharesSpecifyFromDate") or None,
+            "trade_to": f.get("DateOfAllotmentAdviceOrAcquisitionOfSharesOrSaleOfSharesSpecifyToDate") or None,
+            "disclosed_at": iso(disclosed), "url": url, "first_seen_at": now,
         })
     return out
 
+
+def insiders(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now: str, market: str,
+             failed: list, notes: list, warnings: list) -> list[dict]:
+    idx = rows_of(nse.json("corporates-pit-gg", {"index": "equities",
+                                                 "from_date": f"{today - timedelta(days=lookback):%d-%m-%Y}",
+                                                 "to_date": f"{today:%d-%m-%Y}"}))
+    coverage(f"insiders: PIT filings index ({lookback} days)", len(idx),
+             sum((r.get("symbol") or "").strip().upper() in symbols for r in idx), notes, warnings)
+    done = {i.rsplit("-", 1)[0] for i in recent_ids(market, "insiders", days=400) if i.startswith("nse-pit-")}
+    out = []
+    for r in idx:
+        ticker = symbols.get((r.get("symbol") or "").strip().upper())
+        app, xml_url = pick(r, "appId"), pick(r, "xmlFileName")
+        if not ticker or not app or f"nse-pit-{ticker}-{app}" in done:
+            continue
+        if not xml_url:
+            failed.append({"source": f"insiders:{ticker}:{app}", "url": None, "error": "filing has no XBRL file"})
+            continue
+        try:
+            xml = nse.text(xml_url)
+        except FetchError as exc:
+            failed.append(exc.entry(f"insiders:{ticker}:{app}"))
+            if exc.host:
+                break
+            continue
+        out += pit_rows(xml, ticker, app, parse_ts(pick(r, "broadcastDateTime", "exchdisstime")),
+                        pick(r, "ixbrl") or xml_url, now)
+    return out
+
+
+# ---------- deals ----------
 
 def deal_record(r: dict, deal_type: str, source: str, symbols: dict[str, str], now: str) -> dict | None:
     """One bulk/block deal from any NSE shape: historical (BD_*), snapshot (camelCase), archive CSV."""
@@ -214,7 +122,7 @@ def deal_record(r: dict, deal_type: str, source: str, symbols: dict[str, str], n
     client = pick(r, "BD_CLIENT_NAME", "clientName", "Client Name")
     side = (pick(r, "BD_BUY_SELL", "buySell", "Buy/Sell", "Buy / Sell") or "").lower() or None
     shares = num(pick(r, "BD_QTY_TRD", "qty", "Quantity Traded"))
-    price = num(pick(r, "BD_TP_WATP", "watp", "Trade Price / Wght. Avg. Price", "Trade Price / Wght. Avg. Price "))
+    price = num(pick(r, "BD_TP_WATP", "watp", "Trade Price / Wght. Avg. Price"))
     if day is None or shares is None:
         return None
     return {
@@ -225,181 +133,173 @@ def deal_record(r: dict, deal_type: str, source: str, symbols: dict[str, str], n
     }
 
 
-def deals(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now: str,
-          notes: list, failed: list) -> list[dict]:
-    """Per deal type: historical API over the lookback window, else today's snapshot, else the
-    archive CSV. Ids ignore the source, so the same deal from two sources is stored once."""
-    since, out, cache = today - timedelta(days=lookback), [], {}
-
-    def snapshot_payload():   # one snapshot call serves both deal types
-        if "snap" not in cache:
-            cache["snap"] = nse.json("snapshot-capital-market-largedeal")
-        return cache["snap"]
-
-    for deal_type in ("bulk", "block"):
-        attempts = [
-            ("nse_historical", lambda dt=deal_type: rows_of(nse.json(
-                "historicalOR/bulk-block-short-deals",
-                {"optionType": f"{dt}_deals", "from": f"{since:%d-%m-%Y}", "to": f"{today:%d-%m-%Y}"}))),
-            ("nse_snapshot", lambda dt=deal_type: rows_of(snapshot_payload(), f"{dt.upper()}_DEALS_DATA")),
-            ("nse_archive", lambda dt=deal_type: list(csv.DictReader(io.StringIO(
-                nse.text(f"/content/equities/{dt}.csv"))))),
-        ]
-
-        errors = []
-        for source, fetch in attempts:
+def deals(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now: str, notes: list,
+          failed: list, warnings: list, backfill_days: int = 0) -> tuple[list[dict], int]:
+    """Latest session from the snapshot (archive CSV if it fails), plus optional per-ticker
+    backfill. Ids ignore the source, so a deal seen twice is stored once. Returns (rows, sources_ok)."""
+    since, out, ok = today - timedelta(days=lookback), [], 0
+    try:
+        snap = nse.json("snapshot-capital-market-largedeal")
+        total = 0
+        for deal_type in ("bulk", "block"):
+            rows = rows_of(snap, f"{deal_type.upper()}_DEALS_DATA")
+            total += len(rows)
+            out += [d for r in rows if (d := deal_record(r, deal_type, "nse_snapshot", symbols, now))]
+        coverage(f"deals: bulk+block snapshot as on {snap.get('as_on_date')}", total, len(out), notes, warnings)
+        ok += 1
+    except FetchError as exc:
+        failed.append(exc.entry("deals:snapshot"))
+        for deal_type in ("bulk", "block"):
             try:
-                rows = [{k.strip() if isinstance(k, str) else k: v for k, v in r.items()} for r in fetch()]
-            except FetchError as exc:
-                errors.append(exc)
+                rows = list(csv.DictReader(io.StringIO(nse.text(f"/content/equities/{deal_type}.csv"))))
+            except FetchError as exc2:
+                failed.append(exc2.entry(f"deals:{deal_type}:archive"))
                 continue
-            recs = [d for r in rows if (d := deal_record(r, deal_type, source, symbols, now))]
-            out += [d for d in recs if d["date"] >= str(since)]
-            if errors:
-                notes.append(f"{deal_type} deals from {source} after {len(errors)} failed source(s)")
-            break
-        else:
-            failed += [e.entry(f"deals:{deal_type}:{src}") for (src, _), e in zip(attempts, errors)]
-    return out
+            rows = [{(k or "").strip(): v for k, v in r.items()} for r in rows]
+            rows = [r for r in rows if (r.get("Date") or "").strip().upper() != "NO RECORDS"]
+            recs = [d for r in rows if (d := deal_record(r, deal_type, "nse_archive", symbols, now))]
+            notes.append(f"deals: {deal_type}.csv archive has {len(rows)} rows, {len(recs)} for watchlist tickers")
+            out += recs
+            ok += 1
+    if backfill_days:
+        start, calls, found = today - timedelta(days=backfill_days), 0, 0
+        for sym in symbols:
+            for deal_type in ("bulk", "block"):
+                try:
+                    rows = rows_of(nse.json("historicalOR/bulk-block-short-deals", {
+                        "optionType": f"{deal_type}_deals", "symbol": sym,
+                        "from": f"{start:%d-%m-%Y}", "to": f"{today:%d-%m-%Y}"}))
+                except FetchError as exc:
+                    failed.append(exc.entry(f"deals:{deal_type}:backfill:{sym}"))
+                    if exc.host:
+                        return out, ok
+                    continue
+                ok += 1
+                calls, found = calls + 1, found + len(rows)
+                if len(rows) >= 70:
+                    notes.append(f"{deal_type} backfill for {sym} hit NSE's 70-row cap; older deals may be missing")
+                out += [d for r in rows if (d := deal_record(r, deal_type, "nse_historical", symbols, now))]
+        notes.append(f"deals backfill: {calls} per-ticker calls since {start}, {found} rows returned")
+        since = start
+    return [d for d in out if d["date"] >= str(since)], ok
 
 
-def holdings(nse: Nse, symbols: dict[str, str], now: str, failed: list) -> list[dict]:
-    out = []
-    for sym, ticker in symbols.items():
-        for source, endpoint in (("nse_shp", "corporate-share-holdings-master"), ("nse_pledge", "corporate-pledgedata")):
+# ---------- holdings ----------
+
+def stored_periods(market: str, prefix: str) -> dict[str, str]:
+    """Latest stored period per ticker from ids like <prefix>-<TICKER>-<YYYY-MM-DD>-<hash>."""
+    latest: dict[str, str] = {}
+    for i in recent_ids(market, "holdings", days=400):
+        if i.startswith(prefix + "-"):
+            body = i[len(prefix) + 1:].rsplit("-", 1)[0]
+            t, p = body[:-11], body[-10:]
+            latest[t] = max(latest.get(t, ""), p)
+    return latest
+
+
+def shp_record(r: dict, ticker: str, now: str) -> dict | None:
+    period = parse_day(pick(r, "date"))
+    if period is None:
+        return None
+    vals = {"promoter_pct": num(pick(r, "pr_and_prgrp")),   # "0" is a real 0 (no promoter), not a default
+            "public_pct": num(pick(r, "public_val")), "employee_trust_pct": num(pick(r, "employeeTrusts"))}
+    filed = parse_ts(pick(r, "broadcastDate", "submissionDate"))
+    return {"id": f"nse-shp-{ticker}-{period}-" + short_hash(filed, *vals.values()), "ticker": ticker,
+            "period_end": str(period), "source": "nse_shp", "filed_at": iso(filed), "url": pick(r, "xbrl"),
+            "first_seen_at": now, **vals}
+
+
+def pledge_record(r: dict, ticker: str, now: str) -> dict | None:
+    period = parse_day(pick(r, "shp"))
+    if period is None:
+        return None
+    vals = {
+        "sdd_promoter_pct": num(pick(r, "percPromoterHolding")),          # depository-flagged promoters only
+        "promoter_shares": num(pick(r, "totPromoterHolding")),
+        "total_shares": num(pick(r, "totIssuedShares")),
+        "promoter_encumbered_shares": num(pick(r, "totPromoterShares")),
+        "pledged_pct_of_promoter": num(pick(r, "percPromoterShares")),    # encumbered / promoter holding
+        "pledged_pct_of_total": num(pick(r, "percTotShares")),            # encumbered / all shares
+        "depository_pledged_shares": num(pick(r, "numSharesPledged")),   # all holders' pledges
+        "depository_pledged_pct": num(pick(r, "percSharesPledged")),     # ... as % of demat shares
+    }
+    # NSE re-stamps broadcastDt on every daily refresh, so the id hashes the values only: a new
+    # row is stored only when a number changes.
+    return {"id": f"nse-pledge-{ticker}-{period}-" + short_hash(*vals.values()), "ticker": ticker,
+            "period_end": str(period), "source": "nse_pledge", "promoter_pct": None,
+            "filed_at": iso(parse_ts(pick(r, "broadcastDt"))), "url": None, "first_seen_at": now, **vals}
+
+
+def holdings(nse: Nse, symbols: dict[str, str], today: date, now: str, market: str, failed: list,
+             notes: list, warnings: list, limit: int | None) -> tuple[list[dict], int]:
+    out, ok = [], 0
+    by_ticker = {t: s for s, t in symbols.items()}
+    for source, endpoint, prefix, make in (
+            ("nse_shp", "corporate-share-holdings-master", "nse-shp", shp_record),
+            ("nse_pledge", "corporate-pledgedata", "nse-pledge", pledge_record)):
+        due = due_tickers(stored_periods(market, prefix), list(by_ticker), today, limit)
+        notes.append(f"holdings {source}: {len(due)} ticker(s) polled for quarter {latest_quarter_end(today)}")
+        total = 0
+        for ticker in due:
             try:
-                rows = rows_of(nse.json(endpoint, {"index": "equities", "symbol": sym}))
+                rows = rows_of(nse.json(endpoint, {"index": "equities", "symbol": by_ticker[ticker]}))
             except FetchError as exc:
                 failed.append(exc.entry(f"holdings:{source}:{ticker}"))
                 if exc.host:          # host unreachable: every other symbol fails the same way
-                    return out
+                    return out, ok
                 continue
-            recs = []
-            for r in rows:
-                if source == "nse_shp":
-                    period, filed = parse_day(pick(r, "date")), parse_ts(pick(r, "broadcastDate", "submissionDate"))
-                    vals = {"promoter_pct": num(pick(r, "pr_and_prgrp")), "public_pct": num(pick(r, "public_val")),
-                            "employee_trust_pct": num(pick(r, "employeeTrusts")), "url": pick(r, "xbrl")}
-                else:
-                    period, filed = parse_day(pick(r, "shp")), parse_ts(pick(r, "broadcastDt", "disclosureDate", "date"))
-                    vals = {"promoter_pct": num(pick(r, "percPromoterHolding")),
-                            "pledged_pct_of_promoter": num(pick(r, "percPromoterShares")),
-                            "pledged_pct_of_total": num(pick(r, "percTotShares")), "url": None}
-                if period is None:
-                    continue
-                recs.append({"id": f"{source.replace('_', '-')}-{ticker}-{period}-" + short_hash(filed, *vals.values()),
-                             "ticker": ticker, "period_end": str(period), "source": source,
-                             "filed_at": iso(filed), "first_seen_at": now, **vals})
-            recs.sort(key=lambda x: (x["period_end"], x["filed_at"] or ""), reverse=True)
+            ok += 1
+            total += len(rows)
+            if not rows:
+                notes.append(f"holdings {source}: no rows for {ticker}")
+            recs = [x for r in rows if (x := make(r, ticker, now))]
             periods = sorted({x["period_end"] for x in recs}, reverse=True)[:KEEP_QUARTERS]
             out += [x for x in recs if x["period_end"] in periods]
-    return out
+        if due and total == 0 and not any(f["source"].startswith(f"holdings:{source}") for f in failed):
+            coverage(f"holdings {source}: {len(due)} per-ticker calls", 0, 0, notes, warnings)
+    return out, ok
 
 
-def nse_symbols(cfg: dict) -> dict[str, str]:
-    """NSE symbol -> watchlist ticker."""
-    return {meta.get("nse", meta["yahoo"].removesuffix(".NS")).upper(): t for t, meta in cfg["tickers"].items()}
-
-
-SCRATCH_MARKER = ".scratch-ok"
-REPO_MARKERS = (".git", "CLAUDE.md")
-
-
-def write_target(market: str, kind: str, day: date) -> Path:
-    """The file day_file() would append to, computed without creating any directory."""
-    ext = SCHEMAS[kind][0]
-    return data_dir(market) / kind / f"{day:%Y}" / f"{day:%m}" / f"{day:%Y-%m-%d}.{ext}"
-
-
-def replay_problem(root: Path, targets: list[Path]) -> str | None:
-    """Replayed rows are synthetic, so they may only go to an explicit scratch root. Returns why
-    `root` is refused, or None. Checked before anything (even a directory) is created."""
-    root = Path(root)
-    if not (root / SCRATCH_MARKER).is_file():
-        return f"no {SCRATCH_MARKER} marker file in MB_ROOT ({root}); create it to mark a scratch root"
-    for marker in REPO_MARKERS:
-        if (root / marker).exists():
-            return f"MB_ROOT ({root}) contains {marker}: looks like a repo checkout"
-    if any(p.is_file() for p in (root / "data").glob("*/prices/**/*")):
-        return f"MB_ROOT ({root}) has price files under data/*/prices: looks like a real data store"
-    base = root.resolve() / "data"           # the root's own data/, not where a data/ symlink points
-    real = (CODE / "data").resolve()
-    for t in targets:
-        r = t.resolve()                      # follows any symlinked directory on the way
-        if not r.is_relative_to(base):
-            return f"write target {t} resolves to {r}, outside {base} (symlink?)"
-        if r.is_relative_to(real):
-            return f"write target {t} resolves into this checkout's data/ ({real})"
-        for parent in r.parents:             # never inside any repo checkout's data
-            if any((parent / m).exists() for m in REPO_MARKERS):
-                return f"write target {t} resolves into a repo checkout ({parent})"
-        if r.exists():                       # hard links survive resolve(): check the inode itself
-            st = r.stat()
-            if st.st_nlink > 1:
-                return f"write target {t} is hard-linked ({st.st_nlink} links); replay never appends to it"
-            real_inodes = {(s.st_dev, s.st_ino) for f in real.rglob("*") if f.is_file() for s in [f.stat()]}
-            if (st.st_dev, st.st_ino) in real_inodes:
-                return f"write target {t} is the same file as one in this checkout's data/"
-    return None
-
-
-def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None) -> dict:
+def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, args=None) -> dict:
     """Fetch, de-duplicate and append each kind; return the JSON summary."""
+    from common import utc_now, utc_today
     market, rel = cfg["market"], cfg.get("relations") or {}
     symbols, today, now = nse_symbols(cfg), today or utc_today(), utc_now()
-    new, failed, notes = {}, [], []
+    full = bool(getattr(args, "full", False))
+    limit = None if full else int(rel.get("symbol_calls_per_run", 10))
+    new, failed, notes, warnings = {}, [], [], []
     for kind in kinds:
+        n_failed = len(failed)
         try:
             if kind == "insiders":
-                rows = insiders(nse, symbols, today, int(rel.get("insider_lookback_days", 14)), now)
+                rows = insiders(nse, symbols, today, int(rel.get("insider_lookback_days", 14)), now, market, failed,
+                                notes, warnings)
+                ok = 1
+            elif kind == "deals":
+                rows, ok = deals(nse, symbols, today, int(rel.get("deal_lookback_days", 5)), now, notes, failed,
+                                 warnings, int(getattr(args, "deals_backfill", 0) or 0))
             else:
-                n_failed = len(failed)
-                rows = (deals(nse, symbols, today, int(rel.get("deal_lookback_days", 5)), now, notes, failed)
-                        if kind == "deals" else holdings(nse, symbols, now, failed))
-                if len(failed) > n_failed and not rows:
-                    new[kind] = None
-                    continue
+                rows, ok = holdings(nse, symbols, today, now, market, failed, notes, warnings, limit)
         except FetchError as exc:
             failed.append(exc.entry(kind))
             new[kind] = None
             continue
-        seen = recent_ids(market, kind, days=120)
-        fresh = {r["id"]: r for r in rows if r["id"] not in seen}
-        new[kind] = append_jsonl(day_file(market, kind, today), fresh.values())
+        if not ok and len(failed) > n_failed:
+            new[kind] = None
+            continue
+        new[kind] = store(market, kind, rows, today)
+    return summary_of("relations_india", market, new, failed, notes, nse, warnings)
 
-    hosts = sorted({f["allowlist"] for f in failed if "allowlist" in f})
-    summary = {"collector": "relations_india", "market": market, "new": new, "failed": failed, "notes": notes}
-    if hosts:
-        summary["allowlist_needed"] = hosts
-    return summary
+
+def extra_args(ap) -> None:
+    ap.add_argument("--deals-backfill", type=int, default=0, metavar="DAYS",
+                    help="also query bulk/block deals per ticker for the last DAYS days (2 calls per ticker)")
+    ap.add_argument("--full", action="store_true",
+                    help="poll every ticker that misses the latest quarter (no per-run cap)")
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
-    ap.add_argument("--replay", type=Path,
-                    help="read responses from files in this directory instead of NSE (offline tests and "
-                         "debugging; writes only to a scratch MB_ROOT that holds a .scratch-ok file)")
-    ap.add_argument("--only", choices=["insiders", "deals", "holdings"], action="append",
-                    help="collect only these kinds (repeatable)")
-    args = ap.parse_args()
-    cfg = require_market(args)
-    market, rel = cfg["market"], cfg.get("relations") or {}
-    if rel.get("source") != "nse":
-        print(json.dumps({"collector": "relations_india", "market": market,
-                          "skipped": "no `relations.source: nse` in this market's config"}))
-        return 0
-    kinds, today = args.only or ["insiders", "deals", "holdings"], utc_today()
-    if args.replay:
-        problem = replay_problem(ROOT, [write_target(market, k, today) for k in kinds])
-        if problem:
-            print(json.dumps({"collector": "relations_india", "market": market,
-                              "error": f"--replay writes synthetic rows; refusing: {problem}"}))
-            return 2
-    nse = Nse(rel.get("base", "https://www.nseindia.com"), rel.get("archives", "https://nsearchives.nseindia.com"),
-              args.replay, pause=0 if args.replay else 0.7)
-    summary = collect(cfg, nse, kinds, today)
-    print(json.dumps(summary, indent=2))
-    return 1 if all(v is None for v in summary["new"].values()) else 0
+    return collector_main(__doc__, "relations_india", KINDS, collect, extra_args)
 
 
 if __name__ == "__main__":

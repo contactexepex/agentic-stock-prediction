@@ -1,0 +1,30 @@
+{
+ "comNameList": [
+  "HDFC Bank Limited"
+ ],
+ "data": [
+  {
+   "broadcastDt": "05-Oct-2026 16:30:27",
+   "comName": "HDFC Bank Limited",
+   "compBroadcastDate": null,
+   "disclosureFromDate": null,
+   "disclosureToDate": null,
+   "nbfcNonPromoShare": "0",
+   "nbfcPromoShare": "0",
+   "noOfPledgeShare": "0",
+   "noOfSecPledgeShare": "25671.071",
+   "numSharesPledged": "362227619",
+   "percPromoterHolding": "    13.32",
+   "percPromoterShares": "     0.00",
+   "percSharesPledged": "2.35",
+   "percTotShares": "     0.00",
+   "sharesCollateral": "0",
+   "shp": "30-Jun-2026",
+   "totDematShares": "15413831743",
+   "totIssuedShares": "15401327492",
+   "totPromoterHolding": "2051394390",
+   "totPromoterShares": "0",
+   "totPublicHolding": "13349933102"
+  }
+ ]
+}
