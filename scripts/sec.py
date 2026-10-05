@@ -1,8 +1,16 @@
-"""SEC EDGAR helpers for the relationship collectors (collect_insiders, collect_stakes,
-collect_holdings). Free endpoints only. SEC requires a descriptive User-Agent with contact
+"""SEC EDGAR helpers for the SEC collectors (collect_filings, collect_events, collect_insiders,
+collect_stakes, collect_holdings, collect_fundamentals). Free endpoints only. SEC requires a descriptive User-Agent with contact
 info (SEC_USER_AGENT="your-name your@email.com") and at most 10 requests/second; every request
 here goes through one throttle (MIN_INTERVAL) and backs off on 429/503. The throttle is per
 process, so the SEC collectors must run one after another, never in parallel.
+
+A ticker's filings can sit under more than one CIK: SEC's ticker map names the current
+registrant, while an earlier (or related) registrant may still file (XOM: the holding company
+2115436 since 2026-07-01, while Exxon Mobil Corp 34088 still lists filings and holds the
+earlier history). `related_ciks`
+reads those CIKs from the market config (`fundamentals.predecessor_ciks`) and `ticker_submissions`
+fetches and merges the submission lists of all of a ticker's CIKs; every per-ticker collector
+uses it (collect_holdings follows 13F filers, not tickers).
 
 Tests run offline: with MB_SEC_FIXTURES=<dir>, URLs are served from <dir>/urls.json
 ({url: file path, absolute or relative to <dir>}) instead of the network."""
@@ -72,18 +80,74 @@ class Edgar:
         return {"name": d.get("name"), **d["filings"]["recent"]}
 
 
+def related_ciks(cfg: dict) -> dict[str, list[int]]:
+    """Ticker -> CIKs of earlier or related registrants whose filings also belong to the ticker
+    (`fundamentals.predecessor_ciks` in config/markets/<market>.yaml: the one list every SEC
+    collector reads)."""
+    found = (cfg.get("fundamentals") or {}).get("predecessor_ciks") or {}
+    return {str(t).upper(): [int(c) for c in (cs if isinstance(cs, list) else [cs])] for t, cs in found.items()}
+
+
+def merge_recent(parts: list[tuple[int | str, dict]]) -> dict:
+    """Merge the `filings.recent` blocks of several CIKs (the mapped CIK first) into one, column
+    by column, with an added `cik` column (the CIK whose submission list holds the filing, i.e.
+    the archive folder it is served from). A filing listed under several CIKs (a joint filing) is
+    kept once, under the first CIK that lists it. One CIK: its block unchanged plus the `cik`
+    column. Several: newest first (by filing date, then acceptance time); a column missing from
+    one CIK's block is None for its filings."""
+    if len(parts) == 1:
+        cik, rec = parts[0]
+        return {**rec, "cik": [cik] * len(rec["form"])}
+    cols = [c for c in dict.fromkeys(k for _, rec in parts for k in rec) if c not in ("name", "cik")]
+    rows, seen = [], set()
+    for cik, rec in parts:
+        n = len(rec["form"])
+        accs = rec.get("accessionNumber") or [None] * n
+        for i in range(n):
+            if accs[i] is not None:
+                if accs[i] in seen:
+                    continue
+                seen.add(accs[i])
+            row = {c: (rec[c][i] if isinstance(rec.get(c), list) else None) for c in cols}
+            row["cik"] = cik
+            rows.append(row)
+    rows.sort(key=lambda r: (r.get("filingDate") or "", r.get("acceptanceDateTime") or ""), reverse=True)
+    out = {c: [r[c] for r in rows] for c in [*cols, "cik"]}
+    out["name"] = parts[0][1].get("name")
+    return out
+
+
+def ticker_submissions(edgar: Edgar, ticker: str, cik, related: dict[str, list[int]] | None = None
+                       ) -> tuple[dict | None, list[dict]]:
+    """The submissions (`filings.recent`) of a ticker's mapped CIK plus its related CIKs (see
+    related_ciks), merged and de-duplicated by accession number (merge_recent). One request per
+    CIK, each through the Edgar throttle. Returns (merged block, failures): each CIK whose request
+    fails is one failure {"ticker", "cik", "error"}, and the CIKs that answered are still merged;
+    the block is None only when every CIK failed."""
+    ciks = [cik, *[c for c in (related or {}).get(str(ticker).upper(), []) if int(c) != int(cik)]]
+    parts, failed = [], []
+    for c in ciks:
+        try:
+            parts.append((c, edgar.recent(c)))
+        except Exception as exc:
+            failed.append({"ticker": ticker, "cik": c, "error": str(exc)[:200]})
+    return (merge_recent(parts) if parts else None), failed
+
+
 def filings(recent: dict, forms: set[str], since: date | None = None) -> list[dict]:
-    """Filings of the given forms filed on/after `since`, newest first."""
+    """Filings of the given forms filed on/after `since`, in list order (newest first). `cik` is
+    the CIK whose submission list holds the filing (merge_recent's column), else None."""
     n, out = len(recent["form"]), []
     accepted = recent.get("acceptanceDateTime") or [None] * n
     reported = recent.get("reportDate") or [None] * n
+    ciks = recent.get("cik") or [None] * n
     for i, form in enumerate(recent["form"]):
         filed = recent["filingDate"][i]
         if form not in forms or (since and date.fromisoformat(filed) < since):
             continue
         out.append({"accession": recent["accessionNumber"][i], "form": form, "filing_date": filed,
                     "accepted_at": accepted[i] or None, "primary_doc": recent["primaryDocument"][i],
-                    "report_date": reported[i] or None})
+                    "report_date": reported[i] or None, "cik": ciks[i]})
     return out
 
 

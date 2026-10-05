@@ -36,6 +36,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/ranges.yaml`, off by default) and `graph.py` (connection map in `data/<market>/graph/`:
   `status`, `edges`, `hits` = second-order news, `add` = validate and append the graph-builder's edges,
   `attempt` = record the monthly refresh in `data/<market>/graph_runs/`)
+- SEC CIKs: every SEC collector reads a ticker's filings from its mapped CIK plus the CIKs under
+  `fundamentals.predecessor_ciks` in `config/markets/us.yaml` (XOM: 2115436 and 34088), each
+  accession once (`sec.ticker_submissions`).
 - Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
   `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
   `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.

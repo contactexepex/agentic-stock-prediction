@@ -143,21 +143,25 @@ def sec_earnings(cfg: dict, tickers: dict, ua: str, reports: dict | None = None
     pre-announcements, guidance updates also use 2.02): range_inputs.results_filter keeps one per
     quarter when the dates are read, using the 10-Q/10-K reports. Given a dict, `reports`
     receives those per ticker: (acceptance date, timing, form, period end).
-    Returns (rows per ticker, tickers whose submissions request failed)."""
-    from sec import Edgar  # shared SEC client: one throttle, backoff on 429/503, test fixtures
+    Each ticker's filings are those of its mapped CIK plus the predecessor/related CIKs in
+    `fundamentals.predecessor_ciks` (sec.ticker_submissions), each filing once.
+    Returns (rows per ticker, one entry per ticker and CIK whose submissions request failed)."""
+    # shared SEC client: one throttle, backoff on 429/503, test fixtures; a ticker's submissions
+    # are those of its mapped CIK plus its predecessor/related CIKs, de-duplicated by accession
+    from sec import Edgar, related_ciks, ticker_submissions
 
     edgar = Edgar(ua)
     cik_by_ticker = edgar.cik_map()
+    related = related_ciks(cfg)
     out: dict[str, list] = {}
     failed: list[dict] = []
     for key, meta in tickers.items():
         cik = cik_by_ticker.get(meta.get("sec_ticker", key).upper())
         if cik is None:
             continue
-        try:
-            recent = edgar.recent(cik)
-        except Exception as exc:
-            failed.append({"ticker": key, "cik": cik, "error": str(exc)[:200]})
+        recent, errors = ticker_submissions(edgar, key, cik, related)
+        failed += errors
+        if recent is None:
             continue
         n = len(recent["form"])
         items = recent.get("items") or [""] * n

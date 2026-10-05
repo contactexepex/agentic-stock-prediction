@@ -61,6 +61,7 @@ TODAY = datetime.now(timezone.utc).date()
 YESTERDAY = str(TODAY - timedelta(days=1))
 CIKS = {"AAPL": 320193, "BAC": 70858, "XOM": 2115436}
 NEW_ACC = "0000320193-26-000020"          # Apple 10-Q for the quarter ended 2026-06-27
+PRED_NEW_ACC = "0000034088-26-000200"     # synthetic: a 10-Q listed only under XOM's predecessor CIK
 # Periodic filings in the fixtures (accession, form, filing date, report date), as listed by SEC.
 PERIODIC = {
     "AAPL": [("0000320193-26-000013", "10-Q", "2026-05-01", "2026-03-28"),
@@ -121,6 +122,13 @@ def setup(tmp: Path, day: int = 1) -> tuple[Path, Path]:
         filings.append((f"{cik:010d}-26-999999", "8-K", YESTERDAY, ""))          # ignored form
         (fx / f"sub_{t}.json").write_text(json.dumps(submissions(filings)))
         urls[f"https://data.sec.gov/submissions/CIK{cik:010d}.json"] = f"sub_{t}.json"
+    # XOM's predecessor registrant (predecessor_ciks): its own submission list, which also lists the
+    # Q2 10-Q (a joint filing, kept once) and a 10-Q for Q3 on day 3 (filed under 34088 only)
+    pred = list(PERIODIC["XOM"]) + [("0000034088-26-999998", "8-K", YESTERDAY, "")]
+    if day == 3:
+        pred.insert(0, (PRED_NEW_ACC, "10-Q", YESTERDAY, "2026-09-30"))
+    (fx / "sub_XOM_34088.json").write_text(json.dumps(submissions(pred)))
+    urls["https://data.sec.gov/submissions/CIK0000034088.json"] = "sub_XOM_34088.json"
     (fx / "facts_aapl.json").write_text(json.dumps(aapl_facts(with_new=day == 2)))
     urls[cf.facts_url(320193)] = "facts_aapl.json"
     urls[cf.facts_url(70858)] = str(FIX / "companyfacts_bac.json")
@@ -228,7 +236,7 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out["loaded"] == ["AAPL", "BAC", "XOM"] and out["failed"] == [] and out["new_filings"] == []
-    assert out["requests"] == 1 + 3 + 4                       # ticker map, 3 submissions, 4 company facts (XOM x2)
+    assert out["requests"] == 1 + 4 + 4       # ticker map, 4 submissions and 4 company facts (XOM x2 each)
     day1 = rows(root)
     assert out["new_rows"] == len(day1) > 0
     assert not any(x["accession"] == NEW_ACC for x in day1)
@@ -237,7 +245,7 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
     assert {x["accepted_at"] for x in day1 if x["accession"] == "0000320193-26-000013"} == {"2026-05-01T20:30:00.000Z"}
 
     again = json.loads(run("collect_fundamentals.py", root, cfg).stdout)       # nothing new filed
-    assert (again["new_rows"], again["loaded"], again["up_to_date"], again["requests"]) == (0, [], 3, 4)
+    assert (again["new_rows"], again["loaded"], again["up_to_date"], again["requests"]) == (0, [], 3, 5)
 
     setup(tmp_path, day=2)                                                        # Apple files its 10-Q
     r2 = json.loads(run("collect_fundamentals.py", root, cfg).stdout)
@@ -302,6 +310,23 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
     assert "| AAPL | 2026-06-27 | 39.54 | 84.34 |" in text
     nosec = run("context.py", root, cfg, market="nosec")
     assert nosec.returncode == 0 and "Fundamentals" not in nosec.stdout
+
+
+def test_predecessor_cik_filing_triggers_a_reload(tmp_path):
+    """Issue #23: a 10-Q listed only under XOM's predecessor CIK (34088) is a new filing for XOM;
+    if the predecessor's submission list fails, XOM is reported with that CIK and not loaded."""
+    root, cfg = setup(tmp_path, day=1)
+    assert run("collect_fundamentals.py", root, cfg).returncode == 0
+    setup(tmp_path, day=3)
+    out = json.loads(run("collect_fundamentals.py", root, cfg).stdout)
+    assert out["loaded"] == ["XOM"] and out["up_to_date"] == 2 and out["failed"] == []
+    assert [f["accession"] for f in out["filings_without_new_values"]] == [PRED_NEW_ACC]   # not in the facts fixture
+    urls = json.loads((tmp_path / "sec" / "urls.json").read_text())
+    del urls["https://data.sec.gov/submissions/CIK0000034088.json"]
+    (tmp_path / "sec" / "urls.json").write_text(json.dumps(urls))
+    out = json.loads(run("collect_fundamentals.py", root, cfg).stdout)
+    assert [(f["ticker"], f["cik"]) for f in out["failed"]] == [("XOM", 34088)]
+    assert "XOM" not in out["loaded"] and out["up_to_date"] == 2
 
 
 def test_skipped_without_sec(tmp_path):
