@@ -1,0 +1,30 @@
+{
+ "comNameList": [
+  "Sun Pharmaceutical Industries Limited"
+ ],
+ "data": [
+  {
+   "broadcastDt": "05-Oct-2026 16:30:19",
+   "comName": "Sun Pharmaceutical Industries Limited",
+   "compBroadcastDate": "31-10-2022",
+   "disclosureFromDate": null,
+   "disclosureToDate": null,
+   "nbfcNonPromoShare": "0",
+   "nbfcPromoShare": "0",
+   "noOfPledgeShare": "3910.146",
+   "noOfSecPledgeShare": "9447.498",
+   "numSharesPledged": "52006484",
+   "percPromoterHolding": "    54.48",
+   "percPromoterShares": "     1.65",
+   "percSharesPledged": "2.17",
+   "percTotShares": "     0.90",
+   "sharesCollateral": "0",
+   "shp": "30-Jun-2026",
+   "totDematShares": "2396528944",
+   "totIssuedShares": "2399334970",
+   "totPromoterHolding": "1307119535",
+   "totPromoterShares": "21524530",
+   "totPublicHolding": "1092215435"
+  }
+ ]
+}

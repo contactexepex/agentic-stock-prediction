@@ -170,6 +170,33 @@ RELATION_SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "promoter_pct": "DOUBLE", "public_pct": "DOUBLE", "employee_trust_pct": "DOUBLE",
         "pledged_pct_of_promoter": "DOUBLE", "pledged_pct_of_total": "DOUBLE",
         "filed_at": "TIMESTAMPTZ", "url": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+        # nse_pledge rows (depository system-driven disclosures; see collect_relations_india.py)
+        "sdd_promoter_pct": "DOUBLE", "promoter_shares": "DOUBLE", "total_shares": "DOUBLE",
+        "promoter_encumbered_shares": "DOUBLE", "depository_pledged_shares": "DOUBLE",
+        "depository_pledged_pct": "DOUBLE",
+    }),
+    # India primary sources from NSE (collect_nse_india.py).
+    "announcements": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "company": "VARCHAR", "published_at": "TIMESTAMPTZ",
+        "category": "VARCHAR", "subject": "VARCHAR", "url": "VARCHAR", "source": "VARCHAR",
+        "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "financials": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "basis": "VARCHAR", "period_type": "VARCHAR",
+        "period_start": "DATE", "period_end": "DATE", "revenue": "DOUBLE", "revenue_item": "VARCHAR",
+        "total_income": "DOUBLE", "profit_before_tax": "DOUBLE", "net_profit": "DOUBLE",
+        "profit_to_owners": "DOUBLE", "eps_basic": "DOUBLE", "eps_diluted": "DOUBLE",
+        "audited": "VARCHAR", "taxonomy": "VARCHAR", "filing_type": "VARCHAR", "filed_at": "TIMESTAMPTZ",
+        "url": "VARCHAR", "seq_id": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "flows": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "category": "VARCHAR", "buy_cr": "DOUBLE", "sell_cr": "DOUBLE",
+        "net_cr": "DOUBLE", "provisional": "BOOLEAN", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "delivery": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "ticker": "VARCHAR", "series": "VARCHAR", "close": "DOUBLE",
+        "volume": "DOUBLE", "delivery_qty": "DOUBLE", "delivery_pct": "DOUBLE", "trades": "DOUBLE",
+        "turnover_lacs": "DOUBLE", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
     }),
     "graph": ("jsonl", {
         "id": "VARCHAR", "ticker": "VARCHAR", "relation": "VARCHAR", "target": "VARCHAR",

@@ -1,0 +1,15 @@
+{"data": [
+  {"appId": "900001", "broadcastDateTime": "__D1__ 19:05:11", "companyName": "Infosys Limited", "regulation": "Regulation 7 (2)",
+   "symbol": "INFY", "typeOfSubmission": "Original", "exchdisstime": "__D1__ 19:05:12",
+   "ixbrl": "https://nsearchives.nseindia.com/corporate/ixbrl/IT_SYNTH_1_WEB.html",
+   "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_SYNTH_1.xml"},
+  {"appId": "900002", "broadcastDateTime": "__D1__ 20:10:00", "companyName": "Reliance Industries Limited", "regulation": "Regulation 7 (2)",
+   "symbol": "RELIANCE", "typeOfSubmission": "Original", "exchdisstime": "__D1__ 20:10:01",
+   "ixbrl": null, "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_SYNTH_2.xml"},
+  {"appId": "900003", "broadcastDateTime": "__D2__ 18:00:00", "companyName": "Tata Consultancy Services Limited", "regulation": "Regulation 7 (2)",
+   "symbol": "TCS", "typeOfSubmission": "Original", "exchdisstime": "__D2__ 18:00:01",
+   "ixbrl": null, "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_SYNTH_3.xml"},
+  {"appId": "900004", "broadcastDateTime": "__D1__ 10:00:00", "companyName": "Other Ltd", "regulation": "Regulation 7 (2)",
+   "symbol": "NOTWATCHED", "typeOfSubmission": "Original", "exchdisstime": "__D1__ 10:00:01",
+   "ixbrl": null, "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_SYNTH_4.xml"}
+]}

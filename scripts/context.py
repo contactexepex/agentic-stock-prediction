@@ -8,6 +8,7 @@ from datetime import timedelta
 
 import events as ev
 import graph
+import nse_context
 import relations
 import smart_money as sm
 from common import connect, market_arg, md_table, require_market, utc_today
@@ -128,7 +129,9 @@ def main() -> None:
             continue
         print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
     # Relationships (phase 5): India insider trades, deals, pledges and flags; connections (both markets).
-    for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con)]:
+    # India primary sources from NSE (flows, announcements, results, delivery); empty elsewhere.
+    for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con),
+                        *nse_context.context_sections(cfg, con)]:
         print(f"## {title}\n\n{body}")
     print(sm.markdown(cfg, con))
 

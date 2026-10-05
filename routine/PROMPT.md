@@ -27,7 +27,10 @@ and list each FAIL with its reason in the report's `data_quality` section and th
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py` and `collect_filings.py` (all in `scripts/`), and for India also
    `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
-   pledges from NSE). Keep each JSON summary.
+   pledges from NSE) and then `collect_nse_india.py` (announcements, quarterly results, FII/DII
+   flows, delivery %), one after the other, never in parallel (NSE throttles each session).
+   Keep each JSON summary; list its `warnings` (an endpoint that returned nothing at all) in
+   the report's `data_quality` section.
    A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
    entry names a domain the environment's network settings must allow).
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`

@@ -1,8 +1,9 @@
-"""Offline tests for phase 5 relationships: the India relations collector (replaying synthetic,
-hand-written NSE responses from tests/fixtures/nse that match public scraper field names but are
-not yet checked against a live NSE response), its failure path when NSE is unreachable, risk
-flags and optional range widening, the connection map (validation, append-only updates,
-monthly refresh attempts, second-order news hits) and the context-pack sections.
+"""Offline tests for phase 5 relationships: the India relations collector replaying the SYNTHETIC
+NSE responses in tests/fixtures/nse/synthetic (cases the real responses cannot show: large
+insider sale, pledge creation, big deal, pledge rise; real responses are tested in
+test_nse_india.py), its failure path when NSE is unreachable, risk flags and optional range
+widening, the connection map (validation, append-only updates, monthly refresh attempts,
+second-order news hits) and the context-pack sections.
 Run: pytest -q"""
 from __future__ import annotations
 
@@ -75,11 +76,11 @@ def run(script: str, root: Path, cfg: Path, *args: str) -> subprocess.CompletedP
 
 
 def replay_dir(tmp: Path) -> Path:
-    """Copy the NSE fixtures, replacing __Dn__ with the IST date n days ago (NSE format)."""
+    """Copy the synthetic NSE fixtures, replacing __Dn__ with the IST date n days ago (NSE format)."""
     out = tmp / "nse"
     out.mkdir(parents=True)
     today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
-    for f in (FIXTURES / "nse").iterdir():
+    for f in (FIXTURES / "nse" / "synthetic").iterdir():
         text = f.read_text()
         for n in range(31):
             text = text.replace(f"__D{n}__", f"{today - timedelta(days=n):%d-%b-%Y}")
@@ -99,21 +100,23 @@ def test_relations_collector_flags_and_context(tmp_path):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out["new"] == {"insiders": 3, "deals": 2, "holdings": 5}
-    assert any("block deals from nse_snapshot" in n for n in out["notes"])       # fallback used
-    assert out["failed"] and all("allowlist" not in f for f in out["failed"])     # missing replay files only
+    assert "deals: bulk+block snapshot as on" in " ".join(out["notes"]) and out["warnings"] == []
+    assert out["failed"] and all(f["error"] == "no replay file" for f in out["failed"])   # missing replay files only
 
     ins = {r["ticker"]: r for r in rows(root, "insiders")}
     assert set(ins) == {"INFY", "RELIANCE", "TCS"}                                # NOTWATCHED dropped
     assert ins["INFY"]["value"] == 300000000 and ins["INFY"]["person_category"] == "Director"
     assert ins["RELIANCE"]["shares"] == 1000000 and ins["RELIANCE"]["value"] is None
     assert ins["INFY"]["disclosed_at"].endswith("+00:00")                        # IST converted to UTC
+    assert ins["INFY"]["holding_before_pct"] == 0.01                             # XBRL fraction 0.0001 -> 0.01 %
     deals = {d["ticker"]: d for d in rows(root, "deals")}
-    assert set(deals) == {"HDFCBANK", "ICICIBANK"}                                # old deal outside lookback
+    assert set(deals) == {"HDFCBANK", "ICICIBANK"}                                # NOTWATCHED dropped
     assert deals["HDFCBANK"]["side"] == "buy" and deals["HDFCBANK"]["value"] == 5000000 * 1600.5
     assert deals["ICICIBANK"]["deal_type"] == "block" and deals["ICICIBANK"]["source"] == "nse_snapshot"
     hold = rows(root, "holdings")
     assert {(h["source"], h["period_end"]) for h in hold if h["ticker"] == "RELIANCE"} == {
         ("nse_shp", "2026-06-30"), ("nse_shp", "2026-03-31"), ("nse_pledge", "2026-06-30"), ("nse_pledge", "2026-03-31")}
+    assert all(h["promoter_pct"] is None for h in hold if h["source"] == "nse_pledge")   # never the SHP figure
 
     # append-only and de-duplicated: a rerun writes nothing new
     again = json.loads(run("collect_relations_india.py", root, cfg, "--replay", str(replay)).stdout)
@@ -290,10 +293,11 @@ def test_live_failure_reports_hosts_to_allowlist(monkeypatch):
     import urllib.error
     monkeypatch.syspath_prepend(str(SCRIPTS))
     import collect_relations_india as cri
+    import nse
 
     def no_write(*a, **k):
         raise AssertionError("nothing should be written when every source fails")
-    monkeypatch.setattr(cri, "append_jsonl", no_write)
+    monkeypatch.setattr(nse, "append_jsonl", no_write)
     cfg = {"market": MARKET, "relations": {"source": "nse"},
            "tickers": {"INFY": {"yahoo": "INFY.NS"}, "RELIANCE": {"yahoo": "RELIANCE.NS"}}}
 
@@ -305,7 +309,7 @@ def test_live_failure_reports_hosts_to_allowlist(monkeypatch):
     assert out["new"] == {"insiders": None, "deals": None, "holdings": None}
     assert out["allowlist_needed"] == ["nsearchives.nseindia.com", "www.nseindia.com"]
     sources = {f["source"] for f in out["failed"]}
-    assert {"insiders", "deals:bulk:nse_archive", "deals:block:nse_historical"} <= sources
+    assert {"insiders", "deals:snapshot", "deals:bulk:archive", "deals:block:archive"} <= sources
     assert sum(s.startswith("holdings:") for s in sources) == 1                   # fails fast per host
     assert all("egress proxy denied" in f["error"] and f["allowlist"] for f in out["failed"])
 

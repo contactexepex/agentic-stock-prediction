@@ -1,0 +1,30 @@
+{
+ "comNameList": [
+  "Reliance Industries Limited"
+ ],
+ "data": [
+  {
+   "broadcastDt": "05-Oct-2026 16:30:15",
+   "comName": "Reliance Industries Limited",
+   "compBroadcastDate": null,
+   "disclosureFromDate": null,
+   "disclosureToDate": null,
+   "nbfcNonPromoShare": "0",
+   "nbfcPromoShare": "0",
+   "noOfPledgeShare": "0",
+   "noOfSecPledgeShare": "22303.423",
+   "numSharesPledged": "187897413",
+   "percPromoterHolding": "    51.32",
+   "percPromoterShares": "     0.00",
+   "percSharesPledged": "1.39",
+   "percTotShares": "     0.00",
+   "sharesCollateral": "0",
+   "shp": "30-Jun-2026",
+   "totDematShares": "13503792376",
+   "totIssuedShares": "13532538722",
+   "totPromoterHolding": "6944962964",
+   "totPromoterShares": "0",
+   "totPublicHolding": "6587575758"
+  }
+ ]
+}

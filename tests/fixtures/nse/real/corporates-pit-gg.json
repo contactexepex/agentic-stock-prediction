@@ -1,0 +1,52 @@
+{
+ "data": [
+  {
+   "appId": "3705",
+   "broadcastDateTime": "28-Sep-2026 15:34:55",
+   "companyName": "Infosys Limited",
+   "diff": "00:00:00",
+   "exchdisstime": "28-Sep-2026 15:34:56",
+   "ixbrl": "https://nsearchives.nseindia.com/corporate/ixbrl/IT_180_20260928_153455177_WEB.html",
+   "ixbrlFileSize": "21.75 KB",
+   "prevAppId": null,
+   "regulation": "Regulation 7 (2)",
+   "revisionRemark": null,
+   "symbol": "INFY",
+   "typeOfSubmission": "Original",
+   "xbrlFileSize": "5.02 KB",
+   "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_180_WebXMLFile_20260928_153455146.xml"
+  },
+  {
+   "appId": "3949",
+   "broadcastDateTime": "05-Oct-2026 20:01:10",
+   "companyName": "DAMODAR INDUSTRIES LIMITED",
+   "diff": "00:00:02",
+   "exchdisstime": "05-Oct-2026 20:01:12",
+   "ixbrl": "https://nsearchives.nseindia.com/corporate/ixbrl/IT_13962_20261005_200110899_WEB.html",
+   "ixbrlFileSize": "40.14 KB",
+   "prevAppId": null,
+   "regulation": "Regulation 7 (2)",
+   "revisionRemark": null,
+   "symbol": "DAMODARIND",
+   "typeOfSubmission": "Original",
+   "xbrlFileSize": "13.44 KB",
+   "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_13962_WebXMLFile_20261005_200110862.xml"
+  },
+  {
+   "appId": "3920",
+   "broadcastDateTime": "05-Oct-2026 19:59:12",
+   "companyName": "DAMODAR INDUSTRIES LIMITED",
+   "diff": "00:00:00",
+   "exchdisstime": "05-Oct-2026 19:59:13",
+   "ixbrl": "https://nsearchives.nseindia.com/corporate/ixbrl/IT_13962_20261005_195912364_WEB.html",
+   "ixbrlFileSize": "40.14 KB",
+   "prevAppId": null,
+   "regulation": "Regulation 7 (2)",
+   "revisionRemark": null,
+   "symbol": "DAMODARIND",
+   "typeOfSubmission": "Original",
+   "xbrlFileSize": "13.44 KB",
+   "xmlFileName": "https://nsearchives.nseindia.com/corporate/xbrl/IT_13962_WebXMLFile_20261005_195912304.xml"
+  }
+ ]
+}

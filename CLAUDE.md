@@ -22,6 +22,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them.
   Schemas live in `scripts/common.py`.
+- India primary sources (NSE; shared session and replay guard in `nse.py`): `collect_nse_india`
+  -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
+  Filing results per period and basis, FII/DII provisional flows, delivery %); context sections
+  from `nse_context.py`.
 - Relationships (DESIGN.md phase 5): `collect_relations_india` (NSE: SEBI PIT insider/promoter
   trades, bulk and block deals, shareholding and promoter pledges -> `data/india/insiders|deals|holdings/`),
   `relations.py` (risk flags: big deals, pledge rises, insider sales; optional range widening in
