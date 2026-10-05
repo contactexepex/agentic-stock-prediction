@@ -9,6 +9,7 @@ import json
 import re
 import socket
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
@@ -79,8 +80,12 @@ def main() -> int:
 
     jobs = build_jobs(feeds, watchlist)
     for job in jobs:
-        parsed = feedparser.parse(job["url"], agent=USER_AGENT)
-        status = parsed.get("status", 200)
+        for attempt in range(2):  # one retry: Google News occasionally fails a single query
+            parsed = feedparser.parse(job["url"], agent=USER_AGENT)
+            status = parsed.get("status", 200)
+            if not (status >= 400 or (parsed.bozo and not parsed.entries)) or status in (401, 403, 404):
+                break
+            time.sleep(2)
         if status >= 400 or (parsed.bozo and not parsed.entries):
             failed.append({"feed": job["feed"], "status": status,
                            "error": str(parsed.get("bozo_exception", ""))[:200]})

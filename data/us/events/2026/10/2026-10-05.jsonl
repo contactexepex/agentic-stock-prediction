@@ -1,0 +1,23 @@
+{"id": "JPM-earnings-2026-10-13", "date": "2026-10-13", "type": "earnings", "ticker": "JPM", "name": "JPMorgan earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "JPM-ex_dividend-2026-10-06", "date": "2026-10-06", "type": "ex_dividend", "ticker": "JPM", "name": "JPMorgan ex-dividend", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "BAC-earnings-2026-10-14", "date": "2026-10-14", "type": "earnings", "ticker": "BAC", "name": "Bank of America earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "NVDA-earnings-2026-11-17", "date": "2026-11-17", "type": "earnings", "ticker": "NVDA", "name": "Nvidia earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "AAPL-earnings-2026-10-29", "date": "2026-10-29", "type": "earnings", "ticker": "AAPL", "name": "Apple earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "GOOGL-earnings-2026-10-28", "date": "2026-10-28", "type": "earnings", "ticker": "GOOGL", "name": "Alphabet earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "META-earnings-2026-10-28", "date": "2026-10-28", "type": "earnings", "ticker": "META", "name": "Meta Platforms earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "PGR-earnings-2026-10-14", "date": "2026-10-14", "type": "earnings", "ticker": "PGR", "name": "Progressive earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "ALL-earnings-2026-11-04", "date": "2026-11-04", "type": "earnings", "ticker": "ALL", "name": "Allstate earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "DAL-earnings-2026-10-09", "date": "2026-10-09", "type": "earnings", "ticker": "DAL", "name": "Delta Air Lines earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "DAL-ex_dividend-2026-10-15", "date": "2026-10-15", "type": "ex_dividend", "ticker": "DAL", "name": "Delta Air Lines ex-dividend", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "UAL-earnings-2026-10-20", "date": "2026-10-20", "type": "earnings", "ticker": "UAL", "name": "United Airlines earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "XOM-earnings-2026-10-30", "date": "2026-10-30", "type": "earnings", "ticker": "XOM", "name": "ExxonMobil earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "CVX-earnings-2026-10-30", "date": "2026-10-30", "type": "earnings", "ticker": "CVX", "name": "Chevron earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "LLY-earnings-2026-10-29", "date": "2026-10-29", "type": "earnings", "ticker": "LLY", "name": "Eli Lilly earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "MRK-earnings-2026-10-29", "date": "2026-10-29", "type": "earnings", "ticker": "MRK", "name": "Merck earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "TSLA-earnings-2026-10-21", "date": "2026-10-21", "type": "earnings", "ticker": "TSLA", "name": "Tesla earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "GM-earnings-2026-10-20", "date": "2026-10-20", "type": "earnings", "ticker": "GM", "name": "General Motors earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "WMT-earnings-2026-11-19", "date": "2026-11-19", "type": "earnings", "ticker": "WMT", "name": "Walmart earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "WMT-ex_dividend-2026-12-11", "date": "2026-12-11", "type": "ex_dividend", "ticker": "WMT", "name": "Walmart ex-dividend", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "COST-earnings-2026-12-10", "date": "2026-12-10", "type": "earnings", "ticker": "COST", "name": "Costco earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "CAT-earnings-2026-10-29", "date": "2026-10-29", "type": "earnings", "ticker": "CAT", "name": "Caterpillar earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}
+{"id": "DE-earnings-2026-11-25", "date": "2026-11-25", "type": "earnings", "ticker": "DE", "name": "Deere earnings", "source": "yfinance", "first_seen_at": "2026-10-05T14:28:27+00:00"}

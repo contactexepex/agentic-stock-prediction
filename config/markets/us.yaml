@@ -82,8 +82,7 @@ news:
     rates: ["Treasury yields"]
     global: ["oil prices", "geopolitical tensions markets"]
     trade: ["US tariffs trade"]
-  outlets:
-    - {name: CNBC Top News, url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", category: general}
+  outlets:   # CNBC's RSS returns 403 to cloud servers, so it is not used
     - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
 
 filings: sec

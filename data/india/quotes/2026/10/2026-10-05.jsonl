@@ -1,0 +1,15 @@
+{"symbol": "NIFTY50", "yahoo": "^NSEI", "ts": "2026-10-05T09:55:00+00:00", "price": 22555.75, "prev_close": 22421.9492, "change_pct": 0.005967, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "INDIAVIX", "yahoo": "^INDIAVIX", "ts": "2026-10-05T09:55:00+00:00", "price": 14.71, "prev_close": 14.46, "change_pct": 0.017289, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "SPX", "yahoo": "^GSPC", "ts": "2026-10-05T14:25:00+00:00", "price": 7755.4902, "prev_close": 7722.7202, "change_pct": 0.004243, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "NASDAQ", "yahoo": "^IXIC", "ts": "2026-10-05T14:25:00+00:00", "price": 27389.4395, "prev_close": 27190.8594, "change_pct": 0.007303, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "NIKKEI", "yahoo": "^N225", "ts": "2026-10-05T06:25:00+00:00", "price": 69928.0469, "prev_close": 68309.4609, "change_pct": 0.023695, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "HANGSENG", "yahoo": "^HSI", "ts": "2026-10-05T08:05:00+00:00", "price": 24040.3398, "prev_close": 23972.2891, "change_pct": 0.002839, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "USDINR", "yahoo": "INR=X", "ts": "2026-10-05T13:10:00+00:00", "price": 96.283, "prev_close": 96.2248, "change_pct": 0.000605, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "BRENT", "yahoo": "BZ=F", "ts": "2026-10-05T14:15:00+00:00", "price": 101.32, "prev_close": 102.25, "change_pct": -0.009095, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "GOLD", "yahoo": "GC=F", "ts": "2026-10-05T14:15:00+00:00", "price": 4168.6001, "prev_close": 4162.2998, "change_pct": 0.001514, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "US10Y", "yahoo": "^TNX", "ts": "2026-10-05T14:10:00+00:00", "price": 5.298, "prev_close": 5.277, "change_pct": 0.00398, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "DXY", "yahoo": "DX-Y.NYB", "ts": "2026-10-05T14:15:00+00:00", "price": 102.339, "prev_close": 101.93, "change_pct": 0.004013, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "HDFCBANK:ADR", "yahoo": "HDB", "ts": "2026-10-05T14:25:00+00:00", "price": 22.12, "prev_close": 22.34, "change_pct": -0.009848, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "ICICIBANK:ADR", "yahoo": "IBN", "ts": "2026-10-05T14:25:00+00:00", "price": 27.81, "prev_close": 27.44, "change_pct": 0.013484, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "INFY:ADR", "yahoo": "INFY", "ts": "2026-10-05T14:25:00+00:00", "price": 10.775, "prev_close": 11.04, "change_pct": -0.024004, "collected_at": "2026-10-05T14:27:41+00:00"}
+{"symbol": "DRREDDY:ADR", "yahoo": "RDY", "ts": "2026-10-05T14:25:00+00:00", "price": 12.195, "prev_close": 12.25, "change_pct": -0.00449, "collected_at": "2026-10-05T14:27:41+00:00"}
