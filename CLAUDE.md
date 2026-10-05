@@ -64,7 +64,10 @@ itself (its own edits, merge-conflict resolutions and daily-run narrative includ
   untested core logic. Cosmetic: doc wording, naming, formatting, nice-to-have tests for code that
   works. Only blockers fail a verdict and trigger another round; each cosmetic finding becomes a
   GitHub issue labelled `cosmetic` to fix later, and the work can merge.
-- Build work: on FAIL (any blocker), send the blocker list back and judge again, repeating until PASS. Nothing is
+- Build work: on FAIL (any blocker), send the blocker list back and judge again, repeating until PASS.
+- Scope of a review follows the change: an end-to-end run of the routine is needed only when
+  executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
+  agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is
   merged or pushed to main before its PASS.
 - Daily runs: one retry (the run is time-boxed), then the failed output is dropped or withheld
   as `routine/PROMPT.md` says, and the failure is listed in the report's `data_quality`.
