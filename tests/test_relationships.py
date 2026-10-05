@@ -451,3 +451,46 @@ def test_ranges_ignore_a_13d_accepted_after_made_at(tmp_path):
     assert r.returncode == 0, r.stderr
     got = rows(root, "ranges")
     assert got and not any("13D" in n for x in got.values() for n in x["notes"])
+
+
+# ---------- collect_filings goes through sec.py (throttle, backoff, JSON on failure) ----------
+def test_collect_filings_uses_edgar_and_keeps_new_13d_forms(tmp_path):
+    root, cfg = setup(tmp_path)
+    r = run("collect_filings.py", root, cfg)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["failed"] == [] and out["requests"] >= 2
+    got = rows(root, "filings")
+    forms = {x["form"] for x in got.values()}
+    assert {"8-K", "4", "SCHEDULE 13D", "SCHEDULE 13G"} <= forms        # new-format 13D/13G are kept
+    assert "0000320193-26-000010" not in got                             # older than the lookback
+
+
+def test_collect_filings_reports_sec_refusal_as_json(tmp_path):
+    root, cfg = setup(tmp_path)
+    fx = tmp_path / "sec"
+    (fx / "urls.json").write_text("{}")                                  # every SEC request now fails
+    r = run("collect_filings.py", root, cfg)
+    assert r.returncode == 1
+    assert "Traceback" not in r.stderr
+    out = json.loads(r.stdout)
+    assert out["collector"] == "filings" and out["new_filings"] == 0
+    assert out["failed"][0]["url"] == "company_tickers.json"
+
+
+def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
+    import io
+    import urllib.error
+    import sec
+    calls = []
+
+    def fake(req, timeout):
+        calls.append(req.full_url)
+        if len(calls) < 3:
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+        return io.BytesIO(b'{"ok": 1}')
+    monkeypatch.delenv("MB_SEC_FIXTURES", raising=False)
+    monkeypatch.setattr(sec.urllib.request, "urlopen", fake)
+    monkeypatch.setattr(sec.time, "sleep", lambda s: None)
+    assert sec.Edgar("test test@example.com").json("https://data.sec.gov/x.json") == {"ok": 1}
+    assert len(calls) == 3
