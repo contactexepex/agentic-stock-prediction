@@ -2,6 +2,15 @@ Run the daily market-brief pipeline for MARKET=<india|us> in this repository. Fo
 CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 `MB_MARKET=<market>` so every script uses this market. Research only: never place trades.
 
+Judge every agent. After each subagent returns (news-analyst, bull-researcher,
+bear-researcher, forecaster) and after you fill the report in step 11, run the judge subagent
+with three inputs: the exact instructions given, the agent's report, and where its output
+lives. Agent records stay in `work/` until the judge returns PASS. Only then append them to
+`data/` (news-analyst: `work/enriched.jsonl`; forecaster: `work/predictions.jsonl`). On FAIL,
+send the judge's fix list back to the same agent once (fix step 11 yourself) and judge again.
+If it still fails, do not use that output: append nothing (no calls, no enrichment), continue,
+and list each FAIL with its reason in the report's `data_quality` section and the daily summary.
+
 1. Prepare: `mkdir -p work`. If
    `python -c "import duckdb, feedparser, yfinance, pandas, exchange_calendars"` fails, run
    `pip install -q -r requirements.txt`.
@@ -47,7 +56,7 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     `templates/report.md`, then delete the markers. Never change a number, table or chart
     link written by the script.
 
-12. Save: `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
+12. Save (only after the judge passed the report, or its failures are listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
 

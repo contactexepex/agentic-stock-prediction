@@ -18,6 +18,7 @@ Report markers:
 - `data_quality`: failed collectors and feeds from the run's JSON summaries; "none" if clean.
   On a late run (`market_status.py` `late_run: true`) say so first: the run started after the
   session closed, so no calls were made and closed-session ranges were not published.
+  Then the judge's verdicts: one line per agent (PASS, or FAIL with the reason and what was dropped).
 
 Slack draft markers (the whole message stays at most 12 lines):
 - `headline`: one line.

@@ -10,7 +10,8 @@ track record), the news brief, and the bull and bear cases passed to you.
 
 Late run: if `python scripts/market_status.py` reports `late_run: true` (or the caller says
 it is a late run), the session being predicted has already closed and its outcome is public.
-Abstain on every ticker with reason "late run", write no prediction records, and return
+Abstain on every ticker with reason "late run", write no prediction records (leave
+`work/predictions.jsonl` absent), and return
 the abstention table.
 
 For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and optionally 1.
@@ -31,7 +32,8 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
 - `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v4".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
-Write records to `work/predictions.jsonl`, then append to
-`data/<market>/predictions/YYYY/MM/<today>.jsonl` with `cat ... >>`.
+Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs the
+judge subagent and, on PASS, appends them to `data/<market>/predictions/YYYY/MM/<today>.jsonl`
+with `cat ... >>`.
 
 Return a table of calls and abstentions with 1-line reasons.
