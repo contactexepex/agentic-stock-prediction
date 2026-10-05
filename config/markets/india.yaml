@@ -99,6 +99,11 @@ news:
     # Moneycontrol's own RSS feeds (marketreports, latestnews, business, ...) stopped updating in
     # April 2024 (checked 2026-10-05), so Moneycontrol comes in via Google News instead (categories).
     - {name: Livemint Markets, url: "https://www.livemint.com/rss/markets", category: general}
+    # Business Standard and BusinessLine (checked 2026-10-05: both answer, pubDate in IST)
+    - {name: Business Standard Markets, url: "https://www.business-standard.com/rss/markets-106.rss", category: general}
+    - {name: Business Standard Companies, url: "https://www.business-standard.com/rss/companies-101.rss", category: company}
+    - {name: BusinessLine Markets, url: "https://www.thehindubusinessline.com/markets/feeder/default.rss", category: general}
+    - {name: BusinessLine Companies, url: "https://www.thehindubusinessline.com/companies/feeder/default.rss", category: company}
 
 filings: none             # SEC filings only exist for US companies
 
@@ -131,3 +136,29 @@ relations:
     insider_sale_crore: 10    # promoter/director sale at or above this value
     pledge_increase_pp: 1.0   # promoter pledge (% of promoter holding) up this many points q/q
     pledge_filed_days: 60     # flag a pledge rise only while that filing is this recent
+
+# Flows and indices (collect_flows_india.py; issue #9). fpi: NSDL daily FPI investment
+# (fpi.nsdl.co.in; www.fpi.nsdl.co.in is refused by the egress proxy). indices: NSE's daily
+# index close file on nsearchives.nseindia.com (www.niftyindices.com's data endpoints now
+# return its home page). names: index -> the watchlist sector it stands for (null = market-wide);
+# these cover the seven sectors without a Yahoo index (context pack only, not the indicators).
+india_flows:
+  pause_seconds: 1.0
+  fpi: true
+  indices:
+    lookback_days: 10
+    names:
+      Nifty 50: null
+      Nifty Midcap 150: null
+      Nifty Smallcap 250: null
+      Nifty 10 yr Benchmark G-Sec: null
+      Nifty Bank: Banks
+      Nifty IT: IT
+      Nifty Insurance: Insurance
+      Nifty Transportation & Logistics: Transport
+      Nifty Energy: Energy
+      Nifty Pharma: Pharma
+      Nifty Auto: Autos
+      Nifty FMCG: Consumer goods
+      Nifty Construction: Construction
+      Nifty Metal: Metals

@@ -51,6 +51,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   "Fundamentals" section (`scripts/fundamentals.py`; no consensus estimates, so no "surprise").
   These views show today's knowledge (restatements replace originals); for anything as of a past
   time use the macros `fundamentals_latest_asof|quarterly_asof|metrics_asof(<timestamp>)`
+- Macro, flows and short selling (issue #9; HTTP client and append helper in `scripts/sources.py`,
+  context sections in `scripts/macro_context.py`): `collect_macro` (US `macro:` config: Treasury
+  par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
+  `collect_shorts` (US `shorts:`: FINRA Reg SHO daily short-sale volume and short interest ->
+  `data/us/shorts|short_interest/`), `collect_flows_india` (India `india_flows:`: NSDL daily FPI
+  investment and NSE index closes with P/E, P/B, dividend yield -> `data/india/fpi|indices/`).
+  Views `macro_series` (adds 10y-2y and 10y-3m spreads), `macro_latest`, `shorts_latest`,
+  `short_interest_latest`, `fpi_latest`, `indices_latest`; context sections "Macro & flows" and
+  "Short selling". BSE (api.bseindia.com) refuses cloud traffic, so India announcements stay NSE-only
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

@@ -96,6 +96,13 @@ news:
     markets: ["stock market today site:cnbc.com"]   # CNBC headlines via Google News
   outlets:   # CNBC's own RSS returns 403 to cloud servers (rechecked 2026-10-05), see `markets` above
     - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
+    # Press-release wires (checked 2026-10-05). They carry hundreds of small-company releases a
+    # day, so `watchlist_only` keeps just the items that name a watchlist ticker or alias.
+    # GlobeNewswire closes the connection without an answer (site-side, every URL tried) and
+    # www.businesswire.com refuses cloud traffic; Business Wire's feed host works, but its home
+    # feed (G1QFDERJXkJeEFpRWQ==) is deactivated, so the earnings feed is used.
+    - {name: PR Newswire, url: "https://www.prnewswire.com/rss/news-releases-list.rss", category: company, watchlist_only: true}
+    - {name: Business Wire Earnings, url: "https://feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeEF9YXA==", category: company, watchlist_only: true}
 
 filings: sec
 filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G"]  # new-format 13D/13G since Dec 2024
@@ -106,6 +113,32 @@ filing_lookback_days: 7
 # the beta split of the range centre; beta = benchmark move per 1% cue move.
 options: yfinance
 index_cue: {symbol: ES, beta: 1.0}
+
+# Macro (collect_macro.py; issue #9): market-wide series -> data/us/macro/. Treasury par yields
+# (home.treasury.gov CSV) also cover FRED's DGS2/DGS10/T10Y2Y (same H.15 data), so FRED adds
+# only what Treasury and Yahoo (^VIX, DX-Y.NYB) do not: credit spreads and the breakeven.
+macro:
+  lookback_days: 30      # Treasury and FRED observations kept per run (de-duplicated)
+  pause_seconds: 1.0
+  treasury: true
+  fred:                  # fredgraph.csv, no API key
+    BAMLH0A0HYM2: {name: US high-yield OAS (ICE BofA), unit: pct}
+    BAMLC0A0CM: {name: US investment-grade OAS (ICE BofA), unit: pct}
+    T10YIE: {name: 10-year breakeven inflation, unit: pct}
+  cboe:                  # cdn.cboe.com daily options statistics (one JSON per session)
+    lookback_days: 10     # >= 6 sessions, for the 5-observation change
+    ratios:              # name in Cboe's file -> series
+      TOTAL PUT/CALL RATIO: CBOE_PC_TOTAL
+      EQUITY PUT/CALL RATIO: CBOE_PC_EQUITY
+      INDEX PUT/CALL RATIO: CBOE_PC_INDEX
+      SPX + SPXW PUT/CALL RATIO: CBOE_PC_SPX
+      CBOE VOLATILITY INDEX (VIX) PUT/CALL RATIO: CBOE_PC_VIX
+
+# Short selling (collect_shorts.py; issue #9) from FINRA -> data/us/shorts/ and short_interest/.
+shorts:
+  pause_seconds: 0.5
+  daily_volume: {lookback_days: 10}    # Reg SHO consolidated daily short-sale volume files
+  short_interest: {lookback_days: 45}  # settlements twice a month, published ~a week later
 
 # Fundamentals (collect_fundamentals.py): 10-Q/10-K financial data from SEC XBRL company facts.
 fundamentals:

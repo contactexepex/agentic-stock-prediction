@@ -63,6 +63,13 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    flows, delivery %), one after the other, never in parallel (NSE throttles each session).
    Keep each JSON summary; list its `warnings` (an endpoint that returned nothing at all) in
    the report's `data_quality` section.
+   Macro, flows and short selling (issue #9; a market without the collector's config section
+   prints `skipped`): run `collect_macro.py` (US: Treasury yield curve, FRED credit spreads and
+   breakeven, Cboe put/call ratios) and `collect_shorts.py` (US: FINRA daily short-sale volume and
+   short interest), and `collect_flows_india.py` (India: NSDL FPI investment and NSE index closes
+   with P/E, P/B, dividend yield) after `collect_nse_india.py`, never alongside an NSE collector.
+   List every `failed` entry of their summaries in `data_quality` (a session file missing for the
+   latest session is only a note: it is published after the close).
    A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
    entry names a domain the environment's network settings must allow).
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Print a compact Markdown context pack for one market's agents: regime, upcoming events,
 overnight cues and global factors, PASDS indicators, prices and returns, news activity,
-filings, open predictions and the track record, and the previous run's judge FAILs that its
+filings, macro and flows (yields, credit spreads, put/call, short selling; India FPI and
+indices), open predictions and the track record, and the previous run's judge FAILs that its
 report could not list (for today's data_quality). Agents read this instead of raw files."""
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from datetime import timedelta
 import events as ev
 import fundamentals as fu
 import graph
+import macro_context
 import nse_context
 import relations
 import smart_money as sm
@@ -175,8 +177,9 @@ def main() -> None:
             print(sector_gaps(cfg))
     # Relationships (phase 5): India insider trades, deals, pledges and flags; connections (both markets).
     # India primary sources from NSE (flows, announcements, results, delivery); empty elsewhere.
+    # Macro & flows (US Treasury/FRED/Cboe and FINRA shorts; India NSDL FPI and NSE indices).
     for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con),
-                        *nse_context.context_sections(cfg, con)]:
+                        *nse_context.context_sections(cfg, con), *macro_context.context_sections(cfg, con)]:
         print(f"## {title}\n\n{body}")
     print(sm.markdown(cfg, con))
     print(fu.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (no consensus, no "surprise")

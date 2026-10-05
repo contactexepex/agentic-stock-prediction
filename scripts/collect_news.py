@@ -2,7 +2,10 @@
 """Collect RSS headlines (Google News queries + outlet feeds from the market config's `news`
 section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the
 last 7 days. Prints a JSON summary; outlet feeds that answer but carry nothing from the last
-3 days are listed as `stale`. Exit code 1 only if every feed failed."""
+3 days are listed as `stale`. An outlet with `watchlist_only: true` (press-release wires) keeps
+only items whose title or summary names a watchlist company, matched case-sensitively there
+("Progressive", not "progressive"); `skipped_off_watchlist` counts the rest.
+Exit code 1 only if every feed failed."""
 from __future__ import annotations
 
 import hashlib
@@ -52,17 +55,21 @@ def build_jobs(feeds: dict, watchlist: dict) -> list[dict]:
                 jobs.append({"url": google_news_url(q, g), "feed": f"gnews:{q}",
                              "category": cat, "tickers": []})
     for o in feeds.get("outlets", []):
-        jobs.append({"url": o["url"], "feed": o["name"],
-                     "category": o.get("category", "general"), "tickers": []})
+        jobs.append({"url": o["url"], "feed": o["name"], "category": o.get("category", "general"),
+                     "tickers": [], "watchlist_only": bool(o.get("watchlist_only"))})
     return jobs
 
 
-def alias_patterns(watchlist: dict) -> dict[str, re.Pattern]:
+def alias_patterns(watchlist: dict, flags: int = re.I) -> dict[str, re.Pattern]:
     pats = {}
     for ticker, meta in watchlist.get("tickers", {}).items():
         names = [meta["name"], *meta.get("aliases", [])]
-        pats[ticker] = re.compile(r"\b(" + "|".join(map(re.escape, names)) + r")\b", re.I)
+        pats[ticker] = re.compile(r"\b(" + "|".join(map(re.escape, names)) + r")\b", flags)
     return pats
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def parse_time(entry) -> datetime | None:
@@ -73,11 +80,12 @@ def parse_time(entry) -> datetime | None:
 def main() -> int:
     watchlist = require_market(market_arg(__doc__).parse_args())
     feeds, market = watchlist.get("news", {}), watchlist["market"]
-    pats = alias_patterns(watchlist)
+    pats, strict = alias_patterns(watchlist), alias_patterns(watchlist, 0)
     seen = recent_ids(market, "news", days=7)
-    now, now_dt = utc_now(), datetime.now(timezone.utc)
+    now, now_dt = utc_now(), now_utc()
     items: dict[str, dict] = {}
     failed, stale = [], []
+    skipped_off_watchlist = 0
 
     jobs = build_jobs(feeds, watchlist)
     for job in jobs:
@@ -111,7 +119,11 @@ def main() -> int:
             if aid in seen:
                 continue
             text = f"{title} {e.get('summary', '')}"
-            tickers = set(job["tickers"]) | {t for t, p in pats.items() if p.search(text)}
+            tickers = set(job["tickers"]) | {t for t, p in (strict if job.get("watchlist_only") else pats).items()
+                                             if p.search(text)}
+            if job.get("watchlist_only") and not tickers:
+                skipped_off_watchlist += 1   # wire feeds: keep only releases naming a watchlist company
+                continue
             if aid in items:  # same article from several feeds: merge tags
                 items[aid]["tickers"] = sorted(set(items[aid]["tickers"]) | tickers)
                 continue
@@ -124,7 +136,8 @@ def main() -> int:
 
     written = append_jsonl(day_file(market, "news", utc_today()), items.values())
     print(json.dumps({"collector": "news", "market": market, "feeds": len(jobs), "failed": failed,
-                      "stale": stale, "new_items": written}, indent=2))
+                      "stale": stale, "new_items": written,
+                      "skipped_off_watchlist": skipped_off_watchlist}, indent=2))
     return 1 if jobs and len(failed) == len(jobs) else 0
 
 
