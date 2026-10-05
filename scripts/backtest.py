@@ -10,7 +10,9 @@ not replayed, so the headline numbers test the core formula.
 Range inputs (config/ranges.yaml, docs/DESIGN.md section 11) are then switched off and on, each
 scored where it applies (docs/DESIGN.md section 7: keep an input only if it improves accuracy):
 - earnings_history: earnings widening sized from the stock's past earnings-day moves (only
-  reactions completed before d) vs the fixed multiplier; earnings dates from event_history.
+  reactions completed before d) vs the fixed multiplier; earnings dates from event_history, with
+  the SEC 2.02 filings that are not results releases dropped as known at d (only 10-Q/10-K
+  reports accepted by d are used: range_inputs.earnings_versions).
 - ex_dividend: centre shifted down by dividends going ex inside the horizon vs no shift.
 - beta_split: beta x index cue + own cue net of it vs the direct own cue. Historical cues are
   proxies: a numeric index_cue beta (US futures) uses the benchmark's next open gap; "fit" uses
@@ -105,14 +107,28 @@ def input_columns(cfg: dict, rc: dict, df: pd.DataFrame, t: str, h: int, extra: 
     n = len(idx)
     pos = {d.date(): i for i, d in enumerate(idx)}
     cols = pd.DataFrame(index=idx)
-    # earnings
-    events = extra["earnings"].get(t, [])
-    eps = [pos[s] for d, tm in events for s in ri.affected_sessions(cfg, d, tm) if s in pos]
-    cols["earn"] = mark_window(n, eps, h)
-    moves = ri.past_moves(cfg, c, rl.ewma_sigma(c, rc["ewma_lambda"]), events, rc["warmup_bars"])
-    mh = np.full(n, np.nan)
-    for i in np.flatnonzero(cols["earn"].to_numpy()):
-        mh[i] = ri.earnings_stats(moves, rc, idx[i].date())[0]
+    # earnings: each as-of date d uses the events as known at d (SEC 2.02 filings classified by
+    # the 10-Q/10-K reports accepted by d; ri.earnings_versions)
+    earn, mh = np.zeros(n, dtype=bool), np.full(n, np.nan)
+    sigma = rl.ewma_sigma(c, rc["ewma_lambda"])
+    days = np.array([d.date() for d in idx])
+    versions = extra["earnings"].get(t, [])
+    for k, (start, events) in enumerate(versions):
+        end = versions[k + 1][0] if k + 1 < len(versions) else None
+        live = np.ones(n, dtype=bool)
+        if start is not None:
+            live &= days >= start
+        if end is not None:
+            live &= days < end
+        if not live.any():
+            continue
+        eps = [pos[s] for d, tm in events for s in ri.affected_sessions(cfg, d, tm) if s in pos]
+        win = mark_window(n, eps, h) & live
+        earn |= win
+        moves = ri.past_moves(cfg, c, sigma, events, rc["warmup_bars"])
+        for i in np.flatnonzero(win):
+            mh[i] = ri.earnings_stats(moves, rc, idx[i].date())[0]
+    cols["earn"] = earn
     cols["m_hist"] = mh
     # dividends: log shift for ex-dates inside (d, d+h]
     shift = np.zeros(n)
@@ -264,10 +280,10 @@ def run(cfg: dict, rc: dict, eval_sessions: int) -> dict:
         raise SystemExit("no benchmark bars; run collect_prices.py --period 2y first")
     rank = {d: i for i, d in enumerate(bench.index)}
     evdf = ri.load_events(con)
-    extra = {"earnings": ri.earnings_events(evdf), "dividends": ri.dividend_events(evdf), "bench": bench,
+    extra = {"earnings": ri.earnings_versions(evdf), "dividends": ri.dividend_events(evdf), "bench": bench,
              "index_cue": index_cue_series(cfg, bars, rc)}
     out = {"market": cfg["market"], "as_of_date": str(bench.index[-1].date()), "horizons": {}, "by_ticker": {},
-           "inputs": {}, "event_history": {"earnings": sum(map(len, extra["earnings"].values())),
+           "inputs": {}, "event_history": {"earnings": sum(len(v[-1][1]) for v in extra["earnings"].values()),
                                            "dividends": sum(map(len, extra["dividends"].values()))}}
     for h in rc["horizons"]:
         use = {k: ri.enabled(rc, k, cfg["market"], h) for k in INPUTS}

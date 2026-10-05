@@ -83,6 +83,9 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         # amount: dividend per share (ex_dividend); timing: before_open | during | after_close
         # (earnings, when the source has a time). Past events carry a source ending in "_history".
         "amount": "DOUBLE", "timing": "VARCHAR",
+        # periodic_report rows (SEC 10-Q/10-K acceptance, source sec_history): the fiscal period end.
+        # They date each quarter's results release among the 2.02 filings (range_inputs.results_filter).
+        "period_end": "DATE",
     }),
     # Near-the-money implied volatility per ticker and expiry (collect_options.py, US only).
     "options": ("jsonl", {

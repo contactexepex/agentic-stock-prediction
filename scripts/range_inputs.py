@@ -1,5 +1,7 @@
 """Range engine inputs from stored data (library): past earnings-day moves, dividends going ex,
-the overnight index cue for the beta split, and option-implied volatility.
+the overnight index cue for the beta split, and option-implied volatility. Earnings dates are
+read through earnings_events, which keeps only the SEC item 2.02 filings that are a quarter's
+results release (results_filter, by the stored 10-Q/10-K reports, without look-ahead).
 
 Shared by ranges.py (live) and backtest.py (walk-forward), so both use the same rules. The math
 is in rangelib.py; switches and settings are in config/ranges.yaml. `enabled` is true/false, a
@@ -18,6 +20,13 @@ from common import benchmark_key
 
 NEAR_DAYS = 3     # earnings dates this close together are the same report
 MOVED_DAYS = 45   # an upcoming date superseded by a newer one this close was moved
+# SEC item 2.02 filings that are results releases (see results_filter)
+REPORT_GRACE_DAYS = 1      # a release accepted up to a day after its 10-Q/10-K still belongs to it
+REPORT_WINDOW_DAYS = 60    # without a period end, the release is at most this long before the report
+SAME_QUARTER_DAYS = 45     # a yfinance date this close to a confirmed SEC release is the same quarter
+PENDING_MIN_RELEASES = 4   # confirmed releases needed before a pending 2.02 is judged by its lag
+PENDING_LAG_SHARE = 0.75   # pending 2.02 sooner after the quarter end than this x the shortest lag: not results
+PROJECTED_SLACK_DAYS = 10  # a period end projected a year on is that known one if this close (52/53-week years)
 
 
 INPUTS = ("earnings_history", "ex_dividend", "beta_split", "implied_vol")
@@ -57,29 +66,126 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_events(con) -> pd.DataFrame:
-    df = con.execute("SELECT ticker, type, date, timing, amount, source, first_seen_at FROM event_history "
-                     "WHERE type IN ('earnings', 'ex_dividend') ORDER BY ticker, type, date").df()
+    """Earnings, ex-dividend and (SEC markets) periodic-report rows of the event history."""
+    df = con.execute("SELECT ticker, type, date, timing, amount, source, first_seen_at, period_end FROM event_history "
+                     "WHERE type IN ('earnings', 'ex_dividend', 'periodic_report') ORDER BY ticker, type, date").df()
     if df.empty:
         return df
     df["date"] = df["date"].map(_as_date)
+    df["period_end"] = df["period_end"].map(lambda v: None if pd.isna(v) else _as_date(v))
     return _clean(df)
 
 
-def earnings_events(evdf: pd.DataFrame) -> dict[str, list[tuple[date, str | None]]]:
+def periodic_reports(evdf: pd.DataFrame) -> dict[str, list[tuple[date, date | None]]]:
+    """Per ticker: (acceptance date, period end) of each stored 10-Q/10-K, oldest first."""
+    out: dict[str, list] = {}
+    if evdf.empty or "period_end" not in evdf.columns:
+        return out
+    for r in evdf[evdf["type"] == "periodic_report"].itertuples():
+        out.setdefault(r.ticker, []).append((r.date, None if pd.isna(r.period_end) else r.period_end))
+    return {t: sorted(set(v)) for t, v in out.items()}
+
+
+def results_filter(rows: list[tuple[date, str | None, str]], reports: list[tuple[date, date | None]],
+                   as_of: date | None = None) -> list[tuple[date, str | None, str]]:
+    """Drop the SEC item 2.02 filings that are not a quarter's results release, and the yfinance
+    history dates that disagree with a confirmed SEC release. `rows` are (date, timing, source).
+
+    Only the 10-Q/10-K reports accepted on or before `as_of` are used (all stored ones if None), so
+    a walk-forward replay never uses a later filing. For each report, the results release is the
+    latest 2.02 after its period end and up to REPORT_GRACE_DAYS after its acceptance (other 2.02s
+    in that window, e.g. Tesla's delivery reports or pre-announcements, are not results; 2.02s
+    within NEAR_DAYS before it are the same report). A 2.02 between that window and the next
+    period end is not results either. A 2.02 after the newest report's window is pending (its
+    10-Q is not filed yet) and counts, unless PENDING_MIN_RELEASES releases are confirmed and it
+    falls before the next period end (projected a year from the same quarter) or sooner after it
+    than PENDING_LAG_SHARE x the shortest confirmed lag. A 2.02 older than the first window, and
+    every date of a ticker without reports (non-SEC markets, history stored before reports were),
+    is kept. A `yfinance_history` date within SAME_QUARTER_DAYS of a confirmed SEC release
+    (more than NEAR_DAYS away) is dropped: the SEC release wins. Other rows are kept."""
+    known = sorted((f, pe) for f, pe in reports if as_of is None or f <= as_of)
+    if not known:
+        return list(rows)
+    sec = sorted({d for d, _, src in rows if src == "sec_history"})
+    keep: set[date] = set()
+    confirmed: list[date] = []
+    released: set[date] = set()
+    lags: list[int] = []
+    first_lo = None
+    for filed, pe in known:
+        lo = pe if pe is not None else filed - timedelta(days=REPORT_WINDOW_DAYS)
+        first_lo = lo if first_lo is None else min(first_lo, lo)
+        cands = [d for d in sec if lo < d <= filed + timedelta(days=REPORT_GRACE_DAYS)]
+        if not cands:
+            continue
+        rel = max(cands)
+        keep.update(d for d in cands if (rel - d).days <= NEAR_DAYS)
+        confirmed.append(rel)
+        if pe is not None:
+            released.add(pe)
+            lags.append((rel - pe).days)
+    last_hi = known[-1][0] + timedelta(days=REPORT_GRACE_DAYS)
+    pes = {pe for _, pe in known if pe is not None}
+    # period ends: the known ones, and each projected a year on unless a known one is that close
+    ends = sorted(pes | {p + timedelta(days=365) for p in pes
+                         if all(abs((q - p).days - 365) > PROJECTED_SLACK_DAYS for q in pes)})
+    for d in sec:
+        if d <= first_lo:
+            keep.add(d)                                  # before the first report: cannot tell
+        elif d > last_hi:                                # pending: its report is not filed yet
+            pe = max((p for p in ends if p < d), default=None)
+            if len(lags) < PENDING_MIN_RELEASES or pe is None:
+                keep.add(d)
+            elif pe not in released and (d - pe).days >= PENDING_LAG_SHARE * min(lags):
+                keep.add(d)
+    out = []
+    for d, tm, src in rows:
+        if src == "sec_history":
+            if d in keep:
+                out.append((d, tm, src))
+        elif src == "yfinance_history" and any(NEAR_DAYS < abs((d - c).days) <= SAME_QUARTER_DAYS
+                                               for c in confirmed):
+            continue
+        else:
+            out.append((d, tm, src))
+    return out
+
+
+def earnings_events(evdf: pd.DataFrame, as_of: date | None = None) -> dict[str, list[tuple[date, str | None]]]:
     """Per ticker: (date, timing) of every known earnings report, one row per report (a timed row
-    beats an untimed one for the same report)."""
+    beats an untimed one for the same report). SEC 2.02 filings that are not results releases are
+    dropped using the 10-Q/10-K reports accepted by `as_of` (all if None; see results_filter)."""
     out: dict[str, list] = {}
     if evdf.empty:
         return out
+    reports = periodic_reports(evdf)
     e = evdf[evdf["type"] == "earnings"]
     for t, g in e.groupby("ticker"):
-        rows = sorted(((r.date, None if pd.isna(r.timing) else r.timing) for r in g.itertuples()),
-                      key=lambda x: (x[1] is None, x[0]))
+        rows = results_filter([(r.date, None if pd.isna(r.timing) else r.timing, str(r.source or ""))
+                               for r in g.itertuples()], reports.get(t, []), as_of)
+        rows = sorted(((d, tm) for d, tm, _ in rows), key=lambda x: (x[1] is None, x[0]))
         kept: list = []
         for d, tm in rows:
             if all(abs((d - k).days) > NEAR_DAYS for k, _ in kept):
                 kept.append((d, tm))
-        out[t] = sorted(kept)
+        if kept:
+            out[t] = sorted(kept)
+    return out
+
+
+def earnings_versions(evdf: pd.DataFrame) -> dict[str, list[tuple[date | None, list[tuple[date, str | None]]]]]:
+    """Per ticker: (first as-of date, earnings events known then), oldest first. The events only
+    change when a 10-Q/10-K is accepted, so a walk-forward backtest uses the version whose start
+    is the latest on or before its as-of date (None = before the first stored report)."""
+    reports = periodic_reports(evdf)
+    tickers = sorted(set(evdf.loc[evdf["type"] == "earnings", "ticker"])) if not evdf.empty else []
+    out: dict[str, list] = {}
+    for t in tickers:
+        sub = evdf[evdf["ticker"] == t]
+        cuts = sorted({f for f, _ in reports.get(t, [])})
+        versions = [(None, earnings_events(sub, as_of=date.min).get(t, []))]
+        versions += [(c, earnings_events(sub, as_of=c).get(t, [])) for c in cuts]
+        out[t] = versions
     return out
 
 

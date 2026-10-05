@@ -54,7 +54,9 @@ SELECT DISTINCT ON (ticker, type) * FROM events
 WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history')
 ORDER BY ticker, type, first_seen_at DESC, date;
 
--- Every company event ever seen, once per id (past earnings days and dividends for ranges).
+-- Every company event ever seen, once per id (past earnings days and dividends for ranges; SEC
+-- markets also hold `periodic_report` rows, 10-Q/10-K acceptances with period_end). Not every
+-- sec_history earnings row is a results release: read earnings through range_inputs.earnings_events.
 CREATE OR REPLACE VIEW event_history AS
 SELECT DISTINCT ON (id) * FROM events WHERE ticker IS NOT NULL ORDER BY id, first_seen_at;
 
