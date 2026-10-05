@@ -63,3 +63,19 @@ SELECT DISTINCT ON (ticker, as_of_date) * FROM features ORDER BY ticker, as_of_d
 
 CREATE OR REPLACE VIEW regime_latest AS
 SELECT DISTINCT ON (as_of_date) * FROM regime ORDER BY as_of_date, computed_at DESC;
+
+-- Ranges: latest per id, open ones (not yet scored), scored ones with outcomes.
+CREATE OR REPLACE VIEW ranges_latest AS
+SELECT DISTINCT ON (id) * FROM ranges ORDER BY id, made_at;
+
+CREATE OR REPLACE VIEW open_ranges AS
+SELECT r.* FROM ranges_latest r WHERE r.id NOT IN (SELECT range_id FROM range_outcomes);
+
+CREATE OR REPLACE VIEW range_record AS
+SELECT r.*, o.actual_close, o.z, o.hit50, o.hit80, o.naive_hit50, o.naive_hit80, o.is80_pct,
+       o.naive_is80_pct, o.width80_pct, o.naive_width80_pct, o.center_err_pct, o.naive_center_err_pct
+FROM ranges_latest r JOIN (SELECT DISTINCT ON (range_id) * FROM range_outcomes ORDER BY range_id, scored_at) o
+  ON o.range_id = r.id;
+
+CREATE OR REPLACE VIEW calibration_latest AS
+SELECT DISTINCT ON (horizon_days) * FROM calibration ORDER BY horizon_days, as_of_date DESC, computed_at DESC;

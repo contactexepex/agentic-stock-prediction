@@ -1,0 +1,23 @@
+# Range engine settings (docs/DESIGN.md section 4). Shared by both markets.
+horizons: [1, 5]            # trading days ahead
+# Published bands are fixed: a 50% range and an 80% range.
+
+ewma_lambda: 0.94           # volatility decay; recent days count more
+warmup_bars: 60             # bars needed before a volatility estimate is trusted
+
+# Calibration pool: standardized returns from stored history plus live scored ranges.
+history_sessions: 500       # ~2 years of trading days
+half_life_sessions: 120     # recency weighting: an observation 120 sessions old counts half
+live_weight: 2.0            # live scored ranges count this much more than history
+min_pool: 200               # below this, fall back to normal-distribution quantiles
+
+# Centre adjustments (log-return drift, capped).
+cue_weight: 0.5             # share of the overnight cue (pre-market gap / ADR move) applied
+ai_drift_scale: 0.5         # max AI drift = (confidence - 0.5) x this x horizon sigma
+max_center_shift_sigma: 0.5 # hard cap on total centre shift, in horizon sigmas
+
+# Width adjustments.
+earnings_vol_multiple: 3.0  # an earnings day moves like this many normal days (variance add)
+major_event_factor: 1.15    # market-wide major event inside the horizon
+regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.1, UNSTABLE: 1.25}
+max_ai_widen: 0.5           # AI may widen a range by at most 50%, never narrow it

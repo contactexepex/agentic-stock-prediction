@@ -19,10 +19,16 @@ Research only. Nothing here is investment advice, and the routines never trade.
    ratio, RSI, ATR, realized and EWMA volatility, Bollinger width, OBV, volume ratio, beta,
    sector-relative strength) and the file 07 regime (CALM / TRENDING / EVENT_HEAVY / UNSTABLE)
    from the vol index, benchmark trend and the event calendar (`config/events.yaml`).
-5. **Context pack** (`context.py`): everything above as compact tables for the agents.
-6. **Reason** (Claude subagents): news-analyst → bull-researcher + bear-researcher → forecaster.
-7. **Remember**: daily summaries, rolled up into weekly and monthly ones, per market.
-8. **Save** to this repo (append-only data) and **notify** Slack once per market.
+5. **Calibrate** (`calibrate.py`): range quantiles from two years of standardized returns plus
+   live scored ranges, recency-weighted (self-calibration).
+6. **Context pack** (`context.py`): everything above as compact tables for the agents.
+7. **Reason** (Claude subagents): news-analyst → bull-researcher + bear-researcher → forecaster.
+8. **Ranges** (`ranges.py`): 50% and 80% price ranges per ticker for 1 and 5 trading days,
+   widened for earnings, major events and the regime, centre nudged by overnight cues and
+   the AI call. Scored daily against a naive baseline; `backtest.py` checks the formula
+   walk-forward on history.
+9. **Remember**: daily summaries, rolled up into weekly and monthly ones, per market.
+10. **Save** to this repo (append-only data) and **notify** Slack once per market.
 
 Storage is date-partitioned files under `data/<market>/`, queried with DuckDB. See `sql/views.sql`.
 
@@ -54,6 +60,7 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
 4. **First run**: backfill two years of prices once (needed for beta and the range backtest).
    In a Claude Code session on the repo:
    `cd scripts && python collect_prices.py --market india --period 2y && python collect_prices.py --market us --period 2y`,
+   then `python backtest.py --market india` and `--market us` (writes `reports/<market>/backtest-*.md`),
    commit, push. Then click **Run now** on each routine and read the transcript (a green
    status only means the session ran, not that the task succeeded).
 

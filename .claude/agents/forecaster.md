@@ -17,7 +17,13 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   days or the overnight cue (`cue_pct`) points against the call.
 - Confidence 0.50-0.90. Check the track record by confidence band and lower your confidence
   where past calls in that band hit less often than stated.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v2".
+- Optional `range_widen` (0 to 0.5): set it only when you read about a specific risk the
+  formula cannot see (e.g. a pending court ruling, an unscheduled announcement, a geopolitical
+  shock) and say why in the rationale. It can only widen the published range, never narrow it,
+  and applies only to tickers you make a call on.
+- Every ticker gets a published price range from `scripts/ranges.py` whether or not you call it;
+  your call adds a small capped drift to that range's centre.
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v3".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl`, then append to

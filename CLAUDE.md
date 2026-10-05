@@ -12,8 +12,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `config/events.yaml` scheduled market events (rules and fixed dates)
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
   Collectors: `collect_prices`, `collect_quotes`, `collect_events`, `collect_news`,
-  `collect_filings`. Then `score_predictions`, `features` (indicators + regime), `context`.
-  Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07), `events.py` (calendar).
+  `collect_filings`. Then `score_predictions` (calls and ranges), `features` (indicators +
+  regime), `calibrate`, `context`, and after the forecaster `ranges`. `backtest` evaluates the
+  range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
+  `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
   Schemas live in `scripts/common.py`.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
@@ -44,6 +46,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `evidence_ids` must reference news/filing ids. Abstaining is always allowed and often right.
 - No new call for a ticker with indicator quality `BLOCKED`, or with earnings within 1 day
   (`days_to_earnings` <= 1). Lower confidence in `EVENT_HEAVY` and `UNSTABLE` regimes.
+- Price ranges are computed by `scripts/ranges.py`, never by hand. The forecaster may only
+  widen a range (`range_widen` 0-0.5), never narrow it.
 - Calibrate against the track record: if a confidence band hits less often than its stated
   confidence, use lower confidence or abstain.
 - `prompt_version` identifies the agent instructions used (bump it when agent files change).

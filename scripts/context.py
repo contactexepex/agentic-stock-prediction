@@ -57,8 +57,32 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
         ("Open predictions", """
             SELECT id, ticker, as_of_date, horizon_days, direction, confidence FROM open_predictions
             ORDER BY as_of_date, ticker""", []),
-        ("Track record by horizon (all time)", """
+        ("Price ranges published for the latest session (80% and 50%)", """
+            SELECT ticker, horizon_days AS h, target_date, round(base_close, 2) AS base,
+                   round(lo80, 2) AS lo80, round(lo50, 2) AS lo50, round(hi50, 2) AS hi50, round(hi80, 2) AS hi80,
+                   direction, confidence, notes
+            FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)
+            ORDER BY ticker, h""", []),
+        ("Ranges scored on the latest target date (yesterday's calls)", """
+            SELECT ticker, horizon_days AS h, target_date, round(lo80, 2) AS lo80, round(hi80, 2) AS hi80,
+                   round(actual_close, 2) AS actual, hit50, hit80, naive_hit80
+            FROM range_record WHERE target_date = (SELECT max(target_date) FROM range_record)
+            ORDER BY ticker, h""", []),
+        ("Range scorecard (targets: 50% and 80% coverage; score lower is better)", """
+            SELECT horizon_days AS h, CASE WHEN target_date >= current_date - 30 THEN 'last 30d' ELSE 'older' END AS window,
+                   count(*) AS n, round(avg(hit50::INT), 3) AS cover50, round(avg(hit80::INT), 3) AS cover80,
+                   round(avg(naive_hit80::INT), 3) AS naive_cover80,
+                   round(avg(width80_pct), 2) AS width80_pct, round(avg(naive_width80_pct), 2) AS naive_width80_pct,
+                   round(avg(is80_pct), 3) AS score80, round(avg(naive_is80_pct), 3) AS naive_score80
+            FROM range_record GROUP BY ALL
+            UNION ALL
+            SELECT horizon_days, 'all', count(*), round(avg(hit50::INT), 3), round(avg(hit80::INT), 3),
+                   round(avg(naive_hit80::INT), 3), round(avg(width80_pct), 2), round(avg(naive_width80_pct), 2),
+                   round(avg(is80_pct), 3), round(avg(naive_is80_pct), 3)
+            FROM range_record GROUP BY horizon_days ORDER BY 1, 2""", []),
+        ("Track record by horizon (all time; vs always-up baseline)", """
             SELECT horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
+                   round(avg((actual_return > 0)::INT), 3) AS always_up_rate,
                    round(avg(confidence), 3) AS avg_confidence
             FROM track_record GROUP BY horizon_days ORDER BY horizon_days""", []),
         ("Track record by confidence band, last 90 days", """

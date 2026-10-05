@@ -16,7 +16,8 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 
 4. Score: `python scripts/score_predictions.py`.
 
-5. Indicators and regime: `python scripts/features.py`. Keep its JSON summary.
+5. Indicators, regime and calibration: `python scripts/features.py`, then
+   `python scripts/calibrate.py`. Keep both JSON summaries.
 
 6. Context: `python scripts/context.py > work/context.md`.
 
@@ -25,8 +26,9 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 8. Debate: run bull-researcher and bear-researcher in parallel, passing each the market and
    the news brief.
 
-9. Forecast: run the forecaster subagent with the market, the news brief and both cases.
-   Then run `python scripts/context.py > work/context.md` again so the report shows the new calls.
+9. Forecast and ranges: run the forecaster subagent with the market, the news brief and both
+   cases. Then `python scripts/ranges.py` (publishes the 50% and 80% price ranges), and
+   `python scripts/context.py > work/context.md` again so the report shows calls and ranges.
 
 10. Summaries (in `summaries/<market>/`):
    - Write `daily/TODAY.md` (max 400 words): regime, per ticker what changed and why, macro
@@ -42,9 +44,10 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
 
-13. Notify: post ONE message to the Slack channel #market-brief, at most 10 lines: market name
-    and regime, a 1-line headline, the calls with direction and confidence, the 2 most
-    material news items, yesterday's hit/miss count, failed collectors if any, and the link
+13. Notify: post ONE message to the Slack channel #market-brief, at most 12 lines: market name
+    and regime, a 1-line headline, the 1-day 80% ranges for the tickers with calls (ticker,
+    range, direction, confidence), yesterday's ranges hit/miss (80% and 50%), the 2 most
+    material news items, failed collectors if any, and the link
     https://github.com/contactexepex/agentic-stock-prediction/blob/main/reports/<market>/TODAY.md
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and

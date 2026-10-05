@@ -53,6 +53,7 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "id": "VARCHAR", "made_at": "TIMESTAMPTZ", "as_of_date": "DATE", "ticker": "VARCHAR",
         "horizon_days": "INTEGER", "direction": "VARCHAR", "confidence": "DOUBLE",
         "rationale": "VARCHAR", "evidence_ids": "VARCHAR[]", "prompt_version": "VARCHAR",
+        "range_widen": "DOUBLE",
     }),
     "outcomes": ("jsonl", {
         "prediction_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "base_date": "DATE",
@@ -76,6 +77,27 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "id": "VARCHAR", "as_of_date": "DATE", "ticker": "VARCHAR", "computed_at": "TIMESTAMPTZ",
         **FEATURE_COLS,
     }),
+    "ranges": ("jsonl", {
+        "id": "VARCHAR", "made_at": "TIMESTAMPTZ", "as_of_date": "DATE", "session_date": "DATE",
+        "target_date": "DATE", "ticker": "VARCHAR", "horizon_days": "INTEGER",
+        "base_close": "DOUBLE", "center": "DOUBLE", "sigma_h": "DOUBLE",
+        "lo50": "DOUBLE", "hi50": "DOUBLE", "lo80": "DOUBLE", "hi80": "DOUBLE",
+        "naive_lo50": "DOUBLE", "naive_hi50": "DOUBLE", "naive_lo80": "DOUBLE", "naive_hi80": "DOUBLE",
+        "direction": "VARCHAR", "confidence": "DOUBLE", "regime": "VARCHAR",
+        "calibration_id": "VARCHAR", "notes": "VARCHAR[]",
+    }),
+    "range_outcomes": ("jsonl", {
+        "range_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "target_date": "DATE",
+        "actual_close": "DOUBLE", "z": "DOUBLE", "hit50": "BOOLEAN", "hit80": "BOOLEAN",
+        "naive_hit50": "BOOLEAN", "naive_hit80": "BOOLEAN", "is80_pct": "DOUBLE",
+        "naive_is80_pct": "DOUBLE", "width80_pct": "DOUBLE", "naive_width80_pct": "DOUBLE",
+        "center_err_pct": "DOUBLE", "naive_center_err_pct": "DOUBLE",
+    }),
+    "calibration": ("jsonl", {
+        "id": "VARCHAR", "as_of_date": "DATE", "computed_at": "TIMESTAMPTZ", "horizon_days": "INTEGER",
+        "q10": "DOUBLE", "q25": "DOUBLE", "q75": "DOUBLE", "q90": "DOUBLE",
+        "n_history": "INTEGER", "n_live": "INTEGER", "source": "VARCHAR",
+    }),
     "regime": ("jsonl", {
         "id": "VARCHAR", "as_of_date": "DATE", "session_date": "DATE", "computed_at": "TIMESTAMPTZ",
         "regime": "VARCHAR",
@@ -95,6 +117,10 @@ def utc_today() -> date:
 
 
 # ---------- markets ----------
+
+def load_ranges_config() -> dict:
+    return yaml.safe_load((CONFIG / "ranges.yaml").read_text())
+
 
 def market_names() -> list[str]:
     return sorted(p.stem for p in (CONFIG / "markets").glob("*.yaml"))

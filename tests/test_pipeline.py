@@ -62,6 +62,7 @@ def setup(tmp: Path) -> tuple[Path, Path]:
                          ("Apple raises guidance", "duplicate in same feed")]))
     (cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML % feed)
     (cfg / "events.yaml").write_text((REPO / "config" / "events.yaml").read_text().replace("[us]", "[us, testmkt]"))
+    (cfg / "ranges.yaml").write_text((REPO / "config" / "ranges.yaml").read_text())
     return root, cfg
 
 
@@ -187,3 +188,80 @@ def test_market_status(tmp_path):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out["market"] == MARKET and isinstance(out["trading_day"], bool)
+
+
+def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:
+    r = rng.standard_t(4, n) * daily_vol / np.sqrt(2)          # t(4) has variance 2
+    return list(start * np.exp(np.cumsum(r)))
+
+
+def test_calibrate_ranges_and_scoring(tmp_path):
+    root, cfg = setup(tmp_path)
+    rng = np.random.default_rng(11)
+    days = weekdays(date(2024, 6, 3), 520)
+    series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "AAPL": fat_tailed_walk(rng, 520, 150, 0.015),
+              "MSFT": fat_tailed_walk(rng, 520, 300, 0.012), "VOLX": [15.0] * 520}
+    write_bars(root, series, days)
+    assert run("features.py", root, cfg).returncode == 0
+
+    r = run("calibrate.py", root, cfg)
+    assert r.returncode == 0, r.stderr
+    cal = {c["horizon_days"]: c for c in json.loads(r.stdout)["calibration"]}
+    assert cal[1]["source"] == "pool" and cal[1]["n_history"] > 500
+    assert cal[1]["q10"] < cal[1]["q25"] < 0 < cal[1]["q75"] < cal[1]["q90"]
+
+    as_of = days[-1]
+    pred = {"id": f"{as_of}-AAPL-5d", "made_at": "2026-01-01T00:00:00+00:00", "as_of_date": str(as_of),
+            "ticker": "AAPL", "horizon_days": 5, "direction": "up", "confidence": 0.8, "rationale": "t",
+            "evidence_ids": ["x"], "prompt_version": "test", "range_widen": 0.3}
+    p = root / "data" / MARKET / "predictions" / "2026" / "01" / "2026-01-01.jsonl"
+    p.parent.mkdir(parents=True)
+    p.write_text(json.dumps(pred) + "\n")
+
+    r = run("ranges.py", root, cfg)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout)["written"] == 4                 # 2 tickers x 2 horizons
+    assert json.loads(run("ranges.py", root, cfg).stdout)["written"] == 0   # written once
+    rows = {x["id"]: x for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
+            for x in map(json.loads, f.read_text().splitlines())}
+    a5, m5 = rows[f"{as_of}-AAPL-5d"], rows[f"{as_of}-MSFT-5d"]
+    for x in rows.values():
+        assert x["lo80"] < x["lo50"] < x["hi50"] < x["hi80"]
+        assert x["naive_lo80"] < x["base_close"] < x["naive_hi80"]
+    assert a5["direction"] == "up" and a5["center"] > 0 and any("AI widened" in n for n in a5["notes"])
+    assert m5["direction"] is None and m5["center"] == 0
+
+    # add the bars the ranges target and score them
+    targets = sorted({x["target_date"] for x in rows.values()})
+    for i, t in enumerate(targets):
+        d = date.fromisoformat(t)
+        f = root / "data" / MARKET / "prices" / f"{d:%Y}" / f"{d:%m}" / f"{d}.csv"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("date,ticker,open,high,low,close,adj_close,volume,collected_at\n" +
+                     "".join(f"{d},{k},{v[-1]},{v[-1]},{v[-1]},{v[-1]},{v[-1]},1000,2026-01-02T00:00:00+00:00\n"
+                             for k, v in series.items()))
+    s = json.loads(run("score_predictions.py", root, cfg).stdout)
+    assert s["ranges_scored"] == 4 and s["ranges_open"] == 0
+    assert s["hit80"] == 4                                      # unchanged price sits inside every range
+    outs = [x for f in (root / "data" / MARKET / "range_outcomes").glob("**/*.jsonl")
+            for x in map(json.loads, f.read_text().splitlines())]
+    assert all(o["naive_hit80"] and o["width80_pct"] > 0 for o in outs)
+
+    ctx = run("context.py", root, cfg)
+    assert ctx.returncode == 0, ctx.stderr
+    assert "Price ranges" in ctx.stdout and "Range scorecard" in ctx.stdout
+
+
+def test_backtest_coverage_is_calibrated(tmp_path):
+    root, cfg = setup(tmp_path)
+    rng = np.random.default_rng(3)
+    days = weekdays(date(2024, 1, 1), 560)
+    series = {"BENCH": fat_tailed_walk(rng, 560, 100, 0.01), "VOLX": [15.0] * 560,
+              "AAPL": fat_tailed_walk(rng, 560, 150, 0.015), "MSFT": fat_tailed_walk(rng, 560, 300, 0.02)}
+    write_bars(root, series, days)
+    r = run("backtest.py", root, cfg, "--eval-sessions", "150")
+    assert r.returncode == 0, r.stderr
+    h1 = json.loads(r.stdout)["horizons"]["1"]["all"]
+    assert h1["n"] >= 250
+    assert 0.72 <= h1["cover80"] <= 0.88 and 0.42 <= h1["cover50"] <= 0.58
+    assert (root / "reports" / MARKET / f"backtest-{days[-1]}.md").exists()
