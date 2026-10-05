@@ -18,8 +18,9 @@ yfinance hides most request errors behind empty answers, so `failed` lists the Y
 `what`): `calendar` (an error or an empty calendar), `dividends` (an error, or no dividends
 although some are stored for the ticker or its calendar lists an ex-dividend date in the backfill
 window) and `earnings_history` (both yfinance methods raised). The earnings-calendar page
-(finance.yahoo.com) may be refused by the network; the screener fallback (query1) then supplies
-the dates and `earnings_history_sources` counts which method was used."""
+(finance.yahoo.com) is tried first; if it fails (e.g. a network that refuses the host) the
+screener fallback (query1) supplies the dates. `earnings_history_sources` counts which method was
+used."""
 from __future__ import annotations
 
 import json

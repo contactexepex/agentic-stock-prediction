@@ -244,6 +244,26 @@ def test_events_report_silent_yahoo_gaps(env, monkeypatch, capsys):
     assert out["new_history"] == {"earnings": 2, "ex_dividend": 2}
 
 
+def test_events_earnings_lookup_failure_only_when_every_method_raised(env, monkeypatch, capsys):
+    """With finance.yahoo.com reachable the earnings page answers: no failure and the screener is
+    not needed. A method that answers with no rows (None or empty) is a real "no dates", not a
+    failure, even when the other one raised."""
+    blocked = ConnectionError("curl: (56) CONNECT tunnel failed, response 403")
+    cal = {"Earnings Date": [date(2026, 10, 29)]}
+    FakeTicker.specs.update({
+        "AAPL": {"calendar": cal, "page": earnings_frame(["2026-07-30 16:30", "2026-05-01 16:30"]),
+                 "screener": blocked},                     # the primary method answers
+        "MSFT": {"calendar": cal, "page": blocked, "screener": None},    # refused page, no dates listed
+    })
+    code, out = run_main(collect_events, monkeypatch, capsys)
+    assert (code, out["failed"]) == (0, [])
+    assert out["earnings_history_sources"] == {"get_earnings_dates": 1}
+    assert out["new_history"]["earnings"] == 2
+    FakeTicker.specs["MSFT"] = {"calendar": cal, "page": earnings_frame([]), "screener": blocked}
+    code, out = run_main(collect_events, monkeypatch, capsys)
+    assert out["failed"] == []                              # empty page answer, screener raised
+
+
 def test_events_no_dividend_payer_is_fine_but_a_stored_payer_is_not(env, monkeypatch, capsys):
     shot = earnings_frame(["2026-07-22 16:05"])
     FakeTicker.specs.update({

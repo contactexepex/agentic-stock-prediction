@@ -201,10 +201,14 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
 - Yahoo hosts, checked 2026-10-05 (~19:00-19:16 UTC) through a Claude Code session's egress
   proxy (US and India `collect_prices|quotes|events|options` into a scratch root, every HTTP
-  request counted by host). Only `finance.yahoo.com` was refused (403 to CONNECT, also with curl);
-  it serves only yfinance's earnings-calendar page, which `collect_events.py` tries first: all 20
-  tickers per market fell back to the screener on `query1.finance.yahoo.com` and got their
-  earnings dates (`earnings_history_sources`). Prices, quotes and options used only `query1`/`query2`
+  request counted by host). Only `finance.yahoo.com` was refused then (403 to CONNECT, also with
+  curl); it serves only yfinance's earnings-calendar page, which `collect_events.py` tries first:
+  all 20 tickers per market fell back to the screener on `query1.finance.yahoo.com` and got their
+  earnings dates (`earnings_history_sources`). `finance.yahoo.com` was allowlisted later that day:
+  on the rerun of `collect_events.py` (20:06 UTC, both markets) it answered HTTP 200 20 times per
+  market, the earnings page served all 20 tickers (`earnings_history_sources:
+  {get_earnings_dates: 20}`) and `failed` stayed empty. No Yahoo host the routine uses is refused
+  now. Prices, quotes and options used only `query1`/`query2`
   plus `fc.yahoo.com` for the cookie (fresh cache). `consent.yahoo.com` and `guce.yahoo.com` were
   not refused (HTTP 404 at the root) and not contacted. All data came back, but one run silently
   lost BAC's dividend history (yfinance printed "possibly delisted; no price data found"; a rerun
@@ -242,7 +246,8 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   - Yahoo web pages: `finance.yahoo.com`. yfinance worked without it on 2026-10-05 (daily bars,
     fund holdings and an option chain were fetched); its API hosts query1.finance.yahoo.com and
     query2.finance.yahoo.com, and consent.yahoo.com and fc.yahoo.com, all accepted a connection,
-    so only `finance.yahoo.com` needs adding.
+    so only `finance.yahoo.com` needs adding. (Allowlisted later on 2026-10-05: see the Yahoo
+    hosts note above.)
   - Index providers, to read rebalance notices directly: `www.spglobal.com` (S&P methodology and
     announcements), `www.niftyindices.com`. NSE's own nsearchives.nseindia.com (reachable) holds
     the Nifty methodology.
