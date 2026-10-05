@@ -1,7 +1,8 @@
 """Trading calendar and scheduled events (library).
 
 - Trading days come from exchange_calendars (config `calendar`, e.g. XNYS, XBOM). Outside the
-  library's covered range we fall back to Monday-Friday and say so.
+  library's covered range we fall back to Monday-Friday and say so. Dates listed under the
+  market config's `holidays` are always closed (exchange circulars the library lacks).
 - Market events come from config/events.yaml (rules + fixed dates) plus company earnings and
   ex-dividend dates collected into data/<market>/events/ by collect_events.py.
 """
@@ -24,7 +25,13 @@ def _xcal(code: str):
     return xc.get_calendar(code, start="2020-01-01")
 
 
+def extra_holidays(cfg: dict) -> set[date]:
+    return {h if isinstance(h, date) else date.fromisoformat(str(h)) for h in cfg.get("holidays") or []}
+
+
 def is_session(cfg: dict, d: date) -> bool:
+    if d in extra_holidays(cfg):
+        return False
     try:
         cal = _xcal(cfg["calendar"])
         if cal.first_session.date() <= d <= cal.last_session.date():
@@ -114,12 +121,12 @@ def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
             d = prev_session(cfg, d)  # holiday -> previous trading day
             if start <= d <= end:
                 out.append({"date": d, "type": rule["type"], "name": rule["name"],
-                            "major": bool(rule.get("major")), "ticker": None})
+                            "major": bool(rule.get("major")), "ticker": None, "release": rule.get("release")})
     for ev in spec.get("fixed", []):
         d = ev["date"] if isinstance(ev["date"], date) else date.fromisoformat(str(ev["date"]))
         if market in ev["markets"] and start <= d <= end:
             out.append({"date": d, "type": ev["type"], "name": ev["name"],
-                        "major": bool(ev.get("major")), "ticker": None})
+                        "major": bool(ev.get("major")), "ticker": None, "release": ev.get("release")})
     return sorted(out, key=lambda e: (e["date"], e["type"]))
 
 

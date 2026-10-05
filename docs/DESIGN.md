@@ -118,7 +118,10 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 
 ## 11. Open items
 - Watchlists: decided (20 per market, 10 sectors x 2), see `config/markets/`.
-- Verify the India outlet RSS URLs and the 2027 India holiday calendar once live.
+- India outlet RSS checked 2026-10-05 (Moneycontrol's feeds are frozen, now read via Google News).
+  2027 calendars: NSE has not published its 2027 holiday list yet (expected mid-December 2026);
+  `holidays:` in `config/markets/india.yaml` holds the fixed-date ones until then. Add the BLS 2027
+  CPI dates and the RBI FY2027-28 MPC dates to `config/events.yaml` when they are published.
 - Not yet built from section 4: options-implied volatility (US option chains) in the width blend,
   index-then-stock beta split for the centre, past earnings-day moves, and ex-dividend price
   shift (needs the dividend amount). Today: EWMA width, empirical quantiles, earnings / event /

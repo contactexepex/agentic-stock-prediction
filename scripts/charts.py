@@ -70,8 +70,9 @@ def load(con, market: str):
         raise SystemExit("no published ranges; run ranges.py first")
     past = con.execute("SELECT ticker, target_date, lo80, hi80, actual_close, hit80 FROM range_record "
                        "WHERE horizon_days = 1").df()
-    regime = con.execute("SELECT regime FROM regime_latest ORDER BY as_of_date DESC LIMIT 1").fetchone()
-    return ranges, past, (regime[0] if regime else "?")
+    # label with the regime the ranges were built under (a later features.py run may have moved on)
+    regime = ranges["regime"].dropna()
+    return ranges, past, (str(regime.iloc[0]) if len(regime) else "?")
 
 
 def ticker_chart(cfg, t, closes, today, past, regime, path) -> None:
@@ -125,9 +126,8 @@ def ticker_chart(cfg, t, closes, today, past, regime, path) -> None:
     ax.grid(axis="y", color=GRID, linewidth=0.6)
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
 
-    call = fmt_call(r1["direction"] if r1 is not None else None, r1["confidence"] if r1 is not None else None)
-    if r5 is not None and call == "no call":
-        call = fmt_call(r5["direction"], r5["confidence"])
+    made = [(h, r) for h, r in ((1, r1), (5, r5)) if r is not None and r["direction"] in ("up", "down")]
+    call = ", ".join(f"{h}d {fmt_call(r['direction'], r['confidence'])}" for h, r in made) or "no call"
     fig.text(0.08, 0.93, f"{t} · {meta['name']}", fontsize=11, fontweight="bold", color=INK)
     sub = f"Close {money(cur, float(s.iloc[-1]))} · {meta.get('sector') or ''} · regime {regime} · call: {call}"
     if r1 is not None:
@@ -176,7 +176,8 @@ def overview(cfg, bars, ranges, past, regime, as_of, path) -> None:
                 xs, lo, hi = xs + [last + 5], lo + [mine.loc[5]["lo80"]], hi + [mine.loc[5]["hi80"]]
             ax.fill_between(xs, lo, hi, color=BAND80, linewidth=0)
             ax.vlines(last + 1, r["lo80"], r["hi80"], color=BAND50, linewidth=4)
-            call = fmt_call(r["direction"], r["confidence"])
+            made = [(h, mine.loc[h]) for h in (1, 5) if h in mine.index and mine.loc[h]["direction"] in ("up", "down")]
+            call = " ".join(f"{h}d {fmt_call(x['direction'], x['confidence'])}" for h, x in made) or "no call"
         ax.plot(range(len(s)), s.values, color=LINE, linewidth=1.5)
         ax.set_xlim(-1, last + 6)
         p = past[(past["ticker"] == t)].sort_values("target_date")

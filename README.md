@@ -55,8 +55,10 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
 2. **Cloud environment** (claude.ai/code → environment settings):
    - Network access: **Custom**, tick "Also include default list of common package managers", and allow:
      `query1.finance.yahoo.com`, `query2.finance.yahoo.com`, `fc.yahoo.com`, `guce.yahoo.com`,
+     `finance.yahoo.com`, `consent.yahoo.com` (yfinance's cookie fallback when `fc.yahoo.com` fails),
      `news.google.com`, `www.sec.gov`, `data.sec.gov`, `feeds.bbci.co.uk`,
-     `economictimes.indiatimes.com`, `www.moneycontrol.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
+     `economictimes.indiatimes.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
+     (Moneycontrol and CNBC come in through Google News queries, so their own domains are not needed.)
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
    - Setup script: `bash setup.sh`
 3. **Routines** (claude.ai/code/routines → New routine), one per market, both on this repo and environment:

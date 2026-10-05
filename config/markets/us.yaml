@@ -82,7 +82,8 @@ news:
     rates: ["Treasury yields"]
     global: ["oil prices", "geopolitical tensions markets"]
     trade: ["US tariffs trade"]
-  outlets:   # CNBC's RSS returns 403 to cloud servers, so it is not used
+    markets: ["stock market today site:cnbc.com"]   # CNBC headlines via Google News
+  outlets:   # CNBC's own RSS returns 403 to cloud servers (rechecked 2026-10-05), see `markets` above
     - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
 
 filings: sec

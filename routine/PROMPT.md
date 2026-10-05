@@ -7,8 +7,9 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
    `pip install -q -r requirements.txt`.
 
 2. Holiday check: `python scripts/market_status.py`. If `trading_day` is false, post one line
-   to Slack #market-brief ("<market name>: market closed today, next session <session_date>")
-   and stop.
+   to Slack #market-brief with
+   `python scripts/notify_slack.py --text "<market name>: market closed today, next session <session_date>"`
+   (exit code 2 = no webhook: use the Slack connector as in step 13) and stop.
 
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py` and `collect_filings.py` (all in `scripts/`). Keep each JSON summary.
@@ -42,7 +43,8 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
     `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
     `templates/report.md`, then delete the markers. Never change a number, table or chart
-    link written by the script.
+    link written by the script. If report.py prints `"report_kept": true` (today's report was
+    already filled by an earlier run), keep that report and fill only the Slack draft.
 
 12. Save: `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`

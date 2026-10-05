@@ -68,7 +68,7 @@ def main() -> int:
             seen.add(acc)
 
     written = append_jsonl(day_file(market, "filings", utc_today()), rows)
-    print(json.dumps({"collector": "filings", "new_filings": written,
+    print(json.dumps({"collector": "filings", "market": market, "new_filings": written,
                       "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 

@@ -15,7 +15,8 @@ Report markers:
 - `outlook`: the key risks for tomorrow and this week (events table, overnight cues, regime).
 - `sector:<name>`: 2-3 lines per sector pair: what moved each stock, bull vs bear in one line,
   whether both moved together (sector news) or apart (company news).
-- `data_quality`: failed collectors and feeds from the run's JSON summaries; "none" if clean.
+- `data_quality`: failed collectors and feeds (and `stale` news feeds) from the run's JSON
+  summaries; "none" if clean.
 
 Slack draft markers (the whole message stays at most 12 lines):
 - `headline`: one line.

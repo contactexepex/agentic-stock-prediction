@@ -24,13 +24,17 @@ def clean(text: str) -> str:
 def main() -> int:
     ap = market_arg(__doc__)
     ap.add_argument("--dry-run", action="store_true", help="print the payload instead of posting")
+    ap.add_argument("--text", help="post this one line instead of the draft (e.g. the market-closed message)")
     args = ap.parse_args()
     cfg = require_market(args)
     path = ROOT / "work" / f"slack_{cfg['market']}.md"
-    if not path.exists():
+    if args.text:
+        text = args.text.strip() + "\n"
+    elif not path.exists():
         print(json.dumps({"step": "notify", "error": f"{path} not found; run report.py first"}))
         return 1
-    text = clean(path.read_text())
+    else:
+        text = clean(path.read_text())
     if re.search(r"<!--\s*AGENT:", text):
         print(json.dumps({"step": "notify", "error": "draft still has AGENT markers; fill them first"}))
         return 1

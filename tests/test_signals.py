@@ -111,6 +111,31 @@ def test_real_market_configs_and_holidays():
     assert ev.next_session(us, date(2026, 10, 3)) == date(2026, 10, 5)   # Saturday -> Monday
 
 
+def test_config_holidays_close_the_market():
+    india = load_market("india")
+    assert not ev.is_session(india, date(2026, 1, 15))          # Maharashtra civic polls (exchange_calendars)
+    assert not ev.is_session(india, date(2027, 1, 26))          # Republic Day 2027 (config `holidays`)
+    assert ev.next_session(india, date(2027, 1, 26)) == date(2027, 1, 27)
+    assert ev.is_session({**india, "holidays": []}, date(2027, 1, 26)) is True  # library has no 2027 list
+    assert not ev.is_session({"calendar": "XNYS", "holidays": ["2026-10-05"]}, date(2026, 10, 5))
+
+
+def test_scheduled_macro_events():
+    india, us = load_market("india"), load_market("us")
+    evs = ev.market_events(india, date(2026, 10, 1), date(2027, 2, 28))
+    assert {(e["date"], e["type"]) for e in evs} >= {(date(2026, 10, 7), "rbi_policy"), (date(2026, 12, 4), "rbi_policy"),
+                                                     (date(2027, 2, 5), "rbi_policy"), (date(2027, 2, 1), "budget")}
+    us_evs = ev.market_events(us, date(2026, 10, 14), date(2026, 10, 14))
+    cpi = [e for e in us_evs if e["type"] == "cpi"]
+    assert cpi and cpi[0]["major"] and cpi[0]["release"] == "08:30 ET"
+    jobs = ev.market_events(us, date(2026, 11, 6), date(2026, 11, 6))
+    assert jobs[0]["type"] == "jobs_report" and jobs[0]["release"] == "08:30 ET"
+    india_jobs = [e for e in ev.market_events(india, date(2026, 11, 6), date(2026, 11, 6)) if e["type"] == "jobs_report"]
+    assert india_jobs and india_jobs[0]["release"] is None       # released after the NSE close
+    fomc27 = [e["date"] for e in ev.market_events(us, date(2027, 1, 1), date(2027, 12, 31)) if e["type"] == "fomc"]
+    assert len(fomc27) == 8
+
+
 def test_market_events_shift_to_previous_session():
     india = load_market("india")
     evs = ev.market_events(india, date(2026, 10, 1), date(2026, 10, 31))
@@ -119,3 +144,27 @@ def test_market_events_shift_to_previous_session():
     weekly = [e["date"] for e in evs if e["type"] == "weekly_expiry"]
     assert date(2026, 10, 20) not in weekly                    # Diwali holiday -> moved earlier
     assert date(2026, 10, 19) in weekly
+
+
+def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
+    import report
+    us = load_market("us")
+    rows = [{"ticker": t, "horizon_days": 1, "direction": "up", "confidence": 0.6, "base_close": 100.0,
+             "lo80": 98.0, "hi80": 102.0, "lo50": 99.0, "hi50": 101.0, "notes": [], "target_date": "2026-10-06"}
+            for t in list(us["tickers"])[:9]]
+    empty = pd.DataFrame()
+    d = {"as_of": date(2026, 10, 2), "session": date(2026, 10, 5), "ranges": pd.DataFrame(rows),
+         "regime": empty, "features": empty, "quotes": pd.DataFrame(columns=["symbol", "price", "change_pct"]),
+         "scored": empty, "last_target": None, "calls_scored": empty, "scorecard": empty, "by_regime": empty,
+         "direction": empty, "conf_bands": empty, "market": empty, "calibration": empty,
+         "company_events": pd.DataFrame(columns=["date", "name"])}
+    settings = {"repo_url": "https://example.com/r", "branch": "main"}
+    _, slack, _ = report.build(us, d, settings)
+    filled = slack.replace("News: <!-- AGENT:news (the 2 most material items, one line each) -->", "News: a\nb")
+    assert len(filled.strip().splitlines()) <= 12               # 9 calls used to give 15 lines
+    assert "• +6 more in the report" in slack and slack.count("• ") == 4
+    # US CPI at 08:30 ET on the session day: the brief says the calls were made before it
+    d["session"] = date(2026, 10, 14)
+    rep, slack, _ = report.build(us, d, settings)
+    assert "Calls made before release: US CPI (September) at 08:30 ET." in rep
+    assert "calls made before US CPI (September) (08:30 ET)" in slack.splitlines()[0]

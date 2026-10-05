@@ -6,9 +6,15 @@ calendar: XBOM            # exchange_calendars code (BSE and NSE share trading h
 timezone: Asia/Kolkata
 currency: INR
 premarket_quotes: false # NSE has no pre-market trading before the 09:00 pre-open
+# Extra closed days on top of exchange_calendars. XBOM 2026 matches NSE circular
+# NSE/CMTR/71775 (2025-12-12) plus the 2026-01-15 Maharashtra civic-poll holiday; the library
+# has no 2027 holidays yet. NSE publishes the 2027 list around mid-December 2026: replace these
+# provisional fixed-date holidays (Republic Day, Good Friday, Ambedkar Jayanti) with that list.
+holidays: [2027-01-26, 2027-03-26, 2027-04-14]
 
 # Market-level symbols. Roles: benchmark (index the stocks are measured against),
-# vol_index (regime), cue (overnight / pre-open signal), factor (global driver).
+# vol_index (regime), cue (overnight / pre-open signal), factor (global driver),
+# sector_etf (sector context).
 symbols:
   NIFTY50:  {yahoo: "^NSEI", role: benchmark, name: Nifty 50}
   INDIAVIX: {yahoo: "^INDIAVIX", role: vol_index, name: India VIX}
@@ -21,6 +27,11 @@ symbols:
   GOLD:     {yahoo: "GC=F", role: factor, name: Gold}
   US10Y:    {yahoo: "^TNX", role: factor, name: US 10-year yield}
   DXY:      {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
+  # Nifty sector indices (sector context). Only these three have daily history on Yahoo; Auto,
+  # FMCG, Metal, Energy, Infra and Financial Services return just the latest day (checked 2026-10-05).
+  NIFTYBANK:   {yahoo: "^NSEBANK", role: sector_etf, name: Nifty Bank}
+  NIFTYIT:     {yahoo: "^CNXIT", role: sector_etf, name: Nifty IT}
+  NIFTYPHARMA: {yahoo: "^CNXPHARMA", role: sector_etf, name: Nifty Pharma}
 
 # Regime thresholds (PASDS file 07, scaled for India VIX which usually sits lower than US VIX).
 regime:
@@ -79,9 +90,11 @@ news:
     flows: ["FII DII net buying selling"]
     global: ["crude oil prices India", "rupee dollar exchange rate"]
     geopolitics: ["India trade tariffs", "India geopolitical tensions"]
+    markets: ["Sensex Nifty site:moneycontrol.com"]   # Moneycontrol market reports via Google News
   outlets:   # verify each URL on the first run; drop any that fail repeatedly
     - {name: ET Markets, url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: general}
-    - {name: Moneycontrol, url: "https://www.moneycontrol.com/rss/marketreports.xml", category: general}
+    # Moneycontrol's own RSS feeds (marketreports, latestnews, business, ...) stopped updating in
+    # April 2024 (checked 2026-10-05), so Moneycontrol comes in via Google News instead (categories).
     - {name: Livemint Markets, url: "https://www.livemint.com/rss/markets", category: general}
 
 filings: none             # SEC filings only exist for US companies
