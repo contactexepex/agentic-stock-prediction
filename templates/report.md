@@ -23,6 +23,9 @@ Report markers:
   On a late run (`market_status.py` `late_run: true`) say so first: the run started after the
   session closed, so no calls were made and closed-session ranges were not published.
   Then the judge's verdicts: one line per agent (PASS, or FAIL with the reason and what was dropped).
+  Then one line per row of the context pack's "Judge FAILs from the previous run not yet in a
+  report" section (e.g. the monthly graph-builder, judged after the previous brief was posted):
+  run date, agent, reason, what was dropped. Leave it out if that section shows `_none_`.
 
 Slack draft markers (the whole message stays at most 12 lines):
 - `headline`: one line.

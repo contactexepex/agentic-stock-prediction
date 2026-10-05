@@ -28,7 +28,8 @@ Record every FAIL with its reason where it can still be read before the next com
 steps 7-10 in both the report's `data_quality` section and the daily summary; a step 11 FAIL only
 in `data_quality` (the summary was already judged in step 10); a step 14 FAIL only in
 `data/<market>/judgments/` (the brief is already posted), and the next run lists it in its
-`data_quality`.
+`data_quality`: the context pack's section "Judge FAILs from the previous run not yet in a
+report" shows it (step 11).
 Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/MM/TODAY.jsonl`
 (via a work/ file and `cat >>`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>` (unique on a same-day rerun),
 `run_date`, `agent` (one of news-analyst, bull-researcher, bear-researcher, forecaster, summaries,
@@ -113,7 +114,9 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
     `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
     `templates/report.md`, then delete the markers. Never change a number, table or chart
-    link written by the script, and keep the `<!-- report-data: ... -->` line. If report.py
+    link written by the script, and keep the `<!-- report-data: ... -->` line. In `data_quality`,
+    copy every row of the context pack's "Judge FAILs from the previous run not yet in a report"
+    section (e.g. a failed monthly graph-builder run) as one line. If report.py
     prints `"report_kept": true` (today's report was already filled by an earlier run from the
     same data), keep that report and fill only the Slack draft. If it prints a `warning` with
     `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative

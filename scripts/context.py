@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Print a compact Markdown context pack for one market's agents: regime, upcoming events,
 overnight cues and global factors, PASDS indicators, prices and returns, news activity,
-filings, open predictions and the track record. Agents read this instead of raw files."""
+filings, open predictions and the track record, and the previous run's judge FAILs that its
+report could not list (for today's data_quality). Agents read this instead of raw files."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -120,6 +121,29 @@ def upcoming_events(cfg: dict, con) -> str:
     return "| date | event | note |\n|---|---|---|\n" + "".join(f"| {d} | {n} | {k} |\n" for d, n, k in rows)
 
 
+JUDGE_LOOKBACK_DAYS = 7
+
+# The previous run (latest run_date before today, at most JUDGE_LOOKBACK_DAYS back): each agent's
+# final verdict that is a FAIL recorded after that run's last report/slack verdict, i.e. one its
+# report could not list (the step 14 graph-builder), or every final FAIL if it never got that far.
+JUDGE_FAILS_SQL = """
+WITH prev AS (SELECT max(run_date) AS d FROM judgments WHERE run_date < ?::DATE AND run_date >= ?::DATE - ?),
+reported AS (SELECT max(recorded_at) AS t FROM judgments, prev
+             WHERE run_date = prev.d AND agent IN ('report', 'slack')),
+final AS (SELECT j.* FROM judgments j, prev WHERE j.run_date = prev.d
+          QUALIFY row_number() OVER (PARTITION BY j.agent ORDER BY j.recorded_at DESC, j.round DESC) = 1)
+SELECT f.run_date, f.agent, f.round, f.summary, f.dropped, f.recorded_at
+FROM final f, reported
+WHERE upper(f.verdict) = 'FAIL' AND (reported.t IS NULL OR f.recorded_at > reported.t)
+ORDER BY f.recorded_at"""
+
+
+def judge_fails(con, today) -> str:
+    """Judge FAILs of the previous run that its own report could not list (CLAUDE.md "Judging
+    every change"; routine/PROMPT.md step 14): the report copies each into `data_quality`."""
+    return md_table(con.execute(JUDGE_FAILS_SQL, [today, today, JUDGE_LOOKBACK_DAYS]))
+
+
 def main() -> None:
     cfg = require_market(market_arg(__doc__).parse_args())
     con = connect(cfg["market"])
@@ -144,6 +168,8 @@ def main() -> None:
         print(f"## {title}\n\n{body}")
     print(sm.markdown(cfg, con))
     print(fu.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (no consensus, no "surprise")
+    print("## Judge FAILs from the previous run not yet in a report (copy each into data_quality)\n\n"
+          f"{judge_fails(con, utc_today())}")
 
 
 if __name__ == "__main__":
