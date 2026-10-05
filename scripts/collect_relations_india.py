@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Collect India relationship data for watchlist tickers from NSE (session code in nse.py):
-  insiders  SEBI PIT disclosures: the filing index `corporates-pit-gg` (live since about April
-            2026; the older `corporates-pit` feed stopped then) plus each new watchlist filing's
+  insiders  SEBI PIT disclosures: the filing index `corporates-pit-gg` (the older `corporates-pit`
+            feed dwindled in April 2026; its last rows are dated 2 May 2026) plus each new watchlist filing's
             XBRL with one record per disclosed trade              -> data/india/insiders/
   deals     bulk and block deals from the large-deal snapshot (complete for the latest session),
             falling back to the archive CSVs; `--deals-backfill N` also asks the historical API

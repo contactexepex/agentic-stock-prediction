@@ -235,6 +235,13 @@ SELECT DISTINCT ON (id) * FROM reviews ORDER BY id, computed_at DESC;
 CREATE OR REPLACE VIEW announcements_latest AS
 SELECT DISTINCT ON (id) * FROM announcements ORDER BY id, first_seen_at;
 
+-- Announcements with the news-analyst's latest enrichment (news_enriched rows keyed by the same
+-- nse-ann-<seq_id> id); NULL until the analyst has scored the item.
+CREATE OR REPLACE VIEW announcements_enriched AS
+SELECT a.*, e.sentiment, e.relevance, e.materiality, e.event_type, e.urgency, e.summary AS analyst_summary,
+       e.analyzed_at, e.prompt_version
+FROM announcements_latest a LEFT JOIN enriched_latest e USING (id);
+
 -- Latest filing per ticker, basis and period (a revised filing is a newer row).
 CREATE OR REPLACE VIEW financials_latest AS
 SELECT DISTINCT ON (ticker, basis, period_start, period_end) * FROM financials

@@ -30,10 +30,12 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
     tickers, today = list(cfg["tickers"]), utc_today()
     return [
         ("FII/DII cash-market flows (NSE provisional, INR crore)", _flows(con)),
-        ("Company announcements on NSE, last 2 days (primary sources; ids usable as evidence)", md_table(con.execute("""
+        ("Company announcements on NSE, last 2 days (primary sources; ids usable as evidence; "
+         "sentiment and materiality once the news-analyst has scored them)", md_table(con.execute("""
             SELECT ticker, CAST(published_at AS VARCHAR)[:16] AS published_utc, category,
-                   replace(left(subject, 160), '|', '/') AS subject, id
-            FROM announcements_latest
+                   replace(left(subject, 160), '|', '/') AS subject, round(sentiment, 2) AS sentiment,
+                   materiality, id
+            FROM announcements_enriched
             WHERE published_at >= ? AND list_contains(?, ticker)
             ORDER BY published_at DESC LIMIT 40""", [today - timedelta(days=2), tickers]))),
         ("Latest quarterly results (consolidated where filed; INR crore; y/y vs same quarter)", md_table(con.execute("""

@@ -148,9 +148,39 @@ def test_nse_primary_sources_on_real_responses(tmp_path):
 
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
-    for needle in ("FII/FPI net -4,699 cr, DII net +5,182 cr", "nse-ann-106806305",
+    for needle in ("FII/FPI net -4,699 cr, DII net +5,182 cr", "Company announcements on NSE",
                    "| INFY | consolidated | 2026-06-30 | 48211.0 |", "Delivery %", "| INFY | 2026-10-01 | 51.96 |"):
         assert needle in ctx.stdout, needle
+
+
+def test_announcement_enrichment_view_and_context(tmp_path):
+    """news_enriched rows keyed by nse-ann- ids reach the announcements_enriched view and the
+    context pack (which lists the last 2 days, so the context half uses a row dated now)."""
+    from datetime import datetime, timezone
+    root, cfg = setup(tmp_path)
+    replay("collect_nse_india.py", root, cfg, REAL, "--only", "announcements")
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    ann = root / "data" / "india" / "announcements" / f"{now:%Y}" / f"{now:%m}" / f"{now:%Y-%m-%d}.jsonl"
+    ann.parent.mkdir(parents=True, exist_ok=True)
+    with ann.open("a") as f:     # in-test row (not NSE data) so the 2-day context window is time-proof
+        f.write(json.dumps({"id": "nse-ann-test-1", "ticker": "LT", "company": "Larsen & Toubro Limited",
+                            "published_at": now.isoformat(), "category": "Bagging/Receiving of orders/contracts",
+                            "subject": "test order win", "url": None, "source": "test",
+                            "first_seen_at": now.isoformat()}) + "\n")
+    enr = root / "data" / "india" / "news_enriched" / f"{now:%Y}" / f"{now:%m}" / f"{now:%Y-%m-%d}.jsonl"
+    enr.parent.mkdir(parents=True, exist_ok=True)
+    base = {"analyzed_at": now.isoformat(), "relevance": 0.9, "novelty": 0.8, "event_type": "legal",
+            "urgency": "medium", "geopolitical": False, "priced_in": False, "summary": "s", "prompt_version": "news-v5"}
+    enr.write_text(json.dumps({**base, "id": "nse-ann-106806305", "sentiment": -0.4, "materiality": "medium"}) + "\n" +
+                   json.dumps({**base, "id": "nse-ann-test-1", "sentiment": 0.6, "materiality": "high"}) + "\n")
+    q = ("from common import connect; c = connect('india'); print(c.execute(\"SELECT id, sentiment, materiality FROM "
+         "announcements_enriched WHERE id IN ('nse-ann-106806305', 'nse-ann-106806590') ORDER BY id\").fetchall())")
+    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg)}
+    v = subprocess.run([sys.executable, "-c", q], cwd=SCRIPTS, env=env, capture_output=True, text=True)
+    assert v.stdout.strip() == "[('nse-ann-106806305', -0.4, 'medium'), ('nse-ann-106806590', None, None)]", v.stderr
+    ctx = run("context.py", root, cfg)
+    assert ctx.returncode == 0, ctx.stderr
+    assert "| LT |" in ctx.stdout and "| test order win | 0.6 | high | nse-ann-test-1 |" in ctx.stdout
 
 
 def test_empty_endpoint_is_a_warning_not_a_quiet_day(tmp_path):
