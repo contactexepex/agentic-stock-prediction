@@ -1,4 +1,5 @@
-"""Offline end-to-end tests: local RSS fixture, synthetic prices, prediction scoring, context pack.
+"""Offline end-to-end tests: local RSS fixture, synthetic prices, prediction scoring, features,
+regime and the context pack, all on a small throwaway market config.
 Run: pytest -q"""
 from __future__ import annotations
 
@@ -9,13 +10,37 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import numpy as np
+
 REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
+MARKET = "testmkt"
+
+MARKET_YAML = """
+market: testmkt
+name: Test market
+calendar: XNYS
+timezone: America/New_York
+currency: USD
+symbols:
+  BENCH: {role: benchmark, name: Benchmark}
+  VOLX: {role: vol_index, name: Vol index}
+regime: {unstable_vol: 28, event_vol: 20, calm_vol: 16, unstable_bench_vol: 0.25,
+         trend_return_5d: 0.015, flat_return_5d: 0.005, stress_vol_jump: 0.30}
+sectors:
+  Tech: [AAPL, MSFT]
+tickers:
+  AAPL: {name: Apple, aliases: [iPhone]}
+  MSFT: {name: Microsoft}
+news:
+  outlets:
+    - {name: Fixture, url: '%s', category: general}
+"""
 
 
-def run(script: str, root: Path, cfg: Path) -> subprocess.CompletedProcess:
-    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg)}
-    return subprocess.run([sys.executable, str(SCRIPTS / script)], cwd=SCRIPTS, env=env,
+def run(script: str, root: Path, cfg: Path, *args: str) -> subprocess.CompletedProcess:
+    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET}
+    return subprocess.run([sys.executable, str(SCRIPTS / script), *args], cwd=SCRIPTS, env=env,
                           capture_output=True, text=True, check=False)
 
 
@@ -30,29 +55,34 @@ def rss(items: list[tuple[str, str]]) -> str:
 def setup(tmp: Path) -> tuple[Path, Path]:
     root, cfg = tmp / "repo", tmp / "config"
     (root / "data").mkdir(parents=True)
-    cfg.mkdir()
+    (cfg / "markets").mkdir(parents=True)
     feed = tmp / "feed.xml"
     feed.write_text(rss([("Apple raises guidance", "iPhone demand strong"),
                          ("Fed holds rates", "no ticker here"),
                          ("Apple raises guidance", "duplicate in same feed")]))
-    (cfg / "feeds.yaml").write_text(
-        f"outlets:\n  - {{name: Fixture, url: '{feed}', category: general}}\n")
-    (cfg / "watchlist.yaml").write_text("tickers:\n  AAPL:\n    name: Apple\n    aliases: [iPhone]\n")
+    (cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML % feed)
+    (cfg / "events.yaml").write_text((REPO / "config" / "events.yaml").read_text().replace("[us]", "[us, testmkt]"))
     return root, cfg
 
 
-def write_prices(root: Path, start: date, closes: list[float]) -> list[date]:
+def weekdays(start: date, n: int) -> list[date]:
     days, d = [], start
-    while len(days) < len(closes):
+    while len(days) < n:
         if d.weekday() < 5:
             days.append(d)
         d += timedelta(days=1)
-    for day, close in zip(days, closes):
-        p = root / "data" / "prices" / f"{day:%Y}" / f"{day:%m}" / f"{day}.csv"
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text("date,ticker,open,high,low,close,adj_close,volume,collected_at\n"
-                     f"{day},AAPL,{close},{close},{close},{close},{close},1000,2026-01-01T00:00:00+00:00\n")
     return days
+
+
+def write_bars(root: Path, series: dict[str, list[float]], days: list[date]) -> None:
+    for i, day in enumerate(days):
+        p = root / "data" / MARKET / "prices" / f"{day:%Y}" / f"{day:%m}" / f"{day}.csv"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        lines = ["date,ticker,open,high,low,close,adj_close,volume,collected_at"]
+        for t, closes in series.items():
+            c = closes[i]
+            lines.append(f"{day},{t},{c},{c * 1.01},{c * 0.99},{c},{c},{1000 + i},2026-01-01T00:00:00+00:00")
+        p.write_text("\n".join(lines) + "\n")
 
 
 def test_news_collect_tags_and_dedupes(tmp_path):
@@ -60,7 +90,7 @@ def test_news_collect_tags_and_dedupes(tmp_path):
     r = run("collect_news.py", root, cfg)
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["new_items"] == 2
-    rows = [json.loads(l) for f in (root / "data" / "news").glob("**/*.jsonl")
+    rows = [json.loads(l) for f in (root / "data" / MARKET / "news").glob("**/*.jsonl")
             for l in f.read_text().splitlines()]
     tagged = {r["title"]: r["tickers"] for r in rows}
     assert tagged["Apple raises guidance"] == ["AAPL"]
@@ -71,8 +101,10 @@ def test_news_collect_tags_and_dedupes(tmp_path):
 
 def test_scoring_and_context(tmp_path):
     root, cfg = setup(tmp_path)
-    days = write_prices(root, date(2026, 9, 1), [100, 101, 102, 103, 104, 105, 99])
-    pred_dir = root / "data" / "predictions" / "2026" / "09"
+    days = weekdays(date(2026, 9, 1), 7)
+    closes = [100, 101, 102, 103, 104, 105, 99]
+    write_bars(root, {"AAPL": closes, "BENCH": closes, "VOLX": [15] * 7}, days)
+    pred_dir = root / "data" / MARKET / "predictions" / "2026" / "09"
     pred_dir.mkdir(parents=True)
     preds = [
         {"id": f"{days[0]}-AAPL-5d", "made_at": "2026-09-01T22:00:00+00:00", "as_of_date": str(days[0]),
@@ -90,21 +122,56 @@ def test_scoring_and_context(tmp_path):
     r = run("score_predictions.py", root, cfg)
     assert r.returncode == 0, r.stderr
     summary = json.loads(r.stdout)
-    assert summary == {"step": "score", "scored": 2, "still_open": 1}
-    outcomes = {o["prediction_id"]: o for f in (root / "data" / "outcomes").glob("**/*.jsonl")
+    assert (summary["scored"], summary["still_open"]) == (2, 1)
+    outcomes = {o["prediction_id"]: o for f in (root / "data" / MARKET / "outcomes").glob("**/*.jsonl")
                 for o in map(json.loads, f.read_text().splitlines())}
     assert outcomes[preds[0]["id"]]["hit"] is True        # 100 -> 105
     assert outcomes[preds[1]["id"]]["hit"] is False       # 101 -> 99
     assert outcomes[preds[0]["id"]]["target_date"] == str(days[5])
-
     # scoring again is idempotent
     assert json.loads(run("score_predictions.py", root, cfg).stdout)["scored"] == 0
 
-    run("collect_news.py", root, cfg)
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
-    assert "Latest prices and returns" in ctx.stdout and "| AAPL |" in ctx.stdout
     assert "| 5 | 2 | 0.5 |" in ctx.stdout                # 1 hit out of 2 scored
+
+
+def test_features_regime_and_context(tmp_path):
+    root, cfg = setup(tmp_path)
+    rng = np.random.default_rng(7)
+    days = weekdays(date.today() - timedelta(days=420), 290)
+    bench = list(100 * np.exp(np.cumsum(rng.normal(0.0004, 0.01, len(days)))))
+    aapl = list(150 * np.exp(np.cumsum(rng.normal(0.0005, 0.015, len(days)))))
+    write_bars(root, {"BENCH": bench, "AAPL": aapl, "MSFT": aapl[:-1] + [aapl[-2]],
+                      "VOLX": [14.0] * len(days)}, days)
+    events = root / "data" / MARKET / "events" / "2026" / "01" / "2026-01-01.jsonl"
+    events.parent.mkdir(parents=True)
+    soon = date.today() + timedelta(days=3)
+    events.write_text(json.dumps({"id": f"AAPL-earnings-{soon}", "date": str(soon), "type": "earnings",
+                                  "ticker": "AAPL", "name": "Apple earnings", "source": "test",
+                                  "first_seen_at": "2026-01-01T00:00:00+00:00"}) + "\n")
+
+    r = run("features.py", root, cfg)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["as_of_date"] == str(days[-1])
+    assert out["regime"] in {"CALM", "TRENDING", "EVENT_HEAVY", "UNSTABLE"}
+    assert out["tickers"]["BLOCKED"] == 0
+
+    feats = {f["ticker"]: f for p in (root / "data" / MARKET / "features").glob("**/*.jsonl")
+             for f in map(json.loads, p.read_text().splitlines())}
+    a = feats["AAPL"]
+    assert a["bars"] == len(days) and a["quality"] == "OK"
+    assert 0 <= a["rsi_14"] <= 100 and a["atr_pct"] > 0 and a["beta_1y"] is not None
+    assert a["days_to_earnings"] is not None and a["days_to_earnings"] <= 3
+    assert feats["MSFT"]["ret_1d"] == 0.0
+    assert abs(feats["MSFT"]["rel_sector_5d"] + a["rel_sector_5d"]) < 1e-9   # mirror images
+
+    ctx = run("context.py", root, cfg)
+    assert ctx.returncode == 0, ctx.stderr
+    for heading in ("Market regime", "Upcoming events", "Indicators", "Apple earnings"):
+        assert heading in ctx.stdout
+    assert "SEC filings" not in ctx.stdout
 
 
 def test_context_on_empty_repo(tmp_path):
@@ -112,3 +179,11 @@ def test_context_on_empty_repo(tmp_path):
     r = run("context.py", root, cfg)
     assert r.returncode == 0, r.stderr
     assert "_none_" in r.stdout
+
+
+def test_market_status(tmp_path):
+    root, cfg = setup(tmp_path)
+    r = run("market_status.py", root, cfg)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["market"] == MARKET and isinstance(out["trading_day"], bool)

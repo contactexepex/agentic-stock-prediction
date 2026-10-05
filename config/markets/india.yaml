@@ -1,0 +1,87 @@
+# India (NSE). Prices from Yahoo Finance (".NS" symbols). Edit freely; keys are the ids used
+# in data files, reports and prediction ids.
+market: india
+name: India (NSE)
+calendar: XBOM            # exchange_calendars code (BSE and NSE share trading holidays)
+timezone: Asia/Kolkata
+currency: INR
+premarket_quotes: false # NSE has no pre-market trading before the 09:00 pre-open
+
+# Market-level symbols. Roles: benchmark (index the stocks are measured against),
+# vol_index (regime), cue (overnight / pre-open signal), factor (global driver).
+symbols:
+  NIFTY50:  {yahoo: "^NSEI", role: benchmark, name: Nifty 50}
+  INDIAVIX: {yahoo: "^INDIAVIX", role: vol_index, name: India VIX}
+  SPX:      {yahoo: "^GSPC", role: cue, name: S&P 500 (previous US close)}
+  NASDAQ:   {yahoo: "^IXIC", role: cue, name: Nasdaq Composite (previous US close)}
+  NIKKEI:   {yahoo: "^N225", role: cue, name: Nikkei 225}
+  HANGSENG: {yahoo: "^HSI", role: cue, name: Hang Seng}
+  USDINR:   {yahoo: "INR=X", role: factor, name: USD/INR}
+  BRENT:    {yahoo: "BZ=F", role: factor, name: Brent crude}
+  GOLD:     {yahoo: "GC=F", role: factor, name: Gold}
+  US10Y:    {yahoo: "^TNX", role: factor, name: US 10-year yield}
+  DXY:      {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
+
+# Regime thresholds (PASDS file 07, scaled for India VIX which usually sits lower than US VIX).
+regime:
+  unstable_vol: 22        # vol index above this -> UNSTABLE
+  event_vol: 17           # above this (or a major event) -> EVENT_HEAVY
+  calm_vol: 14            # below this and a flat benchmark -> CALM
+  unstable_bench_vol: 0.25
+  trend_return_5d: 0.015
+  flat_return_5d: 0.005
+  stress_vol_jump: 0.30   # one-day vol index jump that triggers stress mode
+
+# Two companies per sector. adr = US-listed share that trades overnight (pre-open cue).
+sectors:
+  Banks: [HDFCBANK, ICICIBANK]
+  IT: [INFY, TCS]
+  Insurance: [SBILIFE, HDFCLIFE]
+  Transport: [ADANIPORTS, INDIGO]
+  Energy: [RELIANCE, ONGC]
+  Pharma: [SUNPHARMA, DRREDDY]
+  Autos: [M&M, MARUTI]
+  Consumer goods: [HINDUNILVR, ITC]
+  Construction: [LT, ULTRACEMCO]
+  Metals: [TATASTEEL, HINDALCO]
+
+tickers:
+  HDFCBANK:   {yahoo: HDFCBANK.NS, name: HDFC Bank, adr: HDB}
+  ICICIBANK:  {yahoo: ICICIBANK.NS, name: ICICI Bank, adr: IBN}
+  INFY:       {yahoo: INFY.NS, name: Infosys, adr: INFY}
+  TCS:        {yahoo: TCS.NS, name: Tata Consultancy Services, aliases: [TCS]}
+  SBILIFE:    {yahoo: SBILIFE.NS, name: SBI Life Insurance, aliases: [SBI Life]}
+  HDFCLIFE:   {yahoo: HDFCLIFE.NS, name: HDFC Life, aliases: [HDFC Life Insurance]}
+  ADANIPORTS: {yahoo: ADANIPORTS.NS, name: Adani Ports, aliases: [APSEZ]}
+  INDIGO:     {yahoo: INDIGO.NS, name: InterGlobe Aviation, aliases: [IndiGo]}
+  RELIANCE:   {yahoo: RELIANCE.NS, name: Reliance Industries, aliases: [RIL]}
+  ONGC:       {yahoo: ONGC.NS, name: ONGC, aliases: [Oil and Natural Gas Corporation]}
+  SUNPHARMA:  {yahoo: SUNPHARMA.NS, name: Sun Pharma, aliases: [Sun Pharmaceutical]}
+  DRREDDY:    {yahoo: DRREDDY.NS, name: Dr Reddy's, aliases: ["Dr. Reddy's"], adr: RDY}
+  M&M:        {yahoo: M&M.NS, name: Mahindra & Mahindra, aliases: [Mahindra]}
+  MARUTI:     {yahoo: MARUTI.NS, name: Maruti Suzuki}
+  HINDUNILVR: {yahoo: HINDUNILVR.NS, name: Hindustan Unilever, aliases: [HUL]}
+  ITC:        {yahoo: ITC.NS, name: ITC, queries: ['"ITC Ltd" share']}
+  LT:         {yahoo: LT.NS, name: Larsen & Toubro, aliases: [L&T]}
+  ULTRACEMCO: {yahoo: ULTRACEMCO.NS, name: UltraTech Cement, aliases: [UltraTech]}
+  TATASTEEL:  {yahoo: TATASTEEL.NS, name: Tata Steel}
+  HINDALCO:   {yahoo: HINDALCO.NS, name: Hindalco}
+
+# News. Every domain here must be allowed in the cloud environment's network settings.
+news:
+  google_news:
+    base: https://news.google.com/rss/search
+    window: 1d
+    params: {hl: en-IN, gl: IN, ceid: "IN:en"}
+    query_template: '"{name}" share'
+  categories:
+    macro: ["RBI monetary policy", "India inflation CPI", "India GDP growth"]
+    flows: ["FII DII net buying selling"]
+    global: ["crude oil prices India", "rupee dollar exchange rate"]
+    geopolitics: ["India trade tariffs", "India geopolitical tensions"]
+  outlets:   # verify each URL on the first run; drop any that fail repeatedly
+    - {name: ET Markets, url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: general}
+    - {name: Moneycontrol, url: "https://www.moneycontrol.com/rss/marketreports.xml", category: general}
+    - {name: Livemint Markets, url: "https://www.livemint.com/rss/markets", category: general}
+
+filings: none             # SEC filings only exist for US companies

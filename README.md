@@ -1,54 +1,65 @@
 # market-brief
 
-A scheduled Claude Code routine that collects free market data, reasons over it with
-subagents, logs scored directional predictions, and posts a daily digest to Slack.
+Two scheduled Claude Code routines, one for India (NSE) and one for the US, that collect free
+market data before the open, compute PASDS indicators and the market regime, reason over them
+with subagents, log scored predictions and post one daily digest per market to Slack.
 No paid APIs: RSS feeds, SEC EDGAR, yfinance, DuckDB, and your Claude subscription.
+Design and roadmap: [`docs/DESIGN.md`](docs/DESIGN.md).
 
-Research only. Nothing here is investment advice, and the routine never trades.
+Research only. Nothing here is investment advice, and the routines never trade.
 
 ## How it works
-1. **Collect** (Python, no LLM): `collect_news.py` (Google News RSS + outlet RSS via feedparser),
-   `collect_prices.py` (yfinance), `collect_filings.py` (SEC EDGAR JSON).
-2. **Score** past predictions against actual prices (`score_predictions.py`).
-3. **Context pack** (`context.py`): returns, news activity/sentiment, filings, track record via DuckDB.
-4. **Reason** (Claude subagents): news-analyst → bull-researcher + bear-researcher → forecaster.
-5. **Remember**: daily summaries, rolled up into weekly and monthly ones.
-6. **Save** to this repo (append-only data) and **notify** Slack.
+1. **Holiday check** (`market_status.py`): exchange calendar; on holidays post one line and stop.
+2. **Collect** (Python, no LLM): `collect_prices.py` (daily bars for 20 tickers plus benchmark,
+   vol index, cues and global factors), `collect_quotes.py` (overnight / pre-market snapshot:
+   futures, Asian markets, ADRs, pre-market gaps), `collect_events.py` (earnings, ex-dividend),
+   `collect_news.py` (Google News + outlet RSS), `collect_filings.py` (SEC, US only).
+3. **Score** past predictions against actual prices (`score_predictions.py`).
+4. **Indicators and regime** (`features.py`): PASDS file 06 indicators per ticker (returns, EMA
+   ratio, RSI, ATR, realized and EWMA volatility, Bollinger width, OBV, volume ratio, beta,
+   sector-relative strength) and the file 07 regime (CALM / TRENDING / EVENT_HEAVY / UNSTABLE)
+   from the vol index, benchmark trend and the event calendar (`config/events.yaml`).
+5. **Context pack** (`context.py`): everything above as compact tables for the agents.
+6. **Reason** (Claude subagents): news-analyst → bull-researcher + bear-researcher → forecaster.
+7. **Remember**: daily summaries, rolled up into weekly and monthly ones, per market.
+8. **Save** to this repo (append-only data) and **notify** Slack once per market.
 
-Storage is date-partitioned files under `data/`, queried with DuckDB. Aggregate any window with
-`time_bucket(INTERVAL '2 weeks', day)` etc. See `sql/views.sql`.
+Storage is date-partitioned files under `data/<market>/`, queried with DuckDB. See `sql/views.sql`.
+
+## Coverage
+`config/markets/india.yaml` and `config/markets/us.yaml`: 10 sectors x 2 companies each, plus
+the market-level symbols. Edit tickers, sectors, regime thresholds and news feeds there.
 
 ## Reused open source
 - [feedparser](https://github.com/kurtmckee/feedparser): RSS parsing
 - [DuckDB](https://github.com/duckdb/duckdb): SQL over JSONL/CSV files
-- [yfinance](https://github.com/ranaroussi/yfinance): daily prices (unofficial Yahoo Finance access; personal use)
+- [yfinance](https://github.com/ranaroussi/yfinance): daily prices and quotes (unofficial Yahoo Finance access; personal use)
+- [exchange_calendars](https://github.com/gerrymanoim/exchange_calendars): trading days and holidays
 - [TradingAgents](https://github.com/TauricResearch/TradingAgents): the analyst/bull/bear/decision
   agent pattern, re-implemented as Claude Code subagents so no LLM API calls are billed
-- Optional later: [edgartools](https://github.com/dgunning/edgartools) for parsing filing financials
 
 ## Setup
-1. **Repo**: create a private GitHub repo, push this folder to `main`. Make sure `main` is not
-   protected against pushes from your account (the routine commits data there).
-2. **Coverage**: edit `config/watchlist.yaml` (tickers, aliases) and `config/feeds.yaml` (categories, outlets).
-3. **Slack**: create a channel `#market-brief`; connect the Slack connector at claude.ai/customize/connectors.
-4. **Cloud environment** (claude.ai/code → environment settings):
+1. **Slack**: create a channel `#market-brief`; connect the Slack connector at claude.ai/customize/connectors.
+2. **Cloud environment** (claude.ai/code → environment settings):
    - Network access: **Custom**, tick "Also include default list of common package managers", and allow:
-     `news.google.com`, `feeds.bbci.co.uk`, `www.cnbc.com`, `www.sec.gov`, `data.sec.gov`,
-     `query1.finance.yahoo.com`, `query2.finance.yahoo.com`, `fc.yahoo.com`, plus any outlet you add.
+     `query1.finance.yahoo.com`, `query2.finance.yahoo.com`, `fc.yahoo.com`, `guce.yahoo.com`,
+     `news.google.com`, `www.sec.gov`, `data.sec.gov`, `feeds.bbci.co.uk`, `www.cnbc.com`,
+     `economictimes.indiatimes.com`, `www.moneycontrol.com`, `www.livemint.com`, plus any outlet you add.
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
    - Setup script: `bash setup.sh`
-5. **Routine** (claude.ai/code/routines → New routine):
-   - Prompt: paste `routine/PROMPT.md` (replace `OWNER/REPO`).
-   - Repository: this repo. Environment: the one from step 4.
-   - Trigger: Schedule → Weekdays, e.g. 07:07 (avoid exactly on the hour).
+3. **Routines** (claude.ai/code/routines → New routine), one per market, both on this repo and environment:
+   - **India**: prompt = `routine/PROMPT.md` with `MARKET=india`; schedule weekdays 08:10 Asia/Kolkata.
+   - **US**: prompt = `routine/PROMPT.md` with `MARKET=us`; schedule weekdays 08:15 America/New_York.
    - Connectors: keep only Slack. Remove everything else, especially anything that can trade.
-6. **First run**: backfill prices once so 20-day returns work. In a Claude Code session on the repo:
-   `cd scripts && python collect_prices.py --period 3mo`, commit, push. Then click **Run now** on the
-   routine and read the transcript (a green status only means the session ran, not that the task succeeded).
+4. **First run**: backfill two years of prices once (needed for beta and the range backtest).
+   In a Claude Code session on the repo:
+   `cd scripts && python collect_prices.py --market india --period 2y && python collect_prices.py --market us --period 2y`,
+   commit, push. Then click **Run now** on each routine and read the transcript (a green
+   status only means the session ran, not that the task succeeded).
 
 ## Local development
 ```
 pip install -r requirements.txt
-pytest -q                      # offline tests with fixtures
-cd scripts && python collect_news.py && python context.py
+pytest -q                      # offline tests with synthetic data and fixtures
+cd scripts && python collect_prices.py --market us && python features.py --market us && python context.py --market us
 ```

@@ -1,50 +1,99 @@
 #!/usr/bin/env python3
-"""Print a compact Markdown context pack for the agents: prices and returns, news activity
-and sentiment by window, recent filings, open predictions and the track record.
-The agents read this instead of raw files, which keeps each run small."""
+"""Print a compact Markdown context pack for one market's agents: regime, upcoming events,
+overnight cues and global factors, PASDS indicators, prices and returns, news activity,
+filings, open predictions and the track record. Agents read this instead of raw files."""
 from __future__ import annotations
 
-from common import connect, md_table, utc_today
+from datetime import timedelta
 
-SECTIONS = [
-    ("Latest prices and returns (%)", """
-        SELECT ticker, date, round(close, 2) AS close,
-               round(ret_1d * 100, 2) AS d1, round(ret_5d * 100, 2) AS d5, round(ret_20d * 100, 2) AS d20
-        FROM returns QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY date DESC) = 1
-        ORDER BY ticker"""),
-    ("News activity and sentiment by window", """
-        SELECT ticker,
-               count(*) FILTER (WHERE day >= current_date - 1)  AS n_1d,
-               count(*) FILTER (WHERE day >= current_date - 7)  AS n_7d,
-               count(*) FILTER (WHERE day >= current_date - 30) AS n_30d,
-               round(avg(sentiment) FILTER (WHERE day >= current_date - 7), 2)  AS sent_7d,
-               round(avg(sentiment) FILTER (WHERE day >= current_date - 30), 2) AS sent_30d,
-               count(*) FILTER (WHERE materiality = 'high' AND day >= current_date - 7) AS high_7d
-        FROM news_ticker_day GROUP BY ticker ORDER BY ticker"""),
-    ("SEC filings, last 14 days", """
-        SELECT ticker, form, filing_date, description, url
-        FROM filings WHERE filing_date >= current_date - 14 ORDER BY filing_date DESC, ticker"""),
-    ("Open predictions", """
-        SELECT id, ticker, as_of_date, horizon_days, direction, confidence FROM open_predictions
-        ORDER BY as_of_date, ticker"""),
-    ("Track record by horizon (all time)", """
-        SELECT horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
-               round(avg(confidence), 3) AS avg_confidence
-        FROM track_record GROUP BY horizon_days ORDER BY horizon_days"""),
-    ("Track record by confidence band, last 90 days", """
-        SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59'
-                    WHEN confidence < 0.7 THEN '0.60-0.69' ELSE '0.70+' END AS band,
-               count(*) AS n, round(avg(hit::INT), 3) AS hit_rate
-        FROM track_record WHERE target_date >= current_date - 90 GROUP BY band ORDER BY band"""),
-]
+import events as ev
+from common import connect, market_arg, md_table, require_market, utc_today
+from features import local_today
+
+PCT = "round({} * 100, 2)"
+
+
+def sections(cfg: dict) -> list[tuple[str, str, list]]:
+    roles = {k: v.get("role") for k, v in cfg["symbols"].items()}
+    names = {**{k: v.get("name", k) for k, v in cfg["symbols"].items()},
+             **{f"{k}:ADR": f"{v['name']} ADR ({v.get('adr')})" for k, v in cfg["tickers"].items()}}
+    case_name = "CASE symbol " + " ".join(f"WHEN '{k}' THEN '{v.replace(chr(39), '')}'" for k, v in names.items()) + " ELSE symbol END"
+    case_role = "CASE symbol " + " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in roles.items()) + " ELSE 'ticker' END"
+    sector = "CASE ticker " + " ".join(f"WHEN '{k}' THEN '{v.get('sector') or ''}'" for k, v in cfg["tickers"].items()) + " END"
+    tickers = list(cfg["tickers"])
+    return [
+        ("Market regime (latest)", """
+            SELECT as_of_date, session_date, regime, vol_level, round(vol_change_1d * 100, 1) AS vol_chg_pct,
+                   round(bench_ret_5d * 100, 2) AS bench_5d_pct, round(bench_vol_10d * 100, 1) AS bench_vol_10d_pct,
+                   major_event, major_event_names, stress, notes
+            FROM regime_latest ORDER BY as_of_date DESC LIMIT 1""", []),
+        ("Overnight cues and global factors (latest snapshot today, UTC)", f"""
+            SELECT symbol, {case_name} AS name, {case_role} AS role, price, prev_close,
+                   round(change_pct * 100, 2) AS change_pct, ts
+            FROM quotes_latest WHERE day = current_date ORDER BY role, symbol""", []),
+        ("Indicators (latest snapshot; returns and vol in %)", f"""
+            SELECT ticker, {sector} AS sector, quality, round(close, 2) AS close,
+                   round(ret_1d * 100, 2) AS d1, round(ret_5d * 100, 2) AS d5, round(ret_20d * 100, 2) AS d20,
+                   round(rsi_14, 0) AS rsi, round(ema_ratio, 3) AS ema_r, round(price_vs_20d_high, 3) AS vs_20d_hi,
+                   round(atr_pct * 100, 2) AS atr_pct, round(ewma_vol * 100, 1) AS ewma_vol,
+                   round(volume_ratio_20d, 2) AS vol_ratio, round(obv_trend, 2) AS obv,
+                   round(beta_1y, 2) AS beta, round(rel_sector_5d * 100, 2) AS vs_peer_5d,
+                   round(cue_change_pct * 100, 2) AS cue_pct, days_to_earnings, ex_dividend_date
+            FROM features_latest
+            WHERE as_of_date = (SELECT max(as_of_date) FROM features_latest) AND list_contains(?, ticker)
+            ORDER BY sector, ticker""", [tickers]),
+        ("News activity and sentiment by window", """
+            SELECT ticker,
+                   count(*) FILTER (WHERE day >= current_date - 1)  AS n_1d,
+                   count(*) FILTER (WHERE day >= current_date - 7)  AS n_7d,
+                   count(*) FILTER (WHERE day >= current_date - 30) AS n_30d,
+                   round(avg(sentiment) FILTER (WHERE day >= current_date - 7), 2)  AS sent_7d,
+                   round(avg(sentiment) FILTER (WHERE day >= current_date - 30), 2) AS sent_30d,
+                   count(*) FILTER (WHERE materiality = 'high' AND day >= current_date - 7) AS high_7d
+            FROM news_ticker_day GROUP BY ticker ORDER BY ticker""", []),
+        ("SEC filings, last 14 days", """
+            SELECT ticker, form, filing_date, description, url
+            FROM filings WHERE filing_date >= current_date - 14 ORDER BY filing_date DESC, ticker""", []),
+        ("Open predictions", """
+            SELECT id, ticker, as_of_date, horizon_days, direction, confidence FROM open_predictions
+            ORDER BY as_of_date, ticker""", []),
+        ("Track record by horizon (all time)", """
+            SELECT horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
+                   round(avg(confidence), 3) AS avg_confidence
+            FROM track_record GROUP BY horizon_days ORDER BY horizon_days""", []),
+        ("Track record by confidence band, last 90 days", """
+            SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59'
+                        WHEN confidence < 0.7 THEN '0.60-0.69' ELSE '0.70+' END AS band,
+                   count(*) AS n, round(avg(hit::INT), 3) AS hit_rate
+            FROM track_record WHERE target_date >= current_date - 90 GROUP BY band ORDER BY band""", []),
+    ]
+
+
+def upcoming_events(cfg: dict, con) -> str:
+    start = local_today(cfg)
+    session = ev.next_session(cfg, start)
+    rows = [(e["date"], e["name"], "major" if e["major"] else "") for e in
+            ev.market_events(cfg, start, session + timedelta(days=14))]
+    rows += con.execute("SELECT date, name, type FROM company_events WHERE date BETWEEN ? AND ?",
+                        [start, session + timedelta(days=14)]).fetchall()
+    if not rows:
+        return "_none_\n"
+    rows.sort(key=lambda r: (r[0], r[1]))
+    return "| date | event | note |\n|---|---|---|\n" + "".join(f"| {d} | {n} | {k} |\n" for d, n, k in rows)
 
 
 def main() -> None:
-    con = connect()
-    print(f"# Context pack for {utc_today()} (UTC)\n")
-    for title, sql in SECTIONS:
-        print(f"## {title}\n")
-        print(md_table(con.execute(sql)))
+    cfg = require_market(market_arg(__doc__).parse_args())
+    con = connect(cfg["market"])
+    print(f"# Context pack: {cfg['name']}, {utc_today()} (UTC)\n")
+    blocks = sections(cfg)
+    for title, sql, params in blocks[:2]:
+        print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
+    print(f"## Upcoming events (next 14 days)\n\n{upcoming_events(cfg, con)}")
+    for title, sql, params in blocks[2:]:
+        if title.startswith("SEC") and cfg.get("filings") != "sec":
+            continue
+        print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
 
 
 if __name__ == "__main__":

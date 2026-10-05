@@ -103,7 +103,7 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 - Cloud environment: allow the extra news, Yahoo and calendar domains.
 
 ## 10. Build phases
-1. Markets config, extra inputs, PASDS indicators, regime, event calendar.
+1. Markets config, extra inputs, PASDS indicators, regime, event calendar. **(built)**
 2. Range engine, self-calibration, scoring against baselines; backtest of range formulas.
 3. Charts, new report layout, Slack message, two routines.
 4. Weekly review: what improved coverage, what to drop.
@@ -111,4 +111,5 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 
 ## 11. Open items
-- India watchlist (5-10 companies) and US watchlist (5-10 companies).
+- Watchlists: decided (20 per market, 10 sectors x 2), see `config/markets/`.
+- Verify the India outlet RSS URLs and the 2027 India holiday calendar once live.

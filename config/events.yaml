@@ -1,0 +1,24 @@
+# Scheduled market events used for the regime (EVENT_HEAVY) and range widening.
+# Company earnings and ex-dividend dates are collected automatically (collect_events.py).
+# `major: true` events raise the regime to EVENT_HEAVY when within 2 calendar days.
+# If a rule date is not a trading day, the event moves to the previous trading day.
+
+rules:
+  - {markets: [us], type: opex, rule: third_friday, name: US monthly options expiry, major: false}
+  - {markets: [us], type: triple_witching, rule: third_friday, months: [3, 6, 9, 12],
+     name: US triple witching, major: true}
+  - {markets: [us, india], type: jobs_report, rule: first_friday,
+     name: "US jobs report (usually first Friday, 08:30 ET; check for shifts)", major: true}
+  - {markets: [india], type: fno_expiry, rule: last_weekday, weekday: 1,
+     name: NSE monthly F&O expiry (last Tuesday), major: true}
+  - {markets: [india], type: weekly_expiry, rule: weekly, weekday: 1,
+     name: Nifty weekly options expiry (Tuesday), major: false}
+
+# One-off dates. Verify each year and add RBI policy, US CPI and index rebalance dates as they
+# are announced. FOMC decisions land at 14:00 ET, after India's close, so India feels them the
+# next session.
+fixed:
+  - {date: 2026-10-28, markets: [us], type: fomc, name: FOMC rate decision, major: true}
+  - {date: 2026-10-29, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}
+  - {date: 2026-12-09, markets: [us], type: fomc, name: FOMC rate decision, major: true}
+  - {date: 2026-12-10, markets: [india], type: fomc, name: FOMC rate decision (previous US evening), major: true}

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Collect recent SEC filings for watchlist tickers from SEC EDGAR's free JSON endpoints
-into data/filings/YYYY/MM/<today>.jsonl. SEC requires a descriptive User-Agent with contact
-info: set SEC_USER_AGENT="your-name your@email.com". Non-SEC-registered tickers are skipped."""
+into data/<market>/filings/YYYY/MM/<today>.jsonl. Only for markets with `filings: sec`.
+SEC requires a descriptive User-Agent with contact info: set
+SEC_USER_AGENT="your-name your@email.com". Non-SEC-registered tickers are skipped."""
 from __future__ import annotations
 
 import json
@@ -11,9 +12,7 @@ import time
 import urllib.request
 from datetime import date, timedelta
 
-import yaml
-
-from common import CONFIG, append_jsonl, day_file, recent_ids, utc_now, utc_today
+from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
 
 DEFAULT_FORMS = ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
 
@@ -25,14 +24,18 @@ def get_json(url: str, ua: str):
 
 
 def main() -> int:
+    watchlist = require_market(market_arg(__doc__).parse_args())
+    market = watchlist["market"]
+    if watchlist.get("filings") != "sec":
+        print(json.dumps({"collector": "filings", "market": market, "skipped": "no SEC filings for this market"}))
+        return 0
     ua = os.environ.get("SEC_USER_AGENT")
     if not ua:
         print(json.dumps({"collector": "filings", "error": "SEC_USER_AGENT not set"}))
         return 1
-    watchlist = yaml.safe_load((CONFIG / "watchlist.yaml").read_text())
     forms = set(watchlist.get("filing_forms", DEFAULT_FORMS))
     since = utc_today() - timedelta(days=int(watchlist.get("filing_lookback_days", 7)))
-    seen = recent_ids("filings", days=60)
+    seen = recent_ids(market, "filings", days=60)
     now = utc_now()
 
     tickmap = get_json("https://www.sec.gov/files/company_tickers.json", ua)
@@ -64,7 +67,7 @@ def main() -> int:
             })
             seen.add(acc)
 
-    written = append_jsonl(day_file("filings", utc_today()), rows)
+    written = append_jsonl(day_file(market, "filings", utc_today()), rows)
     print(json.dumps({"collector": "filings", "new_filings": written,
                       "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0

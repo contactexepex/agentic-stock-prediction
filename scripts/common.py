@@ -1,21 +1,35 @@
 """Shared paths, schemas and DuckDB setup for the market-brief pipeline.
 
-Raw data lives in append-only, date-partitioned files under data/<kind>/YYYY/MM/.
-DuckDB reads those files directly, so any time window is just a SQL query.
+Each market (config/markets/<market>.yaml) has its own data tree: append-only,
+date-partitioned files under data/<market>/<kind>/YYYY/MM/. DuckDB reads those files
+directly, so any time window is just a SQL query. Scripts take --market (or MB_MARKET).
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 import duckdb
+import yaml
 
 CODE = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("MB_ROOT", CODE))
-DATA = ROOT / "data"
 CONFIG = Path(os.environ.get("MB_CONFIG", CODE / "config"))
+
+# Indicator columns written by features.py (formulas in indicators.py).
+FEATURE_COLS: dict[str, str] = {
+    "close": "DOUBLE", "bars": "INTEGER",
+    "ret_1d": "DOUBLE", "ret_3d": "DOUBLE", "ret_5d": "DOUBLE", "ret_20d": "DOUBLE",
+    "ema_ratio": "DOUBLE", "rsi_14": "DOUBLE", "roc_10": "DOUBLE", "price_vs_20d_high": "DOUBLE",
+    "atr_14": "DOUBLE", "atr_pct": "DOUBLE", "realized_vol_10d": "DOUBLE", "ewma_vol": "DOUBLE",
+    "bb_width": "DOUBLE", "obv_trend": "DOUBLE", "volume_ratio_20d": "DOUBLE",
+    "beta_1y": "DOUBLE", "rel_sector_5d": "DOUBLE", "cue_change_pct": "DOUBLE",
+    "days_to_earnings": "INTEGER", "ex_dividend_date": "DATE",
+    "quality": "VARCHAR", "warnings": "VARCHAR[]",
+}
 
 # kind -> (file extension, column types). This is the single source of truth for schemas.
 SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
@@ -26,8 +40,9 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
     }),
     "news_enriched": ("jsonl", {
         "id": "VARCHAR", "analyzed_at": "TIMESTAMPTZ", "relevance": "DOUBLE",
-        "sentiment": "DOUBLE", "materiality": "VARCHAR", "summary": "VARCHAR",
-        "prompt_version": "VARCHAR",
+        "sentiment": "DOUBLE", "novelty": "DOUBLE", "materiality": "VARCHAR",
+        "event_type": "VARCHAR", "urgency": "VARCHAR", "geopolitical": "BOOLEAN",
+        "priced_in": "BOOLEAN", "summary": "VARCHAR", "prompt_version": "VARCHAR",
     }),
     "filings": ("jsonl", {
         "id": "VARCHAR", "ticker": "VARCHAR", "cik": "VARCHAR", "form": "VARCHAR",
@@ -49,6 +64,25 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "low": "DOUBLE", "close": "DOUBLE", "adj_close": "DOUBLE", "volume": "BIGINT",
         "collected_at": "TIMESTAMPTZ",
     }),
+    "quotes": ("jsonl", {
+        "symbol": "VARCHAR", "yahoo": "VARCHAR", "ts": "TIMESTAMPTZ", "price": "DOUBLE",
+        "prev_close": "DOUBLE", "change_pct": "DOUBLE", "collected_at": "TIMESTAMPTZ",
+    }),
+    "events": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "type": "VARCHAR", "ticker": "VARCHAR",
+        "name": "VARCHAR", "source": "VARCHAR", "first_seen_at": "TIMESTAMPTZ",
+    }),
+    "features": ("jsonl", {
+        "id": "VARCHAR", "as_of_date": "DATE", "ticker": "VARCHAR", "computed_at": "TIMESTAMPTZ",
+        **FEATURE_COLS,
+    }),
+    "regime": ("jsonl", {
+        "id": "VARCHAR", "as_of_date": "DATE", "session_date": "DATE", "computed_at": "TIMESTAMPTZ",
+        "regime": "VARCHAR",
+        "vol_level": "DOUBLE", "vol_change_1d": "DOUBLE", "bench_ret_5d": "DOUBLE",
+        "bench_vol_10d": "DOUBLE", "major_event": "BOOLEAN", "major_event_names": "VARCHAR[]",
+        "stress": "BOOLEAN", "notes": "VARCHAR[]",
+    }),
 }
 
 
@@ -60,9 +94,63 @@ def utc_today() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def day_file(kind: str, day: date, ext: str | None = None) -> Path:
+# ---------- markets ----------
+
+def market_names() -> list[str]:
+    return sorted(p.stem for p in (CONFIG / "markets").glob("*.yaml"))
+
+
+def load_market(name: str) -> dict:
+    path = CONFIG / "markets" / f"{name}.yaml"
+    if not path.exists():
+        raise SystemExit(f"unknown market {name!r}; available: {market_names()}")
+    cfg = yaml.safe_load(path.read_text())
+    cfg.setdefault("market", name)
+    cfg.setdefault("symbols", {})
+    for key, meta in cfg["tickers"].items():
+        meta.setdefault("yahoo", key)
+    for key, meta in cfg["symbols"].items():
+        meta.setdefault("yahoo", key)
+    sector_of = {t: s for s, ts in cfg.get("sectors", {}).items() for t in ts}
+    for key, meta in cfg["tickers"].items():
+        meta.setdefault("sector", sector_of.get(key))
+    return cfg
+
+
+def market_arg(description: str | None = None) -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(description=description)
+    ap.add_argument("--market", default=os.environ.get("MB_MARKET"),
+                    help="market config name, e.g. india or us (default: $MB_MARKET)")
+    return ap
+
+
+def require_market(args) -> dict:
+    if not args.market:
+        raise SystemExit(f"--market is required; available: {market_names()}")
+    return load_market(args.market)
+
+
+def symbols_by_role(cfg: dict, role: str) -> dict[str, dict]:
+    return {k: v for k, v in cfg["symbols"].items() if v.get("role") == role}
+
+
+def benchmark_key(cfg: dict) -> str | None:
+    return next(iter(symbols_by_role(cfg, "benchmark")), None)
+
+
+def vol_index_key(cfg: dict) -> str | None:
+    return next(iter(symbols_by_role(cfg, "vol_index")), None)
+
+
+# ---------- files ----------
+
+def data_dir(market: str) -> Path:
+    return ROOT / "data" / market
+
+
+def day_file(market: str, kind: str, day: date, ext: str | None = None) -> Path:
     ext = ext or SCHEMAS[kind][0]
-    path = DATA / kind / f"{day:%Y}" / f"{day:%m}" / f"{day:%Y-%m-%d}.{ext}"
+    path = data_dir(market) / kind / f"{day:%Y}" / f"{day:%m}" / f"{day:%Y-%m-%d}.{ext}"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -73,14 +161,14 @@ def append_jsonl(path: Path, rows) -> int:
     if rows:
         with path.open("a", encoding="utf-8") as f:
             for row in rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
     return len(rows)
 
 
-def recent_ids(kind: str, days: int, key: str = "id") -> set[str]:
+def recent_ids(market: str, kind: str, days: int, key: str = "id") -> set[str]:
     """Ids seen in the last `days` daily files of a kind (for de-duplication)."""
     ids: set[str] = set()
-    files = sorted((DATA / kind).glob("**/*.jsonl"))[-days:]
+    files = sorted((data_dir(market) / kind).glob("**/*.jsonl"))[-days:]
     for f in files:
         for line in f.read_text(encoding="utf-8").splitlines():
             if line.strip():
@@ -88,15 +176,16 @@ def recent_ids(kind: str, days: int, key: str = "id") -> set[str]:
     return ids
 
 
-def connect() -> duckdb.DuckDBPyConnection:
+def connect(market: str) -> duckdb.DuckDBPyConnection:
     """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql."""
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
+    base = data_dir(market)
     for name, (ext, cols) in SCHEMAS.items():
-        has_files = any((DATA / name).glob(f"**/*.{ext}"))
+        has_files = any((base / name).glob(f"**/*.{ext}"))
         col_spec = "{" + ", ".join(f"'{k}': '{v}'" for k, v in cols.items()) + "}"
         if has_files:
-            pattern = (DATA / name).as_posix() + f"/**/*.{ext}"
+            pattern = (base / name).as_posix() + f"/**/*.{ext}"
             if ext == "jsonl":
                 src = f"read_json('{pattern}', format='newline_delimited', columns={col_spec})"
             else:

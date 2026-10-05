@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import sys
 
-from common import append_jsonl, connect, day_file, utc_now, utc_today
+from common import append_jsonl, connect, day_file, market_arg, require_market, utc_now, utc_today
 
 SQL = """
 WITH base AS (
@@ -24,15 +24,16 @@ FROM base JOIN bars t ON t.ticker = base.ticker AND t.rn = base.rn + base.horizo
 
 
 def main() -> int:
-    con = connect()
+    market = require_market(market_arg(__doc__).parse_args())["market"]
+    con = connect(market)
     now = utc_now()
     rows = [{
         "prediction_id": pid, "scored_at": now, "base_date": str(bd), "base_close": bc,
         "target_date": str(td), "target_close": tc, "actual_return": round(ret, 6), "hit": bool(hit),
     } for pid, bd, bc, td, tc, ret, hit in con.execute(SQL).fetchall()]
-    written = append_jsonl(day_file("outcomes", utc_today()), rows)
+    written = append_jsonl(day_file(market, "outcomes", utc_today()), rows)
     open_left = con.execute("SELECT count(*) FROM open_predictions").fetchone()[0] - written
-    print(json.dumps({"step": "score", "scored": written, "still_open": open_left}, indent=2))
+    print(json.dumps({"step": "score", "market": market, "scored": written, "still_open": open_left}, indent=2))
     return 0
 
 

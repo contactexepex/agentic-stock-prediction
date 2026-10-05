@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Collect RSS headlines (Google News queries + outlet feeds) into
-data/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the last 7 days.
-Prints a JSON summary. Exit code 1 only if every feed failed."""
+"""Collect RSS headlines (Google News queries + outlet feeds from the market config's `news`
+section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the
+last 7 days. Prints a JSON summary. Exit code 1 only if every feed failed."""
 from __future__ import annotations
 
 import hashlib
@@ -13,9 +13,8 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
 import feedparser
-import yaml
 
-from common import CONFIG, append_jsonl, day_file, recent_ids, utc_now, utc_today
+from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
 
 USER_AGENT = "market-brief/1.0 (personal research; RSS reader)"
 MAX_AGE = timedelta(days=3)
@@ -41,8 +40,9 @@ def build_jobs(feeds: dict, watchlist: dict) -> list[dict]:
     jobs = []
     g = feeds.get("google_news")
     if g:
+        template = g.get("query_template", '"{name}" stock')
         for ticker, meta in watchlist.get("tickers", {}).items():
-            for q in meta.get("queries", [f'"{meta["name"]}" stock']):
+            for q in meta.get("queries", [template.format(name=meta["name"])]):
                 jobs.append({"url": google_news_url(q, g), "feed": f"gnews:{q}",
                              "category": "company", "tickers": [ticker]})
         for cat, queries in feeds.get("categories", {}).items():
@@ -69,10 +69,10 @@ def parse_time(entry) -> datetime | None:
 
 
 def main() -> int:
-    feeds = yaml.safe_load((CONFIG / "feeds.yaml").read_text())
-    watchlist = yaml.safe_load((CONFIG / "watchlist.yaml").read_text())
+    watchlist = require_market(market_arg(__doc__).parse_args())
+    feeds, market = watchlist.get("news", {}), watchlist["market"]
     pats = alias_patterns(watchlist)
-    seen = recent_ids("news", days=7)
+    seen = recent_ids(market, "news", days=7)
     now, now_dt = utc_now(), datetime.now(timezone.utc)
     items: dict[str, dict] = {}
     failed = []
@@ -110,8 +110,8 @@ def main() -> int:
                 "tickers": sorted(tickers),
             }
 
-    written = append_jsonl(day_file("news", utc_today()), items.values())
-    print(json.dumps({"collector": "news", "feeds": len(jobs), "failed": failed,
+    written = append_jsonl(day_file(market, "news", utc_today()), items.values())
+    print(json.dumps({"collector": "news", "market": market, "feeds": len(jobs), "failed": failed,
                       "new_items": written}, indent=2))
     return 1 if jobs and len(failed) == len(jobs) else 0
 

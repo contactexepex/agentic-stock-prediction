@@ -1,0 +1,91 @@
+# US (NYSE / Nasdaq). Prices from Yahoo Finance. Edit freely; keys are the ids used in data
+# files, reports and prediction ids.
+market: us
+name: US (NYSE/Nasdaq)
+calendar: XNYS
+timezone: America/New_York
+currency: USD
+premarket_quotes: true  # snapshot each ticker's pre-market price (gap vs previous close)
+
+# Roles: benchmark, vol_index (regime), cue (pre-market signal), factor (global driver),
+# sector_etf (sector context).
+symbols:
+  SPY:     {yahoo: SPY, role: benchmark, name: S&P 500 ETF}
+  VIX:     {yahoo: "^VIX", role: vol_index, name: VIX}
+  ES:      {yahoo: "ES=F", role: cue, name: S&P 500 futures}
+  NQ:      {yahoo: "NQ=F", role: cue, name: Nasdaq 100 futures}
+  US10Y:   {yahoo: "^TNX", role: factor, name: US 10-year yield}
+  DXY:     {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
+  WTI:     {yahoo: "CL=F", role: factor, name: WTI crude}
+  GOLD:    {yahoo: "GC=F", role: factor, name: Gold}
+  XLF:     {yahoo: XLF, role: sector_etf, name: Financials}
+  XLK:     {yahoo: XLK, role: sector_etf, name: Technology}
+  XLC:     {yahoo: XLC, role: sector_etf, name: Communication services}
+  XLE:     {yahoo: XLE, role: sector_etf, name: Energy}
+  XLV:     {yahoo: XLV, role: sector_etf, name: Health care}
+  XLY:     {yahoo: XLY, role: sector_etf, name: Consumer discretionary}
+  XLP:     {yahoo: XLP, role: sector_etf, name: Consumer staples}
+  XLI:     {yahoo: XLI, role: sector_etf, name: Industrials}
+
+# Regime thresholds (PASDS file 07).
+regime:
+  unstable_vol: 28
+  event_vol: 20
+  calm_vol: 16
+  unstable_bench_vol: 0.25
+  trend_return_5d: 0.015
+  flat_return_5d: 0.005
+  stress_vol_jump: 0.30
+
+sectors:
+  Banks: [JPM, BAC]
+  Tech: [NVDA, AAPL]
+  Internet: [GOOGL, META]
+  Insurance: [PGR, ALL]
+  Airlines: [DAL, UAL]
+  Energy: [XOM, CVX]
+  Pharma: [LLY, MRK]
+  Autos: [TSLA, GM]
+  Retail: [WMT, COST]
+  Industrials: [CAT, DE]
+
+tickers:
+  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, Jamie Dimon]}
+  BAC:   {name: Bank of America}
+  NVDA:  {name: Nvidia, aliases: [Jensen Huang]}
+  AAPL:  {name: Apple, aliases: [iPhone, Tim Cook]}
+  GOOGL: {name: Alphabet, aliases: [Google]}
+  META:  {name: Meta Platforms, aliases: [Meta, Facebook, Instagram]}
+  PGR:   {name: Progressive, queries: ['"Progressive Corp" stock', '"Progressive insurance" stock']}
+  ALL:   {name: Allstate}
+  DAL:   {name: Delta Air Lines}
+  UAL:   {name: United Airlines}
+  XOM:   {name: ExxonMobil, aliases: [Exxon]}
+  CVX:   {name: Chevron}
+  LLY:   {name: Eli Lilly, aliases: [Lilly]}
+  MRK:   {name: Merck}
+  TSLA:  {name: Tesla, aliases: [Elon Musk]}
+  GM:    {name: General Motors}
+  WMT:   {name: Walmart}
+  COST:  {name: Costco}
+  CAT:   {name: Caterpillar}
+  DE:    {name: Deere, aliases: [John Deere]}
+
+news:
+  google_news:
+    base: https://news.google.com/rss/search
+    window: 1d
+    params: {hl: en-US, gl: US, ceid: "US:en"}
+    query_template: '"{name}" stock'
+  categories:
+    macro: ["Federal Reserve interest rates", "US inflation CPI", "US jobs report"]
+    rates: ["Treasury yields"]
+    global: ["oil prices", "geopolitical tensions markets"]
+    trade: ["US tariffs trade"]
+  outlets:
+    - {name: CNBC Top News, url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", category: general}
+    - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
+
+filings: sec
+filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
+filing_lookback_days: 7
