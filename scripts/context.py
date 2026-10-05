@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import events as ev
+import smart_money as sm
 from common import connect, market_arg, md_table, require_market, utc_today
 from features import local_today
 
@@ -118,6 +119,7 @@ def main() -> None:
         if title.startswith("SEC") and cfg.get("filings") != "sec":
             continue
         print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
+    print(sm.markdown(cfg, con))
 
 
 if __name__ == "__main__":

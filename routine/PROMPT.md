@@ -13,6 +13,9 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py` and `collect_filings.py` (all in `scripts/`). Keep each JSON summary.
    A failed collector is not fatal: continue and report what failed.
+   Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`
+   (Form 4) and `collect_stakes.py` (13D/13G) every day, and `collect_holdings.py` (13F): it
+   downloads only when a new quarter's 13F filings exist and otherwise prints `skipped`.
 
 4. Score: `python scripts/score_predictions.py`.
 

@@ -16,6 +16,7 @@ import pandas as pd
 
 import events as ev
 import rangelib as rl
+import smart_money as sm
 from common import (append_jsonl, connect, day_file, load_ranges_config, market_arg, require_market,
                     utc_now)
 from features import load_bars
@@ -41,6 +42,7 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
     bars = load_bars(con)
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     earnings = {t: d for t, k, d in company if k == "earnings"}
+    smart = sm.range_flags(con, as_of, rc)   # risk flags (fresh activist 13D); widen off by default
     now, rows = utc_now(), []
 
     for h in rc["horizons"]:
@@ -67,6 +69,9 @@ def build(cfg: dict, rc: dict, con) -> list[dict]:
             e = earnings.get(t)
             sigma_h, wnotes = rl.horizon_sigma(sd, h, bool(e and e <= tgt), rc, reg["regime"], bool(major))
             notes += wnotes
+            sm_factor, sm_notes = smart.get(t, (1.0, []))
+            sigma_h *= sm_factor
+            notes += sm_notes
             # centre: overnight cue + AI drift, capped
             center = 0.0
             cue = f.get("cue_change_pct")

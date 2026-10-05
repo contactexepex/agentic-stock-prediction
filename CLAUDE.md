@@ -20,6 +20,12 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
   Schemas live in `scripts/common.py`.
+- Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
+  `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
+  `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.
+  Views `insider_flow`, `insider_cluster_buys`, `activist_stakes`, `holdings_change` and
+  `holdings_quarter` feed the context pack's "Smart money" section and a range risk note
+  (`scripts/smart_money.py`; the widen `activist_13d_factor` in `config/ranges.yaml` stays off).
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
