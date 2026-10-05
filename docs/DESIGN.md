@@ -98,6 +98,34 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 | AI judgement | **Live forward testing only.** Never backtested, because the model may have seen past outcomes during training. |
 | Verdict | Live results after 4-6 weeks (several hundred scored ranges). Weekly review (`review.py`) proposes parameter changes; a human applies them. |
 
+**Historical replay** (`scripts/replay.py --market india|us [--start --end]`): before going live,
+everything rule-based is replayed walk-forward over all stored bars, one as-of day d at a time,
+with only what `ranges.py` would know pre-open the next session (bars up to d's close; earnings
+versions by the 10-Q/10-K reports accepted by that session date; dividends; major events).
+- Ranges: 1d and 5d 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles
+  at d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches
+  on, centre cap, ex-dividend shift), reusing `rangelib`, `range_inputs` and `backtest` helpers.
+  Scored on the close h bars later: coverage overall and by regime, sector, ticker, month, year,
+  earnings and major event in horizon; interval score and width vs the naive range; calibration
+  (stated vs actual coverage, the two published bands plus other levels of the same pool).
+- Regime per day (`regime.classify` on the vol index and benchmark closes, as `features.py`).
+- Direction baselines, labelled as such (the forecaster must beat them live): always-up, 1d and
+  5d momentum sign, RSI(14) mean reversion (below 30 up, above 70 down; `indicators.py` has no
+  signal of its own). Hit rate, 95% interval clustered by date blocks, exact binomial test vs 50%,
+  difference vs always-up on the same rows.
+- Not replayable, so left out and listed in the report: AI drift and widening, own-stock overnight
+  cues (no pre-market/ADR history; the next open would be look-ahead), the US futures index cue,
+  implied vol, live ranges in the calibration pool, pre-open vol quotes. India's index cue (S&P 500
+  previous close x fitted beta) is replayed. Past event dates count as known in advance.
+- Output: a self-contained, novice-first HTML page (three plain sentences answering "do the ranges
+  keep their promise?", "where are they too wide or too narrow?" and "do simple up/down rules
+  work?", four big numbers, three captioned charts; every table, the full findings and the method
+  in collapsed sections) and the full results as JSON in `reports/<market>/replay-<end>.*`, plus
+  one append-only row in `data/<market>/replays/` (schema `replays`). Tests
+  (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's
+  fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
+  synthetic series. About 22 s per market for five years of bars.
+
 ## 8. Output
 Processing data and presentation are separate. Processing data is what the next run reads:
 append-only JSONL under `data/`, the context pack and the summaries; presentation never writes

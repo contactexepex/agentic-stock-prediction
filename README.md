@@ -96,6 +96,10 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    In a Claude Code session on the repo:
    `cd scripts && python collect_prices.py --market india --period 2y && python collect_prices.py --market us --period 2y`,
    then `python backtest.py --market india` and `--market us` (writes `reports/<market>/backtest-*.md`),
+   and `python replay.py --market india` and `--market us` (historical replay of all rule-based
+   parts: ranges, regime and direction baselines scored day by day; writes a self-contained
+   `reports/<market>/replay-<end>.html` with a plain-language summary, a `.json` with every number,
+   and a row in `data/<market>/replays/`; `--start`/`--end` pick the as-of window),
    commit, push. Then click **Run now** on each routine and read the transcript (a green
    status only means the session ran, not that the task succeeded).
 5. **After adding a symbol** to a market config, backfill it once the same way (bars already
