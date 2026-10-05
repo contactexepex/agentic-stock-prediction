@@ -91,7 +91,7 @@ news:
     - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
 
 filings: sec
-filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
+filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G"]  # new-format 13D/13G since Dec 2024
 filing_lookback_days: 7
 
 # Range engine inputs (docs/DESIGN.md section 4). options: implied vol from yfinance option chains

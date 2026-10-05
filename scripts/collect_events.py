@@ -100,23 +100,22 @@ def yf_earnings(cfg: dict, tk, limit: int = 40) -> tuple[list[tuple[date, str | 
 
 def sec_earnings(cfg: dict, tickers: dict, ua: str) -> dict[str, list[tuple[date, str | None, int]]]:
     """Past results releases from SEC EDGAR: 8-K filings with item 2.02, timed by acceptance."""
-    from collect_filings import get_json
-    import time
+    from sec import Edgar  # shared SEC client: one throttle, backoff on 429/503, test fixtures
 
-    tickmap = get_json("https://www.sec.gov/files/company_tickers.json", ua)
-    cik_by_ticker = {v["ticker"].upper(): int(v["cik_str"]) for v in tickmap.values()}
+    edgar = Edgar(ua)
+    cik_by_ticker = edgar.cik_map()
     out: dict[str, list] = {}
     for key, meta in tickers.items():
         cik = cik_by_ticker.get(meta.get("sec_ticker", key).upper())
         if cik is None:
             continue
         try:
-            recent = get_json(f"https://data.sec.gov/submissions/CIK{cik:010d}.json", ua)["filings"]["recent"]
+            recent = edgar.recent(cik)
         except Exception:
             continue
-        time.sleep(0.2)
+        items = recent.get("items") or [""] * len(recent["form"])
         for i, form in enumerate(recent["form"]):
-            if form in ("8-K", "6-K") and "2.02" in (recent["items"][i] or "") and recent["acceptanceDateTime"][i]:
+            if form in ("8-K", "6-K") and "2.02" in (items[i] or "") and recent["acceptanceDateTime"][i]:
                 d, tm = timing(cfg, pd.Timestamp(recent["acceptanceDateTime"][i]))
                 out.setdefault(key, []).append((d, tm, 0))
     return out

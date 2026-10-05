@@ -494,3 +494,28 @@ def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
     monkeypatch.setattr(sec.time, "sleep", lambda s: None)
     assert sec.Edgar("test test@example.com").json("https://data.sec.gov/x.json") == {"ok": 1}
     assert len(calls) == 3
+
+
+def test_collect_events_sec_earnings_timing_runs(tmp_path, monkeypatch):
+    """collect_events' SEC earnings timing goes through sec.Edgar (a broken import used to be
+    swallowed as sec_error with exit 0). 8-K item 2.02 filings become (date, timing) rows."""
+    import collect_events as ce
+    root, cfg = setup(tmp_path)
+    fx = tmp_path / "sec"
+    sub = json.loads((fx / "sub_320193.json").read_text())
+    recent = sub["filings"]["recent"]
+    n = len(recent["form"])
+    recent["items"] = ["2.02,9.01" if f == "8-K" else "" for f in recent["form"]]
+    (fx / "sub_320193.json").write_text(json.dumps(sub))
+    monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
+    us = {"market": "us", "calendar": "XNYS", "timezone": "America/New_York"}
+    out = ce.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "test test@example.com")
+    assert list(out) == ["AAPL"] and len(out["AAPL"]) == 1 and n > 1   # only the 8-K with item 2.02
+    d, tm, rank = out["AAPL"][0]
+    assert rank == 0 and tm in ("before_open", "during", "after_close")
+
+
+def test_us_config_keeps_new_13d_form_names():
+    import yaml
+    forms = yaml.safe_load((REPO / "config" / "markets" / "us.yaml").read_text())["filing_forms"]
+    assert {"SCHEDULE 13D", "SCHEDULE 13G"} <= set(forms)
