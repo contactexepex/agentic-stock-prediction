@@ -111,11 +111,14 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   cues (no pre-market/ADR history; the next open would be look-ahead), the US futures index cue,
   implied vol, live ranges in the calibration pool, pre-open vol quotes. India's index cue (S&P 500
   previous close x fitted beta) is replayed. Past event dates count as known in advance.
-- Output: a self-contained HTML page (plain-language summary first, then charts and tables) and
-  the full results as JSON in `reports/<market>/replay-<end>.*`, plus one append-only row in
-  `data/<market>/replays/` (schema `replays`). Tests (`tests/test_replay.py`): equal to
-  `ranges.py` on a sample day, unchanged when data after d is perturbed, baseline statistics on
-  synthetic series. About 25 s per market for five years of bars.
+- Output: a self-contained, novice-first HTML page (three plain sentences answering "do the ranges
+  keep their promise?", "where are they too wide or too narrow?" and "do simple up/down rules
+  work?", four big numbers, three captioned charts; every table, the full findings and the method
+  in collapsed sections) and the full results as JSON in `reports/<market>/replay-<end>.*`, plus
+  one append-only row in `data/<market>/replays/` (schema `replays`). Tests
+  (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's
+  fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
+  synthetic series. About 22 s per market for five years of bars.
 
 ## 8. Output
 - `reports/<market>/YYYY-MM-DD.md`: yesterday (market and each stock, calls scored), today

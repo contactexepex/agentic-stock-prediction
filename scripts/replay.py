@@ -39,7 +39,6 @@ import math
 import sys
 import time
 from datetime import date, timedelta
-from pathlib import Path
 from statistics import NormalDist
 
 import numpy as np
@@ -385,7 +384,7 @@ def baseline_stats(g: pd.DataFrame, h: int) -> dict:
         dlo, dhi = clustered_ci(diff, blocks[call.to_numpy()])
         out[name] = {"label": SIGNAL_LABELS[name], "calls": n, "coverage": _r(n / len(g)), "hits": k,
                      "hit_rate": _r(rate), "ci95": [_r(lo), _r(hi)], "ci95_iid": [_r(wl), _r(wh)],
-                     "p_vs_50": _r(binom_p_two_sided(k, n), 6),
+                     "p_vs_50": None if not n else float(f"{binom_p_two_sided(k, n):.3g}"),
                      "always_up_same_rows": _r(au_hit[call].mean()) if n else None,
                      "diff_vs_always_up": _r(diff.mean()) if n else None, "diff_ci95": [_r(dlo), _r(dhi)]}
     return out
@@ -461,7 +460,7 @@ def headline(cfg: dict, s: dict) -> list[str]:
         low = sorted(tick.items(), key=lambda kv: kv[1]["cover80"])[:3]
         if low:
             lines.append(f"{h}-day lowest 80% coverage by ticker: "
-                         + ", ".join(f"{t} {pct(v['cover80'], 0)}" for t, v in low) + ".")
+                         + ", ".join(f"{t} {pct(v['cover80'], 1)}" for t, v in low) + ".")
     for h, b in s["baselines"].items():
         au = b.get("always_up")
         if not au:
@@ -479,6 +478,67 @@ def headline(cfg: dict, s: dict) -> list[str]:
         lines.append(f"{h}-day direction baselines: always-up was right {pct(au['hit_rate'], 1)} of the time "
                      f"(95% interval {pct(au['ci95'][0], 1)} to {pct(au['ci95'][1], 1)}); " + "; ".join(parts) + ".")
     return lines
+
+
+def _groups(hs: dict, min_n: int = 100) -> dict[str, dict]:
+    """Named slices of one horizon (regimes, earnings or a major event in the horizon) with enough rows."""
+    out = {f"{k} markets": v for k, v in hs.get("by_regime", {}).items()}
+    out["earnings inside the horizon"] = hs.get("by_earnings", {}).get("earnings in horizon", {})
+    out["a major market event inside the horizon"] = hs.get("by_major_event", {}).get("major event in horizon", {})
+    return {k: v for k, v in out.items() if v.get("n", 0) >= min_n and v.get("cover80") is not None}
+
+
+def top_sentences(s: dict) -> list[str]:
+    """At most three short sentences for the top of the page, one per question (exact figures, one decimal)."""
+    hz, out = s["horizons"], []
+    o = {h: hz.get(h, {}).get("overall", {}) for h in ("1", "5")}
+    if o["1"].get("n") and o["5"].get("n"):
+        c = [o["1"]["cover80"], o["5"]["cover80"]]
+        verdict = ("about right" if all(abs(x - 0.8) <= 0.03 for x in c) else
+                   "too wide (they held more often than promised)" if all(x > 0.8 for x in c) else
+                   "too narrow (they held less often than promised)" if all(x < 0.8 for x in c) else "mixed")
+        out.append(f"Do the ranges keep their promise? The 80% ranges contained the later close {pct(c[0], 1)} of the "
+                   f"time 1 day ahead and {pct(c[1], 1)} 5 days ahead, and the 50% ranges {pct(o['1']['cover50'], 1)} "
+                   f"and {pct(o['5']['cover50'], 1)}, so overall they are {verdict}.")
+    parts = []
+    for h in ("1", "5"):
+        g = _groups(hz.get(h, {}))
+        if not g:
+            continue
+        hi = max(g.items(), key=lambda kv: kv[1]["cover80"])
+        lo = min(g.items(), key=lambda kv: kv[1]["cover80"])
+        prep = lambda name: "in" if name.endswith("markets") else "with"  # noqa: E731
+        hi_txt = (f"{'widest' if hi[1]['cover80'] > 0.8 else 'closest to 80%'} {prep(hi[0])} {hi[0]} "
+                  f"({pct(hi[1]['cover80'], 1)} held)")
+        lo_txt = (f"{'too narrow' if lo[1]['cover80'] < 0.8 else 'closest to 80%'} {prep(lo[0])} {lo[0]} "
+                  f"({pct(lo[1]['cover80'], 1)})")
+        parts.append(f"{h}-day ranges were {hi_txt} and {lo_txt}")
+    if parts:
+        out.append("Where are they too wide or too narrow? " + "; ".join(parts) + ".")
+    b = s.get("baselines", {})
+    au = {h: (b.get(h) or {}).get("always_up") for h in ("1", "5")}
+    if au["1"] and au["5"]:
+        better, worse, noise = [], 0, 0
+        for h in ("1", "5"):
+            for name in SIGNALS[1:]:
+                x = (b.get(h) or {}).get(name)
+                if not x or not x["calls"] or x["diff_ci95"][0] is None:
+                    continue
+                if x["diff_ci95"][0] > 0:
+                    better.append(f"{x['label']} {h}-day (+{100 * x['diff_vs_always_up']:.1f} percentage points)")
+                elif x["diff_ci95"][1] < 0:
+                    worse += 1
+                else:
+                    noise += 1
+        n = worse + noise + len(better)
+        were = "was" if worse == 1 else "were"
+        tail = (f"of the momentum and RSI rules only {', '.join(better)} beat it clearly ({worse} of {n} tests {were} "
+                "clearly worse)" if better else
+                f"none of the momentum and RSI rules beat it clearly ({worse} of {n} tests {were} clearly worse, the rest "
+                "within noise)")
+        out.append(f"Do simple up/down rules work? Always calling \"up\" was right {pct(au['1']['hit_rate'], 1)} of the "
+                   f"time 1 day ahead and {pct(au['5']['hit_rate'], 1)} 5 days ahead (a coin flip is 50%), and {tail}.")
+    return out
 
 
 LIMITATIONS = [
@@ -549,13 +609,13 @@ svg{display:block;width:100%;height:auto}svg text{fill:var(--muted);font-size:11
 border:1px solid var(--ring);border-radius:8px;padding:6px 9px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.15);
 display:none;z-index:10;max-width:260px}select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--axis);
 background:var(--surface);color:var(--ink)}.bad{color:var(--bad)}.good{color:var(--good)}
-.note{font-size:13px;color:var(--muted)}code{background:var(--chip);padding:1px 4px;border-radius:4px}
+.note{font-size:13px;color:var(--muted)}.caption{font-size:13.5px;color:var(--ink2);margin:8px 0 0}.top .answer{color:var(--ink);font-size:16px;margin:8px 0}details{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:10px 16px;margin:10px 0}summary{cursor:pointer;font-weight:600;color:var(--ink)}details[open] summary{margin-bottom:8px}code{background:var(--chip);padding:1px 4px;border-radius:4px}
 """
 
 JS = """
 const tip=document.getElementById('tip');
 document.querySelectorAll('[data-tip]').forEach(el=>{
- el.addEventListener('mousemove',e=>{tip.style.display='block';tip.innerHTML=el.dataset.tip;
+ el.addEventListener('mousemove',e=>{tip.style.display='block';tip.textContent=el.dataset.tip;
   const x=Math.min(e.clientX+14,window.innerWidth-270);tip.style.left=x+'px';tip.style.top=(e.clientY+14)+'px'});
  el.addEventListener('mouseleave',()=>{tip.style.display='none'});});
 const sel=document.getElementById('sector');
@@ -630,7 +690,7 @@ def svg_regime(s: dict) -> str:
             tipx = f"{name}, {h}-day: 80% coverage {_f(v)} over {r['n']:,} ranges ({r['days']} days)"
             out.append(f'<path class="mark" d="{d}" fill="{color}" data-tip="{esc(tipx)}"/>')
     out.append(f'<line x1="{L}" x2="{W - R}" y1="{Y(.8):.1f}" y2="{Y(.8):.1f}" stroke="var(--ink2)" stroke-dasharray="4 4"/>')
-    out.append(f'<text x="{L + 4}" y="{Y(.8) - 5:.1f}" text-anchor="start">target 80%</text>')
+    out.append(f'<text x="{L + 4}" y="{Y(.8) - 5:.1f}" text-anchor="start">promise 80%</text>')
     out.append(f'<line x1="{L}" x2="{W - R}" y1="{Y(0):.1f}" y2="{Y(0):.1f}" stroke="var(--axis)"/>')
     out.append("</svg>")
     return "".join(out)
@@ -695,34 +755,45 @@ def range_table(groups: dict, label: str) -> str:
     return f'<div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div>'
 
 
+def fmt_p(p) -> str:
+    return "" if p is None else ("<0.001" if p < 0.001 else f"{p:.3g}")
+
+
+SCORE_NOTE = ("Score = interval score: the 80% range's width plus a penalty when the price lands outside it, in % of "
+              "the price; lower is better. Naive = a simple range of last close +/- the last 20 days' typical move.")
+CI_NOTE = ("95% interval = the span the true rate most likely lies in, allowing for stocks moving together on the "
+           "same day.")
+
+
 def html_report(cfg: dict, s: dict) -> str:
     hz = s["horizons"]
     h1, h5 = hz.get("1", {}).get("overall", {}), hz.get("5", {}).get("overall", {})
+    au = {h: (s["baselines"].get(h) or {}).get("always_up", {}) for h in ("1", "5")}
 
-    def tile(label, r, key, target):
-        v = r.get(key)
-        cls = "" if v is None else ("good" if abs(v - target) <= 0.03 else "bad")
-        return (f'<div class="card tile"><div class="l">{esc(label)}</div><div class="v {cls}">{_f(v)}</div>'
-                f'<div class="n">target {int(target * 100)}% &middot; {r.get("n", 0):,} ranges</div></div>')
+    def tile(label, v, ci, note):
+        span = "" if not ci or ci[0] is None else f"95% interval {_f(ci[0])} to {_f(ci[1])}"
+        return (f'<div class="card tile"><div class="l">{esc(label)}</div><div class="v">{_f(v)}</div>'
+                f'<div class="n">{esc(note)}</div><div class="n">{span}</div></div>')
 
-    tiles = "".join([tile("1-day 80% range contained the close", h1, "cover80", .8),
-                     tile("5-day 80% range contained the close", h5, "cover80", .8),
-                     tile("1-day 50% range contained the close", h1, "cover50", .5),
-                     tile("5-day 50% range contained the close", h5, "cover50", .5)])
+    tiles = "".join([
+        tile("1-day 80% ranges that held", h1.get("cover80"), h1.get("cover80_ci"), f"promise 80% · {h1.get('n', 0):,} ranges"),
+        tile("5-day 80% ranges that held", h5.get("cover80"), h5.get("cover80_ci"), f"promise 80% · {h5.get('n', 0):,} ranges"),
+        tile("“Always up” right, 1 day ahead", au["1"].get("hit_rate"), au["1"].get("ci95"), "a coin flip is 50%"),
+        tile("“Always up” right, 5 days ahead", au["5"].get("hit_rate"), au["5"].get("ci95"), "a coin flip is 50%")])
+    top = "".join(f"<p class=\"answer\"><b>{esc(x.split('? ', 1)[0])}?</b> {esc(x.split('? ', 1)[1])}</p>"
+                  if "? " in x else f"<p class=\"answer\">{esc(x)}</p>" for x in s.get("top", []))
     summary = "".join(f"<li>{esc(x)}</li>" for x in s["summary"])
     pair = lambda key: {k: (hz.get("1", {}).get(key, {}).get(k), hz.get("5", {}).get(key, {}).get(k))  # noqa: E731
                         for k in dict.fromkeys(list(hz.get("1", {}).get(key, {})) + list(hz.get("5", {}).get(key, {})))}
-    # baselines
     brows = []
     for h in ("1", "5"):
         for name, b in (s["baselines"].get(h) or {}).items():
             d, (dlo, dhi) = b["diff_vs_always_up"], b["diff_ci95"]
             vs = "" if name == "always_up" or d is None else f"{100 * d:+.1f} pts"
             vs_ci = "" if name == "always_up" or dlo is None else f"{100 * dlo:+.1f} to {100 * dhi:+.1f}"
-            p = "" if b["p_vs_50"] is None else f"{b['p_vs_50']:.3g}"
             brows.append(f"<tr><td>{esc(b['label'])}</td><td>{h}d</td><td>{b['calls']:,}</td><td>{_f(b['hit_rate'])}</td>"
-                         f"<td>{_f(b['ci95'][0])} to {_f(b['ci95'][1])}</td><td>{p}</td><td>{vs}</td><td>{vs_ci}</td></tr>")
-    # per-ticker table
+                         f"<td>{_f(b['ci95'][0])} to {_f(b['ci95'][1])}</td><td>{esc(fmt_p(b['p_vs_50']))}</td>"
+                         f"<td>{vs}</td><td>{vs_ci}</td></tr>")
     sector = {t: m.get("sector") or "Other" for t, m in cfg["tickers"].items()}
     trows = []
     for t in sorted(cfg["tickers"]):
@@ -741,62 +812,66 @@ def html_report(cfg: dict, s: dict) -> str:
     lim = "".join(f"<li>{esc(x)}</li>" for x in s["limitations"])
     inputs = "; ".join(f"{h}d: " + (", ".join(k for k, v in u.items() if v) or "none") for h, u in s["settings"]["inputs"].items())
     dash = '<span><span class="dash"></span>perfect calibration</span>'
-    tgt = '<span><span class="dash"></span>target 80%</span>'
+    tgt = '<span><span class="dash"></span>promise 80%</span>'
+    score_note = f'<p class="note">{esc(SCORE_NOTE)}</p>'
+    ic = cfg.get("index_cue") or {}
+    replayed_cue = ic.get("symbol") and ic.get("beta", 1.0) == "fit" and any(
+        u.get("beta_split") for u in s["settings"]["inputs"].values())
+    cue_name = (cfg["symbols"].get(ic.get("symbol")) or {}).get("name") or ic.get("symbol")
+    cue_txt = f", and the {esc(cue_name)} as an overnight cue" if replayed_cue else ""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Historical Replay {esc(cfg['market'].upper())}</title>
 <style>{CSS}</style></head><body><main>
 <h1>Historical replay: {esc(cfg.get('name', cfg['market']))}</h1>
-<p class="sub">As-of days {esc(s['start'])} to {esc(s['end'])} &middot; rule-based parts only (no AI) &middot;
-computed {esc(s['computed_at'])} &middot; research only, not investment advice</p>
-<div class="card"><h2 style="margin-top:0">In plain words</h2>
-<p>Every trading day the system publishes two price ranges per stock: a <b>50% range</b> (the close should land inside
-about half the time) and an <b>80% range</b> (about 8 times in 10), for the next day and five days ahead. This page
-rebuilds those ranges for every past day using only what was known that evening, then checks them against what the
-price actually did. If the 80% ranges contain the price far less than 80% of the time, they are too narrow; far more,
-too wide.</p><ul class="summary">{summary}</ul></div>
+<p class="sub">Every past trading day from {esc(s['start'])} to {esc(s['end'])}, the price ranges were rebuilt using only what
+was known before the next session opened (prices up to that day's close, scheduled events{cue_txt}), then checked
+against the actual close. Rule-based parts only, no AI. Research only,
+not investment advice.</p>
+<div class="card top">{top}</div>
 <div class="tiles">{tiles}</div>
-<h2>Does the stated coverage hold? (calibration)</h2>
-<p>Each point compares what a range promises (across) with how often it held (up). Points on the dashed diagonal are
-perfectly calibrated; below it the ranges are too narrow. The large points are the published 50% and 80% bands; the
-others are other levels from the same formula.</p>
-<div class="card">{legend(dash)}{svg_calibration(s)}</div>
-<h2>Coverage by market regime</h2>
-<p>The regime is the market's mood that day (CALM, TRENDING, EVENT_HEAVY around scheduled events or a high vol index,
-UNSTABLE in stress). The formula widens ranges in EVENT_HEAVY and UNSTABLE. Bars show how often the 80% range held.</p>
-<div class="card">{legend(tgt)}{svg_regime(s)}</div>
-{range_table(pair('by_regime'), 'Regime')}
-<h2>Coverage over time</h2><p>80% coverage per month of as-of dates (months with fewer than {MIN_MONTH_DAYS}
-days, e.g. the first and last, are left out of the chart).</p>
-<div class="card">{legend(tgt)}{svg_time(s)}</div>
-<h2>Where it fails</h2><p>Coverage split by whether a company earnings report or a major market event fell inside the horizon,
-and by year.</p>
+<p class="note">An 80% range promises to contain the later closing price 8 times in 10. {esc(CI_NOTE)}</p>
+<h2>Do the ranges hold as often as they promise?</h2>
+<div class="card">{legend(dash)}{svg_calibration(s)}
+<p class="caption">Look for: points above the dashed line mean the ranges held more often than promised (too wide); below it,
+too narrow. The large points are the published 50% and 80% ranges.</p></div>
+<h2>Coverage by market mood (regime)</h2>
+<div class="card">{legend(tgt)}{svg_regime(s)}
+<p class="caption">Look for: bars well above the dashed 80% line are market moods (CALM, TRENDING, EVENT_HEAVY around
+scheduled events, UNSTABLE in stress) where the ranges are wider than needed.</p></div>
+<h2>Coverage over time</h2>
+<div class="card">{legend(tgt)}{svg_time(s)}
+<p class="caption">Look for: long runs below the 80% line, which would mean the ranges fell behind in some periods
+(months with fewer than {MIN_MONTH_DAYS} days are left out).</p></div>
+<h2>More detail</h2>
+<details><summary>All findings, with every number</summary>
+<p class="note">{esc(CI_NOTE)} pts = percentage points. {esc(SCORE_NOTE)}</p><ul class="summary">{summary}</ul></details>
+<details><summary>Coverage by regime (table)</summary>{range_table(pair('by_regime'), 'Regime')}{score_note}</details>
+<details><summary>Earnings, market events and years</summary>
+<p>Coverage split by whether a company earnings report or a major market event fell inside the horizon, and by year.</p>
 {range_table(pair('by_earnings'), 'Earnings')}
 {range_table(pair('by_major_event'), 'Market event')}
-{range_table(pair('by_year'), 'Year')}
-<p class="note">Score = interval score of the 80% range in % of the price (width plus a penalty for misses; lower is better).
-Naive = last close +/- 20-day volatility with normal quantiles.</p>
-<h2>Direction baselines (not the product's forecasts)</h2>
+{range_table(pair('by_year'), 'Year')}{score_note}</details>
+<details><summary>Direction baselines (simple up/down rules, not the product's forecasts)</summary>
 <p>Simple rules the AI forecaster must beat later. A call is right if the close h days later moved in the called direction
-(no change counts as wrong). The 95% interval allows for stocks moving together on the same day. "vs always-up" compares
-each rule with always-up on the same stocks and days.</p>
+(no change counts as wrong). {esc(CI_NOTE)} "vs always-up" compares each rule with always-up on the same stocks and days,
+in pts (percentage points).</p>
 <div class="scroll"><table><thead><tr><th>Rule</th><th>Horizon</th><th>Calls</th><th>Hit rate</th><th>95% interval</th>
 <th>p vs 50% (if independent)</th><th>vs always-up</th><th>95% interval</th></tr></thead><tbody>{"".join(brows)}</tbody></table></div>
 <p class="note">The p-value is an exact binomial test that treats every call as independent; stocks move together, so it
-overstates the evidence. Trust the 95% intervals, which allow for that: a rule only beats 50% (or always-up) if its interval
-stays above it.</p>
-<p class="note">Momentum: call the sign of the last 1 or 5 days' return. RSI mean reversion: RSI(14) below {RSI_LOW:g} calls up,
-above {RSI_HIGH:g} calls down, otherwise no call (defined in replay.py; indicators.py computes RSI but has no signal).</p>
-<h2>Per ticker</h2>
+overstates the evidence. Trust the 95% intervals: a rule only beats 50% (or always-up) if its interval stays above it.
+Momentum: call the sign of the last 1 or 5 days' return. RSI mean reversion: RSI(14) below {RSI_LOW:g} calls up, above
+{RSI_HIGH:g} calls down, otherwise no call (defined in replay.py; indicators.py computes RSI but has no signal).</p></details>
+<details><summary>Per ticker</summary>
 <p>Filter by sector: <select id="sector"><option value="all">All sectors</option>{opts}</select></p>
 <div class="scroll"><table id="tickers"><thead><tr><th>Ticker</th><th>Sector</th><th>n (1d)</th><th>1d 50%</th><th>1d 80%</th>
 <th>1d score</th><th>1d naive</th><th>5d 50%</th><th>5d 80%</th><th>5d score</th><th>5d naive</th></tr></thead>
-<tbody>{"".join(trows)}</tbody></table></div>
-<h2>Method and limits</h2>
+<tbody>{"".join(trows)}</tbody></table></div>{score_note}</details>
+<details><summary>Method and limits</summary>
 <p>Each as-of day uses only bars up to its close and events as known pre-open the next session, built with the same code as
 the live ranges (scripts/rangelib.py, range_inputs.py, backtest.py helpers, regime.py). Range inputs switched on
 (config/ranges.yaml): {esc(inputs)}. Data: {esc(s['data']['first_bar'])} to {esc(s['data']['last_bar'])},
 {s['data']['tickers']} tickers, {s['data']['earnings_events']} earnings and {s['data']['dividends']} dividend events.
-Runtime {s['runtime_s']:.0f} s.</p><ul>{lim}</ul>
+Computed {esc(s['computed_at'])}, runtime {s['runtime_s']:.0f} s.</p><ul>{lim}</ul></details>
 </main><div id="tip" class="tip"></div><script>{JS}</script></body></html>"""
 
 
@@ -823,6 +898,7 @@ def run(cfg: dict, rc: dict, con, start: date | None = None, end: date | None = 
               })
     s["limitations"] = limitations(cfg, rc, s)
     s["summary"] = headline(cfg, s)
+    s["top"] = top_sentences(s)
     s["runtime_s"] = round(time.time() - t0, 1)
     return s, res
 

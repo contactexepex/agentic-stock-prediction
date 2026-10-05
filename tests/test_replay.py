@@ -4,10 +4,11 @@ Run: pytest -q"""
 from __future__ import annotations
 
 import json
+import re
 import math
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -63,10 +64,17 @@ def py(code: str, root: Path, cfg: Path, *args: str) -> subprocess.CompletedProc
                           text=True, check=False)
 
 
-def build(tmp: Path, name: str, days: list[date], series: dict, events: list[dict]) -> tuple[Path, Path]:
+def build(tmp: Path, name: str, days: list[date], series: dict, events: list[dict],
+          cue: bool = False) -> tuple[Path, Path]:
     root, cfg = setup(tmp / name)
     # earnings_history on for the test market's 1-day ranges, so both earnings paths are exercised
     rc = (cfg / "ranges.yaml").read_text().replace("enabled: {us: [1]}", "enabled: {us: [1], testmkt: [1]}")
+    if cue:   # India's path: beta split of an index cue whose beta is fitted ("fit"), 1-day ranges
+        rc = rc.replace("enabled: {india: [1]}", "enabled: {india: [1], testmkt: [1]}")
+        mk = cfg / "markets" / f"{MARKET}.yaml"
+        text = mk.read_text().replace("  VOLX: {role: vol_index, name: Vol index}\n",
+                                      "  VOLX: {role: vol_index, name: Vol index}\n  CUE: {role: cue, name: Index cue}\n")
+        mk.write_text(text + "index_cue: {symbol: CUE, beta: fit}\n")
     (cfg / "ranges.yaml").write_text(rc)
     write_bars(root, series, days)
     p = root / "data" / MARKET / "events" / "2024" / "01" / "2024-01-01.jsonl"
@@ -78,9 +86,11 @@ def build(tmp: Path, name: str, days: list[date], series: dict, events: list[dic
 def fixture(tmp: Path):
     rng = np.random.default_rng(7)
     days = sessions(date(2024, 6, 3), N)
-    series = {"BENCH": fat_tailed_walk(rng, N, 100, 0.01), "AAPL": fat_tailed_walk(rng, N, 150, 0.015),
+    bench = fat_tailed_walk(rng, N, 100, 0.01)
+    series = {"BENCH": bench, "AAPL": list(1.5 * np.array(bench) * np.array(fat_tailed_walk(rng, N, 1, 0.011))),
               "MSFT": fat_tailed_walk(rng, N, 300, 0.012),
               "VOLX": list(np.clip(20 + np.cumsum(rng.normal(0, 1.2, N)), 11, 35))}
+    series["CUE"] = list(np.array(series["BENCH"]) * np.exp(rng.normal(0, 0.006, N)))   # tracks the benchmark
     d = days[D_POS]
     session = days[D_POS + 1]
     seen = "2024-01-01T00:00:00+00:00"
@@ -104,10 +114,20 @@ def dump(root: Path, cfg: Path, start: str = "-", end: str = "-") -> list[dict]:
 RANGE_FIELDS = ("lo50", "hi50", "lo80", "hi80", "center", "sigma_h", "base")
 
 
-def test_replay_ranges_equal_ranges_py(tmp_path):
+@pytest.mark.parametrize("cue", [False, True])
+def test_replay_ranges_equal_ranges_py(tmp_path, cue):
     days, series, events, d, session = fixture(tmp_path)
     # the live pipeline on the bars known at d: features (regime), calibrate, ranges pre-open the next session
-    live_root, live_cfg = build(tmp_path, "live", days[:D_POS + 1], {k: v[:D_POS + 1] for k, v in series.items()}, events)
+    live_root, live_cfg = build(tmp_path, "live", days[:D_POS + 1], {k: v[:D_POS + 1] for k, v in series.items()},
+                                events, cue)
+    if cue:   # the pre-open quote of the index cue: its last session's change (collected today, quoted pre-open S)
+        today = datetime.now(timezone.utc).date()
+        q = {"symbol": "CUE", "yahoo": "CUE", "ts": f"{session}T12:00:00+00:00", "price": series["CUE"][D_POS],
+             "prev_close": series["CUE"][D_POS - 1], "change_pct": series["CUE"][D_POS] / series["CUE"][D_POS - 1] - 1,
+             "collected_at": f"{today}T00:00:00+00:00"}
+        qp = live_root / "data" / MARKET / "quotes" / f"{today:%Y}" / f"{today:%m}" / f"{today}.jsonl"
+        qp.parent.mkdir(parents=True, exist_ok=True)
+        qp.write_text(json.dumps(q) + "\n")
     r = py(FEATURES, live_root, live_cfg, str(session))
     assert r.returncode == 0, r.stderr
     regime = json.loads(r.stdout)["regime"]
@@ -119,9 +139,14 @@ def test_replay_ranges_equal_ranges_py(tmp_path):
     assert len(live) == 4
     notes = " ".join(n for x in live.values() for n in x["notes"])
     assert "earnings in horizon" in notes and "past moves" in notes and "ex-dividend" in notes
+    assert ("expected from CUE" in notes) is cue
+    if cue:
+        assert all("beta_split" in live[(t, 1)]["inputs"] for t in ("AAPL", "MSFT"))
+        assert live[("AAPL", 1)]["center"] != 0               # AAPL tracks the benchmark (beta near 1)
+        assert all("beta_split" not in live[(t, 5)]["inputs"] for t in ("AAPL", "MSFT"))
 
     # the replay over all stored bars (outcomes included), day d only
-    full_root, full_cfg = build(tmp_path, "full", days, series, events)
+    full_root, full_cfg = build(tmp_path, "full", days, series, events, cue)
     rows = {(x["ticker"], int(x["h"])): x for x in dump(full_root, full_cfg, str(d), str(d))}
     assert set(rows) == set(live)
     for key, lv in live.items():
@@ -169,11 +194,21 @@ def test_replay_cli_writes_report_json_and_record(tmp_path):
     end = str(days[-1])
     assert out["end"] == end and out["start"] == str(days[60])
     page = (root / out["report"]).read_text()
-    for needle in ("Historical replay", "In plain words", "<svg", "Direction baselines", 'id="sector"',
-                   "not the product's forecasts"):
+    for needle in ("Historical replay", "Do the ranges keep their promise?", "Where are they too wide or too narrow?",
+                   "Do simple up/down rules work?", "Direction baselines", 'id="sector"', "not the product's forecasts",
+                   "Look for:", "interval score", "pts = percentage points", "95% interval ="):
         assert needle in page, needle
     assert "http://" not in page and "https://" not in page          # self-contained, no network
+    assert page.count("<svg") == 3 and page.count("<details>") == 6 and page.count('class="card tile"') == 4
+    assert "textContent" in page and "innerHTML" not in page
+    # the dense parts sit in collapsed sections: before the first <details> only the answers, tiles and charts
+    head = page.split("<details>")[0]
+    assert "<table" not in head and 'class="summary"' not in head
     s = json.loads((root / out["json"]).read_text())
+    assert 1 <= len(s["top"]) <= 4 and all(len(x) < 400 for x in s["top"])
+    for x in s["summary"] + s["top"]:   # one decimal everywhere, never a whole-number rounding of a rate
+        labels = x.replace("80%", "").replace("50%", "").replace("95%", "")   # band names, not measured rates
+        assert not re.search(r"(?<![\d.])\d+%", labels), x
     assert s["horizons"]["1"]["overall"]["n"] > 400 and len(s["horizons"]["1"]["calibration"]) == len(replay.LEVELS)
     rec = py("import common; print(common.connect('testmkt').execute("
              "'SELECT count(*), max(cover80_1d), CAST(max(end_date) AS VARCHAR) FROM replays').fetchone())", root, cfg)
@@ -202,6 +237,11 @@ def test_baseline_hit_rates_on_synthetic_series():
     assert mr["calls"] == n // 2 and mr["hits"] == n // 2 and mr["coverage"] == 0.5   # flat row 10 has RSI 50: no call
     lo, hi = au["ci95_iid"]
     assert lo < 0.5 < hi and au["p_vs_50"] > 0.8
+
+
+def test_tiny_p_values_print_as_less_than():
+    assert replay.fmt_p(0.0) == "<0.001" and replay.fmt_p(4.2e-9) == "<0.001"
+    assert replay.fmt_p(0.0123) == "0.0123" and replay.fmt_p(None) == ""
 
 
 def test_binomial_and_wilson():
