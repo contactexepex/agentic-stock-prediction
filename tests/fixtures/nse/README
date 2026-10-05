@@ -5,4 +5,6 @@ corporate-share-holdings-master, corporate-pledgedata) and have NOT yet been che
 live NSE response, because NSE was not reachable from the build environment. People, funds and
 numbers are invented test values. __Dn__ is replaced by the test with the date n days ago
 (dd-Mon-YYYY). Replace or extend these with real responses once www.nseindia.com is allowed.
-collect_relations_india.py --replay refuses to write replayed rows into the repo's own data/.
+collect_relations_india.py --replay writes only to an explicit scratch MB_ROOT (one holding a
+.scratch-ok file, with no .git, CLAUDE.md or price files, and no write target resolving outside
+its own data/ or into a repo checkout), so these rows can never reach a real data/ tree.

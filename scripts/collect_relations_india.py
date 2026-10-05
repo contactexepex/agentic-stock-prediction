@@ -12,8 +12,10 @@ cookies, then calls /api/... with a Referer. Field names follow public open-sour
 and are not yet checked against a live NSE response (NSE was not reachable when this was built).
 `--replay DIR` reads responses from local files instead of the network, named
 <endpoint>[_<symbol or optionType>].json and <name>.csv. The files in tests/fixtures/nse are
-synthetic (hand-written to match those field names), so replay refuses to write into the
-repo's own data/: point MB_ROOT at a scratch directory."""
+synthetic (hand-written to match those field names), so replay only writes to an explicit
+scratch root: MB_ROOT must contain a `.scratch-ok` file, must not look like a repo checkout or a
+real data store (.git, CLAUDE.md, price files), and every write target must resolve inside
+MB_ROOT's own data/ (no symlinks out) and outside any repo checkout."""
 from __future__ import annotations
 
 import csv
@@ -30,8 +32,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from common import (CODE, ROOT, append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now,
-                    utc_today)
+from common import (CODE, ROOT, SCHEMAS, append_jsonl, data_dir, day_file, market_arg, recent_ids,
+                    require_market, utc_now, utc_today)
 
 IST = ZoneInfo("Asia/Kolkata")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -299,17 +301,45 @@ def nse_symbols(cfg: dict) -> dict[str, str]:
     return {meta.get("nse", meta["yahoo"].removesuffix(".NS")).upper(): t for t, meta in cfg["tickers"].items()}
 
 
-def replay_root_ok() -> bool:
-    """Replayed rows are synthetic: allow them only into a data root outside this repo's data/."""
-    repo_data = (CODE / "data").resolve()
-    target = (ROOT / "data").resolve()
-    return target != repo_data and repo_data not in target.parents
+SCRATCH_MARKER = ".scratch-ok"
+REPO_MARKERS = (".git", "CLAUDE.md")
 
 
-def collect(cfg: dict, nse: Nse, kinds: list[str]) -> dict:
+def write_target(market: str, kind: str, day: date) -> Path:
+    """The file day_file() would append to, computed without creating any directory."""
+    ext = SCHEMAS[kind][0]
+    return data_dir(market) / kind / f"{day:%Y}" / f"{day:%m}" / f"{day:%Y-%m-%d}.{ext}"
+
+
+def replay_problem(root: Path, targets: list[Path]) -> str | None:
+    """Replayed rows are synthetic, so they may only go to an explicit scratch root. Returns why
+    `root` is refused, or None. Checked before anything (even a directory) is created."""
+    root = Path(root)
+    if not (root / SCRATCH_MARKER).is_file():
+        return f"no {SCRATCH_MARKER} marker file in MB_ROOT ({root}); create it to mark a scratch root"
+    for marker in REPO_MARKERS:
+        if (root / marker).exists():
+            return f"MB_ROOT ({root}) contains {marker}: looks like a repo checkout"
+    if any(p.is_file() for p in (root / "data").glob("*/prices/**/*")):
+        return f"MB_ROOT ({root}) has price files under data/*/prices: looks like a real data store"
+    base = root.resolve() / "data"           # the root's own data/, not where a data/ symlink points
+    real = (CODE / "data").resolve()
+    for t in targets:
+        r = t.resolve()                      # follows any symlinked directory on the way
+        if not r.is_relative_to(base):
+            return f"write target {t} resolves to {r}, outside {base} (symlink?)"
+        if r.is_relative_to(real):
+            return f"write target {t} resolves into this checkout's data/ ({real})"
+        for parent in r.parents:             # never inside any repo checkout's data
+            if any((parent / m).exists() for m in REPO_MARKERS):
+                return f"write target {t} resolves into a repo checkout ({parent})"
+    return None
+
+
+def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None) -> dict:
     """Fetch, de-duplicate and append each kind; return the JSON summary."""
     market, rel = cfg["market"], cfg.get("relations") or {}
-    symbols, today, now = nse_symbols(cfg), utc_today(), utc_now()
+    symbols, today, now = nse_symbols(cfg), today or utc_today(), utc_now()
     new, failed, notes = {}, [], []
     for kind in kinds:
         try:
@@ -341,7 +371,7 @@ def main() -> int:
     ap = market_arg(__doc__)
     ap.add_argument("--replay", type=Path,
                     help="read responses from files in this directory instead of NSE (offline tests and "
-                         "debugging; refuses to write into this repo's data/, set MB_ROOT to a scratch dir)")
+                         "debugging; writes only to a scratch MB_ROOT that holds a .scratch-ok file)")
     ap.add_argument("--only", choices=["insiders", "deals", "holdings"], action="append",
                     help="collect only these kinds (repeatable)")
     args = ap.parse_args()
@@ -351,14 +381,16 @@ def main() -> int:
         print(json.dumps({"collector": "relations_india", "market": market,
                           "skipped": "no `relations.source: nse` in this market's config"}))
         return 0
-    if args.replay and not replay_root_ok():
-        print(json.dumps({"collector": "relations_india", "market": market,
-                          "error": "--replay writes synthetic rows; refusing to write into the repo's data/. "
-                                   "Set MB_ROOT to a scratch directory."}))
-        return 2
+    kinds, today = args.only or ["insiders", "deals", "holdings"], utc_today()
+    if args.replay:
+        problem = replay_problem(ROOT, [write_target(market, k, today) for k in kinds])
+        if problem:
+            print(json.dumps({"collector": "relations_india", "market": market,
+                              "error": f"--replay writes synthetic rows; refusing: {problem}"}))
+            return 2
     nse = Nse(rel.get("base", "https://www.nseindia.com"), rel.get("archives", "https://nsearchives.nseindia.com"),
               args.replay, pause=0 if args.replay else 0.7)
-    summary = collect(cfg, nse, args.only or ["insiders", "deals", "holdings"])
+    summary = collect(cfg, nse, kinds, today)
     print(json.dumps(summary, indent=2))
     return 1 if all(v is None for v in summary["new"].values()) else 0
 

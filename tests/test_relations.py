@@ -55,6 +55,7 @@ relations:
 def setup(tmp: Path, relations: bool = True, widen: bool = False) -> tuple[Path, Path]:
     root, cfg = tmp / "repo", tmp / "config"
     (root / "data").mkdir(parents=True)
+    (root / ".scratch-ok").write_text("")          # explicit scratch root: --replay may write here
     (cfg / "markets").mkdir(parents=True)
     (cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML % (RELATIONS_YAML if relations else ""))
     for name in ("events.yaml", "settings.yaml"):
@@ -207,6 +208,68 @@ def test_replay_refuses_to_write_into_repo_data(tmp_path):
         r = run("collect_relations_india.py", root, cfg, "--replay", str(replay_dir(tmp_path / f"r{i}")))
         assert r.returncode == 2 and "refusing" in json.loads(r.stdout)["error"]
     assert not target.exists()                                                    # nothing written
+
+
+def _tree(path: Path) -> list[str]:
+    return sorted(str(p.relative_to(path)) for p in path.rglob("*")) if path.exists() else []
+
+
+def test_replay_scratch_root_rules(tmp_path):
+    """Replay writes only to an explicit scratch root that is not a repo checkout or a real data
+    store, and whose write targets do not escape through symlinks."""
+    _, cfg = setup(tmp_path)
+    replay = replay_dir(tmp_path)
+
+    def refused(root: Path, why: str) -> None:
+        before = _tree(root)
+        r = run("collect_relations_india.py", root, cfg, "--replay", str(replay))
+        assert r.returncode == 2, r.stdout + r.stderr
+        assert why in json.loads(r.stdout)["error"], r.stdout
+        assert _tree(root) == before                                              # not even a directory
+
+    def scratch(name: str) -> Path:
+        root = tmp_path / name
+        (root / "data").mkdir(parents=True)
+        (root / ".scratch-ok").write_text("")
+        return root
+
+    bare = tmp_path / "bare"
+    (bare / "data").mkdir(parents=True)
+    refused(bare, "no .scratch-ok")                                               # no opt-in marker
+
+    # Bypass A: another checkout of the repo (e.g. the main clone, run from a worktree's scripts/)
+    checkout = scratch("checkout")
+    (checkout / ".git").mkdir()
+    (checkout / "CLAUDE.md").write_text("# market-brief\n")
+    refused(checkout, "looks like a repo checkout")
+    claude_only = scratch("claude_only")
+    (claude_only / "CLAUDE.md").write_text("# market-brief\n")
+    refused(claude_only, "CLAUDE.md")
+    store = scratch("store")
+    (store / "data" / "india" / "prices" / "2026" / "10").mkdir(parents=True)
+    (store / "data" / "india" / "prices" / "2026" / "10" / "2026-10-05.csv").write_text("date,ticker\n")
+    refused(store, "real data store")
+
+    # Bypass B: data/<market> is a symlink to a real data directory elsewhere
+    real = tmp_path / "realrepo" / "data" / MARKET
+    real.mkdir(parents=True)
+    linked = scratch("linked")
+    (linked / "data" / MARKET).symlink_to(real, target_is_directory=True)
+    refused(linked, "outside")
+    assert _tree(real) == []                                                      # nothing written through it
+    whole = tmp_path / "whole"
+    whole.mkdir()
+    (whole / ".scratch-ok").write_text("")
+    (whole / "data").symlink_to(real.parent, target_is_directory=True)            # data/ itself a symlink
+    refused(whole, "outside")
+    assert _tree(real) == []
+
+    # a proper scratch root still works
+    ok = scratch("ok")
+    r = run("collect_relations_india.py", ok, cfg, "--replay", str(replay))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert json.loads(r.stdout)["new"]["insiders"] == 3
+    assert any(p.endswith(".jsonl") for p in _tree(ok / "data" / MARKET / "insiders"))
 
 
 def test_live_failure_reports_hosts_to_allowlist(monkeypatch):
