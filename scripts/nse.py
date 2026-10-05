@@ -21,7 +21,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -261,6 +261,25 @@ def store(market: str, kind: str, rows: list[dict], today: date, seen_days: int 
     seen = recent_ids(market, kind, days=seen_days)
     fresh = {r["id"]: r for r in rows if r["id"] not in seen}
     return append_jsonl(day_file(market, kind, today), fresh.values())
+
+
+SINCE_WINDOW_DAYS = 7   # --since backfills ask date-range endpoints one week at a time (smaller answers)
+
+
+def date_windows(start: date, end: date, days: int = SINCE_WINDOW_DAYS) -> list[tuple[date, date]]:
+    """Consecutive [from, to] windows of at most `days` days covering start..end (inclusive)."""
+    out, s = [], start
+    while s <= end:
+        e = min(end, s + timedelta(days=days - 1))
+        out.append((s, e))
+        s = e + timedelta(days=1)
+    return out
+
+
+def since_arg(ap) -> None:
+    ap.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD",
+                    help="backfill: ask the date-range endpoints from this date to today in one-week windows "
+                         "instead of the configured lookback (default: the lookback, unchanged)")
 
 
 def coverage(source: str, total: int, matched: int | None, notes: list, warnings: list) -> None:

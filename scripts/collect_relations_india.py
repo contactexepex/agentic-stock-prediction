@@ -30,8 +30,9 @@ import io
 import sys
 from datetime import date, timedelta
 
-from nse import (FetchError, Nse, collector_main, coverage, iso, nse_symbols, num, parse_day, parse_ts, pick,  # noqa: F401
-                 recent_ids, replay_problem, rows_of, short_hash, store, summary_of, write_target, xbrl)
+from nse import (FetchError, Nse, collector_main, coverage, date_windows, iso, nse_symbols, num, parse_day,  # noqa: F401
+                 parse_ts, pick, recent_ids, replay_problem, rows_of, short_hash, since_arg, store, summary_of,
+                 write_target, xbrl)
 
 KEEP_QUARTERS = 4   # shareholding periods kept per ticker on a first fetch (enough for q/q changes)
 KINDS = ["insiders", "deals", "holdings"]
@@ -82,11 +83,16 @@ def pit_rows(xml: str, ticker: str, app: str, disclosed, url: str, now: str) -> 
 
 
 def insiders(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now: str, market: str,
-             failed: list, notes: list, warnings: list) -> list[dict]:
-    idx = rows_of(nse.json("corporates-pit-gg", {"index": "equities",
-                                                 "from_date": f"{today - timedelta(days=lookback):%d-%m-%Y}",
-                                                 "to_date": f"{today:%d-%m-%Y}"}))
-    coverage(f"insiders: PIT filings index ({lookback} days)", len(idx),
+             failed: list, notes: list, warnings: list, since: date | None = None) -> list[dict]:
+    """The PIT filing index over the last `lookback` days (with `since`: one call per week from
+    `since` to today), then each new watchlist filing's XBRL."""
+    windows = [(today - timedelta(days=lookback), today)] if since is None else date_windows(since, today)
+    idx = []
+    for start, end in windows:
+        idx += rows_of(nse.json("corporates-pit-gg", {"index": "equities", "from_date": f"{start:%d-%m-%Y}",
+                                                      "to_date": f"{end:%d-%m-%Y}"}))
+    label = f"{lookback} days" if since is None else f"since {since}, {len(windows)} weekly calls"
+    coverage(f"insiders: PIT filings index ({label})", len(idx),
              sum((r.get("symbol") or "").strip().upper() in symbols for r in idx), notes, warnings)
     done = {i.rsplit("-", 1)[0] for i in recent_ids(market, "insiders", days=400) if i.startswith("nse-pit-")}
     out = []
@@ -95,6 +101,8 @@ def insiders(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now:
         app, xml_url = pick(r, "appId"), pick(r, "xmlFileName")
         if not ticker or not app or f"nse-pit-{ticker}-{app}" in done:
             continue
+        if since is not None:
+            done.add(f"nse-pit-{ticker}-{app}")   # backfill: a filing listed in two windows is read once
         if not xml_url:
             failed.append({"source": f"insiders:{ticker}:{app}", "url": None, "error": "filing has no XBRL file"})
             continue
@@ -267,17 +275,21 @@ def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, ar
     symbols, today, now = nse_symbols(cfg), today or utc_today(), utc_now()
     full = bool(getattr(args, "full", False))
     limit = None if full else int(rel.get("symbol_calls_per_run", 10))
+    since = getattr(args, "since", None)
+    backfill = int(getattr(args, "deals_backfill", 0) or 0)
+    if since is not None:   # deals: the per-ticker historical API from `since`
+        backfill = max(backfill, (today - since).days)
     new, failed, notes, warnings = {}, [], [], []
     for kind in kinds:
         n_failed = len(failed)
         try:
             if kind == "insiders":
                 rows = insiders(nse, symbols, today, int(rel.get("insider_lookback_days", 14)), now, market, failed,
-                                notes, warnings)
+                                notes, warnings, since)
                 ok = 1
             elif kind == "deals":
                 rows, ok = deals(nse, symbols, today, int(rel.get("deal_lookback_days", 5)), now, notes, failed,
-                                 warnings, int(getattr(args, "deals_backfill", 0) or 0))
+                                 warnings, backfill)
             else:
                 rows, ok = holdings(nse, symbols, today, now, market, failed, notes, warnings, limit)
         except FetchError as exc:
@@ -296,6 +308,7 @@ def extra_args(ap) -> None:
                     help="also query bulk/block deals per ticker for the last DAYS days (2 calls per ticker)")
     ap.add_argument("--full", action="store_true",
                     help="poll every ticker that misses the latest quarter (no per-run cap)")
+    since_arg(ap)   # PIT index by week, and the deals backfill from that date
 
 
 def main() -> int:

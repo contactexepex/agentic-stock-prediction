@@ -26,8 +26,8 @@ import sys
 from datetime import date, datetime, timedelta
 
 from collect_relations_india import due_tickers, latest_quarter_end
-from nse import (IST, FetchError, Nse, collector_main, coverage, iso, nse_symbols, num, parse_day, parse_ts, pick,
-                 recent_ids, rows_of, store, summary_of, xbrl)
+from nse import (IST, FetchError, Nse, collector_main, coverage, date_windows, iso, nse_symbols, num, parse_day,
+                 parse_ts, pick, recent_ids, rows_of, since_arg, store, summary_of, xbrl)
 
 KINDS = ["announcements", "financials", "flows", "delivery"]
 
@@ -58,12 +58,17 @@ def first(f: dict, names: tuple) -> tuple[float | None, str | None]:
 # ---------- announcements ----------
 
 def announcements(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now: str, notes: list,
-                  warnings: list) -> list[dict]:
-    rows = nse.json("corporate-announcements", {"index": "equities",
-                                                "from_date": f"{today - timedelta(days=lookback):%d-%m-%Y}",
-                                                "to_date": f"{today:%d-%m-%Y}"})
-    rows = rows_of(rows if isinstance(rows, list) else rows.get("data", []))
-    coverage(f"announcements ({lookback} days)", len(rows),
+                  warnings: list, since: date | None = None) -> list[dict]:
+    """One market-wide call over the last `lookback` days; with `since` (backfill), one call per
+    week from `since` to today."""
+    windows = [(today - timedelta(days=lookback), today)] if since is None else date_windows(since, today)
+    rows = []
+    for start, end in windows:
+        got = nse.json("corporate-announcements", {"index": "equities", "from_date": f"{start:%d-%m-%Y}",
+                                                   "to_date": f"{end:%d-%m-%Y}"})
+        rows += rows_of(got if isinstance(got, list) else got.get("data", []))
+    label = f"{lookback} days" if since is None else f"since {since}, {len(windows)} weekly calls"
+    coverage(f"announcements ({label})", len(rows),
              sum((r.get("symbol") or "").strip().upper() in symbols for r in rows), notes, warnings)
     out = []
     for r in rows:
@@ -111,7 +116,11 @@ def financial_rows(xml: str, ticker: str, meta: dict, now: str) -> list[dict]:
 
 
 def financials(nse: Nse, symbols: dict[str, str], today: date, now: str, market: str, failed: list,
-               notes: list, warnings: list, limit: int | None, per_ticker: int | None) -> tuple[list[dict], int]:
+               notes: list, warnings: list, limit: int | None, per_ticker: int | None,
+               since: date | None = None) -> tuple[list[dict], int]:
+    """Results filings of the tickers missing the latest quarter (at most `limit` tickers, the
+    newest `per_ticker` unseen filings each). With `since` (backfill): every ticker, and every
+    unseen filing broadcast on or after `since`."""
     ids = recent_ids(market, "financials", days=400)
     done = {i.rsplit("-", 1)[1] for i in ids if i.startswith("nse-fin-")}
     latest: dict[str, str] = {}
@@ -121,7 +130,7 @@ def financials(nse: Nse, symbols: dict[str, str], today: date, now: str, market:
             t = body[len("nse-fin-"):].rsplit("-", 7)[0]     # <ticker>-<basis>-<start yyyy-mm-dd>-<end yyyy-mm-dd>
             latest[t] = max(latest.get(t, ""), body[-10:])
     by_ticker = {t: s for s, t in symbols.items()}
-    due = due_tickers(latest, list(by_ticker), today, limit)
+    due = due_tickers(latest, list(by_ticker), today, limit) if since is None else list(by_ticker)
     notes.append(f"financials: {len(due)} ticker(s) polled for quarter {latest_quarter_end(today)}")
     out, ok, total = [], 0, 0
     for ticker in due:
@@ -140,6 +149,8 @@ def financials(nse: Nse, symbols: dict[str, str], today: date, now: str, market:
         filings = sorted((r for r in idx if pick(r, "seq_Id") and pick(r, "seq_Id") not in done and pick(r, "xbrl")),
                          key=lambda r: (parse_day(pick(r, "qe_Date")) or date.min, pick(r, "broadcast_Date") or ""),
                          reverse=True)
+        if since is not None:
+            filings = [r for r in filings if (parse_day(pick(r, "broadcast_Date", "creation_Date")) or date.min) >= since]
         for r in filings[:per_ticker]:
             meta = {"seq": pick(r, "seq_Id"), "xbrl": pick(r, "xbrl"), "consolidated": pick(r, "consolidated"),
                     "audited": pick(r, "audited"), "type_Sub": pick(r, "type_Sub"),
@@ -218,15 +229,19 @@ def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, ar
     full = bool(getattr(args, "full", False))
     limit = None if full else int(rel.get("symbol_calls_per_run", 10))
     per_ticker = None if full else int(rel.get("financial_filings_per_ticker", 4))
+    since = getattr(args, "since", None)
+    if since is not None:
+        limit = per_ticker = None
     new, failed, notes, warnings = {}, [], [], []
     for kind in kinds:
         n_failed = len(failed)
         try:
             if kind == "announcements":
                 rows, ok = announcements(nse, symbols, today, int(rel.get("announcement_lookback_days", 2)), now,
-                                         notes, warnings), 1
+                                         notes, warnings, since), 1
             elif kind == "financials":
-                rows, ok = financials(nse, symbols, today, now, market, failed, notes, warnings, limit, per_ticker)
+                rows, ok = financials(nse, symbols, today, now, market, failed, notes, warnings, limit, per_ticker,
+                                      since)
             elif kind == "flows":
                 rows, ok = flows(nse, now, notes, warnings), 1
             else:
@@ -246,6 +261,7 @@ def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, ar
 def extra_args(ap) -> None:
     ap.add_argument("--full", action="store_true",
                     help="poll every ticker missing the latest quarter and parse all its listed filings")
+    since_arg(ap)   # announcements by week, and every ticker's results filings broadcast since then
 
 
 def main() -> int:

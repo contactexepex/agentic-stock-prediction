@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -130,6 +131,13 @@ def build_source(tmp: Path, perturb: bool = False, perturb_before: bool = False)
                                                 900000 if perturb else 5000)])
     jl(root, "fundamentals", "2026-10-05", [fund("acc-1", "2026-07-30T20:00:00+00:00", 7.4e9),
                                             fund("acc-2", "2026-08-20T20:00:00+00:00", 9.9e9 if perturb else 7.5e9)])
+    jl(root, "deals", "2026-10-05", [
+        {"id": "nse-bulk-d", "date": str(D), "ticker": "MSFT", "deal_type": "bulk", "client": "A", "side": "buy",
+         "shares": 1e6, "price": 10.0, "value": 1e7, "remarks": None, "source": "nse_historical",
+         "first_seen_at": "2026-10-05T14:00:00+00:00"},
+        {"id": "nse-bulk-late", "date": "2026-08-17", "ticker": "MSFT", "deal_type": "bulk", "client": "B",
+         "side": "sell", "shares": 9e6 if perturb else 2e6, "price": 10.0, "value": 2e7, "remarks": None,
+         "source": "nse_historical", "first_seen_at": "2026-10-05T14:00:00+00:00"}])
     jl(root, "news", "2026-08-14", [{"id": "n1", "title": "Apple news" + (" X" if perturb else ""), "url": "u",
                                      "source": "s", "published_at": "2026-08-14T15:00:00+00:00",
                                      "first_seen_at": "2026-08-14T15:05:00+00:00", "feed": "f", "category": "general",
@@ -217,6 +225,9 @@ def test_prepare_keeps_exactly_what_was_public(prepared):
     assert inc["quotes"]["rows_kept"] == 1 and inc["insiders"]["rows_kept"] == 1
     assert inc["fundamentals"]["rows_kept"] == 1 and inc["predictions"]["rows_kept"] == 1
     assert inc["outcomes"]["rows_kept"] == 1
+    assert inc["deals"]["rows_kept"] == 1 and any("deals" in a for a in s["assumptions"])   # dated <= D only
+    assert s["upcoming_earnings"] == {"with_days_to_earnings": {"AAPL": 1}, "earnings_within_1_day": ["AAPL"],
+                                      "blocked": ["NFLX"]}
     assert "news" in s["excluded"] and "news" not in inc and not (root / "data" / MARKET / "news").exists()
     assert s["citable_evidence"]["total"] == 4
     last = max(f.stem for f in (root / "data" / MARKET / "prices").glob("**/*.csv"))
@@ -411,3 +422,119 @@ def test_frozen_clock_sql(monkeypatch):
     con = common.connect("nomarket")
     assert con.execute("SELECT current_date").fetchone()[0] == date(2026, 8, 17)
     monkeypatch.delenv("MB_NOW")
+
+
+# ---------- round 2: --source, the earnings assumption, backfill guards, collector --since ----------
+
+REPO = Path(__file__).resolve().parents[1]
+REAL_NSE = REPO / "tests" / "fixtures" / "nse" / "real"
+
+
+def test_prepare_reads_source(prepared, tmp_path):
+    """--source S: the data comes from S, whatever MB_ROOT says (here an empty root)."""
+    empty = tmp_path / "empty"
+    (empty / "data").mkdir(parents=True)
+    out = tmp_path / "r_source"
+    p = prepare(empty, prepared["base"]["cfg"], out, "--source", str(prepared["base"]["src"]))
+    assert p.returncode == 0, p.stderr
+    a, b = outputs(prepared["base"]["root"]), outputs(out)
+    assert a["context"] == b["context"] and a["ranges"] == b["ranges"] and a["kept"] == b["kept"]
+    assert json.loads(p.stdout)["source_root"] == str(prepared["base"]["src"])
+    p = prepare(empty, prepared["base"]["cfg"], tmp_path / "r_empty")       # no --source: MB_ROOT's empty data
+    assert p.returncode != 0 and "no BENCH bar" in p.stderr
+
+
+def test_assumed_earnings_are_opt_in_and_labelled(prepared, tmp_path):
+    out = tmp_path / "r_assumed"
+    p = prepare(prepared["base"]["src"], prepared["base"]["cfg"], out, "--assume-earnings-known", "14")
+    assert p.returncode == 0, p.stderr
+    s = json.loads(p.stdout)
+    assert s["assumptions"][0].startswith("ASSUMED") and "MSFT 2026-08-25" in s["assumptions"][0]
+    assert s["upcoming_earnings"]["with_days_to_earnings"]["MSFT"] == 8      # 2026-08-25 - session 2026-08-17
+    assert "ASSUMED known in advance" in (out / "work" / "context.md").read_text()
+    assert not any("earnings" in a for a in prepared["base"]["summary"]["assumptions"])   # off by default
+
+
+def test_backfill_refuses_real_data(tmp_path):
+    env = {k: v for k, v in os.environ.items() if k not in ("MB_ROOT", "MB_CONFIG", "MB_NOW")}
+    checkout = tmp_path / "checkout"                     # another market-brief checkout (e.g. a worktree's main clone)
+    for d in ("config/markets", "scripts", "data/us"):
+        (checkout / d).mkdir(parents=True)
+    busy = tmp_path / "busy"
+    busy.mkdir()
+    (busy / "keep.txt").write_text("x")
+    for bad in (REPO, REPO / "data", REPO / "data" / "us" / "x", REPO.parent, checkout / "data" / "x", busy):
+        p = subprocess.run([sys.executable, str(SCRIPTS / "ai_replay.py"), "backfill", "--market", "us", "--source",
+                            str(bad), "--since", "2026-06-01"], cwd=SCRIPTS, env=env, capture_output=True, text=True,
+                           check=False)
+        assert p.returncode != 0 and "--source" in p.stderr, (bad, p.stderr)
+    assert not (REPO / "data" / "us" / "x").exists() and not (checkout / "data" / "x").exists()
+    assert sorted(x.name for x in busy.iterdir()) == ["keep.txt"]
+
+
+def test_backfill_config_overrides_scratch_copy_only(tmp_path):
+    import yaml
+    shutil.copytree(REPO / "config", tmp_path / "config")
+    before = (REPO / "config" / "markets" / "us.yaml").read_text()
+    changed = ar.backfill_config(tmp_path / "config", "us", date(2026, 6, 1), date(2026, 10, 5))
+    assert changed == {"filing_lookback_days": 127, "relationships.insiders.lookback_days": 127,
+                       "relationships.stakes.lookback_days": 127}
+    cfg = yaml.safe_load((tmp_path / "config" / "markets" / "us.yaml").read_text())
+    assert cfg["filing_lookback_days"] == 127 and cfg["relationships"]["stakes"]["lookback_days"] == 127
+    assert (REPO / "config" / "markets" / "us.yaml").read_text() == before
+    assert ar.backfill_config(tmp_path / "config", "india", date(2026, 6, 1), date(2026, 10, 5)) == {}
+
+
+class FakeNse:
+    def __init__(self):
+        self.calls = []
+
+    def json(self, endpoint, params=None):
+        self.calls.append((endpoint, dict(params or {})))
+        return []
+
+
+def test_collector_since_windows_and_default_unchanged():
+    import collect_nse_india as cni
+    import collect_relations_india as cri
+    today = date(2026, 10, 5)
+    for fn, lookback in ((lambda n, s: cni.announcements(n, {}, today, 2, "now", [], [], s), 2),
+                         (lambda n, s: cri.insiders(n, {}, today, 14, "now", "nomarket", [], [], [], s), 14)):
+        n = FakeNse()
+        fn(n, None)                                       # default: one call over the configured lookback
+        assert len(n.calls) == 1
+        assert (n.calls[0][1]["from_date"], n.calls[0][1]["to_date"]) == \
+            (f"{today - timedelta(days=lookback):%d-%m-%Y}", "05-10-2026")
+        n = FakeNse()
+        fn(n, date(2026, 6, 1))                           # --since: one call per week, gap-free, up to today
+        spans = [(datetime.strptime(p["from_date"], "%d-%m-%Y").date(),
+                  datetime.strptime(p["to_date"], "%d-%m-%Y").date()) for _, p in n.calls]
+        assert spans[0][0] == date(2026, 6, 1) and spans[-1][1] == today and len(spans) == 19
+        assert all((b - a).days <= 6 for a, b in spans)
+        assert all(spans[i + 1][0] == spans[i][1] + timedelta(days=1) for i in range(len(spans) - 1))
+
+
+def nse_run(script: str, root: Path, cfg: Path, *args: str) -> dict:
+    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": "india"}
+    env.pop("MB_NOW", None)
+    p = subprocess.run([sys.executable, str(SCRIPTS / script), "--replay", str(REAL_NSE), "--today", "2026-10-05",
+                        *args], cwd=SCRIPTS, env=env, capture_output=True, text=True, check=False)
+    assert p.returncode == 0, p.stdout + p.stderr
+    return json.loads(p.stdout)
+
+
+def test_collector_since_on_real_responses(tmp_path):
+    """--since end to end on the saved NSE responses (the replay ignores dates, so every weekly call
+    returns the same file and the ids are de-duplicated); without it the output is what it was."""
+    from test_nse_india import setup as nse_setup
+    root, cfg = nse_setup(tmp_path / "a")
+    out = nse_run("collect_nse_india.py", root, cfg, "--only", "announcements", "--since", "2026-09-01")
+    assert out["new"] == {"announcements": 7}
+    assert any("announcements (since 2026-09-01, 5 weekly calls): 50 rows returned" in x for x in out["notes"])
+    root, cfg = nse_setup(tmp_path / "b")
+    out = nse_run("collect_nse_india.py", root, cfg, "--only", "announcements")
+    assert out["new"] == {"announcements": 7} and any("announcements (2 days): 10 rows" in x for x in out["notes"])
+    root, cfg = nse_setup(tmp_path / "c", {"AARTIPHARM": {"yahoo": "AARTIPHARM.NS", "name": "Aarti Pharmalabs"}})
+    out = nse_run("collect_relations_india.py", root, cfg, "--only", "deals", "--since", "2026-07-07")
+    assert out["new"] == {"deals": 10}                    # as --deals-backfill 90 (2026-07-07 is 90 days back)
+    assert any("since 2026-07-07" in x for x in out["notes"])

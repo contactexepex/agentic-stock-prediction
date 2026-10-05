@@ -113,7 +113,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    ```
    cd scripts
    python ai_replay.py dates --market us                        # the sample: every 5th trading day, 2026-07-01..09-25
-   python ai_replay.py prepare --market us --date 2026-07-01 --root ../work/replay/us-2026-07-01
+   python ai_replay.py backfill --market us --source ../work/replay/src-us --since 2026-06-01
+   #  -> copy of data/us plus SEC filings, Form 4 and 13D/13G since then (India: NSE announcements,
+   #     results filings, PIT insider trades, bulk/block deals) in a scratch source, never data/
+   python ai_replay.py prepare --market us --date 2026-07-01 --root ../work/replay/us-2026-07-01 \
+       --source ../work/replay/src-us
    #  -> as-of copy of data/us (only what was public before the next session's pre-open start), then
    #     features, calibrate, context (work/context.md in the root) and ranges as of that time;
    #     prints what was kept or dropped. Run the agents with MB_ROOT=<root> and that context pack;
@@ -125,10 +129,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    `record` validates every call (schema and CLAUDE.md prediction rules, evidence ids must exist in
    the as-of root) and stores the valid ones in `<results>/<market>/calls.jsonl` with `replay: true`,
    never in `data/`. `score` checks them against the real stored closes and writes a plain-language
-   HTML page and a `.json` next to it. Known gap: stored SEC filings start 2026-09-28, stored news
-   2026-10-02 (US) / 2026-10-04 (India), and no NSE announcements are stored yet, so on the sample
-   days there is nothing citable and the forecaster can only abstain until filings/announcements
-   history is backfilled.
+   HTML page and a `.json` next to it. Use a `backfill` source: the repo's own data has no SEC
+   filings before 2026-09-28, no news before October 2026 and no NSE announcements, so without it
+   there is nothing citable on the sample days. Upcoming earnings dates are not known honestly as of
+   a past day (no source stores when a date was announced); `prepare --assume-earnings-known 14`
+   uses the actual dates and labels them as an assumption.
 
 ## Local development
 ```

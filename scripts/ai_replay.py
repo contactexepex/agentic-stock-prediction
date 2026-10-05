@@ -7,7 +7,13 @@ is known) this script rebuilds what the routine would have known pre-open on the
 lets the orchestrator run the agents on it, then records and scores their calls:
 
   dates   --market M                 the sample: every 5th trading day 2026-07-01..2026-09-25
-  prepare --market M --date D --root R
+  backfill --market M --source S --since 2026-06-01
+          S = a scratch source root (refused: the repo, its data/ or anything inside/above them): a copy
+          of data/<M>/ plus config/ whose lookbacks are lengthened in S only; the existing collectors
+          then run into S one after another (US: SEC filings, Form 4, 13D/13G, events; India: NSE
+          announcements and results filings, SEBI PIT insider trades, bulk/block deals with their
+          `--since` option, events). Rows keep their real publication/acceptance times.
+  prepare --market M --date D --root R [--source S] [--assume-earnings-known DAYS]
           R = a scratch root: copies of config/, sql/, templates/ and data/<M>/ truncated to what
           was public at the cutoff (the routine's start time on S, before the open; CUTOFF_LOCAL).
           Then features.py, calibrate.py, context.py (R/work/context.md) and ranges.py run with
@@ -31,9 +37,13 @@ Inclusion rules of `prepare` (per data kind; a row is kept only if public by the
 - predictions, ranges: made_at; outcomes, range_outcomes: scored_at and target_date <= D;
   features, regime, calibration, reviews, replays: computed_at; judgments: recorded_at;
   quotes, options: collected_at; graph: added_at; graph_runs: run_at;
+- deals: trade date <= D (assumed: NSE publishes the day's bulk and block deals after the close);
 - kinds with only an observation date and no publication time (macro, shorts, short_interest,
-  fpi, indices, deals, flows, delivery): kept only if first_seen_at <= cutoff, i.e. backfilled
-  rows are dropped;
+  fpi, indices, flows, delivery): kept only if first_seen_at <= cutoff, i.e. backfilled rows are
+  dropped;
+- --assume-earnings-known DAYS (off by default) adds the actual earnings dates within DAYS after D
+  as events first seen at the cutoff, labelled ASSUMED (stored rows do not say when a date was
+  announced);
 - news and news_enriched: dropped (stored news only starts when live collection began); any other
   kind: dropped and listed. summaries/ and reports/ are never copied."""
 from __future__ import annotations
@@ -92,7 +102,10 @@ PUBLIC_AT: dict[str, list[str]] = {
     "quotes": ["collected_at"], "options": ["collected_at"],
     "graph": ["added_at"], "graph_runs": ["run_at"],
 }
-FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "deals", "flows", "delivery")
+FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows", "delivery")
+# Bulk and block deals have only a trade date; NSE publishes each session's deals after its close,
+# so a deal dated <= D was public before the next pre-open (an assumption, listed in the summary).
+DATE_PUBLIC_AFTER_CLOSE = ("deals",)
 for _k in FIRST_SEEN_ONLY:
     PUBLIC_AT[_k] = ["first_seen_at"]
 TARGET_DATE_KINDS = ("outcomes", "range_outcomes")     # also need target_date <= D
@@ -158,6 +171,9 @@ def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp) -> bool:
     if kind == "prices":
         t = _ts(row.get("date"))
         return t is not None and t.date() <= d
+    if kind in DATE_PUBLIC_AFTER_CLOSE:
+        t = _ts(row.get("date"))
+        return t is not None and t.date() <= d
     if kind == "events":
         seen = _ts(row.get("first_seen_at"))
         if seen is not None and seen <= cutoff:
@@ -176,6 +192,8 @@ def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp) -> bool:
 def rule_text(kind: str) -> str:
     if kind == "prices":
         return "bar date <= D"
+    if kind in DATE_PUBLIC_AFTER_CLOSE:
+        return "trade date <= D (assumed: NSE publishes the day's deals after the close)"
     if kind == "events":
         return "first_seen_at <= cutoff, or a backfilled past event (*_history) dated <= D"
     cols = " else ".join(c.replace("+1d", " (end of day UTC)") for c in PUBLIC_AT[kind])
@@ -225,7 +243,7 @@ def copy_asof(market: str, src: Path, dst: Path, d: date, cutoff: datetime) -> d
         if kind in DROPPED:
             excluded[kind] = DROPPED[kind].format(first=first_news)
             continue
-        if kind != "prices" and kind != "events" and kind not in PUBLIC_AT:
+        if kind not in ("prices", "events", *DATE_PUBLIC_AFTER_CLOSE) and kind not in PUBLIC_AT:
             excluded[kind] = "no known publication-time rule for this kind"
             continue
         ext = SCHEMAS[kind][0] if kind in SCHEMAS else "jsonl"
@@ -284,11 +302,12 @@ def evidence(market: str, root: Path, cutoff: datetime, days: int = EVIDENCE_DAY
     counts = {"total": int(len(ev_df)), f"last_{days}d": int(len(recent)),
               "by_kind_total": {k: int((ev_df["kind"] == k).sum()) for k in EVIDENCE_KINDS},
               f"by_kind_last_{days}d": {k: int((recent["kind"] == k).sum()) for k in EVIDENCE_KINDS},
-              "tickers_with_recent_ids": int(recent["ticker"].replace("", np.nan).dropna().nunique())}
+              "tickers_with_recent_ids": int(recent["ticker"].replace("", np.nan).dropna().nunique()),
+              f"by_form_last_{days}d": {str(k): int(v) for k, v in recent["form"].fillna("").value_counts().items()}}
     return ev_df, counts
 
 
-def evidence_section(ev_df: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE_DAYS, limit: int = 80) -> str:
+def evidence_section(ev_df: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE_DAYS, limit: int = 200) -> str:
     since = pd.Timestamp(cutoff) - pd.Timedelta(days=days)
     df = ev_df.assign(public_at=pd.to_datetime(ev_df["public_at"], utc=True))
     df = df[df["public_at"] >= since].sort_values(["public_at", "id"], ascending=[False, True])
@@ -305,11 +324,19 @@ def evidence_section(ev_df: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE
     return head + "\n".join(lines) + "\n" + more
 
 
+def run_script(script: str, root: Path, market: str, *args: str, now: str | None = None,
+               timeout: int | None = None) -> subprocess.CompletedProcess:
+    """Run scripts/<script> on another root (MB_ROOT=root, MB_CONFIG=root/config), as of `now` if given."""
+    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(root / "config"), "MB_MARKET": market}
+    env.pop("MB_NOW", None)
+    if now:
+        env["MB_NOW"] = now
+    return subprocess.run([sys.executable, str(CODE / "scripts" / script), "--market", market, *args],
+                          cwd=CODE / "scripts", env=env, capture_output=True, text=True, check=False, timeout=timeout)
+
+
 def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout: Path | None = None) -> str:
-    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(root / "config"), "MB_MARKET": market,
-           "MB_NOW": now}
-    p = subprocess.run([sys.executable, str(CODE / "scripts" / script), "--market", market, *args],
-                       cwd=CODE / "scripts", env=env, capture_output=True, text=True, check=False)
+    p = run_script(script, root, market, *args, now=now)
     if p.returncode != 0:
         raise SystemExit(f"{script} failed in {root} (exit {p.returncode}):\n{p.stderr[-3000:]}")
     if stdout is not None:
@@ -339,8 +366,33 @@ def check_root(root: Path, src: Path, force: bool) -> None:
         shutil.rmtree(root)
 
 
+def assumed_earnings(cfg: dict, src: Path, d: date, cutoff: datetime, days: int) -> list[dict]:
+    """ASSUMPTION (opt-in, --assume-earnings-known DAYS): the actual earnings dates in (D, D + DAYS]
+    from the source's backfilled past events (range_inputs.earnings_events over every *_history row,
+    i.e. with today's knowledge) are treated as announced before the cutoff, as replay.py treats past
+    event dates. Stored rows do not say when a date was first announced (companies usually announce
+    2-4 weeks ahead), so this is labelled in the event name, the source and the prepare summary."""
+    import range_inputs as ri
+    with data_root(src):
+        evdf = ri.load_events(connect(cfg["market"]))
+    if evdf.empty:
+        return []
+    out = []
+    for t, evs in ri.earnings_events(evdf).items():
+        if t not in cfg["tickers"]:
+            continue
+        for day, timing in evs:
+            if d < day <= d + timedelta(days=days):
+                name = cfg["tickers"][t].get("name", t)
+                out.append({"id": f"{t}-earnings-{day}-assumed", "date": str(day), "type": "earnings", "ticker": t,
+                            "name": f"{name} earnings (ASSUMED known in advance: actual date from later data)",
+                            "source": "assumed_known", "first_seen_at": cutoff.isoformat(), "timing": timing})
+                break
+    return out
+
+
 def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool = False,
-            allow_training_period: bool = False) -> dict:
+            allow_training_period: bool = False, assume_earnings_days: int = 0) -> dict:
     market = cfg["market"]
     src = Path(src or common.ROOT)
     if d <= MODEL_CUTOFF and not allow_training_period:
@@ -357,6 +409,11 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
         if (CODE / name).exists():
             shutil.copytree(CODE / name, root / name)
     copied = copy_asof(market, src, root, d, cutoff)
+    assumed = assumed_earnings(cfg, src, d, cutoff, assume_earnings_days) if assume_earnings_days else []
+    if assumed:
+        path = root / "data" / market / "events" / f"{cutoff:%Y}" / f"{cutoff:%m}" / f"{cutoff:%Y-%m-%d}.assumed.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        common.append_jsonl(path, assumed)
     bench = common.benchmark_key(cfg)
     with data_root(root):
         last = connect(market).execute("SELECT max(date) FROM ohlc WHERE ticker = ?", [bench]).fetchone()[0]
@@ -383,6 +440,12 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
         "context_pack": {"path": str(ctx), "bytes": len(text.encode("utf-8")), "lines": text.count("\n"),
                          "approx_tokens": round(len(text) / 4), "sha256": hashlib.sha256(text.encode()).hexdigest()},
         "citable_evidence": counts,
+        "assumptions": ([f"ASSUMED: {len(assumed)} actual earnings dates within {assume_earnings_days} days after D "
+                         "treated as announced before the cutoff (--assume-earnings-known): "
+                         + ", ".join(f"{a['ticker']} {a['date']}" for a in assumed)] if assume_earnings_days else [])
+                       + (["ASSUMED: bulk/block deals dated <= D were public before the cutoff (NSE publishes "
+                           "them after the close)"] if copied["kinds"].get("deals", {}).get("rows_kept") else []),
+        "upcoming_earnings": upcoming(root, market, d),
         "included": copied["kinds"], "excluded": copied["excluded"],
         "not_copied": ["summaries/ (written live with later knowledge)", "reports/"],
         "steps": steps,
@@ -391,6 +454,18 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
     }
     (root / "ai_replay.json").write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
     return out
+
+
+def upcoming(root: Path, market: str, d: date) -> dict:
+    """The as-of indicator snapshot's earnings view: tickers with days_to_earnings, those <= 1 (no call
+    allowed) and BLOCKED tickers."""
+    with data_root(root):
+        f = connect(market).execute("SELECT ticker, quality, days_to_earnings FROM features_latest "
+                                    "WHERE as_of_date = ? ORDER BY ticker", [d]).df()
+    known = f[f["days_to_earnings"].notna()]
+    return {"with_days_to_earnings": {r.ticker: int(r.days_to_earnings) for r in known.itertuples()},
+            "earnings_within_1_day": sorted(known.loc[known["days_to_earnings"] <= 1, "ticker"]),
+            "blocked": sorted(f.loc[f["quality"] == "BLOCKED", "ticker"])}
 
 
 def limitations(copied: dict, counts: dict) -> list[str]:
@@ -410,6 +485,111 @@ def limitations(copied: dict, counts: dict) -> list[str]:
     if not k.get("prices", {}).get("rows_kept"):
         out.insert(0, "No price bars kept.")
     return out
+
+
+# ---------- backfill: a scratch source root with longer histories ----------
+
+SOURCE_MARKER = ".ai_replay_source"
+# Collectors run into the scratch source, one after another (SEC: the shared 10 requests/s budget and
+# the SEC_USER_AGENT contact; NSE: one polite session per collector, never two at once).
+BACKFILL_STEPS = {
+    "us": [("collect_filings.py",), ("collect_insiders.py",), ("collect_stakes.py",), ("collect_events.py",)],
+    "india": [("collect_nse_india.py", "--only", "announcements", "--only", "financials", "--since", "{since}"),
+              ("collect_relations_india.py", "--only", "insiders", "--only", "deals", "--since", "{since}"),
+              ("collect_events.py",)],
+}
+BACKFILL_KINDS = {"us": ("filings", "insiders", "stakes", "events"),
+                  "india": ("announcements", "financials", "insiders", "deals", "events")}
+
+
+def check_source(source: Path) -> Path:
+    """The scratch source must not be the repo, the real data/ or anything inside or above it."""
+    s = source.resolve()
+    for real_root in {CODE.resolve(), Path(common.ROOT).resolve()}:
+        real = real_root / "data"
+        if s == real_root or s == real or real in s.parents or s in real_root.parents:
+            raise SystemExit(f"--source {s} is the repo, its real data/ or contains them; use a scratch directory")
+    for a in [s, *s.parents]:   # any other market-brief checkout's data/ (e.g. the main clone of a worktree)
+        if a.name == "data" and (a.parent / "config" / "markets").is_dir() and (a.parent / "scripts").is_dir():
+            raise SystemExit(f"--source {s} is inside the real data/ of the checkout {a.parent}; use a scratch directory")
+    if s.exists() and any(s.iterdir()) and not (s / SOURCE_MARKER).exists():
+        raise SystemExit(f"--source {s} exists, is not empty and is not an ai_replay source; choose another path")
+    return s
+
+
+def backfill_config(cfg_dir: Path, market: str, since: date, today: date) -> dict:
+    """Longer lookbacks in the scratch source's config copy only (never the repo's config)."""
+    import yaml
+    path = cfg_dir / "markets" / f"{market}.yaml"
+    doc = yaml.safe_load(path.read_text())
+    days = (today - since).days + 1
+    changed = {}
+    if doc.get("filings") == "sec":
+        doc["filing_lookback_days"] = changed["filing_lookback_days"] = days
+        for k in ("insiders", "stakes"):
+            if k in (doc.get("relationships") or {}):
+                doc["relationships"][k]["lookback_days"] = changed[f"relationships.{k}.lookback_days"] = days
+    path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    return changed
+
+
+def stored_by_month(market: str, root: Path, kinds) -> dict:
+    """Rows per kind by month of their publication/acceptance time (events: event date)."""
+    out = {}
+    for kind in kinds:
+        cols = PUBLIC_AT.get(kind, [])
+        months: dict[str, int] = {}
+        for f in sorted((root / "data" / market / kind).glob("**/*.jsonl")):
+            for line in f.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                r = json.loads(line)
+                t = _ts(r.get("date")) if kind in ("events", "deals") else public_at(kind, r) if cols else None
+                key = "unknown" if t is None else f"{t:%Y-%m}"
+                months[key] = months.get(key, 0) + 1
+        out[kind] = dict(sorted(months.items()))
+    return out
+
+
+def backfill(cfg: dict, source: Path, since: date, timeout: int = 3600) -> dict:
+    market = cfg["market"]
+    if market not in BACKFILL_STEPS:
+        raise SystemExit(f"no backfill steps for market {market}")
+    s = check_source(source)
+    today = common.utc_today()
+    if since >= today:
+        raise SystemExit("--since must be before today")
+    s.mkdir(parents=True, exist_ok=True)
+    (s / SOURCE_MARKER).write_text("ai_replay backfill source (scratch; never the repo's data)\n")
+    src_data = Path(common.ROOT) / "data" / market
+    if not (s / "data" / market).exists():
+        shutil.copytree(src_data, s / "data" / market)
+    if not (s / "config").exists():
+        shutil.copytree(common.CONFIG, s / "config")
+    changed = backfill_config(s / "config", market, since, today)
+    before = stored_by_month(market, s, BACKFILL_KINDS[market])
+    steps = []
+    for step in BACKFILL_STEPS[market]:
+        script, args = step[0], [a.format(since=since) for a in step[1:]]
+        t0 = datetime.now(timezone.utc)
+        try:
+            p = run_script(script, s, market, *args, timeout=timeout)
+            code, out, err = p.returncode, _json_or_text(p.stdout), p.stderr[-1500:]
+        except subprocess.TimeoutExpired:
+            code, out, err = None, None, f"timed out after {timeout} s"
+        if isinstance(out, dict):   # keep the summary readable
+            out = {k: v for k, v in out.items() if k not in ("notes",)} | (
+                {"notes": out["notes"][:12]} if isinstance(out.get("notes"), list) else {})
+        steps.append({"script": script, "args": args, "exit": code, "seconds": round(
+            (datetime.now(timezone.utc) - t0).total_seconds()), "summary": out, "stderr_tail": err if code else ""})
+    res = {"step": "ai_replay.backfill", "market": market, "source": str(s), "copied_from": str(src_data),
+           "since": str(since), "today": str(today), "config_overrides": changed, "steps": steps,
+           "rows_by_public_month_before": before, "rows_by_public_month_after": stored_by_month(
+               market, s, BACKFILL_KINDS[market]),
+           "note": "each backfilled row keeps its real publication/acceptance time; first_seen_at is the "
+                   "backfill time, and prepare filters on the publication/acceptance time"}
+    (s / f"backfill-{market}.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+    return res
 
 
 # ---------- record: validate and store calls ----------
@@ -915,10 +1095,17 @@ def main() -> int:
     p = add("prepare", "build an as-of scratch root and its context pack and ranges")
     p.add_argument("--date", required=True, type=date.fromisoformat)
     p.add_argument("--root", required=True, type=Path)
-    p.add_argument("--source", type=Path, help="root holding the real data/ (default: $MB_ROOT or the repo)")
+    p.add_argument("--source", type=Path, help="root whose data/ is read, e.g. a `backfill` source "
+                                               "(default: $MB_ROOT or the repo)")
     p.add_argument("--force", action="store_true", help="rebuild a root this script prepared before")
     p.add_argument("--allow-training-period", action="store_true",
                    help=f"allow an as-of date on or before {MODEL_CUTOFF} (not a fair test)")
+    p.add_argument("--assume-earnings-known", type=int, default=0, metavar="DAYS",
+                   help="ASSUMPTION, off by default: treat actual earnings dates within DAYS after D as announced "
+                        "before the cutoff (labelled in the context pack and the summary)")
+    p = add("backfill", "copy data/<market> to a scratch source and run the collectors into it from --since")
+    p.add_argument("--source", required=True, type=Path, help="scratch source root (never the repo or its data/)")
+    p.add_argument("--since", required=True, type=date.fromisoformat)
     p = add("record", "validate forecaster calls and store them in the replay results")
     p.add_argument("--date", required=True, type=date.fromisoformat)
     p.add_argument("--root", required=True, type=Path)
@@ -938,10 +1125,13 @@ def main() -> int:
                "dates": [{"as_of_date": str(d), "session_date": str(next_session(cfg, d)),
                           "cutoff_utc": cutoff_for(cfg, d).isoformat()} for d in ds]}
     elif args.cmd == "prepare":
-        res = prepare(cfg, args.date, args.root.resolve(), args.source, args.force, args.allow_training_period)
+        res = prepare(cfg, args.date, args.root.resolve(), args.source, args.force, args.allow_training_period,
+                      args.assume_earnings_known)
         res = {k: v for k, v in res.items() if k != "steps"} | {"steps": {k: (v if k != "features" else {
             x: v.get(x) for x in ("as_of_date", "session_date", "regime", "tickers", "blocked")} if isinstance(v, dict) else v)
             for k, v in res["steps"].items()}}
+    elif args.cmd == "backfill":
+        res = backfill(cfg, args.source, args.since)
     elif args.cmd == "record":
         res = record(cfg, args.date, args.root.resolve(), args.calls, args.results)
     else:
