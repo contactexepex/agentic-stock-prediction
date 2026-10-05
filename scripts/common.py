@@ -138,6 +138,16 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "naive_score80_all": "DOUBLE", "call_hit_all": "DOUBLE", "always_up_all": "DOUBLE",
         "low_sample": "BOOLEAN", "n_proposals": "INTEGER", "proposals": "JSON", "detail": "JSON",
     }),
+    # Historical replay of the rule-based parts (replay.py): headline numbers as columns (scores are
+    # the 80% interval score in % of price on rows with a naive range), the full results as JSON.
+    "replays": ("jsonl", {
+        "id": "VARCHAR", "market": "VARCHAR", "start_date": "DATE", "end_date": "DATE",
+        "computed_at": "TIMESTAMPTZ", "report": "VARCHAR", "n_days": "INTEGER", "n_ranges": "INTEGER",
+        "cover50_1d": "DOUBLE", "cover80_1d": "DOUBLE", "cover50_5d": "DOUBLE", "cover80_5d": "DOUBLE",
+        "score80_1d": "DOUBLE", "naive_score80_1d": "DOUBLE", "score80_5d": "DOUBLE", "naive_score80_5d": "DOUBLE",
+        "always_up_1d": "DOUBLE", "always_up_5d": "DOUBLE", "runtime_s": "DOUBLE",
+        "settings": "JSON", "detail": "JSON",
+    }),
 }
 
 # Relationships (docs/DESIGN.md phase 5), US from SEC EDGAR: one row per Form 4 transaction

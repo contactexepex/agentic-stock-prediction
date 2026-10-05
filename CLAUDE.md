@@ -19,7 +19,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (report skeleton + Slack draft with every number; agents fill only the `AGENT` markers,
   then `notify_slack` posts the draft through `SLACK_WEBHOOK_URL`;
   see `templates/report.md`). `backtest` evaluates the
-  range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
+  range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
+  each past day's 1d/5d ranges as `ranges.py` builds them, the regime, and direction baselines
+  (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
+  and `data/<market>/replays/` (DESIGN.md section 7). Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
   `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
   switchable in `config/ranges.yaml`).
