@@ -219,25 +219,35 @@ SELECT DISTINCT ON (id) * FROM reviews ORDER BY id, computed_at DESC;
 -- in collect_fundamentals.py), from its newest filing, so a restatement or a split
 -- adjustment wins. first_filed = when that tag's value for the period was first filed;
 -- prev_value = the value before the latest revision (NULL = never revised).
-CREATE OR REPLACE VIEW fundamentals_latest AS
-WITH f AS (
+-- Point in time: the *_asof(as_of) macros see only filings known by as_of (a TIMESTAMPTZ; a DATE
+-- means 00:00 UTC that day). known_at = accepted_at, or the end of the filing date (UTC) when the
+-- acceptance time is unknown. The views without _asof use every stored filing, so a restated
+-- value replaces the original there: a backtest must use the _asof macros, e.g.
+--   SELECT * FROM fundamentals_metrics_asof(TIMESTAMPTZ '2026-08-01 12:00:00+00')
+CREATE OR REPLACE MACRO fundamentals_latest_asof(as_of) AS TABLE
+WITH k AS (
+    SELECT *, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ)) AS known_at FROM fundamentals
+), f AS (
     SELECT *, min(tag_rank) OVER (PARTITION BY ticker, concept, period_start, period_end) AS best_rank
-    FROM fundamentals
+    FROM k WHERE known_at <= as_of
 )
 SELECT DISTINCT ON (ticker, concept, period_start, period_end)
        ticker, concept, period, period_start, period_end, fiscal_year, fiscal_period, value, unit, tag,
-       form, accession, filing_date, accepted_at, min(filing_date) OVER fw AS first_filed, prev_value,
+       form, accession, filing_date, accepted_at, known_at, min(filing_date) OVER fw AS first_filed, prev_value,
        prev_value IS NOT NULL AS revised
 FROM f WHERE tag_rank = best_rank
 WINDOW fw AS (PARTITION BY ticker, concept, period_start, period_end)
 ORDER BY ticker, concept, period_start, period_end, filing_date DESC, first_seen_at DESC;
 
+CREATE OR REPLACE VIEW fundamentals_latest AS
+SELECT * FROM fundamentals_latest_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
+
 -- Quarterly flows per (ticker, concept): reported quarters, plus quarters derived from the
 -- cumulative fiscal-year totals where no quarter is reported (Q4 = FY - 9M, and for cash flows,
 -- which 10-Qs report year-to-date only, Q2 = H1 - Q1, Q3 = 9M - H1), marked derived. A derived EPS
 -- is approximate (the share count differs by period). Share averages are not derived.
-CREATE OR REPLACE VIEW fundamentals_quarterly AS
-WITH d AS (SELECT * FROM fundamentals_latest WHERE period IN ('quarter', 'ytd', 'annual')),
+CREATE OR REPLACE MACRO fundamentals_quarterly_asof(as_of) AS TABLE
+WITH d AS (SELECT * FROM fundamentals_latest_asof(as_of) WHERE period IN ('quarter', 'ytd', 'annual')),
 cum AS (
     SELECT d.*, lag(value) OVER cw AS prev_cum, lag(period_end) OVER cw AS prev_end,
            lag(fiscal_period) OVER cw AS prev_fp, lag(filing_date) OVER cw AS prev_filed
@@ -263,12 +273,15 @@ SELECT * FROM derived x
 WHERE NOT EXISTS (SELECT 1 FROM d q WHERE q.ticker = x.ticker AND q.concept = x.concept AND q.period = 'quarter'
                   AND abs(q.period_end - x.period_end) <= 3);
 
+CREATE OR REPLACE VIEW fundamentals_quarterly AS
+SELECT * FROM fundamentals_quarterly_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
+
 -- One row per ticker and fiscal quarter: headline numbers, margins, free cash flow and growth
 -- against the same quarter a year earlier (the quarter ending 350-380 days before). Growth uses
 -- |previous| as the base so a loss shrinking reads as positive. gross_profit falls back to
 -- revenue - cost of revenue when no gross profit is tagged (gross_profit_computed).
 -- `derived` = a headline value (revenue, net income or EPS) is derived from year-to-date totals.
-CREATE OR REPLACE VIEW fundamentals_metrics AS
+CREATE OR REPLACE MACRO fundamentals_metrics_asof(as_of) AS TABLE
 WITH p AS (
     SELECT ticker, period_end, mode(fiscal_year) AS fiscal_year, mode(fiscal_period) AS fiscal_period,
            max(value) FILTER (WHERE concept = 'revenue') AS revenue,
@@ -282,7 +295,7 @@ WITH p AS (
            coalesce(bool_or(derived) FILTER (WHERE concept IN ('revenue', 'net_income', 'eps_diluted')), false) AS derived,
            list(DISTINCT concept ORDER BY concept) FILTER (WHERE derived) AS derived_concepts,
            max(filing_date) AS filing_date
-    FROM fundamentals_quarterly GROUP BY ticker, period_end
+    FROM fundamentals_quarterly_asof(as_of) GROUP BY ticker, period_end
 ), m AS (
     SELECT *, coalesce(gross_profit_reported, revenue - cost_of_revenue) AS gross_profit,
            gross_profit_reported IS NULL AND revenue IS NOT NULL AND cost_of_revenue IS NOT NULL AS gross_profit_computed,
@@ -301,6 +314,9 @@ SELECT m.ticker, m.period_end, m.fiscal_year, m.fiscal_period, m.filing_date, m.
        CASE WHEN m.period_end - y.period_end <= 380 THEN round((m.operating_income - y.operating_income) / nullif(abs(y.operating_income), 0), 4) END AS operating_income_yoy,
        m.derived, m.derived_concepts
 FROM m ASOF LEFT JOIN m AS y ON m.ticker = y.ticker AND m.yoy_key >= y.period_end;
+
+CREATE OR REPLACE VIEW fundamentals_metrics AS
+SELECT * FROM fundamentals_metrics_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
 
 -- Balance sheet per ticker and date: cash and total debt. Debt is tagged differently by each
 -- company. total_debt adds up the parts found (debt_basis says which), NULL when none is tagged.

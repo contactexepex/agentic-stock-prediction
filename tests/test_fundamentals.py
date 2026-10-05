@@ -169,6 +169,30 @@ def test_period_kind_and_fiscal_labels():
     assert label("instant", None, "2026-07-17", "q3") == (2026, "Q3")             # cover-page share count
 
 
+def test_fiscal_label_from_the_period_not_the_filing():
+    """Hand-made: a 10-Q/A for the same period carries a different fy than the original 10-Q
+    (filers do mis-tag DocumentFiscalYearFocus). The period's label comes from the earliest
+    filing for it, and a comparative fact in a later filing keeps its own period's label."""
+    base = {"concept": "revenue", "tag": "us-gaap:Revenues", "tag_rank": 0, "unit": "USD", "cik": "1"}
+    facts = [
+        {**base, "start": "2025-04-01", "end": "2025-06-30", "value": 10, "accession": "orig", "form": "10-Q",
+         "filing_date": "2025-08-01", "fy": 2025, "fp": "Q2"},
+        {**base, "start": "2025-04-01", "end": "2025-06-30", "value": 11, "accession": "amend", "form": "10-Q/A",
+         "filing_date": "2025-09-15", "fy": 2026, "fp": "Q2"},
+        # next year's 10-Q: its own quarter and the year-ago comparative (restated to 12)
+        {**base, "start": "2026-04-01", "end": "2026-06-30", "value": 20, "accession": "next", "form": "10-Q",
+         "filing_date": "2026-08-01", "fy": 2026, "fp": "Q2"},
+        {**base, "start": "2025-04-01", "end": "2025-06-30", "value": 12, "accession": "next", "form": "10-Q",
+         "filing_date": "2026-08-01", "fy": 2026, "fp": "Q2"},
+    ]
+    by_accn, by_end = cf.report_periods(facts)
+    assert by_end == {"2025-06-30": (2025, "Q2"), "2026-06-30": (2026, "Q2")}
+    got = {(r["accession"], r["period_end"]): (r["fiscal_year"], r["fiscal_period"], r["prev_value"])
+           for r in cf.new_rows("T", facts, set(), "2020-01-01", {}, "now")}
+    assert got == {("orig", "2025-06-30"): (2025, "Q2", None), ("amend", "2025-06-30"): (2025, "Q2", 10),
+                   ("next", "2025-06-30"): (2025, "Q2", 11), ("next", "2026-06-30"): (2026, "Q2", None)}
+
+
 def test_restatement_rows_and_dedupe():
     """Real Bank of America restatement: Q2 2025 revenue 26,463m in the 2025 10-Q and 27,443m as the
     comparative in the 2026 10-Q. An unchanged comparative adds no row."""
@@ -180,9 +204,18 @@ def test_restatement_rows_and_dedupe():
     assert [(r["value"], r["prev_value"], r["accession"]) for r in q2] == [
         (26463000000, None, "0000070858-25-000268"), (27443000000, 26463000000, "0000070858-26-000394")]
     assert q2[0]["fiscal_year"] == 2025 and q2[0]["fiscal_period"] == "Q2" and q2[0]["period"] == "quarter"
+    # the restating 2026 10-Q is fy 2026 / fp Q2 in company facts; the comparative keeps its own period's label
+    sec_label = {(f["accession"], f["fy"], f["fp"]) for f in facts if f["accession"] == "0000070858-26-000394"}
+    assert sec_label == {("0000070858-26-000394", 2026, "Q2")}
+    assert (q2[1]["fiscal_year"], q2[1]["fiscal_period"]) == (2025, "Q2")
+    restating = [r for r in got if r["accession"] == "0000070858-26-000394"]
+    assert {(r["fiscal_year"], r["fiscal_period"]) for r in restating if r["period_end"] < "2026-01-01"} == {(2025, "Q2"), (2025, "H1")}
+    assert {(r["fiscal_year"], r["fiscal_period"]) for r in restating if r["period_end"] >= "2026-01-01"} == {(2026, "Q2"), (2026, "H1")}
     # Q1 2025 diluted EPS: 0.90 as filed, 0.89 as restated a year later
     q1 = [r for r in got if r["concept"] == "eps_diluted" and r["period_start"] == "2025-01-01" and r["period"] == "quarter"]
     assert [(r["value"], r["prev_value"]) for r in q1] == [(0.9, None), (0.89, 0.9)]
+    assert [(r["fiscal_year"], r["fiscal_period"], r["accession"]) for r in q1] == [
+        (2025, "Q1", "0000070858-25-000200"), (2025, "Q1", "0000070858-26-000249")]   # the latter filing is fy 2026
     assert all(r["id"] in ids for r in got)
     assert cf.new_rows("BAC", facts, ids, "2020-01-01", {}, "now") == []      # stored ids: nothing new
 
@@ -238,6 +271,17 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
     bac = con.execute("""SELECT value, prev_value, revised, first_filed FROM fundamentals_latest WHERE ticker = 'BAC'
                          AND concept = 'revenue' AND period = 'quarter' AND period_end = '2025-06-30'""").fetchone()
     assert bac == (27443000000, 26463000000, True, date(2025, 7, 31))
+    # point in time: before the restating 10-Q was accepted (2026-07-31 20:30 UTC) the original value holds
+    asof = """SELECT value FROM fundamentals_latest_asof(TIMESTAMPTZ '{}') WHERE ticker = 'BAC'
+               AND concept = 'revenue' AND period = 'quarter' AND period_end = '2025-06-30'"""
+    assert con.execute(asof.format("2026-07-31 20:00:00+00")).fetchone() == (26463000000,)
+    assert con.execute(asof.format("2026-07-31 21:00:00+00")).fetchone() == (27443000000,)
+    before = con.execute("""SELECT max(period_end) FROM fundamentals_metrics_asof(TIMESTAMPTZ '2026-07-01 00:00:00+00')
+                            WHERE ticker = 'AAPL'""").fetchone()
+    assert before == (date(2026, 3, 28),)                       # the June quarter's 10-Q was not filed yet
+    # no acceptance time (XOM's predecessor filings): known at the end of the filing date (UTC)
+    assert con.execute("""SELECT DISTINCT known_at FROM fundamentals_latest WHERE accession = '0000034088-26-000067'"""
+                       ).fetchall() == [(datetime(2026, 5, 5, tzinfo=timezone.utc),)]
     xom = con.execute("""SELECT revenue, revenue_yoy, yoy_period_end FROM fundamentals_metrics
                          WHERE ticker = 'XOM' AND period_end = '2026-06-30'""").fetchone()
     assert xom[0] == 116017000000 and xom[1] == round(116017 / 81506 - 1, 4)  # a year ago from the predecessor CIK
@@ -265,3 +309,26 @@ def test_skipped_without_sec(tmp_path):
     r = run("collect_fundamentals.py", root, cfg, market="nosec")
     assert r.returncode == 0 and "skipped" in json.loads(r.stdout)
     assert not (root / "data" / "nosec").exists()
+
+
+def test_yoy_needs_the_quarter_a_year_earlier(tmp_path, monkeypatch):
+    """Hand-made rows: the year-ago quarter is missing, so the nearest older quarter (15 months
+    back) must not be used as the base; with it present, growth is computed."""
+    root = tmp_path / "repo"
+    path = root / "data" / MARKET / "fundamentals" / "2026" / "10" / "2026-10-05.jsonl"
+    path.parent.mkdir(parents=True)
+    base = {"cik": "1", "concept": "revenue", "tag": "us-gaap:Revenues", "tag_rank": 0, "unit": "USD",
+            "period": "quarter", "form": "10-Q", "accepted_at": None, "prev_value": None,
+            "first_seen_at": "2026-10-05T00:00:00+00:00"}
+    recs = []
+    for t, quarters in {"GAP": [("2024-01-01", "2024-03-31", 100), ("2025-04-01", "2025-06-30", 150)],
+                        "FULL": [("2024-04-01", "2024-06-30", 100), ("2025-04-01", "2025-06-30", 150)]}.items():
+        for start, end, v in quarters:
+            recs.append({**base, "id": f"{t}-{end}", "ticker": t, "period_start": start, "period_end": end,
+                         "fiscal_year": int(end[:4]), "fiscal_period": "Q2", "accession": f"{t}-{end}",
+                         "filing_date": end, "value": v})
+    path.write_text("".join(json.dumps(r) + "\n" for r in recs))
+    con = connect(root, monkeypatch)
+    got = dict((t, (y, g)) for t, y, g in con.execute(
+        "SELECT ticker, yoy_period_end, revenue_yoy FROM fundamentals_metrics WHERE period_end = '2025-06-30'").fetchall())
+    assert got == {"GAP": (None, None), "FULL": (date(2024, 6, 30), 0.5)}

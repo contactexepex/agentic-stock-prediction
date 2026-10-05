@@ -41,7 +41,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/markets/us.yaml`). Views `fundamentals_latest` (newest filing wins), `fundamentals_quarterly`
   (Q4 = FY - 9M and quarterly cash flows derived, marked), `fundamentals_metrics` (YoY growth,
   margins, FCF), `fundamentals_balance` and `fundamentals_latest_report` feed the context pack's
-  "Fundamentals" section (`scripts/fundamentals.py`; no consensus estimates, so no "surprise")
+  "Fundamentals" section (`scripts/fundamentals.py`; no consensus estimates, so no "surprise").
+  These views show today's knowledge (restatements replace originals); for anything as of a past
+  time use the macros `fundamentals_latest_asof|quarterly_asof|metrics_asof(<timestamp>)`
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

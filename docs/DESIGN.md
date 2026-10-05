@@ -150,6 +150,17 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    the latest balance sheet. No consensus estimates are available for free, so there is no
    earnings "surprise". Gaps: banks and insurers tag no gross or operating profit; some companies
    tag debt or capex only in parts or custom tags (e.g. CAT, DE, GM debt; DAL capex), left blank.
+   META has no company-total shares-outstanding fact in company facts (likely because it reports
+   class A and B shares separately), so its `shares_out` is blank. Where no gross profit is tagged,
+   gross margin is computed as (revenue - cost of revenue) / revenue and marked `c`: a uniform
+   formula, not the company's own measure. It misleads for some: CVX's "cost" is purchased crude
+   and products (47.8% for Q2 2026, not an oil major's margin), CAT's and DE's revenue includes
+   financial-services revenue, and WMT's and COST's includes membership fees.
+   **Not point in time:** the plain views (`fundamentals_latest`, `_quarterly`, `_metrics`) use every
+   stored filing, so a restated or split-adjusted value replaces the original. A backtest or any
+   as-of question must use the macros `fundamentals_latest_asof(ts)`, `fundamentals_quarterly_asof(ts)`
+   and `fundamentals_metrics_asof(ts)`, which see only filings known by `ts` (`known_at` =
+   acceptance time, or the end of the filing date in UTC when SEC's list no longer holds it).
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 
