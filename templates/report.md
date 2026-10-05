@@ -3,7 +3,8 @@
 `scripts/report.py` writes `reports/<market>/<session_date>.md` and `work/slack_<market>.md`
 with every number, table and chart link. Replace each `<!-- AGENT:... -->` marker with short
 narrative from the context pack, the news brief, the bull/bear cases and the forecaster, then
-delete the marker. Never change a number, table or chart link the script wrote; quote numbers
+delete the marker. Keep the `<!-- report-data: ... -->` line (report.py uses it to tell whether
+a filled report is still current). Never change a number, table or chart link the script wrote; quote numbers
 only from those tables or the context pack. Plain, short sentences.
 
 Report markers:

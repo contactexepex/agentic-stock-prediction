@@ -284,13 +284,25 @@ def test_calibrate_ranges_and_scoring(tmp_path):
                    "| 1d | since start | 2 |", "Ranges by regime", "Calls by confidence band"):
         assert needle in text, needle
 
-    # a filled report is never overwritten by a re-run (only the Slack draft is rebuilt) unless --force
+    # a filled report is kept by a re-run on the same data (only the Slack draft is rebuilt) ...
     rpath = root / out["report"]
     filled = re.sub(r"<!-- AGENT:[^>]*-->", "narrative", text)
+    assert "<!-- report-data: as_of=" in filled
     rpath.write_text(filled)
     again = run("report.py", root, cfg)
     assert again.returncode == 0 and json.loads(again.stdout)["report_kept"] is True
     assert rpath.read_text() == filled and (root / out["slack_draft"]).exists()
+    # ... but rebuilt (old copy saved, warning) once the data it was built from changed
+    reg_file = sorted((root / "data" / MARKET / "regime").glob("**/*.jsonl"))[-1]
+    last = json.loads(reg_file.read_text().splitlines()[-1])
+    flipped = "UNSTABLE" if last["regime"] != "UNSTABLE" else "CALM"
+    with reg_file.open("a") as f:
+        f.write(json.dumps({**last, "regime": flipped, "computed_at": "2099-01-01T00:00:00+00:00"}) + "\n")
+    stale = json.loads(run("report.py", root, cfg).stdout)
+    assert stale["report_kept"] is False and "warning" in stale
+    assert (root / stale["previous_report"]).read_text() == filled
+    rebuilt = rpath.read_text()
+    assert "<!-- AGENT:headline -->" in rebuilt and f"regime={flipped} -->" in rebuilt
     forced = json.loads(run("report.py", root, cfg, "--force").stdout)
     assert forced["report_kept"] is False and "<!-- AGENT:headline -->" in rpath.read_text()
     slack = (root / out["slack_draft"]).read_text()

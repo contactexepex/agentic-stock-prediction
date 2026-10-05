@@ -169,13 +169,14 @@ def overview(cfg, bars, ranges, past, regime, as_of, path) -> None:
         last = len(s) - 1
         mine = ranges[ranges["ticker"] == t].set_index("horizon_days")
         call = "no range"
-        if 1 in mine.index:
-            r = mine.loc[1]
-            xs, lo, hi = [last, last + 1], [s.iloc[-1], r["lo80"]], [s.iloc[-1], r["hi80"]]
-            if 5 in mine.index:
-                xs, lo, hi = xs + [last + 5], lo + [mine.loc[5]["lo80"]], hi + [mine.loc[5]["hi80"]]
+        horizons = [h for h in (1, 5) if h in mine.index]   # a late run publishes 5-day ranges only
+        if horizons:
+            xs, lo, hi = [last], [s.iloc[-1]], [s.iloc[-1]]
+            for h in horizons:
+                xs, lo, hi = xs + [last + h], lo + [mine.loc[h]["lo80"]], hi + [mine.loc[h]["hi80"]]
             ax.fill_between(xs, lo, hi, color=BAND80, linewidth=0)
-            ax.vlines(last + 1, r["lo80"], r["hi80"], color=BAND50, linewidth=4)
+            if 1 in mine.index:
+                ax.vlines(last + 1, mine.loc[1]["lo80"], mine.loc[1]["hi80"], color=BAND50, linewidth=4)
             made = [(h, mine.loc[h]) for h in (1, 5) if h in mine.index and mine.loc[h]["direction"] in ("up", "down")]
             call = " ".join(f"{h}d {fmt_call(x['direction'], x['confidence'])}" for h, x in made) or "no call"
         ax.plot(range(len(s)), s.values, color=LINE, linewidth=1.5)

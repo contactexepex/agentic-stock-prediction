@@ -134,6 +134,12 @@ def test_scheduled_macro_events():
     assert india_jobs and india_jobs[0]["release"] is None       # released after the NSE close
     fomc27 = [e["date"] for e in ev.market_events(us, date(2027, 1, 1), date(2027, 12, 31)) if e["type"] == "fomc"]
     assert len(fomc27) == 8
+    assert not any(e["major"] for e in ev.market_events(us, date(2027, 1, 1), date(2027, 12, 31))
+                   if e["type"] == "fomc")                     # provisional until confirmed
+    # 2027-01-01 is a holiday: no jobs report moved back to 2026-12-31, a provisional Jan 8 instead
+    around = [(e["date"], e["major"]) for e in ev.market_events(us, date(2026, 12, 28), date(2027, 1, 12))
+              if e["type"] == "jobs_report"]
+    assert around == [(date(2027, 1, 8), False)]
 
 
 def test_market_events_shift_to_previous_session():
@@ -144,6 +150,57 @@ def test_market_events_shift_to_previous_session():
     weekly = [e["date"] for e in evs if e["type"] == "weekly_expiry"]
     assert date(2026, 10, 20) not in weekly                    # Diwali holiday -> moved earlier
     assert date(2026, 10, 19) in weekly
+
+
+def test_scorecard_last_30_days_and_since_start():
+    import duckdb
+    import report
+    con = duckdb.connect()
+    con.execute("""CREATE TABLE range_record (horizon_days INTEGER, target_date DATE, hit50 BOOLEAN, hit80 BOOLEAN,
+                   naive_hit80 BOOLEAN, width80_pct DOUBLE, naive_width80_pct DOUBLE, is80_pct DOUBLE,
+                   naive_is80_pct DOUBLE, center_err_pct DOUBLE, naive_center_err_pct DOUBLE)""")
+    con.execute("""INSERT INTO range_record VALUES
+        (1, current_date - 3,   true,  true,  true,  4.0, 5.0, 4.0, 5.0, 1.0, 1.5),
+        (1, current_date - 20,  false, false, true,  4.0, 5.0, 9.0, 6.0, 3.0, 2.0),
+        (1, current_date - 200, true,  true,  false, 6.0, 5.0, 6.0, 9.0, 1.0, 1.0)""")
+    sc = con.execute(report.SCORECARD_SQL).df()
+    rows = {r.win: r for r in sc.itertuples()}
+    assert list(sc["win"]) == ["since start", "last 30 days"]
+    assert rows["last 30 days"].n == 2 and rows["last 30 days"].c80 == 0.5 and rows["last 30 days"].nc80 == 1.0
+    assert rows["since start"].n == 3 and abs(rows["since start"].c80 - 2 / 3) < 1e-9
+    assert rows["last 30 days"].ce == 2.0 and rows["last 30 days"].nce == 1.75
+    # and the report renders both rows
+    us, empty = load_market("us"), pd.DataFrame()
+    d = {"as_of": date(2026, 10, 2), "session": date(2026, 10, 5),
+         "ranges": pd.DataFrame([{"ticker": "JPM", "horizon_days": 1, "direction": None, "confidence": None,
+                                  "base_close": 100.0, "lo80": 98.0, "hi80": 102.0, "lo50": 99.0, "hi50": 101.0,
+                                  "notes": [], "target_date": "2026-10-05"}]),
+         "regime": empty, "features": empty, "quotes": pd.DataFrame(columns=["symbol", "price", "change_pct"]),
+         "scored": empty, "last_target": None, "calls_scored": empty, "scorecard": sc, "by_regime": empty,
+         "direction": empty, "conf_bands": empty, "market": empty, "calibration": empty,
+         "company_events": pd.DataFrame(columns=["date", "name"])}
+    rep, _, _ = report.build(us, d, {"repo_url": "https://example.com/r", "branch": "main"})
+    assert "| 1d | last 30 days | 2 | 50% | 50% | 100% |" in rep and "| 1d | since start | 3 |" in rep
+
+
+def test_overview_shows_5d_range_and_call_when_1d_was_skipped(monkeypatch):
+    import charts
+    cfg = {"name": "T", "sectors": {"Tech": ["AAPL", "MSFT"]},
+           "tickers": {"AAPL": {"name": "Apple", "sector": "Tech"}, "MSFT": {"name": "Microsoft", "sector": "Tech"}}}
+    idx = pd.bdate_range("2026-07-01", periods=60)
+    bars = {t: pd.DataFrame({"close": np.linspace(100, 110, 60)}, index=idx) for t in ("AAPL", "MSFT")}
+    # late run: the 1-day range targets a closed session and was not published, the 5-day one was
+    ranges = pd.DataFrame([{"ticker": "AAPL", "horizon_days": 5, "lo80": 104.0, "hi80": 116.0,
+                            "direction": "down", "confidence": 0.6}])
+    past = pd.DataFrame(columns=["ticker", "target_date", "hit80"])
+    captured = {}
+    monkeypatch.setattr(charts, "save_png", lambda fig, path: captured.setdefault("fig", fig))
+    charts.overview(cfg, bars, ranges, past, "CALM", idx[-1].date(), "unused.png")
+    titles = {ax.get_title(loc="left").split()[0]: ax for ax in captured["fig"].axes if ax.get_visible()}
+    aapl, msft = titles["AAPL"], titles["MSFT"]
+    assert "5d ▼ down 60%" in aapl.get_title(loc="left") and "no range" not in aapl.get_title(loc="left")
+    assert len(aapl.collections) == 1                            # the 80% cone out to 5 days is drawn
+    assert "no range" in msft.get_title(loc="left") and not msft.collections
 
 
 def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():

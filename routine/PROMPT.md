@@ -56,8 +56,11 @@ and list each FAIL with its reason in the report's `data_quality` section and th
     `reports/<market>/<session_date>.md` (all numbers, tables and charts) and the Slack draft
     `work/slack_<market>.md`. Fill every `<!-- AGENT:... -->` marker in both files following
     `templates/report.md`, then delete the markers. Never change a number, table or chart
-    link written by the script. If report.py prints `"report_kept": true` (today's report was
-    already filled by an earlier run), keep that report and fill only the Slack draft.
+    link written by the script, and keep the `<!-- report-data: ... -->` line. If report.py
+    prints `"report_kept": true` (today's report was already filled by an earlier run from the
+    same data), keep that report and fill only the Slack draft. If it prints a `warning` with
+    `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative
+    only where it still holds.
 
 12. Save (only after the judge passed the report, or its failures are listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
