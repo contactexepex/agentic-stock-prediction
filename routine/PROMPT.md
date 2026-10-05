@@ -24,7 +24,11 @@ still fails:
   sides were heard;
 - your narrative failed (summary or report): replace each failed section with "Narrative withheld:
   failed review (<reason>)"; the numbers, tables and charts written by the scripts stay.
-List every FAIL with its reason in the report's `data_quality` section and the daily summary.
+Record every FAIL with its reason where it can still be read before the next commit: FAILs from
+steps 7-10 in both the report's `data_quality` section and the daily summary; a step 11 FAIL only
+in `data_quality` (the summary was already judged in step 10); a step 14 FAIL only in
+`data/<market>/judgments/` (the brief is already posted), and the next run lists it in its
+`data_quality`.
 Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/MM/TODAY.jsonl`
 (via a work/ file and `cat >>`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>` (unique on a same-day rerun),
 `run_date`, `agent` (one of news-analyst, bull-researcher, bear-researcher, forecaster, summaries,
