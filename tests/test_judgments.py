@@ -27,11 +27,21 @@ def test_log_lines_are_complete_verdicts():
         assert r["verdict"] in ("PASS", "FAIL"), r
         assert isinstance(r["round"], int) and r["round"] >= 1, r
         assert r["summary"].strip(), r
-        try:                                    # ISO UTC timestamp (early lines: a plain date)
-            ts = datetime.fromisoformat(r["recorded_at"])
-            assert ts.tzinfo is not None or len(r["recorded_at"]) == 10, r
-        except ValueError:
-            date.fromisoformat(r["recorded_at"])
+
+
+# The first 17 lines were written on 2026-10-05 with a plain date. The log is append-only, so they
+# stay; every later line must carry a full ISO timestamp in UTC.
+DATE_ONLY_LINES = 17
+
+
+def test_recorded_at_is_iso_utc():
+    for n, r in enumerate(entries(), 1):
+        if n <= DATE_ONLY_LINES:
+            assert date.fromisoformat(r["recorded_at"]), r
+            continue
+        ts = datetime.fromisoformat(r["recorded_at"])
+        assert len(r["recorded_at"]) > 10 and ts.utcoffset() is not None and ts.utcoffset().total_seconds() == 0, \
+            f"line {n}: recorded_at must be ISO UTC, got {r['recorded_at']!r}"
 
 
 def test_rounds_increase_per_subject():

@@ -422,3 +422,32 @@ def test_ranges_carry_activist_note(tmp_path):
     m1 = next(x for x in got.values() if x["ticker"] == "MSFT" and x["horizon_days"] == 1)
     assert any(n.startswith("new 13D: Example Activist Partners LP 5.4%") and n.endswith("x1.2") for n in a1["notes"])
     assert not any("13D" in n for n in m1["notes"])
+
+
+def test_ranges_ignore_a_13d_accepted_after_made_at(tmp_path):
+    """Same setup as above, but the range is made at 20:30 UTC, before the 13D's 21:00 UTC
+    acceptance: ranges.py must not use it (CLAUDE.md: nothing published after made_at)."""
+    root, cfg = setup(tmp_path)
+    rng = np.random.default_rng(5)
+    days, d = [], TODAY
+    while len(days) < 520:
+        if d.weekday() < 5:
+            days.append(d)
+        d -= timedelta(days=1)
+    days.reverse()
+    series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "VOLX": [15.0] * 520,
+              "AAPL": fat_tailed_walk(rng, 520, 150, 0.015), "MSFT": fat_tailed_walk(rng, 520, 300, 0.012)}
+    for i, day in enumerate(days):
+        p = root / "data" / MARKET / "prices" / f"{day:%Y}" / f"{day:%m}" / f"{day}.csv"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("date,ticker,open,high,low,close,adj_close,volume,collected_at\n" + "".join(
+            f"{day},{t},{c[i]},{c[i] * 1.01},{c[i] * 0.99},{c[i]},{c[i]},{1000 + i},2026-01-01T00:00:00+00:00\n"
+            for t, c in series.items()))
+    assert run("collect_stakes.py", root, cfg).returncode == 0
+    for script in ("features.py", "calibrate.py"):
+        r = run(script, root, cfg)
+        assert r.returncode == 0, r.stderr
+    r = run("ranges.py", root, cfg, "--now", f"{TODAY}T20:30:00+00:00")
+    assert r.returncode == 0, r.stderr
+    got = rows(root, "ranges")
+    assert got and not any("13D" in n for x in got.values() for n in x["notes"])

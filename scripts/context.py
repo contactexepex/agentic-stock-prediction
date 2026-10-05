@@ -10,6 +10,7 @@ import events as ev
 import graph
 import relations
 import smart_money as sm
+from score_predictions import is_late
 from common import connect, market_arg, md_table, require_market, utc_today
 from features import local_today
 
@@ -69,7 +70,9 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
         ("Price ranges published for the latest session (80% and 50%)", """
             SELECT ticker, horizon_days AS h, target_date, round(base_close, 2) AS base,
                    round(lo80, 2) AS lo80, round(lo50, 2) AS lo50, round(hi50, 2) AS hi50, round(hi80, 2) AS hi80,
-                   direction, confidence, notes
+                   direction, confidence, notes,
+                   CASE WHEN id IN (SELECT id FROM late_ranges) THEN 'late: not a forecast, never scored'
+                        ELSE '' END AS late
             FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)
             ORDER BY ticker, h""", []),
         ("Ranges scored on the latest target date (yesterday's calls)", """
@@ -119,6 +122,11 @@ def main() -> None:
     cfg = require_market(market_arg(__doc__).parse_args())
     con = connect(cfg["market"])
     print(f"# Context pack: {cfg['name']}, {utc_today()} (UTC)\n")
+    # ranges made at/after the close of the first session after as_of: shown, never scored
+    latest = con.execute("SELECT id, as_of_date, made_at FROM ranges_latest "
+                         "WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)").fetchall()
+    late = [rid for rid, as_of, made in latest if is_late(cfg, as_of, made)]
+    con.execute("CREATE OR REPLACE TEMP TABLE late_ranges AS SELECT unnest(?::VARCHAR[]) AS id", [late])
     blocks = sections(cfg)
     for title, sql, params in blocks[:2]:
         print(f"## {title}\n\n{md_table(con.execute(sql, params))}")

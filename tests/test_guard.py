@@ -231,7 +231,26 @@ def test_report_labels_late_ranges_and_links_the_review(market):
     text = (root / "reports" / MARKET / f"{DAY}.md").read_text()
     line = {t: next(x for x in text.splitlines() if x.startswith(f"| {t} |")) for t in ("AAPL", "MSFT")}
     assert "late: not a forecast, never scored" in line["MSFT"]
+    assert line["MSFT"].split(" | ")[7] == "–"                   # cue blanked on the late row
+    assert line["AAPL"].split(" | ")[7] != "–"
     assert "late:" not in line["AAPL"]
     assert "1 stock(s) have ranges made after the session they target had closed" in text
     import report
     assert report.md_link("review-2026-W40.md") == "[review-2026-W40.md](review-2026-W40.md)"
+
+
+def test_context_pack_labels_late_ranges(market):
+    root, cfg_dir, cfg, rc = market
+    quotes(root, "2026-10-05T10:55:00+00:00")
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    rows = build(cfg, rc, "2026-10-05T11:30:00+00:00")
+    for r in rows.values():
+        if r["ticker"] == "MSFT":
+            r["made_at"] = "2026-10-05T20:40:00+00:00"
+    jsonl(root, "ranges", AS_OF, list(rows.values()))
+    r = run("context.py", root, cfg_dir)
+    assert r.returncode == 0, r.stderr
+    sec = r.stdout.split("## Price ranges published", 1)[1].split("\n## ", 1)[0]
+    lines = [x for x in sec.splitlines() if x.startswith("| AAPL") or x.startswith("| MSFT")]
+    assert len(lines) == 4
+    assert all(x.rstrip(" |").endswith("late: not a forecast, never scored") == x.startswith("| MSFT") for x in lines)

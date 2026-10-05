@@ -26,8 +26,11 @@ still fails:
   failed review (<reason>)"; the numbers, tables and charts written by the scripts stay.
 List every FAIL with its reason in the report's `data_quality` section and the daily summary.
 Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/MM/TODAY.jsonl`
-(via a work/ file and `cat >>`): `id` = `TODAY-<agent>-<round>`, `run_date`, `agent`, `round`,
-`verdict`, `summary` (max 40 words), `dropped` (what was not used, or null), `recorded_at` (ISO UTC).
+(via a work/ file and `cat >>`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>` (unique on a same-day rerun),
+`run_date`, `agent` (one of news-analyst, bull-researcher, bear-researcher, forecaster, summaries,
+report, slack, graph-builder), `round`, `verdict`, `summary` (max 40 words), `dropped` (what was not
+used, or null), `recorded_at` (ISO UTC). Verdicts from steps 10-11 are listed in `data_quality` and
+committed in step 12; the step 14 verdict is committed in step 14 (the brief is already posted).
 
 1. Prepare: `mkdir -p work`. If
    `python -c "import duckdb, feedparser, yfinance, pandas, exchange_calendars"` fails, run
@@ -120,7 +123,7 @@ Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/
     Delete `work/graph.jsonl`, then always record the attempt, even if it added nothing:
     `python scripts/graph.py attempt --note "<one line from its summary>"`. Then commit only what
     exists and changed, and push as in step 12:
-    `git add data/<market>/graph_runs; [ -d data/<market>/graph ] && git add data/<market>/graph;`
+    `git add data/<market>/graph_runs data/<market>/judgments; [ -d data/<market>/graph ] && git add data/<market>/graph;`
     `git diff --cached --quiet || git commit -m "<market> connection map TODAY"`.
     It runs after the brief so it never delays it; new edges feed the "Connections" section
     from the next run.
