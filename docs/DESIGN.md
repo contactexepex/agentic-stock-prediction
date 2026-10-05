@@ -108,5 +108,7 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 3. Charts, new report layout, Slack message, two routines.
 4. Weekly review: what improved coverage, what to drop.
 
+Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
+
 ## 11. Open items
 - India watchlist (5-10 companies) and US watchlist (5-10 companies).
