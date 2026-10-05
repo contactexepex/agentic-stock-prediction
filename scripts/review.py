@@ -517,8 +517,8 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
               "Targets 50% and 80%. Width and interval score in % of price; score is lower-is-better. Naive = last "
               "close +/- 20-day volatility.", "", table(hdr, rows)]
     for title, key in (("By regime", "regime"), ("By sector", "sector"), ("By widening note", "note")):
-        rows = [range_row([k], s, rv) for k, s in d["breakdowns"][key].items()]
-        lines += [f"### {title} (since start)", "", table(["Group · H", *hdr[2:]], rows)]
+        rows = [range_row([win_names[w], k], s, rv) for w, per in d["breakdowns"].items() for k, s in per[key].items()]
+        lines += [f"### {title}", "", table(["Window", "Group · H", *hdr[2:]], rows)]
     lines += ["Notes: `cue` overnight cue, `ai_call` AI direction (drift), `ai_widen` AI widened, `earnings` "
               "earnings in horizon, `event` major market event, `regime` regime widening, `none` no adjustment.", ""]
 
@@ -527,11 +527,11 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
             for w, per in d["calls"].items() for h, s in per.items()]
     lines += ["## Direction calls", "", "Hit rate vs the always-up baseline on the same tickers and dates.", "",
               table(["Window", "H", "n", "Hit rate", "Always-up", "Edge", "Mean conf.", "Flag"], rows),
-              "### By confidence band (since start)", "",
-              table(["Band", "n", "Mean conf.", "Hit rate", "Gap", "Flag"],
-                    [[b, s["n"], fpct(s.get("mean_confidence")), fpct(s.get("hit_rate")),
+              "### By confidence band", "",
+              table(["Window", "Band", "n", "Mean conf.", "Hit rate", "Gap", "Flag"],
+                    [[win_names[w], b, s["n"], fpct(s.get("mean_confidence")), fpct(s.get("hit_rate")),
                       "–" if s.get("gap") is None else f"{s['gap']:+.0%}", flag(s["n"], rv)]
-                     for b, s in d["bands"].items()])]
+                     for w, per in d["bands"].items() for b, s in per.items()])]
 
     lines += [f"## Calibration (latest as of {rec['week_end']})", "",
               table(["H", "Source", "History n", "Live n", "q10", "q25", "q75", "q90"],
@@ -545,8 +545,10 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
               "Each stored range is rebuilt with one input changed (same quantiles, base and outcome). Inputs that "
               "only exist live (cues, AI calls, earnings and event flags) can only be judged here.", ""]
     if live["n"]:
-        lines += [f"Replay with the current config reproduces {live['reproduced']} of {live['n']} published ranges "
-                  "(the rest used settings or inputs the replay holds fixed).", "", table(ab_hdr, ablation_rows(live))]
+        lines += [f"Round-trip consistency check against the current config: the replay rebuilds {live['reproduced']} "
+                  f"of {live['n']} published ranges exactly (the rest used settings or inputs it holds fixed). This "
+                  "checks the decomposition only; it is not an independent validation of the quantile model.", "",
+                  table(ab_hdr, ablation_rows(live))]
     else:
         lines += ["_No scored live ranges yet._", ""]
     hist = d["history_ablation"]
@@ -588,6 +590,9 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
               "so change one parameter at a time and let the next review confirm it.",
               "- Only coverage falling below target blocks a proposal; over-coverage is priced by the interval "
               "score and narrowed by the daily self-calibration (`calibrate.py`).",
+              "- `warmup_bars` and `min_pool` are ablated on price history only. `min_pool` matters only when a "
+              "day's pool is smaller than it (live then falls back to normal quantiles, the walk-forward skips the "
+              "day), so on two years of bars it rarely binds.",
               "- AI judgement is never backtested: AI drift and AI widening are judged only on live ranges.", ""]
     return "\n".join(lines)
 
@@ -605,9 +610,9 @@ def build(cfg: dict, rc: dict, rv: dict, con, week: str, history: bool = True) -
     d = {"partial_week": end >= utc_today(),
          "ranges": {w: by_horizon(win(ranges, s), range_summary) for w, s in windows.items()},
          "calls": {w: by_horizon(win(calls, s), call_summary) for w, s in windows.items()},
-         "breakdowns": {"regime": breakdown(ranges, "regime"), "sector": breakdown(ranges, "sector"),
-                        "note": breakdown(ranges, "tags")},
-         "bands": confidence_bands(calls, rv["confidence_bands"])}
+         "breakdowns": {w: {"regime": breakdown(win(ranges, s), "regime"), "sector": breakdown(win(ranges, s), "sector"),
+                            "note": breakdown(win(ranges, s), "tags")} for w, s in windows.items()},
+         "bands": {w: confidence_bands(win(calls, s), rv["confidence_bands"]) for w, s in windows.items()}}
     cal = con.execute("SELECT DISTINCT ON (horizon_days) * FROM calibration WHERE as_of_date <= ? "
                       "ORDER BY horizon_days, as_of_date DESC, computed_at DESC", [end]).df()
     d["calibration"] = [{k: (str(v)[:10] if k == "as_of_date" else v) for k, v in r.items() if k != "computed_at"}
@@ -618,7 +623,7 @@ def build(cfg: dict, rc: dict, rv: dict, con, week: str, history: bool = True) -
     for ab in (d["live_ablation"], d["history_ablation"]):
         judge(ab, rv)
     d["proposals"] = proposals(rc, d["live_ablation"], d["history_ablation"])
-    d["advice"] = confidence_advice(d["bands"], d["calls"]["all"], rv)
+    d["advice"] = confidence_advice(d["bands"]["all"], d["calls"]["all"], rv)
 
     ra, ca = d["ranges"]["all"]["all"], d["calls"]["all"]["all"]
     rec = {"id": week, "week": week, "week_start": str(start), "week_end": str(end), "computed_at": utc_now(),

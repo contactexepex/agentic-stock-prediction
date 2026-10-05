@@ -132,6 +132,71 @@ def test_report_review_line():
     assert line == "Weekly review 2026-W40: 1 proposed range change for a human to decide (low sample) · https://example.com/r.md"
 
 
+def test_summaries_match_hand_calculation():
+    """Four scored ranges around base 100: 50% range 98-102, 80% range 95-105, naive 99-101 / 97-103."""
+    ys = [100.0, 103.0, 110.0, 94.0]
+    con = duckdb.connect()
+    con.execute("""CREATE TABLE range_record AS SELECT * FROM (VALUES
+        ('a', DATE '2026-10-01', 'A', 1, 100.0, 100.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
+         NULL, 'CALM', ['cue +1.00% x0.5'], true, true, true, true, 10.0, 6.0, 10.0, 6.0),
+        ('b', DATE '2026-10-01', 'A', 1, 100.0, 103.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
+         'up', 'CALM', [], false, true, false, true, 10.0, 6.0, 10.0, 6.0),
+        ('c', DATE '2026-10-02', 'B', 5, 100.0, 110.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
+         NULL, 'UNSTABLE', ['regime UNSTABLE x1.25'], false, false, false, false, 60.0, 76.0, 10.0, 6.0),
+        ('d', DATE '2026-10-02', 'B', 5, 100.0, 94.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
+         NULL, 'CALM', [], false, false, false, false, 20.0, 36.0, 10.0, 6.0))
+        t(id, target_date, ticker, horizon_days, base_close, actual_close, lo50, hi50, lo80, hi80,
+          naive_lo50, naive_hi50, naive_lo80, naive_hi80, direction, regime, notes,
+          hit50, hit80, naive_hit50, naive_hit80, is80_pct, naive_is80_pct, width80_pct, naive_width80_pct)""")
+    # stored is80 matches the interval score by hand: width + (2/0.2) x miss distance
+    for y, stored, naive in zip(ys, (10.0, 10.0, 60.0, 20.0), (6.0, 6.0, 76.0, 36.0)):
+        assert math.isclose(100 * rl.interval_score(95, 105, y, 0.8) / 100, stored)
+        assert math.isclose(100 * rl.interval_score(97, 103, y, 0.8) / 100, naive)
+    cfg = {"tickers": {"A": {"sector": "Tech"}, "B": {"sector": "Energy"}}}
+    df = review.load_ranges(con, cfg, date(2026, 10, 4))
+    # 50% score by hand: 4 + 4 x miss -> 4, 8, 36, 20; naive: 2 + 4 x miss -> 2, 10, 38, 22
+    assert list(df["is50_pct"]) == [4.0, 8.0, 36.0, 20.0]
+    assert list(df["naive_is50_pct"]) == [2.0, 10.0, 38.0, 22.0]
+    assert list(df["width50_pct"]) == [4.0, 4.0, 4.0, 4.0]
+    assert list(df["sector"]) == ["Tech", "Tech", "Energy", "Energy"]
+    assert [t for t in df["tags"]] == [["cue"], ["none", "ai_call"], ["regime"], ["none"]]
+    s = review.range_summary(df)
+    assert s == {"n": 4, "cover50": 0.25, "cover80": 0.5, "naive_cover50": 0.25, "naive_cover80": 0.5,
+                 "width50_pct": 4.0, "width80_pct": 10.0, "naive_width80_pct": 6.0,
+                 "score50_pct": 17.0, "naive_score50_pct": 18.0, "score80_pct": 25.0, "naive_score80_pct": 31.0}
+    by_h = review.by_horizon(df, review.range_summary)
+    assert by_h["1d"]["cover80"] == 1.0 and by_h["5d"]["cover80"] == 0.0 and by_h["5d"]["score80_pct"] == 40.0
+    br = review.breakdown(df, "tags")
+    assert br["none · 5d"]["n"] == 1 and br["none · 1d"]["cover50"] == 0.0 and br["cue · 1d"]["score50_pct"] == 4.0
+
+    calls = pd.DataFrame({"hit": [True, True, False, False], "actual_return": [0.01, 0.02, 0.03, -0.01],
+                          "confidence": [0.6, 0.7, 0.8, 0.9]})
+    c = review.call_summary(calls)
+    assert c == {"n": 4, "hit_rate": 0.5, "always_up": 0.75, "edge": -0.25, "mean_confidence": 0.75}
+
+
+def test_backtest_scale_widens_ranges():
+    import backtest as bt
+    rng = np.random.default_rng(1)
+    idx = pd.bdate_range("2025-01-01", periods=320)
+    bars = {"A": pd.DataFrame({"close": tp.fat_tailed_walk(rng, 320, 100, 0.01)}, index=idx),
+            "B": pd.DataFrame({"close": tp.fat_tailed_walk(rng, 320, 50, 0.02)}, index=idx)}
+    rank = {d: i for i, d in enumerate(idx)}
+    obs = bt.observations(bars, ["A", "B"], 1, RC, rank)
+    plain = bt.evaluate(obs, 1, RC, 40)
+    ones = bt.evaluate(obs, 1, RC, 40, {i: 1.0 for i in range(320)})
+    double = bt.evaluate(obs, 1, RC, 40, {i: 2.0 for i in range(320)})
+    assert len(plain) == 80 and plain.equals(ones)                          # no scale = the formula as before
+    ratio = double["width80"] / plain["width80"]
+    assert ratio.between(1.95, 2.05).all() and (ratio != 1).all()           # log-width doubles exactly
+    assert double["hit80"].mean() >= plain["hit80"].mean()
+    assert not np.allclose(double["is80"], plain["is80"])
+    # scale applies per start day only
+    half = bt.evaluate(obs, 1, RC, 40, {int(plain["rank"].max()): 2.0})
+    changed = half["width80"] != plain["width80"]
+    assert set(half.loc[changed, "rank"]) == {int(plain["rank"].max())}
+
+
 # ---------- end to end ----------
 
 MARKET_YAML = (tp.MARKET_YAML.replace("  Tech: [AAPL, MSFT]\n", "  Tech: [AAPL, MSFT]\n  Energy: [XOM]\n")
@@ -210,15 +275,40 @@ def test_review_end_to_end(tmp_path):
     assert rec["id"] == week and rec["report"] == f"reports/{tp.MARKET}/review-{week}.md"
     d = rec["detail"]
     assert set(d["ranges"]) == {"week", "rolling", "all"} and set(d["ranges"]["all"]) == {"all", "1d", "5d"}
-    assert any(k.startswith("Energy") for k in d["breakdowns"]["sector"])
-    assert {"cue", "regime", "event", "ai_call"} <= {k.split(" · ")[0] for k in d["breakdowns"]["note"]}
-    assert set(d["breakdowns"]["regime"]) >= {"CALM · 5d", "EVENT_HEAVY · 1d"}
+    b = d["breakdowns"]
+    assert set(b) == {"week", "rolling", "all"} and set(d["bands"]) == {"week", "rolling", "all"}
+    assert any(k.startswith("Energy") for k in b["all"]["sector"])
+    assert {"cue", "regime", "event", "ai_call"} <= {k.split(" · ")[0] for k in b["all"]["note"]}
+    assert set(b["all"]["regime"]) >= {"CALM · 5d", "EVENT_HEAVY · 1d"}
+    for key in ("regime", "sector", "note"):                                  # windows nest: week <= 30d <= all
+        n = {w: sum(x["n"] for x in b[w][key].values()) for w in b}
+        assert 0 < n["week"] < n["rolling"] < n["all"], (key, n)
+    assert 0 < d["bands"]["week"]["80%-90%"]["n"] < d["bands"]["rolling"]["80%-90%"]["n"] < 40
+    assert d["bands"]["all"]["80%-90%"]["n"] == 40
+
+    # since-start coverage equals the scored outcomes on disk
+    outs = [json.loads(x) for f in (root / "data" / tp.MARKET / "range_outcomes").glob("**/*.jsonl")
+            for x in f.read_text().splitlines()]
+    a = d["ranges"]["all"]["all"]
+    assert a["cover80"] == round(sum(o["hit80"] for o in outs) / len(outs), 4)
+    assert a["cover50"] == round(sum(o["hit50"] for o in outs) / len(outs), 4)
+    assert a["naive_cover80"] == round(sum(o["naive_hit80"] for o in outs) / len(outs), 4)
+    assert a["score80_pct"] == round(sum(o["is80_pct"] for o in outs) / len(outs), 3)
 
     live = d["live_ablation"]
     assert live["n"] == n_ranges and live["reproduced"] == n_ranges          # replay matches every published range
     verdicts = {v["name"]: v["verdict"] for v in live["variants"]}
     assert verdicts["current config"] == "baseline" and verdicts["drop overnight cue"] == "improves score"
-    assert d["history_ablation"]["n"] > 0 and len(d["history_ablation"]["variants"]) == 3
+    hist = {v["name"]: v for v in d["history_ablation"]["variants"]}
+    assert d["history_ablation"]["n"] > 0 and len(hist) == 3
+    base = hist["current config"]["by_h"]
+    for name in ("drop regime widening", "EWMA lambda 0.97"):               # each variant really changes the ranges
+        var = hist[name]["by_h"]
+        assert set(var) == set(base) == {"1d", "5d"}
+        assert any(var[h]["width80_pct"] != base[h]["width80_pct"] for h in base), name
+        assert any(var[h]["score80_pct"] != base[h]["score80_pct"] for h in base), name
+    assert all(hist["drop regime widening"]["by_h"][h]["width80_pct"] < base[h]["width80_pct"] for h in base)
+    assert "EVENT_HEAVY" in d["history_ablation"]["regime_share"] and d["history_ablation"]["regime_share"]["EVENT_HEAVY"] > 0
 
     props = {(c["param"], p["source"]): c for p in rec["proposals"] for c in p["changes"]}
     assert props[("cue_weight", "live replay")]["proposed"] == 0.0 and rec["n_proposals"] == len(rec["proposals"])
@@ -227,6 +317,7 @@ def test_review_end_to_end(tmp_path):
     text = (root / rec["report"]).read_text()
     for needle in ("## Ranges: coverage vs target", "### By widening note", "## Direction calls",
                    "### By confidence band", "## Calibration", "## Ablation: replay of live scored ranges",
+                   "Round-trip consistency check against the current config",
                    "## Ablation: walk-forward on stored prices", "## Proposed changes to config/ranges.yaml",
                    "`cue_weight`", "**Not applied.**", "drop overnight cue", "low n"):
         assert needle in text, needle

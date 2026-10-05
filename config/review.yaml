@@ -42,3 +42,6 @@ history_variants:
   - {name: half-life 60 sessions, set: {half_life_sessions: 60}}
   - {name: half-life 250 sessions, set: {half_life_sessions: 250}}
   - {name: pool 250 sessions, set: {history_sessions: 250}}
+  - {name: warmup 40 bars, set: {warmup_bars: 40}}
+  - {name: warmup 100 bars, set: {warmup_bars: 100}}
+  - {name: min pool 400, set: {min_pool: 400}}   # below min_pool a day falls back / is skipped
