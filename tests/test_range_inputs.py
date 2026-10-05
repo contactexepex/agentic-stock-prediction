@@ -293,6 +293,54 @@ def test_ranges_apply_inputs(tmp_path):
     assert "implied_vol" not in m1_off["inputs"] and abs(m1_off["iv_sigma_h"] - m1["sigma_h"]) < 2e-6
 
 
+def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
+    """A run after the first target session's close: the 1d range is not published, and an index
+    cue or option snapshot taken after that close is not used (it would carry that session)."""
+    root, cfg = setup(tmp_path)
+    mfile = cfg / "markets" / f"{MARKET}.yaml"
+    mfile.write_text(mfile.read_text() + "\noptions: yfinance\nindex_cue: {symbol: BENCH, beta: 1.0}\n")
+    rc = yaml.safe_load((cfg / "ranges.yaml").read_text())
+    rc.update(ALL_ON)
+    (cfg / "ranges.yaml").write_text(yaml.safe_dump(rc))
+    rng = np.random.default_rng(31)
+    n = 520
+    days = weekdays(date(2024, 6, 3), n)
+    br = rng.normal(0.0003, 0.01, n)
+    write_bars(root, {"BENCH": list(100 * np.exp(np.cumsum(br))),
+                      "AAPL": list(150 * np.exp(np.cumsum(1.2 * br + rng.normal(0, 0.01, n)))),
+                      "MSFT": fat_tailed_walk(rng, n, 300, 0.012), "VOLX": [15.0] * n}, days)
+    as_of = days[-1]
+    xnys = {"market": MARKET, "calendar": "XNYS", "timezone": "America/New_York"}
+    first = ev.next_session(xnys, as_of, include=False)
+    first_close = ev.session_close_utc(xnys, first)
+    late = (first_close + timedelta(minutes=30)).isoformat()      # quoted after the first close
+    made_at = (first_close + timedelta(hours=1)).isoformat()      # run after that close too
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    today = datetime.now(timezone.utc).date()
+    jsonl(root / "data" / MARKET / "quotes" / f"{today:%Y}" / f"{today:%m}" / f"{today}.jsonl",
+          [{"symbol": "BENCH", "yahoo": "BENCH", "ts": late, "price": 101, "prev_close": 100,
+            "change_pct": 0.01, "collected_at": now}])
+    assert run("features.py", root, cfg).returncode == 0
+    assert run("calibrate.py", root, cfg).returncode == 0
+    expiry = first + timedelta(days=21)
+    jsonl(root / "data" / MARKET / "options" / f"{first:%Y}" / f"{first:%m}" / f"{first}.jsonl",
+          [{"id": f"{first}-{t}-{expiry}", "ticker": t, "collected_at": late, "expiry": str(expiry),
+            "days_to_expiry": 21, "spot": 300, "strike": 300, "call_iv": 0.6, "put_iv": 0.6, "atm_iv": 0.6,
+            "straddle": 20, "straddle_pct": 0.067, "source": "yfinance"} for t in ("AAPL", "MSFT")])
+
+    r = run("ranges.py", root, cfg, "--now", made_at)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout)["late"] is True
+    rows = ranges_rows(root)
+    assert not any(x["horizon_days"] == 1 for x in rows.values())      # target session closed
+    for t in ("AAPL", "MSFT"):
+        x = rows[f"{as_of}-{t}-5d"]
+        assert f"index cue ignored: BENCH quoted after {first} close" in x["notes"]
+        assert "beta_split" not in x["inputs"] and x["center"] == 0
+        assert "implied_vol" not in x["inputs"] and x["iv_sigma_h"] is None
+        assert f"late: {first} closed before made_at" in x["notes"]
+
+
 def test_switches_per_market_and_horizon():
     rc = {"a": {"enabled": {"us": [1]}}, "b": {"enabled": {"india": True}}, "c": {"enabled": ["us"]},
           "d": {"enabled": True}}
