@@ -294,15 +294,18 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     ch = run("charts.py", root, cfg)
     assert ch.returncode == 0, ch.stderr
     charts = json.loads(ch.stdout)
-    assert set(charts["tickers"]) == {"AAPL", "MSFT"}
-    for f in [charts["overview"], *charts["tickers"].values()]:
+    # single-purpose images only (the per-ticker charts and the overview collage are gone)
+    assert [Path(f).name for f in charts["charts"]] == ["ranges.png", "sectors.png", "track_record.png"]
+    for f in charts["charts"]:
         assert (root / f).stat().st_size > 2000
+    assert not list((root / "reports" / MARKET / "charts").glob("**/overview.png"))
 
     rep = run("report.py", root, cfg)
     assert rep.returncode == 0, rep.stderr
     out = json.loads(rep.stdout)
     text = (root / out["report"]).read_text()
-    for needle in ("## Today", "<!-- AGENT:headline -->", "/overview.png)", "/AAPL.png)", "80% hit 2/2",
+    for needle in ("## Today", "<!-- AGENT:headline -->", "<!-- AGENT:top3 -->", "/ranges.png)", "/sectors.png)",
+                   "/track_record.png)", f"[{charts['session_date']}.html]({charts['session_date']}.html)", "80% hit 2/2",
                    "## Track record", "<!-- AGENT:sector:Tech -->", "Market on ", "| 5d ▲ up 80% |",
                    "| 1d | since start | 2 |", "Ranges by regime", "Calls by confidence band"):
         assert needle in text, needle
@@ -329,21 +332,40 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     forced = json.loads(run("report.py", root, cfg, "--force").stdout)
     assert forced["report_kept"] is False and "<!-- AGENT:headline -->" in rpath.read_text()
     slack = (root / out["slack_draft"]).read_text()
-    assert "• AAPL ▲ up 80% (5 days) · $" in slack
-    assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.md") and out["url"] in slack
+    assert "Calls today: 1 · AAPL ▲ up 80% (5 days, 80% range $" in slack
+    assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.html") and out["url"] in slack
     assert len(slack.strip().splitlines()) <= 12
 
-    # notify refuses unfilled drafts, then (without a webhook) reports exit code 2
-    env_no_hook = {k: v for k, v in os.environ.items() if k != "SLACK_WEBHOOK_URL"}
+    # the HTML report is built only from a filled report
+    bad = run("html_report.py", root, cfg)
+    assert bad.returncode == 1 and "AGENT markers" in bad.stdout
+    rpath.write_text(re.sub(r"<!-- AGENT:[^>]*-->", "narrative", rpath.read_text()))
+    hr = run("html_report.py", root, cfg)
+    assert hr.returncode == 0, hr.stderr
+    hout = json.loads(hr.stdout)
+    page = (root / hout["html"]).read_text()
+    assert hout["html"] == f"reports/{MARKET}/{charts['session_date']}.html" and "AGENT" not in page
+    assert f'href="{charts["session_date"]}.html"' in (root / hout["index"]).read_text()
+    assert [Path(p).name for p in hout["images"]] == ["ranges.png", "sectors.png", "track_record.png"]
+
+    # notify refuses unfilled drafts, then (without a token or webhook) reports exit code 2
+    env_no_hook = {k: v for k, v in os.environ.items() if k not in ("SLACK_WEBHOOK_URL", "SLACK_BOT_TOKEN")}
     nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
                         env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
     assert nb.returncode == 1 and "AGENT markers" in nb.stdout
     draft = root / out["slack_draft"]
-    draft.write_text(draft.read_text().replace("<!-- AGENT:headline (one line) -->", "Quiet day.")
-                     .replace("<!-- AGENT:news (the 2 most material items, one line each) -->", "none"))
+    draft.write_text(re.sub(r"<!-- AGENT:top3[^>]*-->", "• one\n• two\n• three", draft.read_text()))
     nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
                         env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
     assert nb.returncode == 2 and "AGENT" not in json.loads(nb.stdout)["text"]
+    # dry run: the planned thread (summary, charts, HTML) and its files land in work/
+    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py"), "--dry-run"], cwd=SCRIPTS,
+                        capture_output=True, text=True,
+                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    assert nb.returncode == 0, nb.stdout + nb.stderr
+    plan = json.loads((root / json.loads(nb.stdout)["plan"]).read_text())
+    assert [s["step"] for s in plan["thread"]] == ["summary", "charts", "report"]
+    assert (root / "work" / f"slack_{MARKET}_plan" / f"{charts['session_date']}.html").exists()
 
     # holiday path: one free-text line, no draft needed
     nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py"), "--text", "Test market: market closed today"],

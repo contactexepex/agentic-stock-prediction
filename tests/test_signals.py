@@ -1,6 +1,7 @@
 """Unit tests for indicator formulas, regime rules and event dates."""
 from __future__ import annotations
 
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -259,24 +260,42 @@ def test_scorecard_last_30_days_and_since_start():
     assert "| 1d | last 30 days | 2 | 50% | 50% | 100% |" in rep and "| 1d | since start | 3 |" in rep
 
 
-def test_overview_shows_5d_range_and_call_when_1d_was_skipped(monkeypatch):
+def _view_company(ticker, ranges, close=110.0):
+    return {"ticker": ticker, "name": ticker, "sector": "Tech", "close": close, "ret_1d": 0.01, "quality": "OK",
+            "history": [], "ranges": ranges, "calls": [], "events": [], "news": [],
+            "record": {"ranges": {}, "calls": {"n": 0, "hits": 0, "text": ""}}}
+
+
+def _rng(h, late=False, direction=None, confidence=None):
+    return {"h": h, "target_date": "2026-10-09", "target_label": "Fri 9 Oct", "base_close": 110.0,
+            "center_price": 110.0, "lo50": 107.0, "hi50": 113.0, "lo80": 104.0, "hi80": 116.0,
+            "direction": direction, "confidence": confidence, "late": late, "notes": []}
+
+
+def test_ranges_chart_uses_5d_when_1d_was_skipped_and_labels_late(monkeypatch):
     import charts
-    cfg = {"name": "T", "sectors": {"Tech": ["AAPL", "MSFT"]},
-           "tickers": {"AAPL": {"name": "Apple", "sector": "Tech"}, "MSFT": {"name": "Microsoft", "sector": "Tech"}}}
-    idx = pd.bdate_range("2026-07-01", periods=60)
-    bars = {t: pd.DataFrame({"close": np.linspace(100, 110, 60)}, index=idx) for t in ("AAPL", "MSFT")}
-    # late run: the 1-day range targets a closed session and was not published, the 5-day one was
-    ranges = pd.DataFrame([{"ticker": "AAPL", "horizon_days": 5, "lo80": 104.0, "hi80": 116.0,
-                            "direction": "down", "confidence": 0.6}])
-    past = pd.DataFrame(columns=["ticker", "target_date", "hit80"])
+    # mid-session run: no 1-day range was published, the 5-day ranges are late (never forecasts)
+    view = {"currency": "USD", "companies": [_view_company("AAPL", [_rng(5, late=True)]), _view_company("MSFT", [])]}
     captured = {}
     monkeypatch.setattr(charts, "save_png", lambda fig, path: captured.setdefault("fig", fig))
-    charts.overview(cfg, bars, ranges, past, "CALM", idx[-1].date(), "unused.png")
-    titles = {ax.get_title(loc="left").split()[0]: ax for ax in captured["fig"].axes if ax.get_visible()}
-    aapl, msft = titles["AAPL"], titles["MSFT"]
-    assert "5d ▼ down 60%" in aapl.get_title(loc="left") and "no range" not in aapl.get_title(loc="left")
-    assert len(aapl.collections) == 1                            # the 80% cone out to 5 days is drawn
-    assert "no range" in msft.get_title(loc="left") and not msft.collections
+    assert charts.ranges_chart(view, "unused.png")
+    fig = captured["fig"]
+    texts = [t.get_text() for ax in fig.axes for t in ax.texts] + [t.get_text() for t in fig.texts]
+    assert any("in 5 trading days (by Fri 9 Oct)" in t for t in texts)
+    assert any("late, not a forecast" in t for t in texts) and not any("▼" in t or "▲" in t for t in texts)
+    assert [t.get_text() for t in fig.axes[0].get_yticklabels()] == ["AAPL"]   # MSFT has no range
+    # a non-late 5-day call is shown with its direction and confidence
+    view["companies"][0]["ranges"] = [_rng(5, direction="down", confidence=0.6)]
+    captured.clear()
+    charts.ranges_chart(view, "unused.png")
+    texts = [t.get_text() for t in captured["fig"].axes[0].texts]
+    assert any("▼ down 60%" in t for t in texts)
+    plt_close(captured["fig"])
+
+
+def plt_close(fig):
+    import matplotlib.pyplot as plt
+    plt.close(fig)
 
 
 def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
@@ -293,9 +312,12 @@ def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
          "company_events": pd.DataFrame(columns=["date", "name"])}
     settings = {"repo_url": "https://example.com/r", "branch": "main"}
     _, slack, _ = report.build(us, d, settings)
-    filled = slack.replace("News: <!-- AGENT:news (the 2 most material items, one line each) -->", "News: a\nb")
+    filled = re.sub(r"<!-- AGENT:top3[^>]*-->", "• a\n• b\n• c", slack)
     assert len(filled.strip().splitlines()) <= 12               # 9 calls used to give 15 lines
-    assert "• +6 more in the report" in slack and slack.count("• ") == 4
+    # the summary names the number of calls and at most three of them; details are in the report
+    assert "Calls today: 9 · " in slack and "and 6 more in the report" in slack
+    assert slack.strip().splitlines()[-1] == "Full report (charts, filters, reasons): https://example.com/r/blob/main/reports/us/2026-10-05.html"
+    assert "market mood" not in slack.splitlines()[0]           # no regime row in this fixture
     # US CPI at 08:30 ET on the session day: the brief says the calls were made before it
     d["session"] = date(2026, 10, 14)
     rep, slack, _ = report.build(us, d, settings)

@@ -15,10 +15,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
-  regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` and `report`
-  (report skeleton + Slack draft with every number; agents fill only the `AGENT` markers,
-  then `notify_slack` posts the draft through `SLACK_WEBHOOK_URL`;
-  see `templates/report.md`). `backtest` evaluates the
+  regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
+  PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
+  the `AGENT` markers, see `templates/report.md`). After the judge passes, `html_report` builds
+  the reader's HTML report from the filled md plus the data, and `notify_slack` posts a thread
+  (summary, chart images, HTML file) with `SLACK_BOT_TOKEN`, or the summary text alone through
+  `SLACK_WEBHOOK_URL`. Processing data (data/, context pack, summaries) and presentation (HTML,
+  PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
+  `backtest` evaluates the
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
   `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
@@ -68,8 +72,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
   prices/features/regime which use the trading date)
 - `summaries/<market>/daily|weekly|monthly/` layered narrative memory written by Claude
-- `reports/<market>/<session_date>.md` the daily report linked from Slack; charts in
-  `reports/<market>/charts/<session_date>/`; `config/settings.yaml` holds the repo URL and Slack channel
+- `reports/<market>/<session_date>.md` the daily report (agent-editable source);
+  `reports/<market>/<session_date>.html` the self-contained reader's report linked from Slack
+  (filters by sector and company; no network needed) and `reports/<market>/index.html` (all days);
+  chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
+  `config/settings.yaml` holds the repo URL, optional `pages_url` and the Slack channel id
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`
