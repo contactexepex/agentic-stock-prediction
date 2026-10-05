@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import events as ev
+import fundamentals as fu
 import graph
 import relations
 import smart_money as sm
@@ -131,6 +132,7 @@ def main() -> None:
     for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con)]:
         print(f"## {title}\n\n{body}")
     print(sm.markdown(cfg, con))
+    print(fu.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (no consensus, no "surprise")
 
 
 if __name__ == "__main__":

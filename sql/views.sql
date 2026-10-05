@@ -213,3 +213,137 @@ FROM holdings_change GROUP BY ticker, period;
 -- Weekly reviews (review.py): latest record per ISO week; a rerun appends a newer record.
 CREATE OR REPLACE VIEW review_latest AS
 SELECT DISTINCT ON (id) * FROM reviews ORDER BY id, computed_at DESC;
+
+-- ---------- Fundamentals (SEC XBRL company facts, collect_fundamentals.py; US) ----------
+-- One value per (ticker, concept, period): the best-ranked tag reported for that period (CONCEPTS
+-- in collect_fundamentals.py), from its newest filing, so a restatement or a split
+-- adjustment wins. first_filed = when that tag's value for the period was first filed;
+-- prev_value = the value before the latest revision (NULL = never revised).
+CREATE OR REPLACE VIEW fundamentals_latest AS
+WITH f AS (
+    SELECT *, min(tag_rank) OVER (PARTITION BY ticker, concept, period_start, period_end) AS best_rank
+    FROM fundamentals
+)
+SELECT DISTINCT ON (ticker, concept, period_start, period_end)
+       ticker, concept, period, period_start, period_end, fiscal_year, fiscal_period, value, unit, tag,
+       form, accession, filing_date, accepted_at, min(filing_date) OVER fw AS first_filed, prev_value,
+       prev_value IS NOT NULL AS revised
+FROM f WHERE tag_rank = best_rank
+WINDOW fw AS (PARTITION BY ticker, concept, period_start, period_end)
+ORDER BY ticker, concept, period_start, period_end, filing_date DESC, first_seen_at DESC;
+
+-- Quarterly flows per (ticker, concept): reported quarters, plus quarters derived from the
+-- cumulative fiscal-year totals where no quarter is reported (Q4 = FY - 9M, and for cash flows,
+-- which 10-Qs report year-to-date only, Q2 = H1 - Q1, Q3 = 9M - H1), marked derived. A derived EPS
+-- is approximate (the share count differs by period). Share averages are not derived.
+CREATE OR REPLACE VIEW fundamentals_quarterly AS
+WITH d AS (SELECT * FROM fundamentals_latest WHERE period IN ('quarter', 'ytd', 'annual')),
+cum AS (
+    SELECT d.*, lag(value) OVER cw AS prev_cum, lag(period_end) OVER cw AS prev_end,
+           lag(fiscal_period) OVER cw AS prev_fp, lag(filing_date) OVER cw AS prev_filed
+    FROM d
+    WHERE period <> 'quarter' OR EXISTS (SELECT 1 FROM d y WHERE y.ticker = d.ticker AND y.concept = d.concept
+                                         AND y.period <> 'quarter' AND y.period_start = d.period_start)
+    WINDOW cw AS (PARTITION BY ticker, concept, period_start ORDER BY period_end)
+),
+derived AS (
+    SELECT ticker, concept, prev_end + 1 AS period_start, period_end, fiscal_year,
+           CASE fiscal_period WHEN 'FY' THEN 'Q4' WHEN '9M' THEN 'Q3' WHEN 'H1' THEN 'Q2' END AS fiscal_period,
+           round(value - prev_cum, 6) AS value, unit, greatest(filing_date, prev_filed) AS filing_date, accession, form,
+           true AS derived, fiscal_period || ' - ' || prev_fp AS derived_from
+    FROM cum
+    WHERE period <> 'quarter' AND prev_cum IS NOT NULL AND concept <> 'shares_diluted_avg'
+      AND period_end - prev_end BETWEEN 70 AND 130
+)
+SELECT ticker, concept, period_start, period_end, fiscal_year, fiscal_period, value, unit, filing_date,
+       accession, form, false AS derived, NULL::VARCHAR AS derived_from
+FROM d WHERE period = 'quarter'
+UNION ALL
+SELECT * FROM derived x
+WHERE NOT EXISTS (SELECT 1 FROM d q WHERE q.ticker = x.ticker AND q.concept = x.concept AND q.period = 'quarter'
+                  AND abs(q.period_end - x.period_end) <= 3);
+
+-- One row per ticker and fiscal quarter: headline numbers, margins, free cash flow and growth
+-- against the same quarter a year earlier (the quarter ending 350-380 days before). Growth uses
+-- |previous| as the base so a loss shrinking reads as positive. gross_profit falls back to
+-- revenue - cost of revenue when no gross profit is tagged (gross_profit_computed).
+-- `derived` = a headline value (revenue, net income or EPS) is derived from year-to-date totals.
+CREATE OR REPLACE VIEW fundamentals_metrics AS
+WITH p AS (
+    SELECT ticker, period_end, mode(fiscal_year) AS fiscal_year, mode(fiscal_period) AS fiscal_period,
+           max(value) FILTER (WHERE concept = 'revenue') AS revenue,
+           max(value) FILTER (WHERE concept = 'gross_profit') AS gross_profit_reported,
+           max(value) FILTER (WHERE concept = 'cost_of_revenue') AS cost_of_revenue,
+           max(value) FILTER (WHERE concept = 'operating_income') AS operating_income,
+           max(value) FILTER (WHERE concept = 'net_income') AS net_income,
+           max(value) FILTER (WHERE concept = 'eps_diluted') AS eps_diluted,
+           max(value) FILTER (WHERE concept = 'operating_cash_flow') AS operating_cash_flow,
+           max(value) FILTER (WHERE concept = 'capex') AS capex,
+           coalesce(bool_or(derived) FILTER (WHERE concept IN ('revenue', 'net_income', 'eps_diluted')), false) AS derived,
+           list(DISTINCT concept ORDER BY concept) FILTER (WHERE derived) AS derived_concepts,
+           max(filing_date) AS filing_date
+    FROM fundamentals_quarterly GROUP BY ticker, period_end
+), m AS (
+    SELECT *, coalesce(gross_profit_reported, revenue - cost_of_revenue) AS gross_profit,
+           gross_profit_reported IS NULL AND revenue IS NOT NULL AND cost_of_revenue IS NOT NULL AS gross_profit_computed,
+           operating_cash_flow - capex AS fcf, period_end - 350 AS yoy_key
+    FROM p
+)
+SELECT m.ticker, m.period_end, m.fiscal_year, m.fiscal_period, m.filing_date, m.revenue, m.gross_profit,
+       m.gross_profit_computed, m.operating_income, m.net_income, m.eps_diluted, m.operating_cash_flow, m.capex, m.fcf,
+       round(m.gross_profit / nullif(m.revenue, 0), 4) AS gross_margin,
+       round(m.operating_income / nullif(m.revenue, 0), 4) AS operating_margin,
+       round(m.net_income / nullif(m.revenue, 0), 4) AS net_margin,
+       CASE WHEN m.period_end - y.period_end <= 380 THEN y.period_end END AS yoy_period_end,
+       CASE WHEN m.period_end - y.period_end <= 380 THEN round((m.revenue - y.revenue) / nullif(abs(y.revenue), 0), 4) END AS revenue_yoy,
+       CASE WHEN m.period_end - y.period_end <= 380 THEN round((m.net_income - y.net_income) / nullif(abs(y.net_income), 0), 4) END AS net_income_yoy,
+       CASE WHEN m.period_end - y.period_end <= 380 THEN round((m.eps_diluted - y.eps_diluted) / nullif(abs(y.eps_diluted), 0), 4) END AS eps_yoy,
+       CASE WHEN m.period_end - y.period_end <= 380 THEN round((m.operating_income - y.operating_income) / nullif(abs(y.operating_income), 0), 4) END AS operating_income_yoy,
+       m.derived, m.derived_concepts
+FROM m ASOF LEFT JOIN m AS y ON m.ticker = y.ticker AND m.yoy_key >= y.period_end;
+
+-- Balance sheet per ticker and date: cash and total debt. Debt is tagged differently by each
+-- company. total_debt adds up the parts found (debt_basis says which), NULL when none is tagged.
+CREATE OR REPLACE VIEW fundamentals_balance AS
+WITH b AS (
+    SELECT ticker, period_end, mode(fiscal_year) AS fiscal_year, mode(fiscal_period) AS fiscal_period,
+           max(value) FILTER (WHERE concept = 'cash') AS cash,
+           max(value) FILTER (WHERE concept = 'debt_combined') AS debt_combined,
+           max(value) FILTER (WHERE concept = 'debt_long_term_total') AS debt_long_term_total,
+           max(value) FILTER (WHERE concept = 'debt_noncurrent') AS debt_noncurrent,
+           max(value) FILTER (WHERE concept = 'debt_current') AS debt_current,
+           max(value) FILTER (WHERE concept = 'long_term_debt_current') AS long_term_debt_current,
+           max(value) FILTER (WHERE concept = 'short_term_borrowings') AS short_term_borrowings,
+           max(filing_date) AS filing_date
+    FROM fundamentals_latest WHERE period = 'instant' AND concept NOT LIKE 'shares%' GROUP BY ticker, period_end
+)
+SELECT *,
+       CASE WHEN debt_combined IS NOT NULL THEN debt_combined
+            WHEN debt_noncurrent IS NOT NULL THEN debt_noncurrent + coalesce(debt_current,
+                 coalesce(long_term_debt_current, 0) + coalesce(short_term_borrowings, 0))
+            WHEN debt_long_term_total IS NOT NULL THEN debt_long_term_total + coalesce(short_term_borrowings, 0)
+       END AS total_debt,
+       CASE WHEN debt_combined IS NOT NULL THEN 'combined'
+            WHEN debt_noncurrent IS NOT NULL AND debt_current IS NOT NULL THEN 'noncurrent + current'
+            WHEN debt_noncurrent IS NOT NULL THEN 'noncurrent + current LTD + short-term'
+            WHEN debt_long_term_total IS NOT NULL THEN 'long-term incl. current + short-term'
+       END AS debt_basis
+FROM b;
+
+-- Latest 10-Q/10-K per ticker that added values, with its own reporting period and filed
+-- date (days_since_filed) so analysts know what is fresh.
+CREATE OR REPLACE VIEW fundamentals_latest_report AS
+WITH a AS (
+    SELECT ticker, accession, any_value(form) AS form, min(filing_date) AS filing_date,
+           max(accepted_at) AS accepted_at, max(period_end) FILTER (WHERE period <> 'instant') AS period_end
+    FROM fundamentals GROUP BY ticker, accession
+), lab AS (
+    SELECT DISTINCT ON (ticker, accession) ticker, accession, fiscal_year, fiscal_period
+    FROM fundamentals f
+    WHERE period = CASE WHEN form LIKE '10-K%' THEN 'annual' ELSE 'quarter' END
+    ORDER BY ticker, accession, period_end DESC
+)
+SELECT DISTINCT ON (a.ticker) a.ticker, a.form, a.accession, a.filing_date, a.accepted_at, a.period_end,
+       lab.fiscal_year, lab.fiscal_period, current_date - a.filing_date AS days_since_filed
+FROM a LEFT JOIN lab USING (ticker, accession)
+ORDER BY a.ticker, a.filing_date DESC, a.period_end DESC NULLS LAST;

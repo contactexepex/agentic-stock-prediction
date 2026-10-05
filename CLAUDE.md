@@ -34,6 +34,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   Views `insider_flow`, `insider_cluster_buys`, `activist_stakes`, `holdings_filings`, `holdings_change` and
   `holdings_quarter` feed the context pack's "Smart money" section and a range risk note
   (`scripts/smart_money.py`; the widen `activist_13d_factor` in `config/ranges.yaml` stays off).
+- Fundamentals, US (SEC XBRL company facts): `collect_fundamentals` writes 10-Q/10-K values
+  (revenue, gross profit, operating and net income, diluted EPS, operating cash flow, capex, cash,
+  debt parts, shares; quarter, H1/9M year-to-date and FY) to `data/us/fundamentals/`, one row per
+  tag x period x filing that first reported or changed the value (`fundamentals:` in
+  `config/markets/us.yaml`). Views `fundamentals_latest` (newest filing wins), `fundamentals_quarterly`
+  (Q4 = FY - 9M and quarterly cash flows derived, marked), `fundamentals_metrics` (YoY growth,
+  margins, FCF), `fundamentals_balance` and `fundamentals_latest_report` feed the context pack's
+  "Fundamentals" section (`scripts/fundamentals.py`; no consensus estimates, so no "surprise")
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

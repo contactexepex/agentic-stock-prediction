@@ -138,6 +138,18 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
    **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 23
    tracked filers (`collect_insiders|stakes|holdings.py`), smart-money views and context
    section, and a fresh-13D note on ranges (widen gated in `config/ranges.yaml`, off).
+6. Fundamentals (US built; India from NSE results, separate collector): quarterly, half-yearly
+   (H1 year to date) and annual 10-Q/10-K values from SEC's free XBRL company facts API
+   (`collect_fundamentals.py`, daily; downloads only when a new 10-Q/10-K is listed). Standard
+   concepts are read from a short priority list of us-gaap/dei tags per concept; a value is stored
+   once per filing that first reports it or changes it, so restatements and split adjustments
+   are new rows and the views take the newest filing. Fiscal Q4 (rarely tagged) is derived as
+   FY - 9M and quarterly cash flows from year-to-date totals, marked derived (a derived EPS is
+   approximate: AAPL Q4 FY2025 derives to 1.84 vs 1.85 reported). The context pack shows the last
+   reported quarter (YoY growth, margins, FCF, filed date, `new` if filed in the last 5 days) and
+   the latest balance sheet. No consensus estimates are available for free, so there is no
+   earnings "surprise". Gaps: banks and insurers tag no gross or operating profit; some companies
+   tag debt or capex only in parts or custom tags (e.g. CAT, DE, GM debt; DAL capex), left blank.
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 

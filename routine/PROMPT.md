@@ -33,9 +33,12 @@ and list each FAIL with its reason in the report's `data_quality` section and th
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`
    (Form 4) and `collect_stakes.py` (13D/13G) every day, and `collect_holdings.py` (13F): it
    downloads only when a new quarter's 13F filings exist and otherwise prints `skipped`.
-   Run the four SEC collectors (`collect_filings`, `collect_insiders`, `collect_stakes`,
-   `collect_holdings`) one after another, never in parallel: each throttles only its own
-   requests, and together they must stay under SEC's 10 requests/second.
+   Fundamentals (SEC XBRL, US; other markets print `skipped`): run `collect_fundamentals.py`
+   every day. It downloads a company's financial data only when a new 10-Q/10-K is listed, so
+   only new filings add rows; `new_filings` in its summary names them.
+   Run the five SEC collectors (`collect_filings`, `collect_insiders`, `collect_stakes`,
+   `collect_holdings`, `collect_fundamentals`) one after another, never in parallel: each
+   throttles only its own requests, and together they must stay under SEC's 10 requests/second.
 
 4. Score: `python scripts/score_predictions.py`.
 
