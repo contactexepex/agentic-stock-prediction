@@ -34,6 +34,18 @@ REGIME_PLAIN = {
 NEWS_ID = re.compile(r"\b(?:[0-9a-f]{16}|nse-ann-\d+|\d{10}-\d{2}-\d{6})\b")
 
 
+SAFE_URL = re.compile(r"^https?://\S+$", re.I)
+
+
+def safe_url(url) -> str | None:
+    """The URL if it is plain http(s), else None. Feed links are stored unchecked, and a
+    javascript: or data: link must never become a clickable href in the report."""
+    if not isinstance(url, str):
+        return None
+    u = url.strip()
+    return u if SAFE_URL.match(u) else None
+
+
 def safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "_", name)
 
@@ -125,11 +137,11 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     # every source an agent may cite: news, SEC filings, NSE announcements -> headline + link
     sources: dict[str, dict] = {}
     for x in news.itertuples():
-        sources[x.id] = {"title": x.title, "url": x.url, "source": x.source, "ts": _ts(x.ts)}
+        sources[x.id] = {"title": x.title, "url": safe_url(x.url), "source": x.source, "ts": _ts(x.ts)}
     for x in filings.itertuples():
-        sources[x.id] = {"title": f"{x.ticker} {x.form} filing", "url": x.url, "source": "SEC EDGAR", "ts": _ts(x.accepted_at)}
+        sources[x.id] = {"title": f"{x.ticker} {x.form} filing", "url": safe_url(x.url), "source": "SEC EDGAR", "ts": _ts(x.accepted_at)}
     for x in anns.itertuples():
-        sources[x.id] = {"title": f"{x.ticker}: {x.subject}", "url": x.url, "source": x.source or "NSE",
+        sources[x.id] = {"title": f"{x.ticker}: {x.subject}", "url": safe_url(x.url), "source": x.source or "NSE",
                          "ts": _ts(x.published_at)}
 
     mevents = ev.market_events(cfg, as_of + timedelta(days=1), as_of + timedelta(days=21))
@@ -180,7 +192,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 ts = pd.Timestamp(x.ts) if x.ts is not None and not pd.isna(x.ts) else None
                 if ts is None or (window_start is not None and not (window_start <= ts <= made_at)):
                     continue
-                items.append({"id": x.id, "title": x.title, "url": x.url, "source": x.source, "ts": _ts(ts),
+                items.append({"id": x.id, "title": x.title, "url": safe_url(x.url), "source": x.source, "ts": _ts(ts),
                               "cited": x.id in cited, "rank": (x.id in cited, MATERIALITY.get(x.materiality or "", 0),
                                                                num(x.relevance) or 0.0, ts.isoformat())})
             items.sort(key=lambda i: i["rank"], reverse=True)

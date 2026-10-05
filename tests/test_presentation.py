@@ -137,8 +137,8 @@ def view():
     }
 
 
-def page():
-    v = view()
+def page(v=None):
+    v = v or view()
     n, _ = hr.narrative_html(hr.parse_report(FILLED, ["Tech", "Banks"]), v["sources"])
     return v, hr.build_page(v, n, {"md": "2026-10-05.md", "index": "index.html", "charts": []})
 
@@ -186,6 +186,38 @@ def test_narrative_links_sources_and_flags_unknown_ids():
     n2, _ = hr.narrative_html({"headline": ["<script>alert(1)</script>"], "top3": [], "yesterday": [], "calls": [],
                                "outlook": [], "data_quality": [], "sectors": {}}, {})
     assert "<script>" not in n2["headline"] and "&lt;script&gt;" in n2["headline"]
+
+
+BAD_URLS = ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "JaVaScRiPt:alert(1)",
+            "  javascript:alert(1)", "\tdata:text/html;base64,PHNjcmlwdD4="]
+
+
+def test_safe_url_allows_only_http_and_https():
+    from view_data import safe_url
+    for bad in BAD_URLS + [None, "", "ftp://x.org/a", "//evil.example/x", "https://", "https://a b"]:
+        assert safe_url(bad) is None, bad
+    assert safe_url("https://example.com/a?b=1&c=2") == "https://example.com/a?b=1&c=2"
+    assert safe_url("  HTTP://Example.com/x ") == "HTTP://Example.com/x"
+
+
+def test_unsafe_source_urls_never_become_links():
+    for i, bad in enumerate(BAD_URLS):
+        sid = f"{i:016x}"
+        sources = {sid: {"title": "Bad <b>feed</b>", "url": bad, "source": "Feed"}}
+        out = hr._inline(f"Claim ({sid}). [click]({bad.strip()}) and [x]({bad})", sources, set())
+        assert "href" not in out, (bad, out)
+        assert '<span class="ref" title="Bad &lt;b&gt;feed&lt;/b&gt;">Feed</span>' in out
+        assert "<script>" not in out
+
+
+def test_markdown_links_are_not_rewritten_or_double_escaped():
+    sources = {"0000320193-24-000123": {"title": "Apple 10-K filing", "url": "https://www.sec.gov/x", "source": "SEC EDGAR"}}
+    out = hr._inline("See the [10-K](https://www.sec.gov/Archives/0000320193-24-000123.htm) and "
+                     "[chart](https://example.com/q?a=1&b=2), cited (0000320193-24-000123).", sources, set())
+    assert out.count("<a ") == 3 and "<a <a" not in out and out.count("</a>") == 3
+    assert 'href="https://www.sec.gov/Archives/0000320193-24-000123.htm"' in out      # URL untouched
+    assert 'href="https://example.com/q?a=1&amp;b=2"' in out and "&amp;amp;" not in out
+    assert '>SEC EDGAR</a>' in out                                                     # the bare id still links
 
 
 def test_html_page_has_sections_filters_and_matching_numbers():
@@ -245,7 +277,10 @@ const { chromium } = require('playwright');
   await p.selectOption('#f-sector', 'Tech'); await p.selectOption('#f-company', 'MSFT');
   const one = await p.locator('#cards article').count(); const open = await p.$eval('#cards details.why', d => d.open);
   await p.click('#f-reset'); await p.fill('#f-search', 'aap'); const search = await p.locator('#cards article').count();
-  console.log(JSON.stringify({errors, all, overflow, banks, one, open, search})); await b.close();
+  await p.click('#f-reset');
+  const hrefs = await p.$$eval('a', as => as.map(a => a.getAttribute('href')));
+  const dates = await p.$$eval('#cards svg text', ts => ts.map(t => t.textContent).filter(x => /[A-Z][a-z]{2}$/.test(x)));
+  console.log(JSON.stringify({errors, all, overflow, banks, one, open, search, hrefs, dates})); await b.close();
 })();
 """
 
@@ -254,7 +289,14 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     root = _node_playwright()
     if root is None:
         pytest.skip("node + playwright not installed")
-    _, html = page()
+    # unsafe links put straight into the page data: the JS must refuse them on its own (defence in depth)
+    v = view()
+    v["companies"][1]["news"] = [{"id": f"bad{i}", "title": f"Bad link {i}", "url": u, "source": "Feed",
+                                  "ts": None, "cited": False} for i, u in enumerate(BAD_URLS)]
+    v["companies"][0]["calls"][0]["evidence"].append({"id": "evil", "title": "Evil evidence",
+                                                      "url": "JaVaScRiPt:alert(1)", "source": "Feed"})
+    v["sources"]["ffffffffffffffff"] = {"title": "Bad source", "url": " javascript:alert(1)", "source": "BadFeed"}
+    _, html = page(v)
     f = tmp_path / "r.html"
     f.write_text(html)
     js = tmp_path / "render.js"
@@ -273,6 +315,11 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert "80% chance between $300.00" not in text                      # a late range is never a forecast
     assert "Not enough history yet: 2 of 2" in text and "Fed cuts rates" in text and "Bull:" in text
     assert out["banks"] == 0 and out["one"] == 1 and out["open"] is True and out["search"] == 1
+    # every link on the page is http(s) or a relative link to the report's own files
+    assert out["hrefs"] and all(re.match(r"^(https?://|index\.html$|2026-10-05\.md$)", h) for h in out["hrefs"]), out["hrefs"]
+    assert "Bad link 3" in text and "Evil evidence" in text               # unsafe links stay visible as plain text
+    # one date style on the chart axes: "21 Sep", "5 Oct", "9 Oct"
+    assert out["dates"] and all(re.match(r"^\d{1,2} [A-Z][a-z]{2}$", d) for d in out["dates"]), out["dates"]
 
 
 # ---------- Slack ----------

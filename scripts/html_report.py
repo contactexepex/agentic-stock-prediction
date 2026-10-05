@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from common import ROOT, connect, market_arg, require_market
-from view_data import NEWS_ID, gather_view
+from view_data import NEWS_ID, gather_view, safe_url
 
 META_RE = re.compile(r"<!-- report-meta: (\{.*?\}) -->")
 CHART_FILES = ("ranges.png", "sectors.png", "track_record.png")   # charts.py, in thread order
@@ -84,25 +84,43 @@ def parse_report(md: str, sectors: list[str]) -> dict:
 # ---------- markdown-ish narrative -> safe HTML ----------
 
 def _inline(text: str, sources: dict, used: set) -> str:
-    s = html.escape(text, quote=False)
+    # Markdown links the agent wrote become finished HTML first and are parked behind
+    # placeholders, so later steps (escaping, emphasis, id links) never touch their URLs.
+    # Only http(s) URLs become links; anything else stays visible as plain text.
+    parked: list[str] = []
+
+    def park(fragment: str) -> str:
+        parked.append(fragment)
+        return f"\x00{len(parked) - 1}\x00"
+
+    def md_link(m):
+        url = safe_url(m.group(2))
+        if url is None:
+            return park(html.escape(m.group(0), quote=False))
+        return park(f'<a href="{html.escape(url, quote=True)}" target="_blank" rel="noopener">'
+                    f'{html.escape(m.group(1), quote=False)}</a>')
+    s = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", md_link, text)
+    s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"(?<![\w/])_(.+?)_(?!\w)", r"<em>\1</em>", s)
     s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
-    s = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
-               lambda m: f'<a href="{html.escape(m.group(2))}" target="_blank" rel="noopener">{m.group(1)}</a>', s)
 
     def link(m):
         i = m.group(0)
         src = sources.get(i)
-        if not src or not src.get("url"):
+        if not src:
             return f'<span class="ref ref-missing" title="source id not found">{i}</span>'
         used.add(i)
         label = html.escape(src.get("source") or "source")
         title = html.escape(src.get("title") or "", quote=True)
-        return f'<a class="ref" href="{html.escape(src["url"], quote=True)}" title="{title}" target="_blank" rel="noopener">{label}</a>'
+        url = safe_url(src.get("url"))
+        if url is None:  # known source without a safe link: name it, do not link it
+            return f'<span class="ref" title="{title}">{label}</span>'
+        return f'<a class="ref" href="{html.escape(url, quote=True)}" title="{title}" target="_blank" rel="noopener">{label}</a>'
     s = NEWS_ID.sub(link, s)
     s = re.sub(r"\b(Bull|Bear):", r'<strong class="\1">\1:</strong>', s)
-    return s.replace('class="Bull"', 'class="bull"').replace('class="Bear"', 'class="bear"')
+    s = s.replace('class="Bull"', 'class="bull"').replace('class="Bear"', 'class="bear"')
+    return re.sub(r"\x00(\d+)\x00", lambda m: parked[int(m.group(1))], s)
 
 
 def to_html(lines: list[str], sources: dict, used: set) -> str:
@@ -259,6 +277,8 @@ dl.gloss dt{font-weight:600} dl.gloss dd{margin:0;color:var(--ink2)}
 .charts{display:grid;grid-template-columns:1fr;gap:16px}
 @media (min-width:860px){.charts{grid-template-columns:1fr 1fr} .charts .wide{grid-column:1 / -1}}
 .chart svg{display:block;width:100%;height:auto;overflow:visible}
+/* keep chart text near its design size: a lone card or chart never scales its labels up */
+.co svg{max-width:520px} .chart:not(.wide) svg{max-width:520px} .chart.wide svg{max-width:900px}
 .chart .cap{font-size:.85rem;color:var(--ink2)}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--ink2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -350,6 +370,12 @@ const fmtMoney = v => v == null ? '–' : cur + Number(v).toLocaleString('en-US'
 const fmtPct = (v, d) => { if (v == null) return '–'; const s = Math.abs(v * 100).toFixed(d == null ? 1 : d);
   return (+s === 0 ? '' : v > 0 ? '+' : '−') + s + '%'; };
 const horizonText = h => h === 1 ? 'Next trading day' : h + ' trading days';
+// links: only plain http(s) URLs ever become an href (defence in depth; the data is checked too)
+const safeUrl = u => (typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim())) ? u.trim() : null;
+function linkOrText(url, text){ const u = safeUrl(url); return u ? el('a', {href: u, target: '_blank', rel: 'noopener'}, text) : el('span', null, text); }
+// one date style everywhere on the charts: "4 Sep"; tooltips add the weekday: "Fri 4 Sep"
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fmtDay = (iso, wd) => { const d = new Date(iso.slice(0, 10) + 'T00:00:00Z'); return (wd ? WD[d.getUTCDay()] + ' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
 function el(tag, attrs, text){
   const e = document.createElement(tag);
   for (const k in (attrs || {})) { if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); }
@@ -464,13 +490,13 @@ function fanChart(c){
     s.append(svg('path', {d: area(3, 4), fill: lateAll ? 'var(--late)' : 'var(--band50)'}));
     const far = rs[rs.length - 1];
     [['hi80', -2], ['lo80', 12]].forEach(k => s.append(sText(xs(last + far.h) + 6, ys(pctOf(c, far[k[0]])) + k[1], fmtMoney(far[k[0]]), {fill: 'var(--ink2)'})));
-    rs.forEach(r => s.append(sText(xs(last + r.h), Hh - 8, r.target_label.replace(/^\w+ /, ''), {'text-anchor': 'middle'})));
+    rs.forEach(r => s.append(sText(xs(last + r.h), Hh - 8, fmtDay(r.target_date), {'text-anchor': 'middle'})));
     if (lateAll) s.append(sText(xs(last + far.h) + 6, ys(0) + 4, 'late', {fill: 'var(--ink2)', 'font-weight': 600}));
   }
   const path = c.history.map((p, i) => (i ? 'L' : 'M') + xs(i) + ',' + ys(pctOf(c, p.c))).join('');
   s.append(svg('path', {d: path, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
   s.append(svg('circle', {cx: xs(last), cy: ys(0), r: 4, fill: 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2}));
-  if (n) s.append(sText(xs(0), Hh - 8, c.history[0].d.slice(5).replace('-', '/'), {'text-anchor': 'start'}));
+  if (n) s.append(sText(xs(0), Hh - 8, fmtDay(c.history[0].d), {'text-anchor': 'start'}));
   // crosshair hover: snaps to the nearest trading day (history) or target date (range)
   const cross = svg('line', {y1: T, y2: Hh - B, stroke: 'var(--axis)', 'stroke-width': 1, visibility: 'hidden'});
   s.append(cross);
@@ -483,7 +509,7 @@ function fanChart(c){
     rs.forEach(r => { const d = Math.abs(xs(last + r.h) - px); if (d < bd) { bd = d; best = {i: last + r.h, r: r}; } });
     if (!best || ev.type === 'focus') { cross.setAttribute('visibility', 'hidden'); return [[c.name], ['last close ' + D.as_of_label, fmtMoney(c.close)]]; }
     cross.setAttribute('x1', xs(best.i)); cross.setAttribute('x2', xs(best.i)); cross.setAttribute('visibility', 'visible');
-    if (best.p) return [[best.p.d], ['close', fmtMoney(best.p.c)], ['vs last close', fmtPct(pctOf(c, best.p.c))]];
+    if (best.p) return [[fmtDay(best.p.d, true)], ['close', fmtMoney(best.p.c)], ['vs last close', fmtPct(pctOf(c, best.p.c))]];
     const r = best.r;
     return [[horizonText(r.h) + ', by ' + r.target_label + (r.late ? ' (late, not a forecast)' : '')],
             ['to ' + fmtMoney(r.hi80) + ' (80% range)', fmtMoney(r.lo80)], ['to ' + fmtMoney(r.hi50) + ' (50% range)', fmtMoney(r.lo50)]];
@@ -643,12 +669,12 @@ function card(c){
   calls.forEach(cl => {
     body.append(el('h4', null, horizonText(cl.h) + ' call: ' + cl.direction));
     if (cl.rationale) body.append(el('p', null, cl.rationale));
-    if (cl.evidence.length) { const ul = el('ul'); cl.evidence.forEach(e => { const li = el('li'); if (e.url) { const ln = el('a', {href: e.url, target: '_blank', rel: 'noopener'}, e.title || e.id); li.append(ln, el('span', {class: 'meta'}, ' · ' + (e.source || ''))); } else li.textContent = 'Source ' + e.id + ' (not found)'; ul.append(li); }); body.append(ul); }
+    if (cl.evidence.length) { const ul = el('ul'); cl.evidence.forEach(e => { const li = el('li'); if (e.title || e.url) { const ln = linkOrText(e.url, e.title || e.id); li.append(ln, el('span', {class: 'meta'}, ' · ' + (e.source || ''))); } else li.textContent = 'Source ' + e.id + ' (not found)'; ul.append(li); }); body.append(ul); }
   });
   if (c.events.length) { body.append(el('h4', null, 'Coming up')); const ul = el('ul');
     c.events.forEach(e => ul.append(el('li', null, e.day + ' · ' + e.label + (e.market ? ' (whole market)' : '')))); body.append(ul); }
   if (c.news.length) { body.append(el('h4', null, 'Latest news')); const ul = el('ul');
-    c.news.forEach(n => { const li = el('li'); li.append(el('a', {href: n.url, target: '_blank', rel: 'noopener'}, n.title)); li.append(el('span', {class: 'meta'}, ' · ' + (n.source || '') + (n.ts ? ' · ' + n.ts.slice(0, 10) : '') + (n.cited ? ' · cited for the call' : ''))); ul.append(li); });
+    c.news.forEach(n => { const li = el('li'); li.append(linkOrText(n.url, n.title)); li.append(el('span', {class: 'meta'}, ' · ' + (n.source || '') + (n.ts ? ' · ' + n.ts.slice(0, 10) : '') + (n.cited ? ' · cited for the call' : ''))); ul.append(li); });
     body.append(ul); }
   const sec = (N.sectors || {})[c.sector];
   if (sec) { body.append(el('h4', null, c.sector + ': analysts’ view')); body.append(htmlBlock('prose', sec)); }
