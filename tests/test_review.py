@@ -133,14 +133,15 @@ def test_report_review_line():
 
 
 def test_summaries_match_hand_calculation():
-    """Four scored ranges around base 100: 50% range 98-102, 80% range 95-105, naive 99-101 / 97-103."""
+    """Four scored ranges around base 100: 50% range 98-102, 80% range 95-105, naive 99-101 / 97-103
+    (row b: naive 97.5-103.5 / 96-105, so its naive 50% range hits while its own 50% range misses)."""
     ys = [100.0, 103.0, 110.0, 94.0]
     con = duckdb.connect()
     con.execute("""CREATE TABLE range_record AS SELECT * FROM (VALUES
         ('a', DATE '2026-10-01', 'A', 1, 100.0, 100.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
          NULL, 'CALM', ['cue +1.00% x0.5'], true, true, true, true, 10.0, 6.0, 10.0, 6.0),
-        ('b', DATE '2026-10-01', 'A', 1, 100.0, 103.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
-         'up', 'CALM', [], false, true, false, true, 10.0, 6.0, 10.0, 6.0),
+        ('b', DATE '2026-10-01', 'A', 1, 100.0, 103.0, 98.0, 102.0, 95.0, 105.0, 97.5, 103.5, 96.0, 105.0,
+         'up', 'CALM', [], false, true, true, true, 10.0, 9.0, 10.0, 9.0),
         ('c', DATE '2026-10-02', 'B', 5, 100.0, 110.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
          NULL, 'UNSTABLE', ['regime UNSTABLE x1.25'], false, false, false, false, 60.0, 76.0, 10.0, 6.0),
         ('d', DATE '2026-10-02', 'B', 5, 100.0, 94.0, 98.0, 102.0, 95.0, 105.0, 99.0, 101.0, 97.0, 103.0,
@@ -149,21 +150,22 @@ def test_summaries_match_hand_calculation():
           naive_lo50, naive_hi50, naive_lo80, naive_hi80, direction, regime, notes,
           hit50, hit80, naive_hit50, naive_hit80, is80_pct, naive_is80_pct, width80_pct, naive_width80_pct)""")
     # stored is80 matches the interval score by hand: width + (2/0.2) x miss distance
-    for y, stored, naive in zip(ys, (10.0, 10.0, 60.0, 20.0), (6.0, 6.0, 76.0, 36.0)):
+    naive80 = [(97, 103), (96, 105), (97, 103), (97, 103)]
+    for y, stored, (nlo, nhi), naive in zip(ys, (10.0, 10.0, 60.0, 20.0), naive80, (6.0, 9.0, 76.0, 36.0)):
         assert math.isclose(100 * rl.interval_score(95, 105, y, 0.8) / 100, stored)
-        assert math.isclose(100 * rl.interval_score(97, 103, y, 0.8) / 100, naive)
+        assert math.isclose(100 * rl.interval_score(nlo, nhi, y, 0.8) / 100, naive)
     cfg = {"tickers": {"A": {"sector": "Tech"}, "B": {"sector": "Energy"}}}
     df = review.load_ranges(con, cfg, date(2026, 10, 4))
-    # 50% score by hand: 4 + 4 x miss -> 4, 8, 36, 20; naive: 2 + 4 x miss -> 2, 10, 38, 22
+    # 50% score by hand: 4 + 4 x miss -> 4, 8, 36, 20; naive: width + 4 x miss -> 2, 6, 38, 22
     assert list(df["is50_pct"]) == [4.0, 8.0, 36.0, 20.0]
-    assert list(df["naive_is50_pct"]) == [2.0, 10.0, 38.0, 22.0]
+    assert list(df["naive_is50_pct"]) == [2.0, 6.0, 38.0, 22.0]
     assert list(df["width50_pct"]) == [4.0, 4.0, 4.0, 4.0]
     assert list(df["sector"]) == ["Tech", "Tech", "Energy", "Energy"]
     assert [t for t in df["tags"]] == [["cue"], ["none", "ai_call"], ["regime"], ["none"]]
     s = review.range_summary(df)
-    assert s == {"n": 4, "cover50": 0.25, "cover80": 0.5, "naive_cover50": 0.25, "naive_cover80": 0.5,
-                 "width50_pct": 4.0, "width80_pct": 10.0, "naive_width80_pct": 6.0,
-                 "score50_pct": 17.0, "naive_score50_pct": 18.0, "score80_pct": 25.0, "naive_score80_pct": 31.0}
+    assert s == {"n": 4, "cover50": 0.25, "cover80": 0.5, "naive_cover50": 0.5, "naive_cover80": 0.5,
+                 "width50_pct": 4.0, "width80_pct": 10.0, "naive_width80_pct": 6.75,
+                 "score50_pct": 17.0, "naive_score50_pct": 17.0, "score80_pct": 25.0, "naive_score80_pct": 31.75}
     by_h = review.by_horizon(df, review.range_summary)
     assert by_h["1d"]["cover80"] == 1.0 and by_h["5d"]["cover80"] == 0.0 and by_h["5d"]["score80_pct"] == 40.0
     br = review.breakdown(df, "tags")
@@ -400,6 +402,53 @@ def test_window_boundaries_and_no_data_after_the_week():
     assert {w: d["breakdowns"][w]["sector"]["Tech · 1d"]["n"] for w in d["breakdowns"]} == \
         {"week": 2, "rolling": 4, "all": 5}
     assert rec["detail"]["live_ablation"]["n"] == 5 and rec["n_calls_all"] == 5
+
+
+def test_confidence_bands_edges():
+    calls = pd.DataFrame({"confidence": [0.50, 0.59, 0.60, 0.70, 0.79, 0.80, 0.85, 0.90],
+                          "hit": [True] * 8, "actual_return": [0.01] * 8})
+    bands = review.confidence_bands(calls, [0.5, 0.6, 0.7, 0.8, 0.9])
+    # lower edge inclusive, upper exclusive, except the top band which keeps 0.90 (the maximum allowed)
+    assert {b: s["n"] for b, s in bands.items()} == {"50%-60%": 2, "60%-70%": 1, "70%-80%": 2, "80%-90%": 3}
+    assert bands["80%-90%"]["mean_confidence"] == 0.85
+
+
+def test_compare_coverage_terms():
+    base = {"1d": {"n": 100, "cover50": 0.50, "cover80": 0.80, "score80_pct": 5.0},
+            "5d": {"n": 100, "cover50": 0.50, "cover80": 0.80, "score80_pct": 10.0}}
+
+    def var(c50_1, c80_1, s1, c50_5=0.50, c80_5=0.80, s5=10.0):
+        return {"1d": {"n": 100, "cover50": c50_1, "cover80": c80_1, "score80_pct": s1},
+                "5d": {"n": 100, "cover50": c50_5, "cover80": c80_5, "score80_pct": s5}}
+    # 80% coverage moving away from target: negative gain, and a shortfall when it drops below
+    c = review.compare(base, var(0.50, 0.70, 5.0))
+    assert c == {"rel_score": 0.0, "coverage_shortfall": 0.1, "coverage_gain": -0.05}
+    assert review.compare(base, var(0.50, 0.90, 5.0))["coverage_gain"] == -0.05      # over-covering
+    assert review.compare(base, var(0.50, 0.90, 5.0))["coverage_shortfall"] == 0.0
+    # a drop below target in the 50% band only still counts as a shortfall
+    c = review.compare(base, var(0.42, 0.80, 5.0))
+    assert c["coverage_shortfall"] == 0.08 and c["coverage_gain"] == 0.0
+    # moving towards target from below: positive gain; scores averaged as relative changes
+    worse = {**base, "1d": {**base["1d"], "cover80": 0.70}}
+    c = review.compare(worse, var(0.50, 0.78, 4.5, s5=11.0))
+    assert c == {"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.04}
+    assert review.compare(base, {"1d": {"n": 0}}) is None
+
+
+def test_history_regime_uses_the_next_session():
+    """A major event counts when it falls within 2 days of the NEXT session (as features.py)."""
+    idx = pd.bdate_range("2026-09-14", "2026-11-03")
+    bars = {"BENCH": pd.DataFrame({"close": [100 * 1.0001 ** i for i in range(len(idx))]}, index=idx),
+            "VOLX": pd.DataFrame({"close": [15.0] * len(idx)}, index=idx)}
+    cfg = {"market": "us", "calendar": "XNYS", "regime": TH,
+           "symbols": {"BENCH": {"role": "benchmark"}, "VOLX": {"role": "vol_index"}}}
+    regimes, majors = review.history_context(cfg, bars, list(idx))
+    assert date(2026, 10, 28) in majors                                        # FOMC (config/events.yaml)
+    reg = dict(zip((d.date() for d in idx), regimes))
+    assert reg[date(2026, 10, 22)] == "CALM"            # next session 10-23: window 10-23..10-25
+    assert reg[date(2026, 10, 23)] == "EVENT_HEAVY"     # next session 10-26: window reaches 10-28
+    assert reg[date(2026, 10, 27)] == "EVENT_HEAVY"     # next session is the event day
+    assert reg[date(2026, 10, 28)] == "CALM"            # event day itself: the next session is after it
 
 
 def test_flag_threshold():
