@@ -193,6 +193,20 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   and confirm the provisional 2027 FOMC dates (a six-meeting schedule has been proposed).
   exchange_calendars covers XNYS only to one year after the run date (2027-10-05 when checked
   on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
+- Yahoo hosts, checked 2026-10-05 (~19:00-19:16 UTC) through a Claude Code session's egress
+  proxy (US and India `collect_prices|quotes|events|options` into a scratch root, every HTTP
+  request counted by host). Only `finance.yahoo.com` was refused (403 to CONNECT, also with curl);
+  it serves only yfinance's earnings-calendar page, which `collect_events.py` tries first: all 20
+  tickers per market fell back to the screener on `query1.finance.yahoo.com` and got their
+  earnings dates (`earnings_history_sources`). Prices, quotes and options used only `query1`/`query2`
+  plus `fc.yahoo.com` for the cookie (fresh cache). `consent.yahoo.com` and `guce.yahoo.com` were
+  not refused (HTTP 404 at the root) and not contacted. All data came back, but one run silently
+  lost BAC's dividend history (yfinance printed "possibly delisted; no price data found"; a rerun
+  returned 162 dividends): yfinance hides request errors behind empty frames, tuples and dicts.
+  The Yahoo collectors therefore list in `failed` an empty or stale price frame (stale: older
+  than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
+  a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
+  and earnings dates when every method raised.
 - Done 2026-10-05: NSE field mappings checked against live responses. PIT moved to the
   `corporates-pit-gg` filing index plus per-filing XBRL (the old feed dwindled in April 2026;
   last rows 2 May 2026);

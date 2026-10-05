@@ -8,7 +8,8 @@ call and put implied vol interpolated to the spot price, their average (`atm_iv`
 and the at-the-money straddle (mid price, also as % of spot: roughly the implied move to that
 expiry). Quotes with no bid or an implausible IV are ignored. Append-only: id
 <date>-<ticker>-<expiry> is written once per UTC day. ranges.py blends `atm_iv` into the width
-(docs/DESIGN.md section 4)."""
+(docs/DESIGN.md section 4). A ticker that ends with no snapshot today (Yahoo returned no expiries,
+none in the window, or no usable chain) is listed in `failed` with the reason."""
 from __future__ import annotations
 
 import json
@@ -76,6 +77,16 @@ def snapshot(calls: pd.DataFrame, puts: pd.DataFrame, spot: float) -> dict | Non
             "straddle_pct": r(st / spot) if st else None}
 
 
+def no_chain_reason(listed: bool, expiries: list[str], max_days: int) -> str:
+    """Why a ticker got no snapshot: Yahoo listed no expiries at all (an empty answer, e.g. a
+    blocked or failed request), none falls in the window, or no chain had a usable implied vol."""
+    if not listed:
+        return "no option expiries returned"
+    if not expiries:
+        return f"no expiry within 1-{max_days} days"
+    return "no usable chain (no quote with a plausible implied vol)"
+
+
 def main() -> int:
     ap = market_arg(__doc__)
     ap.add_argument("--expiries", type=int, default=4, help="nearest expiries per ticker (default 4)")
@@ -91,12 +102,12 @@ def main() -> int:
 
     now, today = utc_now(), utc_today()
     seen = recent_ids(market, "options", days=2)
-    rows, failed, empty = [], [], []
+    rows, failed = [], []
     for key, meta in cfg["tickers"].items():
         try:
             tk = yf.Ticker(meta["yahoo"])
             expiries = [e for e in tk.options if 1 <= (date.fromisoformat(e) - today).days <= args.max_days]
-            got = 0
+            got, listed = 0, bool(tk.options)   # () when Yahoo's answer has no option result
             for e in expiries[:args.expiries]:
                 oid = f"{today}-{key}-{e}"
                 if oid in seen:          # already snapshotted today
@@ -114,12 +125,12 @@ def main() -> int:
                 seen.add(oid)
                 got += 1
             if not got:
-                empty.append(key)
+                failed.append({"ticker": key, "error": no_chain_reason(listed, expiries, args.max_days)})
         except Exception as exc:
             failed.append({"ticker": key, "error": str(exc)[:200]})
     written = append_jsonl(day_file(market, "options", today), rows)
     print(json.dumps({"collector": "options", "market": market, "written": written,
-                      "tickers": len({r["ticker"] for r in rows}), "no_chain": empty, "failed": failed}, indent=2))
+                      "tickers": len({r["ticker"] for r in rows}), "failed": failed}, indent=2))
     return 1 if failed and len(failed) == len(cfg["tickers"]) else 0
 
 
