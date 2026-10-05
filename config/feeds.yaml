@@ -1,0 +1,16 @@
+# Free RSS sources. Every domain used here must be in the cloud environment's allowed domains.
+google_news:
+  base: https://news.google.com/rss/search
+  window: 1d            # Google News 'when:' filter
+  params: {hl: en-US, gl: US, ceid: "US:en"}
+
+# Category searches through Google News (add your own categories and queries).
+categories:
+  macro: ["Federal Reserve interest rates", "ECB interest rates", "US inflation CPI"]
+  semiconductors: ["semiconductor industry"]
+  ai: ["artificial intelligence chips demand"]
+
+# Direct outlet feeds (verify each URL still works before relying on it).
+outlets:
+  - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
+  - {name: CNBC Top News, url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", category: general}

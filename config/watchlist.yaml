@@ -1,0 +1,18 @@
+# Example watchlist: replace with your own tickers.
+# name/aliases: used to tag headlines with tickers (whole-word, case-insensitive).
+# queries: Google News searches for this ticker (default: '"<name>" stock').
+# yahoo: Yahoo Finance symbol if different (e.g. ASML.AS for Euronext Amsterdam).
+# sec_ticker: SEC ticker if different; tickers not registered with the SEC are skipped for filings.
+tickers:
+  AAPL:
+    name: Apple
+    aliases: [iPhone, Tim Cook]
+  MSFT:
+    name: Microsoft
+    aliases: [Azure, Satya Nadella]
+  NVDA:
+    name: Nvidia
+    aliases: [Jensen Huang]
+
+filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G"]
+filing_lookback_days: 7
