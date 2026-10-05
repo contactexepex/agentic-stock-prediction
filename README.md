@@ -48,12 +48,15 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
   agent pattern, re-implemented as Claude Code subagents so no LLM API calls are billed
 
 ## Setup
-1. **Slack**: create a channel `#market-brief`; connect the Slack connector at claude.ai/customize/connectors.
+1. **Slack**: create a channel `#market-brief`. Create a Slack app (api.slack.com/apps → Create New App →
+   From scratch), turn on **Incoming Webhooks**, **Add New Webhook to Workspace**, pick `#market-brief`,
+   and copy the webhook URL into the environment variable `SLACK_WEBHOOK_URL`. Allow `hooks.slack.com`
+   in the network settings. (Routines created in the claude.ai UI can use the Slack connector instead.)
 2. **Cloud environment** (claude.ai/code → environment settings):
    - Network access: **Custom**, tick "Also include default list of common package managers", and allow:
      `query1.finance.yahoo.com`, `query2.finance.yahoo.com`, `fc.yahoo.com`, `guce.yahoo.com`,
-     `news.google.com`, `www.sec.gov`, `data.sec.gov`, `feeds.bbci.co.uk`, `www.cnbc.com`,
-     `economictimes.indiatimes.com`, `www.moneycontrol.com`, `www.livemint.com`, plus any outlet you add.
+     `news.google.com`, `www.sec.gov`, `data.sec.gov`, `feeds.bbci.co.uk`,
+     `economictimes.indiatimes.com`, `www.moneycontrol.com`, `www.livemint.com`, `hooks.slack.com`, plus any outlet you add.
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
    - Setup script: `bash setup.sh`
 3. **Routines** (claude.ai/code/routines → New routine), one per market, both on this repo and environment:

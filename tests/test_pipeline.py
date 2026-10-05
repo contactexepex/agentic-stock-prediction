@@ -271,6 +271,18 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.md") and out["url"] in slack
     assert len(slack.strip().splitlines()) <= 12
 
+    # notify refuses unfilled drafts, then (without a webhook) reports exit code 2
+    env_no_hook = {k: v for k, v in os.environ.items() if k != "SLACK_WEBHOOK_URL"}
+    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
+                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    assert nb.returncode == 1 and "AGENT markers" in nb.stdout
+    draft = root / out["slack_draft"]
+    draft.write_text(draft.read_text().replace("<!-- AGENT:headline (one line) -->", "Quiet day.")
+                     .replace("<!-- AGENT:news (the 2 most material items, one line each) -->", "none"))
+    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
+                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    assert nb.returncode == 2 and "AGENT" not in json.loads(nb.stdout)["text"]
+
 
 def test_backtest_coverage_is_calibrated(tmp_path):
     root, cfg = setup(tmp_path)

@@ -48,9 +48,11 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
 
-13. Notify: post the filled `work/slack_<market>.md` as ONE message to the Slack channel
-    #market-brief (channel id in `config/settings.yaml`) using the Slack connector. Nothing
-    else is posted.
+13. Notify: run `python scripts/notify_slack.py`. It posts the filled `work/slack_<market>.md`
+    as ONE message to #market-brief through the incoming webhook in `SLACK_WEBHOOK_URL`. If it
+    exits with code 2 (no webhook configured) and a Slack connector is available in this
+    session, post the same text as one message to #market-brief (channel id in
+    `config/settings.yaml`) with the connector instead. Nothing else is posted.
 
 Never edit or delete existing files under data/. If inputs are missing or thin, say so and
 abstain rather than guess.

@@ -15,6 +15,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `collect_filings`. Then `score_predictions` (calls and ranges), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` and `report`
   (report skeleton + Slack draft with every number; agents fill only the `AGENT` markers,
+  then `notify_slack` posts the draft through `SLACK_WEBHOOK_URL`;
   see `templates/report.md`). `backtest` evaluates the
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
