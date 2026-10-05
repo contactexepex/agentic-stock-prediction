@@ -3,6 +3,10 @@
 market: us
 name: US (NYSE/Nasdaq)
 calendar: XNYS
+# exchange_calendars builds XNYS only up to one year after the run date (on 2026-10-05: to
+# 2027-10-05) and assumes Mon-Fri beyond. Its 2026 and Jan-Sep 2027 holidays match NYSE's
+# 2027 list (Msn, 2026-06-19, read via Bigdata.com); the two 2027 holidays past its end:
+holidays: [2027-11-25, 2027-12-24]   # Thanksgiving, Christmas (observed)
 timezone: America/New_York
 currency: USD
 premarket_quotes: true  # snapshot each ticker's pre-market price (gap vs previous close)
@@ -82,7 +86,8 @@ news:
     rates: ["Treasury yields"]
     global: ["oil prices", "geopolitical tensions markets"]
     trade: ["US tariffs trade"]
-  outlets:   # CNBC's RSS returns 403 to cloud servers, so it is not used
+    markets: ["stock market today site:cnbc.com"]   # CNBC headlines via Google News
+  outlets:   # CNBC's own RSS returns 403 to cloud servers (rechecked 2026-10-05), see `markets` above
     - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
 
 filings: sec

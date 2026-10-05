@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -99,6 +100,19 @@ def test_news_collect_tags_and_dedupes(tmp_path):
     assert tagged["Fed holds rates"] == []
     # second run sees the same items and writes nothing new
     assert json.loads(run("collect_news.py", root, cfg).stdout)["new_items"] == 0
+
+
+def test_news_flags_stale_outlet(tmp_path):
+    root, cfg = setup(tmp_path)
+    old = tmp_path / "old.xml"   # a feed that answers but stopped updating (like Moneycontrol in 2024)
+    old.write_text('<?xml version="1.0"?><rss version="2.0"><channel><title>Old</title><item><title>Old news'
+                   '</title><link>https://example.com/o</link><pubDate>Tue, 23 Apr 2024 10:16:31 GMT</pubDate>'
+                   '</item></channel></rss>')
+    path = cfg / "markets" / f"{MARKET}.yaml"
+    path.write_text(path.read_text() + f"    - {{name: Frozen, url: '{old}', category: general}}\n")
+    out = json.loads(run("collect_news.py", root, cfg).stdout)
+    assert out["new_items"] == 2 and not out["failed"]
+    assert [s["feed"] for s in out["stale"]] == ["Frozen"] and out["stale"][0]["newest"].startswith("2024-04-23")
 
 
 def test_scoring_and_context(tmp_path):
@@ -266,8 +280,31 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     out = json.loads(rep.stdout)
     text = (root / out["report"]).read_text()
     for needle in ("## Today", "<!-- AGENT:headline -->", "/overview.png)", "/AAPL.png)", "80% hit 2/2",
-                   "## Track record", "<!-- AGENT:sector:Tech -->"):
+                   "## Track record", "<!-- AGENT:sector:Tech -->", "Market on ", "| 5d ▲ up 80% |",
+                   "| 1d | since start | 2 |", "Ranges by regime", "Calls by confidence band"):
         assert needle in text, needle
+
+    # a filled report is kept by a re-run on the same data (only the Slack draft is rebuilt) ...
+    rpath = root / out["report"]
+    filled = re.sub(r"<!-- AGENT:[^>]*-->", "narrative", text)
+    assert "<!-- report-data: as_of=" in filled
+    rpath.write_text(filled)
+    again = run("report.py", root, cfg)
+    assert again.returncode == 0 and json.loads(again.stdout)["report_kept"] is True
+    assert rpath.read_text() == filled and (root / out["slack_draft"]).exists()
+    # ... but rebuilt (old copy saved, warning) once the data it was built from changed
+    reg_file = sorted((root / "data" / MARKET / "regime").glob("**/*.jsonl"))[-1]
+    last = json.loads(reg_file.read_text().splitlines()[-1])
+    flipped = "UNSTABLE" if last["regime"] != "UNSTABLE" else "CALM"
+    with reg_file.open("a") as f:
+        f.write(json.dumps({**last, "regime": flipped, "computed_at": "2099-01-01T00:00:00+00:00"}) + "\n")
+    stale = json.loads(run("report.py", root, cfg).stdout)
+    assert stale["report_kept"] is False and "warning" in stale
+    assert (root / stale["previous_report"]).read_text() == filled
+    rebuilt = rpath.read_text()
+    assert "<!-- AGENT:headline -->" in rebuilt and f"regime={flipped} -->" in rebuilt
+    forced = json.loads(run("report.py", root, cfg, "--force").stdout)
+    assert forced["report_kept"] is False and "<!-- AGENT:headline -->" in rpath.read_text()
     slack = (root / out["slack_draft"]).read_text()
     assert "• AAPL ▲ up 80% (5 days) · $" in slack
     assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.md") and out["url"] in slack
@@ -284,6 +321,12 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
                         env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
     assert nb.returncode == 2 and "AGENT" not in json.loads(nb.stdout)["text"]
+
+    # holiday path: one free-text line, no draft needed
+    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py"), "--text", "Test market: market closed today"],
+                        cwd=SCRIPTS, capture_output=True, text=True,
+                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    assert nb.returncode == 2 and json.loads(nb.stdout)["text"] == "Test market: market closed today\n"
 
 
 def test_backtest_coverage_is_calibrated(tmp_path):

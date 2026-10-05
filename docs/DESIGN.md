@@ -136,7 +136,13 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 
 ## 11. Open items
 - Watchlists: decided (20 per market, 10 sectors x 2), see `config/markets/`.
-- Verify the India outlet RSS URLs and the 2027 India holiday calendar once live.
+- India outlet RSS checked 2026-10-05 (Moneycontrol's feeds are frozen, now read via Google News).
+  2027 calendars: NSE has not published its 2027 holiday list yet (expected mid-December 2026);
+  `holidays:` in `config/markets/india.yaml` holds the fixed-date ones until then. Add the BLS 2027
+  CPI dates and the RBI FY2027-28 MPC dates to `config/events.yaml` when they are published,
+  and confirm the provisional 2027 FOMC dates (a six-meeting schedule has been proposed).
+  exchange_calendars covers XNYS only to one year after the run date (2027-10-05 when checked
+  on 2026-10-05); `holidays:` in `config/markets/us.yaml` adds the two later 2027 closures.
 - On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
   against live responses (NSE changes field names; built from public scrapers, not yet seen live).
 - Section 4 range inputs: **built** (`scripts/range_inputs.py`, switches in `config/ranges.yaml`):

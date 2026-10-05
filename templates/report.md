@@ -3,7 +3,8 @@
 `scripts/report.py` writes `reports/<market>/<session_date>.md` and `work/slack_<market>.md`
 with every number, table and chart link. Replace each `<!-- AGENT:... -->` marker with short
 narrative from the context pack, the news brief, the bull/bear cases and the forecaster, then
-delete the marker. Never change a number, table or chart link the script wrote; quote numbers
+delete the marker. Keep the `<!-- report-data: ... -->` line (report.py uses it to tell whether
+a filled report is still current). Never change a number, table or chart link the script wrote; quote numbers
 only from those tables or the context pack. Plain, short sentences.
 
 Report markers:
@@ -15,7 +16,8 @@ Report markers:
 - `outlook`: the key risks for tomorrow and this week (events table, overnight cues, regime).
 - `sector:<name>`: 2-3 lines per sector pair: what moved each stock, bull vs bear in one line,
   whether both moved together (sector news) or apart (company news).
-- `data_quality`: failed collectors and feeds from the run's JSON summaries; "none" if clean.
+- `data_quality`: failed collectors and feeds (and `stale` news feeds) from the run's JSON
+  summaries; "none" if clean.
   On a late run (`market_status.py` `late_run: true`) say so first: the run started after the
   session closed, so no calls were made and closed-session ranges were not published.
   Then the judge's verdicts: one line per agent (PASS, or FAIL with the reason and what was dropped).

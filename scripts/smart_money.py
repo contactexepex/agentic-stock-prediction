@@ -28,9 +28,11 @@ SECTIONS: list[tuple[str, str]] = [
         SELECT ticker, form, filing_date, filer_name, percent, round(shares) AS shares
         FROM stake_filings WHERE filing_date >= current_date - 30
         ORDER BY kind = '13D' DESC, filing_date DESC, ticker LIMIT 15"""),
-    ("13F tracked filers: latest quarter vs previous (common shares)", """
+    ("13F tracked filers: latest quarter vs previous (common shares; change and actions from "
+     "complete filings only, `incomplete` = filers with a partial or combination report)", """
         SELECT ticker, period, filers_holding, round(value_usd / 1e9, 2) AS value_bn,
-               round(change_pct * 100, 1) AS change_pct, n_new, n_exit, n_add, n_trim
+               round(change_pct * 100, 1) AS change_pct, n_new, n_exit, n_add, n_trim,
+               filers_incomplete AS incomplete
         FROM holdings_quarter
         WHERE period = (SELECT max(period) FROM holdings_quarter q WHERE q.ticker = holdings_quarter.ticker)
         ORDER BY change_pct DESC NULLS LAST, ticker"""),

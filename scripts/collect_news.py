@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Collect RSS headlines (Google News queries + outlet feeds from the market config's `news`
 section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the
-last 7 days. Prints a JSON summary. Exit code 1 only if every feed failed."""
+last 7 days. Prints a JSON summary; outlet feeds that answer but carry nothing from the last
+3 days are listed as `stale`. Exit code 1 only if every feed failed."""
 from __future__ import annotations
 
 import hashlib
@@ -76,7 +77,7 @@ def main() -> int:
     seen = recent_ids(market, "news", days=7)
     now, now_dt = utc_now(), datetime.now(timezone.utc)
     items: dict[str, dict] = {}
-    failed = []
+    failed, stale = [], []
 
     jobs = build_jobs(feeds, watchlist)
     for job in jobs:
@@ -90,6 +91,12 @@ def main() -> int:
             failed.append({"feed": job["feed"], "status": status,
                            "error": str(parsed.get("bozo_exception", ""))[:200]})
             continue
+        times = [parse_time(e) for e in parsed.entries]
+        if not job["feed"].startswith("gnews:") and not any(t is None or now_dt - t <= MAX_AGE for t in times):
+            # an outlet feed that answers but has nothing recent has stopped updating
+            newest = max((t for t in times if t), default=None)
+            stale.append({"feed": job["feed"], "entries": len(times),
+                          "newest": newest.isoformat() if newest else None})
         for e in parsed.entries:
             title = (e.get("title") or "").strip()
             if not title:
@@ -117,7 +124,7 @@ def main() -> int:
 
     written = append_jsonl(day_file(market, "news", utc_today()), items.values())
     print(json.dumps({"collector": "news", "market": market, "feeds": len(jobs), "failed": failed,
-                      "new_items": written}, indent=2))
+                      "stale": stale, "new_items": written}, indent=2))
     return 1 if jobs and len(failed) == len(jobs) else 0
 
 
