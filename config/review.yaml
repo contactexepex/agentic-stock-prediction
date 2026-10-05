@@ -1,0 +1,44 @@
+# Weekly review settings (scripts/review.py, docs/DESIGN.md sections 6, 7 and 10 phase 4).
+# The review only PROPOSES changes to config/ranges.yaml; a human decides and edits by hand.
+
+rolling_days: 30            # rolling window, besides the review week and since start
+min_n: 30                   # table rows with fewer scored items are flagged "low n"
+min_n_recommend: 200        # no range-parameter proposal from fewer scored ranges than this
+min_n_calls: 50             # no confidence advice for a band with fewer scored calls than this
+
+# A variant is proposed only when it beats the current config by these margins
+# (scores are 80% interval scores, averaged as relative changes over the horizons).
+min_improvement: 0.02       # >= 2% lower interval score ...
+coverage_tolerance: 0.02    # ... while 50%/80% coverage falls at most this much further BELOW target
+min_coverage_gain: 0.04     # or: 80% coverage this much closer to target, with a score no worse
+calibration_tolerance: 0.05 # a confidence band hitting this far below its stated confidence is flagged
+confidence_bands: [0.50, 0.60, 0.70, 0.80, 0.90]
+
+history_eval_sessions: 120  # walk-forward days replayed on stored prices (recent history)
+
+# Variants replayed on stored LIVE scored ranges (inputs that only exist live: cues, AI calls,
+# earnings and event widening as published). `set` overrides config/ranges.yaml values.
+live_variants:
+  - {name: drop overnight cue, set: {cue_weight: 0.0}}
+  - {name: cue weight 0.25, set: {cue_weight: 0.25}}
+  - {name: cue weight 0.75, set: {cue_weight: 0.75}}
+  - {name: drop AI drift, set: {ai_drift_scale: 0.0}}
+  - {name: AI drift 1.0, set: {ai_drift_scale: 1.0}}
+  - {name: drop AI widening, set: {max_ai_widen: 0.0}}
+  - {name: drop earnings widening, set: {earnings_vol_multiple: 1.0}}
+  - {name: earnings multiple 4, set: {earnings_vol_multiple: 4.0}}
+  - {name: drop event widening, set: {major_event_factor: 1.0}}
+  - {name: drop regime widening, set: {regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.0, UNSTABLE: 1.0}}}
+  - {name: centre cap 0.25 sigma, set: {max_center_shift_sigma: 0.25}}
+
+# Variants replayed walk-forward on stored PRICE history (no AI, no cues, no earnings):
+# core width parameters plus regime and market-event widening rebuilt from stored bars.
+history_variants:
+  - {name: drop regime widening, set: {regime_factor: {CALM: 1.0, TRENDING: 1.0, EVENT_HEAVY: 1.0, UNSTABLE: 1.0}}}
+  - {name: drop event widening, set: {major_event_factor: 1.0}}
+  - {name: event factor 1.3, set: {major_event_factor: 1.3}}
+  - {name: EWMA lambda 0.90, set: {ewma_lambda: 0.90}}
+  - {name: EWMA lambda 0.97, set: {ewma_lambda: 0.97}}
+  - {name: half-life 60 sessions, set: {half_life_sessions: 60}}
+  - {name: half-life 250 sessions, set: {half_life_sessions: 250}}
+  - {name: pool 250 sessions, set: {history_sessions: 250}}

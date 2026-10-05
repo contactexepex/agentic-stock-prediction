@@ -79,3 +79,7 @@ FROM ranges_latest r JOIN (SELECT DISTINCT ON (range_id) * FROM range_outcomes O
 
 CREATE OR REPLACE VIEW calibration_latest AS
 SELECT DISTINCT ON (horizon_days) * FROM calibration ORDER BY horizon_days, as_of_date DESC, computed_at DESC;
+
+-- Weekly reviews (review.py): latest record per ISO week; a rerun appends a newer record.
+CREATE OR REPLACE VIEW review_latest AS
+SELECT DISTINCT ON (id) * FROM reviews ORDER BY id, computed_at DESC;
