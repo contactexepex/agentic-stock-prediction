@@ -321,6 +321,14 @@ def test_review_end_to_end(tmp_path):
                    "## Ablation: walk-forward on stored prices", "## Proposed changes to config/ranges.yaml",
                    "`cue_weight`", "**Not applied.**", "drop overnight cue", "low n"):
         assert needle in text, needle
+    # every coverage row is flagged exactly when n < min_n (30), and both kinds occur
+    section = text.split("## Ranges: coverage vs target")[1].split("###")[0]
+    rows = [[c.strip() for c in line.strip("|").split("|")] for line in section.splitlines()
+            if line.startswith("| ") and not line.startswith("| Window")]
+    assert len(rows) == 9
+    assert all((r[-1] == "low n") == (int(r[2]) < 30) for r in rows), rows
+    assert {r[-1] for r in rows} == {"low n", ""}
+    assert [r[-1] for r in rows if r[0] == f"week {week}" and r[1] == "1d"] == ["low n"]
     # config is never touched
     assert yaml.safe_load((cfg / "ranges.yaml").read_text()) == RC
 
@@ -350,3 +358,121 @@ def test_review_on_empty_market(tmp_path):
     out = json.loads(r.stdout)
     assert out["n_ranges_all"] == 0 and out["low_sample"] and out["proposals"] == []
     assert "_No scored live ranges yet._" in (root / out["report"]).read_text()
+
+
+# ---------- windows, look-ahead and gates ----------
+
+TH = {"unstable_vol": 28, "event_vol": 20, "calm_vol": 16, "unstable_bench_vol": 0.25,
+      "trend_return_5d": 0.015, "flat_return_5d": 0.005, "stress_vol_jump": 0.30}
+
+
+def window_con(target_dates: list[date]):
+    """In-memory DuckDB with one scored range and one scored call per target date."""
+    from common import SCHEMAS
+    con = duckdb.connect()
+    con.execute("SET TimeZone = 'UTC'")
+    con.execute(f"CREATE TABLE calibration ({', '.join(f'{k} {v}' for k, v in SCHEMAS['calibration'][1].items())})")
+    ranges = pd.DataFrame([{  # noqa: F841  (read by DuckDB below)
+        "id": f"r{i}", "target_date": d, "ticker": "A", "horizon_days": 1, "base_close": 100.0, "actual_close": 100.0,
+        "center": 0.0, "sigma_h": 0.02, "lo50": 98.0, "hi50": 102.0, "lo80": 95.0, "hi80": 105.0,
+        "naive_lo50": 99.0, "naive_hi50": 101.0, "naive_lo80": 97.0, "naive_hi80": 103.0, "direction": None,
+        "confidence": None, "regime": "CALM", "notes": [], "hit50": True, "hit80": True, "naive_hit50": True,
+        "naive_hit80": True, "is80_pct": 10.0, "naive_is80_pct": 6.0, "width80_pct": 10.0, "naive_width80_pct": 6.0}
+        for i, d in enumerate(target_dates)])
+    calls = pd.DataFrame([{"id": f"c{i}", "target_date": d, "horizon_days": 1,  # noqa: F841
+                           "confidence": 0.85, "hit": True, "actual_return": 0.01} for i, d in enumerate(target_dates)])
+    con.execute("CREATE TABLE range_record AS SELECT * FROM ranges")
+    con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
+    return con
+
+
+def test_window_boundaries_and_no_data_after_the_week():
+    start, end = review.week_bounds("2026-W40")                              # 2026-09-28 .. 2026-10-04
+    dates = [start - timedelta(days=1), start, end, end + timedelta(days=1),
+             end - timedelta(days=29), end - timedelta(days=30)]
+    rv = {**review.DEFAULTS, "rolling_days": 30}
+    cfg = {"market": "testmkt", "tickers": {"A": {"sector": "Tech"}}}
+    rec, d = review.build(cfg, RC, rv, window_con(dates), "2026-W40", history=False)
+    # week: start, end · 30 days: end-29 .. end · since start: all up to end (end+1 is after the week)
+    assert (rec["n_ranges_week"], rec["n_ranges_30d"], rec["n_ranges_all"]) == (2, 4, 5)
+    assert {w: d["calls"][w]["all"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
+    assert {w: d["bands"][w]["80%-90%"]["n"] for w in d["bands"]} == {"week": 2, "rolling": 4, "all": 5}
+    assert {w: d["breakdowns"][w]["sector"]["Tech · 1d"]["n"] for w in d["breakdowns"]} == \
+        {"week": 2, "rolling": 4, "all": 5}
+    assert rec["detail"]["live_ablation"]["n"] == 5 and rec["n_calls_all"] == 5
+
+
+def test_flag_threshold():
+    rv = {**review.DEFAULTS, "min_n": 30}
+    assert review.flag(29, rv) == "low n" and review.flag(30, rv) == "" and review.flag(0, rv) == "low n"
+
+
+def test_coverage_gate_needs_a_score_no_worse():
+    rv = {**review.DEFAULTS, "min_n_recommend": 200}
+    assert review.verdict({"rel_score": 0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.10}, 500, rv) \
+        == "no material change"
+    assert review.verdict({"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.10}, 500, rv) \
+        == "improves coverage"
+
+
+def ablation(name: str, setting: dict, verdict: str, rel: float) -> dict:
+    by_h = {"1d": {"n": 300, "cover80": 0.8, "score80_pct": 5.0}}
+    return {"variants": [{"name": "current config", "set": {}, "n": 300, "by_h": by_h, "verdict": "baseline"},
+                         {"name": name, "set": setting, "n": 300, "by_h": by_h, "verdict": verdict,
+                          "vs_current": {"rel_score": rel, "coverage_shortfall": 0.0, "coverage_gain": 0.0}}]}
+
+
+def test_proposals_prefer_live_evidence():
+    flat = {"regime_factor": {"CALM": 1.0, "TRENDING": 1.0, "EVENT_HEAVY": 1.0, "UNSTABLE": 1.0}}
+    hist = ablation("drop regime widening", flat, "improves score", -0.05)
+    [p] = review.proposals(RC, {"variants": []}, hist)                      # history alone proposes
+    assert p["source"] == "history walk-forward" and p["changes"][0]["param"] == "regime_factor"
+    assert p["changes"][0]["current"] == RC["regime_factor"] and p["drop"]
+    # live evidence (n >= min) that the change is worse suppresses the history proposal
+    assert review.proposals(RC, ablation("drop regime widening", flat, "worse score", 0.04), hist) == []
+    assert review.proposals(RC, ablation("drop regime widening", flat, "under-covers", 0.0), hist) == []
+    # a live improvement wins over history for the same parameter
+    [p] = review.proposals(RC, ablation("drop regime widening", flat, "improves score", -0.03), hist)
+    assert p["source"] == "live replay" and p["rel_score"] == -0.03
+    assert review.proposals(RC, ablation("x", {"cue_weight": 0.0}, "low n", -0.5), {"variants": []}) == []
+
+
+def test_major_event_counts_after_start_up_to_target():
+    majors = [date(2026, 10, 2)]
+    assert not review.major_between(majors, date(2026, 10, 2), date(2026, 10, 9))   # on the as-of day: known
+    assert review.major_between(majors, date(2026, 10, 1), date(2026, 10, 2))        # on the target day
+    assert review.major_between(majors, date(2026, 9, 28), date(2026, 10, 5))        # inside the horizon
+    assert not review.major_between(majors, date(2026, 9, 25), date(2026, 10, 1))    # after the target
+    assert not review.major_between([], date(2026, 9, 25), date(2026, 10, 1))
+
+
+def test_history_ablation_never_looks_past_the_week():
+    rng = np.random.default_rng(9)
+    n = 340
+    idx = pd.bdate_range("2025-03-03", periods=n)
+
+    def walk(start, vol):
+        return pd.DataFrame({"close": tp.fat_tailed_walk(rng, n, start, vol)}, index=idx)
+    bars = {"BENCH": walk(100, 0.01), "A": walk(150, 0.015), "B": walk(80, 0.02),
+            "VOLX": pd.DataFrame({"close": list(np.linspace(14, 30, n))}, index=idx)}   # crosses regime thresholds
+    cfg = {"market": "testmkt", "calendar": "XNYS", "regime": TH, "tickers": {"A": {}, "B": {}},
+           "symbols": {"BENCH": {"role": "benchmark"}, "VOLX": {"role": "vol_index"}}}
+    rv = {**review.DEFAULTS, "history_eval_sessions": 30,
+          "history_variants": [{"name": "drop regime widening",
+                                "set": {"regime_factor": {k: 1.0 for k in RC["regime_factor"]}}}]}
+    week_end = idx[-60].date()
+    cut = {t: df[df.index <= pd.Timestamp(week_end)] for t, df in bars.items()}
+    past = review.history_ablation(cfg, RC, rv, bars, week_end)
+    assert past["n"] > 0 and past == review.history_ablation(cfg, RC, rv, cut, week_end)   # later bars change nothing
+    assert past != review.history_ablation(cfg, RC, rv, bars, idx[-1].date())
+
+
+def test_weekly_review_written_earlier_is_not_fresh():
+    con = duckdb.connect()
+    con.execute("SET TimeZone = 'UTC'")
+    con.execute("CREATE TABLE review_latest (id VARCHAR, week VARCHAR, report VARCHAR, n_proposals INTEGER, "
+                "low_sample BOOLEAN, computed_at TIMESTAMPTZ)")
+    con.execute("INSERT INTO review_latest VALUES ('2026-W40', '2026-W40', 'reports/x/review-2026-W40.md', 0, false, "
+                "now() - INTERVAL 2 DAY)")
+    rv = report.weekly_review(con, date(2026, 10, 7))
+    assert rv is not None and rv["fresh"] is False                          # linked in the report, no Slack line

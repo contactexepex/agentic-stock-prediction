@@ -142,7 +142,8 @@ def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
     df["is50_pct"] = iscore(df["lo50"], df["hi50"], 0.5)
     df["naive_is50_pct"] = iscore(df["naive_lo50"], df["naive_hi50"], 0.5)
     df["width50_pct"] = 100 * (df["hi50"] - df["lo50"]) / base
-    df["tags"] = [note_tags(n) + (["ai_call"] if d in ("up", "down") else []) for n, d in zip(df["notes"], df["direction"])]
+    df["tags"] = [note_tags(n) + (["ai_call"] if isinstance(d, str) and d in ("up", "down") else [])
+                  for n, d in zip(df["notes"], df["direction"])]
     df["sector"] = [cfg["tickers"].get(t, {}).get("sector") or "other" for t in df["ticker"]]
     return df
 
@@ -234,9 +235,9 @@ def decompose(r, rc: dict) -> dict | None:
             cue, cue_w = math.log1p(float(x.group(1)) / 100), float(x.group(2))
     s_pre = s / (1 + widen)
     sd = s_pre / ((rf or 1.0) * (mef or 1.0)) / math.sqrt(h + (m * m - 1 if m else 0.0))
-    conf = r["confidence"]
-    ai = ({"up": 1, "down": -1}.get(r["direction"], 0) * (float(conf) - 0.5)
-          if conf is not None and not pd.isna(conf) else 0.0)
+    conf, direction = r["confidence"], r["direction"]
+    sign = {"up": 1, "down": -1}.get(direction, 0) if isinstance(direction, str) else 0
+    ai = sign * (float(conf) - 0.5) if conf is not None and not pd.isna(conf) else 0.0
     est = cue_w * cue + rc["ai_drift_scale"] * ai * s_pre
     capped = abs(abs(c) - rc["max_center_shift_sigma"] * s) < 2e-6 and abs(est) > abs(c)
     return {"h": h, "base": base, "y": float(r["actual_close"]), "q": q, "sd": sd, "earnings": m is not None,
@@ -315,6 +316,12 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
     return regimes, majors
 
 
+def major_between(majors: list[date], start: date, end: date) -> bool:
+    """A major event after the as-of date and on or before the target date (as ranges.py)."""
+    k = bisect.bisect_right(majors, start)
+    return k < len(majors) and majors[k] <= end
+
+
 def hist_summary(res: pd.DataFrame) -> dict:
     if res.empty:
         return {"n": 0}
@@ -336,10 +343,7 @@ def history_ablation(cfg: dict, rc: dict, rv: dict, bars: dict, week_end: date) 
     day = [d.date() for d in dates]
 
     def major_in(i: int, h: int) -> bool:
-        if i + h >= len(day):
-            return False
-        k = bisect.bisect_right(majors, day[i])
-        return k < len(majors) and majors[k] <= day[i + h]
+        return i + h < len(day) and major_between(majors, day[i], day[i + h])
 
     cache, variants = {}, []
     for v in [{"name": BASELINE, "set": {}}, *rv["history_variants"]]:
