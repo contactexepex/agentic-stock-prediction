@@ -210,3 +210,28 @@ def test_scoring_skips_records_made_after_the_first_session_closed(market):
     assert [x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
     again = json.loads(run("score_predictions.py", root, cfg_dir).stdout)  # late ones are not "open" either
     assert (again["scored"], again["ranges_scored"], again["still_open"]) == (0, 0, 0)
+
+
+def test_report_labels_late_ranges_and_links_the_review(market):
+    root, cfg_dir, cfg, rc = market
+    quotes(root, "2026-10-05T10:55:00+00:00")
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    rows = build(cfg, rc, "2026-10-05T11:30:00+00:00")
+    for r in rows.values():
+        if r["ticker"] == "MSFT":
+            r["made_at"] = "2026-10-05T20:40:00+00:00"            # after DAY's 20:00 UTC close
+    jsonl(root, "ranges", AS_OF, list(rows.values()))
+    jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
+                                   "computed_at": "2026-10-05T11:05:00+00:00", "regime": "CALM",
+                                   "vol_level": 15.0, "vol_change_1d": 0.0, "bench_ret_5d": 0.0,
+                                   "bench_vol_10d": 0.1, "major_event": False, "major_event_names": [],
+                                   "stress": False, "notes": []}])
+    r = run("report.py", root, cfg_dir, "--force")
+    assert r.returncode == 0, r.stderr
+    text = (root / "reports" / MARKET / f"{DAY}.md").read_text()
+    line = {t: next(x for x in text.splitlines() if x.startswith(f"| {t} |")) for t in ("AAPL", "MSFT")}
+    assert "late: not a forecast, never scored" in line["MSFT"]
+    assert "late:" not in line["AAPL"]
+    assert "1 stock(s) have ranges made after the session they target had closed" in text
+    import report
+    assert report.md_link("review-2026-W40.md") == "[review-2026-W40.md](review-2026-W40.md)"

@@ -232,6 +232,19 @@ def test_range_flags_note_and_gated_widen():
     assert sm.range_flags(con, date(2026, 10, 1), {"activist_13d_factor": 0.5})["AAPL"][0] == 1.0  # never narrows
 
 
+def test_range_flags_ignore_filings_accepted_after_made_at():
+    con = duckdb.connect()
+    con.execute("""CREATE TABLE activist_stakes AS SELECT * FROM (VALUES
+        ('AAPL', DATE '2026-09-30', TIMESTAMPTZ '2026-09-30 21:00:00+00', 'Early Activist', 6.5),
+        ('MSFT', DATE '2026-10-01', TIMESTAMPTZ '2026-10-01 21:00:00+00', 'Late Activist', 5.1),
+        ('NVDA', DATE '2026-10-01', NULL, 'No Time Activist', 5.0)) t(ticker, filing_date, accepted_at, filer_name, percent)""")
+    rc = {"activist_13d_days": 30, "activist_13d_factor": 1.0}
+    made = "2026-10-01T20:00:00+00:00"            # before MSFT's acceptance and before NVDA's filing day ends
+    assert set(sm.range_flags(con, date(2026, 10, 1), rc, made)) == {"AAPL"}
+    assert set(sm.range_flags(con, date(2026, 10, 1), rc, "2026-10-02T00:30:00+00:00")) == {"AAPL", "MSFT", "NVDA"}
+    assert set(sm.range_flags(con, date(2026, 10, 1), rc)) == {"AAPL", "MSFT", "NVDA"}   # no made_at: no bound
+
+
 # ---------- collectors end to end (fixtures) ----------
 
 def test_insiders_collect_and_dedupe(tmp_path):
@@ -380,11 +393,12 @@ def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:
 def test_ranges_carry_activist_note(tmp_path):
     root, cfg = setup(tmp_path)
     rng = np.random.default_rng(5)
-    days, d = [], TODAY - timedelta(days=760)
+    days, d = [], TODAY                         # 520 weekdays ending today (or the last weekday)
     while len(days) < 520:
         if d.weekday() < 5:
             days.append(d)
-        d += timedelta(days=1)
+        d -= timedelta(days=1)
+    days.reverse()
     series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "VOLX": [15.0] * 520,
               "AAPL": fat_tailed_walk(rng, 520, 150, 0.015), "MSFT": fat_tailed_walk(rng, 520, 300, 0.012)}
     for i, day in enumerate(days):
@@ -399,9 +413,9 @@ def test_ranges_carry_activist_note(tmp_path):
     for script in ("features.py", "calibrate.py"):
         r = run(script, root, cfg)
         assert r.returncode == 0, r.stderr
-    # made_at on the evening of the last bar: the bars end weeks ago, and the late-run guard
-    # (correctly) skips ranges whose target session closed before made_at.
-    r = run("ranges.py", root, cfg, "--now", f"{days[-1]}T23:00:00+00:00")
+    # Realistic timeline: the 13D is accepted today at 21:00 UTC (after the close); the range is
+    # made at 23:00 UTC, after it, for the next session (so it is not a late run either).
+    r = run("ranges.py", root, cfg, "--now", f"{TODAY}T23:00:00+00:00")
     assert r.returncode == 0, r.stderr
     got = rows(root, "ranges")
     a1 = next(x for x in got.values() if x["ticker"] == "AAPL" and x["horizon_days"] == 1)

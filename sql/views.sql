@@ -160,7 +160,7 @@ SELECT DISTINCT ON (id) * FROM stakes ORDER BY id, first_seen_at;
 
 -- New activist stakes: original Schedule 13D filings (amendments excluded).
 CREATE OR REPLACE VIEW activist_stakes AS
-SELECT ticker, filing_date, event_date, filer_name, percent, shares, purpose, url, id
+SELECT ticker, filing_date, accepted_at, event_date, filer_name, percent, shares, purpose, url, id
 FROM stake_filings WHERE kind = '13D' AND NOT amendment;
 
 -- 13F filings processed (one row each): report type, completeness and notes such as
