@@ -5,7 +5,9 @@ with every number, table and chart link. Replace each `<!-- AGENT:... -->` marke
 narrative from the context pack, the news brief, the bull/bear cases and the forecaster, then
 delete the marker. Keep the `<!-- report-data: ... -->` line (report.py uses it to tell whether
 a filled report is still current). Never change a number, table or chart link the script wrote; quote numbers
-only from those tables or the context pack. Plain, short sentences.
+only from those tables or the context pack. Plain, short sentences. Every news id must support the exact
+claim it is attached to (its headline or summary says it); never carry over background or causes
+from the bull/bear cases unless they cite evidence for them. The judge checks each id and number.
 
 Report markers:
 - `headline`: 1-2 sentences, the most important thing for today's session.

@@ -65,8 +65,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     earnings = {t: d for t, k, d in company if k == "earnings"}
     rwiden = relations.widen_by_ticker(cfg, rc, con)   # {} unless relation_widen.enabled
-    smart = sm.range_flags(con, as_of, rc)   # risk flags (fresh activist 13D); widen off by default
     now, rows = now or utc_now(), []
+    smart = sm.range_flags(con, as_of, rc, now)   # fresh activist 13D accepted by made_at; widen off by default
     made = datetime.fromisoformat(now)
     first = target_date(cfg, as_of, 1)
     first_close = first_target_close(cfg, as_of)

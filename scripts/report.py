@@ -19,6 +19,7 @@ import pandas as pd
 import yaml
 
 import events as ev
+from score_predictions import is_late
 from charts import CURRENCY, fmt_call, safe
 from common import CONFIG, ROOT, benchmark_key, connect, market_arg, require_market, utc_today, vol_index_key
 
@@ -78,6 +79,10 @@ def review_line(rv: dict, link: str) -> str:
     n = int(rv["n_proposals"])
     return (f"Weekly review {rv['week']}: {n} proposed range change{'s' if n != 1 else ''} for a human to decide"
             f"{' (low sample)' if rv['low_sample'] else ''} · {link}")
+
+
+def md_link(path: str) -> str:
+    return f"[{path}]({path})"
 
 
 def gather(cfg: dict, con) -> dict:
@@ -165,7 +170,7 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
                  for x in cs.itertuples()]
 
     # today: ranges by sector
-    today_rows = []
+    today_rows, n_late = [], 0
     for sector, members in (cfg.get("sectors") or {"": list(cfg["tickers"])}).items():
         for t in members:
             a, b = by.get((t, 1)), by.get((t, 5))
@@ -176,13 +181,19 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
             base = (a or b).base_close
             made = [(h, x) for h, x in ((1, a), (5, b)) if x is not None and x.direction in ("up", "down")]
             call = " · ".join(f"{h}d {fmt_call(x.direction, x.confidence)}" for h, x in made) or "no call"
+            # made at/after the first target session's close: shown for the record, never scored
+            late = any(is_late(cfg, getattr(x, "as_of_date", None), getattr(x, "made_at", None))
+                       for x in (a, b) if x is not None)
+            n_late += late
+            if late:
+                call = "late: not a forecast, never scored"
             notes = "; ".join(sorted({n for x in (a, b) if x is not None for n in (list(x.notes) if x.notes is not None else [])}))
             today_rows.append([
                 t, sector, money(cur, base),
                 f"{money(cur, a.lo80)}–{money(cur, a.hi80)}" if a else "–",
                 f"{money(cur, a.lo50)}–{money(cur, a.hi50)}" if a else "–",
                 f"{money(cur, b.lo80)}–{money(cur, b.hi80)}" if b else "–",
-                call, pct(feats.loc[t]["cue_change_pct"], 2) if t in feats.index else "–", notes])
+                call, "–" if late else pct(feats.loc[t]["cue_change_pct"], 2) if t in feats.index else "–", notes])
 
     cue_rows = [[x.symbol, cfg["symbols"].get(x.symbol, {}).get("name", x.symbol), f"{x.price:,.2f}", pct(x.change_pct, 2)]
                 for x in d["quotes"].itertuples() if x.symbol in cfg["symbols"]]
@@ -225,6 +236,8 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
           *([release_line, ""] if release_line else []),
           f"![Overview]({charts}/overview.png)", "",
           table(["Ticker", "Sector", "Close", "Next day 80%", "Next day 50%", "5 days 80%", "Call", "Cue", "Notes"], today_rows),
+          *([f"{n_late} stock(s) have ranges made after the session they target had closed (a late run): "
+             "they are shown for the record, are not forecasts and are never scored.", ""] if n_late else []),
           "<!-- AGENT:calls -->", "",
           "### Overnight cues and global factors", "", table(["Symbol", "Name", "Last", "Change"], cue_rows),
           *(["### ADRs (US-listed shares, previous US session)", "", table(["Ticker", "ADR", "Last", "Change"], adr_rows)]
@@ -247,7 +260,7 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
            "Up/down calls vs the always-up baseline:", "", table(["H", "Window", "n", "Hit rate", "Always-up"], dir_rows),
            "Calls by confidence band (a band should hit about as often as its confidence):", "",
            table(["Band", "n", "Avg confidence", "Hit rate"], band_rows),
-           *([review_line(d["review"], d["review"]["report"].rsplit("/", 1)[-1]), ""] if d.get("review") else []),
+           *([review_line(d["review"], md_link(d["review"]["report"].rsplit("/", 1)[-1])), ""] if d.get("review") else []),
            "## Data quality", "",
            f"- Indicators: {len(feats) - len(partial) - len(blocked)} OK, partial: {', '.join(partial) or 'none'}, "
            f"blocked: {', '.join(blocked) or 'none'}",

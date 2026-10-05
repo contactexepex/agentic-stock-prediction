@@ -89,7 +89,10 @@ def validate(row: dict, tickers: set[str], today: date) -> tuple[dict | None, li
     return r, []
 
 
-def add(cfg: dict, con, path: Path) -> dict:
+def add(cfg: dict, con, path: Path, dry_run: bool = False) -> dict:
+    """Validate the edges in path and append the new or changed ones. dry_run (`check`) only
+    validates and counts what would be written: the graph-builder runs it, the caller runs `add`
+    after the judge passes the file."""
     today, now = utc_today(), utc_now()
     current = {e["id"]: e for e in load_all_latest(con)}
     tickers = set(cfg["tickers"])
@@ -115,6 +118,9 @@ def add(cfg: dict, con, path: Path) -> dict:
             continue
         new[edge["id"]] = {"id": edge["id"], **{k: edge[k] for k in COMPARE}, "added_at": now,
                            "prompt_version": edge["prompt_version"]}
+    if dry_run:
+        return {"step": "graph_check", "market": cfg["market"], "would_write": len(new), "unchanged": unchanged,
+                "rejected": rejected}
     written = append_jsonl(day_file(cfg["market"], "graph", today), new.values())
     return {"step": "graph_add", "market": cfg["market"], "written": written, "unchanged": unchanged,
             "rejected": rejected}
@@ -224,9 +230,9 @@ def context_section(cfg: dict, con, days: int = 1, limit: int = 40) -> tuple[str
 
 def main() -> int:
     ap = market_arg(__doc__)
-    ap.add_argument("command", choices=["status", "edges", "hits", "add", "attempt"])
+    ap.add_argument("command", choices=["status", "edges", "hits", "check", "add", "attempt"])
     ap.add_argument("--note", help="short note for `attempt`, e.g. tickers that could not be sourced")
-    ap.add_argument("file", nargs="?", type=Path, help="JSONL edges for `add`")
+    ap.add_argument("file", nargs="?", type=Path, help="JSONL edges for `check` / `add`")
     ap.add_argument("--ticker")
     ap.add_argument("--days", type=int, default=1)
     args = ap.parse_args()
@@ -246,8 +252,8 @@ def main() -> int:
                          indent=2, default=str))
     else:
         if not args.file or not args.file.exists():
-            raise SystemExit("usage: graph.py add work/graph.jsonl")
-        out = add(cfg, con, args.file)
+            raise SystemExit(f"usage: graph.py {args.command} work/graph.jsonl")
+        out = add(cfg, con, args.file, dry_run=args.command == "check")
         print(json.dumps(out, indent=2))
         return 1 if out["rejected"] else 0
     return 0

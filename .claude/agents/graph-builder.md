@@ -37,13 +37,14 @@ no generic words like "Group", "Bank" or a bare surname that would match unrelat
 `weight` (stake or revenue share in percent if stated, else null), `as_of` (date of the
 source document, YYYY-MM-DD), `source_url` (the exact page or PDF), `status` ("active", or
 "removed" to retract an existing edge that the latest source no longer supports),
-`prompt_version`: "graph-v1".
+`prompt_version`: "graph-v2".
 
 Re-list existing edges you have re-confirmed (with the newer `as_of` and source) and add
 `status: "removed"` rows for edges that are no longer true (a director who left, a sold stake).
-Then validate and append: `python scripts/graph.py add work/graph.jsonl`. It rejects invalid
-rows with reasons; fix them and run it again (already appended rows are skipped as unchanged).
-Never edit files under `data/` directly.
+Then validate (no write): `python scripts/graph.py check work/graph.jsonl`. It rejects invalid
+rows with reasons; fix them and run it again until nothing is rejected. Do not append: the
+caller has the judge verify `work/graph.jsonl` (every edge against its source) and runs
+`graph.py add` only on PASS. Never write files under `data/`.
 
 Return (max 200 words): edges added, re-confirmed and removed per ticker, tickers you could not
 source, and anything notable (e.g. a new promoter pledge holder, a group company in the news).

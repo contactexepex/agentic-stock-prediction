@@ -55,6 +55,11 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "rationale": "VARCHAR", "evidence_ids": "VARCHAR[]", "prompt_version": "VARCHAR",
         "range_widen": "DOUBLE",
     }),
+    # One row per judge verdict in a daily run (routine/PROMPT.md); build verdicts are in judgments/log.jsonl.
+    "judgments": ("jsonl", {
+        "id": "VARCHAR", "run_date": "DATE", "agent": "VARCHAR", "round": "INTEGER",
+        "verdict": "VARCHAR", "summary": "VARCHAR", "dropped": "VARCHAR", "recorded_at": "TIMESTAMPTZ",
+    }),
     "outcomes": ("jsonl", {
         "prediction_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "base_date": "DATE",
         "base_close": "DOUBLE", "target_date": "DATE", "target_close": "DOUBLE",
