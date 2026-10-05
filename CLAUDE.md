@@ -11,14 +11,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (benchmark, vol index, cues, factors), regime thresholds, sectors, tickers, news feeds
 - `config/events.yaml` scheduled market events (rules and fixed dates)
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
-  Collectors: `collect_prices`, `collect_quotes`, `collect_events`, `collect_news`,
-  `collect_filings`. Then `score_predictions` (calls and ranges), `features` (indicators +
+  Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
+  days and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
+  implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` and `report`
   (report skeleton + Slack draft with every number; agents fill only the `AGENT` markers,
   then `notify_slack` posts the draft through `SLACK_WEBHOOK_URL`;
   see `templates/report.md`). `backtest` evaluates the
   range formula walk-forward. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
-  `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`).
+  `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
+  `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
+  switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them.
   Schemas live in `scripts/common.py`.
@@ -46,10 +49,28 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `reports/<market>/<session_date>.md` the daily report linked from Slack; charts in
   `reports/<market>/charts/<session_date>/`; `config/settings.yaml` holds the repo URL and Slack channel
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
+- `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
+  `data/<market>/judgments/`
 - `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
   graph-builder (monthly connection map; every edge cites a public source), and judge
   (independent verifier; every agent's output is judged before it is appended, committed or posted)
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
+
+## Judging every change
+Every change is reviewed by the `judge` subagent before it is merged, pushed to main, appended to
+`data/` or posted, whoever made it: a subagent, a build agent, or the orchestrating session
+itself (its own edits, merge-conflict resolutions and daily-run narrative included).
+- Give the judge the exact instructions, the claimed result and where the work lives. Never
+  merge, push or append on an agent's word: only a judge PASS counts.
+- Any FALSE claim makes the verdict FAIL, even if the code is right (the report must be true too).
+- Build work: on FAIL, send the fix list back and judge again, repeating until PASS. Nothing is
+  merged or pushed to main before its PASS.
+- Daily runs: one retry (the run is time-boxed), then the failed output is dropped or withheld
+  as `routine/PROMPT.md` says, and the failure is listed in the report's `data_quality`.
+- Every verdict, PASS or FAIL, is appended as one line: build work to `judgments/log.jsonl`
+  (subject, work, commit, round, verdict, summary, recorded_at as ISO UTC); daily runs to
+  `data/<market>/judgments/` (schema `judgments` in `scripts/common.py`). Both are append-only,
+  and `tests/test_judgments.py` checks the build log's format and that every commit exists.
 
 ## Data rules
 1. Files under `data/` are append-only. Never edit, reorder or delete existing lines or files.

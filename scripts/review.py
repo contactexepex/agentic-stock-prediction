@@ -358,7 +358,7 @@ def history_ablation(cfg: dict, rc: dict, rv: dict, bars: dict, week_end: date) 
                 continue
             scale = {i: p["regime_factor"].get(regimes[i], 1.0) * (p["major_event_factor"] if major_in(i, h) else 1.0)
                      for i in range(len(dates))}
-            s = hist_summary(bt.evaluate(obs, h, p, rv["history_eval_sessions"], scale))
+            s = hist_summary(bt.evaluate(obs, h, p, rv["history_eval_sessions"], scale=scale))
             by_h[f"{h}d"] = s
             n += s["n"]
         variants.append({"name": v["name"], "set": v.get("set") or {}, "n": n, "by_h": by_h})

@@ -100,6 +100,11 @@ news:
 
 filings: none             # SEC filings only exist for US companies
 
+# Range engine inputs (docs/DESIGN.md section 4). index_cue: the overnight cue for the
+# benchmark's expected move (beta split of the range centre). beta: fit = regress Nifty's daily
+# return on the cue's previous session return over the last year of stored bars.
+index_cue: {symbol: SPX, beta: fit}
+
 # NSE data (session code in scripts/nse.py): relationships from collect_relations_india.py
 # (DESIGN.md phase 5) and primary sources from collect_nse_india.py. NSE's public JSON needs
 # browser-like headers plus a cookie from the home page. The cloud environment must allow

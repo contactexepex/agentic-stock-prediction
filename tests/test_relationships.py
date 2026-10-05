@@ -232,6 +232,19 @@ def test_range_flags_note_and_gated_widen():
     assert sm.range_flags(con, date(2026, 10, 1), {"activist_13d_factor": 0.5})["AAPL"][0] == 1.0  # never narrows
 
 
+def test_range_flags_ignore_filings_accepted_after_made_at():
+    con = duckdb.connect()
+    con.execute("""CREATE TABLE activist_stakes AS SELECT * FROM (VALUES
+        ('AAPL', DATE '2026-09-30', TIMESTAMPTZ '2026-09-30 21:00:00+00', 'Early Activist', 6.5),
+        ('MSFT', DATE '2026-10-01', TIMESTAMPTZ '2026-10-01 21:00:00+00', 'Late Activist', 5.1),
+        ('NVDA', DATE '2026-10-01', NULL, 'No Time Activist', 5.0)) t(ticker, filing_date, accepted_at, filer_name, percent)""")
+    rc = {"activist_13d_days": 30, "activist_13d_factor": 1.0}
+    made = "2026-10-01T20:00:00+00:00"            # before MSFT's acceptance and before NVDA's filing day ends
+    assert set(sm.range_flags(con, date(2026, 10, 1), rc, made)) == {"AAPL"}
+    assert set(sm.range_flags(con, date(2026, 10, 1), rc, "2026-10-02T00:30:00+00:00")) == {"AAPL", "MSFT", "NVDA"}
+    assert set(sm.range_flags(con, date(2026, 10, 1), rc)) == {"AAPL", "MSFT", "NVDA"}   # no made_at: no bound
+
+
 # ---------- collectors end to end (fixtures) ----------
 
 def test_insiders_collect_and_dedupe(tmp_path):
@@ -380,11 +393,12 @@ def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:
 def test_ranges_carry_activist_note(tmp_path):
     root, cfg = setup(tmp_path)
     rng = np.random.default_rng(5)
-    days, d = [], TODAY - timedelta(days=760)
+    days, d = [], TODAY                         # 520 weekdays ending today (or the last weekday)
     while len(days) < 520:
         if d.weekday() < 5:
             days.append(d)
-        d += timedelta(days=1)
+        d -= timedelta(days=1)
+    days.reverse()
     series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "VOLX": [15.0] * 520,
               "AAPL": fat_tailed_walk(rng, 520, 150, 0.015), "MSFT": fat_tailed_walk(rng, 520, 300, 0.012)}
     for i, day in enumerate(days):
@@ -399,12 +413,84 @@ def test_ranges_carry_activist_note(tmp_path):
     for script in ("features.py", "calibrate.py"):
         r = run(script, root, cfg)
         assert r.returncode == 0, r.stderr
-    # made_at on the evening of the last bar: the bars end weeks ago, and the late-run guard
-    # (correctly) skips ranges whose target session closed before made_at.
-    r = run("ranges.py", root, cfg, "--now", f"{days[-1]}T23:00:00+00:00")
+    # Realistic timeline: the 13D is accepted today at 21:00 UTC (after the close); the range is
+    # made at 23:00 UTC, after it, for the next session (so it is not a late run either).
+    r = run("ranges.py", root, cfg, "--now", f"{TODAY}T23:00:00+00:00")
     assert r.returncode == 0, r.stderr
     got = rows(root, "ranges")
     a1 = next(x for x in got.values() if x["ticker"] == "AAPL" and x["horizon_days"] == 1)
     m1 = next(x for x in got.values() if x["ticker"] == "MSFT" and x["horizon_days"] == 1)
     assert any(n.startswith("new 13D: Example Activist Partners LP 5.4%") and n.endswith("x1.2") for n in a1["notes"])
     assert not any("13D" in n for n in m1["notes"])
+
+
+def test_ranges_ignore_a_13d_accepted_after_made_at(tmp_path):
+    """Same setup as above, but the range is made at 20:30 UTC, before the 13D's 21:00 UTC
+    acceptance: ranges.py must not use it (CLAUDE.md: nothing published after made_at)."""
+    root, cfg = setup(tmp_path)
+    rng = np.random.default_rng(5)
+    days, d = [], TODAY
+    while len(days) < 520:
+        if d.weekday() < 5:
+            days.append(d)
+        d -= timedelta(days=1)
+    days.reverse()
+    series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "VOLX": [15.0] * 520,
+              "AAPL": fat_tailed_walk(rng, 520, 150, 0.015), "MSFT": fat_tailed_walk(rng, 520, 300, 0.012)}
+    for i, day in enumerate(days):
+        p = root / "data" / MARKET / "prices" / f"{day:%Y}" / f"{day:%m}" / f"{day}.csv"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("date,ticker,open,high,low,close,adj_close,volume,collected_at\n" + "".join(
+            f"{day},{t},{c[i]},{c[i] * 1.01},{c[i] * 0.99},{c[i]},{c[i]},{1000 + i},2026-01-01T00:00:00+00:00\n"
+            for t, c in series.items()))
+    assert run("collect_stakes.py", root, cfg).returncode == 0
+    for script in ("features.py", "calibrate.py"):
+        r = run(script, root, cfg)
+        assert r.returncode == 0, r.stderr
+    r = run("ranges.py", root, cfg, "--now", f"{TODAY}T20:30:00+00:00")
+    assert r.returncode == 0, r.stderr
+    got = rows(root, "ranges")
+    assert got and not any("13D" in n for x in got.values() for n in x["notes"])
+
+
+# ---------- collect_filings goes through sec.py (throttle, backoff, JSON on failure) ----------
+def test_collect_filings_uses_edgar_and_keeps_new_13d_forms(tmp_path):
+    root, cfg = setup(tmp_path)
+    r = run("collect_filings.py", root, cfg)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["failed"] == [] and out["requests"] >= 2
+    got = rows(root, "filings")
+    forms = {x["form"] for x in got.values()}
+    assert {"8-K", "4", "SCHEDULE 13D", "SCHEDULE 13G"} <= forms        # new-format 13D/13G are kept
+    assert "0000320193-26-000010" not in got                             # older than the lookback
+
+
+def test_collect_filings_reports_sec_refusal_as_json(tmp_path):
+    root, cfg = setup(tmp_path)
+    fx = tmp_path / "sec"
+    (fx / "urls.json").write_text("{}")                                  # every SEC request now fails
+    r = run("collect_filings.py", root, cfg)
+    assert r.returncode == 1
+    assert "Traceback" not in r.stderr
+    out = json.loads(r.stdout)
+    assert out["collector"] == "filings" and out["new_filings"] == 0
+    assert out["failed"][0]["url"] == "company_tickers.json"
+
+
+def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
+    import io
+    import urllib.error
+    import sec
+    calls = []
+
+    def fake(req, timeout):
+        calls.append(req.full_url)
+        if len(calls) < 3:
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+        return io.BytesIO(b'{"ok": 1}')
+    monkeypatch.delenv("MB_SEC_FIXTURES", raising=False)
+    monkeypatch.setattr(sec.urllib.request, "urlopen", fake)
+    monkeypatch.setattr(sec.time, "sleep", lambda s: None)
+    assert sec.Edgar("test test@example.com").json("https://data.sec.gov/x.json") == {"ok": 1}
+    assert len(calls) == 3

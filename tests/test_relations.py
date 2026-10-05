@@ -338,3 +338,14 @@ def test_graph_refresh_due_once_per_month(tmp_path):
     f.write_text(json.dumps({"id": "x", "run_at": last_month.isoformat(), "month": f"{last_month:%Y-%m}",
                              "edges": 5, "tickers_without_edges": 0, "note": None}) + "\n")
     assert json.loads(run("graph.py", root2, cfg2, "status").stdout)["refresh_due"] is True
+
+
+def test_graph_check_validates_without_writing(tmp_path):
+    root, cfg = setup(tmp_path)
+    before = _tree(root)
+    r = run("graph.py", root, cfg, "check", str(FIXTURES / "graph_edges.jsonl"))
+    assert r.returncode == 1                                     # the fixture has one invalid edge
+    out = json.loads(r.stdout)
+    assert (out["step"], out["would_write"], len(out["rejected"])) == ("graph_check", 3, 1)
+    assert _tree(root) == before                                 # nothing written anywhere under the root
+    assert not (root / "data" / "india" / "graph").exists()

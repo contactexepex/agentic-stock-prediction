@@ -82,14 +82,16 @@ def realized_sigma(close: pd.Series, n: int = 20) -> float | None:
 
 
 def horizon_sigma(sigma_daily: float, h: int, earnings_in_horizon: bool, cfg: dict,
-                  regime: str, major_event: bool) -> tuple[float, list[str]]:
-    """Horizon volatility with event and regime widening. Returns (sigma_h, notes)."""
+                  regime: str, major_event: bool, earnings_multiple: float | None = None,
+                  earnings_note: str = "") -> tuple[float, list[str]]:
+    """Horizon volatility with event and regime widening. Returns (sigma_h, notes).
+    earnings_multiple overrides the fixed `earnings_vol_multiple` (past moves or options)."""
     notes = []
     var = sigma_daily ** 2 * h
     if earnings_in_horizon:
-        m = cfg["earnings_vol_multiple"]
+        m = earnings_multiple if earnings_multiple is not None else cfg["earnings_vol_multiple"]
         var += (m ** 2 - 1) * sigma_daily ** 2
-        notes.append(f"earnings in horizon (x{m} day)")
+        notes.append(f"earnings in horizon (x{m if earnings_multiple is None else round(m, 2)} day{earnings_note})")
     s = math.sqrt(var)
     rf = cfg["regime_factor"].get(regime, 1.0)
     if rf != 1.0:
@@ -99,3 +101,65 @@ def horizon_sigma(sigma_daily: float, h: int, earnings_in_horizon: bool, cfg: di
         s *= cfg["major_event_factor"]
         notes.append(f"major event x{cfg['major_event_factor']}")
     return s, notes
+
+
+# ---------- range inputs (docs/DESIGN.md section 4; switches in config/ranges.yaml) ----------
+
+def earnings_multiple(moves: list[tuple[float, float, int]], fixed: float, min_events: int,
+                      prior_events: float, max_multiple: float) -> tuple[float, int]:
+    """How many normal days an earnings day moves like, from past earnings reactions.
+
+    moves: (log move over the reaction window, daily sigma before it, sessions in the window).
+    A window of k sessions holds the earnings day plus k-1 normal days, so each event gives
+    x = (move / sigma)^2 - (k - 1), an estimate of the earnings day's variance in normal-day
+    units. The mean is shrunk towards `fixed`^2 as if the fixed multiple were `prior_events`
+    events, and too few events fall back to `fixed`. Returns (multiple, events used)."""
+    xs = [r * r / (s * s) - (k - 1) for r, s, k in moves if s and s > 0 and math.isfinite(r)]
+    n = len(xs)
+    if n < min_events:
+        return fixed, n
+    m2 = max(1.0, float(np.mean(xs)))
+    m2 = (n * m2 + prior_events * fixed ** 2) / (n + prior_events)
+    return min(math.sqrt(m2), max_multiple), n
+
+
+def implied_variance(iv: float, calendar_days: float) -> float:
+    """Total log-return variance to expiry implied by an annualized (365-day) implied vol."""
+    return iv * iv * max(calendar_days, 0.5) / 365.0
+
+
+def implied_earnings_multiple(total_var: float, sessions: int, sigma_daily: float,
+                              max_multiple: float) -> float:
+    """Options-implied earnings day: implied variance to expiry minus the other sessions at the
+    normal daily variance, in normal-day units (at least 1)."""
+    if sigma_daily <= 0:
+        return 1.0
+    e = total_var - max(sessions - 1, 0) * sigma_daily ** 2
+    return min(math.sqrt(max(1.0, e / sigma_daily ** 2)), max_multiple)
+
+
+def blend_sigma(sigma_daily: float, implied_daily_var: float, weight: float) -> float:
+    """Variance blend of the realized (EWMA) and implied daily volatility."""
+    return math.sqrt((1 - weight) * sigma_daily ** 2 + weight * implied_daily_var)
+
+
+def ex_dividend_shift(base: float, amounts: list[float]) -> float:
+    """Log shift of the centre for dividends going ex inside the horizon (price drops by them)."""
+    shift = 0.0
+    for a in amounts:
+        if a and a > 0 and a < 0.5 * base:
+            shift += math.log(1 - a / base)
+    return shift
+
+
+def beta_split_center(beta: float | None, index_cue: float | None, own_cue: float | None,
+                      index_weight: float, own_weight: float, cue_weight: float) -> float:
+    """Centre from overnight cues (log moves): beta x expected index move plus the stock's own
+    cue net of that. Falls back to the direct own cue when there is no index cue or beta."""
+    if index_cue is None or beta is None:
+        return cue_weight * own_cue if own_cue is not None else 0.0
+    market = beta * index_cue
+    out = index_weight * market
+    if own_cue is not None:
+        out += own_weight * (own_cue - market)
+    return out

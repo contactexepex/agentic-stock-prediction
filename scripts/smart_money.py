@@ -49,14 +49,22 @@ def markdown(cfg: dict, con) -> str:
     return "\n".join(out)
 
 
-def range_flags(con, as_of: date, rc: dict) -> dict[str, tuple[float, list[str]]]:
+def range_flags(con, as_of: date, rc: dict, made_at=None) -> dict[str, tuple[float, list[str]]]:
     """ticker -> (sigma factor, notes) for fresh activist 13D stakes (filed on or after
-    as_of - activist_13d_days). Factor 1.0 unless ranges.yaml turns the widen on."""
+    as_of - activist_13d_days). Factor 1.0 unless ranges.yaml turns the widen on. With made_at,
+    only filings SEC had accepted by made_at count (CLAUDE.md: nothing published after made_at);
+    a filing without an acceptance time counts from the end of its filing date."""
     days = int(rc.get("activist_13d_days", 30))
     factor = max(1.0, float(rc.get("activist_13d_factor", 1.0)))
-    rows = con.execute("""
-        SELECT ticker, filing_date, filer_name, percent FROM activist_stakes
-        WHERE filing_date >= ? ORDER BY ticker, filing_date""", [as_of - timedelta(days=days)]).fetchall()
+    cols = {r[0] for r in con.execute("DESCRIBE activist_stakes").fetchall()}
+    known = ("coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ))" if "accepted_at" in cols
+             else "CAST(filing_date + 1 AS TIMESTAMPTZ)")
+    sql = "SELECT ticker, filing_date, filer_name, percent FROM activist_stakes WHERE filing_date >= ?"
+    params: list = [as_of - timedelta(days=days)]
+    if made_at is not None:
+        sql += f" AND {known} <= CAST(? AS TIMESTAMPTZ)"
+        params.append(str(made_at))
+    rows = con.execute(sql + " ORDER BY ticker, filing_date", params).fetchall()
     flags: dict[str, tuple[float, list[str]]] = {}
     for ticker, filed, filer, pct in rows:
         f, notes = flags.get(ticker, (1.0, []))
