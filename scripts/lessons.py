@@ -140,17 +140,16 @@ def evidence(con, ids: list[str]) -> list[dict]:
     if not ids:
         return []
     rows = con.execute("""
-        SELECT id, 'news' AS kind, title AS text, published_at AS at FROM news WHERE list_contains(?, id)
+        SELECT * FROM (SELECT id, 'news' AS kind, title AS text, published_at AS at FROM news WHERE list_contains(?, id)
         UNION ALL SELECT id, 'filing', form || ': ' || coalesce(description, ''), accepted_at FROM filings
             WHERE list_contains(?, id)
         UNION ALL SELECT id, 'announcement', coalesce(category, '') || ': ' || coalesce(subject, ''), published_at
-            FROM announcements WHERE list_contains(?, id)""", [ids, ids, ids]).df()
-    seen, out = set(), []
+            FROM announcements WHERE list_contains(?, id)
+        ) ORDER BY id, kind = 'announcement', kind = 'filing', "at", text""", [ids, ids, ids]).df()
+    first: dict[str, dict] = {}   # per id the news row, else the filing, else the announcement (ORDER BY)
     for r in rows.itertuples(index=False):
-        if r.id not in seen:
-            seen.add(r.id)
-            out.append({"id": r.id, "kind": r.kind, "text": r.text, "at": _iso(r.at)})
-    return out + [{"id": i, "kind": "unknown", "text": None, "at": None} for i in ids if i not in seen]
+        first.setdefault(r.id, {"id": r.id, "kind": r.kind, "text": r.text, "at": _iso(r.at)})
+    return [first.get(i, {"id": i, "kind": "unknown", "text": None, "at": None}) for i in dict.fromkeys(ids)]
 
 
 # ---------- validation ----------

@@ -50,12 +50,14 @@ SELECT base.id, base.ticker, base.as_of_date, base.made_at, base.base_date, base
        CASE WHEN base.direction = 'up' THEN t.close > base.base_close
             ELSE t.close < base.base_close END AS hit
 FROM base JOIN bars t ON t.ticker = base.ticker AND t.rn = base.rn + base.horizon_days
+ORDER BY base.id, base.made_at
 """
 
 
 RANGE_SQL = """
 SELECT r.*, b.close AS actual
 FROM open_ranges r JOIN ohlc b ON b.ticker = r.ticker AND b.date = r.target_date
+ORDER BY r.id
 """
 
 

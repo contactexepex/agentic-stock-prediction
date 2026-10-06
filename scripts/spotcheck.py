@@ -53,7 +53,7 @@ def evidence_rows(con, ids: list[str]) -> list[dict]:
         ("announcements", "SELECT id, coalesce(category, '') || ': ' || coalesce(subject, '') AS text, url, "
                           "coalesce(published_at, first_seen_at) AS public_at FROM announcements WHERE id IN ?"),
     ):
-        for r in con.execute(f"SELECT DISTINCT ON (id) * FROM ({sql})", [ids]).df().to_dict("records"):
+        for r in con.execute(f"SELECT DISTINCT ON (id) * FROM ({sql}) ORDER BY ALL", [ids]).df().to_dict("records"):
             out.append({"kind": kind, **{k: (str(v) if v is not None and not (isinstance(v, float) and pd.isna(v)) else None)
                                          for k, v in r.items()}})
     enr = con.execute("SELECT id, summary, sentiment, materiality FROM enriched_latest WHERE id IN ?", [ids]).df() \

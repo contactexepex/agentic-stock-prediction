@@ -2,10 +2,10 @@
 process deterministic without touching the code under test.
 
 - the test network guard (tests/netguard/mb_netguard.py) is installed, as in the test suite;
-- every DuckDB connection runs on one thread, so rows of a query without a full ORDER BY come back
-  in file order every time. This hides a production defect (the routine runs DuckDB with its default
-  threads, where such rows and float sums over them vary between runs; docs/REFACTOR_PLAN.md,
-  "Known nondeterminism"); GOLDEN_DUCKDB_PARALLEL=1 leaves the default to show it;
+- DuckDB keeps its default threads, as in production: every query whose row order or float sum
+  reaches an output has a full ORDER BY or an order-independent aggregate (docs/REFACTOR_PLAN.md,
+  "Known nondeterminism", fixed), so the outputs do not depend on the thread count.
+  GOLDEN_DUCKDB_THREADS=N sets N threads on every connection (e.g. a high count to stress that);
 - then the interpreter's own sitecustomize runs, if there is one."""
 import importlib.util
 import os
@@ -22,20 +22,19 @@ if os.environ.get("MB_NETGUARD"):
     finally:
         sys.path.remove(_netguard)
 
-import duckdb  # noqa: E402
+if os.environ.get("GOLDEN_DUCKDB_THREADS"):
+    import duckdb
 
-_duckdb_connect = duckdb.connect
+    _duckdb_connect = duckdb.connect
+    _threads = int(os.environ["GOLDEN_DUCKDB_THREADS"])
 
+    def _connect_with_threads(*args, **kwargs):
+        """duckdb.connect with threads = GOLDEN_DUCKDB_THREADS."""
+        connection = _duckdb_connect(*args, **kwargs)
+        connection.execute(f"SET threads TO {_threads}")
+        return connection
 
-def _single_thread_connect(*args, **kwargs):
-    """duckdb.connect with threads = 1."""
-    connection = _duckdb_connect(*args, **kwargs)
-    connection.execute("SET threads TO 1")
-    return connection
-
-
-if not os.environ.get("GOLDEN_DUCKDB_PARALLEL"):
-    duckdb.connect = _single_thread_connect
+    duckdb.connect = _connect_with_threads
 
 for _path in sys.path:
     if os.path.abspath(_path or os.getcwd()) in (_here, _netguard):

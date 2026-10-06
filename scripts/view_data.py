@@ -94,6 +94,27 @@ def _list(v) -> list:
     return [x for x in list(v) if x is not None]
 
 
+# calls by stated-confidence band (exact decimal average: no dependence on row order) and the scored
+# calls in a fixed order for scoring.call_scores / reliability (docs/REFACTOR_PLAN.md, nondeterminism)
+BANDS_SQL = """SELECT CASE WHEN confidence < 0.6 THEN '50-59%' WHEN confidence < 0.7 THEN '60-69%'
+                         WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band,
+                    count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
+             FROM track_record GROUP BY band ORDER BY band"""
+SCORED_CALLS_SQL = ("SELECT confidence, hit FROM track_record WHERE confidence IS NOT NULL AND hit IS NOT NULL "
+                    "ORDER BY id, scored_at")
+# the same for report.py: its confidence bands, and range_record with the averaged % columns as exact decimals
+CONF_BANDS_SQL = """SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59' WHEN confidence < 0.7 THEN '0.60-0.69'
+                              WHEN confidence < 0.8 THEN '0.70-0.79' ELSE '0.80-0.90' END AS band,
+                         count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf,
+                         avg(hit::INT) AS hit
+                  FROM track_record GROUP BY band ORDER BY band"""
+EXACT_COLUMNS = ("width80_pct", "naive_width80_pct", "is80_pct", "naive_is80_pct", "center_err_pct",
+                 "naive_center_err_pct")
+RANGE_RECORD_EXACT = ("(SELECT * REPLACE ("
+                      + ", ".join(f"TRY_CAST({c} AS DECIMAL(38,10)) AS {c}" for c in EXACT_COLUMNS)
+                      + ") FROM range_record)")
+
+
 def record_text(n: int, hits: int, what: str) -> str:
     """Plain-language track record: a share once there is enough history, else a sample note."""
     if n == 0:
@@ -120,19 +141,20 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                    SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS k
                    FROM bars WHERE date <= ?) WHERE k <= {HISTORY_DAYS} ORDER BY ticker, date""", [as_of])
     rr = q("""SELECT ticker, horizon_days AS h, count(*) AS n, sum(hit80::INT) AS h80, sum(hit50::INT) AS h50
-              FROM range_record GROUP BY ALL""")
-    tr = q("SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM track_record GROUP BY ALL")
+              FROM range_record GROUP BY ALL ORDER BY ticker, h""")
+    tr = q("SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM track_record GROUP BY ALL ORDER BY ticker")
     preds = q("SELECT DISTINCT ON (id) * FROM predictions WHERE as_of_date = ? ORDER BY id, made_at", [as_of]) \
         if _has_rows(con, "predictions") else pd.DataFrame()
     news = q("""SELECT n.id, n.title, n.url, n.source, coalesce(n.published_at, n.first_seen_at) AS ts, n.tickers,
                        e.materiality, e.relevance, e.summary
                 FROM (SELECT DISTINCT ON (id) * FROM news ORDER BY id, first_seen_at) n
-                LEFT JOIN enriched_latest e USING (id)""")
+                LEFT JOIN enriched_latest e USING (id) ORDER BY id""")
     filings = q("SELECT DISTINCT ON (id) id, ticker, form, url, accepted_at, description FROM filings ORDER BY id") \
         if _has_rows(con, "filings") else pd.DataFrame()
-    anns = q("SELECT id, ticker, subject, url, published_at, source FROM announcements_latest") \
+    anns = q("SELECT id, ticker, subject, url, published_at, source FROM announcements_latest ORDER BY id") \
         if _has_rows(con, "announcements") else pd.DataFrame()
-    cevents = q("SELECT date, type, ticker, name, amount FROM company_events WHERE date BETWEEN ? AND ? ORDER BY date",
+    cevents = q("SELECT date, type, ticker, name, amount FROM company_events WHERE date BETWEEN ? AND ? "
+                "ORDER BY date, ticker, type, name",
                 [as_of, as_of + timedelta(days=21)])
 
     # every source an agent may cite: news, SEC filings, NSE announcements -> headline + link
@@ -253,10 +275,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     # track record, market-wide: stated vs actual hit rate (ranges by band, calls by confidence)
     cal = q("""SELECT horizon_days AS h, count(*) AS n, avg(hit50::INT) AS c50, avg(hit80::INT) AS c80
                FROM range_record GROUP BY ALL ORDER BY h""")
-    bands = q("""SELECT CASE WHEN confidence < 0.6 THEN '50-59%' WHEN confidence < 0.7 THEN '60-69%'
-                             WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band,
-                        count(*) AS n, avg(confidence) AS conf, avg(hit::INT) AS hit
-                 FROM track_record GROUP BY band ORDER BY band""")
+    bands = q(BANDS_SQL)
     points = []
     for x in cal.itertuples():
         for stated, actual in ((0.5, x.c50), (0.8, x.c80)):
@@ -267,7 +286,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                        "actual": num(x.hit), "n": int(x.n)})
 
     # proper scores of the scored calls (scoring.py): Brier, log loss, reliability with Wilson 95%
-    sc_calls = q("SELECT confidence, hit FROM track_record WHERE confidence IS NOT NULL AND hit IS NOT NULL")
+    sc_calls = q(SCORED_CALLS_SQL)
     call_scores = scoring.call_scores(sc_calls)
     reliability = [{**r, "mean_conf": num(r["mean_conf"]), "hit_rate": num(r["hit_rate"]),
                     "wilson_lo": num(r["wilson_lo"]), "wilson_hi": num(r["wilson_hi"])}

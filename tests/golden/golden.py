@@ -31,11 +31,11 @@ difference too. Normalisation, applied before hashing, is limited to:
 - the run directory's absolute path -> <RUN>, this checkout's absolute path -> <CODE>;
 - the NORMALISED entries: four wall-clock values (durations and build times that do not follow
   MB_NOW), each masked only in the output paths where it appears.
-Child processes load tests/golden/site/sitecustomize.py: the network guard, and DuckDB on one thread.
-The thread setting hides a production defect, it does not fix it: several queries have no full
-ORDER BY or aggregate floats in scan order, so with DuckDB's default threads their row order (and a
-float's last digit) varies between runs (docs/REFACTOR_PLAN.md, "Known nondeterminism").
-GOLDEN_DUCKDB_PARALLEL=1 turns the setting off to show it.
+Child processes load tests/golden/site/sitecustomize.py: the network guard. DuckDB runs with its
+default threads, as in production: the queries whose row order or float sums reach an output have a
+full ORDER BY or an order-independent aggregate (docs/REFACTOR_PLAN.md, "Known nondeterminism",
+fixed). GOLDEN_DUCKDB_THREADS=N sets N threads on every DuckDB connection (a stress check; the
+manifest records it).
 Nothing else is masked. The recorded set (manifest plus full copies, for diffs) lives under --dir,
 by default work/golden (git-ignored)."""
 from __future__ import annotations
@@ -307,7 +307,7 @@ def record(directory: Path, serial: bool, jobs: int) -> int:
     wall = round(time.monotonic() - started, 1)
     manifest = {**outputs, "input_commit": INPUT_COMMIT, "phase_clocks": PHASE_CLOCKS,
                 "normalised": [{"paths": list(p), "pattern": r.decode()} for p, r, _ in NORMALISED],
-                "duckdb_parallel": bool(os.environ.get("GOLDEN_DUCKDB_PARALLEL")), "code_commit": git_head(),
+                "duckdb_threads": os.environ.get("GOLDEN_DUCKDB_THREADS") or "default", "code_commit": git_head(),
                 "schedule": "serial" if serial else f"parallel, {jobs} steps per market",
                 "exit_codes": exit_codes(run_dir)}
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=True))

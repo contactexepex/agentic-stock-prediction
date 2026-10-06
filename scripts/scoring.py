@@ -45,9 +45,16 @@ def _py(p, y) -> tuple[np.ndarray, np.ndarray]:
     return p[ok], y[ok]
 
 
+def _mean(values) -> float | None:
+    """Mean of the non-NaN values, summed exactly (math.fsum), so it does not depend on row order."""
+    a = np.asarray(values, dtype=float)
+    a = a[~np.isnan(a)]
+    return math.fsum(a) / len(a) if len(a) else None
+
+
 def brier(p, y) -> float | None:
     p, y = _py(p, y)
-    return float(np.mean((p - y) ** 2)) if len(p) else None
+    return _mean((p - y) ** 2)
 
 
 def log_loss(p, y) -> float | None:
@@ -55,7 +62,7 @@ def log_loss(p, y) -> float | None:
     if not len(p):
         return None
     p = np.clip(p, EPS, 1 - EPS)
-    return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+    return -_mean(y * np.log(p) + (1 - y) * np.log(1 - p))
 
 
 def reliability(p, y, edges=CALL_BINS) -> list[dict]:
@@ -69,7 +76,7 @@ def reliability(p, y, edges=CALL_BINS) -> list[dict]:
         n, k = int(m.sum()), int(y[m].sum())
         wl, wh = wilson(k, n)
         out.append({"bin": f"{lo:.2f}-{hi:.2f}", "lo": lo, "hi": hi, "n": n,
-                    "mean_conf": float(p[m].mean()) if n else None,
+                    "mean_conf": _mean(p[m]) if n else None,
                     "hit_rate": k / n if n else None, "wilson_lo": wl, "wilson_hi": wh})
     return out
 
@@ -113,12 +120,12 @@ def range_scores(df: pd.DataFrame) -> dict:
             for r in df[["lo50", "hi50", "lo80", "hi80", "actual_close", "base_close"]].itertuples(index=False)]
     s = pd.DataFrame(rows)
     base = df["base_close"].astype(float)
-    return {"n": int(len(df)), "cover50": _r(df["hit50"].astype(float).mean()),
-            "cover80": _r(df["hit80"].astype(float).mean()),
-            "is50_pct": _r(s["is50_pct"].mean()), "is80_pct": _r(s["is80_pct"].mean()),
-            "qs_pct": _r(s["qs_pct"].mean()),
-            "width50_pct": _r((100 * (df["hi50"] - df["lo50"]) / base).mean()),
-            "width80_pct": _r((100 * (df["hi80"] - df["lo80"]) / base).mean())}
+    return {"n": int(len(df)), "cover50": _r(_mean(df["hit50"].astype(float))),
+            "cover80": _r(_mean(df["hit80"].astype(float))),
+            "is50_pct": _r(_mean(s["is50_pct"])), "is80_pct": _r(_mean(s["is80_pct"])),
+            "qs_pct": _r(_mean(s["qs_pct"])),
+            "width50_pct": _r(_mean(100 * (df["hi50"] - df["lo50"]) / base)),
+            "width80_pct": _r(_mean(100 * (df["hi80"] - df["lo80"]) / base))}
 
 
 def _r(x, k: int = 4):
@@ -131,9 +138,9 @@ def summary(con) -> dict:
     """All-time proper scores from the scored track record: calls per horizon and overall
     (Brier, log loss, reliability) and ranges per horizon (coverage, interval and quantile scores)."""
     calls = con.execute("SELECT horizon_days, confidence, hit FROM track_record "
-                        "WHERE confidence IS NOT NULL AND hit IS NOT NULL").df()
+                        "WHERE confidence IS NOT NULL AND hit IS NOT NULL ORDER BY id, scored_at").df()
     rng = con.execute("SELECT horizon_days, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
-                      "FROM range_record WHERE actual_close IS NOT NULL").df()
+                      "FROM range_record WHERE actual_close IS NOT NULL ORDER BY id").df()
     out = {"calls": {"all": call_scores(calls)}, "ranges": {}}
     out["calls"]["all"]["reliability"] = reliability(calls["confidence"], calls["hit"]) if len(calls) else []
     for h, g in (calls.groupby("horizon_days") if len(calls) else []):

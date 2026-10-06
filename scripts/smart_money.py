@@ -23,11 +23,11 @@ SECTIONS: list[tuple[str, str]] = [
                round(price, 2) AS price, round(value) AS value, round(shares_after) AS held_after, plan_10b5_1
         FROM insider_trades
         WHERE NOT derivative AND code IN ('P', 'S') AND transaction_date >= current_date - 7
-        ORDER BY code = 'P' DESC, value DESC NULLS LAST LIMIT 10"""),
+        ORDER BY code = 'P' DESC, value DESC NULLS LAST, id LIMIT 10"""),
     ("13D/13G filings, last 30 days (13D = active holder >5%; 13G = passive)", """
         SELECT ticker, form, filing_date, filer_name, percent, round(shares) AS shares
         FROM stake_filings WHERE filing_date >= current_date - 30
-        ORDER BY kind = '13D' DESC, filing_date DESC, ticker LIMIT 15"""),
+        ORDER BY kind = '13D' DESC, filing_date DESC, ticker, id LIMIT 15"""),
     ("13F tracked filers: latest quarter vs previous (common shares; change and actions from "
      "complete filings only, `incomplete` = filers with a partial or combination report)", """
         SELECT ticker, period, filers_holding, round(value_usd / 1e9, 2) AS value_bn,

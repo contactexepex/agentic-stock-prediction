@@ -110,7 +110,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
                 index_cue = cue_beta * math.log1p(float(q[0]))
     opts = pd.DataFrame()
     if cfg.get("options") and "implied_vol" in rc:   # applied if switched on, else a shadow value
-        opts = con.execute("SELECT * FROM options_latest WHERE day >= ? AND collected_at <= ?",
+        opts = con.execute("SELECT * FROM options_latest WHERE day >= ? AND collected_at <= ? "
+                           "ORDER BY ticker, expiry, day",
                            [made.date() - timedelta(days=int(rc["implied_vol"]["max_age_days"])),
                             min(made, first_open)]).df()
         if not opts.empty:

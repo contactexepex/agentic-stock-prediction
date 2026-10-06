@@ -475,7 +475,7 @@ def latest_aci_replay(con, week_end: date, rc: dict) -> dict | None:
     counted in `note`. Returns its before/after comparison and held-out check (if run)."""
     try:
         rows = con.execute("SELECT id, end_date, settings, detail FROM replays WHERE id LIKE '%-aci%' "
-                           "AND end_date <= ? ORDER BY computed_at DESC", [week_end]).fetchall()
+                           "AND end_date <= ? ORDER BY computed_at DESC, id DESC", [week_end]).fetchall()
     except Exception:  # no replays stored
         return None
     skipped = 0
