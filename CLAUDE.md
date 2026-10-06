@@ -46,6 +46,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - SEC CIKs: every SEC collector reads a ticker's filings from its mapped CIK plus the CIKs under
   `fundamentals.predecessor_ciks` in `config/markets/us.yaml` (XOM: 2115436 and 34088), each
   accession once (`sec.ticker_submissions`).
+- SEC acceptance times: the submissions JSON `acceptanceDateTime` can be shifted later by the New
+  York UTC offset (+4h EDT, +5h EST) for a whole CIK's file (seen from 2026-10-05). `Edgar.recent`
+  checks each file against the SGML header `<ACCEPTANCE-DATETIME>` (Eastern) of its newest filing
+  (one cached request per CIK, `work/sec_acceptance.json`) and corrects it; collector summaries
+  list `sec_times` (ok / shifted / unverified CIKs). Stored rows are fixed on read:
+  `check_sec_times.py` appends header times to `data/<market>/sec_times/` and `common.connect`
+  reads `accepted_at` of filings, insiders, stakes, holdings and fundamentals through them.
 - Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
   `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
   `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.

@@ -12,8 +12,25 @@ reads those CIKs from the market config (`fundamentals.predecessor_ciks`) and `t
 fetches and merges the submission lists of all of a ticker's CIKs; every per-ticker collector
 uses it (collect_holdings follows 13F filers, not tickers).
 
+Acceptance times. The submissions JSON's `acceptanceDateTime` (labelled UTC, "Z") is not always
+true: since 2026-10-05 some CIKs' submission files are served with every acceptance time shifted
+later by the New York UTC offset of that moment (+4h in EDT, +5h in EST; the ET wall-clock time
+converted to UTC twice), while other CIKs' files are right (by 2026-10-06 the shifted files were
+exactly those regenerated after a new filing on 2026-10-05). The shift is uniform over a whole
+file, so `Edgar.recent` checks each file once against the authoritative time, the SGML header
+`<ACCEPTANCE-DATETIME>` (YYYYMMDDHHMMSS, US Eastern) of the newest listed filing (`<acc>.hdr.sgml`,
+the same time as the index page's "Accepted"), and either keeps the column ("ok"), corrects every
+value ("shifted": true = JSON minus the ET offset; the JSON value is kept in
+`acceptanceDateTimeJson`) or keeps it and says so ("unverified: ..." when the header cannot be
+read or the difference is not that offset). Statuses are in `Edgar.time_checks` (CIK -> status)
+for the collectors' summaries. Header times are immutable, so they are cached per accession in
+work/sec_acceptance.json (under MB_ROOT): a second collector in the same run, or a later run whose
+newest filing is unchanged, costs no extra request. Stored rows from a shifted file are corrected
+on read through `sec_times` (scripts/check_sec_times.py, see common.connect).
+
 Tests run offline: with MB_SEC_FIXTURES=<dir>, URLs are served from <dir>/urls.json
-({url: file path, absolute or relative to <dir>}) instead of the network."""
+({url: file path, absolute or relative to <dir>}) instead of the network (a header missing from
+the fixtures leaves the file "unverified" without counting a request; the disk cache is not used)."""
 from __future__ import annotations
 
 import json
@@ -22,11 +39,56 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import date, datetime
+import re
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 MIN_INTERVAL = 0.15  # seconds between requests (<= ~7 req/s, under SEC's 10/s limit)
 ARCHIVE = "https://www.sec.gov/Archives/edgar/data"
+EASTERN = ZoneInfo("America/New_York")   # EDGAR's clock (SGML header and index page times)
+ROOT = Path(os.environ.get("MB_ROOT", Path(__file__).resolve().parents[1]))
+ACCEPT_CACHE = "work/sec_acceptance.json"
+
+
+def iso_z(ts: datetime) -> str:
+    """UTC instant in the submissions JSON's format (2026-07-14T10:30:38.000Z)."""
+    return ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def parse_z(v: str) -> datetime:
+    return datetime.fromisoformat(v.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def et_offset_hours(ts: datetime) -> int:
+    """Hours New York is behind UTC at that instant (4 in EDT, 5 in EST)."""
+    return int(-ts.astimezone(EASTERN).utcoffset().total_seconds() // 3600)
+
+
+def sgml_acceptance(data: bytes) -> str | None:
+    """<ACCEPTANCE-DATETIME>YYYYMMDDHHMMSS (US Eastern) of a filing's SGML header -> UTC (iso_z)."""
+    m = re.search(rb"<ACCEPTANCE-DATETIME>\s*(\d{14})", data)
+    if not m:
+        return None
+    return iso_z(datetime.strptime(m.group(1).decode(), "%Y%m%d%H%M%S").replace(tzinfo=EASTERN))
+
+
+def is_shifted(json_value: str, true_value: str) -> bool:
+    """The submissions-JSON error: the JSON time is later than the true one by exactly the ET
+    UTC offset at the true instant."""
+    t = parse_z(true_value)
+    return parse_z(json_value) - t == timedelta(hours=et_offset_hours(t))
+
+
+def unshift(json_value: str) -> str:
+    """Invert the shift: true = JSON - h with h the ET offset at the true instant (h = 4 or 5,
+    the one consistent with itself; around a DST change, where both could be, EST's 5 is tried
+    first; filings are not accepted at 1-3am on a Sunday, so this never matters in practice)."""
+    j = parse_z(json_value)
+    for h in (5, 4):
+        if et_offset_hours(j - timedelta(hours=h)) == h:
+            return iso_z(j - timedelta(hours=h))
+    return iso_z(j - timedelta(hours=et_offset_hours(j)))
 
 
 class Edgar:
@@ -37,6 +99,8 @@ class Edgar:
         fx = os.environ.get("MB_SEC_FIXTURES")
         self.fixtures = Path(fx) if fx else None
         self.urls = json.loads((self.fixtures / "urls.json").read_text()) if fx else {}
+        self.time_checks: dict[str, str] = {}   # CIK -> ok | shifted | unverified: <why>
+        self._accepted: dict[str, str] | None = None   # accession -> true acceptance (iso_z)
 
     def _fixture(self, url: str) -> Path:
         if url not in self.urls:
@@ -74,10 +138,80 @@ class Edgar:
         data = self.json("https://www.sec.gov/files/company_tickers.json")
         return {v["ticker"].upper(): int(v["cik_str"]) for v in data.values()}
 
+    def _cache(self) -> dict[str, str]:
+        if self._accepted is None:
+            self._accepted = {}
+            if not self.fixtures:
+                try:
+                    self._accepted = json.loads((ROOT / ACCEPT_CACHE).read_text())
+                except (OSError, ValueError):
+                    pass
+        return self._accepted
+
+    def acceptance(self, cik: int | str, accession: str) -> str | None:
+        """True acceptance time (UTC, iso_z) of a filing from its SGML header (cached)."""
+        cache = self._cache()
+        if accession not in cache:
+            v = sgml_acceptance(self.get(archive_url(cik, accession, f"{accession}.hdr.sgml")))
+            if v is None:
+                return None
+            cache[accession] = v
+            if not self.fixtures:
+                try:
+                    path = ROOT / ACCEPT_CACHE
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = path.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(cache))
+                    tmp.replace(path)
+                except OSError:
+                    pass
+        return cache[accession]
+
+    def check_times(self, cik: int | str, rec: dict) -> str:
+        """Check a submissions block's acceptanceDateTime against the SGML header of its newest
+        listed filing and correct the whole column in place when it is shifted (module doc)."""
+        acc = rec.get("accessionNumber") or []
+        col = rec.get("acceptanceDateTime") or []
+        i = next((k for k, v in enumerate(col) if v and k < len(acc) and acc[k]), None)
+        if i is None:
+            status = "unverified: no acceptance time with an accession number"
+        elif (self.fixtures and acc[i] not in self._cache()
+              and archive_url(cik, acc[i], f"{acc[i]}.hdr.sgml") not in self.urls):
+            status = "unverified: no header fixture"      # tests without header fixtures: no request
+        else:
+            try:
+                true = self.acceptance(cik, acc[i])
+            except Exception as exc:
+                true, status = None, f"unverified: header {acc[i]}: {str(exc)[:100]}"
+            else:
+                status = "unverified: no ACCEPTANCE-DATETIME" if true is None else None
+            if true is not None:
+                if parse_z(col[i]) == parse_z(true):
+                    status = "ok"
+                elif is_shifted(col[i], true):
+                    rec["acceptanceDateTimeJson"] = list(col)
+                    rec["acceptanceDateTime"] = [unshift(v) if v else v for v in col]
+                    status = "shifted"
+                else:
+                    status = f"unverified: {acc[i]} JSON {col[i]} vs header {true}"
+        self.time_checks[str(int(cik))] = status
+        return status
+
     def recent(self, cik: int) -> dict:
-        """The `filings.recent` block of a company's submissions (latest ~1000 filings)."""
+        """The `filings.recent` block of a company's submissions (latest ~1000 filings), with
+        `acceptanceDateTime` checked and, if shifted, corrected (check_times)."""
         d = self.json(f"https://data.sec.gov/submissions/CIK{int(cik):010d}.json")
-        return {"name": d.get("name"), **d["filings"]["recent"]}
+        rec = {"name": d.get("name"), **d["filings"]["recent"]}
+        self.check_times(cik, rec)
+        return rec
+
+
+def time_summary(edgar: Edgar) -> dict:
+    """Collector summary of the acceptance-time checks: {"ok": n, "shifted": [CIK], "unverified": {CIK: why}}."""
+    checks = getattr(edgar, "time_checks", {})
+    return {"ok": sum(v == "ok" for v in checks.values()),
+            "shifted": sorted(c for c, v in checks.items() if v == "shifted"),
+            "unverified": {c: v.split(": ", 1)[-1] for c, v in checks.items() if v.startswith("unverified")}}
 
 
 def related_ciks(cfg: dict) -> dict[str, list[int]]:

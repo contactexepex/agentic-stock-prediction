@@ -180,6 +180,19 @@ SCHEMAS.update({
     }),
 })
 
+# SEC acceptance-time checks (scripts/check_sec_times.py; see sec.py): one row per stored accession
+# checked against its SGML header. accepted_at = the header's time (authoritative, UTC),
+# json_accepted_at = the value stored from the submissions JSON. connect() reads accepted_at of
+# filings, insiders, stakes, holdings and fundamentals through it (ACCEPTED_KEYS), so a value
+# stored from a shifted submissions file is corrected on read without editing data/.
+SCHEMAS["sec_times"] = ("jsonl", {
+    "accession": "VARCHAR", "cik": "VARCHAR", "accepted_at": "TIMESTAMPTZ",
+    "json_accepted_at": "TIMESTAMPTZ", "source": "VARCHAR", "checked_at": "TIMESTAMPTZ",
+})
+# kind -> its accession column, for the sec_times correction in connect()
+ACCEPTED_KEYS = {"filings": "id", "insiders": "accession", "stakes": "id", "holdings": "accession",
+                 "fundamentals": "accession"}
+
 # Fundamentals, US from SEC XBRL company facts (collect_fundamentals.py): one row per ticker x
 # tag x period x filing that first reported the value or changed it (prev_value = earlier value).
 SCHEMAS["fundamentals"] = ("jsonl", {
@@ -493,7 +506,17 @@ def connect(market: str) -> duckdb.DuckDBPyConnection:
                 src = f"read_json('{pattern}', format='newline_delimited', columns={col_spec})"
             else:
                 src = f"read_csv('{pattern}', header=true, columns={col_spec})"
-            con.execute(f"CREATE VIEW {name} AS SELECT * FROM {src}")
+            if name in ACCEPTED_KEYS and any((base / "sec_times").glob("**/*.jsonl")):
+                # accepted_at corrected to the SGML header's time where one was checked (sec_times)
+                tpat = (base / "sec_times").as_posix() + "/**/*.jsonl"
+                tspec = "{" + ", ".join(f"'{k}': '{v}'" for k, v in SCHEMAS["sec_times"][1].items()) + "}"
+                fix = (f"(SELECT DISTINCT ON (accession) accession AS _acc, accepted_at AS _true FROM "
+                       f"read_json('{tpat}', format='newline_delimited', columns={tspec}) "
+                       f"WHERE accepted_at IS NOT NULL ORDER BY accession, checked_at DESC)")
+                con.execute(f"CREATE VIEW {name} AS SELECT s.* REPLACE (coalesce(f._true, s.accepted_at) AS accepted_at) "
+                            f"FROM {src} s LEFT JOIN {fix} f ON f._acc = s.{ACCEPTED_KEYS[name]}")
+            else:
+                con.execute(f"CREATE VIEW {name} AS SELECT * FROM {src}")
         else:
             con.execute(f"CREATE TABLE {name} ({', '.join(f'{k} {v}' for k, v in cols.items())})")
     con.execute((CODE / "sql" / "views.sql").read_text())

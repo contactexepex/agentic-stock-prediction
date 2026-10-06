@@ -136,19 +136,21 @@ def dividends_expected(cal: dict | None, n_stored: int, since: date) -> str | No
     return f"calendar lists ex-dividend {max(listed)}" if listed else None
 
 
-def sec_earnings(cfg: dict, tickers: dict, ua: str, reports: dict | None = None
+def sec_earnings(cfg: dict, tickers: dict, ua: str, reports: dict | None = None, times: dict | None = None
                  ) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
     """Item 2.02 filings from SEC EDGAR: 8-K/6-K filings with item 2.02 (results of operations),
     timed by acceptance. Not every one is a quarter's results release (Tesla's delivery reports,
     pre-announcements, guidance updates also use 2.02): range_inputs.results_filter keeps one per
     quarter when the dates are read, using the 10-Q/10-K reports. Given a dict, `reports`
-    receives those per ticker: (acceptance date, timing, form, period end).
+    receives those per ticker: (acceptance date, timing, form, period end). Acceptance times are
+    the checked/corrected ones of sec.Edgar.recent; given a dict, `times` receives the summary of
+    those checks (sec.time_summary).
     Each ticker's filings are those of its mapped CIK plus the predecessor/related CIKs in
     `fundamentals.predecessor_ciks` (sec.ticker_submissions), each filing once.
     Returns (rows per ticker, one entry per ticker and CIK whose submissions request failed)."""
     # shared SEC client: one throttle, backoff on 429/503, test fixtures; a ticker's submissions
     # are those of its mapped CIK plus its predecessor/related CIKs, de-duplicated by accession
-    from sec import Edgar, related_ciks, ticker_submissions
+    from sec import Edgar, related_ciks, ticker_submissions, time_summary
 
     edgar = Edgar(ua)
     cik_by_ticker = edgar.cik_map()
@@ -176,6 +178,8 @@ def sec_earnings(cfg: dict, tickers: dict, ua: str, reports: dict | None = None
                 d, tm = timing(cfg, pd.Timestamp(recent["acceptanceDateTime"][i]))
                 pe = date.fromisoformat(period[i][:10]) if period[i] else None
                 reports.setdefault(key, []).append((d, tm, form, pe))
+    if times is not None:
+        times.update(time_summary(edgar))
     return out, failed
 
 
@@ -353,11 +357,11 @@ def main() -> int:
 
     sec: dict[str, list] = {}
     sec_reports: dict[str, list] = {}
-    sec_error, sec_failed = None, []
+    sec_error, sec_failed, sec_times = None, [], {}
     ua = os.environ.get("SEC_USER_AGENT")
     if not args.no_history and cfg.get("filings") == "sec" and ua:
         try:
-            sec, sec_failed = sec_earnings(cfg, cfg["tickers"], ua, sec_reports)
+            sec, sec_failed = sec_earnings(cfg, cfg["tickers"], ua, sec_reports, sec_times)
         except Exception as exc:
             sec_error = str(exc)[:200]
 
@@ -462,7 +466,7 @@ def main() -> int:
     written = append_jsonl(day_file(market, "events", today), rows)
     print(json.dumps({"collector": "events", "market": market, "new_events": written - sum(hist.values()) - n_reports,
                       "new_history": hist, "earnings_history_sources": earn_sources,
-                      "sec_tickers": len(sec), "sec_reports": n_reports, "sec_error": sec_error, "sec_failed": sec_failed, **nse_info,
+                      "sec_tickers": len(sec), "sec_reports": n_reports, "sec_error": sec_error, "sec_failed": sec_failed, **({"sec_times": sec_times} if sec_times else {}), **nse_info,
                       "failed": failed}, indent=2))
     # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
     no_calendar = {f["ticker"] for f in failed if f["what"] == "calendar"}

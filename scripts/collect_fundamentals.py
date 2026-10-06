@@ -252,7 +252,7 @@ def main() -> int:
         "loaded": loaded, "up_to_date": len(up_to_date), "new_filings": new_filings,
         "revised_rows": sum(r["prev_value"] is not None for r in rows),
         "filings_without_new_values": not_in_xbrl,
-        "requests": edgar.requests, "skipped_not_sec": skipped, "failed": failed}, indent=2))
+        "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 
 
