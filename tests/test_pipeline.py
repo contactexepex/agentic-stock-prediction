@@ -69,9 +69,13 @@ def setup(tmp: Path) -> tuple[Path, Path]:
 
 
 def weekdays(start: date, n: int) -> list[date]:
+    """n market sessions from `start`: weekdays that are no NYSE holiday (the test market's calendar), because the
+    price views leave out bars on days the exchange is closed (issue #40)."""
+    from marketbrief.core.calendar import is_session
+
     days, d = [], start
     while len(days) < n:
-        if d.weekday() < 5:
+        if is_session({"calendar": "XNYS"}, d):
             days.append(d)
         d += timedelta(days=1)
     return days
