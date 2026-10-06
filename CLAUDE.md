@@ -16,7 +16,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config; both markets:
   a split or bonus confirmed by a Yahoo `Stock Splits` row, or for India by NSE's bhavcopy, is recorded
   once in `data/<market>/adjustments/` (`scripts/adjust.py`) and applied on read by the `ohlc`/`bars`
-  views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-based close is only a `warnings` entry;
+  views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-base is a `warnings` entry and holds
+  that symbol's new bars (`held`); a wrong record is cancelled by a later one with `supersedes`;
   DESIGN.md section 3), `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain

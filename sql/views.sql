@@ -6,9 +6,12 @@
 --   FROM news_ticker_day GROUP BY ALL ORDER BY period;
 
 -- Splits and bonus issues (issue #31; scripts/adjust.py): one row per corporate action, the
--- first detected wins. Applied on read by ohlc and bars below.
+-- first detected wins; a record named by a later row's `supersedes` (a hand-made correction,
+-- factor 1.0 to cancel or the right factor) is left out. Applied on read by ohlc and bars below.
 CREATE OR REPLACE VIEW price_adjustments AS
-SELECT DISTINCT ON (id) * FROM adjustments ORDER BY id, detected_at;
+SELECT DISTINCT ON (id) * FROM adjustments
+WHERE id NOT IN (SELECT supersedes FROM adjustments WHERE supersedes IS NOT NULL)
+ORDER BY id, detected_at;
 
 -- Daily bars as stored (one per ticker per date, latest collection wins), for audits.
 CREATE OR REPLACE VIEW ohlc_raw AS

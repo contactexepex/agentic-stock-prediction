@@ -35,15 +35,18 @@ Splits and bonus issues (issue #31, both markets; detect_adjustments, scripts/ad
 symbol's new bars are written, Yahoo's frame (today's basis) is compared with our stored bars of
 the same dates. A `Stock Splits` row whose stored bars before it sit on the old basis is recorded
 once in data/<market>/adjustments/ (summary `adjustments`) and applied on read by the ohlc and bars
-views; for India a re-based close with no split row can be confirmed from NSE's bhavcopy instead.
-Any other mismatch above 2% goes to `warnings` and is never recorded. An older bar Yahoo serves
-after a recorded split is written on its date's stored basis (`rebased_bars`), and a recorded split
-no longer blocks the bhavcopy fallback."""
+views; for India a re-base with no split row can be confirmed from NSE's bhavcopies instead (which
+also finds the ex-date after a missed run). Any other mismatch above 2% goes to `warnings` and is
+never recorded; when it is a re-base or a split row no source confirms, the symbol's new bars are
+held (`held`, `failed`) until a later run can record it. An older bar Yahoo serves after a recorded
+split is written on its date's stored basis (`rebased_bars`), and a recorded split no longer
+blocks the bhavcopy fallback."""
 from __future__ import annotations
 
 import csv
 import io
 import json
+import math
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -175,7 +178,8 @@ def basis_problem(cfg: dict, ticker: str, d: date, bar: dict, splits: list[date]
 
 
 def nse_fallback(cfg: dict, today: date, now: str, n_sessions: int, splits: dict[str, list[date]] | None = None,
-                 nse=None, recorded: set[str] | frozenset = frozenset()) -> tuple[list[dict], dict[str, list[dict]], list[str]]:
+                 nse=None, recorded: set[str] | frozenset = frozenset(),
+                 held: set[str] | frozenset = frozenset()) -> tuple[list[dict], dict[str, list[dict]], list[str]]:
     """Fill missing watchlist bars of the last `n_sessions` sessions from the NSE bhavcopy, oldest
     session first (a filled bar can then anchor the next session's basis check).
     Returns (filled bars, {ticker: [{date, reason}] still missing}, notes)."""
@@ -209,6 +213,8 @@ def nse_fallback(cfg: dict, today: date, now: str, n_sessions: int, splits: dict
         for t in lacking:
             bar = bars.get(t)
             reason = problem or (None if bar else f"no EQ row for {t} in the bhavcopy")
+            if not reason and t in held:   # its Yahoo frame failed the split/bonus check this run
+                reason = "price basis unconfirmed (split/bonus?); held, see warnings"
             reason = reason or basis_problem(cfg, t, d, bar, splits.get(t, []), recorded)
             if reason:
                 still.setdefault(t, []).append({"date": d.isoformat(), "reason": reason})
@@ -229,7 +235,8 @@ def nse_fallback(cfg: dict, today: date, now: str, n_sessions: int, splits: dict
 
 
 def apply_fallback(cfg: dict, today: date, now: str, targets: dict, failed: list[dict],
-                   splits: dict[str, list[date]], recorded: set[str] | frozenset = frozenset()) -> dict:
+                   splits: dict[str, list[date]], recorded: set[str] | frozenset = frozenset(),
+                   held: set[str] | frozenset = frozenset()) -> dict:
     """Run the NSE fallback and sort the Yahoo failures: a stock whose recent sessions are all
     stored afterwards moves to `resolved_by_nse`; one still missing a session, or whose newest
     stored bar (before the fallback) lies further back than the checked sessions, stays in `failed`."""
@@ -238,7 +245,7 @@ def apply_fallback(cfg: dict, today: date, now: str, targets: dict, failed: list
     newest = {t: newest_stored(cfg, t, today) for t in cfg["tickers"]
               if any(f["ticker"] == t for f in failed)}
     try:
-        filled, still, notes = nse_fallback(cfg, today, now, n, splits, recorded=recorded)
+        filled, still, notes = nse_fallback(cfg, today, now, n, splits, recorded=recorded, held=held)
     except Exception as exc:  # the fallback must never cost the Yahoo bars already written
         filled, still, notes = [], {}, [f"nse fallback error: {str(exc)[:200]}"]
     resolved, keep = [], []
@@ -254,7 +261,7 @@ def apply_fallback(cfg: dict, today: date, now: str, targets: dict, failed: list
             f["newest_stored_bar"] = str(last) if last else f"none in the last {NEWEST_LOOKBACK} sessions"
             f["sessions_behind"] = behind
             f["beyond_nse_window"] = f"the fallback checks only sessions from {window_start}"
-        if t in still or "beyond_nse_window" in f:
+        if t in still or "beyond_nse_window" in f or t in held:   # a held stock stays failed
             keep.append(f)
         else:
             resolved.append({**f, "filled_dates": [b["date"] for b in filled if b["ticker"] == t]})
@@ -298,23 +305,37 @@ def has_stored_before(cfg: dict, key: str, d: date) -> bool:
     return any(key in stored_bars(p) for p in files)
 
 
+def step_matches(step: float, factor: float) -> bool:
+    """True when a price step (close / previous close) looks like the split factor: within
+    0.8-1.25x of it and nearer to it than to no step at all (log distance)."""
+    if step <= 0:
+        return False
+    return 0.8 <= step / factor <= 1.25 and abs(math.log(step / factor)) < abs(math.log(step))
+
+
 def detect_adjustments(cfg: dict, key: str, df, today: date, now: str, adjs: list[dict],
-                       nse_check=None) -> tuple[list[dict], list[str]]:
+                       nse_check=None, seen: set | None = None) -> tuple[list[dict], list[str], bool]:
     """Splits and bonus issues of one symbol, from Yahoo's frame compared with our stored bars
-    (run before this run's bars are written). Returns (new adjustments records, warnings).
+    (run before this run's bars are written). Returns (new adjustments records, warnings, hold);
+    hold = True: the stored basis and Yahoo's disagree in a way no source confirms, so this run must
+    not write the symbol's new bars (they would sit on Yahoo's new basis next to old-basis bars; a
+    later run writes them through to_stored_basis once the split is recorded).
 
     Yahoo's frame is on today's basis; a stored bar keeps the basis of its collection time.
+    `seen` = (ticker, ex_date) pairs already in data/<market>/adjustments/ (superseded ones too).
     1. Each `Stock Splits` row (ex-date E, ratio r, factor 1/r) not yet recorded: the stored bars
        in the frame before E (and on/after the previous split row) are compared with Yahoo's
        closes for the same dates, the stored ones on the basis the recorded adjustments give.
-       All at Yahoo/stored = factor (within SPLIT_TOL): the stored bars are on the old basis ->
-       recorded (source yahoo_splits). All at 1 (within MATCH_TOL): they were collected after the
-       split, nothing to adjust. No stored bar before E at all: nothing to adjust. Anything else
-       (mixed ratios, or no stored bar in the frame to compare): a warning, no record.
-    2. Any other stored bar in the frame whose close differs from Yahoo's by more than MATCH_TOL
-       (the generic symptom: Yahoo re-based history after a corporate action with no split row)
-       is only a warning, unless `nse_check` (India watchlist stocks) confirms it from NSE's
-       bhavcopy (source nse_prev_close). An overlap ratio alone is never recorded."""
+       All at Yahoo/stored = factor (within SPLIT_TOL; whether or not the session before E is
+       stored) and Yahoo's own frame without a step of about the factor at E: recorded (source
+       yahoo_splits). All at 1 (within MATCH_TOL): collected after the split, nothing to adjust.
+       No stored bar before E at all: nothing to adjust. Anything else: a warning, and hold.
+    2. Stored bars whose close differs from Yahoo's by more than MATCH_TOL with no split row
+       explaining it: when every stored date up to the newest mismatch is off by one ratio that
+       is a simple fraction (a re-base), `nse_check` (India watchlist stocks) may confirm it from
+       NSE's bhavcopies (source nse_prev_close); else a warning, and hold. A mismatch that is no
+       re-base (isolated, mixed, not a simple fraction) is a warning only. An overlap ratio alone
+       is never recorded."""
     yc = frame_closes(df, today)
     stored = {}
     for d in yc:
@@ -322,7 +343,7 @@ def detect_adjustments(cfg: dict, key: str, df, today: date, now: str, adjs: lis
         if row and row.get("close") not in (None, "") and float(row["close"]) > 0:
             stored[d] = float(row["close"])
     known = [a for a in adjs if a["ticker"] == key]
-    ids = {a["id"] for a in known}
+    seen = set(seen or ()) | {(a["ticker"], adj._day(a["ex_date"])) for a in known}
     records, warnings = [], []
 
     def view(d: date) -> float:
@@ -330,95 +351,116 @@ def detect_adjustments(cfg: dict, key: str, df, today: date, now: str, adjs: lis
 
     ratios = yahoo_split_ratios(df)
     bounds = sorted(ratios)
-    warned = False
+    hold = False
     for i in range(len(bounds) - 1, -1, -1):          # newest split first
         ex, r = bounds[i], ratios[bounds[i]]
         factor = 1 / r
-        if f"{key}-{ex}" in ids:
+        if (key, ex) in seen:
             continue
         lower = bounds[i - 1] if i else date.min
         window = [d for d in sorted(stored) if lower <= d < ex]
         if not window:
             if has_stored_before(cfg, key, ex):
                 warnings.append(f"{key}: Yahoo reports a split/bonus on {ex} (ratio {r:g}) but no stored bar in the "
-                                f"fetched window before it to check the stored basis; not recorded")
-                warned = True
+                                f"fetched window before it to check the stored basis; not recorded, new bars held")
+                hold = True
             continue
         got = {d: yc[d] / view(d) for d in window}
         if all(abs(x / factor - 1) <= adj.SPLIT_TOL for x in got.values()):
+            before = [d for d in yc if d < ex]
+            if ex in yc and before and step_matches(yc[ex] / yc[max(before)], factor):
+                warnings.append(f"{key}: Yahoo reports a split/bonus on {ex} (ratio {r:g}) but its own frame steps by "
+                                f"{yc[ex] / yc[max(before)]:.4f} there (not re-based); not recorded, new bars held")
+                hold = True
+                continue
             d = window[-1]
             rec = adj.record(key, ex, factor, "yahoo_splits", now, yahoo_ratio=r, check_date=str(d),
                              stored_close=stored[d], yahoo_close=yc[d], measured_factor=round(got[d], 6))
             records.append(rec)
             known.append({**rec, "ex_date": ex})
-            ids.add(rec["id"])
+            seen.add((key, ex))
         elif not all(abs(x - 1) <= adj.MATCH_TOL for x in got.values()):
             lo, hi = min(got.values()), max(got.values())
             warnings.append(f"{key}: Yahoo reports a split/bonus on {ex} (ratio {r:g}) but Yahoo/stored closes before "
-                            f"it range {lo:.4f}-{hi:.4f} (expected {factor:.4f} or 1); not recorded")
-            warned = True
-    if warned:
-        return records, warnings
+                            f"it range {lo:.4f}-{hi:.4f} (expected {factor:.4f} or 1); not recorded, new bars held")
+            hold = True
+    if hold:
+        return records, warnings, True
     mism = {d: yc[d] / view(d) for d in sorted(stored) if abs(yc[d] / view(d) - 1) > adj.MATCH_TOL}
     if not mism:
-        return records, warnings
+        return records, warnings, False
     first, last = min(mism), max(mism)
     vals = list(mism.values())
     mid = sorted(vals)[len(vals) // 2]
-    later = [d for d in sorted(yc) if d > last]
     detail = (f"{key}: Yahoo's close differs from the stored close on {len(mism)} date(s) {first}..{last} "
               f"(Yahoo/stored {min(vals):.4f}-{max(vals):.4f})")
-    consistent = (all(abs(x / mid - 1) <= adj.SPLIT_TOL for x in vals)
-                  and all(d in mism for d in stored if d <= last))
-    fr = adj.split_fraction(mid) if consistent else None
-    if nse_check and fr is not None and later:
-        rec, why = nse_check(key, later[0], last, stored[last], adj.factor_after(known, key, last), yc[last], float(fr))
+    rebase = (all(abs(x / mid - 1) <= adj.SPLIT_TOL for x in vals)
+              and all(d in mism for d in stored if d <= last))
+    fr = adj.split_fraction(mid) if rebase else None
+    if fr is None:
+        warnings.append(detail + "; not a re-base by a split/bonus factor, not recorded")
+        return records, warnings, False
+    later = [d for d in sorted(yc) if d > last]
+    if nse_check and later:
+        rec, why = nse_check(key, last, stored[last], adj.factor_after(known, key, last), float(fr), later, yc)
         if rec:
             records.append(rec)
-            return records, warnings
+            return records, warnings, False
         detail += f"; NSE check: {why}"
-    warnings.append(detail + "; no Yahoo split row or NSE bhavcopy confirms a split/bonus, not recorded")
-    return records, warnings
+    warnings.append(detail + f"; a re-base by {fr} that no Yahoo split row or NSE bhavcopy confirms (yet): "
+                    "not recorded, new bars held")
+    return records, warnings, True
+
+
+NSE_SCAN = 5   # frame sessions after the newest re-based stored bar searched for the ex-date
 
 
 def nse_basis_check(cfg: dict, now: str, nse_getter):
-    """India watchlist stocks: confirm a split/bonus from NSE's bhavcopy of the presumed ex-date E
-    (the frame's next session after the newest stored bar whose close Yahoo re-based). NSE's
-    PREV_CLOSE on E is the as-traded close of the session before; it is not adjusted (HDFCBANK's
-    1:1 bonus, ex 2025-08-26: PREV_CLOSE 1964.10 = its 25-Aug close). Recorded only when (1) E's
-    previous session is that stored bar's date, (2) PREV_CLOSE matches our stored close within
-    PREV_CLOSE_TOLERANCE (our bar is the as-traded one), (3) Yahoo's re-based close / PREV_CLOSE is
-    the split factor within SPLIT_TOL and (4) NSE's close on E / PREV_CLOSE is within 0.8-1.25x
-    of the factor (the traded price stepped by about the factor on E)."""
+    """India watchlist stocks: confirm a re-base (ratio = factor) of our stored closes from NSE's
+    bhavcopies and find its ex-date. NSE's PREV_CLOSE is the as-traded close of the session before;
+    it is not adjusted on an ex-date (HDFCBANK's 1:1 bonus, ex 2025-08-26: PREV_CLOSE 1964.10 = its
+    25-Aug close). The frame's sessions after the newest re-based stored bar `last` are checked in
+    order, up to NSE_SCAN. Each one's PREV_CLOSE must equal the as-traded close of its previous
+    session within PREV_CLOSE_TOLERANCE: our stored close when that session is `last` (the first
+    one must follow `last` directly, which ties our stored basis to the traded one), else Yahoo's
+    re-based close / factor. The first session whose traded close / PREV_CLOSE steps by about the
+    factor (step_matches) is the ex-date and the action is recorded; a session with a normal day's
+    step moves on to the next; anything else stops without a record."""
     from nse import FetchError, nse_symbols
     symbols = nse_symbols(cfg)
 
-    def check(key, ex, prev, stored_prev, f_known, yahoo_prev, factor):
+    def check(key, last, stored_last, f_known, factor, later, yc):
         if key not in cfg["tickers"]:
             return None, "not a watchlist stock (no bhavcopy row)"
-        if ev.prev_session(cfg, ex, include=False) != prev:
-            return None, f"stored bar {prev} is not the session before {ex}"
-        url = f"/products/content/sec_bhavdata_full_{ex:%d%m%Y}.csv"
-        try:
-            bars, problem = bhavcopy_bars(nse_getter().text(url), ex, symbols)
-        except FetchError as exc:
-            return None, f"bhavcopy {ex}: {exc.error[:120]}"
-        if problem or key not in bars:
-            return None, problem or f"no EQ row for {key} in the {ex} bhavcopy"
-        b, pc = bars[key], bars[key].get("prev_close")
-        if not pc:
-            return None, f"no PREV_CLOSE in the {ex} bhavcopy"
-        if abs(pc / stored_prev - 1) > PREV_CLOSE_TOLERANCE:
-            return None, f"PREV_CLOSE {pc:g} vs stored close {stored_prev:g} on {prev}"
-        measured = yahoo_prev / (pc * f_known)
-        if abs(measured / factor - 1) > adj.SPLIT_TOL:
-            return None, f"Yahoo/PREV_CLOSE {measured:.4f} is not the factor {factor:.4f}"
-        step = b["close"] / pc / factor
-        if not 0.8 <= step <= 1.25:
-            return None, f"NSE close on {ex} {b['close']:g} vs PREV_CLOSE {pc:g} shows no step of {factor:.4f}"
-        return adj.record(key, ex, factor, "nse_prev_close", now, check_date=str(prev), stored_close=stored_prev,
-                          yahoo_close=yahoo_prev, measured_factor=round(measured, 6), nse_prev_close=pc,
-                          nse_ex_close=b["close"], url=f"https://nsearchives.nseindia.com{url}"), None
+        for e in later[:NSE_SCAN]:
+            p = ev.prev_session(cfg, e, include=False)
+            if p == last:
+                expected = stored_last
+            elif p in yc and p > last:
+                expected = yc[p] / (factor * f_known)
+            else:
+                return None, f"the session before {e} ({p}) is neither the stored bar {last} nor in Yahoo's frame"
+            url = f"/products/content/sec_bhavdata_full_{e:%d%m%Y}.csv"
+            try:
+                bars, problem = bhavcopy_bars(nse_getter().text(url), e, symbols)
+            except FetchError as exc:
+                return None, f"bhavcopy {e}: {exc.error[:120]}"
+            if problem or key not in bars:
+                return None, problem or f"no EQ row for {key} in the {e} bhavcopy"
+            b, pc = bars[key], bars[key].get("prev_close")
+            if not pc:
+                return None, f"no PREV_CLOSE in the {e} bhavcopy"
+            if abs(pc / expected - 1) > PREV_CLOSE_TOLERANCE:
+                return None, f"{e}: PREV_CLOSE {pc:g} vs the as-traded close {expected:g} of {p}"
+            step = b["close"] / pc
+            if step_matches(step, factor):
+                return adj.record(key, e, factor, "nse_prev_close", now, check_date=str(last), stored_close=stored_last,
+                                  yahoo_close=yc[last], measured_factor=round(yc[last] / (stored_last * f_known), 6),
+                                  nse_prev_close=pc, nse_ex_close=b["close"],
+                                  url=f"https://nsearchives.nseindia.com{url}"), None
+            if not 0.8 <= step <= 1.25:
+                return None, f"{e}: traded close / PREV_CLOSE {step:.4f} is neither a normal day nor the factor"
+        return None, f"no step of {factor:.4f} in the bhavcopies of {later[0]}..{later[:NSE_SCAN][-1]}"
     return check
 
 
@@ -444,7 +486,8 @@ def main() -> int:
     now, today = utc_now(), utc_today()
     written, failed, splits = 0, [], {}
     adjs = adj.load(cfg["market"])
-    new_adjs, warnings, rebased, nse_box, nse_check = [], [], [], {}, None
+    seen = {(a["ticker"], a["ex_date"]) for a in adj.load(cfg["market"], include_superseded=True)}
+    new_adjs, warnings, rebased, held, nse_box, nse_check = [], [], [], [], {}, None
     if (cfg.get("price_fallback") or {}).get("source") == "nse_bhavcopy":
         nse_check = nse_basis_check(cfg, now, lambda: nse_box.setdefault("c", nse_client(cfg)))
 
@@ -461,14 +504,25 @@ def main() -> int:
             if not error.startswith("stale"):
                 continue
         try:   # before this symbol's bars are written: Yahoo's frame against the stored bars
-            recs, warns = detect_adjustments(cfg, key, df, today, now, adjs, nse_check)
+            recs, warns, hold = detect_adjustments(cfg, key, df, today, now, adjs, nse_check, seen)
         except Exception as exc:  # a failed check must not cost the bars
-            recs, warns = [], [f"{key}: split/bonus check failed: {str(exc)[:160]}"]
+            recs, warns, hold = [], [f"{key}: split/bonus check failed: {str(exc)[:160]}"], False
         for rec in recs:
-            append_jsonl(day_file(cfg["market"], "adjustments", date.fromisoformat(rec["ex_date"])), [rec])
-            adjs.append({**rec, "ex_date": date.fromisoformat(rec["ex_date"])})
+            ex = date.fromisoformat(rec["ex_date"])
+            append_jsonl(day_file(cfg["market"], "adjustments", ex), [rec])
+            adjs.append({**rec, "ex_date": ex})
+            seen.add((key, ex))
         new_adjs += recs
         warnings += warns
+        if hold:   # Yahoo's frame is on a basis no source confirms: no new bar is written this run
+            held.append(key)
+            note = "price basis unconfirmed (split/bonus?): new bars held, see warnings"
+            entry = next((f for f in failed if f["ticker"] == key), None)
+            if entry:
+                entry["error"] += f"; {note}"
+            else:
+                failed.append({"ticker": key, "yahoo": symbol, "error": note})
+            continue
         for idx, row in df.iterrows():
             d = idx.date()
             if d >= today or row.isna()[["Open", "High", "Low", "Close"]].any():
@@ -492,8 +546,10 @@ def main() -> int:
                "adjustments": new_adjs}
     if rebased:
         summary["rebased_bars"] = rebased
+    if held:
+        summary["held"] = held
     if (cfg.get("price_fallback") or {}).get("source") == "nse_bhavcopy":
-        summary.update(apply_fallback(cfg, today, now, targets, failed, splits, {a["id"] for a in adjs}))
+        summary.update(apply_fallback(cfg, today, now, targets, failed, splits, {a["id"] for a in adjs}, set(held)))
     summary["warnings"] = warnings
     summary["failed"] = failed
     print(json.dumps(summary, indent=2))

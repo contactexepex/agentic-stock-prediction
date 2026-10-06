@@ -30,8 +30,11 @@ def _day(v) -> date:
     return v if isinstance(v, date) else date.fromisoformat(str(v)[:10])
 
 
-def load(market: str) -> list[dict]:
-    """The stored adjustments of a market, one per id (the first detected wins), ex_date as a date."""
+def load(market: str, include_superseded: bool = False) -> list[dict]:
+    """The stored adjustments of a market, one per id (the first detected wins), ex_date as a date.
+    A wrong record is corrected by appending a new one (own id, e.g. `<ticker>-<ex_date>-fix1`,
+    `supersedes` = the wrong id, `factor` 1.0 to cancel it or the right factor, a `note`): a
+    superseded record is left out (as by the price_adjustments view) unless include_superseded."""
     rows: dict[str, dict] = {}
     for f in sorted((data_dir(market) / "adjustments").glob("**/*.jsonl")):
         for line in f.read_text(encoding="utf-8").splitlines():
@@ -40,7 +43,10 @@ def load(market: str) -> list[dict]:
             r = json.loads(line)
             if r["id"] not in rows or str(r.get("detected_at")) < str(rows[r["id"]].get("detected_at")):
                 rows[r["id"]] = {**r, "ex_date": _day(r["ex_date"])}
-    return list(rows.values())
+    if include_superseded:
+        return list(rows.values())
+    gone = {r.get("supersedes") for r in rows.values() if r.get("supersedes")}
+    return [r for i, r in rows.items() if i not in gone]
 
 
 def factor_after(adjs, ticker: str, d, detected_after=None) -> float:

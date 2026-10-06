@@ -105,7 +105,8 @@ def todays_files(market: str, kind: str, today: date) -> list[Path]:
     col, out = TRADING_DATE_KINDS[kind], []
     for p in files:
         d = file_day(p)
-        if d is None or d < today - timedelta(days=10):
+        # adjustments are filed by ex-date, which can lie further back than 10 days: all files are read
+        if d is None or (kind != "adjustments" and d < today - timedelta(days=10)):
             continue
         if p.stat().st_size == 0 or any(r.get(col) and str(r[col])[:10] == str(today) for r in read_rows(p)[0]):
             out.append(p)

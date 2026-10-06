@@ -108,16 +108,29 @@ recorded for the past. Design (adjust on read; data stays append-only):
   (id `<ticker>-<E>`, `factor` = 1/r = price multiplier for every bar before E, `volume_factor` =
   r, `source` `yahoo_splits`, the compared date and closes as evidence, `detected_at`) when every
   stored close in the frame before E (after any earlier split row) is Yahoo's x 1/factor within
-  1%. Stored closes already equal to Yahoo's (collected after the split) or no stored bar before E:
-  nothing to record. India: a re-based close with no split row is recorded (`nse_prev_close`) only
-  when NSE's bhavcopy of the presumed ex-date confirms it: its PREV_CLOSE (as traded, not adjusted:
-  HDFCBANK 26-Aug-2025 1964.10) equals our stored close of the session before (within 0.5%), the
-  re-based ratio Yahoo/stored is the same on every stored date up to then and within 0.1% of a
-  simple fraction p/q (p, q <= 20), Yahoo's close / PREV_CLOSE matches that fraction within 1%,
-  and the traded close on the ex-date stepped by about it (0.8-1.25x of the factor). Every other mismatch above 2% (mixed ratios, a
-  split row with no stored bar in the window to compare, an unconfirmed re-based close) goes to the
-  summary's `warnings` (validate.py: `PRICE_BASIS`), never to a record. An overlap ratio alone is
-  never a source. Dividends are never adjusted (ex-dividend handling is separate, in ranges).
+  1% (whether or not the session before E is stored) and Yahoo's own frame has no step of about
+  the factor at E. Stored closes already equal to Yahoo's (collected after the split) or no stored
+  bar before E: nothing to record. A re-base (every stored close up to the newest mismatch off by
+  one ratio within 0.1% of a simple fraction p/q, p, q <= 20) with no split row is recorded for
+  India (`nse_prev_close`) when NSE's bhavcopies confirm it: the frame's sessions after our newest
+  re-based bar are walked in order (up to 5); each one's PREV_CLOSE (as traded, not adjusted on an
+  ex-date: HDFCBANK 26-Aug-2025 1964.10) must equal the as-traded close of its previous session
+  within 0.5% (our stored close for the first one, Yahoo's re-based close / factor after that),
+  and the first whose traded close / PREV_CLOSE steps by about the factor (0.8-1.25x of it and
+  nearer to it than to 1) is the ex-date. So a missed run (bars stored to E-2) is handled too.
+- Hold: a re-base or split row no source confirms (an unconfirmed re-base, mixed ratios before a
+  split row, a split row with no stored bar in the window, a step in Yahoo's own frame at E) is a
+  `warnings` entry (validate.py: `PRICE_BASIS`), and the symbol's new bars are not written this
+  run (summary `held`, an entry in `failed`; the India bhavcopy fallback skips it too), so no
+  new-basis bar lands next to old-basis ones; when the split row (or NSE confirmation) arrives, a
+  later run records it and writes the held bars through the basis conversion below. A mismatch
+  above 2% that is no re-base (one corrected bar, mixed ratios with no split row) is a warning
+  only. An overlap ratio alone is never a source. Dividends are never adjusted (ex-dividend
+  handling is separate, in ranges).
+- A wrong record is corrected by appending a new one (own id, e.g. `<ticker>-<E>-fix1`,
+  `supersedes` = the wrong id, `factor` 1.0 to cancel or the right factor, a `note`): the
+  `price_adjustments` view and `adjust.load` leave the superseded record out, and the collector
+  never records that (ticker, ex-date) again.
 - After a recorded split, an older bar Yahoo serves on the new basis (a gap it fills late) is
   written on its date's stored basis (prices / factor, volume x factor; summary `rebased_bars`),
   and a recorded split no longer blocks the bhavcopy fallback (the as-traded bar fits the views).

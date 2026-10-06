@@ -114,6 +114,8 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "volume_factor": "DOUBLE", "source": "VARCHAR", "yahoo_ratio": "DOUBLE", "check_date": "DATE",
         "stored_close": "DOUBLE", "yahoo_close": "DOUBLE", "measured_factor": "DOUBLE",
         "nse_prev_close": "DOUBLE", "nse_ex_close": "DOUBLE", "url": "VARCHAR", "detected_at": "TIMESTAMPTZ",
+        # correction of a wrong record (appended by hand; see adjust.load): the id it replaces
+        "supersedes": "VARCHAR", "note": "VARCHAR",
     }),
     "quotes": ("jsonl", {
         "symbol": "VARCHAR", "yahoo": "VARCHAR", "ts": "TIMESTAMPTZ", "price": "DOUBLE",
