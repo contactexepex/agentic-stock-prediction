@@ -31,7 +31,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
   Adaptive Conformal Inference (`aci.py`: per horizon x band x regime miss rate alpha_t updated from
   outcomes scored before `calibrate` runs; `aci:` in `config/ranges.yaml`, off by default; the weekly
-  review shows alpha_t and proposes switching it on from that replay). Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
+  review shows alpha_t and proposes switching it on from a replay with the same settings, marked
+  provisional unless its held-out check `--aci-tune-end` agrees). Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
   `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
   switchable in `config/ranges.yaml`).

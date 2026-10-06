@@ -60,10 +60,10 @@ implied_vol:                # US option chains (collect_options.py); no backtest
 # (replay.py --aci) and the weekly review. `enabled` takes the same forms as the range inputs.
 aci:
   enabled: false
-  gamma: 0.01               # step per scored target date (replay: 0.002-0.02 all help; 0.01 chosen)
+  gamma: 0.01               # step per scored target date; chosen in-sample on the 5-year replay (held-out: DESIGN 7)
   max_shift: 0.15           # alpha_t stays within this of the target (0.5 or 0.2)
   min_history: 20           # scored target dates before the adjusted alpha is used
-  by_regime: true           # a separate alpha per regime label (replay: CALM no longer under-covers)
+  by_regime: true           # a separate alpha per regime label; chosen in-sample (CALM stays at target)
 
 # Relationship risk flags (scripts/relations.py; markets with a `relations:` block). Extra width
 # per flag type, summed per ticker and capped. Off by default: switch on only if the weekly

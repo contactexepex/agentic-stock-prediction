@@ -436,8 +436,8 @@ def proposals(rc: dict, live: dict, hist: dict) -> list[dict]:
                              "changes": [{"param": k, "current": rc.get(k), "proposed": val} for k, val in v["set"].items()],
                              "drop": v["name"].lower().startswith("drop"),
                              "rel_score": v["vs_current"]["rel_score"],
-                             "cover80_now": {h: x.get("cover80") for h, x in base["by_h"].items()},
-                             "cover80_then": {h: x.get("cover80") for h, x in v["by_h"].items()}}
+                             "cover80_before": {h: x.get("cover80") for h, x in base["by_h"].items()},
+                             "cover80_after": {h: x.get("cover80") for h, x in v["by_h"].items()}}
     return sorted(best.values(), key=lambda p: p["rel_score"])
 
 
@@ -461,43 +461,90 @@ def aci_state(con, rc: dict, week_end: date) -> dict:
     return {"settings": aci.settings(rc), "state": t.snapshot()}
 
 
-def latest_aci_replay(con, week_end: date) -> dict | None:
-    """The newest `replay.py --aci` record ending by the week's end: its before/after comparison."""
+ACI_SETTING_KEYS = ("gamma", "max_shift", "min_history", "by_regime")
+
+
+def same_aci_settings(stored: dict | None, rc: dict) -> bool:
+    cur = aci.settings(rc)
+    return bool(stored) and all(stored.get(k) == cur[k] for k in ACI_SETTING_KEYS)
+
+
+def latest_aci_replay(con, week_end: date, rc: dict) -> dict | None:
+    """The newest `replay.py --aci` record ending by the week's end whose ACI settings (gamma, max_shift,
+    min_history, by_regime) equal config/ranges.yaml's; records with other settings are skipped and
+    counted in `note`. Returns its before/after comparison and held-out check (if run)."""
     try:
-        row = con.execute("SELECT id, end_date, detail FROM replays WHERE id LIKE '%-aci' AND end_date <= ? "
-                          "ORDER BY computed_at DESC LIMIT 1", [week_end]).fetchone()
+        rows = con.execute("SELECT id, end_date, settings, detail FROM replays WHERE id LIKE '%-aci%' "
+                           "AND end_date <= ? ORDER BY computed_at DESC", [week_end]).fetchall()
     except Exception:  # no replays stored
         return None
-    if not row:
-        return None
-    detail = json.loads(row[2]) if isinstance(row[2], str) else row[2]
-    cmp = (detail or {}).get("aci_comparison")
-    return {"id": row[0], "end_date": str(row[1])[:10], "comparison": cmp,
-            "settings": ((detail or {}).get("settings") or {}).get("aci")} if cmp else None
+    skipped = 0
+    for rid, end, settings, detail in rows:
+        settings = json.loads(settings) if isinstance(settings, str) else (settings or {})
+        detail = json.loads(detail) if isinstance(detail, str) else (detail or {})
+        if not detail.get("aci_comparison"):
+            continue
+        if not same_aci_settings(settings.get("aci"), rc):
+            skipped += 1
+            continue
+        return {"id": rid, "end_date": str(end)[:10], "comparison": detail["aci_comparison"],
+                "held_out": detail.get("aci_held_out"), "settings": settings.get("aci"),
+                "note": f"{skipped} newer ACI replay(s) with other settings than config/ranges.yaml skipped"
+                        if skipped else ""}
+    if skipped:
+        return {"id": None, "comparison": None, "held_out": None, "settings": None,
+                "note": f"{skipped} stored ACI replay(s), none with the config/ranges.yaml ACI settings "
+                        f"({', '.join(f'{k} {aci.settings(rc)[k]}' for k in ACI_SETTING_KEYS)}): no ACI proposal; "
+                        "run replay.py --aci with the current settings"}
+    return None
 
 
-def aci_proposal(rc: dict, rep: dict | None) -> dict | None:
-    """Propose switching ACI on when the replay shows, on every horizon, a lower 50% and 80%
-    interval score with both bands' coverage closer to target. Never when it is already on."""
-    if rep is None or (rc.get("aci") or {}).get("enabled"):
-        return None
-    rel, ok, now80, then80, n = [], True, {}, {}, 0
-    for h, groups in rep["comparison"].items():
+def aci_passes(cmp: dict) -> tuple[bool, list[float], dict, dict, int]:
+    """On every horizon: lower 80% and no higher 50% interval score, and both bands' coverage closer to target."""
+    rel, ok, before80, after80, n = [], True, {}, {}, 0
+    for h, groups in (cmp or {}).items():
         b, a = groups["overall"]["before"], groups["overall"]["after"]
         if not b.get("n") or b.get("score80") is None or a.get("score80") is None:
-            return None
+            return False, [], {}, {}, 0
         n += b["n"]
         better = a["score80"] < b["score80"] and a["score50"] <= b["score50"]
         closer = all(abs(a[f"cover{k}"] - t) < abs(b[f"cover{k}"] - t) for k, t in TARGETS.items())
         ok &= better and closer
         rel.append(a["score80"] / b["score80"] - 1)
-        now80[f"{h}d"], then80[f"{h}d"] = b["cover80"], a["cover80"]
-    if not ok or not rel:
+        before80[f"{h}d"], after80[f"{h}d"] = b["cover80"], a["cover80"]
+    return ok and bool(rel), rel, before80, after80, n
+
+
+def aci_proposal(rc: dict, rep: dict | None) -> dict | None:
+    """Propose switching ACI on (never when it is already on, never from a replay with other settings).
+    Out of sample: the replay's held-out check (replay.py --aci-tune-end) selected the config's settings
+    on the tuning dates and they pass `aci_passes` on the later test dates. Otherwise, if the whole
+    window passes, the proposal is PROVISIONAL: in-sample, the settings were tuned on that replay."""
+    if rep is None or not rep.get("comparison") or (rc.get("aci") or {}).get("enabled"):
         return None
-    return {"variant": f"ACI on (replay {rep['id']})", "source": "historical replay (replay.py --aci)", "n": n,
-            "verdict": "improves score", "drop": False, "rel_score": round(float(np.mean(rel)), 4),
+    if not same_aci_settings(rep.get("settings"), rc):
+        return None
+    ho = rep.get("held_out")
+    reason = "no held-out check (replay.py --aci --aci-tune-end)"
+    if ho:
+        ok_t, rel_t, b_t, a_t, n_t = aci_passes(ho.get("test_selected"))
+        if ho.get("selected_is_config") and ok_t:
+            return {"variant": f"ACI on (replay {rep['id']})", "n": n_t, "verdict": "improves score", "drop": False,
+                    "source": f"historical replay, out of sample (as-of dates after {ho['tune_end']})",
+                    "evidence": "out-of-sample", "provisional": False,
+                    "rel_score": round(float(np.mean(rel_t)), 4),
+                    "changes": [{"param": "aci.enabled", "current": False, "proposed": True}],
+                    "cover80_before": b_t, "cover80_after": a_t}
+        reason = ("held-out tuning picked other settings" if not ho.get("selected_is_config")
+                  else "held-out test dates do not pass")
+    ok, rel, b, a, n = aci_passes(rep["comparison"])
+    if not ok:
+        return None
+    return {"variant": f"ACI on (replay {rep['id']}), PROVISIONAL", "n": n, "verdict": "improves score (in-sample)",
+            "drop": False, "source": f"historical replay, in-sample: settings tuned on this replay; {reason}",
+            "evidence": "in-sample", "provisional": True, "rel_score": round(float(np.mean(rel)), 4),
             "changes": [{"param": "aci.enabled", "current": False, "proposed": True}],
-            "cover80_now": now80, "cover80_then": then80}
+            "cover80_before": b, "cover80_after": a}
 
 
 def confidence_advice(bands: dict, calls: dict, rv: dict) -> list[str]:
@@ -629,16 +676,37 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
                     [[f"{s['horizon_days']}d", f"{s['band']}%", s["key"], s["steps"], fnum(s["alpha"], 3),
                       fnum(s["effective_alpha"], 3), fpct(s["implied_coverage"], 1)] for s in a["state"]])]
     rep = a.get("replay")
-    if rep:
-        rows = [[f"{h}d", g, v["before"].get("n"),
+
+    def cmp_rows(cmp):
+        return [[f"{h}d", g, v["before"].get("n"),
                  f"{fpct(v['before'].get('cover50'), 1)} → {fpct(v['after'].get('cover50'), 1)}",
                  f"{fpct(v['before'].get('cover80'), 1)} → {fpct(v['after'].get('cover80'), 1)}",
                  f"{fnum(v['before'].get('score50'))} → {fnum(v['after'].get('score50'))}",
                  f"{fnum(v['before'].get('score80'))} → {fnum(v['after'].get('score80'))}"]
-                for h, groups in rep["comparison"].items() for g, v in groups.items() if v["before"].get("n")]
-        lines += [f"Historical replay `{rep['id']}` (`replay.py --aci`), fixed bands → ACI on the same rows:", "",
-                  table(["H", "Group", "n", "50% cover", "80% cover", "50% score", "80% score"], rows)]
-    else:
+                for h, groups in cmp.items() for g, v in groups.items() if v["before"].get("n")]
+    cmp_hdr = ["H", "Group", "n", "50% cover", "80% cover", "50% score", "80% score"]
+    if rep and rep.get("note"):
+        lines += [f"> {rep['note']}.", ""]
+    if rep and rep.get("comparison"):
+        lines += [f"Historical replay `{rep['id']}` (`replay.py --aci`), fixed bands → ACI on the same rows. "
+                  "**In-sample: the ACI settings in config/ranges.yaml were tuned on this replay window**, so these "
+                  "gains are optimistic:", "", table(cmp_hdr, cmp_rows(rep["comparison"]))]
+        ho = rep.get("held_out")
+        if ho:
+            sel = ho["selected"]
+            lines += [f"Held-out check: gamma and the alpha scope (one, or one per regime) picked on as-of dates up to "
+                      f"{ho['tune_end']} only (selected gamma {sel['gamma']}, "
+                      f"{'per regime' if sel['by_regime'] else 'one alpha'}; "
+                      f"{'the config settings' if ho['selected_is_config'] else 'NOT the config settings'}). "
+                      "Out of sample, fixed bands → the selected settings on the later as-of dates:", "",
+                      table(cmp_hdr, cmp_rows(ho["test_selected"]))]
+            if not ho["selected_is_config"] and ho.get("test_config"):
+                lines += ["The config settings on the same later dates (not out of sample: they were chosen on the "
+                          "whole window):", "", table(cmp_hdr, cmp_rows(ho["test_config"]))]
+        else:
+            lines += ["_No held-out check stored (`replay.py --aci --aci-tune-end DATE`): any ACI proposal is "
+                      "provisional._", ""]
+    elif not rep:
         lines += ["_No `replay.py --aci` record stored yet: no ACI proposal._", ""]
 
     lines += [f"## Calibration (latest as of {rec['week_end']})", "",
@@ -677,8 +745,8 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
     for p in props:
         for ch in p["changes"]:
             rows.append([f"`{ch['param']}`", fval(ch["current"]), fval(ch["proposed"]), p["source"], p["n"], f"{p['rel_score']:+.1%}",
-                         " / ".join(f"{fpct(p['cover80_now'].get(h))} → {fpct(p['cover80_then'].get(h))}"
-                                    for h in p["cover80_then"]), p["variant"]])
+                         " / ".join(f"{fpct(p['cover80_before'].get(h))} → {fpct(p['cover80_after'].get(h))}"
+                                    for h in p["cover80_after"]), p["variant"]])
     lines += [table(["Parameter", "Current", "Proposed", "Evidence", "n", "Score change", f"80% cover ({hz})", "Variant"], rows)
               if rows else f"_None: no variant cleared the thresholds (n >= {rv['min_n_recommend']}, score "
               f"{rv['min_improvement']:.0%} better without coverage falling more than {rv['coverage_tolerance']:.0%} "
@@ -733,7 +801,7 @@ def build(cfg: dict, rc: dict, rv: dict, con, week: str, history: bool = True) -
     d["proposals"] = proposals(rc, d["live_ablation"], d["history_ablation"])
     d["scores"] = {w: proper_scores(win(ranges, s), win(calls, s)) for w, s in windows.items()}
     d["aci"] = aci_state(con, rc, end)
-    d["aci"]["replay"] = latest_aci_replay(con, end)
+    d["aci"]["replay"] = latest_aci_replay(con, end, rc)
     p = aci_proposal(rc, d["aci"]["replay"])
     if p:
         d["proposals"].append(p)

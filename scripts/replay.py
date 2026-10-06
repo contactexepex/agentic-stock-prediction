@@ -62,7 +62,7 @@ SIGNAL_LABELS = {"always_up": "Always up", "momentum_1d": "1-day momentum", "mom
                  "rsi_reversion": "RSI(14) mean reversion"}
 RSI_LOW, RSI_HIGH = 30.0, 70.0
 DEFAULT_LEVELS = {"q10": 0.10, "q25": 0.25, "q75": 0.75, "q90": 0.90}   # fixed band quantiles (ACI off)
-MIN_MONTH_DAYS = 5 # the coverage-over-time chart leaves out months with fewer as-of days (kept in the JSON)
+MIN_MONTH_DAYS = 5   # the coverage-over-time chart leaves out months with fewer as-of days (kept in the JSON)
 
 
 # ---------- inputs as known at d ----------
@@ -846,8 +846,9 @@ def html_report(cfg: dict, s: dict) -> str:
         f"{a.get('max_shift')} from the target miss rate, after {a.get('min_history')} scored days, "
         f"{'one rate per regime' if a.get('by_regime') else 'one rate per horizon and band'}): each day the share "
         "of past ranges that missed moves the band's quantile level. The table compares the same rows with fixed bands "
-        "(before) and ACI (after). Width and scores in % of the price, lower is better.</p>"
-        f"{aci_table(s['aci_comparison'])}</div>")
+        "(before) and ACI (after). Width and scores in % of the price, lower is better. These settings may have "
+        "been chosen on this same window: in-sample unless the held-out check below agrees.</p>"
+        f"{aci_table(s['aci_comparison'])}{held_out_html(s.get('aci_held_out'))}</div>")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Historical Replay {esc(cfg['market'].upper())}</title>
 <style>{CSS}</style></head><body><main>
@@ -923,6 +924,97 @@ def aci_comparison(before: dict, after: dict) -> dict:
     return out
 
 
+def _num(x, k: int = 2) -> str:
+    return "" if x is None else f"{x:.{k}f}"
+
+
+ACI_GRID = tuple((g, br) for g in (0.002, 0.005, 0.01, 0.02) for br in (False, True))   # held-out tuning grid
+ACI_SETTING_KEYS = ("gamma", "max_shift", "min_history", "by_regime")
+
+
+def aci_tag(a: dict, tune_end: date | None = None) -> str:
+    """Replay id / file suffix naming the ACI settings (and the held-out split), e.g.
+    -aci-g0.01-regime-s0.15-m20-t2024-12-31."""
+    t = (f"-aci-g{a['gamma']:g}-{'regime' if a['by_regime'] else 'all'}-s{a['max_shift']:g}"
+         f"-m{int(a['min_history'])}")
+    return t + (f"-t{tune_end}" if tune_end else "")
+
+
+def _cmp_groups(g: pd.DataFrame, h: int) -> dict:
+    out = {"overall": range_summary(g, h)}
+    for k, x in g.groupby("regime"):
+        out[str(k)] = range_summary(x, h)
+    out["major event in horizon"] = range_summary(g[g["major"]], h)
+    out["no major event"] = range_summary(g[~g["major"]], h)
+    return out
+
+
+def rows_comparison(fixed: dict, after: dict, keep) -> dict:
+    """fixed vs ACI on the rows `keep(frame)` selects, per horizon: overall, by regime, by major event."""
+    out = {}
+    for h, gf in fixed.items():
+        b, a = _cmp_groups(gf[keep(gf)], h), _cmp_groups(after[h][keep(after[h])], h)
+        out[str(h)] = {k: {"before": {c: v.get(c) for c in CMP_KEYS}, "after": {c: a.get(k, {}).get(c) for c in CMP_KEYS}}
+                       for k, v in b.items()}
+    return out
+
+
+def mean_rel_score80(cmp: dict) -> float | None:
+    rel = [g["overall"]["after"]["score80"] / g["overall"]["before"]["score80"] - 1 for g in cmp.values()
+           if g["overall"]["before"].get("score80") and g["overall"]["after"].get("score80") is not None]
+    return float(np.mean(rel)) if rel else None
+
+
+def held_out(cfg: dict, rc: dict, con, tune_end: date, start: date | None = None, end: date | None = None) -> dict:
+    """Out-of-sample check of the ACI settings: every ACI_GRID variant is replayed (ACI runs online over
+    the whole window), the variant with the lowest mean relative 80% interval score on the TUNING rows
+    (as-of date and target close on or before tune_end) is selected, and fixed bands vs that variant (and
+    vs the config's settings) are compared on the TEST rows only (as-of date after tune_end)."""
+    bars, extra = load_inputs(cfg, rc, con)
+    fixed, _ = replay_rows(cfg, {**rc, "aci": {**aci.settings(rc), "enabled": False}}, bars, extra, start, end)
+
+    def tune(g: pd.DataFrame) -> pd.Series:   # outcome known by tune_end too (5-day targets cross it)
+        return (g["date"] <= tune_end) & g["bar_target"].map(lambda x: isinstance(x, date) and x <= tune_end)
+
+    def test(g: pd.DataFrame) -> pd.Series:
+        return g["date"] > tune_end
+
+    variants, frames = [], {}
+    for gamma, br in ACI_GRID:
+        r = aci_rc(rc, gamma, br)
+        res, _ = replay_rows(cfg, r, bars, extra, start, end)
+        key = aci_tag(r["aci"])
+        frames[key] = (r["aci"], res)
+        variants.append({"tag": key, "gamma": gamma, "by_regime": br,
+                         "tune_rel_score80": _r(mean_rel_score80(rows_comparison(fixed, res, tune)))})
+    best = min((v for v in variants if v["tune_rel_score80"] is not None), key=lambda v: v["tune_rel_score80"])
+    sel_settings, sel_res = frames[best["tag"]]
+    cur = aci_rc(rc)["aci"]
+    cur_key = aci_tag(cur)
+    if cur_key not in frames:
+        frames[cur_key] = (cur, replay_rows(cfg, aci_rc(rc), bars, extra, start, end)[0])
+    return {"tune_end": str(tune_end), "grid": variants,
+            "selected": {k: sel_settings[k] for k in ACI_SETTING_KEYS},
+            "config": {k: cur[k] for k in ACI_SETTING_KEYS},
+            "selected_is_config": all(sel_settings[k] == cur[k] for k in ACI_SETTING_KEYS),
+            "test_selected": rows_comparison(fixed, sel_res, test),
+            "test_config": rows_comparison(fixed, frames[cur_key][1], test),
+            "tune_config": rows_comparison(fixed, frames[cur_key][1], tune)}
+
+
+def held_out_html(ho: dict | None) -> str:
+    if not ho:
+        return "<p class=\"note\">No held-out check in this run (replay.py --aci --aci-tune-end DATE).</p>"
+    sel = ho["selected"]
+    return (f"<h3>Held-out check</h3><p>gamma and one-or-per-regime alpha picked from {len(ho['grid'])} variants on "
+            f"as-of dates up to {esc(ho['tune_end'])} only (lowest 80% interval score): gamma {sel['gamma']}, "
+            f"{'per regime' if sel['by_regime'] else 'one alpha'}"
+            f"{' = the config settings' if ho['selected_is_config'] else ' (not the config settings)'}. "
+            f"Fixed bands vs that choice on the later, unseen as-of dates:</p>{aci_table(ho['test_selected'])}"
+            + ("" if ho["selected_is_config"] else
+               f"<p>Fixed bands vs the config settings on the same later dates:</p>{aci_table(ho['test_config'])}"))
+
+
 def aci_table(cmp: dict) -> str:
     rows = []
     for h, groups in cmp.items():
@@ -930,12 +1022,11 @@ def aci_table(cmp: dict) -> str:
             b, a = v["before"], v["after"]
             if not b.get("n"):
                 continue
-            num = lambda x, k=2: "" if x is None else f"{x:.{k}f}"  # noqa: E731
             rows.append(f"<tr><td>{h}d</td><td>{esc(k)}</td><td>{b['n']:,}</td>"
                         + "".join(f"<td>{_f(b.get(c))} → {_f(a.get(c))}</td>" for c in ("cover50", "cover80"))
-                        + "".join(f"<td>{num(b.get(c))} → {num(a.get(c))}</td>"
+                        + "".join(f"<td>{_num(b.get(c))} → {_num(a.get(c))}</td>"
                                   for c in ("width80_pct", "score50", "score80"))
-                        + f"<td>{num(b.get('qs_pct'), 3)} → {num(a.get('qs_pct'), 3)}</td></tr>")
+                        + f"<td>{_num(b.get('qs_pct'), 3)} → {_num(a.get('qs_pct'), 3)}</td></tr>")
     head = ("<tr><th>H</th><th>Group</th><th>n</th><th>50% held</th><th>80% held</th><th>80% width</th>"
             "<th>50% score</th><th>80% score</th><th>Quantile score</th></tr>")
     return f'<div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div>'
@@ -1003,7 +1094,12 @@ def main() -> int:
                          "writes replay-<end>-aci.html|json")
     ap.add_argument("--aci-gamma", type=float, help="with --aci: gamma instead of config/ranges.yaml aci.gamma")
     ap.add_argument("--aci-by-regime", choices=("on", "off"), help="with --aci: one alpha per regime (on) or one overall")
+    ap.add_argument("--aci-tune-end", type=date.fromisoformat,
+                    help="with --aci: held-out check; pick gamma/by_regime from a grid on as-of dates up to this date, "
+                         "report fixed vs ACI on the dates after it (out of sample)")
     args = ap.parse_args()
+    if (args.aci_gamma is not None or args.aci_by_regime or args.aci_tune_end) and not args.aci:
+        raise SystemExit("--aci-gamma, --aci-by-regime and --aci-tune-end need --aci")
     cfg = require_market(args)
     rc = load_ranges_config(cfg["market"])
     con = connect(cfg["market"])
@@ -1014,9 +1110,12 @@ def main() -> int:
     if args.aci:
         before = s
         by = None if args.aci_by_regime is None else args.aci_by_regime == "on"
-        s, _ = run(cfg, aci_rc(rc, args.aci_gamma, by), con, args.start, args.end)
+        rc_aci = aci_rc(rc, args.aci_gamma, by)
+        s, _ = run(cfg, rc_aci, con, args.start, args.end)
         s["aci_comparison"] = aci_comparison(before, s)
-        suffix = "-aci"
+        if args.aci_tune_end:
+            s["aci_held_out"] = held_out(cfg, rc_aci, con, args.aci_tune_end, args.start, args.end)
+        suffix = aci_tag(rc_aci["aci"], args.aci_tune_end)
     out = ROOT / "reports" / cfg["market"]
     out.mkdir(parents=True, exist_ok=True)
     page, js = out / f"replay-{s['end']}{suffix}.html", out / f"replay-{s['end']}{suffix}.json"
@@ -1031,6 +1130,10 @@ def main() -> int:
                       "aci": s["settings"]["aci"],
                       "overall": {h: v["overall"] for h, v in s["horizons"].items()},
                       "aci_comparison": {h: v["overall"] for h, v in s.get("aci_comparison", {}).items()} or None,
+                      "aci_held_out": None if "aci_held_out" not in s else {
+                          **{k: s["aci_held_out"][k] for k in ("tune_end", "selected", "config", "selected_is_config")},
+                          "test_selected": {h: v["overall"] for h, v in s["aci_held_out"]["test_selected"].items()},
+                          "test_config": {h: v["overall"] for h, v in s["aci_held_out"]["test_config"].items()}},
                       "always_up": {h: (b or {}).get("always_up", {}).get("hit_rate") for h, b in s["baselines"].items()},
                       "summary": s["summary"]}, indent=2, default=str))
     return 0

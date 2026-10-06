@@ -103,7 +103,8 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    `reports/<market>/replay-<end>.html` with a plain-language summary, a `.json` with every number,
    and a row in `data/<market>/replays/`; `--start`/`--end` pick the as-of window;
    `--aci` adds the same replay with Adaptive Conformal Inference on and a before/after table,
-   `replay-<end>-aci.*`, which the weekly review reads to propose switching `aci:` on in
+   `replay-<end>-aci-<settings>.*`; `--aci-tune-end DATE` adds a held-out check, which the weekly
+   review reads to propose switching `aci:` on in
    `config/ranges.yaml`; it stays off until a human edits it),
    commit, push. Then click **Run now** on each routine and read the transcript (a green
    status only means the session ran, not that the task succeeded).

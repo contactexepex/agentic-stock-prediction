@@ -151,13 +151,23 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's
   fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
   synthetic series. About 22 s per market for five years of bars.
-- ACI mode (`--aci`, optional `--aci-gamma`, `--aci-by-regime on|off`): the same replay with
-  ACI on (each day's alpha from the misses of ranges whose target close is on or before d), and a
-  before/after table on the same rows (coverage at 50%/80%, width, interval scores, quantile
-  score; overall, by regime and by major event) in `replay-<end>-aci.html|json` and a replays row
-  with id `<start>_<end>-aci`. The weekly review reads the newest such row and proposes
-  `aci.enabled: true` only if, on every horizon, both interval scores are lower and both bands'
-  coverage is closer to target. Evidence on a 5-year scratch backfill (`collect_prices --period 5y`,
+- ACI mode (`--aci`, optional `--aci-gamma`, `--aci-by-regime on|off`, `--aci-tune-end DATE`): the
+  same replay with ACI on (each day's alpha from the misses of ranges whose target close is on or
+  before d), and a before/after table on the same rows (coverage at 50%/80%, width, interval
+  scores, quantile score; overall, by regime and by major event) in `replay-<end><tag>.html|json`
+  and a replays row with id `<start>_<end><tag>`; the tag names the settings, e.g.
+  `-aci-g0.01-regime-s0.15-m20`, plus `-t<DATE>` for a held-out run. Held-out check
+  (`--aci-tune-end`): each of 8 variants (gamma 0.002/0.005/0.01/0.02, one alpha or one per regime)
+  is replayed; the one with the lowest mean relative 80% interval score on the tuning rows (as-of
+  date and target close on or before DATE) is selected, and fixed bands vs that choice (and vs the
+  config's settings) are compared on the later as-of dates only.
+- The weekly review uses the newest such row whose ACI settings (gamma, max_shift, min_history,
+  by_regime) equal `config/ranges.yaml`'s; rows with other settings are skipped with a note. It
+  proposes `aci.enabled: true` only if, on every horizon, the 80% interval score is lower, the 50%
+  one no higher, and both bands' coverage closer to target. The proposal is out of sample only when
+  the held-out tuning selected the config's settings and the test dates pass; otherwise it is
+  marked PROVISIONAL ("in-sample: settings tuned on this replay").
+- Evidence on a 5-year scratch backfill (`collect_prices --period 5y`,
   `collect_events --history-days 1900`, never the real data/; as-of days 2021-12-31 (US) and
   2022-01-03 (India) to 2026-10-05), fixed bands -> ACI with the `config/ranges.yaml` settings
   (gamma 0.01, max shift 0.15, min history 20, one alpha per regime), 80% interval score in % of
@@ -175,8 +185,26 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   this same replay (a sweep of gamma 0.002/0.005/0.01/0.02 with and without regimes; all help, the
   differences are small), so the gain is in-sample: one alpha for all regimes (gamma 0.01) reaches
   80% overall but leaves CALM under target (76.7-78.2% of 80% ranges held) while UNSTABLE stays
-  wide, so alpha is kept per regime. UNSTABLE days
-  are few, so their alpha moves slowly and the bands there stay wider than promised.
+  wide, so alpha is kept per regime. UNSTABLE days are few, so their alpha moves slowly and the
+  bands there stay wider than promised.
+
+  Held-out check (`--aci-tune-end 2024-12-31`; tuning on as-of dates to 2024-12-31, test on
+  the as-of dates after it, to 2026-10-05). In both markets the tuning dates select gamma 0.02 with one alpha,
+  not the config's settings, so the review's proposal stays PROVISIONAL. Fixed bands -> that
+  selection on the unseen test dates:
+
+  | Market, horizon | n | 50% held | 80% held | 50% score | 80% score | CALM 80% held |
+  |---|---|---|---|---|---|---|
+  | US 1d | 8,780 | 52.4% -> 50.2% | 82.0% -> 80.1% | 5.020 -> 5.009 | 7.509 -> 7.478 | 80.1% -> 77.9% |
+  | US 5d | 8,700 | 55.6% -> 50.5% | 85.0% -> 80.2% | 11.480 -> 11.405 | 17.109 -> 16.865 | 82.0% -> 76.6% |
+  | India 1d | 8,675 | 52.46% -> 50.05% | 82.0% -> 80.0% | 3.582 -> 3.576 | 5.439 -> 5.415 | 79.5% -> 76.9% |
+  | India 5d | 8,610 | 55.3% -> 50.2% | 84.95% -> 80.4% | 8.267 -> 8.231 | 12.287 -> 12.087 | 81.6% -> 75.75% |
+
+  Out of sample, ACI with one alpha still brings both bands to target and lowers both interval
+  scores on every horizon, but CALM falls under target, as in-sample. On the same test dates the
+  config's settings (gamma 0.01, per regime) score 7.447 / 16.595 (US 1d / 5d 80%) and 5.386 /
+  11.985 (India) with CALM at 79.5-80.4%, but those settings were chosen on the whole window, so
+  that comparison is not out of sample.
 
 **AI replay harness** (`scripts/ai_replay.py`): the table above keeps AI judgement out of backtests
 because the model may have seen past outcomes. Days after its training data (as-of dates after
