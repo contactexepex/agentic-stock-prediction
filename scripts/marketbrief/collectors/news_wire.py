@@ -1,6 +1,7 @@
 """Wire (press-release) matching on its own: the tickers a wire text names. The collector gets the same
 names and exclusions through the Tagger's wire rules (marketbrief/analytics/news_tags.py), which also split
 primary and mentioned."""
+
 from __future__ import annotations
 
 import re

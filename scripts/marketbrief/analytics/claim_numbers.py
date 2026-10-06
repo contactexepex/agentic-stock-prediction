@@ -1,4 +1,5 @@
 """Numbers quoted in claims: number literals with scale and unit, their stated rounding, and matching."""
+
 from __future__ import annotations
 
 import math
@@ -11,18 +12,44 @@ NUMBER_LITERAL = re.compile(
     r"(?P<cur>US\$|\$|₹|Rs\.?\s?|INR\s?|USD\s?|€|£)?\s?"
     r"(?P<num>\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
     r"(?:\s?(?P<scale>lakh crore|trillion|billion|million|thousand|crore|lakh|tn|bn|mn|cr|k|b|m)\b)?"
-    r"\s?(?P<pct>%|per ?cent\b|percent\b|bps\b|basis points\b)?", re.I)
+    r"\s?(?P<pct>%|per ?cent\b|percent\b|bps\b|basis points\b)?",
+    re.I,
+)
 PLAIN_NUMBER = re.compile(r"(?<![A-Za-z0-9.])\d[\d,]*(?:\.\d+)?")
-SCALES = {"trillion": 1e12, "tn": 1e12, "billion": 1e9, "bn": 1e9, "b": 1e9, "million": 1e6, "mn": 1e6,
-          "m": 1e6, "thousand": 1e3, "k": 1e3, "crore": 1e7, "cr": 1e7, "lakh": 1e5, "lakh crore": 1e12}
-CURRENCIES = {"$": "usd", "us$": "usd", "usd": "usd", "₹": "inr", "rs": "inr", "rs.": "inr", "inr": "inr",
-              "€": "eur", "£": "gbp"}
+SCALES = {
+    "trillion": 1e12,
+    "tn": 1e12,
+    "billion": 1e9,
+    "bn": 1e9,
+    "b": 1e9,
+    "million": 1e6,
+    "mn": 1e6,
+    "m": 1e6,
+    "thousand": 1e3,
+    "k": 1e3,
+    "crore": 1e7,
+    "cr": 1e7,
+    "lakh": 1e5,
+    "lakh crore": 1e12,
+}
+CURRENCIES = {
+    "$": "usd",
+    "us$": "usd",
+    "usd": "usd",
+    "₹": "inr",
+    "rs": "inr",
+    "rs.": "inr",
+    "inr": "inr",
+    "€": "eur",
+    "£": "gbp",
+}
 EXACT = 1e-9
 
 
 @dataclass(frozen=True)
 class QuotedNumber:
     """One number literal of a text: its text, value with the scale applied, unit marker and half rounding step."""
+
     literal: str
     value: float
     unit: str | None
@@ -88,8 +115,9 @@ def half_step_of(literal: str | None) -> float:
     return numbers[0].half_step if numbers else 0.0
 
 
-def values_match(first: tuple[float, str | None], second: tuple[float, str | None],
-                 relative: float = RELATIVE_TOLERANCE) -> bool:
+def values_match(
+    first: tuple[float, str | None], second: tuple[float, str | None], relative: float = RELATIVE_TOLERANCE
+) -> bool:
     """Two stated values agree within `relative` of the larger, or within either literal's stated rounding."""
     (a, a_text), (b, b_text) = first, second
     tolerance = max(relative * max(abs(a), abs(b)), half_step_of(a_text), half_step_of(b_text))

@@ -1,4 +1,5 @@
 """Markdown table builders."""
+
 from __future__ import annotations
 
 NO_ROWS_MARKDOWN = "_none_\n"

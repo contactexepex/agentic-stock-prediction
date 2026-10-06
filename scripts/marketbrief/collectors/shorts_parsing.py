@@ -1,14 +1,23 @@
 """Parsers of the FINRA short-selling sources: the Reg SHO daily short-sale volume file (pipe-separated, with a
 header and a trailer line holding the number of data rows) and the consolidated short interest JSON."""
+
 from __future__ import annotations
 
 from datetime import date
 
 from marketbrief.constants.columns import COL_DATE, COL_ID, COL_TICKER
 from marketbrief.constants.config_keys import CFG_TICKERS
-from marketbrief.constants.free_sources import (MSG_EMPTY_FILE, MSG_FILE_WRONG_DATE, MSG_NO_TRAILER,
-                                                MSG_TRAILER_MISMATCH, MSG_UNEXPECTED_HEADER, SOURCE_FINRA_INTEREST,
-                                                SOURCE_FINRA_REGSHO, VOLUME_HEADER_PREFIX, VOLUME_MIN_FIELDS)
+from marketbrief.constants.free_sources import (
+    MSG_EMPTY_FILE,
+    MSG_FILE_WRONG_DATE,
+    MSG_NO_TRAILER,
+    MSG_TRAILER_MISMATCH,
+    MSG_UNEXPECTED_HEADER,
+    SOURCE_FINRA_INTEREST,
+    SOURCE_FINRA_REGSHO,
+    VOLUME_HEADER_PREFIX,
+    VOLUME_MIN_FIELDS,
+)
 from marketbrief.utils.numbers import parse_accounting_amount
 
 HEADER_PREVIEW = 60
@@ -32,13 +41,23 @@ def volume_problem(trailer: list[str], data: list[list[str]]) -> str | None:
 
 def volume_row(parts: list[str], day: date, ticker: str, now: str) -> dict:
     """One `shorts` row of a data line (Date|Symbol|ShortVolume|ShortExemptVolume|TotalVolume|Market(s))."""
-    short, exempt, total = (parse_accounting_amount(parts[2]), parse_accounting_amount(parts[3]),
-                            parse_accounting_amount(parts[4]))
-    return {COL_ID: f"finra-shvol-{day}-{ticker}", COL_DATE: str(day), COL_TICKER: ticker,
-            "short_volume": short, "short_exempt_volume": exempt, "total_volume": total,
-            "short_pct": round(short / total * 100, SHORT_PERCENT_DECIMALS) if short is not None and total else None,
-            "markets": parts[MARKETS_INDEX] if len(parts) > MARKETS_INDEX else None, "source": SOURCE_FINRA_REGSHO,
-            "first_seen_at": now}
+    short, exempt, total = (
+        parse_accounting_amount(parts[2]),
+        parse_accounting_amount(parts[3]),
+        parse_accounting_amount(parts[4]),
+    )
+    return {
+        COL_ID: f"finra-shvol-{day}-{ticker}",
+        COL_DATE: str(day),
+        COL_TICKER: ticker,
+        "short_volume": short,
+        "short_exempt_volume": exempt,
+        "total_volume": total,
+        "short_pct": round(short / total * 100, SHORT_PERCENT_DECIMALS) if short is not None and total else None,
+        "markets": parts[MARKETS_INDEX] if len(parts) > MARKETS_INDEX else None,
+        "source": SOURCE_FINRA_REGSHO,
+        "first_seen_at": now,
+    }
 
 
 def parse_volume(text: str, day: date, symbols: dict[str, str], now: str) -> tuple[list[dict], str | None]:
@@ -72,12 +91,19 @@ def parse_short_interest(payload, symbols: dict[str, str], now: str) -> list[dic
         settlement = record.get("settlementDate")
         if not ticker or not settlement:
             continue
-        rows.append({COL_ID: f"finra-si-{settlement}-{ticker}", "settlement_date": settlement, COL_TICKER: ticker,
-                     "short_interest": parse_accounting_amount(record.get("currentShortPositionQuantity")),
-                     "prev_short_interest": parse_accounting_amount(record.get("previousShortPositionQuantity")),
-                     "change_pct": parse_accounting_amount(record.get("changePercent")),
-                     "avg_daily_volume": parse_accounting_amount(record.get("averageDailyVolumeQuantity")),
-                     "days_to_cover": parse_accounting_amount(record.get("daysToCoverQuantity")),
-                     "revised": bool(record.get("revisionFlag")), "source": SOURCE_FINRA_INTEREST,
-                     "first_seen_at": now})
+        rows.append(
+            {
+                COL_ID: f"finra-si-{settlement}-{ticker}",
+                "settlement_date": settlement,
+                COL_TICKER: ticker,
+                "short_interest": parse_accounting_amount(record.get("currentShortPositionQuantity")),
+                "prev_short_interest": parse_accounting_amount(record.get("previousShortPositionQuantity")),
+                "change_pct": parse_accounting_amount(record.get("changePercent")),
+                "avg_daily_volume": parse_accounting_amount(record.get("averageDailyVolumeQuantity")),
+                "days_to_cover": parse_accounting_amount(record.get("daysToCoverQuantity")),
+                "revised": bool(record.get("revisionFlag")),
+                "source": SOURCE_FINRA_INTEREST,
+                "first_seen_at": now,
+            }
+        )
     return rows

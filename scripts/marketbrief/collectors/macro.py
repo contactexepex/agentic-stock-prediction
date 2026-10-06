@@ -12,21 +12,41 @@ configured ratio is stored with `complete` false and fetched again on the next r
 lists every source or session that could not be read (HTTP status, or the host to allowlist),
 a per-session file missing before the latest completed session is a failure, the latest one a
 note (publishing lag). Exit code 1 only if every source failed."""
+
 from __future__ import annotations
 
 import json
 from datetime import date, timedelta
 
-from marketbrief.collectors.collector_store import (Problems, complete_days, not_published, stale_cutoff,
-                                                      store_changed, summary)
+from marketbrief.collectors.collector_store import (
+    Problems,
+    complete_days,
+    not_published,
+    stale_cutoff,
+    store_changed,
+    summary,
+)
 from marketbrief.collectors.macro_parsing import parse_cboe, parse_fred, treasury
 from marketbrief.constants.config_keys import CFG_MACRO, CFG_MARKET
-from marketbrief.constants.free_sources import (CBOE_URL, COLLECTOR_MACRO, DEFAULT_CBOE_LOOKBACK_DAYS,
-                                                DEFAULT_MACRO_LOOKBACK_DAYS, DEFAULT_MACRO_PAUSE_SECONDS, FRED_URL,
-                                                HEADERS_CSV, MACRO_VALUE_COLUMNS, MSG_CBOE_NOT_YET,
-                                                MSG_CBOE_RATIOS_MISSING, MSG_NO_FRED_VALUES, MSG_NO_YIELD_ROWS,
-                                                MSG_SKIPPED_NO_MACRO, MSG_TREASURY_NOTE, SOURCE_CBOE,
-                                                SOURCE_TREASURY, UNIT_PERCENT)
+from marketbrief.constants.free_sources import (
+    CBOE_URL,
+    COLLECTOR_MACRO,
+    DEFAULT_CBOE_LOOKBACK_DAYS,
+    DEFAULT_MACRO_LOOKBACK_DAYS,
+    DEFAULT_MACRO_PAUSE_SECONDS,
+    FRED_URL,
+    HEADERS_CSV,
+    MACRO_VALUE_COLUMNS,
+    MSG_CBOE_NOT_YET,
+    MSG_CBOE_RATIOS_MISSING,
+    MSG_NO_FRED_VALUES,
+    MSG_NO_YIELD_ROWS,
+    MSG_SKIPPED_NO_MACRO,
+    MSG_TREASURY_NOTE,
+    SOURCE_CBOE,
+    SOURCE_TREASURY,
+    UNIT_PERCENT,
+)
 from marketbrief.constants.kinds import KIND_MACRO
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_MARKET, SUMMARY_SKIPPED
 from marketbrief.core.cli import market_arg, require_market
@@ -55,13 +75,19 @@ def collect_cboe(client, cfg: dict, today: date, settings: dict, now: str, probl
                 problems.notes.append(MSG_CBOE_NOT_YET.format(day=day, status=exc.status))
                 continue
             problems.failed.append(exc.entry(SOURCE_CBOE, date=str(day)))
-            if exc.host or exc.status is None:   # host unreachable: the other days fail the same way
+            if exc.host or exc.status is None:  # host unreachable: the other days fail the same way
                 break
             continue
         found, missing = parse_cboe(payload, day, wanted, now)
         if missing:
-            problems.failed.append({"source": SOURCE_CBOE, "date": str(day), "url": url,
-                                    "error": MSG_CBOE_RATIOS_MISSING.format(missing=missing)})
+            problems.failed.append(
+                {
+                    "source": SOURCE_CBOE,
+                    "date": str(day),
+                    "url": url,
+                    "error": MSG_CBOE_RATIOS_MISSING.format(missing=missing),
+                }
+            )
         available += 1
         rows += found
     return rows, available
@@ -95,8 +121,9 @@ def collect_fred(client, series: dict, today: date, lookback: int, now: str, pro
             continue
         found = parse_fred(text, series_id, since, meta.get("unit", UNIT_PERCENT), meta.get("name", series_id), now)
         if not found:
-            problems.failed.append({"source": f"fred:{series_id}", "url": url,
-                                    "error": MSG_NO_FRED_VALUES.format(days=lookback)})
+            problems.failed.append(
+                {"source": f"fred:{series_id}", "url": url, "error": MSG_NO_FRED_VALUES.format(days=lookback)}
+            )
             continue
         answered += 1
         rows += found
@@ -131,8 +158,15 @@ def main() -> int:
     """Entry point of scripts/collect_macro.py."""
     cfg = require_market(market_arg(__doc__).parse_args())
     if not cfg.get(CFG_MACRO):
-        print(json.dumps({SUMMARY_COLLECTOR: COLLECTOR_MACRO, SUMMARY_MARKET: cfg[CFG_MARKET],
-                          SUMMARY_SKIPPED: MSG_SKIPPED_NO_MACRO}))
+        print(
+            json.dumps(
+                {
+                    SUMMARY_COLLECTOR: COLLECTOR_MACRO,
+                    SUMMARY_MARKET: cfg[CFG_MARKET],
+                    SUMMARY_SKIPPED: MSG_SKIPPED_NO_MACRO,
+                }
+            )
+        )
         return 0
     client = FreeSourceClient(pause=float(cfg[CFG_MACRO].get("pause_seconds", DEFAULT_MACRO_PAUSE_SECONDS)))
     out = collect(cfg, client, utc_today(), utc_now())

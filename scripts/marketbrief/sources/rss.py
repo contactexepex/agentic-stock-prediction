@@ -1,4 +1,5 @@
 """RSS and Atom feed access (feedparser, with the project's User-Agent)."""
+
 from __future__ import annotations
 
 import feedparser

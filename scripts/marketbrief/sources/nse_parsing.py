@@ -1,5 +1,6 @@
 """Parsing helpers for NSE payloads (fields are strings; "-", "" and "Nil" mean missing) and the XBRL instance
 documents of SEBI PIT and Integrated Filing disclosures."""
+
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +8,7 @@ import re
 from datetime import date, datetime, timezone
 
 from marketbrief.constants.config_keys import CFG_TICKERS, META_NSE_SYMBOL, META_YAHOO
-from marketbrief.constants.sources import (NSE_DATE_FORMATS, NSE_MISSING_VALUES, NSE_YAHOO_SUFFIX, TIMEZONE_IST)
+from marketbrief.constants.sources import NSE_DATE_FORMATS, NSE_MISSING_VALUES, NSE_YAHOO_SUFFIX, TIMEZONE_IST
 
 IST = TIMEZONE_IST
 SHORT_HASH_LENGTH = 12
@@ -64,8 +65,10 @@ def iso(value) -> str | None:
 
 def nse_symbols(cfg: dict) -> dict[str, str]:
     """NSE symbol -> watchlist ticker."""
-    return {meta.get(META_NSE_SYMBOL, meta[META_YAHOO].removesuffix(NSE_YAHOO_SUFFIX)).upper(): ticker
-            for ticker, meta in cfg[CFG_TICKERS].items()}
+    return {
+        meta.get(META_NSE_SYMBOL, meta[META_YAHOO].removesuffix(NSE_YAHOO_SUFFIX)).upper(): ticker
+        for ticker, meta in cfg[CFG_TICKERS].items()
+    }
 
 
 def xbrl(text: str) -> tuple[dict[str, dict], dict[str, dict[str, str]]]:
@@ -73,8 +76,12 @@ def xbrl(text: str) -> tuple[dict[str, dict], dict[str, dict[str, str]]]:
     contexts = {}
     for context_id, body in _CONTEXT.findall(text):
         period = dict(_PERIOD.findall(body))
-        contexts[context_id] = {"start": period.get("startDate"), "end": period.get("endDate"),
-                                "instant": period.get("instant"), "dimensional": "xbrldi:" in body}
+        contexts[context_id] = {
+            "start": period.get("startDate"),
+            "end": period.get("endDate"),
+            "instant": period.get("instant"),
+            "dimensional": "xbrldi:" in body,
+        }
     facts: dict[str, dict[str, str]] = {}
     for _prefix, name, context, value in _FACT.findall(text):
         facts.setdefault(context, {})[name] = (value or "").strip()

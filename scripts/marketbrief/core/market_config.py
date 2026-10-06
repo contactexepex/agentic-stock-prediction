@@ -1,15 +1,32 @@
 """Loading config/markets/<market>.yaml and config/ranges.yaml, and reading symbol roles from them."""
+
 from __future__ import annotations
 
 import yaml
 
-from marketbrief.constants.config_keys import (BY_MARKET_SUFFIX, CFG_MARKET, CFG_SECTOR_ETFS, CFG_SECTORS,
-                                               CFG_SYMBOLS, CFG_TICKERS, META_ROLE, META_SECTOR, META_SECTOR_ETF,
-                                               META_SECTORS, META_YAHOO, ROLE_BENCHMARK, ROLE_SECTOR_ETF,
-                                               ROLE_VOL_INDEX)
+from marketbrief.constants.config_keys import (
+    BY_MARKET_SUFFIX,
+    CFG_MARKET,
+    CFG_SECTOR_ETFS,
+    CFG_SECTORS,
+    CFG_SYMBOLS,
+    CFG_TICKERS,
+    META_ROLE,
+    META_SECTOR,
+    META_SECTOR_ETF,
+    META_SECTORS,
+    META_YAHOO,
+    ROLE_BENCHMARK,
+    ROLE_SECTOR_ETF,
+    ROLE_VOL_INDEX,
+)
 from marketbrief.constants.files import DIR_CONFIG_MARKETS, FILE_RANGES_CONFIG, YAML_SUFFIX
-from marketbrief.constants.messages import (MSG_SECTORS_ONLY_FOR_SECTOR_ETF, MSG_SECTOR_MAPPED_TWICE,
-                                            MSG_SECTOR_UNKNOWN, MSG_UNKNOWN_MARKET)
+from marketbrief.constants.messages import (
+    MSG_SECTORS_ONLY_FOR_SECTOR_ETF,
+    MSG_SECTOR_MAPPED_TWICE,
+    MSG_SECTOR_UNKNOWN,
+    MSG_UNKNOWN_MARKET,
+)
 from marketbrief.core import paths
 
 
@@ -41,7 +58,7 @@ def load_market(name: str) -> dict:
         meta.setdefault(META_YAHOO, key)
     for key, meta in cfg[CFG_SYMBOLS].items():
         meta.setdefault(META_YAHOO, key)
-    sector_of = {t: s for s, ts in cfg.get(CFG_SECTORS, {}).items() for t in ts}
+    sector_of = {ticker: s for s, ts in cfg.get(CFG_SECTORS, {}).items() for ticker in ts}
     for key, meta in cfg[CFG_TICKERS].items():
         meta.setdefault(META_SECTOR, sector_of.get(key))
     cfg[CFG_SECTOR_ETFS] = sector_etf_map(cfg)

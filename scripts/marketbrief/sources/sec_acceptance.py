@@ -4,6 +4,7 @@ and the collectors' summary of the checks.
 Background (docs in sources/sec_filings.py): the submissions JSON's `acceptanceDateTime` is sometimes shifted
 later by the New York UTC offset (+4h EDT, +5h EST) for a whole CIK's file; the SGML header's
 `<ACCEPTANCE-DATETIME>` (US Eastern) is the authority."""
+
 from __future__ import annotations
 
 import re
@@ -14,10 +15,10 @@ from marketbrief.constants.messages import MSG_SEC_TIME_UNVERIFIED_WARNING
 from marketbrief.constants.statuses import STATUS_OK, STATUS_SHIFTED, STATUS_UNVERIFIED, UNVERIFIED_PREFIX
 from marketbrief.utils.timefmt import format_utc_z, parse_utc_z
 
-EASTERN = ZoneInfo("America/New_York")   # EDGAR's clock (SGML header and index page times)
+EASTERN = ZoneInfo("America/New_York")  # EDGAR's clock (SGML header and index page times)
 SGML_ACCEPTANCE_PATTERN = re.compile(rb"<ACCEPTANCE-DATETIME>\s*(\d{14})")
 SGML_ACCEPTANCE_FORMAT = "%Y%m%d%H%M%S"
-CANDIDATE_OFFSET_HOURS = (5, 4)   # EST's 5 is tried first when unshifting around a DST change
+CANDIDATE_OFFSET_HOURS = (5, 4)  # EST's 5 is tried first when unshifting around a DST change
 
 
 def et_offset_hours(instant: datetime) -> int:
@@ -54,9 +55,11 @@ def unshift(json_value: str) -> str:
 def time_summary(edgar) -> dict:
     """Collector summary of the acceptance-time checks: {"ok": n, "shifted": [CIK], "unverified": {CIK: why}}."""
     checks = getattr(edgar, "time_checks", {})
-    return {STATUS_OK: sum(v == STATUS_OK for v in checks.values()),
-            STATUS_SHIFTED: sorted(c for c, v in checks.items() if v == STATUS_SHIFTED),
-            STATUS_UNVERIFIED: {c: v.split(": ", 1)[-1] for c, v in checks.items() if v.startswith(STATUS_UNVERIFIED)}}
+    return {
+        STATUS_OK: sum(v == STATUS_OK for v in checks.values()),
+        STATUS_SHIFTED: sorted(c for c, v in checks.items() if v == STATUS_SHIFTED),
+        STATUS_UNVERIFIED: {c: v.split(": ", 1)[-1] for c, v in checks.items() if v.startswith(STATUS_UNVERIFIED)},
+    }
 
 
 def time_warnings(checked) -> list[str]:
@@ -64,8 +67,10 @@ def time_warnings(checked) -> list[str]:
     4-5h late): for the collectors' `warnings` (the routine lists them in data_quality). Takes the
     Edgar client or a time_summary dict."""
     summary = checked if isinstance(checked, dict) else time_summary(checked)
-    return [MSG_SEC_TIME_UNVERIFIED_WARNING.format(cik=cik, why=why)
-            for cik, why in (summary.get(STATUS_UNVERIFIED) or {}).items()]
+    return [
+        MSG_SEC_TIME_UNVERIFIED_WARNING.format(cik=cik, why=why)
+        for cik, why in (summary.get(STATUS_UNVERIFIED) or {}).items()
+    ]
 
 
 def unverified(why: str) -> str:

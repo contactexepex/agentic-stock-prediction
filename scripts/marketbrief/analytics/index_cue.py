@@ -1,5 +1,6 @@
 """The overnight index cue of the range centre (beta split): the beta of the benchmark's daily move on the cue's
 previous-session move, fitted from stored bars or set in the market config (`index_cue`)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -14,8 +15,9 @@ def log_returns(close: pd.Series) -> pd.Series:
     return np.log(close / close.shift(1))
 
 
-def fit_cue_beta(bench: pd.Series, cue: pd.Series, upto: pd.Timestamp | None, sessions: int,
-                 min_obs: int = MIN_CUE_OBSERVATIONS) -> float | None:
+def fit_cue_beta(
+    bench: pd.Series, cue: pd.Series, upto: pd.Timestamp | None, sessions: int, min_obs: int = MIN_CUE_OBSERVATIONS
+) -> float | None:
     """Slope of the benchmark's daily log return on the cue's previous-session log return (the
     last cue session strictly before the benchmark date), over the last `sessions` benchmark sessions."""
     bench_returns = log_returns(bench).dropna()

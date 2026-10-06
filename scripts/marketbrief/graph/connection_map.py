@@ -1,33 +1,11 @@
-"""Per-company connection map (DESIGN.md phase 5) for one market.
-
-Edges link a watchlist ticker to a person or company (board, group, subsidiary, supplier,
-customer, competitor, promoter, major_holder). They are written by the graph-builder agent,
-each citing a public source, and stored append-only in data/<market>/graph/YYYY/MM/<date>.jsonl.
-The id is <ticker>|<relation>|<target slug>: a newer row with the same id replaces the edge,
-and status "removed" retracts it (view graph_edges).
-
-  graph.py status            JSON: edge counts, tickers without edges, refresh_due
-  graph.py edges [--ticker]  Markdown table of current edges
-  graph.py hits [--days N]   second-order news: articles about a linked entity, not the ticker
-  graph.py add FILE          validate a JSONL file of edges and append new or changed ones
-  graph.py attempt [--note]  record a refresh attempt in data/<market>/graph_runs/ (run after
-                             every graph-builder run, even one that added nothing)
-A refresh is due when no attempt has been recorded in the current UTC month, so a run that
-finds nothing to add is not repeated until the next month."""
-
+"""The connection map: edges between watchlist companies and the people and companies around them."""
 from __future__ import annotations
 
 import json
-import re
-import sys
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
-
-from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
-from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl, day_file
-from marketbrief.utils.markdown import cursor_markdown_table
 from marketbrief.utils.text import slugify
 from marketbrief.constants.connection_map import (
     MSG_ALIASES_MUST_BE_A_LIST_OF,
@@ -40,13 +18,16 @@ from marketbrief.constants.connection_map import (
     MSG_TARGET_NAME_MISSING,
     MSG_TARGET_TICKER_MUST_BE_A_STRING,
     MSG_TICKER_NOT_IN_THE_WATCHLIST,
-    MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL,
     MSG_WEIGHT_MUST_BE_A_NUMBER_OR,
 )
 
+
 RELATIONS = ("board", "group", "subsidiary", "supplier", "customer", "competitor", "promoter", "major_holder")
+
 TARGET_KINDS = ("person", "company")
+
 STATUSES = ("active", "removed")
+
 COMPARE = (
     "ticker",
     "relation",
@@ -60,6 +41,7 @@ COMPARE = (
     "as_of",
     "source_url",
 )
+
 MIN_NAME = 3  # shorter names/aliases are never matched against headlines
 
 
@@ -232,132 +214,3 @@ def attempt(cfg: dict, con, note: str | None = None) -> dict:
     }
     append_jsonl(day_file(cfg["market"], "graph_runs", utc_today()), [row])
     return {"step": "graph_attempt", **row}
-
-
-def name_patterns(edges: list[dict]) -> list[tuple[dict, re.Pattern]]:
-    """A compiled name pattern for each edge's target and aliases."""
-    out = []
-    for edge in edges:
-        names = [name for name in {edge["target"], *(edge.get("aliases") or [])} if len(name) >= MIN_NAME]
-        if names:
-            out.append(
-                (
-                    edge,
-                    re.compile(
-                        r"(?<!\w)(" + "|".join(map(re.escape, sorted(names, key=len, reverse=True))) + r")(?!\w)", re.I
-                    ),
-                )
-            )
-    return out
-
-
-def hits(_cfg: dict, con, days: int = 1, today: date | None = None) -> list[dict]:
-    """Second-order news: an article that names a linked entity (or is tagged with a linked
-    watchlist ticker) but is not itself tagged with the ticker. One row per (ticker, article)."""
-    edges = load_edges(con)
-    if not edges:
-        return []
-    since = (today or utc_today()) - timedelta(days=days)
-    news = con.execute(
-        """
-        SELECT n.id, n.title, n.source, n.tickers, CAST(coalesce(n.published_at, n.first_seen_at) AS DATE) AS day,
-               e.sentiment, e.materiality
-        FROM (SELECT DISTINCT ON (id) * FROM news ORDER BY id, first_seen_at) n
-        LEFT JOIN enriched_latest e USING (id)
-        WHERE CAST(coalesce(n.published_at, n.first_seen_at) AS DATE) >= ?""",
-        [since],
-    ).fetchall()
-    pats = name_patterns(edges)
-    found: dict[tuple[str, str], dict] = {}
-    for nid, title, source, tagged, day, sentiment, materiality in news:
-        tagged = set(tagged or [])
-        for edge, pat in pats:
-            match = pat.search(title or "")
-            via_ticker = edge.get("target_ticker") and edge["target_ticker"] in tagged
-            if edge["ticker"] in tagged or not (match or via_ticker):
-                continue
-            key = (edge["ticker"], nid)
-            link = f"{edge['relation']}: {edge['target']}"
-            if key in found:
-                if link not in found[key]["via"]:
-                    found[key]["via"].append(link)
-                continue
-            found[key] = {
-                "ticker": edge["ticker"],
-                "via": [link],
-                "news_id": nid,
-                "day": str(day),
-                "title": title,
-                "source": source,
-                "sentiment": sentiment,
-                "materiality": materiality,
-            }
-    return sorted(found.values(), key=lambda hit: (hit["ticker"], hit["day"], hit["news_id"]))
-
-
-def context_section(cfg: dict, con, days: int = 1, limit: int = 40) -> tuple[str, str]:
-    """('Connections ...', markdown) for context.py."""
-    map_status = status(cfg, con)
-    title = f"Connections: second-order news, last {days} day(s) (news about a linked company or person)"
-    if not map_status["edges"]:
-        return title, "_no connection map yet (graph-builder runs monthly)_\n"
-    rows = hits(cfg, con, days)
-    head = (
-        f"Map: {map_status['edges']} edges, last changed {str(map_status['last_added_at'])[:10]}"
-        f"{', refresh due' if map_status['refresh_due'] else ''}.\n\n"
-    )
-    if not rows:
-        return title, head + "_none_\n"
-    clean = lambda status_text: str(status_text).replace("|", "/")  # noqa: E731
-    body = "| ticker | via | news_id | day | title | sentiment |\n|---|---|---|---|---|---|\n"
-    body += "".join(
-        f"| {hit['ticker']} | {clean('; '.join(hit['via']))} | {hit['news_id']} | {hit['day']} | "
-        f"{clean(hit['title'])} | {'' if hit['sentiment'] is None else round(hit['sentiment'], 2)} |\n"
-        for hit in rows[:limit]
-    )
-    if len(rows) > limit:
-        body += f"\n_{len(rows) - limit} more: `python scripts/graph.py hits`_\n"
-    return title, head + body
-
-
-def main() -> int:
-    """Run `status`, `edges`, `hits`, `add`, `check` or `attempt` of the connection map."""
-    parser = market_arg(__doc__)
-    parser.add_argument("command", choices=["status", "edges", "hits", "check", "add", "attempt"])
-    parser.add_argument("--note", help="short note for `attempt`, e.g. tickers that could not be sourced")
-    parser.add_argument("file", nargs="?", type=Path, help="JSONL edges for `check` / `add`")
-    parser.add_argument("--ticker")
-    parser.add_argument("--days", type=int, default=1)
-    args = parser.parse_args()
-    cfg = require_market(args)
-    con = connect(cfg["market"])
-    if args.command == "status":
-        print(json.dumps(status(cfg, con), indent=2))
-    elif args.command == "edges":
-        cur = con.execute(
-            "SELECT ticker, relation, target, target_kind, target_ticker, aliases, detail, as_of, "
-            "source_url FROM graph_edges"
-            + (" WHERE ticker = ?" if args.ticker else "")
-            + " ORDER BY ticker, relation, target",
-            [args.ticker] if args.ticker else [],
-        )
-        print(cursor_markdown_table(cur))
-    elif args.command == "attempt":
-        print(json.dumps(attempt(cfg, con, args.note), indent=2))
-    elif args.command == "hits":
-        print(
-            json.dumps(
-                {"market": cfg["market"], "days": args.days, "hits": hits(cfg, con, args.days)}, indent=2, default=str
-            )
-        )
-    else:
-        if not args.file or not args.file.exists():
-            raise SystemExit(MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL.format(command=args.command))
-        out = add(cfg, con, args.file, dry_run=args.command == "check")
-        print(json.dumps(out, indent=2))
-        return 1 if out["rejected"] else 0
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

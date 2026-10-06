@@ -1,5 +1,6 @@
 """Earnings reaction windows for the range engine: which sessions an earnings report moves, past reaction moves,
 the earnings multiple they imply, and the dividends going ex inside a horizon."""
+
 from __future__ import annotations
 
 import math
@@ -9,8 +10,13 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.analytics import range_math
-from marketbrief.constants.range_inputs import (EARNINGS_LOOKBACK_DAYS, INPUT_EARNINGS_HISTORY, TIMING_AFTER_CLOSE,
-                                                TIMING_BEFORE_OPEN, TIMING_DURING)
+from marketbrief.constants.range_inputs import (
+    EARNINGS_LOOKBACK_DAYS,
+    INPUT_EARNINGS_HISTORY,
+    TIMING_AFTER_CLOSE,
+    TIMING_BEFORE_OPEN,
+    TIMING_DURING,
+)
 from marketbrief.core.calendar import is_session, next_session
 
 
@@ -57,16 +63,22 @@ def past_moves(cfg: dict, close: pd.Series, sigma: pd.Series, events, warmup: in
 def earnings_stats(moves: list[tuple], range_config: dict, as_of: date) -> tuple[float, int, float | None]:
     """(multiple, events used, median absolute move) from reactions completed by as_of."""
     history = range_config[INPUT_EARNINGS_HISTORY]
-    done = [m for m in moves if m[0] <= as_of][-int(history["lookback_events"]):]
+    done = [m for m in moves if m[0] <= as_of][-int(history["lookback_events"]) :]
     multiple, used = range_math.earnings_multiple(
-        [(move, sigma, sessions) for _, move, sigma, sessions in done], range_config["earnings_vol_multiple"],
-        int(history["min_events"]), float(history["prior_events"]), float(history["max_multiple"]))
+        [(move, sigma, sessions) for _, move, sigma, sessions in done],
+        range_config["earnings_vol_multiple"],
+        int(history["min_events"]),
+        float(history["prior_events"]),
+        float(history["max_multiple"]),
+    )
     median = float(np.median([abs(move) for _, move, _, _ in done])) if done else None
     return multiple, used, median
 
 
-def dividends_in_horizon(cfg: dict, dividends: list[tuple[date, float | None]], as_of: date,
-                         target: date) -> list[float]:
+def dividends_in_horizon(
+    cfg: dict, dividends: list[tuple[date, float | None]], as_of: date, target: date
+) -> list[float]:
     """Amounts of dividends whose ex-date session falls in (as_of, target]."""
-    return [amount for day, amount in dividends
-            if amount and day <= target and as_of < next_session(cfg, day) <= target]
+    return [
+        amount for day, amount in dividends if amount and day <= target and as_of < next_session(cfg, day) <= target
+    ]

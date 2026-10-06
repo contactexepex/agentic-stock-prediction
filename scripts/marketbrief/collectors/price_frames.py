@@ -1,4 +1,5 @@
 """Yahoo daily frames and the stored prices CSV files: freshness checks, stored bars, split rows, writing a bar."""
+
 from __future__ import annotations
 
 import csv
@@ -10,9 +11,18 @@ from marketbrief.constants.collection import STALE_DAYS
 from marketbrief.constants.columns import COL_CLOSE, COL_TICKER
 from marketbrief.constants.config_keys import CFG_SYMBOLS, CFG_TICKERS, META_ROLE
 from marketbrief.constants.kinds import EXT_CSV, KIND_PRICES
-from marketbrief.constants.prices import (ERROR_NO_COMPLETED_BAR, ERROR_NO_DATA, MSG_STALE, OWN_EXCHANGE_ROLES,
-                                          PRICE_DECIMALS, PRICE_FILE_COLUMNS, STORED_LOOKBACK_DAYS, YAHOO_CLOSE,
-                                          YAHOO_OHLC, YAHOO_SPLITS)
+from marketbrief.constants.prices import (
+    ERROR_NO_COMPLETED_BAR,
+    ERROR_NO_DATA,
+    MSG_STALE,
+    OWN_EXCHANGE_ROLES,
+    PRICE_DECIMALS,
+    PRICE_FILE_COLUMNS,
+    STORED_LOOKBACK_DAYS,
+    YAHOO_CLOSE,
+    YAHOO_OHLC,
+    YAHOO_SPLITS,
+)
 from marketbrief.core.calendar import prev_session
 from marketbrief.core.paths import data_dir
 from marketbrief.core.storage import day_file
@@ -45,8 +55,7 @@ def stored_bars(path: Path) -> dict[str, dict]:
     """{ticker: row} of the bars in one prices day file (a later row for a ticker wins)."""
     if not path.exists():
         return {}
-    return {row[COL_TICKER]: row for row in csv.DictReader(io.StringIO(path.read_text()))
-            if row.get(COL_TICKER)}
+    return {row[COL_TICKER]: row for row in csv.DictReader(io.StringIO(path.read_text())) if row.get(COL_TICKER)}
 
 
 def write_bar(path: Path, row: list) -> None:
@@ -69,8 +78,11 @@ def yahoo_split_ratios(frame) -> dict[date, float]:
     2.0 for a 2:1 split or a 1:1 bonus, 0 on other rows)."""
     if frame is None or getattr(frame, "empty", True) or YAHOO_SPLITS not in frame:
         return {}
-    return {stamp.date(): float(value) for stamp, value in frame[YAHOO_SPLITS].items()
-            if value == value and value not in (0, 1) and value > 0}
+    return {
+        stamp.date(): float(value)
+        for stamp, value in frame[YAHOO_SPLITS].items()
+        if value == value and value not in (0, 1) and value > 0
+    }
 
 
 def yahoo_splits(frame) -> list[date]:
@@ -118,5 +130,10 @@ def to_stored_basis(row: list, factor: float) -> list:
     unchanged at factor = 1."""
     if factor == 1:
         return row
-    return [row[0], row[1], *(round(value / factor, PRICE_DECIMALS) for value in row[2:7]),
-            int(round(row[7] * factor)), row[8]]
+    return [
+        row[0],
+        row[1],
+        *(round(value / factor, PRICE_DECIMALS) for value in row[2:7]),
+        int(round(row[7] * factor)),
+        row[8],
+    ]

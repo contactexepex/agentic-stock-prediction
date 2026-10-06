@@ -6,6 +6,7 @@ date, annual, instant), its fiscal label and the rows a filing adds (a value tha
 period are those of the filing whose own reporting period ends on that date (SEC's fy/fp describe the filing, not the
 fact). A fiscal Q4 is rarely reported as such: the views derive it as FY minus 9M (and quarterly cash flows from the
 year-to-date totals) and mark it derived."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -13,10 +14,23 @@ from datetime import date
 from typing import NamedTuple
 
 from marketbrief.constants.columns import COL_ID, COL_TICKER
-from marketbrief.constants.fundamentals_collection import (ANNUAL_DAYS, CONCEPTS, DEFAULT_NAMESPACE, FACTS_URL,
-                                                           FISCAL_ANNUAL, FISCAL_Q4, PERIOD_ANNUAL, PERIOD_INSTANT,
-                                                           PERIOD_QUARTER, PERIOD_YTD, PERIODIC_FORMS, QUARTER_DAYS,
-                                                           YEAR_AGO_DAYS, YTD_DAYS, YTD_LABELS)
+from marketbrief.constants.fundamentals_collection import (
+    ANNUAL_DAYS,
+    CONCEPTS,
+    DEFAULT_NAMESPACE,
+    FACTS_URL,
+    FISCAL_ANNUAL,
+    FISCAL_Q4,
+    PERIOD_ANNUAL,
+    PERIOD_INSTANT,
+    PERIOD_QUARTER,
+    PERIOD_YTD,
+    PERIODIC_FORMS,
+    QUARTER_DAYS,
+    YEAR_AGO_DAYS,
+    YTD_DAYS,
+    YTD_LABELS,
+)
 
 
 def facts_url(cik: int) -> str:
@@ -33,10 +47,23 @@ def extract(doc: dict, cik: int) -> list[dict]:
             for fact in doc.get("facts", {}).get(namespace, {}).get(name, {}).get("units", {}).get(unit, []):
                 if fact.get("form") not in PERIODIC_FORMS or fact.get("val") is None:
                     continue
-                found.append({"concept": concept, "tag": f"{namespace}:{name}", "tag_rank": rank, "unit": unit,
-                              "start": fact.get("start"), "end": fact["end"], "value": fact["val"],
-                              "accession": fact["accn"], "form": fact["form"], "filing_date": fact["filed"],
-                              "fy": fact.get("fy"), "fp": fact.get("fp"), "cik": str(int(cik))})
+                found.append(
+                    {
+                        "concept": concept,
+                        "tag": f"{namespace}:{name}",
+                        "tag_rank": rank,
+                        "unit": unit,
+                        "start": fact.get("start"),
+                        "end": fact["end"],
+                        "value": fact["val"],
+                        "accession": fact["accn"],
+                        "form": fact["form"],
+                        "filing_date": fact["filed"],
+                        "fy": fact.get("fy"),
+                        "fp": fact.get("fp"),
+                        "cik": str(int(cik)),
+                    }
+                )
     return found
 
 
@@ -62,7 +89,7 @@ def report_periods(facts: list[dict]) -> tuple[dict[str, tuple], dict[str, tuple
     by_end: dict[str, tuple] = {}
     for end, fy, fp, _filed in sorted(by_accession.values(), key=lambda r: r[3], reverse=True):
         if fy and fp:
-            by_end[end] = (fy, fp)       # earliest filing for the period wins (sorted newest first)
+            by_end[end] = (fy, fp)  # earliest filing for the period wins (sorted newest first)
     return {accession: report[:3] for accession, report in by_accession.items()}, by_end
 
 
@@ -71,9 +98,9 @@ def label_of(fact: dict, by_accession: dict, by_end: dict) -> tuple[int, str] | 
     label = by_end.get(fact["end"])
     if label is None:
         report = by_accession.get(fact["accession"])
-        if report and fact["end"] > report[0] and report[1] and report[2]:   # e.g. a cover-page share count
+        if report and fact["end"] > report[0] and report[1] and report[2]:  # e.g. a cover-page share count
             label = (report[1], report[2])
-    if label is None:                                          # one year before a known period end
+    if label is None:  # one year before a known period end
         end = date.fromisoformat(fact["end"])
         for known_end, (fy, fp) in by_end.items():
             if YEAR_AGO_DAYS[0] <= (date.fromisoformat(known_end) - end).days <= YEAR_AGO_DAYS[1]:
@@ -105,6 +132,7 @@ def row_id(ticker: str, fact: dict) -> str:
 class RowContext(NamedTuple):
     """What a fact's row adds to the fact: its period kind, the earlier value, the fiscal year and period and the
     filing's acceptance time."""
+
     kind: str
     previous: float | None
     fiscal_year: int | None
@@ -115,15 +143,32 @@ class RowContext(NamedTuple):
 def fundamentals_row(ticker: str, fact: dict, context: RowContext, now: str) -> dict:
     """The row of one fact: the value, its period, its filing and the earlier value (`prev_value`)."""
     kind, previous, fy, fp, accepted_at = context
-    return {COL_ID: row_id(ticker, fact), COL_TICKER: ticker, "cik": fact["cik"], "concept": fact["concept"],
-            "tag": fact["tag"], "tag_rank": fact["tag_rank"], "unit": fact["unit"], "period_start": fact["start"],
-            "period_end": fact["end"], "period": kind, "fiscal_year": fy, "fiscal_period": fp, "form": fact["form"],
-            "accession": fact["accession"], "filing_date": fact["filing_date"], "accepted_at": accepted_at,
-            "value": fact["value"], "prev_value": previous, "first_seen_at": now}
+    return {
+        COL_ID: row_id(ticker, fact),
+        COL_TICKER: ticker,
+        "cik": fact["cik"],
+        "concept": fact["concept"],
+        "tag": fact["tag"],
+        "tag_rank": fact["tag_rank"],
+        "unit": fact["unit"],
+        "period_start": fact["start"],
+        "period_end": fact["end"],
+        "period": kind,
+        "fiscal_year": fy,
+        "fiscal_period": fp,
+        "form": fact["form"],
+        "accession": fact["accession"],
+        "filing_date": fact["filing_date"],
+        "accepted_at": accepted_at,
+        "value": fact["value"],
+        "prev_value": previous,
+        "first_seen_at": now,
+    }
 
 
-def new_rows(ticker: str, facts: list[dict], stored_ids: set[str], since: str, accepted: dict[str, str],
-             now: str) -> list[dict]:
+def new_rows(
+    ticker: str, facts: list[dict], stored_ids: set[str], since: str, accepted: dict[str, str], now: str
+) -> list[dict]:
     """Rows for facts not stored yet whose value is new for their (tag, period): walk each
     period's facts in filing order; a value equal to the previous filing's is skipped."""
     by_accession, by_end = report_periods(facts)

@@ -37,14 +37,21 @@ appends each new accession's header time, and core.database.connect applies them
 Tests run offline: with MB_SEC_FIXTURES=<dir>, URLs are served from <dir>/urls.json
 ({url: file path, absolute or relative to <dir>}) instead of the network (a header missing from
 the fixtures leaves the file "unverified" without counting a request; the disk cache is not used)."""
+
 from __future__ import annotations
 
 import json
 import os
 from datetime import date
 
-from marketbrief.constants.config_keys import (CFG_FILINGS, CFG_FUNDAMENTALS, CFG_MARKET, CFG_PREDECESSOR_CIKS,
-                                               CFG_TICKERS, FILINGS_SOURCE_SEC)
+from marketbrief.constants.config_keys import (
+    CFG_FILINGS,
+    CFG_FUNDAMENTALS,
+    CFG_MARKET,
+    CFG_PREDECESSOR_CIKS,
+    CFG_TICKERS,
+    FILINGS_SOURCE_SEC,
+)
 from marketbrief.constants.environment import ENV_SEC_USER_AGENT
 from marketbrief.constants.messages import MSG_SEC_NOT_APPLICABLE, MSG_SEC_USER_AGENT_MISSING
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_ERROR, SUMMARY_MARKET, SUMMARY_SKIPPED
@@ -56,7 +63,9 @@ def related_ciks(cfg: dict) -> dict[str, list[int]]:
     (`fundamentals.predecessor_ciks` in config/markets/<market>.yaml: the one list every SEC
     collector reads)."""
     found = (cfg.get(CFG_FUNDAMENTALS) or {}).get(CFG_PREDECESSOR_CIKS) or {}
-    return {str(t).upper(): [int(c) for c in (cs if isinstance(cs, list) else [cs])] for t, cs in found.items()}
+    return {
+        str(ticker).upper(): [int(c) for c in (cs if isinstance(cs, list) else [cs])] for ticker, cs in found.items()
+    }
 
 
 def merge_recent(parts: list[tuple[int | str, dict]]) -> dict:
@@ -88,8 +97,9 @@ def merge_recent(parts: list[tuple[int | str, dict]]) -> dict:
     return out
 
 
-def ticker_submissions(edgar: Edgar, ticker: str, cik, related: dict[str, list[int]] | None = None
-                       ) -> tuple[dict | None, list[dict]]:
+def ticker_submissions(
+    edgar: Edgar, ticker: str, cik, related: dict[str, list[int]] | None = None
+) -> tuple[dict | None, list[dict]]:
     """The submissions (`filings.recent`) of a ticker's mapped CIK plus its related CIKs (see
     related_ciks), merged and de-duplicated by accession number (merge_recent). One request per
     CIK, each through the Edgar throttle. Returns (merged block, failures): each CIK whose request
@@ -116,22 +126,40 @@ def filings_of_forms(recent: dict, forms: set[str], since: date | None = None) -
         filed = recent["filingDate"][i]
         if form not in forms or (since and date.fromisoformat(filed) < since):
             continue
-        out.append({"accession": recent["accessionNumber"][i], "form": form, "filing_date": filed,
-                    "accepted_at": accepted[i] or None, "primary_doc": recent["primaryDocument"][i],
-                    "report_date": reported[i] or None, "cik": ciks[i]})
+        out.append(
+            {
+                "accession": recent["accessionNumber"][i],
+                "form": form,
+                "filing_date": filed,
+                "accepted_at": accepted[i] or None,
+                "primary_doc": recent["primaryDocument"][i],
+                "report_date": reported[i] or None,
+                "cik": ciks[i],
+            }
+        )
     return out
 
 
 def require_sec(cfg: dict, collector: str) -> str | None:
     """User-Agent for SEC markets; prints a JSON summary and returns None when not applicable."""
     if cfg.get(CFG_FILINGS) != FILINGS_SOURCE_SEC:
-        print(json.dumps({SUMMARY_COLLECTOR: collector, SUMMARY_MARKET: cfg[CFG_MARKET],
-                          SUMMARY_SKIPPED: MSG_SEC_NOT_APPLICABLE}))
+        print(
+            json.dumps(
+                {SUMMARY_COLLECTOR: collector, SUMMARY_MARKET: cfg[CFG_MARKET], SUMMARY_SKIPPED: MSG_SEC_NOT_APPLICABLE}
+            )
+        )
         return None
     user_agent = os.environ.get(ENV_SEC_USER_AGENT)
     if not user_agent:
-        print(json.dumps({SUMMARY_COLLECTOR: collector, SUMMARY_MARKET: cfg[CFG_MARKET],
-                          SUMMARY_ERROR: MSG_SEC_USER_AGENT_MISSING}))
+        print(
+            json.dumps(
+                {
+                    SUMMARY_COLLECTOR: collector,
+                    SUMMARY_MARKET: cfg[CFG_MARKET],
+                    SUMMARY_ERROR: MSG_SEC_USER_AGENT_MISSING,
+                }
+            )
+        )
         raise SystemExit(1)
     return user_agent
 

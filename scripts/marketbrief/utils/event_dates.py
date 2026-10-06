@@ -1,4 +1,5 @@
 """Date helpers over the calendar of major market events."""
+
 from __future__ import annotations
 
 import bisect

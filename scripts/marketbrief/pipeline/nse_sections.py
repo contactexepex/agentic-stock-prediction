@@ -27,7 +27,8 @@ def _flows(con) -> str:
         f"(provisional). Last {len(rows)} reported days: FII {fii5:+,.0f} cr, DII {dii5:+,.0f} cr.\n\n"
     )
     table = "| date | fii_net_cr | dii_net_cr |\n|---|---|---|\n" + "".join(
-        f"| {d} | {'' if f is None else round(f, 2)} | {'' if x is None else round(x, 2)} |\n" for d, f, x in rows
+        f"| {d} | {'' if flow_row is None else round(flow_row, 2)} | {'' if x is None else round(x, 2)} |\n"
+        for d, flow_row, x in rows
     )
     return line + table
 

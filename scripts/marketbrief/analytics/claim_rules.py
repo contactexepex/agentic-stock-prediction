@@ -1,5 +1,6 @@
 """The deterministic gate of the claim-checker's records (claims.py validate|add): ids, enums, verbatim
 quotes and the numbers in each claim. Pure: the stored sources come in as a `ClaimSources` map."""
+
 from __future__ import annotations
 
 import math
@@ -8,13 +9,46 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from marketbrief.analytics.claim_numbers import literal_for, plain_number_tokens
-from marketbrief.constants.verification import (ATTRIBUTIONS, CLAIM_TYPES, FACT_KEY_PATTERN, METHOD_VERSION_CLAIMS,
-                                                QUOTE_MAX_WORDS, SOURCE_ARTICLE, STANCE_AFFIRMS, STANCES, UNITS)
+from marketbrief.constants.verification import (
+    ATTRIBUTIONS,
+    CLAIM_TYPES,
+    FACT_KEY_PATTERN,
+    METHOD_VERSION_CLAIMS,
+    QUOTE_MAX_WORDS,
+    SOURCE_ARTICLE,
+    STANCE_AFFIRMS,
+    STANCES,
+    UNITS,
+)
 
-AGENT_FIELDS = ("cluster_id", "fact_key", "claim_type", "subject", "predicate", "stance", "value_num", "unit",
-                "period", "effective_date", "quote", "quote_source_id", "attribution", "news_ids", "prompt_version")
-REQUIRED = ("cluster_id", "fact_key", "claim_type", "subject", "predicate", "quote", "quote_source_id",
-            "attribution", "prompt_version")
+AGENT_FIELDS = (
+    "cluster_id",
+    "fact_key",
+    "claim_type",
+    "subject",
+    "predicate",
+    "stance",
+    "value_num",
+    "unit",
+    "period",
+    "effective_date",
+    "quote",
+    "quote_source_id",
+    "attribution",
+    "news_ids",
+    "prompt_version",
+)
+REQUIRED = (
+    "cluster_id",
+    "fact_key",
+    "claim_type",
+    "subject",
+    "predicate",
+    "quote",
+    "quote_source_id",
+    "attribution",
+    "prompt_version",
+)
 TEXT_LIMITS = {"subject": 200, "predicate": 300, "period": 40}
 QUOTE_CHARS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "–": "-", "—": "-", " ": " "})
 
@@ -23,6 +57,7 @@ QUOTE_CHARS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "�
 class SourceText:
     """One citable source of a cluster: its kind (article | filing | announcement), its texts by field
     (extract, title, primary), when it became available to us and when it was public."""
+
     kind: str
     fields: dict[str, str]
     available_at: str
@@ -32,6 +67,7 @@ class SourceText:
 @dataclass
 class ClusterSources:
     """What a claim about one cluster may cite: the cluster row, its news ids and its sources by id."""
+
     cluster_row_id: str
     ticker: str
     news_ids: set[str]
@@ -67,8 +103,7 @@ def field_errors(rec: dict) -> list[str]:
         return errors
     if not re.fullmatch(FACT_KEY_PATTERN, str(rec["fact_key"])):
         errors.append(f"fact_key must match {FACT_KEY_PATTERN} (got {rec['fact_key']!r})")
-    for key, allowed in (("claim_type", CLAIM_TYPES), ("attribution", ATTRIBUTIONS),
-                         ("stance", STANCES)):
+    for key, allowed in (("claim_type", CLAIM_TYPES), ("attribution", ATTRIBUTIONS), ("stance", STANCES)):
         value = rec.get(key, STANCE_AFFIRMS if key == "stance" else None)
         if value not in allowed:
             errors.append(f"{key} must be one of {', '.join(allowed)} (got {value!r})")
@@ -127,8 +162,10 @@ def check_claim(rec, clusters: dict[str, ClusterSources], seen: set[str]) -> tup
         return [f"cluster_id {rec['cluster_id']!r} is not a current cluster"], None
     source = cluster.sources.get(rec["quote_source_id"])
     if source is None:
-        return [f"quote_source_id {rec['quote_source_id']!r} is not an item or stored primary source of "
-                f"cluster {rec['cluster_id']}"], None
+        return [
+            f"quote_source_id {rec['quote_source_id']!r} is not an item or stored primary source of "
+            f"cluster {rec['cluster_id']}"
+        ], None
     where = quote_field(rec["quote"], source)
     if where is None:
         errors.append(f"quote not found verbatim in the stored text of {rec['quote_source_id']}")
@@ -149,10 +186,19 @@ def check_claim(rec, clusters: dict[str, ClusterSources], seen: set[str]) -> tup
     if errors:
         return errors, None
     stored = {k: rec.get(k) for k in AGENT_FIELDS}
-    stored.update({"id": cid, "cluster_row_id": cluster.cluster_row_id, "ticker": cluster.ticker,
-                   "stance": rec.get("stance", STANCE_AFFIRMS), "value_text": literal, "quote_field": where,
-                   "source_kind": source.kind, "news_ids": sorted(news_ids),
-                   "source_available_at": source.available_at,
-                   "source_published_at": source.published_at or source.available_at,
-                   "method_version": METHOD_VERSION_CLAIMS})
+    stored.update(
+        {
+            "id": cid,
+            "cluster_row_id": cluster.cluster_row_id,
+            "ticker": cluster.ticker,
+            "stance": rec.get("stance", STANCE_AFFIRMS),
+            "value_text": literal,
+            "quote_field": where,
+            "source_kind": source.kind,
+            "news_ids": sorted(news_ids),
+            "source_available_at": source.available_at,
+            "source_published_at": source.published_at or source.available_at,
+            "method_version": METHOD_VERSION_CLAIMS,
+        }
+    )
     return [], stored

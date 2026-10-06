@@ -18,21 +18,43 @@ is stored with `complete` false and fetched again on the next run. Prints a JSON
 numbers, a session file missing before the latest completed session, a configured index absent
 from a file). Exit code 1 only if both kinds failed. NSE throttles per
 client: run it after collect_nse_india.py, never alongside the NSE collectors."""
+
 from __future__ import annotations
 
 import json
 from datetime import date
 
 from marketbrief.collectors.flows_parsing import parse_fpi, parse_indices
-from marketbrief.collectors.collector_store import (Problems, complete_days, not_published, stale_cutoff,
-                                                      store_changed, summary)
+from marketbrief.collectors.collector_store import (
+    Problems,
+    complete_days,
+    not_published,
+    stale_cutoff,
+    store_changed,
+    summary,
+)
 from marketbrief.constants.config_keys import CFG_INDIA_FLOWS, CFG_MARKET
-from marketbrief.constants.free_sources import (COLLECTOR_FLOWS_INDIA, DEFAULT_FLOWS_PAUSE_SECONDS,
-                                                DEFAULT_INDEX_LOOKBACK_DAYS, FPI_ASSET_EQUITY, FPI_ROUTE_SUBTOTAL,
-                                                FPI_URL, FPI_VALUE_COLUMNS, HEADERS_CSV, HEADERS_HTML, INDEX_URL,
-                                                INDEX_VALUE_COLUMNS, MSG_FPI_EQUITY_NET, MSG_FPI_NOTE,
-                                                MSG_FPI_NO_EQUITY, MSG_INDEX_MISSING, MSG_INDEX_NOT_YET,
-                                                MSG_SKIPPED_NO_FLOWS, SOURCE_NSDL_FPI, SOURCE_NSE_INDICES)
+from marketbrief.constants.free_sources import (
+    COLLECTOR_FLOWS_INDIA,
+    DEFAULT_FLOWS_PAUSE_SECONDS,
+    DEFAULT_INDEX_LOOKBACK_DAYS,
+    FPI_ASSET_EQUITY,
+    FPI_ROUTE_SUBTOTAL,
+    FPI_URL,
+    FPI_VALUE_COLUMNS,
+    HEADERS_CSV,
+    HEADERS_HTML,
+    INDEX_URL,
+    INDEX_VALUE_COLUMNS,
+    MSG_FPI_EQUITY_NET,
+    MSG_FPI_NOTE,
+    MSG_FPI_NO_EQUITY,
+    MSG_INDEX_MISSING,
+    MSG_INDEX_NOT_YET,
+    MSG_SKIPPED_NO_FLOWS,
+    SOURCE_NSDL_FPI,
+    SOURCE_NSE_INDICES,
+)
 from marketbrief.constants.kinds import KIND_FPI, KIND_INDICES
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_MARKET, SUMMARY_SKIPPED
 from marketbrief.core.cli import market_arg, require_market
@@ -52,16 +74,16 @@ def collect_fpi(client, now: str, problems: Problems) -> list[dict] | None:
     rows, problem = parse_fpi(page, now)
     if problem:
         problems.failed.append({"source": SOURCE_NSDL_FPI, "url": FPI_URL, "error": problem})
-    equity = next((r for r in rows if r["asset_class"] == FPI_ASSET_EQUITY
-                   and r["route"].lower() == FPI_ROUTE_SUBTOTAL), None)
+    equity = next(
+        (r for r in rows if r["asset_class"] == FPI_ASSET_EQUITY and r["route"].lower() == FPI_ROUTE_SUBTOTAL), None
+    )
     if rows:
         tail = MSG_FPI_EQUITY_NET.format(net=equity["net_cr"]) if equity else MSG_FPI_NO_EQUITY
         problems.notes.append(MSG_FPI_NOTE.format(reporting=rows[0]["reporting_date"], count=len(rows)) + tail)
     return rows or None
 
 
-def collect_indices(client, cfg: dict, today: date, settings: dict, now: str,
-                    problems: Problems) -> tuple[list, int]:
+def collect_indices(client, cfg: dict, today: date, settings: dict, now: str, problems: Problems) -> tuple[list, int]:
     """(rows, sessions available) of NSE's index close files for the sessions in the lookback that are not stored
     complete; an incomplete day is stored but fetched again next run (complete_days)."""
     names = settings.get("names") or {}
@@ -86,8 +108,14 @@ def collect_indices(client, cfg: dict, today: date, settings: dict, now: str,
         if problem:
             problems.failed.append({"source": SOURCE_NSE_INDICES, "date": str(day), "url": url, "error": problem})
         if missing:
-            problems.failed.append({"source": SOURCE_NSE_INDICES, "date": str(day), "url": url,
-                                    "error": MSG_INDEX_MISSING.format(missing=missing)})
+            problems.failed.append(
+                {
+                    "source": SOURCE_NSE_INDICES,
+                    "date": str(day),
+                    "url": url,
+                    "error": MSG_INDEX_MISSING.format(missing=missing),
+                }
+            )
         for row in found:
             row["complete"] = not problem and not missing
         available += 1
@@ -104,8 +132,7 @@ def collect(cfg: dict, client, today: date, now: str) -> dict:
         new[KIND_FPI] = None if rows is None else store_changed(market, KIND_FPI, rows, today, FPI_VALUE_COLUMNS)
     if settings.get("indices"):
         rows, available = collect_indices(client, cfg, today, settings["indices"], now, problems)
-        new[KIND_INDICES] = (store_changed(market, KIND_INDICES, rows, today, INDEX_VALUE_COLUMNS)
-                             if available else None)
+        new[KIND_INDICES] = store_changed(market, KIND_INDICES, rows, today, INDEX_VALUE_COLUMNS) if available else None
     return summary(COLLECTOR_FLOWS_INDIA, market, new, problems, client)
 
 
@@ -113,8 +140,15 @@ def main() -> int:
     """Entry point of scripts/collect_flows_india.py."""
     cfg = require_market(market_arg(__doc__).parse_args())
     if not cfg.get(CFG_INDIA_FLOWS):
-        print(json.dumps({SUMMARY_COLLECTOR: COLLECTOR_FLOWS_INDIA, SUMMARY_MARKET: cfg[CFG_MARKET],
-                          SUMMARY_SKIPPED: MSG_SKIPPED_NO_FLOWS}))
+        print(
+            json.dumps(
+                {
+                    SUMMARY_COLLECTOR: COLLECTOR_FLOWS_INDIA,
+                    SUMMARY_MARKET: cfg[CFG_MARKET],
+                    SUMMARY_SKIPPED: MSG_SKIPPED_NO_FLOWS,
+                }
+            )
+        )
         return 0
     client = FreeSourceClient(pause=float(cfg[CFG_INDIA_FLOWS].get("pause_seconds", DEFAULT_FLOWS_PAUSE_SECONDS)))
     out = collect(cfg, client, utc_today(), utc_now())

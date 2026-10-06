@@ -5,6 +5,7 @@ NSE serves its JSON only to browser-like clients: one session per run loads the 
 calls /api/... with a Referer, pausing between requests (marketbrief/sources/nse_client.py). The environment must
 allow www.nseindia.com and nsearchives.nseindia.com. `--replay DIR` reads responses from local files instead of the
 network; replayed rows can be synthetic, so replay only writes to an explicit scratch root (nse_replay_guard.py)."""
+
 from __future__ import annotations
 
 import json
@@ -15,13 +16,30 @@ from pathlib import Path
 from marketbrief.collectors.collector_store import Problems, summary
 from marketbrief.collectors.nse_replay_guard import replay_problem, write_target
 from marketbrief.constants.columns import COL_ID
-from marketbrief.constants.config_keys import (CFG_MARKET, CFG_RELATIONS, REL_ARCHIVES, REL_BASE, REL_PAUSE_SECONDS,
-                                               REL_SOURCE, REL_SOURCE_NSE)
-from marketbrief.constants.nse_collection import (EXIT_REPLAY_REFUSED, MSG_ENDPOINT_EMPTY, MSG_ONLY_HELP,
-                                                  MSG_REPLAY_HELP, MSG_REPLAY_REFUSED, MSG_ROWS_FOR_WATCHLIST,
-                                                  MSG_ROWS_RETURNED, MSG_SINCE_HELP, MSG_SKIPPED_NO_NSE,
-                                                  MSG_TODAY_HELP, MSG_TODAY_NEEDS_REPLAY, SEEN_LOOKBACK_DAYS,
-                                                  SINCE_WINDOW_DAYS)
+from marketbrief.constants.config_keys import (
+    CFG_MARKET,
+    CFG_RELATIONS,
+    REL_ARCHIVES,
+    REL_BASE,
+    REL_PAUSE_SECONDS,
+    REL_SOURCE,
+    REL_SOURCE_NSE,
+)
+from marketbrief.constants.nse_collection import (
+    EXIT_REPLAY_REFUSED,
+    MSG_ENDPOINT_EMPTY,
+    MSG_ONLY_HELP,
+    MSG_REPLAY_HELP,
+    MSG_REPLAY_REFUSED,
+    MSG_ROWS_FOR_WATCHLIST,
+    MSG_ROWS_RETURNED,
+    MSG_SINCE_HELP,
+    MSG_SKIPPED_NO_NSE,
+    MSG_TODAY_HELP,
+    MSG_TODAY_NEEDS_REPLAY,
+    SEEN_LOOKBACK_DAYS,
+    SINCE_WINDOW_DAYS,
+)
 from marketbrief.constants.sources import NSE_ARCHIVES_URL, NSE_BASE_URL, NSE_DEFAULT_PAUSE_SECONDS
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_MARKET, SUMMARY_NEW, SUMMARY_SKIPPED
 from marketbrief.core import paths
@@ -35,6 +53,7 @@ from marketbrief.sources.nse_client import Nse
 class NseRun:
     """What every kind's collection step needs: the NSE session, the NSE symbol -> ticker map, the collection date
     and time, the market and the problems list of the run."""
+
     nse: Nse
     symbols: dict[str, str]
     today: date
@@ -72,15 +91,21 @@ def coverage(source: str, total: int, matched: int | None, problems: Problems) -
     if total == 0:
         problems.warnings.append(MSG_ENDPOINT_EMPTY.format(source=source))
     else:
-        problems.notes.append(MSG_ROWS_RETURNED.format(source=source, total=total)
-                              + ("" if matched is None else MSG_ROWS_FOR_WATCHLIST.format(matched=matched)))
+        problems.notes.append(
+            MSG_ROWS_RETURNED.format(source=source, total=total)
+            + ("" if matched is None else MSG_ROWS_FOR_WATCHLIST.format(matched=matched))
+        )
 
 
 def open_nse(cfg: dict, replay: Path | None) -> Nse:
     """The run's NSE client: from the replay folder, or the network paced as the market config says."""
     relations = cfg.get(CFG_RELATIONS) or {}
-    return Nse(relations.get(REL_BASE, NSE_BASE_URL), relations.get(REL_ARCHIVES, NSE_ARCHIVES_URL), replay,
-               pause=0 if replay else float(relations.get(REL_PAUSE_SECONDS, NSE_DEFAULT_PAUSE_SECONDS)))
+    return Nse(
+        relations.get(REL_BASE, NSE_BASE_URL),
+        relations.get(REL_ARCHIVES, NSE_ARCHIVES_URL),
+        replay,
+        pause=0 if replay else float(relations.get(REL_PAUSE_SECONDS, NSE_DEFAULT_PAUSE_SECONDS)),
+    )
 
 
 def collector_main(doc: str, name: str, kinds: list[str], collect, extra_args=None) -> int:
@@ -104,8 +129,15 @@ def collector_main(doc: str, name: str, kinds: list[str], collect, extra_args=No
     if args.replay:
         problem = replay_problem(paths.ROOT, [write_target(market, kind, today) for kind in only])
         if problem:
-            print(json.dumps({SUMMARY_COLLECTOR: name, SUMMARY_MARKET: market,
-                              "error": MSG_REPLAY_REFUSED.format(problem=problem)}))
+            print(
+                json.dumps(
+                    {
+                        SUMMARY_COLLECTOR: name,
+                        SUMMARY_MARKET: market,
+                        "error": MSG_REPLAY_REFUSED.format(problem=problem),
+                    }
+                )
+            )
             return EXIT_REPLAY_REFUSED
     result = collect(cfg, open_nse(cfg, args.replay), only, today, args)
     print(json.dumps(result, indent=2))

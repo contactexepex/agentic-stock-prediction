@@ -13,6 +13,7 @@ lo50 = q25, hi50 = q75, hi80 = q90.
   is twice the pinball loss integrated over all levels). Identity used in the tests:
   QS = (0.1 * IS80 + 0.25 * IS50) / 4.
 All range scores are in % of the base close, as the rest of the scorecard."""
+
 from __future__ import annotations
 
 import math
@@ -23,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.analytics import range_math
-from marketbrief.constants.scoring import (CALL_BINS, COIN_FLIP_BRIER, EPS, MISSING_DASH, RANGE_QUANTILES, WILSON_Z)
+from marketbrief.constants.scoring import CALL_BINS, COIN_FLIP_BRIER, EPS, MISSING_DASH, RANGE_QUANTILES, WILSON_Z
 from marketbrief.utils.numbers import round_or_none
 
 
@@ -81,9 +82,18 @@ def reliability(p, y, edges=CALL_BINS) -> list[dict]:
         m = (p >= lo) & ((p <= hi) if last else (p < hi))
         n, k = int(m.sum()), int(y[m].sum())
         wl, wh = wilson(k, n)
-        out.append({"bin": f"{lo:.2f}-{hi:.2f}", "lo": lo, "hi": hi, "n": n,
-                    "mean_conf": exact_mean(p[m]) if n else None,
-                    "hit_rate": k / n if n else None, "wilson_lo": wl, "wilson_hi": wh})
+        out.append(
+            {
+                "bin": f"{lo:.2f}-{hi:.2f}",
+                "lo": lo,
+                "hi": hi,
+                "n": n,
+                "mean_conf": exact_mean(p[m]) if n else None,
+                "hit_rate": k / n if n else None,
+                "wilson_lo": wl,
+                "wilson_hi": wh,
+            }
+        )
     return out
 
 
@@ -94,8 +104,12 @@ def call_scores(df: pd.DataFrame) -> dict:
         return {"n": 0}
     p, y = df["confidence"].astype(float), df["hit"].astype(float)
     b, ll = brier(p, y), log_loss(p, y)
-    return {"n": int(len(df)), "brier": round_or_none(b), "log_loss": round_or_none(ll),
-            "brier_skill": round_or_none(1 - b / COIN_FLIP_BRIER) if b is not None else None}
+    return {
+        "n": int(len(df)),
+        "brier": round_or_none(b),
+        "log_loss": round_or_none(ll),
+        "brier_skill": round_or_none(1 - b / COIN_FLIP_BRIER) if b is not None else None,
+    }
 
 
 def pinball(q_value: float, level: float, y: float) -> float:
@@ -112,9 +126,11 @@ def range_scores_row(lo50, hi50, lo80, hi80, y, base) -> dict:
     """Interval scores (50%, 80%) and quantile score of one scored range, in % of base."""
     vals = {"lo50": lo50, "hi50": hi50, "lo80": lo80, "hi80": hi80}
     qs = {lv: float(vals[k]) for k, lv in RANGE_QUANTILES}
-    return {"is50_pct": 100 * range_math.interval_score(lo50, hi50, y, 0.5) / base,
-            "is80_pct": 100 * range_math.interval_score(lo80, hi80, y, 0.8) / base,
-            "qs_pct": 100 * quantile_score(qs, y) / base}
+    return {
+        "is50_pct": 100 * range_math.interval_score(lo50, hi50, y, 0.5) / base,
+        "is80_pct": 100 * range_math.interval_score(lo80, hi80, y, 0.8) / base,
+        "qs_pct": 100 * quantile_score(qs, y) / base,
+    }
 
 
 def range_scores(df: pd.DataFrame) -> dict:
@@ -122,33 +138,44 @@ def range_scores(df: pd.DataFrame) -> dict:
     lo80, hi80, actual_close, base_close, hit50, hit80)."""
     if df is None or df.empty:
         return {"n": 0}
-    rows = [range_scores_row(*(float(x) for x in r))
-            for r in df[["lo50", "hi50", "lo80", "hi80", "actual_close", "base_close"]].itertuples(index=False)]
+    rows = [
+        range_scores_row(*(float(x) for x in r))
+        for r in df[["lo50", "hi50", "lo80", "hi80", "actual_close", "base_close"]].itertuples(index=False)
+    ]
     s = pd.DataFrame(rows)
     base = df["base_close"].astype(float)
-    return {"n": int(len(df)), "cover50": round_or_none(exact_mean(df["hit50"].astype(float))),
-            "cover80": round_or_none(exact_mean(df["hit80"].astype(float))),
-            "is50_pct": round_or_none(exact_mean(s["is50_pct"])), "is80_pct": round_or_none(exact_mean(s["is80_pct"])),
-            "qs_pct": round_or_none(exact_mean(s["qs_pct"])),
-            "width50_pct": round_or_none(exact_mean(100 * (df["hi50"] - df["lo50"]) / base)),
-            "width80_pct": round_or_none(exact_mean(100 * (df["hi80"] - df["lo80"]) / base))}
+    return {
+        "n": int(len(df)),
+        "cover50": round_or_none(exact_mean(df["hit50"].astype(float))),
+        "cover80": round_or_none(exact_mean(df["hit80"].astype(float))),
+        "is50_pct": round_or_none(exact_mean(s["is50_pct"])),
+        "is80_pct": round_or_none(exact_mean(s["is80_pct"])),
+        "qs_pct": round_or_none(exact_mean(s["qs_pct"])),
+        "width50_pct": round_or_none(exact_mean(100 * (df["hi50"] - df["lo50"]) / base)),
+        "width80_pct": round_or_none(exact_mean(100 * (df["hi80"] - df["lo80"]) / base)),
+    }
 
 
 # ---------- track-record summary (score_predictions, context pack, review, HTML) ----------
 
+
 def summary(con) -> dict:
     """All-time proper scores from the scored track record: calls per horizon and overall
     (Brier, log loss, reliability) and ranges per horizon (coverage, interval and quantile scores)."""
-    calls = con.execute("SELECT horizon_days, confidence, hit FROM track_record "
-                        "WHERE confidence IS NOT NULL AND hit IS NOT NULL ORDER BY id, scored_at").df()
-    rng = con.execute("SELECT horizon_days, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
-                      "FROM range_record WHERE actual_close IS NOT NULL ORDER BY id").df()
+    calls = con.execute(
+        "SELECT horizon_days, confidence, hit FROM track_record "
+        "WHERE confidence IS NOT NULL AND hit IS NOT NULL ORDER BY id, scored_at"
+    ).df()
+    rng = con.execute(
+        "SELECT horizon_days, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
+        "FROM range_record WHERE actual_close IS NOT NULL ORDER BY id"
+    ).df()
     out = {"calls": {"all": call_scores(calls)}, "ranges": {}}
     out["calls"]["all"]["reliability"] = reliability(calls["confidence"], calls["hit"]) if len(calls) else []
-    for h, g in (calls.groupby("horizon_days") if len(calls) else []):
-        out["calls"][f"{int(h)}d"] = call_scores(g)
-    for h, g in (rng.groupby("horizon_days") if len(rng) else []):
-        out["ranges"][f"{int(h)}d"] = range_scores(g)
+    for horizon, g in calls.groupby("horizon_days") if len(calls) else []:
+        out["calls"][f"{int(horizon)}d"] = call_scores(g)
+    for horizon, g in rng.groupby("horizon_days") if len(rng) else []:
+        out["ranges"][f"{int(horizon)}d"] = range_scores(g)
     return out
 
 
@@ -176,25 +203,45 @@ def format_percent(value) -> str:
 def markdown(s: dict) -> str:
     """Compact Markdown for the context pack."""
     calls = s["calls"]
-    lines = ["Calls: Brier (coin flip 0.250) and log loss (coin flip 0.693), lower is better; "
-             "skill = 1 - Brier/0.25.", "",
-             "| h | n | brier | log_loss | skill |", "|---|---|---|---|---|"]
+    lines = [
+        "Calls: Brier (coin flip 0.250) and log loss (coin flip 0.693), lower is better; skill = 1 - Brier/0.25.",
+        "",
+        "| h | n | brier | log_loss | skill |",
+        "|---|---|---|---|---|",
+    ]
     for k, v in calls.items():
-        lines.append(f"| {k} | {v['n']} | {format_number(v.get('brier'))} | {format_number(v.get('log_loss'))} | "
-                     f"{format_number(v.get('brier_skill'))} |")
+        lines.append(
+            f"| {k} | {v['n']} | {format_number(v.get('brier'))} | {format_number(v.get('log_loss'))} | "
+            f"{format_number(v.get('brier_skill'))} |"
+        )
     rel = [r for r in calls["all"].get("reliability", []) if r["n"]]
     if rel:
-        lines += ["", "Reliability (all horizons): stated confidence vs hit rate, Wilson 95%.", "",
-                  "| bin | n | mean_conf | hit_rate | 95% |", "|---|---|---|---|---|"]
-        lines += [f"| {r['bin']} | {r['n']} | {format_percent(r['mean_conf'])} | {format_percent(r['hit_rate'])} | "
-                  f"{format_percent(r['wilson_lo'])}-{format_percent(r['wilson_hi'])} |" for r in rel]
-    lines += ["", "Ranges (all time; % of price, lower is better): interval scores and quantile score "
-              "(mean pinball loss over q10/q25/q75/q90).", "",
-              "| h | n | cover50 | cover80 | is50 | is80 | qs |", "|---|---|---|---|---|---|---|"]
+        lines += [
+            "",
+            "Reliability (all horizons): stated confidence vs hit rate, Wilson 95%.",
+            "",
+            "| bin | n | mean_conf | hit_rate | 95% |",
+            "|---|---|---|---|---|",
+        ]
+        lines += [
+            f"| {r['bin']} | {r['n']} | {format_percent(r['mean_conf'])} | {format_percent(r['hit_rate'])} | "
+            f"{format_percent(r['wilson_lo'])}-{format_percent(r['wilson_hi'])} |"
+            for r in rel
+        ]
+    lines += [
+        "",
+        "Ranges (all time; % of price, lower is better): interval scores and quantile score "
+        "(mean pinball loss over q10/q25/q75/q90).",
+        "",
+        "| h | n | cover50 | cover80 | is50 | is80 | qs |",
+        "|---|---|---|---|---|---|---|",
+    ]
     for k, v in s["ranges"].items():
-        lines.append(f"| {k} | {v['n']} | {format_percent(v.get('cover50'))} | {format_percent(v.get('cover80'))} | "
-                     f"{format_number(v.get('is50_pct'))} | {format_number(v.get('is80_pct'))} | "
-                     f"{format_number(v.get('qs_pct'))} |")
+        lines.append(
+            f"| {k} | {v['n']} | {format_percent(v.get('cover50'))} | {format_percent(v.get('cover80'))} | "
+            f"{format_number(v.get('is50_pct'))} | {format_number(v.get('is80_pct'))} | "
+            f"{format_number(v.get('qs_pct'))} |"
+        )
     if not s["ranges"]:
         lines.append("| – | 0 | – | – | – | – | – |")
     return "\n".join(lines) + "\n"

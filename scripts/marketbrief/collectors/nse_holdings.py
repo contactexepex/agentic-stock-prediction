@@ -8,6 +8,7 @@ shareholding pattern and is stored as `sdd_promoter_pct`, never as `promoter_pct
 shares encumbered as % of that promoter holding; `percTotShares` = the same as % of all shares;
 `percSharesPledged` = every pledge in the depository system (any holder, e.g. margin pledges) as % of demat
 shares."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -15,17 +16,26 @@ from datetime import date, timedelta
 from marketbrief.collectors.nse_runner import NseRun, coverage
 from marketbrief.constants.columns import COL_ID, COL_TICKER
 from marketbrief.constants.kinds import KIND_HOLDINGS
-from marketbrief.constants.nse_collection import (ENDPOINT_PLEDGE, ENDPOINT_SHAREHOLDING, MSG_HOLDINGS_CALLS,
-                                                  MSG_HOLDINGS_NO_ROWS, MSG_HOLDINGS_POLLED, PLEDGE_ID_PREFIX,
-                                                  SEEN_KEEP_QUARTERS, SEEN_LOOKBACK_DAYS, SHP_ID_PREFIX,
-                                                  SOURCE_PLEDGE, SOURCE_SHAREHOLDING)
+from marketbrief.constants.nse_collection import (
+    ENDPOINT_PLEDGE,
+    ENDPOINT_SHAREHOLDING,
+    MSG_HOLDINGS_CALLS,
+    MSG_HOLDINGS_NO_ROWS,
+    MSG_HOLDINGS_POLLED,
+    PLEDGE_ID_PREFIX,
+    SEEN_KEEP_QUARTERS,
+    SEEN_LOOKBACK_DAYS,
+    SHP_ID_PREFIX,
+    SOURCE_PLEDGE,
+    SOURCE_SHAREHOLDING,
+)
 from marketbrief.core.storage import recent_ids
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_parsing import iso, parse_day, parse_ts, pick, rows_of, short_hash
 from marketbrief.utils.numbers import parse_nse_number
 
-PERIOD_LENGTH = 10   # the period in an id: YYYY-MM-DD
-TICKER_SUFFIX_LENGTH = 11   # "-YYYY-MM-DD" after the ticker
+PERIOD_LENGTH = 10  # the period in an id: YYYY-MM-DD
+TICKER_SUFFIX_LENGTH = 11  # "-YYYY-MM-DD" after the ticker
 
 
 def latest_quarter_end(today: date) -> date:
@@ -38,8 +48,8 @@ def due_tickers(stored: dict[str, str], tickers: list[str], today: date, limit: 
     filing season spreads its calls over several runs: tickers with nothing stored come first
     (oldest stored period first), ties rotated by a daily hash."""
     quarter = str(latest_quarter_end(today))
-    due = [t for t in tickers if stored.get(t, "") < quarter]
-    due.sort(key=lambda t: (stored.get(t, ""), short_hash(t, today)))
+    due = [ticker for ticker in tickers if stored.get(ticker, "") < quarter]
+    due.sort(key=lambda ticker: (stored.get(ticker, ""), short_hash(ticker, today)))
     return due if limit is None else due[:limit]
 
 
@@ -48,7 +58,7 @@ def stored_periods(market: str, prefix: str) -> dict[str, str]:
     latest: dict[str, str] = {}
     for stored_id in recent_ids(market, KIND_HOLDINGS, days=SEEN_LOOKBACK_DAYS):
         if stored_id.startswith(prefix + "-"):
-            body = stored_id[len(prefix) + 1:].rsplit("-", 1)[0]
+            body = stored_id[len(prefix) + 1 :].rsplit("-", 1)[0]
             ticker, period = body[:-TICKER_SUFFIX_LENGTH], body[-PERIOD_LENGTH:]
             latest[ticker] = max(latest.get(ticker, ""), period)
     return latest
@@ -59,13 +69,22 @@ def shp_record(row: dict, ticker: str, now: str) -> dict | None:
     period = parse_day(pick(row, "date"))
     if period is None:
         return None
-    values = {"promoter_pct": parse_nse_number(pick(row, "pr_and_prgrp")),   # "0" is a real 0 (no promoter)
-              "public_pct": parse_nse_number(pick(row, "public_val")),
-              "employee_trust_pct": parse_nse_number(pick(row, "employeeTrusts"))}
+    values = {
+        "promoter_pct": parse_nse_number(pick(row, "pr_and_prgrp")),  # "0" is a real 0 (no promoter)
+        "public_pct": parse_nse_number(pick(row, "public_val")),
+        "employee_trust_pct": parse_nse_number(pick(row, "employeeTrusts")),
+    }
     filed = parse_ts(pick(row, "broadcastDate", "submissionDate"))
-    return {COL_ID: f"{SHP_ID_PREFIX}-{ticker}-{period}-" + short_hash(filed, *values.values()), COL_TICKER: ticker,
-            "period_end": str(period), "source": SOURCE_SHAREHOLDING, "filed_at": iso(filed),
-            "url": pick(row, "xbrl"), "first_seen_at": now, **values}
+    return {
+        COL_ID: f"{SHP_ID_PREFIX}-{ticker}-{period}-" + short_hash(filed, *values.values()),
+        COL_TICKER: ticker,
+        "period_end": str(period),
+        "source": SOURCE_SHAREHOLDING,
+        "filed_at": iso(filed),
+        "url": pick(row, "xbrl"),
+        "first_seen_at": now,
+        **values,
+    }
 
 
 def pledge_record(row: dict, ticker: str, now: str) -> dict | None:
@@ -74,24 +93,34 @@ def pledge_record(row: dict, ticker: str, now: str) -> dict | None:
     if period is None:
         return None
     values = {
-        "sdd_promoter_pct": parse_nse_number(pick(row, "percPromoterHolding")),   # depository-flagged promoters only
+        "sdd_promoter_pct": parse_nse_number(pick(row, "percPromoterHolding")),  # depository-flagged promoters only
         "promoter_shares": parse_nse_number(pick(row, "totPromoterHolding")),
         "total_shares": parse_nse_number(pick(row, "totIssuedShares")),
         "promoter_encumbered_shares": parse_nse_number(pick(row, "totPromoterShares")),
-        "pledged_pct_of_promoter": parse_nse_number(pick(row, "percPromoterShares")),   # encumbered / promoter holding
-        "pledged_pct_of_total": parse_nse_number(pick(row, "percTotShares")),           # encumbered / all shares
-        "depository_pledged_shares": parse_nse_number(pick(row, "numSharesPledged")),   # all holders' pledges
-        "depository_pledged_pct": parse_nse_number(pick(row, "percSharesPledged")),     # ... as % of demat shares
+        "pledged_pct_of_promoter": parse_nse_number(pick(row, "percPromoterShares")),  # encumbered / promoter holding
+        "pledged_pct_of_total": parse_nse_number(pick(row, "percTotShares")),  # encumbered / all shares
+        "depository_pledged_shares": parse_nse_number(pick(row, "numSharesPledged")),  # all holders' pledges
+        "depository_pledged_pct": parse_nse_number(pick(row, "percSharesPledged")),  # ... as % of demat shares
     }
     # NSE re-stamps broadcastDt on every daily refresh, so the id hashes the values only: a new
     # row is stored only when a number changes.
-    return {COL_ID: f"{PLEDGE_ID_PREFIX}-{ticker}-{period}-" + short_hash(*values.values()), COL_TICKER: ticker,
-            "period_end": str(period), "source": SOURCE_PLEDGE, "promoter_pct": None,
-            "filed_at": iso(parse_ts(pick(row, "broadcastDt"))), "url": None, "first_seen_at": now, **values}
+    return {
+        COL_ID: f"{PLEDGE_ID_PREFIX}-{ticker}-{period}-" + short_hash(*values.values()),
+        COL_TICKER: ticker,
+        "period_end": str(period),
+        "source": SOURCE_PLEDGE,
+        "promoter_pct": None,
+        "filed_at": iso(parse_ts(pick(row, "broadcastDt"))),
+        "url": None,
+        "first_seen_at": now,
+        **values,
+    }
 
 
-HOLDING_DATASETS = ((SOURCE_SHAREHOLDING, ENDPOINT_SHAREHOLDING, SHP_ID_PREFIX, shp_record),
-                    (SOURCE_PLEDGE, ENDPOINT_PLEDGE, PLEDGE_ID_PREFIX, pledge_record))
+HOLDING_DATASETS = (
+    (SOURCE_SHAREHOLDING, ENDPOINT_SHAREHOLDING, SHP_ID_PREFIX, shp_record),
+    (SOURCE_PLEDGE, ENDPOINT_PLEDGE, PLEDGE_ID_PREFIX, pledge_record),
+)
 
 
 def dataset_rows(run: NseRun, dataset: tuple, due: list[str], by_ticker: dict[str, str]) -> tuple[list, int, int, bool]:
@@ -124,13 +153,18 @@ def holdings(run: NseRun, limit: int | None) -> tuple[list[dict], int]:
     for dataset in HOLDING_DATASETS:
         source, _endpoint, prefix, _make = dataset
         due = due_tickers(stored_periods(run.market, prefix), list(by_ticker), run.today, limit)
-        run.problems.notes.append(MSG_HOLDINGS_POLLED.format(source=source, count=len(due),
-                                                              quarter=latest_quarter_end(run.today)))
+        run.problems.notes.append(
+            MSG_HOLDINGS_POLLED.format(source=source, count=len(due), quarter=latest_quarter_end(run.today))
+        )
         records, answered, total, aborted = dataset_rows(run, dataset, due, by_ticker)
         found += records
         ok += answered
         if aborted:
             return found, ok
-        if due and total == 0 and not any(f["source"].startswith(f"holdings:{source}") for f in run.problems.failed):
+        if (
+            due
+            and total == 0
+            and not any(failure["source"].startswith(f"holdings:{source}") for failure in run.problems.failed)
+        ):
             coverage(MSG_HOLDINGS_CALLS.format(source=source, count=len(due)), 0, 0, run.problems)
     return found, ok

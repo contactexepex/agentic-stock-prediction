@@ -16,28 +16,45 @@ with our stored bars of the same dates.
 `hold` = True: the stored basis and Yahoo's disagree in a way no source confirms, so this run must not write the
 symbol's new bars (they would sit on Yahoo's new basis next to old-basis bars; a later run writes them through
 to_stored_basis once the split is recorded)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
 
 from marketbrief.analytics.price_adjustments import adjustment_record, as_date, factor_after, split_fraction
-from marketbrief.collectors.price_frames import (frame_closes, has_stored_before, newest_stored_before, prices_file,
-                                                 stored_bars, yahoo_split_ratios)
+from marketbrief.collectors.price_frames import (
+    frame_closes,
+    has_stored_before,
+    newest_stored_before,
+    prices_file,
+    stored_bars,
+    yahoo_split_ratios,
+)
 from marketbrief.collectors.price_rebase import RebaseClaim, step_matches
 from marketbrief.collectors.price_run import PriceRun
 from marketbrief.constants.columns import COL_CLOSE, COL_TICKER
 from marketbrief.constants.price_adjustments import BASIS_MATCH_TOLERANCE, KEY_EX_DATE, SPLIT_TOLERANCE
-from marketbrief.constants.prices import (MSG_CLOSE_MISMATCH, MSG_NO_STORED_IN_FRAME, MSG_NO_WINDOW_FOR_SPLIT,
-                                          MSG_NOT_ONE_REBASE, MSG_NSE_CHECK_SUFFIX, MSG_REBASE_NOT_FRACTION,
-                                          MSG_REBASE_UNCONFIRMED, MSG_SPLIT_NEITHER_ADJUSTED,
-                                          MSG_SPLIT_NOT_REBASED, MSG_SPLIT_RATIOS_UNEXPLAINED, SOURCE_YAHOO_SPLITS)
+from marketbrief.constants.prices import (
+    MSG_CLOSE_MISMATCH,
+    MSG_NO_STORED_IN_FRAME,
+    MSG_NO_WINDOW_FOR_SPLIT,
+    MSG_NOT_ONE_REBASE,
+    MSG_NSE_CHECK_SUFFIX,
+    MSG_REBASE_NOT_FRACTION,
+    MSG_REBASE_UNCONFIRMED,
+    MSG_SPLIT_NEITHER_ADJUSTED,
+    MSG_SPLIT_NOT_REBASED,
+    MSG_SPLIT_RATIOS_UNEXPLAINED,
+    SOURCE_YAHOO_SPLITS,
+)
 
 
 @dataclass
 class Detection:
     """The state of one symbol's check: Yahoo's closes, our stored closes, the adjustments known so far and the
     outcome (new records, warnings, hold)."""
+
     key: str
     yahoo_closes: dict[date, float]
     stored: dict[date, float]
@@ -102,8 +119,9 @@ class AdjustmentDetector:
         ratio = state.yahoo_closes[first] / (newest[1] * factor_after(state.known, state.key, newest[0]))
         if abs(ratio - 1) <= BASIS_MATCH_TOLERANCE:
             return False
-        state.warnings.append(MSG_NO_STORED_IN_FRAME.format(key=state.key, first=first, ratio=ratio,
-                                                            stored_day=newest[0]))
+        state.warnings.append(
+            MSG_NO_STORED_IN_FRAME.format(key=state.key, first=first, ratio=ratio, stored_day=newest[0])
+        )
         return True
 
     def check_split_rows(self, state: Detection, ratios: dict[date, float]) -> None:
@@ -136,39 +154,61 @@ class AdjustmentDetector:
             self.record_split(state, ex_date, ratio, factor, window[-1], got)
         elif all(abs(x - 1) <= BASIS_MATCH_TOLERANCE for x in got.values()):
             if stepped:
-                state.warnings.append(MSG_SPLIT_NEITHER_ADJUSTED.format(key=state.key, day=ex_date, ratio=ratio,
-                                                                        step=step))
+                state.warnings.append(
+                    MSG_SPLIT_NEITHER_ADJUSTED.format(key=state.key, day=ex_date, ratio=ratio, step=step)
+                )
                 state.hold = True
         else:
-            state.warnings.append(MSG_SPLIT_RATIOS_UNEXPLAINED.format(
-                key=state.key, day=ex_date, ratio=ratio, low=min(got.values()), high=max(got.values()),
-                factor=factor))
+            state.warnings.append(
+                MSG_SPLIT_RATIOS_UNEXPLAINED.format(
+                    key=state.key,
+                    day=ex_date,
+                    ratio=ratio,
+                    low=min(got.values()),
+                    high=max(got.values()),
+                    factor=factor,
+                )
+            )
             state.hold = True
 
-    def record_split(self, state: Detection, ex_date: date, ratio: float, factor: float, check_day: date,
-                     got: dict[date, float]) -> None:
+    def record_split(
+        self, state: Detection, ex_date: date, ratio: float, factor: float, check_day: date, got: dict[date, float]
+    ) -> None:
         """Record a split Yahoo's history is re-based for and our stored bars are not."""
-        record = adjustment_record(state.key, ex_date, factor, SOURCE_YAHOO_SPLITS, self.run.now,
-                                   yahoo_ratio=ratio, check_date=str(check_day),
-                                   stored_close=state.stored[check_day], yahoo_close=state.yahoo_closes[check_day],
-                                   measured_factor=round(got[check_day], 6))
+        record = adjustment_record(
+            state.key,
+            ex_date,
+            factor,
+            SOURCE_YAHOO_SPLITS,
+            self.run.now,
+            yahoo_ratio=ratio,
+            check_date=str(check_day),
+            stored_close=state.stored[check_day],
+            yahoo_close=state.yahoo_closes[check_day],
+            measured_factor=round(got[check_day], 6),
+        )
         state.records.append(record)
         state.known.append({**record, KEY_EX_DATE: ex_date})
         state.seen.add((state.key, ex_date))
 
     def check_rebase(self, state: Detection) -> tuple[list[dict], list[str], bool]:
         """Stored closes that differ from Yahoo's with no split row explaining it (case 2)."""
-        mismatches = {d: state.yahoo_closes[d] / state.stored_view(d) for d in sorted(state.stored)
-                      if abs(state.yahoo_closes[d] / state.stored_view(d) - 1) > BASIS_MATCH_TOLERANCE}
+        mismatches = {
+            d: state.yahoo_closes[d] / state.stored_view(d)
+            for d in sorted(state.stored)
+            if abs(state.yahoo_closes[d] / state.stored_view(d) - 1) > BASIS_MATCH_TOLERANCE
+        }
         if not mismatches:
             return state.records, state.warnings, False
         first, last = min(mismatches), max(mismatches)
         values = list(mismatches.values())
         middle = sorted(values)[len(values) // 2]
-        detail = MSG_CLOSE_MISMATCH.format(key=state.key, count=len(mismatches), first=first, last=last,
-                                           low=min(values), high=max(values))
-        is_rebase = (all(abs(x / middle - 1) <= SPLIT_TOLERANCE for x in values)
-                     and all(d in mismatches for d in state.stored if d <= last))
+        detail = MSG_CLOSE_MISMATCH.format(
+            key=state.key, count=len(mismatches), first=first, last=last, low=min(values), high=max(values)
+        )
+        is_rebase = all(abs(x / middle - 1) <= SPLIT_TOLERANCE for x in values) and all(
+            d in mismatches for d in state.stored if d <= last
+        )
         if not is_rebase:
             state.warnings.append(detail + MSG_NOT_ONE_REBASE)
             return state.records, state.warnings, False
@@ -182,8 +222,15 @@ class AdjustmentDetector:
         """Ask the NSE check to confirm a re-base by `fraction`; hold when nothing does."""
         later = [d for d in sorted(state.yahoo_closes) if d > last]
         if self.nse_check and later:
-            claim = RebaseClaim(state.key, last, state.stored[last], factor_after(state.known, state.key, last),
-                                float(fraction), later, state.yahoo_closes)
+            claim = RebaseClaim(
+                state.key,
+                last,
+                state.stored[last],
+                factor_after(state.known, state.key, last),
+                float(fraction),
+                later,
+                state.yahoo_closes,
+            )
             record, why = self.nse_check.confirm(claim)
             if record:
                 state.records.append(record)

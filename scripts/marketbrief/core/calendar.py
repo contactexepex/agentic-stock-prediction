@@ -6,6 +6,7 @@
 - Market events come from config/events.yaml (rules + fixed dates) plus company earnings and
   ex-dividend dates collected into data/<market>/events/ by the events collector.
 """
+
 from __future__ import annotations
 
 import calendar as month_calendar
@@ -15,12 +16,28 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from marketbrief.constants.calendar import (CALENDAR_START, DEFAULT_CLOSE, DEFAULT_OPEN, EDGE_CLOSE, EDGE_OPEN,
-                                            FILE_EVENTS_CONFIG, KEY_EVENTS_FIXED, KEY_EVENTS_RULES,
-                                            MAJOR_WINDOW_DAYS, MAX_SESSION_OFFSET, MIN_SESSION_OFFSET,
-                                            MSG_SESSION_OFFSET_RANGE, MSG_UNKNOWN_EVENT_RULE, RULE_FIRST_FRIDAY,
-                                            RULE_LAST_WEEKDAY, RULE_MONTH_END, RULE_THIRD_FRIDAY, RULE_WEEKLY,
-                                            WEEKDAY_FRIDAY, WEEKS_PADDING_DAYS)
+from marketbrief.constants.calendar import (
+    CALENDAR_START,
+    DEFAULT_CLOSE,
+    DEFAULT_OPEN,
+    EDGE_CLOSE,
+    EDGE_OPEN,
+    FILE_EVENTS_CONFIG,
+    KEY_EVENTS_FIXED,
+    KEY_EVENTS_RULES,
+    MAJOR_WINDOW_DAYS,
+    MAX_SESSION_OFFSET,
+    MIN_SESSION_OFFSET,
+    MSG_SESSION_OFFSET_RANGE,
+    MSG_UNKNOWN_EVENT_RULE,
+    RULE_FIRST_FRIDAY,
+    RULE_LAST_WEEKDAY,
+    RULE_MONTH_END,
+    RULE_THIRD_FRIDAY,
+    RULE_WEEKLY,
+    WEEKDAY_FRIDAY,
+    WEEKS_PADDING_DAYS,
+)
 from marketbrief.constants.config_keys import CFG_CALENDAR, CFG_HOLIDAYS, CFG_MARKET, CFG_TIMEZONE
 from marketbrief.core import paths
 
@@ -29,12 +46,16 @@ from marketbrief.core import paths
 def exchange_calendar(code: str):
     """The exchange_calendars calendar of an exchange code (XNYS, XBOM ...), loaded once."""
     import exchange_calendars
+
     return exchange_calendars.get_calendar(code, start=CALENDAR_START)
 
 
 def extra_holidays(cfg: dict) -> set[date]:
     """The market config's extra closed days."""
-    return {h if isinstance(h, date) else date.fromisoformat(str(h)) for h in cfg.get(CFG_HOLIDAYS) or []}
+    return {
+        holiday if isinstance(holiday, date) else date.fromisoformat(str(holiday))
+        for holiday in cfg.get(CFG_HOLIDAYS) or []
+    }
 
 
 def calendar_covers(cfg: dict, day: date) -> bool:
@@ -113,6 +134,7 @@ def sessions_ahead(cfg: dict, start: date, count: int) -> list[date]:
 
 # ---------- rule dates ----------
 
+
 def nth_weekday(year: int, month: int, weekday: int, nth: int) -> date:
     """The nth given weekday (Monday = 0) of a month."""
     first = date(year, month, 1)
@@ -167,15 +189,22 @@ def session_offset(rule: dict) -> int:
     before). Only 0 or a small negative offset is allowed."""
     offset = int(rule.get("session_offset") or 0)
     if not MIN_SESSION_OFFSET <= offset <= MAX_SESSION_OFFSET:
-        raise ValueError(MSG_SESSION_OFFSET_RANGE.format(low=MIN_SESSION_OFFSET, high=MAX_SESSION_OFFSET,
-                                                         offset=offset))
+        raise ValueError(
+            MSG_SESSION_OFFSET_RANGE.format(low=MIN_SESSION_OFFSET, high=MAX_SESSION_OFFSET, offset=offset)
+        )
     return offset
 
 
 def _market_event(day: date, spec: dict) -> dict:
     """One market-level event row."""
-    return {"date": day, "type": spec["type"], "name": spec["name"], "major": bool(spec.get("major")),
-            "ticker": None, "release": spec.get("release")}
+    return {
+        "date": day,
+        "type": spec["type"],
+        "name": spec["name"],
+        "major": bool(spec.get("major")),
+        "ticker": None,
+        "release": spec.get("release"),
+    }
 
 
 def _rule_events(cfg: dict, spec: dict, start: date, end: date) -> list[dict]:
@@ -191,7 +220,7 @@ def _rule_events(cfg: dict, spec: dict, start: date, end: date) -> list[dict]:
             if day in skip:  # known not to happen on (or before) this date
                 continue
             day = prev_session(cfg, day)  # holiday -> previous trading day
-            for _ in range(steps_back):   # e.g. the session before the last session of the month
+            for _ in range(steps_back):  # e.g. the session before the last session of the month
                 day = prev_session(cfg, day, include=False)
             if start <= day <= end:
                 found.append(_market_event(day, rule))
@@ -211,5 +240,6 @@ def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
 
 def major_events_near(events: list[dict], day: date, window: int = MAJOR_WINDOW_DAYS) -> list[dict]:
     """Company-independent major events from `day` to `window` days after it."""
-    return [e for e in events if e["major"] and e["ticker"] is None
-            and day <= e["date"] <= day + timedelta(days=window)]
+    return [
+        e for e in events if e["major"] and e["ticker"] is None and day <= e["date"] <= day + timedelta(days=window)
+    ]

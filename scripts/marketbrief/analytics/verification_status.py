@@ -22,18 +22,36 @@ A cluster's status is the highest of its base status (the cluster row alone) and
 facts its outlet items state. A fact stated only by a primary source (no outlet item affirms it, e.g. a
 share allotment filed beside an unconfirmed story) keeps its own row, flagged primary_only, but never
 raises the cluster's status or confirmed_at, nor adds its primary ids to the confirming ids."""
+
 from __future__ import annotations
 
 from marketbrief.analytics.claim_numbers import values_match
-from marketbrief.constants.verification import (ATTRIBUTION_OPINION, ATTRIBUTION_SOURCES_SAY, CLAIM_TYPE_OPINION,
-                                                CLAIM_TYPE_PROMOTIONAL, CLAIM_TYPE_RUMOUR, FIELD_TITLE,
-                                                FLAG_MISMATCH_PRIMARY, FLAG_OUTLET_VALUES_DISAGREE,
-                                                FLAG_PRIMARY_DENIES, FLAG_PRIMARY_ONLY, FLAG_PRIMARY_WITHOUT_VALUE,
-                                                FLAG_STANCES_DISAGREE, FLAG_UNIT_MISMATCH,
-                                                PRIMARY_SOURCE_KINDS, STATUS_CONFIRMED_PRIMARY, STATUS_CONTRADICTED,
-                                                STATUS_CORROBORATED, STATUS_PRECEDENCE, STATUS_PROMOTIONAL,
-                                                STATUS_RUMOUR, STATUS_SINGLE_SOURCE, STATUS_UNVERIFIED,
-                                                STANCE_AFFIRMS, STANCE_DENIES)
+from marketbrief.constants.verification import (
+    ATTRIBUTION_OPINION,
+    ATTRIBUTION_SOURCES_SAY,
+    CLAIM_TYPE_OPINION,
+    CLAIM_TYPE_PROMOTIONAL,
+    CLAIM_TYPE_RUMOUR,
+    FIELD_TITLE,
+    FLAG_MISMATCH_PRIMARY,
+    FLAG_OUTLET_VALUES_DISAGREE,
+    FLAG_PRIMARY_DENIES,
+    FLAG_PRIMARY_ONLY,
+    FLAG_PRIMARY_WITHOUT_VALUE,
+    FLAG_STANCES_DISAGREE,
+    FLAG_UNIT_MISMATCH,
+    PRIMARY_SOURCE_KINDS,
+    STATUS_CONFIRMED_PRIMARY,
+    STATUS_CONTRADICTED,
+    STATUS_CORROBORATED,
+    STATUS_PRECEDENCE,
+    STATUS_PROMOTIONAL,
+    STATUS_RUMOUR,
+    STATUS_SINGLE_SOURCE,
+    STATUS_UNVERIFIED,
+    STANCE_AFFIRMS,
+    STANCE_DENIES,
+)
 
 
 def highest(statuses) -> str:
@@ -63,8 +81,11 @@ def is_rumour(statement: dict) -> bool:
 
 def has_value(statement: dict) -> bool:
     """A value that takes part in comparisons: stated with a unit, and not quoted from a headline."""
-    return (statement.get("value_num") is not None and statement.get("unit") is not None
-            and statement.get("quote_field") != FIELD_TITLE)
+    return (
+        statement.get("value_num") is not None
+        and statement.get("unit") is not None
+        and statement.get("quote_field") != FIELD_TITLE
+    )
 
 
 def same_period(first: str | None, second: str | None) -> bool:
@@ -79,8 +100,9 @@ def value_groups(statements: list[dict]) -> list[list[dict]]:
     for s in sorted(statements, key=lambda x: (x["value_num"], x["quote_source_id"])):
         for group in groups:
             head = group[0]
-            if head["unit"] == s["unit"] and values_match((head["value_num"], head.get("value_text")),
-                                                          (s["value_num"], s.get("value_text"))):
+            if head["unit"] == s["unit"] and values_match(
+                (head["value_num"], head.get("value_text")), (s["value_num"], s.get("value_text"))
+            ):
                 group.append(s)
                 break
         else:
@@ -92,8 +114,15 @@ def conflict_rows(groups: list[list[dict]]) -> list[dict]:
     """The disagreeing values for display: value (a primary source's when one states it), unit, the source
     ids stating it, and whether a primary did."""
     heads = [next((s for s in g if is_primary(s)), g[0]) for g in groups]
-    return [{"value": h["value_num"], "unit": h["unit"], "ids": sorted({s["quote_source_id"] for s in g}),
-             "primary": is_primary(h)} for h, g in zip(heads, groups)]
+    return [
+        {
+            "value": horizon["value_num"],
+            "unit": horizon["unit"],
+            "ids": sorted({s["quote_source_id"] for s in g}),
+            "primary": is_primary(horizon),
+        }
+        for horizon, g in zip(heads, groups)
+    ]
 
 
 def _primary_checks(primary: list[dict], outlets: list[dict], result: dict) -> bool:
@@ -114,8 +143,11 @@ def _primary_checks(primary: list[dict], outlets: list[dict], result: dict) -> b
         same_unit = [p for p in values if p["unit"] == s["unit"]]
         if not same_unit:
             result["flags"].add(FLAG_UNIT_MISMATCH)
-        elif not any(values_match((p["value_num"], p.get("value_text")), (s["value_num"], s.get("value_text")))
-                     and same_period(p.get("period"), s.get("period")) for p in same_unit):
+        elif not any(
+            values_match((p["value_num"], p.get("value_text")), (s["value_num"], s.get("value_text")))
+            and same_period(p.get("period"), s.get("period"))
+            for p in same_unit
+        ):
             result["flags"].add(FLAG_MISMATCH_PRIMARY)
             result["mismatch_ids"].update(s["news_ids"])
     return contradicted
@@ -164,14 +196,23 @@ def fact_status(statements: list[dict], verified_origin: dict[str, str]) -> dict
     else:
         status = STATUS_SINGLE_SOURCE if origins else STATUS_UNVERIFIED
     numeric = [s for s in statements if has_value(s) and s["stance"] == STANCE_AFFIRMS]
-    groups = [g for unit in sorted({s["unit"] for s in numeric})
-              for g in value_groups([s for s in numeric if s["unit"] == unit])]
-    return {"status": status, "flags": sorted(result["flags"]), "mismatch_ids": sorted(result["mismatch_ids"]),
-            "primary_ids": sorted({s["quote_source_id"] for s in affirm}),
-            "outlet_ids": sorted({n for s in outlets for n in s["news_ids"]}),
-            "origins": sorted(origins), "conflicts": conflict_rows(groups) if len(groups) > 1 else [],
-            "confirmed_at": min((s.get("source_published_at") or s["source_available_at"] for s in affirm),
-                                default=None) if confirmed else None}
+    groups = [
+        g
+        for unit in sorted({s["unit"] for s in numeric})
+        for g in value_groups([s for s in numeric if s["unit"] == unit])
+    ]
+    return {
+        "status": status,
+        "flags": sorted(result["flags"]),
+        "mismatch_ids": sorted(result["mismatch_ids"]),
+        "primary_ids": sorted({s["quote_source_id"] for s in affirm}),
+        "outlet_ids": sorted({n for s in outlets for n in s["news_ids"]}),
+        "origins": sorted(origins),
+        "conflicts": conflict_rows(groups) if len(groups) > 1 else [],
+        "confirmed_at": min((s.get("source_published_at") or s["source_available_at"] for s in affirm), default=None)
+        if confirmed
+        else None,
+    }
 
 
 def verified_origins(cluster: dict) -> dict[str, str]:
@@ -224,15 +265,18 @@ def cluster_status(cluster: dict, statements: list[dict]) -> tuple[dict, dict[st
     for key, fact in facts.items():
         if not any(not is_primary(s) and s["stance"] == STANCE_AFFIRMS for s in by_fact[key]):
             fact["flags"] = sorted({*fact["flags"], FLAG_PRIMARY_ONLY})
-    event = [f for f in facts.values() if FLAG_PRIMARY_ONLY not in f["flags"]]   # facts the outlets state
+    event = [f for f in facts.values() if FLAG_PRIMARY_ONLY not in f["flags"]]  # facts the outlets state
     status = highest([base_status(cluster), *(f["status"] for f in event)])
     mismatch = {n for f in event for n in f["mismatch_ids"]}
     confirmed = [f["confirmed_at"] for f in event if f["confirmed_at"] is not None]
-    result = {"status": status, "flags": sorted({x for f in event for x in f["flags"]}),
-              "mismatch_ids": sorted(mismatch),
-              "primary_ids": sorted({p for f in event for p in f["primary_ids"]}),
-              "outlet_ids": sorted({o for f in event for o in f["outlet_ids"]}),
-              "conflicts": [c for f in event for c in f["conflicts"]],
-              "confirmed_at": min(confirmed) if status == STATUS_CONFIRMED_PRIMARY and confirmed else None,
-              "ids": id_statuses(cluster, status, mismatch)}
+    result = {
+        "status": status,
+        "flags": sorted({x for f in event for x in f["flags"]}),
+        "mismatch_ids": sorted(mismatch),
+        "primary_ids": sorted({p for f in event for p in f["primary_ids"]}),
+        "outlet_ids": sorted({o for f in event for o in f["outlet_ids"]}),
+        "conflicts": [c for f in event for c in f["conflicts"]],
+        "confirmed_at": min(confirmed) if status == STATUS_CONFIRMED_PRIMARY and confirmed else None,
+        "ids": id_statuses(cluster, status, mismatch),
+    }
     return result, facts

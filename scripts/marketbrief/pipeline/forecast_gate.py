@@ -27,8 +27,8 @@ def evidence_times(con) -> dict:
         "SELECT id, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ), first_seen_at) FROM filings",
         "SELECT id, coalesce(published_at, first_seen_at) FROM announcements",
     ):
-        for i, t in con.execute(f"SELECT * FROM ({sql}) ORDER BY 1, 2").fetchall():  # per id the earliest wins
-            out.setdefault(i, as_utc_timestamp(t))
+        for i, row in con.execute(f"SELECT * FROM ({sql}) ORDER BY 1, 2").fetchall():  # per id the earliest wins
+            out.setdefault(i, as_utc_timestamp(row))
     return out
 
 
@@ -104,12 +104,12 @@ def stage_forecast(res, cfg, con, st, now, vc, path: Path) -> None:  # noqa: PLR
                 errs.append(f"made_at {rec['made_at']} is in the future")
             if not ISO_UTC.match(str(rec["made_at"])):
                 errs.append("made_at is not ISO 8601 UTC")
-        tk = [rec.get("ticker")] if isinstance(rec, dict) and rec.get("ticker") else []
+        cited_tickers = [rec.get("ticker")] if isinstance(rec, dict) and rec.get("ticker") else []
         if errs:
             res.block(
                 CODE_FORECAST_RULE,
                 f"line {i} ({rec.get('id') if isinstance(rec, dict) else '?'}): " + "; ".join(errs),
-                tk,
+                cited_tickers,
             )
         elif status_failures(res, rec, i, statuses):
             good += 1

@@ -1,4 +1,5 @@
 """Command-line plumbing shared by the entry-point scripts: the --market argument."""
+
 from __future__ import annotations
 
 import argparse
@@ -12,8 +13,11 @@ from marketbrief.core.market_config import load_market, market_names
 def market_arg(description: str | None = None) -> argparse.ArgumentParser:
     """An argument parser that has --market (default $MB_MARKET)."""
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("--market", default=os.environ.get(ENV_MARKET),
-                        help="market config name, e.g. india or us (default: $MB_MARKET)")
+    parser.add_argument(
+        "--market",
+        default=os.environ.get(ENV_MARKET),
+        help="market config name, e.g. india or us (default: $MB_MARKET)",
+    )
     return parser
 
 

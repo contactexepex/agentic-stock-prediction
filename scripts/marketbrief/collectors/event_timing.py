@@ -1,5 +1,6 @@
 """Dates and timing of company events: the local date of a timestamp and whether it falls before the open, during
 or after the close, plus the helpers that merge report dates from several sources."""
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -8,8 +9,13 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from marketbrief.constants.config_keys import CFG_CALENDAR, CFG_TIMEZONE
-from marketbrief.constants.events import (NEAR_DAYS, QUARTER_GAP_DAYS, TIMING_AFTER_CLOSE, TIMING_BEFORE_OPEN,
-                                          TIMING_DURING)
+from marketbrief.constants.events import (
+    NEAR_DAYS,
+    QUARTER_GAP_DAYS,
+    TIMING_AFTER_CLOSE,
+    TIMING_BEFORE_OPEN,
+    TIMING_DURING,
+)
 from marketbrief.core.calendar import exchange_calendar
 
 
@@ -37,7 +43,7 @@ def timing(cfg: dict, stamp) -> tuple[date, str | None]:
     try:
         calendar = exchange_calendar(cfg[CFG_CALENDAR])
         if not calendar.is_session(day.isoformat()):
-            return day, TIMING_BEFORE_OPEN           # weekend/holiday: first reaction is the next session
+            return day, TIMING_BEFORE_OPEN  # weekend/holiday: first reaction is the next session
         opens, closes = calendar.session_open(day.isoformat()), calendar.session_close(day.isoformat())
     except Exception:
         return day, None

@@ -39,6 +39,7 @@ duplicates_removed. A cluster is appended (schema `news_clusters`) when it has a
 in the last `window_hours`, holds 2+ items or a fetched article, and is new or changed since its
 last stored row. Read the state at a time with the macro news_clusters_asof(ts) (sql/views.sql).
 Prints a JSON summary."""
+
 from __future__ import annotations
 
 import hashlib
@@ -48,17 +49,26 @@ from collections import Counter, defaultdict
 
 import pandas as pd
 
-from marketbrief.analytics.cluster_items import (DisjointSets, drop_tokens, iso_seconds, load_items,
-                                                 load_primaries)
+from marketbrief.analytics.cluster_items import DisjointSets, drop_tokens, iso_seconds, load_items, load_primaries
 from marketbrief.analytics.cluster_origins import describe
 from marketbrief.analytics.news_sources import Sources, load_sources
 from marketbrief.analytics.news_tags import norm
 from marketbrief.analytics.text_measures import estimated_containment, title_tokens
-from marketbrief.constants.news_clusters import (DEFAULT_COPY_CONTAINMENT, DEFAULT_MIN_SHINGLES, DEFAULT_TITLE_JACCARD,
-                                                 DEFAULT_TITLE_MIN_SHARED, DEFAULT_WINDOW_HOURS, MAX_EXAMPLES,
-                                                 MAX_SIZE_BUCKET, MAX_UNVETTED_DOMAINS, METHOD_VERSION_CLUSTERS,
-                                                 STATE_HASH_KEYS, STATE_HASH_LENGTH, STEP_NEWS_CLUSTERS,
-                                                 STORED_CLUSTERS_SQL)
+from marketbrief.constants.news_clusters import (
+    DEFAULT_COPY_CONTAINMENT,
+    DEFAULT_MIN_SHINGLES,
+    DEFAULT_TITLE_JACCARD,
+    DEFAULT_TITLE_MIN_SHARED,
+    DEFAULT_WINDOW_HOURS,
+    MAX_EXAMPLES,
+    MAX_SIZE_BUCKET,
+    MAX_UNVETTED_DOMAINS,
+    METHOD_VERSION_CLUSTERS,
+    STATE_HASH_KEYS,
+    STATE_HASH_LENGTH,
+    STEP_NEWS_CLUSTERS,
+    STORED_CLUSTERS_SQL,
+)
 from marketbrief.core import cli, clock, database, storage
 
 
@@ -89,6 +99,7 @@ def copy_test(items: list[dict], cl: dict):
             return False
         c = estimated_containment(a.get("minhash"), a.get("shingle_count"), b.get("minhash"), b.get("shingle_count"))
         return c is not None and c >= copy_threshold
+
     return copies
 
 
@@ -99,7 +110,7 @@ def cluster_ticker(items: list[dict], cfg: dict, src: Sources) -> list[dict]:
     jac = float(cl.get("title_jaccard", DEFAULT_TITLE_JACCARD))
     shared = int(cl.get("title_min_shared", DEFAULT_TITLE_MIN_SHARED))
     items = sorted(items, key=lambda x: (x["t"], x["id"]))
-    dup = duplicate_sets(items)   # 1. duplicates
+    dup = duplicate_sets(items)  # 1. duplicates
     reps = [i for i in range(len(items)) if dup.find(i) == i]
     dups = defaultdict(list)
     for i in range(len(items)):
@@ -108,15 +119,15 @@ def cluster_ticker(items: list[dict], cfg: dict, src: Sources) -> list[dict]:
     drop = drop_tokens(cfg, items[0]["ticker"]) if items else set()
     toks = {i: title_tokens(items[i]["title"], drop) for i in reps}
     copies = copy_test(items, cl)
-    events = DisjointSets(len(items))   # 2. event links
+    events = DisjointSets(len(items))  # 2. event links
     for x, i in enumerate(reps):
-        for j in reps[x + 1:]:
+        for j in reps[x + 1 :]:
             if items[j]["t"] - items[i]["t"] > window:
                 break
             ti, tj = toks[i], toks[j]
             inter = len(ti & tj)
             same_title = inter >= shared and inter / len(ti | tj) >= jac
-            same_number = inter >= 1 and bool(items[i]["nums"] & items[j]["nums"])   # "$20 billion" alone is common
+            same_number = inter >= 1 and bool(items[i]["nums"] & items[j]["nums"])  # "$20 billion" alone is common
             if same_title or same_number or copies(i, j):
                 events.union(i, j)
     groups = defaultdict(list)
@@ -131,22 +142,34 @@ def cluster_ticker(items: list[dict], cfg: dict, src: Sources) -> list[dict]:
 
 def state_hash(c: dict) -> str:
     """A short hash of the cluster's stored state (a new row is written only when it changes)."""
-    return hashlib.sha1(json.dumps({k: c[k] for k in STATE_HASH_KEYS}, sort_keys=True,
-                                   default=str).encode()).hexdigest()[:STATE_HASH_LENGTH]
+    return hashlib.sha1(
+        json.dumps({k: c[k] for k in STATE_HASH_KEYS}, sort_keys=True, default=str).encode()
+    ).hexdigest()[:STATE_HASH_LENGTH]
 
 
 def stored_row(c: dict, as_of: pd.Timestamp, digest: str) -> dict:
     """The `news_clusters` record of a cluster."""
     return {
-        "id": f"{c['cluster_id']}@{as_of:%Y%m%dT%H%M%SZ}", "as_of": iso_seconds(as_of), "cluster_id": c["cluster_id"],
-        "ticker": c["ticker"], "news_ids": c["news_ids"], "duplicate_ids": c["duplicate_ids"],
-        "n_items": c["n_items"], "outlets": c["outlets"], "tiers": c["tiers"],
-        "independent_origins": c["independent_origins"], "unread_vetted_origins": c["unread_vetted_origins"],
+        "id": f"{c['cluster_id']}@{as_of:%Y%m%dT%H%M%SZ}",
+        "as_of": iso_seconds(as_of),
+        "cluster_id": c["cluster_id"],
+        "ticker": c["ticker"],
+        "news_ids": c["news_ids"],
+        "duplicate_ids": c["duplicate_ids"],
+        "n_items": c["n_items"],
+        "outlets": c["outlets"],
+        "tiers": c["tiers"],
+        "independent_origins": c["independent_origins"],
+        "unread_vetted_origins": c["unread_vetted_origins"],
         "unvetted_ids": c["unvetted_ids"],
-        "origins": c["origins"], "origin_groups": c["origin_groups"], "primary_ids": c["primary_ids"],
+        "origins": c["origins"],
+        "origin_groups": c["origin_groups"],
+        "primary_ids": c["primary_ids"],
         "first_reported_at": iso_seconds(c["first_reported_at"]),
         "last_reported_at": iso_seconds(c["last_reported_at"]),
-        "inputs_until": iso_seconds(c["inputs_until"]), "flags": c["flags"], "state_hash": digest,
+        "inputs_until": iso_seconds(c["inputs_until"]),
+        "flags": c["flags"],
+        "state_hash": digest,
         "method_version": METHOD_VERSION_CLUSTERS,
     }
 
@@ -154,30 +177,43 @@ def stored_row(c: dict, as_of: pd.Timestamp, digest: str) -> dict:
 def attach_primaries(c: dict, prim: dict, window: pd.Timedelta) -> None:
     """Add the ticker's filings and announcements public from `window` before the first report."""
     lo = c["first_reported_at"] - window
-    p = [(t, i) for t, i in prim.get(c["ticker"], []) if lo <= t]   # load_primaries: <= as_of
+    p = [(primary, i) for primary, i in prim.get(c["ticker"], []) if lo <= primary]  # load_primaries: <= as_of
     c["primary_ids"] = [i for _t, i in p]
     if p:
-        c["inputs_until"] = max(c["inputs_until"], max(t for t, _i in p))
+        c["inputs_until"] = max(c["inputs_until"], max(primary for primary, _i in p))
 
 
 def run_summary(market: str, as_of: pd.Timestamp, counts: dict, current: list[dict]) -> dict:
     """The JSON summary of a run."""
     examples = sorted(current, key=lambda c: (-c["n_items"], c["cluster_id"]))[:MAX_EXAMPLES]
     return {
-        "step": STEP_NEWS_CLUSTERS, "market": market, "as_of": iso_seconds(as_of), **counts,
+        "step": STEP_NEWS_CLUSTERS,
+        "market": market,
+        "as_of": iso_seconds(as_of),
+        **counts,
         "size_distribution": dict(sorted(Counter(min(c["n_items"], MAX_SIZE_BUCKET) for c in current).items())),
         "independent_origins_distribution": dict(sorted(Counter(c["independent_origins"] for c in current).items())),
         "unread_vetted_distribution": dict(sorted(Counter(c["unread_vetted_origins"] for c in current).items())),
         "clusters_with_unvetted_items": sum(1 for c in current if c["unvetted_ids"]),
         # outlets not on the allowlist (config/news_sources.yaml), for review: vet and add, or ignore
-        "unvetted_domains": dict(Counter(o for c in current for o in c["unvetted_outlets"])
-                                 .most_common(MAX_UNVETTED_DOMAINS)),
-        "flags": dict(Counter(f for c in current for f in c["flags"]).most_common()),
+        "unvetted_domains": dict(
+            Counter(o for c in current for o in c["unvetted_outlets"]).most_common(MAX_UNVETTED_DOMAINS)
+        ),
+        "flags": dict(Counter(flag for c in current for flag in c["flags"]).most_common()),
         "with_primary": sum(1 for c in current if c["primary_ids"]),
-        "examples": [{"cluster_id": c["cluster_id"], "n_items": c["n_items"], "titles": c["titles"][:4],
-                      "origins": c["origins"], "independent_origins": c["independent_origins"],
-                      "unvetted_ids": c["unvetted_ids"], "primary_ids": c["primary_ids"][:5],
-                      "flags": c["flags"]} for c in examples],
+        "examples": [
+            {
+                "cluster_id": c["cluster_id"],
+                "n_items": c["n_items"],
+                "titles": c["titles"][:4],
+                "origins": c["origins"],
+                "independent_origins": c["independent_origins"],
+                "unvetted_ids": c["unvetted_ids"],
+                "primary_ids": c["primary_ids"][:5],
+                "flags": c["flags"],
+            }
+            for c in examples
+        ],
     }
 
 
@@ -194,7 +230,7 @@ def main() -> int:
     by_ticker = defaultdict(list)
     for it in items:
         by_ticker[it["ticker"]].append(it)
-    clusters = [c for t in sorted(by_ticker) for c in cluster_ticker(by_ticker[t], cfg, src)]
+    clusters = [c for ticker in sorted(by_ticker) for c in cluster_ticker(by_ticker[ticker], cfg, src)]
     rows, unchanged, skipped, current = [], 0, 0, []
     for c in clusters:
         attach_primaries(c, prim, window)
@@ -208,8 +244,14 @@ def main() -> int:
             continue
         rows.append(stored_row(c, as_of, digest))
     written = storage.append_jsonl(storage.day_file(market, "news_clusters", clock.utc_today()), rows) if rows else 0
-    counts = {"items": len(items), "clusters": len(clusters), "current": len(current), "written": written,
-              "unchanged": unchanged, "not_written_single_or_old": skipped}
+    counts = {
+        "items": len(items),
+        "clusters": len(clusters),
+        "current": len(current),
+        "written": written,
+        "unchanged": unchanged,
+        "not_written_single_or_old": skipped,
+    }
     summary = run_summary(market, as_of, counts, current)
     summary["seconds"] = round(time.monotonic() - t0, 1)
     print(json.dumps(summary, indent=2, default=str))

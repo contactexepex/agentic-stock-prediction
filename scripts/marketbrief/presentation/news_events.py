@@ -1,19 +1,26 @@
 """News events with their verification status for the context pack, and the evidence-status line of each
 call in the report (news verification phase B; statuses from news_verified, as of a time)."""
+
 from __future__ import annotations
 
 import json
 
 import pandas as pd
 
-from marketbrief.constants.verification import (NEVER_SUPPORT_STATUSES, STATUS_PRECEDENCE, STATUS_UNVERIFIED,
-                                                WIDEN_ONLY_STATUSES)
+from marketbrief.constants.verification import (
+    NEVER_SUPPORT_STATUSES,
+    STATUS_PRECEDENCE,
+    STATUS_UNVERIFIED,
+    WIDEN_ONLY_STATUSES,
+)
 from marketbrief.core.clock import clock
 from marketbrief.pipeline.claim_sources import clean_row
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 
-TITLE = ("News events and verification status (one row per same-event cluster instead of its headlines, "
-         "highest status first; status as of now; cite = ids to cite, main evidence first)")
+TITLE = (
+    "News events and verification status (one row per same-event cluster instead of its headlines, "
+    "highest status first; status as of now; cite = ids to cite, main evidence first)"
+)
 EVENTS_SQL = """
 WITH c AS (SELECT * FROM news_clusters_asof(?::TIMESTAMPTZ) WHERE last_reported_at >= ?::TIMESTAMPTZ),
 v AS (SELECT * FROM news_verified_asof(?::TIMESTAMPTZ) WHERE level = 'cluster')
@@ -25,8 +32,10 @@ TITLES_SQL = "SELECT DISTINCT ON (id) id, title FROM news WHERE list_contains(?,
 CALLS_SQL = """
 SELECT DISTINCT ON (id) id, ticker, horizon_days, direction, evidence_ids, made_at FROM predictions
 WHERE as_of_date = ? ORDER BY id, made_at"""
-HEADER = ("| ticker | event | status | verified origins | unread vetted | primary | conflicts | cite | first reported "
-          "| confirmed |\n|---|---|---|---|---|---|---|---|---|---|\n")
+HEADER = (
+    "| ticker | event | status | verified origins | unread vetted | primary | conflicts | cite | first reported "
+    "| confirmed |\n|---|---|---|---|---|---|---|---|---|---|\n"
+)
 
 
 def _short_time(value) -> str:
@@ -44,8 +53,11 @@ def _cite(row: dict, status: str) -> list[str]:
     """Up to 3 ids a call may cite: confirming primary ids first, then news ids whose own status is the
     event's, unless that status can never support a call (rumour, promotional, contradicted)."""
     own = dict(zip(row.get("status_ids") or [], row.get("id_statuses") or []))
-    news = [] if status in (*NEVER_SUPPORT_STATUSES, *WIDEN_ONLY_STATUSES) else \
-        [i for i in row.get("news_ids") or [] if own.get(i, STATUS_UNVERIFIED) == status]
+    news = (
+        []
+        if status in (*NEVER_SUPPORT_STATUSES, *WIDEN_ONLY_STATUSES)
+        else [i for i in row.get("news_ids") or [] if own.get(i, STATUS_UNVERIFIED) == status]
+    )
     return (list(row.get("primary_ids") or []) + news)[:3]
 
 
@@ -55,9 +67,15 @@ def event_rows(con, now, window_hours: float, per_ticker: int) -> list[dict]:
     now = pd.Timestamp(now)
     since = now - pd.Timedelta(hours=window_hours)
     df = con.execute(EVENTS_SQL, [now.isoformat(), since.isoformat(), now.isoformat()]).df()
-    rows = sorted((clean_row(r) for r in df.to_dict("records")),
-                  key=lambda r: (r["ticker"], STATUS_PRECEDENCE.index(r.get("status") or STATUS_UNVERIFIED),
-                                 -pd.Timestamp(r["last_reported_at"]).value, r["cluster_id"]))
+    rows = sorted(
+        (clean_row(r) for r in df.to_dict("records")),
+        key=lambda r: (
+            r["ticker"],
+            STATUS_PRECEDENCE.index(r.get("status") or STATUS_UNVERIFIED),
+            -pd.Timestamp(r["last_reported_at"]).value,
+            r["cluster_id"],
+        ),
+    )
     kept, count = [], {}
     for r in rows:
         count[r["ticker"]] = count.get(r["ticker"], 0) + 1
@@ -77,13 +95,15 @@ def context_section(con, window_hours: float = 72, per_ticker: int = 4) -> tuple
     for r in rows:
         status = r.get("status") or STATUS_UNVERIFIED
         label = status if r.get("status") else f"{STATUS_UNVERIFIED} (no status row)"
-        flags = [f for f in r.get("status_flags") or [] if f]
+        flags = [flag for flag in r.get("status_flags") or [] if flag]
         title = (titles.get((r.get("news_ids") or [""])[0]) or "").replace("|", "/")[:90]
-        lines.append(f"| {r['ticker']} | {title} | {label}{' [' + ', '.join(flags) + ']' if flags else ''} | "
-                     f"{r['independent_origins']} | {r['unread_vetted_origins']} | "
-                     f"{', '.join(r.get('primary_ids') or []) or '–'} | {_conflicts(r.get('conflicts')) or '–'} | "
-                     f"{', '.join(_cite(r, status)) or '–'} | {_short_time(r['first_reported_at'])} | "
-                     f"{_short_time(r.get('confirmed_at'))} |")
+        lines.append(
+            f"| {r['ticker']} | {title} | {label}{' [' + ', '.join(flags) + ']' if flags else ''} | "
+            f"{r['independent_origins']} | {r['unread_vetted_origins']} | "
+            f"{', '.join(r.get('primary_ids') or []) or '–'} | {_conflicts(r.get('conflicts')) or '–'} | "
+            f"{', '.join(_cite(r, status)) or '–'} | {_short_time(r['first_reported_at'])} | "
+            f"{_short_time(r.get('confirmed_at'))} |"
+        )
     return TITLE, HEADER + "\n".join(lines) + "\n"
 
 
@@ -93,8 +113,7 @@ def call_status_lines(con, as_of) -> list[str]:
     if calls.empty:
         return []
     statuses = EvidenceStatuses(con)
-    out = ["Evidence status of the calls (each cited id as of the call's made_at; the first is the main evidence):",
-           ""]
+    out = ["Evidence status of the calls (each cited id as of the call's made_at; the first is the main evidence):", ""]
     for c in calls.itertuples():
         ids = list(c.evidence_ids) if c.evidence_ids is not None else []
         if not statuses.active(c.made_at):

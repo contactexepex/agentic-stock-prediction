@@ -1,4 +1,5 @@
 """The run's clock (MB_NOW freezes it) and the frozen-clock DuckDB connection."""
+
 from __future__ import annotations
 
 import os
@@ -10,9 +11,13 @@ import duckdb
 from marketbrief.constants.environment import ENV_NOW
 from marketbrief.constants.messages import MSG_MB_NOW_NEEDS_OFFSET
 
-_CLOCK_SQL = [(re.compile(r"\bcurrent_date\b(\s*\(\s*\))?", re.I), "DATE '{d}'"),
-              (re.compile(r"\b(?:now|get_current_timestamp|current_timestamp)\s*\(\s*\)|\bcurrent_timestamp\b", re.I),
-               "TIMESTAMPTZ '{t}'")]
+_CLOCK_SQL = [
+    (re.compile(r"\bcurrent_date\b(\s*\(\s*\))?", re.I), "DATE '{d}'"),
+    (
+        re.compile(r"\b(?:now|get_current_timestamp|current_timestamp)\s*\(\s*\)|\bcurrent_timestamp\b", re.I),
+        "TIMESTAMPTZ '{t}'",
+    ),
+]
 
 
 def clock() -> datetime:

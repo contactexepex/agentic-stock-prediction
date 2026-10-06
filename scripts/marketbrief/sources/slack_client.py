@@ -1,4 +1,5 @@
 """The HTTP POST behind the Slack Web API and incoming webhooks: one attempt, no retry."""
+
 from __future__ import annotations
 
 import urllib.error

@@ -1,5 +1,6 @@
 """Parsers of the macro sources (US Treasury par yield curve CSV, FRED series CSV, Cboe daily options statistics):
 each gives `macro` rows, one per series and observation date."""
+
 from __future__ import annotations
 
 import csv
@@ -9,16 +10,28 @@ from datetime import date, datetime, timedelta
 from typing import NamedTuple
 
 from marketbrief.constants.columns import COL_DATE, COL_ID
-from marketbrief.constants.free_sources import (FRED_DATE_COLUMNS, HEADERS_CSV, MSG_NOT_YIELD_CSV, SOURCE_CBOE,
-                                                SOURCE_FRED, SOURCE_TREASURY, TENOR_PATTERN, TREASURY_DATE_COLUMN,
-                                                TREASURY_DATE_FORMAT, TREASURY_URL, UNIT_PERCENT, UNIT_RATIO,
-                                                YIELD_CURVE_PREVIEW)
+from marketbrief.constants.free_sources import (
+    FRED_DATE_COLUMNS,
+    HEADERS_CSV,
+    MSG_NOT_YIELD_CSV,
+    SOURCE_CBOE,
+    SOURCE_FRED,
+    SOURCE_TREASURY,
+    TENOR_PATTERN,
+    TREASURY_DATE_COLUMN,
+    TREASURY_DATE_FORMAT,
+    TREASURY_URL,
+    UNIT_PERCENT,
+    UNIT_RATIO,
+    YIELD_CURVE_PREVIEW,
+)
 from marketbrief.sources.errors import FetchError
 from marketbrief.utils.numbers import parse_accounting_amount
 
 
 class SeriesInfo(NamedTuple):
     """What a series is: its unit, display name and source."""
+
     unit: str
     name: str
     source: str
@@ -26,8 +39,17 @@ class SeriesInfo(NamedTuple):
 
 def macro_row(series: str, day: date, value: float, info: SeriesInfo, now: str, complete: bool = True) -> dict:
     """One `macro` row (id <series>-<date>)."""
-    return {COL_ID: f"{series}-{day}", COL_DATE: str(day), "series": series, "name": info.name, "value": value,
-            "unit": info.unit, "source": info.source, "first_seen_at": now, "complete": complete}
+    return {
+        COL_ID: f"{series}-{day}",
+        COL_DATE: str(day),
+        "series": series,
+        "name": info.name,
+        "value": value,
+        "unit": info.unit,
+        "source": info.source,
+        "first_seen_at": now,
+        "complete": complete,
+    }
 
 
 def tenor_series(column: str) -> str | None:
@@ -88,11 +110,17 @@ def parse_fred(text: str, series_id: str, since: date, unit: str, name: str, now
 def parse_cboe(payload: dict, day: date, wanted: dict[str, str], now: str) -> tuple[list[dict], list[str]]:
     """`ratios` list -> (rows for the configured ratio names ({name in Cboe's file: series}),
     configured names absent or without a number). Rows are `complete` only when none is missing."""
-    by_name = {(r.get("name") or "").strip().upper(): parse_accounting_amount(r.get("value"))
-               for r in payload.get("ratios") or []}
+    by_name = {
+        (r.get("name") or "").strip().upper(): parse_accounting_amount(r.get("value"))
+        for r in payload.get("ratios") or []
+    }
     found = {name: by_name.get(name.upper()) for name in wanted}
     missing = sorted(name for name, value in found.items() if value is None)
-    rows = [macro_row(series, day, found[name], SeriesInfo(UNIT_RATIO, f"Cboe {name}", SOURCE_CBOE), now,
-                      complete=not missing)
-            for name, series in wanted.items() if found[name] is not None]
+    rows = [
+        macro_row(
+            series, day, found[name], SeriesInfo(UNIT_RATIO, f"Cboe {name}", SOURCE_CBOE), now, complete=not missing
+        )
+        for name, series in wanted.items()
+        if found[name] is not None
+    ]
     return rows, missing

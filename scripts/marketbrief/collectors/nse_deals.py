@@ -2,6 +2,7 @@
 falling back to the archive CSVs; `--deals-backfill N` also asks the historical API per ticker for the last N days
 (market-wide calls are capped at 70 rows) -> data/india/deals/. Ids ignore the source, so a deal seen twice is
 stored once."""
+
 from __future__ import annotations
 
 import csv
@@ -10,11 +11,21 @@ from datetime import date, timedelta
 
 from marketbrief.collectors.nse_runner import NseRun, coverage
 from marketbrief.constants.columns import COL_DATE, COL_ID, COL_TICKER
-from marketbrief.constants.nse_collection import (BACKFILL_CAP_ROWS, DEAL_TYPES, ENDPOINT_DEAL_HISTORY,
-                                                  ENDPOINT_DEAL_SNAPSHOT, MSG_DEALS_ARCHIVE_NOTE,
-                                                  MSG_DEALS_BACKFILL_NOTE, MSG_DEALS_CAP, MSG_DEALS_COVERAGE,
-                                                  NO_RECORDS, NSE_DATE_ARGUMENT, SOURCE_ARCHIVE, SOURCE_HISTORICAL,
-                                                  SOURCE_SNAPSHOT)
+from marketbrief.constants.nse_collection import (
+    BACKFILL_CAP_ROWS,
+    DEAL_TYPES,
+    ENDPOINT_DEAL_HISTORY,
+    ENDPOINT_DEAL_SNAPSHOT,
+    MSG_DEALS_ARCHIVE_NOTE,
+    MSG_DEALS_BACKFILL_NOTE,
+    MSG_DEALS_CAP,
+    MSG_DEALS_COVERAGE,
+    NO_RECORDS,
+    NSE_DATE_ARGUMENT,
+    SOURCE_ARCHIVE,
+    SOURCE_HISTORICAL,
+    SOURCE_SNAPSHOT,
+)
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_parsing import parse_day, pick, rows_of, short_hash
 from marketbrief.utils.numbers import parse_nse_number
@@ -36,9 +47,17 @@ def deal_record(row: dict, deal_type: str, source: str, symbols: dict[str, str],
         return None
     return {
         COL_ID: f"nse-{deal_type}-{day}-{ticker}-" + short_hash(client, side, shares, price),
-        COL_DATE: str(day), COL_TICKER: ticker, "deal_type": deal_type, "client": client, "side": side,
-        "shares": shares, "price": price, "value": round(shares * price, VALUE_DECIMALS) if price else None,
-        "remarks": pick(row, "BD_REMARKS", "remarks", "Remarks"), "source": source, "first_seen_at": now,
+        COL_DATE: str(day),
+        COL_TICKER: ticker,
+        "deal_type": deal_type,
+        "client": client,
+        "side": side,
+        "shares": shares,
+        "price": price,
+        "value": round(shares * price, VALUE_DECIMALS) if price else None,
+        "remarks": pick(row, "BD_REMARKS", "remarks", "Remarks"),
+        "source": source,
+        "first_seen_at": now,
     }
 
 
@@ -71,8 +90,9 @@ def archive_deals(run: NseRun) -> tuple[list[dict], int]:
         rows = [{(k or "").strip(): v for k, v in row.items()} for row in rows]
         rows = [row for row in rows if (row.get("Date") or "").strip().upper() != NO_RECORDS]
         records = deal_records(rows, deal_type, SOURCE_ARCHIVE, run)
-        run.problems.notes.append(MSG_DEALS_ARCHIVE_NOTE.format(deal_type=deal_type, rows=len(rows),
-                                                                 watchlist=len(records)))
+        run.problems.notes.append(
+            MSG_DEALS_ARCHIVE_NOTE.format(deal_type=deal_type, rows=len(rows), watchlist=len(records))
+        )
         found += records
         ok += 1
     return found, ok
@@ -85,9 +105,17 @@ def backfill_deals(run: NseRun, backfill_days: int) -> tuple[list[dict], int, bo
     for symbol in run.symbols:
         for deal_type in DEAL_TYPES:
             try:
-                rows = rows_of(run.nse.json(ENDPOINT_DEAL_HISTORY, {
-                    "optionType": f"{deal_type}_deals", "symbol": symbol,
-                    "from": start.strftime(NSE_DATE_ARGUMENT), "to": run.today.strftime(NSE_DATE_ARGUMENT)}))
+                rows = rows_of(
+                    run.nse.json(
+                        ENDPOINT_DEAL_HISTORY,
+                        {
+                            "optionType": f"{deal_type}_deals",
+                            "symbol": symbol,
+                            "from": start.strftime(NSE_DATE_ARGUMENT),
+                            "to": run.today.strftime(NSE_DATE_ARGUMENT),
+                        },
+                    )
+                )
             except FetchError as exc:
                 run.problems.failed.append(exc.entry(f"deals:{deal_type}:backfill:{symbol}"))
                 if exc.host:

@@ -1,4 +1,5 @@
 """Lists of a market's trading sessions. The two helpers answer different questions, so they stay separate."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta

@@ -22,6 +22,7 @@ so it differs from the company-filed shareholding pattern and is stored as `sdd_
 never as `promoter_pct`. `percPromoterShares` = promoter shares encumbered as % of that promoter
 holding; `percTotShares` = the same as % of all shares; `percSharesPledged` = every pledge in
 the depository system (any holder, e.g. margin pledges) as % of demat shares."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -33,9 +34,15 @@ from marketbrief.collectors.nse_insiders import insiders
 from marketbrief.collectors.nse_runner import NseRun, collector_main, run_summary, since_arg, store
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_RELATIONS
 from marketbrief.constants.kinds import KIND_DEALS, KIND_INSIDERS
-from marketbrief.constants.nse_collection import (COLLECTOR_RELATIONS, DEFAULT_DEAL_LOOKBACK_DAYS,
-                                                  DEFAULT_INSIDER_LOOKBACK_DAYS, DEFAULT_SYMBOL_CALLS_PER_RUN,
-                                                  MSG_DEALS_BACKFILL_HELP, MSG_FULL_RELATIONS_HELP, RELATION_KINDS)
+from marketbrief.constants.nse_collection import (
+    COLLECTOR_RELATIONS,
+    DEFAULT_DEAL_LOOKBACK_DAYS,
+    DEFAULT_INSIDER_LOOKBACK_DAYS,
+    DEFAULT_SYMBOL_CALLS_PER_RUN,
+    MSG_DEALS_BACKFILL_HELP,
+    MSG_FULL_RELATIONS_HELP,
+    RELATION_KINDS,
+)
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_client import Nse
@@ -50,11 +57,14 @@ def collect_kind(run: NseRun, kind: str, settings: dict, args) -> tuple[list[dic
         return insiders(run, lookback, since), 1
     if kind == KIND_DEALS:
         backfill = int(getattr(args, "deals_backfill", 0) or 0)
-        if since is not None:   # deals: the per-ticker historical API from `since`
+        if since is not None:  # deals: the per-ticker historical API from `since`
             backfill = max(backfill, (run.today - since).days)
         return deals(run, int(settings.get("deal_lookback_days", DEFAULT_DEAL_LOOKBACK_DAYS)), backfill)
-    limit = None if bool(getattr(args, "full", False)) else int(
-        settings.get("symbol_calls_per_run", DEFAULT_SYMBOL_CALLS_PER_RUN))
+    limit = (
+        None
+        if bool(getattr(args, "full", False))
+        else int(settings.get("symbol_calls_per_run", DEFAULT_SYMBOL_CALLS_PER_RUN))
+    )
     return holdings(run, limit)
 
 
@@ -82,7 +92,7 @@ def extra_args(parser) -> None:
     """The relations collector's own options."""
     parser.add_argument("--deals-backfill", type=int, default=0, metavar="DAYS", help=MSG_DEALS_BACKFILL_HELP)
     parser.add_argument("--full", action="store_true", help=MSG_FULL_RELATIONS_HELP)
-    since_arg(parser)   # PIT index by week, and the deals backfill from that date
+    since_arg(parser)  # PIT index by week, and the deals backfill from that date
 
 
 def main() -> int:

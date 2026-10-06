@@ -1,13 +1,25 @@
 """The independent origins, flags and summary row of one cluster of news items (news verification phase A)."""
+
 from __future__ import annotations
 
 from collections import defaultdict
 
 from marketbrief.analytics.cluster_items import DisjointSets
-from marketbrief.constants.news_clusters import (FLAG_DUPLICATES_REMOVED, FLAG_LOW_TIER_ONLY, FLAG_NO_VETTED_ORIGIN,
-                                                 FLAG_OPINION, FLAG_ORIGINS_UNVERIFIED, FLAG_PROMOTIONAL,
-                                                 FLAG_SINGLE_SOURCE, FLAG_SOURCES_SAY, FLAG_UNREAD, LABEL_OUTLET,
-                                                 LABEL_PROVIDER, LABEL_WIRE, READ_ACCESS)
+from marketbrief.constants.news_clusters import (
+    FLAG_DUPLICATES_REMOVED,
+    FLAG_LOW_TIER_ONLY,
+    FLAG_NO_VETTED_ORIGIN,
+    FLAG_OPINION,
+    FLAG_ORIGINS_UNVERIFIED,
+    FLAG_PROMOTIONAL,
+    FLAG_SINGLE_SOURCE,
+    FLAG_SOURCES_SAY,
+    FLAG_UNREAD,
+    LABEL_OUTLET,
+    LABEL_PROVIDER,
+    LABEL_WIRE,
+    READ_ACCESS,
+)
 
 
 def item_label(it: dict) -> str:
@@ -45,16 +57,22 @@ def merge_origins(items: list[dict], members: list[int], labels: list[str], copi
 
 def origin_group(group: list[dict], labels: list[str]) -> dict:
     """One origin: its name (agency, else provider, else first label) and what its items allow it to count."""
-    name = next((x for x in labels if x.startswith(LABEL_WIRE)), None) or \
-        next((x for x in labels if x.startswith(LABEL_PROVIDER)), None) or labels[0]
-    return {"origin": name, "news_ids": [it["id"] for it in group],
-            "promotional": all(it["promo"] for it in group),
-            "vetted": any(it["vetted"] for it in group),
-            "opinion": any(it["opinion"] for it in group),
-            # verified: a vetted, non-promotional, non-opinion item whose text was read
-            # or that carries agency evidence (byline, provider, dateline, title, label)
-            "verified": any(countable(it) and (it["read"] or it["wire"]) for it in group),
-            "unread_vetted": any(countable(it) for it in group)}
+    name = (
+        next((x for x in labels if x.startswith(LABEL_WIRE)), None)
+        or next((x for x in labels if x.startswith(LABEL_PROVIDER)), None)
+        or labels[0]
+    )
+    return {
+        "origin": name,
+        "news_ids": [it["id"] for it in group],
+        "promotional": all(it["promo"] for it in group),
+        "vetted": any(it["vetted"] for it in group),
+        "opinion": any(it["opinion"] for it in group),
+        # verified: a vetted, non-promotional, non-opinion item whose text was read
+        # or that carries agency evidence (byline, provider, dateline, title, label)
+        "verified": any(countable(it) and (it["read"] or it["wire"]) for it in group),
+        "unread_vetted": any(countable(it) for it in group),
+    }
 
 
 def origin_groups(items: list[dict], members: list[int], copies) -> list[dict]:
@@ -69,15 +87,21 @@ def origin_groups(items: list[dict], members: list[int], copies) -> list[dict]:
     return groups
 
 
-def cluster_flags(its: list[dict], arts: list[dict], independent: int, unread_vetted: int,
-                  has_duplicates: bool) -> list:
+def cluster_flags(
+    its: list[dict], arts: list[dict], independent: int, unread_vetted: int, has_duplicates: bool
+) -> list:
     """The flags of a cluster (see the news_clusters module docstring)."""
-    checks = [(any(it["promo"] for it in its), FLAG_PROMOTIONAL), (any(it["say"] for it in its), FLAG_SOURCES_SAY),
-              (independent == 1, FLAG_SINGLE_SOURCE), (independent == 0, FLAG_NO_VETTED_ORIGIN),
-              (bool(unread_vetted), FLAG_ORIGINS_UNVERIFIED), (any(it["opinion"] for it in its), FLAG_OPINION),
-              (not any(it["vetted"] for it in its), FLAG_LOW_TIER_ONLY),
-              (not any(a.get("access") in READ_ACCESS for a in arts), FLAG_UNREAD),
-              (has_duplicates, FLAG_DUPLICATES_REMOVED)]
+    checks = [
+        (any(it["promo"] for it in its), FLAG_PROMOTIONAL),
+        (any(it["say"] for it in its), FLAG_SOURCES_SAY),
+        (independent == 1, FLAG_SINGLE_SOURCE),
+        (independent == 0, FLAG_NO_VETTED_ORIGIN),
+        (bool(unread_vetted), FLAG_ORIGINS_UNVERIFIED),
+        (any(it["opinion"] for it in its), FLAG_OPINION),
+        (not any(it["vetted"] for it in its), FLAG_LOW_TIER_ONLY),
+        (not any(a.get("access") in READ_ACCESS for a in arts), FLAG_UNREAD),
+        (has_duplicates, FLAG_DUPLICATES_REMOVED),
+    ]
     return [flag for hit, flag in checks if hit]
 
 
@@ -96,17 +120,24 @@ def describe(items: list[dict], members: list[int], dups: dict, copies) -> dict:
         g["unread_vetted"] = g["unread_vetted"] and not g["verified"]
     arts = [it["article"] for it in its if it["article"]]
     return {
-        "ticker": rep["ticker"], "cluster_id": f"{rep['ticker']}-{rep['id']}",
+        "ticker": rep["ticker"],
+        "cluster_id": f"{rep['ticker']}-{rep['id']}",
         "news_ids": [items[i]["id"] for i in members],
         "duplicate_ids": sorted(items[d]["id"] for i in members for d in dups.get(i, [])),
-        "n_items": len(members), "outlets": outlets, "tiers": [tier_of[x] for x in outlets],
-        "independent_origins": independent, "unread_vetted_origins": unread_vetted,
+        "n_items": len(members),
+        "outlets": outlets,
+        "tiers": [tier_of[x] for x in outlets],
+        "independent_origins": independent,
+        "unread_vetted_origins": unread_vetted,
         "unvetted_ids": sorted(items[m]["id"] for m in members if not items[m]["vetted"]),  # also in a vetted group
-        "origins": [g["origin"] for g in counted], "origin_groups": groups,
-        "first_reported_at": min(it["t"] for it in its), "last_reported_at": max(it["t"] for it in its),
+        "origins": [g["origin"] for g in counted],
+        "origin_groups": groups,
+        "first_reported_at": min(it["t"] for it in its),
+        "last_reported_at": max(it["t"] for it in its),
         "inputs_until": max([it["seen"] for it in its] + [it["fetched"] for it in its if it["fetched"] is not None]),
         "newest_seen": max(it["seen"] for it in its),
         "flags": cluster_flags(its, arts, independent, unread_vetted, len(all_idx) > len(members)),
-        "n_articles": len(arts), "titles": [items[i]["title"] for i in members],
+        "n_articles": len(arts),
+        "titles": [items[i]["title"] for i in members],
         "unvetted_outlets": [it["outlet_key"] for it in its if not it["vetted"]],
     }

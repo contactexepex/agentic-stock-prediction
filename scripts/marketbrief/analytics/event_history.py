@@ -3,6 +3,7 @@ dates are read through earnings_events, which keeps only the SEC item 2.02 filin
 release (results_filter, by the stored 10-Q/10-K reports, without look-ahead).
 
 Shared by the live ranges and the walk-forward backtest, so both use the same rules."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,13 +12,26 @@ from datetime import date, timedelta
 import pandas as pd
 
 from marketbrief.constants.columns import COL_DATE, COL_FIRST_SEEN_AT, COL_SOURCE, COL_TICKER, COL_TYPE
-from marketbrief.constants.range_inputs import (DAYS_PER_YEAR, HISTORY_SUFFIX, LOAD_EVENTS_SQL, MOVED_DAYS, NEAR_DAYS,
-                                                PENDING_LAG_SHARE, PENDING_MIN_RELEASES, PROJECTED_SLACK_DAYS,
-                                                REPORT_GRACE_DAYS, REPORT_WINDOW_DAYS, SAME_QUARTER_DAYS,
-                                                SOURCE_SEC_HISTORY, SOURCE_YFINANCE_HISTORY, TYPE_EARNINGS,
-                                                TYPE_EX_DIVIDEND, TYPE_PERIODIC_REPORT)
+from marketbrief.constants.range_inputs import (
+    DAYS_PER_YEAR,
+    HISTORY_SUFFIX,
+    LOAD_EVENTS_SQL,
+    MOVED_DAYS,
+    NEAR_DAYS,
+    PENDING_LAG_SHARE,
+    PENDING_MIN_RELEASES,
+    PROJECTED_SLACK_DAYS,
+    REPORT_GRACE_DAYS,
+    REPORT_WINDOW_DAYS,
+    SAME_QUARTER_DAYS,
+    SOURCE_SEC_HISTORY,
+    SOURCE_YFINANCE_HISTORY,
+    TYPE_EARNINGS,
+    TYPE_EX_DIVIDEND,
+    TYPE_PERIODIC_REPORT,
+)
 
-Release = tuple[date, str | None, str]   # (date, timing, source)
+Release = tuple[date, str | None, str]  # (date, timing, source)
 
 
 def as_date(value) -> date:
@@ -35,8 +49,13 @@ def drop_moved_upcoming(events: pd.DataFrame) -> pd.DataFrame:
         if is_history[index]:
             keep.append(True)
             continue
-        newer = events[(~is_history) & (events[COL_TICKER] == row[COL_TICKER]) & (events[COL_TYPE] == row[COL_TYPE])
-                       & (events[COL_FIRST_SEEN_AT] > row[COL_FIRST_SEEN_AT]) & (events[COL_DATE] != row[COL_DATE])]
+        newer = events[
+            (~is_history)
+            & (events[COL_TICKER] == row[COL_TICKER])
+            & (events[COL_TYPE] == row[COL_TYPE])
+            & (events[COL_FIRST_SEEN_AT] > row[COL_FIRST_SEEN_AT])
+            & (events[COL_DATE] != row[COL_DATE])
+        ]
         keep.append(not any(abs((day - row[COL_DATE]).days) <= MOVED_DAYS for day in newer[COL_DATE]))
     return events[keep]
 
@@ -65,6 +84,7 @@ def periodic_reports(events: pd.DataFrame) -> dict[str, list[tuple[date, date | 
 class ConfirmedReleases:
     """What the stored 10-Q/10-K reports confirm among the SEC 2.02 dates: the dates to keep, the confirmed
     releases, the period ends released, the release lags (days after a period end) and the earliest window start."""
+
     keep: set[date] = field(default_factory=set)
     confirmed: list[date] = field(default_factory=list)
     released: set[date] = field(default_factory=set)
@@ -95,8 +115,11 @@ def projected_period_ends(known: list[tuple[date, date | None]]) -> list[date]:
     """The known period ends, and each projected a year on unless a known one is that close."""
     period_ends = {pe for _, pe in known if pe is not None}
     year = timedelta(days=DAYS_PER_YEAR)
-    projected = {p + year for p in period_ends
-                 if all(abs((q - p).days - DAYS_PER_YEAR) > PROJECTED_SLACK_DAYS for q in period_ends)}
+    projected = {
+        p + year
+        for p in period_ends
+        if all(abs((q - p).days - DAYS_PER_YEAR) > PROJECTED_SLACK_DAYS for q in period_ends)
+    }
     return sorted(period_ends | projected)
 
 
@@ -107,8 +130,8 @@ def keep_unconfirmed(sec: list[date], found: ConfirmedReleases, known: list[tupl
     ends = projected_period_ends(known)
     for day in sec:
         if day <= found.first_lo:
-            found.keep.add(day)                              # before the first report: cannot tell
-        elif day > last_hi:                                  # pending: its report is not filed yet
+            found.keep.add(day)  # before the first report: cannot tell
+        elif day > last_hi:  # pending: its report is not filed yet
             period_end = max((p for p in ends if p < day), default=None)
             if len(found.lags) < PENDING_MIN_RELEASES or period_end is None:
                 found.keep.add(day)
@@ -116,8 +139,9 @@ def keep_unconfirmed(sec: list[date], found: ConfirmedReleases, known: list[tupl
                 found.keep.add(day)
 
 
-def results_filter(rows: list[Release], reports: list[tuple[date, date | None]],
-                   as_of: date | None = None) -> list[Release]:
+def results_filter(
+    rows: list[Release], reports: list[tuple[date, date | None]], as_of: date | None = None
+) -> list[Release]:
     """Drop the SEC item 2.02 filings that are not a quarter's results release, and the yfinance
     history dates that disagree with a confirmed SEC release. `rows` are (date, timing, source).
 
@@ -144,8 +168,9 @@ def results_filter(rows: list[Release], reports: list[tuple[date, date | None]],
         if source == SOURCE_SEC_HISTORY:
             if day in found.keep:
                 kept.append((day, timing, source))
-        elif source == SOURCE_YFINANCE_HISTORY and any(NEAR_DAYS < abs((day - c).days) <= SAME_QUARTER_DAYS
-                                                       for c in found.confirmed):
+        elif source == SOURCE_YFINANCE_HISTORY and any(
+            NEAR_DAYS < abs((day - c).days) <= SAME_QUARTER_DAYS for c in found.confirmed
+        ):
             continue
         else:
             kept.append((day, timing, source))
@@ -162,8 +187,11 @@ def earnings_events(events: pd.DataFrame, as_of: date | None = None) -> dict[str
     reports = periodic_reports(events)
     earnings = events[events[COL_TYPE] == TYPE_EARNINGS]
     for ticker, group in earnings.groupby(COL_TICKER):
-        rows = results_filter([(r.date, None if pd.isna(r.timing) else r.timing, str(r.source or ""))
-                               for r in group.itertuples()], reports.get(ticker, []), as_of)
+        rows = results_filter(
+            [(r.date, None if pd.isna(r.timing) else r.timing, str(r.source or "")) for r in group.itertuples()],
+            reports.get(ticker, []),
+            as_of,
+        )
         rows = sorted(((day, timing) for day, timing, _ in rows), key=lambda x: (x[1] is None, x[0]))
         kept: list = []
         for day, timing in rows:

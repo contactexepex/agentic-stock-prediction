@@ -3,6 +3,7 @@
 Input: a DataFrame for one ticker indexed by date (ascending) with open, high, low, close,
 volume. Each indicator returns None when there are too few bars (explicit nulls, no guessing).
 """
+
 from __future__ import annotations
 
 import math
@@ -10,10 +11,18 @@ import math
 import numpy as np
 import pandas as pd
 
-from marketbrief.constants.indicators import (BLOCKED_MISSING, EWMA_LAMBDA, FAST_CRITICAL, JUMP_WARNING_RETURN,
-                                              MSG_JUMP, MSG_MISSING, QUALITY_BLOCKED, QUALITY_OK, QUALITY_PARTIAL,
-                                              TRADING_DAYS)
-
+from marketbrief.constants.indicators import (
+    BLOCKED_MISSING,
+    EWMA_LAMBDA,
+    FAST_CRITICAL,
+    JUMP_WARNING_RETURN,
+    MSG_JUMP,
+    MSG_MISSING,
+    QUALITY_BLOCKED,
+    QUALITY_OK,
+    QUALITY_PARTIAL,
+    TRADING_DAYS,
+)
 
 
 def finite_or_none(x) -> float | None:
@@ -65,8 +74,11 @@ def atr(df: pd.DataFrame, n: int = 14) -> float | None:
     if len(df) < n + 1:
         return None
     prev = df["close"].shift(1)
-    tr = pd.concat([df["high"] - df["low"], (df["high"] - prev).abs(), (df["low"] - prev).abs()],
-                   axis=1).max(axis=1).iloc[1:]
+    tr = (
+        pd.concat([df["high"] - df["low"], (df["high"] - prev).abs(), (df["low"] - prev).abs()], axis=1)
+        .max(axis=1)
+        .iloc[1:]
+    )
     return finite_or_none(tr.ewm(alpha=1 / n, adjust=False).mean().iloc[-1])
 
 
@@ -130,7 +142,6 @@ def beta(close: pd.Series, bench: pd.Series, n: int = TRADING_DAYS, min_obs: int
     return finite_or_none(joined.iloc[:, 0].cov(joined.iloc[:, 1]) / var) if var else None
 
 
-
 def compute(df: pd.DataFrame, bench: pd.Series | None = None) -> dict:
     """All per-ticker indicators for the last bar in df."""
     df = df.sort_index()
@@ -138,12 +149,20 @@ def compute(df: pd.DataFrame, bench: pd.Series | None = None) -> dict:
     out = {
         "close": finite_or_none(c.iloc[-1]) if len(c) else None,
         "bars": int(len(df)),
-        "ret_1d": period_return(c, 1), "ret_3d": period_return(c, 3), "ret_5d": period_return(c, 5),
+        "ret_1d": period_return(c, 1),
+        "ret_3d": period_return(c, 3),
+        "ret_5d": period_return(c, 5),
         "ret_20d": period_return(c, 20),
-        "ema_ratio": ema_ratio(c), "rsi_14": rsi(c), "roc_10": period_return(c, 10),
-        "price_vs_20d_high": price_vs_high(df), "atr_14": atr(df),
-        "realized_vol_10d": realized_vol(c), "ewma_vol": ewma_vol(c),
-        "bb_width": bb_width(c), "obv_trend": obv_trend(df), "volume_ratio_20d": volume_ratio(df),
+        "ema_ratio": ema_ratio(c),
+        "rsi_14": rsi(c),
+        "roc_10": period_return(c, 10),
+        "price_vs_20d_high": price_vs_high(df),
+        "atr_14": atr(df),
+        "realized_vol_10d": realized_vol(c),
+        "ewma_vol": ewma_vol(c),
+        "bb_width": bb_width(c),
+        "obv_trend": obv_trend(df),
+        "volume_ratio_20d": volume_ratio(df),
         "beta_1y": beta(c, bench) if bench is not None else None,
     }
     out["atr_pct"] = finite_or_none(out["atr_14"] / out["close"]) if out["atr_14"] and out["close"] else None

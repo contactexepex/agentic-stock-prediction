@@ -1,4 +1,5 @@
 """The one error type of every source client."""
+
 from __future__ import annotations
 
 from marketbrief.constants.statuses import SUMMARY_ALLOWLIST

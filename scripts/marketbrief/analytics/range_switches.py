@@ -1,5 +1,6 @@
 """Which range engine inputs are on (config/ranges.yaml). `enabled` is true/false, a list of markets, or a mapping
 market -> true/false or a list of horizons (e.g. {us: [1]})."""
+
 from __future__ import annotations
 
 

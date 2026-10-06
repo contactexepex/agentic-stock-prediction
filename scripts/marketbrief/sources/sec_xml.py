@@ -1,4 +1,5 @@
 """XML helpers for the SEC documents the collectors read (Form 4, 13D/13G, 13F): path text, flags, dates."""
+
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET

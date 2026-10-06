@@ -1,4 +1,5 @@
 """Append-only JSONL storage: day files, appending rows and reading back recent ids."""
+
 from __future__ import annotations
 
 import json

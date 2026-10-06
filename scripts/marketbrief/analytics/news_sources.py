@@ -1,5 +1,6 @@
 """The news-source allowlist (config/news_sources.yaml): vetted outlets and their tiers, news agencies (wires)
 and how an item's origin is read from its byline, provider, source label, title or text."""
+
 from __future__ import annotations
 
 import re
@@ -38,27 +39,32 @@ class Sources:
         self.domains: dict[str, dict] = {d.lower(): (m or {}) for d, m in (cfg.get("domains") or {}).items()}
         self.label_domain = {normalise_label(n): d for d, m in self.domains.items() for n in m.get("names") or []}
         self.wires: dict[str, dict] = cfg.get("wires") or {}
-        self.wire_names = {normalise_label(n): w for w, m in self.wires.items()
-                           for n in [w, *(m.get("names") or [])]}
+        self.wire_names = {normalise_label(n): w for w, m in self.wires.items() for n in [w, *(m.get("names") or [])]}
         self.wire_domains = {d: w for w, m in self.wires.items() for d in m.get("domains") or []}
         promo = cfg.get("promotional") or {}
         self.promo_names = {normalise_label(n) for n in promo.get("providers") or []}
         self.promo_domains = {d.lower() for d in promo.get("domains") or []}
         self.promo_text = re.compile("|".join(f"(?:{p})" for p in promo.get("text") or []) or NEVER_MATCHES, re.I)
-        self.material = [(int(weight), re.compile(r"\b(?:" + "|".join(patterns) + r")\b", re.I))
-                         for weight, patterns in (cfg.get("material_terms") or {}).items()]
+        self.material = [
+            (int(weight), re.compile(r"\b(?:" + "|".join(patterns) + r")\b", re.I))
+            for weight, patterns in (cfg.get("material_terms") or {}).items()
+        ]
         attribution = [n for m in self.wires.values() for n in m.get("attribution") or []]
         alt = alternation(attribution)
         self._wire_att = re.compile(
             rf"\b(?:({alt})\s+(?i:has\s+|had\s+|first\s+)?(?i:reported|reports|said in a report|news agency reported)"
             rf"|(?i:according to (?:a |an )?)({alt})(?:\s+(?i:(?:news\s+)?report))?"
-            rf"|(?i:told )({alt})\b|(?i:citing (?:a |an )?)({alt})\b)")
+            rf"|(?i:told )({alt})\b|(?i:citing (?:a |an )?)({alt})\b)"
+        )
         # "(With inputs from PTI)" closes an Indian agency-based story, so it is read anywhere
         self._inputs = re.compile(rf"(?i:with (?:additional )?inputs from )({alt})\b")
         datelines = alternation([n for m in self.wires.values() for n in m.get("names") or []])
         self._dateline = re.compile(rf"\(({datelines})\)\s*[-–—:]?")
-        self._title_wire = re.compile(rf"(?:\bBy\s+({alt}|AP)\s*$|[-:|]\s*({alt})(?:\s+reports?)?\s*$"
-                                      rf"|\b({alt})\s+(?:reports?|reported)\b|\bciting\s+({alt})\b)", re.I)
+        self._title_wire = re.compile(
+            rf"(?:\bBy\s+({alt}|AP)\s*$|[-:|]\s*({alt})(?:\s+reports?)?\s*$"
+            rf"|\b({alt})\s+(?:reports?|reported)\b|\bciting\s+({alt})\b)",
+            re.I,
+        )
         self._att_wire = {normalise_label(n): w for w, m in self.wires.items() for n in m.get("attribution") or []}
 
     # domains
@@ -86,8 +92,9 @@ class Sources:
             domain = self.lookup(label.strip())[0]
         return domain
 
-    def is_promotional(self, *, name: str | None = None, domain: str | None = None,
-                       text: str | None = None) -> str | None:
+    def is_promotional(
+        self, *, name: str | None = None, domain: str | None = None, text: str | None = None
+    ) -> str | None:
         """Why an item is vendor or promotional content, or None."""
         if name and normalise_label(name) in self.promo_names:
             return f"provider {name}"
@@ -112,8 +119,9 @@ class Sources:
     def wire_of_domain(self, host: str | None) -> str | None:
         """The news agency that owns a host (or a parent domain of it), or None."""
         host = (host or "").lower()
-        return next((wire for domain, wire in self.wire_domains.items()
-                     if host == domain or host.endswith("." + domain)), None)
+        return next(
+            (wire for domain, wire in self.wire_domains.items() if host == domain or host.endswith("." + domain)), None
+        )
 
     def wire_in_title(self, title: str | None) -> str | None:
         """The agency a title credits ('By Reuters', '- Reuters', 'Reuters reports'), or None."""
@@ -137,8 +145,9 @@ class Sources:
             return self._att_wire.get(normalise_label(next(g for g in found.groups() if g))), "attribution"
         return None, None
 
-    def detect_wire(self, *, byline=None, provider=None, text=None, title=None, source=None,
-                    domain=None) -> tuple[str | None, str | None]:
+    def detect_wire(
+        self, *, byline=None, provider=None, text=None, title=None, source=None, domain=None
+    ) -> tuple[str | None, str | None]:
         """(agency, evidence) of an item's origin: provider, byline, source label/domain, title, then text."""
         if provider and self.wire_of_name(provider):
             return self.wire_of_name(provider), "provider"

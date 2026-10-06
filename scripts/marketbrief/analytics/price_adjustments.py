@@ -10,6 +10,7 @@ on read: the `ohlc` and `bars` views (sql/views.sql) multiply the prices of ever
 ex-date by that action's `factor` (0.5 for a 1:1 bonus or a 2:1 split) and divide its volume by it,
 cumulatively over all later actions; `ohlc_raw` and `bars_raw` keep the bars as stored.
 Dividends are never adjusted."""
+
 from __future__ import annotations
 
 import json
@@ -21,8 +22,14 @@ import pandas as pd
 from marketbrief.constants.columns import COL_ID, COL_TICKER
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
 from marketbrief.constants.kinds import KIND_ADJUSTMENTS
-from marketbrief.constants.price_adjustments import (FRACTION_TOLERANCE, KEY_DETECTED_AT, KEY_EX_DATE, KEY_FACTOR,
-                                                     KEY_SUPERSEDES, MAX_SPLIT_TERM)
+from marketbrief.constants.price_adjustments import (
+    FRACTION_TOLERANCE,
+    KEY_DETECTED_AT,
+    KEY_EX_DATE,
+    KEY_FACTOR,
+    KEY_SUPERSEDES,
+    MAX_SPLIT_TERM,
+)
 from marketbrief.core.paths import data_dir
 
 ISO_DATE_LENGTH = 10
@@ -96,5 +103,13 @@ def split_fraction(ratio: float) -> Fraction | None:
 
 def adjustment_record(ticker: str, ex_date: date, factor: float, source: str, now: str, **evidence) -> dict:
     """One adjustments row (schema `adjustments` in marketbrief/core/schemas.py)."""
-    return {"id": f"{ticker}-{ex_date}", "ticker": ticker, "ex_date": str(ex_date), "factor": factor,
-            "volume_factor": 1 / factor, "source": source, **evidence, "detected_at": now}
+    return {
+        "id": f"{ticker}-{ex_date}",
+        "ticker": ticker,
+        "ex_date": str(ex_date),
+        "factor": factor,
+        "volume_factor": 1 / factor,
+        "source": source,
+        **evidence,
+        "detected_at": now,
+    }

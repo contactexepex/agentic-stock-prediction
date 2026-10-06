@@ -13,6 +13,7 @@ SEC_USER_AGENT. The daily routine runs it after the SEC collectors (routine/PROM
 the collectors already store corrected times from a file proven shifted, so this catches rows
 stored from an unverified file (listed in the collectors' `warnings`) and rows stored before the
 fix; each new accession costs one request once. `failed` lists headers that could not be read."""
+
 from __future__ import annotations
 
 import json
@@ -20,9 +21,16 @@ import re
 
 from marketbrief.constants.columns import COL_ACCEPTED_AT, COL_ACCESSION, COL_CHECKED_AT, COL_SOURCE
 from marketbrief.constants.config_keys import CFG_MARKET
-from marketbrief.constants.sec_times import (COLLECTOR_SEC_TIMES, ERROR_TEXT_LIMIT, MSG_NO_HEADER_TIME,
-                                             SEC_TIME_CHECKED_SQL, SEC_TIME_ONLY_ACCEPTED, SEC_TIME_SOURCES,
-                                             SOURCE_SGML_HEADER, WRONG_ROWS_LIMIT)
+from marketbrief.constants.sec_times import (
+    COLLECTOR_SEC_TIMES,
+    ERROR_TEXT_LIMIT,
+    MSG_NO_HEADER_TIME,
+    SEC_TIME_CHECKED_SQL,
+    SEC_TIME_ONLY_ACCEPTED,
+    SEC_TIME_SOURCES,
+    SOURCE_SGML_HEADER,
+    WRONG_ROWS_LIMIT,
+)
 from marketbrief.constants.kinds import KIND_SEC_TIMES
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_REQUESTS
 from marketbrief.core.cli import market_arg, require_market
@@ -57,7 +65,7 @@ def stored(market: str) -> tuple[dict[str, tuple[str, str]], set[str]]:
             if not accession or accession in found:
                 continue
             match = ARCHIVE_FOLDER.search(url or "")
-            folder = match.group(1) if match else cik     # the archive folder the filing is served from
+            folder = match.group(1) if match else cik  # the archive folder the filing is served from
             if folder:
                 found[accession] = (str(int(folder)), format_utc_z(accepted_at))
     checked = {row[0] for row in connection.execute(SEC_TIME_CHECKED_SQL).fetchall()}
@@ -72,8 +80,14 @@ def check_accession(edgar: Edgar, accession: str, cik: str, stored_at: str, now:
         return {"failed": {COL_ACCESSION: accession, "cik": cik, "error": str(exc)[:ERROR_TEXT_LIMIT]}}
     if header_time is None:
         return {"failed": {COL_ACCESSION: accession, "cik": cik, "error": MSG_NO_HEADER_TIME}}
-    return {COL_ACCESSION: accession, "cik": cik, COL_ACCEPTED_AT: header_time, "json_accepted_at": stored_at,
-            COL_SOURCE: SOURCE_SGML_HEADER, COL_CHECKED_AT: now}
+    return {
+        COL_ACCESSION: accession,
+        "cik": cik,
+        COL_ACCEPTED_AT: header_time,
+        "json_accepted_at": stored_at,
+        COL_SOURCE: SOURCE_SGML_HEADER,
+        COL_CHECKED_AT: now,
+    }
 
 
 def wrong_entry(row: dict) -> dict | None:
@@ -81,8 +95,12 @@ def wrong_entry(row: dict) -> dict | None:
     header, stored_at = row[COL_ACCEPTED_AT], row["json_accepted_at"]
     if parse_utc_z(header) == parse_utc_z(stored_at):
         return None
-    return {COL_ACCESSION: row[COL_ACCESSION], "stored": stored_at, "header": header,
-            "stored_minus_true_h": (parse_utc_z(stored_at) - parse_utc_z(header)).total_seconds() / 3600}
+    return {
+        COL_ACCESSION: row[COL_ACCESSION],
+        "stored": stored_at,
+        "header": header,
+        "stored_minus_true_h": (parse_utc_z(stored_at) - parse_utc_z(header)).total_seconds() / 3600,
+    }
 
 
 def main() -> int:
@@ -111,9 +129,22 @@ def main() -> int:
         if mismatch:
             wrong.append(mismatch)
     written = 0 if args.dry_run else append_jsonl(day_file(market, KIND_SEC_TIMES, utc_today()), rows)
-    print(json.dumps({SUMMARY_COLLECTOR: COLLECTOR_SEC_TIMES, SUMMARY_MARKET: market,
-                      "stored_accessions": len(rows_in), "already_checked": len(done & set(rows_in)),
-                      "checked": len(rows), "written": written, "wrong": len(wrong),
-                      "wrong_rows": wrong[:WRONG_ROWS_LIMIT], SUMMARY_FAILED: failed,
-                      SUMMARY_REQUESTS: edgar.requests, "dry_run": args.dry_run}, indent=2))
+    print(
+        json.dumps(
+            {
+                SUMMARY_COLLECTOR: COLLECTOR_SEC_TIMES,
+                SUMMARY_MARKET: market,
+                "stored_accessions": len(rows_in),
+                "already_checked": len(done & set(rows_in)),
+                "checked": len(rows),
+                "written": written,
+                "wrong": len(wrong),
+                "wrong_rows": wrong[:WRONG_ROWS_LIMIT],
+                SUMMARY_FAILED: failed,
+                SUMMARY_REQUESTS: edgar.requests,
+                "dry_run": args.dry_run,
+            },
+            indent=2,
+        )
+    )
     return 1 if failed and not rows else 0

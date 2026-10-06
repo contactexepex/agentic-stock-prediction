@@ -1,4 +1,5 @@
 """The inputs of news clustering as of a moment: news items per watchlist ticker and primary candidates."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -10,9 +11,16 @@ import pandas as pd
 from marketbrief.analytics.article_pages import canonical_url, host_of
 from marketbrief.analytics.news_sources import Sources, label_domains, outlet_key, outlet_of
 from marketbrief.analytics.text_measures import distinctive, numbers, sources_say, title_tokens
-from marketbrief.constants.news_clusters import (ANNOUNCEMENTS_SQL, ARTICLES_SQL, DEFAULT_LOOKBACK_HOURS,
-                                                 DEFAULT_WINDOW_HOURS, FILINGS_SQL, GOOGLE_NEWS_HOST, NEWS_ROWS_SQL,
-                                                 READ_ACCESS)
+from marketbrief.constants.news_clusters import (
+    ANNOUNCEMENTS_SQL,
+    ARTICLES_SQL,
+    DEFAULT_LOOKBACK_HOURS,
+    DEFAULT_WINDOW_HOURS,
+    FILINGS_SQL,
+    GOOGLE_NEWS_HOST,
+    NEWS_ROWS_SQL,
+    READ_ACCESS,
+)
 
 
 class DisjointSets:
@@ -38,6 +46,7 @@ class DisjointSets:
 
 class NewsRow(NamedTuple):
     """One stored news row."""
+
     id: str
     title: str | None
     url: str | None
@@ -52,13 +61,13 @@ def to_utc(v) -> pd.Timestamp | None:
     """A timestamp as UTC (None for missing values)."""
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return None
-    t = pd.Timestamp(v)
-    return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+    timestamp = pd.Timestamp(v)
+    return timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
 
 
-def iso_seconds(t: pd.Timestamp | None) -> str | None:
+def iso_seconds(timestamp: pd.Timestamp | None) -> str | None:
     """A timestamp as ISO text rounded down to the second."""
-    return None if t is None else t.floor("s").isoformat()
+    return None if timestamp is None else timestamp.floor("s").isoformat()
 
 
 def own_page(article: dict | None, url: str | None, host: str) -> str | None:
@@ -82,8 +91,11 @@ def row_fields(row: NewsRow, article: dict | None, src: Sources, learned: dict) 
     domain = listed or domain
     seen_t, pub_t = to_utc(row.first_seen_at), to_utc(row.published_at)
     art = article or {}
-    wire, evidence = (art.get("origin_wire"), art.get("origin_evidence")) if art.get("origin_wire") else \
-        src.detect_wire(title=row.title, source=row.source, domain=domain)
+    wire, evidence = (
+        (art.get("origin_wire"), art.get("origin_evidence"))
+        if art.get("origin_wire")
+        else src.detect_wire(title=row.title, source=row.source, domain=domain)
+    )
     provider = art.get("provider")
     meta = src.lookup(domain)[1] or {}
     news_path = meta.get("opinion_unless_path")
@@ -91,18 +103,34 @@ def row_fields(row: NewsRow, article: dict | None, src: Sources, learned: dict) 
     # e.g. Seeking Alpha: contributor articles are opinion; only its news desk (/news/) is not
     opinion = bool(news_path) and not (page and urlsplit(page).path.startswith(news_path))
     return {
-        "id": row.id, "title": row.title or "", "source": row.source, "domain": domain, "tier": src.tier(domain),
+        "id": row.id,
+        "title": row.title or "",
+        "source": row.source,
+        "domain": domain,
+        "tier": src.tier(domain),
         # vetted: an allowlisted outlet, or the agency itself (its Google News source label). An
         # agency named in an unvetted item's title only joins that agency's group; it never makes
         # the item vetted, so it can never create or count an origin.
-        "vetted": bool(listed) or evidence == "source", "read": bool(art.get("access") in READ_ACCESS),
-        "opinion": opinion, "t": pub_t if pub_t is not None and pub_t <= seen_t else seen_t, "seen": seen_t,
-        "wire": wire, "wire_ev": evidence, "provider": provider if not src.wire_of_name(provider) else None,
-        "promo": (art.get("promotional") or src.is_promotional(name=row.source, domain=domain)
-                  or src.is_promotional(name=provider) or src.is_promotional(text=row.title)),
-        "canon": canonical_url(own_page(article, row.url, host)), "outlet_key": outlet_key(domain, row.source),
-        "article": article, "fetched": to_utc(art.get("fetched_at")),
-        "say": bool(art.get("sources_say")) or sources_say(row.title), "nums": distinctive(numbers(row.title)),
+        "vetted": bool(listed) or evidence == "source",
+        "read": bool(art.get("access") in READ_ACCESS),
+        "opinion": opinion,
+        "t": pub_t if pub_t is not None and pub_t <= seen_t else seen_t,
+        "seen": seen_t,
+        "wire": wire,
+        "wire_ev": evidence,
+        "provider": provider if not src.wire_of_name(provider) else None,
+        "promo": (
+            art.get("promotional")
+            or src.is_promotional(name=row.source, domain=domain)
+            or src.is_promotional(name=provider)
+            or src.is_promotional(text=row.title)
+        ),
+        "canon": canonical_url(own_page(article, row.url, host)),
+        "outlet_key": outlet_key(domain, row.source),
+        "article": article,
+        "fetched": to_utc(art.get("fetched_at")),
+        "say": bool(art.get("sources_say")) or sources_say(row.title),
+        "nums": distinctive(numbers(row.title)),
     }
 
 
@@ -114,25 +142,27 @@ def load_items(con, cfg: dict, src: Sources, as_of: pd.Timestamp) -> list[dict]:
     learned = label_domains(((r.source, r.source_domain) for r in rows), src)
     items = []
     for row in rows:
-        tickers = [t for t in (row.primary_tickers or []) if t in cfg["tickers"]]
+        tickers = [ticker for ticker in (row.primary_tickers or []) if ticker in cfg["tickers"]]
         if not tickers:
             continue
         a = articles.get(row.id)
         a = {k: (None if isinstance(v, float) and pd.isna(v) else v) for k, v in a.items()} if a else None
         fields = row_fields(row, a, src, learned)
-        items.extend({**fields, "ticker": t} for t in tickers)
+        items.extend({**fields, "ticker": ticker} for ticker in tickers)
     return items
 
 
 def load_primaries(con, src: Sources, as_of: pd.Timestamp) -> dict[str, list[tuple]]:
     """{ticker: [(public time, id)]} of the SEC filings and NSE announcements that may confirm a story."""
     cl = src.clusters
-    since = as_of - pd.Timedelta(hours=float(cl.get("lookback_hours", DEFAULT_LOOKBACK_HOURS))
-                                 + float(cl.get("window_hours", DEFAULT_WINDOW_HOURS)))
+    since = as_of - pd.Timedelta(
+        hours=float(cl.get("lookback_hours", DEFAULT_LOOKBACK_HOURS))
+        + float(cl.get("window_hours", DEFAULT_WINDOW_HOURS))
+    )
     out: dict[str, list[tuple]] = defaultdict(list)
     forms = list(cl.get("sec_forms") or [])
-    for tid, ticker, t in con.execute(FILINGS_SQL, [forms]).fetchall() + con.execute(ANNOUNCEMENTS_SQL).fetchall():
-        tt = to_utc(t)
+    for tid, ticker, row in con.execute(FILINGS_SQL, [forms]).fetchall() + con.execute(ANNOUNCEMENTS_SQL).fetchall():
+        tt = to_utc(row)
         if tt is not None and since <= tt <= as_of:
             out[ticker].append((tt, tid))
     return out

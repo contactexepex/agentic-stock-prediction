@@ -1,4 +1,5 @@
 """NSE's provisional FII/DII cash figures of the NSE primary-source collector -> data/india/flows/."""
+
 from __future__ import annotations
 
 import re
@@ -19,9 +20,17 @@ def flows(run: NseRun) -> list[dict]:
         day, category = parse_day(pick(row, "date")), pick(row, "category")
         if day is None or not category:
             continue
-        found.append({COL_ID: f"nse-fiidii-{day}-{re.sub(r'[^a-z]+', '', category.lower())}", COL_DATE: str(day),
-                      "category": category, "buy_cr": parse_nse_number(pick(row, "buyValue")),
-                      "sell_cr": parse_nse_number(pick(row, "sellValue")),
-                      "net_cr": parse_nse_number(pick(row, "netValue")), "provisional": True,
-                      "source": SOURCE_FIIDII, "first_seen_at": run.now})
+        found.append(
+            {
+                COL_ID: f"nse-fiidii-{day}-{re.sub(r'[^a-z]+', '', category.lower())}",
+                COL_DATE: str(day),
+                "category": category,
+                "buy_cr": parse_nse_number(pick(row, "buyValue")),
+                "sell_cr": parse_nse_number(pick(row, "sellValue")),
+                "net_cr": parse_nse_number(pick(row, "netValue")),
+                "provisional": True,
+                "source": SOURCE_FIIDII,
+                "first_seen_at": run.now,
+            }
+        )
     return found

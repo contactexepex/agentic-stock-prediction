@@ -79,7 +79,7 @@ def status_rows(cluster: dict, statements: list[dict], as_of: pd.Timestamp) -> l
     result, facts = cluster_status(cluster, statements)
     stamp = f"{as_of:%Y%m%dT%H%M%SZ}"
     inputs = [iso(cluster["inputs_until"]) or iso(cluster["as_of"])]
-    inputs += [t for s in statements for t in (s["extracted_at"], s["source_available_at"]) if t]
+    inputs += [time for s in statements for time in (s["extracted_at"], s["source_available_at"]) if time]
     common = {
         "as_of": as_of.isoformat(),
         "cluster_id": cluster["cluster_id"],
@@ -167,7 +167,9 @@ def run(cfg: dict) -> dict:
         "facts_by_status": counts(LEVEL_CLAIM),
         "written": written,
         "unchanged": len(current) - len(rows),
-        "flags": dict(Counter(f for r in current if r["level"] == LEVEL_CLUSTER for f in r["flags"]).most_common()),
+        "flags": dict(
+            Counter(flag for r in current if r["level"] == LEVEL_CLUSTER for flag in r["flags"]).most_common()
+        ),
     }
 
 

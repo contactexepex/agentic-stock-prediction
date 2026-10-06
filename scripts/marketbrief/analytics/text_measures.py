@@ -1,6 +1,7 @@
 """Measures of an article's text (deterministic, no LLM): sentences, normalised numbers, attribution phrases and
 the MinHash signature of its 6-word shingles for copy detection. Article text is untrusted data: it is only
 measured, never followed as instructions, and never stored (at most 3 key sentences of at most 40 words)."""
+
 from __future__ import annotations
 
 import hashlib
@@ -8,23 +9,56 @@ import html as html_lib
 import re
 from functools import lru_cache
 
-from marketbrief.constants.articles import (HEX_DIGITS_PER_HASH, KEY_SENTENCE_WORDS, KEY_SENTENCES, MAX_NUMBERS,
-                                            MIN_SENTENCE_WORDS, MINHASH_SEED, NUM_PERM, SHINGLE)
+from marketbrief.constants.articles import (
+    HEX_DIGITS_PER_HASH,
+    KEY_SENTENCE_WORDS,
+    KEY_SENTENCES,
+    MAX_NUMBERS,
+    MIN_SENTENCE_WORDS,
+    MINHASH_SEED,
+    NUM_PERM,
+    SHINGLE,
+)
 from marketbrief.constants.verification import CURRENCY_UNITS
 
 ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
-GLUED_PARAGRAPHS = re.compile(r"(?<=[A-Za-z0-9]{2}[.!?])(?=[A-Z][A-Za-z])")   # 'said.The', 'post.HDFC'
+GLUED_PARAGRAPHS = re.compile(r"(?<=[A-Za-z0-9]{2}[.!?])(?=[A-Z][A-Za-z])")  # 'said.The', 'post.HDFC'
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])[\"'”’)]?\s+(?=[\"'“‘(]?[A-Z0-9₹$])")
 NUMBER = re.compile(
     r"(?P<cur>US\$|\$|₹|Rs\.?\s?|INR\s?|USD\s?|€|£)?\s?"
     r"(?P<num>\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
     r"(?:\s?(?P<scale>lakh crore|trillion|billion|million|thousand|crore|lakh|tn|bn|mn|cr|k|b|m)\b)?"
-    r"\s?(?P<pct>%|per ?cent\b|percent\b|bps\b|basis points\b)?", re.I)
-SCALES = {"trillion": 1e12, "tn": 1e12, "billion": 1e9, "bn": 1e9, "b": 1e9, "million": 1e6, "mn": 1e6, "m": 1e6,
-          "thousand": 1e3, "k": 1e3, "crore": 1e7, "cr": 1e7, "lakh": 1e5, "lakh crore": 1e12}
-CURRENCIES = {"$": "usd", "us$": "usd", "usd": "usd", "₹": "inr", "rs": "inr", "rs.": "inr", "inr": "inr",
-              "€": "eur", "£": "gbp"}
-AMBIGUOUS_SCALES = ("m", "b", "k")   # "5m" alone is ambiguous (minutes, metres)
+    r"\s?(?P<pct>%|per ?cent\b|percent\b|bps\b|basis points\b)?",
+    re.I,
+)
+SCALES = {
+    "trillion": 1e12,
+    "tn": 1e12,
+    "billion": 1e9,
+    "bn": 1e9,
+    "b": 1e9,
+    "million": 1e6,
+    "mn": 1e6,
+    "m": 1e6,
+    "thousand": 1e3,
+    "k": 1e3,
+    "crore": 1e7,
+    "cr": 1e7,
+    "lakh": 1e5,
+    "lakh crore": 1e12,
+}
+CURRENCIES = {
+    "$": "usd",
+    "us$": "usd",
+    "usd": "usd",
+    "₹": "inr",
+    "rs": "inr",
+    "rs.": "inr",
+    "inr": "inr",
+    "€": "eur",
+    "£": "gbp",
+}
+AMBIGUOUS_SCALES = ("m", "b", "k")  # "5m" alone is ambiguous (minutes, metres)
 UNIT_PERCENT, UNIT_BASIS_POINTS = "pct", "bps"
 MIN_PLAIN_NUMBER, MIN_DISTINCTIVE_NUMBER = 10, 1000
 YEAR_RANGE = (1900, 2100)
@@ -32,7 +66,9 @@ SOURCES_SAY = re.compile(
     r"\b(?:sources?|people|persons?|officials?|executives?)\s+(?:familiar|aware|close|with (?:direct )?knowledge)\b"
     r"|\bsources?\s+(?:said|say|says|told)\b|\bsaid\s+(?:\w+\s+){0,3}sources?\b|\bciting\s+(?:\w+\s+){0,4}sources?\b"
     r"|\baccording to (?:\w+\s+){0,3}sources?\b|\bwho (?:declined to be|did not want to be|asked not to be) "
-    r"(?:named|identified)\b|:\s*sources?\s*$|\bsources say\b", re.I)
+    r"(?:named|identified)\b|:\s*sources?\s*$|\bsources say\b",
+    re.I,
+)
 TOKEN = re.compile(r"[a-z0-9$₹%.]+")
 TITLE_WORD = re.compile(r"[a-z][a-z0-9&'-]*")
 MIN_TITLE_WORD_LENGTH = 3
@@ -80,7 +116,7 @@ def numbers(text: str | None, limit: int = MAX_NUMBERS) -> list[str]:
     found: list[str] = []
     for match in NUMBER.finditer(text or ""):
         if match.start("num") > 0 and text[match.start("num") - 1].isalnum():
-            continue                                # Q3, FY26, H1
+            continue  # Q3, FY26, H1
         number = normalised_number(match)
         if number is None:
             continue
@@ -105,8 +141,9 @@ def distinctive(normalised: list[str]) -> set[str]:
     return found
 
 
-def key_sentences(text: str, names: list[str] | None = None, count: int = KEY_SENTENCES,
-                  max_words: int = KEY_SENTENCE_WORDS) -> list[str]:
+def key_sentences(
+    text: str, names: list[str] | None = None, count: int = KEY_SENTENCES, max_words: int = KEY_SENTENCE_WORDS
+) -> list[str]:
     """At most `count` sentences (each cut to max_words words): the lede, then sentences with a number or
     one of the company names, in text order."""
     candidates = [s for s in sentences(text) if len(s.split()) >= MIN_SENTENCE_WORDS]
@@ -136,7 +173,7 @@ def sources_say(*texts: str | None) -> bool:
 def shingles(text: str | None, size: int = SHINGLE) -> set[str]:
     """The word shingles (`size` consecutive lower-case tokens) of a text."""
     words = [token.strip(".") for token in TOKEN.findall((text or "").lower()) if token.strip(".")]
-    return {" ".join(words[i:i + size]) for i in range(len(words) - size + 1)}
+    return {" ".join(words[i : i + size]) for i in range(len(words) - size + 1)}
 
 
 def minhash_hex(shingle_set: set[str]) -> str | None:
@@ -144,6 +181,7 @@ def minhash_hex(shingle_set: set[str]) -> str | None:
     if not shingle_set:
         return None
     from datasketch import MinHash
+
     signature = MinHash(num_perm=NUM_PERM, seed=MINHASH_SEED)
     signature.update_batch([s.encode("utf-8") for s in sorted(shingle_set)])
     return "".join(f"{int(v):0{HEX_DIGITS_PER_HASH}x}" for v in signature.hashvalues)
@@ -152,7 +190,7 @@ def minhash_hex(shingle_set: set[str]) -> str | None:
 def signature_values(hex_signature: str) -> list[int]:
     """The integer values of a hex MinHash signature."""
     step = HEX_DIGITS_PER_HASH
-    return [int(hex_signature[i:i + step], 16) for i in range(0, len(hex_signature), step)]
+    return [int(hex_signature[i : i + step], 16) for i in range(0, len(hex_signature), step)]
 
 
 def estimated_jaccard(first: str, second: str) -> float:
@@ -161,8 +199,9 @@ def estimated_jaccard(first: str, second: str) -> float:
     return sum(x == y for x, y in zip(first_values, second_values)) / len(first_values)
 
 
-def estimated_containment(first: str | None, first_count: int | None, second: str | None,
-                          second_count: int | None) -> float | None:
+def estimated_containment(
+    first: str | None, first_count: int | None, second: str | None, second_count: int | None
+) -> float | None:
     """Estimated |A∩B| / min(|A|,|B|) from two MinHash signatures and their shingle counts."""
     if not first or not second or not first_count or not second_count:
         return None

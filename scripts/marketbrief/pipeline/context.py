@@ -12,7 +12,7 @@ from datetime import timedelta
 
 from marketbrief.core import calendar
 from marketbrief.analytics import fundamentals
-from marketbrief.graph import connection_map as graph
+from marketbrief.graph import news_hits
 from marketbrief.pipeline.lessons import context_section
 from marketbrief.pipeline import macro_sections
 from marketbrief.pipeline import nse_sections
@@ -283,7 +283,7 @@ def main() -> None:
     # Macro & flows (US Treasury/FRED/Cboe and FINRA shorts; India NSDL FPI and NSE indices).
     for title, body in [
         *relation_flags.context_sections(cfg, con),
-        graph.context_section(cfg, con),
+        news_hits.context_section(cfg, con),
         *nse_sections.context_sections(cfg, con),
         *macro_sections.context_sections(cfg, con),
     ]:

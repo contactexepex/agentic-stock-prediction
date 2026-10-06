@@ -1,22 +1,39 @@
 """The CLAUDE.md prediction rules as one record check, shared by the daily gate
 (validate.py --stage forecast) and the as-of replay (ai_replay.py record), and the news-verification
 rules on the cited evidence (check_news_status; the daily gate only)."""
+
 from __future__ import annotations
 
 from typing import NamedTuple
 
-from marketbrief.constants.prediction_rules import (CONF_MAX, CONF_MIN, DEFAULT_AS_OF_LABEL, DEFAULT_EVIDENCE_LABEL,
-                                                    HORIZONS, RATIONALE_WORDS, REQUIRED, WIDEN_MAX)
-from marketbrief.constants.verification import (CODE_NEWS_STATUS_BLOCKED, CODE_NEWS_STATUS_CONFIDENCE,
-                                                CODE_NEWS_STATUS_CONTRADICTED, CODE_NEWS_STATUS_MAIN,
-                                                MAIN_EVIDENCE_STATUSES, NEVER_SUPPORT_STATUSES, WEAK_CONFIDENCE_PENALTY,
-                                                WEAK_STATUSES, WIDEN_ONLY_STATUSES)
+from marketbrief.constants.prediction_rules import (
+    CONF_MAX,
+    CONF_MIN,
+    DEFAULT_AS_OF_LABEL,
+    DEFAULT_EVIDENCE_LABEL,
+    HORIZONS,
+    RATIONALE_WORDS,
+    REQUIRED,
+    WIDEN_MAX,
+)
+from marketbrief.constants.verification import (
+    CODE_NEWS_STATUS_BLOCKED,
+    CODE_NEWS_STATUS_CONFIDENCE,
+    CODE_NEWS_STATUS_CONTRADICTED,
+    CODE_NEWS_STATUS_MAIN,
+    MAIN_EVIDENCE_STATUSES,
+    NEVER_SUPPORT_STATUSES,
+    WEAK_CONFIDENCE_PENALTY,
+    WEAK_STATUSES,
+    WIDEN_ONLY_STATUSES,
+)
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
 
 
 class RuleLabels(NamedTuple):
     """How the messages name the required as-of date and the evidence source (the replay words them differently)."""
+
     as_of: str = DEFAULT_AS_OF_LABEL
     evidence: str = DEFAULT_EVIDENCE_LABEL
 
@@ -24,15 +41,17 @@ class RuleLabels(NamedTuple):
 def identity_errors(rec: dict, ctx: dict, seen: set[str], want, as_of, label: str) -> list[str]:
     """Ticker, horizon, as_of_date and id rules."""
     errs = []
-    t, h = rec["ticker"], rec["horizon_days"]
-    if t not in ctx["tickers"]:
-        errs.append(f"unknown ticker {t!r}")
-    if not isinstance(h, int) or isinstance(h, bool) or h not in HORIZONS:
-        errs.append(f"horizon_days must be 1 or 5 (got {h!r})")
+    ticker, horizon = rec["ticker"], rec["horizon_days"]
+    if ticker not in ctx["tickers"]:
+        errs.append(f"unknown ticker {ticker!r}")
+    if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon not in HORIZONS:
+        errs.append(f"horizon_days must be 1 or 5 (got {horizon!r})")
     if as_of is not None and str(rec["as_of_date"]) != str(want):
         errs.append(f"as_of_date {rec['as_of_date']} is not {label} {want}")
-    if rec["id"] != f"{rec['as_of_date']}-{t}-{h}d":
-        errs.append(f"id must be <as_of_date>-<ticker>-<horizon>d = {rec['as_of_date']}-{t}-{h}d (got {rec['id']!r})")
+    if rec["id"] != f"{rec['as_of_date']}-{ticker}-{horizon}d":
+        errs.append(
+            f"id must be <as_of_date>-<ticker>-<horizon>d = {rec['as_of_date']}-{ticker}-{horizon}d (got {rec['id']!r})"
+        )
     if rec["id"] in seen:
         errs.append(f"id {rec['id']} already recorded")
     return errs
@@ -70,23 +89,24 @@ def evidence_errors(rec: dict, ctx: dict, made, label: str) -> list[str]:
     return errs
 
 
-def feature_errors(ctx: dict, t: str, want) -> list[str]:
+def feature_errors(ctx: dict, ticker: str, want) -> list[str]:
     """No call for a ticker without an indicator snapshot, with BLOCKED quality or earnings within a day."""
-    f = ctx["features"].get(t)
-    if t not in ctx["tickers"]:
+    features = ctx["features"].get(ticker)
+    if ticker not in ctx["tickers"]:
         return []
-    if f is None:
-        return [f"no indicator snapshot for {t}" + (f" on {want}" if want is not None else "")]
+    if features is None:
+        return [f"no indicator snapshot for {ticker}" + (f" on {want}" if want is not None else "")]
     errs = []
-    if f["quality"] == "BLOCKED":
-        errs.append(f"{t} indicator quality is BLOCKED")
-    if f["days_to_earnings"] is not None and f["days_to_earnings"] <= 1:
-        errs.append(f"{t} has earnings within 1 day (days_to_earnings {f['days_to_earnings']})")
+    if features["quality"] == "BLOCKED":
+        errs.append(f"{ticker} indicator quality is BLOCKED")
+    if features["days_to_earnings"] is not None and features["days_to_earnings"] <= 1:
+        errs.append(f"{ticker} has earnings within 1 day (days_to_earnings {features['days_to_earnings']})")
     return errs
 
 
-def check_prediction(rec, ctx: dict, seen: set[str], as_of=None, require_made_at: bool = False,
-                     labels: RuleLabels | None = None) -> list[str]:
+def check_prediction(
+    rec, ctx: dict, seen: set[str], as_of=None, require_made_at: bool = False, labels: RuleLabels | None = None
+) -> list[str]:
     """Reasons a forecaster record breaks the schema or the CLAUDE.md prediction rules (empty = valid).
 
     ctx: `tickers` (watchlist), `features` {ticker: {quality, days_to_earnings}}, `evidence`
@@ -103,8 +123,8 @@ def check_prediction(rec, ctx: dict, seen: set[str], as_of=None, require_made_at
             errs.append(f"missing {k}")
     if errs:
         return errs
-    t = rec["ticker"]
-    want = as_of.get(t) if isinstance(as_of, dict) else as_of
+    ticker = rec["ticker"]
+    want = as_of.get(ticker) if isinstance(as_of, dict) else as_of
     errs += identity_errors(rec, ctx, seen, want, as_of, labels.as_of)
     errs += value_errors(rec)
     made = None
@@ -115,7 +135,7 @@ def check_prediction(rec, ctx: dict, seen: set[str], as_of=None, require_made_at
     errs += evidence_errors(rec, ctx, made, labels.evidence)
     if not isinstance(rec["prompt_version"], str):
         errs.append("prompt_version must be text")
-    return errs + feature_errors(ctx, t, want)
+    return errs + feature_errors(ctx, ticker, want)
 
 
 def check_news_status(rec: dict, statuses: list[str]) -> list[tuple[str, str]]:
@@ -126,18 +146,30 @@ def check_news_status(rec: dict, statuses: list[str]) -> list[tuple[str, str]]:
     id caps the confidence at CONF_MAX - 0.05."""
     ids, out = rec["evidence_ids"], []
     if statuses[0] not in MAIN_EVIDENCE_STATUSES:
-        out.append((CODE_NEWS_STATUS_MAIN, f"main evidence {ids[0]} is {statuses[0]}; it must be "
-                                           f"{' or '.join(MAIN_EVIDENCE_STATUSES)}"))
+        out.append(
+            (
+                CODE_NEWS_STATUS_MAIN,
+                f"main evidence {ids[0]} is {statuses[0]}; it must be {' or '.join(MAIN_EVIDENCE_STATUSES)}",
+            )
+        )
     blocked = [f"{i} ({s})" for i, s in zip(ids, statuses, strict=False) if s in NEVER_SUPPORT_STATUSES]
     if blocked:
         out.append((CODE_NEWS_STATUS_BLOCKED, f"evidence that cannot support a call: {', '.join(blocked)}"))
     contradicted = [i for i, s in zip(ids, statuses, strict=False) if s in WIDEN_ONLY_STATUSES]
     if contradicted and not (rec.get("range_widen") or 0) > 0:
-        out.append((CODE_NEWS_STATUS_CONTRADICTED, f"contradicted evidence {contradicted} may only be cited "
-                                                   "to widen the range (range_widen > 0)"))
+        out.append(
+            (
+                CODE_NEWS_STATUS_CONTRADICTED,
+                f"contradicted evidence {contradicted} may only be cited to widen the range (range_widen > 0)",
+            )
+        )
     weak = [f"{i} ({s})" for i, s in zip(ids, statuses, strict=False) if s in WEAK_STATUSES]
     cap = round(CONF_MAX - WEAK_CONFIDENCE_PENALTY, 2)
     if weak and rec["confidence"] > cap + 1e-9:
-        out.append((CODE_NEWS_STATUS_CONFIDENCE, f"confidence {rec['confidence']} above {cap:.2f} while citing "
-                                                 f"{', '.join(weak)}"))
+        out.append(
+            (
+                CODE_NEWS_STATUS_CONFIDENCE,
+                f"confidence {rec['confidence']} above {cap:.2f} while citing {', '.join(weak)}",
+            )
+        )
     return out
