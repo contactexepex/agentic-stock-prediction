@@ -54,12 +54,11 @@ import regime as rg
 import scoring as sc
 from marketbrief.core.clock import utc_now
 from marketbrief.core.market_config import benchmark_key, load_ranges_config, vol_index_key
-from marketbrief.core.paths import ROOT
 from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from marketbrief.utils.event_dates import major_event_between
 from marketbrief.utils.numbers import round_or_none, share_percent_text
 from features import load_bars
-from marketbrief.core import cli, database, storage
+from marketbrief.core import cli, database, paths, storage
 
 LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)   # calibration curve (stated coverage)
 SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")
@@ -1116,16 +1115,16 @@ def main() -> int:
         if args.aci_tune_end:
             s["aci_held_out"] = held_out(cfg, rc_aci, con, args.aci_tune_end, args.start, args.end)
         suffix = aci_tag(rc_aci["aci"], args.aci_tune_end)
-    out = ROOT / "reports" / cfg["market"]
+    out = paths.ROOT / "reports" / cfg["market"]
     out.mkdir(parents=True, exist_ok=True)
     page, js = out / f"replay-{s['end']}{suffix}.html", out / f"replay-{s['end']}{suffix}.json"
     page.write_text(html_report(cfg, s), encoding="utf-8")
     js.write_text(json.dumps(s, indent=1, default=str), encoding="utf-8")
-    rel = str(page.relative_to(ROOT))
+    rel = str(page.relative_to(paths.ROOT))
     rec = record(s, rel)
     rec["id"] += suffix
     storage.append_jsonl(storage.day_file(cfg["market"], "replays", date.fromisoformat(s["end"])), [rec])
-    print(json.dumps({"step": "replay", "market": cfg["market"], "report": rel, "json": str(js.relative_to(ROOT)),
+    print(json.dumps({"step": "replay", "market": cfg["market"], "report": rel, "json": str(js.relative_to(paths.ROOT)),
                       "start": s["start"], "end": s["end"], "runtime_s": s["runtime_s"],
                       "aci": s["settings"]["aci"],
                       "overall": {h: v["overall"] for h, v in s["horizons"].items()},

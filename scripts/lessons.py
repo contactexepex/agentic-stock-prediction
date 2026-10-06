@@ -40,7 +40,7 @@ import pandas as pd
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_now, utc_today
 from marketbrief.core.database import connect
-from marketbrief.core.paths import ROOT
+from marketbrief.core import paths
 from marketbrief.core.storage import append_jsonl, day_file
 from score_predictions import is_late
 
@@ -306,7 +306,7 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("prepare", help="write the facts of settled calls without a lesson")
     p.add_argument("--max", type=int, default=DEFAULT_MAX, help="at most N calls, newest settled first")
-    p.add_argument("--out", type=Path, default=ROOT / "work" / "lesson_facts.jsonl")
+    p.add_argument("--out", type=Path, default=paths.ROOT / "work" / "lesson_facts.jsonl")
     for name in ("validate", "add"):
         q = sub.add_parser(name)
         q.add_argument("file", type=Path)

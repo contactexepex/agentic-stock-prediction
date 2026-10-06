@@ -23,7 +23,7 @@ import pandas as pd
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
-from marketbrief.core.paths import ROOT
+from marketbrief.core import paths
 from review import previous_week, week_bounds
 
 SAMPLE_CALLS, SAMPLE_REPORTS = 2, 1
@@ -91,9 +91,9 @@ def sample(cfg: dict, week: str) -> dict:
             "outcome": {k: str(v) for k, v in outcome[0].items()} if outcome else None})
     reports = []
     for d in pd.date_range(start, end):
-        p = ROOT / "reports" / market / f"{d.date()}.md"
+        p = paths.ROOT / "reports" / market / f"{d.date()}.md"
         if p.exists() and "<!-- AGENT:" not in p.read_text(encoding="utf-8"):
-            reports.append(p.relative_to(ROOT).as_posix())
+            reports.append(p.relative_to(paths.ROOT).as_posix())
     rep = sorted(rng.sample(reports, min(SAMPLE_REPORTS, len(reports)))) if reports else []
     return {"calls": out_calls, "reports": rep, "n_calls_in_week": int(len(calls)), "n_reports_in_week": len(reports)}
 

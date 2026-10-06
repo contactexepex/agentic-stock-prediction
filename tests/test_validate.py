@@ -87,8 +87,6 @@ def root(tmp_path, monkeypatch):
                                                          "regime": "CALM", "vol_level": 15.2}])
     (tmp_path / "work").mkdir()
     monkeypatch.setattr(common, "ROOT", tmp_path)
-    monkeypatch.setattr(v, "ROOT", tmp_path)
-    monkeypatch.setattr(spotcheck, "ROOT", tmp_path)
     monkeypatch.setenv("MB_NOW", NOW)
     return tmp_path
 

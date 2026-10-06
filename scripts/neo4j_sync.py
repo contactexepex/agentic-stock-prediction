@@ -46,7 +46,7 @@ from typing import Callable
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
-from marketbrief.core.paths import ROOT
+from marketbrief.core import paths
 from marketbrief.sources.neo4j_client import Neo4jClient, Neo4jError
 from marketbrief.utils.text import slugify_with_unknown_fallback
 
@@ -723,7 +723,7 @@ def main() -> int:
     args = ap.parse_args()
     cfg = require_market(args)
     if args.dry_run:
-        sink = DryRunSink(ROOT / "work" / "neo4j_dryrun" / cfg["market"])
+        sink = DryRunSink(paths.ROOT / "work" / "neo4j_dryrun" / cfg["market"])
     else:
         sink = client_from_env()
         if sink is None:
@@ -745,7 +745,7 @@ def main() -> int:
     only = [k.strip() for k in args.kinds.split(",")] if args.kinds else None
     out = sync(cfg, con, sink, full=args.full, since=args.since, batch_size=args.batch_size, only=only)
     if args.dry_run:
-        out["dry_run_dir"] = str(sink.dir.relative_to(ROOT)) if sink.dir.is_relative_to(ROOT) else str(sink.dir)
+        out["dry_run_dir"] = str(sink.dir.relative_to(paths.ROOT)) if sink.dir.is_relative_to(paths.ROOT) else str(sink.dir)
         out["statements"] = sink.n
     print(json.dumps(out, indent=2, default=str))
     return 0 if out["ok"] else 1

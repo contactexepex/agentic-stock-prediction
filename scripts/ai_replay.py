@@ -81,7 +81,6 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.core import paths
-from marketbrief.core.paths import CODE
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import benchmark_key, load_market, market_names
@@ -392,8 +391,8 @@ def run_script(script: str, root: Path, market: str, *args: str, now: str | None
     env.pop("MB_NOW", None)
     if now:
         env["MB_NOW"] = now
-    return subprocess.run([sys.executable, str(CODE / "scripts" / script), "--market", market, *args],
-                          cwd=CODE / "scripts", env=env, capture_output=True, text=True, check=False, timeout=timeout)
+    return subprocess.run([sys.executable, str(paths.CODE / "scripts" / script), "--market", market, *args],
+                          cwd=paths.CODE / "scripts", env=env, capture_output=True, text=True, check=False, timeout=timeout)
 
 
 def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout: Path | None = None) -> str:
@@ -469,8 +468,8 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
     (root / MARKER).write_text(f"{market} {d}\n")
     shutil.copytree(paths.CONFIG, root / "config")
     for name in ("sql", "templates"):
-        if (CODE / name).exists():
-            shutil.copytree(CODE / name, root / name)
+        if (paths.CODE / name).exists():
+            shutil.copytree(paths.CODE / name, root / name)
     copied = copy_asof(market, src, root, d, cutoff)
     assumed = assumed_earnings(cfg, src, d, cutoff, assume_earnings_days) if assume_earnings_days else []
     if assumed:
@@ -571,7 +570,7 @@ BACKFILL_KINDS = {"us": ("filings", "insiders", "stakes", "events"),
 def check_source(source: Path) -> Path:
     """The scratch source must not be the repo, the real data/ or anything inside or above it."""
     s = source.resolve()
-    for real_root in {CODE.resolve(), Path(paths.ROOT).resolve()}:
+    for real_root in {paths.CODE.resolve(), Path(paths.ROOT).resolve()}:
         real = real_root / "data"
         if s == real_root or s == real or real in s.parents or s in real_root.parents:
             raise SystemExit(f"--source {s} is the repo, its real data/ or contains them; use a scratch directory")
@@ -1180,9 +1179,9 @@ def main() -> int:
     p.add_argument("--date", required=True, type=date.fromisoformat)
     p.add_argument("--root", required=True, type=Path)
     p.add_argument("--calls", required=True, type=Path, help="forecaster-format JSONL (may be empty: all abstain)")
-    p.add_argument("--results", type=Path, default=CODE / "work" / "ai_replay", help="results dir (default work/ai_replay)")
+    p.add_argument("--results", type=Path, default=paths.CODE / "work" / "ai_replay", help="results dir (default work/ai_replay)")
     p = add("score", "score the recorded calls on real closes; write HTML and JSON")
-    p.add_argument("--results", type=Path, default=CODE / "work" / "ai_replay")
+    p.add_argument("--results", type=Path, default=paths.CODE / "work" / "ai_replay")
     p.add_argument("--out", required=True, type=Path, help="HTML path; the JSON goes next to it")
     args = ap.parse_args()
     if not args.market:

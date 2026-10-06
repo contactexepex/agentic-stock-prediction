@@ -22,7 +22,8 @@ from zoneinfo import ZoneInfo
 
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
-from marketbrief.core.paths import CODE, ROOT, data_dir
+from marketbrief.core.paths import data_dir
+from marketbrief.core import paths
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.core.storage import append_jsonl, day_file, recent_ids
 from marketbrief.sources.nse_client import Nse
@@ -122,7 +123,7 @@ def replay_problem(root: Path, targets: list[Path]) -> str | None:
     if any(p.is_file() for p in (root / "data").glob("*/prices/**/*")):
         return f"MB_ROOT ({root}) has price files under data/*/prices: looks like a real data store"
     base = root.resolve() / "data"           # the root's own data/, not where a data/ symlink points
-    real = (CODE / "data").resolve()
+    real = (paths.CODE / "data").resolve()
     for t in targets:
         r = t.resolve()                      # follows any symlinked directory on the way
         if not r.is_relative_to(base):
@@ -215,7 +216,7 @@ def collector_main(doc: str, name: str, kinds: list[str], collect, extra_args=No
         raise SystemExit("--today is only allowed with --replay")
     only, today = args.only or kinds, args.today or utc_today()
     if args.replay:
-        problem = replay_problem(ROOT, [write_target(market, k, today) for k in only])
+        problem = replay_problem(paths.ROOT, [write_target(market, k, today) for k in only])
         if problem:
             print(json.dumps({"collector": name, "market": market,
                               "error": f"--replay writes synthetic rows; refusing: {problem}"}))

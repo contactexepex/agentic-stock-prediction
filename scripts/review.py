@@ -37,7 +37,7 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import benchmark_key, load_ranges_config, vol_index_key
-from marketbrief.core.paths import CONFIG, ROOT
+from marketbrief.core import paths
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.utils.event_dates import major_event_between
 from marketbrief.utils.markdown import markdown_table
@@ -63,7 +63,7 @@ NOTE_PATTERNS = {
 
 
 def load_review_config() -> dict:
-    path = CONFIG / "review.yaml"
+    path = paths.CONFIG / "review.yaml"
     return {**DEFAULTS, **((yaml.safe_load(path.read_text()) or {}) if path.exists() else {})}
 
 
@@ -833,13 +833,13 @@ def main() -> int:
         return 0
     rv = load_review_config()
     rec, d = build(cfg, load_ranges_config(cfg["market"]), rv, con, week, history=not args.no_history)
-    path = ROOT / rec["report"]
+    path = paths.ROOT / rec["report"]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(markdown(cfg, rv, rec, d))
     out = day_file(cfg["market"], "reviews", utc_today())
     append_jsonl(out, [rec])
     print(json.dumps({"step": "review", "market": cfg["market"], "week": week, "due": True, "report": rec["report"],
-                      "record": str(out.relative_to(ROOT)), "n_ranges_week": rec["n_ranges_week"],
+                      "record": str(out.relative_to(paths.ROOT)), "n_ranges_week": rec["n_ranges_week"],
                       "n_ranges_all": rec["n_ranges_all"], "n_calls_all": rec["n_calls_all"],
                       "low_sample": rec["low_sample"],
                       "proposals": [{**c, "source": p["source"], "n": p["n"], "rel_score": p["rel_score"]}

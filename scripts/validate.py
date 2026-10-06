@@ -41,12 +41,12 @@ import pandas as pd
 
 import events as ev
 import market_status
-from marketbrief.core.paths import ROOT, data_dir
+from marketbrief.core.paths import data_dir
 import narrative_numbers as nn
 from marketbrief.core.settings import load_settings, load_validate_config
 from marketbrief.utils.timefmt import as_utc_timestamp
 from prediction_rules import check_prediction
-from marketbrief.core import cli, clock, database, market_config, schemas
+from marketbrief.core import cli, clock, database, market_config, paths, schemas
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
 # kinds whose day files are named by the trading date, with the column that says when a row was written
@@ -84,7 +84,7 @@ def run_status(cfg: dict) -> dict:
 
 
 def work_dir() -> Path:
-    return ROOT / "work"
+    return paths.ROOT / "work"
 
 
 def kind_files(market: str, kind: str) -> list[Path]:
@@ -220,7 +220,7 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
         n = 0
         for p in files:
             rows, problems = read_rows(p)
-            rel = p.relative_to(ROOT).as_posix()
+            rel = p.relative_to(paths.ROOT).as_posix()
             if problems:
                 res.block("BAD_FILE", f"{rel}: {'; '.join(problems[:3])}", tickers_in(rows))
             if kind in TRADING_DATE_KINDS:
@@ -522,7 +522,7 @@ def stage_features(res, cfg, con, st, now, today, vc):
 def stage_context(res, cfg, con, st, now, today, vc, path: Path | None = None):
     path = path or work_dir() / "context.md"
     if not path.exists() or path.stat().st_size == 0:
-        res.block("MISSING_CONTEXT", f"{path.relative_to(ROOT) if path.is_relative_to(ROOT) else path} is missing or empty")
+        res.block("MISSING_CONTEXT", f"{path.relative_to(paths.ROOT) if path.is_relative_to(paths.ROOT) else path} is missing or empty")
         return
     text = path.read_text(encoding="utf-8")
     first = text.splitlines()[0] if text else ""
@@ -716,7 +716,7 @@ def report_session(con, st: dict) -> str:
 
 
 def report_file(cfg: dict, con, st: dict) -> Path:
-    return ROOT / "reports" / cfg["market"] / f"{report_session(con, st)}.md"
+    return paths.ROOT / "reports" / cfg["market"] / f"{report_session(con, st)}.md"
 
 
 def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = None, slack_path: Path | None = None):
@@ -726,7 +726,7 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
     check_files(res, cfg, ("news_enriched", "predictions", "ranges"), today, now, vc)   # appended since collect
     check_ranges(res, cfg, con, now)
     if not report_path.exists():
-        res.block("MISSING_REPORT", f"{report_path.relative_to(ROOT) if report_path.is_relative_to(ROOT) else report_path} not written")
+        res.block("MISSING_REPORT", f"{report_path.relative_to(paths.ROOT) if report_path.is_relative_to(paths.ROOT) else report_path} not written")
         return
     filled = report_path.read_text(encoding="utf-8")
     slack = slack_path.read_text(encoding="utf-8") if slack_path.exists() else None
@@ -748,13 +748,13 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
     targets = [(report_path, agent_lines(filled, skel_r or ""))]
     if slack is not None:
         targets.append((slack_path, agent_lines(slack, skel_s or "")))
-    summary = ROOT / "summaries" / cfg["market"] / "daily" / f"{today}.md"
+    summary = paths.ROOT / "summaries" / cfg["market"] / "daily" / f"{today}.md"
     if summary.exists():
         targets.append((summary, summary.read_text(encoding="utf-8").splitlines()))
     checked = {}
     for path, lines in targets:
         bad = nn.unmatched(lines, pool, small)
-        checked[path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)] = {
+        checked[path.relative_to(paths.ROOT).as_posix() if path.is_relative_to(paths.ROOT) else str(path)] = {
             "agent_lines": len(lines), "unmatched": len(bad)}
         if bad:
             res.block("UNMATCHED_NUMBER", f"{path.name}: {len(bad)} number(s) with no same-kind source number for "

@@ -133,7 +133,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
-  `HttpClient` base; Edgar, NSE, free-source, Neo4j, Slack, RSS and article clients). Callers import from
+  `HttpClient` base under the Edgar, NSE, free-source, Neo4j and Slack clients; RSS and article-page access sit beside it). Callers import from
   it directly; `scripts/common.py` is only the patch point (`common.ROOT` and `common.CONFIG` read and write
   `core.paths`; tests assign them), and `sources.py`, `nse.py`, `sec.py` keep the collectors' own helpers.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,

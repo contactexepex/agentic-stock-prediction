@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from marketbrief.core.paths import CONFIG
+from marketbrief.core import paths
 
 MAJOR_WINDOW_DAYS = 2  # PASDS: a major event within 2 calendar days -> EVENT_HEAVY
 DEFAULT_OPEN = time(9, 30)   # local open and close assumed only when the exchange calendar
@@ -150,7 +150,7 @@ def session_offset(rule: dict) -> int:
 
 def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
     """Rule-based and fixed market-level events between start and end (inclusive)."""
-    spec = yaml.safe_load((path or CONFIG / "events.yaml").read_text()) or {}
+    spec = yaml.safe_load((path or paths.CONFIG / "events.yaml").read_text()) or {}
     market, out = cfg["market"], []
     for rule in spec.get("rules", []):
         if market not in rule["markets"]:

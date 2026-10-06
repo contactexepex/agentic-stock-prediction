@@ -25,7 +25,7 @@ import urllib.parse
 from pathlib import Path
 
 from marketbrief.core.cli import market_arg, require_market
-from marketbrief.core.paths import ROOT
+from marketbrief.core import paths
 from marketbrief.core.settings import load_settings
 from marketbrief.sources.slack_client import SlackHttp
 
@@ -89,7 +89,7 @@ class Slack:
             "channel_id": channel, "thread_ts": thread_ts, "initial_comment": comment})
 
 
-def thread_plan(text: str, files: dict | None, root: Path = ROOT) -> list[dict]:
+def thread_plan(text: str, files: dict | None, root: Path = paths.ROOT) -> list[dict]:
     """The thread in posting order: summary, chart images (one reply), HTML report (one reply)."""
     steps = [{"step": "summary", "method": "chat.postMessage", "text": text}]
     if not files:
@@ -111,7 +111,7 @@ def title_of(p: Path) -> str:
     return {"ranges": "Price ranges", "sectors": "Sector moves", "track_record": "Track record"}.get(p.stem, p.stem)
 
 
-def post_thread(slack: Slack, channel: str, steps: list[dict], root: Path = ROOT) -> dict:
+def post_thread(slack: Slack, channel: str, steps: list[dict], root: Path = paths.ROOT) -> dict:
     ts = slack.post_message(channel, steps[0]["text"])
     done = ["summary"]
     for s in steps[1:]:
@@ -121,7 +121,7 @@ def post_thread(slack: Slack, channel: str, steps: list[dict], root: Path = ROOT
     return {"thread_ts": ts, "posted": done}
 
 
-def write_plan(market: str, channel: str | None, steps: list[dict], root: Path = ROOT) -> str:
+def write_plan(market: str, channel: str | None, steps: list[dict], root: Path = paths.ROOT) -> str:
     plan = root / "work" / f"slack_{market}_plan.json"
     folder = root / "work" / f"slack_{market}_plan"
     if folder.exists():
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None, http=urllib_http) -> int:
     args = ap.parse_args(argv)
     cfg = require_market(args)
     market = cfg["market"]
-    path = ROOT / "work" / f"slack_{market}.md"
+    path = paths.ROOT / "work" / f"slack_{market}.md"
     if args.text:
         text = args.text.strip() + "\n"
     elif not path.exists():
@@ -166,18 +166,18 @@ def main(argv: list[str] | None = None, http=urllib_http) -> int:
     settings = load_settings()
     channel = settings.get("slack_channel_id")
     files = None
-    mpath = ROOT / "work" / f"slack_{market}_files.json"
+    mpath = paths.ROOT / "work" / f"slack_{market}_files.json"
     if not args.text:
         if mpath.exists():
             files = json.loads(mpath.read_text())
         else:
-            out["files_warning"] = f"{mpath.relative_to(ROOT)} not found (run html_report.py): summary only"
-    steps = thread_plan(text, files, ROOT)
+            out["files_warning"] = f"{mpath.relative_to(paths.ROOT)} not found (run html_report.py): summary only"
+    steps = thread_plan(text, files, paths.ROOT)
     token, hook = os.environ.get("SLACK_BOT_TOKEN"), os.environ.get("SLACK_WEBHOOK_URL")
 
     if args.dry_run:
         out.update({"posted": False, "reason": "dry run", "mode": "thread" if token else ("webhook" if hook else "none"),
-                    "plan": write_plan(market, channel, steps, ROOT), "text": text})
+                    "plan": write_plan(market, channel, steps, paths.ROOT), "text": text})
         print(json.dumps(out, ensure_ascii=False))
         return 0
     if token:
@@ -186,7 +186,7 @@ def main(argv: list[str] | None = None, http=urllib_http) -> int:
             return 1
         slack = Slack(token, http)
         try:
-            res = post_thread(slack, channel, steps, ROOT)
+            res = post_thread(slack, channel, steps, paths.ROOT)
         except (SlackError, OSError) as exc:
             print(json.dumps({**out, "posted": False, "mode": "thread", "error": str(exc)[:300],
                               "calls": slack.calls}))

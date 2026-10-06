@@ -26,7 +26,7 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import benchmark_key, vol_index_key
-from marketbrief.core.paths import ROOT
+from marketbrief.core import paths
 from marketbrief.utils.markdown import markdown_table
 from marketbrief.utils.money import format_money
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
@@ -112,7 +112,7 @@ def gather(cfg: dict, con) -> dict:
         "company_events": q("SELECT date, name FROM company_events WHERE date BETWEEN ? AND ? ORDER BY date",
                             [as_of, as_of + timedelta(days=21)]),
         "review": weekly_review(con, pd.Timestamp(ranges["session_date"].iloc[0]).date()),
-        "charts": {p.name for p in (ROOT / "reports" / cfg["market"] / "charts"
+        "charts": {p.name for p in (paths.ROOT / "reports" / cfg["market"] / "charts"
                                     / str(pd.Timestamp(ranges["session_date"].iloc[0]).date())).glob("*.png")},
     }
 
@@ -329,7 +329,7 @@ def main() -> int:
     settings = load_settings()
     d = gather(cfg, connect(cfg["market"]))
     report, slack, url = build(cfg, d, settings)
-    rpath = ROOT / "reports" / cfg["market"] / f"{d['session']}.md"
+    rpath = paths.ROOT / "reports" / cfg["market"] / f"{d['session']}.md"
     rpath.parent.mkdir(parents=True, exist_ok=True)
     # A report without AGENT markers was already filled by an earlier run. Keep its narrative
     # only while it still describes the same data (as_of and regime in its report-data line), so
@@ -338,12 +338,12 @@ def main() -> int:
     old = rpath.read_text() if rpath.exists() else None
     filled = old is not None and "<!-- AGENT:" not in old
     kept = filled and not args.force and data_stamp(d) in old
-    out = {"step": "report", "market": cfg["market"], "report": str(rpath.relative_to(ROOT)), "report_kept": kept}
+    out = {"step": "report", "market": cfg["market"], "report": str(rpath.relative_to(paths.ROOT)), "report_kept": kept}
     if filled and not kept:
-        backup = ROOT / "work" / f"report_{cfg['market']}_{d['session']}.previous.md"
+        backup = paths.ROOT / "work" / f"report_{cfg['market']}_{d['session']}.previous.md"
         backup.parent.mkdir(parents=True, exist_ok=True)
         backup.write_text(old)
-        out["previous_report"] = str(backup.relative_to(ROOT))
+        out["previous_report"] = str(backup.relative_to(paths.ROOT))
         if not args.force:
             why = ("was built from other data (as_of or regime changed)" if "<!-- report-data:" in old
                    else "has no report-data line (written before that check existed), so it cannot be shown current")
@@ -351,14 +351,14 @@ def main() -> int:
                               "previous narrative only where it still holds")
     if not kept:
         rpath.write_text(report)
-    spath = ROOT / "work" / f"slack_{cfg['market']}.md"
+    spath = paths.ROOT / "work" / f"slack_{cfg['market']}.md"
     spath.parent.mkdir(parents=True, exist_ok=True)
     spath.write_text(slack)
     # The script-written skeletons: validate.py --stage report tells agent lines from script lines
     # by them (a kept report's skeleton is rebuilt from the same data, so it is still current).
-    (ROOT / "work" / f"report_{cfg['market']}_{d['session']}.skeleton.md").write_text(report)
-    (ROOT / "work" / f"slack_{cfg['market']}.skeleton.md").write_text(slack)
-    print(json.dumps({**out, "slack_draft": str(spath.relative_to(ROOT)), "url": url,
+    (paths.ROOT / "work" / f"report_{cfg['market']}_{d['session']}.skeleton.md").write_text(report)
+    (paths.ROOT / "work" / f"slack_{cfg['market']}.skeleton.md").write_text(slack)
+    print(json.dumps({**out, "slack_draft": str(spath.relative_to(paths.ROOT)), "url": url,
                       "agent_markers": 0 if kept else report.count("<!-- AGENT:")}, indent=2))
     return 0
 
