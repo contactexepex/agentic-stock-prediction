@@ -56,7 +56,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
-  Schemas live in `scripts/common.py`.
+  Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` re-exports them).
 - India primary sources (NSE; shared session and replay guard in `nse.py`): `collect_nse_india`
   -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
   Filing results per period and basis, FII/DII provisional flows, delivery %); context sections
@@ -103,7 +103,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   through DuckDB; Neo4j is a derived copy that `--full` rebuilds from the repo. Idempotent MERGE
   batches, incremental by per-kind watermarks stored in Neo4j, `--dry-run` writes the statements to
   `work/neo4j_dryrun/`. Optional and non-blocking in the routine.
-- Macro, flows and short selling (issue #9; HTTP client and append helper in `scripts/sources.py`,
+- Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `scripts/sources.py`,
   context sections in `scripts/macro_context.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
   `collect_shorts` (US `shorts:`: FINRA Reg SHO daily short-sale volume and short interest ->
@@ -130,6 +130,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
     apart (`unread_vetted_origins`). Unvetted outlets, promotional items and opinion never count. It attaches SEC filing and NSE announcement
     candidates. Output goes to `data/<market>/news_clusters/` as per-run snapshots. Read them as
     of a time with the `news_clusters_asof(ts)` macro, which does not look ahead.
+- `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
+  statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
+  database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
+  `HttpClient` base; Edgar, NSE, free-source, Neo4j, Slack, RSS and article clients). `common`, `sources`,
+  `nse` and `sec` re-export from it; `common.ROOT` and `common.CONFIG` read and write `core.paths`.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
@@ -188,6 +193,9 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
   agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is
   merged or pushed to main before its PASS.
+- Merging: a batch is merged to main as soon as its review passes; the working branch is only where a
+  batch is built. The end-to-end run of both markets is required before the routines are re-enabled,
+  not before code reaches main.
 - Tests (offline; a guard in `tests/conftest.py` fails any test whose Python code reaches the network;
   it sees Python sockets only, not C libraries or node): the fast tier
   `python -m pytest -m "not slow" -n auto` on each edit, the full suite `python -m pytest -n auto`

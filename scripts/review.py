@@ -16,7 +16,6 @@ proposal. Proposed config/ranges.yaml changes are written to the report, never a
 Appends a record to data/<market>/reviews/ and writes reports/<market>/review-YYYY-Www.md."""
 from __future__ import annotations
 
-import bisect
 import json
 import math
 import re
@@ -36,6 +35,8 @@ import regime as rg
 import scoring
 from common import (CONFIG, ROOT, append_jsonl, benchmark_key, connect, day_file, load_ranges_config,
                     market_arg, require_market, utc_now, utc_today, vol_index_key)
+from marketbrief.utils.event_dates import major_event_between as major_between
+from marketbrief.utils.markdown import markdown_table as table
 from features import load_bars
 
 DEFAULTS = {
@@ -318,12 +319,6 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
     return regimes, majors
 
 
-def major_between(majors: list[date], start: date, end: date) -> bool:
-    """A major event after the as-of date and on or before the target date (as ranges.py)."""
-    k = bisect.bisect_right(majors, start)
-    return k < len(majors) and majors[k] <= end
-
-
 def hist_summary(res: pd.DataFrame) -> dict:
     if res.empty:
         return {"n": 0}
@@ -574,14 +569,6 @@ def fval(v) -> str:
     if isinstance(v, dict):
         return "{" + ", ".join(f"{k}: {x}" for k, x in v.items()) + "}"
     return str(v)
-
-
-def table(header: list[str], rows: list[list]) -> str:
-    if not rows:
-        return "_none_\n"
-    out = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
-    out += ["| " + " | ".join(str(c) for c in r) + " |" for r in rows]
-    return "\n".join(out) + "\n"
 
 
 def flag(n: int, rv: dict) -> str:

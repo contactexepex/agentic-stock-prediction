@@ -300,6 +300,7 @@ def test_flows_india_layout_change_is_a_failure(root):
 
 def test_client_classifies_errors(monkeypatch):
     import urllib.error
+    import urllib.request
     import http.client
     monkeypatch.setattr(time, "sleep", lambda s: None)
     calls = []
@@ -312,7 +313,7 @@ def test_client_classifies_errors(monkeypatch):
             raise http.client.RemoteDisconnected("Remote end closed connection without response")
         raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
 
-    monkeypatch.setattr(sources.urllib.request, "urlopen", fake_open)
+    monkeypatch.setattr(urllib.request, "urlopen", fake_open)
     c = sources.Client(pause=0)
     with pytest.raises(FetchError) as e:
         c.get("https://a.example/proxy")
@@ -376,7 +377,7 @@ def test_news_outlets_utc_dedupe_and_watchlist_only(root, monkeypatch, capsys, t
     (cfg_dir / "markets" / "us.yaml").write_text(yaml.safe_dump(doc))
     monkeypatch.setattr(common, "CONFIG", cfg_dir)
     real_parse = feedparser.parse
-    monkeypatch.setattr(cn.feedparser, "parse", lambda url, agent=None: real_parse(str(FIX / url)))
+    monkeypatch.setattr(feedparser, "parse", lambda url, agent=None: real_parse(str(FIX / url)))
     monkeypatch.setattr(cn, "now_utc", lambda: datetime(2026, 10, 5, 22, 0, tzinfo=timezone.utc))
     monkeypatch.setattr(cn, "utc_today", lambda: TODAY)
     monkeypatch.setattr(sys, "argv", ["collect_news", "--market", "us"])

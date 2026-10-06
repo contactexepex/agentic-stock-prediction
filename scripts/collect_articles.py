@@ -38,6 +38,7 @@ from collections import Counter
 import pandas as pd
 
 import news_verify as nv
+from marketbrief.sources.article_fetch import Pacer, make_session
 from news_tags import norm
 from common import append_jsonl, clock, connect, day_file, market_arg, require_market, utc_now, utc_today
 
@@ -45,17 +46,6 @@ GOOGLE_HOST = "news.google.com"
 TZ_ABBREV = {"EDT": -4 * 3600, "EST": -5 * 3600, "CDT": -5 * 3600, "CST": -6 * 3600, "MDT": -6 * 3600,
              "MST": -7 * 3600, "PDT": -7 * 3600, "PST": -8 * 3600, "IST": 5 * 3600 + 1800, "GMT": 0, "UTC": 0}
 CONF_RANK = {"high": 2, "low": 1}
-
-
-class Pacer:
-    def __init__(self, pause: float):
-        self.pause, self.last = pause, 0.0
-
-    def wait(self):
-        dt = time.monotonic() - self.last
-        if self.last and dt < self.pause:
-            time.sleep(self.pause - dt)
-        self.last = time.monotonic()
 
 
 def google_only(request) -> None:
@@ -78,12 +68,6 @@ def decode_google(links: list[str], src: nv.Sources) -> list[dict]:
 
 
 DECODER = decode_google   # tests replace this
-
-
-def make_session():
-    import requests
-    s = requests.Session()   # trust_env: the proxy and REQUESTS_CA_BUNDLE from the environment
-    return s
 
 
 SESSION_FACTORY = make_session   # tests replace this

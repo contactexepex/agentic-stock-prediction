@@ -30,17 +30,13 @@ Prints one JSON summary (rows read, upserted and failed per kind). Exit 0 = all 
 1 = any failure, 2 = NEO4J_URI not set (nothing sent)."""
 from __future__ import annotations
 
-import base64
 import json
 import math
 import os
 import re
 import shutil
 import sys
-import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -48,6 +44,8 @@ from pathlib import Path
 from typing import Callable
 
 from common import ROOT, connect, market_arg, require_market, utc_now
+from marketbrief.sources.neo4j_client import Neo4jClient, Neo4jError
+from marketbrief.utils.text import slugify_with_unknown_fallback
 
 BATCH_SIZE = 500
 OVERLAP_DAYS = 3          # incremental re-reads this much before the watermark (re-upserts are harmless)
@@ -61,67 +59,7 @@ INDEXES = [("Company", "ticker"), ("Company", "market"), ("Holder", "market"), (
            ("Outcome", "market"), ("SyncState", "market")]
 
 
-# ---------- HTTP Query API ----------
-
-class Neo4jError(RuntimeError):
-    pass
-
-
-class Neo4jClient:
-    """Minimal client for the Neo4j Query API v2 (one auto-commit transaction per statement)."""
-
-    def __init__(self, base_url: str, database: str, user: str, password: str, timeout: float = 60,
-                 retries: int = 2, backoff: float | None = None):
-        self.base_url, self.database = base_url.rstrip("/"), database
-        self.url = f"{self.base_url}/db/{urllib.parse.quote(database, safe='')}/query/v2"
-        token = base64.b64encode(f"{user}:{password}".encode()).decode()
-        self._headers = {"Authorization": f"Basic {token}", "Content-Type": "application/json",
-                         "Accept": "application/json"}
-        self._secrets = [s for s in (password, token) if s]
-        self.timeout, self.retries = timeout, retries
-        self.backoff = float(os.environ.get("NEO4J_RETRY_BACKOFF", 2.0)) if backoff is None else backoff
-
-    @property
-    def host(self) -> str:
-        return urllib.parse.urlparse(self.base_url).hostname or "?"
-
-    def redact(self, text: str) -> str:
-        for s in self._secrets:
-            text = text.replace(s, "***")
-        return text
-
-    def run(self, statement: str, parameters: dict | None = None) -> dict:
-        body = json.dumps({"statement": statement, "parameters": parameters or {}, "includeCounters": True}).encode()
-        last = ""
-        for attempt in range(self.retries + 1):
-            if attempt:
-                time.sleep(self.backoff * attempt)
-            req = urllib.request.Request(self.url, data=body, headers=self._headers, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                    payload = json.loads(resp.read().decode() or "{}")
-            except urllib.error.HTTPError as exc:
-                detail = _error_text(exc.read().decode(errors="replace"))
-                last = f"HTTP {exc.code}: {detail}"
-                if exc.code in (429, 500, 502, 503, 504):
-                    continue
-                raise Neo4jError(self.redact(last)) from None
-            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
-                last = f"connection failed: {getattr(exc, 'reason', exc)}"
-                continue
-            if payload.get("errors"):
-                raise Neo4jError(self.redact(_error_text(json.dumps(payload))))
-            return payload
-        raise Neo4jError(self.redact(last))
-
-
-def _error_text(body: str) -> str:
-    try:
-        errs = json.loads(body).get("errors") or []
-        return "; ".join(f"{e.get('code', '')}: {e.get('message', '')}"[:300] for e in errs) or body[:300]
-    except (ValueError, AttributeError):
-        return body[:300]
-
+# ---------- HTTP Query API (client: marketbrief/sources/neo4j_client.py) ----------
 
 def default_database(uri: str | None) -> str:
     """NEO4J_DATABASE if set, else the first label of the URI host: on Aura the database is named
@@ -146,7 +84,7 @@ def client_from_env() -> Neo4jClient | None:
         port = f":{u.port}" if u.port and u.port != 7687 else ("" if secure else ":7474")
         base = f"{'https' if secure else 'http'}://{u.hostname}{port}"
     return Neo4jClient(base, default_database(uri or base),
-                       os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", ""))
+                       (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "")))
 
 
 # ---------- values ----------
@@ -168,8 +106,7 @@ def clean(v):
     return v
 
 
-def slug(text: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", str(text or "unknown").lower()).strip("-") or "unknown"
+slug = slugify_with_unknown_fallback
 
 
 # ---------- Cypher building blocks (static text only; values are parameters) ----------

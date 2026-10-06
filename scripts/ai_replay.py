@@ -79,13 +79,16 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
-import yaml
 
 import common
 import events as ev
 import replay
 from common import ACCEPTED_KEYS, CODE, SCHEMAS, connect, load_market, market_names, utc_now
+from marketbrief.utils.numbers import share_percent_text
+from marketbrief.utils.timefmt import as_utc_timestamp as _ts
 from features import load_bars
+from marketbrief.constants.messages import MSG_MARKET_REQUIRED
+from marketbrief.core.settings import load_settings
 from prediction_rules import HORIZONS, check_prediction
 
 FAIR, CONTAMINATED = "fair", "contaminated"   # ForecastBench leakage rule (see the docstring)
@@ -137,7 +140,7 @@ DROPPED = {"news": "stored news only starts when live collection began ({first})
 
 def training_cutoff() -> date:
     """`model_training_cutoff` from config/settings.yaml: the model may have seen data up to this date."""
-    v = (yaml.safe_load((common.CONFIG / "settings.yaml").read_text()) or {}).get("model_training_cutoff")
+    v = (load_settings() or {}).get("model_training_cutoff")
     if v is None:
         raise SystemExit(f"{common.CONFIG / 'settings.yaml'} has no model_training_cutoff (YYYY-MM-DD)")
     return v if isinstance(v, date) else date.fromisoformat(str(v))
@@ -174,17 +177,6 @@ def sample_dates(cfg: dict, start: date = SAMPLE_START, end: date = SAMPLE_END, 
 
 
 # ---------- prepare: the as-of copy ----------
-
-def _ts(v) -> pd.Timestamp | None:
-    if v is None or v == "":
-        return None
-    try:
-        t = pd.Timestamp(v)
-    except (ValueError, TypeError):
-        return None
-    if pd.isna(t):
-        return None
-    return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
 
 
 def public_at(kind: str, row: dict) -> pd.Timestamp | None:
@@ -884,7 +876,11 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
 
 
 def pct(x, k: int = 1) -> str:
-    return "n/a" if x is None else f"{100 * x:.{k}f}%"
+    """A share as a percent with one decimal by default (`k` decimals when given); 'n/a' when missing."""
+    return share_percent_text(x, k)
+
+
+_f = pct   # the HTML tooltips' name for the same one-decimal percent
 
 
 def top_sentences(s: dict) -> list[str]:
@@ -916,9 +912,6 @@ def top_sentences(s: dict) -> list[str]:
 
 
 # ---------- HTML ----------
-
-def _f(x, k=1) -> str:
-    return "n/a" if x is None else f"{100 * x:.{k}f}%"
 
 
 def svg_hit_bars(s: dict) -> str:
@@ -1187,7 +1180,7 @@ def main() -> int:
     p.add_argument("--out", required=True, type=Path, help="HTML path; the JSON goes next to it")
     args = ap.parse_args()
     if not args.market:
-        raise SystemExit(f"--market is required; available: {market_names()}")
+        raise SystemExit(MSG_MARKET_REQUIRED.format(available=market_names()))
     cfg = load_market(args.market)
     if args.cmd == "dates":
         ds = sample_dates(cfg)

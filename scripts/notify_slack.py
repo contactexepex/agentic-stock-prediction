@@ -21,14 +21,12 @@ import os
 import re
 import shutil
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from pathlib import Path
 
-import yaml
-
-from common import CONFIG, ROOT, market_arg, require_market
+from common import ROOT, market_arg, require_market
+from marketbrief.core.settings import load_settings
+from marketbrief.sources.slack_client import SlackHttp
 
 API = "https://slack.com/api/"
 MIME = {".png": "image/png", ".html": "text/html"}
@@ -42,12 +40,7 @@ def clean(text: str) -> str:
 
 def urllib_http(url: str, data: bytes, headers: dict) -> tuple[int, bytes]:
     """POST data to url; returns (status, body). Replaced by a fake in tests."""
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.status, resp.read()
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read()
+    return SlackHttp().post(url, data, headers)
 
 
 class SlackError(RuntimeError):
@@ -169,7 +162,7 @@ def main(argv: list[str] | None = None, http=urllib_http) -> int:
     out: dict = {"step": "notify"}
     if len(text.splitlines()) > 12:
         out["warning"] = "draft longer than 12 lines"
-    settings = yaml.safe_load((CONFIG / "settings.yaml").read_text())
+    settings = load_settings()
     channel = settings.get("slack_channel_id")
     files = None
     mpath = ROOT / "work" / f"slack_{market}_files.json"

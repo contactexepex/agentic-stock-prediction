@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 import rangelib as rl
+from marketbrief.utils.numbers import round_finite_or_none as _r
 
 EPS = 1e-6
 CALL_BINS = (0.5, 0.6, 0.7, 0.8, 0.9)   # bins [0.5, 0.6), [0.6, 0.7), [0.7, 0.8), [0.8, 0.9]
@@ -133,10 +134,6 @@ def range_scores(df: pd.DataFrame) -> dict:
             "width80_pct": _r(_mean(100 * (df["hi80"] - df["lo80"]) / base))}
 
 
-def _r(x, k: int = 4):
-    return None if x is None or (isinstance(x, float) and not math.isfinite(x)) else round(float(x), k)
-
-
 # ---------- track-record summary (score_predictions, context pack, review, HTML) ----------
 
 def summary(con) -> dict:
@@ -162,7 +159,8 @@ def _f(v, k: int = 3) -> str:
 def percent(v, digits: int = 0, sign: bool = False) -> str:
     """A share (0.625) as a percent rounded half up on its decimal value ('63%', digits=1 '62.5%',
     sign=True '+63%'); '–' for a missing or non-finite value. The one convention for printed whole
-    percents, also in the HTML report's JavaScript (pct0)."""
+    percents, also in the HTML report's JavaScript (pct0). Domain: finite values below about 1e26 in
+    magnitude (shares are 0 to 1); larger ones raise decimal.InvalidOperation."""
     if v is None or not math.isfinite(float(v)):
         return "–"
     value = Decimal(repr(float(v))).scaleb(2).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)

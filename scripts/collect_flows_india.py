@@ -30,15 +30,12 @@ import sys
 from datetime import date, datetime
 
 from common import market_arg, require_market, utc_now, utc_today
+from marketbrief.utils.text import slugify as slug
 from sources import (Client, FetchError, complete_days, not_published, num, recent_sessions, stale_cutoff,
                      store_changed, summary)
 
 FPI_URL = "https://fpi.nsdl.co.in/web/Reports/Latest.aspx"
 INDEX_URL = "https://nsearchives.nseindia.com/content/indices/ind_close_all_{day:%d%m%Y}.csv"
-
-
-def slug(s: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
 # ---------- NSDL FPI ----------

@@ -26,12 +26,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
-import feedparser
-
 from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
+from marketbrief.sources.rss import fetch_feed
 from news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
 
-USER_AGENT = "market-brief/1.0 (personal research; RSS reader)"
 MAX_AGE = timedelta(days=3)
 socket.setdefaulttimeout(20)
 
@@ -107,7 +105,7 @@ def main() -> int:
     jobs = build_jobs(feeds, watchlist)
     for job in jobs:
         for attempt in range(2):  # one retry: Google News occasionally fails a single query
-            parsed = feedparser.parse(job["url"], agent=USER_AGENT)
+            parsed = fetch_feed(job["url"])
             status = parsed.get("status", 200)
             if not (status >= 400 or (parsed.bozo and not parsed.entries)) or status in (401, 403, 404):
                 break

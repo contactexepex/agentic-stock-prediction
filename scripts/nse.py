@@ -13,136 +13,23 @@ can be synthetic, so replay only writes to an explicit scratch root (see replay_
 from __future__ import annotations
 
 import hashlib
-import http.cookiejar
 import json
 import re
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from common import (CODE, ROOT, SCHEMAS, append_jsonl, data_dir, day_file, market_arg, recent_ids,
                     require_market, utc_today)
+from marketbrief.sources.errors import FetchError  # noqa: F401  (re-export: nse.FetchError)
+from marketbrief.sources.nse_client import Nse  # noqa: F401  (re-export: nse.Nse)
+from marketbrief.utils.numbers import parse_nse_number as num  # noqa: F401  (re-export: nse.num)
 
 IST = ZoneInfo("Asia/Kolkata")
-UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-      "Chrome/126.0 Safari/537.36")
-PAGES = {  # Referer per API: NSE checks that the call comes from its own page
-    "corporates-pit-gg": "/companies-listing/corporate-filings-insider-trading",
-    "bulk-block-short-deals": "/report-detail/display-bulk-and-block-deals",
-    "snapshot-capital-market-largedeal": "/market-data/large-deals",
-    "corporate-share-holdings-master": "/companies-listing/corporate-filings-shareholding-pattern",
-    "corporate-pledgedata": "/companies-listing/corporate-filings-pledged-data",
-    "corporate-announcements": "/companies-listing/corporate-filings-announcements",
-    "integrated-filing-results": "/companies-listing/corporate-integrated-filing",
-    "corporates-financial-results": "/companies-listing/corporate-filings-financial-results",
-    "fiidiiTradeReact": "/reports/fii-dii",
-}
-ARCHIVES_HOST = "nsearchives.nseindia.com"
-
-
-class FetchError(Exception):
-    def __init__(self, url: str, error: str, host: str | None = None):
-        super().__init__(error)
-        self.url, self.error, self.host = url, error, host
-
-    def entry(self, source: str) -> dict:
-        e = {"source": source, "url": self.url, "error": self.error[:200]}
-        if self.host:
-            e["allowlist"] = self.host
-        return e
-
-
-class Nse:
-    """Minimal NSE client: one cookie session, browser headers, polite pacing."""
-
-    def __init__(self, base: str = "https://www.nseindia.com", archives: str = "https://nsearchives.nseindia.com",
-                 replay: Path | None = None, pause: float = 0.7):
-        self.base, self.archives, self.replay, self.pause = base.rstrip("/"), archives.rstrip("/"), replay, pause
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-        self.warm_error: FetchError | None = None
-        self.warmed = False
-        self.requests = 0
-
-    def _open(self, url: str, accept: str, referer: str | None = None) -> bytes:
-        headers = {"User-Agent": UA, "Accept": accept, "Accept-Language": "en-US,en;q=0.9,en-IN;q=0.8"}
-        if referer:
-            headers["Referer"] = referer
-        host = urllib.parse.urlsplit(url).hostname
-        for attempt in (1, 2):   # one retry for transient network errors (TLS EOF, reset, timeout)
-            self.requests += 1
-            try:
-                with self.opener.open(urllib.request.Request(url, headers=headers), timeout=30) as resp:
-                    return resp.read()
-            except urllib.error.HTTPError as exc:
-                raise FetchError(url, f"HTTP {exc.code} from {host} (NSE refused or no such file)") from exc
-            except (urllib.error.URLError, OSError) as exc:
-                reason = str(getattr(exc, "reason", exc))
-                if "Tunnel connection failed" in reason or "403" in reason:
-                    # the egress proxy refuses this host: every later call fails the same way
-                    raise FetchError(url, f"egress proxy denied {host}: {reason}", host) from exc
-                if attempt == 2:
-                    raise FetchError(url, f"{host} unreachable after a retry: {reason}") from exc
-                time.sleep(2)
-            finally:
-                time.sleep(self.pause)
-        raise AssertionError("unreachable")
-
-    def _warm(self) -> None:
-        if not self.warmed:
-            self.warmed = True
-            try:
-                self._open(self.base + "/", "text/html,application/xhtml+xml")
-            except FetchError as exc:
-                self.warm_error = exc
-        if self.warm_error and self.warm_error.host:   # host not reachable at all: fail fast
-            raise self.warm_error
-
-    def json(self, endpoint: str, params: dict | None = None):
-        params = params or {}
-        if self.replay:
-            keys = [params[k] for k in ("symbol", "optionType") if params.get(k)]
-            return self._replay("_".join([endpoint.rsplit("/", 1)[-1], *keys]) + ".json", json.loads)
-        url = f"{self.base}/api/{endpoint}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
-        self._warm()
-        referer = self.base + PAGES.get(endpoint.rsplit("/", 1)[-1], "/")
-        try:
-            return json.loads(self._open(url, "application/json, text/plain, */*", referer))
-        except json.JSONDecodeError as exc:
-            raise FetchError(url, f"not JSON (likely an NSE block page): {exc}") from exc
-
-    def text(self, path_or_url: str) -> str:
-        """An archive file by path (/content/...) or by its full nsearchives URL."""
-        path = path_or_url.split(ARCHIVES_HOST, 1)[-1] if ARCHIVES_HOST in path_or_url else path_or_url
-        if self.replay:
-            return self._replay(path.rsplit("/", 1)[-1], lambda s: s)
-        return self._open(self.archives + path, "text/csv,application/xml,*/*", self.base + "/").decode("utf-8", "replace")
-
-    def _replay(self, name: str, parse):
-        f = self.replay / name
-        if not f.exists():
-            raise FetchError(f"replay:{name}", "no replay file")
-        return parse(f.read_text(encoding="utf-8"))
 
 
 # ---------- parsing helpers (NSE fields are strings; "-", "" and "Nil" mean missing) ----------
-
-def num(x) -> float | None:
-    """'1,234.5' -> 1234.5. A literal '0' is a real zero; missing markers give None."""
-    if x is None or isinstance(x, bool):
-        return None
-    if isinstance(x, (int, float)):
-        return float(x)
-    s = str(x).replace(",", "").replace("%", "").strip()
-    try:
-        return float(s)
-    except ValueError:
-        return None
-
 
 def pick(row: dict, *keys):
     for k in keys:

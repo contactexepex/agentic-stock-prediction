@@ -548,13 +548,13 @@ def run_events_main(monkeypatch, capsys, tmp_path, cfg: dict, yf_data: dict, tod
     """collect_events.main() in-process: fake yfinance, NSE replayed from NSE_FIX, data under tmp_path."""
     import types
 
-    import common
+    from marketbrief.core import paths
     fake = types.ModuleType("yfinance")
     fake.Ticker = lambda sym: FakeTicker(yf_data.get(sym, {}))
     monkeypatch.setitem(sys.modules, "yfinance", fake)
     monkeypatch.setattr(ce, "require_market", lambda args: cfg)
     monkeypatch.setattr(ce, "data_dir", lambda m: tmp_path / "data" / m)
-    monkeypatch.setattr(common, "data_dir", lambda m: tmp_path / "data" / m)
+    monkeypatch.setattr(paths, "data_dir", lambda m: tmp_path / "data" / m)
     monkeypatch.setattr(ce, "utc_today", lambda: today)
     monkeypatch.setattr(ce, "nse_client", lambda c: replay_nse())
     monkeypatch.setattr(sys, "argv", ["collect_events.py"])

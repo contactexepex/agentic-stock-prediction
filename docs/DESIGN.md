@@ -798,7 +798,7 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     seven of ten; only Nifty Bank, IT and Pharma are configured, see `config/markets/india.yaml`).
     JETS and IAK returned two years of daily bars through yfinance on 2026-10-05.
 - Issue #9, remaining free sources: **built 2026-10-05** after the hosts were allowlisted (checked
-  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in `sources.py`:
+  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in `marketbrief/sources/free_source_client.py`, re-exported by `sources.py`:
   identifying User-Agent, 0.5-1 s between requests, up to 3 attempts on a dropped connection, none
   on an HTTP error; every unread source or session file is listed in `failed`):
   - `collect_macro.py` (US): Treasury par yield curve CSV (`home.treasury.gov`, HTTP 200);

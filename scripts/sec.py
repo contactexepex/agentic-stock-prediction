@@ -1,7 +1,8 @@
 """SEC EDGAR helpers for the SEC collectors (collect_filings, collect_events, collect_insiders,
-collect_stakes, collect_holdings, collect_fundamentals). Free endpoints only. SEC requires a descriptive User-Agent with contact
-info (SEC_USER_AGENT="your-name your@email.com") and at most 10 requests/second; every request
-here goes through one throttle (MIN_INTERVAL) and backs off on 429/503. The throttle is per
+collect_stakes, collect_holdings, collect_fundamentals). Free endpoints only. SEC requires a descriptive
+User-Agent with contact info (SEC_USER_AGENT="your-name your@email.com") and at most 10 requests/second;
+every request goes through one throttle (the Edgar client in marketbrief/sources/sec_client.py, interval
+SEC_MIN_INTERVAL_SECONDS) and backs off on 429/5xx. The throttle is per
 process, so the SEC collectors must run one after another, never in parallel.
 
 A ticker's filings can sit under more than one CIK: SEC's ticker map names the current
@@ -40,217 +41,27 @@ from __future__ import annotations
 
 import json
 import os
-import time
-import urllib.error
-import urllib.request
 import xml.etree.ElementTree as ET
-import re
-from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
-from zoneinfo import ZoneInfo
+from datetime import date, datetime
 
-MIN_INTERVAL = 0.15  # seconds between requests (<= ~7 req/s, under SEC's 10/s limit)
-ARCHIVE = "https://www.sec.gov/Archives/edgar/data"
-EASTERN = ZoneInfo("America/New_York")   # EDGAR's clock (SGML header and index page times)
-ROOT = Path(os.environ.get("MB_ROOT", Path(__file__).resolve().parents[1]))
-ACCEPT_CACHE = "work/sec_acceptance.json"
-
-
-def iso_z(ts: datetime) -> str:
-    """UTC instant in the submissions JSON's format (2026-07-14T10:30:38.000Z)."""
-    return ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-
-def parse_z(v: str) -> datetime:
-    return datetime.fromisoformat(v.replace("Z", "+00:00")).astimezone(timezone.utc)
-
-
-def et_offset_hours(ts: datetime) -> int:
-    """Hours New York is behind UTC at that instant (4 in EDT, 5 in EST)."""
-    return int(-ts.astimezone(EASTERN).utcoffset().total_seconds() // 3600)
-
-
-def sgml_acceptance(data: bytes) -> str | None:
-    """<ACCEPTANCE-DATETIME>YYYYMMDDHHMMSS (US Eastern) of a filing's SGML header -> UTC (iso_z)."""
-    m = re.search(rb"<ACCEPTANCE-DATETIME>\s*(\d{14})", data)
-    if not m:
-        return None
-    return iso_z(datetime.strptime(m.group(1).decode(), "%Y%m%d%H%M%S").replace(tzinfo=EASTERN))
-
-
-def is_shifted(json_value: str, true_value: str) -> bool:
-    """The submissions-JSON error: the JSON time is later than the true one by exactly the ET
-    UTC offset at the true instant."""
-    t = parse_z(true_value)
-    return parse_z(json_value) - t == timedelta(hours=et_offset_hours(t))
-
-
-def unshift(json_value: str) -> str:
-    """Invert the shift: true = JSON - h with h the ET offset at the true instant (h = 4 or 5,
-    the one consistent with itself; around a DST change, where both could be, EST's 5 is tried
-    first; filings are not accepted at 1-3am on a Sunday, so this never matters in practice)."""
-    j = parse_z(json_value)
-    for h in (5, 4):
-        if et_offset_hours(j - timedelta(hours=h)) == h:
-            return iso_z(j - timedelta(hours=h))
-    return iso_z(j - timedelta(hours=et_offset_hours(j)))
-
-
-class Edgar:
-    def __init__(self, ua: str):
-        self.ua = ua
-        self.last = 0.0
-        self.requests = 0
-        fx = os.environ.get("MB_SEC_FIXTURES")
-        self.fixtures = Path(fx) if fx else None
-        self.urls = json.loads((self.fixtures / "urls.json").read_text()) if fx else {}
-        self.time_checks: dict[str, str] = {}   # CIK -> ok | shifted | unverified: <why>
-        self._accepted: dict[str, str] | None = None   # accession -> true acceptance (iso_z)
-
-    def _fixture(self, url: str) -> Path:
-        if url not in self.urls:
-            raise FileNotFoundError(f"no fixture for {url}")
-        return self.fixtures / self.urls[url]
-
-    def open(self, url: str):
-        """Streaming response (file-like). Throttled; retries twice on 429/5xx."""
-        self.requests += 1
-        if self.fixtures:
-            return self._fixture(url).open("rb")
-        for attempt in range(3):
-            wait = self.last + MIN_INTERVAL - time.monotonic()
-            if wait > 0:
-                time.sleep(wait)
-            self.last = time.monotonic()
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": self.ua, "Accept-Encoding": "identity"})
-                return urllib.request.urlopen(req, timeout=60)
-            except urllib.error.HTTPError as exc:
-                if exc.code in (429, 500, 502, 503) and attempt < 2:
-                    time.sleep(2 + 3 * attempt)
-                    continue
-                raise
-        raise RuntimeError("unreachable")
-
-    def get(self, url: str) -> bytes:
-        with self.open(url) as resp:
-            return resp.read()
-
-    def json(self, url: str):
-        return json.loads(self.get(url))
-
-    def cik_map(self) -> dict[str, int]:
-        data = self.json("https://www.sec.gov/files/company_tickers.json")
-        return {v["ticker"].upper(): int(v["cik_str"]) for v in data.values()}
-
-    def _cache(self) -> dict[str, str]:
-        if self._accepted is None:
-            self._accepted = {}
-            if not self.fixtures:
-                try:
-                    self._accepted = json.loads((ROOT / ACCEPT_CACHE).read_text())
-                except (OSError, ValueError):
-                    pass
-        return self._accepted
-
-    def acceptance(self, cik: int | str, accession: str) -> str | None:
-        """True acceptance time (UTC, iso_z) of a filing from its SGML header (cached)."""
-        cache = self._cache()
-        if accession not in cache:
-            v = sgml_acceptance(self.get(archive_url(cik, accession, f"{accession}.hdr.sgml")))
-            if v is None:
-                return None
-            cache[accession] = v
-            if not self.fixtures:
-                try:
-                    path = ROOT / ACCEPT_CACHE
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    tmp = path.with_suffix(".tmp")
-                    tmp.write_text(json.dumps(cache))
-                    tmp.replace(path)
-                except OSError:
-                    pass
-        return cache[accession]
-
-    def _verdict(self, cik: int | str, accession: str, json_value: str) -> str:
-        """One filing: "ok" (JSON = header), "shifted" (JSON = header + ET offset) or
-        "unverified: <why>"."""
-        if (self.fixtures and accession not in self._cache()
-                and archive_url(cik, accession, f"{accession}.hdr.sgml") not in self.urls):
-            return "unverified: no header fixture"      # tests without header fixtures: no request
-        try:
-            true = self.acceptance(cik, accession)
-        except Exception as exc:
-            return f"unverified: header {accession}: {str(exc)[:100]}"
-        if true is None:
-            return f"unverified: no ACCEPTANCE-DATETIME in {accession}"
-        if parse_z(json_value) == parse_z(true):
-            return "ok"
-        if is_shifted(json_value, true):
-            return "shifted"
-        return f"unverified: {accession} JSON {json_value} vs header {true}"
-
-    def check_times(self, cik: int | str, rec: dict) -> str:
-        """Check a submissions block's acceptanceDateTime against the SGML headers of its newest
-        and its oldest listed filing (one cached request each; one when they are the same filing)
-        and correct the whole column in place only when both are shifted. Both right: "ok".
-        Anything else, including a mixed file (one right, one shifted), is "unverified: ..." and
-        the column is kept as served: correcting a right value would make it 4-5h too early
-        (look-ahead), keeping a shifted one only makes it late."""
-        acc = rec.get("accessionNumber") or []
-        col = rec.get("acceptanceDateTime") or []
-        idx = [k for k, v in enumerate(col) if v and k < len(acc) and acc[k]]
-        if not idx:
-            status = "unverified: no acceptance time with an accession number"
-        else:
-            probes = list(dict.fromkeys([idx[0], idx[-1]]))         # newest, oldest
-            verdicts = [self._verdict(cik, acc[k], col[k]) for k in probes]
-            bad = [v for v in verdicts if v.startswith("unverified")]
-            if bad:
-                status = bad[0]
-            elif len(set(verdicts)) > 1:
-                status = (f"unverified: mixed file (newest {acc[probes[0]]} {verdicts[0]}, "
-                          f"oldest {acc[probes[1]]} {verdicts[1]})")
-            elif verdicts[0] == "shifted":
-                rec["acceptanceDateTimeJson"] = list(col)
-                rec["acceptanceDateTime"] = [unshift(v) if v else v for v in col]
-                status = "shifted"
-            else:
-                status = "ok"
-        self.time_checks[str(int(cik))] = status
-        return status
-
-    def recent(self, cik: int) -> dict:
-        """The `filings.recent` block of a company's submissions (latest ~1000 filings), with
-        `acceptanceDateTime` checked and, if shifted, corrected (check_times)."""
-        d = self.json(f"https://data.sec.gov/submissions/CIK{int(cik):010d}.json")
-        rec = {"name": d.get("name"), **d["filings"]["recent"]}
-        self.check_times(cik, rec)
-        return rec
-
-
-def time_summary(edgar: Edgar) -> dict:
-    """Collector summary of the acceptance-time checks: {"ok": n, "shifted": [CIK], "unverified": {CIK: why}}."""
-    checks = getattr(edgar, "time_checks", {})
-    return {"ok": sum(v == "ok" for v in checks.values()),
-            "shifted": sorted(c for c, v in checks.items() if v == "shifted"),
-            "unverified": {c: v.split(": ", 1)[-1] for c, v in checks.items() if v.startswith("unverified")}}
-
-
-def time_warnings(checked: Edgar | dict) -> list[str]:
-    """One warning per CIK whose acceptance times could not be verified (stored as served, maybe
-    4-5h late): for the collectors' `warnings` (the routine lists them in data_quality). Takes the
-    Edgar client or a time_summary dict."""
-    summary = checked if isinstance(checked, dict) else time_summary(checked)
-    return [f"SEC acceptance times of CIK {c} unverified, stored as served (maybe 4-5h late): {why}"
-            for c, why in (summary.get("unverified") or {}).items()]
+from marketbrief.constants.config_keys import (CFG_FILINGS, CFG_FUNDAMENTALS, CFG_MARKET, CFG_PREDECESSOR_CIKS,
+                                               CFG_TICKERS, FILINGS_SOURCE_SEC)
+from marketbrief.constants.environment import ENV_SEC_USER_AGENT
+from marketbrief.constants.messages import MSG_SEC_NOT_APPLICABLE, MSG_SEC_USER_AGENT_MISSING
+from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_ERROR, SUMMARY_MARKET, SUMMARY_SKIPPED
+from marketbrief.sources.sec_acceptance import (EASTERN, et_offset_hours, is_shifted, sgml_acceptance,  # noqa: F401
+                                                time_summary, time_warnings, unshift)
+from marketbrief.sources.sec_client import Edgar, archive_url  # noqa: F401  (re-exports: sec.Edgar, sec.archive_url)
+from marketbrief.utils.numbers import parse_sec_number as num  # noqa: F401  (re-export: sec.num)
+from marketbrief.utils.timefmt import format_utc_z as iso_z  # noqa: F401  (re-export: sec.iso_z)
+from marketbrief.utils.timefmt import parse_utc_z as parse_z  # noqa: F401  (re-export: sec.parse_z)
 
 
 def related_ciks(cfg: dict) -> dict[str, list[int]]:
     """Ticker -> CIKs of earlier or related registrants whose filings also belong to the ticker
     (`fundamentals.predecessor_ciks` in config/markets/<market>.yaml: the one list every SEC
     collector reads)."""
-    found = (cfg.get("fundamentals") or {}).get("predecessor_ciks") or {}
+    found = (cfg.get(CFG_FUNDAMENTALS) or {}).get(CFG_PREDECESSOR_CIKS) or {}
     return {str(t).upper(): [int(c) for c in (cs if isinstance(cs, list) else [cs])] for t, cs in found.items()}
 
 
@@ -323,10 +134,6 @@ def raw_doc(primary_doc: str) -> str:
     return primary_doc.split("/", 1)[1] if primary_doc.startswith("xsl") and "/" in primary_doc else primary_doc
 
 
-def archive_url(cik: int | str, accession: str, doc: str = "") -> str:
-    return f"{ARCHIVE}/{int(cik)}/{accession.replace('-', '')}/{doc}"
-
-
 def xml_root(data: bytes) -> ET.Element:
     """Parse XML and drop namespaces so paths read like the plain tag names."""
     root = ET.fromstring(data)
@@ -342,13 +149,6 @@ def text(el: ET.Element | None, path: str) -> str | None:
     v = el.findtext(path)
     v = v.strip() if v else None
     return v or None
-
-
-def num(v: str | None) -> float | None:
-    try:
-        return float(v.replace(",", "")) if v not in (None, "") else None
-    except ValueError:
-        return None
 
 
 def flag(v: str | None) -> bool | None:
@@ -371,22 +171,23 @@ def us_date(v: str | None) -> str | None:
 
 def require_sec(cfg: dict, collector: str) -> str | None:
     """User-Agent for SEC markets; prints a JSON summary and returns None when not applicable."""
-    if cfg.get("filings") != "sec":
-        print(json.dumps({"collector": collector, "market": cfg["market"],
-                          "skipped": "no SEC filings for this market (the market's own collector covers it)"}))
+    if cfg.get(CFG_FILINGS) != FILINGS_SOURCE_SEC:
+        print(json.dumps({SUMMARY_COLLECTOR: collector, SUMMARY_MARKET: cfg[CFG_MARKET],
+                          SUMMARY_SKIPPED: MSG_SEC_NOT_APPLICABLE}))
         return None
-    ua = os.environ.get("SEC_USER_AGENT")
-    if not ua:
-        print(json.dumps({"collector": collector, "market": cfg["market"], "error": "SEC_USER_AGENT not set"}))
+    user_agent = os.environ.get(ENV_SEC_USER_AGENT)
+    if not user_agent:
+        print(json.dumps({SUMMARY_COLLECTOR: collector, SUMMARY_MARKET: cfg[CFG_MARKET],
+                          SUMMARY_ERROR: MSG_SEC_USER_AGENT_MISSING}))
         raise SystemExit(1)
-    return ua
+    return user_agent
 
 
 def watch_ciks(cfg: dict, edgar: Edgar) -> tuple[dict[str, int], list[str]]:
     """Watchlist ticker -> CIK (via SEC's ticker map); tickers not registered with the SEC are skipped."""
     cmap = edgar.cik_map()
     found, skipped = {}, []
-    for ticker, meta in cfg["tickers"].items():
+    for ticker, meta in cfg[CFG_TICKERS].items():
         cik = cmap.get(str(meta.get("sec_ticker", ticker)).upper())
         if cik is None:
             skipped.append(ticker)

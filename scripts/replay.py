@@ -54,6 +54,9 @@ import regime as rg
 import scoring as sc
 from common import (ROOT, append_jsonl, benchmark_key, connect, day_file, load_ranges_config, market_arg,
                     require_market, utc_now, vol_index_key)
+from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
+from marketbrief.utils.event_dates import major_event_between as major_between
+from marketbrief.utils.numbers import round_finite_or_none as _r, share_percent_text
 from features import load_bars
 
 LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)   # calibration curve (stated coverage)
@@ -116,12 +119,6 @@ def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
 
 def major_dates(cfg: dict, start: date, end: date) -> list[date]:
     return sorted({e["date"] for e in ev.market_events(cfg, start, end) if e["major"]})
-
-
-def major_between(majors: list[date], start: date, end: date) -> bool:
-    """A major market event after the as-of date and on or before the target (as ranges.py)."""
-    k = bisect.bisect_right(majors, start)
-    return k < len(majors) and majors[k] <= end
 
 
 def rsi_series(close: pd.Series, n: int = 14) -> pd.Series:
@@ -273,7 +270,7 @@ def load_inputs(cfg: dict, rc: dict, con) -> tuple[dict, dict]:
     bars = load_bars(con)
     bench = bars.get(benchmark_key(cfg))
     if bench is None or bench.empty:
-        raise SystemExit("no benchmark bars; run collect_prices.py --period 2y first")
+        raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
     evdf = ri.load_events(con)
     extra = {"earnings": known_versions(cfg, ri.earnings_versions(evdf)) if not evdf.empty else {},
              "dividends": ri.dividend_events(evdf) if not evdf.empty else {}, "bench": bench,
@@ -324,10 +321,6 @@ def clustered_ci(values: np.ndarray, blocks: np.ndarray, zc: float = 1.96) -> tu
         return None, None
     se = math.sqrt((s ** 2).sum() * nb / (nb - 1)) / n
     return m - zc * se, m + zc * se
-
-
-def _r(x, k: int = 4):
-    return None if x is None or (isinstance(x, float) and not math.isfinite(x)) else round(float(x), k)
 
 
 def range_summary(g: pd.DataFrame, h: int) -> dict:
@@ -443,7 +436,8 @@ def summarize(cfg: dict, rc: dict, res: dict[int, pd.DataFrame], reg: pd.DataFra
 # ---------- plain-language summary ----------
 
 def pct(x, k: int = 0) -> str:
-    return "n/a" if x is None else f"{100 * x:.{k}f}%"
+    """A share as a whole percent by default (`k` decimals when given); 'n/a' when missing."""
+    return share_percent_text(x, k)
 
 
 def headline(cfg: dict, s: dict) -> list[str]:

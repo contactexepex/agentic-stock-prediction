@@ -55,6 +55,7 @@ from pathlib import Path
 import adjust as adj
 import events as ev
 from common import STALE_DAYS, append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
+from marketbrief.utils.sessions import last_completed_sessions as recent_sessions
 
 FIELDS = ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume", "collected_at"]
 OWN_EXCHANGE = ("benchmark", "vol_index", "sector_etf")   # roles that follow the market's calendar
@@ -99,15 +100,6 @@ def write_bar(path: Path, row: list) -> None:
 
 PREV_CLOSE_TOLERANCE = 0.005   # bhavcopy PREV_CLOSE vs our stored close of the previous session
 NEWEST_LOOKBACK = 40           # sessions searched back for a stock's newest stored bar
-
-
-def recent_sessions(cfg: dict, today: date, n: int) -> list[date]:
-    """The last `n` completed sessions before UTC `today`, oldest first."""
-    out, d = [], today
-    for _ in range(n):
-        d = ev.prev_session(cfg, d, include=False)
-        out.append(d)
-    return out[::-1]
 
 
 def newest_stored(cfg: dict, ticker: str, today: date) -> tuple[date | None, int]:

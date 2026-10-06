@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Build the self-contained HTML report for one market's day, and the report index.
 
-Run after the filled report (reports/<market>/<session_date>.md, no AGENT markers left) has
-passed the report gate (validate.py --stage report). Numbers, charts and labels come from the stored data (view_data.py); the
-narrative (headline, top 3, sector notes, outlook, data quality) is copied from the filled
-report, with every cited news/filing id turned into a link to its source. Writes
-reports/<market>/<session_date>.html (inline CSS/JS, data embedded as JSON, no network needed),
-reports/<market>/index.html (every report day, newest first) and work/slack_<market>_files.json
+Run after the filled report (reports/<market>/<session_date>.md, no AGENT markers left) has passed the report gate
+(validate.py --stage report). Numbers, charts and labels come from the stored data (view_data.py); the narrative
+(headline, top 3, sector notes, outlook, data quality) is copied from the filled report, with every cited news/filing
+id turned into a link to its source. Writes reports/<market>/<session_date>.html (inline CSS/JS, data embedded as JSON,
+no network needed), reports/<market>/index.html (every report day, newest first) and work/slack_<market>_files.json
 (the files notify_slack.py attaches). Refuses a report that still has AGENT markers."""
 from __future__ import annotations
 
@@ -359,6 +358,7 @@ INDEX = """<!doctype html>
 </div></body></html>
 """
 
+# pct0 (in the JS below) is scoring.percent for shares from 0 to 1; a negative half differs (JS -12, Python -13).
 JS = r"""
 (function(){
 'use strict';

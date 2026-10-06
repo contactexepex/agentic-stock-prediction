@@ -480,7 +480,9 @@ def test_collect_filings_reports_sec_refusal_as_json(tmp_path):
 
 def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
     import io
+    import time
     import urllib.error
+    import urllib.request
     import sec
     calls = []
 
@@ -490,8 +492,8 @@ def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
             raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
         return io.BytesIO(b'{"ok": 1}')
     monkeypatch.delenv("MB_SEC_FIXTURES", raising=False)
-    monkeypatch.setattr(sec.urllib.request, "urlopen", fake)
-    monkeypatch.setattr(sec.time, "sleep", lambda s: None)
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    monkeypatch.setattr(time, "sleep", lambda s: None)
     assert sec.Edgar("test test@example.com").json("https://data.sec.gov/x.json") == {"ok": 1}
     assert len(calls) == 3
 

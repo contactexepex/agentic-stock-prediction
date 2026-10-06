@@ -10,16 +10,20 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
 import events as ev
 import scoring
 from common import benchmark_key, vol_index_key
+from marketbrief.constants.formatting import CURRENCY_SYMBOLS
+from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
+from marketbrief.utils.money import format_money as money
+from marketbrief.utils.numbers import json_safe_float as num
 from score_predictions import is_late
 
-CURRENCY = {"INR": "₹", "USD": "$"}
+CURRENCY = CURRENCY_SYMBOLS
 HISTORY_DAYS = 20        # trading days of closes shown before the forecast fan
 MIN_SAMPLE = 10          # fewer scored ranges/calls than this: "not enough history yet"
 NEWS_PER_COMPANY = 3
@@ -57,29 +61,10 @@ def fmt_call(direction, confidence) -> str:
     return f"{'▲ up' if direction == 'up' else '▼ down'} {scoring.percent(confidence)}"
 
 
-def money(cur: str, v) -> str:
-    if v is None or (isinstance(v, float) and math.isnan(v)):
-        return "–"
-    return f"{CURRENCY.get(cur, '')}{v:,.2f}"
-
-
 def day_label(d) -> str:
     """'Mon 12 Oct' for a calendar date."""
     d = pd.Timestamp(d).date()
     return f"{d:%a} {d.day} {d:%b}"
-
-
-def num(v, digits: int | None = None):
-    """JSON-safe float (NaN/NA -> None)."""
-    if v is None:
-        return None
-    try:
-        if pd.isna(v):
-            return None
-    except (TypeError, ValueError):
-        pass
-    v = float(v)
-    return round(v, digits) if digits is not None else v
 
 
 def iso(v) -> str | None:
@@ -129,7 +114,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     cur = cfg.get("currency", "")
     ranges = q("SELECT * FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)")
     if ranges.empty:
-        raise SystemExit("no published ranges; run ranges.py first")
+        raise SystemExit(MSG_NO_PUBLISHED_RANGES)
     as_of = pd.Timestamp(ranges["as_of_date"].iloc[0]).date()
     session = pd.Timestamp(ranges["session_date"].iloc[0]).date()
     made_at = pd.to_datetime(ranges["made_at"], utc=True).max()

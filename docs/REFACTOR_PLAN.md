@@ -202,7 +202,8 @@ made the result NaN or inf), while `count(*)` beside them still counts their row
 (`tests/test_determinism.py::test_exact_decimal_sum_limits`).
 
 Rounding convention for printed whole percents: half up on the value's decimal form, everywhere
-(1- and 2-decimal percents in backtest tables and range/validate notes keep Python formatting).
+(1- and 2-decimal percents keep Python formatting, e.g. in backtest tables, range/validate notes, review.py's
+`rel_score` and ablation `:+.1%` columns and collect_prices.py's split-gap message).
 `scoring.percent` (whole percent, `decimal` ROUND_HALF_UP) prints every share in the md report,
 the Slack text, the context pack's proper-score tables and view_data's call and record texts; the
 HTML report's JavaScript uses `pct0` (same rule). The weekly review, chart labels and range/regime
@@ -536,6 +537,11 @@ README, DESIGN.md, routine/PROMPT.md) keep naming the entry points, which do not
 | 6 | `replay/` (backtest, rule replay, ai_replay; shared HTML parts) | replay.py, ai_replay.py, backtest.py |
 | 7 | `presentation/` (report, html_report with CSS/JS as asset files, view_data, charts, Slack) | report.py, html_report.py |
 | 8 | `graph/` (connection map, Neo4j) | neo4j_sync.py |
+
+Status: steps 1 and 2 were built as one batch (build/refactor-batch2). Not in it: the calendar half of
+`events.py` (`core/calendar.py`), `utils/text.clean` and the other "same purpose" helpers, and the top-50 string
+literals and the other exception messages outside the code those steps moved (they move with their modules; the
+four messages raised in more than one module are already constants).
 
 Proof required for every step 1-8 (all four, given to the judge with the commands' output):
 1. golden: `record` on the step's base commit, `compare` on the step's commit -> `"identical": true`;

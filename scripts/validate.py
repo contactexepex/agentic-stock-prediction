@@ -38,13 +38,13 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
-import yaml
 
 import events as ev
 import market_status
-from common import (CONFIG, ROOT, SCHEMAS, clock, connect, data_dir, load_ranges_config, market_arg,
+from common import (ROOT, SCHEMAS, clock, connect, data_dir, load_ranges_config, market_arg,
                     require_market, symbols_by_role, utc_today)
 import narrative_numbers as nn
+from marketbrief.core.settings import load_settings, load_validate_config
 from prediction_rules import check_prediction, ts
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
@@ -58,7 +58,7 @@ FETCH_COL = {"quotes": "collected_at", "news": "first_seen_at", "filings": "firs
 
 
 def load_config() -> dict:
-    return yaml.safe_load((CONFIG / "validate.yaml").read_text())
+    return load_validate_config()
 
 
 class Result:
@@ -668,7 +668,7 @@ def skeletons(cfg: dict, session: str) -> tuple[str | None, str | None]:
     if rp.exists() and sp.exists():
         return rp.read_text(encoding="utf-8"), sp.read_text(encoding="utf-8")
     import report as rpt
-    settings = yaml.safe_load((CONFIG / "settings.yaml").read_text())
+    settings = load_settings()
     d = rpt.gather(cfg, connect(cfg["market"]))
     r, s, _ = rpt.build(cfg, d, settings)
     return r, s

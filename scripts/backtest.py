@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Walk-forward backtest of the range formula (no AI) on stored bars for one market.
 
-For each evaluation day d (the last --eval-sessions trading days) and horizon h, the range is
-built exactly as live (EWMA volatility at d, empirical quantiles from a recency-weighted pool of
-outcomes already known at d) and scored on the close h sessions later. The naive baseline is
-last close +/- 20-day realized volatility with normal quantiles. Regime and AI adjustments are
-not replayed, so the headline numbers test the core formula.
+For each evaluation day d (the last --eval-sessions trading days) and horizon h, the range is built exactly as live
+(EWMA volatility at d, empirical quantiles from a recency-weighted pool of outcomes already known at d) and scored on
+the close h sessions later. The naive baseline is last close +/- 20-day realized volatility with normal quantiles.
+Regime and AI adjustments are not replayed, so the headline numbers test the core formula.
 
 Range inputs (config/ranges.yaml, docs/DESIGN.md section 11) are then switched off and on, each
 scored where it applies (docs/DESIGN.md section 7: keep an input only if it improves accuracy):
@@ -34,6 +33,7 @@ import events as ev
 import range_inputs as ri
 import rangelib as rl
 from common import ROOT, benchmark_key, connect, load_ranges_config, market_arg, require_market
+from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from features import load_bars
 
 # input -> (arm when off, arm when on, column marking the rows where it applies)
@@ -277,7 +277,7 @@ def run(cfg: dict, rc: dict, eval_sessions: int) -> dict:
     bars = load_bars(con)
     bench = bars.get(benchmark_key(cfg))
     if bench is None:
-        raise SystemExit("no benchmark bars; run collect_prices.py --period 2y first")
+        raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
     rank = {d: i for i, d in enumerate(bench.index)}
     evdf = ri.load_events(con)
     extra = {"earnings": ri.earnings_versions(evdf), "dividends": ri.dividend_events(evdf), "bench": bench,

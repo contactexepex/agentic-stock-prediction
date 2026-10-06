@@ -24,6 +24,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from common import append_jsonl, connect, day_file, market_arg, md_table, require_market, utc_now, utc_today
+from marketbrief.utils.text import slugify as slug
 
 RELATIONS = ("board", "group", "subsidiary", "supplier", "customer", "competitor", "promoter", "major_holder")
 TARGET_KINDS = ("person", "company")
@@ -31,10 +32,6 @@ STATUSES = ("active", "removed")
 COMPARE = ("ticker", "relation", "target", "target_kind", "target_ticker", "aliases", "detail",
            "weight", "status", "as_of", "source_url")
 MIN_NAME = 3          # shorter names/aliases are never matched against headlines
-
-
-def slug(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
 def edge_id(ticker: str, relation: str, target: str) -> str:
