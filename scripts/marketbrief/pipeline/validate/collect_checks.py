@@ -10,6 +10,23 @@ from marketbrief.core import market_config, paths, schemas
 from marketbrief.constants.validation import FETCH_COL, TRADING_DATE_KINDS
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, tickers_in, todays_files
+from marketbrief.constants.validation import (
+    MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION,
+    MSG_BENCHMARK_VOL_INDEX_NO_BARS_STORED,
+    MSG_BAD_CLOSE_ON_RECENT_BAR,
+    MSG_DUPLICATED_KEYS,
+    MSG_COLLECTOR_FAILED,
+    MSG_ZERO_ROWS_WITHOUT_REASON,
+    MSG_IS_NOT_A_JSON_SUMMARY,
+    MSG_LATE_RUN_SESSION_HAS_CLOSED_BUT,
+    MSG_MARKET_SYMBOLS_WITH_NO_BARS_STORED,
+    MSG_COLLECTOR_PROBLEM,
+    MSG_COLLECTOR_FILE_PROBLEM,
+    MSG_NEWEST_BAR_OLDER_THAN_THE_LAST,
+    MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR,
+    MSG_NO_STORED_PRICE_BARS,
+    MSG_PRICES_PRICE_BASIS_WARNING_S,
+)
 
 
 def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, validate_config: dict) -> dict:
@@ -22,14 +39,18 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
             rows, problems = read_rows(path)
             rel = path.relative_to(paths.ROOT).as_posix()
             if problems:
-                res.block("BAD_FILE", f"{rel}: {'; '.join(problems[:3])}", tickers_in(rows))
+                res.block(
+                    "BAD_FILE",
+                    MSG_COLLECTOR_FILE_PROBLEM.format(rel=rel, value="; ".join(problems[:3])),
+                    tickers_in(rows),
+                )
             if kind in TRADING_DATE_KINDS:
                 col = TRADING_DATE_KINDS[kind]
                 rows = [row for row in rows if row.get(col) and str(row[col])[:10] == str(today)]
             row_count += len(rows)
             bad = check_rows(kind, rows, path.suffix == ".csv", now, tol)
             if bad:
-                res.block("SCHEMA", f"{rel}: {'; '.join(bad)}", tickers_in(rows))
+                res.block("SCHEMA", MSG_COLLECTOR_FILE_PROBLEM.format(rel=rel, value="; ".join(bad)), tickers_in(rows))
         counts[kind] = row_count
     return counts
 
@@ -43,7 +64,10 @@ def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict):
             f"SELECT {key}, count(*) FROM {kind} GROUP BY 1 HAVING count(*) > 1 ORDER BY 1 LIMIT 20"
         ).fetchall()
         if rows:
-            res.block("DUPLICATE_ID", f"{kind}: {len(rows)} duplicated {key}(s), e.g. {[row[0] for row in rows[:5]]}")
+            res.block(
+                "DUPLICATE_ID",
+                MSG_DUPLICATED_KEYS.format(kind=kind, count=len(rows), key=key, value=[row[0] for row in rows[:5]]),
+            )
 
 
 def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_config: dict) -> None:
@@ -53,7 +77,7 @@ def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_c
     if never:
         res.block(
             "MISSING_SYMBOL",
-            "benchmark / vol index: no bars stored at all (never collected; the regime needs them)",
+            MSG_BENCHMARK_VOL_INDEX_NO_BARS_STORED,
             never,
         )
     bad_core = [key for key in core if key in last and last[key] < need]
@@ -71,7 +95,7 @@ def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_c
     if never:
         res.warn(
             "MISSING_SYMBOL",
-            "market symbols with no bars stored at all (never collected: cues, factors, sector ETFs)",
+            MSG_MARKET_SYMBOLS_WITH_NO_BARS_STORED,
             never,
         )
     stale = [key for key in others if key in last and last[key] < old]
@@ -91,11 +115,11 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
     missing = [ticker for ticker in cfg["tickers"] if ticker not in last]
     stale = [ticker for ticker in cfg["tickers"] if ticker in last and last[ticker] < need]
     if missing:
-        res.block("MISSING_BARS", "no stored price bars", missing)
+        res.block("MISSING_BARS", MSG_NO_STORED_PRICE_BARS, missing)
     if stale:
         res.block(
             "STALE_BARS",
-            f"newest bar older than the last completed session {need} (e.g. {stale[0]} {last[stale[0]]})",
+            MSG_NEWEST_BAR_OLDER_THAN_THE_LAST.format(need=need, value=stale[0], value_2=last[stale[0]]),
             stale,
         )
     if run_status["late_run"]:
@@ -106,7 +130,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
         if no_bar:
             res.warn(
                 "LATE_RUN_NO_SESSION_BAR",
-                f"late run: session {sess} has closed but has no stored bar (the run is as of the previous session)",
+                MSG_LATE_RUN_SESSION_HAS_CLOSED_BUT.format(sess=sess),
                 no_bar,
             )
     check_symbol_bars(res, cfg, last, need, validate_config)
@@ -116,7 +140,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
         "SELECT DISTINCT ticker FROM prices WHERE date >= ? AND (close IS NULL OR close <= 0) ORDER BY 1", [since]
     ).fetchall()
     if bad:
-        res.block("BAD_CLOSE", f"close missing or <= 0 on a bar since {since}", [bad_move[0] for bad_move in bad])
+        res.block("BAD_CLOSE", MSG_BAD_CLOSE_ON_RECENT_BAR.format(since=since), [bad_move[0] for bad_move in bad])
     moves = con.execute(
         "SELECT DISTINCT ON (ticker) ticker, date, ret_1d FROM returns ORDER BY ticker, date DESC"
     ).fetchall()
@@ -126,7 +150,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
         if not corporate_action_near(con, ticker, day, validate_config):
             res.warn(
                 "BIG_MOVE",
-                f"{ticker} 1-day return {row:+.1%} on {day} with no split/corporate-action event on file",
+                MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION.format(ticker=ticker, row=row, day=day),
                 [ticker],
             )
 
@@ -190,14 +214,16 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
         try:
             collector_summary = json.loads(summary_path.read_text())
         except (json.JSONDecodeError, OSError) as e:
-            res.warn("COLLECTOR_SUMMARY", f"{summary_path.name} is not a JSON summary ({e})")
+            res.warn("COLLECTOR_SUMMARY", MSG_IS_NOT_A_JSON_SUMMARY.format(name=summary_path.name, error=e))
             continue
         name = collector_summary.get("collector") or summary_path.stem.removeprefix("collect_")
         seen[name] = collector_summary
         if collector_summary.get("market") not in (None, cfg["market"]):
             continue
         if collector_summary.get("error"):
-            res.warn("COLLECTOR_ERROR", f"{name}: {str(collector_summary['error'])[:200]}")
+            res.warn(
+                "COLLECTOR_ERROR", MSG_COLLECTOR_PROBLEM.format(name=name, value=str(collector_summary["error"])[:200])
+            )
         failed = collector_summary.get("failed")
         if failed:
             what = [
@@ -212,7 +238,7 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
             ]
             res.warn(
                 "COLLECTOR_FAILED",
-                f"{name}: {len(what)} failed: {what[:10]}",
+                MSG_COLLECTOR_FAILED.format(name=name, count=len(what), value=what[:10]),
                 [warning for warning in what if warning in cfg["tickers"]],
             )
         if name == "prices" and collector_summary.get(
@@ -221,7 +247,9 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
             warning_texts = [str(warning) for warning in collector_summary["warnings"]]
             res.warn(
                 "PRICE_BASIS",
-                f"prices: {len(warning_texts)} price-basis warning(s): {'; '.join(warning_texts[:5])[:600]}",
+                MSG_PRICES_PRICE_BASIS_WARNING_S.format(
+                    count=len(warning_texts), value="; ".join(warning_texts[:5])[:600]
+                ),
                 [warning.split(":", 1)[0] for warning in warning_texts if warning.split(":", 1)[0] in cfg["tickers"]],
             )
         key = (validate_config.get("expect_output") or {}).get(name)
@@ -232,9 +260,9 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
             or collector_summary.get("skipped")
         )
         if key and collector_summary.get(key) == 0 and not explained:
-            res.warn("EMPTY_OUTPUT", f"{name}: {key} is 0 and the summary gives no reason")
+            res.warn("EMPTY_OUTPUT", MSG_ZERO_ROWS_WITHOUT_REASON.format(name=name, key=key))
     if not seen:
         for kind in validate_config.get("expect_output") or {}:
             if counts.get(kind, 0) == 0 and kind in counts:
-                res.warn("EMPTY_OUTPUT", f"{kind}: no rows written today (no collector summaries in work/steps/)")
+                res.warn("EMPTY_OUTPUT", MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR.format(kind=kind))
     return {"summaries": sorted(seen), "rows_today": counts}

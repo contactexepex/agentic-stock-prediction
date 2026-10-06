@@ -1,6 +1,7 @@
 """What the claim-checker may read and cite, loaded from data/ as of a time: current clusters, the
 stored text of their items (title, article extract) and of their primary sources (SEC filing text in
 primary_texts, NSE announcement subjects). Only rows available by that time are used."""
+
 from __future__ import annotations
 
 import json
@@ -8,8 +9,14 @@ import json
 import pandas as pd
 
 from marketbrief.analytics.claim_rules import ClusterSources, SourceText
-from marketbrief.constants.verification import (FIELD_EXTRACT, FIELD_PRIMARY, FIELD_TITLE, SOURCE_ANNOUNCEMENT,
-                                                SOURCE_ARTICLE, SOURCE_FILING)
+from marketbrief.constants.verification import (
+    FIELD_EXTRACT,
+    FIELD_PRIMARY,
+    FIELD_TITLE,
+    SOURCE_ANNOUNCEMENT,
+    SOURCE_ARTICLE,
+    SOURCE_FILING,
+)
 from marketbrief.utils.timefmt import as_utc_timestamp
 
 READ_ACCESS = ("full", "partial", "paywalled")
@@ -80,14 +87,26 @@ def primary_rows(con, ids: list[str], now: pd.Timestamp) -> dict[str, dict]:
     out: dict[str, dict] = {}
     texts = con.execute(TEXTS_SQL, [ids, now.isoformat(), now.isoformat()]).df().to_dict("records")
     for r in sorted((clean_row(x) for x in texts), key=lambda x: x["id"]):
-        entry = out.setdefault(r["primary_id"], {"kind": SOURCE_FILING, "label": r["form"], "docs": [],
-                                                 "available_at": iso(r["available_at"]),
-                                                 "published_at": iso(r["available_at"])})
+        entry = out.setdefault(
+            r["primary_id"],
+            {
+                "kind": SOURCE_FILING,
+                "label": r["form"],
+                "docs": [],
+                "available_at": iso(r["available_at"]),
+                "published_at": iso(r["available_at"]),
+            },
+        )
         entry["docs"].append(r["text"] or "")
         entry["available_at"] = max(entry["available_at"], iso(r["fetched_at"]))
     for r in con.execute(ANNOUNCEMENTS_SQL, [ids, now.isoformat()]).df().to_dict("records"):
-        out[r["id"]] = {"kind": SOURCE_ANNOUNCEMENT, "label": r["category"], "docs": [r["subject"] or ""],
-                        "available_at": iso(r["available_at"]), "published_at": iso(r["available_at"])}
+        out[r["id"]] = {
+            "kind": SOURCE_ANNOUNCEMENT,
+            "label": r["category"],
+            "docs": [r["subject"] or ""],
+            "available_at": iso(r["available_at"]),
+            "published_at": iso(r["available_at"]),
+        }
     return out
 
 
@@ -105,13 +124,15 @@ def build_sources(cluster: dict, items: dict[str, dict], primaries: dict[str, di
         if article and article.get("access") in READ_ACCESS and article.get("extract"):
             fields[FIELD_EXTRACT] = " ".join(article["extract"])
             available = max(available, iso(article["fetched_at"]))
-        found.sources[nid] = SourceText(SOURCE_ARTICLE, fields, available,
-                                        min(available, iso(item["published_at"]) or available))
+        found.sources[nid] = SourceText(
+            SOURCE_ARTICLE, fields, available, min(available, iso(item["published_at"]) or available)
+        )
     for pid in cluster.get("primary_ids") or []:
         entry = primaries.get(pid)
         if entry is not None:
-            found.sources[pid] = SourceText(entry["kind"], {FIELD_PRIMARY: "\n".join(entry["docs"])},
-                                            entry["available_at"], entry["published_at"])
+            found.sources[pid] = SourceText(
+                entry["kind"], {FIELD_PRIMARY: "\n".join(entry["docs"])}, entry["available_at"], entry["published_at"]
+            )
     return found
 
 

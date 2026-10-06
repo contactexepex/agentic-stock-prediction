@@ -8,6 +8,15 @@ from urllib.parse import urlparse
 from marketbrief.constants.validation import ENRICH_ENUMS
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, todays_files
+from marketbrief.constants.validation import (
+    MSG_IDS_ALREADY_IN_NEWS_ENRICHED_E,
+    MSG_IDS_ARE_NOT_NEWS_ANNOUNCEMENTS_FIRST,
+    MSG_ENRICHED_FILE_PROBLEM,
+    MSG_ENRICHMENT_RULE_PROBLEM,
+    MSG_NEWS_ARTICLES_ROWS_BREAK_THE_ARTICLE,
+    MSG_TODAYS_IDS_WITHOUT_ENRICHMENT,
+    MSG_REPEATED_IDS,
+)
 
 
 def registrable(host: str) -> str:
@@ -87,7 +96,7 @@ def check_articles(res: Result, cfg: dict, today: date):
             elif row["access"] in ("skipped_unlisted", "undecoded") and row.get("http_status") is not None:
                 bad.append(f"{row.get('id')}: access {row['access']} but an HTTP status is stored")
     if bad:
-        res.warn("ARTICLE_ROWS", f"{len(bad)} news_articles rows break the article rules, e.g. {bad[:3]}")
+        res.warn("ARTICLE_ROWS", MSG_NEWS_ARTICLES_ROWS_BREAK_THE_ARTICLE.format(count=len(bad), value=bad[:3]))
 
 
 def todays_new_ids(con, today) -> set[str]:
@@ -132,31 +141,29 @@ def stage_news(  # noqa: PLR0913 (uniform stage signature)
         return
     rows, problems = read_rows(path) if path.stat().st_size else ([], [])
     if problems:
-        res.block("BAD_FILE", f"{path.name}: {'; '.join(problems[:3])}")
+        res.block("BAD_FILE", MSG_ENRICHED_FILE_PROBLEM.format(name=path.name, value="; ".join(problems[:3])))
     bad = check_rows("news_enriched", rows, False, now, timedelta(minutes=validate_config["future_tolerance_minutes"]))
     if bad:
-        res.block("SCHEMA", f"{path.name}: {'; '.join(bad)}")
+        res.block("SCHEMA", MSG_ENRICHED_FILE_PROBLEM.format(name=path.name, value="; ".join(bad)))
     new_ids = todays_new_ids(con, today)
     done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()}
     ids = [row.get("id") for row in rows]
     dup = sorted({index for index in ids if ids.count(index) > 1})
     if dup:
-        res.block("DUPLICATE_ID", f"{path.name}: repeated ids {dup[:5]}")
+        res.block("DUPLICATE_ID", MSG_REPEATED_IDS.format(name=path.name, value=dup[:5]))
     extra = sorted({index for index in ids if index not in new_ids})
     if extra:
         res.block(
-            "ENRICH_UNKNOWN_ID", f"{len(extra)} ids are not news/announcements first seen today, e.g. {extra[:5]}"
+            "ENRICH_UNKNOWN_ID", MSG_IDS_ARE_NOT_NEWS_ANNOUNCEMENTS_FIRST.format(count=len(extra), value=extra[:5])
         )
     again = sorted({index for index in ids if index in done})
     if again:
-        res.block("ENRICH_ALREADY_STORED", f"{len(again)} ids already in news_enriched, e.g. {again[:5]}")
+        res.block("ENRICH_ALREADY_STORED", MSG_IDS_ALREADY_IN_NEWS_ENRICHED_E.format(count=len(again), value=again[:5]))
     missing = sorted(new_ids - done - set(ids))
     if missing:
-        res.warn(
-            "ENRICH_MISSING", f"{len(missing)} of today's news/announcement ids have no enrichment, e.g. {missing[:5]}"
-        )
+        res.warn("ENRICH_MISSING", MSG_TODAYS_IDS_WITHOUT_ENRICHMENT.format(count=len(missing), value=missing[:5]))
     for row in rows:
         why = enrichment_rule_problems(row)
         if why:
-            res.block("ENRICH_RULE", f"{row.get('id')}: {'; '.join(why)}")
+            res.block("ENRICH_RULE", MSG_ENRICHMENT_RULE_PROBLEM.format(record_id=row.get("id"), value="; ".join(why)))
     res.info["news"] = {"records": len(rows), "new_ids_today": len(new_ids)}

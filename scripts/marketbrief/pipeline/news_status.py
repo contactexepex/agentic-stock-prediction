@@ -8,6 +8,7 @@ one row per cluster (level cluster) and per fact (level claim) when new or chang
 stored row; as_of = now and every input is <= inputs_until <= as_of. Read the state at a time with
 news_verified_asof(ts) and each news id's status with news_status_ids_asof(ts) (sql/views.sql).
 Prints a JSON summary with the number of events and facts per status."""
+
 from __future__ import annotations
 
 import hashlib
@@ -19,8 +20,13 @@ import pandas as pd
 
 from marketbrief.analytics.news_sources import load_sources
 from marketbrief.analytics.verification_status import cluster_status
-from marketbrief.constants.verification import (KIND_NEWS_VERIFIED, LEVEL_CLAIM, LEVEL_CLUSTER, METHOD_VERSION_STATUS,
-                                                STATUS_PRECEDENCE)
+from marketbrief.constants.verification import (
+    KIND_NEWS_VERIFIED,
+    LEVEL_CLAIM,
+    LEVEL_CLUSTER,
+    METHOD_VERSION_STATUS,
+    STATUS_PRECEDENCE,
+)
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_today
 from marketbrief.core.database import connect
@@ -34,8 +40,21 @@ ORDER BY id, extracted_at"""
 STORED_SQL = """
 SELECT DISTINCT ON (cluster_id, coalesce(claim_id, '')) cluster_id, coalesce(claim_id, '') AS claim, state_hash
 FROM news_verified WHERE as_of <= ?::TIMESTAMPTZ ORDER BY cluster_id, coalesce(claim_id, ''), as_of DESC, id"""
-HASHED = ("cluster_row_id", "status", "primary_ids", "outlet_ids", "mismatch_ids", "status_ids", "id_statuses",
-          "independent_origins", "unread_vetted_origins", "origins", "conflicts", "flags", "confirmed_at")
+HASHED = (
+    "cluster_row_id",
+    "status",
+    "primary_ids",
+    "outlet_ids",
+    "mismatch_ids",
+    "status_ids",
+    "id_statuses",
+    "independent_origins",
+    "unread_vetted_origins",
+    "origins",
+    "conflicts",
+    "flags",
+    "confirmed_at",
+)
 
 
 def statements_by_cluster(con, cluster_ids: list[str], now: pd.Timestamp) -> dict[str, list[dict]]:
@@ -60,23 +79,55 @@ def status_rows(cluster: dict, statements: list[dict], as_of: pd.Timestamp) -> l
     stamp = f"{as_of:%Y%m%dT%H%M%SZ}"
     inputs = [iso(cluster["inputs_until"]) or iso(cluster["as_of"])]
     inputs += [t for s in statements for t in (s["extracted_at"], s["source_available_at"]) if t]
-    common = {"as_of": as_of.isoformat(), "cluster_id": cluster["cluster_id"], "cluster_row_id": cluster["id"],
-              "ticker": cluster["ticker"], "independent_origins": cluster["independent_origins"],
-              "unread_vetted_origins": cluster["unread_vetted_origins"],
-              "first_reported_at": iso(cluster["first_reported_at"]), "inputs_until": max(inputs),
-              "method_version": METHOD_VERSION_STATUS}
+    common = {
+        "as_of": as_of.isoformat(),
+        "cluster_id": cluster["cluster_id"],
+        "cluster_row_id": cluster["id"],
+        "ticker": cluster["ticker"],
+        "independent_origins": cluster["independent_origins"],
+        "unread_vetted_origins": cluster["unread_vetted_origins"],
+        "first_reported_at": iso(cluster["first_reported_at"]),
+        "inputs_until": max(inputs),
+        "method_version": METHOD_VERSION_STATUS,
+    }
     ids = sorted(result["ids"])
-    rows = [{"id": f"{cluster['cluster_id']}|*@{stamp}", **common, "claim_id": None, "level": LEVEL_CLUSTER,
-             "status": result["status"], "primary_ids": result["primary_ids"], "outlet_ids": result["outlet_ids"],
-             "mismatch_ids": result["mismatch_ids"], "status_ids": ids, "id_statuses": [result["ids"][i] for i in ids],
-             "origins": list(cluster.get("origins") or []), "conflicts": result["conflicts"],
-             "flags": result["flags"], "confirmed_at": result["confirmed_at"]}]
+    rows = [
+        {
+            "id": f"{cluster['cluster_id']}|*@{stamp}",
+            **common,
+            "claim_id": None,
+            "level": LEVEL_CLUSTER,
+            "status": result["status"],
+            "primary_ids": result["primary_ids"],
+            "outlet_ids": result["outlet_ids"],
+            "mismatch_ids": result["mismatch_ids"],
+            "status_ids": ids,
+            "id_statuses": [result["ids"][i] for i in ids],
+            "origins": list(cluster.get("origins") or []),
+            "conflicts": result["conflicts"],
+            "flags": result["flags"],
+            "confirmed_at": result["confirmed_at"],
+        }
+    ]
     for key, fact in facts.items():
-        rows.append({"id": f"{cluster['cluster_id']}|{key}@{stamp}", **common, "claim_id": key, "level": LEVEL_CLAIM,
-                     "status": fact["status"], "primary_ids": fact["primary_ids"], "outlet_ids": fact["outlet_ids"],
-                     "mismatch_ids": fact["mismatch_ids"], "status_ids": [], "id_statuses": [],
-                     "origins": fact["origins"], "conflicts": fact["conflicts"], "flags": fact["flags"],
-                     "confirmed_at": fact["confirmed_at"]})
+        rows.append(
+            {
+                "id": f"{cluster['cluster_id']}|{key}@{stamp}",
+                **common,
+                "claim_id": key,
+                "level": LEVEL_CLAIM,
+                "status": fact["status"],
+                "primary_ids": fact["primary_ids"],
+                "outlet_ids": fact["outlet_ids"],
+                "mismatch_ids": fact["mismatch_ids"],
+                "status_ids": [],
+                "id_statuses": [],
+                "origins": fact["origins"],
+                "conflicts": fact["conflicts"],
+                "flags": fact["flags"],
+                "confirmed_at": fact["confirmed_at"],
+            }
+        )
     for row in rows:
         row["state_hash"] = state_hash(row)
     return rows
@@ -103,10 +154,19 @@ def run(cfg: dict) -> dict:
     def counts(level: str) -> dict:
         found = Counter(r["status"] for r in current if r["level"] == level)
         return dict(sorted(found.items(), key=lambda kv: order[kv[0]]))
-    return {"step": "news_status", "market": market, "as_of": as_of.isoformat(), "clusters": len(clusters),
-            "claims": sum(len(v) for v in claims.values()), "events_by_status": counts(LEVEL_CLUSTER),
-            "facts_by_status": counts(LEVEL_CLAIM), "written": written, "unchanged": len(current) - len(rows),
-            "flags": dict(Counter(f for r in current if r["level"] == LEVEL_CLUSTER for f in r["flags"]).most_common())}
+
+    return {
+        "step": "news_status",
+        "market": market,
+        "as_of": as_of.isoformat(),
+        "clusters": len(clusters),
+        "claims": sum(len(v) for v in claims.values()),
+        "events_by_status": counts(LEVEL_CLUSTER),
+        "facts_by_status": counts(LEVEL_CLAIM),
+        "written": written,
+        "unchanged": len(current) - len(rows),
+        "flags": dict(Counter(f for r in current if r["level"] == LEVEL_CLUSTER for f in r["flags"]).most_common()),
+    }
 
 
 def main() -> int:

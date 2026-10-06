@@ -133,7 +133,8 @@ def html_report(cfg: dict, stats: dict) -> str:
             f"<td>{share_cell(one_day_stats, 'cover50')}</td><td>{share_cell(one_day_stats, 'cover80')}</td>"
             f"<td>{score_cell(one_day_stats, 'score80')}</td><td>{score_cell(one_day_stats, 'naive_score80')}</td>"
             f"<td>{share_cell(five_day_stats, 'cover50')}</td><td>{share_cell(five_day_stats, 'cover80')}</td>"
-            f"<td>{score_cell(five_day_stats, 'score80')}</td><td>{score_cell(five_day_stats, 'naive_score80')}</td></tr>"
+            f"<td>{score_cell(five_day_stats, 'score80')}</td>"
+            f"<td>{score_cell(five_day_stats, 'naive_score80')}</td></tr>"
         )
     opts = "".join(f'<option value="{esc(item)}">{esc(item)}</option>' for item in sorted(set(sector.values())))
     lim = "".join(f"<li>{esc(item)}</li>" for item in stats["limitations"])

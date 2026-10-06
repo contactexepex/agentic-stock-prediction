@@ -29,6 +29,20 @@ from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.utils.markdown import cursor_markdown_table
 from marketbrief.utils.text import slugify
+from marketbrief.constants.connection_map import (
+    MSG_ALIASES_MUST_BE_A_LIST_OF,
+    MSG_AS_OF_IS_IN_THE_FUTURE,
+    MSG_AS_OF_MUST_BE_YYYY_MM,
+    MSG_RELATION_NOT_ONE_OF,
+    MSG_SOURCE_URL_MUST_BE_THE_HTTP,
+    MSG_STATUS_NOT_ONE_OF,
+    MSG_TARGET_KIND_NOT_ONE_OF,
+    MSG_TARGET_NAME_MISSING,
+    MSG_TARGET_TICKER_MUST_BE_A_STRING,
+    MSG_TICKER_NOT_IN_THE_WATCHLIST,
+    MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL,
+    MSG_WEIGHT_MUST_BE_A_NUMBER_OR,
+)
 
 RELATIONS = ("board", "group", "subsidiary", "supplier", "customer", "competitor", "promoter", "major_holder")
 TARGET_KINDS = ("person", "company")
@@ -66,13 +80,13 @@ def normalise_as_of_and_aliases(record: dict, today: date) -> list[str]:
     try:
         as_of = date.fromisoformat(str(record["as_of"]))
         if as_of > today:
-            errs.append("as_of is in the future")
+            errs.append(MSG_AS_OF_IS_IN_THE_FUTURE)
         record["as_of"] = str(as_of)
     except ValueError:
-        errs.append("as_of must be YYYY-MM-DD (date of the source)")
+        errs.append(MSG_AS_OF_MUST_BE_YYYY_MM)
     aliases = record["aliases"] or []
     if not isinstance(aliases, list) or not all(isinstance(alias, str) for alias in aliases):
-        errs.append("aliases must be a list of strings")
+        errs.append(MSG_ALIASES_MUST_BE_A_LIST_OF)
     else:
         record["aliases"] = sorted({alias.strip() for alias in aliases if alias.strip()})
     return errs
@@ -83,23 +97,23 @@ def validate(row: dict, tickers: set[str], today: date) -> tuple[dict | None, li
     errs = []
     record = {key: row.get(key) for key in COMPARE + ("prompt_version",)}
     if record["ticker"] not in tickers:
-        errs.append(f"ticker {record['ticker']!r} not in the watchlist")
+        errs.append(MSG_TICKER_NOT_IN_THE_WATCHLIST.format(ticker=record["ticker"]))
     if record["relation"] not in RELATIONS:
-        errs.append(f"relation {record['relation']!r} not one of {RELATIONS}")
+        errs.append(MSG_RELATION_NOT_ONE_OF.format(relation=record["relation"], relations=RELATIONS))
     if not isinstance(record["target"], str) or len(record["target"].strip()) < 2:
-        errs.append("target name missing")
+        errs.append(MSG_TARGET_NAME_MISSING)
     if record["target_kind"] not in TARGET_KINDS:
-        errs.append(f"target_kind {record['target_kind']!r} not one of {TARGET_KINDS}")
+        errs.append(MSG_TARGET_KIND_NOT_ONE_OF.format(target_kind=record["target_kind"], target_kinds=TARGET_KINDS))
     if not str(record["source_url"] or "").startswith(("https://", "http://")):
-        errs.append("source_url must be the http(s) page that states this edge")
+        errs.append(MSG_SOURCE_URL_MUST_BE_THE_HTTP)
     record["status"] = record["status"] or "active"
     if record["status"] not in STATUSES:
-        errs.append(f"status {record['status']!r} not one of {STATUSES}")
+        errs.append(MSG_STATUS_NOT_ONE_OF.format(status=record["status"], statuses=STATUSES))
     errs += normalise_as_of_and_aliases(record, today)
     if record["weight"] is not None and not isinstance(record["weight"], (int, float)):
-        errs.append("weight must be a number or null")
+        errs.append(MSG_WEIGHT_MUST_BE_A_NUMBER_OR)
     if record["target_ticker"] is not None and not isinstance(record["target_ticker"], str):
-        errs.append("target_ticker must be a string or null")
+        errs.append(MSG_TARGET_TICKER_MUST_BE_A_STRING)
     if errs:
         return None, errs
     record["target"] = record["target"].strip()
@@ -333,7 +347,7 @@ def main() -> int:
         )
     else:
         if not args.file or not args.file.exists():
-            raise SystemExit(f"usage: graph.py {args.command} work/graph.jsonl")
+            raise SystemExit(MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL.format(command=args.command))
         out = add(cfg, con, args.file, dry_run=args.command == "check")
         print(json.dumps(out, indent=2))
         return 1 if out["rejected"] else 0

@@ -14,6 +14,11 @@ from marketbrief.constants.ai_replay import MARKER
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.evidence import evidence
 from marketbrief.replay.ai_replay.roots import data_root
+from marketbrief.constants.ai_replay import (
+    MSG_IS_ALREADY_RECORDED_IN_USE_A,
+    MSG_IS_NOT_A_PREPARED_AI_REPLAY,
+    MSG_WAS_PREPARED_FOR_NOT,
+)
 
 
 def store_dir(results: Path, market: str) -> Path:
@@ -32,11 +37,17 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
     """What the forecaster saw in the prepared root: snapshot quality, earnings, citable ids."""
     meta_path = root / "ai_replay.json"
     if not (root / MARKER).exists() or not meta_path.exists():
-        raise SystemExit(f"{root} is not a prepared ai_replay root (run prepare first)")
+        raise SystemExit(MSG_IS_NOT_A_PREPARED_AI_REPLAY.format(root=root))
     meta = json.loads(meta_path.read_text())
     if meta["market"] != cfg["market"] or meta["as_of_date"] != str(as_of_day):
         raise SystemExit(
-            f"{root} was prepared for {meta['market']} {meta['as_of_date']}, not {cfg['market']} {as_of_day}"
+            MSG_WAS_PREPARED_FOR_NOT.format(
+                root=root,
+                market=meta["market"],
+                as_of_date=meta["as_of_date"],
+                market_2=cfg["market"],
+                as_of_day=as_of_day,
+            )
         )
     with data_root(root):
         con = connect(cfg["market"])
@@ -77,7 +88,7 @@ def record(cfg: dict, as_of_day: date, root: Path, calls_file: Path, results: Pa
     days = read_jsonl(store_directory / "days.jsonl")
     if any(stored["date"] == str(as_of_day) for stored in days):
         raise SystemExit(
-            f"{market} {as_of_day} is already recorded in {store_directory}; use a new --results directory to re-run it"
+            MSG_IS_ALREADY_RECORDED_IN_USE_A.format(market=market, as_of_day=as_of_day, store_directory=store_directory)
         )
     seen = {stored["id"] for stored in read_jsonl(store_directory / "calls.jsonl")}
     raw = (

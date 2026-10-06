@@ -25,6 +25,7 @@ from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core import paths
 from marketbrief.pipeline.review.helpers import previous_week, week_bounds
+from marketbrief.constants.pipeline_messages import MSG_WEEK_MUST_LOOK_LIKE_2026_W40
 
 SAMPLE_CALLS, SAMPLE_REPORTS = 2, 1
 CHECKLIST = [
@@ -146,7 +147,7 @@ def main() -> int:
     cfg = require_market(args)
     week = args.week or previous_week(utc_today())
     if not re.fullmatch(r"\d{4}-W\d{2}", week):
-        raise SystemExit(f"--week must look like 2026-W40 (got {week!r})")
+        raise SystemExit(MSG_WEEK_MUST_LOOK_LIKE_2026_W40.format(week=week))
     con = connect(cfg["market"])
     if args.if_due and done(con, week):
         print(json.dumps({"step": "spotcheck", "market": cfg["market"], "week": week, "due": False}))

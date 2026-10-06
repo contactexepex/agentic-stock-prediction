@@ -15,13 +15,14 @@ from marketbrief.constants.ai_replay import (
     SAMPLE_START,
     SAMPLE_STEP,
 )
+from marketbrief.constants.ai_replay import MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY
 
 
 def training_cutoff() -> date:
     """`model_training_cutoff` from config/settings.yaml: the model may have seen data up to this date."""
     value = (load_settings() or {}).get("model_training_cutoff")
     if value is None:
-        raise SystemExit(f"{paths.CONFIG / 'settings.yaml'} has no model_training_cutoff (YYYY-MM-DD)")
+        raise SystemExit(MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY.format(value=paths.CONFIG / "settings.yaml"))
     return value if isinstance(value, date) else date.fromisoformat(str(value))
 
 

@@ -19,6 +19,19 @@ from marketbrief.constants.lessons import (
     TIME_FIELDS,
 )
 from marketbrief.pipeline.lessons.facts import settled, stored_ids
+from marketbrief.constants.lessons import (
+    MSG_A_LESSON_FOR_IS_ALREADY_STORED,
+    MSG_DOES_NOT_EXIST,
+    MSG_DUPLICATE_LESSON_FOR_IN_THIS_FILE,
+    MSG_IS_BUT_THE_STORED_VALUE_IS,
+    MSG_LESSON_WORD_COUNT,
+    MSG_MISSING_AGENT_FIELD,
+    MSG_MUST_BE_TEXT,
+    MSG_NUMBER_IN_THE_LESSON_MATCHES_NOTHING,
+    MSG_PREDICTION_DOES_NOT_EXIST_OR_IS,
+    MSG_PREDICTION_IS_SETTLED_BUT_ITS_RANGE,
+    MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL,
+)
 
 
 def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
@@ -68,7 +81,7 @@ def text_number_errors(text: str, fact: dict) -> list[str]:
         tol = 0.5 * 10**-dec + 1e-9
         matches = [what for allowed_value, what in vals if abs(number - allowed_value) <= tol]
         if not matches:
-            errs.append(f"number {sign}{num}{pct.strip()} in the lesson matches nothing in the call or its outcome")
+            errs.append(MSG_NUMBER_IN_THE_LESSON_MATCHES_NOTHING.format(sign=sign, num=num, strip=pct.strip()))
             continue
         if (
             sign
@@ -81,7 +94,9 @@ def text_number_errors(text: str, fact: dict) -> list[str]:
         ):
             neg = sign in "-−"
             if neg != (fact["actual_return"] < 0):
-                errs.append(f"return {sign}{num}% has the wrong sign (actual_return {fact['actual_return']:+.6f})")
+                errs.append(
+                    MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL.format(sign=sign, num=num, actual_return=fact["actual_return"])
+                )
     return errs
 
 
@@ -111,9 +126,9 @@ def agent_field_problems(record: dict) -> list[str]:
     errs = [f"unknown field {key!r}" for key in record if key not in AGENT_FIELDS and key not in FACT_FIELDS]
     for key in AGENT_FIELDS:
         if record.get(key) in (None, ""):
-            errs.append(f"missing {key}")
+            errs.append(MSG_MISSING_AGENT_FIELD.format(key=key))
         elif not isinstance(record[key], str):
-            errs.append(f"{key} must be text")
+            errs.append(MSG_MUST_BE_TEXT.format(key=key))
     return errs
 
 
@@ -123,13 +138,13 @@ def prediction_problems(prediction_id, facts: dict, stored: set[str], seen: set[
         return []
     errs = []
     if prediction_id not in facts:
-        errs.append(f"prediction {prediction_id!r} does not exist or is not settled (no stored outcome)")
+        errs.append(MSG_PREDICTION_DOES_NOT_EXIST_OR_IS.format(prediction_id=prediction_id))
     elif facts[prediction_id] is None:
-        errs.append(f"prediction {prediction_id!r} is settled but its range is still open; wait for it")
+        errs.append(MSG_PREDICTION_IS_SETTLED_BUT_ITS_RANGE.format(prediction_id=prediction_id))
     if f"lesson-{prediction_id}" in stored:
-        errs.append(f"a lesson for {prediction_id} is already stored")
+        errs.append(MSG_A_LESSON_FOR_IS_ALREADY_STORED.format(prediction_id=prediction_id))
     if prediction_id in seen:
-        errs.append(f"duplicate lesson for {prediction_id} in this file")
+        errs.append(MSG_DUPLICATE_LESSON_FOR_IN_THIS_FILE.format(prediction_id=prediction_id))
     seen.add(prediction_id)
     return errs
 
@@ -140,11 +155,11 @@ def lesson_text_problems(text, record: dict, fact: dict | None) -> list[str]:
     if isinstance(text, str):
         word_count = len(text.split())
         if word_count == 0 or word_count > MAX_WORDS:
-            errs.append(f"lesson must be 1-{MAX_WORDS} words (got {word_count})")
+            errs.append(MSG_LESSON_WORD_COUNT.format(max_words=MAX_WORDS, word_count=word_count))
     if fact:
         for key in FACT_FIELDS:
             if key in record and not same(key, record[key], fact[key]):
-                errs.append(f"{key} is {record[key]!r} but the stored value is {fact[key]!r}")
+                errs.append(MSG_IS_BUT_THE_STORED_VALUE_IS.format(key=key, value=record[key], value_2=fact[key]))
         if isinstance(text, str):
             errs += text_number_errors(text, fact)
     return errs
@@ -173,7 +188,7 @@ def read_file(path: Path) -> list:
     """One entry per non-empty line: the parsed object, or the raw text when it is not JSON
     (validate_records then rejects it as not a JSON object)."""
     if not path.exists():
-        raise SystemExit(f"{path} does not exist")
+        raise SystemExit(MSG_DOES_NOT_EXIST.format(path=path))
     recs = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():

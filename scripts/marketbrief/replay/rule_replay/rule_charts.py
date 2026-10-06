@@ -91,8 +91,10 @@ def svg_regime(summary: dict) -> str:
                 f"L{bar_left + bar_width - corner_radius:.1f},{top_y:.1f} Q{bar_left + bar_width:.1f},{top_y:.1f} "
                 f"{bar_left + bar_width:.1f},{top_y + corner_radius:.1f} L{bar_left + bar_width:.1f},{bottom_y:.1f} Z"
             )
-            tipx = (f"{name}, {horizon}-day: 80% coverage {scaled_text(tick)} over {regime_stats['n']:,} ranges "
-                    f"({regime_stats['days']} days)")
+            tipx = (
+                f"{name}, {horizon}-day: 80% coverage {scaled_text(tick)} over {regime_stats['n']:,} ranges "
+                f"({regime_stats['days']} days)"
+            )
             out.append(f'<path class="mark" d="{bar_path}" fill="{color}" data-tip="{esc(tipx)}"/>')
     out.append(
         f'<line x1="{left}" x2="{width - right}" y1="{scale_y(0.8):.1f}" y2="{scale_y(0.8):.1f}" '

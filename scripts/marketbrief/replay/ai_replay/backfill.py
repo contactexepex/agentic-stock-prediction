@@ -13,6 +13,13 @@ from marketbrief.utils.timefmt import as_utc_timestamp
 from marketbrief.constants.ai_replay import BACKFILL_KINDS, BACKFILL_STEPS, PUBLIC_AT, SOURCE_MARKER
 from marketbrief.replay.ai_replay.copy_asof import public_at
 from marketbrief.replay.ai_replay.roots import json_or_text, run_script
+from marketbrief.constants.ai_replay import (
+    MSG_NO_BACKFILL_STEPS_FOR_MARKET,
+    MSG_SINCE_MUST_BE_BEFORE_TODAY,
+    MSG_SOURCE_EXISTS_IS_NOT_EMPTY_AND,
+    MSG_SOURCE_IS_INSIDE_THE_REAL_DATA,
+    MSG_SOURCE_IS_THE_REPO_ITS_REAL,
+)
 
 
 def check_source(source: Path) -> Path:
@@ -21,9 +28,7 @@ def check_source(source: Path) -> Path:
     for real_root in {paths.CODE.resolve(), Path(paths.ROOT).resolve()}:
         real = real_root / "data"
         if resolved == real_root or resolved == real or real in resolved.parents or resolved in real_root.parents:
-            raise SystemExit(
-                f"--source {resolved} is the repo, its real data/ or contains them; use a scratch directory"
-            )
+            raise SystemExit(MSG_SOURCE_IS_THE_REPO_ITS_REAL.format(resolved=resolved))
     for ancestor in [
         resolved,
         *resolved.parents,
@@ -33,14 +38,9 @@ def check_source(source: Path) -> Path:
             and (ancestor.parent / "config" / "markets").is_dir()
             and (ancestor.parent / "scripts").is_dir()
         ):
-            raise SystemExit(
-                f"--source {resolved} is inside the real data/ of the checkout {ancestor.parent}; use a scratch "
-                f"directory"
-            )
+            raise SystemExit(MSG_SOURCE_IS_INSIDE_THE_REAL_DATA.format(resolved=resolved, parent=ancestor.parent))
     if resolved.exists() and any(resolved.iterdir()) and not (resolved / SOURCE_MARKER).exists():
-        raise SystemExit(
-            f"--source {resolved} exists, is not empty and is not an ai_replay source; choose another path"
-        )
+        raise SystemExit(MSG_SOURCE_EXISTS_IS_NOT_EMPTY_AND.format(resolved=resolved))
     return resolved
 
 
@@ -88,11 +88,11 @@ def stored_by_month(market: str, root: Path, kinds) -> dict:
 def backfill(cfg: dict, source: Path, since: date, timeout: int = 3600) -> dict:
     market = cfg["market"]
     if market not in BACKFILL_STEPS:
-        raise SystemExit(f"no backfill steps for market {market}")
+        raise SystemExit(MSG_NO_BACKFILL_STEPS_FOR_MARKET.format(market=market))
     source_root = check_source(source)
     today = utc_today()
     if since >= today:
-        raise SystemExit("--since must be before today")
+        raise SystemExit(MSG_SINCE_MUST_BE_BEFORE_TODAY)
     source_root.mkdir(parents=True, exist_ok=True)
     (source_root / SOURCE_MARKER).write_text("ai_replay backfill source (scratch; never the repo's data)\n")
     src_data = Path(paths.ROOT) / "data" / market

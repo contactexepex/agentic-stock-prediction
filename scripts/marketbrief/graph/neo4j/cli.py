@@ -38,6 +38,7 @@ from marketbrief.sources.neo4j_client import Neo4jError
 from marketbrief.constants.neo4j import BATCH_SIZE
 from marketbrief.graph.neo4j.connection import DryRunSink, client_from_env
 from marketbrief.graph.neo4j.sync import sync
+from marketbrief.constants.neo4j import MSG_PROBE_NEEDS_A_SERVER_NOT_DRY
 
 
 def main() -> int:
@@ -69,7 +70,7 @@ def main() -> int:
             return 2
     if args.probe:
         if isinstance(sink, DryRunSink):
-            raise SystemExit("--probe needs a server, not --dry-run")
+            raise SystemExit(MSG_PROBE_NEEDS_A_SERVER_NOT_DRY)
         try:
             res = sink.run("RETURN 1 AS ok")
             print(

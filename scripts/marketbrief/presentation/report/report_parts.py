@@ -78,6 +78,7 @@ def report_basics(cfg, day):
 
     return cur, feats, img, market, range_by_ticker_horizon, reg, regime_line, session, vol_name
 
+
 def yesterday_tables(cfg, cur, day, feats):
     """Yesterday: the market line, the ranges scored on the latest target date and the calls scored."""
     # yesterday: the market and the watchlist on the latest bar, then ranges scored on the latest target date
@@ -136,6 +137,7 @@ def yesterday_tables(cfg, cur, day, feats):
     ]
 
     return call_rows, calls_hit, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows
+
 
 def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
     """Today's ranges and calls by sector, and the number of late (never scored) stocks."""
@@ -206,6 +208,7 @@ def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
 
     return n_late, today_rows
 
+
 def cue_tables(cfg, day):
     """Overnight cues and global factors, and the ADR rows."""
     cue_rows = [
@@ -231,6 +234,7 @@ def cue_tables(cfg, day):
 
     return adr_rows, cue_rows
 
+
 def calendar_lines(cfg, day, session):
     """Upcoming market and company events, and the data released before the open."""
     mevents = calendar.market_events(cfg, day["as_of"] + timedelta(days=1), day["as_of"] + timedelta(days=21))
@@ -246,6 +250,7 @@ def calendar_lines(cfg, day, session):
     upcoming.sort()
 
     return release_line, released, upcoming
+
 
 def track_record_rows(day, feats):
     """Track-record tables (scorecard, regimes, direction, bands, calibration) and data-quality lists."""

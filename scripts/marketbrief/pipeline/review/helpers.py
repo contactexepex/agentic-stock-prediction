@@ -10,6 +10,7 @@ import pandas as pd
 import yaml
 from marketbrief.core import paths
 from marketbrief.constants.review import DEFAULTS, NOTE_PATTERNS
+from marketbrief.constants.review import MSG_WEEK_MUST_LOOK_LIKE_2026_W40
 
 
 def load_review_config() -> dict:
@@ -20,7 +21,7 @@ def load_review_config() -> dict:
 def week_bounds(week: str) -> tuple[date, date]:
     match = re.fullmatch(r"(\d{4})-W(\d{2})", week)
     if not match:
-        raise SystemExit(f"--week must look like 2026-W40, got {week!r}")
+        raise SystemExit(MSG_WEEK_MUST_LOOK_LIKE_2026_W40.format(week=week))
     start = date.fromisocalendar(int(match.group(1)), int(match.group(2)), 1)
     return start, start + timedelta(days=6)
 

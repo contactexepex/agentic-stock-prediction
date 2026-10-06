@@ -9,7 +9,13 @@ from pathlib import Path
 import pandas as pd
 from marketbrief.core.schemas import ACCEPTED_KEYS, SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
-from marketbrief.constants.ai_replay import DATE_COLUMN_BY_KIND, DATE_PUBLIC_AFTER_CLOSE, DROPPED, PUBLIC_AT, TARGET_DATE_KINDS
+from marketbrief.constants.ai_replay import (
+    DATE_COLUMN_BY_KIND,
+    DATE_PUBLIC_AFTER_CLOSE,
+    DROPPED,
+    PUBLIC_AT,
+    TARGET_DATE_KINDS,
+)
 
 
 def public_at(kind: str, row: dict) -> pd.Timestamp | None:

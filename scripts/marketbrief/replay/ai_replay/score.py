@@ -10,13 +10,14 @@ from marketbrief.constants.ai_replay import CONTAMINATED, FAIR
 from marketbrief.replay.ai_replay.ai_html import html_page
 from marketbrief.replay.ai_replay.record import read_jsonl
 from marketbrief.replay.ai_replay.summaries import summarize
+from marketbrief.constants.ai_replay import MSG_NOTHING_RECORDED_IN
 
 
 def score(cfg: dict, results: Path, out: Path) -> dict:
     store_directory = Path(results) / cfg["market"]
     calls, days = read_jsonl(store_directory / "calls.jsonl"), read_jsonl(store_directory / "days.jsonl")
     if not days:
-        raise SystemExit(f"nothing recorded in {store_directory}")
+        raise SystemExit(MSG_NOTHING_RECORDED_IN.format(store_directory=store_directory))
     bars = load_bars(connect(cfg["market"]))
     summary = summarize(cfg, calls, days, bars)
     out = Path(out)

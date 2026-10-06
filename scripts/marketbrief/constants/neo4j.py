@@ -72,3 +72,6 @@ WATERMARK_STATEMENT = (
 # ---------- messages ----------
 MSG_NEO4J_READ_FAILED = "read: {error}"
 MSG_NEO4J_WATERMARK_FAILED = "watermark: {error}"
+
+# ---------- neo4j cli ----------
+MSG_PROBE_NEEDS_A_SERVER_NOT_DRY = "--probe needs a server, not --dry-run"

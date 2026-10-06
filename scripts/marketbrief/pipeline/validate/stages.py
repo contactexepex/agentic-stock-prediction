@@ -17,6 +17,17 @@ from marketbrief.pipeline.validate.collect_checks import (
 )
 from marketbrief.pipeline.validate.gate_result import work_dir
 from marketbrief.pipeline.validate.news_checks import check_articles, check_news_sources
+from marketbrief.constants.validation import (
+    MSG_FEATURE_ROW_OLDER_THAN_THE_TICKER,
+    MSG_FIRST_LINE_IS_NOT_TODAY_S,
+    MSG_INDICATOR_QUALITY_BLOCKED_NO_CALL_ALLOWED,
+    MSG_IS_MISSING_OR_EMPTY,
+    MSG_NO_FEATURE_ROW,
+    MSG_NO_MARKET_REGIME_SECTION,
+    MSG_NO_REGIME_ROW_AS_OF_NEWEST,
+    MSG_THE_CONTEXT_PACK_CONTAINS_A_PYTHON,
+    MSG_WATCHLIST_TICKERS_NOT_NAMED_IN_THE,
+)
 
 
 def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)
@@ -54,16 +65,16 @@ def stage_features(res, cfg, con, status, now, today, validate_config):  # noqa:
         ticker for ticker in cfg["tickers"] if ticker in feats and ticker in last and feats[ticker][0] < last[ticker]
     ]
     if missing:
-        res.block("MISSING_FEATURES", "no feature row", missing)
+        res.block("MISSING_FEATURES", MSG_NO_FEATURE_ROW, missing)
     if behind:
-        res.block("STALE_FEATURES", "feature row older than the ticker's newest bar (run features.py)", behind)
+        res.block("STALE_FEATURES", MSG_FEATURE_ROW_OLDER_THAN_THE_TICKER, behind)
     blocked = [ticker for ticker in cfg["tickers"] if ticker in feats and feats[ticker][1] == "BLOCKED"]
     if blocked:
-        res.warn("QUALITY_BLOCKED", "indicator quality BLOCKED: no call allowed", blocked)
+        res.warn("QUALITY_BLOCKED", MSG_INDICATOR_QUALITY_BLOCKED_NO_CALL_ALLOWED, blocked)
     need = date.fromisoformat(status["previous_session"])
     reg = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
     if reg is None or reg < need:
-        res.block("MISSING_REGIME", f"no regime row as of {need} (newest {reg})")
+        res.block("MISSING_REGIME", MSG_NO_REGIME_ROW_AS_OF_NEWEST.format(need=need, reg=reg))
 
 
 def stage_context(  # noqa: PLR0913 (uniform stage signature)
@@ -73,20 +84,22 @@ def stage_context(  # noqa: PLR0913 (uniform stage signature)
     if not path.exists() or path.stat().st_size == 0:
         res.block(
             "MISSING_CONTEXT",
-            f"{path.relative_to(paths.ROOT) if path.is_relative_to(paths.ROOT) else path} is missing or empty",
+            MSG_IS_MISSING_OR_EMPTY.format(
+                value=path.relative_to(paths.ROOT) if path.is_relative_to(paths.ROOT) else path
+            ),
         )
         return
     text = path.read_text(encoding="utf-8")
     first = text.splitlines()[0] if text else ""
     if not first.startswith("# Context pack") or str(today) not in first:
-        res.block("STALE_CONTEXT", f"first line is not today's pack header: {first[:80]!r}")
+        res.block("STALE_CONTEXT", MSG_FIRST_LINE_IS_NOT_TODAY_S.format(value=first[:80]))
     if "Traceback (most recent call last)" in text:
-        res.block("CONTEXT_ERROR", "the context pack contains a Python traceback")
+        res.block("CONTEXT_ERROR", MSG_THE_CONTEXT_PACK_CONTAINS_A_PYTHON)
     absent = [ticker for ticker in cfg["tickers"] if not re.search(rf"(?<![\w&]){re.escape(ticker)}(?![\w&])", text)]
     if absent:
-        res.block("CONTEXT_INCOMPLETE", "watchlist tickers not named in the context pack", absent)
+        res.block("CONTEXT_INCOMPLETE", MSG_WATCHLIST_TICKERS_NOT_NAMED_IN_THE, absent)
     if "## Market regime" not in text:
-        res.block("CONTEXT_INCOMPLETE", "no 'Market regime' section")
+        res.block("CONTEXT_INCOMPLETE", MSG_NO_MARKET_REGIME_SECTION)
 
 
 def stage_forecast(  # noqa: PLR0913 (uniform stage signature)

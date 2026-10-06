@@ -10,6 +10,16 @@ import pandas as pd
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 from marketbrief.core import paths, schemas
 from marketbrief.constants.validation import TRADING_DATE_KINDS
+from marketbrief.constants.validation import (
+    MSG_LAST_LINE_HAS_NO_NEWLINE_TRUNCATED,
+    MSG_LINE_IS_NOT_A_JSON_OBJECT,
+    MSG_LINE_IS_NOT_JSON,
+    MSG_MORE_PROBLEMS_OMITTED,
+    MSG_ROW_TYPE_PROBLEM,
+    MSG_ROW_FIELDS_NOT_IN_THE_SCHEMA,
+    MSG_ROW_IS_IN_THE_FUTURE_NOW,
+    MSG_ROW_MISSING_ID,
+)
 
 
 def kind_files(market: str, kind: str) -> list[Path]:
@@ -50,7 +60,7 @@ def read_rows(path: Path) -> tuple[list[dict], list[str]]:
     if not raw:
         return [], ["empty file"]
     if not raw.endswith(b"\n"):
-        problems.append("last line has no newline (truncated write?)")
+        problems.append(MSG_LAST_LINE_HAS_NO_NEWLINE_TRUNCATED)
     text = raw.decode("utf-8", errors="replace")
     if path.suffix == ".csv":
         reader = csv.DictReader(text.splitlines())
@@ -61,10 +71,10 @@ def read_rows(path: Path) -> tuple[list[dict], list[str]]:
         try:
             row = json.loads(line)
         except json.JSONDecodeError as e:
-            problems.append(f"line {index} is not JSON ({e.msg})")
+            problems.append(MSG_LINE_IS_NOT_JSON.format(index=index, msg=e.msg))
             continue
         if not isinstance(row, dict):
-            problems.append(f"line {index} is not a JSON object")
+            problems.append(MSG_LINE_IS_NOT_A_JSON_OBJECT.format(index=index))
             continue
         rows.append(row)
     return rows, problems
@@ -125,21 +135,25 @@ def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, to
     for index, row in enumerate(rows, 1):
         unknown = [key for key in row if key not in cols]
         if unknown:
-            out.append(f"row {index}: fields not in the {kind} schema: {unknown}")
+            out.append(MSG_ROW_FIELDS_NOT_IN_THE_SCHEMA.format(index=index, kind=kind, unknown=unknown))
         if "id" in cols and not row.get("id"):
-            out.append(f"row {index}: missing id")
+            out.append(MSG_ROW_MISSING_ID.format(index=index))
         for key, typ in cols.items():
             if key not in row:
                 continue
             why = type_problem(row[key], typ, csv_row)
             if why:
-                out.append(f"row {index}: {key}={str(row[key])[:40]!r} {why}")
+                out.append(MSG_ROW_TYPE_PROBLEM.format(index=index, key=key, value=str(row[key])[:40], why=why))
             elif typ == "TIMESTAMPTZ" and row[key]:
                 timestamp = as_utc_timestamp(row[key])
                 if timestamp is not None and timestamp > now + tol:
-                    out.append(f"row {index}: {key} {row[key]} is in the future (now {now.isoformat()})")
+                    out.append(
+                        MSG_ROW_IS_IN_THE_FUTURE_NOW.format(
+                            index=index, key=key, value=row[key], isoformat=now.isoformat()
+                        )
+                    )
         if len(out) >= 5:
-            out.append("...")
+            out.append(MSG_MORE_PROBLEMS_OMITTED)
             break
     return out
 

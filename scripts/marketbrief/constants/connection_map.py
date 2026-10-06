@@ -1,0 +1,15 @@
+"""Exception and log messages (str.format templates) of connection map."""
+
+# ---------- connection map ----------
+MSG_ALIASES_MUST_BE_A_LIST_OF = "aliases must be a list of strings"
+MSG_TICKER_NOT_IN_THE_WATCHLIST = "ticker {ticker!r} not in the watchlist"
+MSG_RELATION_NOT_ONE_OF = "relation {relation!r} not one of {relations}"
+MSG_TARGET_NAME_MISSING = "target name missing"
+MSG_TARGET_KIND_NOT_ONE_OF = "target_kind {target_kind!r} not one of {target_kinds}"
+MSG_SOURCE_URL_MUST_BE_THE_HTTP = "source_url must be the http(s) page that states this edge"
+MSG_STATUS_NOT_ONE_OF = "status {status!r} not one of {statuses}"
+MSG_WEIGHT_MUST_BE_A_NUMBER_OR = "weight must be a number or null"
+MSG_TARGET_TICKER_MUST_BE_A_STRING = "target_ticker must be a string or null"
+MSG_AS_OF_IS_IN_THE_FUTURE = "as_of is in the future"
+MSG_AS_OF_MUST_BE_YYYY_MM = "as_of must be YYYY-MM-DD (date of the source)"
+MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL = "usage: graph.py {command} work/graph.jsonl"

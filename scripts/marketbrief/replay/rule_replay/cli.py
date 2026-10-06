@@ -46,6 +46,7 @@ from marketbrief.replay.rule_replay.narrative import headline, limitations, top_
 from marketbrief.replay.rule_replay.range_rows import replay_rows
 from marketbrief.replay.rule_replay.replay_statistics import summarize
 from marketbrief.replay.rule_replay.rule_html import html_report
+from marketbrief.constants.replay import MSG_ACI_GAMMA_ACI_BY_REGIME_AND, MSG_NO_TRADING_DAYS_IN_THE_WINDOW
 
 
 def run(cfg: dict, ranges_config: dict, con, start: date | None = None, end: date | None = None) -> tuple[dict, dict]:
@@ -149,13 +150,13 @@ def main() -> int:
     )
     args = parser.parse_args()
     if (args.aci_gamma is not None or args.aci_by_regime or args.aci_tune_end) and not args.aci:
-        raise SystemExit("--aci-gamma, --aci-by-regime and --aci-tune-end need --aci")
+        raise SystemExit(MSG_ACI_GAMMA_ACI_BY_REGIME_AND)
     cfg = cli.require_market(args)
     ranges_config = load_ranges_config(cfg["market"])
     con = database.connect(cfg["market"])
     summary, _ = run(cfg, ranges_config, con, args.start, args.end)
     if not summary["end"]:
-        raise SystemExit("no trading days in the window")
+        raise SystemExit(MSG_NO_TRADING_DAYS_IN_THE_WINDOW)
     suffix = ""
     if args.aci:
         before = summary

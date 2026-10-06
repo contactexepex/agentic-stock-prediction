@@ -132,7 +132,8 @@ def load_context(cfg: dict, rc: dict, con, now: str | None = None) -> RangeConte
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     rwiden = relation_flags.widen_by_ticker(cfg, rc, con)   # {} unless relation_widen.enabled
     now = now or utc_now()
-    smart = smart_money.range_flags(con, as_of, rc, now)   # fresh activist 13D accepted by made_at; widen off by default
+    # fresh activist 13D accepted by made_at; widen off by default
+    smart = smart_money.range_flags(con, as_of, rc, now)
     made = datetime.fromisoformat(now)
     first_open, first_close = first_target_open(cfg, as_of), first_target_close(cfg, as_of)
     # SEC 2.02 filings that are not results releases are dropped using the 10-Q/10-K reports

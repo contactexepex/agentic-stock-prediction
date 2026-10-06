@@ -11,6 +11,17 @@ from marketbrief.core import calendar, database, market_config, paths
 from marketbrief.constants.validation import FETCH_COL
 from marketbrief.pipeline.validate.collect_checks import check_files
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
+from marketbrief.constants.validation import (
+    MSG_LOST_ITS_REPORT_DATA_LINE,
+    MSG_NEWS_FEED_COUNT_UNAVAILABLE,
+    MSG_NOT_WRITTEN,
+    MSG_NOT_WRITTEN_2,
+    MSG_NO_RANGE_AS_OF_AND_NO,
+    MSG_SOURCE_QUERY_SKIPPED,
+    MSG_STILL_HAS_NUMBERED_AGENT_MARKERS,
+    MSG_STILL_HAS_AGENT_MARKERS,
+    MSG_WORK_CONTEXT_MD_MISSING_NARRATIVE_NUMBERS,
+)
 
 
 def records(con, sql: str, params=(), notes: list | None = None) -> list[dict]:
@@ -19,7 +30,11 @@ def records(con, sql: str, params=(), notes: list | None = None) -> list[dict]:
         return con.execute(sql, list(params)).df().to_dict("records")
     except Exception as e:  # noqa: BLE001 - noted in info.number_sources
         if notes is not None:
-            notes.append(f"source query skipped ({type(e).__name__}: {str(e).splitlines()[0][:120]}): {sql[:80]}")
+            notes.append(
+                MSG_SOURCE_QUERY_SKIPPED.format(
+                    name=type(e).__name__, value=str(e).splitlines()[0][:120], value_2=sql[:80]
+                )
+            )
         return []
 
 
@@ -103,7 +118,7 @@ def build_pool(cfg: dict, con, validate_config: dict, today: date, texts: list[s
 
         pool.add(None, "plain", len(build_jobs(cfg.get("news") or {}, cfg)))
     except Exception as e:  # noqa: BLE001 - only a source of numbers: noted, the check goes on
-        notes.append(f"news feed count unavailable ({type(e).__name__}: {e})")
+        notes.append(MSG_NEWS_FEED_COUNT_UNAVAILABLE.format(name=type(e).__name__, error=e))
     steps = work_dir() / "steps"
     narrative_numbers.collector_summaries(pool, sorted(steps.glob("collect_*.json")) if steps.exists() else [])
     since = today - timedelta(days=validate_config["narrative_news_days"])
@@ -171,7 +186,7 @@ def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
     if missing:
         res.block(
             "MISSING_RANGE",
-            f"no range as of {as_of} and no skip reason: {missing[:10]}",
+            MSG_NO_RANGE_AS_OF_AND_NO.format(as_of=as_of, value=missing[:10]),
             [missing_item.split()[0] for missing_item in missing],
         )
     res.info["ranges_skipped"] = {key: len(skipped_count) for key, skipped_count in skipped.items()}
@@ -202,20 +217,24 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
     if not report_path.exists():
         res.block(
             "MISSING_REPORT",
-            f"{report_path.relative_to(paths.ROOT) if report_path.is_relative_to(paths.ROOT) else report_path} not "
-            f"written",
+            MSG_NOT_WRITTEN.format(
+                value=report_path.relative_to(paths.ROOT) if report_path.is_relative_to(paths.ROOT) else report_path
+            ),
         )
         return
     filled = report_path.read_text(encoding="utf-8")
     slack = slack_path.read_text(encoding="utf-8") if slack_path.exists() else None
     if "<!-- AGENT:" in filled:
-        res.block("AGENT_MARKERS", f"{report_path.name} still has {filled.count('<!-- AGENT:')} AGENT marker(s)")
+        res.block(
+            "AGENT_MARKERS",
+            MSG_STILL_HAS_NUMBERED_AGENT_MARKERS.format(name=report_path.name, count=filled.count("<!-- AGENT:")),
+        )
     if "<!-- report-data:" not in filled:
-        res.block("REPORT_DATA_LINE", f"{report_path.name} lost its report-data line")
+        res.block("REPORT_DATA_LINE", MSG_LOST_ITS_REPORT_DATA_LINE.format(name=report_path.name))
     if slack is None:
-        res.block("MISSING_SLACK_DRAFT", f"{slack_path.name} not written")
+        res.block("MISSING_SLACK_DRAFT", MSG_NOT_WRITTEN_2.format(name=slack_path.name))
     elif "<!-- AGENT:" in slack:
-        res.block("AGENT_MARKERS", f"{slack_path.name} still has AGENT marker(s)")
+        res.block("AGENT_MARKERS", MSG_STILL_HAS_AGENT_MARKERS.format(name=slack_path.name))
     skel_r, skel_s = skeletons(cfg, session)
     pack = work_dir() / "context.md"
     pool = build_pool(
@@ -259,7 +278,5 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
                 ],
             )
     if not pack.exists():
-        res.warn(
-            "NO_CONTEXT_PACK", "work/context.md missing: narrative numbers checked against the skeleton and DuckDB only"
-        )
+        res.warn("NO_CONTEXT_PACK", MSG_WORK_CONTEXT_MD_MISSING_NARRATIVE_NUMBERS)
     res.info["report"] = checked

@@ -5,6 +5,7 @@
   confirmed_primary (news_verified_asof). Any other filing or announcement (another ticker's, or one
   that confirms no event, e.g. a Form 4 or a share allotment) is unverified;
 - an id no row lists, or any id before the feature existed, is unverified."""
+
 from __future__ import annotations
 
 import pandas as pd

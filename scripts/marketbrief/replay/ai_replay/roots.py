@@ -11,6 +11,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from marketbrief.core import paths
 from marketbrief.constants.ai_replay import MARKER
+from marketbrief.constants.ai_replay import (
+    MSG_FAILED_IN_EXIT,
+    MSG_ROOT_ALREADY_HOLDS_A_PREPARED_REPLAY,
+    MSG_ROOT_EXISTS_IS_NOT_EMPTY_AND,
+    MSG_ROOT_MUST_NOT_BE_THE_SOURCE,
+    MSG_ROOT_MUST_NOT_CONTAIN_THE_SOURCE,
+)
 
 
 @contextmanager
@@ -46,7 +53,11 @@ def run_script(
 def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout: Path | None = None) -> str:
     process = run_script(script, root, market, *args, now=now)
     if process.returncode != 0:
-        raise SystemExit(f"{script} failed in {root} (exit {process.returncode}):\n{process.stderr[-3000:]}")
+        raise SystemExit(
+            MSG_FAILED_IN_EXIT.format(
+                script=script, root=root, returncode=process.returncode, value=process.stderr[-3000:]
+            )
+        )
     if stdout is not None:
         stdout.parent.mkdir(parents=True, exist_ok=True)
         stdout.write_text(process.stdout, encoding="utf-8")
@@ -63,12 +74,12 @@ def json_or_text(text: str):
 def check_root(root: Path, src: Path, force: bool) -> None:
     root, src = root.resolve(), src.resolve()
     if root == src or src in root.parents and (src / "data") in [root, *root.parents]:
-        raise SystemExit(f"--root {root} must not be the source root or inside its data/")
+        raise SystemExit(MSG_ROOT_MUST_NOT_BE_THE_SOURCE.format(root=root))
     if root in src.parents or root == src:
-        raise SystemExit(f"--root {root} must not contain the source root")
+        raise SystemExit(MSG_ROOT_MUST_NOT_CONTAIN_THE_SOURCE.format(root=root))
     if root.exists() and any(root.iterdir()):
         if not (root / MARKER).exists():
-            raise SystemExit(f"--root {root} exists, is not empty and is not an ai_replay root; choose another path")
+            raise SystemExit(MSG_ROOT_EXISTS_IS_NOT_EMPTY_AND.format(root=root))
         if not force:
-            raise SystemExit(f"--root {root} already holds a prepared replay; pass --force to rebuild it")
+            raise SystemExit(MSG_ROOT_ALREADY_HOLDS_A_PREPARED_REPLAY.format(root=root))
         shutil.rmtree(root)

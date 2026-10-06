@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from marketbrief.core import calendar
 from marketbrief.core.cli import market_arg, require_market
+from marketbrief.constants.pipeline_messages import MSG_NOW_NEEDS_A_UTC_OFFSET_E
 
 
 def status(cfg: dict, now: datetime) -> dict:
@@ -44,7 +45,7 @@ def main() -> int:
     cfg = require_market(args)
     now = datetime.fromisoformat(args.now) if args.now else datetime.now(ZoneInfo(cfg["timezone"]))
     if now.tzinfo is None:
-        raise SystemExit("--now needs a UTC offset, e.g. 2026-10-05T14:40:00+00:00")
+        raise SystemExit(MSG_NOW_NEEDS_A_UTC_OFFSET_E)
     print(json.dumps(status(cfg, now), indent=2))
     return 0
 

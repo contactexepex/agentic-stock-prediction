@@ -17,6 +17,11 @@ from marketbrief.replay.ai_replay.copy_asof import copy_asof
 from marketbrief.replay.ai_replay.cutoff import cutoff_for, leakage_label, next_session, training_cutoff
 from marketbrief.replay.ai_replay.evidence import evidence, evidence_section
 from marketbrief.replay.ai_replay.roots import check_root, data_root, json_or_text, run_step
+from marketbrief.constants.ai_replay import (
+    MSG_IS_NOT_A_TRADING_DAY,
+    MSG_IS_ON_OR_BEFORE_THE_MODEL,
+    MSG_NO_BAR_DATED_IN_LATEST_KEPT,
+)
 
 
 def assumed_earnings(cfg: dict, src: Path, as_of_day: date, cutoff: datetime, days: int) -> list[dict]:
@@ -67,13 +72,9 @@ def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     src = Path(src or paths.ROOT)
     model_cut = training_cutoff()
     if leakage_label(as_of_day, model_cut) == CONTAMINATED and not allow_training_period:
-        raise SystemExit(
-            f"{as_of_day} is on or before the model's training cutoff {model_cut} (config/settings.yaml "
-            "model_training_cutoff): contaminated, not a fair test. "
-            "Pass --allow-training-period to prepare it anyway."
-        )
+        raise SystemExit(MSG_IS_ON_OR_BEFORE_THE_MODEL.format(as_of_day=as_of_day, model_cut=model_cut))
     if not calendar.is_session(cfg, as_of_day):
-        raise SystemExit(f"{as_of_day} is not a {market} trading day")
+        raise SystemExit(MSG_IS_NOT_A_TRADING_DAY.format(as_of_day=as_of_day, market=market))
     check_root(root, src, force)
     session, cutoff = next_session(cfg, as_of_day), cutoff_for(cfg, as_of_day)
     root.mkdir(parents=True, exist_ok=True)
@@ -92,7 +93,7 @@ def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     with data_root(root):
         last = connect(market).execute("SELECT max(date) FROM ohlc WHERE ticker = ?", [bench]).fetchone()[0]
     if last is None or pd.Timestamp(last).date() != as_of_day:
-        raise SystemExit(f"no {bench} bar dated {as_of_day} in {src} (latest kept: {last})")
+        raise SystemExit(MSG_NO_BAR_DATED_IN_LATEST_KEPT.format(bench=bench, as_of_day=as_of_day, src=src, last=last))
     now = cutoff.isoformat()
     steps = {
         "features": json_or_text(run_step("features.py", root, market, now)),

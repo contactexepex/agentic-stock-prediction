@@ -175,7 +175,13 @@ class HorizonReplay:
             next_date = next_earnings(self.extra["earnings"].get(ticker, []), context.day)
             in_horizon, multiple = bool(next_date and next_date <= context.target_date), None
         sigma_h, _ = range_math.horizon_sigma(
-            float(observation["sigma"]), self.horizon, in_horizon, ranges_config, context.regime, context.major, multiple
+            float(observation["sigma"]),
+            self.horizon,
+            in_horizon,
+            ranges_config,
+            context.regime,
+            context.major,
+            multiple,
         )
         center = 0.0
         beta, index_cue = observation["beta"], observation["idx_cue"]
