@@ -53,3 +53,6 @@ MSG_FETCH_ERROR = "{kind}: {error_type}: {detail}"
 FETCH_ERROR_TLS, FETCH_ERROR_NETWORK = "tls", "network"
 FETCH_ERROR_TEXT_LIMIT = 160
 CONTENT_TYPE_TEXT_LIMIT = 40
+
+# ---------- article extraction ----------
+MSG_MESSAGE = "{name}: {name_2}"

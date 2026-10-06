@@ -31,6 +31,7 @@ from marketbrief.constants.events import (
     YAHOO_EARNINGS,
     YAHOO_EVENT_TYPE_COLUMN,
 )
+from marketbrief.constants.events import MSG_MESSAGE
 
 DIVIDEND_DECIMALS = 6
 
@@ -53,7 +54,7 @@ def yf_earnings(
             answered = True
         except Exception as exc:
             frame = None
-            errors.append(f"{method_name.strip('_')}: {str(exc)[:METHOD_ERROR_LIMIT]}")
+            errors.append(MSG_MESSAGE.format(strip=method_name.strip("_"), value=str(exc)[:METHOD_ERROR_LIMIT]))
         if frame is not None and not frame.empty:
             used = method_name.strip("_")
             break

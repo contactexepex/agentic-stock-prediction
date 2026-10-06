@@ -39,3 +39,6 @@ MSG_INCOMPLETE_CONFIDENTIAL = "holdings omitted as confidential"
 MSG_INCOMPLETE_PLACEHOLDER = "placeholder table (CUSIP 000000000)"
 MSG_INCOMPLETE_TABLE_LINES = "table has {lines} of {total} lines"
 MSG_NO_INFORMATION_TABLE = "no information table in filing"
+
+# ---------- 13F holdings ----------
+MSG_REPORTED_BY = "{filer} {period}: reported by {by}"

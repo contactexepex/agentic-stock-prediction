@@ -21,6 +21,7 @@ from marketbrief.constants.articles import (
     EXTRACTOR_TRAFILATURA,
     MSG_UNPARSABLE_HTML,
 )
+from marketbrief.constants.articles import MSG_MESSAGE
 
 ARTICLE_TYPES = ("BlogPosting", "LiveBlogPosting")
 DATE_PUBLISHED_META = ("article:published_time", "datePublished", "parsely-pub-date", "publish-date", "pubdate")
@@ -147,7 +148,7 @@ def best_text(
         try:
             text = extract_jsonld(article) if name == EXTRACTOR_JSONLD else EXTRACTORS[name](html, url)
         except Exception as exc:
-            errors.append(f"{name}: {type(exc).__name__}")
+            errors.append(MSG_MESSAGE.format(name=name, name_2=type(exc).__name__))
             continue
         if len(text) > len(best):
             best, best_by = text, name

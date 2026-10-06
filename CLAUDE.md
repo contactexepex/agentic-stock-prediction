@@ -71,7 +71,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `attempt` = record the monthly refresh in `data/<market>/graph_runs/`)
 - SEC CIKs: every SEC collector reads a ticker's filings from its mapped CIK plus the CIKs under
   `fundamentals.predecessor_ciks` in `config/markets/us.yaml` (XOM: 2115436 and 34088), each
-  accession once (`sec.ticker_submissions`).
+  accession once (`sec_filings.ticker_submissions`).
 - SEC acceptance times: the submissions JSON `acceptanceDateTime` can be shifted later by the New
   York UTC offset (+4h EDT, +5h EST) for a whole CIK's file (seen from 2026-10-05). `Edgar.recent`
   checks each file against the SGML header `<ACCEPTANCE-DATETIME>` (Eastern) of its newest and
@@ -222,7 +222,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   the full suite after any merge that brings in code changes (CI also runs on push). New end-to-end
   tests go in `SLOW` in `tests/conftest.py`.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
-  in `config/validate.yaml`), not by the judge: one retry (the run is time-boxed), then the failed
+  in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, not by the judge: one retry (the run is time-boxed), then the failed
   output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's
   `data_quality`. The judge still checks the monthly graph-builder edges, and once a week
   (`scripts/spotcheck.py --if-due`) a deterministic sample of the past week's output (2 forecasts

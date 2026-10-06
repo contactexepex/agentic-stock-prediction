@@ -31,7 +31,8 @@ Method:
    - Outputs: missing files; record counts that differ from the input; duplicate or invalid
      ids; malformed JSONL.
    - Fabrication: evidence ids or numbers that do not exist in the data or the context pack
-     (reflector lessons: re-run `python scripts/lessons.py validate work/lessons.jsonl`).
+     (in a build review of the reflection log, re-run `python scripts/lessons.py validate` on the
+     file under review; daily lessons are gated by that command, not by the judge).
    - Code: stubs, TODOs, `pass`, hard-coded results, swallowed exceptions; features that are
      configured but never called.
    - Tests: tests that assert nothing, skip, or only test mocks of the code under test.

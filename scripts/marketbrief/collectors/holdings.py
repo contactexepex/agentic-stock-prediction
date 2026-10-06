@@ -59,6 +59,7 @@ from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.sources.sec_acceptance import time_summary, time_warnings
 from marketbrief.sources.sec_client import Edgar, archive_url
 from marketbrief.sources.sec_filings import filings_of_forms, require_sec
+from marketbrief.constants.sec_collection import MSG_REPORTED_BY
 
 
 def stored(market: str) -> tuple[set[str], dict[str, str]]:
@@ -111,7 +112,7 @@ class HoldingsRun:
         """A 13F-NT (notice: reported by another manager) gets only the filing row and counts as filed."""
         by = "; ".join(cover["other_managers"]) or MSG_UNNAMED_MANAGER
         self.rows.append(filing_row(ref, REPORT_TYPE_NOTICE, None, False, f"reported by {by}"))
-        self.notices.append(f"{ref.filer} {period}: reported by {by}")
+        self.notices.append(MSG_REPORTED_BY.format(filer=ref.filer, period=period, by=by))
 
     def load_holdings(self, ref: FilingRef, cover: dict, period: str, table: tuple) -> None:
         """The filing row and the watched rows of a holdings report (zero rows only when it is complete)."""

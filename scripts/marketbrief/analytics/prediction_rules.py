@@ -29,6 +29,24 @@ from marketbrief.constants.verification import (
 )
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
+from marketbrief.constants.prediction_rules import (
+    MSG_AS_OF_DATE_IS_NOT,
+    MSG_CONFIDENCE_MUST_BE_GOT,
+    MSG_DIRECTION_MUST_BE_UP_OR_DOWN,
+    MSG_EVIDENCE_IDS_NOT_IN,
+    MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT,
+    MSG_HAS_EARNINGS_WITHIN_1_DAY_DAYS,
+    MSG_HORIZON_DAYS_MUST_BE_1_OR,
+    MSG_ID_ALREADY_RECORDED,
+    MSG_ID_MUST_BE_AS_OF_DATE,
+    MSG_INDICATOR_QUALITY_IS_BLOCKED,
+    MSG_MADE_AT_IS_NOT_A_TIMESTAMP,
+    MSG_MISSING,
+    MSG_PROMPT_VERSION_MUST_BE_TEXT,
+    MSG_RANGE_WIDEN_MUST_BE_0_GOT,
+    MSG_RATIONALE_MUST_BE_TEXT_OF_AT,
+    MSG_UNKNOWN_TICKER,
+)
 
 
 class RuleLabels(NamedTuple):
@@ -43,17 +61,17 @@ def identity_errors(rec: dict, ctx: dict, seen: set[str], want, as_of, label: st
     errs = []
     ticker, horizon = rec["ticker"], rec["horizon_days"]
     if ticker not in ctx["tickers"]:
-        errs.append(f"unknown ticker {ticker!r}")
+        errs.append(MSG_UNKNOWN_TICKER.format(ticker=ticker))
     if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon not in HORIZONS:
-        errs.append(f"horizon_days must be 1 or 5 (got {horizon!r})")
+        errs.append(MSG_HORIZON_DAYS_MUST_BE_1_OR.format(horizon=horizon))
     if as_of is not None and str(rec["as_of_date"]) != str(want):
-        errs.append(f"as_of_date {rec['as_of_date']} is not {label} {want}")
+        errs.append(MSG_AS_OF_DATE_IS_NOT.format(as_of_date=rec["as_of_date"], label=label, want=want))
     if rec["id"] != f"{rec['as_of_date']}-{ticker}-{horizon}d":
         errs.append(
-            f"id must be <as_of_date>-<ticker>-<horizon>d = {rec['as_of_date']}-{ticker}-{horizon}d (got {rec['id']!r})"
+            MSG_ID_MUST_BE_AS_OF_DATE.format(as_of_date=rec["as_of_date"], ticker=ticker, horizon=horizon, id=rec["id"])
         )
     if rec["id"] in seen:
-        errs.append(f"id {rec['id']} already recorded")
+        errs.append(MSG_ID_ALREADY_RECORDED.format(id=rec["id"]))
     return errs
 
 
@@ -61,15 +79,15 @@ def value_errors(rec: dict) -> list[str]:
     """Direction, confidence, range_widen and rationale rules."""
     errs = []
     if rec["direction"] not in ("up", "down"):
-        errs.append(f"direction must be up or down (got {rec['direction']!r})")
+        errs.append(MSG_DIRECTION_MUST_BE_UP_OR_DOWN.format(direction=rec["direction"]))
     c = rec["confidence"]
     if not isinstance(c, (int, float)) or isinstance(c, bool) or not (CONF_MIN <= c <= CONF_MAX):
-        errs.append(f"confidence must be {CONF_MIN:.2f}-{CONF_MAX:.2f} (got {c!r})")
+        errs.append(MSG_CONFIDENCE_MUST_BE_GOT.format(conf_min=CONF_MIN, conf_max=CONF_MAX, c=c))
     w = rec.get("range_widen")
     if w is not None and (not isinstance(w, (int, float)) or isinstance(w, bool) or not 0 <= w <= WIDEN_MAX):
-        errs.append(f"range_widen must be 0-{WIDEN_MAX} (got {w!r})")
+        errs.append(MSG_RANGE_WIDEN_MUST_BE_0_GOT.format(widen_max=WIDEN_MAX, w=w))
     if not isinstance(rec["rationale"], str) or len(rec["rationale"].split()) > RATIONALE_WORDS:
-        errs.append(f"rationale must be text of at most {RATIONALE_WORDS} words")
+        errs.append(MSG_RATIONALE_MUST_BE_TEXT_OF_AT.format(rationale_words=RATIONALE_WORDS))
     return errs
 
 
@@ -81,11 +99,11 @@ def evidence_errors(rec: dict, ctx: dict, made, label: str) -> list[str]:
     errs = []
     unknown = [x for x in ids if x not in ctx["evidence"]]
     if unknown:
-        errs.append(f"evidence ids not in {label}: {unknown}")
+        errs.append(MSG_EVIDENCE_IDS_NOT_IN.format(label=label, unknown=unknown))
     if isinstance(ctx["evidence"], dict) and made is not None:
         late = [x for x in ids if ctx["evidence"].get(x) is not None and ctx["evidence"][x] > made]
         if late:
-            errs.append(f"evidence published after made_at {made.isoformat()}: {late}")
+            errs.append(MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT.format(isoformat=made.isoformat(), late=late))
     return errs
 
 
@@ -98,9 +116,11 @@ def feature_errors(ctx: dict, ticker: str, want) -> list[str]:
         return [f"no indicator snapshot for {ticker}" + (f" on {want}" if want is not None else "")]
     errs = []
     if features["quality"] == "BLOCKED":
-        errs.append(f"{ticker} indicator quality is BLOCKED")
+        errs.append(MSG_INDICATOR_QUALITY_IS_BLOCKED.format(ticker=ticker))
     if features["days_to_earnings"] is not None and features["days_to_earnings"] <= 1:
-        errs.append(f"{ticker} has earnings within 1 day (days_to_earnings {features['days_to_earnings']})")
+        errs.append(
+            MSG_HAS_EARNINGS_WITHIN_1_DAY_DAYS.format(ticker=ticker, days_to_earnings=features["days_to_earnings"])
+        )
     return errs
 
 
@@ -120,7 +140,7 @@ def check_prediction(
     errs = [f"unknown field {k!r}" for k in rec if k not in cols]
     for k in REQUIRED + (("made_at",) if require_made_at else ()):
         if rec.get(k) in (None, ""):
-            errs.append(f"missing {k}")
+            errs.append(MSG_MISSING.format(k=k))
     if errs:
         return errs
     ticker = rec["ticker"]
@@ -131,10 +151,10 @@ def check_prediction(
     if rec.get("made_at") is not None:
         made = as_utc_timestamp(rec["made_at"])
         if made is None:
-            errs.append(f"made_at is not a timestamp ({rec['made_at']!r})")
+            errs.append(MSG_MADE_AT_IS_NOT_A_TIMESTAMP.format(made_at=rec["made_at"]))
     errs += evidence_errors(rec, ctx, made, labels.evidence)
     if not isinstance(rec["prompt_version"], str):
-        errs.append("prompt_version must be text")
+        errs.append(MSG_PROMPT_VERSION_MUST_BE_TEXT)
     return errs + feature_errors(ctx, ticker, want)
 
 
