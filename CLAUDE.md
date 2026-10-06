@@ -14,7 +14,12 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
-  implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
+  implied vol; India skips). Then `score_predictions` (calls and ranges), `lessons` (reflection log,
+  pattern from TauricResearch/TradingAgents: `prepare` writes the deterministic facts of settled calls
+  without a lesson, the reflector agent writes one lesson of at most 60 words each, `validate` checks
+  each cites an existing settled prediction id and its numbers match the outcome, `add` appends to
+  `data/<market>/lessons/`; the context pack shows a lesson only from its `available_from` = scoring
+  time, MB_NOW-aware), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
   PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
   the `AGENT` markers, see `templates/report.md`). After the judge passes, `html_report` builds
@@ -26,7 +31,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
   each past day's 1d/5d ranges as `ranges.py` builds them, the regime, and direction baselines
   (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
-  and `data/<market>/replays/` (DESIGN.md section 7). Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
+  and `data/<market>/replays/` (DESIGN.md section 7). `ai_replay` replays the AI agents as of past
+  days (never runs an LLM itself); ForecastBench leakage rule: only as-of dates after
+  `model_training_cutoff` in `config/settings.yaml` are a fair test, earlier ones are labelled
+  `contaminated` on every row and the score page and scored separately, never pooled. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
   `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
   switchable in `config/ranges.yaml`).
@@ -90,11 +98,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `reports/<market>/<session_date>.html` the self-contained reader's report linked from Slack
   (filters by sector and company; no network needed) and `reports/<market>/index.html` (all days);
   chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
-  `config/settings.yaml` holds the repo URL, optional `pages_url` and the Slack channel id
+  `config/settings.yaml` holds the repo URL, optional `pages_url`, the Slack channel id and the AI
+  model's `model_training_cutoff` (ai_replay's fair vs contaminated split)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`
-- `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
+- `.claude/agents/` subagents: reflector (one lesson per settled call, after scoring), news-analyst,
+  bull-researcher, bear-researcher, forecaster (reads the lessons; never overriding the prediction rules),
   graph-builder (monthly connection map; every edge cites a public source), and judge
   (independent verifier; every agent's output is judged before it is appended, committed or posted)
 - `routine/PROMPT.md` the routines' saved prompt (one per market)

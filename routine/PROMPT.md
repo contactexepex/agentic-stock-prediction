@@ -5,6 +5,7 @@ CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 Judge every agent and every narrative (CLAUDE.md "Judging every change"). Run the judge
 subagent with three inputs: the exact instructions you gave, the output's claims, and where the
 output lives. Judge:
+- the reflector (`work/lessons.jsonl`, step 4a; also gated by `scripts/lessons.py validate`);
 - the news-analyst (`work/enriched.jsonl` plus its brief);
 - each researcher (its returned case text; save it to `work/bull.md` / `work/bear.md` first);
 - the forecaster (`work/predictions.jsonl` plus its table);
@@ -12,7 +13,7 @@ output lives. Judge:
 - the filled report and Slack draft in step 11;
 - the graph-builder (`work/graph.jsonl`) in step 14.
 Agent records stay in `work/` until the judge returns PASS; only then append them to `data/`.
-Delete `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
+Delete `work/lessons.jsonl`, `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
 runs and right after each append, so a stale file can never be appended twice.
 On FAIL, send the fix list back once (to the agent, or fix your own narrative) and judge again.
 The daily run allows ONE retry because it is time-boxed; build work repeats until PASS. If it
@@ -25,14 +26,14 @@ still fails:
 - your narrative failed (summary or report): replace each failed section with "Narrative withheld:
   failed review (<reason>)"; the numbers, tables and charts written by the scripts stay.
 Record every FAIL with its reason where it can still be read before the next commit: FAILs from
-steps 7-10 in both the report's `data_quality` section and the daily summary; a step 11 FAIL only
+steps 4a and 7-10 in both the report's `data_quality` section and the daily summary; a step 11 FAIL only
 in `data_quality` (the summary was already judged in step 10); a step 14 FAIL only in
 `data/<market>/judgments/` (the brief is already posted), and the next run lists it in its
 `data_quality`: the context pack's section "Judge FAILs from the previous run not yet in a
 report" shows it (step 11).
 Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/MM/TODAY.jsonl`
 (via a work/ file and `cat >>`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>` (unique on a same-day rerun),
-`run_date`, `agent` (one of news-analyst, bull-researcher, bear-researcher, forecaster, summaries,
+`run_date`, `agent` (one of reflector, news-analyst, bull-researcher, bear-researcher, forecaster, summaries,
 report, slack, graph-builder), `round`, `verdict`, `summary` (max 40 words), `dropped` (what was not
 used, or null), `recorded_at` (ISO UTC). Verdicts from steps 10-11 are listed in `data_quality` and
 committed in step 12; the step 14 verdict is committed in step 14 (the brief is already posted).
@@ -86,6 +87,20 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    `sec_failed` / `nse_failed` tickers in `data_quality`.
 
 4. Score: `python scripts/score_predictions.py`.
+
+4a. Lessons (reflection log, after scoring): `python scripts/lessons.py prepare` writes the facts of
+    settled calls that have no lesson yet to `work/lesson_facts.jsonl` (deterministic: the call, its
+    evidence ids and rationale, the outcome and the close vs its published range; a call whose range
+    is still open waits). If its `n` is 0, skip to step 5. Otherwise delete `work/lessons.jsonl`, run
+    the reflector subagent with the market (it writes one lesson of at most 60 words per call to
+    `work/lessons.jsonl`), then run the gate `python scripts/lessons.py validate work/lessons.jsonl`
+    (exit 0 = every lesson cites an existing settled prediction id, no stored lesson repeats, and every
+    number in its text and every copied fact matches the stored call and outcome; exit 1 lists the
+    errors) and the judge. Only when both pass: `python scripts/lessons.py add work/lessons.jsonl`
+    (it validates again and appends the facts recomputed from `data/` plus the text, all or nothing),
+    then delete `work/lessons.jsonl`. On FAIL after the one retry, add nothing (the calls stay in the
+    next run's `prepare`) and list it in `data_quality`. The context pack (step 6) shows each lesson
+    only from its `available_from` (the outcome's scoring time) on.
 
 5. Indicators, regime and calibration: `python scripts/features.py`, then
    `python scripts/calibrate.py`. Keep both JSON summaries.

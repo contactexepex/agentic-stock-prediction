@@ -81,6 +81,39 @@ and the event calendar.
 - **forecaster:** direction and confidence (0.50-0.90), or abstain. It may shift the centre
   within a capped amount and may **widen** a range for an event it read about, but may never
   **narrow** a range below the formula. All numbers come from scripts, never from memory.
+- **reflector:** after scoring, one short lesson per settled call (the reflection log below).
+
+**Reflection log** (`scripts/lessons.py`, `.claude/agents/reflector.md`; pattern adapted from
+TauricResearch/TradingAgents, Apache-2.0, `tradingagents/memory/reflection.py` and `settlement.py`:
+settle past decisions against realised outcomes, write a short lesson, and let later decisions read
+the same ticker's recent lessons plus recent ones from other tickers, point-in-time). Here:
+- Facts are deterministic. `lessons.py prepare` (routine step 4a, right after `score_predictions`)
+  lists every settled call without a lesson: the call (direction, confidence, horizon, rationale,
+  evidence ids and what each said), the outcome (base and target close, return, hit) and, when a
+  range was published for it, the bands, whether the close landed in the 50%/80% band and its
+  position (`below_80`, `in_80_below_50`, `in_50`, `in_80_above_50`, `above_80`). A call whose range
+  is still open (not late, not scored) waits for it, so the lesson can cite it.
+- Only the paragraph is written by an agent: the reflector, at most 60 words, citing only the stored
+  call and outcome: what happened, what the evidence did or did not predict, one takeaway.
+- Gate (deterministic, `lessons.py validate`): each record cites an existing settled prediction id,
+  no stored lesson is repeated, 1-60 words, every copied fact equals the stored one, and every number
+  in the text matches the call or its outcome (return %, with the right sign if signed; confidence;
+  closes; band edges; the close's % distance from a band edge; the horizon; 50/80 for the bands; a
+  number already in the rationale; dates and ids are skipped). Then the judge. `lessons.py add`
+  validates again and appends the facts recomputed from `data/` (never the agent's copy) plus the
+  text to `data/<market>/lessons/` (schema `lessons`), all or nothing.
+- Availability: `settled_at` = the outcome's `scored_at`; `available_from` = the latest `scored_at`
+  of the facts cited (outcome and range outcome). `context.py` adds "Lessons from past calls": the 3
+  most recent lessons market-wide and each ticker's last 3, only with `available_from` <= the run's
+  clock (`common.clock()`, so an `MB_NOW` replay sees exactly what was settled by then; a newer
+  version of the same lesson id replaces the older one). `ai_replay.py prepare` keeps lessons by
+  `available_from` and `target_date` <= D. Tests (`tests/test_lessons.py`): no lesson visible before
+  its `available_from`; perturbing outcomes and lessons that became known after a past made_at leaves
+  that made_at's section byte-identical; validation catches a wrong number, a wrong sign, a
+  nonexistent or unsettled id, a wrong copied fact; the section's per-ticker and market-wide picks.
+- The forecaster (`forecast-v8`) weighs lessons as single anecdotes: they can make it more cautious
+  or confirm a setup the track record supports, never override the prediction rules, never raise
+  confidence beyond the evidence and track record, and are never evidence ids.
 
 ## 6. Scoring (the judge)
 | What | Metric | Must beat |
@@ -130,6 +163,16 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
 because the model may have seen past outcomes. Days after its training data (as-of dates after
 2026-06-30) are a fair test, so the agents can be replayed there, strictly as of the day. The
 script is deterministic and never runs an LLM; the orchestrating session runs the agents.
+- Leakage rule, from ForecastBench (forecastingresearch/forecastbench, MIT; Karger et al., arXiv
+  2409.19839: questions must resolve after the model's training cutoff, else the model may already
+  know the answer): the cutoff is `model_training_cutoff` in `config/settings.yaml` (2026-06-30).
+  An as-of date after it is `fair`; on or before it, `contaminated`. `prepare` refuses a contaminated
+  date unless `--allow-training-period` and labels its summary (`test`, `model_training_cutoff`);
+  `record` labels every stored call and day; `score` relabels from the current config, scores the
+  `fair` and `contaminated` groups separately (each its own hit rates, bands, baselines, abstention;
+  nothing pooled), and the page shows the fair result first and any contaminated days in a separate,
+  labelled section, with a `Test` column on every per-day and per-call row. Tests: the two groups'
+  numbers come only from their own rows, and moving the cutoff in config relabels a date.
 - `dates --market M`: the sample, every 5th exchange trading day from 2026-07-01 to 2026-09-25
   (13 per market), each with its next session and cutoff.
 - `backfill --market M --source S --since 2026-06-01`: S is a scratch source root (the repo, its
@@ -149,7 +192,7 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
   (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
   time; events first seen by the cutoff plus backfilled past events dated <= D; predictions,
-  ranges, outcomes and snapshots by their own made/scored/computed time; bulk/block deals by trade
+  ranges, outcomes and snapshots by their own made/scored/computed time, lessons by `available_from`; bulk/block deals by trade
   date <= D (assumed: NSE publishes them after the close; listed under `assumptions`); kinds with
   only an observation date (macro, shorts, FPI, indices, flows, delivery) only if first seen by the
   cutoff. Upcoming earnings: only rows first seen by the cutoff count. `--assume-earnings-known DAYS`
@@ -641,3 +684,17 @@ against the user's Aura instance returned `[[1]]`. No live sync has been run yet
    ```
    `kind` names the data kind (`holdings_13f` and `shareholding` read `data/<market>/holdings/`) and
    `record_id` the line's `id`.
+
+## 13. Credits (ideas adopted from other projects)
+- **Reflection log** (section 5): TauricResearch/TradingAgents (https://github.com/TauricResearch/TradingAgents,
+  Apache-2.0). Its memory log settles each past decision against the realised return, has a model
+  write a short reflection (`tradingagents/memory/reflection.py`, `settlement.py`), and gives later
+  runs the same ticker's recent decisions plus recent lessons from other tickers, filtered to those
+  resolved by the trade date in historical runs. Only the idea is reused, no code: here the facts
+  are computed by `scripts/lessons.py`, the lesson is checked number by number, and visibility is
+  keyed on the scoring time.
+- **Leakage rule for the AI replay** (section 7): ForecastBench (https://github.com/forecastingresearch/forecastbench,
+  MIT; Karger et al., "ForecastBench: A Dynamic Benchmark of AI Forecasting Capabilities", arXiv
+  2409.19839). Only forecasts on questions that resolve after the model's training cutoff are a
+  fair test; here as-of dates on or before `model_training_cutoff` are labelled contaminated and
+  scored separately.

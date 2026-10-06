@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """As-of replay harness for the AI agents (deterministic; it never runs an LLM itself).
 
-The model's training data runs to about mid-2026, so only trading days after MODEL_CUTOFF
-(2026-06-30) are a fair test of the forecaster. For a past as-of date D (a trading day: its close
+The model's training data runs to about mid-2026. ForecastBench's leakage rule (Karger et al.,
+arXiv 2409.19839): only as-of dates AFTER the model's training cutoff (`model_training_cutoff` in
+config/settings.yaml, 2026-06-30) are a fair test of the forecaster; earlier dates are labelled
+"contaminated" (the model may have seen what happened), `prepare` refuses them unless
+--allow-training-period, and `record`/`score` label every row and score the two groups separately,
+never pooled. For a past as-of date D (a trading day: its close
 is known) this script rebuilds what the routine would have known pre-open on the next session S,
 lets the orchestrator run the agents on it, then records and scores their calls:
 
@@ -35,6 +39,7 @@ Inclusion rules of `prepare` (per data kind; a row is kept only if public by the
   filing time, else first_seen_at; announcements: published_at; financials: filed_at;
 - events: first_seen_at <= cutoff, plus backfilled past events (source *_history) dated <= D;
 - predictions, ranges: made_at; outcomes, range_outcomes: scored_at and target_date <= D;
+  lessons: available_from and target_date <= D;
   features, regime, calibration, reviews, replays: computed_at; judgments: recorded_at;
   quotes, options: collected_at; graph: added_at; graph_runs: run_at;
 - deals: trade date <= D (assumed: NSE publishes the day's bulk and block deals after the close);
@@ -65,6 +70,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
+import yaml
 
 import common
 import events as ev
@@ -72,7 +78,7 @@ import replay
 from common import CODE, SCHEMAS, connect, load_market, market_names, utc_now
 from features import load_bars
 
-MODEL_CUTOFF = date(2026, 6, 30)            # the model may have seen prices up to about here
+FAIR, CONTAMINATED = "fair", "contaminated"   # ForecastBench leakage rule (see the docstring)
 SAMPLE_START, SAMPLE_END, SAMPLE_STEP = date(2026, 7, 1), date(2026, 9, 25), 5
 # The data cutoff (and made_at) is the routine's scheduled start on the next session, exchange time
 # (docs/DESIGN.md section 2); other markets: REGULAR_LEAD before the open.
@@ -96,7 +102,7 @@ PUBLIC_AT: dict[str, list[str]] = {
     "announcements": ["published_at", "first_seen_at"],
     "financials": ["filed_at", "first_seen_at"],
     "predictions": ["made_at"], "ranges": ["made_at"],
-    "outcomes": ["scored_at"], "range_outcomes": ["scored_at"],
+    "outcomes": ["scored_at"], "range_outcomes": ["scored_at"], "lessons": ["available_from"],
     "features": ["computed_at"], "regime": ["computed_at"], "calibration": ["computed_at"],
     "reviews": ["computed_at"], "replays": ["computed_at"], "judgments": ["recorded_at"],
     "quotes": ["collected_at"], "options": ["collected_at"],
@@ -108,12 +114,26 @@ FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows
 DATE_PUBLIC_AFTER_CLOSE = ("deals",)
 for _k in FIRST_SEEN_ONLY:
     PUBLIC_AT[_k] = ["first_seen_at"]
-TARGET_DATE_KINDS = ("outcomes", "range_outcomes")     # also need target_date <= D
+TARGET_DATE_KINDS = ("outcomes", "range_outcomes", "lessons")     # also need target_date <= D
 DROPPED = {"news": "stored news only starts when live collection began ({first}); no history before",
            "news_enriched": "AI enrichment of news (no news history before {first})"}
 
 
 # ---------- dates and cutoff ----------
+
+def training_cutoff() -> date:
+    """`model_training_cutoff` from config/settings.yaml: the model may have seen data up to this date."""
+    v = (yaml.safe_load((common.CONFIG / "settings.yaml").read_text()) or {}).get("model_training_cutoff")
+    if v is None:
+        raise SystemExit(f"{common.CONFIG / 'settings.yaml'} has no model_training_cutoff (YYYY-MM-DD)")
+    return v if isinstance(v, date) else date.fromisoformat(str(v))
+
+
+def leakage_label(d, cutoff: date | None = None) -> str:
+    """"fair" for an as-of date after the training cutoff, else "contaminated" (never pooled)."""
+    d = d if isinstance(d, date) else date.fromisoformat(str(d)[:10])
+    return FAIR if d > (cutoff or training_cutoff()) else CONTAMINATED
+
 
 def next_session(cfg: dict, d: date) -> date:
     return ev.next_session(cfg, d, include=False)
@@ -395,8 +415,10 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
             allow_training_period: bool = False, assume_earnings_days: int = 0) -> dict:
     market = cfg["market"]
     src = Path(src or common.ROOT)
-    if d <= MODEL_CUTOFF and not allow_training_period:
-        raise SystemExit(f"{d} is on or before {MODEL_CUTOFF} (the model's training data); not a fair test. "
+    model_cut = training_cutoff()
+    if leakage_label(d, model_cut) == CONTAMINATED and not allow_training_period:
+        raise SystemExit(f"{d} is on or before the model's training cutoff {model_cut} (config/settings.yaml "
+                         "model_training_cutoff): contaminated, not a fair test. "
                          "Pass --allow-training-period to prepare it anyway.")
     if not ev.is_session(cfg, d):
         raise SystemExit(f"{d} is not a {market} trading day")
@@ -436,7 +458,8 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
         "step": "ai_replay.prepare", "market": market, "as_of_date": str(d), "session_date": str(session),
         "cutoff_utc": now, "cutoff_rule": ("routine start on the next session, exchange time "
                                            f"{CUTOFF_LOCAL.get(market, 'open - 75 min')}"),
-        "fair_test": d > MODEL_CUTOFF, "source_root": str(src), "root": str(root),
+        "fair_test": leakage_label(d, model_cut) == FAIR, "test": leakage_label(d, model_cut),
+        "model_training_cutoff": str(model_cut), "source_root": str(src), "root": str(root),
         "context_pack": {"path": str(ctx), "bytes": len(text.encode("utf-8")), "lines": text.count("\n"),
                          "approx_tokens": round(len(text) / 4), "sha256": hashlib.sha256(text.encode()).hexdigest()},
         "citable_evidence": counts,
@@ -478,7 +501,8 @@ def limitations(copied: dict, counts: dict) -> list[str]:
            "is empty unless such a row was stored before the cutoff; the earnings-day block can then not apply.",
            "Price bars are the stored (later) downloads: a split after D is already applied to earlier closes.",
            "The model's own memory is the remaining risk: only as-of dates after "
-           f"{MODEL_CUTOFF} are treated as a fair test."]
+           f"{training_cutoff()} (model_training_cutoff) are treated as a fair test; earlier ones are "
+           "labelled contaminated and scored separately."]
     if counts["total"] == 0:
         out.insert(0, "No citable evidence ids at all as of the cutoff: under the CLAUDE.md rule (evidence_ids "
                       "required) the forecaster can only abstain.")
@@ -691,6 +715,8 @@ def record(cfg: dict, d: date, root: Path, calls_file: Path, results: Path) -> d
     seen = {x["id"] for x in read_jsonl(sd / "calls.jsonl")}
     raw = [x for x in calls_file.read_text(encoding="utf-8").splitlines() if x.strip()] if calls_file.exists() else []
     now, cutoff = utc_now(), ctx["meta"]["cutoff_utc"]
+    model_cut = training_cutoff()
+    label = leakage_label(d, model_cut)
     good, bad = [], []
     for i, line in enumerate(raw, 1):
         try:
@@ -704,20 +730,21 @@ def record(cfg: dict, d: date, root: Path, calls_file: Path, results: Path) -> d
             continue
         seen.add(rec["id"])
         good.append({**rec, "agent_made_at": rec.get("made_at"), "made_at": cutoff, "market": market,
-                     "replay": True, "recorded_at": now,
+                     "replay": True, "recorded_at": now, "test": label, "model_training_cutoff": str(model_cut),
                      "context_sha256": ctx["meta"]["context_pack"]["sha256"]})
     common.append_jsonl(sd / "calls.jsonl", good)
     common.append_jsonl(sd / "rejected.jsonl", [{**b, "market": market, "date": str(d), "recorded_at": now}
                                                 for b in bad])
     eligible = sorted(t for t, f in ctx["features"].items() if t in ctx["tickers"] and f["quality"] != "BLOCKED"
                       and not (f["days_to_earnings"] is not None and f["days_to_earnings"] <= 1))
-    day = {"market": market, "date": str(d), "session_date": ctx["meta"]["session_date"], "cutoff_utc": cutoff,
+    day = {"market": market, "date": str(d), "test": label, "model_training_cutoff": str(model_cut),
+           "session_date": ctx["meta"]["session_date"], "cutoff_utc": cutoff,
            "root": str(root), "n_tickers": len(ctx["tickers"]), "eligible": eligible,
            "n_calls": len(good), "n_rejected": len(bad),
            "prompt_versions": sorted({g["prompt_version"] for g in good}), "recorded_at": now,
            "citable_ids": ctx["meta"]["citable_evidence"]["total"]}
     common.append_jsonl(sd / "days.jsonl", [day])
-    return {"step": "ai_replay.record", "market": market, "date": str(d), "results": str(sd),
+    return {"step": "ai_replay.record", "market": market, "date": str(d), "test": label, "results": str(sd),
             "recorded": len(good), "rejected": bad, "eligible_tickers": len(eligible)}
 
 
@@ -798,15 +825,30 @@ def group_stats(g: pd.DataFrame) -> dict:
     return out
 
 
-def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict) -> dict:
+def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict, cutoff: date | None = None) -> dict:
+    """Scores per leakage group (ForecastBench rule): `fair` = as-of dates after the model's training
+    cutoff, `contaminated` = on or before it. Each group is scored on its own rows only; nothing is
+    pooled across groups. The label comes from the current config cutoff, not from the stored rows."""
+    cutoff = cutoff or training_cutoff()
+    out = {"market": cfg["market"], "name": cfg.get("name"), "computed_at": utc_now(),
+           "model_training_cutoff": str(cutoff),
+           "rule": (f"fair = as-of date after {cutoff} (the model's training cutoff); contaminated = on or before "
+                    "it. Scored separately, never pooled.")}
+    for label in (FAIR, CONTAMINATED):
+        g_days = [x for x in days if leakage_label(x["date"], cutoff) == label]
+        g_calls = [c for c in calls if leakage_label(c["as_of_date"], cutoff) == label]
+        out[label] = summarize_group(cfg, g_calls, g_days, bars, label)
+    return out
+
+
+def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, label: str) -> dict:
     df = score_rows(cfg, calls, bars)
     sc = df[df["status"] == "scored"] if len(df) else df
-    out = {"market": cfg["market"], "name": cfg.get("name"), "computed_at": utc_now(),
-           "n_days": len(days), "dates": sorted(x["date"] for x in days), "n_calls": int(len(df)),
+    out = {"test": label, "n_days": len(days), "dates": sorted(x["date"] for x in days), "n_calls": int(len(df)),
            "n_scored": int(len(sc)), "n_pending": int((df["status"] == "pending").sum()) if len(df) else 0,
            "n_no_bars": int((df["status"] == "no bars").sum()) if len(df) else 0,
            "prompt_versions": sorted({c.get("prompt_version") for c in calls if c.get("prompt_version")}),
-           "fair_test": all(date.fromisoformat(x["date"]) > MODEL_CUTOFF for x in days),
+           "fair_test": label == FAIR,
            "overall": group_stats(sc) if len(sc) else {"n": 0},
            "by_horizon": {str(h): group_stats(sc[sc["h"] == h]) if len(sc) else {"n": 0} for h in HORIZONS},
            "by_band": []}
@@ -831,13 +873,14 @@ def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict) -> dic
     per_day = []
     for x in sorted(days, key=lambda x: x["date"]):
         g = sc[sc["date"].astype(str) == x["date"]] if len(sc) else sc
-        per_day.append({"date": x["date"], "calls": x["n_calls"], "rejected": x["n_rejected"],
+        per_day.append({"date": x["date"], "test": label, "calls": x["n_calls"], "rejected": x["n_rejected"],
                         "citable_ids": x.get("citable_ids"), "scored": int(len(g)),
                         "hits": int(g["hit"].astype(bool).sum()) if len(g) else 0})
     out["per_day"] = per_day
     keep = ["id", "date", "ticker", "h", "direction", "confidence", "status", "base_date", "base", "target_date",
             "target", "ret", "hit", "evidence_ids"]
-    out["calls"] = [{k: (None if (isinstance(v, float) and not math.isfinite(v)) else v) for k, v in r.items()}
+    out["calls"] = [{"test": label, **{k: (None if (isinstance(v, float) and not math.isfinite(v)) else v)
+                                       for k, v in r.items()}}
                     for r in df.reindex(columns=keep).astype(object).where(df.reindex(columns=keep).notna(), None)
                     .to_dict("records")] if len(df) else []
     out["top"] = top_sentences(out)
@@ -954,8 +997,44 @@ def signed_pct(x) -> str:
 
 
 def html_page(s: dict) -> str:
+    """The score page: the fair group (as-of dates after the training cutoff) is the result; the
+    contaminated group, if any, is a separate, labelled section scored on its own rows only."""
     esc = replay.esc
-    o, hz, ab = s["overall"], s["by_horizon"], s["abstention"]
+    f, c = s[FAIR], s[CONTAMINATED]
+    cut = esc(s["model_training_cutoff"])
+    banner = (f'<p class="note"><b>Fair test</b> = an as-of date after {cut}, the model\'s training cutoff '
+              '(<code>model_training_cutoff</code> in config/settings.yaml; ForecastBench leakage rule). Dates on or '
+              f'before it are <b>contaminated</b>: the model may have seen what happened. The two groups are scored '
+              f'separately and never pooled: {f["n_days"]} fair and {c["n_days"]} contaminated days.</p>')
+    if f["n_days"]:
+        sub = (f'<p class="sub">On {f["n_days"]} past trading days after the model\'s training data '
+               f'({esc(f["dates"][0])} to {esc(f["dates"][-1])}), the AI forecaster saw only what was known before the '
+               'next session opened, and its up/down calls were checked against the actual closes. Research only, not '
+               'investment advice.</p>')
+        body = group_html(f)
+    else:
+        sub = ('<p class="sub">No fair-test day is recorded yet, so there is no fair result. Research only, not '
+               'investment advice.</p>')
+        body = ""
+    if c["n_days"]:
+        body += (f'<section class="contaminated"><h2>Contaminated dates (on or before {cut}): not a fair test</h2>'
+                 f'<p class="note bad">CONTAMINATED: {c["n_days"]} as-of dates ({esc(c["dates"][0])} to '
+                 f'{esc(c["dates"][-1])}) fall inside the model\'s training period, so it may have seen these prices. '
+                 'They are scored on their own below, never pooled with the fair result.</p>'
+                 f'{group_html(c)}</section>')
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Replay {esc(s['market'].upper())}</title>
+<style>{replay.CSS}</style></head><body><main>
+<h1>AI forecaster replay: {esc(s.get('name') or s['market'])}</h1>
+{sub}{banner}{body}
+</main><div id="tip" class="tip"></div><script>{replay.JS}</script></body></html>"""
+
+
+def group_html(g: dict) -> str:
+    """One leakage group's results (fair or contaminated): answers, tiles, charts and detail tables."""
+    esc = replay.esc
+    lab = g["test"]
+    o, hz, ab = g["overall"], g["by_horizon"], g["abstention"]
 
     def tile(label, r, note):
         v = r.get("hit_rate") if r else None
@@ -973,20 +1052,20 @@ def html_page(s: dict) -> str:
         f'{ab["any"]["slots"] - ab["any"]["ticker_days_with_a_call"]} of {ab["any"]["slots"]} stock-days</div>'
         f'<div class="n">abstaining is allowed and often right</div></div>'])
     top = "".join(f"<p class=\"answer\"><b>{esc(x.split('? ', 1)[0])}?</b> {esc(x.split('? ', 1)[1])}</p>"
-                  for x in s["top"])
+                  for x in g["top"])
     hrows = []
-    for name, g in (("1-day", hz["1"]), ("5-day", hz["5"]), ("All", o)):
-        if not g.get("n"):
+    for name, x in (("1-day", hz["1"]), ("5-day", hz["5"]), ("All", o)):
+        if not x.get("n"):
             hrows.append(f"<tr><td>{name}</td><td>0</td>" + "<td></td>" * 6 + "</tr>")
             continue
-        d = g["diff_vs_always_up"]
-        hrows.append(f"<tr><td>{name}</td><td>{g['n']}</td><td>{_f(g['hit_rate'])}</td>"
-                     f"<td>{_f(g['ci95'][0])} to {_f(g['ci95'][1])}</td><td>{esc(replay.fmt_p(g['p_vs_50']))}</td>"
-                     f"<td>{_f(g['mean_confidence'])}</td><td>{_f(g['always_up']['hit_rate'])}</td>"
+        d = x["diff_vs_always_up"]
+        hrows.append(f"<tr><td>{name}</td><td>{x['n']}</td><td>{_f(x['hit_rate'])}</td>"
+                     f"<td>{_f(x['ci95'][0])} to {_f(x['ci95'][1])}</td><td>{esc(replay.fmt_p(x['p_vs_50']))}</td>"
+                     f"<td>{_f(x['mean_confidence'])}</td><td>{_f(x['always_up']['hit_rate'])}</td>"
                      f"<td>{pts(d['pts'])}</td></tr>")
     rrows = []
-    for name, g in (("1-day", hz["1"]), ("5-day", hz["5"]), ("All", o)):
-        for r in (g.get("rules") or {}).values():
+    for name, x in (("1-day", hz["1"]), ("5-day", hz["5"]), ("All", o)):
+        for r in (x.get("rules") or {}).values():
             if not r.get("n"):
                 continue
             rrows.append(f"<tr><td>{esc(r['label'])}</td><td>{name}</td><td>{r['n']}</td><td>{_f(r['hit_rate'])}</td>"
@@ -994,39 +1073,33 @@ def html_page(s: dict) -> str:
     brows = "".join(f"<tr><td>{b['band']}</td><td>{b.get('n', 0)}</td><td>{_f(b.get('stated'))}</td>"
                     f"<td>{_f(b.get('hit_rate'))}</td><td>"
                     f"{'' if not b.get('n') else _f(b['ci95'][0]) + ' to ' + _f(b['ci95'][1])}</td></tr>"
-                    for b in s["by_band"])
+                    for b in g["by_band"])
     arows = "".join(f"<tr><td>{k}</td><td>{v['slots']}</td><td>{v.get('calls', v.get('ticker_days_with_a_call'))}</td>"
                     f"<td>{_f(v['abstention_rate'])}</td></tr>" for k, v in ab.items() if isinstance(v, dict))
-    drows = "".join(f"<tr><td>{x['date']}</td><td>{x['citable_ids']}</td><td>{x['calls']}</td><td>{x['rejected']}</td>"
-                    f"<td>{x['scored']}</td><td>{x['hits']}</td></tr>" for x in s["per_day"])
-    crows = "".join(f"<tr><td>{esc(c['date'])}</td><td>{esc(c['ticker'])}</td><td>{c['h']}d</td><td>{esc(c['direction'])}</td>"
+    drows = "".join(f"<tr><td>{x['date']}</td><td>{lab}</td><td>{x['citable_ids']}</td><td>{x['calls']}</td><td>{x['rejected']}</td>"
+                    f"<td>{x['scored']}</td><td>{x['hits']}</td></tr>" for x in g["per_day"])
+    crows = "".join(f"<tr><td>{esc(str(c['date']))}</td><td>{esc(c['test'])}</td><td>{esc(c['ticker'])}</td><td>{c['h']}d</td><td>{esc(c['direction'])}</td>"
                     f"<td>{c['confidence']:.2f}</td><td>{esc(c['status'])}</td>"
                     f"<td>{signed_pct(c.get('ret'))}</td>"
                     f"<td>{'' if c.get('hit') is None else ('right' if c['hit'] else 'wrong')}</td>"
-                    f"<td>{esc(', '.join(c.get('evidence_ids') or []))}</td></tr>" for c in s["calls"])
-    fair = ("" if s["fair_test"] else
-            f'<p class="note bad">Some dates are on or before {MODEL_CUTOFF}: the model may have seen those prices.</p>')
+                    f"<td>{esc(', '.join(c.get('evidence_ids') or []))}</td></tr>" for c in g["calls"])
     legend = ('<div class="legend"><span><span class="sw" style="background:var(--s1)"></span>AI forecaster</span>'
               '<span><span class="sw" style="background:var(--s2)"></span>Always up (same calls)</span>'
               '<span><span class="dash"></span>coin flip 50%</span></div>')
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Replay {esc(s['market'].upper())}</title>
-<style>{replay.CSS}</style></head><body><main>
-<h1>AI forecaster replay: {esc(s.get('name') or s['market'])}</h1>
-<p class="sub">On {s['n_days']} past trading days after the model's training data ({esc(', '.join(s['dates'][:1]))} to
-{esc(', '.join(s['dates'][-1:]))}), the AI forecaster saw only what was known before the next session opened, and its
-up/down calls were checked against the actual closes. Research only, not investment advice.</p>{fair}
+    tag = (f'<p class="note"><b>Group: {esc(lab)}</b> ({g["n_days"]} as-of days, {g["n_calls"]} calls); '
+           'every number in this group uses only its own rows.</p>')
+    return f"""{tag}
 <div class="card top">{top}</div>
 <div class="tiles">{tiles}</div>
 <p class="note">A call is right if the close 1 or 5 trading days later moved the called way (no change counts as wrong).
 95% interval = the span the true hit rate most likely lies in; with few calls it is wide.</p>
 <h2>Was the AI right more often than “always up”?</h2>
-<div class="card">{legend}{svg_hit_bars(s)}
+<div class="card">{legend}{svg_hit_bars(g)}
 <p class="caption">Look for: blue bars above both the dashed 50% line and the orange bar beside them. Bars that differ by
 less than their 95% intervals (hover a bar) are within noise.</p></div>
 <h2>Does its confidence mean what it says?</h2>
 <div class="card"><div class="legend"><span><span class="sw" style="background:var(--s1)"></span>AI calls by confidence band
-(line = 95% interval)</span><span><span class="dash"></span>perfect calibration</span></div>{svg_calibration(s)}
+(line = 95% interval)</span><span><span class="dash"></span>perfect calibration</span></div>{svg_calibration(g)}
 <p class="caption">Look for: points on the dashed line. Below it, calls stated with that confidence were right less often
 than promised (overconfident); above it, more often.</p></div>
 <h2>More detail</h2>
@@ -1047,19 +1120,18 @@ return) and RSI(14) mean reversion (below {replay.RSI_LOW:g} up, above {replay.R
 <details><summary>Abstention</summary><div class="scroll"><table><thead><tr><th>Horizon</th><th>Stock-days</th><th>Calls</th>
 <th>No call</th></tr></thead><tbody>{arows}</tbody></table></div>
 <p class="note">Stock-days count only tickers the rules allow a call on (not BLOCKED, no earnings within 1 day).</p></details>
-<details><summary>Per sample day</summary><div class="scroll"><table><thead><tr><th>As-of date</th><th>Citable ids</th>
+<details><summary>Per sample day</summary><div class="scroll"><table><thead><tr><th>As-of date</th><th>Test</th><th>Citable ids</th>
 <th>Calls</th><th>Rejected</th><th>Scored</th><th>Right</th></tr></thead><tbody>{drows}</tbody></table></div></details>
-<details><summary>Every call</summary><div class="scroll"><table><thead><tr><th>As-of</th><th>Ticker</th><th>Horizon</th>
+<details><summary>Every call</summary><div class="scroll"><table><thead><tr><th>As-of</th><th>Test</th><th>Ticker</th><th>Horizon</th>
 <th>Call</th><th>Confidence</th><th>Status</th><th>Return</th><th>Result</th><th>Evidence</th></tr></thead>
 <tbody>{crows}</tbody></table></div></details>
 <details><summary>Method and limits</summary><ul>
 <li>Each day was prepared by <code>scripts/ai_replay.py prepare</code>: prices up to that day's close, and filings,
 announcements and other records only if public before the routine's pre-open start on the next session.</li>
 <li>No news before live collection began, so calls could cite only SEC filings (US) or NSE announcements (India).</li>
-<li>Scored on the real stored closes, {s['n_pending']} calls still pending (target after the last stored bar).</li>
-<li>Prompt versions: {esc(', '.join(s['prompt_versions']) or 'none')}. Computed {esc(s['computed_at'])}.</li>
-<li>A small sample: a dozen days per market cannot show a small edge; treat the result as a smoke test.</li></ul></details>
-</main><div id="tip" class="tip"></div><script>{replay.JS}</script></body></html>"""
+<li>Scored on the real stored closes, {g['n_pending']} calls still pending (target after the last stored bar).</li>
+<li>Prompt versions: {esc(', '.join(g['prompt_versions']) or 'none')}.</li>
+<li>A small sample: a dozen days per market cannot show a small edge; treat the result as a smoke test.</li></ul></details>"""
 
 
 def score(cfg: dict, results: Path, out: Path) -> dict:
@@ -1075,9 +1147,11 @@ def score(cfg: dict, results: Path, out: Path) -> dict:
     js = out.with_suffix(".json")
     js.write_text(json.dumps(s, indent=1, default=str), encoding="utf-8")
     return {"step": "ai_replay.score", "market": cfg["market"], "html": str(out), "json": str(js),
-            "n_days": s["n_days"], "n_calls": s["n_calls"], "n_scored": s["n_scored"], "n_pending": s["n_pending"],
-            "overall": {k: s["overall"].get(k) for k in ("n", "hit_rate", "ci95")}, "abstention": s["abstention"],
-            "top": s["top"]}
+            "model_training_cutoff": s["model_training_cutoff"], "rule": s["rule"],
+            **{label: {"n_days": g["n_days"], "n_calls": g["n_calls"], "n_scored": g["n_scored"],
+                       "n_pending": g["n_pending"], "overall": {k: g["overall"].get(k) for k in ("n", "hit_rate", "ci95")},
+                       "abstention": g["abstention"], "top": g["top"]}
+               for label, g in ((FAIR, s[FAIR]), (CONTAMINATED, s[CONTAMINATED]))}}
 
 
 # ---------- CLI ----------
@@ -1099,7 +1173,8 @@ def main() -> int:
                                                "(default: $MB_ROOT or the repo)")
     p.add_argument("--force", action="store_true", help="rebuild a root this script prepared before")
     p.add_argument("--allow-training-period", action="store_true",
-                   help=f"allow an as-of date on or before {MODEL_CUTOFF} (not a fair test)")
+                   help="allow an as-of date on or before model_training_cutoff in config/settings.yaml "
+                        "(labelled contaminated: not a fair test, scored separately)")
     p.add_argument("--assume-earnings-known", type=int, default=0, metavar="DAYS",
                    help="ASSUMPTION, off by default: treat actual earnings dates within DAYS after D as announced "
                         "before the cutoff (labelled in the context pack and the summary)")

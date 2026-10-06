@@ -59,6 +59,21 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "rationale": "VARCHAR", "evidence_ids": "VARCHAR[]", "prompt_version": "VARCHAR",
         "range_widen": "DOUBLE",
     }),
+    # Reflection log (lessons.py; pattern from TauricResearch/TradingAgents): one lesson per settled call.
+    # Facts are copied deterministically from predictions/outcomes/ranges/range_outcomes; only `lesson`
+    # (<= 60 words) is written by the reflector agent. settled_at = the outcome's scored_at; available_from
+    # = the latest scored_at among the facts cited (context.py shows a lesson only from then on).
+    "lessons": ("jsonl", {
+        "id": "VARCHAR", "prediction_id": "VARCHAR", "ticker": "VARCHAR", "horizon_days": "INTEGER",
+        "as_of_date": "DATE", "made_at": "TIMESTAMPTZ", "direction": "VARCHAR", "confidence": "DOUBLE",
+        "rationale": "VARCHAR", "evidence_ids": "VARCHAR[]", "call_prompt_version": "VARCHAR",
+        "base_date": "DATE", "base_close": "DOUBLE", "target_date": "DATE", "target_close": "DOUBLE",
+        "actual_return": "DOUBLE", "hit": "BOOLEAN", "range_id": "VARCHAR", "range_target_date": "DATE",
+        "range_actual_close": "DOUBLE", "lo80": "DOUBLE", "lo50": "DOUBLE", "hi50": "DOUBLE", "hi80": "DOUBLE",
+        "hit50": "BOOLEAN", "hit80": "BOOLEAN", "range_position": "VARCHAR",
+        "settled_at": "TIMESTAMPTZ", "available_from": "TIMESTAMPTZ",
+        "lesson": "VARCHAR", "prompt_version": "VARCHAR", "written_at": "TIMESTAMPTZ",
+    }),
     # One row per judge verdict in a daily run (routine/PROMPT.md); build verdicts are in judgments/log.jsonl.
     "judgments": ("jsonl", {
         "id": "VARCHAR", "run_date": "DATE", "agent": "VARCHAR", "round": "INTEGER",

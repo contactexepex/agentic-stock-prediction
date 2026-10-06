@@ -347,7 +347,9 @@ def test_score_synthetic():
                   "confidence": 0.7, "prompt_version": "v", "evidence_ids": ["e"]})
     rec.append({"date": str(last), "n_tickers": 4, "eligible": ["UP", "DN", "FL", "XX"], "n_calls": 1,
                 "n_rejected": 0, "citable_ids": 1})
-    s = ar.summarize(cfg, calls, rec, bars)
+    full = ar.summarize(cfg, calls, rec, bars)
+    s = full["fair"]                                    # every sample day is after the training cutoff
+    assert full["contaminated"]["n_days"] == 0 and full["contaminated"]["n_calls"] == 0
     assert s["n_calls"] == 13 and s["n_scored"] == 12 and s["n_pending"] == 1
     o = s["overall"]
     assert o["n"] == 12 and o["hits"] == 4                       # only the UP calls hit
@@ -364,7 +366,7 @@ def test_score_synthetic():
     ab = s["abstention"]                                         # 5 days x 4 eligible tickers = 20 slots
     assert ab["5d"] == {"slots": 20, "calls": 9, "abstention_rate": replay._r(11 / 20)}
     assert ab["1d"]["calls"] == 4 and ab["any"]["ticker_days_with_a_call"] == 13
-    page = ar.html_page(s)
+    page = ar.html_page(full)
     assert page.count("<svg") == 2 and page.count("<details") >= 5 and len(s["top"]) == 3
     assert "http" not in page.replace("http-equiv", "")          # self-contained
 
@@ -378,7 +380,7 @@ def test_score_cli_on_recorded_calls(prepared, tmp_path):
     p = subprocess.run([sys.executable, str(SCRIPTS / "ai_replay.py"), "score", "--market", MARKET, "--results",
                         str(results), "--out", str(out)], cwd=SCRIPTS, env=env, capture_output=True, text=True, check=False)
     assert p.returncode == 0, p.stderr
-    s = json.loads(out.with_suffix(".json").read_text())
+    s = json.loads(out.with_suffix(".json").read_text())["fair"]
     # scored against the source's real closes (the as-of root has no bars after D)
     bars = pd.concat([pd.read_csv(f) for f in sorted((prepared["base"]["src"] / "data" / MARKET / "prices")
                                                      .glob("**/*.csv"))])
@@ -402,7 +404,7 @@ def test_sample_dates_cli():
         ds = [date.fromisoformat(x["as_of_date"]) for x in out["dates"]]
         all_sessions = [d for d in (date(2026, 7, 1) + timedelta(days=i) for i in range(87)) if ev.is_session(cfg, d)]
         assert ds == all_sessions[::5] and ds[0] == date(2026, 7, 1) and ds[-1] <= date(2026, 9, 25)
-        assert 12 <= len(ds) <= 13 and all(d > ar.MODEL_CUTOFF for d in ds)
+        assert 12 <= len(ds) <= 13 and all(d > ar.training_cutoff() for d in ds)
         for x in out["dates"]:       # cutoff: before the next session's open, on that session's date
             s = date.fromisoformat(x["session_date"])
             assert datetime.fromisoformat(x["cutoff_utc"]) < ev.session_open_utc(cfg, s)
@@ -538,3 +540,80 @@ def test_collector_since_on_real_responses(tmp_path):
     out = nse_run("collect_relations_india.py", root, cfg, "--only", "deals", "--since", "2026-07-07")
     assert out["new"] == {"deals": 10}                    # as --deals-backfill 90 (2026-07-07 is 90 days back)
     assert any("since 2026-07-07" in x for x in out["notes"])
+
+
+
+def test_fair_and_contaminated_scored_separately():
+    """ForecastBench leakage rule: as-of dates on or before the training cutoff are 'contaminated',
+    labelled on every row and scored on their own; the fair result never includes them."""
+    days = sessions(date(2026, 6, 1), date(2026, 8, 31))
+    n = len(days)
+    bars = bars_from({"UP": [100 * 1.01 ** i for i in range(n)], "DN": [100 * 0.99 ** i for i in range(n)]}, days)
+    cfg = {"market": "syn", "name": "Synthetic"}
+    cut = date(2026, 6, 30)
+    early, late = [d for d in days[:20:5] if d <= cut], [d for d in days[30:50:5] if d > cut]
+    calls, rec = [], []
+    for d in early:   # contaminated: every call hits
+        calls.append({"id": f"{d}-UP-5d", "as_of_date": str(d), "ticker": "UP", "horizon_days": 5, "direction": "up",
+                      "confidence": 0.8, "prompt_version": "v", "evidence_ids": ["e"]})
+        rec.append({"date": str(d), "n_tickers": 2, "eligible": ["UP", "DN"], "n_calls": 1, "n_rejected": 0,
+                    "citable_ids": 1})
+    for d in late:    # fair: every call misses
+        calls.append({"id": f"{d}-DN-5d", "as_of_date": str(d), "ticker": "DN", "horizon_days": 5, "direction": "up",
+                      "confidence": 0.6, "prompt_version": "v", "evidence_ids": ["e"]})
+        rec.append({"date": str(d), "n_tickers": 2, "eligible": ["UP", "DN"], "n_calls": 1, "n_rejected": 0,
+                    "citable_ids": 1})
+    s = ar.summarize(cfg, calls, rec, bars, cutoff=cut)
+    f, c = s["fair"], s["contaminated"]
+    assert s["model_training_cutoff"] == "2026-06-30" and "never pooled" in s["rule"]
+    assert (f["n_days"], f["n_calls"], f["overall"]["hits"]) == (len(late), len(late), 0)
+    assert (c["n_days"], c["n_calls"], c["overall"]["hits"]) == (len(early), len(early), len(early))
+    assert f["overall"]["hit_rate"] == 0.0 and c["overall"]["hit_rate"] == 1.0   # not pooled (pooled would be between)
+    assert f["fair_test"] is True and c["fair_test"] is False
+    assert {x["test"] for x in f["calls"]} == {"fair"} and {x["test"] for x in c["calls"]} == {"contaminated"}
+    assert {x["test"] for x in f["per_day"]} == {"fair"} and {x["test"] for x in c["per_day"]} == {"contaminated"}
+    assert f["abstention"]["any"]["slots"] == 2 * len(late) and c["abstention"]["any"]["slots"] == 2 * len(early)
+    page = ar.html_page(s)
+    assert "Contaminated dates (on or before 2026-06-30): not a fair test" in page
+    assert page.count("<td>contaminated</td>") == 2 * len(early)          # per-day and per-call rows
+    assert page.count("<td>fair</td>") == 2 * len(late)
+    assert page.index("<b>Group: fair</b>") < page.index("<b>Group: contaminated</b>")
+    # only contaminated days: no fair result at all
+    only = ar.summarize(cfg, calls[:len(early)], rec[:len(early)], bars, cutoff=cut)
+    assert only["fair"]["n_days"] == 0 and "No fair-test day" in ar.html_page(only)
+    assert ar.leakage_label("2026-06-30", cut) == "contaminated" and ar.leakage_label(date(2026, 7, 1), cut) == "fair"
+
+
+def test_training_cutoff_comes_from_config(prepared, tmp_path):
+    """Moving model_training_cutoff past D makes D contaminated: prepare refuses it without
+    --allow-training-period and, with it, labels the root, the recorded calls and the day."""
+    src = prepared["base"]["src"]
+    cfg = tmp_path / "config"
+    shutil.copytree(prepared["base"]["cfg"], cfg)
+    st = cfg / "settings.yaml"
+    assert "model_training_cutoff: 2026-06-30" in st.read_text()
+    st.write_text(st.read_text().replace("model_training_cutoff: 2026-06-30", "model_training_cutoff: 2026-08-20"))
+    p = prepare(src, cfg, tmp_path / "r")
+    assert p.returncode != 0 and "2026-08-20" in p.stderr and "contaminated" in p.stderr
+    p = prepare(src, cfg, tmp_path / "r", "--allow-training-period")
+    assert p.returncode == 0, p.stderr
+    out = json.loads(p.stdout)
+    assert out["test"] == "contaminated" and out["fair_test"] is False and out["model_training_cutoff"] == "2026-08-20"
+    assert prepared["base"]["summary"]["test"] == "fair"
+    results, calls = tmp_path / "results", tmp_path / "calls.jsonl"
+    calls.write_text(json.dumps(call()) + "\n")
+    env = {**os.environ, "MB_ROOT": str(src), "MB_CONFIG": str(cfg)}
+    p = subprocess.run([sys.executable, str(SCRIPTS / "ai_replay.py"), "record", "--market", MARKET, "--date", str(D),
+                        "--root", str(tmp_path / "r"), "--calls", str(calls), "--results", str(results)],
+                       cwd=SCRIPTS, env=env, capture_output=True, text=True, check=False)
+    assert p.returncode == 0, p.stderr
+    stored = json.loads((results / MARKET / "calls.jsonl").read_text())
+    day = json.loads((results / MARKET / "days.jsonl").read_text())
+    assert stored["test"] == day["test"] == "contaminated" and stored["model_training_cutoff"] == "2026-08-20"
+    page = tmp_path / "page.html"
+    p = subprocess.run([sys.executable, str(SCRIPTS / "ai_replay.py"), "score", "--market", MARKET, "--results",
+                        str(results), "--out", str(page)], cwd=SCRIPTS, env=env, capture_output=True, text=True, check=False)
+    assert p.returncode == 0, p.stderr
+    res = json.loads(p.stdout)
+    assert res["fair"]["n_calls"] == 0 and res["contaminated"]["n_calls"] == 1
+    assert "CONTAMINATED" in page.read_text()

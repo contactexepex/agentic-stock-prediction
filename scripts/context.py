@@ -2,7 +2,8 @@
 """Print a compact Markdown context pack for one market's agents: regime, upcoming events,
 overnight cues and global factors, PASDS indicators, prices and returns, news activity,
 filings, macro and flows (yields, credit spreads, put/call, short selling; India FPI and
-indices), open predictions and the track record, and the previous run's judge FAILs that its
+indices), open predictions and the track record, lessons from past calls (lessons.py; only those
+available by now), and the previous run's judge FAILs that its
 report could not list (for today's data_quality). Agents read this instead of raw files."""
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from datetime import timedelta
 import events as ev
 import fundamentals as fu
 import graph
+import lessons
 import macro_context
 import nse_context
 import relations
@@ -181,6 +183,9 @@ def main() -> None:
     for title, body in [*relations.context_sections(cfg, con), graph.context_section(cfg, con),
                         *nse_context.context_sections(cfg, con), *macro_context.context_sections(cfg, con)]:
         print(f"## {title}\n\n{body}")
+    # Reflection log: lessons settled before now (MB_NOW-aware), this ticker's last 3 and the latest 3 overall.
+    title, body = lessons.context_section(cfg, con)
+    print(f"## {title}\n\n{body}")
     print(sm.markdown(cfg, con))
     print(fu.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (no consensus, no "surprise")
     print("## Judge FAILs from the previous run not yet in a report (copy each into data_quality)\n\n"

@@ -18,7 +18,12 @@ Research only. Nothing here is investment advice, and the routines never trade.
    only), `collect_macro.py` (US: Treasury yield curve, FRED credit spreads, Cboe put/call),
    `collect_shorts.py` (US: FINRA short-sale volume and short interest) and
    `collect_flows_india.py` (India: NSDL FPI flows, NSE sector index closes and valuations).
-3. **Score** past predictions against actual prices (`score_predictions.py`).
+3. **Score** past predictions against actual prices (`score_predictions.py`), then **reflect**
+   (`lessons.py`): for each newly settled call the script lists the facts (call, evidence, return,
+   close vs its range), the reflector subagent writes one lesson of at most 60 words, `lessons.py
+   validate` checks every id and number against the stored outcome, and `lessons.py add` stores it in
+   `data/<market>/lessons/`. The context pack shows each ticker's last 3 lessons and the 3 most recent
+   overall, only once they were known (from the scoring time on).
 4. **Indicators and regime** (`features.py`): PASDS file 06 indicators per ticker (returns, EMA
    ratio, RSI, ATR, realized and EWMA volatility, Bollinger width, OBV, volume ratio, beta,
    sector-relative strength) and the file 07 regime (CALM / TRENDING / EVENT_HEAVY / UNSTABLE)
@@ -56,7 +61,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
 - [yfinance](https://github.com/ranaroussi/yfinance): daily prices and quotes (unofficial Yahoo Finance access; personal use)
 - [exchange_calendars](https://github.com/gerrymanoim/exchange_calendars): trading days and holidays
 - [TradingAgents](https://github.com/TauricResearch/TradingAgents): the analyst/bull/bear/decision
-  agent pattern, re-implemented as Claude Code subagents so no LLM API calls are billed
+  agent pattern, re-implemented as Claude Code subagents so no LLM API calls are billed, and its
+  reflection/memory log (settle past decisions, write a short lesson that later decisions read;
+  Apache-2.0, idea only) behind `scripts/lessons.py`
+- [ForecastBench](https://github.com/forecastingresearch/forecastbench) (MIT; arXiv 2409.19839): the
+  leakage rule in `scripts/ai_replay.py` (only dates after the model's training cutoff are a fair test)
 
 ## Setup
 1. **Slack**: create a channel `#market-brief`. Create a Slack app (api.slack.com/apps → Create New App →
@@ -108,8 +117,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    daily 1-month window gives them only ~18 bars, so their 20-day return is empty):
    `cd scripts && python collect_prices.py --market india --period 2y`, then commit and push `data/`.
 6. **AI replay before going live** (optional; `scripts/ai_replay.py`, docs/DESIGN.md section 7). It
-   tests the AI agents on past days after the model's training data (as-of dates after 2026-06-30),
-   strictly as of that day. The script never runs an LLM: the orchestrating session runs the agents.
+   tests the AI agents on past days after the model's training data (as-of dates after
+   `model_training_cutoff` in `config/settings.yaml`, 2026-06-30), strictly as of that day. The script
+   never runs an LLM: the orchestrating session runs the agents. Following ForecastBench's leakage
+   rule, earlier dates (only with `prepare --allow-training-period`) are labelled `contaminated` on
+   every stored row and on the score page, and scored separately from the `fair` ones, never pooled.
    ```
    cd scripts
    python ai_replay.py dates --market us                        # the sample: every 5th trading day, 2026-07-01..09-25
