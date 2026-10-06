@@ -60,28 +60,34 @@ sectors:
   Retail: [WMT, COST]
   Industrials: [CAT, DE]
 
+# News tagging (scripts/news_tags.py): a ticker is tagged when one of its `news_names` (default:
+# name + aliases) occurs as a whole word, case-insensitively, in the title (the plain-text summary
+# only when the title names no watchlist company),
+# after that ticker's `news_exclude` regexes were removed. Names and aliases must be unambiguous
+# (full names, products, unambiguous symbols); a Google News query hit alone does not tag.
 # wire_names: the names `watchlist_only` (press-release wire) feeds match, case-insensitively and
 # as whole words (scripts/collect_news.py): full company names where the name or an alias is a
 # common word ("Apple", "Meta", "Progressive", "iPhone", "Facebook"). Default: name and aliases.
 tickers:
-  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, Jamie Dimon], wire_names: [JPMorgan Chase, JPMorgan, J.P. Morgan]}
-  BAC:   {name: Bank of America}
-  NVDA:  {name: Nvidia, aliases: [NVIDIA Corporation, Jensen Huang], wire_names: [Nvidia, NVIDIA Corporation]}
-  AAPL:  {name: Apple, aliases: [iPhone, Tim Cook], wire_names: [Apple Inc]}
-  GOOGL: {name: Alphabet, aliases: [Google], wire_names: [Alphabet Inc, Google LLC, Google Cloud]}
-  META:  {name: Meta Platforms, aliases: [Meta, Facebook, Instagram], wire_names: [Meta Platforms]}
-  PGR:   {name: Progressive, queries: ['"Progressive Corp" stock', '"Progressive insurance" stock'],
+  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, J.P. Morgan, Jamie Dimon, JPM], wire_names: [JPMorgan Chase, JPMorgan, J.P. Morgan]}
+  BAC:   {name: Bank of America, aliases: [BofA, BoA]}
+  NVDA:  {name: Nvidia, aliases: [NVIDIA Corporation, Jensen Huang, NVDA], wire_names: [Nvidia, NVIDIA Corporation]}
+  AAPL:  {name: Apple, aliases: [iPhone, Tim Cook, AAPL], wire_names: [Apple Inc], news_exclude: ['Apple Hospitality']}
+  GOOGL: {name: Alphabet, aliases: [Google, YouTube, GOOGL, GOOG], wire_names: [Alphabet Inc, Google LLC, Google Cloud],
+          news_exclude: ['news\.google\.com']}   # every Google News summary links news.google.com
+  META:  {name: Meta Platforms, aliases: [Meta, Facebook, Instagram], wire_names: [Meta Platforms], news_exclude: ['meta[- ]analys[ie]s']}
+  PGR:   {name: Progressive, news_names: [Progressive Corp, Progressive Corporation, Progressive Insurance, PGR], queries: ['"Progressive Corp" stock', '"Progressive insurance" stock'],
           wire_names: [Progressive Corporation, Progressive Corp, Progressive Insurance]}
   ALL:   {name: Allstate}
-  DAL:   {name: Delta Air Lines}
-  UAL:   {name: United Airlines}
-  XOM:   {name: ExxonMobil, aliases: [Exxon]}
-  CVX:   {name: Chevron}
-  LLY:   {name: Eli Lilly, aliases: [Lilly], wire_names: [Eli Lilly]}
-  MRK:   {name: Merck, wire_names: [Merck & Co, Merck]}   # Merck KGaA (Germany) is excluded below
-  TSLA:  {name: Tesla, aliases: [Elon Musk], wire_names: [Tesla]}
+  DAL:   {name: Delta Air Lines, aliases: [Delta Airlines]}
+  UAL:   {name: United Airlines, aliases: [United Airlines Holdings, UAL]}
+  XOM:   {name: ExxonMobil, aliases: [Exxon, Exxon Mobil, XOM]}
+  CVX:   {name: Chevron, aliases: [CVX], news_exclude: ['Chevron (?:doctrine|deference)']}
+  LLY:   {name: Eli Lilly, aliases: [Lilly, Zepbound, Mounjaro, LLY], wire_names: [Eli Lilly]}
+  MRK:   {name: Merck, aliases: [Keytruda, MRK], wire_names: [Merck & Co, Merck], news_exclude: ['Merck KGaA']}   # Merck KGaA (Germany) is excluded (wires: below)
+  TSLA:  {name: Tesla, aliases: [TSLA], wire_names: [Tesla]}   # not Elon Musk: SpaceX, xAI, X, politics
   GM:    {name: General Motors}
-  WMT:   {name: Walmart}
+  WMT:   {name: Walmart, aliases: [WMT]}
   COST:  {name: Costco}
   CAT:   {name: Caterpillar}
   DE:    {name: Deere, aliases: [John Deere]}

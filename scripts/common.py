@@ -41,6 +41,12 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "id": "VARCHAR", "title": "VARCHAR", "url": "VARCHAR", "source": "VARCHAR",
         "published_at": "TIMESTAMPTZ", "first_seen_at": "TIMESTAMPTZ",
         "feed": "VARCHAR", "category": "VARCHAR", "tickers": "VARCHAR[]",
+        # tickers = primary_tickers (the item is about them) + mentioned_tickers (named in passing);
+        # tag_confidence high|low|null (low: several title companies, comparison/list, summary-only).
+        # source_domain: the RSS <source url> host (Google News), part of the id; tag_version:
+        # the news_tags.py tagger that set the tags (missing on older rows: re-tagged on read)
+        "primary_tickers": "VARCHAR[]", "mentioned_tickers": "VARCHAR[]", "tag_confidence": "VARCHAR",
+        "source_domain": "VARCHAR", "tag_version": "INTEGER",
     }),
     "news_enriched": ("jsonl", {
         "id": "VARCHAR", "analyzed_at": "TIMESTAMPTZ", "relevance": "DOUBLE",
@@ -478,17 +484,30 @@ class FrozenClockConnection:
 
 def connect(market: str) -> duckdb.DuckDBPyConnection:
     """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql.
-    With MB_NOW set, the connection's SQL sees that time as now (FrozenClockConnection)."""
+    With MB_NOW set, the connection's SQL sees that time as now (FrozenClockConnection).
+    News is the exception: the stored rows are `news_stored`, and the `news` view (views.sql)
+    re-tags rows from before the current tagger with `news_retag` (scripts/news_tags.py)."""
+    from news_tags import RETAG_TYPE, Tagger
     con = duckdb.connect()
+    try:
+        retag = Tagger(load_market(market)).retag_stored
+    except SystemExit:   # no market config (some tests): tags stay as stored
+        def retag(feed, title, tickers, primary, mentioned, confidence, tag_version):
+            return {"tickers": list(tickers or []), "primary_tickers": list(primary or []),
+                    "mentioned_tickers": list(mentioned or []), "tag_confidence": confidence}
+    con.create_function("news_retag", retag,
+                        ["VARCHAR", "VARCHAR", "VARCHAR[]", "VARCHAR[]", "VARCHAR[]", "VARCHAR", "INTEGER"],
+                        duckdb.struct_type(RETAG_TYPE), null_handling="special", side_effects=False)
     if os.environ.get("MB_NOW"):
         con = FrozenClockConnection(con, clock())
     con.execute("SET TimeZone = 'UTC'")
     base = data_dir(market)
-    for name, (ext, cols) in SCHEMAS.items():
-        has_files = any((base / name).glob(f"**/*.{ext}"))
+    for kind, (ext, cols) in SCHEMAS.items():
+        name = "news_stored" if kind == "news" else kind
+        has_files = any((base / kind).glob(f"**/*.{ext}"))
         col_spec = "{" + ", ".join(f"'{k}': '{v}'" for k, v in cols.items()) + "}"
         if has_files:
-            pattern = (base / name).as_posix() + f"/**/*.{ext}"
+            pattern = (base / kind).as_posix() + f"/**/*.{ext}"
             if ext == "jsonl":
                 src = f"read_json('{pattern}', format='newline_delimited', columns={col_spec})"
             else:

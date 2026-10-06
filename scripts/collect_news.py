@@ -2,14 +2,22 @@
 """Collect RSS headlines (Google News queries + outlet feeds from the market config's `news`
 section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the
 last 7 days. Prints a JSON summary; outlet feeds that answer but carry nothing from the last
-3 days are listed as `stale`. An outlet with `watchlist_only: true` (press-release wires) keeps
-only items whose title or summary names a watchlist company: case-insensitive whole-word
-matching on each ticker's `wire_names` (full company names; default its name and aliases) after
-removing the `news.wire_exclude` phrases; `skipped_off_watchlist` counts the rest.
+3 days are listed as `stale`. Tags come from scripts/news_tags.py, headline first: companies
+named in the title (a ticker's `news_names`, default name and aliases, whole words,
+case-insensitive, minus its `news_exclude` phrases); only when the title names none, the
+plain-text summary (no HTML, URLs or outlet name). Each row stores `tickers`, `primary_tickers`
+(title companies, unless compared "X vs Y" or listed), `mentioned_tickers` (listed, compared or
+summary-only) and `tag_confidence` (high: exactly one title company, primary; else low). A
+Google News company query does not tag by itself. Rows carry `tag_version`; older rows are
+re-tagged on read by the `news` view. An item's id is its normalized title + source domain
+(Google News <source url>), so one article under two source labels is stored once.
+An outlet with `watchlist_only: true` (press-release wires) keeps only items whose title or
+summary names a watchlist company: case-insensitive whole-word matching on each ticker's
+`wire_names` (full company names; default its name and aliases) after removing the
+`news.wire_exclude` phrases; `skipped_off_watchlist` counts the rest.
 Exit code 1 only if every feed failed."""
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import socket
@@ -21,19 +29,11 @@ from urllib.parse import quote_plus
 import feedparser
 
 from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
+from news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
 
 USER_AGENT = "market-brief/1.0 (personal research; RSS reader)"
 MAX_AGE = timedelta(days=3)
 socket.setdefaulttimeout(20)
-
-
-def norm(text: str) -> str:
-    return re.sub(r"\W+", " ", text.lower()).strip()
-
-
-def article_id(title: str, source: str) -> str:
-    # Google News links are redirect URLs, so title + source is the stable identity.
-    return hashlib.sha256(f"{norm(title)}|{norm(source)}".encode()).hexdigest()[:16]
 
 
 def google_news_url(query: str, g: dict) -> str:
@@ -47,30 +47,22 @@ def build_jobs(feeds: dict, watchlist: dict) -> list[dict]:
     g = feeds.get("google_news")
     if g:
         template = g.get("query_template", '"{name}" stock')
-        for ticker, meta in watchlist.get("tickers", {}).items():
-            for q in meta.get("queries", [template.format(name=meta["name"])]):
-                jobs.append({"url": google_news_url(q, g), "feed": f"gnews:{q}",
-                             "category": "company", "tickers": [ticker]})
+        for _ticker, q in company_queries(watchlist, template):
+            # the query only finds candidates: many results never name the company
+            jobs.append({"url": google_news_url(q, g), "feed": f"gnews:{q}", "category": "company"})
         for cat, queries in feeds.get("categories", {}).items():
             for q in queries:
-                jobs.append({"url": google_news_url(q, g), "feed": f"gnews:{q}",
-                             "category": cat, "tickers": []})
+                jobs.append({"url": google_news_url(q, g), "feed": f"gnews:{q}", "category": cat})
     for o in feeds.get("outlets", []):
         jobs.append({"url": o["url"], "feed": o["name"], "category": o.get("category", "general"),
-                     "tickers": [], "watchlist_only": bool(o.get("watchlist_only"))})
+                     "watchlist_only": bool(o.get("watchlist_only"))})
     return jobs
 
 
-def alias_patterns(watchlist: dict) -> dict[str, re.Pattern]:
-    pats = {}
-    for ticker, meta in watchlist.get("tickers", {}).items():
-        names = [meta["name"], *meta.get("aliases", [])]
-        pats[ticker] = re.compile(r"\b(" + "|".join(map(re.escape, names)) + r")\b", re.I)
-    return pats
-
-
 def wire_patterns(watchlist: dict) -> dict[str, re.Pattern]:
-    """For `watchlist_only` (press-release wire) feeds: a ticker's `wire_names` (full company
+    """The wire matching on its own (main() uses the same names and exclusions through
+    news_tags.Tagger's wire rules, which also split primary/mentioned).
+    For `watchlist_only` (press-release wire) feeds: a ticker's `wire_names` (full company
     names, so single ambiguous words such as "Apple" or "Meta" are left out), else its name and
     aliases; case-insensitive, whole words ("NVIDIA", "JPMORGAN CHASE" match)."""
     pats = {}
@@ -105,7 +97,7 @@ def parse_time(entry) -> datetime | None:
 def main() -> int:
     watchlist = require_market(market_arg(__doc__).parse_args())
     feeds, market = watchlist.get("news", {}), watchlist["market"]
-    pats, wire, exclude = alias_patterns(watchlist), wire_patterns(watchlist), wire_exclusions(feeds)
+    tagger = Tagger(watchlist)
     seen = recent_ids(market, "news", days=7)
     now, now_dt = utc_now(), now_utc()
     items: dict[str, dict] = {}
@@ -134,31 +126,29 @@ def main() -> int:
             title = (e.get("title") or "").strip()
             if not title:
                 continue
-            source = (e.get("source") or {}).get("title") or job["feed"]
+            src = e.get("source") or {}
+            source = src.get("title") or job["feed"]
             if source and title.endswith(f" - {source}"):
                 title = title[: -len(f" - {source}")]
             published = parse_time(e)
             if published and now_dt - published > MAX_AGE:
                 continue
-            aid = article_id(title, source)
-            if aid in seen:
+            domain = source_domain(src.get("href"))
+            aid = item_id(title, source, domain)
+            if aid in seen or article_id(title, source) in seen:   # also ids stored before domains
                 continue
-            text = f"{title} {e.get('summary', '')}"
-            if job.get("watchlist_only"):
-                tickers = set(job["tickers"]) | wire_tickers(text, wire, exclude)
-            else:
-                tickers = set(job["tickers"]) | {t for t, p in pats.items() if p.search(text)}
-            if job.get("watchlist_only") and not tickers:
+            # headline first; the plain-text summary only when the title names no company
+            tags = tagger.classify_item(title, e.get("summary"), source, wire=job.get("watchlist_only", False))
+            if job.get("watchlist_only") and not tags["tickers"]:
                 skipped_off_watchlist += 1   # wire feeds: keep only releases naming a watchlist company
                 continue
-            if aid in items:  # same article from several feeds: merge tags
-                items[aid]["tickers"] = sorted(set(items[aid]["tickers"]) | tickers)
+            if aid in items:  # same article from several feeds: tags come from its text, keep the first
                 continue
             items[aid] = {
                 "id": aid, "title": title, "url": e.get("link"), "source": source,
                 "published_at": published.isoformat() if published else None,
                 "first_seen_at": now, "feed": job["feed"], "category": job["category"],
-                "tickers": sorted(tickers),
+                **tags, "source_domain": domain, "tag_version": TAG_VERSION,
             }
 
     written = append_jsonl(day_file(market, "news", utc_today()), items.values())

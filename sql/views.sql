@@ -19,18 +19,37 @@ SELECT ticker, date, close,
 FROM bars
 WINDOW w AS (PARTITION BY ticker ORDER BY date);
 
+-- News with corrected ticker tags. Tags are derived, and rows are append-only, so rows written
+-- before the current tagger (tag_version NULL) are re-tagged on read by news_retag
+-- (scripts/news_tags.py, registered in common.connect): headline first with the config's precise
+-- names minus `news_exclude` (never from news.google.com links, source names or a query hit
+-- alone), split into primary_tickers / mentioned_tickers with tag_confidence. Old wire rows whose
+-- title names no company keep their tags as mentioned. `news_stored` is the rows as stored.
+CREATE OR REPLACE VIEW news AS
+WITH r AS (
+    SELECT *, news_retag(feed, title, tickers, primary_tickers, mentioned_tickers, tag_confidence,
+                         tag_version) AS t_
+    FROM news_stored
+)
+SELECT * EXCLUDE (t_) REPLACE (t_.tickers AS tickers, t_.primary_tickers AS primary_tickers,
+                               t_.mentioned_tickers AS mentioned_tickers, t_.tag_confidence AS tag_confidence)
+FROM r;
+
 -- Latest enrichment per article (re-analysis appends a newer row, it never edits).
 CREATE OR REPLACE VIEW enriched_latest AS
 SELECT DISTINCT ON (id) * FROM news_enriched ORDER BY id, analyzed_at DESC;
 
--- One row per (ticker, article), dated by publish time (fallback: first seen).
+-- One row per (ticker, article), dated by publish time (fallback: first seen). role: 'primary'
+-- (the item is about the ticker) or 'mentioned'; tag_confidence 'low' marks tags to read with care.
 CREATE OR REPLACE VIEW news_ticker_day AS
 WITH x AS (
-    SELECT unnest(tickers) AS ticker, id, title, source,
+    SELECT unnest(tickers) AS ticker, id, title, source, primary_tickers, tag_confidence,
            coalesce(published_at, first_seen_at) AS ts
     FROM news
 )
 SELECT x.ticker, CAST(x.ts AS DATE) AS day, x.id, x.title, x.source,
+       CASE WHEN list_contains(x.primary_tickers, x.ticker) THEN 'primary' ELSE 'mentioned' END AS role,
+       x.tag_confidence,
        e.sentiment, e.relevance, e.materiality
 FROM x LEFT JOIN enriched_latest e USING (id);
 

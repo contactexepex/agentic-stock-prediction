@@ -61,10 +61,15 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
             FROM features_latest
             WHERE as_of_date = (SELECT max(as_of_date) FROM features_latest) AND list_contains(?, ticker)
             ORDER BY sector, ticker""", [tickers]),
-        ("News activity and sentiment by window", """
+        # role/tag_confidence (scripts/news_tags.py): primary_7d = items about the ticker (named in
+        # the headline as the subject); low_conf_7d = tags to read with care (several companies in
+        # the headline, a comparison or list, or named only in the summary)
+        ("News activity and sentiment by window (primary = about the ticker; low_conf = mentioned or ambiguous tag)", """
             SELECT ticker,
                    count(*) FILTER (WHERE day >= current_date - 1)  AS n_1d,
                    count(*) FILTER (WHERE day >= current_date - 7)  AS n_7d,
+                   count(*) FILTER (WHERE day >= current_date - 7 AND role = 'primary') AS primary_7d,
+                   count(*) FILTER (WHERE day >= current_date - 7 AND tag_confidence = 'low') AS low_conf_7d,
                    count(*) FILTER (WHERE day >= current_date - 30) AS n_30d,
                    round(avg(sentiment) FILTER (WHERE day >= current_date - 7), 2)  AS sent_7d,
                    round(avg(sentiment) FILTER (WHERE day >= current_date - 30), 2) AS sent_30d,
