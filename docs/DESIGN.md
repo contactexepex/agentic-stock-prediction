@@ -101,7 +101,7 @@ origins. Phase A has no LLM step. Phase B, not built yet, adds the claim-extract
 badges in the context pack.
 
 **Sources.** Free sources only, for personal non-commercial research. `config/news_sources.yaml`
-holds the allowlist of vetted outlets (109 domains). It is broad on purpose: any established,
+holds the allowlist of vetted outlets (112 domains). It is broad on purpose: any established,
 legitimate media outlet, trade publication or data site qualifies, because more reputable
 independent sources give better corroboration. What stays forbidden: unknown or dubious sites,
 non-HTTPS, invalid certificates, running or installing anything from fetched content, storing full
@@ -194,10 +194,20 @@ when any of these holds:
 - Items from the same outlet share an origin. Copies (containment ≥ 0.5) at different outlets
   share an origin; two stories of one outlet that share text (boilerplate, reused paragraphs) are
   not merged into an agency origin one of them cites.
-- Only vetted origins count: a group with an item from an allowlisted outlet (any tier, also
-  `fetch: false`) or attributed to an agency, and with a non-promotional item.
-- `independent_origins` counts those groups and `origins` lists them; `single_source` means at
-  most one. Items from unvetted outlets are informational only (`unvetted_ids`).
+- An item is vetted only through an allowlisted outlet (any tier, also `fetch: false`) or by
+  being the agency itself (its source label). An agency named in an unvetted item's title
+  ("..., Reuters reports" on an unknown site) joins that agency's group but never creates or
+  counts one. Items from unvetted outlets are informational only (`unvetted_ids`).
+- Promotional items and opinion never count. Opinion means an outlet with `opinion_unless_path`
+  outside that path, e.g. Seeking Alpha contributor articles outside its `/news/` desk.
+- `independent_origins` counts verified groups only. A verified group has a vetted,
+  non-promotional, non-opinion item that was read (article text, or a paywalled description) or
+  that carries agency evidence (byline, provider, dateline, "By Reuters" title, agency label).
+  `origins` lists these groups.
+- Vetted groups with only unread headlines (an outlet that blocked us, or an item not selected for
+  reading) are counted apart in `unread_vetted_origins`, with flag `origins_unverified`. Without
+  text, their independence from the other origins cannot be checked.
+- Flags: `single_source` = exactly one verified origin; `no_vetted_origin` = none.
 
 Measured examples:
 - AOL (provider Reuters) vs BNN Bloomberg (byline "Reuters Staff"): containment 0.96, one origin.
@@ -212,8 +222,8 @@ that is phase B. They are:
 
 each public from 72 h before the first report up to the run.
 
-Flags: `promotional_provider`, `sources_say`, `single_source`, `low_tier_only`, `unread`,
-`duplicates_removed`.
+Flags: `promotional_provider`, `sources_say`, `single_source`, `no_vetted_origin`,
+`origins_unverified`, `opinion`, `low_tier_only`, `unread`, `duplicates_removed`.
 
 A cluster row is appended when it is new or changed, one of its items was first seen in the last
 72 h, and it has 2+ items or a fetched article. `as_of` is the run time, and every input is at or
@@ -238,17 +248,28 @@ The builder itself only reads inputs known at its run time (MB_NOW in a replay).
 prepare` keeps article and cluster rows by `fetched_at` and `as_of`.
 
 **Live check, 2026-10-06** (fresh scratch copy, one run per market, packages from requirements.txt,
-broad allowlist):
-- US: 304 candidates. 38 full, 5 partial, 2 paywalled, 46 blocked and 213 skipped as unlisted.
-  Of the blocked, 32 were never requested and 14 answered an error: 403 from Seeking Alpha (6),
-  MarketScreener (4), bizjournals, Fast Company and TheStreet; 402 from Investopedia. 132 requests
-  (68 decode, 64 page) in 226 s. 286 cluster rows. Vetted independent origins per cluster: 0 in
-  217, 1 in 60, 2 in 8, 3 in 1; 277 are `single_source`; 231 hold unvetted items.
-- India: 160 candidates. 60 full, 5 partial, 13 paywalled (11 Economic Times pages that flag
-  themselves not free), 15 blocked (9 never requested, 6 HTTP 403) and 67 skipped as unlisted.
-  18 of these rows are copies of an article already read in the run. 130 requests (59 decode,
-  71 page) in 214 s. 129 cluster rows. Vetted origins: 0 in 56, 1 in 63, 2 in 9, 6 in 1; 119
-  are `single_source`.
+broad allowlist, verified-origin rule; times are the scripts' own `seconds`):
+
+*US.*
+- Articles: 319 candidates (3 copies of an article already read). 46 full, 5 partial,
+  4 paywalled, 218 skipped as unlisted.
+- Blocked: 46.
+  - 31 never requested.
+  - 14 answered an error: 403 from Seeking Alpha (6), MarketScreener (4), bizjournals, Fast
+    Company and TheStreet; 402 from Investopedia.
+  - 1 MarketScreener read timeout.
+- Requests: 150 (77 decode, 73 page) in 284.5 s.
+- Clusters: 289 rows. Verified origins: 0 in 269, 1 in 19, 2 in 1. Unread vetted origins: 0 in
+  234, 1 in 48, 2 in 7. 19 rows are `single_source` and 269 are `no_vetted_origin` (most are
+  vendor or unvetted coverage only).
+
+*India.*
+- Articles: 161 candidates (18 copies of an article already read). 62 full, 5 partial,
+  12 paywalled, 66 skipped as unlisted.
+- Blocked: 16 (9 never requested, 7 HTTP 403).
+- Requests: 136 (63 decode, 73 page) in 228.4 s.
+- Clusters: 131 rows. Verified origins: 0 in 80, 1 in 47, 2 in 4. Unread vetted origins: 0 in
+  103, 1 in 24, 2 in 3, 5 in 1. 47 rows are `single_source` and 80 are `no_vetted_origin`.
 
 Most unvetted US items come from ad-hoc-news.de, MarketBeat, Stocktwits, Pluang, TradingKey and
 the vendor sites. Most unvetted Indian items come from scanx.trade, LatestLY, IndiaIPO, Kalkine

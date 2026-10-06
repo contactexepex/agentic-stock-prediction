@@ -162,6 +162,52 @@ class Sources:
         return self.wire_in_text(text)
 
 
+# ---------- outlets of source labels ----------
+
+def label_domains(pairs) -> dict[str, str]:
+    """norm(source label) -> outlet domain, learned from (label, domain) pairs of one run's rows
+    (Google News <source url>), so a label-only row and a domain row of one outlet are one outlet:
+    a label used with exactly one domain ("The CSR Universe" -> thecsruniverse.com), and a label
+    without one whose letters equal a seen domain's first part ("Pluang" -> pluang.com)."""
+    from news_tags import norm
+    seen: dict[str, set] = {}
+    labels = set()
+    for label, dom in pairs:
+        if label:
+            labels.add(label)
+        if label and dom:
+            seen.setdefault(norm(label), set()).add(dom)
+    out = {k: next(iter(v)) for k, v in seen.items() if len(v) == 1}
+    first = {}
+    for v in seen.values():
+        for d in v:
+            first.setdefault(re.sub(r"[^a-z0-9]", "", d.split(".")[0]), d)
+    for label in labels:
+        k = norm(label)
+        if k not in out:
+            c = re.sub(r"[^a-z0-9]", "", label.lower())
+            if c in first:
+                out[k] = first[c]
+    return out
+
+
+def outlet_of(source: str | None, src: "Sources", learned: dict[str, str]) -> str | None:
+    """Outlet domain of a source label: configured name, learned mapping, or a label that is a host."""
+    from news_tags import norm
+    if not source:
+        return None
+    d = src.domain_of_label(source) or learned.get(norm(source))
+    if d is None and re.fullmatch(r"[A-Za-z0-9.-]+\.[A-Za-z]{2,}", source.strip()):
+        d = source.strip().lower().removeprefix("www.")
+    return d
+
+
+def outlet_key(domain: str | None, source: str | None) -> str:
+    """Key of an outlet in summaries and clusters: its domain, else 'label:<normalised label>'."""
+    from news_tags import norm
+    return domain or f"label:{norm(source)}"
+
+
 # ---------- URLs ----------
 
 def host_of(url: str | None) -> str:

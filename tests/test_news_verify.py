@@ -476,7 +476,7 @@ def test_shared_round_amount_alone_does_not_link(src):
                 "t": pd.Timestamp("2026-10-05T10:00:00+00:00"), "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"),
                 "wire": None, "wire_ev": None, "provider": None, "promo": None, "canon": None, "outlet_key": f"d{i}.com",
                 "article": None, "fetched": None, "say": False, "nums": nv.distinctive(nv.numbers(title)),
-                "vetted": True}
+                "vetted": True, "read": False, "opinion": False}
     nvda = news_clusters.cluster_ticker(
         [item(1, "NVDA", "Nvidia Spent $20 Billion on Buybacks Last Quarter. Here's What That Means for You"),
          item(2, "NVDA", "Nvidia's $20bn licensing deal with Groq faces lawsuit from jilted engineers")], cfg, src)
@@ -541,10 +541,12 @@ def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):
     env.run(news_clusters, capsys)                               # T1 = NOW: Fortune is its own origin
     con = common.connect(MARKET)
 
-    def cvx_origins(ts: str) -> list:
-        return con.execute("SELECT origins FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ)) WHERE ticker = 'CVX' "
-                           "AND list_contains(news_ids, 'n31')", [ts]).fetchone()[0]
-    assert "outlet:fortune.com" in cvx_origins(NOW)
+    def fortune_group(ts: str) -> dict:
+        groups = con.execute("SELECT origin_groups FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ)) "
+                             "WHERE ticker = 'CVX' AND list_contains(news_ids, 'n31')", [ts]).fetchone()[0]
+        return next(g for g in json.loads(groups) if "n31" in g["news_ids"])
+    # T1: Fortune's headline is unread, so it is an unverified vetted origin of its own
+    assert fortune_group(NOW)["origin"] == "outlet:fortune.com" and fortune_group(NOW)["unread_vetted"]
     t2 = "2026-10-06T02:00:00+00:00"
     late = {**[r for r in env.rows("news_articles") if r["id"] == "n01"][0], "id": "n31", "ticker": "CVX",
             "fetched_at": "2026-10-06T01:00:00+00:00", "final_url": "https://fortune.com/2026/10/05/chevron-cfo/",
@@ -554,8 +556,8 @@ def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):
     env.set_now(t2)
     assert env.run(news_clusters, capsys)["written"] >= 1
     con = common.connect(MARKET)
-    assert "outlet:fortune.com" in cvx_origins(NOW) and "outlet:fortune.com" not in cvx_origins(t2)
-    assert "wire:Reuters" in cvx_origins(t2)
+    assert fortune_group(NOW)["origin"] == "outlet:fortune.com"      # the T1 state is unchanged
+    assert fortune_group(t2)["origin"] == "wire:Reuters"             # after the fetch: a Reuters copy
 
 
 def test_clusters_asof_drops_ids_that_moved(env):
@@ -588,7 +590,8 @@ def test_same_outlet_copy_keeps_its_own_origin(src):
 
     def item(i, outlet, wire, title):
         return {"id": f"m{i}", "ticker": "HDFCBANK", "title": title, "source": outlet, "domain": outlet, "tier": "tier1",
-                "vetted": True, "t": pd.Timestamp("2026-10-05T10:00:00+00:00") + pd.Timedelta(minutes=i),
+                "vetted": True, "read": True, "opinion": False,
+                "t": pd.Timestamp("2026-10-05T10:00:00+00:00") + pd.Timedelta(minutes=i),
                 "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"), "wire": wire, "wire_ev": None, "provider": None,
                 "promo": None, "canon": None, "outlet_key": outlet, "article": arts[i], "fetched": None, "say": False,
                 "nums": set()}
@@ -652,3 +655,73 @@ def test_decoder_only_talks_to_google(monkeypatch, src):
     res = collect_articles.decode_google(["https://news.google.com/rss/articles/abc"], src)
     assert res[0]["success"] is False and "refused" in res[0]["message"]
     assert sent == ["https://news.google.com/rss/articles/abc"]      # the redirect off Google was never sent
+
+
+def _item(i, title, *, outlet, vetted, read=False, wire=None, ev=None, promo=None, opinion=False):
+    return {"id": f"v{i}", "ticker": "CVX", "title": title, "source": outlet, "domain": outlet, "tier": "tier2",
+            "vetted": vetted, "read": read, "opinion": opinion,
+            "t": pd.Timestamp("2026-10-05T10:00:00+00:00") + pd.Timedelta(minutes=i),
+            "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"), "wire": wire, "wire_ev": ev, "provider": None,
+            "promo": promo, "canon": None, "outlet_key": outlet, "article": None, "fetched": None, "say": False,
+            "nums": set()}
+
+
+CVX_CFG = {"tickers": {"CVX": {"name": "Chevron"}}}
+
+
+def test_unvetted_site_never_creates_an_agency_origin(src):
+    title = "Chevron names Jeff Gustavson next CFO, Reuters reports"
+    assert src.detect_wire(title=title, source="Dubious Daily", domain="dubiousdaily.xyz") == ("Reuters", "title")
+    alone = news_clusters.cluster_ticker([_item(1, title, outlet="dubiousdaily.xyz", vetted=False,
+                                                wire="Reuters", ev="title")], CVX_CFG, src)[0]
+    assert alone["origins"] == [] and alone["independent_origins"] == 0 and alone["unvetted_ids"] == ["v1"]
+    assert "no_vetted_origin" in alone["flags"] and "single_source" not in alone["flags"]
+    # it may join an existing agency group, which counts once, because of the vetted read copy
+    joined = news_clusters.cluster_ticker([
+        _item(1, title, outlet="dubiousdaily.xyz", vetted=False, wire="Reuters", ev="title"),
+        _item(2, "Chevron names Jeff Gustavson next CFO", outlet="bnnbloomberg.ca", vetted=True, read=True,
+              wire="Reuters", ev="byline")], CVX_CFG, src)[0]
+    assert joined["origins"] == ["wire:Reuters"] and joined["independent_origins"] == 1
+
+
+def test_unread_headlines_are_unverified_origins(src):
+    c = news_clusters.cluster_ticker([
+        _item(1, "Chevron names Jeff Gustavson next CFO", outlet="bnnbloomberg.ca", vetted=True, read=True,
+              wire="Reuters", ev="byline"),
+        _item(2, "Chevron names Jeff Gustavson as next CFO", outlet="marketscreener.com", vetted=True),
+        _item(3, "Chevron names Jeff Gustavson next CFO: analysis", outlet="seekingalpha.com", vetted=True,
+              read=True, opinion=True)], CVX_CFG, src)[0]
+    assert c["origins"] == ["wire:Reuters"] and c["independent_origins"] == 1 and c["unread_vetted_origins"] == 1
+    assert {"single_source", "origins_unverified", "opinion"} <= set(c["flags"])
+    only_unread = news_clusters.cluster_ticker([
+        _item(1, "Chevron names Jeff Gustavson as next CFO", outlet="marketscreener.com", vetted=True),
+        _item(2, "Chevron names Jeff Gustavson next CFO", outlet="cnbc.com", vetted=True)], CVX_CFG, src)[0]
+    assert only_unread["independent_origins"] == 0 and only_unread["unread_vetted_origins"] == 2
+    assert "no_vetted_origin" in only_unread["flags"] and "origins_unverified" in only_unread["flags"]
+
+
+def test_items_vetted_read_and_opinion_from_stored_rows(env, capsys):
+    env.run(collect_articles, capsys)
+    env.write("news", [
+        news_row(40, "Chevron CFO move: a contrarian take", "CVX", source="Seeking Alpha", domain="seekingalpha.com", conf="low"),
+        news_row(41, "Chevron names new CFO", "CVX", source="Seeking Alpha", domain="seekingalpha.com", conf="low",
+                 url="https://seekingalpha.com/news/4500000-chevron-names-new-cfo"),
+        news_row(42, "Chevron names Jeff Gustavson next CFO, Reuters reports", "CVX", source="Dubious Daily",
+                 domain="dubiousdaily.xyz", conf="low")])
+    con = common.connect(MARKET)
+    items = {i["id"]: i for i in news_clusters.load_items(con, common.load_market(MARKET), nv.load_sources(),
+                                                          pd.Timestamp(NOW))}
+    assert items["n40"]["opinion"] and not items["n41"]["opinion"]          # contributor piece vs news desk
+    assert items["n42"]["wire"] == "Reuters" and not items["n42"]["vetted"]  # an agency named by an unvetted site
+    assert items["n05"]["vetted"] and items["n01"]["read"] and not items["n05"]["read"]
+
+
+def test_label_and_domain_keys_are_one_outlet(src):
+    learned = nv.label_domains([("Pluang", None), ("pluang.com", "pluang.com"), ("The CSR Universe", "thecsruniverse.com"),
+                                ("The CSR Universe", None), ("ad-hoc-news.de", None)])
+    keys = {nv.outlet_key(nv.outlet_of(lab, src, learned), lab)
+            for lab in ("Pluang", "pluang.com")}
+    assert keys == {"pluang.com"}
+    assert nv.outlet_key(nv.outlet_of("ad-hoc-news.de", src, learned), "ad-hoc-news.de") == "ad-hoc-news.de"
+    assert nv.outlet_key(nv.outlet_of("The CSR Universe", src, learned), "The CSR Universe") == "thecsruniverse.com"
+    assert nv.outlet_key(None, "Some Blog") == "label:some blog"

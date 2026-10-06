@@ -119,8 +119,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
     challenge are `fetch: false`: never requested, still vetted. Output goes to `data/<market>/news_articles/`, one row per news id: access
     full|partial|paywalled|blocked|undecoded|skipped_unlisted, metadata, agency origin, at most 3
     key sentences of <= 40 words, normalised numbers, and a MinHash. The full text is never stored.
-  - `news_clusters` groups same-event items per ticker and counts independent vetted origins:
-    copies of one agency story, or of one text, count once; unvetted outlets never count. It attaches SEC filing and NSE announcement
+  - `news_clusters` groups same-event items per ticker and counts independent verified origins.
+    A verified origin is a vetted outlet whose item was read, or that carries agency evidence.
+    Copies of one agency story, or of one text, count once. Unread vetted headlines are counted
+    apart (`unread_vetted_origins`). Unvetted outlets, promotional items and opinion never count. It attaches SEC filing and NSE announcement
     candidates. Output goes to `data/<market>/news_clusters/` as per-run snapshots. Read them as
     of a time with the `news_clusters_asof(ts)` macro, which does not look ahead.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,

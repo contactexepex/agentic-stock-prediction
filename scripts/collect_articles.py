@@ -183,6 +183,10 @@ def main() -> int:
     t0, now = time.monotonic(), pd.Timestamp(clock())
     con = connect(market)
     cands = candidates(con, cfg, src, now)
+    learned = nv.label_domains(con.execute(
+        "SELECT source, source_domain FROM news WHERE first_seen_at >= ? AND first_seen_at <= ?",
+        [(now - pd.Timedelta(hours=float(sel.get("lookback_hours", 24)))).to_pydatetime(),
+         now.to_pydatetime()]).fetchall())
     names = {t: [m["name"], *m.get("aliases", [])] for t, m in cfg["tickers"].items()}
     out_path = day_file(market, "news_articles", utc_today())
     pacer, cap = Pacer(float(sel.get("pause_seconds", 1.5))), int(sel.get("max_per_run", 80))
@@ -208,7 +212,8 @@ def main() -> int:
 
     for c in cands:
         if c["tier"] == "unlisted":
-            unvetted.append({"domain": c["outlet"], "source_label": c["source"]})
+            unvetted.append({"key": nv.outlet_key(c["outlet"] or nv.outlet_of(c["source"], src, learned),
+                                                  c["source"])})
             emit({**base_row(c, utc_now()), "access": "skipped_unlisted",
                   "note": f"outlet {c['outlet'] or c['source']!r} not on the allowlist (not requested)"})
             continue
@@ -300,8 +305,7 @@ def main() -> int:
         "collector": "articles", "market": market, "candidates": len(cands), "written": len(written),
         "deferred": deferred, "copied_same_article": len(copies),
         # outlets not on the allowlist (never requested), for review: vet and add, or ignore
-        "unvetted_domains": dict(Counter(r["domain"] or "label:" + (r["source_label"] or "?")
-                                         for r in unvetted).most_common(40)),
+        "unvetted_domains": dict(Counter(r["key"] for r in unvetted).most_common(40)),
         "by_access": dict(Counter(r["access"] for r in written).most_common()),
         "by_domain": dict(Counter(f"{r['domain']}:{r['access']}" for r in written).most_common()),
         "requests": {**requests_made, "total": sum(requests_made.values()),

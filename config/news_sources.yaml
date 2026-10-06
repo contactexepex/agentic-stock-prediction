@@ -43,6 +43,8 @@ material_terms:
 # tier2 (established outlets, trade press, data sites and aggregators that syndicate them; the
 # JSON-LD provider or byline decides the origin). names: source labels Google News uses.
 # extract: optional extractor order (default jsonld, trafilatura, newspaper).
+# opinion_unless_path: items of the outlet are opinion (never counted as an origin) unless their
+# publisher URL path starts with it (the news desk); an item without a known URL is opinion.
 # fetch: false = the outlet answered 401/403/a bot challenge from the cloud: never requested (no
 # evasion), but still vetted: its headline counts as a vetted origin.
 # A domain not listed here is unvetted: never fetched, never counted, and listed with counts in
@@ -101,7 +103,8 @@ domains:
   marketscreener.com: {tier: tier2, names: [MarketScreener, marketscreener.com, MarketScreener India]}
   nasdaq.com: {tier: tier2, names: [Nasdaq]}
   thestreet.com: {tier: tier2, names: [TheStreet, The Street]}
-  seekingalpha.com: {tier: tier2, names: [Seeking Alpha]}
+  # contributor articles are opinion (never an independent factual origin); its news desk is /news/
+  seekingalpha.com: {tier: tier2, names: [Seeking Alpha], opinion_unless_path: /news/}
   investopedia.com: {tier: tier2, names: [Investopedia]}
   kiplinger.com: {tier: tier2, names: [Kiplinger]}
   fortune.com: {tier: tier2, names: [Fortune]}
@@ -126,6 +129,8 @@ domains:
   independent.co.uk: {tier: tier2, names: [The Independent]}
   telegraph.co.uk: {tier: tier2, names: [The Telegraph]}
   scmp.com: {tier: tier2, names: [South China Morning Post]}
+  news.bloomberglaw.com: {tier: tier2, names: [Bloomberg Law, Bloomberg Law News]}   # HTTPS 200, cert verified 2026-10-06
+  gulfnews.com: {tier: tier2, names: [Gulf News]}                                    # HTTPS 200, cert verified 2026-10-06
   oilprice.com: {tier: tier2, names: [OilPrice.com, "Crude Oil Prices Today | OilPrice.com"]}
   theverge.com: {tier: tier2, names: [The Verge]}
   techcrunch.com: {tier: tier2, names: [TechCrunch]}
@@ -158,6 +163,7 @@ domains:
   news18.com: {tier: tier2, names: [News18, CNBC-TV18 News18]}
   firstpost.com: {tier: tier2, names: [Firstpost]}
   deccanherald.com: {tier: tier2, names: [Deccan Herald]}
+  newindianexpress.com: {tier: tier2, names: [The New Indian Express, New Indian Express]}   # HTTPS 200, cert verified 2026-10-06
   theprint.in: {tier: tier2, names: [ThePrint]}
   inc42.com: {tier: tier2, names: [Inc42, Inc42 Media]}
   vccircle.com: {tier: tier2, names: [VCCircle]}
