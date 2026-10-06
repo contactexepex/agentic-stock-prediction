@@ -159,10 +159,14 @@ def _f(v, k: int = 3) -> str:
     return "–" if v is None else f"{v:.{k}f}"
 
 
-def percent(v) -> str:
-    """A share (0.625) as a whole percent rounded half up on its decimal value ('63%'): the one convention
-    for printed shares, also in the HTML report's JavaScript (pct0) and DuckDB's round()."""
-    return f"{Decimal(repr(float(v))).scaleb(2).quantize(Decimal(1), ROUND_HALF_UP)}%"
+def percent(v, digits: int = 0, sign: bool = False) -> str:
+    """A share (0.625) as a percent rounded half up on its decimal value ('63%', digits=1 '62.5%',
+    sign=True '+63%'); '–' for a missing or non-finite value. The one convention for printed whole
+    percents, also in the HTML report's JavaScript (pct0)."""
+    if v is None or not math.isfinite(float(v)):
+        return "–"
+    value = Decimal(repr(float(v))).scaleb(2).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)
+    return f"{value:+}%" if sign else f"{value}%"
 
 
 def _p(v) -> str:

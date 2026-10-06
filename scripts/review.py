@@ -563,7 +563,7 @@ def confidence_advice(bands: dict, calls: dict, rv: dict) -> list[str]:
 # ---------- report ----------
 
 def fpct(v, digits: int = 0) -> str:
-    return "–" if v is None or (isinstance(v, float) and math.isnan(v)) else f"{v:.{digits}%}"
+    return scoring.percent(v, digits)
 
 
 def fnum(v, digits: int = 3) -> str:
@@ -635,14 +635,14 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
               "earnings in horizon, `event` major market event, `regime` regime widening, `none` no adjustment.", ""]
 
     rows = [[win_names[w], h, s["n"], fpct(s.get("hit_rate")), fpct(s.get("always_up")),
-             "–" if s.get("edge") is None else f"{s['edge']:+.0%}", fpct(s.get("mean_confidence")), flag(s["n"], rv)]
+             scoring.percent(s.get("edge"), sign=True), fpct(s.get("mean_confidence")), flag(s["n"], rv)]
             for w, per in d["calls"].items() for h, s in per.items()]
     lines += ["## Direction calls", "", "Hit rate vs the always-up baseline on the same tickers and dates.", "",
               table(["Window", "H", "n", "Hit rate", "Always-up", "Edge", "Mean conf.", "Flag"], rows),
               "### By confidence band", "",
               table(["Window", "Band", "n", "Mean conf.", "Hit rate", "Gap", "Flag"],
                     [[win_names[w], b, s["n"], fpct(s.get("mean_confidence")), fpct(s.get("hit_rate")),
-                      "–" if s.get("gap") is None else f"{s['gap']:+.0%}", flag(s["n"], rv)]
+                      scoring.percent(s.get("gap"), sign=True), flag(s["n"], rv)]
                      for w, per in d["bands"].items() for b, s in per.items()])]
 
     sc_rows = [[win_names[w], h, s["n"], fnum(s.get("brier")), fnum(s.get("log_loss")), fnum(s.get("brier_skill")),

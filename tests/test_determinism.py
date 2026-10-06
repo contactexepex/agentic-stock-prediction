@@ -211,6 +211,8 @@ def test_no_half_to_even_percent_format_left():
     import review
     scripts = Path(scoring.__file__).parent
     hits = [f"{p.name}:{i}" for p in sorted(scripts.glob("*.py"))
-            for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r":\.0%\}", line)]
+            for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r"\{[^}]*:[+ ]?\.(0|\{[^}]+\})%\}", line)]
     assert hits == []
-    assert review.band_label(0.625, 5 / 8) == "63%-63%"
+    assert review.band_label(0.625, 5 / 8) == "63%-63%" and review.fpct(0.625) == review.fpct(5 / 8) == "63%"
+    assert scoring.percent(0.125, sign=True) == "+13%" and scoring.percent(float("inf")) == "–"
+    assert scoring.percent(0.625, 1) == "62.5%" and scoring.percent(None) == "–"

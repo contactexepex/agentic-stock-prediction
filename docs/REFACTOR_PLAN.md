@@ -201,7 +201,8 @@ infinities and values of 1e28 or more become NULL and are left out of `avg`/`sum
 made the result NaN or inf), while `count(*)` beside them still counts their rows
 (`tests/test_determinism.py::test_exact_decimal_sum_limits`).
 
-Rounding convention for printed shares: half up on the value's decimal form, everywhere.
+Rounding convention for printed whole percents: half up on the value's decimal form, everywhere
+(1- and 2-decimal percents in backtest tables and range/validate notes keep Python formatting).
 `scoring.percent` (whole percent, `decimal` ROUND_HALF_UP) prints every share in the md report,
 the Slack text, the context pack's proper-score tables and view_data's call and record texts; the
 HTML report's JavaScript uses `pct0` (same rule). The weekly review, chart labels and range/regime
