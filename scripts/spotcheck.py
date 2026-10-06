@@ -20,7 +20,10 @@ import sys
 
 import pandas as pd
 
-from common import ROOT, connect, market_arg, require_market, utc_now, utc_today
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.paths import ROOT
 from review import previous_week, week_bounds
 
 SAMPLE_CALLS, SAMPLE_REPORTS = 2, 1

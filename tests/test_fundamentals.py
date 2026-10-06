@@ -145,8 +145,9 @@ def rows(root: Path) -> list[dict]:
 
 def connect(root: Path, monkeypatch):
     import common
+    from marketbrief.core.database import connect
     monkeypatch.setattr(common, "ROOT", root)
-    return common.connect(MARKET)
+    return connect(MARKET)
 
 
 # ---------- pure functions ----------

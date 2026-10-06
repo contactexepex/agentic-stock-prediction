@@ -1,7 +1,7 @@
 """SEC acceptance times: the submissions JSON's acceptanceDateTime can be shifted later by the New
-York UTC offset (whole file, some CIKs; seen from 2026-10-05); sec.Edgar.recent checks each file
+York UTC offset (whole file, some CIKs; seen from 2026-10-05); Edgar.recent checks each file
 against the SGML header <ACCEPTANCE-DATETIME> (US Eastern) of its newest filing and corrects it,
-and stored rows are corrected on read through sec_times (check_sec_times.py, common.connect).
+and stored rows are corrected on read through sec_times (check_sec_times.py, core.database.connect).
 Offline: real headers (*.hdr.sgml) and real submission lists trimmed to three filings, downloaded
 2026-10-06 (tests/fixtures/sec/README.md). Run: pytest -q"""
 from __future__ import annotations
@@ -24,6 +24,10 @@ MARKET = "testsectimes"
 sys.path.insert(0, str(SCRIPTS))
 
 import sec  # noqa: E402
+from marketbrief.sources.sec_acceptance import (EASTERN, et_offset_hours, is_shifted, sgml_acceptance, time_summary,
+                                                time_warnings, unshift)  # noqa: E402
+from marketbrief.sources.sec_client import Edgar, archive_url  # noqa: E402
+from marketbrief.utils.timefmt import format_utc_z, parse_utc_z  # noqa: E402
 
 CIKS = {"JPM": 19617, "AAPL": 320193, "TSLA": 1318605}
 HEADERS = {   # accession -> (CIK, fixture): every filing of the trimmed lists
@@ -56,7 +60,7 @@ def urls(headers=HEADERS) -> dict:
     for t, cik in CIKS.items():
         out[f"https://data.sec.gov/submissions/CIK{cik:010d}.json"] = str(FIX / f"submissions_{t.lower()}_trimmed.json")
     for acc, (cik, name) in headers.items():
-        out[sec.archive_url(cik, acc, f"{acc}.hdr.sgml")] = str(FIX / name)
+        out[archive_url(cik, acc, f"{acc}.hdr.sgml")] = str(FIX / name)
     return out
 
 
@@ -71,17 +75,17 @@ def fixtures(d: Path, headers=HEADERS) -> Path:
 @pytest.fixture
 def edgar(tmp_path, monkeypatch):
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fixtures(tmp_path / "sec")))
-    return sec.Edgar("market-brief tests test@example.com")
+    return Edgar("market-brief tests test@example.com")
 
 
 # ---------- the rule ----------
 
 def test_header_time_is_eastern_and_converted_to_utc():
     for acc, (_, name) in HEADERS.items():
-        assert sec.sgml_acceptance((FIX / name).read_bytes()) == TRUE[acc]
-    assert sec.sgml_acceptance(b"<SEC-HEADER>no time</SEC-HEADER>") is None
+        assert sgml_acceptance((FIX / name).read_bytes()) == TRUE[acc]
+    assert sgml_acceptance(b"<SEC-HEADER>no time</SEC-HEADER>") is None
     # the full submission .txt carries the same tag (YYYYMMDDHHMMSS, Eastern)
-    assert sec.sgml_acceptance(b"<SEC-DOCUMENT>x\n<ACCEPTANCE-DATETIME>20260714063038\n") == TRUE["0001628280-26-048078"]
+    assert sgml_acceptance(b"<SEC-DOCUMENT>x\n<ACCEPTANCE-DATETIME>20260714063038\n") == TRUE["0001628280-26-048078"]
 
 
 def test_shift_is_the_eastern_offset_and_unshift_inverts_it():
@@ -90,15 +94,15 @@ def test_shift_is_the_eastern_offset_and_unshift_inverts_it():
              ("2026-02-14T02:20:00.000Z", TRUE["0001628280-26-008131"]),     # EST: +5h
              ("2025-01-31T16:01:27.000Z", TRUE["0000320193-25-000008"])]
     for shifted, true in cases:
-        assert sec.is_shifted(shifted, true) and sec.unshift(shifted) == true
-    assert not sec.is_shifted(TRUE["0001628280-26-064366"], TRUE["0001628280-26-064366"])
-    assert not sec.is_shifted("2026-07-14T15:30:38.000Z", TRUE["0001628280-26-048078"])   # +5h in summer: not the rule
+        assert is_shifted(shifted, true) and unshift(shifted) == true
+    assert not is_shifted(TRUE["0001628280-26-064366"], TRUE["0001628280-26-064366"])
+    assert not is_shifted("2026-07-14T15:30:38.000Z", TRUE["0001628280-26-048078"])   # +5h in summer: not the rule
     # the days around both 2026 DST changes (March 8, November 1), at EDGAR hours
     for day in ("2026-03-06", "2026-03-09", "2026-10-30", "2026-11-02"):
         for hh in ("06:00:01", "12:00:00", "21:59:59"):
-            true = datetime.fromisoformat(f"{day}T{hh}").replace(tzinfo=sec.EASTERN)
-            shifted = true + timedelta(hours=sec.et_offset_hours(true))
-            assert sec.unshift(sec.iso_z(shifted)) == sec.iso_z(true)
+            true = datetime.fromisoformat(f"{day}T{hh}").replace(tzinfo=EASTERN)
+            shifted = true + timedelta(hours=et_offset_hours(true))
+            assert unshift(format_utc_z(shifted)) == format_utc_z(true)
 
 
 # ---------- Edgar.recent ----------
@@ -113,7 +117,7 @@ def test_recent_corrects_a_shifted_file_and_keeps_a_right_one(edgar):
     tsla = edgar.recent(CIKS["TSLA"])
     assert dict(zip(tsla["accessionNumber"], tsla["acceptanceDateTime"])) == {a: TRUE[a] for a in tsla["accessionNumber"]}
     assert "acceptanceDateTimeJson" not in tsla and edgar.requests == 9               # newest + oldest header per CIK
-    assert sec.time_summary(edgar) == {"ok": 1, "shifted": ["19617", "320193"], "unverified": {}}
+    assert time_summary(edgar) == {"ok": 1, "shifted": ["19617", "320193"], "unverified": {}}
     edgar.recent(CIKS["JPM"])                                                         # header cached: no request
     assert edgar.requests == 10
     # sec.filings (insiders, stakes, holdings, fundamentals) and the merged lists carry the fix
@@ -126,15 +130,15 @@ def test_recent_corrects_a_shifted_file_and_keeps_a_right_one(edgar):
 def test_unexplained_difference_or_missing_header_is_unverified_and_kept(tmp_path, monkeypatch):
     other = {**HEADERS, "0001140361-26-038674": (320193, "hdr_tsla_8k_0001628280-26-064366.sgml")}   # wrong time
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fixtures(tmp_path / "a", other)))
-    e = sec.Edgar("t t@example.com")
+    e = Edgar("t t@example.com")
     raw = json.loads((FIX / "submissions_aapl_trimmed.json").read_text())["filings"]["recent"]
     assert e.recent(CIKS["AAPL"])["acceptanceDateTime"] == raw["acceptanceDateTime"]
     assert e.time_checks["320193"].startswith("unverified: 0001140361-26-038674 JSON")
     no_hdr = {k: v for k, v in HEADERS.items() if v[0] != CIKS["AAPL"]}
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fixtures(tmp_path / "b", no_hdr)))
-    e = sec.Edgar("t t@example.com")
+    e = Edgar("t t@example.com")
     assert e.recent(CIKS["AAPL"])["acceptanceDateTime"] == raw["acceptanceDateTime"] and e.requests == 1
-    assert sec.time_summary(e) == {"ok": 0, "shifted": [], "unverified": {"320193": "no header fixture"}}
+    assert time_summary(e) == {"ok": 0, "shifted": [], "unverified": {"320193": "no header fixture"}}
 
 
 # ---------- collectors and the read-side correction ----------
@@ -178,7 +182,7 @@ def run(script: str, root: Path, cfg: Path, fx: Path, *args) -> dict:
 
 
 def query(root: Path, cfg: Path, sql: str) -> list[tuple]:
-    code = (f"import sys; sys.path.insert(0, {str(SCRIPTS)!r}); import json; from common import connect; "
+    code = (f"import sys; sys.path.insert(0, {str(SCRIPTS)!r}); import json; from marketbrief.core.database import connect; "
             f"print(json.dumps([list(map(str, r)) for r in connect({MARKET!r}).execute({sql!r}).fetchall()]))")
     env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg)}
     r = subprocess.run([sys.executable, "-c", code], cwd=SCRIPTS, env=env, capture_output=True, text=True, check=True)
@@ -264,15 +268,15 @@ def test_mixed_file_is_unverified_and_never_unshifted(tmp_path, monkeypatch, whi
     EARLIER (look-ahead), so it is kept as served and reported."""
     fx = mixed_fixtures(tmp_path / "sec", which)
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
-    e = sec.Edgar("t t@example.com")
+    e = Edgar("t t@example.com")
     served = json.loads((fx / "sub_aapl_mixed.json").read_text())["filings"]["recent"]["acceptanceDateTime"]
     rec = e.recent(CIKS["AAPL"])
     assert rec["acceptanceDateTime"] == served and "acceptanceDateTimeJson" not in rec
     assert e.time_checks["320193"].startswith("unverified: mixed file") and e.requests == 3
-    assert all(sec.parse_z(v) >= sec.parse_z(TRUE[a]) for a, v in zip(rec["accessionNumber"], rec["acceptanceDateTime"]))
-    w = sec.time_warnings(e)
+    assert all(parse_utc_z(v) >= parse_utc_z(TRUE[a]) for a, v in zip(rec["accessionNumber"], rec["acceptanceDateTime"]))
+    w = time_warnings(e)
     assert len(w) == 1 and "CIK 320193 unverified" in w[0] and "mixed file" in w[0]
-    assert sec.time_warnings(sec.time_summary(e)) == w
+    assert time_warnings(time_summary(e)) == w
 
 
 def test_collectors_put_unverified_ciks_in_warnings(tmp_path):

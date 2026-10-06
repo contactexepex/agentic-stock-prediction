@@ -24,7 +24,9 @@ from matplotlib.lines import Line2D  # noqa: E402
 from PIL import Image  # noqa: E402
 
 import scoring  # noqa: E402
-from common import ROOT, connect, market_arg, require_market  # noqa: E402
+from marketbrief.core.cli import market_arg, require_market  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.paths import ROOT  # noqa: E402
 from view_data import CURRENCY, gather_view, primary_horizon  # noqa: E402
 
 # Reference palette (dataviz skill): light surface, blue ramp for ranges, blue/red diverging

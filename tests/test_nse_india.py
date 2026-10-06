@@ -173,7 +173,8 @@ def test_announcement_enrichment_view_and_context(tmp_path):
             "urgency": "medium", "geopolitical": False, "priced_in": False, "summary": "s", "prompt_version": "news-v5"}
     enr.write_text(json.dumps({**base, "id": "nse-ann-106806305", "sentiment": -0.4, "materiality": "medium"}) + "\n" +
                    json.dumps({**base, "id": "nse-ann-test-1", "sentiment": 0.6, "materiality": "high"}) + "\n")
-    q = ("from common import connect; c = connect('india'); print(c.execute(\"SELECT id, sentiment, materiality FROM "
+    q = ("from marketbrief.core.database import connect; c = connect('india'); "
+         "print(c.execute(\"SELECT id, sentiment, materiality FROM "
          "announcements_enriched WHERE id IN ('nse-ann-106806305', 'nse-ann-106806590') ORDER BY id\").fetchall())")
     env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg)}
     v = subprocess.run([sys.executable, "-c", q], cwd=SCRIPTS, env=env, capture_output=True, text=True)
@@ -204,7 +205,8 @@ def test_empty_endpoint_is_a_warning_not_a_quiet_day(tmp_path):
 
 def test_transient_error_is_retried_once(monkeypatch):
     monkeypatch.syspath_prepend(str(SCRIPTS))
-    import nse
+    from marketbrief.sources.errors import FetchError
+    from marketbrief.sources.nse_client import Nse
     calls = []
 
     class Resp:
@@ -223,7 +225,7 @@ def test_transient_error_is_retried_once(monkeypatch):
             raise urllib.error.URLError(OSError("EOF occurred in violation of protocol"))
         return Resp()
 
-    client = nse.Nse(pause=0)
+    client = Nse(pause=0)
     monkeypatch.setattr(client.opener, "open", flaky)
     client.warmed = True
     assert client.json("fiidiiTradeReact") == {"data": [1]} and len(calls) == 2
@@ -233,7 +235,7 @@ def test_transient_error_is_retried_once(monkeypatch):
     monkeypatch.setattr(client.opener, "open", always_eof)
     try:
         client.json("fiidiiTradeReact")
-    except nse.FetchError as exc:
+    except FetchError as exc:
         assert exc.host is None and "after a retry" in exc.error     # not mistaken for a blocked host
     else:
         raise AssertionError("expected FetchError")

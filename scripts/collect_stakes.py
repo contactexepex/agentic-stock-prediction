@@ -20,7 +20,12 @@ import sys
 from datetime import timedelta
 
 import sec
-from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
+from marketbrief.sources.sec_acceptance import time_summary, time_warnings
+from marketbrief.sources.sec_client import Edgar, archive_url
+from marketbrief.utils.numbers import parse_sec_number
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.storage import append_jsonl, day_file, recent_ids
 
 DEFAULT_FORMS = ["SCHEDULE 13D", "SCHEDULE 13D/A", "SCHEDULE 13G", "SCHEDULE 13G/A"]
 
@@ -34,16 +39,17 @@ def parse_schedule13(data: bytes) -> dict:
     if "13D" in form:
         for p in root.findall("formData/reportingPersons/reportingPersonInfo"):
             persons.append({"name": sec.text(p, "reportingPersonName"), "cik": sec.text(p, "reportingPersonCIK"),
-                            "shares": sec.num(sec.text(p, "aggregateAmountOwned")),
-                            "percent": sec.num(sec.text(p, "percentOfClass"))})
+                            "shares": parse_sec_number(sec.text(p, "aggregateAmountOwned")),
+                            "percent": parse_sec_number(sec.text(p, "percentOfClass"))})
         event = sec.text(cover, "dateOfEvent")
         item4 = root.find("formData/items1To7/item4")
         purpose = " ".join(t.strip() for t in item4.itertext() if t.strip()) if item4 is not None else None
     else:
         for p in root.findall("formData/coverPageHeaderReportingPersonDetails"):
             persons.append({"name": sec.text(p, "reportingPersonName"), "cik": None,
-                            "shares": sec.num(sec.text(p, "reportingPersonBeneficiallyOwnedAggregateNumberOfShares")),
-                            "percent": sec.num(sec.text(p, "classPercent"))})
+                            "shares": parse_sec_number(sec.text(p,
+                            "reportingPersonBeneficiallyOwnedAggregateNumberOfShares")),
+                            "percent": parse_sec_number(sec.text(p, "classPercent"))})
         event = sec.text(cover, "eventDateRequiresFilingThisStatement")
         purpose = None
     issuer = cover.find("issuerInfo") if cover is not None else None
@@ -78,7 +84,7 @@ def main() -> int:
     forms = set(rel.get("forms", DEFAULT_FORMS))
     since = utc_today() - timedelta(days=int(rel.get("lookback_days", 7)))
     seen = recent_ids(market, "stakes", days=120)
-    edgar, now = sec.Edgar(ua), utc_now()
+    edgar, now = Edgar(ua), utc_now()
     ciks, skipped = sec.watch_ciks(cfg, edgar)
     related = sec.related_ciks(cfg)
 
@@ -95,7 +101,7 @@ def main() -> int:
             if int(f["accession"].split("-")[0]) in own:   # self-filed: the company as an investor
                 as_investor += 1
                 continue
-            url = sec.archive_url(f["cik"], f["accession"], sec.raw_doc(f["primary_doc"]))
+            url = archive_url(f["cik"], f["accession"], sec.raw_doc(f["primary_doc"]))
             try:
                 parsed = parse_schedule13(edgar.get(url))
             except Exception as exc:
@@ -112,7 +118,7 @@ def main() -> int:
     print(json.dumps({
         "collector": "stakes", "market": market, "since": str(since), "filings_read": read,
         "new_rows": written, "new_13d": sum(r["kind"] == "13D" and not r["amendment"] for r in rows),
-        "as_investor_skipped": as_investor, "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar),
+        "as_investor_skipped": as_investor, "requests": edgar.requests, "sec_times": time_summary(edgar), "warnings": time_warnings(edgar),
         "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 

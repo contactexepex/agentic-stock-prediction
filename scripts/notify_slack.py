@@ -24,7 +24,8 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-from common import ROOT, market_arg, require_market
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.paths import ROOT
 from marketbrief.core.settings import load_settings
 from marketbrief.sources.slack_client import SlackHttp
 

@@ -7,7 +7,7 @@ Every accession stored in filings, insiders, stakes, holdings or fundamentals wi
 `accepted_at` and not checked before (no sec_times row yet) is looked up once in its
 `<accession>.hdr.sgml` (cached in work/sec_acceptance.json, one throttled request per new
 accession). One row per accession: accepted_at = the header's time (UTC), json_accepted_at = the
-stored value. common.connect() then reads accepted_at of those kinds through the newest row per
+stored value. core.database.connect() then reads accepted_at of those kinds through the newest row per
 accession, so a value stored from a shifted submissions file is corrected on read, without editing
 data/. --dry-run prints the summary without appending. Only for markets with `filings: sec`; needs
 SEC_USER_AGENT. The daily routine runs it after the SEC collectors (routine/PROMPT.md step 3):
@@ -20,9 +20,14 @@ import json
 import re
 import sys
 
-from common import append_jsonl, connect, day_file, market_arg, require_market, utc_now, utc_today
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.storage import append_jsonl, day_file
 
 import sec
+from marketbrief.sources.sec_client import Edgar
+from marketbrief.utils.timefmt import format_utc_z, parse_utc_z
 
 # kind -> SQL giving (accession, cik folder, stored accepted_at) of its rows, read raw from the files
 SOURCES = {
@@ -36,7 +41,8 @@ SOURCES = {
 
 def stored(market: str) -> tuple[dict[str, tuple[str, str]], set[str]]:
     """(accession -> (CIK folder, stored accepted_at as iso_z), accessions already checked)."""
-    from common import SCHEMAS, data_dir
+    from marketbrief.core.paths import data_dir
+    from marketbrief.core.schemas import SCHEMAS
     base = data_dir(market)
     con = connect(market)
     out: dict[str, tuple[str, str]] = {}
@@ -51,7 +57,7 @@ def stored(market: str) -> tuple[dict[str, tuple[str, str]], set[str]]:
             m = re.search(r"/edgar/data/(\d+)/", url or "")
             folder = m.group(1) if m else cik     # the archive folder the filing is served from
             if folder:
-                out[acc] = (str(int(folder)), sec.iso_z(at))
+                out[acc] = (str(int(folder)), format_utc_z(at))
     done = {r[0] for r in con.execute("SELECT DISTINCT accession FROM sec_times").fetchall()}
     return out, done
 
@@ -66,7 +72,7 @@ def main() -> int:
         return 0
     market = cfg["market"]
     rows_in, done = stored(market)
-    edgar = sec.Edgar(ua)
+    edgar = Edgar(ua)
     now = utc_now()
     rows, failed, wrong = [], [], []
     for acc, (cik, at) in sorted(rows_in.items()):
@@ -82,9 +88,9 @@ def main() -> int:
             continue
         rows.append({"accession": acc, "cik": cik, "accepted_at": true, "json_accepted_at": at,
                      "source": "sgml_header", "checked_at": now})
-        if sec.parse_z(true) != sec.parse_z(at):
+        if parse_utc_z(true) != parse_utc_z(at):
             wrong.append({"accession": acc, "stored": at, "header": true,
-                          "stored_minus_true_h": (sec.parse_z(at) - sec.parse_z(true)).total_seconds() / 3600})
+                          "stored_minus_true_h": (parse_utc_z(at) - parse_utc_z(true)).total_seconds() / 3600})
     written = 0 if args.dry_run else append_jsonl(day_file(market, "sec_times", utc_today()), rows)
     print(json.dumps({"collector": "sec_times", "market": market, "stored_accessions": len(rows_in),
                       "already_checked": len(done & set(rows_in)), "checked": len(rows), "written": written,

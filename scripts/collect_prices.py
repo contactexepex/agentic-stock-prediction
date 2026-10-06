@@ -54,8 +54,12 @@ from pathlib import Path
 
 import adjust as adj
 import events as ev
-from common import STALE_DAYS, append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
-from marketbrief.utils.sessions import last_completed_sessions as recent_sessions
+from marketbrief.constants.collection import STALE_DAYS
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.paths import data_dir
+from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.utils.sessions import last_completed_sessions
 
 FIELDS = ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume", "collected_at"]
 OWN_EXCHANGE = ("benchmark", "vol_index", "sector_etf")   # roles that follow the market's calendar
@@ -115,7 +119,7 @@ def newest_stored(cfg: dict, ticker: str, today: date) -> tuple[date | None, int
 
 def nse_client(cfg: dict):
     """The NSE archive client (tests replace it with a replay client)."""
-    from nse import Nse
+    from marketbrief.sources.nse_client import Nse
     rel = cfg.get("relations") or {}
     return Nse(rel.get("base", "https://www.nseindia.com"), rel.get("archives", "https://nsearchives.nseindia.com"),
                pause=float(rel.get("pause_seconds", 0.7)))
@@ -125,7 +129,8 @@ def bhavcopy_bars(text: str, day: date, symbols: dict[str, str]) -> tuple[dict[s
     """Watchlist bars (series EQ) of one sec_bhavdata_full file -> ({ticker: bar}, problem).
     A file whose DATE1 is not `day` (NSE serves the previous session's file on a holiday) gives
     no bars and a problem. Each bar carries NSE's PREV_CLOSE for the corporate-action guard."""
-    from nse import num, parse_day
+    from nse import parse_day
+    from marketbrief.utils.numbers import parse_nse_number
     rows = [{(k or "").strip(): (v or "").strip() for k, v in r.items()} for r in csv.DictReader(io.StringIO(text))]
     served = {parse_day(r.get("DATE1")) for r in rows} - {None}
     if served != {day}:
@@ -136,12 +141,12 @@ def bhavcopy_bars(text: str, day: date, symbols: dict[str, str]) -> tuple[dict[s
         ticker = symbols.get(r.get("SYMBOL", "").upper())
         if not ticker or r.get("SERIES") != "EQ":
             continue
-        o, h, lo, c = (num(r.get(k)) for k in ("OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE"))
-        vol = num(r.get("TTL_TRD_QNTY"))
+        o, h, lo, c = (parse_nse_number(r.get(k)) for k in ("OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE"))
+        vol = parse_nse_number(r.get("TTL_TRD_QNTY"))
         if None in (o, h, lo, c, vol) or min(o, h, lo, c) <= 0 or not lo <= min(o, c) <= max(o, c) <= h:
             continue
         out[ticker] = {"open": o, "high": h, "low": lo, "close": c, "volume": int(vol),
-                       "prev_close": num(r.get("PREV_CLOSE"))}
+                       "prev_close": parse_nse_number(r.get("PREV_CLOSE"))}
     return out, None
 
 
@@ -176,10 +181,11 @@ def nse_fallback(cfg: dict, today: date, now: str, n_sessions: int, splits: dict
     """Fill missing watchlist bars of the last `n_sessions` sessions from the NSE bhavcopy, oldest
     session first (a filled bar can then anchor the next session's basis check).
     Returns (filled bars, {ticker: [{date, reason}] still missing}, notes)."""
-    from nse import FetchError, nse_symbols
+    from nse import nse_symbols
+    from marketbrief.sources.errors import FetchError
     symbols, splits = nse_symbols(cfg), splits or {}
     missing = {}
-    for d in recent_sessions(cfg, today, n_sessions):
+    for d in last_completed_sessions(cfg, today, n_sessions):
         have = stored_bars(day_file(cfg["market"], "prices", d, "csv"))
         lacking = [t for t in cfg["tickers"] if t not in have]
         if lacking:
@@ -234,7 +240,7 @@ def apply_fallback(cfg: dict, today: date, now: str, targets: dict, failed: list
     stored afterwards moves to `resolved_by_nse`; one still missing a session, or whose newest
     stored bar (before the fallback) lies further back than the checked sessions, stays in `failed`."""
     n = int((cfg.get("price_fallback") or {}).get("sessions", 5))
-    window_start = recent_sessions(cfg, today, n)[0]
+    window_start = last_completed_sessions(cfg, today, n)[0]
     newest = {t: newest_stored(cfg, t, today) for t in cfg["tickers"]
               if any(f["ticker"] == t for f in failed)}
     try:
@@ -467,7 +473,8 @@ def nse_basis_check(cfg: dict, now: str, nse_getter):
       of 0.9 or more (e.g. a 1:10 bonus, 10/11) only the chain confirms, since an ordinary day's move
       can look like the step.
     No confirmation (yet) returns (None, reason): the caller warns and holds the symbol."""
-    from nse import FetchError, nse_symbols
+    from nse import nse_symbols
+    from marketbrief.sources.errors import FetchError
     symbols = nse_symbols(cfg)
 
     def check(key, last, stored_last, f_known, factor, later, yc):

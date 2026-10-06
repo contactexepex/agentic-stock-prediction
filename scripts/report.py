@@ -22,9 +22,13 @@ import events as ev
 from score_predictions import is_late
 from scoring import percent
 from view_data import CONF_BANDS_SQL, RANGE_RECORD_EXACT, fmt_call
-from common import ROOT, benchmark_key, connect, market_arg, require_market, utc_today, vol_index_key
-from marketbrief.utils.markdown import markdown_table as table
-from marketbrief.utils.money import format_money as money
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import benchmark_key, vol_index_key
+from marketbrief.core.paths import ROOT
+from marketbrief.utils.markdown import markdown_table
+from marketbrief.utils.money import format_money
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
 from marketbrief.core.settings import load_settings
 
@@ -161,15 +165,16 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
     n1 = len(s1)
     h80, h50 = (int(s1["hit80"].sum()), int(s1["hit50"].sum())) if n1 else (0, 0)
     nh80 = int(s1["naive_hit80"].fillna(False).sum()) if n1 else 0
-    scored_rows = [[x.ticker, f"{money(cur, x.lo80)}–{money(cur, x.hi80)}",
-                    f"{money(cur, x.lo50)}–{money(cur, x.hi50)}", money(cur, x.actual_close),
+    scored_rows = [[x.ticker, f"{format_money(cur, x.lo80)}–{format_money(cur, x.hi80)}",
+                    f"{format_money(cur, x.lo50)}–{format_money(cur, x.hi50)}", format_money(cur, x.actual_close),
                     mark(x.hit80), mark(x.hit50), mark(x.naive_hit80)] for x in s1.itertuples()]
     s5 = sc[sc["horizon_days"] == 5] if not sc.empty else sc
     line5 = (f"5-day ranges that matured on the same date: 80% hit {int(s5['hit80'].sum())}/{len(s5)}, "
              f"50% hit {int(s5['hit50'].sum())}/{len(s5)}." if len(s5) else "")
     cs = d["calls_scored"]
     calls_hit = int(cs["hit"].sum()) if not cs.empty else 0
-    call_rows = [[x.ticker, f"{x.horizon_days}d", x.direction, percent(x.confidence), pct(x.actual_return, 2), mark(x.hit)]
+    call_rows = [[x.ticker, f"{x.horizon_days}d", x.direction, percent(x.confidence), pct(x.actual_return, 2),
+    mark(x.hit)]
                  for x in cs.itertuples()]
 
     # today: ranges by sector
@@ -192,16 +197,18 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
                 call = "late: not a forecast, never scored"
             notes = "; ".join(sorted({n for x in (a, b) if x is not None for n in (list(x.notes) if x.notes is not None else [])}))
             today_rows.append([
-                t, sector, money(cur, base),
-                f"{money(cur, a.lo80)}–{money(cur, a.hi80)}" if a else "–",
-                f"{money(cur, a.lo50)}–{money(cur, a.hi50)}" if a else "–",
-                f"{money(cur, b.lo80)}–{money(cur, b.hi80)}" if b else "–",
+                t, sector, format_money(cur, base),
+                f"{format_money(cur, a.lo80)}–{format_money(cur, a.hi80)}" if a else "–",
+                f"{format_money(cur, a.lo50)}–{format_money(cur, a.hi50)}" if a else "–",
+                f"{format_money(cur, b.lo80)}–{format_money(cur, b.hi80)}" if b else "–",
                 call, "–" if late else pct(feats.loc[t]["cue_change_pct"], 2) if t in feats.index else "–", notes])
 
-    cue_rows = [[x.symbol, cfg["symbols"].get(x.symbol, {}).get("name", x.symbol), f"{x.price:,.2f}", pct(x.change_pct, 2)]
+    cue_rows = [[x.symbol, cfg["symbols"].get(x.symbol, {}).get("name", x.symbol), f"{x.price:,.2f}",
+    pct(x.change_pct, 2)]
                 for x in d["quotes"].itertuples() if x.symbol in cfg["symbols"]]
     adr_rows = [[x.symbol.replace(":ADR", ""), cfg["tickers"].get(x.symbol.replace(":ADR", ""), {}).get("adr", ""),
-                 f"{x.price:,.2f}", pct(x.change_pct, 2)] for x in d["quotes"].itertuples() if x.symbol.endswith(":ADR")]
+                 f"{x.price:,.2f}",
+                 pct(x.change_pct, 2)] for x in d["quotes"].itertuples() if x.symbol.endswith(":ADR")]
 
     mevents = ev.market_events(cfg, d["as_of"] + timedelta(days=1), d["as_of"] + timedelta(days=21))
     upcoming = [(e["date"], e["name"], "major" if e["major"] else "") for e in mevents]
@@ -234,22 +241,24 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
           f"### Ranges scored (target date {d['last_target'] or '–'})", "",
           (f"Next-day ranges: **80% hit {h80}/{n1}** (naive {nh80}/{n1}) · 50% hit {h50}/{n1}" if n1 else
            "No ranges have matured yet."), "",
-          table(["Ticker", "80% range", "50% range", "Actual", "80%", "50%", "Naive 80%"], scored_rows),
+          markdown_table(["Ticker", "80% range", "50% range", "Actual", "80%", "50%", "Naive 80%"], scored_rows),
           line5, "",
-          "### Calls scored", "", table(["Ticker", "H", "Call", "Conf.", "Move", "Hit"], call_rows),
+          "### Calls scored", "", markdown_table(["Ticker", "H", "Call", "Conf.", "Move", "Hit"], call_rows),
           f"## Today ({session})", "", regime_line, "",
           *([release_line, ""] if release_line else []),
           *img("ranges.png", "Price ranges for every company"),
-          table(["Ticker", "Sector", "Close", "Next day 80%", "Next day 50%", "5 days 80%", "Call", "Cue", "Notes"], today_rows),
+          markdown_table(["Ticker", "Sector", "Close", "Next day 80%", "Next day 50%", "5 days 80%", "Call", "Cue",
+          "Notes"], today_rows),
           *([f"{n_late} stock(s) have ranges made after the first session they cover had opened (a "
              "mid-session or late run): they are shown for the record, are not forecasts and are never "
              "scored.", ""] if n_late else []),
           "<!-- AGENT:calls -->", "",
-          "### Overnight cues and global factors", "", table(["Symbol", "Name", "Last", "Change"], cue_rows),
-          *(["### ADRs (US-listed shares, previous US session)", "", table(["Ticker", "ADR", "Last", "Change"], adr_rows)]
+          "### Overnight cues and global factors", "", markdown_table(["Symbol", "Name", "Last", "Change"], cue_rows),
+          *(["### ADRs (US-listed shares, previous US session)", "",
+          markdown_table(["Ticker", "ADR", "Last", "Change"], adr_rows)]
             if adr_rows else []),
           "## Tomorrow and this week", "",
-          table(["Date", "Event", "Type"], [[str(a), b, c] for a, b, c in upcoming]),
+          markdown_table(["Date", "Event", "Type"], [[str(a), b, c] for a, b, c in upcoming]),
           "<!-- AGENT:outlook -->", "",
           "## By sector", "", *img("sectors.png", "Sector moves")]
     for sector in (cfg.get("sectors") or {}):
@@ -257,19 +266,20 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
     md += ["## Track record", "", *img("track_record.png", "Track record: promised vs actual"),
            "Ranges (targets 50% / 80%; width, score and centre error in % of price, lower is better; "
            "naive = last close ± recent typical move, no-change = last close as the centre):", "",
-           table(["H", "Window", "n", "50% cover", "80% cover", "Naive 80%", "Width", "Naive width", "Score",
+           markdown_table(["H", "Window", "n", "50% cover", "80% cover", "Naive 80%", "Width", "Naive width", "Score",
                   "Naive score", "Centre err", "No-change err"], sc_rows),
            "Ranges by regime (since start):", "",
-           table(["H", "Regime", "n", "50% cover", "80% cover", "Naive 80%"], regime_rows),
-           "Up/down calls vs the always-up baseline:", "", table(["H", "Window", "n", "Hit rate", "Always-up"], dir_rows),
+           markdown_table(["H", "Regime", "n", "50% cover", "80% cover", "Naive 80%"], regime_rows),
+           "Up/down calls vs the always-up baseline:", "",
+           markdown_table(["H", "Window", "n", "Hit rate", "Always-up"], dir_rows),
            "Calls by confidence band (a band should hit about as often as its confidence):", "",
-           table(["Band", "n", "Avg confidence", "Hit rate"], band_rows),
+           markdown_table(["Band", "n", "Avg confidence", "Hit rate"], band_rows),
            *([review_line(d["review"], md_link(d["review"]["report"].rsplit("/", 1)[-1])), ""] if d.get("review") else []),
            "## Data quality", "",
            f"- Indicators: {len(feats) - len(partial) - len(blocked)} OK, partial: {', '.join(partial) or 'none'}, "
            f"blocked: {', '.join(blocked) or 'none'}",
            f"- Regime notes: {'; '.join(reg['notes']) if reg is not None and reg['notes'] is not None and len(reg['notes']) else 'none'}", "",
-           table(["H", "Calibration", "History n", "Live n", "q10 / q90"], cal_rows),
+           markdown_table(["H", "Calibration", "History n", "Live n", "q10 / q90"], cal_rows),
            "<!-- AGENT:data_quality -->", ""]
     report = "\n".join(md)
 
@@ -292,7 +302,7 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
         call_line = f"Calls today: none. Price ranges for all {len(cfg['tickers'])} stocks are in the report."
     elif len(calls) <= 3:
         call_line = f"Calls today: {len(calls)} · " + " · ".join(
-            f"{t} {fmt_call(x.direction, x.confidence)} ({hz(x)}, 80% range {money(cur, x.lo80)}–{money(cur, x.hi80)})"
+            f"{t} {fmt_call(x.direction, x.confidence)} ({hz(x)}, 80% range {format_money(cur, x.lo80)}–{format_money(cur, x.hi80)})"
             for t, x in calls)
     else:
         call_line = (f"Calls today: {len(calls)} · " + ", ".join(f"{t} {fmt_call(x.direction, x.confidence)}"

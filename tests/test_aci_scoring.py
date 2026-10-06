@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import aci  # noqa: E402
+from marketbrief.core.market_config import load_ranges_config  # noqa: E402
 import rangelib as rl  # noqa: E402
 import scoring  # noqa: E402
 from test_pipeline import MARKET, fat_tailed_walk, run, setup, weekdays, write_bars  # noqa: E402
@@ -259,7 +260,7 @@ def test_calibrate_uses_aci_levels_from_outcomes_scored_by_now():
     idx = pd.bdate_range("2024-01-01", periods=400)
     bars = {t: pd.DataFrame({"close": fat_tailed_walk(rng, 400, 100, 0.01)}, index=idx) for t in ("BENCH", "A")}
     cfg = {"market": "testmkt", "symbols": {"BENCH": {"role": "benchmark"}}, "tickers": {"A": {}}}
-    rc = {**__import__("common").load_ranges_config("us"), "horizons": [1]}
+    rc = {**load_ranges_config("us"), "horizons": [1]}
     rc["aci"] = {**rc["aci"], "enabled": True, "gamma": 0.05, "min_history": 3, "by_regime": False}
     con = duckdb.connect()
     con.execute("CREATE TABLE range_record (id VARCHAR, horizon_days INTEGER, as_of_date DATE, target_date DATE, "
@@ -326,11 +327,13 @@ def test_review_proposes_aci_only_when_score_and_coverage_improve():
 
 HELD_OUT = """
 import json, sys, datetime
-import common, replay
-cfg = common.load_market('testmkt'); rc = common.load_ranges_config('testmkt')
+import replay
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import load_market, load_ranges_config
+cfg = load_market('testmkt'); rc = load_ranges_config('testmkt')
 tune_end = datetime.date.fromisoformat(sys.argv[1])
-ho = replay.held_out(cfg, replay.aci_rc(rc), common.connect('testmkt'), tune_end)
-bars, extra = replay.load_inputs(cfg, rc, common.connect('testmkt'))
+ho = replay.held_out(cfg, replay.aci_rc(rc), connect('testmkt'), tune_end)
+bars, extra = replay.load_inputs(cfg, rc, connect('testmkt'))
 res, _ = replay.replay_rows(cfg, rc, bars, extra)
 n_test = {str(h): int(((g['date'] > tune_end) & g['actual'].notna()).sum()) for h, g in res.items()}
 c80 = {str(h): float(g.loc[(g['date'] > tune_end) & g['actual'].notna(), 'hit80'].astype(float).mean())

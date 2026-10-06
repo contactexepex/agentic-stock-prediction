@@ -22,9 +22,14 @@ import collect_macro as cm  # noqa: E402
 import collect_news as cn  # noqa: E402
 import collect_shorts as cs  # noqa: E402
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.schemas import SCHEMAS  # noqa: E402
+from marketbrief.sources.free_source_client import FreeSourceClient  # noqa: E402
+from marketbrief.utils.numbers import parse_accounting_amount  # noqa: E402
 import macro_context  # noqa: E402
 import sources  # noqa: E402
-from sources import FetchError  # noqa: E402
+from marketbrief.sources.errors import FetchError  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "sources"
 TODAY = date(2026, 10, 5)        # Monday; previous US session Fri 2026-10-02, India Thu 2026-10-01 (2 Oct holiday)
@@ -65,7 +70,7 @@ def rows(root: Path, market: str, kind: str) -> list[dict]:
 
 
 def assert_schema(found: list[dict], kind: str) -> None:
-    cols = set(common.SCHEMAS[kind][1])
+    cols = set(SCHEMAS[kind][1])
     assert found, kind
     for r in found:
         assert set(r) == cols, (kind, set(r) ^ cols)
@@ -117,7 +122,7 @@ def test_cboe_parse_ratios():
 
 
 def test_finra_volume_parse_and_trailer_check():
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     text = (FIX / "CNMSshvol20261002.txt").read_text()
     got, problem = cs.parse_volume(text, date(2026, 10, 2), cs.finra_symbols(cfg), NOW)
     assert problem is None and len(got) == 20                    # AA and SPY are not on the watchlist
@@ -130,7 +135,7 @@ def test_finra_volume_parse_and_trailer_check():
 
 
 def test_finra_short_interest_parse():
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     got = cs.parse_short_interest(json.loads((FIX / "finra_short_interest.json").read_text()), cs.finra_symbols(cfg), NOW)
     assert len(got) == 40 and {r["settlement_date"] for r in got} == {"2026-08-31", "2026-09-15"}
     nvda = next(r for r in got if r["ticker"] == "NVDA" and r["settlement_date"] == "2026-08-31")
@@ -154,7 +159,7 @@ def test_nsdl_fpi_parse():
 
 
 def test_nse_index_parse():
-    cfg = common.load_market("india")
+    cfg = load_market("india")
     names = cfg["india_flows"]["indices"]["names"]
     got, missing, problem = cfi.parse_indices((FIX / "ind_close_all_05102026.csv").read_text(), TODAY, names, NOW)
     assert problem is None and missing == [] and len(got) == len(names) == 14
@@ -169,16 +174,16 @@ def test_nse_index_parse():
 
 
 def test_number_parsing():
-    assert sources.num("(9634.96)") == -9634.96 and sources.num("Rs.95.9927") == 95.9927
-    assert sources.num("-.88") == -0.88 and sources.num("1,234.5") == 1234.5
-    assert sources.num("-") is None and sources.num(".") is None and sources.num("") is None
+    assert parse_accounting_amount("(9634.96)") == -9634.96 and parse_accounting_amount("Rs.95.9927") == 95.9927
+    assert parse_accounting_amount("-.88") == -0.88 and parse_accounting_amount("1,234.5") == 1234.5
+    assert parse_accounting_amount("-") is None and parse_accounting_amount(".") is None and parse_accounting_amount("") is None
 
 
 # ---------- collectors end to end: schema, dedupe, revisions, failures ----------
 
 def us_cfg(cboe_lookback: int = 4) -> dict:
     """The real US config; the Cboe lookback shortened to the fixture sessions (10-01, 10-02, 10-05)."""
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     cfg["macro"]["cboe"]["lookback_days"] = cboe_lookback
     return cfg
 
@@ -199,14 +204,14 @@ def test_macro_collect_schema_dedupe_and_revision(root):
     revised = (FIX / "treasury_2026.csv").read_bytes().replace(b"10/05/2026,4.05", b"10/05/2026,4.07")
     routes = [("daily-treasury-rates", revised), *US_ROUTES[1:]]
     assert cm.collect(cfg, FakeClient(routes), TODAY, "2026-10-06T02:00:00+00:00")["new"]["macro"] == 1
-    con = common.connect("us")
+    con = connect("us")
     assert con.execute("SELECT value FROM macro_latest WHERE series = 'UST_1M'").fetchone()[0] == 4.07
     spread = con.execute("SELECT value, chg_1 FROM macro_latest WHERE series = 'UST_10Y_2Y'").fetchone()
     assert spread[0] == pytest.approx(5.31 - 4.84) and spread[1] == pytest.approx((5.31 - 4.84) - (5.28 - 4.83))
 
 
 def test_macro_failures_are_listed(root):
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     routes = [("daily-treasury-rates", FetchError("u", "egress proxy denied home.treasury.gov", host="home.treasury.gov")),
               ("fred.stlouisfed.org", FetchError("u", "fred.stlouisfed.org closed the connection without an HTTP answer")),
               ("2026-10-02_daily_options", "cboe_2026-10-02_daily_options.json")]
@@ -224,7 +229,7 @@ def test_macro_main_skips_other_market_and_exit_code(root, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["collect_macro", "--market", "india"])
     assert cm.main() == 0 and "skipped" in json.loads(capsys.readouterr().out)
     monkeypatch.setattr(sys, "argv", ["collect_macro", "--market", "us"])
-    monkeypatch.setattr(cm, "Client", lambda **kw: FakeClient([]))
+    monkeypatch.setattr(cm, "FreeSourceClient", lambda **kw: FakeClient([]))
     monkeypatch.setattr(cm, "utc_today", lambda: TODAY)
     assert cm.main() == 1                       # every source failed (all 404)
     out = json.loads(capsys.readouterr().out)
@@ -232,7 +237,7 @@ def test_macro_main_skips_other_market_and_exit_code(root, monkeypatch, capsys):
 
 
 def test_shorts_collect_schema_dedupe_and_failures(root):
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     routes = [("CNMSshvol20261001", "CNMSshvol20261001.txt"), ("CNMSshvol20261002", "CNMSshvol20261002.txt"),
               ("consolidatedShortInterest", "finra_short_interest.json")]
     client = FakeClient(routes)
@@ -249,14 +254,14 @@ def test_shorts_collect_schema_dedupe_and_failures(root):
     again = cs.collect(cfg, client2, TODAY, NOW)
     assert again["new"] == {"shorts": 0, "short_interest": 0}
     assert not any("CNMSshvol20261001" in u for u in client2.calls)
-    con = common.connect("us")
+    con = connect("us")
     latest = con.execute("SELECT date, n_prior FROM shorts_latest WHERE ticker = 'NVDA'").fetchone()
     assert str(latest[0]) == "2026-10-02" and latest[1] == 1
     assert str(con.execute("SELECT settlement_date FROM short_interest_latest WHERE ticker = 'NVDA'").fetchone()[0]) == "2026-09-15"
 
 
 def test_shorts_missing_ticker_and_api_failure(root):
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     lines = [ln for ln in (FIX / "CNMSshvol20261002.txt").read_text().splitlines() if "|NVDA|" not in ln]
     cut = ("\n".join(lines[:-1] + [str(len(lines) - 2)]) + "\n").encode()
     routes = [("CNMSshvol20261002", cut),
@@ -269,7 +274,7 @@ def test_shorts_missing_ticker_and_api_failure(root):
 
 
 def test_flows_india_collect_schema_dedupe_and_failures(root):
-    cfg = common.load_market("india")
+    cfg = load_market("india")
     routes = [("fpi.nsdl.co.in", "nsdl_fpi_latest.html")] + [
         (f"ind_close_all_{d}", f"ind_close_all_{d}.csv") for d in ("25092026", "29092026", "30092026", "01102026", "05102026")]
     out = cfi.collect(cfg, FakeClient(routes), TODAY, NOW)
@@ -280,7 +285,7 @@ def test_flows_india_collect_schema_dedupe_and_failures(root):
     assert [f["date"] for f in out["failed"]] == ["2026-09-28"]
     again = cfi.collect(cfg, FakeClient(routes), TODAY, NOW)
     assert again["new"] == {"fpi": 0, "indices": 0}
-    con = common.connect("india")
+    con = connect("india")
     nifty = con.execute("SELECT close, ret_1_pct, date_1 FROM indices_latest WHERE index_name = 'Nifty 50'").fetchone()
     assert nifty[0] == 22555.75 and str(nifty[2]) == "2026-10-01"
     assert nifty[1] == pytest.approx((22555.75 / 22421.95 - 1) * 100)
@@ -292,7 +297,7 @@ def test_flows_india_collect_schema_dedupe_and_failures(root):
 
 
 def test_flows_india_layout_change_is_a_failure(root):
-    cfg = common.load_market("india")
+    cfg = load_market("india")
     routes = [("fpi.nsdl.co.in", "treasury_2026.csv")]
     out = cfi.collect({**cfg, "india_flows": {"fpi": True}}, FakeClient(routes), TODAY, NOW)
     assert out["new"] == {"fpi": None} and "report title" in out["failed"][0]["error"]
@@ -314,7 +319,7 @@ def test_client_classifies_errors(monkeypatch):
         raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_open)
-    c = sources.Client(pause=0)
+    c = FreeSourceClient(pause=0)
     with pytest.raises(FetchError) as e:
         c.get("https://a.example/proxy")
     assert e.value.host == "a.example" and e.value.status is None
@@ -332,11 +337,11 @@ def test_client_classifies_errors(monkeypatch):
 # ---------- context sections ----------
 
 def test_context_sections(root):
-    us, india = us_cfg(), common.load_market("india")
+    us, india = us_cfg(), load_market("india")
     cm.collect(us, FakeClient(US_ROUTES), TODAY, NOW)
     cs.collect(us, FakeClient([("CNMSshvol20261002", "CNMSshvol20261002.txt"),
                                ("consolidatedShortInterest", "finra_short_interest.json")]), TODAY, NOW)
-    secs = dict(macro_context.context_sections(us, common.connect("us")))
+    secs = dict(macro_context.context_sections(us, connect("us")))
     macro = next(v for k, v in secs.items() if k.startswith("Macro & flows"))
     assert "| UST_10Y | Treasury par yield 10 Yr | 2026-10-05 | 5.31% | +3 bp | +7 bp | 2026-09-28 |" in macro
     assert "| UST_10Y_2Y | Treasury 10y minus 2y | 2026-10-05 | 0.47% |" in macro
@@ -344,11 +349,11 @@ def test_context_sections(root):
     assert "BAMLH0A0HYM2" in macro and "UST_1.5M" not in macro      # only the main tenors are shown
     shorts = next(v for k, v in secs.items() if k.startswith("Short selling"))
     assert "| NVDA | 2026-10-02 |" in shorts and "| 2026-09-15 | 294.23 |" in shorts
-    assert macro_context.context_sections(india, common.connect("india")) != []
+    assert macro_context.context_sections(india, connect("india")) != []
     cfi.collect(india, FakeClient([("fpi.nsdl.co.in", "nsdl_fpi_latest.html"),
                                    ("ind_close_all_05102026", "ind_close_all_05102026.csv"),
                                    ("ind_close_all_01102026", "ind_close_all_01102026.csv")]), TODAY, NOW)
-    isecs = dict(macro_context.context_sections(india, common.connect("india")))
+    isecs = dict(macro_context.context_sections(india, connect("india")))
     fpi = next(v for k, v in isecs.items() if "FPI" in k)
     assert "| 2026-10-05 | Equity | Sub-total | 13147.77 | 22429.29 | -9281.52 | -966.9 |" in fpi
     assert "Equity net over the last 1 stored reports (2026-10-05 to 2026-10-05): -9,282 cr." in fpi
@@ -422,7 +427,7 @@ WIRE_CASES = [
 @pytest.mark.parametrize("text,expected", WIRE_CASES)
 def test_news_wire_matching(text, expected):
     """watchlist_only feeds: case-insensitive whole-word wire_names, wire_exclude phrases removed."""
-    cfg = common.load_market("us")
+    cfg = load_market("us")
     pats, exclude = cn.wire_patterns(cfg), cn.wire_exclusions(cfg["news"])
     assert cn.wire_tickers(text, pats, exclude) == expected
 
@@ -450,7 +455,7 @@ def test_incomplete_finra_day_is_refetched(root):
     c4 = FakeClient([])
     cs.collect(cfg, c4, TODAY, NOW)
     assert not any("CNMSshvol20261002" in u for u in c4.calls)
-    con = common.connect("us")
+    con = connect("us")
     assert con.execute("SELECT count(*), bool_and(complete) FROM shorts_daily WHERE date = '2026-10-02'").fetchone() == (20, True)
 
 
@@ -467,7 +472,7 @@ def test_truncated_finra_file_is_incomplete(root):
 
 
 def test_incomplete_index_and_cboe_days_are_refetched(root):
-    india = common.load_market("india")
+    india = load_market("india")
     india["india_flows"] = {"fpi": False, "indices": {**india["india_flows"]["indices"], "lookback_days": 1}}
     text = (FIX / "ind_close_all_05102026.csv").read_text().splitlines()
     partial = ("\n".join(ln for ln in text if not ln.startswith("Nifty Metal")) + "\n").encode()
@@ -478,7 +483,7 @@ def test_incomplete_index_and_cboe_days_are_refetched(root):
     c3 = FakeClient([])
     cfi.collect(india, c3, TODAY, NOW)
     assert c3.calls == []
-    assert common.connect("india").execute("SELECT count(*), bool_and(complete) FROM indices_daily").fetchone() == (14, True)
+    assert connect("india").execute("SELECT count(*), bool_and(complete) FROM indices_daily").fetchone() == (14, True)
 
     us = us_cfg()
     us["macro"] = {"treasury": False, "cboe": {**us["macro"]["cboe"], "lookback_days": 3}}   # 10-02, 10-05
@@ -501,7 +506,7 @@ def test_fpi_unreadable_numbers_and_missing_equity_are_failures(root):
     assert len(got) == 24
     # no Equity sub-total: reported as a failure, never a StopIteration
     no_equity = page.replace(">Equity<", ">Equities<")
-    cfg = common.load_market("india")
+    cfg = load_market("india")
     out = cfi.collect({**cfg, "india_flows": {"fpi": True}},
                       FakeClient([("fpi.nsdl.co.in", no_equity.encode())]), TODAY, NOW)
     assert "without an Equity sub-total" in out["failed"][0]["error"] and out["new"]["fpi"] > 0

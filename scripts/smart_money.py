@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from common import md_table
+from marketbrief.utils.markdown import cursor_markdown_table
 
 SECTIONS: list[tuple[str, str]] = [
     ("Insider open-market trades by ticker (Form 4; USD; P buys vs S sales, last 30/90 days)", """
@@ -45,7 +45,7 @@ def markdown(cfg: dict, con) -> str:
         return ""
     out = ["## Smart money (SEC: insiders, big stakes, 13F)\n"]
     for title, sql in SECTIONS:
-        out.append(f"### {title}\n\n{md_table(con.execute(sql))}")
+        out.append(f"### {title}\n\n{cursor_markdown_table(con.execute(sql))}")
     return "\n".join(out)
 
 

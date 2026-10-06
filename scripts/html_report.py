@@ -15,8 +15,8 @@ import re
 import sys
 from pathlib import Path
 
-from common import ROOT, connect, market_arg, require_market
 from view_data import NEWS_ID, gather_view, safe_url
+from marketbrief.core import cli, database, paths
 
 META_RE = re.compile(r"<!-- report-meta: (\{.*?\}) -->")
 CHART_FILES = ("ranges.png", "sectors.png", "track_record.png")   # charts.py, in thread order
@@ -178,9 +178,9 @@ def build_index(market: str, name: str, folder: Path) -> str:
 
 
 def run(cfg: dict) -> dict:
-    con = connect(cfg["market"])
+    con = database.connect(cfg["market"])
     view = gather_view(cfg, con)
-    folder = ROOT / "reports" / cfg["market"]
+    folder = paths.ROOT / "reports" / cfg["market"]
     md_path = folder / f"{view['session']}.md"
     if not md_path.exists():
         raise SystemExit(f"{md_path} not found; run report.py and fill it first")
@@ -193,18 +193,18 @@ def run(cfg: dict) -> dict:
     out = folder / f"{view['session']}.html"
     out.write_text(page)
     (folder / "index.html").write_text(build_index(cfg["market"], cfg["name"], folder))
-    manifest = {"market": cfg["market"], "session": view["session"], "html": str(out.relative_to(ROOT)),
-                "images": [str((charts / f).relative_to(ROOT)) for f in CHART_FILES if (charts / f).exists()]}
-    mpath = ROOT / "work" / f"slack_{cfg['market']}_files.json"
+    manifest = {"market": cfg["market"], "session": view["session"], "html": str(out.relative_to(paths.ROOT)),
+                "images": [str((charts / f).relative_to(paths.ROOT)) for f in CHART_FILES if (charts / f).exists()]}
+    mpath = paths.ROOT / "work" / f"slack_{cfg['market']}_files.json"
     mpath.parent.mkdir(parents=True, exist_ok=True)
     mpath.write_text(json.dumps(manifest, indent=2))
     return {"step": "html_report", "market": cfg["market"], "html": manifest["html"],
-            "index": str((folder / "index.html").relative_to(ROOT)), "slack_files": str(mpath.relative_to(ROOT)),
+            "index": str((folder / "index.html").relative_to(paths.ROOT)), "slack_files": str(mpath.relative_to(paths.ROOT)),
             "images": manifest["images"], "bytes": len(page.encode())}
 
 
 def main() -> int:
-    cfg = require_market(market_arg(__doc__).parse_args())
+    cfg = cli.require_market(cli.market_arg(__doc__).parse_args())
     try:
         out = run(cfg)
     except ValueError as exc:

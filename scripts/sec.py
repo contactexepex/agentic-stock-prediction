@@ -32,7 +32,7 @@ immutable, so they are cached per accession in work/sec_acceptance.json (under M
 collector in the same run, or a later run whose newest filing is unchanged, costs no extra
 request. Stored rows (including those stored from an unverified file) are corrected on read
 through `sec_times`: scripts/check_sec_times.py, run by the routine after the SEC collectors,
-appends each new accession's header time, and common.connect applies them.
+appends each new accession's header time, and core.database.connect applies them.
 
 Tests run offline: with MB_SEC_FIXTURES=<dir>, URLs are served from <dir>/urls.json
 ({url: file path, absolute or relative to <dir>}) instead of the network (a header missing from
@@ -49,12 +49,7 @@ from marketbrief.constants.config_keys import (CFG_FILINGS, CFG_FUNDAMENTALS, CF
 from marketbrief.constants.environment import ENV_SEC_USER_AGENT
 from marketbrief.constants.messages import MSG_SEC_NOT_APPLICABLE, MSG_SEC_USER_AGENT_MISSING
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_ERROR, SUMMARY_MARKET, SUMMARY_SKIPPED
-from marketbrief.sources.sec_acceptance import (EASTERN, et_offset_hours, is_shifted, sgml_acceptance,  # noqa: F401
-                                                time_summary, time_warnings, unshift)
-from marketbrief.sources.sec_client import Edgar, archive_url  # noqa: F401  (re-exports: sec.Edgar, sec.archive_url)
-from marketbrief.utils.numbers import parse_sec_number as num  # noqa: F401  (re-export: sec.num)
-from marketbrief.utils.timefmt import format_utc_z as iso_z  # noqa: F401  (re-export: sec.iso_z)
-from marketbrief.utils.timefmt import parse_utc_z as parse_z  # noqa: F401  (re-export: sec.parse_z)
+from marketbrief.sources.sec_client import Edgar
 
 
 def related_ciks(cfg: dict) -> dict[str, list[int]]:

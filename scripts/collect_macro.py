@@ -22,9 +22,13 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 
-from common import market_arg, require_market, utc_now, utc_today
-from sources import (Client, FetchError, complete_days, not_published, num, recent_sessions, stale_cutoff,
-                     store_changed, summary)
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from sources import complete_days, not_published, stale_cutoff, store_changed, summary
+from marketbrief.sources.errors import FetchError
+from marketbrief.sources.free_source_client import FreeSourceClient
+from marketbrief.utils.numbers import parse_accounting_amount
+from marketbrief.utils.sessions import sessions_in_window
 
 TREASURY_URL = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
                 "daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve"
@@ -60,7 +64,7 @@ def parse_treasury(text: str, since: date, now: str) -> list[dict]:
         if day < since:
             continue
         for col, val in r.items():
-            series, v = tenor_series(col or ""), num(val)
+            series, v = tenor_series(col or ""), parse_accounting_amount(val)
             if series and v is not None:
                 rows.append(row(series, day, v, "pct", f"Treasury par yield {col.strip()}", "treasury", now))
     return rows
@@ -89,7 +93,7 @@ def parse_fred(text: str, sid: str, since: date, unit: str, name: str, now: str)
             day = date.fromisoformat((d or "").strip())
         except ValueError:
             continue
-        v = num(r.get(sid))
+        v = parse_accounting_amount(r.get(sid))
         if day >= since and v is not None:
             rows.append(row(sid, day, v, unit, name, "fred", now))
     return rows
@@ -100,7 +104,8 @@ def parse_fred(text: str, sid: str, since: date, unit: str, name: str, now: str)
 def parse_cboe(payload: dict, day: date, wanted: dict[str, str], now: str) -> tuple[list[dict], list[str]]:
     """`ratios` list -> (rows for the configured ratio names ({name in Cboe's file: series}),
     configured names absent or without a number). Rows are `complete` only when none is missing."""
-    by_name = {(r.get("name") or "").strip().upper(): num(r.get("value")) for r in payload.get("ratios") or []}
+    by_name = {(r.get("name") or "").strip().upper(): parse_accounting_amount(r.get("value"))
+               for r in payload.get("ratios") or []}
     found = {n: by_name.get(n.upper()) for n in wanted}
     missing = sorted(n for n, v in found.items() if v is None)
     rows = [row(series, day, found[n], "ratio", f"Cboe {n}", "cboe", now, complete=not missing)
@@ -112,7 +117,7 @@ def cboe(client, cfg: dict, today: date, conf: dict, market: str, now: str, fail
     wanted = conf.get("ratios") or {}
     have = complete_days(market, "macro", "series", set(wanted.values()))
     cutoff, rows, ok = stale_cutoff(cfg, today), [], 0
-    for d in recent_sessions(cfg, today, int(conf.get("lookback_days", 7))):
+    for d in sessions_in_window(cfg, today, int(conf.get("lookback_days", 7))):
         if str(d) in have:
             ok += 1
             continue
@@ -191,7 +196,7 @@ def main() -> int:
         print(json.dumps({"collector": "macro", "market": cfg["market"],
                           "skipped": "no `macro:` section in this market's config"}))
         return 0
-    client = Client(pause=float(cfg["macro"].get("pause_seconds", 1.0)))
+    client = FreeSourceClient(pause=float(cfg["macro"].get("pause_seconds", 1.0)))
     out = collect(cfg, client, utc_today(), utc_now())
     print(json.dumps(out, indent=2))
     return 1 if out["sources_ok"] == 0 else 0

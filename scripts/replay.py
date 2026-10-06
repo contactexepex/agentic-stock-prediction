@@ -29,7 +29,7 @@ Also, past event dates are taken as known in advance (scheduled), since backfill
 when each date was first announced.
 
 Writes reports/<market>/replay-<end>.html (self-contained) and .json, and appends one row to
-data/<market>/replays/ (schema `replays` in common.py). Prints a JSON summary."""
+data/<market>/replays/ (schema `replays` in marketbrief/core/schemas.py). Prints a JSON summary."""
 from __future__ import annotations
 
 import bisect
@@ -52,12 +52,14 @@ import range_inputs as ri
 import rangelib as rl
 import regime as rg
 import scoring as sc
-from common import (ROOT, append_jsonl, benchmark_key, connect, day_file, load_ranges_config, market_arg,
-                    require_market, utc_now, vol_index_key)
+from marketbrief.core.clock import utc_now
+from marketbrief.core.market_config import benchmark_key, load_ranges_config, vol_index_key
+from marketbrief.core.paths import ROOT
 from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
-from marketbrief.utils.event_dates import major_event_between as major_between
-from marketbrief.utils.numbers import round_finite_or_none as _r, share_percent_text
+from marketbrief.utils.event_dates import major_event_between
+from marketbrief.utils.numbers import round_or_none, share_percent_text
 from features import load_bars
+from marketbrief.core import cli, database, storage
 
 LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)   # calibration curve (stated coverage)
 SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")
@@ -196,7 +198,7 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
             q = normal if levels is DEFAULT_LEVELS else {k: nd.inv_cdf(p) for k, p in levels.items()}
             pit, source = nd.cdf, "normal"
         tgt_cal = ev.sessions_ahead(cfg, d + timedelta(days=1), h)[-1]   # ranges.target_date
-        major = major_between(majors, d, tgt_cal)
+        major = major_event_between(majors, d, tgt_cal)
         for t, f in frames.items():
             if ts not in f.index:
                 continue
@@ -332,18 +334,19 @@ def range_summary(g: pd.DataFrame, h: int) -> dict:
     lo, hi = clustered_ci(hit80, blocks)
     nv = g[g["naive_hit80"].notna()] if "naive_hit80" in g.columns else g.iloc[0:0]
     out = {"n": int(len(g)), "days": int(g["date"].nunique()),
-           "cover50": _r(g["hit50"].mean()), "cover80": _r(g["hit80"].mean()),
-           "cover80_ci": [_r(lo), _r(hi)],
-           "width50_pct": _r(g["width50"].mean(), 3), "width80_pct": _r(g["width80"].mean(), 3),
-           "score50": _r(g["is50"].mean(), 3), "score80": _r(g["is80"].mean(), 3),
-           "qs_pct": _r(g["qs"].mean(), 4) if "qs" in g else None,
-           "abs_err_pct": _r(g["abs_err"].mean(), 3)}
+           "cover50": round_or_none(g["hit50"].mean()), "cover80": round_or_none(g["hit80"].mean()),
+           "cover80_ci": [round_or_none(lo), round_or_none(hi)],
+           "width50_pct": round_or_none(g["width50"].mean(), 3), "width80_pct": round_or_none(g["width80"].mean(), 3),
+           "score50": round_or_none(g["is50"].mean(), 3), "score80": round_or_none(g["is80"].mean(), 3),
+           "qs_pct": round_or_none(g["qs"].mean(), 4) if "qs" in g else None,
+           "abs_err_pct": round_or_none(g["abs_err"].mean(), 3)}
     if len(nv):
-        out.update({"naive_n": int(len(nv)), "naive_cover50": _r(nv["naive_hit50"].astype(float).mean()),
-                    "naive_cover80": _r(nv["naive_hit80"].astype(float).mean()),
-                    "naive_width80_pct": _r(nv["naive_width80"].mean(), 3),
-                    "naive_score50": _r(nv["naive_is50"].mean(), 3), "naive_score80": _r(nv["naive_is80"].mean(), 3),
-                    "score80_same_rows": _r(nv["is80"].mean(), 3)})
+        out.update({"naive_n": int(len(nv)), "naive_cover50": round_or_none(nv["naive_hit50"].astype(float).mean()),
+                    "naive_cover80": round_or_none(nv["naive_hit80"].astype(float).mean()),
+                    "naive_width80_pct": round_or_none(nv["naive_width80"].mean(), 3),
+                    "naive_score50": round_or_none(nv["naive_is50"].mean(), 3),
+                    "naive_score80": round_or_none(nv["naive_is80"].mean(), 3),
+                    "score80_same_rows": round_or_none(nv["is80"].mean(), 3)})
     return out
 
 
@@ -355,13 +358,13 @@ def calibration(g: pd.DataFrame) -> list[dict]:
     out = []
     for lv in LEVELS:
         lo, hi = 0.5 - lv / 2, 0.5 + lv / 2
-        out.append({"stated": lv, "actual": _r(((u >= lo) & (u <= hi)).mean()),
+        out.append({"stated": lv, "actual": round_or_none(((u >= lo) & (u <= hi)).mean()),
                     "published": lv in (0.5, 0.8)})
     for p in out:   # the published bands are scored on the bands themselves
         if p["stated"] == 0.5:
-            p["actual"] = _r(g["hit50"].mean())
+            p["actual"] = round_or_none(g["hit50"].mean())
         elif p["stated"] == 0.8:
-            p["actual"] = _r(g["hit80"].mean())
+            p["actual"] = round_or_none(g["hit80"].mean())
     return out
 
 
@@ -392,11 +395,13 @@ def baseline_stats(g: pd.DataFrame, h: int) -> dict:
         wl, wh = wilson(k, n)
         diff = (hit[call].astype(float) - au_hit[call]).to_numpy()
         dlo, dhi = clustered_ci(diff, blocks[call.to_numpy()])
-        out[name] = {"label": SIGNAL_LABELS[name], "calls": n, "coverage": _r(n / len(g)), "hits": k,
-                     "hit_rate": _r(rate), "ci95": [_r(lo), _r(hi)], "ci95_iid": [_r(wl), _r(wh)],
+        out[name] = {"label": SIGNAL_LABELS[name], "calls": n, "coverage": round_or_none(n / len(g)), "hits": k,
+                     "hit_rate": round_or_none(rate), "ci95": [round_or_none(lo), round_or_none(hi)],
+                     "ci95_iid": [round_or_none(wl), round_or_none(wh)],
                      "p_vs_50": None if not n else float(f"{binom_p_two_sided(k, n):.3g}"),
-                     "always_up_same_rows": _r(au_hit[call].mean()) if n else None,
-                     "diff_vs_always_up": _r(diff.mean()) if n else None, "diff_ci95": [_r(dlo), _r(dhi)]}
+                     "always_up_same_rows": round_or_none(au_hit[call].mean()) if n else None,
+                     "diff_vs_always_up": round_or_none(diff.mean()) if n else None,
+                     "diff_ci95": [round_or_none(dlo), round_or_none(dhi)]}
     return out
 
 
@@ -423,8 +428,9 @@ def summarize(cfg: dict, rc: dict, res: dict[int, pd.DataFrame], reg: pd.DataFra
         hs["calendar_mismatch"] = int((sc["bar_target"] != sc["target_date"]).sum()) if len(sc) else 0
         hs["pool_fallback_days"] = int(g.loc[g["q_source"] == "normal", "date"].nunique())
         last = g[g["date"] == g["date"].max()]
-        hs["alpha"] = {"mean50": _r(g["alpha50"].mean()), "mean80": _r(g["alpha80"].mean()),
-                       "last50": _r(last["alpha50"].iloc[0]), "last80": _r(last["alpha80"].iloc[0])}
+        hs["alpha"] = {"mean50": round_or_none(g["alpha50"].mean()), "mean80": round_or_none(g["alpha80"].mean()),
+                       "last50": round_or_none(last["alpha50"].iloc[0]),
+                       "last80": round_or_none(last["alpha80"].iloc[0])}
         out["horizons"][str(h)] = hs
         out["baselines"][str(h)] = baseline_stats(g, h)
     counts = reg["regime"].value_counts() if not reg.empty else pd.Series(dtype=int)
@@ -980,7 +986,7 @@ def held_out(cfg: dict, rc: dict, con, tune_end: date, start: date | None = None
         key = aci_tag(r["aci"])
         frames[key] = (r["aci"], res)
         variants.append({"tag": key, "gamma": gamma, "by_regime": br,
-                         "tune_rel_score80": _r(mean_rel_score80(rows_comparison(fixed, res, tune)))})
+                         "tune_rel_score80": round_or_none(mean_rel_score80(rows_comparison(fixed, res, tune)))})
     best = min((v for v in variants if v["tune_rel_score80"] is not None), key=lambda v: v["tune_rel_score80"])
     sel_settings, sel_res = frames[best["tag"]]
     cur = aci_rc(rc)["aci"]
@@ -1080,7 +1086,7 @@ def record(s: dict, report: str) -> dict:
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
+    ap = cli.market_arg(__doc__)
     ap.add_argument("--start", type=date.fromisoformat, help="first as-of date (default: after the warm-up bars)")
     ap.add_argument("--end", type=date.fromisoformat, help="last as-of date (default: the last benchmark bar)")
     ap.add_argument("--aci", action="store_true",
@@ -1094,9 +1100,9 @@ def main() -> int:
     args = ap.parse_args()
     if (args.aci_gamma is not None or args.aci_by_regime or args.aci_tune_end) and not args.aci:
         raise SystemExit("--aci-gamma, --aci-by-regime and --aci-tune-end need --aci")
-    cfg = require_market(args)
+    cfg = cli.require_market(args)
     rc = load_ranges_config(cfg["market"])
-    con = connect(cfg["market"])
+    con = database.connect(cfg["market"])
     s, _ = run(cfg, rc, con, args.start, args.end)
     if not s["end"]:
         raise SystemExit("no trading days in the window")
@@ -1118,7 +1124,7 @@ def main() -> int:
     rel = str(page.relative_to(ROOT))
     rec = record(s, rel)
     rec["id"] += suffix
-    append_jsonl(day_file(cfg["market"], "replays", date.fromisoformat(s["end"])), [rec])
+    storage.append_jsonl(storage.day_file(cfg["market"], "replays", date.fromisoformat(s["end"])), [rec])
     print(json.dumps({"step": "replay", "market": cfg["market"], "report": rel, "json": str(js.relative_to(ROOT)),
                       "start": s["start"], "end": s["end"], "runtime_s": s["runtime_s"],
                       "aci": s["settings"]["aci"],

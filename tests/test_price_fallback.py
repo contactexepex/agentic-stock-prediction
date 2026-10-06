@@ -24,7 +24,8 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 import collect_prices  # noqa: E402
 import common  # noqa: E402
-from nse import Nse  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.sources.nse_client import Nse  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "nse"
 TODAY = date(2026, 10, 6)              # Tuesday; previous XBOM session Monday 2026-10-05
@@ -163,7 +164,7 @@ def test_yahoo_gap_filled_from_bhavcopy(env, monkeypatch, capsys):
     assert all(r["source"] == "nse_bhavcopy" and r["filled_at"] == NOW and r["id"] == f"{r['date']}-{r['ticker']}"
                and r["url"].endswith(f"sec_bhavdata_full_{date.fromisoformat(r['date']):%d%m%Y}.csv") for r in rows)
     assert (env.root / "data" / "india" / "price_sources" / "2026" / "10" / "2026-10-05.jsonl").exists()
-    con = common.connect("india")
+    con = connect("india")
     n, distinct = con.execute("SELECT count(*), count(DISTINCT (ticker, date)) FROM prices").fetchone()
     assert n == distinct                                       # one bar per (ticker, date)
     assert con.execute("SELECT close FROM ohlc WHERE ticker='MARUTI' AND date='2026-10-05'").fetchone()[0] == 11532.0

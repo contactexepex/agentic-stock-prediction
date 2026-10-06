@@ -21,10 +21,10 @@ lets the orchestrator run the agents on it, then records and scores their calls:
           R = a scratch root: copies of config/, sql/, templates/ and data/<M>/ truncated to what
           was public at the cutoff (the routine's start time on S, before the open; CUTOFF_LOCAL).
           Then features.py, calibrate.py, context.py (R/work/context.md) and ranges.py run with
-          MB_ROOT=R and MB_NOW=cutoff (scripts/common.py clock(): every "now"/"today" and DuckDB's
+          MB_ROOT=R and MB_NOW=cutoff (marketbrief/core/clock.py clock(): every "now"/"today" and DuckDB's
           current_date is the cutoff). Prints and saves (R/ai_replay.json) what was kept or dropped.
   record  --market M --date D --root R --calls F --results DIR
-          validates forecaster-format records (schema `predictions` in common.py and the CLAUDE.md
+          validates forecaster-format records (schema `predictions` in marketbrief/core/schemas.py and the CLAUDE.md
           prediction rules, checked against R) and appends the valid ones to
           DIR/<M>/calls.jsonl tagged replay=true (never to data/<M>/predictions/).
   score   --market M --results DIR --out PAGE.html
@@ -80,12 +80,17 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-import common
+from marketbrief.core import paths
+from marketbrief.core.paths import CODE
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import benchmark_key, load_market, market_names
+from marketbrief.core.storage import append_jsonl
 import events as ev
 import replay
-from common import ACCEPTED_KEYS, CODE, SCHEMAS, connect, load_market, market_names, utc_now
-from marketbrief.utils.numbers import share_percent_text
-from marketbrief.utils.timefmt import as_utc_timestamp as _ts
+from marketbrief.core.schemas import ACCEPTED_KEYS, SCHEMAS
+from marketbrief.utils.numbers import round_or_none, share_percent_text
+from marketbrief.utils.timefmt import as_utc_timestamp
 from features import load_bars
 from marketbrief.constants.messages import MSG_MARKET_REQUIRED
 from marketbrief.core.settings import load_settings
@@ -142,7 +147,7 @@ def training_cutoff() -> date:
     """`model_training_cutoff` from config/settings.yaml: the model may have seen data up to this date."""
     v = (load_settings() or {}).get("model_training_cutoff")
     if v is None:
-        raise SystemExit(f"{common.CONFIG / 'settings.yaml'} has no model_training_cutoff (YYYY-MM-DD)")
+        raise SystemExit(f"{paths.CONFIG / 'settings.yaml'} has no model_training_cutoff (YYYY-MM-DD)")
     return v if isinstance(v, date) else date.fromisoformat(str(v))
 
 
@@ -182,11 +187,11 @@ def sample_dates(cfg: dict, start: date = SAMPLE_START, end: date = SAMPLE_END, 
 def public_at(kind: str, row: dict) -> pd.Timestamp | None:
     for col in PUBLIC_AT.get(kind, []):
         if col.endswith("+1d"):
-            t = _ts(row.get(col[:-3]))
+            t = as_utc_timestamp(row.get(col[:-3]))
             if t is not None:
                 return t.normalize() + pd.Timedelta(days=1)
         else:
-            t = _ts(row.get(col))
+            t = as_utc_timestamp(row.get(col))
             if t is not None:
                 return t
     return None
@@ -194,7 +199,7 @@ def public_at(kind: str, row: dict) -> pd.Timestamp | None:
 
 def load_sec_times(base: Path) -> dict[str, str]:
     """Accession -> SGML-header acceptance time (newest check wins) from data/<market>/sec_times/,
-    the correction common.connect applies to accepted_at (see scripts/sec.py)."""
+    the correction connect applies to accepted_at (see scripts/sec.py)."""
     best: dict[str, tuple[str, str]] = {}
     for f in sorted((base / "sec_times").glob("**/*.jsonl")):
         for line in f.read_text(encoding="utf-8").splitlines():
@@ -214,25 +219,25 @@ def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp, times: dict[st
     if times and kind in ACCEPTED_KEYS and row.get(ACCEPTED_KEYS[kind]) in times:
         row = {**row, "accepted_at": times[row[ACCEPTED_KEYS[kind]]]}
     if kind in ("prices", "price_sources"):   # a bar and its provenance row share the bar date
-        t = _ts(row.get("date"))
+        t = as_utc_timestamp(row.get("date"))
         return t is not None and t.date() <= d
     if kind == "adjustments":   # a split/bonus applies to the root's bars only from its ex-date
-        t = _ts(row.get("ex_date"))
+        t = as_utc_timestamp(row.get("ex_date"))
         return t is not None and t.date() <= d
     if kind in DATE_PUBLIC_AFTER_CLOSE:
-        t = _ts(row.get("date"))
+        t = as_utc_timestamp(row.get("date"))
         return t is not None and t.date() <= d
     if kind == "events":
-        seen = _ts(row.get("first_seen_at"))
+        seen = as_utc_timestamp(row.get("first_seen_at"))
         if seen is not None and seen <= cutoff:
             return True
-        day = _ts(row.get("date"))
+        day = as_utc_timestamp(row.get("date"))
         return str(row.get("source") or "").endswith("_history") and day is not None and day.date() <= d
     t = public_at(kind, row)
     if t is None or t > cutoff:
         return False
     if kind in TARGET_DATE_KINDS:
-        td = _ts(row.get("target_date"))
+        td = as_utc_timestamp(row.get("target_date"))
         return td is not None and td.date() <= d
     return True
 
@@ -325,13 +330,13 @@ def copy_asof(market: str, src: Path, dst: Path, d: date, cutoff: datetime) -> d
 
 @contextmanager
 def data_root(root: Path):
-    """Point common.connect() at another root inside this process."""
-    old = common.ROOT
-    common.ROOT = Path(root)
+    """Point connect() at another root inside this process."""
+    old = paths.ROOT
+    paths.ROOT = Path(root)
     try:
         yield
     finally:
-        common.ROOT = old
+        paths.ROOT = old
 
 
 def evidence(market: str, root: Path, cutoff: datetime, days: int = EVIDENCE_DAYS) -> tuple[pd.DataFrame, dict]:
@@ -450,7 +455,7 @@ def assumed_earnings(cfg: dict, src: Path, d: date, cutoff: datetime, days: int)
 def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool = False,
             allow_training_period: bool = False, assume_earnings_days: int = 0) -> dict:
     market = cfg["market"]
-    src = Path(src or common.ROOT)
+    src = Path(src or paths.ROOT)
     model_cut = training_cutoff()
     if leakage_label(d, model_cut) == CONTAMINATED and not allow_training_period:
         raise SystemExit(f"{d} is on or before the model's training cutoff {model_cut} (config/settings.yaml "
@@ -462,7 +467,7 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
     session, cutoff = next_session(cfg, d), cutoff_for(cfg, d)
     root.mkdir(parents=True, exist_ok=True)
     (root / MARKER).write_text(f"{market} {d}\n")
-    shutil.copytree(common.CONFIG, root / "config")
+    shutil.copytree(paths.CONFIG, root / "config")
     for name in ("sql", "templates"):
         if (CODE / name).exists():
             shutil.copytree(CODE / name, root / name)
@@ -471,8 +476,8 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
     if assumed:
         path = root / "data" / market / "events" / f"{cutoff:%Y}" / f"{cutoff:%m}" / f"{cutoff:%Y-%m-%d}.assumed.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
-        common.append_jsonl(path, assumed)
-    bench = common.benchmark_key(cfg)
+        append_jsonl(path, assumed)
+    bench = benchmark_key(cfg)
     with data_root(root):
         last = connect(market).execute("SELECT max(date) FROM ohlc WHERE ticker = ?", [bench]).fetchone()[0]
     if last is None or pd.Timestamp(last).date() != d:
@@ -566,7 +571,7 @@ BACKFILL_KINDS = {"us": ("filings", "insiders", "stakes", "events"),
 def check_source(source: Path) -> Path:
     """The scratch source must not be the repo, the real data/ or anything inside or above it."""
     s = source.resolve()
-    for real_root in {CODE.resolve(), Path(common.ROOT).resolve()}:
+    for real_root in {CODE.resolve(), Path(paths.ROOT).resolve()}:
         real = real_root / "data"
         if s == real_root or s == real or real in s.parents or s in real_root.parents:
             raise SystemExit(f"--source {s} is the repo, its real data/ or contains them; use a scratch directory")
@@ -605,7 +610,8 @@ def stored_by_month(market: str, root: Path, kinds) -> dict:
                 if not line.strip():
                     continue
                 r = json.loads(line)
-                t = _ts(r.get("date")) if kind in ("events", "deals") else public_at(kind, r) if cols else None
+                t = as_utc_timestamp(r.get("date")) if kind in ("events", "deals") else public_at(kind,
+                r) if cols else None
                 key = "unknown" if t is None else f"{t:%Y-%m}"
                 months[key] = months.get(key, 0) + 1
         out[kind] = dict(sorted(months.items()))
@@ -617,16 +623,16 @@ def backfill(cfg: dict, source: Path, since: date, timeout: int = 3600) -> dict:
     if market not in BACKFILL_STEPS:
         raise SystemExit(f"no backfill steps for market {market}")
     s = check_source(source)
-    today = common.utc_today()
+    today = utc_today()
     if since >= today:
         raise SystemExit("--since must be before today")
     s.mkdir(parents=True, exist_ok=True)
     (s / SOURCE_MARKER).write_text("ai_replay backfill source (scratch; never the repo's data)\n")
-    src_data = Path(common.ROOT) / "data" / market
+    src_data = Path(paths.ROOT) / "data" / market
     if not (s / "data" / market).exists():
         shutil.copytree(src_data, s / "data" / market)
     if not (s / "config").exists():
-        shutil.copytree(common.CONFIG, s / "config")
+        shutil.copytree(paths.CONFIG, s / "config")
     changed = backfill_config(s / "config", market, since, today)
     before = stored_by_month(market, s, BACKFILL_KINDS[market])
     steps = []
@@ -720,8 +726,8 @@ def record(cfg: dict, d: date, root: Path, calls_file: Path, results: Path) -> d
         good.append({**rec, "agent_made_at": rec.get("made_at"), "made_at": cutoff, "market": market,
                      "replay": True, "recorded_at": now, "test": label, "model_training_cutoff": str(model_cut),
                      "context_sha256": ctx["meta"]["context_pack"]["sha256"]})
-    common.append_jsonl(sd / "calls.jsonl", good)
-    common.append_jsonl(sd / "rejected.jsonl", [{**b, "market": market, "date": str(d), "recorded_at": now}
+    append_jsonl(sd / "calls.jsonl", good)
+    append_jsonl(sd / "rejected.jsonl", [{**b, "market": market, "date": str(d), "recorded_at": now}
                                                 for b in bad])
     eligible = sorted(t for t, f in ctx["features"].items() if t in ctx["tickers"] and f["quality"] != "BLOCKED"
                       and not (f["days_to_earnings"] is not None and f["days_to_earnings"] <= 1))
@@ -731,7 +737,7 @@ def record(cfg: dict, d: date, root: Path, calls_file: Path, results: Path) -> d
            "n_calls": len(good), "n_rejected": len(bad),
            "prompt_versions": sorted({g["prompt_version"] for g in good}), "recorded_at": now,
            "citable_ids": ctx["meta"]["citable_evidence"]["total"]}
-    common.append_jsonl(sd / "days.jsonl", [day])
+    append_jsonl(sd / "days.jsonl", [day])
     return {"step": "ai_replay.record", "market": market, "date": str(d), "test": label, "results": str(sd),
             "recorded": len(good), "rejected": bad, "eligible_tickers": len(eligible)}
 
@@ -777,7 +783,8 @@ def score_rows(cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
 
 def _rate(k: int, n: int) -> dict:
     lo, hi = replay.wilson(k, n)
-    return {"n": n, "hits": k, "hit_rate": replay._r(k / n) if n else None, "ci95": [replay._r(lo), replay._r(hi)],
+    return {"n": n, "hits": k, "hit_rate": round_or_none(k / n) if n else None,
+    "ci95": [round_or_none(lo), round_or_none(hi)],
             "p_vs_50": None if not n else float(f"{replay.binom_p_two_sided(k, n):.3g}")}
 
 
@@ -788,14 +795,14 @@ def group_stats(g: pd.DataFrame) -> dict:
         return {"n": 0}
     hit = g["hit"].astype(bool)
     out = _rate(int(hit.sum()), len(g))
-    out.update({"mean_confidence": replay._r(g["confidence"].mean()),
-                "brier": replay._r(((g["confidence"] - hit.astype(float)) ** 2).mean())})
+    out.update({"mean_confidence": round_or_none(g["confidence"].mean()),
+                "brier": round_or_none(((g["confidence"] - hit.astype(float)) ** 2).mean())})
     au = (g["fwd"] > 0)
     out["always_up"] = _rate(int(au.sum()), len(g))
     diff = (hit.astype(float) - au.astype(float)).to_numpy()
     blocks = pd.factorize(g["date"])[0]
     lo, hi = replay.clustered_ci(diff, blocks)
-    out["diff_vs_always_up"] = {"pts": replay._r(diff.mean()), "ci95": [replay._r(lo), replay._r(hi)],
+    out["diff_vs_always_up"] = {"pts": round_or_none(diff.mean()), "ci95": [round_or_none(lo), round_or_none(hi)],
                                 "note": "95% interval clustered by as-of date"}
     rules = {}
     sig = replay.signals(g.assign(ret1=g["ret1"], ret5=g["ret5"], rsi=g["rsi"]))
@@ -807,7 +814,7 @@ def group_stats(g: pd.DataFrame) -> dict:
         rhit = ((s > 0) & up) | ((s < 0) & down)
         r = _rate(int(rhit[call].sum()), int(call.sum()))
         r["label"] = replay.SIGNAL_LABELS[name]
-        r["ai_hit_rate_same_rows"] = replay._r(hit[call].mean()) if call.any() else None
+        r["ai_hit_rate_same_rows"] = round_or_none(hit[call].mean()) if call.any() else None
         rules[name] = r
     out["rules"] = rules
     return out
@@ -843,7 +850,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
     for name, lo, hi in BANDS:
         g = sc[(sc["confidence"] >= lo) & (sc["confidence"] < hi)] if len(sc) else sc
         r = _rate(int(g["hit"].astype(bool).sum()), len(g)) if len(g) else {"n": 0}
-        r.update({"band": name, "stated": replay._r(g["confidence"].mean()) if len(g) else None})
+        r.update({"band": name, "stated": round_or_none(g["confidence"].mean()) if len(g) else None})
         out["by_band"].append(r)
     # abstention: a call slot is an eligible ticker (not BLOCKED, no earnings within 1 day) x horizon x day
     called = {(c["as_of_date"], c["ticker"], int(c["horizon_days"])) for c in calls}
@@ -851,11 +858,11 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
     for h in HORIZONS:
         slots = sum(len(x["eligible"]) for x in days)
         n = sum(1 for x in days for t in x["eligible"] if (x["date"], t, h) in called)
-        ab[f"{h}d"] = {"slots": slots, "calls": n, "abstention_rate": replay._r(1 - n / slots) if slots else None}
+        ab[f"{h}d"] = {"slots": slots, "calls": n, "abstention_rate": round_or_none(1 - n / slots) if slots else None}
     slots = sum(len(x["eligible"]) for x in days)
     anyc = sum(1 for x in days for t in x["eligible"] if any((x["date"], t, h) in called for h in HORIZONS))
     ab["any"] = {"slots": slots, "ticker_days_with_a_call": anyc,
-                 "abstention_rate": replay._r(1 - anyc / slots) if slots else None}
+                 "abstention_rate": round_or_none(1 - anyc / slots) if slots else None}
     ab["ineligible_ticker_days"] = sum(x["n_tickers"] - len(x["eligible"]) for x in days)
     out["abstention"] = ab
     per_day = []
@@ -880,7 +887,6 @@ def pct(x, k: int = 1) -> str:
     return share_percent_text(x, k)
 
 
-_f = pct   # the HTML tooltips' name for the same one-decimal percent
 
 
 def top_sentences(s: dict) -> list[str]:
@@ -940,7 +946,7 @@ def svg_hit_bars(s: dict) -> str:
             d = (f"M{x:.1f},{y0:.1f} L{x:.1f},{y1 + rr:.1f} Q{x:.1f},{y1:.1f} {x + rr:.1f},{y1:.1f} "
                  f"L{x + bw - rr:.1f},{y1:.1f} Q{x + bw:.1f},{y1:.1f} {x + bw:.1f},{y1 + rr:.1f} L{x + bw:.1f},{y0:.1f} Z")
             ci = r["ci95"]
-            tip = f"{name}, {label}: right {_f(v)} of {r['n']} (95% interval {_f(ci[0])} to {_f(ci[1])})"
+            tip = f"{name}, {label}: right {pct(v)} of {r['n']} (95% interval {pct(ci[0])} to {pct(ci[1])})"
             out.append(f'<path class="mark" d="{d}" fill="{color}" data-tip="{html.escape(tip, quote=True)}"/>')
     out.append(f'<line x1="{L}" x2="{W - R}" y1="{Y(.5):.1f}" y2="{Y(.5):.1f}" stroke="var(--ink2)" stroke-dasharray="4 4"/>')
     out.append(f'<text x="{L + 4}" y="{Y(.5) - 5:.1f}" text-anchor="start">coin flip</text>')
@@ -968,8 +974,8 @@ def svg_calibration(s: dict) -> str:
         x, y = X(b["stated"]), Y(b["hit_rate"])
         lo, hi = b["ci95"]
         out.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{Y(lo):.1f}" y2="{Y(hi):.1f}" stroke="var(--s1)" stroke-width="2"/>')
-        tip = (f"Band {b['band']}: stated {_f(b['stated'])}, right {_f(b['hit_rate'])} of {b['n']} calls "
-               f"(95% interval {_f(lo)} to {_f(hi)})")
+        tip = (f"Band {b['band']}: stated {pct(b['stated'])}, right {pct(b['hit_rate'])} of {b['n']} calls "
+               f"(95% interval {pct(lo)} to {pct(hi)})")
         out.append(f'<circle class="mark" cx="{x:.1f}" cy="{y:.1f}" r="6" fill="var(--s1)" stroke="var(--surface)" '
                    f'stroke-width="2" data-tip="{html.escape(tip, quote=True)}"/>')
         out.append(f'<text x="{x + 10:.1f}" y="{y + 4:.1f}" text-anchor="start">{b["n"]} calls</text>')
@@ -1028,8 +1034,8 @@ def group_html(g: dict) -> str:
     def tile(label, r, note):
         v = r.get("hit_rate") if r else None
         ci = (r or {}).get("ci95") or [None, None]
-        span = "" if ci[0] is None else f"95% interval {_f(ci[0])} to {_f(ci[1])}"
-        return (f'<div class="card tile"><div class="l">{esc(label)}</div><div class="v">{_f(v)}</div>'
+        span = "" if ci[0] is None else f"95% interval {pct(ci[0])} to {pct(ci[1])}"
+        return (f'<div class="card tile"><div class="l">{esc(label)}</div><div class="v">{pct(v)}</div>'
                 f'<div class="n">{esc(note)}</div><div class="n">{span}</div></div>')
 
     tiles = "".join([
@@ -1037,7 +1043,7 @@ def group_html(g: dict) -> str:
         tile("AI calls right, 1 day ahead", hz["1"], f"{hz['1'].get('n', 0)} scored calls · coin flip 50%"),
         tile("“Always up” right on the same calls", o.get("always_up") or {}, "same stocks, days and horizons"),
         f'<div class="card tile"><div class="l">Stock-days with no call</div>'
-        f'<div class="v">{_f(ab["any"]["abstention_rate"])}</div><div class="n">abstained on '
+        f'<div class="v">{pct(ab["any"]["abstention_rate"])}</div><div class="n">abstained on '
         f'{ab["any"]["slots"] - ab["any"]["ticker_days_with_a_call"]} of {ab["any"]["slots"]} stock-days</div>'
         f'<div class="n">abstaining is allowed and often right</div></div>'])
     top = "".join(f"<p class=\"answer\"><b>{esc(x.split('? ', 1)[0])}?</b> {esc(x.split('? ', 1)[1])}</p>"
@@ -1048,23 +1054,23 @@ def group_html(g: dict) -> str:
             hrows.append(f"<tr><td>{name}</td><td>0</td>" + "<td></td>" * 6 + "</tr>")
             continue
         d = x["diff_vs_always_up"]
-        hrows.append(f"<tr><td>{name}</td><td>{x['n']}</td><td>{_f(x['hit_rate'])}</td>"
-                     f"<td>{_f(x['ci95'][0])} to {_f(x['ci95'][1])}</td><td>{esc(replay.fmt_p(x['p_vs_50']))}</td>"
-                     f"<td>{_f(x['mean_confidence'])}</td><td>{_f(x['always_up']['hit_rate'])}</td>"
+        hrows.append(f"<tr><td>{name}</td><td>{x['n']}</td><td>{pct(x['hit_rate'])}</td>"
+                     f"<td>{pct(x['ci95'][0])} to {pct(x['ci95'][1])}</td><td>{esc(replay.fmt_p(x['p_vs_50']))}</td>"
+                     f"<td>{pct(x['mean_confidence'])}</td><td>{pct(x['always_up']['hit_rate'])}</td>"
                      f"<td>{pts(d['pts'])}</td></tr>")
     rrows = []
     for name, x in (("1-day", hz["1"]), ("5-day", hz["5"]), ("All", o)):
         for r in (x.get("rules") or {}).values():
             if not r.get("n"):
                 continue
-            rrows.append(f"<tr><td>{esc(r['label'])}</td><td>{name}</td><td>{r['n']}</td><td>{_f(r['hit_rate'])}</td>"
-                         f"<td>{_f(r['ci95'][0])} to {_f(r['ci95'][1])}</td><td>{_f(r['ai_hit_rate_same_rows'])}</td></tr>")
-    brows = "".join(f"<tr><td>{b['band']}</td><td>{b.get('n', 0)}</td><td>{_f(b.get('stated'))}</td>"
-                    f"<td>{_f(b.get('hit_rate'))}</td><td>"
-                    f"{'' if not b.get('n') else _f(b['ci95'][0]) + ' to ' + _f(b['ci95'][1])}</td></tr>"
+            rrows.append(f"<tr><td>{esc(r['label'])}</td><td>{name}</td><td>{r['n']}</td><td>{pct(r['hit_rate'])}</td>"
+                         f"<td>{pct(r['ci95'][0])} to {pct(r['ci95'][1])}</td><td>{pct(r['ai_hit_rate_same_rows'])}</td></tr>")
+    brows = "".join(f"<tr><td>{b['band']}</td><td>{b.get('n', 0)}</td><td>{pct(b.get('stated'))}</td>"
+                    f"<td>{pct(b.get('hit_rate'))}</td><td>"
+                    f"{'' if not b.get('n') else pct(b['ci95'][0]) + ' to ' + pct(b['ci95'][1])}</td></tr>"
                     for b in g["by_band"])
     arows = "".join(f"<tr><td>{k}</td><td>{v['slots']}</td><td>{v.get('calls', v.get('ticker_days_with_a_call'))}</td>"
-                    f"<td>{_f(v['abstention_rate'])}</td></tr>" for k, v in ab.items() if isinstance(v, dict))
+                    f"<td>{pct(v['abstention_rate'])}</td></tr>" for k, v in ab.items() if isinstance(v, dict))
     drows = "".join(f"<tr><td>{x['date']}</td><td>{lab}</td><td>{x['citable_ids']}</td><td>{x['calls']}</td><td>{x['rejected']}</td>"
                     f"<td>{x['scored']}</td><td>{x['hits']}</td></tr>" for x in g["per_day"])
     crows = "".join(f"<tr><td>{esc(str(c['date']))}</td><td>{esc(c['test'])}</td><td>{esc(c['ticker'])}</td><td>{c['h']}d</td><td>{esc(c['direction'])}</td>"

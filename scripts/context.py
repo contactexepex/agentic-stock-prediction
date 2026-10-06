@@ -19,7 +19,10 @@ import relations
 import scoring
 import smart_money as sm
 from score_predictions import is_late
-from common import connect, market_arg, md_table, require_market, utc_today
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_today
+from marketbrief.core.database import connect
+from marketbrief.utils.markdown import cursor_markdown_table
 from features import local_today
 
 PCT = "round({} * 100, 2)"
@@ -167,7 +170,7 @@ ORDER BY f.recorded_at, f.agent, f.round"""
 def judge_fails(con, today) -> str:
     """Judge FAILs of the previous run that its own report could not list (CLAUDE.md "Judging
     every change"; routine/PROMPT.md step 14): the report copies each into `data_quality`."""
-    return md_table(con.execute(JUDGE_FAILS_SQL, [today, today, JUDGE_LOOKBACK_DAYS]))
+    return cursor_markdown_table(con.execute(JUDGE_FAILS_SQL, [today, today, JUDGE_LOOKBACK_DAYS]))
 
 
 def main() -> None:
@@ -181,12 +184,12 @@ def main() -> None:
     con.execute("CREATE OR REPLACE TEMP TABLE late_ranges AS SELECT unnest(?::VARCHAR[]) AS id", [late])
     blocks = sections(cfg)
     for title, sql, params in blocks[:2]:
-        print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
+        print(f"## {title}\n\n{cursor_markdown_table(con.execute(sql, params))}")
     print(f"## Upcoming events (next 14 days)\n\n{upcoming_events(cfg, con)}")
     for title, sql, params in blocks[2:]:
         if title.startswith("SEC") and cfg.get("filings") != "sec":
             continue
-        print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
+        print(f"## {title}\n\n{cursor_markdown_table(con.execute(sql, params))}")
         if title.startswith("Sector ETFs") and sector_gaps(cfg):
             print(sector_gaps(cfg))
         if title.startswith("Track record by confidence band"):

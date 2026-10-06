@@ -1,5 +1,5 @@
 """The marketbrief package: core (paths, clock, schemas, market config, storage, database, cli) and utils.
-The old flat module `common` must keep forwarding to it."""
+`common.ROOT` and `common.CONFIG` (the tests' patch point) must forward to it."""
 from __future__ import annotations
 
 import json
@@ -15,6 +15,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.core.paths import data_dir  # noqa: E402
 from marketbrief.constants.messages import MSG_MARKET_REQUIRED  # noqa: E402
 from marketbrief.core import cli, clock, database, market_config, paths, schemas, storage  # noqa: E402
 from marketbrief.utils import event_dates, markdown, money, numbers, sessions, text, timefmt  # noqa: E402
@@ -22,7 +23,7 @@ from marketbrief.utils import event_dates, markdown, money, numbers, sessions, t
 REAL_CONFIG = Path(__file__).resolve().parents[1] / "config"
 
 
-# ---------- the common shim ----------
+# ---------- the one patch point: common.ROOT and common.CONFIG ----------
 
 def test_common_root_and_config_are_the_package_paths(monkeypatch, tmp_path):
     original_root, original_config = paths.ROOT, paths.CONFIG
@@ -30,19 +31,9 @@ def test_common_root_and_config_are_the_package_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(common, "ROOT", tmp_path)
     monkeypatch.setattr(common, "CONFIG", tmp_path / "cfg")
     assert paths.ROOT == tmp_path and paths.CONFIG == tmp_path / "cfg"
-    assert common.data_dir("us") == tmp_path / "data" / "us" and paths.data_dir("us") == tmp_path / "data" / "us"
+    assert data_dir("us") == tmp_path / "data" / "us" and paths.data_dir("us") == tmp_path / "data" / "us"
     monkeypatch.undo()
     assert paths.ROOT == original_root and paths.CONFIG == original_config
-
-
-def test_common_reexports_every_name_callers_use():
-    for name in ("ACCEPTED_KEYS", "FEATURE_COLS", "RELATION_SCHEMAS", "SCHEMAS", "STALE_DAYS", "FrozenClockConnection",
-                 "append_jsonl", "benchmark_key", "clock", "connect", "data_dir", "day_file", "freeze_sql",
-                 "load_market", "load_ranges_config", "market_arg", "market_names", "md_table", "recent_ids",
-                 "require_market", "sector_etf_map", "sector_etf_problems", "symbols_by_role", "utc_now",
-                 "utc_today", "vol_index_key"):
-        assert hasattr(common, name), name
-    assert common.STALE_DAYS == 7 and common.md_table is markdown.cursor_markdown_table
 
 
 # ---------- schemas ----------
@@ -187,11 +178,11 @@ def test_the_number_parsers_differ_where_the_sources_differ():
     assert numbers.parse_nse_number("1,234.5") == 1234.5 and numbers.parse_nse_number("12%") == 12.0
     assert numbers.parse_nse_number("0") == 0.0 and numbers.parse_nse_number("-") is None
     assert numbers.parse_nse_number(True) is None and numbers.parse_nse_number(3) == 3.0
-    assert numbers.parse_amount_with_accounting_negatives("(12.5)") == -12.5
-    assert numbers.parse_amount_with_accounting_negatives("Rs. 1,000") == 1000.0
-    assert numbers.parse_amount_with_accounting_negatives("12%") is None
-    assert numbers.parse_amount_with_accounting_negatives(".") is None
-    assert numbers.parse_amount_with_accounting_negatives(True) is None
+    assert numbers.parse_accounting_amount("(12.5)") == -12.5
+    assert numbers.parse_accounting_amount("Rs. 1,000") == 1000.0
+    assert numbers.parse_accounting_amount("12%") is None
+    assert numbers.parse_accounting_amount(".") is None
+    assert numbers.parse_accounting_amount(True) is None
     assert numbers.parse_sec_number("1,234.5") == 1234.5 and numbers.parse_sec_number("") is None
     assert numbers.parse_sec_number(None) is None and numbers.parse_sec_number("abc") is None
     assert numbers.json_safe_float(float("nan")) is None and numbers.json_safe_float(None) is None
@@ -199,9 +190,9 @@ def test_the_number_parsers_differ_where_the_sources_differ():
 
 
 def test_rounding_and_percent_text_helpers():
-    assert numbers.round_finite_or_none(1.23456) == 1.2346 and numbers.round_finite_or_none(1.23456, 1) == 1.2
-    assert numbers.round_finite_or_none(None) is None and numbers.round_finite_or_none(math.inf) is None
-    assert numbers.round_finite_or_none(float("nan")) is None and numbers.round_finite_or_none(3) == 3.0
+    assert numbers.round_or_none(1.23456) == 1.2346 and numbers.round_or_none(1.23456, 1) == 1.2
+    assert numbers.round_or_none(None) is None and numbers.round_or_none(math.inf) is None
+    assert numbers.round_or_none(float("nan")) is None and numbers.round_or_none(3) == 3.0
     assert numbers.share_percent_text(0.625, 0) == "62%" and numbers.share_percent_text(0.625, 1) == "62.5%"
     assert numbers.share_percent_text(None, 1) == "n/a"
 
@@ -210,7 +201,7 @@ def test_replay_and_ai_replay_keep_their_percent_defaults():
     import ai_replay
     import replay
     assert replay.pct(0.456) == "46%" and replay.pct(0.456, 1) == "45.6%" and replay.pct(None) == "n/a"
-    assert ai_replay.pct(0.456) == "45.6%" and ai_replay.pct(0.456, 0) == "46%" and ai_replay._f(0.456) == "45.6%"
+    assert ai_replay.pct(0.456) == "45.6%" and ai_replay.pct(0.456, 0) == "46%"
 
 
 def test_text_markdown_and_money_helpers():

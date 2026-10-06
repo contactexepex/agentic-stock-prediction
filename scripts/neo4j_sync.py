@@ -3,7 +3,7 @@
 
 The repo's append-only files under data/ stay the source of truth. Neo4j is a derived copy that
 `--full` rebuilds from them at any time, so nothing is lost if the database is emptied. The script
-only reads data/ (through the DuckDB views in common.connect) and never writes there.
+only reads data/ (through the DuckDB views in core.database.connect) and never writes there.
 
   neo4j_sync.py --market us              incremental: rows recorded since the last sync (minus a
                                          3-day overlap), per kind
@@ -43,7 +43,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Callable
 
-from common import ROOT, connect, market_arg, require_market, utc_now
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now
+from marketbrief.core.database import connect
+from marketbrief.core.paths import ROOT
 from marketbrief.sources.neo4j_client import Neo4jClient, Neo4jError
 from marketbrief.utils.text import slugify_with_unknown_fallback
 
@@ -104,9 +107,6 @@ def clean(v):
     if isinstance(v, dict):
         return json.dumps(v, default=str, sort_keys=True)
     return v
-
-
-slug = slugify_with_unknown_fallback
 
 
 # ---------- Cypher building blocks (static text only; values are parameters) ----------
@@ -272,7 +272,7 @@ PERSON_CATEGORIES = ("director", "key managerial", "kmp", "designated", "employe
 
 
 def holder_id(m: str, cik, name) -> str:
-    return f"{m}:cik:{cik}" if cik else f"{m}:name:{slug(name)}"
+    return f"{m}:cik:{cik}" if cik else f"{m}:name:{slugify_with_unknown_fallback(name)}"
 
 
 def shape_insider(m: str, r: dict) -> dict:
@@ -366,7 +366,7 @@ def shape_graph(m: str, r: dict) -> dict:
     row["id"] = f"{m}:graph:{r['id']}"
     row.update(ticker=r["ticker"], company_id=company_id(m, r["ticker"]), status=r.get("status") or "active",
                target_ticker=r.get("target_ticker"),
-               target_id=company_id(m, r["target_ticker"]) if r.get("target_ticker") else f"{m}:name:{slug(r.get('target'))}",
+               target_id=company_id(m, r["target_ticker"]) if r.get("target_ticker") else f"{m}:name:{slugify_with_unknown_fallback(r.get('target'))}",
                target_name=r.get("target"), target_person=r.get("target_kind") == "person")
     return row
 

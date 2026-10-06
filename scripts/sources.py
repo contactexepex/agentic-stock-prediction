@@ -2,9 +2,8 @@
 series, Cboe put/call ratios), collect_shorts.py (FINRA short-sale volume and short interest) and
 collect_flows_india.py (NSDL FPI flows, NSE index closes).
 
-The HTTP client moved to marketbrief/sources/free_source_client.py (Client here is a re-export), with
-FetchError (marketbrief/sources/errors.py). Tests pass a fake client with the same `get` method, so
-nothing here touches the network."""
+The HTTP client is marketbrief/sources/free_source_client.py and FetchError is marketbrief/sources/errors.py.
+Tests pass a fake client with the same `get` method, so nothing here touches the network."""
 from __future__ import annotations
 
 import json
@@ -19,12 +18,6 @@ from marketbrief.constants.statuses import (SUMMARY_ALLOWLIST, SUMMARY_ALLOWLIST
 from marketbrief.core.paths import data_dir
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.sources.errors import FetchError
-from marketbrief.sources.free_source_client import FreeSourceClient as Client
-from marketbrief.utils.numbers import parse_amount_with_accounting_negatives as num
-from marketbrief.utils.sessions import sessions_in_window as recent_sessions
-
-__all__ = ["Client", "FetchError", "complete_days", "not_published", "num", "recent_sessions", "stale_cutoff",
-           "store_changed", "stored_rows", "summary"]
 
 NOT_PUBLISHED_STATUSES = (403, 404)
 

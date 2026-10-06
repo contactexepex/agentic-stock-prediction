@@ -19,8 +19,9 @@ sys.path.insert(0, str(CODE / "scripts"))
 import collect_flows_india  # noqa: E402
 import collect_macro  # noqa: E402
 import collect_shorts  # noqa: E402
-import common  # noqa: E402
-from sources import FetchError  # noqa: E402
+from marketbrief.core.clock import utc_now  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.sources.errors import FetchError  # noqa: E402
 
 FIXTURE_DAY = date(2026, 10, 5)
 ROUTES = {
@@ -57,7 +58,7 @@ class FixtureClient:
 
 def main() -> int:
     market = sys.argv[1]
-    cfg, now = common.load_market(market), common.utc_now()
+    cfg, now = load_market(market), utc_now()
     if market == "us":
         cfg["macro"]["cboe"]["lookback_days"] = 4      # the fixture sessions, as in tests/test_sources.py
         runs = [(collect_macro, "macro"), (collect_shorts, "shorts")]

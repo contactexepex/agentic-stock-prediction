@@ -15,9 +15,13 @@ import os
 import sys
 from datetime import date, timedelta
 
-from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.storage import append_jsonl, day_file, recent_ids
 
-from sec import Edgar, related_ciks, ticker_submissions, time_summary, time_warnings
+from sec import related_ciks, ticker_submissions
+from marketbrief.sources.sec_acceptance import time_summary, time_warnings
+from marketbrief.sources.sec_client import Edgar
 
 # SEC renamed beneficial-ownership forms "SCHEDULE 13D/13G" (structured XML) in Dec 2024; keep both.
 DEFAULT_FORMS = ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G"]

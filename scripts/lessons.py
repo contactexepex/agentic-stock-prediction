@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Reflection log: one short lesson per settled call, read by later forecasts.
 
-Pattern adapted from TauricResearch/TradingAgents (Apache-2.0; tradingagents/memory/reflection.py
-and settlement.py): settle past decisions against realised outcomes, write a one-paragraph lesson,
-and let later decisions read the same ticker's recent lessons plus recent ones market-wide, only
-those already known at the decision time. Here the facts are deterministic (this script) and only
-the paragraph is written by an agent (`.claude/agents/reflector.md`), checked by `validate`.
+Pattern adapted from TauricResearch/TradingAgents (Apache-2.0; tradingagents/memory/reflection.py and settlement.py):
+settle past decisions against realised outcomes, write a one-paragraph lesson, and let later decisions read the same
+ticker's recent lessons plus recent ones market-wide, only those already known at the decision time. Here the facts
+are deterministic (this script) and only the paragraph is written by an agent (`.claude/agents/reflector.md`), checked
+by `validate`.
 
   prepare  [--max N] [--out F]   settled calls without a lesson -> F (default work/lesson_facts.jsonl):
                                  the call (direction, confidence, rationale, evidence ids and what they
@@ -16,19 +16,17 @@ the paragraph is written by an agent (`.claude/agents/reflector.md`), checked by
   add F                          validate, then append the full records to data/<market>/lessons/
                                  (all or nothing; a lesson id already stored is refused)
 
-The reflector writes one JSON object per lesson: {"prediction_id", "lesson", "prompt_version"},
-optionally with copied fact fields, each of which must equal the stored value. `validate` checks:
-the prediction id exists and is settled (an outcome is stored); no lesson for it is stored or
-repeated in the file; the lesson is 1-60 words; every number in its text matches the call or its
-outcome (with a % sign: the return, the close's % distance from a band edge, confidence in %;
-without: closes, band edges, confidence, the horizon; either way: the 50/80 band names and numbers
-already in the stored rationale; dates and ids are skipped), and a signed return has the right sign.
-`add` stores the facts recomputed from data/ (never the agent's copy) plus the text.
+The reflector writes one JSON object per lesson: {"prediction_id", "lesson", "prompt_version"}, optionally with copied
+fact fields, each of which must equal the stored value. `validate` checks: the prediction id exists and is settled (an
+outcome is stored); no lesson for it is stored or repeated in the file; the lesson is 1-60 words; every number in its
+text matches the call or its outcome (with a % sign: the return, the close's % distance from a band edge, confidence
+in %; without: closes, band edges, confidence, the horizon; either way: the 50/80 band names and numbers already in
+the stored rationale; dates and ids are skipped), and a signed return has the right sign. `add` stores the facts
+recomputed from data/ (never the agent's copy) plus the text.
 
-Availability: `settled_at` = the outcome's scored_at; `available_from` = the latest scored_at of
-the facts the lesson cites (the outcome, and the range outcome when a range is cited). The context
-pack (context.py) shows a lesson only once available_from <= its clock (MB_NOW-aware), so a
-lesson never reveals an outcome unknown at a forecast's made_at."""
+Availability: `settled_at` = the outcome's scored_at; `available_from` = the latest scored_at of the facts the lesson
+cites (the outcome, and the range outcome when a range is cited). The context pack (context.py) shows a lesson only
+once available_from <= its clock (MB_NOW-aware), so a lesson never reveals an outcome unknown at made_at."""
 from __future__ import annotations
 
 import json
@@ -39,8 +37,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from common import (ROOT, append_jsonl, clock, connect, day_file, market_arg, require_market, utc_now,
-                    utc_today)
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import clock, utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.paths import ROOT
+from marketbrief.core.storage import append_jsonl, day_file
 from score_predictions import is_late
 
 MAX_WORDS = 60
@@ -343,7 +344,7 @@ def main() -> int:
 
 def context_section(cfg: dict, con, per_ticker: int = 3, market_wide: int = 3) -> tuple[str, str]:
     """("Lessons from past calls", markdown): the latest `market_wide` lessons market-wide and each
-    ticker's last `per_ticker`, using only lessons with available_from <= now (common.clock(), so an
+    ticker's last `per_ticker`, using only lessons with available_from <= now (core.clock.clock(), so an
     MB_NOW replay sees only what was settled by then). Newest version of a lesson id wins."""
     now = clock()
     df = con.execute("""

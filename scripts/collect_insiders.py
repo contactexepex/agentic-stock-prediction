@@ -20,7 +20,12 @@ import sys
 from datetime import timedelta
 
 import sec
-from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
+from marketbrief.sources.sec_acceptance import time_summary, time_warnings
+from marketbrief.sources.sec_client import Edgar, archive_url
+from marketbrief.utils.numbers import parse_sec_number
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.storage import append_jsonl, day_file, recent_ids
 
 DEFAULT_FORMS = ["4", "4/A"]
 
@@ -53,8 +58,8 @@ def parse_form4(data: bytes) -> dict:
     for table, tag, derivative in (("nonDerivativeTable", "nonDerivativeTransaction", False),
                                    ("derivativeTable", "derivativeTransaction", True)):
         for t in root.findall(f"{table}/{tag}"):
-            shares = sec.num(sec.text(t, "transactionAmounts/transactionShares/value"))
-            price = sec.num(sec.text(t, "transactionAmounts/transactionPricePerShare/value"))
+            shares = parse_sec_number(sec.text(t, "transactionAmounts/transactionShares/value"))
+            price = parse_sec_number(sec.text(t, "transactionAmounts/transactionPricePerShare/value"))
             lines.append({
                 "derivative": derivative,
                 "security": sec.text(t, "securityTitle/value"),
@@ -63,7 +68,8 @@ def parse_form4(data: bytes) -> dict:
                 "acquired_disposed": sec.text(t, "transactionAmounts/transactionAcquiredDisposedCode/value"),
                 "shares": shares, "price": price,
                 "value": round(shares * price, 2) if shares is not None and price is not None else None,
-                "shares_after": sec.num(sec.text(t, "postTransactionAmounts/sharesOwnedFollowingTransaction/value")),
+                "shares_after": parse_sec_number(sec.text(t,
+                "postTransactionAmounts/sharesOwnedFollowingTransaction/value")),
                 "ownership": sec.text(t, "ownershipNature/directOrIndirectOwnership/value"),
             })
     return {"form": sec.text(root, "documentType"), "issuer_cik": sec.text(root, "issuer/issuerCik"),
@@ -99,7 +105,7 @@ def main() -> int:
     forms = set(rel.get("forms", DEFAULT_FORMS))
     since = utc_today() - timedelta(days=int(rel.get("lookback_days", 7)))
     seen = {i.rsplit("-", 1)[0] for i in recent_ids(market, "insiders", days=120)}
-    edgar, now = sec.Edgar(ua), utc_now()
+    edgar, now = Edgar(ua), utc_now()
     ciks, skipped = sec.watch_ciks(cfg, edgar)
     related = sec.related_ciks(cfg)
 
@@ -113,7 +119,7 @@ def main() -> int:
         for f in sec.filings(recent, forms, since):
             if f["accession"] in seen:
                 continue
-            url = sec.archive_url(f["cik"], f["accession"], sec.raw_doc(f["primary_doc"]))
+            url = archive_url(f["cik"], f["accession"], sec.raw_doc(f["primary_doc"]))
             try:
                 parsed = parse_form4(edgar.get(url))
             except Exception as exc:
@@ -132,7 +138,7 @@ def main() -> int:
         "collector": "insiders", "market": market, "since": str(since), "filings_read": read,
         "new_rows": written, "open_market_buys": sum(r["code"] == "P" for r in rows),
         "open_market_sales": sum(r["code"] == "S" for r in rows), "other_issuer_skipped": other_issuer,
-        "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
+        "requests": edgar.requests, "sec_times": time_summary(edgar), "warnings": time_warnings(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 
 

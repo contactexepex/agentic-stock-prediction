@@ -4,7 +4,7 @@ index closes with valuation) and, US, "Short selling (FINRA)". Each section appe
 market's config has the collector's section. Numbers come from the DuckDB views in sql/views.sql."""
 from __future__ import annotations
 
-from common import md_table
+from marketbrief.utils.markdown import cursor_markdown_table
 
 # The order series are listed in; others follow alphabetically.
 US_ORDER = ["UST_3M", "UST_2Y", "UST_5Y", "UST_10Y", "UST_30Y", "UST_10Y_2Y", "UST_10Y_3M"]
@@ -44,7 +44,7 @@ def _us_shorts(con, tickers: list[str]) -> str:
     return ("Daily short-sale volume is FINRA-reported (off-exchange) volume only: compare with the ticker's "
             "own average, not across tickers. prior_avg_pct = average of the up to 20 sessions before the "
             "latest; prior_n says how many (below 20 = a shorter, less reliable baseline). Short interest "
-            "settles twice a month and is published about a week later.\n\n" + md_table(con.execute("""
+            "settles twice a month and is published about a week later.\n\n" + cursor_markdown_table(con.execute("""
         SELECT coalesce(v.ticker, s.ticker) AS ticker, v.date, round(v.short_pct, 1) AS short_pct,
                round(v.short_pct_5d, 1) AS avg5_pct, round(v.short_pct_prior_avg, 1) AS prior_avg_pct,
                v.n_prior AS prior_n, round(v.short_pct_5d - v.short_pct_prior_avg, 1) AS avg5_vs_prior_pp,
@@ -55,7 +55,7 @@ def _us_shorts(con, tickers: list[str]) -> str:
 
 
 def _india_fpi(con) -> str:
-    latest = md_table(con.execute("""
+    latest = cursor_markdown_table(con.execute("""
         SELECT reporting_date, asset_class, route, gross_purchases_cr, gross_sales_cr, net_cr, net_usd_mn
         FROM fpi_latest
         WHERE route ILIKE 'sub-total' OR asset_class = 'Total' OR (asset_class = 'Equity' AND route ILIKE 'stock exchange')
@@ -74,7 +74,7 @@ def _india_fpi(con) -> str:
 
 
 def _india_indices(con) -> str:
-    return md_table(con.execute("""
+    return cursor_markdown_table(con.execute("""
         SELECT index_name, coalesce(sector, '') AS watchlist_sector, date, round(close, 2) AS close,
                round(change_pct, 2) AS d1_pct, round(ret_5_pct, 2) AS d5_pct, date_5, pe, pb, div_yield
         FROM indices_latest ORDER BY sector IS NULL, sector, index_name"""))

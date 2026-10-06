@@ -23,8 +23,12 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-from common import append_jsonl, connect, day_file, market_arg, md_table, require_market, utc_now, utc_today
-from marketbrief.utils.text import slugify as slug
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.utils.markdown import cursor_markdown_table
+from marketbrief.utils.text import slugify
 
 RELATIONS = ("board", "group", "subsidiary", "supplier", "customer", "competitor", "promoter", "major_holder")
 TARGET_KINDS = ("person", "company")
@@ -35,7 +39,7 @@ MIN_NAME = 3          # shorter names/aliases are never matched against headline
 
 
 def edge_id(ticker: str, relation: str, target: str) -> str:
-    return f"{ticker}|{relation}|{slug(target)}"
+    return f"{ticker}|{relation}|{slugify(target)}"
 
 
 def load_edges(con, ticker: str | None = None) -> list[dict]:
@@ -241,7 +245,7 @@ def main() -> int:
         cur = con.execute("SELECT ticker, relation, target, target_kind, target_ticker, aliases, detail, as_of, "
                           "source_url FROM graph_edges" + (" WHERE ticker = ?" if args.ticker else "") +
                           " ORDER BY ticker, relation, target", [args.ticker] if args.ticker else [])
-        print(md_table(cur))
+        print(cursor_markdown_table(cur))
     elif args.command == "attempt":
         print(json.dumps(attempt(cfg, con, args.note), indent=2))
     elif args.command == "hits":

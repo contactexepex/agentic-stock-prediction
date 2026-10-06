@@ -25,7 +25,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import yaml
 
-import common
+from marketbrief.core import paths
 from marketbrief.sources.article_fetch import get_article_page
 
 METHOD_VERSION = "nv-a1"
@@ -39,7 +39,7 @@ SHINGLE = 6
 # ---------- config ----------
 
 def load_sources() -> "Sources":
-    return Sources(yaml.safe_load((common.CONFIG / "news_sources.yaml").read_text()))
+    return Sources(yaml.safe_load((paths.CONFIG / "news_sources.yaml").read_text()))
 
 
 def _name(s: str | None) -> str:

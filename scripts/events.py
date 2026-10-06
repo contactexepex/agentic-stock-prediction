@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from common import CONFIG
+from marketbrief.core.paths import CONFIG
 
 MAJOR_WINDOW_DAYS = 2  # PASDS: a major event within 2 calendar days -> EVENT_HEAVY
 DEFAULT_OPEN = time(9, 30)   # local open and close assumed only when the exchange calendar

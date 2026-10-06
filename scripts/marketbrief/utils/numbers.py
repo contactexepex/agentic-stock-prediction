@@ -7,7 +7,7 @@ import math
 import pandas as pd
 
 
-def round_finite_or_none(value, digits: int = 4):
+def round_or_none(value, digits: int = 4):
     """`value` rounded to `digits` decimals as a float; None for None, NaN and infinities."""
     if value is None or (isinstance(value, float) and not math.isfinite(value)):
         return None
@@ -33,7 +33,7 @@ def parse_nse_number(raw) -> float | None:
         return None
 
 
-def parse_amount_with_accounting_negatives(raw) -> float | None:
+def parse_accounting_amount(raw) -> float | None:
     """'1,234.5' -> 1234.5; '(12.5)' -> -12.5 (accounting negative); 'Rs.' is dropped; '.', '-', '' -> None."""
     if raw is None:
         return None

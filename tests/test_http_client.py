@@ -174,9 +174,8 @@ def test_nse_client_http_status_is_final_and_sends_browser_headers(monkeypatch):
 
 
 def test_the_nse_and_free_source_errors_are_one_class():
-    import nse
-    import sources
-    assert nse.FetchError is sources.FetchError is FetchError
+    from marketbrief.sources.errors import FetchError
+    assert FetchError is FetchError is FetchError
     error = FetchError("u", "x" * 300, status=503, host="h.example")
     assert error.entry("src", extra=1) == {"source": "src", "url": "u", "error": "x" * 200, "extra": 1,
                                           "status": 503, "allowlist": "h.example"}

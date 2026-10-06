@@ -16,11 +16,11 @@ import pandas as pd
 
 import events as ev
 import scoring
-from common import benchmark_key, vol_index_key
+from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.constants.formatting import CURRENCY_SYMBOLS
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
-from marketbrief.utils.money import format_money as money
-from marketbrief.utils.numbers import json_safe_float as num
+from marketbrief.utils.money import format_money
+from marketbrief.utils.numbers import json_safe_float
 from score_predictions import is_late
 
 CURRENCY = CURRENCY_SYMBOLS
@@ -166,7 +166,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
             meta = cfg["tickers"].get(t, {})
             f = feats.loc[t] if t in feats.index else None
             h = hist[hist["ticker"] == t]
-            ret1 = num(f["ret_1d"]) if f is not None else None
+            ret1 = json_safe_float(f["ret_1d"]) if f is not None else None
             if ret1 is not None:
                 moves.append((t, ret1))
             rows = []
@@ -177,10 +177,12 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 late = is_late(cfg, getattr(r, "as_of_date", None), getattr(r, "made_at", None))
                 rows.append({
                     "h": hz, "target_date": iso(r.target_date), "target_label": day_label(r.target_date),
-                    "base_close": num(r.base_close), "center_price": num(r.base_close * math.exp(r.center)),
-                    "lo50": num(r.lo50), "hi50": num(r.hi50), "lo80": num(r.lo80), "hi80": num(r.hi80),
+                    "base_close": json_safe_float(r.base_close),
+                    "center_price": json_safe_float(r.base_close * math.exp(r.center)),
+                    "lo50": json_safe_float(r.lo50), "hi50": json_safe_float(r.hi50), "lo80": json_safe_float(r.lo80),
+                    "hi80": json_safe_float(r.hi80),
                     "direction": r.direction if r.direction in ("up", "down") else None,
-                    "confidence": num(r.confidence) if r.direction in ("up", "down") else None,
+                    "confidence": json_safe_float(r.confidence) if r.direction in ("up", "down") else None,
                     "late": bool(late), "notes": _list(r.notes),
                 })
             calls = []
@@ -203,7 +205,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                     continue
                 items.append({"id": x.id, "title": x.title, "url": safe_url(x.url), "source": x.source, "ts": _ts(ts),
                               "cited": x.id in cited, "rank": (x.id in cited, MATERIALITY.get(x.materiality or "", 0),
-                                                               num(x.relevance) or 0.0, ts.isoformat())})
+                                                               json_safe_float(x.relevance) or 0.0, ts.isoformat())})
             items.sort(key=lambda i: i["rank"], reverse=True)
             seen, unique = set(), []
             for i in items:  # the same story from two feeds is shown once
@@ -218,7 +220,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 d = pd.Timestamp(e.date).date()
                 label = e.name
                 if e.type == "ex_dividend" and e.amount is not None and not pd.isna(e.amount):
-                    label = f"{e.name} ({money(cur, e.amount)} per share)"
+                    label = f"{e.name} ({format_money(cur, e.amount)} per share)"
                 evs.append({"date": d.isoformat(), "label": label, "type": e.type, "day": day_label(d)})
             last_target = max((pd.Timestamp(x["target_date"]).date() for x in rows), default=as_of)
             for e in mevents:
@@ -234,10 +236,11 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
             nc, hc = (int(trow["n"].iloc[0]), int(trow["hits"].iloc[0])) if len(trow) else (0, 0)
             companies.append({
                 "ticker": t, "name": meta.get("name", t), "sector": sector,
-                "close": num(f["close"]) if f is not None else (num(h["close"].iloc[-1]) if len(h) else None),
+                "close": json_safe_float(f["close"]) if f is not None else (
+                    json_safe_float(h["close"].iloc[-1]) if len(h) else None),
                 "ret_1d": ret1, "quality": (f["quality"] if f is not None else "no data"),
                 "days_to_earnings": (int(f["days_to_earnings"]) if f is not None and not pd.isna(f["days_to_earnings"]) else None),
-                "history": [{"d": iso(x.date), "c": num(x.close, 4)} for x in h.itertuples()],
+                "history": [{"d": iso(x.date), "c": json_safe_float(x.close, 4)} for x in h.itertuples()],
                 "ranges": rows, "calls": calls, "events": evs,
                 "news": items[:NEWS_PER_COMPANY],
                 "record": {"ranges": rec_r, "calls": {"n": nc, "hits": hc, "text": record_text(nc, hc, "up/down calls")}},
@@ -253,8 +256,9 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     if reg is not None:
         regime_view = {
             "code": reg["regime"], "plain": REGIME_PLAIN.get(reg["regime"], reg["regime"]),
-            "stress": bool(reg["stress"]), "vol_name": vol_name, "vol_level": num(reg["vol_level"], 2),
-            "vol_change_1d": num(reg["vol_change_1d"]), "bench_name": bench, "bench_ret_5d": num(reg["bench_ret_5d"]),
+            "stress": bool(reg["stress"]), "vol_name": vol_name, "vol_level": json_safe_float(reg["vol_level"], 2),
+            "vol_change_1d": json_safe_float(reg["vol_change_1d"]), "bench_name": bench,
+            "bench_ret_5d": json_safe_float(reg["bench_ret_5d"]),
             "major_events": _list(reg["major_event_names"]), "notes": _list(reg["notes"]),
         }
 
@@ -266,16 +270,16 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     for x in cal.itertuples():
         for stated, actual in ((0.5, x.c50), (0.8, x.c80)):
             points.append({"kind": "range", "label": f"{int(stated * 100)}% ranges, {int(x.h)}-day",
-                           "stated": stated, "actual": num(actual), "n": int(x.n)})
+                           "stated": stated, "actual": json_safe_float(actual), "n": int(x.n)})
     for x in bands.itertuples():
-        points.append({"kind": "call", "label": f"Calls at {x.band} confidence", "stated": num(x.conf),
-                       "actual": num(x.hit), "n": int(x.n)})
+        points.append({"kind": "call", "label": f"Calls at {x.band} confidence", "stated": json_safe_float(x.conf),
+                       "actual": json_safe_float(x.hit), "n": int(x.n)})
 
     # proper scores of the scored calls (scoring.py): Brier, log loss, reliability with Wilson 95%
     sc_calls = q(SCORED_CALLS_SQL)
     call_scores = scoring.call_scores(sc_calls)
-    reliability = [{**r, "mean_conf": num(r["mean_conf"]), "hit_rate": num(r["hit_rate"]),
-                    "wilson_lo": num(r["wilson_lo"]), "wilson_hi": num(r["wilson_hi"])}
+    reliability = [{**r, "mean_conf": json_safe_float(r["mean_conf"]), "hit_rate": json_safe_float(r["hit_rate"]),
+                    "wilson_lo": json_safe_float(r["wilson_lo"]), "wilson_hi": json_safe_float(r["wilson_hi"])}
                    for r in scoring.reliability(sc_calls["confidence"], sc_calls["hit"])] if len(sc_calls) else []
 
     n_calls = sum(len(c["calls"]) for c in companies)

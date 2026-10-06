@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import types
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +16,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
 import collect_events  # noqa: E402
 import collect_options  # noqa: E402
 import collect_prices  # noqa: E402
@@ -143,7 +146,7 @@ def test_prices_report_empty_partial_and_stale_frames(env, monkeypatch, capsys):
         "BENCH": "no completed bar",
         "VOLX": "stale: newest bar 2026-10-01, expected 2026-10-02 or later",
     }
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     newest = dict(con.execute("SELECT ticker, max(date) FROM prices GROUP BY 1").fetchall())
     assert newest == {"AAPL": date(2026, 10, 2), "MSFT": date(2026, 9, 30),   # stale bars still stored
                       "VOLX": date(2026, 10, 1), "CUE": date(2026, 9, 30)}
@@ -160,7 +163,7 @@ def test_prices_stale_cue_after_a_week_and_empty_frame(env, monkeypatch, capsys)
 
 
 def test_prices_expected_bar_follows_the_exchange_calendar(env):
-    cfg = common.load_market(MARKET)
+    cfg = load_market(MARKET)
     assert collect_prices.expected_bar(cfg, "AAPL", date(2026, 11, 27)) == date(2026, 11, 25)  # Thanksgiving
     assert collect_prices.expected_bar(cfg, "BENCH", date(2026, 10, 5)) == date(2026, 10, 2)
     assert collect_prices.expected_bar(cfg, "CUE", date(2026, 10, 5)) == date(2026, 9, 28)
@@ -273,7 +276,7 @@ def test_events_no_dividend_payer_is_fine_but_a_stored_payer_is_not(env, monkeyp
     })
     code, out = run_main(collect_events, monkeypatch, capsys)
     assert (code, out["failed"]) == (0, [])
-    common.append_jsonl(common.day_file(MARKET, "events", date(2026, 9, 1)), [
+    append_jsonl(day_file(MARKET, "events", date(2026, 9, 1)), [
         {"id": "MSFT-ex_dividend-2026-08-20", "date": "2026-08-20", "type": "ex_dividend", "ticker": "MSFT",
          "name": "Microsoft ex-dividend", "source": "yfinance_history", "first_seen_at": NOW, "amount": 0.83}])
     code, out = run_main(collect_events, monkeypatch, capsys)

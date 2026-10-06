@@ -56,7 +56,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
-  Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` re-exports them).
+  Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
 - India primary sources (NSE; shared session and replay guard in `nse.py`): `collect_nse_india`
   -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
   Filing results per period and basis, FII/DII provisional flows, delivery %); context sections
@@ -77,7 +77,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   shifted; otherwise (mixed, unreadable) it keeps the served times and the collector lists the CIK
   in `warnings` (summary key `sec_times`: ok / shifted / unverified). Stored rows are fixed on
   read: `check_sec_times.py` (run by the routine after the SEC collectors) appends header times to
-  `data/<market>/sec_times/`; `common.connect` reads `accepted_at` of filings, insiders, stakes,
+  `data/<market>/sec_times/`; `core.database.connect` reads `accepted_at` of filings, insiders, stakes,
   holdings and fundamentals through them, and `ai_replay` filters those kinds by the same times.
 - Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
   `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
@@ -133,8 +133,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
-  `HttpClient` base; Edgar, NSE, free-source, Neo4j, Slack, RSS and article clients). `common`, `sources`,
-  `nse` and `sec` re-export from it; `common.ROOT` and `common.CONFIG` read and write `core.paths`.
+  `HttpClient` base; Edgar, NSE, free-source, Neo4j, Slack, RSS and article clients). Callers import from
+  it directly; `scripts/common.py` is only the patch point (`common.ROOT` and `common.CONFIG` read and write
+  `core.paths`; tests assign them), and `sources.py`, `nse.py`, `sec.py` keep the collectors' own helpers.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

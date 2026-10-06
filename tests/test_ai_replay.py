@@ -21,7 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import ai_replay as ar  # noqa: E402
-import common  # noqa: E402
+from marketbrief.utils.numbers import round_or_none  # noqa: E402
+from marketbrief.core.clock import freeze_sql, utc_now, utc_today  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
 import events as ev  # noqa: E402
 import replay  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, fat_tailed_walk, setup, write_bars  # noqa: E402
@@ -357,7 +360,7 @@ def test_score_synthetic():
     assert s["n_calls"] == 13 and s["n_scored"] == 12 and s["n_pending"] == 1
     o = s["overall"]
     assert o["n"] == 12 and o["hits"] == 4                       # only the UP calls hit
-    assert o["ci95"] == [replay._r(x) for x in replay.wilson(4, 12)]
+    assert o["ci95"] == [round_or_none(x) for x in replay.wilson(4, 12)]
     assert o["always_up"]["hits"] == 4                           # UP rises; DN falls; FL flat (a miss)
     assert s["by_horizon"]["5"]["n"] == 8 and s["by_horizon"]["5"]["hits"] == 4
     assert s["by_horizon"]["1"]["hit_rate"] == 0.0
@@ -368,7 +371,7 @@ def test_score_synthetic():
     m5 = o["rules"]["momentum_5d"]                               # sign of the last 5 days: UP up, DN down, FL none
     assert m5["n"] == 8 and m5["hits"] == 8 and m5["ai_hit_rate_same_rows"] == 0.5
     ab = s["abstention"]                                         # 5 days x 4 eligible tickers = 20 slots
-    assert ab["5d"] == {"slots": 20, "calls": 9, "abstention_rate": replay._r(11 / 20)}
+    assert ab["5d"] == {"slots": 20, "calls": 9, "abstention_rate": round_or_none(11 / 20)}
     assert ab["1d"]["calls"] == 4 and ab["any"]["ticker_days_with_a_call"] == 13
     page = ar.html_page(full)
     assert page.count("<svg") == 2 and page.count("<details") >= 5 and len(s["top"]) == 3
@@ -404,7 +407,7 @@ def test_sample_dates_cli():
                            env={k: v for k, v in os.environ.items() if k not in ("MB_ROOT", "MB_CONFIG", "MB_NOW")})
         assert p.returncode == 0, p.stderr
         out = json.loads(p.stdout)
-        cfg = common.load_market(market)
+        cfg = load_market(market)
         ds = [date.fromisoformat(x["as_of_date"]) for x in out["dates"]]
         all_sessions = [d for d in (date(2026, 7, 1) + timedelta(days=i) for i in range(87)) if ev.is_session(cfg, d)]
         assert ds == all_sessions[::5] and ds[0] == date(2026, 7, 1) and ds[-1] <= date(2026, 9, 25)
@@ -413,19 +416,19 @@ def test_sample_dates_cli():
             s = date.fromisoformat(x["session_date"])
             assert datetime.fromisoformat(x["cutoff_utc"]) < ev.session_open_utc(cfg, s)
             assert s == ev.next_session(cfg, date.fromisoformat(x["as_of_date"]), include=False)
-    assert ar.cutoff_for(common.load_market("us"), date(2026, 7, 1)).isoformat() == "2026-07-02T12:15:00+00:00"
-    assert ar.cutoff_for(common.load_market("india"), date(2026, 7, 1)).isoformat() == "2026-07-02T02:40:00+00:00"
+    assert ar.cutoff_for(load_market("us"), date(2026, 7, 1)).isoformat() == "2026-07-02T12:15:00+00:00"
+    assert ar.cutoff_for(load_market("india"), date(2026, 7, 1)).isoformat() == "2026-07-02T02:40:00+00:00"
 
 
 def test_frozen_clock_sql(monkeypatch):
     at = datetime(2026, 8, 17, 12, 15, tzinfo=timezone.utc)
     sql = "SELECT current_date - 7, CURRENT_DATE, now(), current_timestamp FROM t WHERE x_current_date = 1"
-    out = common.freeze_sql(sql, at)
+    out = freeze_sql(sql, at)
     assert out.count("DATE '2026-08-17'") == 2 and out.count("TIMESTAMPTZ '2026-08-17T12:15:00+00:00'") == 2
     assert "x_current_date" in out
     monkeypatch.setenv("MB_NOW", "2026-08-17T12:15:00+00:00")
-    assert common.utc_today() == date(2026, 8, 17) and common.utc_now() == "2026-08-17T12:15:00+00:00"
-    con = common.connect("nomarket")
+    assert utc_today() == date(2026, 8, 17) and utc_now() == "2026-08-17T12:15:00+00:00"
+    con = connect("nomarket")
     assert con.execute("SELECT current_date").fetchone()[0] == date(2026, 8, 17)
     monkeypatch.delenv("MB_NOW")
 

@@ -21,9 +21,13 @@ import json
 import sys
 from datetime import date, timedelta
 
-from common import market_arg, require_market, utc_now, utc_today
-from sources import (Client, FetchError, not_published, num, recent_sessions, stale_cutoff, store_changed,
-                     complete_days, summary)
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from sources import not_published, stale_cutoff, store_changed, complete_days, summary
+from marketbrief.sources.errors import FetchError
+from marketbrief.sources.free_source_client import FreeSourceClient
+from marketbrief.utils.numbers import parse_accounting_amount
+from marketbrief.utils.sessions import sessions_in_window
 
 VOLUME_URL = "https://cdn.finra.org/equity/regsho/daily/CNMSshvol{day:%Y%m%d}.txt"
 SI_URL = "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
@@ -59,7 +63,8 @@ def parse_volume(text: str, day: date, symbols: dict[str, str], now: str) -> tup
         if parts[0] != f"{day:%Y%m%d}":
             problem = f"file for {day} holds date {parts[0]}"
             continue
-        short, exempt, total = num(parts[2]), num(parts[3]), num(parts[4])
+        short, exempt, total = (parse_accounting_amount(parts[2]), parse_accounting_amount(parts[3]),
+                                parse_accounting_amount(parts[4]))
         rows.append({"id": f"finra-shvol-{day}-{ticker}", "date": str(day), "ticker": ticker,
                      "short_volume": short, "short_exempt_volume": exempt, "total_volume": total,
                      "short_pct": round(short / total * 100, 2) if short is not None and total else None,
@@ -72,7 +77,7 @@ def daily_volume(client, cfg: dict, today: date, conf: dict, now: str, failed: l
     market, symbols = cfg["market"], finra_symbols(cfg)
     have = complete_days(market, "shorts", "ticker", set(symbols.values()))
     cutoff, rows, ok = stale_cutoff(cfg, today), [], 0
-    for d in recent_sessions(cfg, today, int(conf.get("lookback_days", 10))):
+    for d in sessions_in_window(cfg, today, int(conf.get("lookback_days", 10))):
         if str(d) in have:
             ok += 1
             continue
@@ -109,11 +114,11 @@ def parse_short_interest(payload, symbols: dict[str, str], now: str) -> list[dic
         if not ticker or not settle:
             continue
         rows.append({"id": f"finra-si-{settle}-{ticker}", "settlement_date": settle, "ticker": ticker,
-                     "short_interest": num(r.get("currentShortPositionQuantity")),
-                     "prev_short_interest": num(r.get("previousShortPositionQuantity")),
-                     "change_pct": num(r.get("changePercent")),
-                     "avg_daily_volume": num(r.get("averageDailyVolumeQuantity")),
-                     "days_to_cover": num(r.get("daysToCoverQuantity")),
+                     "short_interest": parse_accounting_amount(r.get("currentShortPositionQuantity")),
+                     "prev_short_interest": parse_accounting_amount(r.get("previousShortPositionQuantity")),
+                     "change_pct": parse_accounting_amount(r.get("changePercent")),
+                     "avg_daily_volume": parse_accounting_amount(r.get("averageDailyVolumeQuantity")),
+                     "days_to_cover": parse_accounting_amount(r.get("daysToCoverQuantity")),
                      "revised": bool(r.get("revisionFlag")), "source": "finra_short_interest",
                      "first_seen_at": now})
     return rows
@@ -167,7 +172,7 @@ def main() -> int:
         print(json.dumps({"collector": "shorts", "market": cfg["market"],
                           "skipped": "no `shorts:` section in this market's config"}))
         return 0
-    client = Client(pause=float(cfg["shorts"].get("pause_seconds", 0.5)))
+    client = FreeSourceClient(pause=float(cfg["shorts"].get("pause_seconds", 0.5)))
     out = collect(cfg, client, utc_today(), utc_now())
     print(json.dumps(out, indent=2))
     return 1 if out["new"] and all(v is None for v in out["new"].values()) else 0

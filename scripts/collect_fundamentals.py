@@ -38,7 +38,12 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 import sec
-from common import append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
+from marketbrief.sources.sec_acceptance import time_summary, time_warnings
+from marketbrief.sources.sec_client import Edgar
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.paths import data_dir
+from marketbrief.core.storage import append_jsonl, day_file
 
 PERIODIC_FORMS = {"10-Q", "10-Q/A", "10-K", "10-K/A", "10-KT", "10-KT/A"}
 USD, PER_SHARE, SHARES = "USD", "USD/shares", "shares"
@@ -211,7 +216,7 @@ def main() -> int:
     predecessors = sec.related_ciks(cfg)
 
     ids, accs = stored(market)
-    edgar, now = sec.Edgar(ua), utc_now()
+    edgar, now = Edgar(ua), utc_now()
     ciks, skipped = sec.watch_ciks(cfg, edgar)
     rows, loaded, up_to_date, new_filings, not_in_xbrl, failed = [], [], [], [], [], []
     for ticker, cik in ciks.items():
@@ -252,7 +257,7 @@ def main() -> int:
         "loaded": loaded, "up_to_date": len(up_to_date), "new_filings": new_filings,
         "revised_rows": sum(r["prev_value"] is not None for r in rows),
         "filings_without_new_values": not_in_xbrl,
-        "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
+        "requests": edgar.requests, "sec_times": time_summary(edgar), "warnings": time_warnings(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 
 

@@ -341,6 +341,7 @@ def write_jsonl(root: Path, kind: str, recs: list[dict]) -> None:
 
 def test_views_cluster_buys_and_13f_actions(tmp_path, monkeypatch):
     import common
+    from marketbrief.core.database import connect
     root, _ = setup(tmp_path)
     t = str(TODAY - timedelta(days=5))
     base = {"form": "4", "filing_date": t, "derivative": False, "transaction_date": t, "first_seen_at": "2026-01-01T00:00:00Z"}
@@ -369,7 +370,7 @@ def test_views_cluster_buys_and_13f_actions(tmp_path, monkeypatch):
          "shares": 110, "complete": True},
     ])
     monkeypatch.setattr(common, "ROOT", root)
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     flow = {r[0]: r for r in con.execute("SELECT ticker, buyers_30d, cluster_buy, net_value_30d, planned_sell_share_30d "
                                          "FROM insider_flow").fetchall()}
     assert flow["AAPL"][1:4] == (3, True, 3000.0) and flow["MSFT"][1:] == (1, False, -45.0, 1.0)
@@ -483,7 +484,7 @@ def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
     import time
     import urllib.error
     import urllib.request
-    import sec
+    from marketbrief.sources.sec_client import Edgar
     calls = []
 
     def fake(req, timeout):
@@ -494,12 +495,12 @@ def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
     monkeypatch.delenv("MB_SEC_FIXTURES", raising=False)
     monkeypatch.setattr(urllib.request, "urlopen", fake)
     monkeypatch.setattr(time, "sleep", lambda s: None)
-    assert sec.Edgar("test test@example.com").json("https://data.sec.gov/x.json") == {"ok": 1}
+    assert Edgar("test test@example.com").json("https://data.sec.gov/x.json") == {"ok": 1}
     assert len(calls) == 3
 
 
 def test_collect_events_sec_earnings_timing_runs(tmp_path, monkeypatch):
-    """collect_events' SEC earnings timing goes through sec.Edgar (a broken import used to be
+    """collect_events' SEC earnings timing goes through Edgar (a broken import used to be
     swallowed as sec_error with exit 0). 8-K item 2.02 filings become (date, timing) rows."""
     import collect_events as ce
     root, cfg = setup(tmp_path)
