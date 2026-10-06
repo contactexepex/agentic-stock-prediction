@@ -124,14 +124,14 @@ runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs) a
   6 arguments, 50 statements). Run `python -m ruff check scripts --statistics`.
 - Step 0 reports only (no fixes). Counts on 2026-10-06 (commit 24749bd):
 
-  | rule | scripts/ | tests/ (before this step's files) |
+  | rule | scripts/ | tests/ (pre-existing files; the step-0 files are clean) |
   |---|---|---|
-  | E501 line-too-long | 279 | 135 |
+  | E501 line-too-long | 279 | 133 |
   | N806 non-lowercase variable | 38 | 1 |
   | PLR0913 too many arguments | 36 | 8 |
   | C901 too complex | 27 | 0 |
   | PLR0912 too many branches | 22 | 0 |
-  | ARG001 unused function argument | 17 | 48 |
+  | ARG001 unused function argument | 17 | 45 |
   | PLR0915 too many statements | 13 | 5 |
   | PLR0911 too many returns | 10 | 1 |
   | E741 ambiguous variable name | 9 | 5 |
@@ -141,7 +141,7 @@ runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs) a
   | F541 f-string without placeholders | 0 | 6 |
   | ERA001 commented-out code | 0 | 1 |
   | N802 invalid function name | 0 | 1 |
-  | total | 455 | 233 |
+  | total | 455 | 228 |
 
   Most findings per file (scripts/): html_report 115 (mostly E501 in the embedded CSS/JS), replay 68,
   ai_replay 47, validate 37, neo4j_sync 18, collect_prices 18, report 15, review 12, collect_holdings 11.
