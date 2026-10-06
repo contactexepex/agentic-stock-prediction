@@ -96,7 +96,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `data/<market>/judgments/`
 - `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
   graph-builder (monthly connection map; every edge cites a public source), and judge
-  (independent verifier; every agent's output is judged before it is appended, committed or posted)
+  (independent verifier; every agent's output is judged before it is appended, committed or posted).
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring and the
   researchers, Opus 5.5 for the forecaster, graph-builder and judge; table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market)

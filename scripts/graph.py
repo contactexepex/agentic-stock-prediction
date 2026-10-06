@@ -85,7 +85,7 @@ def validate(row: dict, tickers: set[str], today: date) -> tuple[dict | None, li
         return None, errs
     r["target"] = r["target"].strip()
     r["id"] = edge_id(r["ticker"], r["relation"], r["target"])
-    r["prompt_version"] = r["prompt_version"] or "graph-v2"
+    r["prompt_version"] = r["prompt_version"] or "graph-v3"
     return r, []
 
 

@@ -657,10 +657,10 @@ Each subagent's model and effort are set in its `.claude/agents/<name>.md` front
 | reflector (lessons from settled calls), once merged | Claude Sonnet 5.5 | medium |
 | headline aboutness check, once built | Claude Haiku 4.5 (`claude-haiku-4-5`; no effort setting) | - |
 | claim extraction and cross-checking, once built | Claude Sonnet 5.5 | high |
-| orchestrator (the routine session itself, incl. report narrative) | the routine's session model (Opus 5.5) | session default |
+| orchestrator (the routine session itself, incl. report narrative) | the routine sessions' configured model: `claude-opus-5-5` (India and US routine sessions, checked 2026-10-06) | session default |
 
-Claude Fable 5.1 is not assigned; the user chooses it manually for complex planning. Whether a
+Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the user chooses it manually for complex planning. Whether a
 scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
-must confirm it from the transcript (model per subagent call). The track record will be compared
-before and after this change; a per-call `model` field on predictions is a planned follow-up.
+must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
+(forecast-v8, news-v6, graph-v3), and a per-call `model` field on predictions is a planned follow-up.
 

@@ -36,7 +36,7 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   and applies only to tickers you make a call on.
 - Every ticker gets a published price range from `scripts/ranges.py` whether or not you call it;
   your call adds a small capped drift to that range's centre.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v7".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v8".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs the
