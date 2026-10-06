@@ -1,0 +1,37 @@
+# Lint settings for the refactor (docs/REFACTOR_PLAN.md). ruff is pinned in requirements-dev.txt.
+#   python -m ruff check scripts tests                      every finding
+#   python -m ruff check scripts --statistics               counts per rule
+# Step 0 only reports: existing findings are fixed package by package as code moves (each step
+# leaves the files it moves clean); no mass fix.
+target-version = "py311"
+line-length = 120
+extend-exclude = ["work", "data", "reports", "summaries"]
+
+[lint]
+select = [
+    "E",       # pycodestyle errors (E501 line length included)
+    "W",       # pycodestyle warnings
+    "F",       # pyflakes: unused imports and variables, undefined names
+    "N",       # pep8-naming
+    "ARG",     # unused function arguments
+    "ERA",     # commented-out code
+    "C90",     # mccabe complexity
+    "PLR0911", # too many return statements
+    "PLR0912", # too many branches
+    "PLR0913", # too many arguments
+    "PLR0915", # too many statements
+]
+
+[lint.mccabe]
+max-complexity = 12
+
+[lint.pylint]
+max-args = 6
+max-branches = 12
+max-returns = 6
+max-statements = 50
+
+[lint.per-file-ignores]
+# netguard's sitecustomize files must import after patching sys.path
+"tests/netguard/*" = ["E402"]
+"tests/golden/site/*" = ["E402"]

@@ -152,6 +152,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, the
   reflector and the researchers, Opus 5.5 for the forecaster, graph-builder and judge; table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
+- Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
+  `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
+  for the files it moves (ruff in `requirements-dev.txt`, dev and CI only) and shrinks the size
+  allow-list in `tests/test_code_structure.py`. Known defect outside the freeze: some DuckDB queries
+  have no full ORDER BY (plan, "Known nondeterminism"); refactor steps keep them exactly as they are
 
 ## Judging every change
 Every change to code, config, agent instructions or process is reviewed by the `judge` subagent
