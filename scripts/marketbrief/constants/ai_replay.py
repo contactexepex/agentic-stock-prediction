@@ -1,10 +1,11 @@
 """Labels, cutoff rules, publication-time rules and backfill steps of the AI replay (ai_replay.py)."""
+
 from __future__ import annotations
 
 from datetime import date, time, timedelta
 
 
-FAIR, CONTAMINATED = "fair", "contaminated"   # ForecastBench leakage rule (see the docstring)
+FAIR, CONTAMINATED = "fair", "contaminated"  # ForecastBench leakage rule (see the docstring)
 
 SAMPLE_START, SAMPLE_END, SAMPLE_STEP = date(2026, 7, 1), date(2026, 9, 25), 5
 
@@ -16,7 +17,7 @@ REGULAR_LEAD = timedelta(minutes=75)
 
 MARKER = ".ai_replay_root"
 
-EVIDENCE_KINDS = ("news", "filings", "announcements")   # ids a call may cite (CLAUDE.md: news/filing ids)
+EVIDENCE_KINDS = ("news", "filings", "announcements")  # ids a call may cite (CLAUDE.md: news/filing ids)
 
 EVIDENCE_DAYS = 14
 
@@ -32,19 +33,31 @@ PUBLIC_AT: dict[str, list[str]] = {
     "holdings": ["accepted_at", "filed_at", "filing_date+1d", "first_seen_at"],
     "announcements": ["published_at", "first_seen_at"],
     "financials": ["filed_at", "first_seen_at"],
-    "predictions": ["made_at"], "ranges": ["made_at"],
-    "outcomes": ["scored_at"], "range_outcomes": ["scored_at"], "lessons": ["available_from"],
-    "features": ["computed_at"], "regime": ["computed_at"], "calibration": ["computed_at"],
-    "reviews": ["computed_at"], "replays": ["computed_at"], "judgments": ["recorded_at"],
-    "quotes": ["collected_at"], "options": ["collected_at"],
-    "graph": ["added_at"], "graph_runs": ["run_at"],
+    "predictions": ["made_at"],
+    "ranges": ["made_at"],
+    "outcomes": ["scored_at"],
+    "range_outcomes": ["scored_at"],
+    "lessons": ["available_from"],
+    "features": ["computed_at"],
+    "regime": ["computed_at"],
+    "calibration": ["computed_at"],
+    "reviews": ["computed_at"],
+    "replays": ["computed_at"],
+    "judgments": ["recorded_at"],
+    "quotes": ["collected_at"],
+    "options": ["collected_at"],
+    "graph": ["added_at"],
+    "graph_runs": ["run_at"],
     # SEC acceptance times from the filing's SGML header (check_sec_times.py): a permanent fact
     # about the filing, public from its acceptance; checked_at is only when we looked it up
     "sec_times": ["accepted_at"],
     # news verification phase A: an article row once fetched, a cluster row once computed (every
     # input of a cluster row is <= its as_of; news_clusters_asof() in sql/views.sql reads them)
-    "news_articles": ["fetched_at"], "news_clusters": ["as_of"],
-    "primary_texts": ["fetched_at"], "news_claims": ["extracted_at"], "news_verified": ["as_of"],  # phase B
+    "news_articles": ["fetched_at"],
+    "news_clusters": ["as_of"],
+    "primary_texts": ["fetched_at"],
+    "news_claims": ["extracted_at"],
+    "news_verified": ["as_of"],  # phase B
 }
 
 FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows", "delivery")
@@ -56,10 +69,12 @@ DATE_PUBLIC_AFTER_CLOSE = ("deals",)
 for _k in FIRST_SEEN_ONLY:
     PUBLIC_AT[_k] = ["first_seen_at"]
 
-TARGET_DATE_KINDS = ("outcomes", "range_outcomes", "lessons")     # also need target_date <= D
+TARGET_DATE_KINDS = ("outcomes", "range_outcomes", "lessons")  # also need target_date <= D
 
-DROPPED = {"news": "stored news only starts when live collection began ({first}); no history before",
-           "news_enriched": "AI enrichment of news (no news history before {first})"}
+DROPPED = {
+    "news": "stored news only starts when live collection began ({first}); no history before",
+    "news_enriched": "AI enrichment of news (no news history before {first})",
+}
 
 SOURCE_MARKER = ".ai_replay_source"
 
@@ -67,10 +82,14 @@ SOURCE_MARKER = ".ai_replay_source"
 # the SEC_USER_AGENT contact; NSE: one polite session per collector, never two at once).
 BACKFILL_STEPS = {
     "us": [("collect_filings.py",), ("collect_insiders.py",), ("collect_stakes.py",), ("collect_events.py",)],
-    "india": [("collect_nse_india.py", "--only", "announcements", "--only", "financials", "--since", "{since}"),
-              ("collect_relations_india.py", "--only", "insiders", "--only", "deals", "--since", "{since}"),
-              ("collect_events.py",)],
+    "india": [
+        ("collect_nse_india.py", "--only", "announcements", "--only", "financials", "--since", "{since}"),
+        ("collect_relations_india.py", "--only", "insiders", "--only", "deals", "--since", "{since}"),
+        ("collect_events.py",),
+    ],
 }
 
-BACKFILL_KINDS = {"us": ("filings", "insiders", "stakes", "events"),
-                  "india": ("announcements", "financials", "insiders", "deals", "events")}
+BACKFILL_KINDS = {
+    "us": ("filings", "insiders", "stakes", "events"),
+    "india": ("announcements", "financials", "insiders", "deals", "events"),
+}

@@ -1,6 +1,6 @@
 """Stylesheet and script of the self-contained replay pages (rule replay and AI replay)."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 
 CSS = """
@@ -24,14 +24,20 @@ th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--grid)}th{co
 td:first-child,th:first-child{text-align:left}.scroll{overflow-x:auto}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin:4px 0 8px}
 .sw{display:inline-block;width:10px;height:10px;border-radius:5px;margin-right:6px;vertical-align:middle}
-.sw.line{height:2px;width:16px;border-radius:1px}.dash{border-top:2px dashed var(--muted);width:16px;display:inline-block;
+.sw.line{height:2px;width:16px;border-radius:1px}.dash{border-top:2px dashed \
+var(--muted);width:16px;display:inline-block;
 margin-right:6px;vertical-align:middle}
 svg{display:block;width:100%;height:auto}svg text{fill:var(--muted);font-size:11px}
 .mark:hover{opacity:.75}.tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);
 border:1px solid var(--ring);border-radius:8px;padding:6px 9px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.15);
-display:none;z-index:10;max-width:260px}select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--axis);
+display:none;z-index:10;max-width:260px}select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid \
+var(--axis);
 background:var(--surface);color:var(--ink)}.bad{color:var(--bad)}.good{color:var(--good)}
-.note{font-size:13px;color:var(--muted)}.caption{font-size:13.5px;color:var(--ink2);margin:8px 0 0}.top .answer{color:var(--ink);font-size:16px;margin:8px 0}details{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:10px 16px;margin:10px 0}summary{cursor:pointer;font-weight:600;color:var(--ink)}details[open] summary{margin-bottom:8px}code{background:var(--chip);padding:1px 4px;border-radius:4px}
+.note{font-size:13px;color:var(--muted)}.caption{font-size:13.5px;color:var(--ink2);margin:8px 0 0}.top \
+.answer{color:var(--ink);font-size:16px;margin:8px 0}details{background:var(--surface);border:1px solid \
+var(--ring);border-radius:12px;padding:10px 16px;margin:10px \
+0}summary{cursor:pointer;font-weight:600;color:var(--ink)}details[open] \
+summary{margin-bottom:8px}code{background:var(--chip);padding:1px 4px;border-radius:4px}
 """
 
 JS = """

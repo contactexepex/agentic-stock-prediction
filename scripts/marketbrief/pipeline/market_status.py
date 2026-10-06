@@ -6,6 +6,7 @@ abstains, because any call would be scored on an outcome that is already public.
 `in_session` is true between the open (`session_open_utc`) and the close of `session_date` (a
 manual mid-session run): that session's outcome is partly public, so no call is made, ranges.py
 publishes no 1-day range, and every range or call made then is late (never scored)."""
+
 from __future__ import annotations
 
 import json
@@ -23,7 +24,8 @@ def status(cfg: dict, now: datetime) -> dict:
     session = calendar.next_session(cfg, today)
     open_, close = calendar.session_open_utc(cfg, session), calendar.session_close_utc(cfg, session)
     return {
-        "market": cfg["market"], "local_time": now.isoformat(timespec="minutes"),
+        "market": cfg["market"],
+        "local_time": now.isoformat(timespec="minutes"),
         "trading_day": calendar.is_session(cfg, today),
         "session_date": str(session),
         "previous_session": str(calendar.prev_session(cfg, today, include=False)),
@@ -36,9 +38,9 @@ def status(cfg: dict, now: datetime) -> dict:
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
-    ap.add_argument("--now", help="evaluate at this ISO 8601 time with offset instead of now (testing)")
-    args = ap.parse_args()
+    parser = market_arg(__doc__)
+    parser.add_argument("--now", help="evaluate at this ISO 8601 time with offset instead of now (testing)")
+    args = parser.parse_args()
     cfg = require_market(args)
     now = datetime.fromisoformat(args.now) if args.now else datetime.now(ZoneInfo(cfg["timezone"]))
     if now.tzinfo is None:

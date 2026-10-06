@@ -26,6 +26,7 @@ recomputed from data/ (never the agent's copy) plus the text.
 Availability: `settled_at` = the outcome's scored_at; `available_from` = the latest scored_at of the facts the lesson
 cites (the outcome, and the range outcome when a range is cited). The context pack (context.py) shows a lesson only
 once available_from <= its clock (MB_NOW-aware), so a lesson never reveals an outcome unknown at made_at."""
+
 from __future__ import annotations
 
 import json
@@ -41,39 +42,82 @@ from marketbrief.pipeline.lessons.validation import check
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
-    sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("prepare", help="write the facts of settled calls without a lesson")
-    p.add_argument("--max", type=int, default=DEFAULT_MAX, help="at most N calls, newest settled first")
-    p.add_argument("--out", type=Path, default=paths.ROOT / "work" / "lesson_facts.jsonl")
+    parser = market_arg(__doc__)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    prepare_parser = sub.add_parser("prepare", help="write the facts of settled calls without a lesson")
+    prepare_parser.add_argument("--max", type=int, default=DEFAULT_MAX, help="at most N calls, newest settled first")
+    prepare_parser.add_argument("--out", type=Path, default=paths.ROOT / "work" / "lesson_facts.jsonl")
     for name in ("validate", "add"):
-        q = sub.add_parser(name)
-        q.add_argument("file", type=Path)
-    args = ap.parse_args()
+        file_parser = sub.add_parser(name)
+        file_parser.add_argument("file", type=Path)
+    args = parser.parse_args()
     cfg = require_market(args)
     market = cfg["market"]
     if args.cmd == "prepare":
         con = connect(market)
         facts, done = settled(cfg, con), stored_ids(con)
-        todo = [f for pid, f in facts.items() if f is not None and f"lesson-{pid}" not in done]
-        waiting = sorted(pid for pid, f in facts.items() if f is None and f"lesson-{pid}" not in done)
-        todo.sort(key=lambda f: (f["settled_at"], f["prediction_id"]), reverse=True)
-        todo = todo[:args.max]
+        todo = [fact for pid, fact in facts.items() if fact is not None and f"lesson-{pid}" not in done]
+        waiting = sorted(pid for pid, fact in facts.items() if fact is None and f"lesson-{pid}" not in done)
+        todo.sort(key=lambda fact: (fact["settled_at"], fact["prediction_id"]), reverse=True)
+        todo = todo[: args.max]
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text("".join(json.dumps({**f, "evidence": evidence(con, f["evidence_ids"])}, default=str) + "\n"
-                                    for f in todo), encoding="utf-8")
-        print(json.dumps({"step": "lessons.prepare", "market": market, "facts": str(args.out), "n": len(todo),
-                          "waiting_for_range": waiting, "already_stored": len(done), "now": utc_now()}, indent=2))
+        args.out.write_text(
+            "".join(
+                json.dumps({**fact, "evidence": evidence(con, fact["evidence_ids"])}, default=str) + "\n"
+                for fact in todo
+            ),
+            encoding="utf-8",
+        )
+        print(
+            json.dumps(
+                {
+                    "step": "lessons.prepare",
+                    "market": market,
+                    "facts": str(args.out),
+                    "n": len(todo),
+                    "waiting_for_range": waiting,
+                    "already_stored": len(done),
+                    "now": utc_now(),
+                },
+                indent=2,
+            )
+        )
         return 0
-    good, bad, n = check(cfg, args.file)
+    good, bad, record_count = check(cfg, args.file)
     if args.cmd == "validate" or bad:
-        print(json.dumps({"step": f"lessons.{args.cmd}", "market": market, "file": str(args.file), "records": n,
-                          "valid": len(good), "errors": bad, "appended": 0}, indent=2, default=str))
+        print(
+            json.dumps(
+                {
+                    "step": f"lessons.{args.cmd}",
+                    "market": market,
+                    "file": str(args.file),
+                    "records": record_count,
+                    "valid": len(good),
+                    "errors": bad,
+                    "appended": 0,
+                },
+                indent=2,
+                default=str,
+            )
+        )
         return 1 if bad else 0
     now = utc_now()
-    rows = [{**g, "written_at": now} for g in good]
+    rows = [{**valid_record, "written_at": now} for valid_record in good]
     path = day_file(market, "lessons", utc_today())
     append_jsonl(path, rows)
-    print(json.dumps({"step": "lessons.add", "market": market, "file": str(args.file), "records": n,
-                      "valid": len(good), "errors": [], "appended": len(rows), "to": str(path)}, indent=2))
+    print(
+        json.dumps(
+            {
+                "step": "lessons.add",
+                "market": market,
+                "file": str(args.file),
+                "records": record_count,
+                "valid": len(good),
+                "errors": [],
+                "appended": len(rows),
+                "to": str(path),
+            },
+            indent=2,
+        )
+    )
     return 0

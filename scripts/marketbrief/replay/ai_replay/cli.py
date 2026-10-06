@@ -60,6 +60,7 @@ Inclusion rules of `prepare` (per data kind; a row is kept only if public by the
   announced);
 - news and news_enriched: dropped (stored news only starts when live collection began); any other
   kind: dropped and listed. summaries/ and reports/ are never copied."""
+
 from __future__ import annotations
 
 import argparse
@@ -79,54 +80,98 @@ from marketbrief.replay.ai_replay.score import score
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="cmd", required=True)
 
     def add(name: str, help_: str) -> argparse.ArgumentParser:
-        p = sub.add_parser(name, help=help_)
-        p.add_argument("--market", default=os.environ.get("MB_MARKET"), help=f"one of {market_names()}")
-        return p
+        subparser = sub.add_parser(name, help=help_)
+        subparser.add_argument("--market", default=os.environ.get("MB_MARKET"), help=f"one of {market_names()}")
+        return subparser
 
     add("dates", "print the sample of as-of dates")
-    p = add("prepare", "build an as-of scratch root and its context pack and ranges")
-    p.add_argument("--date", required=True, type=date.fromisoformat)
-    p.add_argument("--root", required=True, type=Path)
-    p.add_argument("--source", type=Path, help="root whose data/ is read, e.g. a `backfill` source "
-                                               "(default: $MB_ROOT or the repo)")
-    p.add_argument("--force", action="store_true", help="rebuild a root this script prepared before")
-    p.add_argument("--allow-training-period", action="store_true",
-                   help="allow an as-of date on or before model_training_cutoff in config/settings.yaml "
-                        "(labelled contaminated: not a fair test, scored separately)")
-    p.add_argument("--assume-earnings-known", type=int, default=0, metavar="DAYS",
-                   help="ASSUMPTION, off by default: treat actual earnings dates within DAYS after D as announced "
-                        "before the cutoff (labelled in the context pack and the summary)")
-    p = add("backfill", "copy data/<market> to a scratch source and run the collectors into it from --since")
-    p.add_argument("--source", required=True, type=Path, help="scratch source root (never the repo or its data/)")
-    p.add_argument("--since", required=True, type=date.fromisoformat)
-    p = add("record", "validate forecaster calls and store them in the replay results")
-    p.add_argument("--date", required=True, type=date.fromisoformat)
-    p.add_argument("--root", required=True, type=Path)
-    p.add_argument("--calls", required=True, type=Path, help="forecaster-format JSONL (may be empty: all abstain)")
-    p.add_argument("--results", type=Path, default=paths.CODE / "work" / "ai_replay", help="results dir (default work/ai_replay)")
-    p = add("score", "score the recorded calls on real closes; write HTML and JSON")
-    p.add_argument("--results", type=Path, default=paths.CODE / "work" / "ai_replay")
-    p.add_argument("--out", required=True, type=Path, help="HTML path; the JSON goes next to it")
-    args = ap.parse_args()
+    subparser = add("prepare", "build an as-of scratch root and its context pack and ranges")
+    subparser.add_argument("--date", required=True, type=date.fromisoformat)
+    subparser.add_argument("--root", required=True, type=Path)
+    subparser.add_argument(
+        "--source", type=Path, help="root whose data/ is read, e.g. a `backfill` source (default: $MB_ROOT or the repo)"
+    )
+    subparser.add_argument("--force", action="store_true", help="rebuild a root this script prepared before")
+    subparser.add_argument(
+        "--allow-training-period",
+        action="store_true",
+        help="allow an as-of date on or before model_training_cutoff in config/settings.yaml "
+        "(labelled contaminated: not a fair test, scored separately)",
+    )
+    subparser.add_argument(
+        "--assume-earnings-known",
+        type=int,
+        default=0,
+        metavar="DAYS",
+        help="ASSUMPTION, off by default: treat actual earnings dates within DAYS after D as announced "
+        "before the cutoff (labelled in the context pack and the summary)",
+    )
+    subparser = add("backfill", "copy data/<market> to a scratch source and run the collectors into it from --since")
+    subparser.add_argument(
+        "--source", required=True, type=Path, help="scratch source root (never the repo or its data/)"
+    )
+    subparser.add_argument("--since", required=True, type=date.fromisoformat)
+    subparser = add("record", "validate forecaster calls and store them in the replay results")
+    subparser.add_argument("--date", required=True, type=date.fromisoformat)
+    subparser.add_argument("--root", required=True, type=Path)
+    subparser.add_argument(
+        "--calls", required=True, type=Path, help="forecaster-format JSONL (may be empty: all abstain)"
+    )
+    subparser.add_argument(
+        "--results", type=Path, default=paths.CODE / "work" / "ai_replay", help="results dir (default work/ai_replay)"
+    )
+    subparser = add("score", "score the recorded calls on real closes; write HTML and JSON")
+    subparser.add_argument("--results", type=Path, default=paths.CODE / "work" / "ai_replay")
+    subparser.add_argument("--out", required=True, type=Path, help="HTML path; the JSON goes next to it")
+    args = parser.parse_args()
     if not args.market:
         raise SystemExit(MSG_MARKET_REQUIRED.format(available=market_names()))
     cfg = load_market(args.market)
     if args.cmd == "dates":
-        ds = sample_dates(cfg)
-        res = {"market": cfg["market"], "rule": f"every {SAMPLE_STEP}th {cfg['calendar']} trading day from "
-               f"{SAMPLE_START} to {SAMPLE_END}, starting with the first", "n": len(ds),
-               "dates": [{"as_of_date": str(d), "session_date": str(next_session(cfg, d)),
-                          "cutoff_utc": cutoff_for(cfg, d).isoformat()} for d in ds]}
+        sample = sample_dates(cfg)
+        res = {
+            "market": cfg["market"],
+            "rule": f"every {SAMPLE_STEP}th {cfg['calendar']} trading day from "
+            f"{SAMPLE_START} to {SAMPLE_END}, starting with the first",
+            "n": len(sample),
+            "dates": [
+                {
+                    "as_of_date": str(as_of_day),
+                    "session_date": str(next_session(cfg, as_of_day)),
+                    "cutoff_utc": cutoff_for(cfg, as_of_day).isoformat(),
+                }
+                for as_of_day in sample
+            ],
+        }
     elif args.cmd == "prepare":
-        res = prepare(cfg, args.date, args.root.resolve(), args.source, args.force, args.allow_training_period,
-                      args.assume_earnings_known)
-        res = {k: v for k, v in res.items() if k != "steps"} | {"steps": {k: (v if k != "features" else {
-            x: v.get(x) for x in ("as_of_date", "session_date", "regime", "tickers", "blocked")} if isinstance(v, dict) else v)
-            for k, v in res["steps"].items()}}
+        res = prepare(
+            cfg,
+            args.date,
+            args.root.resolve(),
+            args.source,
+            args.force,
+            args.allow_training_period,
+            args.assume_earnings_known,
+        )
+        res = {key: value for key, value in res.items() if key != "steps"} | {
+            "steps": {
+                key: (
+                    value
+                    if key != "features"
+                    else {
+                        field: value.get(field)
+                        for field in ("as_of_date", "session_date", "regime", "tickers", "blocked")
+                    }
+                    if isinstance(value, dict)
+                    else value
+                )
+                for key, value in res["steps"].items()
+            }
+        }
     elif args.cmd == "backfill":
         res = backfill(cfg, args.source, args.since)
     elif args.cmd == "record":

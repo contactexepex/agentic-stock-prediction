@@ -1,4 +1,5 @@
 """Limits, field lists, SQL and patterns of the reflection log (lessons.py)."""
+
 from __future__ import annotations
 
 import re
@@ -8,11 +9,37 @@ MAX_WORDS = 60
 
 DEFAULT_MAX = 40
 
-FACT_FIELDS = ("id", "prediction_id", "ticker", "horizon_days", "as_of_date", "made_at", "direction",
-               "confidence", "rationale", "evidence_ids", "call_prompt_version", "base_date", "base_close",
-               "target_date", "target_close", "actual_return", "hit", "range_id", "range_target_date",
-               "range_actual_close", "lo80", "lo50", "hi50", "hi80", "hit50", "hit80", "range_position",
-               "settled_at", "available_from")
+FACT_FIELDS = (
+    "id",
+    "prediction_id",
+    "ticker",
+    "horizon_days",
+    "as_of_date",
+    "made_at",
+    "direction",
+    "confidence",
+    "rationale",
+    "evidence_ids",
+    "call_prompt_version",
+    "base_date",
+    "base_close",
+    "target_date",
+    "target_close",
+    "actual_return",
+    "hit",
+    "range_id",
+    "range_target_date",
+    "range_actual_close",
+    "lo80",
+    "lo50",
+    "hi50",
+    "hi80",
+    "hit50",
+    "hit80",
+    "range_position",
+    "settled_at",
+    "available_from",
+)
 
 AGENT_FIELDS = ("prediction_id", "lesson", "prompt_version")
 
@@ -37,8 +64,8 @@ ID_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}(?:T[0-9:.+\-Z]+)?(?:-[A-Za-z0-9&.\-]+-\
 
 NUM_RE = re.compile(r"(?<![\w.])([+\-−]?)(\d+(?:,\d{3})*(?:\.\d+)?)(\s*%)?")
 
-PCT_KINDS = ("return", "confidence_pct")       # (and "distance from ...") only with a % sign
+PCT_KINDS = ("return", "confidence_pct")  # (and "distance from ...") only with a % sign
 
-BOTH_KINDS = ("band", "rationale")              # with or without a % sign
+BOTH_KINDS = ("band", "rationale")  # with or without a % sign
 
 TIME_FIELDS = ("made_at", "settled_at", "available_from")

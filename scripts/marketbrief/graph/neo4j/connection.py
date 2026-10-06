@@ -1,4 +1,5 @@
 """Neo4j connection from the environment, the dry-run sink and statement execution."""
+
 from __future__ import annotations
 
 import json
@@ -28,12 +29,15 @@ def client_from_env() -> Neo4jClient | None:
     if not uri and not base:
         return None
     if not base:
-        u = urllib.parse.urlparse(uri)
-        secure = u.scheme.endswith("+s") or u.scheme.endswith("+ssc") or u.scheme == "https"
-        port = f":{u.port}" if u.port and u.port != 7687 else ("" if secure else ":7474")
-        base = f"{'https' if secure else 'http'}://{u.hostname}{port}"
-    return Neo4jClient(base, default_database(uri or base),
-                       (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "")))
+        parsed_uri = urllib.parse.urlparse(uri)
+        secure = parsed_uri.scheme.endswith("+s") or parsed_uri.scheme.endswith("+ssc") or parsed_uri.scheme == "https"
+        port = f":{parsed_uri.port}" if parsed_uri.port and parsed_uri.port != 7687 else ("" if secure else ":7474")
+        base = f"{'https' if secure else 'http'}://{parsed_uri.hostname}{port}"
+    return Neo4jClient(
+        base,
+        default_database(uri or base),
+        (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "")),
+    )
 
 
 class DryRunSink:
@@ -48,15 +52,16 @@ class DryRunSink:
     def run(self, statement: str, parameters: dict | None = None, name: str = "statement") -> dict:
         self.n += 1
         path = self.dir / f"{self.n:04d}-{name}.json"
-        path.write_text(json.dumps({"statement": statement, "parameters": parameters or {}}, indent=1,
-                                   ensure_ascii=False))
+        path.write_text(
+            json.dumps({"statement": statement, "parameters": parameters or {}}, indent=1, ensure_ascii=False)
+        )
         return {"data": {"fields": [], "values": []}, "counters": {}}
 
 
 def add_counters(total: dict, res: dict) -> None:
-    for k, v in (res.get("counters") or {}).items():
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            total[k] = total.get(k, 0) + v
+    for key, value in (res.get("counters") or {}).items():
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            total[key] = total.get(key, 0) + value
 
 
 def run_stmt(sink, statement: str, params: dict, name: str) -> dict:

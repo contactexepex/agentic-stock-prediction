@@ -25,7 +25,7 @@ from marketbrief.pipeline.review import cli
 from marketbrief.pipeline.review import helpers
 from marketbrief.pipeline.review import history_ablation
 from marketbrief.pipeline.review import live_ablation
-from marketbrief.pipeline.review import markdown
+from marketbrief.pipeline.review import markdown_cells
 from marketbrief.pipeline.review import summaries
 from marketbrief.pipeline.review import verdicts  # noqa: E402
 from marketbrief.utils.event_dates import major_event_between  # noqa: E402
@@ -463,7 +463,7 @@ def test_history_regime_uses_the_next_session():
 
 def test_flag_threshold():
     rv = {**review.DEFAULTS, "min_n": 30}
-    assert markdown.flag(29, rv) == "low n" and markdown.flag(30, rv) == "" and markdown.flag(0, rv) == "low n"
+    assert markdown_cells.flag(29, rv) == "low n" and markdown_cells.flag(30, rv) == "" and markdown_cells.flag(0, rv) == "low n"
 
 
 def test_coverage_gate_needs_a_score_no_worse():

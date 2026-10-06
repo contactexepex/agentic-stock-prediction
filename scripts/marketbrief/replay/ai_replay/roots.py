@@ -1,4 +1,5 @@
 """Scratch roots: pointing readers at another root, running scripts on it, guarding its location."""
+
 from __future__ import annotations
 
 import json
@@ -23,32 +24,40 @@ def data_root(root: Path):
         paths.ROOT = old
 
 
-def run_script(script: str, root: Path, market: str, *args: str, now: str | None = None,
-               timeout: int | None = None) -> subprocess.CompletedProcess:
+def run_script(
+    script: str, root: Path, market: str, *args: str, now: str | None = None, timeout: int | None = None
+) -> subprocess.CompletedProcess:
     """Run scripts/<script> on another root (MB_ROOT=root, MB_CONFIG=root/config), as of `now` if given."""
     env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(root / "config"), "MB_MARKET": market}
     env.pop("MB_NOW", None)
     if now:
         env["MB_NOW"] = now
-    return subprocess.run([sys.executable, str(paths.CODE / "scripts" / script), "--market", market, *args],
-                          cwd=paths.CODE / "scripts", env=env, capture_output=True, text=True, check=False, timeout=timeout)
+    return subprocess.run(
+        [sys.executable, str(paths.CODE / "scripts" / script), "--market", market, *args],
+        cwd=paths.CODE / "scripts",
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout,
+    )
 
 
 def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout: Path | None = None) -> str:
-    p = run_script(script, root, market, *args, now=now)
-    if p.returncode != 0:
-        raise SystemExit(f"{script} failed in {root} (exit {p.returncode}):\n{p.stderr[-3000:]}")
+    process = run_script(script, root, market, *args, now=now)
+    if process.returncode != 0:
+        raise SystemExit(f"{script} failed in {root} (exit {process.returncode}):\n{process.stderr[-3000:]}")
     if stdout is not None:
         stdout.parent.mkdir(parents=True, exist_ok=True)
-        stdout.write_text(p.stdout, encoding="utf-8")
-    return p.stdout
+        stdout.write_text(process.stdout, encoding="utf-8")
+    return process.stdout
 
 
-def json_or_text(s: str):
+def json_or_text(text: str):
     try:
-        return json.loads(s)
+        return json.loads(text)
     except json.JSONDecodeError:
-        return s.strip()[-2000:]
+        return text.strip()[-2000:]
 
 
 def check_root(root: Path, src: Path, force: bool) -> None:

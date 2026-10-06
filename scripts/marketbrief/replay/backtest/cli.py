@@ -18,6 +18,7 @@ scored where it applies (docs/DESIGN.md section 7: keep an input only if it impr
   next open gap if the market has pre-market quotes, else none (ADR history is not stored).
 - implied_vol has no stored history: live only, not backtested.
 Writes reports/<market>/backtest-<as_of>.md (or --out) and prints a JSON summary."""
+
 from __future__ import annotations
 
 import json
@@ -27,16 +28,29 @@ from marketbrief.replay.backtest.report import markdown, run
 
 
 def main() -> int:
-    ap = cli.market_arg(__doc__)
-    ap.add_argument("--eval-sessions", type=int, default=250, help="trading days to evaluate (default 250)")
-    ap.add_argument("--out", help="write the report here instead of reports/<market>/")
-    args = ap.parse_args()
+    parser = cli.market_arg(__doc__)
+    parser.add_argument("--eval-sessions", type=int, default=250, help="trading days to evaluate (default 250)")
+    parser.add_argument("--out", help="write the report here instead of reports/<market>/")
+    args = parser.parse_args()
     cfg = cli.require_market(args)
-    rc = market_config.load_ranges_config(cfg["market"])
-    s = run(cfg, rc, args.eval_sessions)
-    path = Path(args.out) if args.out else paths.ROOT / "reports" / cfg["market"] / f"backtest-{s['as_of_date']}.md"
+    ranges_config = market_config.load_ranges_config(cfg["market"])
+    summary = run(cfg, ranges_config, args.eval_sessions)
+    path = (
+        Path(args.out) if args.out else paths.ROOT / "reports" / cfg["market"] / f"backtest-{summary['as_of_date']}.md"
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(markdown(cfg, s))
-    print(json.dumps({"step": "backtest", "report": str(path), "horizons": s["horizons"],
-                      "inputs": s["inputs"], "event_history": s["event_history"]}, indent=2, default=str))
+    path.write_text(markdown(cfg, summary))
+    print(
+        json.dumps(
+            {
+                "step": "backtest",
+                "report": str(path),
+                "horizons": summary["horizons"],
+                "inputs": summary["inputs"],
+                "event_history": summary["event_history"],
+            },
+            indent=2,
+            default=str,
+        )
+    )
     return 0

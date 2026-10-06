@@ -1,4 +1,5 @@
 """Verdicts of the ablations, the proposed config changes and the confidence advice."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -13,87 +14,135 @@ def compare(base: dict, var: dict) -> dict | None:
     coverage_shortfall: largest extra drop BELOW target of 50%/80% coverage (over-coverage is
     left to the interval score and the daily self-calibration). coverage_gain: mean move of
     80% coverage towards its target."""
-    hs = [h for h, b in base.items() if b.get("n") and var.get(h, {}).get("n") and b.get("score80_pct")]
-    if not hs:
+    horizons = [
+        horizon
+        for horizon, base_summary in base.items()
+        if base_summary.get("n") and var.get(horizon, {}).get("n") and base_summary.get("score80_pct")
+    ]
+    if not horizons:
         return None
-    rel = float(np.mean([var[h]["score80_pct"] / base[h]["score80_pct"] - 1 for h in hs]))
-    short = max(max(0.0, t - var[h][f"cover{b}"]) - max(0.0, t - base[h][f"cover{b}"])
-                for h in hs for b, t in TARGETS.items())
-    gain = float(np.mean([abs(base[h]["cover80"] - 0.8) - abs(var[h]["cover80"] - 0.8) for h in hs]))
+    rel = float(np.mean([var[horizon]["score80_pct"] / base[horizon]["score80_pct"] - 1 for horizon in horizons]))
+    short = max(
+        max(0.0, target - var[horizon][f"cover{base_summary}"])
+        - max(0.0, target - base[horizon][f"cover{base_summary}"])
+        for horizon in horizons
+        for base_summary, target in TARGETS.items()
+    )
+    gain = float(
+        np.mean([abs(base[horizon]["cover80"] - 0.8) - abs(var[horizon]["cover80"] - 0.8) for horizon in horizons])
+    )
     return {"rel_score": round(rel, 4), "coverage_shortfall": round(float(short), 4), "coverage_gain": round(gain, 4)}
 
 
-def verdict(cmp: dict | None, n: int, rv: dict) -> str:
-    if cmp is None:
-        return "no data"
-    if n < rv["min_n_recommend"]:
-        return "low n"
-    if cmp["rel_score"] <= -rv["min_improvement"] and cmp["coverage_shortfall"] <= rv["coverage_tolerance"]:
+def verdict(cmp: dict | None, count: int, review_config: dict) -> str:
+    if cmp is None or count < review_config["min_n_recommend"]:
+        return "no data" if cmp is None else "low n"
+    if (
+        cmp["rel_score"] <= -review_config["min_improvement"]
+        and cmp["coverage_shortfall"] <= review_config["coverage_tolerance"]
+    ):
         return "improves score"
-    if cmp["coverage_gain"] >= rv["min_coverage_gain"] and cmp["rel_score"] <= 0:
+    if cmp["coverage_gain"] >= review_config["min_coverage_gain"] and cmp["rel_score"] <= 0:
         return "improves coverage"
-    if cmp["rel_score"] >= rv["min_improvement"]:
+    if cmp["rel_score"] >= review_config["min_improvement"]:
         return "worse score"
-    if cmp["coverage_shortfall"] > rv["coverage_tolerance"]:
+    if cmp["coverage_shortfall"] > review_config["coverage_tolerance"]:
         return "under-covers"
     return "no material change"
 
 
-def judge(ablation: dict, rv: dict) -> None:
+def judge(ablation: dict, review_config: dict) -> None:
     """Annotate each variant with its comparison to the current config and a verdict."""
-    vs = ablation.get("variants") or []
-    base = next((v for v in vs if v["name"] == BASELINE), None)
-    for v in vs:
-        if v is base:
-            v["verdict"] = "baseline" if v["n"] else "no data"
+    variants = ablation.get("variants") or []
+    base = next((variant for variant in variants if variant["name"] == BASELINE), None)
+    for variant in variants:
+        if variant is base:
+            variant["verdict"] = "baseline" if variant["n"] else "no data"
             continue
-        v["vs_current"] = compare(base["by_h"], v["by_h"]) if base else None
-        v["verdict"] = verdict(v["vs_current"], v["n"], rv)
+        variant["vs_current"] = compare(base["by_h"], variant["by_h"]) if base else None
+        variant["verdict"] = verdict(variant["vs_current"], variant["n"], review_config)
 
 
-def proposals(rc: dict, live: dict, hist: dict) -> list[dict]:
+def proposals(ranges_config: dict, live: dict, hist: dict) -> list[dict]:
     """Best qualifying variant per parameter set; live evidence wins over price history, and
     price history is not proposed against live evidence (n >= min) that the change is worse."""
     best: dict[tuple, dict] = {}
-    live_worse = {tuple(sorted(v["set"])) for v in live.get("variants") or []
-                  if v.get("verdict") in ("worse score", "under-covers")}
-    for source, ab in (("history walk-forward", hist), ("live replay", live)):
-        for v in ab.get("variants") or []:
-            if v.get("verdict") not in ("improves score", "improves coverage"):
+    live_worse = {
+        tuple(sorted(variant["set"]))
+        for variant in live.get("variants") or []
+        if variant.get("verdict") in ("worse score", "under-covers")
+    }
+    for source, ablation in (("history walk-forward", hist), ("live replay", live)):
+        for variant in ablation.get("variants") or []:
+            if variant.get("verdict") not in ("improves score", "improves coverage"):
                 continue
-            key = tuple(sorted(v["set"]))
+            key = tuple(sorted(variant["set"]))
             if source != "live replay" and key in live_worse:
                 continue
             cur = best.get(key)
-            if cur is None or source == "live replay" and cur["source"] != "live replay" or \
-                    cur["source"] == source and v["vs_current"]["rel_score"] < cur["rel_score"]:
-                base = next(x for x in ab["variants"] if x["name"] == BASELINE)
-                best[key] = {"variant": v["name"], "source": source, "n": v["n"], "verdict": v["verdict"],
-                             "changes": [{"param": k, "current": rc.get(k), "proposed": val} for k, val in v["set"].items()],
-                             "drop": v["name"].lower().startswith("drop"),
-                             "rel_score": v["vs_current"]["rel_score"],
-                             "cover80_before": {h: x.get("cover80") for h, x in base["by_h"].items()},
-                             "cover80_after": {h: x.get("cover80") for h, x in v["by_h"].items()}}
-    return sorted(best.values(), key=lambda p: p["rel_score"])
+            if (
+                cur is None
+                or source == "live replay"
+                and cur["source"] != "live replay"
+                or cur["source"] == source
+                and variant["vs_current"]["rel_score"] < cur["rel_score"]
+            ):
+                base = next(variant_row for variant_row in ablation["variants"] if variant_row["name"] == BASELINE)
+                best[key] = {
+                    "variant": variant["name"],
+                    "source": source,
+                    "n": variant["n"],
+                    "verdict": variant["verdict"],
+                    "changes": [
+                        {"param": param, "current": ranges_config.get(param), "proposed": val}
+                        for param, val in variant["set"].items()
+                    ],
+                    "drop": variant["name"].lower().startswith("drop"),
+                    "rel_score": variant["vs_current"]["rel_score"],
+                    "cover80_before": {
+                        horizon: variant_row.get("cover80") for horizon, variant_row in base["by_h"].items()
+                    },
+                    "cover80_after": {
+                        horizon: variant_row.get("cover80") for horizon, variant_row in variant["by_h"].items()
+                    },
+                }
+    return sorted(best.values(), key=lambda params: params["rel_score"])
 
 
 def proper_scores(ranges: pd.DataFrame, calls: pd.DataFrame) -> dict:
     """Brier, log loss and reliability for calls; interval and quantile scores for ranges (scoring.py)."""
-    c = calls[calls["confidence"].notna() & calls["hit"].notna()] if not calls.empty else calls
-    out = {"calls": by_horizon(c, scoring.call_scores) if not c.empty else {"all": {"n": 0}},
-           "reliability": scoring.reliability(c["confidence"], c["hit"]) if not c.empty else [],
-           "ranges": by_horizon(ranges, scoring.range_scores) if not ranges.empty else {"all": {"n": 0}}}
+    scored_calls = calls[calls["confidence"].notna() & calls["hit"].notna()] if not calls.empty else calls
+    out = {
+        "calls": by_horizon(scored_calls, scoring.call_scores) if not scored_calls.empty else {"all": {"n": 0}},
+        "reliability": scoring.reliability(scored_calls["confidence"], scored_calls["hit"])
+        if not scored_calls.empty
+        else [],
+        "ranges": by_horizon(ranges, scoring.range_scores) if not ranges.empty else {"all": {"n": 0}},
+    }
     return out
 
 
-def confidence_advice(bands: dict, calls: dict, rv: dict) -> list[str]:
+def confidence_advice(bands: dict, calls: dict, review_config: dict) -> list[str]:
     out = []
-    for band, s in bands.items():
-        if s.get("n", 0) >= rv["min_n_calls"] and s["gap"] < -rv["calibration_tolerance"]:
-            out.append(f"Calls at {band} confidence hit {scoring.percent(s['hit_rate'])} (mean stated {scoring.percent(s['mean_confidence'])}, "
-                       f"n={s['n']}): use lower confidence or abstain in this band.")
-    a = calls.get("all", {})
-    if a.get("n", 0) >= rv["min_n_calls"] and a["edge"] is not None and a["edge"] <= 0:
-        out.append(f"Calls hit {scoring.percent(a['hit_rate'])} vs always-up {scoring.percent(a['always_up'])} (n={a['n']}): no edge over the "
-                   "baseline; abstain more.")
+    for band, band_stats in bands.items():
+        if (
+            band_stats.get("n", 0) >= review_config["min_n_calls"]
+            and band_stats["gap"] < -review_config["calibration_tolerance"]
+        ):
+            out.append(
+                f"Calls at {band} confidence hit {scoring.percent(band_stats['hit_rate'])} (mean stated "
+                f"{scoring.percent(band_stats['mean_confidence'])}, "
+                f"n={band_stats['n']}): use lower confidence or abstain in this band."
+            )
+    all_calls = calls.get("all", {})
+    if (
+        all_calls.get("n", 0) >= review_config["min_n_calls"]
+        and all_calls["edge"] is not None
+        and all_calls["edge"] <= 0
+    ):
+        out.append(
+            f"Calls hit {scoring.percent(all_calls['hit_rate'])} vs always-up "
+            f"{scoring.percent(all_calls['always_up'])} (n={all_calls['n']}): no edge over the "
+            "baseline; abstain more."
+        )
     return out

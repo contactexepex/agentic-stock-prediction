@@ -212,12 +212,12 @@ def test_no_half_to_even_percent_format_left():
     """Every printed share uses scoring.percent (half up): no Python ':.0%' format remains in scripts/,
     and the weekly review prints 0.625 and 5/8 as 63% like the daily report."""
     import re
-    from marketbrief.pipeline.review import markdown
+    from marketbrief.pipeline.review import markdown_cells
     from marketbrief.pipeline.review import summaries
     scripts = Path(scoring.__file__).parent
     hits = [f"{p.relative_to(scripts)}:{i}" for p in sorted(scripts.rglob("*.py"))
             for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r"\{[^}]*:[+ ]?\.(0|\{[^}]+\})%\}", line)]
     assert hits == []
-    assert summaries.band_label(0.625, 5 / 8) == "63%-63%" and markdown.fpct(0.625) == markdown.fpct(5 / 8) == "63%"
+    assert summaries.band_label(0.625, 5 / 8) == "63%-63%" and markdown_cells.fpct(0.625) == markdown_cells.fpct(5 / 8) == "63%"
     assert scoring.percent(0.125, sign=True) == "+13%" and scoring.percent(float("inf")) == "–"
     assert scoring.percent(0.625, 1) == "62.5%" and scoring.percent(None) == "–"

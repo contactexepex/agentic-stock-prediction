@@ -12,6 +12,7 @@ and the closes stored with a call, are compared and stored in the basis the reco
 The printed summary adds `scores` (scoring.py) over the whole track record: Brier score, log loss
 and a reliability table (confidence bins vs hit rate, Wilson 95%) for calls; coverage, 50%/80%
 interval scores and the quantile score (mean pinball loss over q10/q25/q75/q90) for ranges."""
+
 from __future__ import annotations
 
 import json
@@ -36,9 +37,10 @@ def is_late(cfg: dict, as_of, made_at) -> bool:
     horizon covers that session, so from its open part of the outcome is public)."""
     if made_at is None or (not isinstance(made_at, str) and pd.isna(made_at)):
         return False
-    d = as_of if isinstance(as_of, date) and not isinstance(as_of, datetime) else pd.Timestamp(as_of).date()
-    first = calendar.sessions_ahead(cfg, d + timedelta(days=1), 1)[-1]
+    as_of_day = as_of if isinstance(as_of, date) and not isinstance(as_of, datetime) else pd.Timestamp(as_of).date()
+    first = calendar.sessions_ahead(cfg, as_of_day + timedelta(days=1), 1)[-1]
     return pd.Timestamp(made_at).to_pydatetime() >= calendar.session_open_utc(cfg, first)
+
 
 SQL = """
 WITH base AS (
@@ -82,27 +84,35 @@ def score_ranges(cfg: dict, con, now: str) -> tuple[list[dict], int]:
     record_basis before it is compared with the stored edges; actual_close is stored in that basis."""
     out, late = [], 0
     adjs = load_adjustments(con)
-    for r in con.execute(RANGE_SQL).df().itertuples():
-        if is_late(cfg, r.as_of_date, r.made_at):
+    for row in con.execute(RANGE_SQL).df().itertuples():
+        if is_late(cfg, row.as_of_date, row.made_at):
             late += 1
             continue
-        k = record_basis(adjs, r.ticker, r.as_of_date, r.made_at)
-        y, base = float(r.actual) / k, float(r.base_close)
-        pct = lambda v: round(100 * v / base, 4)  # noqa: E731
-        naive = r.naive_lo80 is not None and not math.isnan(r.naive_lo80)
-        out.append({
-            "range_id": r.id, "scored_at": now, "target_date": str(r.target_date)[:10], "actual_close": y,
-            "z": round((math.log(y / base) - r.center) / r.sigma_h, 6) if r.sigma_h else None,
-            "hit50": bool(r.lo50 <= y <= r.hi50), "hit80": bool(r.lo80 <= y <= r.hi80),
-            "naive_hit50": bool(r.naive_lo50 <= y <= r.naive_hi50) if naive else None,
-            "naive_hit80": bool(r.naive_lo80 <= y <= r.naive_hi80) if naive else None,
-            "is80_pct": pct(range_math.interval_score(r.lo80, r.hi80, y, 0.8)),
-            "naive_is80_pct": pct(range_math.interval_score(r.naive_lo80, r.naive_hi80, y, 0.8)) if naive else None,
-            "width80_pct": pct(r.hi80 - r.lo80),
-            "naive_width80_pct": pct(r.naive_hi80 - r.naive_lo80) if naive else None,
-            "center_err_pct": round(100 * abs(y / (base * math.exp(r.center)) - 1), 4),
-            "naive_center_err_pct": round(100 * abs(y / base - 1), 4),
-        })
+        key = record_basis(adjs, row.ticker, row.as_of_date, row.made_at)
+        actual_close, base = float(row.actual) / key, float(row.base_close)
+        pct = lambda volume: round(100 * volume / base, 4)  # noqa: E731
+        naive = row.naive_lo80 is not None and not math.isnan(row.naive_lo80)
+        out.append(
+            {
+                "range_id": row.id,
+                "scored_at": now,
+                "target_date": str(row.target_date)[:10],
+                "actual_close": actual_close,
+                "z": round((math.log(actual_close / base) - row.center) / row.sigma_h, 6) if row.sigma_h else None,
+                "hit50": bool(row.lo50 <= actual_close <= row.hi50),
+                "hit80": bool(row.lo80 <= actual_close <= row.hi80),
+                "naive_hit50": bool(row.naive_lo50 <= actual_close <= row.naive_hi50) if naive else None,
+                "naive_hit80": bool(row.naive_lo80 <= actual_close <= row.naive_hi80) if naive else None,
+                "is80_pct": pct(range_math.interval_score(row.lo80, row.hi80, actual_close, 0.8)),
+                "naive_is80_pct": pct(range_math.interval_score(row.naive_lo80, row.naive_hi80, actual_close, 0.8))
+                if naive
+                else None,
+                "width80_pct": pct(row.hi80 - row.lo80),
+                "naive_width80_pct": pct(row.naive_hi80 - row.naive_lo80) if naive else None,
+                "center_err_pct": round(100 * abs(actual_close / (base * math.exp(row.center)) - 1), 4),
+                "naive_center_err_pct": round(100 * abs(actual_close / base - 1), 4),
+            }
+        )
     return out, late
 
 
@@ -113,17 +123,29 @@ def main() -> int:
     now = utc_now()
     rows, late_calls = [], 0
     adjs = load_adjustments(con)
-    for pid, ticker, as_of, made_at, bd, bc, td, tc, ret, hit in con.execute(SQL).fetchall():
+    for pid, ticker, as_of, made_at, base_date, base_close, target_date, target_close, ret, hit in con.execute(
+        SQL
+    ).fetchall():
         if is_late(cfg, as_of, made_at):
             late_calls += 1
             continue
         # base and target both come from the bars view (one basis), so the return and the hit hold
         # across a split; the two closes are stored in the basis the call saw (record_basis)
-        k = record_basis(adjs, ticker, bd, made_at)
-        if k != 1:
-            bc, tc = bc / k, tc / k
-        rows.append({"prediction_id": pid, "scored_at": now, "base_date": str(bd), "base_close": bc,
-                     "target_date": str(td), "target_close": tc, "actual_return": round(ret, 6), "hit": bool(hit)})
+        key = record_basis(adjs, ticker, base_date, made_at)
+        if key != 1:
+            base_close, target_close = base_close / key, target_close / key
+        rows.append(
+            {
+                "prediction_id": pid,
+                "scored_at": now,
+                "base_date": str(base_date),
+                "base_close": base_close,
+                "target_date": str(target_date),
+                "target_close": target_close,
+                "actual_return": round(ret, 6),
+                "hit": bool(hit),
+            }
+        )
     written = append_jsonl(day_file(market, "outcomes", utc_today()), rows)
     open_left = con.execute("SELECT count(*) FROM open_predictions").fetchone()[0] - written - late_calls
     ranges, late_ranges = score_ranges(cfg, con, now)
@@ -131,12 +153,23 @@ def main() -> int:
     r_open = con.execute("SELECT count(*) FROM open_ranges").fetchone()[0] - r_written - late_ranges
     # proper scores over the whole track record, including what was just scored (fresh connection)
     scores = scoring.summary(connect(market))
-    print(json.dumps({"step": "score", "market": market, "scored": written, "still_open": open_left,
-                      "late_skipped": {"calls": late_calls, "ranges": late_ranges},
-                      "ranges_scored": r_written, "ranges_open": r_open,
-                      "hit80": sum(r["hit80"] for r in ranges), "hit50": sum(r["hit50"] for r in ranges),
-                      "scores": scores},
-                     indent=2))
+    print(
+        json.dumps(
+            {
+                "step": "score",
+                "market": market,
+                "scored": written,
+                "still_open": open_left,
+                "late_skipped": {"calls": late_calls, "ranges": late_ranges},
+                "ranges_scored": r_written,
+                "ranges_open": r_open,
+                "hit80": sum(row["hit80"] for row in ranges),
+                "hit50": sum(row["hit50"] for row in ranges),
+                "scores": scores,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

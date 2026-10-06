@@ -27,6 +27,7 @@ and advance only after every batch of a kind succeeded.
 
 Prints one JSON summary (rows read, upserted and failed per kind). Exit 0 = all synced,
 1 = any failure, 2 = NEO4J_URI not set (nothing sent)."""
+
 from __future__ import annotations
 
 import json
@@ -40,39 +41,69 @@ from marketbrief.graph.neo4j.sync import sync
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
-    ap.add_argument("--full", action="store_true", help="delete this market's projection and load everything")
-    ap.add_argument("--dry-run", action="store_true", help="write statements to work/neo4j_dryrun/ instead")
-    ap.add_argument("--probe", action="store_true", help="only run RETURN 1 against the server")
-    ap.add_argument("--since", help="ISO timestamp: override the stored watermark of every incremental kind")
-    ap.add_argument("--kinds", help="comma-separated subset of kinds (default: all)")
-    ap.add_argument("--batch-size", type=int, default=BATCH_SIZE)
-    args = ap.parse_args()
+    parser = market_arg(__doc__)
+    parser.add_argument("--full", action="store_true", help="delete this market's projection and load everything")
+    parser.add_argument("--dry-run", action="store_true", help="write statements to work/neo4j_dryrun/ instead")
+    parser.add_argument("--probe", action="store_true", help="only run RETURN 1 against the server")
+    parser.add_argument("--since", help="ISO timestamp: override the stored watermark of every incremental kind")
+    parser.add_argument("--kinds", help="comma-separated subset of kinds (default: all)")
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    args = parser.parse_args()
     cfg = require_market(args)
     if args.dry_run:
         sink = DryRunSink(paths.ROOT / "work" / "neo4j_dryrun" / cfg["market"])
     else:
         sink = client_from_env()
         if sink is None:
-            print(json.dumps({"step": "neo4j_sync", "market": cfg["market"], "ok": False, "skipped": True,
-                              "reason": "NEO4J_URI not set"}))
+            print(
+                json.dumps(
+                    {
+                        "step": "neo4j_sync",
+                        "market": cfg["market"],
+                        "ok": False,
+                        "skipped": True,
+                        "reason": "NEO4J_URI not set",
+                    }
+                )
+            )
             return 2
     if args.probe:
         if isinstance(sink, DryRunSink):
             raise SystemExit("--probe needs a server, not --dry-run")
         try:
             res = sink.run("RETURN 1 AS ok")
-            print(json.dumps({"step": "neo4j_probe", "host": sink.host, "database": sink.database, "ok": True,
-                              "result": (res.get("data") or {}).get("values")}))
+            print(
+                json.dumps(
+                    {
+                        "step": "neo4j_probe",
+                        "host": sink.host,
+                        "database": sink.database,
+                        "ok": True,
+                        "result": (res.get("data") or {}).get("values"),
+                    }
+                )
+            )
             return 0
         except Neo4jError as exc:
-            print(json.dumps({"step": "neo4j_probe", "host": sink.host, "database": sink.database, "ok": False, "error": str(exc)}))
+            print(
+                json.dumps(
+                    {
+                        "step": "neo4j_probe",
+                        "host": sink.host,
+                        "database": sink.database,
+                        "ok": False,
+                        "error": str(exc),
+                    }
+                )
+            )
             return 1
     con = connect(cfg["market"])
-    only = [k.strip() for k in args.kinds.split(",")] if args.kinds else None
+    only = [key.strip() for key in args.kinds.split(",")] if args.kinds else None
     out = sync(cfg, con, sink, full=args.full, since=args.since, batch_size=args.batch_size, only=only)
     if args.dry_run:
-        out["dry_run_dir"] = str(sink.dir.relative_to(paths.ROOT)) if sink.dir.is_relative_to(paths.ROOT) else str(sink.dir)
+        out["dry_run_dir"] = (
+            str(sink.dir.relative_to(paths.ROOT)) if sink.dir.is_relative_to(paths.ROOT) else str(sink.dir)
+        )
         out["statements"] = sink.n
     print(json.dumps(out, indent=2, default=str))
     return 0 if out["ok"] else 1

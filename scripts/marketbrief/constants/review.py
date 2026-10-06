@@ -1,14 +1,23 @@
 """Defaults, targets and note patterns of the weekly review (review.py)."""
+
 from __future__ import annotations
 
 import re
 
 
 DEFAULTS = {
-    "rolling_days": 30, "min_n": 30, "min_n_recommend": 200, "min_n_calls": 50,
-    "min_improvement": 0.02, "coverage_tolerance": 0.02, "min_coverage_gain": 0.04,
-    "calibration_tolerance": 0.05, "confidence_bands": [0.5, 0.6, 0.7, 0.8, 0.9],
-    "history_eval_sessions": 120, "live_variants": [], "history_variants": [],
+    "rolling_days": 30,
+    "min_n": 30,
+    "min_n_recommend": 200,
+    "min_n_calls": 50,
+    "min_improvement": 0.02,
+    "coverage_tolerance": 0.02,
+    "min_coverage_gain": 0.04,
+    "calibration_tolerance": 0.05,
+    "confidence_bands": [0.5, 0.6, 0.7, 0.8, 0.9],
+    "history_eval_sessions": 120,
+    "live_variants": [],
+    "history_variants": [],
 }
 
 TARGETS = {"50": 0.5, "80": 0.8}

@@ -1,20 +1,24 @@
 """Levels, signals, notes and grids of the rule-based replay (replay.py)."""
+
 from __future__ import annotations
 
 
-
-LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)   # calibration curve (stated coverage)
+LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)  # calibration curve (stated coverage)
 
 SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")
 
-SIGNAL_LABELS = {"always_up": "Always up", "momentum_1d": "1-day momentum", "momentum_5d": "5-day momentum",
-                 "rsi_reversion": "RSI(14) mean reversion"}
+SIGNAL_LABELS = {
+    "always_up": "Always up",
+    "momentum_1d": "1-day momentum",
+    "momentum_5d": "5-day momentum",
+    "rsi_reversion": "RSI(14) mean reversion",
+}
 
 RSI_LOW, RSI_HIGH = 30.0, 70.0
 
-DEFAULT_LEVELS = {"q10": 0.10, "q25": 0.25, "q75": 0.75, "q90": 0.90}   # fixed band quantiles (ACI off)
+DEFAULT_LEVELS = {"q10": 0.10, "q25": 0.25, "q75": 0.75, "q90": 0.90}  # fixed band quantiles (ACI off)
 
-MIN_MONTH_DAYS = 5   # the coverage-over-time chart leaves out months with fewer as-of days (kept in the JSON)
+MIN_MONTH_DAYS = 5  # the coverage-over-time chart leaves out months with fewer as-of days (kept in the JSON)
 
 LIMITATIONS = [
     "No AI: the forecaster's drift and widening are judged only live (the model may have seen past prices).",
@@ -30,12 +34,15 @@ LIMITATIONS = [
     "so they are wider than a naive binomial interval.",
 ]
 
-SCORE_NOTE = ("Score = interval score: the 80% range's width plus a penalty when the price lands outside it, in % of "
-              "the price; lower is better. Naive = a simple range of last close +/- the last 20 days' typical move.")
+SCORE_NOTE = (
+    "Score = interval score: the 80% range's width plus a penalty when the price lands outside it, in % of "
+    "the price; lower is better. Naive = a simple range of last close +/- the last 20 days' typical move."
+)
 
-CI_NOTE = ("95% interval = the span the true rate most likely lies in, allowing for stocks moving together on the "
-           "same day.")
+CI_NOTE = (
+    "95% interval = the span the true rate most likely lies in, allowing for stocks moving together on the same day."
+)
 
 CMP_KEYS = ("n", "cover50", "cover80", "width50_pct", "width80_pct", "score50", "score80", "qs_pct")
 
-ACI_GRID = tuple((g, br) for g in (0.002, 0.005, 0.01, 0.02) for br in (False, True))   # held-out tuning grid
+ACI_GRID = tuple((g, br) for g in (0.002, 0.005, 0.01, 0.02) for br in (False, True))  # held-out tuning grid

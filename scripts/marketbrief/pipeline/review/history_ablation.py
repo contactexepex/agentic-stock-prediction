@@ -1,4 +1,5 @@
 """Ablation (b): walk-forward on stored prices with each input switched off."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -20,64 +21,99 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
     """Regime per bar date rebuilt from stored bars (as features.py does live, with closes instead
     of pre-open quotes) and the sorted dates of major market events."""
     bench = bars[benchmark_key(cfg)]["close"]
-    vk = vol_index_key(cfg)
-    vol = bars[vk]["close"].reindex(bench.index) if vk in bars else pd.Series(np.nan, index=bench.index)
+    vol_key = vol_index_key(cfg)
+    vol = bars[vol_key]["close"].reindex(bench.index) if vol_key in bars else pd.Series(np.nan, index=bench.index)
     first, last = dates[0].date(), dates[-1].date()
     events = calendar.market_events(cfg, first, last + timedelta(days=30))
-    majors = sorted({e["date"] for e in events if e["major"]})
+    majors = sorted({event["date"] for event in events if event["major"]})
     regimes = []
-    for i, d in enumerate(dates):
-        tail = bench.iloc[max(0, i - 30): i + 1]
-        lvl = None if pd.isna(vol.iloc[i]) else float(vol.iloc[i])
-        prev = None if i == 0 or pd.isna(vol.iloc[i - 1]) else float(vol.iloc[i - 1])
-        session = dates[i + 1].date() if i + 1 < len(dates) else calendar.next_session(cfg, d.date(), include=False)
+    for position, date_index in enumerate(dates):
+        tail = bench.iloc[max(0, position - 30) : position + 1]
+        lvl = None if pd.isna(vol.iloc[position]) else float(vol.iloc[position])
+        prev = None if position == 0 or pd.isna(vol.iloc[position - 1]) else float(vol.iloc[position - 1])
+        session = (
+            dates[position + 1].date()
+            if position + 1 < len(dates)
+            else calendar.next_session(cfg, date_index.date(), include=False)
+        )
         near = calendar.major_events_near(events, session)
-        regimes.append(regime_rules.classify(cfg["regime"], lvl, indicators.period_return(tail, 5), indicators.realized_vol(tail), bool(near),
-                                   lvl / prev - 1 if lvl and prev else None)[0])
+        regimes.append(
+            regime_rules.classify(
+                cfg["regime"],
+                lvl,
+                indicators.period_return(tail, 5),
+                indicators.realized_vol(tail),
+                bool(near),
+                lvl / prev - 1 if lvl and prev else None,
+            )[0]
+        )
     return regimes, majors
 
 
 def hist_summary(res: pd.DataFrame) -> dict:
     if res.empty:
         return {"n": 0}
-    m = res.mean(numeric_only=True)
-    return {"n": int(len(res)), "cover50": round(float(m["hit50"]), 4), "cover80": round(float(m["hit80"]), 4),
-            "width80_pct": round(float(m["width80"]), 3), "score50_pct": round(float(m["is50"]), 3),
-            "score80_pct": round(float(m["is80"]), 3), "naive_cover80": round(float(m["naive_hit80"]), 4),
-            "naive_score80_pct": round(float(m["naive_is80"]), 3)}
+    means = res.mean(numeric_only=True)
+    return {
+        "n": int(len(res)),
+        "cover50": round(float(means["hit50"]), 4),
+        "cover80": round(float(means["hit80"]), 4),
+        "width80_pct": round(float(means["width80"]), 3),
+        "score50_pct": round(float(means["is50"]), 3),
+        "score80_pct": round(float(means["is80"]), 3),
+        "naive_cover80": round(float(means["naive_hit80"]), 4),
+        "naive_score80_pct": round(float(means["naive_is80"]), 3),
+    }
 
 
-def history_ablation(cfg: dict, rc: dict, rv: dict, bars: dict, week_end: date) -> dict:
+def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: dict, week_end: date) -> dict:
     bkey = benchmark_key(cfg)
-    bars = {t: df[df.index <= pd.Timestamp(week_end)] for t, df in bars.items()}
-    if bkey not in bars or len(bars[bkey]) < rc["warmup_bars"] + 30:
+    bars = {ticker: frame[frame.index <= pd.Timestamp(week_end)] for ticker, frame in bars.items()}
+    if bkey not in bars or len(bars[bkey]) < ranges_config["warmup_bars"] + 30:
         return {"n": 0, "error": "not enough benchmark bars", "variants": []}
     dates = list(bars[bkey].index)
-    rank = {d: i for i, d in enumerate(dates)}
+    rank = {position: date_position for date_position, position in enumerate(dates)}
     regimes, majors = history_context(cfg, bars, dates)
-    day = [d.date() for d in dates]
+    session_dates = [position.date() for position in dates]
 
-    def major_in(i: int, h: int) -> bool:
-        return i + h < len(day) and major_event_between(majors, day[i], day[i + h])
+    def major_in(date_position: int, horizon: int) -> bool:
+        return date_position + horizon < len(session_dates) and major_event_between(
+            majors, session_dates[date_position], session_dates[date_position + horizon]
+        )
 
     cache, variants = {}, []
-    for v in [{"name": BASELINE, "set": {}}, *rv["history_variants"]]:
-        p = merge(rc, v.get("set"))
-        by_h, n = {}, 0
-        for h in p["horizons"]:
-            key = (p["ewma_lambda"], p["warmup_bars"], h)
+    for variant in [{"name": BASELINE, "set": {}}, *review_config["history_variants"]]:
+        params = merge(ranges_config, variant.get("set"))
+        by_h, bar_count = {}, 0
+        for horizon in params["horizons"]:
+            key = (params["ewma_lambda"], params["warmup_bars"], horizon)
             if key not in cache:
-                cache[key] = observations.observations(bars, cfg["tickers"], h, p, rank)
+                cache[key] = observations.observations(bars, cfg["tickers"], horizon, params, rank)
             obs = cache[key]
             if obs.empty:
                 continue
-            scale = {i: p["regime_factor"].get(regimes[i], 1.0) * (p["major_event_factor"] if major_in(i, h) else 1.0)
-                     for i in range(len(dates))}
-            s = hist_summary(evaluation.evaluate(obs, h, p, rv["history_eval_sessions"], scale=scale))
-            by_h[f"{h}d"] = s
-            n += s["n"]
-        variants.append({"name": v["name"], "set": v.get("set") or {}, "n": n, "by_h": by_h})
-    share = {k: round(regimes[-rv["history_eval_sessions"]:].count(k) / min(len(regimes), rv["history_eval_sessions"]), 3)
-             for k in REGIME_ORDER}
-    return {"n": variants[0]["n"] if variants else 0, "sessions": rv["history_eval_sessions"],
-            "regime_share": share, "variants": variants}
+            scale = {
+                date_position: params["regime_factor"].get(regimes[date_position], 1.0)
+                * (params["major_event_factor"] if major_in(date_position, horizon) else 1.0)
+                for date_position in range(len(dates))
+            }
+            summary = hist_summary(
+                evaluation.evaluate(obs, horizon, params, review_config["history_eval_sessions"], scale=scale)
+            )
+            by_h[f"{horizon}d"] = summary
+            bar_count += summary["n"]
+        variants.append({"name": variant["name"], "set": variant.get("set") or {}, "n": bar_count, "by_h": by_h})
+    share = {
+        regime: round(
+            regimes[-review_config["history_eval_sessions"] :].count(regime)
+            / min(len(regimes), review_config["history_eval_sessions"]),
+            3,
+        )
+        for regime in REGIME_ORDER
+    }
+    return {
+        "n": variants[0]["n"] if variants else 0,
+        "sessions": review_config["history_eval_sessions"],
+        "regime_share": share,
+        "variants": variants,
+    }

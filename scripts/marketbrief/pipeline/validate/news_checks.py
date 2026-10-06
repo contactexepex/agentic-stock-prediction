@@ -1,4 +1,5 @@
 """News stage: source allow-list, article pages and the news analyst's enrichment file."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -19,24 +20,28 @@ def registrable(host: str) -> str:
 def allowed_news_sources(cfg: dict) -> tuple[set[str], dict[str, set[str]]]:
     """(domains of the Google News base, outlet name -> allowed link domains)."""
     news = cfg.get("news") or {}
-    gn = news.get("google_news") or {}
-    gdom = {registrable(urlparse(gn["base"]).hostname)} if gn.get("base") else set()
+    google_news = news.get("google_news") or {}
+    gdom = {registrable(urlparse(google_news["base"]).hostname)} if google_news.get("base") else set()
     outlets = {}
-    for o in news.get("outlets") or []:
-        doms = {registrable(urlparse(o["url"]).hostname)} | {registrable(d) for d in o.get("link_domains") or []}
-        outlets[o["name"]] = doms
+    for outlet in news.get("outlets") or []:
+        doms = {registrable(urlparse(outlet["url"]).hostname)} | {
+            registrable(domain) for domain in outlet.get("link_domains") or []
+        }
+        outlets[outlet["name"]] = doms
     return gdom, outlets
 
 
 def check_news_sources(res: Result, cfg: dict, con, today: date):
     gdom, outlets = allowed_news_sources(cfg)
-    rows = con.execute("SELECT id, url, feed, tickers FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
+    rows = con.execute(
+        "SELECT id, url, feed, tickers FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]
+    ).fetchall()
     bad = []
     for nid, url, feed, tickers in rows:
-        u = urlparse(url or "")
-        dom = registrable(u.hostname or "")
-        if u.scheme != "https":
-            bad.append((nid, f"scheme {u.scheme or 'none'}", tickers))
+        parsed_url = urlparse(url or "")
+        dom = registrable(parsed_url.hostname or "")
+        if parsed_url.scheme != "https":
+            bad.append((nid, f"scheme {parsed_url.scheme or 'none'}", tickers))
         elif str(feed).startswith("gnews:"):
             if dom not in gdom:
                 bad.append((nid, f"Google News feed but link domain {dom}", tickers))
@@ -46,9 +51,12 @@ def check_news_sources(res: Result, cfg: dict, con, today: date):
         else:
             bad.append((nid, f"feed {feed!r} is not a configured outlet", tickers))
     if bad:
-        res.block("NEWS_SOURCE", f"{len(bad)} news rows from unconfigured sources or not https, e.g. "
-                  + "; ".join(f"{i}: {w}" for i, w, _ in bad[:5]),
-                  [t for *_, ts_ in bad for t in (ts_ or []) if t in cfg["tickers"]])
+        res.block(
+            "NEWS_SOURCE",
+            f"{len(bad)} news rows from unconfigured sources or not https, e.g. "
+            + "; ".join(f"{index}: {source}" for index, source, _ in bad[:5]),
+            [tag for *_, ts_ in bad for tag in (ts_ or []) if tag in cfg["tickers"]],
+        )
 
 
 def check_articles(res: Result, cfg: dict, today: date):
@@ -58,25 +66,31 @@ def check_articles(res: Result, cfg: dict, today: date):
     from marketbrief.analytics.article_pages import url_check
     from marketbrief.analytics.news_sources import load_sources
     from marketbrief.constants.articles import ACCESS
+
     src, bad = load_sources(), []
-    for p in todays_files(cfg["market"], "news_articles", today):
-        for r in read_rows(p)[0]:
-            ext = r.get("extract") or []
-            if r.get("access") not in ACCESS:
-                bad.append(f"{r.get('id')}: access {r.get('access')!r}")
-            elif len(ext) > 3 or any(len(str(s).split()) > 40 for s in ext):
-                bad.append(f"{r.get('id')}: extract longer than 3 sentences of 40 words")
-            elif r["access"] in ("full", "partial", "paywalled") and r.get("http_status") is not None \
-                    and not url_check(r.get("final_url"), src)[0]:
-                bad.append(f"{r.get('id')}: read from a URL that is not an allowlisted https page "
-                           f"({str(r.get('final_url'))[:60]})")
-            elif r["access"] in ("skipped_unlisted", "undecoded") and r.get("http_status") is not None:
-                bad.append(f"{r.get('id')}: access {r['access']} but an HTTP status is stored")
+    for path in todays_files(cfg["market"], "news_articles", today):
+        for row in read_rows(path)[0]:
+            ext = row.get("extract") or []
+            if row.get("access") not in ACCESS:
+                bad.append(f"{row.get('id')}: access {row.get('access')!r}")
+            elif len(ext) > 3 or any(len(str(extractor).split()) > 40 for extractor in ext):
+                bad.append(f"{row.get('id')}: extract longer than 3 sentences of 40 words")
+            elif (
+                row["access"] in ("full", "partial", "paywalled")
+                and row.get("http_status") is not None
+                and not url_check(row.get("final_url"), src)[0]
+            ):
+                bad.append(
+                    f"{row.get('id')}: read from a URL that is not an allowlisted https page "
+                    f"({str(row.get('final_url'))[:60]})"
+                )
+            elif row["access"] in ("skipped_unlisted", "undecoded") and row.get("http_status") is not None:
+                bad.append(f"{row.get('id')}: access {row['access']} but an HTTP status is stored")
     if bad:
         res.warn("ARTICLE_ROWS", f"{len(bad)} news_articles rows break the article rules, e.g. {bad[:3]}")
 
 
-def stage_news(res, cfg, con, st, now, today, vc, path: Path | None = None):
+def stage_news(res, cfg, con, status, now, today, validate_config, path: Path | None = None):
     path = path or work_dir() / "enriched.jsonl"
     if not path.exists():
         res.info["news"] = "no work/enriched.jsonl"
@@ -84,39 +98,51 @@ def stage_news(res, cfg, con, st, now, today, vc, path: Path | None = None):
     rows, problems = read_rows(path) if path.stat().st_size else ([], [])
     if problems:
         res.block("BAD_FILE", f"{path.name}: {'; '.join(problems[:3])}")
-    bad = check_rows("news_enriched", rows, False, now, timedelta(minutes=vc["future_tolerance_minutes"]))
+    bad = check_rows("news_enriched", rows, False, now, timedelta(minutes=validate_config["future_tolerance_minutes"]))
     if bad:
         res.block("SCHEMA", f"{path.name}: {'; '.join(bad)}")
-    new_ids = {r[0] for r in con.execute("SELECT id FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()}
-    new_ids |= {r[0] for r in con.execute("SELECT id FROM announcements WHERE CAST(first_seen_at AS DATE) = ?",
-                                          [today]).fetchall()}
-    done = {r[0] for r in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()}
-    ids = [r.get("id") for r in rows]
-    dup = sorted({i for i in ids if ids.count(i) > 1})
+    new_ids = {
+        row[0] for row in con.execute("SELECT id FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
+    }
+    new_ids |= {
+        row[0]
+        for row in con.execute("SELECT id FROM announcements WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
+    }
+    done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()}
+    ids = [row.get("id") for row in rows]
+    dup = sorted({index for index in ids if ids.count(index) > 1})
     if dup:
         res.block("DUPLICATE_ID", f"{path.name}: repeated ids {dup[:5]}")
-    extra = sorted({i for i in ids if i not in new_ids})
+    extra = sorted({index for index in ids if index not in new_ids})
     if extra:
-        res.block("ENRICH_UNKNOWN_ID", f"{len(extra)} ids are not news/announcements first seen today, e.g. {extra[:5]}")
-    again = sorted({i for i in ids if i in done})
+        res.block(
+            "ENRICH_UNKNOWN_ID", f"{len(extra)} ids are not news/announcements first seen today, e.g. {extra[:5]}"
+        )
+    again = sorted({index for index in ids if index in done})
     if again:
         res.block("ENRICH_ALREADY_STORED", f"{len(again)} ids already in news_enriched, e.g. {again[:5]}")
     missing = sorted(new_ids - done - set(ids))
     if missing:
-        res.warn("ENRICH_MISSING", f"{len(missing)} of today's news/announcement ids have no enrichment, e.g. {missing[:5]}")
-    for r in rows:
+        res.warn(
+            "ENRICH_MISSING", f"{len(missing)} of today's news/announcement ids have no enrichment, e.g. {missing[:5]}"
+        )
+    for row in rows:
         why = []
-        for k, lo, hi in (("relevance", 0, 1), ("sentiment", -1, 1), ("novelty", 0, 1)):
-            v = r.get(k)
-            if not isinstance(v, (int, float)) or isinstance(v, bool) or not lo <= v <= hi:
-                why.append(f"{k} {v!r} not in {lo}..{hi}")
-        why += [f"{k} {r.get(k)!r} not one of {sorted(ok)}" for k, ok in ENRICH_ENUMS.items() if r.get(k) not in ok]
-        if not isinstance(r.get("summary"), str) or len(r["summary"].split()) > 25:
+        for key, lower, upper in (("relevance", 0, 1), ("sentiment", -1, 1), ("novelty", 0, 1)):
+            value = row.get(key)
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or not lower <= value <= upper:
+                why.append(f"{key} {value!r} not in {lower}..{upper}")
+        why += [
+            f"{key} {row.get(key)!r} not one of {sorted(allowed)}"
+            for key, allowed in ENRICH_ENUMS.items()
+            if row.get(key) not in allowed
+        ]
+        if not isinstance(row.get("summary"), str) or len(row["summary"].split()) > 25:
             why.append("summary missing or over 25 words")
-        if not r.get("prompt_version"):
+        if not row.get("prompt_version"):
             why.append("prompt_version missing")
-        if not r.get("analyzed_at"):
+        if not row.get("analyzed_at"):
             why.append("analyzed_at missing")
         if why:
-            res.block("ENRICH_RULE", f"{r.get('id')}: {'; '.join(why)}")
+            res.block("ENRICH_RULE", f"{row.get('id')}: {'; '.join(why)}")
     res.info["news"] = {"records": len(rows), "new_ids_today": len(new_ids)}

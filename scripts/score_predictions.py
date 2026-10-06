@@ -2,6 +2,7 @@
 """Score open predictions and ranges whose horizon has passed.
 
 Thin entry point; the code is in marketbrief/pipeline/score_predictions.py (`--help` shows its description)."""
+
 import sys
 
 from marketbrief.pipeline.score_predictions import main

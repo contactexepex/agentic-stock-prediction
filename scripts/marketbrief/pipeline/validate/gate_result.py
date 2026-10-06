@@ -1,4 +1,5 @@
 """The result of a gate run (failures, warnings, info) and the run's shared lookups."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,8 +17,8 @@ class Result:
         self.failures, self.warnings, self.info = [], [], {}
 
     def add(self, severity: str, code: str, detail: str, tickers=()):
-        item = {"code": code, "detail": detail, "tickers": sorted(set(tickers))}
-        (self.failures if severity == "block" else self.warnings).append(item)
+        entry = {"code": code, "detail": detail, "tickers": sorted(set(tickers))}
+        (self.failures if severity == "block" else self.warnings).append(entry)
 
     def block(self, code, detail, tickers=()):
         self.add("block", code, detail, tickers)

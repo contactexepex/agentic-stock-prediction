@@ -1,4 +1,5 @@
 """Review configuration, ISO weeks and small numeric and note helpers."""
+
 from __future__ import annotations
 
 import math
@@ -17,63 +18,70 @@ def load_review_config() -> dict:
 
 
 def week_bounds(week: str) -> tuple[date, date]:
-    m = re.fullmatch(r"(\d{4})-W(\d{2})", week)
-    if not m:
+    match = re.fullmatch(r"(\d{4})-W(\d{2})", week)
+    if not match:
         raise SystemExit(f"--week must look like 2026-W40, got {week!r}")
-    start = date.fromisocalendar(int(m.group(1)), int(m.group(2)), 1)
+    start = date.fromisocalendar(int(match.group(1)), int(match.group(2)), 1)
     return start, start + timedelta(days=6)
 
 
-def iso_week(d: date) -> str:
-    y, w, _ = d.isocalendar()
-    return f"{y}-W{w:02d}"
+def iso_week(day: date) -> str:
+    year, week, _ = day.isocalendar()
+    return f"{year}-W{week:02d}"
 
 
-def previous_week(d: date) -> str:
-    return iso_week(d - timedelta(days=7))
+def previous_week(day: date) -> str:
+    return iso_week(day - timedelta(days=7))
 
 
-def numeric_series(s: pd.Series) -> pd.Series:
-    return pd.Series([np.nan if v is None or (isinstance(v, float) and math.isnan(v)) else float(v) for v in s],
-                     dtype=float, index=s.index)
+def numeric_series(values: pd.Series) -> pd.Series:
+    return pd.Series(
+        [
+            np.nan if value is None or (isinstance(value, float) and math.isnan(value)) else float(value)
+            for value in values
+        ],
+        dtype=float,
+        index=values.index,
+    )
 
 
-def rounded_mean(s: pd.Series, digits: int = 4):
-    s = numeric_series(s).dropna()
-    return round(float(s.mean()), digits) if len(s) else None
+def rounded_mean(values: pd.Series, digits: int = 4):
+    values = numeric_series(values).dropna()
+    return round(float(values.mean()), digits) if len(values) else None
 
 
-def notes_list(v) -> list[str]:
-    return [] if v is None or (isinstance(v, float) and math.isnan(v)) else [str(x) for x in v]
+def notes_list(notes) -> list[str]:
+    return [] if notes is None or (isinstance(notes, float) and math.isnan(notes)) else [str(note) for note in notes]
 
 
 def note_tags(notes) -> list[str]:
     tags = []
-    for n in notes_list(notes):
-        tag = next((k for k, p in NOTE_PATTERNS.items() if p.match(n)), None)
+    for note in notes_list(notes):
+        tag = next((key for key, pattern in NOTE_PATTERNS.items() if pattern.match(note)), None)
         if tag is None:
-            tag = re.sub(r"[^a-z0-9_-]", "", n.split()[0].lower()) if n.split() else "other"
+            tag = re.sub(r"[^a-z0-9_-]", "", note.split()[0].lower()) if note.split() else "other"
         if tag and tag not in tags:
             tags.append(tag)
     return tags or ["none"]
 
 
-def clean(o):
+def clean(obj):
     """Plain JSON types (numpy scalars -> Python, NaN -> null, dates -> ISO strings)."""
-    if isinstance(o, dict):
-        return {str(k): clean(v) for k, v in o.items()}
-    if isinstance(o, (list, tuple, np.ndarray)):
-        return [clean(v) for v in o]
-    if isinstance(o, (np.bool_, bool)):
-        return bool(o)
-    if isinstance(o, (np.integer, int)):
-        return int(o)
-    if isinstance(o, (np.floating, float)):
-        return None if math.isnan(o) else float(o)
-    if isinstance(o, (date, pd.Timestamp)):
-        return str(o)[:10]
-    return o
+    if isinstance(obj, dict):
+        return {str(key): clean(value) for key, value in obj.items()}
+    if isinstance(obj, (list, tuple, np.ndarray)):
+        return [clean(value) for value in obj]
+    if isinstance(obj, (np.bool_, bool)):
+        obj = bool(obj)
+    elif isinstance(obj, (np.integer, int)):
+        obj = int(obj)
+    elif isinstance(obj, (np.floating, float)):
+        obj = None if math.isnan(obj) else float(obj)
+    elif isinstance(obj, (date, pd.Timestamp)):
+        obj = str(obj)[:10]
+    return obj
 
 
-def merge(rc: dict, overrides: dict) -> dict:
-    return {**rc, **(overrides or {})}
+def merge(ranges_config: dict, overrides: dict) -> dict:
+    """The ranges config with a variant's overrides applied."""
+    return {**ranges_config, **(overrides or {})}

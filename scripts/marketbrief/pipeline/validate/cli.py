@@ -27,6 +27,7 @@ Stages (each runs after the routine step of the same name):
             rows, and the text of the news ids it cites); every ticker x horizon has a range or
             a skip reason the calendar explains.
 - all:      every stage whose input exists."""
+
 from __future__ import annotations
 
 import json
@@ -42,42 +43,59 @@ from marketbrief.pipeline.validate.stages import stage_collect, stage_context, s
 
 def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
     paths = paths or {}
-    vc = load_config()
+    validate_config = load_config()
     con = database.connect(cfg["market"])
     now, today = pd.Timestamp(clock.clock()), clock.utc_today()
-    st = run_status(cfg)
+    status = run_status(cfg)
     res = Result()
-    res.info["run"] = {k: st[k] for k in ("session_date", "previous_session", "late_run", "in_session", "trading_day")}
+    res.info["run"] = {
+        key: status[key] for key in ("session_date", "previous_session", "late_run", "in_session", "trading_day")
+    }
     stages = STAGES if stage == "all" else (stage,)
-    for s in stages:
-        if s == "collect":
-            stage_collect(res, cfg, con, st, now, today, vc)
-        elif s == "news":
-            stage_news(res, cfg, con, st, now, today, vc, paths.get("enriched"))
-        elif s == "features":
-            stage_features(res, cfg, con, st, now, today, vc)
-        elif s == "context":
-            stage_context(res, cfg, con, st, now, today, vc, paths.get("context"))
-        elif s == "forecast":
-            stage_forecast(res, cfg, con, st, now, today, vc, paths.get("predictions"))
-        elif s == "report":
-            rp = paths.get("report") or report_file(cfg, con, st)
-            if stage == "all" and not rp.exists():
-                res.info["report"] = f"skipped: {rp.name} not written yet"
+    for stage_name in stages:
+        if stage_name == "collect":
+            stage_collect(res, cfg, con, status, now, today, validate_config)
+        elif stage_name == "news":
+            stage_news(res, cfg, con, status, now, today, validate_config, paths.get("enriched"))
+        elif stage_name == "features":
+            stage_features(res, cfg, con, status, now, today, validate_config)
+        elif stage_name == "context":
+            stage_context(res, cfg, con, status, now, today, validate_config, paths.get("context"))
+        elif stage_name == "forecast":
+            stage_forecast(res, cfg, con, status, now, today, validate_config, paths.get("predictions"))
+        elif stage_name == "report":
+            report_path = paths.get("report") or report_file(cfg, con, status)
+            if stage == "all" and not report_path.exists():
+                res.info["report"] = f"skipped: {report_path.name} not written yet"
                 continue
-            stage_report(res, cfg, con, st, now, today, vc, rp, paths.get("slack"))
-    return {"step": "validate", "market": cfg["market"], "stage": stage, "checked_at": now.isoformat(),
-            "ok": not res.failures, "failures": res.failures, "warnings": res.warnings, "info": res.info}
+            stage_report(res, cfg, con, status, now, today, validate_config, report_path, paths.get("slack"))
+    return {
+        "step": "validate",
+        "market": cfg["market"],
+        "stage": stage,
+        "checked_at": now.isoformat(),
+        "ok": not res.failures,
+        "failures": res.failures,
+        "warnings": res.warnings,
+        "info": res.info,
+    }
 
 
 def main() -> int:
-    ap = cli.market_arg(__doc__)
-    ap.add_argument("--stage", required=True, choices=[*STAGES, "all"])
+    parser = cli.market_arg(__doc__)
+    parser.add_argument("--stage", required=True, choices=[*STAGES, "all"])
     for name in ("predictions", "enriched", "context", "report", "slack"):
-        ap.add_argument(f"--{name}", type=Path, help=f"path of the {name} file (default: the routine's)")
-    args = ap.parse_args()
+        parser.add_argument(f"--{name}", type=Path, help=f"path of the {name} file (default: the routine's)")
+    args = parser.parse_args()
     cfg = cli.require_market(args)
-    out = run(cfg, args.stage, {k: getattr(args, k) for k in ("predictions", "enriched", "context", "report", "slack")
-                                if getattr(args, k)})
+    out = run(
+        cfg,
+        args.stage,
+        {
+            key: getattr(args, key)
+            for key in ("predictions", "enriched", "context", "report", "slack")
+            if getattr(args, key)
+        },
+    )
     print(json.dumps(out, indent=2, default=str))
     return 0 if out["ok"] else 1

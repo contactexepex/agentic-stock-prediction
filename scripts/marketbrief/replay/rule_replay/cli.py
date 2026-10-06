@@ -29,6 +29,7 @@ when each date was first announced.
 
 Writes reports/<market>/replay-<end>.html (self-contained) and .json, and appends one row to
 data/<market>/replays/ (schema `replays` in marketbrief/core/schemas.py). Prints a JSON summary."""
+
 from __future__ import annotations
 
 import json
@@ -47,98 +48,171 @@ from marketbrief.replay.rule_replay.replay_statistics import summarize
 from marketbrief.replay.rule_replay.rule_html import html_report
 
 
-def run(cfg: dict, rc: dict, con, start: date | None = None, end: date | None = None) -> tuple[dict, dict]:
-    t0 = time.time()
-    bars, extra = load_inputs(cfg, rc, con)
-    res, reg = replay_rows(cfg, rc, bars, extra, start, end)
-    s = summarize(cfg, rc, res, reg)
+def run(cfg: dict, ranges_config: dict, con, start: date | None = None, end: date | None = None) -> tuple[dict, dict]:
+    started_at = time.time()
+    bars, extra = load_inputs(cfg, ranges_config, con)
+    res, reg = replay_rows(cfg, ranges_config, bars, extra, start, end)
+    summary = summarize(cfg, ranges_config, res, reg)
     bench = bars[benchmark_key(cfg)]
     days = reg.index.tolist()
-    s.update({"market": cfg["market"], "name": cfg.get("name"), "start": str(days[0]) if days else None,
-              "end": str(days[-1]) if days else None, "computed_at": utc_now(),
-              "settings": {"inputs": {str(h): {k: range_switches.enabled(rc, k, cfg["market"], h) for k in INPUTS}
-                                      for h in rc["horizons"]},
-                           "regime_factor": rc["regime_factor"], "major_event_factor": rc["major_event_factor"],
-                           "earnings_vol_multiple": rc["earnings_vol_multiple"], "history_sessions": rc["history_sessions"],
-                           "half_life_sessions": rc["half_life_sessions"], "min_pool": rc["min_pool"],
-                           "aci": {**adaptive_conformal.settings(rc), "on": {str(h): range_switches.enabled(rc, "aci", cfg["market"], h)
-                                                              for h in rc["horizons"]}}},
-              "data": {"first_bar": str(bench.index[0].date()), "last_bar": str(bench.index[-1].date()),
-                       "tickers": sum(1 for t in cfg["tickers"] if t in bars),
-                       "earnings_events": sum(len(v[-1][1]) for v in extra["earnings"].values() if v),
-                       "dividends": sum(map(len, extra["dividends"].values()))},
-              })
-    s["limitations"] = limitations(cfg, rc, s)
-    s["summary"] = headline(cfg, s)
-    s["top"] = top_sentences(s)
-    s["runtime_s"] = round(time.time() - t0, 1)
-    return s, res
+    summary.update(
+        {
+            "market": cfg["market"],
+            "name": cfg.get("name"),
+            "start": str(days[0]) if days else None,
+            "end": str(days[-1]) if days else None,
+            "computed_at": utc_now(),
+            "settings": {
+                "inputs": {
+                    str(horizon): {
+                        key: range_switches.enabled(ranges_config, key, cfg["market"], horizon) for key in INPUTS
+                    }
+                    for horizon in ranges_config["horizons"]
+                },
+                "regime_factor": ranges_config["regime_factor"],
+                "major_event_factor": ranges_config["major_event_factor"],
+                "earnings_vol_multiple": ranges_config["earnings_vol_multiple"],
+                "history_sessions": ranges_config["history_sessions"],
+                "half_life_sessions": ranges_config["half_life_sessions"],
+                "min_pool": ranges_config["min_pool"],
+                "aci": {
+                    **adaptive_conformal.settings(ranges_config),
+                    "on": {
+                        str(horizon): range_switches.enabled(ranges_config, "aci", cfg["market"], horizon)
+                        for horizon in ranges_config["horizons"]
+                    },
+                },
+            },
+            "data": {
+                "first_bar": str(bench.index[0].date()),
+                "last_bar": str(bench.index[-1].date()),
+                "tickers": sum(1 for ticker in cfg["tickers"] if ticker in bars),
+                "earnings_events": sum(len(versions[-1][1]) for versions in extra["earnings"].values() if versions),
+                "dividends": sum(map(len, extra["dividends"].values())),
+            },
+        }
+    )
+    summary["limitations"] = limitations(cfg, ranges_config, summary)
+    summary["summary"] = headline(cfg, summary)
+    summary["top"] = top_sentences(summary)
+    summary["runtime_s"] = round(time.time() - started_at, 1)
+    return summary, res
 
 
-def record(s: dict, report: str) -> dict:
-    o = {h: s["horizons"].get(h, {}).get("overall", {}) for h in ("1", "5")}
-    b = {h: (s["baselines"].get(h) or {}).get("always_up", {}) for h in ("1", "5")}
-    return {"id": f"{s['start']}_{s['end']}", "market": s["market"], "start_date": s["start"], "end_date": s["end"],
-            "computed_at": s["computed_at"], "report": report, "n_days": len(s["regime_timeline"]),
-            "n_ranges": sum(x.get("n", 0) for x in o.values()),
-            "cover50_1d": o["1"].get("cover50"), "cover80_1d": o["1"].get("cover80"),
-            "cover50_5d": o["5"].get("cover50"), "cover80_5d": o["5"].get("cover80"),
-            "score80_1d": o["1"].get("score80_same_rows"), "naive_score80_1d": o["1"].get("naive_score80"),
-            "score80_5d": o["5"].get("score80_same_rows"), "naive_score80_5d": o["5"].get("naive_score80"),
-            "always_up_1d": b["1"].get("hit_rate"), "always_up_5d": b["5"].get("hit_rate"),
-            "runtime_s": s["runtime_s"], "settings": s["settings"],
-            "detail": {k: v for k, v in s.items() if k not in ("settings", "regime_timeline")}}
+def record(summary: dict, report: str) -> dict:
+    overall = {horizon: summary["horizons"].get(horizon, {}).get("overall", {}) for horizon in ("1", "5")}
+    always_up = {horizon: (summary["baselines"].get(horizon) or {}).get("always_up", {}) for horizon in ("1", "5")}
+    return {
+        "id": f"{summary['start']}_{summary['end']}",
+        "market": summary["market"],
+        "start_date": summary["start"],
+        "end_date": summary["end"],
+        "computed_at": summary["computed_at"],
+        "report": report,
+        "n_days": len(summary["regime_timeline"]),
+        "n_ranges": sum(overall_row.get("n", 0) for overall_row in overall.values()),
+        "cover50_1d": overall["1"].get("cover50"),
+        "cover80_1d": overall["1"].get("cover80"),
+        "cover50_5d": overall["5"].get("cover50"),
+        "cover80_5d": overall["5"].get("cover80"),
+        "score80_1d": overall["1"].get("score80_same_rows"),
+        "naive_score80_1d": overall["1"].get("naive_score80"),
+        "score80_5d": overall["5"].get("score80_same_rows"),
+        "naive_score80_5d": overall["5"].get("naive_score80"),
+        "always_up_1d": always_up["1"].get("hit_rate"),
+        "always_up_5d": always_up["5"].get("hit_rate"),
+        "runtime_s": summary["runtime_s"],
+        "settings": summary["settings"],
+        "detail": {key: value for key, value in summary.items() if key not in ("settings", "regime_timeline")},
+    }
 
 
 def main() -> int:
-    ap = cli.market_arg(__doc__)
-    ap.add_argument("--start", type=date.fromisoformat, help="first as-of date (default: after the warm-up bars)")
-    ap.add_argument("--end", type=date.fromisoformat, help="last as-of date (default: the last benchmark bar)")
-    ap.add_argument("--aci", action="store_true",
-                    help="also replay with Adaptive Conformal Inference on (adaptive_conformal.py) and compare on the same rows; "
-                         "writes replay-<end>-aci.html|json")
-    ap.add_argument("--aci-gamma", type=float, help="with --aci: gamma instead of config/ranges.yaml aci.gamma")
-    ap.add_argument("--aci-by-regime", choices=("on", "off"), help="with --aci: one alpha per regime (on) or one overall")
-    ap.add_argument("--aci-tune-end", type=date.fromisoformat,
-                    help="with --aci: held-out check; pick gamma/by_regime from a grid on as-of dates up to this date, "
-                         "report fixed vs ACI on the dates after it (out of sample)")
-    args = ap.parse_args()
+    parser = cli.market_arg(__doc__)
+    parser.add_argument("--start", type=date.fromisoformat, help="first as-of date (default: after the warm-up bars)")
+    parser.add_argument("--end", type=date.fromisoformat, help="last as-of date (default: the last benchmark bar)")
+    parser.add_argument(
+        "--aci",
+        action="store_true",
+        help="also replay with Adaptive Conformal Inference on (adaptive_conformal.py) and compare on the same rows; "
+        "writes replay-<end>-aci.html|json",
+    )
+    parser.add_argument("--aci-gamma", type=float, help="with --aci: gamma instead of config/ranges.yaml aci.gamma")
+    parser.add_argument(
+        "--aci-by-regime", choices=("on", "off"), help="with --aci: one alpha per regime (on) or one overall"
+    )
+    parser.add_argument(
+        "--aci-tune-end",
+        type=date.fromisoformat,
+        help="with --aci: held-out check; pick gamma/by_regime from a grid on as-of dates up to this date, "
+        "report fixed vs ACI on the dates after it (out of sample)",
+    )
+    args = parser.parse_args()
     if (args.aci_gamma is not None or args.aci_by_regime or args.aci_tune_end) and not args.aci:
         raise SystemExit("--aci-gamma, --aci-by-regime and --aci-tune-end need --aci")
     cfg = cli.require_market(args)
-    rc = load_ranges_config(cfg["market"])
+    ranges_config = load_ranges_config(cfg["market"])
     con = database.connect(cfg["market"])
-    s, _ = run(cfg, rc, con, args.start, args.end)
-    if not s["end"]:
+    summary, _ = run(cfg, ranges_config, con, args.start, args.end)
+    if not summary["end"]:
         raise SystemExit("no trading days in the window")
     suffix = ""
     if args.aci:
-        before = s
-        by = None if args.aci_by_regime is None else args.aci_by_regime == "on"
-        rc_aci = aci_rc(rc, args.aci_gamma, by)
-        s, _ = run(cfg, rc_aci, con, args.start, args.end)
-        s["aci_comparison"] = aci_comparison(before, s)
+        before = summary
+        by_regime = None if args.aci_by_regime is None else args.aci_by_regime == "on"
+        rc_aci = aci_rc(ranges_config, args.aci_gamma, by_regime)
+        summary, _ = run(cfg, rc_aci, con, args.start, args.end)
+        summary["aci_comparison"] = aci_comparison(before, summary)
         if args.aci_tune_end:
-            s["aci_held_out"] = held_out(cfg, rc_aci, con, args.aci_tune_end, args.start, args.end)
+            summary["aci_held_out"] = held_out(cfg, rc_aci, con, args.aci_tune_end, args.start, args.end)
         suffix = aci_tag(rc_aci["aci"], args.aci_tune_end)
     out = paths.ROOT / "reports" / cfg["market"]
     out.mkdir(parents=True, exist_ok=True)
-    page, js = out / f"replay-{s['end']}{suffix}.html", out / f"replay-{s['end']}{suffix}.json"
-    page.write_text(html_report(cfg, s), encoding="utf-8")
-    js.write_text(json.dumps(s, indent=1, default=str), encoding="utf-8")
+    page, json_file = out / f"replay-{summary['end']}{suffix}.html", out / f"replay-{summary['end']}{suffix}.json"
+    page.write_text(html_report(cfg, summary), encoding="utf-8")
+    json_file.write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")
     rel = str(page.relative_to(paths.ROOT))
-    rec = record(s, rel)
+    rec = record(summary, rel)
     rec["id"] += suffix
-    storage.append_jsonl(storage.day_file(cfg["market"], "replays", date.fromisoformat(s["end"])), [rec])
-    print(json.dumps({"step": "replay", "market": cfg["market"], "report": rel, "json": str(js.relative_to(paths.ROOT)),
-                      "start": s["start"], "end": s["end"], "runtime_s": s["runtime_s"],
-                      "aci": s["settings"]["aci"],
-                      "overall": {h: v["overall"] for h, v in s["horizons"].items()},
-                      "aci_comparison": {h: v["overall"] for h, v in s.get("aci_comparison", {}).items()} or None,
-                      "aci_held_out": None if "aci_held_out" not in s else {
-                          **{k: s["aci_held_out"][k] for k in ("tune_end", "selected", "config", "selected_is_config")},
-                          "test_selected": {h: v["overall"] for h, v in s["aci_held_out"]["test_selected"].items()},
-                          "test_config": {h: v["overall"] for h, v in s["aci_held_out"]["test_config"].items()}},
-                      "always_up": {h: (b or {}).get("always_up", {}).get("hit_rate") for h, b in s["baselines"].items()},
-                      "summary": s["summary"]}, indent=2, default=str))
+    storage.append_jsonl(storage.day_file(cfg["market"], "replays", date.fromisoformat(summary["end"])), [rec])
+    print(
+        json.dumps(
+            {
+                "step": "replay",
+                "market": cfg["market"],
+                "report": rel,
+                "json": str(json_file.relative_to(paths.ROOT)),
+                "start": summary["start"],
+                "end": summary["end"],
+                "runtime_s": summary["runtime_s"],
+                "aci": summary["settings"]["aci"],
+                "overall": {horizon: value["overall"] for horizon, value in summary["horizons"].items()},
+                "aci_comparison": {
+                    horizon: value["overall"] for horizon, value in summary.get("aci_comparison", {}).items()
+                }
+                or None,
+                "aci_held_out": None
+                if "aci_held_out" not in summary
+                else {
+                    **{
+                        key: summary["aci_held_out"][key]
+                        for key in ("tune_end", "selected", "config", "selected_is_config")
+                    },
+                    "test_selected": {
+                        horizon: value["overall"] for horizon, value in summary["aci_held_out"]["test_selected"].items()
+                    },
+                    "test_config": {
+                        horizon: value["overall"] for horizon, value in summary["aci_held_out"]["test_config"].items()
+                    },
+                },
+                "always_up": {
+                    horizon: (band or {}).get("always_up", {}).get("hit_rate")
+                    for horizon, band in summary["baselines"].items()
+                },
+                "summary": summary["summary"],
+            },
+            indent=2,
+            default=str,
+        )
+    )
     return 0

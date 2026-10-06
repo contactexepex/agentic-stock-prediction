@@ -1,4 +1,5 @@
 """Ablation (a): replay of the stored live ranges with each input switched off."""
+
 from __future__ import annotations
 
 import math
@@ -8,83 +9,139 @@ from marketbrief.constants.review import BASELINE, NOTE_PATTERNS
 from marketbrief.pipeline.review.helpers import merge, notes_list
 
 
-def decompose(r, rc: dict) -> dict | None:
+def decompose(row, ranges_config: dict) -> dict | None:
     """Split a published range into its inputs (from its notes and stored numbers). Parts the
     replay cannot attribute (new inputs, changed settings) are kept fixed in `residual`/`sd`."""
-    h, base, s, c = int(r["horizon_days"]), float(r["base_close"]), r["sigma_h"], r["center"]
-    if s is None or pd.isna(s) or s <= 0 or base <= 0 or pd.isna(c):
+    horizon, base, horizon_sigma, center = (
+        int(row["horizon_days"]),
+        float(row["base_close"]),
+        row["sigma_h"],
+        row["center"],
+    )
+    if horizon_sigma is None or pd.isna(horizon_sigma) or horizon_sigma <= 0 or base <= 0 or pd.isna(center):
         return None
-    s, c = float(s), float(c)
-    q = {k: (math.log(float(r[col]) / base) - c) / s
-         for k, col in (("q10", "lo80"), ("q25", "lo50"), ("q75", "hi50"), ("q90", "hi80"))}
-    m = rf = mef = None
+    horizon_sigma, center = float(horizon_sigma), float(center)
+    z_quantiles = {
+        key: (math.log(float(row[col]) / base) - center) / horizon_sigma
+        for key, col in (("q10", "lo80"), ("q25", "lo50"), ("q75", "hi50"), ("q90", "hi80"))
+    }
+    earnings_multiple = regime_factor = event_factor = None
     widen, cue, cue_w = 0.0, 0.0, 0.0
-    for n in notes_list(r["notes"]):
-        if (x := NOTE_PATTERNS["earnings"].match(n)):
-            m = float(x.group(1))
-        elif (x := NOTE_PATTERNS["regime"].match(n)):
-            rf = float(x.group(2))
-        elif (x := NOTE_PATTERNS["event"].match(n)):
-            mef = float(x.group(1))
-        elif (x := NOTE_PATTERNS["ai_widen"].match(n)):
-            widen = float(x.group(1)) / 100
-        elif (x := NOTE_PATTERNS["cue"].match(n)):
-            cue, cue_w = math.log1p(float(x.group(1)) / 100), float(x.group(2))
-    s_pre = s / (1 + widen)
-    sd = s_pre / ((rf or 1.0) * (mef or 1.0)) / math.sqrt(h + (m * m - 1 if m else 0.0))
-    conf, direction = r["confidence"], r["direction"]
+    for note in notes_list(row["notes"]):
+        if pattern_match := NOTE_PATTERNS["earnings"].match(note):
+            earnings_multiple = float(pattern_match.group(1))
+        elif pattern_match := NOTE_PATTERNS["regime"].match(note):
+            regime_factor = float(pattern_match.group(2))
+        elif pattern_match := NOTE_PATTERNS["event"].match(note):
+            event_factor = float(pattern_match.group(1))
+        elif pattern_match := NOTE_PATTERNS["ai_widen"].match(note):
+            widen = float(pattern_match.group(1)) / 100
+        elif pattern_match := NOTE_PATTERNS["cue"].match(note):
+            cue, cue_w = math.log1p(float(pattern_match.group(1)) / 100), float(pattern_match.group(2))
+    s_pre = horizon_sigma / (1 + widen)
+    daily_sigma = (
+        s_pre
+        / ((regime_factor or 1.0) * (event_factor or 1.0))
+        / math.sqrt(horizon + (earnings_multiple * earnings_multiple - 1 if earnings_multiple else 0.0))
+    )
+    conf, direction = row["confidence"], row["direction"]
     sign = {"up": 1, "down": -1}.get(direction, 0) if isinstance(direction, str) else 0
-    ai = sign * (float(conf) - 0.5) if conf is not None and not pd.isna(conf) else 0.0
-    est = cue_w * cue + rc["ai_drift_scale"] * ai * s_pre
-    capped = abs(abs(c) - rc["max_center_shift_sigma"] * s) < 2e-6 and abs(est) > abs(c)
-    return {"h": h, "base": base, "y": float(r["actual_close"]), "q": q, "sd": sd, "earnings": m is not None,
-            "regime": r["regime"], "event": mef is not None, "widen": widen, "cue": cue, "ai": ai,
-            "residual": 0.0 if capped else c - est}
+    ai_edge = sign * (float(conf) - 0.5) if conf is not None and not pd.isna(conf) else 0.0
+    est = cue_w * cue + ranges_config["ai_drift_scale"] * ai_edge * s_pre
+    capped = abs(abs(center) - ranges_config["max_center_shift_sigma"] * horizon_sigma) < 2e-6 and abs(est) > abs(
+        center
+    )
+    return {
+        "h": horizon,
+        "base": base,
+        "y": float(row["actual_close"]),
+        "q": z_quantiles,
+        "sd": daily_sigma,
+        "earnings": earnings_multiple is not None,
+        "regime": row["regime"],
+        "event": event_factor is not None,
+        "widen": widen,
+        "cue": cue,
+        "ai": ai_edge,
+        "residual": 0.0 if capped else center - est,
+    }
 
 
-def replay_range(comp: dict, p: dict) -> dict:
-    sd, h = comp["sd"], comp["h"]
-    var = sd * sd * h + ((p["earnings_vol_multiple"] ** 2 - 1) * sd * sd if comp["earnings"] else 0.0)
-    s = math.sqrt(var) * p["regime_factor"].get(comp["regime"], 1.0)
-    s *= p["major_event_factor"] if comp["event"] else 1.0
-    center = comp["residual"] + p["cue_weight"] * comp["cue"] + p["ai_drift_scale"] * comp["ai"] * s
-    s *= 1 + min(max(comp["widen"], 0.0), p["max_ai_widen"])
-    cap = p["max_center_shift_sigma"] * s
+def replay_range(comp: dict, params: dict) -> dict:
+    daily_sigma, horizon = comp["sd"], comp["h"]
+    var = daily_sigma * daily_sigma * horizon + (
+        (params["earnings_vol_multiple"] ** 2 - 1) * daily_sigma * daily_sigma if comp["earnings"] else 0.0
+    )
+    horizon_sigma = math.sqrt(var) * params["regime_factor"].get(comp["regime"], 1.0)
+    horizon_sigma *= params["major_event_factor"] if comp["event"] else 1.0
+    center = (
+        comp["residual"] + params["cue_weight"] * comp["cue"] + params["ai_drift_scale"] * comp["ai"] * horizon_sigma
+    )
+    horizon_sigma *= 1 + min(max(comp["widen"], 0.0), params["max_ai_widen"])
+    cap = params["max_center_shift_sigma"] * horizon_sigma
     center = max(-cap, min(cap, center))
-    base, y, q = comp["base"], comp["y"], comp["q"]
-    b = {k: base * math.exp(center + v * s) for k, v in q.items()}
-    return {"horizon_days": h, "lo80": b["q10"], "hi80": b["q90"],
-            "hit50": b["q25"] <= y <= b["q75"], "hit80": b["q10"] <= y <= b["q90"],
-            "is50": 100 * range_math.interval_score(b["q25"], b["q75"], y, 0.5) / base,
-            "is80": 100 * range_math.interval_score(b["q10"], b["q90"], y, 0.8) / base,
-            "width80": 100 * (b["q90"] - b["q10"]) / base}
+    base, actual_close, z_quantiles = comp["base"], comp["y"], comp["q"]
+    band_edges = {key: base * math.exp(center + value * horizon_sigma) for key, value in z_quantiles.items()}
+    return {
+        "horizon_days": horizon,
+        "lo80": band_edges["q10"],
+        "hi80": band_edges["q90"],
+        "hit50": band_edges["q25"] <= actual_close <= band_edges["q75"],
+        "hit80": band_edges["q10"] <= actual_close <= band_edges["q90"],
+        "is50": 100 * range_math.interval_score(band_edges["q25"], band_edges["q75"], actual_close, 0.5) / base,
+        "is80": 100 * range_math.interval_score(band_edges["q10"], band_edges["q90"], actual_close, 0.8) / base,
+        "width80": 100 * (band_edges["q90"] - band_edges["q10"]) / base,
+    }
 
 
 def replay_summary(res: pd.DataFrame) -> dict:
     if res.empty:
         return {"n": 0}
-    m = res.mean(numeric_only=True)
-    return {"n": int(len(res)), "cover50": round(float(m["hit50"]), 4), "cover80": round(float(m["hit80"]), 4),
-            "width80_pct": round(float(m["width80"]), 3), "score50_pct": round(float(m["is50"]), 3),
-            "score80_pct": round(float(m["is80"]), 3)}
+    means = res.mean(numeric_only=True)
+    return {
+        "n": int(len(res)),
+        "cover50": round(float(means["hit50"]), 4),
+        "cover80": round(float(means["hit80"]), 4),
+        "width80_pct": round(float(means["width80"]), 3),
+        "score50_pct": round(float(means["is50"]), 3),
+        "score80_pct": round(float(means["is80"]), 3),
+    }
 
 
 def per_horizon(res: pd.DataFrame, horizons) -> dict:
-    return {f"{h}d": replay_summary(res[res["horizon_days"] == h]) for h in horizons if not res.empty}
+    return {f"{horizon}d": replay_summary(res[res["horizon_days"] == horizon]) for horizon in horizons if not res.empty}
 
 
-def live_ablation(df: pd.DataFrame, rc: dict, rv: dict) -> dict:
-    comps = [c for c in (decompose(r, rc) for r in df.to_dict("records")) if c is not None] if not df.empty else []
+def live_ablation(frame: pd.DataFrame, ranges_config: dict, review_config: dict) -> dict:
+    comps = (
+        [
+            component
+            for component in (decompose(row, ranges_config) for row in frame.to_dict("records"))
+            if component is not None
+        ]
+        if not frame.empty
+        else []
+    )
     if not comps:
         return {"n": 0, "reproduced": 0, "variants": []}
-    base_rows = [replay_range(c, rc) for c in comps]
-    pub = df.to_dict("records")
-    reproduced = sum(abs(b["lo80"] / float(p["lo80"]) - 1) < 1e-4 and abs(b["hi80"] / float(p["hi80"]) - 1) < 1e-4
-                     for b, p in zip(base_rows, pub))
+    base_rows = [replay_range(component, ranges_config) for component in comps]
+    pub = frame.to_dict("records")
+    reproduced = sum(
+        abs(pair["lo80"] / float(params["lo80"]) - 1) < 1e-4 and abs(pair["hi80"] / float(params["hi80"]) - 1) < 1e-4
+        for pair, params in zip(base_rows, pub)
+    )
     variants = []
-    for v in [{"name": BASELINE, "set": {}}, *rv["live_variants"]]:
-        p = merge(rc, v.get("set"))
-        res = pd.DataFrame(base_rows if not v.get("set") else [replay_range(c, p) for c in comps])
-        variants.append({"name": v["name"], "set": v.get("set") or {}, "n": len(res),
-                         "by_h": per_horizon(res, rc["horizons"])})
+    for variant in [{"name": BASELINE, "set": {}}, *review_config["live_variants"]]:
+        params = merge(ranges_config, variant.get("set"))
+        res = pd.DataFrame(
+            base_rows if not variant.get("set") else [replay_range(component, params) for component in comps]
+        )
+        variants.append(
+            {
+                "name": variant["name"],
+                "set": variant.get("set") or {},
+                "n": len(res),
+                "by_h": per_horizon(res, ranges_config["horizons"]),
+            }
+        )
     return {"n": len(comps), "reproduced": int(reproduced), "variants": variants}

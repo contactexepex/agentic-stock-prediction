@@ -9,6 +9,7 @@ A report that was already filled in (no markers left) is kept unless --force, bu
 its `report-data` line (as_of, regime) matches the data; otherwise it is rebuilt and the old
 copy is saved to work/report_<market>_<session>.previous.md.
 Run after charts.py (the report embeds the single-purpose charts it wrote)."""
+
 from __future__ import annotations
 
 import json
@@ -22,15 +23,16 @@ from marketbrief.presentation.report.gather import gather
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
-    ap.add_argument("--force", action="store_true",
-                    help="rebuild the report even if today's report was already filled in")
-    args = ap.parse_args()
+    parser = market_arg(__doc__)
+    parser.add_argument(
+        "--force", action="store_true", help="rebuild the report even if today's report was already filled in"
+    )
+    args = parser.parse_args()
     cfg = require_market(args)
     settings = load_settings()
-    d = gather(cfg, connect(cfg["market"]))
-    report, slack, url = build(cfg, d, settings)
-    rpath = paths.ROOT / "reports" / cfg["market"] / f"{d['session']}.md"
+    report_data = gather(cfg, connect(cfg["market"]))
+    report, slack, url = build(cfg, report_data, settings)
+    rpath = paths.ROOT / "reports" / cfg["market"] / f"{report_data['session']}.md"
     rpath.parent.mkdir(parents=True, exist_ok=True)
     # A report without AGENT markers was already filled by an earlier run. Keep its narrative
     # only while it still describes the same data (as_of and regime in its report-data line), so
@@ -38,18 +40,23 @@ def main() -> int:
     # one is saved to work/ so its narrative can be reused where it still holds.
     old = rpath.read_text() if rpath.exists() else None
     filled = old is not None and "<!-- AGENT:" not in old
-    kept = filled and not args.force and data_stamp(d) in old
+    kept = filled and not args.force and data_stamp(report_data) in old
     out = {"step": "report", "market": cfg["market"], "report": str(rpath.relative_to(paths.ROOT)), "report_kept": kept}
     if filled and not kept:
-        backup = paths.ROOT / "work" / f"report_{cfg['market']}_{d['session']}.previous.md"
+        backup = paths.ROOT / "work" / f"report_{cfg['market']}_{report_data['session']}.previous.md"
         backup.parent.mkdir(parents=True, exist_ok=True)
         backup.write_text(old)
         out["previous_report"] = str(backup.relative_to(paths.ROOT))
         if not args.force:
-            why = ("was built from other data (as_of or regime changed)" if "<!-- report-data:" in old
-                   else "has no report-data line (written before that check existed), so it cannot be shown current")
-            out["warning"] = (f"the filled report {why}: rebuilt it; refill the markers, reusing the "
-                              "previous narrative only where it still holds")
+            why = (
+                "was built from other data (as_of or regime changed)"
+                if "<!-- report-data:" in old
+                else "has no report-data line (written before that check existed), so it cannot be shown current"
+            )
+            out["warning"] = (
+                f"the filled report {why}: rebuilt it; refill the markers, reusing the "
+                "previous narrative only where it still holds"
+            )
     if not kept:
         rpath.write_text(report)
     spath = paths.ROOT / "work" / f"slack_{cfg['market']}.md"
@@ -57,8 +64,17 @@ def main() -> int:
     spath.write_text(slack)
     # The script-written skeletons: validate.py --stage report tells agent lines from script lines
     # by them (a kept report's skeleton is rebuilt from the same data, so it is still current).
-    (paths.ROOT / "work" / f"report_{cfg['market']}_{d['session']}.skeleton.md").write_text(report)
+    (paths.ROOT / "work" / f"report_{cfg['market']}_{report_data['session']}.skeleton.md").write_text(report)
     (paths.ROOT / "work" / f"slack_{cfg['market']}.skeleton.md").write_text(slack)
-    print(json.dumps({**out, "slack_draft": str(spath.relative_to(paths.ROOT)), "url": url,
-                      "agent_markers": 0 if kept else report.count("<!-- AGENT:")}, indent=2))
+    print(
+        json.dumps(
+            {
+                **out,
+                "slack_draft": str(spath.relative_to(paths.ROOT)),
+                "url": url,
+                "agent_markers": 0 if kept else report.count("<!-- AGENT:"),
+            },
+            indent=2,
+        )
+    )
     return 0

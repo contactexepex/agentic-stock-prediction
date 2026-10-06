@@ -2,6 +2,7 @@
 """Weekly spot-check sample for the judge.
 
 Thin entry point; the code is in marketbrief/pipeline/spotcheck.py (`--help` shows its description)."""
+
 import sys
 
 from marketbrief.pipeline.spotcheck import main

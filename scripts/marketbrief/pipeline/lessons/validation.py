@@ -1,4 +1,5 @@
 """Validation of the reflector's lessons: ids exist, word limit, every number matches the call or outcome."""
+
 from __future__ import annotations
 
 import json
@@ -7,118 +8,164 @@ import re
 from pathlib import Path
 import pandas as pd
 from marketbrief.core.database import connect
-from marketbrief.constants.lessons import AGENT_FIELDS, BOTH_KINDS, FACT_FIELDS, ID_RE, MAX_WORDS, NUM_RE, PCT_KINDS, TIME_FIELDS
+from marketbrief.constants.lessons import (
+    AGENT_FIELDS,
+    BOTH_KINDS,
+    FACT_FIELDS,
+    ID_RE,
+    MAX_WORDS,
+    NUM_RE,
+    PCT_KINDS,
+    TIME_FIELDS,
+)
 from marketbrief.pipeline.lessons.facts import settled, stored_ids
 
 
-def allowed_numbers(f: dict) -> list[tuple[float, str]]:
+def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
     """(value, what) pairs a lesson's text may cite, as absolute values."""
-    vals = [(1.0, "horizon"), (5.0, "horizon"), (float(f["horizon_days"]), "horizon"),
-            (50.0, "band"), (80.0, "band")]
-    if f.get("actual_return") is not None:
-        vals.append((abs(100 * f["actual_return"]), "return"))
-    if f.get("confidence") is not None:
-        vals += [(f["confidence"], "confidence"), (100 * f["confidence"], "confidence_pct")]
-    for k in ("base_close", "target_close", "range_actual_close", "lo80", "lo50", "hi50", "hi80"):
-        if f.get(k) is not None:
-            vals.append((abs(f[k]), k))
-    for num in NUM_RE.findall(ID_RE.sub(" ", f.get("rationale") or "")):   # numbers the stored rationale cites
+    vals = [
+        (1.0, "horizon"),
+        (5.0, "horizon"),
+        (float(fact["horizon_days"]), "horizon"),
+        (50.0, "band"),
+        (80.0, "band"),
+    ]
+    if fact.get("actual_return") is not None:
+        vals.append((abs(100 * fact["actual_return"]), "return"))
+    if fact.get("confidence") is not None:
+        vals += [(fact["confidence"], "confidence"), (100 * fact["confidence"], "confidence_pct")]
+    for key in ("base_close", "target_close", "range_actual_close", "lo80", "lo50", "hi50", "hi80"):
+        if fact.get(key) is not None:
+            vals.append((abs(fact[key]), key))
+    for num in NUM_RE.findall(ID_RE.sub(" ", fact.get("rationale") or "")):  # numbers the stored rationale cites
         vals.append((float(num[1].replace(",", "")), "rationale"))
-    y = f.get("range_actual_close")
-    if y is not None:
-        for k in ("lo80", "lo50", "hi50", "hi80"):
-            if f.get(k):
-                vals.append((abs(100 * (y / f[k] - 1)), f"distance from {k}"))
+    close = fact.get("range_actual_close")
+    if close is not None:
+        for key in ("lo80", "lo50", "hi50", "hi80"):
+            if fact.get(key):
+                vals.append((abs(100 * (close / fact[key] - 1)), f"distance from {key}"))
     return vals
 
 
-def text_number_errors(text: str, f: dict) -> list[str]:
+def text_number_errors(text: str, fact: dict) -> list[str]:
     """Numbers in the lesson that match nothing in the call or its outcome (dates, ids, the ticker skipped)."""
-    t = text
-    for x in [f["prediction_id"], *(f.get("evidence_ids") or [])]:
-        t = t.replace(x, " ")
-    t = ID_RE.sub(" ", t)
-    t = re.sub(rf"(?<![\w]){re.escape(f['ticker'])}(?![\w])", " ", t)
+    cleaned_text = text
+    for number in [fact["prediction_id"], *(fact.get("evidence_ids") or [])]:
+        cleaned_text = cleaned_text.replace(number, " ")
+    cleaned_text = ID_RE.sub(" ", cleaned_text)
+    cleaned_text = re.sub(rf"(?<![\w]){re.escape(fact['ticker'])}(?![\w])", " ", cleaned_text)
     errs = []
-    for sign, num, pct in NUM_RE.findall(t):
+    for sign, num, pct in NUM_RE.findall(cleaned_text):
         # a percentage may only be a return, a % distance, confidence in %, a band name or a rationale
         # number; a plain number only a close, band edge, confidence, horizon or a rationale number
-        vals = [(v, what) for v, what in allowed_numbers(f)
-                if (what in PCT_KINDS or what.startswith("distance")) == bool(pct) or what in BOTH_KINDS]
-        x = float(num.replace(",", ""))
+        vals = [
+            (allowed_value, what)
+            for allowed_value, what in allowed_numbers(fact)
+            if (what in PCT_KINDS or what.startswith("distance")) == bool(pct) or what in BOTH_KINDS
+        ]
+        number = float(num.replace(",", ""))
         dec = len(num.split(".")[1]) if "." in num else 0
-        tol = 0.5 * 10 ** -dec + 1e-9
-        matches = [what for v, what in vals if abs(x - v) <= tol]
+        tol = 0.5 * 10**-dec + 1e-9
+        matches = [what for allowed_value, what in vals if abs(number - allowed_value) <= tol]
         if not matches:
             errs.append(f"number {sign}{num}{pct.strip()} in the lesson matches nothing in the call or its outcome")
             continue
-        if sign and pct and "return" in matches and f.get("actual_return") and \
-                not any(abs(x - v) <= tol for v, what in vals if what.startswith("distance")):
+        if (
+            sign
+            and pct
+            and "return" in matches
+            and fact.get("actual_return")
+            and not any(
+                abs(number - allowed_value) <= tol for allowed_value, what in vals if what.startswith("distance")
+            )
+        ):
             neg = sign in "-−"
-            if neg != (f["actual_return"] < 0):
-                errs.append(f"return {sign}{num}% has the wrong sign (actual_return {f['actual_return']:+.6f})")
+            if neg != (fact["actual_return"] < 0):
+                errs.append(f"return {sign}{num}% has the wrong sign (actual_return {fact['actual_return']:+.6f})")
     return errs
 
 
-def same(key: str, a, b) -> bool:
+def same(key: str, copied, stored) -> bool:
     """A copied fact equals the stored one (numbers to 1e-9, timestamps as instants)."""
-    if key in TIME_FIELDS and isinstance(a, str) and isinstance(b, str):
+    if key in TIME_FIELDS and isinstance(copied, str) and isinstance(stored, str):
         try:
-            return pd.Timestamp(a) == pd.Timestamp(b)
+            return pd.Timestamp(copied) == pd.Timestamp(stored)
         except ValueError:
             return False
-    if isinstance(a, bool) or isinstance(b, bool):
-        return a is b
-    if isinstance(b, float) or isinstance(a, float):
+    if isinstance(copied, bool) or isinstance(stored, bool):
+        return copied is stored
+    if isinstance(stored, float) or isinstance(copied, float):
         try:
-            return a is not None and b is not None and math.isclose(float(a), float(b), rel_tol=1e-9, abs_tol=1e-9)
+            return (
+                copied is not None
+                and stored is not None
+                and math.isclose(float(copied), float(stored), rel_tol=1e-9, abs_tol=1e-9)
+            )
         except (TypeError, ValueError):
             return False
-    return a == b
+    return copied == stored
+
+
+def agent_field_problems(record: dict) -> list[str]:
+    """Unknown fields and missing or non-text agent fields of one lesson record."""
+    errs = [f"unknown field {key!r}" for key in record if key not in AGENT_FIELDS and key not in FACT_FIELDS]
+    for key in AGENT_FIELDS:
+        if record.get(key) in (None, ""):
+            errs.append(f"missing {key}")
+        elif not isinstance(record[key], str):
+            errs.append(f"{key} must be text")
+    return errs
+
+
+def prediction_problems(prediction_id, facts: dict, stored: set[str], seen: set[str]) -> list[str]:
+    """The cited prediction must exist, be settled, have no stored lesson and not repeat in the file."""
+    if not isinstance(prediction_id, str):
+        return []
+    errs = []
+    if prediction_id not in facts:
+        errs.append(f"prediction {prediction_id!r} does not exist or is not settled (no stored outcome)")
+    elif facts[prediction_id] is None:
+        errs.append(f"prediction {prediction_id!r} is settled but its range is still open; wait for it")
+    if f"lesson-{prediction_id}" in stored:
+        errs.append(f"a lesson for {prediction_id} is already stored")
+    if prediction_id in seen:
+        errs.append(f"duplicate lesson for {prediction_id} in this file")
+    seen.add(prediction_id)
+    return errs
+
+
+def lesson_text_problems(text, record: dict, fact: dict | None) -> list[str]:
+    """Word limit of the lesson text, copied facts equal to the stored ones, numbers matching the call."""
+    errs = []
+    if isinstance(text, str):
+        word_count = len(text.split())
+        if word_count == 0 or word_count > MAX_WORDS:
+            errs.append(f"lesson must be 1-{MAX_WORDS} words (got {word_count})")
+    if fact:
+        for key in FACT_FIELDS:
+            if key in record and not same(key, record[key], fact[key]):
+                errs.append(f"{key} is {record[key]!r} but the stored value is {fact[key]!r}")
+        if isinstance(text, str):
+            errs += text_number_errors(text, fact)
+    return errs
 
 
 def validate_records(recs: list, facts: dict, stored: set[str]) -> tuple[list[dict], list[dict]]:
     """(valid full records, errors). facts = settled(); stored = lesson ids already in data/."""
     good, bad, seen = [], [], set()
-    for i, rec in enumerate(recs, 1):
+    for index, rec in enumerate(recs, 1):
         if not isinstance(rec, dict):
-            bad.append({"line": i, "prediction_id": None, "errors": ["not a JSON object"]})
+            bad.append({"line": index, "prediction_id": None, "errors": ["not a JSON object"]})
             continue
         pid = rec.get("prediction_id")
-        errs = [f"unknown field {k!r}" for k in rec if k not in AGENT_FIELDS and k not in FACT_FIELDS]
-        for k in AGENT_FIELDS:
-            if rec.get(k) in (None, ""):
-                errs.append(f"missing {k}")
-            elif not isinstance(rec[k], str):
-                errs.append(f"{k} must be text")
-        f = facts.get(pid) if isinstance(pid, str) else None
-        if not isinstance(pid, str):
-            pass
-        elif pid not in facts:
-            errs.append(f"prediction {pid!r} does not exist or is not settled (no stored outcome)")
-        elif f is None:
-            errs.append(f"prediction {pid!r} is settled but its range is still open; wait for it")
-        if isinstance(pid, str):
-            if f"lesson-{pid}" in stored:
-                errs.append(f"a lesson for {pid} is already stored")
-            if pid in seen:
-                errs.append(f"duplicate lesson for {pid} in this file")
-            seen.add(pid)
+        fact = facts.get(pid) if isinstance(pid, str) else None
         text = rec.get("lesson")
-        if isinstance(text, str):
-            n = len(text.split())
-            if n == 0 or n > MAX_WORDS:
-                errs.append(f"lesson must be 1-{MAX_WORDS} words (got {n})")
-        if f:
-            for k in FACT_FIELDS:
-                if k in rec and not same(k, rec[k], f[k]):
-                    errs.append(f"{k} is {rec[k]!r} but the stored value is {f[k]!r}")
-            if isinstance(text, str):
-                errs += text_number_errors(text, f)
+        errs = agent_field_problems(rec) + prediction_problems(pid, facts, stored, seen)
+        errs += lesson_text_problems(text, rec, fact)
         if errs:
-            bad.append({"line": i, "prediction_id": pid, "errors": errs})
+            bad.append({"line": index, "prediction_id": pid, "errors": errs})
         else:
-            good.append({**f, "lesson": text.strip(), "prompt_version": rec["prompt_version"]})
+            good.append({**fact, "lesson": text.strip(), "prompt_version": rec["prompt_version"]})
     return good, bad
 
 
