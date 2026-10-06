@@ -257,7 +257,8 @@ def test_yahoo_split_blocks_the_fill(env, monkeypatch, capsys):
 
 def test_stock_stale_beyond_the_window_stays_failed(tmp_path, monkeypatch, capsys):
     """With 2 checked sessions (10-01, 10-05), a stock whose newest stored bar is 09-29 (3 sessions
-    behind) gets both bars filled but stays in `failed` with its age: 09-30 is still missing."""
+    behind) stays in `failed` with its age. Neither of its bars is filled: 09-30 and 10-01 are not
+    stored, so there is no previous close to check the basis against. INFY's 10-05 bar is filled."""
     e = make_env(tmp_path, monkeypatch, ["TCS", "INFY"], TODAY, sessions=2)
     shutil.copy(FIX / "prices" / "sec_bhavdata_full_05102026.csv", e.replay)
     shutil.copy(FIX / "real" / "sec_bhavdata_full_01102026.csv", e.replay)
