@@ -62,7 +62,15 @@ Fixed inputs:
     tests/test_fundamentals.py; the seed config tracks the fixture 13F filer 9999200 in place of the
     real filers), and `collect_macro` and `collect_shorts` on `tests/fixtures/sources`;
   - rule-built rows for the kinds whose collectors need Yahoo or SEC header pages: options (AAPL,
-    JPM, NVDA), sec_times (one Form 4 accession), price_sources (one INFY bar);
+    JPM, NVDA), sec_times (one Form 4 accession), price_sources (one INFY bar); and India financials
+    of the quarter a year before the fixtures' latest (2025-04-01..06-30 for INFY consolidated,
+    HDFCBANK and SBILIFE standalone), so the y/y columns of "Latest quarterly results" have values;
+  - the fixture 13F tables are served with the AAPL common-share values times 1,000,164 (copies in
+    `run/seed/sec/`; tests/fixtures unchanged), so the 13F `value_bn` is 37.51 instead of 0.0.
+    Checked: `round(value_usd / 1e9, 1)` in smart_money.py fails `compare` (5 files, the US context
+    packs) and `round(revenue_yoy * 100, 0)` in nse_context.py fails it (7 files: the India context
+    packs and the ai_replay context with its sha256); with the earlier seed both printed the same
+    (0.0, empty);
   - the seed root lives in a temporary directory outside the checkout (the NSE `--replay` guard
     refuses any write target inside a repository) and is copied to `run/seed/root`; its paths appear
     as `<SEED>` in the seed logs;
