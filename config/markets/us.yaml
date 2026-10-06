@@ -69,8 +69,9 @@ sectors:
 # as whole words (scripts/collect_news.py): full company names where the name or an alias is a
 # common word ("Apple", "Meta", "Progressive", "iPhone", "Facebook"). Default: name and aliases.
 tickers:
-  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, J.P. Morgan, Jamie Dimon, JPM], wire_names: [JPMorgan Chase, JPMorgan, J.P. Morgan]}
-  BAC:   {name: Bank of America, aliases: [BofA, BoA]}
+  JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, J.P. Morgan, Jamie Dimon, JPM], wire_names: [JPMorgan Chase, JPMorgan, J.P. Morgan],
+         broker: true}
+  BAC:   {name: Bank of America, aliases: [BofA, BoA], broker: true}
   NVDA:  {name: Nvidia, aliases: [NVIDIA Corporation, Jensen Huang, NVDA], wire_names: [Nvidia, NVIDIA Corporation]}
   AAPL:  {name: Apple, aliases: [iPhone, Tim Cook, AAPL], wire_names: [Apple Inc], news_exclude: ['Apple Hospitality']}
   GOOGL: {name: Alphabet, aliases: [Google, YouTube, GOOGL, GOOG], wire_names: [Alphabet Inc, Google LLC, Google Cloud],
@@ -86,7 +87,8 @@ tickers:
   LLY:   {name: Eli Lilly, aliases: [Lilly, Zepbound, Mounjaro, LLY], wire_names: [Eli Lilly]}
   MRK:   {name: Merck, aliases: [Keytruda, MRK], wire_names: [Merck & Co, Merck], news_exclude: ['Merck KGaA']}   # Merck KGaA (Germany) is excluded (wires: below)
   TSLA:  {name: Tesla, aliases: [TSLA], wire_names: [Tesla]}   # not Elon Musk: SpaceX, xAI, X, politics
-  GM:    {name: General Motors}
+  GM:    {name: General Motors, aliases: [GM], wire_names: [General Motors],   # "GM" also: genetically modified, general manager
+          news_exclude: ['\bGM[- ](?:crops?|foods?|seeds?|mustard|cotton|wheat|maize|corn|soy\w*|rice|plants?|mosquito\w*|organisms?|free)\b', '\bGM (?:of|and CEO)\b', '\bnon-GM\b']}
   WMT:   {name: Walmart, aliases: [WMT]}
   COST:  {name: Costco}
   CAT:   {name: Caterpillar}

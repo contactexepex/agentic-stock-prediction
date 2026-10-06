@@ -173,6 +173,24 @@ def test_collector_dedupes_source_labels_and_tags_plain_text(tmp_path):
     assert _run(root, cfg)["new_items"] == 0           # second run: all seen
 
 
+def test_collector_same_title_from_two_domains_is_two_rows(tmp_path):
+    root, cfg = tmp_path / "repo", tmp_path / "config"
+    (cfg / "markets").mkdir(parents=True)
+    t = "HDFC Bank shares slip 2% despite CEO clarity"
+    feed = tmp_path / "feed.xml"
+    feed.write_text('<?xml version="1.0"?><rss version="2.0"><channel><title>T</title>'
+                    + _item(t, "Business Today", "https://www.businesstoday.in", 0)
+                    + _item(t, "Mint", "https://www.livemint.com", 1) + "</channel></rss>")
+    (cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML % feed)
+    for name in ("ranges.yaml", "settings.yaml", "events.yaml"):
+        (cfg / name).write_text((REPO / "config" / name).read_text())
+    assert _run(root, cfg)["new_items"] == 2
+    rows = [json.loads(l) for f in (root / "data" / MARKET / "news").glob("**/*.jsonl")
+            for l in f.read_text().splitlines()]
+    assert sorted(r["source_domain"] for r in rows) == ["businesstoday.in", "livemint.com"]
+    assert len({r["id"] for r in rows}) == 2
+
+
 def test_collector_skips_items_stored_under_the_old_id(tmp_path):
     """Rows stored before ids used the source domain (title + source label) are not re-collected."""
     from news_tags import article_id
@@ -249,12 +267,78 @@ def test_summary_only_match_is_mentioned_low(us):
     ("Why did NVDA, HPE, CRWD stocks rise to 52-week highs?", [], ["NVDA"], "low"),
     ("Accenture beats; peers Apple, Tesla and Nvidia rally", [], ["AAPL", "NVDA", "TSLA"], "low"),
     ("Alphabet (NASDAQ:GOOGL) posts negative free cash flow", ["GOOGL"], [], "high"),
-    ("JPMorgan raises Tesla price target", ["JPM", "TSLA"], [], "low"),
+    ("JPMorgan raises Tesla price target", ["TSLA"], ["JPM"], "low"),          # broker acts on Tesla
 ])
 def test_roles(us, title, primary, mentioned, conf):
     tags = us.classify(title)
     assert (tags["primary_tickers"], tags["mentioned_tickers"], tags["tag_confidence"]) == (primary, mentioned, conf)
     assert tags["tickers"] == sorted(primary + mentioned)
+
+
+@pytest.mark.parametrize("title,primary,mentioned", [
+    # analyst actions: the bank acts on another company
+    ("JPMorgan cuts target for Aon stock to $400", [], ["JPM"]),
+    ("Bank of America Upgrades DraftKings to Buy With $27 Price Target", [], ["BAC"]),
+    ("Aon price target raised by JPMorgan", [], ["JPM"]),
+    ("JPMorgan keeps Overweight rating on Snowflake", [], ["JPM"]),
+    ("BofA initiates coverage of Rivian with Neutral", [], ["BAC"]),
+    ("Tesla price target raised by JPMorgan", ["TSLA"], ["JPM"]),
+    # holdings
+    ("36,399 Shares of Global Partners LP $GLP Bought by Bank of America Corp", [], ["BAC"]),
+    ("JPMorgan Chase & Co. boosts stake in Vistra", [], ["JPM"]),
+    ("Nvidia takes stake in Intel", [], ["NVDA"]),
+    # venues
+    ("Crown Castle to present at Bank of America 2026 conference", [], ["BAC"]),
+    ("Charity gala held at Bank of America Plaza", [], ["BAC"]),
+    # broker research arm, "at BofA", comments
+    ("BofA Securities sees upside in Snowflake", [], ["BAC"]),
+    ("Strategist at BofA says small caps are cheap", [], ["BAC"]),
+    ("JPMorgan sees S&P 500 at 8,000 by year-end", [], ["JPM"]),
+    ("Equities can withstand higher yields, says JPMorgan", [], ["JPM"]),
+    ("JPMorgan's October stock picks diversify across sectors", [], ["JPM"]),
+    ("Fifth Third stock faces JPMorgan target cut to USD 58", [], ["JPM"]),
+    ("JPMorgan keeps Buy on Sabesp stock at USD 35.00", [], ["JPM"]),
+    ("DraftKings jumps 5% after Bank of America upgrade", [], ["BAC"]),
+    ("Bank of America buys 74,760 shares in Capital City Bank Group stock", [], ["BAC"]),
+    ("JPMorgan reports 2.93% voting rights in Adtran Networks stock", [], ["JPM"]),
+    ("JPMorgan price target raised to $350 at Wells Fargo", ["JPM"], []),
+    # the company itself is the subject
+    ("JPMorgan raises dividend after third-quarter profit beat", ["JPM"], []),
+    ("JPMorgan says its trading revenue jumped", ["JPM"], []),
+    ("JPMorgan stock price target raised by Wells Fargo", ["JPM"], []),
+    ("Layoffs at JPMorgan hit 500 staff", ["JPM"], []),
+    ("Tesla cuts prices; analysts trim price targets", ["TSLA"], []),
+    ("Costco downgraded from Hold to Sell due to high valuation", ["COST"], []),
+])
+def test_actor_or_holder_is_mentioned(us, title, primary, mentioned):
+    tags = us.classify(title)
+    assert (tags["primary_tickers"], tags["mentioned_tickers"]) == (primary, mentioned)
+    if not primary:
+        assert tags["tag_confidence"] == "low"
+
+
+def test_actor_on_an_indian_stock_is_not_us_primary(us, india):
+    title = "Bajaj Finance share price target raised by JPMorgan"
+    assert us.classify(title)["primary_tickers"] == [] and us.classify(title)["mentioned_tickers"] == ["JPM"]
+    assert india.classify(title)["tickers"] == []
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("Weaker tourism trends are hitting these stocks (DAL:NYSE)", ["DAL"]),
+    ("Airline (DAL) shares fall on fuel costs", ["DAL"]),
+    ("Airline (NYSE: DAL) shares fall", ["DAL"]),
+    ("Airline (dal) recipes", []),                         # symbols are case-sensitive
+    ("GM plans new EV plant in Michigan", ["GM"]),
+    ("GM crops spark debate in parliament", []),
+    ("Hotel names new GM of operations", []),
+])
+def test_symbols_and_gm(us, title, expected):
+    assert us.classify(title)["tickers"] == expected
+
+
+def test_semicolon_is_not_a_list(india):
+    tags = india.classify("Buy HDFC Bank; target of Rs 950: ICICI Securities")
+    assert tags["primary_tickers"] == ["HDFCBANK"] and tags["tag_confidence"] == "high"
 
 
 def test_india_list_title_is_mentioned(india):

@@ -60,8 +60,15 @@ after the ticker's `news_exclude` phrases are removed ("Kotak Mahindra", "Tech M
 plain-text summary used (HTML, URLs/domains and the outlet name removed: every Google News
 summary is a `news.google.com` link, which used to tag nearly everything GOOGL). Roles:
 `primary_tickers` = companies named in the title (all of them when several), except in a
-comparison ("X vs Y") or a list ("TCS, Infosys and Wipro ...", "Stocks to watch: A, B, C"),
-where they are `mentioned_tickers`, as is a company found only in the summary.
+comparison ("X vs Y") or a list ("TCS, Infosys and Wipro ...", "Stocks to watch: A, B, C";
+commas or slashes, not ";"), where they are `mentioned_tickers`, as is a company found only in
+the summary, and a company acting on or holding another one (`Tagger.is_actor`): analyst
+actions ("JPMorgan cuts target for Aon", "target raised by JPMorgan", "Bank of America upgrades
+DraftKings"), holdings ("shares of X bought by Bank of America Corp", "takes stake in"), venues
+("present at Bank of America 2026 conference", "Bank of America Plaza"); tickers with
+`broker: true` (JPM, BAC) also as research arms, commentators ("JPMorgan sees", "says
+JPMorgan") and in their own picks or views ("JPMorgan's October stock picks"). Names also match
+as `(TICKER)`, `(TICKER:EXCH)` or `(EXCH: TICKER)`, case-sensitive.
 `tag_confidence` is high only for a title naming exactly one company as primary, low for every
 other tagged item: the hook for a later LLM aboutness check by the news-analyst (not built);
 `news_ticker_day` carries `role` and `tag_confidence`, and the context pack's news table counts
