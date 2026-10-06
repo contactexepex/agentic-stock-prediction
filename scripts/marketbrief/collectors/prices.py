@@ -30,6 +30,12 @@ session is stored afterwards and its newest bar before the fallback was no more 
 sessions behind. Otherwise it stays in `failed` with `missing_after_nse` (date and reason) and/or
 `newest_stored_bar` and `sessions_behind`; a gap Yahoo did not flag is added there too.
 
+Holiday bars (issue #40): Yahoo serves a flat zero-volume bar (open = high = low = close = the previous close) on
+exchange holidays. A stock or own-exchange index (benchmark, vol index, sector index) bar on a day that is not a session
+of the market calendar, and a flat zero-volume stock bar on any day, is not stored; it is listed in the summary's
+`dropped_non_session` (ticker, date, reason). Cues and factors follow other calendars and are kept. Bars already stored
+stay; the `ohlc_raw` view leaves them out on read (`own_closed_days`, built by `connect`).
+
 Splits and bonus issues (issue #31, both markets; price_split_detection.py, analytics/price_adjustments.py):
 before a symbol's new bars are written, Yahoo's frame (today's basis) is compared with our stored bars of
 the same dates. A `Stock Splits` row whose stored bars before it sit on the old basis is recorded
@@ -70,6 +76,7 @@ from marketbrief.constants.config_keys import (
     CFG_PRICE_FALLBACK,
     CFG_SYMBOLS,
     CFG_TICKERS,
+    META_ROLE,
     META_YAHOO,
 )
 from marketbrief.constants.kinds import KIND_ADJUSTMENTS
@@ -77,7 +84,10 @@ from marketbrief.constants.price_adjustments import KEY_EX_DATE
 from marketbrief.constants.prices import (
     COLLECTOR_PRICES,
     DEFAULT_PERIOD,
+    DROP_REASON_FLAT_ZERO_VOLUME,
+    DROP_REASON_NOT_A_SESSION,
     ENTRY_ERROR,
+    ENTRY_REASON,
     ENTRY_YAHOO,
     ERROR_STALE_PREFIX,
     ERROR_TEXT_LIMIT,
@@ -86,9 +96,11 @@ from marketbrief.constants.prices import (
     MSG_HELD_NOTE,
     MSG_LONGER_HISTORY_FAILED,
     MSG_SPLIT_CHECK_FAILED,
+    OWN_EXCHANGE_ROLES,
     PRICE_DECIMALS,
     SOURCE_NSE_BHAVCOPY,
     SUMMARY_ADJUSTMENTS,
+    SUMMARY_DROPPED_NON_SESSION,
     SUMMARY_HELD,
     SUMMARY_NEW_BARS,
     SUMMARY_REBASED,
@@ -104,6 +116,7 @@ from marketbrief.constants.prices import (
     YAHOO_VOLUME,
 )
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_WARNINGS
+from marketbrief.core.calendar import is_session
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file
@@ -138,6 +151,7 @@ class PriceCollector:
         self.warnings: list[str] = []
         self.rebased: list[dict] = []
         self.held: list[str] = []
+        self.dropped: list[dict] = []
         nse_box: dict = {}
         nse_check = None
         if uses_nse_fallback(cfg):
@@ -190,8 +204,25 @@ class PriceCollector:
         else:
             self.failed.append({COL_TICKER: key, ENTRY_YAHOO: symbol, ENTRY_ERROR: MSG_HELD_NOTE})
 
+    def drop_reason(self, key: str, day: date, row) -> str | None:
+        """Why Yahoo's bar is no real session bar, or None. Yahoo serves a flat zero-volume bar (open = high = low =
+        close = the previous close) for an exchange holiday. A stock or an index of the market's own exchange
+        (benchmark, vol index, sector index) is dropped on a day that is not a session of the market calendar; a
+        stock is also dropped for a flat bar with zero volume (indices report volume 0 legitimately; cues and
+        factors trade on other exchanges' calendars)."""
+        is_stock = key in self.cfg[CFG_TICKERS]
+        own_exchange = is_stock or self.cfg[CFG_SYMBOLS].get(key, {}).get(META_ROLE) in OWN_EXCHANGE_ROLES
+        if own_exchange and not is_session(self.cfg, day):
+            return DROP_REASON_NOT_A_SESSION
+        flat = len({float(row[column]) for column in YAHOO_OHLC}) == 1
+        volume = row[YAHOO_VOLUME]
+        if is_stock and flat and (volume != volume or int(volume) == 0):
+            return DROP_REASON_FLAT_ZERO_VOLUME
+        return None
+
     def write_new_bars(self, key: str, frame) -> None:
-        """Write each completed bar of the frame that no prices file holds yet."""
+        """Write each completed bar of the frame that no prices file holds yet (bars of days without a session
+        and flat zero-volume stock bars are listed in `dropped_non_session`, not stored)."""
         today = self.run.today
         for stamp, row in frame.iterrows():
             day = stamp.date()
@@ -199,6 +230,10 @@ class PriceCollector:
                 continue
             path = prices_file(self.cfg, day)
             if key in stored_bars(path):
+                continue
+            reason = self.drop_reason(key, day, row)
+            if reason:
+                self.dropped.append({COL_TICKER: key, COL_DATE: day.isoformat(), ENTRY_REASON: reason})
                 continue
             close = float(row[YAHOO_CLOSE])
             adj_close = float(row[YAHOO_ADJ_CLOSE]) if YAHOO_ADJ_CLOSE in row else close
@@ -254,6 +289,8 @@ class PriceCollector:
             summary[SUMMARY_REBASED] = self.rebased
         if self.held:
             summary[SUMMARY_HELD] = self.held
+        if self.dropped:
+            summary[SUMMARY_DROPPED_NON_SESSION] = self.dropped
         if uses_nse_fallback(self.cfg):
             recorded = {adjustment[COL_ID] for adjustment in self.adjustments}
             summary.update(apply_fallback(self.run, self.targets, self.failed, self.splits, recorded, set(self.held)))

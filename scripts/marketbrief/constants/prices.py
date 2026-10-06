@@ -6,6 +6,9 @@ PRICE_FILE_COLUMNS = [COL_DATE, COL_TICKER, COL_OPEN, COL_HIGH, COL_LOW, COL_CLO
                       COL_COLLECTED_AT]
 OWN_EXCHANGE_ROLES = ("benchmark", "vol_index", "sector_etf")   # roles that follow the market's calendar
 COLLECTOR_PRICES = "prices"
+DROP_REASON_NOT_A_SESSION = "not a session of the market calendar"
+DROP_REASON_FLAT_ZERO_VOLUME = "flat bar with zero volume"
+ENTRY_REASON = "reason"
 
 YAHOO_OPEN, YAHOO_HIGH, YAHOO_LOW, YAHOO_CLOSE = "Open", "High", "Low", "Close"
 YAHOO_ADJ_CLOSE, YAHOO_VOLUME, YAHOO_SPLITS = "Adj Close", "Volume", "Stock Splits"
@@ -41,6 +44,7 @@ SUMMARY_NEW_BARS = "new_bars"
 SUMMARY_ADJUSTMENTS = "adjustments"
 SUMMARY_REBASED = "rebased_bars"
 SUMMARY_HELD = "held"
+SUMMARY_DROPPED_NON_SESSION = "dropped_non_session"
 SUMMARY_FILLED_FROM_NSE = "filled_from_nse"
 SUMMARY_RESOLVED_BY_NSE = "resolved_by_nse"
 SUMMARY_NSE_NOTES = "nse_notes"
