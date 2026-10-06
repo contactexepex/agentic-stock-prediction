@@ -7,7 +7,7 @@ compare every output byte for byte with a recorded run (docs/REFACTOR_PLAN.md, "
   python tests/golden/golden.py run --out DIR                 one run into DIR, no comparison
 
 Inputs are fixed: data/, config/ and reports/ come from git commit INPUT_COMMIT (never the working
-tree, so daily-run appends do not change them), plus a synthetic overlay built by rules in this file
+tree, so daily-run appends do not change them), plus a synthetic overlay built by rules in overlay.py
 (stored calls of REVIEW_WEEK, a forecaster file with one call that breaks the rules, lessons, and a
 filled report). Every script runs as a subprocess on that scratch root with MB_ROOT, MB_CONFIG,
 MB_MARKET and a fixed MB_NOW per phase, PYTHONHASHSEED=0, TZ=UTC and the test network guard on
@@ -16,9 +16,9 @@ this checkout's.
 
 Two phases per market, each with its own frozen clock (PHASE_CLOCKS):
 - pre_open: the morning of 2026-10-05, when the stored bars are current: the normal path (fresh
-  bars, 1d and 5d ranges published, report, HTML, Slack dry run);
+  bars, scoring, US 1d and 5d ranges published, India's already stored, report, HTML, Slack dry run);
 - late: the morning of 2026-10-06, after every stored input was collected: news visible, bars a
-  session behind (validate failures), late ranges, forecaster gate, lessons, review, spot-check,
+  session behind (validate failures), late-path ranges, forecaster gate, lessons, review, spot-check,
   backtest, replays, ai_replay, Neo4j dry run.
 
 Compared: each step's exit code, stdout and stderr, and every file under the scratch root that the
@@ -36,25 +36,21 @@ from __future__ import annotations
 import argparse
 import difflib
 import hashlib
-import io
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import tarfile
-from datetime import date, timedelta
 from pathlib import Path
 
-import yaml
+from overlay import (INPUT_COMMIT, append_valid_calls, fill_report, git_inputs, write_forecaster_file,
+                     write_lessons, write_past_calls)
 
 CODE = Path(__file__).resolve().parents[2]
 SCRIPTS = CODE / "scripts"
 NETGUARD = CODE / "tests" / "netguard"
 GOLDEN_SITE = CODE / "tests" / "golden" / "site"
-INPUT_COMMIT = "24749bdc4835bff242b2683f83e85f2a7e3a2ab0"
-INPUT_PATHS = ("data", "config", "reports")
 DEFAULT_DIR = CODE / "work" / "golden"
 MARKETS = ("india", "us")
 
@@ -63,9 +59,6 @@ PHASE_CLOCKS = {
     "us": {"pre_open": "2026-10-05T12:15:00+00:00", "late": "2026-10-06T12:15:00+00:00"},
 }
 MID_SESSION_CHECK = "2026-10-05T15:00:00+00:00"
-PAST_CALL_DATES = [date(2026, 9, 21) + timedelta(days=i) for i in range(5)]
-PAST_CALL_HOUR_UTC = {"india": "11:00:00", "us": "21:00:00"}
-PAST_CALL_TICKERS = 3
 REVIEW_WEEK = "2026-W39"
 REPLAY_WINDOW = ("2026-09-14", "2026-10-01")
 BACKTEST_SESSIONS = "40"
@@ -78,119 +71,6 @@ AI_REPLAY_DATE = "2026-09-25"
 NORMALISED_FIELDS = ("runtime_s", "generated_at", "prepared_at", "seconds")
 NORMALISED_TEXT = ((rb"runtime \d+ s\.", b"runtime <normalised> s."),)
 PY = "{python}"
-
-
-# ---------- synthetic inputs ----------
-
-def git_inputs(dest: Path) -> None:
-    """Extract INPUT_PATHS at INPUT_COMMIT into dest."""
-    blob = subprocess.run(["git", "-C", str(CODE), "archive", "--format=tar", INPUT_COMMIT, *INPUT_PATHS],
-                          check=True, capture_output=True).stdout
-    with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
-        tar.extractall(dest, filter="data")
-
-
-def watchlist_head(root: Path, market: str) -> list[str]:
-    """The first PAST_CALL_TICKERS tickers of the market config (file order)."""
-    cfg = yaml.safe_load((root / "config" / "markets" / f"{market}.yaml").read_text())
-    return list(cfg["tickers"])[:PAST_CALL_TICKERS]
-
-
-def first_news_ids(root: Path, market: str, tickers: list[str]) -> dict[str, str]:
-    """Ticker -> id of the first stored news row tagged with it (file order)."""
-    found: dict[str, str] = {}
-    for path in sorted((root / "data" / market / "news").glob("**/*.jsonl")):
-        for line in path.read_text().splitlines():
-            row = json.loads(line)
-            for ticker in row.get("tickers") or []:
-                if ticker in tickers and ticker not in found:
-                    found[ticker] = row["id"]
-    return found
-
-
-def latest_bar_date(root: Path, market: str, ticker: str) -> str:
-    """The newest stored price date of a ticker (the forecaster's as_of_date)."""
-    for path in sorted((root / "data" / market / "prices").glob("**/*.csv"), reverse=True):
-        if any(line.split(",")[1] == ticker for line in path.read_text().splitlines()[1:]):
-            return path.stem
-    raise SystemExit(f"no bars for {ticker}")
-
-
-def write_past_calls(root: Path, market: str) -> None:
-    """Stored calls of REVIEW_WEEK: each watchlist-head ticker, both horizons, every day, after the close."""
-    tickers = watchlist_head(root, market)
-    for day_index, as_of in enumerate(PAST_CALL_DATES):
-        calls = [{"id": f"{as_of}-{ticker}-{horizon}d", "made_at": f"{as_of}T{PAST_CALL_HOUR_UTC[market]}+00:00",
-                  "as_of_date": str(as_of), "ticker": ticker, "horizon_days": horizon,
-                  "direction": "up" if (day_index + ticker_index + horizon) % 2 else "down",
-                  "confidence": [0.55, 0.6, 0.65, 0.7][(day_index + ticker_index) % 4],
-                  "rationale": "golden synthetic call", "evidence_ids": ["golden-evidence"],
-                  "prompt_version": "golden", "range_widen": 0.0}
-                 for ticker_index, ticker in enumerate(tickers) for horizon in (1, 5)]
-        path = root / "data" / market / "predictions" / f"{as_of:%Y}" / f"{as_of:%m}" / f"{as_of}.jsonl"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("".join(json.dumps(call) + "\n" for call in calls))
-
-
-def write_forecaster_file(root: Path, market: str, clock: str) -> None:
-    """Today's forecaster output (work/predictions.jsonl): one 5d call per watchlist-head ticker with
-    news, plus one call that breaks the rules (confidence 0.95, unknown evidence id)."""
-    tickers = watchlist_head(root, market)
-    news = first_news_ids(root, market, tickers)
-
-    def call(ticker: str, horizon: int, direction: str, confidence: float, evidence_id: str, widen: float) -> dict:
-        as_of = latest_bar_date(root, market, ticker)
-        return {"id": f"{as_of}-{ticker}-{horizon}d", "made_at": clock, "as_of_date": as_of, "ticker": ticker,
-                "horizon_days": horizon, "direction": direction, "confidence": confidence,
-                "rationale": "golden forecaster call", "evidence_ids": [evidence_id], "prompt_version": "golden",
-                "range_widen": widen}
-    calls = [call(t, 5, "up" if i % 2 else "down", 0.6, news[t], 0.1) for i, t in enumerate(tickers) if t in news]
-    calls.append(call(tickers[-1], 1, "up", 0.95, "missing-id", 0.0))
-    (root / "work").mkdir(parents=True, exist_ok=True)
-    (root / "work" / "predictions.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls))
-
-
-def append_valid_calls(root: Path, market: str, clock: str) -> None:
-    """The routine's step 9: drop the calls validate --stage forecast failed, append the rest."""
-    summary = json.loads(step_log(root, market, "validate_forecast", "stdout").read_text())
-    failed_ids = {m.group(1) for failure in summary.get("failures", [])
-                  for m in re.finditer(r"line \d+ \((\S+)\)", failure["detail"])}
-    if any(f["code"] == "CALLS_NOT_ALLOWED" for f in summary.get("failures", [])):
-        failed_ids = {"*"}
-    work_file = root / "work" / "predictions.jsonl"
-    calls = [json.loads(line) for line in work_file.read_text().splitlines() if line.strip()]
-    kept = [c for c in calls if "*" not in failed_ids and c["id"] not in failed_ids]
-    path = root / "data" / market / "predictions" / clock[:4] / clock[5:7] / f"{clock[:10]}.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as handle:
-        handle.writelines(json.dumps(c) + "\n" for c in kept)
-    work_file.unlink()
-
-
-def write_lessons(root: Path, _market: str, _clock: str) -> None:
-    """The reflector's stand-in: one number-free lesson per prepared fact."""
-    facts = root / "work" / "lesson_facts.jsonl"
-    rows = [json.loads(line) for line in facts.read_text().splitlines() if line.strip()] if facts.exists() else []
-    lessons = [{"prediction_id": f["prediction_id"], "lesson": "Golden lesson: weigh the regime before the headline.",
-                "prompt_version": "golden"} for f in rows]
-    (root / "work" / "lessons.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lessons))
-
-
-def fill_report(root: Path, market: str, _clock: str) -> None:
-    """Replace each AGENT marker of the report and the Slack draft with a fixed number-free sentence."""
-    report_step = json.loads(step_log(root, market, "report", "stdout").read_text())
-    path = root / report_step["report"]
-
-    def sentence(match: re.Match) -> str:
-        name = match.group(1).split(" ")[0]
-        if name == "top3":
-            return "- Golden point one.\n- Golden point two.\n- Golden point three."
-        return f"Golden narrative for {name}."
-    path.write_text(re.sub(r"<!-- AGENT:([^>]*?) -->", sentence, path.read_text()))
-    slack = root / "work" / f"slack_{market}.md"
-    lines = [line for line in slack.read_text().splitlines() if "AGENT:failures" not in line]
-    slack.write_text("\n".join(re.sub(r"<!-- AGENT:top3[^>]*-->", "• Golden one.\n• Golden two.\n• Golden three.", line)
-                               for line in lines) + "\n")
 
 
 # ---------- the steps ----------
@@ -261,11 +141,6 @@ def steps(market: str) -> list[tuple[str, str, object, str | None]]:
         ("validate_all", [PY, "validate.py", "--stage", "all"], None),
     ]
     return [("pre_open", *s) for s in pre_open] + [("late", *s) for s in late]
-
-
-def step_log(root: Path, market: str, label: str, stream: str) -> Path:
-    """The log file of a step of the current phase (GOLDEN_PHASE)."""
-    return root.parent / "steps" / market / f"{os.environ['GOLDEN_PHASE']}.{label}.{stream}"
 
 
 def environment(root: Path, market: str, clock: str) -> dict[str, str]:

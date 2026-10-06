@@ -30,8 +30,8 @@ Fixed inputs:
 - `data/`, `config/` and `reports/` extracted with `git archive` from commit
   `24749bdc4835bff242b2683f83e85f2a7e3a2ab0` (`INPUT_COMMIT`), never the working tree, so daily-run
   appends do not change the inputs;
-- a synthetic overlay built by rules in golden.py: stored calls of ISO week 2026-W39 (the first 3
-  tickers of each market, 1d and 5d, every weekday 2026-09-21..25), a forecaster file
+- a synthetic overlay built by rules in `tests/golden/overlay.py`: stored calls of ISO week 2026-W39
+  (the first 3 tickers of each market, 1d and 5d, every weekday 2026-09-21..25), a forecaster file
   (`work/predictions.jsonl`: one 5d call per ticker with news, citing a real stored news id, plus one
   call that breaks the rules: confidence 0.95 and an unknown evidence id), number-free lessons for
   the reflector's role, and number-free sentences in place of the report's AGENT markers;
@@ -48,8 +48,8 @@ Two phases per market, each with a frozen clock:
 
 | phase | india MB_NOW | us MB_NOW | what it exercises |
 |---|---|---|---|
-| pre_open | 2026-10-05T02:40Z | 2026-10-05T12:15Z | bars current; US publishes 40 ranges (1d and 5d); India's ranges for as-of 2026-10-01 are already stored (skip path); report, charts, HTML, Slack dry run |
-| late | 2026-10-06T02:30Z | 2026-10-06T12:15Z | every stored input visible; bars a session behind (STALE_BARS, MISSING_REGIME failures); scoring of the W39 calls; lessons; news clusters; forecaster gate and append; late ranges; review; spot-check; backtest; replays; ai_replay; Neo4j dry run |
+| pre_open | 2026-10-05T02:40Z | 2026-10-05T12:15Z | bars current; rows collected later that day are flagged by validate (SCHEMA: time in the future); scoring of the W39 calls (27 India and 30 US outcomes); US publishes 40 ranges (1d and 5d); India's ranges for as-of 2026-10-01 are already stored (skip path); report, charts, HTML, Slack dry run |
+| late | 2026-10-06T02:30Z | 2026-10-06T12:15Z | every stored input visible; bars a session behind (STALE_BARS, MISSING_REGIME failures); scoring again (nothing new to score); lessons (27 and 30 added); news clusters (15 and 20 written); forecaster gate (the rule-breaking call dropped, 3 calls appended per market); ranges.py on the late path (as-of bars a session behind: target session closed, nothing published); review; spot-check; backtest; replays; ai_replay; Neo4j dry run |
 
 Commands covered (49 script runs per market, 98 per run, plus 5 synthetic-input steps per market;
 the step list is `steps()` in golden.py):
@@ -110,8 +110,11 @@ How each later step proves byte-identical outputs:
    in a refactor step (a new wall-clock field would be a behaviour change).
 
 The recorded set (manifest with hashes and exit codes plus a full copy of every output, used for
-diffs) lives in `work/golden/` (git-ignored); only the generator, the comparer and the sitecustomize
-are in git.
+diffs) lives in `work/golden/` (git-ignored). Committed are only `tests/golden/golden.py` (steps,
+runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs) and
+`tests/golden/site/sitecustomize.py`. Two consecutive runs of the same commit compared identical
+(2026-10-06), and a deliberate change (`rangelib.naive_range` widened by a factor 1.0001) made
+`compare` fail with 22 differing outputs (stored ranges, replays, backtests, review, Neo4j statements).
 
 ## 2. Enforcement
 
