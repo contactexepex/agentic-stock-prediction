@@ -11,7 +11,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (benchmark, vol index, cues, factors), regime thresholds, sectors, tickers, news feeds
 - `config/events.yaml` scheduled market events (rules and fixed dates)
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
-  Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
+  Collectors: `collect_prices` (India: a watchlist bar Yahoo lacks for a recent session comes
+  from NSE's bhavcopy when its price basis checks out, listed in `filled_from_nse` and recorded in
+  `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config), `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
@@ -110,7 +112,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
-  prices/features/regime which use the trading date)
+  prices/price_sources/features/regime which use the trading date)
 - `summaries/<market>/daily|weekly|monthly/` layered narrative memory written by Claude
 - `reports/<market>/<session_date>.md` the daily report (agent-editable source);
   `reports/<market>/<session_date>.html` the self-contained reader's report linked from Slack

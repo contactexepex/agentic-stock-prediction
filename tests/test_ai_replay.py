@@ -617,3 +617,13 @@ def test_training_cutoff_comes_from_config(prepared, tmp_path):
     res = json.loads(p.stdout)
     assert res["fair"]["n_calls"] == 0 and res["contaminated"]["n_calls"] == 1
     assert "CONTAMINATED" in page.read_text()
+
+
+def test_keep_row_price_sources_by_bar_date():
+    """An NSE-fill provenance row (data/<market>/price_sources/) is kept like its bar: by bar date."""
+    cut = pd.Timestamp(CUT)
+    row = {"id": f"{D}-AAPL", "date": str(D), "ticker": "AAPL", "source": "nse_bhavcopy",
+           "filled_at": "2026-08-20T06:00:00+00:00"}
+    assert ar.keep_row("price_sources", row, D, cut)
+    assert not ar.keep_row("price_sources", {**row, "date": str(D + timedelta(days=1))}, D, cut)
+    assert ar.rule_text("price_sources") == "bar date <= D"

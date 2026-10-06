@@ -489,6 +489,40 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
   a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
   and earnings dates when every method raised.
+- India price fallback, added 2026-10-06: Yahoo had no 2026-10-05 bar for SBILIFE, HDFCLIFE,
+  DRREDDY, MARUTI and ULTRACEMCO (it jumped from 10-01 to 10-06 although NSE traded on 10-05).
+  `collect_prices.py` now fills a watchlist stock's missing bar for any of the last
+  `price_fallback.sessions` (5) completed sessions of the exchange calendar from NSE's
+  security-wise bhavcopy (`sec_bhavdata_full_DDMMYYYY.csv` on nsearchives.nseindia.com, the file
+  `collect_nse_india.py` reads for delivery %; series EQ, used only when its DATE1 is that
+  session). Yahoo is asked first and a (date, ticker) is written once, so the fallback never
+  replaces a bar. Price basis: the bhavcopy is as traded. yfinance's `Close` with
+  `auto_adjust=False` is not dividend-adjusted but is split/bonus-adjusted as of the collection
+  time, so stored bars collected after a split or bonus sit on the post-event basis: HDFCBANK
+  2025-08-22 (stored on 2026-10-05, after the 1:1 bonus with ex-date 2025-08-26) has close 982.3
+  and volume 19,833,502, while NSE's bhavcopy has 1964.60 and 9,916,751. The bhavcopy's
+  PREV_CLOSE is not adjusted either (26-Aug-2025: 1964.10). So a bhavcopy bar is written only
+  when its PREV_CLOSE is within 0.5% of our stored close of the previous session and the Yahoo
+  frame shows no split or bonus after that session; otherwise the stock stays in `failed` with
+  the reason (`missing_after_nse`). A bar on a split's ex-date is refused when the Yahoo frame
+  shows the split, or when our stored previous close was collected after the split (adjusted)
+  while PREV_CLOSE is not. (If Yahoo returned no frame and the stored previous close is itself
+  the unadjusted pre-split close, the check passes and the post-split bar is written next to
+  it: the same step a Yahoo collection made on that day leaves in the append-only store.) Where no split or bonus intervened the two
+  sources agree: for the 20 watchlist stocks on six sessions (2026-09-24 to 10-01, 120
+  stock-days) the stored Yahoo bars matched the bhavcopy's open, high, low and close to within
+  0.0002 (Yahoo's float rounding, e.g. 3858.3999 for 3858.40) and its volume exactly. `adj_close`
+  is set to the close on filled rows (as Yahoo gives for a new bar). The prices CSV has a fixed
+  column list (`read_csv` with `columns=`), so no source column was added; instead each filled
+  bar gets a row in `data/<market>/price_sources/` (id, date, ticker, source `nse_bhavcopy`, url,
+  filled_at; files dated by the bar's trading date) and the view `bar_sources` gives every
+  stored bar's source (`yahoo` unless a price_sources row names another). The collector summary
+  lists each fallback bar in `filled_from_nse`, moves a Yahoo failure to `resolved_by_nse` only
+  when every checked session is stored afterwards and its newest bar before the fallback was at
+  most `sessions` sessions behind, and otherwise keeps it in `failed` (`missing_after_nse` with
+  date and reason, or `newest_stored_bar` and `sessions_behind` for a gap older than the checked
+  sessions). For India, collect_prices therefore reads NSE and must not run alongside an NSE
+  collector.
 - Issue #9, done 2026-10-05 (no new network access needed):
   - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the
     close of the third Friday of March, June, September and December (the triple-witching day),
