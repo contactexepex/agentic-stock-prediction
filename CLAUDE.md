@@ -172,6 +172,17 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   works. Only blockers fail a verdict and trigger another round; each cosmetic finding becomes a
   GitHub issue labelled `cosmetic` to fix later, and the work can merge.
 - Build work: on FAIL (any blocker), send the blocker list back and judge again, repeating until PASS.
+  A re-check covers only the listed blockers and the diff that fixed them, not the whole batch again.
+- Batches: plan work as a few batches (a feature, a refactor chunk, or a group of related fixes with
+  the cosmetic issues that touch the same files), build the whole batch, then one review per batch;
+  never a review cycle per small item. The reviewer lists every finding in one pass.
+- Build workflow (keep it fast): the builder runs the fast tier while iterating and the full suite
+  once at the end; live network checks only when a collector or fetcher changed (otherwise saved
+  fixtures); the golden harness (`tests/golden/golden.py`) once at the end for refactors. Every number
+  in a build report (test counts, row counts, timings) is pasted from command output, never retyped.
+  Mechanical work (moves, renames, refactor steps proven by the golden harness) runs on Sonnet with
+  medium effort; new logic and the judge run on Opus. At most one heavy job (full suite, golden run,
+  live collection) at a time on the session's machine.
 - Scope of a review follows the change: an end-to-end run of the routine is needed only when
   executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
   agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is

@@ -21,8 +21,12 @@ Method:
    timestamps, no information after `made_at`), prediction rules, schemas in
    `scripts/common.py`, and "no data/, reports/ or summaries/ in build commits".
 2. Check each one yourself with a command or a file read, and record the evidence: the
-   command and the relevant output, or `path:line`. Re-run counts, tests and scripts. Never
-   accept the agent's numbers, test results or summaries as evidence.
+   command and the relevant output, or `path:line`. Never accept the agent's numbers, test results
+   or summaries as evidence. Be proportionate: verify every requirement, but re-run expensive steps
+   (full suite, golden harness, live collection) once at most, cite the CI run where it covers the
+   commit, and spot-check large tables of numbers rather than recomputing every row. List all
+   findings in one pass. On a re-check after FAIL, verify only the listed blockers and the diff
+   that fixed them.
 3. Look for what is commonly faked or skipped:
    - Outputs: missing files; record counts that differ from the input; duplicate or invalid
      ids; malformed JSONL.
