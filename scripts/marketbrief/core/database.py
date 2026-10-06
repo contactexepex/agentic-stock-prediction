@@ -10,7 +10,12 @@ import duckdb
 from marketbrief.constants.columns import COL_ACCEPTED_AT, COL_ACCESSION, COL_CHECKED_AT
 from marketbrief.constants.environment import ENV_NOW
 from marketbrief.constants.files import DIR_SQL, FILE_VIEWS_SQL, JSONL_GLOB
-from marketbrief.constants.kinds import FILE_FORMAT_JSONL, KIND_NEWS, KIND_SEC_TIMES, NEWS_STORED_VIEW
+from marketbrief.constants.kinds import (
+    FILE_FORMAT_JSONL,
+    KIND_NEWS,
+    KIND_SEC_TIMES,
+    NEWS_STORED_VIEW,
+)
 from marketbrief.core import paths
 from marketbrief.core.clock import FrozenClockConnection, clock
 from marketbrief.core.market_config import load_market
@@ -53,7 +58,7 @@ def unretagged_news_function(
     tickers,
     primary,
     mentioned,
-    confidence,  # noqa: PLR0913
+    confidence,
     _tag_version,
 ):
     """Stand-in for the news re-tagger when there is no market config: tags stay as stored.
@@ -104,6 +109,7 @@ def connect(market: str) -> duckdb.DuckDBPyConnection:
             else:
                 con.execute(f"CREATE VIEW {name} AS SELECT * FROM {source_sql}")
         else:
-            con.execute(f"CREATE TABLE {name} ({', '.join(f'{k} {v}' for k, v in columns.items())})")
+            column_sql = ", ".join(f"{column_name} {column_type}" for column_name, column_type in columns.items())
+            con.execute(f"CREATE TABLE {name} ({column_sql})")
     con.execute((paths.CODE / DIR_SQL / FILE_VIEWS_SQL).read_text())
     return con

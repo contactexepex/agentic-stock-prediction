@@ -136,9 +136,9 @@ class EventsCollector:
     """One events run: stored history, SEC and NSE earnings, then each ticker's Yahoo calendar, dividends and
     past earnings dates, merged into new event rows."""
 
-    def __init__(self, cfg: dict, yf, no_history: bool, history_days: int):
+    def __init__(self, cfg: dict, yfinance, no_history: bool, history_days: int):
         """The stored events (to skip ids already seen) or the Yahoo collector's config."""
-        self.cfg, self.yf, self.no_history = cfg, yf, no_history
+        self.cfg, self.yfinance, self.no_history = cfg, yfinance, no_history
         self.market, self.now, self.today = cfg[CFG_MARKET], utc_now(), utc_today()
         self.since = self.today - timedelta(days=history_days)
         self.stored = stored_events(self.market)
@@ -198,7 +198,7 @@ class EventsCollector:
         due = nse_due(self.stored, list(self.cfg[CFG_TICKERS]), self.today)
         self.nse_info = {
             "nse_polled": len(due),
-            "nse_backfill": sum(v is None for v in due.values()),
+            "nse_backfill": sum(last_date is None for last_date in due.values()),
             "nse_failed": [],
             "nse_notes": [],
         }
@@ -258,8 +258,8 @@ class EventsCollector:
             self.failed.append({COL_TICKER: key, "what": WHAT_EARNINGS_HISTORY, "error": "; ".join(yahoo_errors)})
         # a yfinance date between two NSE results dates a quarter apart is either the same report
         # or not a results release (no quarter is missing there)
-        known_nse = self.history.nse_dates.get(key, []) + [d for d, _, _ in self.nse.get(key, [])]
-        yahoo_dates = [c for c in yahoo_dates if not between_quarters(c[0], known_nse)]
+        known_nse = self.history.nse_dates.get(key, []) + [known_day for known_day, _, _ in self.nse.get(key, [])]
+        yahoo_dates = [candidate for candidate in yahoo_dates if not between_quarters(candidate[0], known_nse)]
         primary = SOURCE_NSE_HISTORY if self.nse_info else SOURCE_SEC_HISTORY  # the filings source of this market
         for day, when, priority in merge_near(self.sec.get(key, []) + self.nse.get(key, []) + yahoo_dates):
             if not (self.since <= day < self.today):
@@ -273,7 +273,7 @@ class EventsCollector:
 
     def collect_ticker(self, key: str, meta: dict) -> None:
         """Calendar, dividends and (unless --no-history) earnings history of one ticker."""
-        ticker = self.yf.Ticker(meta[META_YAHOO])
+        ticker = self.yfinance.Ticker(meta[META_YAHOO])
         calendar = read_calendar(ticker, key, self.failed)
         dividends = read_dividends(
             ticker, key, calendar, self.history.dividend_counts.get(key, 0), self.since, self.failed
@@ -312,7 +312,7 @@ class EventsCollector:
         written = append_jsonl(day_file(self.market, KIND_EVENTS, self.today), self.rows)
         print(json.dumps(self.summary(written), indent=2))
         # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
-        no_calendar = {f[COL_TICKER] for f in self.failed if f["what"] == WHAT_CALENDAR}
+        no_calendar = {failure[COL_TICKER] for failure in self.failed if failure["what"] == WHAT_CALENDAR}
         return 1 if no_calendar and len(no_calendar) == len(self.cfg[CFG_TICKERS]) else 0
 
 
@@ -328,6 +328,6 @@ def main() -> int:
     )
     args = parser.parse_args()
     cfg = require_market(args)
-    import yfinance as yf
+    import yfinance
 
-    return EventsCollector(cfg, yf, args.no_history, args.history_days).collect()
+    return EventsCollector(cfg, yfinance, args.no_history, args.history_days).collect()

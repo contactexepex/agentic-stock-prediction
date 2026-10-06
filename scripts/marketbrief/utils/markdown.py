@@ -16,10 +16,10 @@ def markdown_table(header: list[str], rows: list[list]) -> str:
 
 def cursor_markdown_table(cursor) -> str:
     """A markdown table of a DuckDB cursor's rows (None shown empty); '_none_' when there are none."""
-    columns = [d[0] for d in cursor.description]
+    columns = [column_description[0] for column_description in cursor.description]
     rows = cursor.fetchall()
     if not rows:
         return NO_ROWS_MARKDOWN
     out = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
-    out += ["| " + " | ".join("" if v is None else str(v) for v in r) + " |" for r in rows]
+    out += ["| " + " | ".join("" if cell is None else str(cell) for cell in row) + " |" for row in rows]
     return "\n".join(out) + "\n"

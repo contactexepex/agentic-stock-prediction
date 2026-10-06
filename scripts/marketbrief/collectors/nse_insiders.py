@@ -100,13 +100,13 @@ def insiders(run: NseRun, lookback: int, since: date | None = None) -> list[dict
     coverage(
         MSG_PIT_COVERAGE.format(label=label),
         len(index),
-        sum((r.get("symbol") or "").strip().upper() in run.symbols for r in index),
+        sum((listed_row.get("symbol") or "").strip().upper() in run.symbols for listed_row in index),
         run.problems,
     )
     done = {
-        i.rsplit("-", 1)[0]
-        for i in recent_ids(run.market, KIND_INSIDERS, days=SEEN_LOOKBACK_DAYS)
-        if i.startswith(PIT_ID_PREFIX)
+        stored_id.rsplit("-", 1)[0]
+        for stored_id in recent_ids(run.market, KIND_INSIDERS, days=SEEN_LOOKBACK_DAYS)
+        if stored_id.startswith(PIT_ID_PREFIX)
     }
     found = []
     for row in index:

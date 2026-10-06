@@ -55,15 +55,15 @@ def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
                     }
                 )
                 if position + horizon < len(close):
-                    tgt = float(close.iloc[position + horizon])
+                    target_close = float(close.iloc[position + horizon])
                     called_up = call["direction"] == "up"
                     row.update(
                         {
                             "target_date": close.index[position + horizon].date(),
-                            "target": tgt,
-                            "ret": tgt / base - 1,
-                            "fwd": math.log(tgt / base),
-                            "hit": (tgt > base) if called_up else (tgt < base),
+                            "target": target_close,
+                            "ret": target_close / base - 1,
+                            "fwd": math.log(target_close / base),
+                            "hit": (target_close > base) if called_up else (target_close < base),
                             "status": "scored",
                         }
                     )
@@ -107,16 +107,16 @@ def group_stats(group: pd.DataFrame) -> dict:
         "note": "95% interval clustered by as-of date",
     }
     rules = {}
-    sig = replay_statistics.signals(group.assign(ret1=group["ret1"], ret5=group["ret5"], rsi=group["rsi"]))
+    signals = replay_statistics.signals(group.assign(ret1=group["ret1"], ret5=group["ret5"], rsi=group["rsi"]))
     up_moves, down = group["fwd"] > 0, group["fwd"] < 0
-    for name, signal in sig.items():
+    for name, signal in signals.items():
         if name == "always_up":
             continue
-        call = signal != 0
+        has_call = signal != 0
         rhit = ((signal > 0) & up_moves) | ((signal < 0) & down)
-        rule_stats = hit_rate_stats(int(rhit[call].sum()), int(call.sum()))
+        rule_stats = hit_rate_stats(int(rhit[has_call].sum()), int(has_call.sum()))
         rule_stats["label"] = replay.SIGNAL_LABELS[name]
-        rule_stats["ai_hit_rate_same_rows"] = round_or_none(hit[call].mean()) if call.any() else None
+        rule_stats["ai_hit_rate_same_rows"] = round_or_none(hit[has_call].mean()) if has_call.any() else None
         rules[name] = rule_stats
     out["rules"] = rules
     return out

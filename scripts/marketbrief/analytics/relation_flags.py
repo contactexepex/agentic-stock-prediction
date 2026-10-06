@@ -41,47 +41,47 @@ def flag_settings(cfg: dict) -> dict | None:
 
 def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
     """The current big-deal, pledge and insider-sale flags of the watchlist."""
-    th = flag_settings(cfg)
-    if th is None:
+    thresholds = flag_settings(cfg)
+    if thresholds is None:
         return []
     today = today or utc_today()
-    since = today - timedelta(days=int(th["window_days"]))
+    since = today - timedelta(days=int(thresholds["window_days"]))
     tickers = list(cfg["tickers"])
     flags = []
-    for row, day, kind, side, client, shares, price, crore, adv in con.execute(
+    for ticker, day, kind, side, client, shares, price, crore, adv in con.execute(
         """
             SELECT ticker, date, deal_type, side, client, shares, price, value_crore, adv_ratio FROM deals_scored
             WHERE date >= ? AND list_contains(?, ticker) AND (value >= ? OR adv_ratio >= ?)
             ORDER BY date DESC, value DESC, id""",
-        [since, tickers, th["big_deal_crore"] * CRORE, th["big_deal_adv"]],
+        [since, tickers, thresholds["big_deal_crore"] * CRORE, thresholds["big_deal_adv"]],
     ).fetchall():
         size = f"INR {crore:,.0f} cr" if crore is not None else "value n/a"
         flags.append(
             {
-                "ticker": row,
+                "ticker": ticker,
                 "flag": "big_deal",
                 "date": str(day),
                 "detail": f"{kind} {side or '?'} {shares:,.0f} sh @ {price or 0:,.2f} by {client} "
                 f"({size}{f', {adv:.2f}x 20d volume' if adv is not None else ''})",
             }
         )
-    for row, period, prev, pledged, change, filed in con.execute(
+    for ticker, period, prev, pledged, change, filed in con.execute(
         """
             SELECT ticker, period_end, prev_period, pledged_pct_of_promoter, pledge_change_pp, filed_at FROM (
                 SELECT * FROM pledge_changes WHERE list_contains(?, ticker)
                 QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY period_end DESC) = 1)
             WHERE pledge_change_pp >= ? AND coalesce(CAST(filed_at AS DATE), period_end + INTERVAL 60 DAY) >= ?""",
-        [tickers, th["pledge_increase_pp"], today - timedelta(days=int(th["pledge_filed_days"]))],
+        [tickers, thresholds["pledge_increase_pp"], today - timedelta(days=int(thresholds["pledge_filed_days"]))],
     ).fetchall():
         flags.append(
             {
-                "ticker": row,
+                "ticker": ticker,
                 "flag": "pledge_increase",
                 "date": str(filed.date() if filed else period),
                 "detail": f"promoter pledge {pledged:.2f}% of promoter holding at {period}, +{change:.2f} pp vs {prev}",
             }
         )
-    for row, day, person, category, txn, mode, shares, value in con.execute(
+    for ticker, day, person, category, txn, mode, shares, value in con.execute(
         """
             SELECT ticker, CAST(coalesce(disclosed_at, first_seen_at) AS DATE), person, person_category,
                    "transaction", mode, shares, value FROM insider_trades
@@ -95,16 +95,16 @@ def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
         if "pledge" in txn_l and "invo" in txn_l:
             flags.append(
                 {
-                    "ticker": row,
+                    "ticker": ticker,
                     "flag": "pledge_invoked",
                     "date": str(day),
                     "detail": f"{who}: {txn}, {shares or 0:,.0f} sh{amount}",
                 }
             )
-        elif "pledge" in txn_l and not any(w in txn_l for w in ("revok", "release")):
+        elif "pledge" in txn_l and not any(word in txn_l for word in ("revok", "release")):
             flags.append(
                 {
-                    "ticker": row,
+                    "ticker": ticker,
                     "flag": "pledge_created",
                     "date": str(day),
                     "detail": f"{who}: {txn}, {shares or 0:,.0f} sh{amount}",
@@ -112,12 +112,12 @@ def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
             )
         elif (
             txn_l.startswith(("sell", "sale"))
-            and any(r in cat_l for r in INSIDER_ROLES)
-            and (value or 0) >= th["insider_sale_crore"] * CRORE
+            and any(role in cat_l for role in INSIDER_ROLES)
+            and (value or 0) >= thresholds["insider_sale_crore"] * CRORE
         ):
             flags.append(
                 {
-                    "ticker": row,
+                    "ticker": ticker,
                     "flag": "insider_sale",
                     "date": str(day),
                     "detail": f"{who} sold {shares or 0:,.0f} sh{amount} ({mode or 'mode n/a'})",
@@ -128,27 +128,30 @@ def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
 
 def widen_by_ticker(cfg: dict, ranges_config: dict, con) -> dict[str, tuple[float, str]]:
     """{ticker: (extra width, note)} from risk flags; empty unless relation_widen.enabled."""
-    w = ranges_config.get("relation_widen") or {}
-    if not w.get("enabled"):
+    relation_widen = ranges_config.get("relation_widen") or {}
+    if not relation_widen.get("enabled"):
         return {}
     out: dict[str, tuple[float, set]] = {}
     for flag in risk_flags(cfg, con):
-        add = float(w.get(flag["flag"], 0) or 0)
+        add = float(relation_widen.get(flag["flag"], 0) or 0)
         if add > 0:
             total, names = out.get(flag["ticker"], (0.0, set()))
             out[flag["ticker"]] = (total + add if flag["flag"] not in names else total, names | {flag["flag"]})
-    cap = float(w.get("max", 0.2))
+    cap = float(relation_widen.get("max", 0.2))
     return {
-        ticker: (round(min(x, cap), 4), f"relation flags +{percent(min(x, cap))} ({', '.join(sorted(n))})")
-        for ticker, (x, n) in out.items()
-        if x > 0
+        ticker: (
+            round(min(extra_width, cap), 4),
+            f"relation flags +{percent(min(extra_width, cap))} ({', '.join(sorted(flag_names))})",
+        )
+        for ticker, (extra_width, flag_names) in out.items()
+        if extra_width > 0
     }
 
 
 def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
     """(title, markdown) blocks for context.py; empty for markets without `relations:`."""
-    th = flag_settings(cfg)
-    if th is None:
+    thresholds = flag_settings(cfg)
+    if thresholds is None:
         return []
     rel, today, tickers = cfg["relations"], utc_today(), list(cfg["tickers"])
     ins_days, deal_days = int(rel.get("insider_lookback_days", 14)), int(rel.get("deal_lookback_days", 5))
@@ -225,7 +228,7 @@ def main() -> int:
             {
                 "market": cfg["market"],
                 "flags": risk_flags(cfg, con),
-                "widen": {ticker: w for ticker, (w, _) in widen_by_ticker(cfg, ranges_config, con).items()},
+                "widen": {ticker: width for ticker, (width, _) in widen_by_ticker(cfg, ranges_config, con).items()},
             },
             indent=2,
         )

@@ -105,7 +105,7 @@ class Nse(HttpClient):
         """An /api/<endpoint> call parsed as JSON (or the replay file's content)."""
         params = params or {}
         if self.replay:
-            keys = [params[k] for k in ("symbol", "optionType") if params.get(k)]
+            keys = [params[param_name] for param_name in ("symbol", "optionType") if params.get(param_name)]
             return self._replay("_".join([endpoint.rsplit("/", 1)[-1], *keys]) + ".json", json.loads)
         url = f"{self.base}/api/{endpoint}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
         self._warm()

@@ -35,20 +35,20 @@ def compare(base: dict, var: dict) -> dict | None:
     return {"rel_score": round(rel, 4), "coverage_shortfall": round(float(short), 4), "coverage_gain": round(gain, 4)}
 
 
-def verdict(cmp: dict | None, count: int, review_config: dict) -> str:
+def verdict(comparison: dict | None, count: int, review_config: dict) -> str:
     """The verdict of a variant: no data, low n, improves score or coverage, worse, under-covers."""
-    if cmp is None or count < review_config["min_n_recommend"]:
-        return "no data" if cmp is None else "low n"
+    if comparison is None or count < review_config["min_n_recommend"]:
+        return "no data" if comparison is None else "low n"
     if (
-        cmp["rel_score"] <= -review_config["min_improvement"]
-        and cmp["coverage_shortfall"] <= review_config["coverage_tolerance"]
+        comparison["rel_score"] <= -review_config["min_improvement"]
+        and comparison["coverage_shortfall"] <= review_config["coverage_tolerance"]
     ):
         return "improves score"
-    if cmp["coverage_gain"] >= review_config["min_coverage_gain"] and cmp["rel_score"] <= 0:
+    if comparison["coverage_gain"] >= review_config["min_coverage_gain"] and comparison["rel_score"] <= 0:
         return "improves coverage"
-    if cmp["rel_score"] >= review_config["min_improvement"]:
+    if comparison["rel_score"] >= review_config["min_improvement"]:
         return "worse score"
-    if cmp["coverage_shortfall"] > review_config["coverage_tolerance"]:
+    if comparison["coverage_shortfall"] > review_config["coverage_tolerance"]:
         return "under-covers"
     return "no material change"
 
@@ -81,13 +81,13 @@ def proposals(ranges_config: dict, live: dict, hist: dict) -> list[dict]:
             key = tuple(sorted(variant["set"]))
             if source != "live replay" and key in live_worse:
                 continue
-            cur = best.get(key)
+            current_best = best.get(key)
             if (
-                cur is None
+                current_best is None
                 or source == "live replay"
-                and cur["source"] != "live replay"
-                or cur["source"] == source
-                and variant["vs_current"]["rel_score"] < cur["rel_score"]
+                and current_best["source"] != "live replay"
+                or current_best["source"] == source
+                and variant["vs_current"]["rel_score"] < current_best["rel_score"]
             ):
                 base = next(variant_row for variant_row in ablation["variants"] if variant_row["name"] == BASELINE)
                 best[key] = {
@@ -96,8 +96,8 @@ def proposals(ranges_config: dict, live: dict, hist: dict) -> list[dict]:
                     "n": variant["n"],
                     "verdict": variant["verdict"],
                     "changes": [
-                        {"param": param, "current": ranges_config.get(param), "proposed": val}
-                        for param, val in variant["set"].items()
+                        {"param": param, "current": ranges_config.get(param), "proposed": value}
+                        for param, value in variant["set"].items()
                     ],
                     "drop": variant["name"].lower().startswith("drop"),
                     "rel_score": variant["vs_current"]["rel_score"],

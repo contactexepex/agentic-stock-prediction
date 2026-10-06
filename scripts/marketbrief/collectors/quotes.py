@@ -61,23 +61,23 @@ def priced(frame: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def snapshot(yf, symbol: str, now: str | None = None) -> dict:
+def snapshot(yfinance, symbol: str, now: str | None = None) -> dict:
     """The latest intraday price of a symbol against the previous regular-session close."""
-    ticker = yf.Ticker(symbol)
+    ticker = yfinance.Ticker(symbol)
     intraday = priced(ticker.history(period=INTRADAY_PERIOD, interval=INTRADAY_INTERVAL, prepost=True))
     daily = priced(ticker.history(period=DAILY_PERIOD, interval="1d"))
     if intraday.empty or daily.empty:
         raise ValueError(MSG_NO_DATA)
-    last_ts = intraday.index[-1]
-    if pd.Timestamp(now or utc_now()) - last_ts > timedelta(days=STALE_DAYS):
-        raise ValueError(MSG_STALE_QUOTE.format(last=last_ts.tz_convert("UTC").isoformat()))
-    session_day = last_ts.tz_convert(daily.index.tz).date() if daily.index.tz else last_ts.date()
+    last_timestamp = intraday.index[-1]
+    if pd.Timestamp(now or utc_now()) - last_timestamp > timedelta(days=STALE_DAYS):
+        raise ValueError(MSG_STALE_QUOTE.format(last=last_timestamp.tz_convert("UTC").isoformat()))
+    session_day = last_timestamp.tz_convert(daily.index.tz).date() if daily.index.tz else last_timestamp.date()
     prior = daily[[stamp.date() < session_day for stamp in daily.index]]
     if prior.empty:
         raise ValueError(MSG_NO_PREVIOUS_CLOSE)
     price, previous = float(intraday[YAHOO_CLOSE_COLUMN].iloc[-1]), float(prior[YAHOO_CLOSE_COLUMN].iloc[-1])
     return {
-        "ts": last_ts.tz_convert("UTC").isoformat(),
+        "ts": last_timestamp.tz_convert("UTC").isoformat(),
         "price": round(price, 4),
         "prev_close": round(previous, 4),
         "change_pct": round(price / previous - 1, 6),
@@ -88,13 +88,13 @@ def main() -> int:
     """Entry point of scripts/collect_quotes.py."""
     args = market_arg(__doc__).parse_args()
     cfg = require_market(args)
-    import yfinance as yf
+    import yfinance
 
     now, rows, failed = utc_now(), [], []
     targets = quote_targets(cfg)
     for key, symbol in targets.items():
         try:
-            rows.append({COL_SYMBOL: key, "yahoo": symbol, **snapshot(yf, symbol, now), "collected_at": now})
+            rows.append({COL_SYMBOL: key, "yahoo": symbol, **snapshot(yfinance, symbol, now), "collected_at": now})
         except Exception as exc:
             failed.append({COL_SYMBOL: key, "yahoo": symbol, "error": str(exc)[:QUOTE_TEXT_LIMIT]})
     written = append_jsonl(day_file(cfg[CFG_MARKET], KIND_QUOTES, utc_today()), rows)

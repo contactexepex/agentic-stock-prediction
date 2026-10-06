@@ -79,7 +79,7 @@ def store_changed(market: str, kind: str, rows: list[dict], today: date, value_c
     fresh: dict[str, dict] = {}
     for row in rows:
         old = stored.get(row[COL_ID])
-        if old is None or any(old.get(c) != row.get(c) for c in value_cols):
+        if old is None or any(old.get(column) != row.get(column) for column in value_cols):
             fresh[row[COL_ID]] = row
     return append_jsonl(day_file(market, kind, today), fresh.values()) if fresh else 0
 

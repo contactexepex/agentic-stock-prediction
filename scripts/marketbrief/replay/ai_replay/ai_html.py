@@ -172,7 +172,7 @@ def html_page(summary: dict) -> str:
 <style>{replay_page.CSS}</style></head><body><main>
 <h1>AI forecaster replay: {escape_html(summary.get("name") or summary["market"])}</h1>
 {sub}{banner}{body}
-</main><div id="tip" class="tip"></div><script>{replay_page.JS}</script></body></html>"""
+</main><div id="tip" class="tip"></div><script>{replay_page.REPLAY_SCRIPT}</script></body></html>"""
 
 
 def group_html(group: dict) -> str:

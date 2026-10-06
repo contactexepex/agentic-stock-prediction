@@ -141,7 +141,7 @@ def collector_main(doc: str, name: str, kinds: list[str], collect, extra_args=No
             return EXIT_REPLAY_REFUSED
     result = collect(cfg, open_nse(cfg, args.replay), only, today, args)
     print(json.dumps(result, indent=2))
-    return 1 if all(v is None for v in result[SUMMARY_NEW].values()) else 0
+    return 1 if all(new_count is None for new_count in result[SUMMARY_NEW].values()) else 0
 
 
 def run_summary(name: str, run: NseRun, new: dict) -> dict:

@@ -49,7 +49,7 @@ class Edgar(HttpClient):
     """SEC EDGAR access: every request goes through one throttle and backs off on 429/5xx; with
     MB_SEC_FIXTURES=<dir> the URLs in <dir>/urls.json are served from files instead of the network."""
 
-    def __init__(self, ua: str):
+    def __init__(self, user_agent: str):
         """An SEC EDGAR client with the contact user agent."""
         policy = HttpPolicy(
             timeout=SEC_TIMEOUT_SECONDS,
@@ -60,7 +60,7 @@ class Edgar(HttpClient):
             count_attempts=False,
         )
         super().__init__(policy)
-        self.ua = ua
+        self.user_agent = user_agent
         fixtures_dir = os.environ.get(ENV_SEC_FIXTURES)
         self.fixtures = Path(fixtures_dir) if fixtures_dir else None
         self.urls = json.loads((self.fixtures / "urls.json").read_text()) if fixtures_dir else {}
@@ -78,7 +78,9 @@ class Edgar(HttpClient):
         self.requests += 1
         if self.fixtures:
             return self._fixture(url).open("rb")
-        return self.send(url, headers={"User-Agent": self.ua, "Accept-Encoding": ACCEPT_ENCODING_IDENTITY}, stream=True)
+        return self.send(
+            url, headers={"User-Agent": self.user_agent, "Accept-Encoding": ACCEPT_ENCODING_IDENTITY}, stream=True
+        )
 
     def get(self, url: str) -> bytes:
         """The body of a URL."""
@@ -92,7 +94,7 @@ class Edgar(HttpClient):
     def cik_map(self) -> dict[str, int]:
         """SEC's ticker -> CIK map."""
         data = self.json(SEC_TICKER_MAP_URL)
-        return {v["ticker"].upper(): int(v["cik_str"]) for v in data.values()}
+        return {entry["ticker"].upper(): int(entry["cik_str"]) for entry in data.values()}
 
     def _cache(self) -> dict[str, str]:
         """The accession -> acceptance-time cache, loaded once (not used with fixtures)."""
@@ -156,13 +158,17 @@ class Edgar(HttpClient):
         (look-ahead), keeping a shifted one only makes it late."""
         accessions = block.get("accessionNumber") or []
         times = block.get("acceptanceDateTime") or []
-        listed = [k for k, v in enumerate(times) if v and k < len(accessions) and accessions[k]]
+        listed = [
+            index
+            for index, stored_time in enumerate(times)
+            if stored_time and index < len(accessions) and accessions[index]
+        ]
         if not listed:
             status = unverified(MSG_SEC_TIME_NO_ACCEPTANCE)
         else:
             probes = list(dict.fromkeys([listed[0], listed[-1]]))  # newest, oldest
-            verdicts = [self._verdict(cik, accessions[k], times[k]) for k in probes]
-            bad = [v for v in verdicts if v.startswith(STATUS_UNVERIFIED)]
+            verdicts = [self._verdict(cik, accessions[position], times[position]) for position in probes]
+            bad = [verdict for verdict in verdicts if verdict.startswith(STATUS_UNVERIFIED)]
             if bad:
                 status = bad[0]
             elif len(set(verdicts)) > 1:
@@ -176,7 +182,7 @@ class Edgar(HttpClient):
                 )
             elif verdicts[0] == STATUS_SHIFTED:
                 block["acceptanceDateTimeJson"] = list(times)
-                block["acceptanceDateTime"] = [unshift(v) if v else v for v in times]
+                block["acceptanceDateTime"] = [unshift(verdict) if verdict else verdict for verdict in times]
                 status = STATUS_SHIFTED
             else:
                 status = STATUS_OK

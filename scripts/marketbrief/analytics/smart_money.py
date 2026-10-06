@@ -69,7 +69,7 @@ def range_flags(con, as_of: date, ranges_config: dict, made_at=None) -> dict[str
     a filing without an acceptance time counts from the end of its filing date."""
     days = int(ranges_config.get("activist_13d_days", 30))
     factor = max(1.0, float(ranges_config.get("activist_13d_factor", 1.0)))
-    cols = {r[0] for r in con.execute("DESCRIBE activist_stakes").fetchall()}
+    cols = {column[0] for column in con.execute("DESCRIBE activist_stakes").fetchall()}
     known = (
         "coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ))"
         if "accepted_at" in cols
@@ -83,7 +83,7 @@ def range_flags(con, as_of: date, ranges_config: dict, made_at=None) -> dict[str
     rows = con.execute(sql + " ORDER BY ticker, filing_date", params).fetchall()
     flags: dict[str, tuple[float, list[str]]] = {}
     for ticker, filed, filer, pct in rows:
-        f, notes = flags.get(ticker, (1.0, []))
+        previous_factor, notes = flags.get(ticker, (1.0, []))
         size = f" {pct:g}%" if pct is not None else ""
         notes.append(f"new 13D: {filer or 'unknown filer'}{size} filed {filed}" + (f" x{factor}" if factor > 1 else ""))
         flags[ticker] = (factor, notes)

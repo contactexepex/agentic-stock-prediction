@@ -48,7 +48,11 @@ from marketbrief.constants.free_sources import (
     UNIT_PERCENT,
 )
 from marketbrief.constants.kinds import KIND_MACRO
-from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_MARKET, SUMMARY_SKIPPED
+from marketbrief.constants.statuses import (
+    SUMMARY_COLLECTOR,
+    SUMMARY_MARKET,
+    SUMMARY_SKIPPED,
+)
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.sources.errors import FetchError
@@ -103,7 +107,7 @@ def collect_treasury(client, today: date, lookback: int, now: str, problems: Pro
     if not rows:
         problems.failed.append({"source": SOURCE_TREASURY, "error": MSG_NO_YIELD_ROWS.format(days=lookback)})
         return rows, False
-    problems.notes.append(MSG_TREASURY_NOTE.format(count=len(rows), latest=max(r["date"] for r in rows)))
+    problems.notes.append(MSG_TREASURY_NOTE.format(count=len(rows), latest=max(row["date"] for row in rows)))
     return rows, True
 
 
@@ -113,7 +117,7 @@ def collect_fred(client, series: dict, today: date, lookback: int, now: str, pro
     since = today - timedelta(days=lookback)
     for series_id, meta in (series or {}).items():
         meta = meta or {}
-        url = FRED_URL.format(sid=series_id, start=since)
+        url = FRED_URL.format(series_id=series_id, start=since)
         try:
             text = client.get(url, headers=HEADERS_CSV).decode("utf-8-sig")
         except FetchError as exc:
@@ -138,12 +142,12 @@ def collect(cfg: dict, client, today: date, now: str) -> dict:
     rows: list[dict] = []
     sources_ok = 0
     if settings.get("treasury", True):
-        found, ok = collect_treasury(client, today, lookback, now, problems)
+        found, source_ok = collect_treasury(client, today, lookback, now, problems)
         rows += found
-        sources_ok += ok
-    found, ok = collect_fred(client, settings.get("fred"), today, lookback, now, problems)
+        sources_ok += source_ok
+    found, source_ok = collect_fred(client, settings.get("fred"), today, lookback, now, problems)
     rows += found
-    sources_ok += ok
+    sources_ok += source_ok
     if settings.get("cboe"):
         found, available = collect_cboe(client, cfg, today, settings["cboe"], now, problems)
         rows += found

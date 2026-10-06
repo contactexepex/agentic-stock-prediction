@@ -75,7 +75,8 @@ def collect_fpi(client, now: str, problems: Problems) -> list[dict] | None:
     if problem:
         problems.failed.append({"source": SOURCE_NSDL_FPI, "url": FPI_URL, "error": problem})
     equity = next(
-        (r for r in rows if r["asset_class"] == FPI_ASSET_EQUITY and r["route"].lower() == FPI_ROUTE_SUBTOTAL), None
+        (row for row in rows if row["asset_class"] == FPI_ASSET_EQUITY and row["route"].lower() == FPI_ROUTE_SUBTOTAL),
+        None,
     )
     if rows:
         tail = MSG_FPI_EQUITY_NET.format(net=equity["net_cr"]) if equity else MSG_FPI_NO_EQUITY
@@ -153,4 +154,4 @@ def main() -> int:
     client = FreeSourceClient(pause=float(cfg[CFG_INDIA_FLOWS].get("pause_seconds", DEFAULT_FLOWS_PAUSE_SECONDS)))
     out = collect(cfg, client, utc_today(), utc_now())
     print(json.dumps(out, indent=2))
-    return 1 if out["new"] and all(v is None for v in out["new"].values()) else 0
+    return 1 if out["new"] and all(new_value is None for new_value in out["new"].values()) else 0

@@ -35,7 +35,7 @@ def load_ranges_config(market: str | None = None) -> dict:
     `<key>` for that market (e.g. earnings_vol_multiple_by_market)."""
     ranges_config = yaml.safe_load((paths.CONFIG / FILE_RANGES_CONFIG).read_text())
     if market:
-        for key in [k for k in ranges_config if k.endswith(BY_MARKET_SUFFIX)]:
+        for key in [setting for setting in ranges_config if setting.endswith(BY_MARKET_SUFFIX)]:
             if market in (ranges_config[key] or {}):
                 ranges_config[key.removesuffix(BY_MARKET_SUFFIX)] = ranges_config[key][market]
     return ranges_config
@@ -43,7 +43,7 @@ def load_ranges_config(market: str | None = None) -> dict:
 
 def market_names() -> list[str]:
     """The configured markets, sorted."""
-    return sorted(p.stem for p in (paths.CONFIG / DIR_CONFIG_MARKETS).glob(f"*{YAML_SUFFIX}"))
+    return sorted(market_path.stem for market_path in (paths.CONFIG / DIR_CONFIG_MARKETS).glob(f"*{YAML_SUFFIX}"))
 
 
 def load_market(name: str) -> dict:
@@ -58,7 +58,9 @@ def load_market(name: str) -> dict:
         meta.setdefault(META_YAHOO, key)
     for key, meta in cfg[CFG_SYMBOLS].items():
         meta.setdefault(META_YAHOO, key)
-    sector_of = {ticker: s for s, ts in cfg.get(CFG_SECTORS, {}).items() for ticker in ts}
+    sector_of = {
+        ticker: sector for sector, sector_tickers in cfg.get(CFG_SECTORS, {}).items() for ticker in sector_tickers
+    }
     for key, meta in cfg[CFG_TICKERS].items():
         meta.setdefault(META_SECTOR, sector_of.get(key))
     cfg[CFG_SECTOR_ETFS] = sector_etf_map(cfg)
@@ -100,7 +102,7 @@ def sector_etf_problems(cfg: dict) -> list[str]:
 
 def symbols_by_role(cfg: dict, role: str) -> dict[str, dict]:
     """The market-level symbols (cues, factors, benchmark ...) that have this role."""
-    return {k: v for k, v in cfg[CFG_SYMBOLS].items() if v.get(META_ROLE) == role}
+    return {symbol: meta for symbol, meta in cfg[CFG_SYMBOLS].items() if meta.get(META_ROLE) == role}
 
 
 def benchmark_key(cfg: dict) -> str | None:

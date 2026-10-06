@@ -90,7 +90,7 @@ def clean_text(text: str | None) -> str:
 
 def sentences(text: str) -> list[str]:
     """The sentences of a text."""
-    return [s.strip() for s in SENTENCE_BREAK.split(clean_text(text)) if s.strip()]
+    return [sentence.strip() for sentence in SENTENCE_BREAK.split(clean_text(text)) if sentence.strip()]
 
 
 def normalised_number(match: re.Match) -> str | None:
@@ -146,9 +146,13 @@ def key_sentences(
 ) -> list[str]:
     """At most `count` sentences (each cut to max_words words): the lede, then sentences with a number or
     one of the company names, in text order."""
-    candidates = [s for s in sentences(text) if len(s.split()) >= MIN_SENTENCE_WORDS]
+    candidates = [
+        candidate_sentence
+        for candidate_sentence in sentences(text)
+        if len(candidate_sentence.split()) >= MIN_SENTENCE_WORDS
+    ]
     if not candidates:
-        candidates = [s for s in sentences(text) if s]
+        candidates = [candidate_sentence for candidate_sentence in sentences(text) if candidate_sentence]
     names_pattern = re.compile(r"\b(?:" + "|".join(map(re.escape, names)) + r")\b", re.I) if names else None
     chosen = candidates[:1]
     for sentence in candidates[1:]:
@@ -162,7 +166,7 @@ def key_sentences(
         if sentence not in chosen:
             chosen.append(sentence)
     chosen.sort(key=candidates.index)
-    return [" ".join(s.split()[:max_words]) for s in chosen[:count]]
+    return [" ".join(candidate_sentence.split()[:max_words]) for candidate_sentence in chosen[:count]]
 
 
 def sources_say(*texts: str | None) -> bool:
@@ -173,7 +177,7 @@ def sources_say(*texts: str | None) -> bool:
 def shingles(text: str | None, size: int = SHINGLE) -> set[str]:
     """The word shingles (`size` consecutive lower-case tokens) of a text."""
     words = [token.strip(".") for token in TOKEN.findall((text or "").lower()) if token.strip(".")]
-    return {" ".join(words[i : i + size]) for i in range(len(words) - size + 1)}
+    return {" ".join(words[start : start + size]) for start in range(len(words) - size + 1)}
 
 
 def minhash_hex(shingle_set: set[str]) -> str | None:
@@ -183,20 +187,22 @@ def minhash_hex(shingle_set: set[str]) -> str | None:
     from datasketch import MinHash
 
     signature = MinHash(num_perm=NUM_PERM, seed=MINHASH_SEED)
-    signature.update_batch([s.encode("utf-8") for s in sorted(shingle_set)])
-    return "".join(f"{int(v):0{HEX_DIGITS_PER_HASH}x}" for v in signature.hashvalues)
+    signature.update_batch([shingle.encode("utf-8") for shingle in sorted(shingle_set)])
+    return "".join(f"{int(hash_value):0{HEX_DIGITS_PER_HASH}x}" for hash_value in signature.hashvalues)
 
 
 def signature_values(hex_signature: str) -> list[int]:
     """The integer values of a hex MinHash signature."""
     step = HEX_DIGITS_PER_HASH
-    return [int(hex_signature[i : i + step], 16) for i in range(0, len(hex_signature), step)]
+    return [int(hex_signature[offset : offset + step], 16) for offset in range(0, len(hex_signature), step)]
 
 
 def estimated_jaccard(first: str, second: str) -> float:
     """The share of equal values of two MinHash signatures (the Jaccard estimate)."""
     first_values, second_values = signature_values(first), signature_values(second)
-    return sum(x == y for x, y in zip(first_values, second_values)) / len(first_values)
+    return sum(first_value == second_value for first_value, second_value in zip(first_values, second_values)) / len(
+        first_values
+    )
 
 
 def estimated_containment(
@@ -230,5 +236,9 @@ def stop_words() -> frozenset:
 def title_tokens(title: str | None, drop: set[str] | None = None) -> set[str]:
     """The distinctive lower-case words of a headline (stop words and the `drop` words left out)."""
     words = TITLE_WORD.findall((title or "").lower().replace("’", "'"))
-    words = [w.removesuffix("'s") for w in words]
-    return {w for w in words if len(w) >= MIN_TITLE_WORD_LENGTH and w not in stop_words() and w not in (drop or set())}
+    words = [word.removesuffix("'s") for word in words]
+    return {
+        word
+        for word in words
+        if len(word) >= MIN_TITLE_WORD_LENGTH and word not in stop_words() and word not in (drop or set())
+    }

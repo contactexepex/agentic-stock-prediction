@@ -97,8 +97,8 @@ def _is_number(value) -> bool:
 
 def field_errors(rec: dict) -> list[str]:
     """Schema, enum and text-length problems of one record (no source lookups)."""
-    errors = [f"unknown field {k!r}" for k in rec if k not in AGENT_FIELDS]
-    errors += [f"missing {k}" for k in REQUIRED if rec.get(k) in (None, "")]
+    errors = [f"unknown field {field_name!r}" for field_name in rec if field_name not in AGENT_FIELDS]
+    errors += [f"missing {field_name}" for field_name in REQUIRED if rec.get(field_name) in (None, "")]
     if errors:
         return errors
     if not re.fullmatch(FACT_KEY_PATTERN, str(rec["fact_key"])):
@@ -174,7 +174,7 @@ def check_claim(rec, clusters: dict[str, ClusterSources], seen: set[str]) -> tup
     news_ids = rec.get("news_ids")
     if news_ids is None:
         news_ids = [rec["quote_source_id"]] if source.kind == SOURCE_ARTICLE else []
-    if not isinstance(news_ids, list) or not all(isinstance(x, str) for x in news_ids):
+    if not isinstance(news_ids, list) or not all(isinstance(news_id, str) for news_id in news_ids):
         errors.append("news_ids must be a list of ids")
     else:
         unknown = sorted(set(news_ids) - cluster.news_ids)
@@ -185,7 +185,7 @@ def check_claim(rec, clusters: dict[str, ClusterSources], seen: set[str]) -> tup
         errors.append(f"claim {cid} already stored or repeated in the file")
     if errors:
         return errors, None
-    stored = {k: rec.get(k) for k in AGENT_FIELDS}
+    stored = {field_name: rec.get(field_name) for field_name in AGENT_FIELDS}
     stored.update(
         {
             "id": cid,

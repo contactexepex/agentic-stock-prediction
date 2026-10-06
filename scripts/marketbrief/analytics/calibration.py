@@ -40,34 +40,39 @@ from marketbrief.core.storage import append_jsonl, day_file
 def history_pool(
     bars: dict[str, pd.DataFrame], tickers, horizon: int, ranges_config: dict, session_rank: dict
 ) -> tuple[np.ndarray, np.ndarray]:
-    """(standardized returns, their ages in sessions) of the tickers' stored bars for horizon h."""
-    zs, ages = [], []
+    """(standardized returns, their ages in sessions) of the tickers' stored bars for the horizon."""
+    standardized_returns, ages = [], []
     last = max(session_rank.values()) if session_rank else 0
     for ticker in tickers:
-        df = bars.get(ticker)
-        if df is None or len(df) < ranges_config["warmup_bars"] + horizon + 1:
+        ticker_bars = bars.get(ticker)
+        if ticker_bars is None or len(ticker_bars) < ranges_config["warmup_bars"] + horizon + 1:
             continue
-        s = range_math.standardized(df["close"], horizon, ranges_config["ewma_lambda"], ranges_config["warmup_bars"])
-        s = s[np.isfinite(s["z"])]
-        for d, z in zip(s.index, s["z"], strict=False):
-            r = session_rank.get(d)
-            if r is not None and last - r < ranges_config["history_sessions"]:
-                zs.append(z)
-                ages.append(last - r)
-    return np.array(zs), np.array(ages, dtype=float)
+        standardized_rows = range_math.standardized(
+            ticker_bars["close"], horizon, ranges_config["ewma_lambda"], ranges_config["warmup_bars"]
+        )
+        standardized_rows = standardized_rows[np.isfinite(standardized_rows["z"])]
+        for bar_date, standardized_return in zip(standardized_rows.index, standardized_rows["z"], strict=False):
+            session_index = session_rank.get(bar_date)
+            if session_index is not None and last - session_index < ranges_config["history_sessions"]:
+                standardized_returns.append(standardized_return)
+                ages.append(last - session_index)
+    return np.array(standardized_returns), np.array(ages, dtype=float)
 
 
 def live_pool(
     live: pd.DataFrame, horizon: int, bench: pd.DataFrame, session_rank: dict, ranges_config: dict
 ) -> tuple[np.ndarray, np.ndarray]:
-    """(realized z, recency x live weights) of the scored live ranges of horizon h."""
-    lv = live[live["horizon_days"] == horizon] if not live.empty else live
-    if not len(lv):
+    """(realized z, recency x live weights) of the scored live ranges of the horizon."""
+    horizon_ranges = live[live["horizon_days"] == horizon] if not live.empty else live
+    if not len(horizon_ranges):
         return np.array([]), np.array([])
     last = len(bench) - 1
-    ages = np.array([max(0, last - session_rank.get(pd.Timestamp(d), last)) for d in lv["as_of_date"]], dtype=float)
+    ages = np.array(
+        [max(0, last - session_rank.get(pd.Timestamp(as_of_day), last)) for as_of_day in horizon_ranges["as_of_date"]],
+        dtype=float,
+    )
     weights = range_math.recency_weights(ages, ranges_config["half_life_sessions"]) * ranges_config["live_weight"]
-    return lv["z"].to_numpy(dtype=float), weights
+    return horizon_ranges["z"].to_numpy(dtype=float), weights
 
 
 def aci_state(con, cfg: dict, ranges_config: dict, as_of, now: str):
@@ -82,12 +87,17 @@ def aci_state(con, cfg: dict, ranges_config: dict, as_of, now: str):
     return tracker, tracker.key(reg[0] if reg else None)
 
 
-def quantiles(z: np.ndarray, w: np.ndarray, levels: dict, ranges_config: dict, use_aci: bool) -> tuple[dict, str]:
+def quantiles(
+    standardized_returns: np.ndarray, weights: np.ndarray, levels: dict, ranges_config: dict, use_aci: bool
+) -> tuple[dict, str]:
     """(the quantiles of the pool, their source): normal ones when the pool is too small."""
-    if len(z) >= ranges_config["min_pool"]:
-        return {k: range_math.weighted_quantile(z, w, v) for k, v in levels.items()}, SOURCE_POOL
+    if len(standardized_returns) >= ranges_config["min_pool"]:
+        return {
+            level_name: range_math.weighted_quantile(standardized_returns, weights, level)
+            for level_name, level in levels.items()
+        }, SOURCE_POOL
     if use_aci:
-        return {k: NormalDist().inv_cdf(v) for k, v in levels.items()}, SOURCE_NORMAL
+        return {level_name: NormalDist().inv_cdf(level) for level_name, level in levels.items()}, SOURCE_NORMAL
     lo80, hi80 = range_math.normal_quantiles(0.8)
     lo50, hi50 = range_math.normal_quantiles(0.5)
     return {"q10": lo80, "q25": lo50, "q75": hi50, "q90": hi80}, SOURCE_NORMAL
@@ -97,7 +107,7 @@ def compute(cfg: dict, ranges_config: dict, con, bars: dict[str, pd.DataFrame], 
     """The calibration row of each horizon."""
     bench = bars[benchmark_key(cfg)]
     as_of = bench.index[-1].date()
-    session_rank = {d: i for i, d in enumerate(bench.index)}
+    session_rank = {bar_date: session_index for session_index, bar_date in enumerate(bench.index)}
     live = con.execute(LIVE_RANGE_SQL).df()
     now, rows = now or utc_now(), []
     tracker, akey = aci_state(con, cfg, ranges_config, as_of, now)
@@ -107,14 +117,14 @@ def compute(cfg: dict, ranges_config: dict, con, bars: dict[str, pd.DataFrame], 
         z_hist, age_hist = history_pool(bars, cfg["tickers"], horizon, ranges_config, session_rank)
         w_hist = range_math.recency_weights(age_hist, ranges_config["half_life_sessions"])
         z_live, w_live = live_pool(live, horizon, bench, session_rank, ranges_config)
-        z, w = np.concatenate([z_hist, z_live]), np.concatenate([w_hist, w_live])
-        q, source = quantiles(z, w, levels, ranges_config, use_aci)
+        standardized_returns, weights = np.concatenate([z_hist, z_live]), np.concatenate([w_hist, w_live])
+        pool_quantiles, source = quantiles(standardized_returns, weights, levels, ranges_config, use_aci)
         row = {
             "id": f"{as_of}-{horizon}d",
             "as_of_date": str(as_of),
             "computed_at": now,
             "horizon_days": horizon,
-            **{k: round(v, ROUND_DECIMALS) for k, v in q.items()},
+            **{level_name: round(quantile, ROUND_DECIMALS) for level_name, quantile in pool_quantiles.items()},
             "n_history": int(len(z_hist)),
             "n_live": int(len(z_live)),
             "source": source,

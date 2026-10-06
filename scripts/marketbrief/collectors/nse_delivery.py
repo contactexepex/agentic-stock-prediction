@@ -53,12 +53,12 @@ def delivery_row(record: dict, day: date, ticker: str, now: str) -> dict:
 def delivery(run: NseRun, lookback: int) -> tuple[list[dict], int]:
     """(rows, bhavcopies read) of the sessions in the lookback that are not stored yet."""
     stored = {
-        i.split("-", STORED_DATE_PART)[STORED_DATE_PART][:10]
-        for i in recent_ids(run.market, KIND_DELIVERY, days=DELIVERY_SEEN_DAYS)
-        if i.startswith(DELIVERY_ID_PREFIX)
+        stored_id.split("-", STORED_DATE_PART)[STORED_DATE_PART][:10]
+        for stored_id in recent_ids(run.market, KIND_DELIVERY, days=DELIVERY_SEEN_DAYS)
+        if stored_id.startswith(DELIVERY_ID_PREFIX)
     }
     ist_now = datetime.now(IST)
-    found, ok = [], 0
+    found, files_read = [], 0
     for back in range(lookback, -1, -1):
         day = run.today - timedelta(days=back)
         if (
@@ -72,12 +72,15 @@ def delivery(run: NseRun, lookback: int) -> tuple[list[dict], int]:
         except FetchError as exc:
             if exc.host:
                 run.problems.failed.append(exc.entry(KIND_DELIVERY))
-                return found, ok
+                return found, files_read
             run.problems.notes.append(MSG_DELIVERY_MISSING.format(day=day, error=exc.error[:DELIVERY_ERROR_LIMIT]))
             continue
-        ok += 1
-        rows = [{(k or "").strip(): (v or "").strip() for k, v in r.items()} for r in csv.DictReader(io.StringIO(text))]
-        served = {str(parse_day(r.get("DATE1"))) for r in rows if parse_day(r.get("DATE1"))}
+        files_read += 1
+        rows = [
+            {(column or "").strip(): (cell or "").strip() for column, cell in csv_row.items()}
+            for csv_row in csv.DictReader(io.StringIO(text))
+        ]
+        served = {str(parse_day(csv_row.get("DATE1"))) for csv_row in rows if parse_day(csv_row.get("DATE1"))}
         if served and str(day) not in served:  # on a holiday NSE serves the previous session's file
             run.problems.notes.append(MSG_DELIVERY_HOLIDAY.format(day=day, served=", ".join(sorted(served))))
         matched = 0
@@ -88,4 +91,4 @@ def delivery(run: NseRun, lookback: int) -> tuple[list[dict], int]:
             matched += 1
             found.append(delivery_row(record, parse_day(record.get("DATE1")) or day, ticker, run.now))
         coverage(MSG_DELIVERY_COVERAGE.format(day=day), len(rows), matched, run.problems)
-    return found, ok
+    return found, files_read

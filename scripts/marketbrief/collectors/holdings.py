@@ -77,7 +77,7 @@ def stored(market: str) -> tuple[set[str], dict[str, str]]:
 def configured(cfg: dict) -> tuple[dict[int, str], dict[str, str], int]:
     """(filers {CIK: name}, watched CUSIPs {CUSIP: ticker}, quarters to load) of relationships.holdings."""
     settings = cfg.get(CFG_RELATIONSHIPS, {}).get(COLLECTOR_HOLDINGS, {})
-    filers = {int(k): v for k, v in (settings.get("filers") or {}).items()}
+    filers = {int(cik): name for cik, name in (settings.get("filers") or {}).items()}
     cusips = {}
     for ticker, listed in (settings.get("cusips") or {}).items():
         for cusip in [listed] if isinstance(listed, str) else listed:
@@ -110,9 +110,9 @@ class HoldingsRun:
 
     def load_notice(self, ref: FilingRef, cover: dict, period: str) -> None:
         """A 13F-NT (notice: reported by another manager) gets only the filing row and counts as filed."""
-        by = "; ".join(cover["other_managers"]) or MSG_UNNAMED_MANAGER
-        self.rows.append(filing_row(ref, REPORT_TYPE_NOTICE, None, False, f"reported by {by}"))
-        self.notices.append(MSG_REPORTED_BY.format(filer=ref.filer, period=period, by=by))
+        reporting_manager = "; ".join(cover["other_managers"]) or MSG_UNNAMED_MANAGER
+        self.rows.append(filing_row(ref, REPORT_TYPE_NOTICE, None, False, f"reported by {reporting_manager}"))
+        self.notices.append(MSG_REPORTED_BY.format(filer=ref.filer, period=period, by=reporting_manager))
 
     def load_holdings(self, ref: FilingRef, cover: dict, period: str, table: tuple) -> None:
         """The filing row and the watched rows of a holdings report (zero rows only when it is complete)."""
@@ -120,7 +120,7 @@ class HoldingsRun:
         why = incomplete_reason(cover, n_lines, placeholder)
         self.rows.append(filing_row(ref, cover["report_type"], n_lines, why is None, why))
         self.rows += to_rows(ref, aggregates, self.tickers if why is None else [], cover["report_type"], why is None)
-        held = sum(1 for (_, put_call), a in aggregates.items() if put_call is None and a["shares"] > 0)
+        held = sum(1 for (_, put_call), aggregate in aggregates.items() if put_call is None and aggregate["shares"] > 0)
         message = MSG_HELD.format(filer=ref.filer, period=period, held=held)
         self.loaded.append(message + (MSG_HELD_INCOMPLETE.format(why=why) if why else ""))
 
@@ -216,7 +216,9 @@ def main() -> int:
                 "requests": edgar.requests,
                 "sec_times": time_summary(edgar),
                 "warnings": time_warnings(edgar),
-                "waiting_on": [n for c, n in filers.items() if latest.get(str(c), "") < due],
+                "waiting_on": [
+                    filer_name for filer_cik, filer_name in filers.items() if latest.get(str(filer_cik), "") < due
+                ],
                 "failed": run.failed,
             },
             indent=2,

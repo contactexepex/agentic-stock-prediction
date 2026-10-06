@@ -81,8 +81,10 @@ def fpi_layout_problems(rows: list[dict], bad: list[str]) -> str | None:
     problems = []
     if bad:
         problems.append(MSG_FPI_BAD_ROWS.format(count=len(bad), rows=bad[:BAD_ROWS_SHOWN]))
-    has_equity = any(r["asset_class"] == FPI_ASSET_EQUITY and r["route"].lower() == FPI_ROUTE_SUBTOTAL for r in rows)
-    if not has_equity or not any(r["asset_class"] == FPI_ASSET_TOTAL for r in rows):
+    has_equity = any(
+        row["asset_class"] == FPI_ASSET_EQUITY and row["route"].lower() == FPI_ROUTE_SUBTOTAL for row in rows
+    )
+    if not has_equity or not any(row["asset_class"] == FPI_ASSET_TOTAL for row in rows):
         problems.append(MSG_FPI_NO_TOTALS.format(count=len(rows)))
     return "; ".join(problems) or None
 
@@ -110,7 +112,7 @@ def parse_fpi(page: str, now: str) -> tuple[list[dict], str | None]:
                 asset = FPI_ASSET_TOTAL
         else:
             continue
-        if asset is None or any(v is None for v in values):
+        if asset is None or any(amount is None for amount in values):
             bad.append(" | ".join(cells)[:BAD_ROW_PREVIEW])  # a data-shaped row we cannot read: reported, not skipped
             continue
         rows.append(fpi_row(reporting, asset, route, values, usd_inr, now))
@@ -138,7 +140,7 @@ def parse_indices(text: str, day: date, names: dict, now: str) -> tuple[list[dic
     wanted = {name.lower(): (name, sector) for name, sector in names.items()}
     rows, served = [], set()
     for record in reader:
-        record = {(k or "").strip(): (v or "").strip() for k, v in record.items()}
+        record = {(column or "").strip(): (cell or "").strip() for column, cell in record.items()}
         hit = wanted.get(record.get("Index Name", "").lower())
         if not hit:
             continue
@@ -148,7 +150,7 @@ def parse_indices(text: str, day: date, names: dict, now: str) -> tuple[list[dic
             continue
         served.add(file_day)
         rows.append(index_row(record, file_day, hit[0], hit[1], now))
-    missing = sorted(name for name, _ in wanted.values() if name not in {r["index_name"] for r in rows})
+    missing = sorted(name for name, _ in wanted.values() if name not in {row["index_name"] for row in rows})
     problem = (
         MSG_INDEX_FILE_DATES.format(day=day, served=sorted(map(str, served))) if served and day not in served else None
     )

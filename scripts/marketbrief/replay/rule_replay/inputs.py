@@ -18,9 +18,10 @@ from marketbrief.replay.backtest import observations
 
 
 def known_versions(cfg: dict, versions: dict) -> dict:
-    """Shift each earnings version's start (a 10-Q/10-K acceptance date c) to the last session before
-    c: ranges.py made pre-open on session S uses the reports accepted by S, so as-of d (S = the next
-    session after d) sees the version once d >= that session. observations.input_columns then applies it."""
+    """Shift each earnings version's start (a 10-Q/10-K acceptance date) to the last session before
+    it: ranges.py made pre-open on session S uses the reports accepted by S, so an as-of day (S = the next
+    session after it) sees the version once it is on or after that session. observations.input_columns then applies \
+it."""
     return {
         ticker: [
             (None if start is None else calendar.prev_session(cfg, start, include=False), end)
@@ -31,7 +32,7 @@ def known_versions(cfg: dict, versions: dict) -> dict:
 
 
 def next_earnings(versions: list, as_of_day: date) -> date | None:
-    """The first earnings date after d in the version active pre-open the next session (the
+    """The first earnings date after `as_of_day` in the version active pre-open the next session (the
     historical stand-in for ranges.py's upcoming `company_events` date when earnings_history is off)."""
     if not versions:
         return None
@@ -84,8 +85,8 @@ def major_dates(cfg: dict, start: date, end: date) -> list[date]:
 
 
 def rsi_series(close: pd.Series, window: int = 14) -> pd.Series:
-    """indicators.rsi at every date (the same causal Wilder smoothing, so the value at d equals
-    indicators.rsi(close[:d]); tests/test_replay.py checks it)."""
+    """indicators.rsi at every date (the same causal Wilder smoothing, so the value at a date equals
+    indicators.rsi of the closes up to it; tests/test_replay.py checks it)."""
     diff = close.diff()
     gain = diff.clip(lower=0).iloc[1:].ewm(alpha=1 / window, adjust=False).mean()
     loss = (-diff.clip(upper=0)).iloc[1:].ewm(alpha=1 / window, adjust=False).mean()
@@ -98,10 +99,10 @@ def rsi_series(close: pd.Series, window: int = 14) -> pd.Series:
 
 def window_days(bench: pd.DataFrame, ranges_config: dict, start: date | None, end: date | None) -> list[date]:
     """The as-of days of the replay window."""
-    idx = [timestamp.date() for timestamp in bench.index]
-    first = idx[min(ranges_config["warmup_bars"], len(idx) - 1)] if idx else None
+    session_days = [timestamp.date() for timestamp in bench.index]
+    first = session_days[min(ranges_config["warmup_bars"], len(session_days) - 1)] if session_days else None
     first_day = max(start, first) if start else first
-    return [day for day in idx if first_day and day >= first_day and (end is None or day <= end)]
+    return [day for day in session_days if first_day and day >= first_day and (end is None or day <= end)]
 
 
 def load_inputs(cfg: dict, ranges_config: dict, con) -> tuple[dict, dict]:
@@ -110,10 +111,12 @@ def load_inputs(cfg: dict, ranges_config: dict, con) -> tuple[dict, dict]:
     bench = bars.get(benchmark_key(cfg))
     if bench is None or bench.empty:
         raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
-    evdf = event_history.load_events(con)
+    events_frame = event_history.load_events(con)
     extra = {
-        "earnings": known_versions(cfg, event_history.earnings_versions(evdf)) if not evdf.empty else {},
-        "dividends": event_history.dividend_events(evdf) if not evdf.empty else {},
+        "earnings": known_versions(cfg, event_history.earnings_versions(events_frame))
+        if not events_frame.empty
+        else {},
+        "dividends": event_history.dividend_events(events_frame) if not events_frame.empty else {},
         "bench": bench,
         "index_cue": observations.index_cue_series(cfg, bars, ranges_config)
         if range_switches.enabled(ranges_config, "beta_split", cfg["market"])

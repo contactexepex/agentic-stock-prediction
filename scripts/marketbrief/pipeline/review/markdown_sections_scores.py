@@ -41,7 +41,7 @@ def aci_lines(review_data) -> list[str]:
     ]
     rep = aci.get("replay")
 
-    def comparison_rows(cmp):
+    def comparison_rows(comparison):
         """Table rows comparing fixed bands with ACI per horizon and group."""
         return [
             [
@@ -53,12 +53,12 @@ def aci_lines(review_data) -> list[str]:
                 f"{fnum(value['before'].get('score50'))} → {fnum(value['after'].get('score50'))}",
                 f"{fnum(value['before'].get('score80'))} → {fnum(value['after'].get('score80'))}",
             ]
-            for horizon, groups in cmp.items()
+            for horizon, groups in comparison.items()
             for group, value in groups.items()
             if value["before"].get("n")
         ]
 
-    cmp_hdr = ["H", "Group", "n", "50% cover", "80% cover", "50% score", "80% score"]
+    comparison_header = ["H", "Group", "n", "50% cover", "80% cover", "50% score", "80% score"]
     if rep and rep.get("note"):
         lines += [f"> {rep['note']}.", ""]
     if rep and rep.get("comparison"):
@@ -67,26 +67,26 @@ def aci_lines(review_data) -> list[str]:
             "**In-sample: the ACI settings in config/ranges.yaml were tuned on this replay window**, so these "
             "gains are optimistic:",
             "",
-            markdown_table(cmp_hdr, comparison_rows(rep["comparison"])),
+            markdown_table(comparison_header, comparison_rows(rep["comparison"])),
         ]
         held_out = rep.get("held_out")
         if held_out:
-            sel = held_out["selected"]
+            selected = held_out["selected"]
             lines += [
                 f"Held-out check: gamma and the alpha scope (one, or one per regime) picked on as-of dates up to "
-                f"{held_out['tune_end']} only (selected gamma {sel['gamma']}, "
-                f"{'per regime' if sel['by_regime'] else 'one alpha'}; "
+                f"{held_out['tune_end']} only (selected gamma {selected['gamma']}, "
+                f"{'per regime' if selected['by_regime'] else 'one alpha'}; "
                 f"{'the config settings' if held_out['selected_is_config'] else 'NOT the config settings'}). "
                 "Out of sample, fixed bands → the selected settings on the later as-of dates:",
                 "",
-                markdown_table(cmp_hdr, comparison_rows(held_out["test_selected"])),
+                markdown_table(comparison_header, comparison_rows(held_out["test_selected"])),
             ]
             if not held_out["selected_is_config"] and held_out.get("test_config"):
                 lines += [
                     "The config settings on the same later dates (not out of sample: they were chosen on the "
                     "whole window):",
                     "",
-                    markdown_table(cmp_hdr, comparison_rows(held_out["test_config"])),
+                    markdown_table(comparison_header, comparison_rows(held_out["test_config"])),
                 ]
         else:
             lines += [
@@ -109,13 +109,13 @@ def calibration_lines(rec, review_data) -> list[str]:
             ["H", "Source", "History n", "Live n", "q10", "q25", "q75", "q90"],
             [
                 [
-                    f"{call['horizon_days']}d",
-                    call["source"],
-                    call["n_history"],
-                    call["n_live"],
-                    *(fnum(call[quantile_name], 2) for quantile_name in ("q10", "q25", "q75", "q90")),
+                    f"{calibration_row['horizon_days']}d",
+                    calibration_row["source"],
+                    calibration_row["n_history"],
+                    calibration_row["n_live"],
+                    *(fnum(calibration_row[quantile_name], 2) for quantile_name in ("q10", "q25", "q75", "q90")),
                 ]
-                for call in review_data["calibration"]
+                for calibration_row in review_data["calibration"]
             ],
         ),
     ]
@@ -126,7 +126,7 @@ def calibration_lines(rec, review_data) -> list[str]:
 def ablation_lines(rec, review_data, by_horizon) -> list[str]:
     """Ablations: replay of the live scored ranges and walk-forward on stored prices."""
     lines = []
-    ab_hdr = [
+    ablation_header = [
         "Variant",
         "n",
         f"50% cover ({by_horizon})",
@@ -150,7 +150,7 @@ def ablation_lines(rec, review_data, by_horizon) -> list[str]:
             f"of {live['n']} published ranges exactly (the rest used settings or inputs it holds fixed). This "
             "checks the decomposition only; it is not an independent validation of the quantile model.",
             "",
-            markdown_table(ab_hdr, ablation_rows(live)),
+            markdown_table(ablation_header, ablation_rows(live)),
         ]
     else:
         lines += ["_No scored live ranges yet._", ""]
@@ -165,7 +165,7 @@ def ablation_lines(rec, review_data, by_horizon) -> list[str]:
             "only outcomes known before it), plus regime and market-event widening rebuilt from stored bars "
             f"(regime mix: {share}). No AI, cue or earnings inputs.",
             "",
-            markdown_table(ab_hdr, ablation_rows(hist)),
+            markdown_table(ablation_header, ablation_rows(hist)),
         ]
     else:
         lines += [f"_Not run: {hist.get('error', 'skipped')}._", ""]

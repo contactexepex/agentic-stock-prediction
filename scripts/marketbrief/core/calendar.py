@@ -101,8 +101,8 @@ def _session_edge_utc(cfg: dict, day: date, edge: str) -> datetime:
         calendar = exchange_calendar(cfg[CFG_CALENDAR])
         if calendar_covers(cfg, day) and calendar.is_session(day.isoformat()):
             session = day.isoformat()
-            at = calendar.session_open(session) if edge == EDGE_OPEN else calendar.session_close(session)
-            return at.to_pydatetime().astimezone(timezone.utc)
+            edge_time = calendar.session_open(session) if edge == EDGE_OPEN else calendar.session_close(session)
+            return edge_time.to_pydatetime().astimezone(timezone.utc)
         zone = ZoneInfo(str(calendar.tz))
         local_time = (calendar.open_times if edge == EDGE_OPEN else calendar.close_times)[-1][1]
     except Exception:
@@ -181,7 +181,7 @@ def rule_dates(rule: dict, start: date, end: date) -> list[date]:
         if not months or month in months:
             found.append(_monthly_date(rule, year, month))
         year, month = (year + 1, 1) if month == 12 else (year, month + 1)
-    return [d for d in found if start <= d <= end]
+    return [rule_day for rule_day in found if start <= rule_day <= end]
 
 
 def session_offset(rule: dict) -> int:
@@ -214,7 +214,10 @@ def _rule_events(cfg: dict, spec: dict, start: date, end: date) -> list[dict]:
     for rule in spec.get(KEY_EVENTS_RULES, []):
         if cfg[CFG_MARKET] not in rule["markets"]:
             continue
-        skip = {s if isinstance(s, date) else date.fromisoformat(str(s)) for s in rule.get("skip") or []}
+        skip = {
+            skipped_day if isinstance(skipped_day, date) else date.fromisoformat(str(skipped_day))
+            for skipped_day in rule.get("skip") or []
+        }
         steps_back = -session_offset(rule)
         for day in rule_dates(rule, start - padding, end + padding):
             if day in skip:  # known not to happen on (or before) this date
@@ -235,11 +238,13 @@ def market_events(cfg: dict, start: date, end: date, path=None) -> list[dict]:
         day = fixed["date"] if isinstance(fixed["date"], date) else date.fromisoformat(str(fixed["date"]))
         if cfg[CFG_MARKET] in fixed["markets"] and start <= day <= end:
             found.append(_market_event(day, fixed))
-    return sorted(found, key=lambda e: (e["date"], e["type"]))
+    return sorted(found, key=lambda event: (event["date"], event["type"]))
 
 
 def major_events_near(events: list[dict], day: date, window: int = MAJOR_WINDOW_DAYS) -> list[dict]:
     """Company-independent major events from `day` to `window` days after it."""
     return [
-        e for e in events if e["major"] and e["ticker"] is None and day <= e["date"] <= day + timedelta(days=window)
+        event
+        for event in events
+        if event["major"] and event["ticker"] is None and day <= event["date"] <= day + timedelta(days=window)
     ]

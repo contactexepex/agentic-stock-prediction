@@ -132,7 +132,9 @@ def basis_problem(
     that is not already recorded in data/<market>/adjustments/ (ids in `recorded`): a recorded
     one is applied on read, and the as-traded bar then sits on the basis the views expect."""
     previous = prev_session(cfg, day, include=False)
-    after = sorted(s for s in splits if s > previous and f"{ticker}-{s}" not in recorded)
+    after = sorted(
+        split_day for split_day in splits if split_day > previous and f"{ticker}-{split_day}" not in recorded
+    )
     if after:
         return MSG_SPLIT_AFTER_PREVIOUS.format(day=after[0])
     row = stored_bars(prices_file(cfg, previous)).get(ticker)
@@ -255,7 +257,7 @@ class NseBarFiller:
             {
                 COL_TICKER: ticker,
                 COL_DATE: day.isoformat(),
-                **{k: v for k, v in bar.items() if k != "prev_close"},
+                **{field: value for field, value in bar.items() if field != "prev_close"},
                 COL_SOURCE: SOURCE_NSE_BHAVCOPY,
                 COL_URL: url,
             }
@@ -304,9 +306,9 @@ def apply_fallback(
     sessions = int((cfg.get(CFG_PRICE_FALLBACK) or {}).get(CFG_FALLBACK_SESSIONS, DEFAULT_FALLBACK_SESSIONS))
     window_start = last_completed_sessions(cfg, run.today, sessions)[0]
     newest = {
-        ticker_name: newest_stored(cfg, ticker_name, run.today)
-        for ticker_name in cfg[CFG_TICKERS]
-        if any(f[COL_TICKER] == ticker_name for f in failed)
+        configured_ticker: newest_stored(cfg, configured_ticker, run.today)
+        for configured_ticker in cfg[CFG_TICKERS]
+        if any(failed_entry[COL_TICKER] == configured_ticker for failed_entry in failed)
     }
     try:
         filled, still, notes = nse_fallback(run, sessions, splits, recorded=recorded, held=held)
@@ -325,7 +327,7 @@ def apply_fallback(
             dates = [bar[COL_DATE] for bar in filled if bar[COL_TICKER] == ticker]
             resolved.append({**failure, ENTRY_FILLED_DATES: dates})
     for ticker, days in still.items():  # a gap Yahoo did not flag is listed too
-        if not any(f[COL_TICKER] == ticker for f in keep):
+        if not any(failed_entry[COL_TICKER] == ticker for failed_entry in keep):
             keep.append(
                 {
                     COL_TICKER: ticker,

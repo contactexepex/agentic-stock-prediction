@@ -57,7 +57,7 @@ class Kind:
     statements: list[tuple[str, Callable[[dict], bool] | None]]
     shape: Callable[[str, dict], dict]  # DuckDB row -> parameter row
     incremental: bool = True  # False: derived view, all rows every run
-    rows_fn: Callable | None = None  # ... or from the market config
+    rows_function: Callable | None = None  # ... or from the market config
 
 
 # config: Market, Sector, Company
@@ -108,7 +108,7 @@ def keep_stored_row(_market: str, stored_row: dict) -> dict:
 
 
 KINDS: list[Kind] = [
-    Kind("config", None, CONFIG_STATEMENTS, keep_stored_row, incremental=False, rows_fn=config_rows),
+    Kind("config", None, CONFIG_STATEMENTS, keep_stored_row, incremental=False, rows_function=config_rows),
     Kind("news", NEWS_SQL, [(NEWS_STATEMENT, None)], shape_news),
     Kind(
         "filings",
@@ -134,7 +134,7 @@ KINDS: list[Kind] = [
         [(EVENTS_CURRENT, None)],
         keep_stored_row,
         incremental=False,
-        rows_fn=events_current_rows,
+        rows_function=events_current_rows,
     ),
     Kind(
         "insiders",

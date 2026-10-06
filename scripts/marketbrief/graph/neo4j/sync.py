@@ -37,15 +37,15 @@ def schema_statements() -> list[str]:
 def read_rows(kind: Kind, cfg: dict, con, since: str | None) -> list[dict]:
     """The rows of a kind (all, or since the watermark), shaped and sorted by id."""
     market = cfg["market"]
-    if kind.rows_fn:
-        return kind.rows_fn(cfg, con, since)
+    if kind.rows_function:
+        return kind.rows_function(cfg, con, since)
     sql, params = f"SELECT * FROM ({kind.sql}) q", []
     if kind.incremental and since:
         sql += f" WHERE q._ts IS NULL OR q._ts >= CAST(? AS TIMESTAMPTZ) - INTERVAL {OVERLAP_DAYS} DAY"
         params = [since]
-    cur = con.execute(sql, params)
-    cols = [column[0] for column in cur.description]
-    rows = [kind.shape(market, dict(zip(cols, row))) for row in cur.fetchall()]
+    cursor = con.execute(sql, params)
+    column_names = [column[0] for column in cursor.description]
+    rows = [kind.shape(market, dict(zip(column_names, row))) for row in cursor.fetchall()]
     return sorted(rows, key=lambda row: (str(row["id"]), str(row.get("source_id"))))
 
 
@@ -134,10 +134,10 @@ def upsert_batches(run: SyncRun, kind: Kind, rows: list[dict], record: dict) -> 
 
 def store_watermark(run: SyncRun, kind: Kind, rows: list[dict], record: dict) -> None:
     """Remember the newest recorded_at of the synced rows as the kind's watermark in Neo4j."""
-    marks_ts = [row["recorded_at"] for row in rows if row.get("recorded_at")]
-    if not marks_ts:
+    mark_times = [row["recorded_at"] for row in rows if row.get("recorded_at")]
+    if not mark_times:
         return
-    newest = max(marks_ts, key=lambda timestamp: datetime.fromisoformat(timestamp))
+    newest = max(mark_times, key=lambda timestamp: datetime.fromisoformat(timestamp))
     params = {
         "id": f"{run.market}:{kind.name}",
         "market": run.market,

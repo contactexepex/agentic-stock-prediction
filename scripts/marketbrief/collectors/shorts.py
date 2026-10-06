@@ -85,7 +85,7 @@ def daily_volume(client, cfg: dict, today: date, settings: dict, now: str, probl
         found, problem = parse_volume(text, day, symbols, now)
         if problem:
             problems.failed.append({"source": SOURCE_FINRA_VOLUME, "date": str(day), "url": url, "error": problem})
-        missing = sorted(set(symbols.values()) - {r[COL_TICKER] for r in found})
+        missing = sorted(set(symbols.values()) - {found_row[COL_TICKER] for found_row in found})
         if missing:
             problems.failed.append(
                 {
@@ -125,8 +125,8 @@ def short_interest(client, cfg: dict, today: date, settings: dict, now: str, pro
             }
         )
         return rows
-    latest = max(r["settlement_date"] for r in rows)
-    missing = sorted(set(symbols.values()) - {r[COL_TICKER] for r in rows if r["settlement_date"] == latest})
+    latest = max(row["settlement_date"] for row in rows)
+    missing = sorted(set(symbols.values()) - {row[COL_TICKER] for row in rows if row["settlement_date"] == latest})
     if missing:
         problems.failed.append(
             {
@@ -135,7 +135,7 @@ def short_interest(client, cfg: dict, today: date, settings: dict, now: str, pro
                 "error": MSG_INTEREST_SETTLEMENT_MISSING.format(latest=latest, missing=missing),
             }
         )
-    settlements = ", ".join(sorted({r["settlement_date"] for r in rows}))
+    settlements = ", ".join(sorted({row["settlement_date"] for row in rows}))
     problems.notes.append(MSG_INTEREST_NOTE.format(count=len(rows), settlements=settlements))
     return rows
 
@@ -176,4 +176,4 @@ def main() -> int:
     client = FreeSourceClient(pause=float(cfg[CFG_SHORTS].get("pause_seconds", DEFAULT_SHORTS_PAUSE_SECONDS)))
     out = collect(cfg, client, utc_today(), utc_now())
     print(json.dumps(out, indent=2))
-    return 1 if out["new"] and all(v is None for v in out["new"].values()) else 0
+    return 1 if out["new"] and all(new_value is None for new_value in out["new"].values()) else 0

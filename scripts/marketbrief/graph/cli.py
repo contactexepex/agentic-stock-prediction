@@ -21,7 +21,7 @@ import json
 from pathlib import Path
 
 from marketbrief.constants.connection_map import (
-    MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL,
+    MSG_USAGE_GRAPH_COMMAND,
 )
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.database import connect
@@ -44,14 +44,14 @@ def main() -> int:
     if args.command == "status":
         print(json.dumps(status(cfg, con), indent=2))
     elif args.command == "edges":
-        cur = con.execute(
+        cursor = con.execute(
             "SELECT ticker, relation, target, target_kind, target_ticker, aliases, detail, as_of, "
             "source_url FROM graph_edges"
             + (" WHERE ticker = ?" if args.ticker else "")
             + " ORDER BY ticker, relation, target",
             [args.ticker] if args.ticker else [],
         )
-        print(cursor_markdown_table(cur))
+        print(cursor_markdown_table(cursor))
     elif args.command == "attempt":
         print(json.dumps(attempt(cfg, con, args.note), indent=2))
     elif args.command == "hits":
@@ -62,7 +62,7 @@ def main() -> int:
         )
     else:
         if not args.file or not args.file.exists():
-            raise SystemExit(MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL.format(command=args.command))
+            raise SystemExit(MSG_USAGE_GRAPH_COMMAND.format(command=args.command))
         out = add(cfg, con, args.file, dry_run=args.command == "check")
         print(json.dumps(out, indent=2))
         return 1 if out["rejected"] else 0

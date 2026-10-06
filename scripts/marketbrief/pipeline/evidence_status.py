@@ -41,7 +41,7 @@ class EvidenceStatuses:
             table: dict[str, dict[str, str]] = {}
             for news_id, ticker, status in self.con.execute(IDS_SQL, [key]).fetchall():
                 table.setdefault(news_id, {})[ticker] = status
-            confirming = {(p, ticker_name) for p, ticker_name in self.con.execute(CONFIRMING_SQL, [key]).fetchall()}
+            confirming = {(news_id, ticker) for news_id, ticker in self.con.execute(CONFIRMING_SQL, [key]).fetchall()}
             self._by_time[key] = (table, confirming)
         return self._by_time[key]
 

@@ -15,18 +15,18 @@ from marketbrief.constants.lessons import (
     FACT_FIELDS,
     ID_RE,
     MAX_WORDS,
-    MSG_A_LESSON_FOR_IS_ALREADY_STORED,
-    MSG_DOES_NOT_EXIST,
-    MSG_DUPLICATE_LESSON_FOR_IN_THIS_FILE,
-    MSG_IS_BUT_THE_STORED_VALUE_IS,
+    MSG_COPIED_FACT_DIFFERS,
+    MSG_DUPLICATE_LESSON_IN_FILE,
+    MSG_FIELD_MUST_BE_TEXT,
+    MSG_LESSON_ALREADY_STORED,
+    MSG_LESSON_NUMBER_MATCHES_NOTHING,
     MSG_LESSON_WORD_COUNT,
     MSG_MISSING_AGENT_FIELD,
-    MSG_MUST_BE_TEXT,
     MSG_NOT_A_JSON_OBJECT,
-    MSG_NUMBER_IN_THE_LESSON_MATCHES_NOTHING,
-    MSG_PREDICTION_DOES_NOT_EXIST_OR_IS,
-    MSG_PREDICTION_IS_SETTLED_BUT_ITS_RANGE,
-    MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL,
+    MSG_PATH_DOES_NOT_EXIST,
+    MSG_PREDICTION_NOT_SETTLED,
+    MSG_RANGE_STILL_OPEN,
+    MSG_RETURN_HAS_WRONG_SIGN,
     NUM_RE,
     PCT_KINDS,
     TIME_FIELDS,
@@ -37,7 +37,7 @@ from marketbrief.pipeline.lessons.facts import settled, stored_ids
 
 def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
     """(value, what) pairs a lesson's text may cite, as absolute values."""
-    vals = [
+    allowed_values = [
         (1.0, "horizon"),
         (5.0, "horizon"),
         (float(fact["horizon_days"]), "horizon"),
@@ -45,20 +45,20 @@ def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
         (80.0, "band"),
     ]
     if fact.get("actual_return") is not None:
-        vals.append((abs(100 * fact["actual_return"]), "return"))
+        allowed_values.append((abs(100 * fact["actual_return"]), "return"))
     if fact.get("confidence") is not None:
-        vals += [(fact["confidence"], "confidence"), (100 * fact["confidence"], "confidence_pct")]
+        allowed_values += [(fact["confidence"], "confidence"), (100 * fact["confidence"], "confidence_pct")]
     for key in ("base_close", "target_close", "range_actual_close", "lo80", "lo50", "hi50", "hi80"):
         if fact.get(key) is not None:
-            vals.append((abs(fact[key]), key))
+            allowed_values.append((abs(fact[key]), key))
     for num in NUM_RE.findall(ID_RE.sub(" ", fact.get("rationale") or "")):  # numbers the stored rationale cites
-        vals.append((float(num[1].replace(",", "")), "rationale"))
+        allowed_values.append((float(num[1].replace(",", "")), "rationale"))
     close = fact.get("range_actual_close")
     if close is not None:
         for key in ("lo80", "lo50", "hi50", "hi80"):
             if fact.get(key):
-                vals.append((abs(100 * (close / fact[key] - 1)), f"distance from {key}"))
-    return vals
+                allowed_values.append((abs(100 * (close / fact[key] - 1)), f"distance from {key}"))
+    return allowed_values
 
 
 def text_number_errors(text: str, fact: dict) -> list[str]:
@@ -72,7 +72,7 @@ def text_number_errors(text: str, fact: dict) -> list[str]:
     for sign, num, pct in NUM_RE.findall(cleaned_text):
         # a percentage may only be a return, a % distance, confidence in %, a band name or a rationale
         # number; a plain number only a close, band edge, confidence, horizon or a rationale number
-        vals = [
+        allowed_values = [
             (allowed_value, what)
             for allowed_value, what in allowed_numbers(fact)
             if (what in PCT_KINDS or what.startswith("distance")) == bool(pct) or what in BOTH_KINDS
@@ -80,9 +80,9 @@ def text_number_errors(text: str, fact: dict) -> list[str]:
         number = float(num.replace(",", ""))
         dec = len(num.split(".")[1]) if "." in num else 0
         tol = 0.5 * 10**-dec + 1e-9
-        matches = [what for allowed_value, what in vals if abs(number - allowed_value) <= tol]
+        matches = [what for allowed_value, what in allowed_values if abs(number - allowed_value) <= tol]
         if not matches:
-            errs.append(MSG_NUMBER_IN_THE_LESSON_MATCHES_NOTHING.format(sign=sign, num=num, strip=pct.strip()))
+            errs.append(MSG_LESSON_NUMBER_MATCHES_NOTHING.format(sign=sign, num=num, unit=pct.strip()))
             continue
         if (
             sign
@@ -90,14 +90,14 @@ def text_number_errors(text: str, fact: dict) -> list[str]:
             and "return" in matches
             and fact.get("actual_return")
             and not any(
-                abs(number - allowed_value) <= tol for allowed_value, what in vals if what.startswith("distance")
+                abs(number - allowed_value) <= tol
+                for allowed_value, what in allowed_values
+                if what.startswith("distance")
             )
         ):
             neg = sign in "-−"
             if neg != (fact["actual_return"] < 0):
-                errs.append(
-                    MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL.format(sign=sign, num=num, actual_return=fact["actual_return"])
-                )
+                errs.append(MSG_RETURN_HAS_WRONG_SIGN.format(sign=sign, num=num, actual_return=fact["actual_return"]))
     return errs
 
 
@@ -129,7 +129,7 @@ def agent_field_problems(record: dict) -> list[str]:
         if record.get(key) in (None, ""):
             errs.append(MSG_MISSING_AGENT_FIELD.format(key=key))
         elif not isinstance(record[key], str):
-            errs.append(MSG_MUST_BE_TEXT.format(key=key))
+            errs.append(MSG_FIELD_MUST_BE_TEXT.format(key=key))
     return errs
 
 
@@ -139,13 +139,13 @@ def prediction_problems(prediction_id, facts: dict, stored: set[str], seen: set[
         return []
     errs = []
     if prediction_id not in facts:
-        errs.append(MSG_PREDICTION_DOES_NOT_EXIST_OR_IS.format(prediction_id=prediction_id))
+        errs.append(MSG_PREDICTION_NOT_SETTLED.format(prediction_id=prediction_id))
     elif facts[prediction_id] is None:
-        errs.append(MSG_PREDICTION_IS_SETTLED_BUT_ITS_RANGE.format(prediction_id=prediction_id))
+        errs.append(MSG_RANGE_STILL_OPEN.format(prediction_id=prediction_id))
     if f"lesson-{prediction_id}" in stored:
-        errs.append(MSG_A_LESSON_FOR_IS_ALREADY_STORED.format(prediction_id=prediction_id))
+        errs.append(MSG_LESSON_ALREADY_STORED.format(prediction_id=prediction_id))
     if prediction_id in seen:
-        errs.append(MSG_DUPLICATE_LESSON_FOR_IN_THIS_FILE.format(prediction_id=prediction_id))
+        errs.append(MSG_DUPLICATE_LESSON_IN_FILE.format(prediction_id=prediction_id))
     seen.add(prediction_id)
     return errs
 
@@ -160,7 +160,7 @@ def lesson_text_problems(text, record: dict, fact: dict | None) -> list[str]:
     if fact:
         for key in FACT_FIELDS:
             if key in record and not same(key, record[key], fact[key]):
-                errs.append(MSG_IS_BUT_THE_STORED_VALUE_IS.format(key=key, value=record[key], value_2=fact[key]))
+                errs.append(MSG_COPIED_FACT_DIFFERS.format(key=key, copied=record[key], stored=fact[key]))
         if isinstance(text, str):
             errs += text_number_errors(text, fact)
     return errs
@@ -189,7 +189,7 @@ def read_file(path: Path) -> list:
     """One entry per non-empty line: the parsed object, or the raw text when it is not JSON
     (validate_records then rejects it as not a JSON object)."""
     if not path.exists():
-        raise SystemExit(MSG_DOES_NOT_EXIST.format(path=path))
+        raise SystemExit(MSG_PATH_DOES_NOT_EXIST.format(path=path))
     recs = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():

@@ -112,7 +112,7 @@ def financial_row(filing: FilingContext, period: tuple[str, str], facts: dict, n
 def financial_rows(xml: str, ticker: str, meta: dict, now: str) -> list[dict]:
     """One record per non-dimensional duration context that carries results (quarter, YTD, year)."""
     contexts, facts = xbrl(xml)
-    main = next((facts[c] for c in facts if FIELD_NATURE in facts[c]), {})
+    main = next((facts[fact_context] for fact_context in facts if FIELD_NATURE in facts[fact_context]), {})
     basis = (main.get(FIELD_NATURE) or meta.get("consolidated") or "").lower() or None
     taxonomy = found.group(1) if (found := re.search(r"INTEGRATED_FILING_([A-Z]+)_", meta.get("xbrl") or "")) else None
     filing = FilingContext(ticker, basis, taxonomy, meta, main)
@@ -129,7 +129,7 @@ def financial_rows(xml: str, ticker: str, meta: dict, now: str) -> list[dict]:
 def stored_state(market: str) -> tuple[set[str], dict[str, str]]:
     """(filing sequence ids already stored, newest stored period end per ticker) from the stored financials ids."""
     ids = recent_ids(market, KIND_FINANCIALS, days=SEEN_LOOKBACK_DAYS)
-    done = {i.rsplit("-", 1)[1] for i in ids if i.startswith(FINANCIAL_ID_PREFIX)}
+    done = {listed_id.rsplit("-", 1)[1] for listed_id in ids if listed_id.startswith(FINANCIAL_ID_PREFIX)}
     latest: dict[str, str] = {}
     for stored_id in ids:
         if stored_id.startswith(FINANCIAL_ID_PREFIX):
@@ -143,12 +143,23 @@ def unseen_filings(index: list[dict], done: set[str], since: date | None) -> lis
     """The listed filings with an XBRL file that are not stored (newest period first); with `since` only those
     broadcast on or after it."""
     filings = sorted(
-        (r for r in index if pick(r, "seq_Id") and pick(r, "seq_Id") not in done and pick(r, "xbrl")),
-        key=lambda r: (parse_day(pick(r, "qe_Date")) or date.min, pick(r, "broadcast_Date") or ""),
+        (
+            filing_row
+            for filing_row in index
+            if pick(filing_row, "seq_Id") and pick(filing_row, "seq_Id") not in done and pick(filing_row, "xbrl")
+        ),
+        key=lambda filing_row: (
+            parse_day(pick(filing_row, "qe_Date")) or date.min,
+            pick(filing_row, "broadcast_Date") or "",
+        ),
         reverse=True,
     )
     if since is not None:
-        filings = [r for r in filings if (parse_day(pick(r, "broadcast_Date", "creation_Date")) or date.min) >= since]
+        filings = [
+            filing_row
+            for filing_row in filings
+            if (parse_day(pick(filing_row, "broadcast_Date", "creation_Date")) or date.min) >= since
+        ]
     return filings
 
 
@@ -174,7 +185,7 @@ def financials(
     by_ticker = {ticker: symbol for symbol, ticker in run.symbols.items()}
     due = due_tickers(latest, list(by_ticker), run.today, limit) if since is None else list(by_ticker)
     run.problems.notes.append(MSG_FINANCIALS_POLLED.format(count=len(due), quarter=latest_quarter_end(run.today)))
-    found, ok, total = [], 0, 0
+    found, calls_answered, total = [], 0, 0
     for ticker in due:
         try:
             index = rows_of(
@@ -185,9 +196,9 @@ def financials(
         except FetchError as exc:
             run.problems.failed.append(exc.entry(f"financials:{ticker}"))
             if exc.host:
-                return found, ok
+                return found, calls_answered
             continue
-        ok += 1
+        calls_answered += 1
         total += len(index)
         if not index:
             run.problems.notes.append(MSG_FINANCIALS_NONE_LISTED.format(ticker=ticker))
@@ -198,7 +209,7 @@ def financials(
             except FetchError as exc:
                 run.problems.failed.append(exc.entry(f"financials:{ticker}:{meta['seq']}"))
                 if exc.host:
-                    return found, ok
-    if ok and total == 0:
-        coverage(MSG_FINANCIALS_CALLS.format(count=ok), 0, 0, run.problems)
-    return found, ok
+                    return found, calls_answered
+    if calls_answered and total == 0:
+        coverage(MSG_FINANCIALS_CALLS.format(count=calls_answered), 0, 0, run.problems)
+    return found, calls_answered

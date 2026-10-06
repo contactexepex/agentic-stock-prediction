@@ -12,6 +12,22 @@ from marketbrief.constants.prediction_rules import (
     DEFAULT_AS_OF_LABEL,
     DEFAULT_EVIDENCE_LABEL,
     HORIZONS,
+    MSG_AS_OF_DATE_MISMATCH,
+    MSG_CONFIDENCE_OUT_OF_RANGE,
+    MSG_DIRECTION_MUST_BE_UP_OR_DOWN,
+    MSG_EARNINGS_WITHIN_ONE_DAY,
+    MSG_EVIDENCE_IDS_UNKNOWN,
+    MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT,
+    MSG_HORIZON_MUST_BE_1_OR_5,
+    MSG_ID_ALREADY_RECORDED,
+    MSG_ID_MUST_BE_DATE_TICKER_HORIZON,
+    MSG_INDICATOR_QUALITY_BLOCKED,
+    MSG_MADE_AT_IS_NOT_A_TIMESTAMP,
+    MSG_MISSING_FIELD,
+    MSG_PROMPT_VERSION_MUST_BE_TEXT,
+    MSG_RANGE_WIDEN_OUT_OF_RANGE,
+    MSG_RATIONALE_NOT_TEXT_OR_TOO_LONG,
+    MSG_UNKNOWN_TICKER,
     RATIONALE_WORDS,
     REQUIRED,
     WIDEN_MAX,
@@ -29,24 +45,6 @@ from marketbrief.constants.verification import (
 )
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
-from marketbrief.constants.prediction_rules import (
-    MSG_AS_OF_DATE_IS_NOT,
-    MSG_CONFIDENCE_MUST_BE_GOT,
-    MSG_DIRECTION_MUST_BE_UP_OR_DOWN,
-    MSG_EVIDENCE_IDS_NOT_IN,
-    MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT,
-    MSG_HAS_EARNINGS_WITHIN_1_DAY_DAYS,
-    MSG_HORIZON_DAYS_MUST_BE_1_OR,
-    MSG_ID_ALREADY_RECORDED,
-    MSG_ID_MUST_BE_AS_OF_DATE,
-    MSG_INDICATOR_QUALITY_IS_BLOCKED,
-    MSG_MADE_AT_IS_NOT_A_TIMESTAMP,
-    MSG_MISSING,
-    MSG_PROMPT_VERSION_MUST_BE_TEXT,
-    MSG_RANGE_WIDEN_MUST_BE_0_GOT,
-    MSG_RATIONALE_MUST_BE_TEXT_OF_AT,
-    MSG_UNKNOWN_TICKER,
-)
 
 
 class RuleLabels(NamedTuple):
@@ -63,12 +61,14 @@ def identity_errors(rec: dict, ctx: dict, seen: set[str], want, as_of, label: st
     if ticker not in ctx["tickers"]:
         errs.append(MSG_UNKNOWN_TICKER.format(ticker=ticker))
     if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon not in HORIZONS:
-        errs.append(MSG_HORIZON_DAYS_MUST_BE_1_OR.format(horizon=horizon))
+        errs.append(MSG_HORIZON_MUST_BE_1_OR_5.format(horizon=horizon))
     if as_of is not None and str(rec["as_of_date"]) != str(want):
-        errs.append(MSG_AS_OF_DATE_IS_NOT.format(as_of_date=rec["as_of_date"], label=label, want=want))
+        errs.append(MSG_AS_OF_DATE_MISMATCH.format(as_of_date=rec["as_of_date"], label=label, want=want))
     if rec["id"] != f"{rec['as_of_date']}-{ticker}-{horizon}d":
         errs.append(
-            MSG_ID_MUST_BE_AS_OF_DATE.format(as_of_date=rec["as_of_date"], ticker=ticker, horizon=horizon, id=rec["id"])
+            MSG_ID_MUST_BE_DATE_TICKER_HORIZON.format(
+                as_of_date=rec["as_of_date"], ticker=ticker, horizon=horizon, id=rec["id"]
+            )
         )
     if rec["id"] in seen:
         errs.append(MSG_ID_ALREADY_RECORDED.format(id=rec["id"]))
@@ -80,30 +80,40 @@ def value_errors(rec: dict) -> list[str]:
     errs = []
     if rec["direction"] not in ("up", "down"):
         errs.append(MSG_DIRECTION_MUST_BE_UP_OR_DOWN.format(direction=rec["direction"]))
-    c = rec["confidence"]
-    if not isinstance(c, (int, float)) or isinstance(c, bool) or not (CONF_MIN <= c <= CONF_MAX):
-        errs.append(MSG_CONFIDENCE_MUST_BE_GOT.format(conf_min=CONF_MIN, conf_max=CONF_MAX, c=c))
-    w = rec.get("range_widen")
-    if w is not None and (not isinstance(w, (int, float)) or isinstance(w, bool) or not 0 <= w <= WIDEN_MAX):
-        errs.append(MSG_RANGE_WIDEN_MUST_BE_0_GOT.format(widen_max=WIDEN_MAX, w=w))
+    confidence = rec["confidence"]
+    if (
+        not isinstance(confidence, (int, float))
+        or isinstance(confidence, bool)
+        or not (CONF_MIN <= confidence <= CONF_MAX)
+    ):
+        errs.append(MSG_CONFIDENCE_OUT_OF_RANGE.format(conf_min=CONF_MIN, conf_max=CONF_MAX, confidence=confidence))
+    range_widen = rec.get("range_widen")
+    if range_widen is not None and (
+        not isinstance(range_widen, (int, float)) or isinstance(range_widen, bool) or not 0 <= range_widen <= WIDEN_MAX
+    ):
+        errs.append(MSG_RANGE_WIDEN_OUT_OF_RANGE.format(widen_max=WIDEN_MAX, range_widen=range_widen))
     if not isinstance(rec["rationale"], str) or len(rec["rationale"].split()) > RATIONALE_WORDS:
-        errs.append(MSG_RATIONALE_MUST_BE_TEXT_OF_AT.format(rationale_words=RATIONALE_WORDS))
+        errs.append(MSG_RATIONALE_NOT_TEXT_OR_TOO_LONG.format(rationale_words=RATIONALE_WORDS))
     return errs
 
 
 def evidence_errors(rec: dict, ctx: dict, made, label: str) -> list[str]:
     """The cited evidence ids exist and (with public times) were public by made_at."""
     ids = rec["evidence_ids"]
-    if not isinstance(ids, list) or not ids or not all(isinstance(x, str) for x in ids):
+    if not isinstance(ids, list) or not ids or not all(isinstance(evidence_id, str) for evidence_id in ids):
         return ["evidence_ids must be a non-empty list of ids"]
     errs = []
-    unknown = [x for x in ids if x not in ctx["evidence"]]
+    unknown = [evidence_id for evidence_id in ids if evidence_id not in ctx["evidence"]]
     if unknown:
-        errs.append(MSG_EVIDENCE_IDS_NOT_IN.format(label=label, unknown=unknown))
+        errs.append(MSG_EVIDENCE_IDS_UNKNOWN.format(label=label, unknown=unknown))
     if isinstance(ctx["evidence"], dict) and made is not None:
-        late = [x for x in ids if ctx["evidence"].get(x) is not None and ctx["evidence"][x] > made]
+        late = [
+            evidence_id
+            for evidence_id in ids
+            if ctx["evidence"].get(evidence_id) is not None and ctx["evidence"][evidence_id] > made
+        ]
         if late:
-            errs.append(MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT.format(isoformat=made.isoformat(), late=late))
+            errs.append(MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT.format(made_at=made.isoformat(), late=late))
     return errs
 
 
@@ -116,11 +126,9 @@ def feature_errors(ctx: dict, ticker: str, want) -> list[str]:
         return [f"no indicator snapshot for {ticker}" + (f" on {want}" if want is not None else "")]
     errs = []
     if features["quality"] == "BLOCKED":
-        errs.append(MSG_INDICATOR_QUALITY_IS_BLOCKED.format(ticker=ticker))
+        errs.append(MSG_INDICATOR_QUALITY_BLOCKED.format(ticker=ticker))
     if features["days_to_earnings"] is not None and features["days_to_earnings"] <= 1:
-        errs.append(
-            MSG_HAS_EARNINGS_WITHIN_1_DAY_DAYS.format(ticker=ticker, days_to_earnings=features["days_to_earnings"])
-        )
+        errs.append(MSG_EARNINGS_WITHIN_ONE_DAY.format(ticker=ticker, days_to_earnings=features["days_to_earnings"]))
     return errs
 
 
@@ -137,10 +145,10 @@ def check_prediction(
         return ["not a JSON object"]
     labels = labels or RuleLabels()
     cols = SCHEMAS["predictions"][1]
-    errs = [f"unknown field {k!r}" for k in rec if k not in cols]
-    for k in REQUIRED + (("made_at",) if require_made_at else ()):
-        if rec.get(k) in (None, ""):
-            errs.append(MSG_MISSING.format(k=k))
+    errs = [f"unknown field {field!r}" for field in rec if field not in cols]
+    for field in REQUIRED + (("made_at",) if require_made_at else ()):
+        if rec.get(field) in (None, ""):
+            errs.append(MSG_MISSING_FIELD.format(field=field))
     if errs:
         return errs
     ticker = rec["ticker"]
@@ -172,10 +180,16 @@ def check_news_status(rec: dict, statuses: list[str]) -> list[tuple[str, str]]:
                 f"main evidence {ids[0]} is {statuses[0]}; it must be {' or '.join(MAIN_EVIDENCE_STATUSES)}",
             )
         )
-    blocked = [f"{i} ({s})" for i, s in zip(ids, statuses, strict=False) if s in NEVER_SUPPORT_STATUSES]
+    blocked = [
+        f"{evidence_id} ({status})"
+        for evidence_id, status in zip(ids, statuses, strict=False)
+        if status in NEVER_SUPPORT_STATUSES
+    ]
     if blocked:
         out.append((CODE_NEWS_STATUS_BLOCKED, f"evidence that cannot support a call: {', '.join(blocked)}"))
-    contradicted = [i for i, s in zip(ids, statuses, strict=False) if s in WIDEN_ONLY_STATUSES]
+    contradicted = [
+        evidence_id for evidence_id, status in zip(ids, statuses, strict=False) if status in WIDEN_ONLY_STATUSES
+    ]
     if contradicted and not (rec.get("range_widen") or 0) > 0:
         out.append(
             (
@@ -183,7 +197,11 @@ def check_news_status(rec: dict, statuses: list[str]) -> list[tuple[str, str]]:
                 f"contradicted evidence {contradicted} may only be cited to widen the range (range_widen > 0)",
             )
         )
-    weak = [f"{i} ({s})" for i, s in zip(ids, statuses, strict=False) if s in WEAK_STATUSES]
+    weak = [
+        f"{evidence_id} ({status})"
+        for evidence_id, status in zip(ids, statuses, strict=False)
+        if status in WEAK_STATUSES
+    ]
     cap = round(CONF_MAX - WEAK_CONFIDENCE_PENALTY, 2)
     if weak and rec["confidence"] > cap + 1e-9:
         out.append(

@@ -47,12 +47,12 @@ def schedule_13d_persons(root) -> list[dict]:
     """The reporting persons of a Schedule 13D (name, cik, shares, percent of class)."""
     return [
         {
-            "name": xml_text(p, "reportingPersonName"),
-            "cik": xml_text(p, "reportingPersonCIK"),
-            "shares": parse_sec_number(xml_text(p, "aggregateAmountOwned")),
-            "percent": parse_sec_number(xml_text(p, "percentOfClass")),
+            "name": xml_text(person, "reportingPersonName"),
+            "cik": xml_text(person, "reportingPersonCIK"),
+            "shares": parse_sec_number(xml_text(person, "aggregateAmountOwned")),
+            "percent": parse_sec_number(xml_text(person, "percentOfClass")),
         }
-        for p in root.findall("formData/reportingPersons/reportingPersonInfo")
+        for person in root.findall("formData/reportingPersons/reportingPersonInfo")
     ]
 
 
@@ -60,12 +60,12 @@ def schedule_13g_persons(root) -> list[dict]:
     """The reporting persons of a Schedule 13G (name, shares, percent of class; no CIK listed)."""
     return [
         {
-            "name": xml_text(p, "reportingPersonName"),
+            "name": xml_text(person, "reportingPersonName"),
             "cik": None,
-            "shares": parse_sec_number(xml_text(p, "reportingPersonBeneficiallyOwnedAggregateNumberOfShares")),
-            "percent": parse_sec_number(xml_text(p, "classPercent")),
+            "shares": parse_sec_number(xml_text(person, "reportingPersonBeneficiallyOwnedAggregateNumberOfShares")),
+            "percent": parse_sec_number(xml_text(person, "classPercent")),
         }
-        for p in root.findall("formData/coverPageHeaderReportingPersonDetails")
+        for person in root.findall("formData/coverPageHeaderReportingPersonDetails")
     ]
 
 
@@ -99,10 +99,10 @@ def parse_schedule13(data: bytes) -> dict:
 
 def to_row(filing: dict, parsed: dict, ticker: str, url: str, now: str) -> dict:
     """The `stakes` row of one Schedule 13D/13G."""
-    percents = [x["percent"] for x in parsed["persons"] if x["percent"] is not None]
-    shares = [x["shares"] for x in parsed["persons"] if x["shares"] is not None]
-    names = [x["name"] for x in parsed["persons"] if x["name"]]
-    filer_cik = parsed["filer_cik"] or next((x["cik"] for x in parsed["persons"] if x["cik"]), None)
+    percents = [person["percent"] for person in parsed["persons"] if person["percent"] is not None]
+    shares = [person["shares"] for person in parsed["persons"] if person["shares"] is not None]
+    names = [person["name"] for person in parsed["persons"] if person["name"]]
+    filer_cik = parsed["filer_cik"] or next((person["cik"] for person in parsed["persons"] if person["cik"]), None)
     return {
         COL_ID: filing["accession"],
         COL_TICKER: ticker,
@@ -176,7 +176,7 @@ def main() -> int:
                 "since": str(since),
                 "filings_read": read,
                 "new_rows": written,
-                "new_13d": sum(r["kind"] == KIND_13D and not r["amendment"] for r in rows),
+                "new_13d": sum(row["kind"] == KIND_13D and not row["amendment"] for row in rows),
                 "as_investor_skipped": as_investor,
                 "requests": edgar.requests,
                 "sec_times": time_summary(edgar),

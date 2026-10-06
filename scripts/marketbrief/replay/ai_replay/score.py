@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from marketbrief.analytics.features import load_bars
-from marketbrief.constants.ai_replay import CONTAMINATED, FAIR, MSG_NOTHING_RECORDED_IN
+from marketbrief.constants.ai_replay import CONTAMINATED, FAIR, MSG_NOTHING_RECORDED
 from marketbrief.core.database import connect
 from marketbrief.replay.ai_replay.ai_html import html_page
 from marketbrief.replay.ai_replay.record import read_jsonl
@@ -18,7 +18,7 @@ def score(cfg: dict, results: Path, out: Path) -> dict:
     store_directory = Path(results) / cfg["market"]
     calls, days = read_jsonl(store_directory / "calls.jsonl"), read_jsonl(store_directory / "days.jsonl")
     if not days:
-        raise SystemExit(MSG_NOTHING_RECORDED_IN.format(store_directory=store_directory))
+        raise SystemExit(MSG_NOTHING_RECORDED.format(store_directory=store_directory))
     bars = load_bars(connect(cfg["market"]))
     summary = summarize(cfg, calls, days, bars)
     out = Path(out)

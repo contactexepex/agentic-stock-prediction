@@ -68,6 +68,11 @@ def candidates(con, cfg: dict, src: Sources, now: pd.Timestamp) -> list[dict]:
             }
         )
     found.sort(
-        key=lambda c: (-c["priority"], TIER_RANK.get(c["tier"], TIER_RANK[TIER_UNLISTED]), -c["ts"].value, c["id"])
+        key=lambda candidate: (
+            -candidate["priority"],
+            TIER_RANK.get(candidate["tier"], TIER_RANK[TIER_UNLISTED]),
+            -candidate["ts"].value,
+            candidate["id"],
+        )
     )
     return found

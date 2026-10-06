@@ -125,13 +125,13 @@ def svg_time(summary: dict) -> str:
         return ""
     width, height, left, right, top, bottom = 640, 300, 48, 30, 16, 36
     plot_width, plot_height = width - left - right, height - top - bottom
-    vals = [
+    values = [
         value["cover80"]
         for horizon in ("1", "5")
         for value in summary["horizons"].get(horizon, {}).get("by_month", {}).values()
         if value.get("days", 0) >= MIN_MONTH_DAYS
     ]
-    lower = max(0.0, math.floor(min(vals + [0.6]) * 10) / 10)
+    lower = max(0.0, math.floor(min(values + [0.6]) * 10) / 10)
     scale_x = lambda index: left + (index + 0.5) * plot_width / len(months)  # noqa: E731
     scale_y = lambda value: top + (1 - (value - lower) / (1 - lower)) * plot_height  # noqa: E731
     out = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="80% coverage by month">']

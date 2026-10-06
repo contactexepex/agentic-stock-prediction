@@ -20,6 +20,7 @@ from marketbrief.constants.events import (
     METHOD_ERROR_LIMIT,
     MSG_CALENDAR_LISTS_EX_DIVIDEND,
     MSG_EMPTY_CALENDAR,
+    MSG_METHOD_ERROR,
     MSG_NO_DIVIDENDS,
     MSG_STORED_DIVIDENDS,
     PRIORITY_CALL,
@@ -31,7 +32,6 @@ from marketbrief.constants.events import (
     YAHOO_EARNINGS,
     YAHOO_EVENT_TYPE_COLUMN,
 )
-from marketbrief.constants.events import MSG_MESSAGE
 
 DIVIDEND_DECIMALS = 6
 
@@ -54,7 +54,7 @@ def yf_earnings(
             answered = True
         except Exception as exc:
             frame = None
-            errors.append(MSG_MESSAGE.format(strip=method_name.strip("_"), value=str(exc)[:METHOD_ERROR_LIMIT]))
+            errors.append(MSG_METHOD_ERROR.format(method=method_name.strip("_"), error=str(exc)[:METHOD_ERROR_LIMIT]))
         if frame is not None and not frame.empty:
             used = method_name.strip("_")
             break
@@ -82,7 +82,7 @@ def dividends_expected(calendar: dict | None, stored_count: int, since: date) ->
     Yahoo's calendar lists an ex-dividend date inside the window), or None."""
     if stored_count:
         return MSG_STORED_DIVIDENDS.format(count=stored_count)
-    listed = [d for d in as_dates((calendar or {}).get(FIELD_EX_DIVIDEND_DATE)) if d >= since]
+    listed = [day for day in as_dates((calendar or {}).get(FIELD_EX_DIVIDEND_DATE)) if day >= since]
     return MSG_CALENDAR_LISTS_EX_DIVIDEND.format(day=max(listed)) if listed else None
 
 

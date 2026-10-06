@@ -154,20 +154,20 @@ def plain_text(summary: str | None, source: str | None = None) -> str:
 
 def _alternation(names: list[str]) -> str:
     """A regex alternation of the distinct names, longest first."""
-    return "|".join(map(re.escape, sorted({n.translate(_QUOTES) for n in names if n}, key=len, reverse=True)))
+    return "|".join(map(re.escape, sorted({name.translate(_QUOTES) for name in names if name}, key=len, reverse=True)))
 
 
 def _regex(patterns: list[str]) -> re.Pattern | None:
     """One case-insensitive regex of the patterns, or None when there are none."""
-    return re.compile("|".join(f"(?:{p})" for p in patterns), re.I) if patterns else None
+    return re.compile("|".join(f"(?:{pattern})" for pattern in patterns), re.I) if patterns else None
 
 
 def company_queries(watchlist: dict, template: str) -> list[tuple[str, str]]:
     """(ticker, Google News query) for every company query job."""
     return [
-        (ticker, q)
+        (ticker, query)
         for ticker, meta in watchlist.get("tickers", {}).items()
-        for q in meta.get("queries", [template.format(name=meta["name"])])
+        for query in meta.get("queries", [template.format(name=meta["name"])])
     ]
 
 
@@ -189,7 +189,7 @@ class Tagger:
         self.rules: Rules = {}
         self.wire_rules: Rules = {}
         self.symbols: dict[str, re.Pattern] = {}
-        self.brokers = {ticker_name for ticker_name, meta in watchlist.get("tickers", {}).items() if meta.get("broker")}
+        self.brokers = {ticker for ticker, meta in watchlist.get("tickers", {}).items() if meta.get("broker")}
         for ticker, meta in watchlist.get("tickers", {}).items():
             names = meta.get("news_names") or [meta["name"], *meta.get("aliases", [])]
             self.rules[ticker] = (
@@ -199,28 +199,28 @@ class Tagger:
             wnames = meta.get("wire_names") or [meta["name"], *meta.get("aliases", [])]
             self.wire_rules[ticker] = (re.compile(r"\b(?:" + _alternation(wnames) + r")\b", re.I), wire_ex)
             self.symbols[ticker] = symbol_regex(ticker)
-        self.wire_feeds = {o["name"] for o in feeds.get("outlets", []) if o.get("watchlist_only")}
+        self.wire_feeds = {outlet["name"] for outlet in feeds.get("outlets", []) if outlet.get("watchlist_only")}
 
     def matches(self, text: str, rules: Rules) -> list[tuple[int, int, str]]:
         """(start, end, ticker) of every name match, excluded phrases blanked out first, plus the
         ticker symbol in parentheses ('(DAL)', '(DAL:NYSE)', '(NYSE: DAL)'), case-sensitive."""
         text = (text or "").translate(_QUOTES)
         out = []
-        for ticker, (pat, ex) in rules.items():
-            ticker_name = ex.sub(lambda m: " " * len(m.group()), text) if ex else text
-            out += [(m.start(), m.end(), ticker) for m in pat.finditer(ticker_name)]
-            out += [(m.start(), m.end(), ticker) for m in self.symbols[ticker].finditer(text)]
+        for ticker, (name_pattern, exclusion) in rules.items():
+            visible_text = exclusion.sub(lambda match: " " * len(match.group()), text) if exclusion else text
+            out += [(match.start(), match.end(), ticker) for match in name_pattern.finditer(visible_text)]
+            out += [(match.start(), match.end(), ticker) for match in self.symbols[ticker].finditer(text)]
         return sorted(out)
 
-    def is_actor(self, title: str, s: int, e: int, ticker: str) -> bool:
-        """True when the company matched at title[s:e] acts on something else instead of being the
+    def is_actor(self, title: str, start: int, end: int, ticker: str) -> bool:
+        """True when the company matched at title[start:end] acts on something else instead of being the
         subject: an analyst action ("JPMorgan cuts target for Aon", "target raised by JPMorgan",
         "Bank of America upgrades DraftKings"), a holding ("shares of X bought by Bank of America
         Corp", "Nvidia takes stake in ..."), or a venue ("to present at Bank of America 2026
         conference", "Bank of America Plaza"). Companies marked `broker: true` in the config are
         also actors as a research or securities arm ("BofA Securities", "at BofA" in analyst
         news) and when they comment ("JPMorgan says/sees ...", not "says its ...")."""
-        before, after = title[:s], title[e:]
+        before, after = title[:start], title[end:]
         action = bool(_ACTION_WORDS.search(title))
         # the action word must be in the same clause: "Tesla cuts prices; analysts trim targets"
         # leaves Tesla the subject
@@ -229,7 +229,7 @@ class Tagger:
         # "Costco downgraded from Hold to Sell" is passive: Costco is the object
         if act and _ACTION_WORDS.search(clause_after) and not _PASSIVE_NEXT.search(after[act.end() :]):
             return True
-        if _PASSIVE.search(before) and _ACTION_WORDS.search(f"{clause_before} {title[s:e]}{clause_after}"):
+        if _PASSIVE.search(before) and _ACTION_WORDS.search(f"{clause_before} {title[start:end]}{clause_after}"):
             return True
         if _PLACE_AFTER.search(after) or (_AT.search(before) and _VENUE_AFTER.search(after)):
             return True
@@ -258,13 +258,19 @@ class Tagger:
                 primary = []
             else:
                 listed = {
-                    ticker for s, e, ticker in found if _LIST_AFTER.search(title[e:]) or _LIST_BEFORE.search(title[:s])
+                    ticker
+                    for start, end, ticker in found
+                    if _LIST_AFTER.search(title[end:]) or _LIST_BEFORE.search(title[:start])
                 }
                 # an actor or holder is mentioned only when every one of its title matches is one
                 actors = {
                     ticker
                     for ticker in order
-                    if all(self.is_actor(title, s, e, ticker) for s, e, x in found if x == ticker)
+                    if all(
+                        self.is_actor(title, start, end, ticker)
+                        for start, end, found_ticker in found
+                        if found_ticker == ticker
+                    )
                 }
                 primary = [ticker for ticker in order if ticker not in listed and ticker not in actors]
             mentioned = [ticker for ticker in order if ticker not in primary]
@@ -290,14 +296,14 @@ class Tagger:
         """The tickers of an RSS item."""
         return set(self.classify_item(title, summary, source)["tickers"])
 
-    def retag_stored(  # noqa: PLR0913
+    def retag_stored(  # noqa: PLR0913 (one argument per stored column the SQL macro passes)
         self,
         feed,
         title,
         tickers,
         primary,
         mentioned,
-        confidence,  # noqa: PLR0913
+        confidence,
         tag_version,
     ) -> dict:
         """Corrected tags of a stored row (see the module docstring)."""

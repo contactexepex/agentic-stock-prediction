@@ -11,10 +11,10 @@ import pandas as pd
 from marketbrief.analytics.prediction_rules import RuleLabels, check_prediction
 from marketbrief.constants.ai_replay import (
     MARKER,
-    MSG_IS_ALREADY_RECORDED_IN_USE_A,
-    MSG_IS_NOT_A_PREPARED_AI_REPLAY,
+    MSG_DAY_ALREADY_RECORDED,
+    MSG_NOT_A_PREPARED_ROOT,
     MSG_NOT_JSON,
-    MSG_WAS_PREPARED_FOR_NOT,
+    MSG_ROOT_PREPARED_FOR_OTHER_DAY,
 )
 from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
@@ -42,16 +42,16 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
     """What the forecaster saw in the prepared root: snapshot quality, earnings, citable ids."""
     meta_path = root / "ai_replay.json"
     if not (root / MARKER).exists() or not meta_path.exists():
-        raise SystemExit(MSG_IS_NOT_A_PREPARED_AI_REPLAY.format(root=root))
+        raise SystemExit(MSG_NOT_A_PREPARED_ROOT.format(root=root))
     meta = json.loads(meta_path.read_text())
     if meta["market"] != cfg["market"] or meta["as_of_date"] != str(as_of_day):
         raise SystemExit(
-            MSG_WAS_PREPARED_FOR_NOT.format(
+            MSG_ROOT_PREPARED_FOR_OTHER_DAY.format(
                 root=root,
-                market=meta["market"],
-                as_of_date=meta["as_of_date"],
-                market_2=cfg["market"],
-                as_of_day=as_of_day,
+                prepared_market=meta["market"],
+                prepared_as_of_date=meta["as_of_date"],
+                requested_market=cfg["market"],
+                requested_as_of_day=as_of_day,
             )
         )
     with data_root(root):
@@ -59,7 +59,7 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
         feats = con.execute(
             "SELECT ticker, quality, days_to_earnings FROM features_latest WHERE as_of_date = ?", [as_of_day]
         ).df()
-    ev_df, _ = evidence(cfg["market"], root, datetime.fromisoformat(meta["cutoff_utc"]))
+    evidence_frame, _ = evidence(cfg["market"], root, datetime.fromisoformat(meta["cutoff_utc"]))
     return {
         "meta": meta,
         "features": {
@@ -69,7 +69,7 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
             }
             for row in feats.itertuples()
         },
-        "evidence": set(ev_df["id"]),
+        "evidence": set(evidence_frame["id"]),
         "tickers": set(cfg["tickers"]),
     }
 
@@ -94,7 +94,7 @@ def record(cfg: dict, as_of_day: date, root: Path, calls_file: Path, results: Pa
     days = read_jsonl(store_directory / "days.jsonl")
     if any(stored["date"] == str(as_of_day) for stored in days):
         raise SystemExit(
-            MSG_IS_ALREADY_RECORDED_IN_USE_A.format(market=market, as_of_day=as_of_day, store_directory=store_directory)
+            MSG_DAY_ALREADY_RECORDED.format(market=market, as_of_day=as_of_day, store_directory=store_directory)
         )
     seen = {stored["id"] for stored in read_jsonl(store_directory / "calls.jsonl")}
     raw = (

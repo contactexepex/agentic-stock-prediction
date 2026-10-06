@@ -30,12 +30,12 @@ def context_section(cfg: dict, con, per_ticker: int = 3, market_wide: int = 3) -
             "|---|---|---|---|---|---|---|",
         ]
         for row in rows.itertuples(index=False):
-            ret = "" if pd.isna(row.actual_return) else f"{100 * row.actual_return:+.2f}"
+            return_text = "" if pd.isna(row.actual_return) else f"{100 * row.actual_return:+.2f}"
             pos = "" if row.range_position is None or pd.isna(row.range_position) else row.range_position
             lesson = str(row.lesson).replace("|", "/").replace("\n", " ")
             out.append(
                 f"| {row.ticker} | {row.prediction_id} {row.direction} | {row.confidence:.2f} | "
-                f"{'hit' if row.hit else 'miss'} | {ret} | {pos} | {lesson} |"
+                f"{'hit' if row.hit else 'miss'} | {return_text} | {pos} | {lesson} |"
             )
         return "\n".join(out) + "\n"
 

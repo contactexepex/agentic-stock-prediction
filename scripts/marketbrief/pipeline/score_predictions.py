@@ -122,9 +122,18 @@ def main() -> int:
     now = utc_now()
     rows, late_calls = [], 0
     adjs = load_adjustments(con)
-    for pid, ticker, as_of, made_at, base_date, base_close, target_date, target_close, ret, hit in con.execute(
-        SQL
-    ).fetchall():
+    for (
+        pid,
+        ticker,
+        as_of,
+        made_at,
+        base_date,
+        base_close,
+        target_date,
+        target_close,
+        realized_return,
+        hit,
+    ) in con.execute(SQL).fetchall():
         if is_late(cfg, as_of, made_at):
             late_calls += 1
             continue
@@ -141,7 +150,7 @@ def main() -> int:
                 "base_close": base_close,
                 "target_date": str(target_date),
                 "target_close": target_close,
-                "actual_return": round(ret, 6),
+                "actual_return": round(realized_return, 6),
                 "hit": bool(hit),
             }
         )

@@ -70,7 +70,7 @@ class Detection:
 
     def step_at(self, ex_date: date) -> float | None:
         """Yahoo's own close step at `ex_date` (close / previous close) when the frame has both, else None."""
-        before = [d for d in self.yahoo_closes if d < ex_date]
+        before = [day for day in self.yahoo_closes if day < ex_date]
         if ex_date in self.yahoo_closes and before:
             return self.yahoo_closes[ex_date] / self.yahoo_closes[max(before)]
         return None
@@ -99,8 +99,8 @@ class AdjustmentDetector:
         pairs already in data/<market>/adjustments/ (superseded ones too)."""
         yahoo_closes = frame_closes(frame, self.run.today)
         stored = self.stored_closes(key, yahoo_closes)
-        known = [a for a in self.adjustments if a[COL_TICKER] == key]
-        seen = set(seen or ()) | {(a[COL_TICKER], as_date(a[KEY_EX_DATE])) for a in known}
+        known = [adjustment for adjustment in self.adjustments if adjustment[COL_TICKER] == key]
+        seen = set(seen or ()) | {(adjustment[COL_TICKER], as_date(adjustment[KEY_EX_DATE])) for adjustment in known}
         state = Detection(key, yahoo_closes, stored, known, seen)
         if not stored and yahoo_closes and self.no_overlap(state):
             return state.records, state.warnings, True
@@ -137,22 +137,22 @@ class AdjustmentDetector:
     def check_split_row(self, state: Detection, ex_date: date, ratio: float, lower: date) -> None:
         """One split row: record it, ignore it, or warn and hold (see the module docstring, case 1)."""
         factor = 1 / ratio
-        window = [d for d in sorted(state.stored) if lower <= d < ex_date]
+        window = [session_day for session_day in sorted(state.stored) if lower <= session_day < ex_date]
         if not window:
             if has_stored_before(self.run.cfg, state.key, ex_date):
                 state.warnings.append(MSG_NO_WINDOW_FOR_SPLIT.format(key=state.key, day=ex_date, ratio=ratio))
                 state.hold = True
             return
-        got = {d: state.yahoo_closes[d] / state.stored_view(d) for d in window}
+        got = {session_day: state.yahoo_closes[session_day] / state.stored_view(session_day) for session_day in window}
         step = state.step_at(ex_date)
         stepped = step is not None and step_matches(step, factor)
-        if all(abs(x / factor - 1) <= SPLIT_TOLERANCE for x in got.values()):
+        if all(abs(adjusted_ratio / factor - 1) <= SPLIT_TOLERANCE for adjusted_ratio in got.values()):
             if stepped:
                 state.warnings.append(MSG_SPLIT_NOT_REBASED.format(key=state.key, day=ex_date, ratio=ratio, step=step))
                 state.hold = True
                 return
             self.record_split(state, ex_date, ratio, factor, window[-1], got)
-        elif all(abs(x - 1) <= BASIS_MATCH_TOLERANCE for x in got.values()):
+        elif all(abs(adjusted_ratio - 1) <= BASIS_MATCH_TOLERANCE for adjusted_ratio in got.values()):
             if stepped:
                 state.warnings.append(
                     MSG_SPLIT_NEITHER_ADJUSTED.format(key=state.key, day=ex_date, ratio=ratio, step=step)
@@ -194,9 +194,9 @@ class AdjustmentDetector:
     def check_rebase(self, state: Detection) -> tuple[list[dict], list[str], bool]:
         """Stored closes that differ from Yahoo's with no split row explaining it (case 2)."""
         mismatches = {
-            d: state.yahoo_closes[d] / state.stored_view(d)
-            for d in sorted(state.stored)
-            if abs(state.yahoo_closes[d] / state.stored_view(d) - 1) > BASIS_MATCH_TOLERANCE
+            session_day: state.yahoo_closes[session_day] / state.stored_view(session_day)
+            for session_day in sorted(state.stored)
+            if abs(state.yahoo_closes[session_day] / state.stored_view(session_day) - 1) > BASIS_MATCH_TOLERANCE
         }
         if not mismatches:
             return state.records, state.warnings, False
@@ -206,8 +206,8 @@ class AdjustmentDetector:
         detail = MSG_CLOSE_MISMATCH.format(
             key=state.key, count=len(mismatches), first=first, last=last, low=min(values), high=max(values)
         )
-        is_rebase = all(abs(x / middle - 1) <= SPLIT_TOLERANCE for x in values) and all(
-            d in mismatches for d in state.stored if d <= last
+        is_rebase = all(abs(ratio / middle - 1) <= SPLIT_TOLERANCE for ratio in values) and all(
+            session_day in mismatches for session_day in state.stored if session_day <= last
         )
         if not is_rebase:
             state.warnings.append(detail + MSG_NOT_ONE_REBASE)
@@ -220,7 +220,7 @@ class AdjustmentDetector:
 
     def confirm_rebase(self, state: Detection, detail: str, fraction, last: date) -> tuple[list[dict], list[str], bool]:
         """Ask the NSE check to confirm a re-base by `fraction`; hold when nothing does."""
-        later = [d for d in sorted(state.yahoo_closes) if d > last]
+        later = [session_day for session_day in sorted(state.yahoo_closes) if session_day > last]
         if self.nse_check and later:
             claim = RebaseClaim(
                 state.key,

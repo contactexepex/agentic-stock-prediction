@@ -21,14 +21,14 @@ def _flows(con) -> str:
         SELECT * FROM w ORDER BY date DESC""").fetchall()
     if not rows:
         return "_none_\n"
-    latest, fii5, dii5 = rows[0], sum(r[1] or 0 for r in rows), sum(r[2] or 0 for r in rows)
+    latest, fii5, dii5 = rows[0], sum(row[1] or 0 for row in rows), sum(row[2] or 0 for row in rows)
     line = (
         f"Latest {latest[0]}: FII/FPI net {latest[1]:+,.0f} cr, DII net {latest[2]:+,.0f} cr "
         f"(provisional). Last {len(rows)} reported days: FII {fii5:+,.0f} cr, DII {dii5:+,.0f} cr.\n\n"
     )
     table = "| date | fii_net_cr | dii_net_cr |\n|---|---|---|\n" + "".join(
-        f"| {d} | {'' if flow_row is None else round(flow_row, 2)} | {'' if x is None else round(x, 2)} |\n"
-        for d, flow_row, x in rows
+        f"| {day} | {'' if fii_net is None else round(fii_net, 2)} | {'' if dii_net is None else round(dii_net, 2)} |\n"
+        for day, fii_net, dii_net in rows
     )
     return line + table
 

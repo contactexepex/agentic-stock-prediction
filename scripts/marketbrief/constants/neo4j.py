@@ -73,4 +73,5 @@ MSG_NEO4J_READ_FAILED = "read: {error}"
 MSG_NEO4J_WATERMARK_FAILED = "watermark: {error}"
 
 # ---------- neo4j cli ----------
-MSG_PROBE_NEEDS_A_SERVER_NOT_DRY = "--probe needs a server, not --dry-run"
+MSG_PROBE_NEEDS_SERVER = "--probe needs a server, not --dry-run"
+MSG_NEO4J_URI_NOT_SET = "NEO4J_URI not set"

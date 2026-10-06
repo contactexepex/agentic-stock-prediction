@@ -87,9 +87,11 @@ def report_periods(facts: list[dict]) -> tuple[dict[str, tuple], dict[str, tuple
         if fact["start"] and (known is None or fact["end"] > known[0]):
             by_accession[fact["accession"]] = (fact["end"], fact["fy"], fact["fp"], fact["filing_date"])
     by_end: dict[str, tuple] = {}
-    for end, fy, fp, _filed in sorted(by_accession.values(), key=lambda r: r[3], reverse=True):
-        if fy and fp:
-            by_end[end] = (fy, fp)  # earliest filing for the period wins (sorted newest first)
+    for end, fiscal_year, fiscal_period, _filed in sorted(
+        by_accession.values(), key=lambda accession_row: accession_row[3], reverse=True
+    ):
+        if fiscal_year and fiscal_period:
+            by_end[end] = (fiscal_year, fiscal_period)  # earliest filing for the period wins (sorted newest first)
     return {accession: report[:3] for accession, report in by_accession.items()}, by_end
 
 
@@ -102,9 +104,9 @@ def label_of(fact: dict, by_accession: dict, by_end: dict) -> tuple[int, str] | 
             label = (report[1], report[2])
     if label is None:  # one year before a known period end
         end = date.fromisoformat(fact["end"])
-        for known_end, (fy, fp) in by_end.items():
+        for known_end, (fiscal_year, fiscal_period) in by_end.items():
             if YEAR_AGO_DAYS[0] <= (date.fromisoformat(known_end) - end).days <= YEAR_AGO_DAYS[1]:
-                label = (fy - 1, fp)
+                label = (fiscal_year - 1, fiscal_period)
                 break
     return label
 
@@ -114,14 +116,14 @@ def fiscal_label(kind: str, fact: dict, by_accession: dict, by_end: dict) -> tup
     label = label_of(fact, by_accession, by_end)
     if label is None:
         return None, None
-    fy, fp = label
+    fiscal_year, fiscal_period = label
     if kind == PERIOD_ANNUAL:
-        return fy, FISCAL_ANNUAL
+        return fiscal_year, FISCAL_ANNUAL
     if kind == PERIOD_QUARTER:
-        return fy, FISCAL_Q4 if fp == FISCAL_ANNUAL else fp
+        return fiscal_year, FISCAL_Q4 if fiscal_period == FISCAL_ANNUAL else fiscal_period
     if kind == PERIOD_YTD:
-        return fy, YTD_LABELS.get(fp)
-    return fy, fp
+        return fiscal_year, YTD_LABELS.get(fiscal_period)
+    return fiscal_year, fiscal_period
 
 
 def row_id(ticker: str, fact: dict) -> str:
@@ -142,7 +144,7 @@ class RowContext(NamedTuple):
 
 def fundamentals_row(ticker: str, fact: dict, context: RowContext, now: str) -> dict:
     """The row of one fact: the value, its period, its filing and the earlier value (`prev_value`)."""
-    kind, previous, fy, fp, accepted_at = context
+    kind, previous, fiscal_year, fiscal_period, accepted_at = context
     return {
         COL_ID: row_id(ticker, fact),
         COL_TICKER: ticker,
@@ -154,8 +156,8 @@ def fundamentals_row(ticker: str, fact: dict, context: RowContext, now: str) -> 
         "period_start": fact["start"],
         "period_end": fact["end"],
         "period": kind,
-        "fiscal_year": fy,
-        "fiscal_period": fp,
+        "fiscal_year": fiscal_year,
+        "fiscal_period": fiscal_period,
         "form": fact["form"],
         "accession": fact["accession"],
         "filing_date": fact["filing_date"],
@@ -177,20 +179,22 @@ def new_rows(
         if fact["end"] >= since:
             groups[(fact["tag"], fact["unit"], fact["start"], fact["end"])].append(fact)
     rows = []
-    for key in sorted(groups, key=lambda k: (k[0], k[2] or "", k[3])):
+    for key in sorted(groups, key=lambda group_key: (group_key[0], group_key[2] or "", group_key[3])):
         kind = period_kind(key[2], key[3])
         if kind is None:
             continue
         last = None
-        for fact in sorted(groups[key], key=lambda x: (x["filing_date"], x["accession"])):
+        for fact in sorted(
+            groups[key], key=lambda candidate_fact: (candidate_fact["filing_date"], candidate_fact["accession"])
+        ):
             rid = row_id(ticker, fact)
             if rid in stored_ids:
                 last = fact["value"]
                 continue
             if last is not None and fact["value"] == last:
                 continue
-            fy, fp = fiscal_label(kind, fact, by_accession, by_end)
-            context = RowContext(kind, last, fy, fp, accepted.get(fact["accession"]))
+            fiscal_year, fiscal_period = fiscal_label(kind, fact, by_accession, by_end)
+            context = RowContext(kind, last, fiscal_year, fiscal_period, accepted.get(fact["accession"]))
             rows.append(fundamentals_row(ticker, fact, context, now))
             stored_ids.add(rid)
             last = fact["value"]

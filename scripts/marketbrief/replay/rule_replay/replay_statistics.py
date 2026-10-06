@@ -136,14 +136,14 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
     blocks = (group["rank"] // max(horizon, 1)).to_numpy()
     out = {}
     for name, signal in signals(group).items():
-        call = signal != 0
+        has_call = signal != 0
         hit = ((signal > 0) & up_moves) | ((signal < 0) & down_moves)
-        calls, hit_count = int(call.sum()), int(hit[call].sum())
+        calls, hit_count = int(has_call.sum()), int(hit[has_call].sum())
         rate = hit_count / calls if calls else None
-        lower, upper = clustered_ci(hit[call].astype(float).to_numpy(), blocks[call.to_numpy()])
+        lower, upper = clustered_ci(hit[has_call].astype(float).to_numpy(), blocks[has_call.to_numpy()])
         wilson_lower, wilson_upper = wilson(hit_count, calls)
-        diff = (hit[call].astype(float) - always_up_hit[call]).to_numpy()
-        diff_lower, diff_upper = clustered_ci(diff, blocks[call.to_numpy()])
+        diff = (hit[has_call].astype(float) - always_up_hit[has_call]).to_numpy()
+        diff_lower, diff_upper = clustered_ci(diff, blocks[has_call.to_numpy()])
         out[name] = {
             "label": SIGNAL_LABELS[name],
             "calls": calls,
@@ -153,7 +153,7 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
             "ci95": [round_or_none(lower), round_or_none(upper)],
             "ci95_iid": [round_or_none(wilson_lower), round_or_none(wilson_upper)],
             "p_vs_50": None if not calls else float(f"{binom_p_two_sided(hit_count, calls):.3g}"),
-            "always_up_same_rows": round_or_none(always_up_hit[call].mean()) if calls else None,
+            "always_up_same_rows": round_or_none(always_up_hit[has_call].mean()) if calls else None,
             "diff_vs_always_up": round_or_none(diff.mean()) if calls else None,
             "diff_ci95": [round_or_none(diff_lower), round_or_none(diff_upper)],
         }

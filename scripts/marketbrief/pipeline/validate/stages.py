@@ -7,15 +7,15 @@ from datetime import date
 from pathlib import Path
 
 from marketbrief.constants.validation import (
+    MSG_CONTEXT_PACK_HAS_TRACEBACK,
     MSG_FEATURE_ROW_OLDER_THAN_THE_TICKER,
-    MSG_FIRST_LINE_IS_NOT_TODAY_S,
+    MSG_FILE_MISSING_OR_EMPTY,
+    MSG_FIRST_LINE_NOT_PACK_HEADER,
     MSG_INDICATOR_QUALITY_BLOCKED_NO_CALL_ALLOWED,
-    MSG_IS_MISSING_OR_EMPTY,
     MSG_NO_FEATURE_ROW,
     MSG_NO_MARKET_REGIME_SECTION,
-    MSG_NO_REGIME_ROW_AS_OF_NEWEST,
-    MSG_THE_CONTEXT_PACK_CONTAINS_A_PYTHON,
-    MSG_WATCHLIST_TICKERS_NOT_NAMED_IN_THE,
+    MSG_NO_REGIME_ROW_FOR_SESSION,
+    MSG_WATCHLIST_NOT_IN_CONTEXT_PACK,
     STAGE_KINDS,
 )
 from marketbrief.core import paths, schemas
@@ -77,7 +77,7 @@ def stage_features(res, cfg, con, status, now, today, validate_config):  # noqa:
     need = date.fromisoformat(status["previous_session"])
     reg = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
     if reg is None or reg < need:
-        res.block("MISSING_REGIME", MSG_NO_REGIME_ROW_AS_OF_NEWEST.format(need=need, reg=reg))
+        res.block("MISSING_REGIME", MSG_NO_REGIME_ROW_FOR_SESSION.format(need=need, newest_regime=reg))
 
 
 def stage_context(  # noqa: PLR0913 (uniform stage signature)
@@ -88,20 +88,20 @@ def stage_context(  # noqa: PLR0913 (uniform stage signature)
     if not path.exists() or path.stat().st_size == 0:
         res.block(
             "MISSING_CONTEXT",
-            MSG_IS_MISSING_OR_EMPTY.format(
-                value=path.relative_to(paths.ROOT) if path.is_relative_to(paths.ROOT) else path
+            MSG_FILE_MISSING_OR_EMPTY.format(
+                path=path.relative_to(paths.ROOT) if path.is_relative_to(paths.ROOT) else path
             ),
         )
         return
     text = path.read_text(encoding="utf-8")
     first = text.splitlines()[0] if text else ""
     if not first.startswith("# Context pack") or str(today) not in first:
-        res.block("STALE_CONTEXT", MSG_FIRST_LINE_IS_NOT_TODAY_S.format(value=first[:80]))
+        res.block("STALE_CONTEXT", MSG_FIRST_LINE_NOT_PACK_HEADER.format(first_line=first[:80]))
     if "Traceback (most recent call last)" in text:
-        res.block("CONTEXT_ERROR", MSG_THE_CONTEXT_PACK_CONTAINS_A_PYTHON)
+        res.block("CONTEXT_ERROR", MSG_CONTEXT_PACK_HAS_TRACEBACK)
     absent = [ticker for ticker in cfg["tickers"] if not re.search(rf"(?<![\w&]){re.escape(ticker)}(?![\w&])", text)]
     if absent:
-        res.block("CONTEXT_INCOMPLETE", MSG_WATCHLIST_TICKERS_NOT_NAMED_IN_THE, absent)
+        res.block("CONTEXT_INCOMPLETE", MSG_WATCHLIST_NOT_IN_CONTEXT_PACK, absent)
     if "## Market regime" not in text:
         res.block("CONTEXT_INCOMPLETE", MSG_NO_MARKET_REGIME_SECTION)
 

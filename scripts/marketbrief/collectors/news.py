@@ -55,7 +55,9 @@ socket.setdefaulttimeout(SOCKET_TIMEOUT_SECONDS)
 def google_news_url(query: str, settings: dict) -> str:
     """The Google News RSS search URL of a query (window and parameters from the config)."""
     query = f"{query} when:{settings.get('window', DEFAULT_WINDOW)}"
-    params = "&".join(f"{k}={quote_plus(str(v))}" for k, v in settings.get("params", {}).items())
+    params = "&".join(
+        f"{param_name}={quote_plus(str(param_value))}" for param_name, param_value in settings.get("params", {}).items()
+    )
     return f"{settings['base']}?q={quote_plus(query)}&{params}"
 
 

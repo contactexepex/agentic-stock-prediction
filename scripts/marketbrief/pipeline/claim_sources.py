@@ -64,8 +64,8 @@ def clean_row(row: dict) -> dict:
 def current_clusters(con, now: pd.Timestamp, window_hours: float) -> list[dict]:
     """Cluster rows as of now (news_clusters_asof) whose last item was reported in the last window_hours."""
     since = now - pd.Timedelta(hours=window_hours)
-    df = con.execute(CLUSTERS_SQL, [now.isoformat(), since.isoformat()]).df()
-    return [clean_row(r) for r in df.to_dict("records")]
+    cluster_rows = con.execute(CLUSTERS_SQL, [now.isoformat(), since.isoformat()]).df()
+    return [clean_row(row) for row in cluster_rows.to_dict("records")]
 
 
 def cluster_ids(cluster: dict) -> list[str]:
@@ -75,10 +75,12 @@ def cluster_ids(cluster: dict) -> list[str]:
 
 def item_rows(con, ids: list[str], now: pd.Timestamp) -> dict[str, dict]:
     """News rows (title, source, first seen) and their article rows fetched by now, by id."""
-    items = {r["id"]: clean_row(r) for r in con.execute(ITEMS_SQL, [ids, now.isoformat()]).df().to_dict("records")}
-    for r in con.execute(ARTICLES_SQL, [now.isoformat(), ids]).df().to_dict("records"):
-        if r["id"] in items:
-            items[r["id"]]["article"] = clean_row(r)
+    items = {
+        row["id"]: clean_row(row) for row in con.execute(ITEMS_SQL, [ids, now.isoformat()]).df().to_dict("records")
+    }
+    for row in con.execute(ARTICLES_SQL, [now.isoformat(), ids]).df().to_dict("records"):
+        if row["id"] in items:
+            items[row["id"]]["article"] = clean_row(row)
     return items
 
 
@@ -86,26 +88,26 @@ def primary_rows(con, ids: list[str], now: pd.Timestamp) -> dict[str, dict]:
     """Primary sources by id: filings with stored text (documents joined) and NSE announcements."""
     out: dict[str, dict] = {}
     texts = con.execute(TEXTS_SQL, [ids, now.isoformat(), now.isoformat()]).df().to_dict("records")
-    for r in sorted((clean_row(x) for x in texts), key=lambda x: x["id"]):
+    for row in sorted((clean_row(record) for record in texts), key=lambda record: record["id"]):
         entry = out.setdefault(
-            r["primary_id"],
+            row["primary_id"],
             {
                 "kind": SOURCE_FILING,
-                "label": r["form"],
+                "label": row["form"],
                 "docs": [],
-                "available_at": iso(r["available_at"]),
-                "published_at": iso(r["available_at"]),
+                "available_at": iso(row["available_at"]),
+                "published_at": iso(row["available_at"]),
             },
         )
-        entry["docs"].append(r["text"] or "")
-        entry["available_at"] = max(entry["available_at"], iso(r["fetched_at"]))
-    for r in con.execute(ANNOUNCEMENTS_SQL, [ids, now.isoformat()]).df().to_dict("records"):
-        out[r["id"]] = {
+        entry["docs"].append(row["text"] or "")
+        entry["available_at"] = max(entry["available_at"], iso(row["fetched_at"]))
+    for row in con.execute(ANNOUNCEMENTS_SQL, [ids, now.isoformat()]).df().to_dict("records"):
+        out[row["id"]] = {
             "kind": SOURCE_ANNOUNCEMENT,
-            "label": r["category"],
-            "docs": [r["subject"] or ""],
-            "available_at": iso(r["available_at"]),
-            "published_at": iso(r["available_at"]),
+            "label": row["category"],
+            "docs": [row["subject"] or ""],
+            "available_at": iso(row["available_at"]),
+            "published_at": iso(row["available_at"]),
         }
     return out
 
@@ -138,7 +140,7 @@ def build_sources(cluster: dict, items: dict[str, dict], primaries: dict[str, di
 
 def sources_by_cluster(con, clusters: list[dict], now: pd.Timestamp) -> dict[str, ClusterSources]:
     """cluster_id -> its citable sources, all available by now."""
-    ids = sorted({i for c in clusters for i in cluster_ids(c)})
-    primary = sorted({p for c in clusters for p in c.get("primary_ids") or []})
+    ids = sorted({news_id for cluster in clusters for news_id in cluster_ids(cluster)})
+    primary = sorted({primary_id for cluster in clusters for primary_id in cluster.get("primary_ids") or []})
     items, primaries = item_rows(con, ids, now), primary_rows(con, primary, now)
-    return {c["cluster_id"]: build_sources(c, items, primaries) for c in clusters}
+    return {cluster["cluster_id"]: build_sources(cluster, items, primaries) for cluster in clusters}

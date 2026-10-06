@@ -38,13 +38,25 @@ from datetime import date
 
 from marketbrief.analytics import adaptive_conformal, range_switches
 from marketbrief.constants.range_inputs import INPUTS
-from marketbrief.constants.replay import MSG_ACI_GAMMA_ACI_BY_REGIME_AND, MSG_NO_TRADING_DAYS_IN_THE_WINDOW
+from marketbrief.constants.replay import (
+    MSG_ACI_OPTIONS_NEED_ACI,
+    MSG_NO_TRADING_DAYS_IN_THE_WINDOW,
+)
 from marketbrief.core import cli, database, paths, storage
 from marketbrief.core.clock import utc_now
 from marketbrief.core.market_config import benchmark_key, load_ranges_config
-from marketbrief.replay.rule_replay.aci_compare import aci_comparison, aci_rc, aci_tag, held_out
+from marketbrief.replay.rule_replay.aci_compare import (
+    aci_comparison,
+    aci_ranges_config,
+    aci_tag,
+    held_out,
+)
 from marketbrief.replay.rule_replay.inputs import load_inputs
-from marketbrief.replay.rule_replay.narrative import headline, limitations, top_sentences
+from marketbrief.replay.rule_replay.narrative import (
+    headline,
+    limitations,
+    top_sentences,
+)
 from marketbrief.replay.rule_replay.range_rows import replay_rows
 from marketbrief.replay.rule_replay.replay_statistics import summarize
 from marketbrief.replay.rule_replay.rule_html import html_report
@@ -154,7 +166,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     if (args.aci_gamma is not None or args.aci_by_regime or args.aci_tune_end) and not args.aci:
-        raise SystemExit(MSG_ACI_GAMMA_ACI_BY_REGIME_AND)
+        raise SystemExit(MSG_ACI_OPTIONS_NEED_ACI)
     cfg = cli.require_market(args)
     ranges_config = load_ranges_config(cfg["market"])
     con = database.connect(cfg["market"])
@@ -165,12 +177,12 @@ def main() -> int:
     if args.aci:
         before = summary
         by_regime = None if args.aci_by_regime is None else args.aci_by_regime == "on"
-        rc_aci = aci_rc(ranges_config, args.aci_gamma, by_regime)
-        summary, _ = run(cfg, rc_aci, con, args.start, args.end)
+        replay_ranges_config = aci_ranges_config(ranges_config, args.aci_gamma, by_regime)
+        summary, _ = run(cfg, replay_ranges_config, con, args.start, args.end)
         summary["aci_comparison"] = aci_comparison(before, summary)
         if args.aci_tune_end:
-            summary["aci_held_out"] = held_out(cfg, rc_aci, con, args.aci_tune_end, args.start, args.end)
-        suffix = aci_tag(rc_aci["aci"], args.aci_tune_end)
+            summary["aci_held_out"] = held_out(cfg, replay_ranges_config, con, args.aci_tune_end, args.start, args.end)
+        suffix = aci_tag(replay_ranges_config["aci"], args.aci_tune_end)
     out = paths.ROOT / "reports" / cfg["market"]
     out.mkdir(parents=True, exist_ok=True)
     page, json_file = out / f"replay-{summary['end']}{suffix}.html", out / f"replay-{summary['end']}{suffix}.json"

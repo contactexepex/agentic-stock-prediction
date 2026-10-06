@@ -119,6 +119,6 @@ def values_match(
     first: tuple[float, str | None], second: tuple[float, str | None], relative: float = RELATIVE_TOLERANCE
 ) -> bool:
     """Two stated values agree within `relative` of the larger, or within either literal's stated rounding."""
-    (a, a_text), (b, b_text) = first, second
-    tolerance = max(relative * max(abs(a), abs(b)), half_step_of(a_text), half_step_of(b_text))
-    return abs(a - b) <= tolerance + EXACT
+    (first_value, a_text), (second_value, b_text) = first, second
+    tolerance = max(relative * max(abs(first_value), abs(second_value)), half_step_of(a_text), half_step_of(b_text))
+    return abs(first_value - second_value) <= tolerance + EXACT

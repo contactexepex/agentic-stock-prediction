@@ -50,7 +50,7 @@ def load_sec_times(base: Path) -> dict[str, str]:
 
 
 def keep_row(kind: str, row: dict, as_of_day: date, cutoff: pd.Timestamp, times: dict[str, str] | None = None) -> bool:
-    """True when the row was public by the cutoff (pre-open of the session after d). `times`
+    """True when the row was public by the cutoff (pre-open of the session after `as_of_day`). `times`
     (load_sec_times) replaces a SEC row's stored accepted_at with its header time, as the
     corrected views do: a value stored from a shifted submissions file is 4-5h late."""
     if times and kind in ACCEPTED_KEYS and row.get(ACCEPTED_KEYS[kind]) in times:
@@ -125,9 +125,9 @@ def filter_csv_rows(
     return ([lines[0]] + kept if kept else []), row_count
 
 
-def earliest_news(src_market: Path) -> str | None:
+def earliest_news(source_market: Path) -> str | None:
     """The date of the first stored news file, or None."""
-    files = sorted((src_market / "news").glob("**/*.jsonl"))
+    files = sorted((source_market / "news").glob("**/*.jsonl"))
     return files[0].stem if files else None
 
 
@@ -150,23 +150,23 @@ def copy_asof(market: str, src: Path, dst: Path, as_of_day: date, cutoff: dateti
             excluded[kind] = "no known publication-time rule for this kind"
             continue
         ext = SCHEMAS[kind][0] if kind in SCHEMAS else "jsonl"
-        stat = {"rule": rule_text(kind), "files_in": 0, "files_out": 0, "rows_in": 0, "rows_kept": 0}
+        kind_stats = {"rule": rule_text(kind), "files_in": 0, "files_out": 0, "rows_in": 0, "rows_kept": 0}
         for path in sorted(kdir.glob(f"**/*.{ext}")):
             text = path.read_text(encoding="utf-8")
             kept, row_count = (filter_csv_rows if ext == "csv" else filter_jsonl_rows)(
                 text, kind, as_of_day, cut, times
             )
-            stat["files_in"] += 1
-            stat["rows_in"] += row_count
+            kind_stats["files_in"] += 1
+            kind_stats["rows_in"] += row_count
             rows = len(kept) - (1 if ext == "csv" and kept else 0)
-            stat["rows_kept"] += rows
+            kind_stats["rows_kept"] += rows
             if rows:
                 out = out_base / path.relative_to(base)
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_text("\n".join(kept) + "\n", encoding="utf-8")
-                stat["files_out"] += 1
-        stat["rows_dropped"] = stat["rows_in"] - stat["rows_kept"]
-        kinds[kind] = stat
+                kind_stats["files_out"] += 1
+        kind_stats["rows_dropped"] = kind_stats["rows_in"] - kind_stats["rows_kept"]
+        kinds[kind] = kind_stats
     for kind in DROPPED:
         excluded.setdefault(kind, DROPPED[kind].format(first=first_news))
     return {"kinds": kinds, "excluded": excluded, "first_news_file": first_news}

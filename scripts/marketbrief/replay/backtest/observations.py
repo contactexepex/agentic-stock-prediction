@@ -57,8 +57,14 @@ def mark_window(length: int, positions: list[int], horizon: int) -> np.ndarray:
     return out
 
 
-def observations(  # noqa: PLR0913
-    bars, tickers, horizon: int, ranges_config: dict, rank: dict, cfg: dict | None = None, extra: dict | None = None
+def observations(  # noqa: PLR0913 (the walk-forward inputs; callers pass them by position and keyword)
+    bars,
+    tickers,
+    horizon: int,
+    ranges_config: dict,
+    index_by_timestamp: dict,
+    cfg: dict | None = None,
+    extra: dict | None = None,
 ) -> pd.DataFrame:
     """The walk-forward observations: standardised outcomes per ticker and day."""
     out = []
@@ -81,7 +87,7 @@ def observations(  # noqa: PLR0913
             standardized_returns = standardized_returns.join(
                 input_columns(cfg, ranges_config, frame, ticker_symbol, horizon, extra)
             )
-        standardized_returns["rank"] = [rank.get(position) for position in standardized_returns.index]
+        standardized_returns["rank"] = [index_by_timestamp.get(timestamp) for timestamp in standardized_returns.index]
         out.append(standardized_returns.dropna(subset=["rank", "z", "s20"]))
     if not out:
         return pd.DataFrame()
@@ -95,15 +101,15 @@ def input_columns(
 ) -> pd.DataFrame:
     """Per as-of date: earnings in horizon and the walk-forward multiple, ex-dividend log shift,
     beta at d and the cue proxies."""
-    close, idx = frame["close"], frame.index
-    length = len(idx)
-    position_of_day = {timestamp.date(): position for position, timestamp in enumerate(idx)}
-    cols = pd.DataFrame(index=idx)
+    close, bar_index = frame["close"], frame.index
+    length = len(bar_index)
+    position_of_day = {timestamp.date(): position for position, timestamp in enumerate(bar_index)}
+    input_frame = pd.DataFrame(index=bar_index)
     # earnings: each as-of date d uses the events as known at d (SEC 2.02 filings classified by
     # the 10-Q/10-K reports accepted by d; event_history.earnings_versions)
     earn, history_multiplier = np.zeros(length, dtype=bool), np.full(length, np.nan)
     sigma = range_math.ewma_sigma(close, ranges_config["ewma_lambda"])
-    days = np.array([timestamp.date() for timestamp in idx])
+    days = np.array([timestamp.date() for timestamp in bar_index])
     versions = extra["earnings"].get(ticker, [])
     for key, (start, events) in enumerate(versions):
         end = versions[key + 1][0] if key + 1 < len(versions) else None
@@ -125,10 +131,10 @@ def input_columns(
         moves = earnings_reaction.past_moves(cfg, close, sigma, events, ranges_config["warmup_bars"])
         for row_position in np.flatnonzero(window_rows):
             history_multiplier[row_position] = earnings_reaction.earnings_stats(
-                moves, ranges_config, idx[row_position].date()
+                moves, ranges_config, bar_index[row_position].date()
             )[0]
-    cols["earn"] = earn
-    cols["m_hist"] = history_multiplier
+    input_frame["earn"] = earn
+    input_frame["m_hist"] = history_multiplier
     # dividends: log shift for ex-dates inside (d, d+h]
     shift = np.zeros(length)
     for ex_day, amount in extra["dividends"].get(ticker, []):
@@ -137,12 +143,12 @@ def input_columns(
             continue
         for row_position in range(max(0, position - horizon), position):
             shift[row_position] += range_math.ex_dividend_shift(float(close.iloc[row_position]), [amount])
-    cols["div_shift"] = shift
-    cols["has_div"] = shift != 0
+    input_frame["div_shift"] = shift
+    input_frame["has_div"] = shift != 0
     # cues
     bench = extra["bench"]
-    cols["beta"] = rolling_beta(close, bench["close"]).clip(*ranges_config["beta_split"]["beta_clip"])
-    cols["own"] = np.log(frame["open"].shift(-1) / close) if cfg.get("premarket_quotes") else np.nan
-    cols["idx_cue"] = extra["index_cue"].reindex(idx) if extra["index_cue"] is not None else np.nan
-    cols["has_cue"] = cols["idx_cue"].notna() & cols["beta"].notna()
-    return cols
+    input_frame["beta"] = rolling_beta(close, bench["close"]).clip(*ranges_config["beta_split"]["beta_clip"])
+    input_frame["own"] = np.log(frame["open"].shift(-1) / close) if cfg.get("premarket_quotes") else np.nan
+    input_frame["idx_cue"] = extra["index_cue"].reindex(bar_index) if extra["index_cue"] is not None else np.nan
+    input_frame["has_cue"] = input_frame["idx_cue"].notna() & input_frame["beta"].notna()
+    return input_frame

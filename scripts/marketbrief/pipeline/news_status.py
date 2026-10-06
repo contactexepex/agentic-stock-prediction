@@ -71,7 +71,9 @@ def statements_by_cluster(con, cluster_ids: list[str], now: pd.Timestamp) -> dic
 
 def state_hash(row: dict) -> str:
     """A hash of the fields that define a status row's state."""
-    return hashlib.sha1(json.dumps({k: row[k] for k in HASHED}, sort_keys=True, default=str).encode()).hexdigest()[:16]
+    return hashlib.sha1(
+        json.dumps({field: row[field] for field in HASHED}, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
 
 
 def status_rows(cluster: dict, statements: list[dict], as_of: pd.Timestamp) -> list[dict]:
@@ -79,7 +81,12 @@ def status_rows(cluster: dict, statements: list[dict], as_of: pd.Timestamp) -> l
     result, facts = cluster_status(cluster, statements)
     stamp = f"{as_of:%Y%m%dT%H%M%SZ}"
     inputs = [iso(cluster["inputs_until"]) or iso(cluster["as_of"])]
-    inputs += [time for s in statements for time in (s["extracted_at"], s["source_available_at"]) if time]
+    inputs += [
+        time
+        for statement in statements
+        for time in (statement["extracted_at"], statement["source_available_at"])
+        if time
+    ]
     common = {
         "as_of": as_of.isoformat(),
         "cluster_id": cluster["cluster_id"],
@@ -103,7 +110,7 @@ def status_rows(cluster: dict, statements: list[dict], as_of: pd.Timestamp) -> l
             "outlet_ids": result["outlet_ids"],
             "mismatch_ids": result["mismatch_ids"],
             "status_ids": ids,
-            "id_statuses": [result["ids"][i] for i in ids],
+            "id_statuses": [result["ids"][news_id] for news_id in ids],
             "origins": list(cluster.get("origins") or []),
             "conflicts": result["conflicts"],
             "flags": result["flags"],
@@ -140,9 +147,14 @@ def run(cfg: dict) -> dict:
     as_of = pd.Timestamp(clock()).floor("s")
     lookback = float(load_sources().clusters.get("lookback_hours", 144))
     con = connect(market)
-    clusters = [c for c in current_clusters(con, as_of, lookback) if c["ticker"] in cfg["tickers"]]
-    claims = statements_by_cluster(con, [c["cluster_id"] for c in clusters], as_of)
-    stored = {(c, k): h for c, k, h in con.execute(STORED_SQL, [as_of.isoformat()]).fetchall()}
+    clusters = [
+        cluster_row for cluster_row in current_clusters(con, as_of, lookback) if cluster_row["ticker"] in cfg["tickers"]
+    ]
+    claims = statements_by_cluster(con, [cluster_row["cluster_id"] for cluster_row in clusters], as_of)
+    stored = {
+        (cluster_id, claim_key): stored_hash
+        for cluster_id, claim_key, stored_hash in con.execute(STORED_SQL, [as_of.isoformat()]).fetchall()
+    }
     rows, current = [], []
     for cluster in clusters:
         for row in status_rows(cluster, claims.get(cluster["cluster_id"], []), as_of):
@@ -150,25 +162,27 @@ def run(cfg: dict) -> dict:
             if stored.get((row["cluster_id"], row["claim_id"] or "")) != row["state_hash"]:
                 rows.append(row)
     written = append_jsonl(day_file(market, KIND_NEWS_VERIFIED, utc_today()), rows) if rows else 0
-    order = {s: i for i, s in enumerate(STATUS_PRECEDENCE)}
+    order = {status: position for position, status in enumerate(STATUS_PRECEDENCE)}
 
     def counts(level: str) -> dict:
         """The number of rows of each status at one level, in status precedence order."""
-        found = Counter(r["status"] for r in current if r["level"] == level)
-        return dict(sorted(found.items(), key=lambda kv: order[kv[0]]))
+        found = Counter(status_row["status"] for status_row in current if status_row["level"] == level)
+        return dict(sorted(found.items(), key=lambda entry: order[entry[0]]))
 
     return {
         "step": "news_status",
         "market": market,
         "as_of": as_of.isoformat(),
         "clusters": len(clusters),
-        "claims": sum(len(v) for v in claims.values()),
+        "claims": sum(len(claim_list) for claim_list in claims.values()),
         "events_by_status": counts(LEVEL_CLUSTER),
         "facts_by_status": counts(LEVEL_CLAIM),
         "written": written,
         "unchanged": len(current) - len(rows),
         "flags": dict(
-            Counter(flag for r in current if r["level"] == LEVEL_CLUSTER for flag in r["flags"]).most_common()
+            Counter(
+                flag for status_row in current if status_row["level"] == LEVEL_CLUSTER for flag in status_row["flags"]
+            ).most_common()
         ),
     }
 

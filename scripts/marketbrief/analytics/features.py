@@ -59,7 +59,15 @@ def quotes_today(con, day: date) -> dict[str, dict]:
     rows = con.execute(
         "SELECT symbol, price, prev_close, change_pct, ts FROM quotes_latest WHERE day = ?", [day]
     ).fetchall()
-    return {r[0]: {"price": r[1], "prev_close": r[2], "change_pct": r[3], "ts": r[4]} for r in rows}
+    return {
+        quote_row[0]: {
+            "price": quote_row[1],
+            "prev_close": quote_row[2],
+            "change_pct": quote_row[3],
+            "ts": quote_row[4],
+        }
+        for quote_row in rows
+    }
 
 
 def company_events(con, start: date) -> dict[tuple[str, str], date]:
@@ -96,9 +104,9 @@ def add_sector_strength(cfg: dict, rows: dict[str, dict]) -> None:
     for members in cfg.get(CFG_SECTORS, {}).values():
         for key in members:
             peers = [
-                rows[p][SECTOR_PEER_RETURN]
-                for p in members
-                if p != key and rows.get(p, {}).get(SECTOR_PEER_RETURN) is not None
+                rows[peer][SECTOR_PEER_RETURN]
+                for peer in members
+                if peer != key and rows.get(peer, {}).get(SECTOR_PEER_RETURN) is not None
             ]
             own = rows.get(key, {}).get(SECTOR_PEER_RETURN)
             rows[key]["rel_sector_5d"] = own - sum(peers) / len(peers) if own is not None and peers else None
@@ -144,7 +152,7 @@ def regime_row(
         "bench_ret_5d": bench_ret_5d,
         "bench_vol_10d": bench_vol_10d,
         "major_event": bool(near),
-        "major_event_names": [e["name"] for e in near],
+        "major_event_names": [event["name"] for event in near],
         "stress": stress,
         "notes": notes,
     }
@@ -175,13 +183,13 @@ def run(cfg: dict, today_local: date | None = None, utc_day: date | None = None)
     add_sector_strength(cfg, rows)
     feature_rows = [
         {
-            "id": f"{as_of}-{k}",
+            "id": f"{as_of}-{ticker_key}",
             "as_of_date": as_of.isoformat(),
-            "ticker": k,
+            "ticker": ticker_key,
             "computed_at": now,
-            **{c: v.get(c) for c in FEATURE_COLS},
+            **{column: feature_values.get(column) for column in FEATURE_COLS},
         }
-        for k, v in rows.items()
+        for ticker_key, feature_values in rows.items()
     ]
 
     vol_level, vol_change = vol_inputs(bars, vol_key, quotes)
@@ -189,7 +197,12 @@ def run(cfg: dict, today_local: date | None = None, utc_day: date | None = None)
 
     append_jsonl(day_file(market, "features", as_of), feature_rows)
     append_jsonl(day_file(market, "regime", as_of), [regime_data])
-    quality = {q: sorted(k for k, v in rows.items() if v["quality"] == q) for q in QUALITY_ORDER}
+    quality = {
+        quality_level: sorted(
+            ticker_key for ticker_key, feature_values in rows.items() if feature_values["quality"] == quality_level
+        )
+        for quality_level in QUALITY_ORDER
+    }
     return {
         "step": STEP_FEATURES,
         "market": market,
@@ -198,10 +211,10 @@ def run(cfg: dict, today_local: date | None = None, utc_day: date | None = None)
         "regime": regime_data["regime"],
         "stress": regime_data["stress"],
         "notes": regime_data["notes"],
-        "tickers": {q: len(v) for q, v in quality.items()},
+        "tickers": {quality_level: len(feature_values) for quality_level, feature_values in quality.items()},
         "partial": quality[QUALITY_PARTIAL],
         "blocked": quality[QUALITY_BLOCKED],
-        "upcoming_events": [f"{e['date']} {e['name']}" for e in upcoming],
+        "upcoming_events": [f"{event['date']} {event['name']}" for event in upcoming],
     }
 
 

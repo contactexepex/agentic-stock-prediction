@@ -27,8 +27,8 @@ def aci_comparison(before: dict, after: dict) -> dict:
                 groups[key] = (section_row, (horizon_after.get(sect) or {}).get(key, {}))
         out[horizon] = {
             key: {
-                "before": {column: before_stats.get(column) for column in CMP_KEYS},
-                "after": {column: after_stats.get(column) for column in CMP_KEYS},
+                "before": {metric: before_stats.get(metric) for metric in CMP_KEYS},
+                "after": {metric: after_stats.get(metric) for metric in CMP_KEYS},
             }
             for key, (before_stats, after_stats) in groups.items()
         }
@@ -73,19 +73,19 @@ def rows_comparison(fixed: dict, after: dict, keep) -> dict:
         )
         out[str(horizon)] = {
             key: {
-                "before": {column: group_row.get(column) for column in CMP_KEYS},
-                "after": {column: after_groups.get(key, {}).get(column) for column in CMP_KEYS},
+                "before": {metric: group_row.get(metric) for metric in CMP_KEYS},
+                "after": {metric: after_groups.get(key, {}).get(metric) for metric in CMP_KEYS},
             }
             for key, group_row in before.items()
         }
     return out
 
 
-def mean_rel_score80(cmp: dict) -> float | None:
+def mean_rel_score80(comparison: dict) -> float | None:
     """The mean relative change of the 80% score over the groups."""
     rel = [
         group["overall"]["after"]["score80"] / group["overall"]["before"]["score80"] - 1
-        for group in cmp.values()
+        for group in comparison.values()
         if group["overall"]["before"].get("score80") and group["overall"]["after"].get("score80") is not None
     ]
     return float(np.mean(rel)) if rel else None
@@ -120,7 +120,7 @@ def held_out(
 
     variants, frames = [], {}
     for gamma, by_regime in ACI_GRID:
-        replay_ranges = aci_rc(ranges_config, gamma, by_regime)
+        replay_ranges = aci_ranges_config(ranges_config, gamma, by_regime)
         res, _ = replay_rows(cfg, replay_ranges, bars, extra, start, end)
         key = aci_tag(replay_ranges["aci"])
         frames[key] = (replay_ranges["aci"], res)
@@ -136,20 +136,25 @@ def held_out(
         (variant for variant in variants if variant["tune_rel_score80"] is not None),
         key=lambda variant: variant["tune_rel_score80"],
     )
-    sel_settings, sel_res = frames[best["tag"]]
-    cur = aci_rc(ranges_config)["aci"]
-    cur_key = aci_tag(cur)
-    if cur_key not in frames:
-        frames[cur_key] = (cur, replay_rows(cfg, aci_rc(ranges_config), bars, extra, start, end)[0])
+    selected_settings, selected_result = frames[best["tag"]]
+    current_settings = aci_ranges_config(ranges_config)["aci"]
+    current_key = aci_tag(current_settings)
+    if current_key not in frames:
+        frames[current_key] = (
+            current_settings,
+            replay_rows(cfg, aci_ranges_config(ranges_config), bars, extra, start, end)[0],
+        )
     return {
         "tune_end": str(tune_end),
         "grid": variants,
-        "selected": {setting: sel_settings[setting] for setting in ACI_SETTING_KEYS},
-        "config": {setting: cur[setting] for setting in ACI_SETTING_KEYS},
-        "selected_is_config": all(sel_settings[setting] == cur[setting] for setting in ACI_SETTING_KEYS),
-        "test_selected": rows_comparison(fixed, sel_res, test),
-        "test_config": rows_comparison(fixed, frames[cur_key][1], test),
-        "tune_config": rows_comparison(fixed, frames[cur_key][1], tune),
+        "selected": {setting: selected_settings[setting] for setting in ACI_SETTING_KEYS},
+        "config": {setting: current_settings[setting] for setting in ACI_SETTING_KEYS},
+        "selected_is_config": all(
+            selected_settings[setting] == current_settings[setting] for setting in ACI_SETTING_KEYS
+        ),
+        "test_selected": rows_comparison(fixed, selected_result, test),
+        "test_config": rows_comparison(fixed, frames[current_key][1], test),
+        "tune_config": rows_comparison(fixed, frames[current_key][1], tune),
     }
 
 
@@ -157,13 +162,13 @@ def held_out_html(held_out_result: dict | None) -> str:
     """The HTML of the held-out check, empty when there is none."""
     if not held_out_result:
         return '<p class="note">No held-out check in this run (replay.py --aci --aci-tune-end DATE).</p>'
-    sel = held_out_result["selected"]
+    selected = held_out_result["selected"]
     return (
         f"<h3>Held-out check</h3><p>gamma and one-or-per-regime alpha picked from {len(held_out_result['grid'])} "
         f"variants on "
         f"as-of dates up to {escape_html(held_out_result['tune_end'])} only (lowest 80% interval score): gamma "
-        f"{sel['gamma']}, "
-        f"{'per regime' if sel['by_regime'] else 'one alpha'}"
+        f"{selected['gamma']}, "
+        f"{'per regime' if selected['by_regime'] else 'one alpha'}"
         f"{' = the config settings' if held_out_result['selected_is_config'] else ' (not the config settings)'}. "
         f"Fixed bands vs that choice on the later, unseen as-of dates:</p>{aci_table(held_out_result['test_selected'])}"
         + (
@@ -175,10 +180,10 @@ def held_out_html(held_out_result: dict | None) -> str:
     )
 
 
-def aci_table(cmp: dict) -> str:
+def aci_table(comparison: dict) -> str:
     """The before and after table of fixed bands against ACI."""
     rows = []
-    for horizon, groups in cmp.items():
+    for horizon, groups in comparison.items():
         for key, group_row in groups.items():
             before, after = group_row["before"], group_row["after"]
             if not before.get("n"):
@@ -186,12 +191,12 @@ def aci_table(cmp: dict) -> str:
             rows.append(
                 f"<tr><td>{horizon}d</td><td>{escape_html(key)}</td><td>{before['n']:,}</td>"
                 + "".join(
-                    f"<td>{scaled_text(before.get(column))} → {scaled_text(after.get(column))}</td>"
-                    for column in ("cover50", "cover80")
+                    f"<td>{scaled_text(before.get(metric))} → {scaled_text(after.get(metric))}</td>"
+                    for metric in ("cover50", "cover80")
                 )
                 + "".join(
-                    f"<td>{two_decimals_text(before.get(column))} → {two_decimals_text(after.get(column))}</td>"
-                    for column in ("width80_pct", "score50", "score80")
+                    f"<td>{two_decimals_text(before.get(metric))} → {two_decimals_text(after.get(metric))}</td>"
+                    for metric in ("width80_pct", "score50", "score80")
                 )
                 + f"<td>{two_decimals_text(before.get('qs_pct'), 3)} → "
                 f"{two_decimals_text(after.get('qs_pct'), 3)}</td></tr>"
@@ -203,7 +208,7 @@ def aci_table(cmp: dict) -> str:
     return f'<div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div>'
 
 
-def aci_rc(ranges_config: dict, gamma: float | None = None, by_regime: bool | None = None) -> dict:
+def aci_ranges_config(ranges_config: dict, gamma: float | None = None, by_regime: bool | None = None) -> dict:
     """A copy of the range settings with ACI switched on (optionally another gamma / by_regime)."""
     aci_settings = {**adaptive_conformal.settings(ranges_config), "enabled": True}
     if gamma is not None:

@@ -55,7 +55,9 @@ def rows_of(payload, key: str | None = None) -> list[dict]:
 
 def short_hash(*parts) -> str:
     """A 12-character sha256 of the parts (None as empty), for ids."""
-    return hashlib.sha256("|".join("" if p is None else str(p) for p in parts).encode()).hexdigest()[:SHORT_HASH_LENGTH]
+    return hashlib.sha256("|".join("" if part is None else str(part) for part in parts).encode()).hexdigest()[
+        :SHORT_HASH_LENGTH
+    ]
 
 
 def iso(value) -> str | None:

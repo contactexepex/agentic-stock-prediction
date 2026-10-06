@@ -19,8 +19,14 @@ from __future__ import annotations
 import json
 import re
 
-from marketbrief.constants.columns import COL_ACCEPTED_AT, COL_ACCESSION, COL_CHECKED_AT, COL_SOURCE
+from marketbrief.constants.columns import (
+    COL_ACCEPTED_AT,
+    COL_ACCESSION,
+    COL_CHECKED_AT,
+    COL_SOURCE,
+)
 from marketbrief.constants.config_keys import CFG_MARKET
+from marketbrief.constants.kinds import KIND_SEC_TIMES
 from marketbrief.constants.sec_times import (
     COLLECTOR_SEC_TIMES,
     ERROR_TEXT_LIMIT,
@@ -31,8 +37,12 @@ from marketbrief.constants.sec_times import (
     SOURCE_SGML_HEADER,
     WRONG_ROWS_LIMIT,
 )
-from marketbrief.constants.kinds import KIND_SEC_TIMES
-from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_REQUESTS
+from marketbrief.constants.statuses import (
+    SUMMARY_COLLECTOR,
+    SUMMARY_FAILED,
+    SUMMARY_MARKET,
+    SUMMARY_REQUESTS,
+)
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
@@ -48,9 +58,9 @@ ARCHIVE_FOLDER = re.compile(r"/edgar/data/(\d+)/")
 
 def raw_rows_sql(base, kind: str, query: str) -> str:
     """The SQL of one kind's raw stored rows, with the file reader and its typed columns filled in."""
-    spec = "{" + ", ".join(f"'{k}': '{v}'" for k, v in SCHEMAS[kind][1].items()) + "}"
+    spec = "{" + ", ".join(f"'{column}': '{column_type}'" for column, column_type in SCHEMAS[kind][1].items()) + "}"
     source = f"read_json('{(base / kind).as_posix()}/**/*.jsonl', format='newline_delimited', columns={spec})"
-    return query.format(src=source) + SEC_TIME_ONLY_ACCEPTED
+    return query.format(source_relation=source) + SEC_TIME_ONLY_ACCEPTED
 
 
 def stored(market: str) -> tuple[dict[str, tuple[str, str]], set[str]]:

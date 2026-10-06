@@ -56,4 +56,4 @@ FETCH_ERROR_TEXT_LIMIT = 160
 CONTENT_TYPE_TEXT_LIMIT = 40
 
 # ---------- article extraction ----------
-MSG_MESSAGE = "{name}: {name_2}"
+MSG_EXTRACTOR_ERROR = "{name}: {error_type}"

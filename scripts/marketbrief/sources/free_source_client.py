@@ -78,9 +78,9 @@ class FreeSourceClient(HttpClient):
         }
         return self.send(url, headers=request_headers, data=data)
 
-    def json(self, url: str, **kw):
+    def json(self, url: str, **request_options):
         """A URL's body parsed as JSON."""
-        body = self.get(url, **kw)
+        body = self.get(url, **request_options)
         try:
             return json.loads(body)
         except json.JSONDecodeError as exc:

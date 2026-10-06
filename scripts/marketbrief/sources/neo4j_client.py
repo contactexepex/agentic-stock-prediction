@@ -31,7 +31,7 @@ def error_text(body: str) -> str:
     try:
         errors = json.loads(body).get("errors") or []
         return (
-            "; ".join(f"{e.get('code', '')}: {e.get('message', '')}"[:ERROR_TEXT_LIMIT] for e in errors)
+            "; ".join(f"{error.get('code', '')}: {error.get('message', '')}"[:ERROR_TEXT_LIMIT] for error in errors)
             or body[:ERROR_TEXT_LIMIT]
         )
     except (ValueError, AttributeError):
@@ -60,7 +60,7 @@ class Neo4jClient(HttpClient):
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
-        self._secrets = [s for s in (password, token) if s]
+        self._secrets = [secret for secret in (password, token) if secret]
         self.timeout, self.retries = timeout, retries
         self.backoff = (
             float(os.environ.get(ENV_NEO4J_RETRY_BACKOFF, NEO4J_DEFAULT_BACKOFF_SECONDS))

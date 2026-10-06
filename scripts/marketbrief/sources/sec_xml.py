@@ -19,9 +19,9 @@ def raw_doc(primary_doc: str) -> str:
 def xml_root(data: bytes) -> ET.Element:
     """Parse XML and drop namespaces so paths read like the plain tag names."""
     root = ET.fromstring(data)
-    for el in root.iter():
-        if isinstance(el.tag, str) and "}" in el.tag:
-            el.tag = el.tag.split("}", 1)[1]
+    for element in root.iter():
+        if isinstance(element.tag, str) and "}" in element.tag:
+            element.tag = element.tag.split("}", 1)[1]
     return root
 
 

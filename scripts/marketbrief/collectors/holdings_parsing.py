@@ -50,7 +50,7 @@ def parse_cover(data: bytes) -> dict:
         "report_type": (xml_text(root, "formData/coverPage/reportType") or "").upper(),
         "entry_total": int(total) if total is not None else None,
         "confidential": bool(xml_flag(xml_text(root, "formData/summaryPage/isConfidentialOmitted"))),
-        "other_managers": [xml_text(m, "name") for m in managers if xml_text(m, "name")],
+        "other_managers": [xml_text(manager, "name") for manager in managers if xml_text(manager, "name")],
     }
 
 
@@ -62,7 +62,7 @@ def local_name(tag: str) -> str:
 def add_line(aggregates: Aggregates, children: dict, ticker: str, cusip: str) -> None:
     """Add one information-table line of a watched CUSIP (shares only, not principal amounts) to the aggregates."""
     amounts = (
-        {local_name(c.tag): (c.text or "").strip() for c in children["shrsOrPrnAmt"]}
+        {local_name(child.tag): (child.text or "").strip() for child in children["shrsOrPrnAmt"]}
         if "shrsOrPrnAmt" in children
         else {}
     )
@@ -93,7 +93,7 @@ def parse_info_table(stream, cusips: dict[str, str]) -> tuple[Aggregates, int, b
         if local_name(element.tag) != "infoTable":
             continue
         total += 1
-        children = {local_name(c.tag): c for c in element}
+        children = {local_name(child.tag): child for child in element}
         cusip = (children["cusip"].text or "").strip().upper() if "cusip" in children else ""
         placeholder |= cusip.strip("0") == ""
         ticker = cusips.get(cusip)
@@ -119,10 +119,10 @@ def incomplete_reason(cover: dict, n_lines: int, placeholder: bool) -> str | Non
 def info_table_url(edgar: Edgar, cik: int, accession: str) -> str:
     """The URL of a filing's information table (its largest XML besides primary_doc.xml)."""
     items = edgar.json(archive_url(cik, accession, "index.json"))["directory"]["item"]
-    xmls = [i for i in items if i["name"].lower().endswith(".xml") and i["name"] != "primary_doc.xml"]
+    xmls = [item for item in items if item["name"].lower().endswith(".xml") and item["name"] != "primary_doc.xml"]
     if not xmls:
         raise ValueError(MSG_NO_INFORMATION_TABLE)
-    best = max(xmls, key=lambda i: int(i.get("size") or 0))
+    best = max(xmls, key=lambda item: int(item.get("size") or 0))
     return archive_url(cik, accession, best["name"])
 
 
@@ -168,7 +168,7 @@ def to_rows(
             (ticker, None), {"cusip": None, "shares": 0.0, "value_usd": 0.0, "n_lines": 0, "issuer_name": None}
         )
     rows = []
-    for (ticker, put_call), aggregate in sorted(aggregates.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")):
+    for (ticker, put_call), aggregate in sorted(aggregates.items(), key=lambda entry: (entry[0][0], entry[0][1] or "")):
         rows.append(
             {
                 COL_ID: f"{ref.filing['accession']}-{ticker}" + (f"-{put_call}" if put_call else ""),

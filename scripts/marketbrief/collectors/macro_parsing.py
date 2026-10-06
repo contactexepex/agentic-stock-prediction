@@ -111,8 +111,8 @@ def parse_cboe(payload: dict, day: date, wanted: dict[str, str], now: str) -> tu
     """`ratios` list -> (rows for the configured ratio names ({name in Cboe's file: series}),
     configured names absent or without a number). Rows are `complete` only when none is missing."""
     by_name = {
-        (r.get("name") or "").strip().upper(): parse_accounting_amount(r.get("value"))
-        for r in payload.get("ratios") or []
+        (ratio.get("name") or "").strip().upper(): parse_accounting_amount(ratio.get("value"))
+        for ratio in payload.get("ratios") or []
     }
     found = {name: by_name.get(name.upper()) for name in wanted}
     missing = sorted(name for name, value in found.items() if value is None)

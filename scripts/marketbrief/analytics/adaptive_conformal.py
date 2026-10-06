@@ -31,26 +31,36 @@ def settings(ranges_config: dict) -> dict:
 
 
 def aci_step(
-    alpha: float, target: float, err: float, gamma: float, lo: float | None = None, hi: float | None = None
+    alpha: float,
+    target: float,
+    err: float,
+    gamma: float,
+    lower_bound: float | None = None,
+    upper_bound: float | None = None,
 ) -> float:
     """One ACI update. err in [0, 1] (1 = miss, or the share of misses in the step)."""
-    a = alpha + gamma * (target - err)
-    if lo is not None:
-        a = max(lo, a)
-    if hi is not None:
-        a = min(hi, a)
-    return a
+    updated_alpha = alpha + gamma * (target - err)
+    if lower_bound is not None:
+        updated_alpha = max(lower_bound, updated_alpha)
+    if upper_bound is not None:
+        updated_alpha = min(upper_bound, updated_alpha)
+    return updated_alpha
 
 
 def aci_path(
-    errs, target: float, gamma: float, lo: float | None = None, hi: float | None = None, alpha0: float | None = None
+    errs,
+    target: float,
+    gamma: float,
+    lower_bound: float | None = None,
+    upper_bound: float | None = None,
+    alpha0: float | None = None,
 ) -> list[float]:
     """alpha_0 .. alpha_T for an error sequence (alpha_0 = target unless given)."""
-    a = target if alpha0 is None else alpha0
-    out = [a]
-    for e in errs:
-        a = aci_step(a, target, float(e), gamma, lo, hi)
-        out.append(a)
+    alpha = target if alpha0 is None else alpha0
+    out = [alpha]
+    for error in errs:
+        alpha = aci_step(alpha, target, float(error), gamma, lower_bound, upper_bound)
+        out.append(alpha)
     return out
 
 
@@ -75,18 +85,20 @@ class Tracker:
     def update(self, horizon: int, band: str, key: str, err: float) -> None:
         """Move one band's alpha by one ACI step from the observed miss rate."""
         target = TARGET[band]
-        k = (int(horizon), band, key)
-        lo, hi = clamps(target, self.s["max_shift"])
-        self.alpha[k] = aci_step(self.alpha.get(k, target), target, err, self.s["gamma"], lo, hi)
-        self.steps[k] = self.steps.get(k, 0) + 1
+        state_key = (int(horizon), band, key)
+        lower_bound, upper_bound = clamps(target, self.s["max_shift"])
+        self.alpha[state_key] = aci_step(
+            self.alpha.get(state_key, target), target, err, self.s["gamma"], lower_bound, upper_bound
+        )
+        self.steps[state_key] = self.steps.get(state_key, 0) + 1
 
     def effective(self, horizon: int, band: str, key: str) -> float:
         """alpha used for the band: the target until min_history steps were seen."""
         target = TARGET[band]
-        k = (int(horizon), band, key)
-        if self.steps.get(k, 0) < self.s["min_history"]:
+        state_key = (int(horizon), band, key)
+        if self.steps.get(state_key, 0) < self.s["min_history"]:
             return target
-        return self.alpha.get(k, target)
+        return self.alpha.get(state_key, target)
 
     def levels(self, horizon: int, key: str) -> dict[str, float]:
         """Quantile levels for q10/q25/q75/q90 (the 80% band stays at least as wide as the 50%)."""
@@ -94,30 +106,35 @@ class Tracker:
         a80 = min(self.effective(horizon, "80", key), a50)
         return {"q10": a80 / 2, "q25": a50 / 2, "q75": 1 - a50 / 2, "q90": 1 - a80 / 2}
 
-    def feed(self, df: pd.DataFrame) -> None:
+    def feed(self, scored_ranges: pd.DataFrame) -> None:
         """Update from scored ranges (columns horizon_days, target_date, hit50, hit80 and, when
         by_regime, regime), one step per target date in date order; err = share of misses."""
-        if df is None or df.empty:
+        if scored_ranges is None or scored_ranges.empty:
             return
-        d = df.copy()
-        d["key"] = [self.key(r) for r in (d["regime"] if "regime" in d else [None] * len(d))]
+        scored_copy = scored_ranges.copy()
+        scored_copy["key"] = [
+            self.key(regime_label)
+            for regime_label in (scored_copy["regime"] if "regime" in scored_copy else [None] * len(scored_copy))
+        ]
         # each (horizon, key) series in target-date order
-        for (horizon, key), g in d.groupby(["horizon_days", "key"], sort=True):
-            for _, s in g.groupby("target_date", sort=True):
+        for (horizon, key), series_rows in scored_copy.groupby(["horizon_days", "key"], sort=True):
+            for _, target_day_rows in series_rows.groupby("target_date", sort=True):
                 for band in BANDS:
-                    self.update(int(horizon), band, key, 1.0 - float(s[f"hit{band}"].astype(float).mean()))
+                    self.update(
+                        int(horizon), band, key, 1.0 - float(target_day_rows[f"hit{band}"].astype(float).mean())
+                    )
 
     def snapshot(self) -> list[dict]:
         """The current alphas of every horizon, band and key."""
         out = []
-        for (horizon, band, key), a in sorted(self.alpha.items()):
+        for (horizon, band, key), alpha in sorted(self.alpha.items()):
             target = TARGET[band]
             out.append(
                 {
                     "horizon_days": horizon,
                     "band": band,
                     "key": key,
-                    "alpha": round(a, 5),
+                    "alpha": round(alpha, 5),
                     "alpha_target": target,
                     "steps": self.steps[(horizon, band, key)],
                     "effective_alpha": round(self.effective(horizon, band, key), 5),
@@ -136,9 +153,9 @@ WHERE o.scored_at <= ?::TIMESTAMPTZ AND r.hit50 IS NOT NULL AND r.hit80 IS NOT N
 def live_tracker(con, ranges_config: dict, now: str, until=None) -> Tracker:
     """ACI state from live scored ranges known at `now` (scored_at <= now), optionally only
     target dates <= until."""
-    df = con.execute(LIVE_SQL, [now]).df()
-    if until is not None and not df.empty:
-        df = df[pd.to_datetime(df["target_date"]).dt.date <= until]
+    scored_ranges = con.execute(LIVE_SQL, [now]).df()
+    if until is not None and not scored_ranges.empty:
+        scored_ranges = scored_ranges[pd.to_datetime(scored_ranges["target_date"]).dt.date <= until]
     tracker = Tracker(ranges_config)
-    tracker.feed(df)
+    tracker.feed(scored_ranges)
     return tracker

@@ -37,7 +37,7 @@ class RangeContext:
     """The shared inputs of one run (cfg, ranges config, regime row, as-of date, made-at time and stored data)."""
 
     cfg: dict
-    rc: dict
+    ranges_config: dict
     reg: pd.Series
     as_of: date
     now: str
@@ -66,9 +66,9 @@ class RangeContext:
 class HorizonContext:
     """One horizon of a run: its target session, calibration quantiles and whether a major event falls in it."""
 
-    h: int
+    horizon: int
     target: date
-    q: dict
+    quantiles: dict
     cal_id: str
     major: bool
 
@@ -93,8 +93,8 @@ def cue_times(con, feats: pd.DataFrame) -> dict:
     on the snapshot's UTC day no later than its computed_at (ADR first)."""
     out = {}
     for ticker, feature_row in feats.iterrows():
-        at = pd.Timestamp(feature_row["computed_at"]).to_pydatetime()
-        row = con.execute(CUE_TIME_SQL, [f"{ticker}:ADR", ticker, at, at, f"{ticker}:ADR"]).fetchone()
+        computed_at = pd.Timestamp(feature_row["computed_at"]).to_pydatetime()
+        row = con.execute(CUE_TIME_SQL, [f"{ticker}:ADR", ticker, computed_at, computed_at, f"{ticker}:ADR"]).fetchone()
         out[ticker] = pd.Timestamp(row[0]).to_pydatetime() if row and row[0] is not None else None
     return out
 
@@ -107,8 +107,8 @@ def load_index_cue(
     if not (enabled(ranges_config, INPUT_BETA_SPLIT, cfg["market"]) and symbol):
         return None, None
     as_of = pd.Timestamp(reg["as_of_date"]).date()
-    at = pd.Timestamp(reg["computed_at"]).to_pydatetime()
-    quote = con.execute(INDEX_CUE_SQL, [symbol, at, at]).fetchone()
+    computed_at = pd.Timestamp(reg["computed_at"]).to_pydatetime()
+    quote = con.execute(INDEX_CUE_SQL, [symbol, computed_at, computed_at]).fetchone()
     cue_beta = index_cue_beta(cfg, bars, ranges_config, pd.Timestamp(as_of))
     if not (quote and quote[0] is not None and cue_beta is not None):
         return None, None
@@ -119,16 +119,16 @@ def load_index_cue(
 
 def load_options(con, cfg: dict, ranges_config: dict, made: datetime, first_open: datetime) -> pd.DataFrame:
     """The newest option snapshot per ticker and expiry known before made_at and the first target open."""
-    opts = pd.DataFrame()
+    option_snapshots = pd.DataFrame()
     if cfg.get("options") and "implied_vol" in ranges_config:  # applied if switched on, else a shadow value
-        opts = con.execute(
+        option_snapshots = con.execute(
             OPTIONS_SQL,
             [made.date() - timedelta(days=int(ranges_config["implied_vol"]["max_age_days"])), min(made, first_open)],
         ).df()
-        if not opts.empty:
-            opts["expiry"] = opts["expiry"].map(lambda d: pd.Timestamp(d).date())
-            opts = opts.sort_values("day").drop_duplicates(["ticker", "expiry"], keep="last")
-    return opts
+        if not option_snapshots.empty:
+            option_snapshots["expiry"] = option_snapshots["expiry"].map(lambda expiry: pd.Timestamp(expiry).date())
+            option_snapshots = option_snapshots.sort_values("day").drop_duplicates(["ticker", "expiry"], keep="last")
+    return option_snapshots
 
 
 def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) -> RangeContext:
@@ -156,21 +156,21 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
     known_by = pd.Timestamp(made).tz_convert(cfg["timezone"]).date()
     earn_ev = earnings_events(events, as_of=known_by)
     sigma = {
-        ticker_name: range_math.ewma_sigma(bars[ticker_name]["close"], ranges_config["ewma_lambda"])
-        for ticker_name in cfg["tickers"]
-        if ticker_name in bars
+        ticker: range_math.ewma_sigma(bars[ticker]["close"], ranges_config["ewma_lambda"])
+        for ticker in cfg["tickers"]
+        if ticker in bars
     }
     moves = (
         {
-            ticker_name: past_moves(
+            ticker: past_moves(
                 cfg,
-                bars[ticker_name]["close"],
-                sigma[ticker_name],
-                earn_ev.get(ticker_name, []),
+                bars[ticker]["close"],
+                sigma[ticker],
+                earn_ev.get(ticker, []),
                 ranges_config["warmup_bars"],
             )
-            for ticker_name in cfg["tickers"]
-            if ticker_name in bars
+            for ticker in cfg["tickers"]
+            if ticker in bars
         }
         if enabled(ranges_config, INPUT_EARNINGS_HISTORY, cfg["market"])
         else {}
@@ -178,7 +178,7 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
     index_cue, index_cue_note = load_index_cue(con, cfg, ranges_config, bars, reg, first_open)
     return RangeContext(
         cfg=cfg,
-        rc=ranges_config,
+        ranges_config=ranges_config,
         reg=reg,
         as_of=as_of,
         now=now,
@@ -188,10 +188,10 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
         first_close=first_close,
         feats=feats,
         cal=cal,
-        pred={(r.ticker, int(r.horizon_days)): r for r in preds.itertuples()},
+        pred={(prediction.ticker, int(prediction.horizon_days)): prediction for prediction in preds.itertuples()},
         existing=existing,
         bars=bars,
-        earnings={ticker_name: d for ticker_name, k, d in company if k == TYPE_EARNINGS},
+        earnings={ticker: earnings_day for ticker, event_type, earnings_day in company if event_type == TYPE_EARNINGS},
         rwiden=rwiden,
         smart=smart,
         cue_ts=cue_times(con, feats),
@@ -206,18 +206,20 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
 
 def horizon_context(ctx: RangeContext, horizon: int) -> HorizonContext | None:
     """The horizon's target and calibration, or None when its outcome is already public (late or mid-session run)."""
-    tgt = target_date(ctx.cfg, ctx.as_of, horizon)
-    if ctx.made >= session_close_utc(ctx.cfg, tgt):
+    target_day = target_date(ctx.cfg, ctx.as_of, horizon)
+    if ctx.made >= session_close_utc(ctx.cfg, target_day):
         return None  # late run: the target session already closed, its outcome is public
-    if tgt == ctx.first and ctx.made >= ctx.first_open:
+    if target_day == ctx.first and ctx.made >= ctx.first_open:
         return None  # mid-session run: the 1-day target session has opened, its outcome is partly public
-    major = any(e["major"] for e in market_events(ctx.cfg, ctx.as_of + timedelta(days=1), tgt))
+    major = any(event["major"] for event in market_events(ctx.cfg, ctx.as_of + timedelta(days=1), target_day))
     if horizon in ctx.cal.index:
-        c = ctx.cal.loc[horizon]
-        q = {"q10": c.q10, "q25": c.q25, "q75": c.q75, "q90": c.q90}
-        cal_id = CALIBRATION_ID.format(id=c.id, source=c.source, history=c.n_history, live=c.n_live)
+        calibration = ctx.cal.loc[horizon]
+        quantiles = {"q10": calibration.q10, "q25": calibration.q25, "q75": calibration.q75, "q90": calibration.q90}
+        cal_id = CALIBRATION_ID.format(
+            id=calibration.id, source=calibration.source, history=calibration.n_history, live=calibration.n_live
+        )
     else:
         lo80, hi80 = range_math.normal_quantiles(0.8)
         lo50, hi50 = range_math.normal_quantiles(0.5)
-        q, cal_id = {"q10": lo80, "q25": lo50, "q75": hi50, "q90": hi80}, NO_CALIBRATION_ID
-    return HorizonContext(h=horizon, target=tgt, q=q, cal_id=cal_id, major=major)
+        quantiles, cal_id = {"q10": lo80, "q25": lo50, "q75": hi50, "q90": hi80}, NO_CALIBRATION_ID
+    return HorizonContext(horizon=horizon, target=target_day, quantiles=quantiles, cal_id=cal_id, major=major)

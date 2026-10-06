@@ -32,7 +32,11 @@ from __future__ import annotations
 
 import json
 
-from marketbrief.constants.neo4j import BATCH_SIZE, MSG_PROBE_NEEDS_A_SERVER_NOT_DRY
+from marketbrief.constants.neo4j import (
+    BATCH_SIZE,
+    MSG_NEO4J_URI_NOT_SET,
+    MSG_PROBE_NEEDS_SERVER,
+)
 from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.database import connect
@@ -64,14 +68,14 @@ def main() -> int:
                         "market": cfg["market"],
                         "ok": False,
                         "skipped": True,
-                        "reason": "NEO4J_URI not set",
+                        "reason": MSG_NEO4J_URI_NOT_SET,
                     }
                 )
             )
             return 2
     if args.probe:
         if isinstance(sink, DryRunSink):
-            raise SystemExit(MSG_PROBE_NEEDS_A_SERVER_NOT_DRY)
+            raise SystemExit(MSG_PROBE_NEEDS_SERVER)
         try:
             res = sink.run("RETURN 1 AS ok")
             print(

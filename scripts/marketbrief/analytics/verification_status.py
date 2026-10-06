@@ -90,78 +90,88 @@ def has_value(statement: dict) -> bool:
 
 def same_period(first: str | None, second: str | None) -> bool:
     """Periods agree when either is missing or one contains the other ('Q3' and 'Q3 2026')."""
-    a, b = ("".join((p or "").lower().split()) for p in (first, second))
-    return not a or not b or a in b or b in a
+    first_text, second_text = ("".join((period or "").lower().split()) for period in (first, second))
+    return not first_text or not second_text or first_text in second_text or second_text in first_text
 
 
 def value_groups(statements: list[dict]) -> list[list[dict]]:
     """Numeric statements of one unit grouped by agreeing value (each joins the first group it matches)."""
     groups: list[list[dict]] = []
-    for s in sorted(statements, key=lambda x: (x["value_num"], x["quote_source_id"])):
+    for statement in sorted(statements, key=lambda item: (item["value_num"], item["quote_source_id"])):
         for group in groups:
             head = group[0]
-            if head["unit"] == s["unit"] and values_match(
-                (head["value_num"], head.get("value_text")), (s["value_num"], s.get("value_text"))
+            if head["unit"] == statement["unit"] and values_match(
+                (head["value_num"], head.get("value_text")), (statement["value_num"], statement.get("value_text"))
             ):
-                group.append(s)
+                group.append(statement)
                 break
         else:
-            groups.append([s])
+            groups.append([statement])
     return groups
 
 
 def conflict_rows(groups: list[list[dict]]) -> list[dict]:
     """The disagreeing values for display: value (a primary source's when one states it), unit, the source
     ids stating it, and whether a primary did."""
-    heads = [next((s for s in g if is_primary(s)), g[0]) for g in groups]
+    heads = [next((statement for statement in group if is_primary(statement)), group[0]) for group in groups]
     return [
         {
             "value": horizon["value_num"],
             "unit": horizon["unit"],
-            "ids": sorted({s["quote_source_id"] for s in g}),
+            "ids": sorted({statement["quote_source_id"] for statement in group}),
             "primary": is_primary(horizon),
         }
-        for horizon, g in zip(heads, groups)
+        for horizon, group in zip(heads, groups)
     ]
 
 
 def _primary_checks(primary: list[dict], outlets: list[dict], result: dict) -> bool:
     """Primary statements against each other and the outlets; returns True when the fact is contradicted."""
-    affirm = [s for s in primary if s["stance"] == STANCE_AFFIRMS]
-    deny = [s for s in primary if s["stance"] == STANCE_DENIES]
+    affirm = [statement for statement in primary if statement["stance"] == STANCE_AFFIRMS]
+    deny = [statement for statement in primary if statement["stance"] == STANCE_DENIES]
     contradicted = bool(affirm and deny)
     if deny:
-        affirming_outlets = [s for s in outlets if s["stance"] == STANCE_AFFIRMS]
+        affirming_outlets = [statement for statement in outlets if statement["stance"] == STANCE_AFFIRMS]
         if affirming_outlets:
             contradicted = True
             result["flags"].add(FLAG_PRIMARY_DENIES)
-            result["mismatch_ids"].update(n for s in affirming_outlets for n in s["news_ids"])
-    values = [s for s in affirm if has_value(s)]
-    if any(len(value_groups([s for s in values if s["unit"] == unit])) > 1 for unit in {s["unit"] for s in values}):
+            result["mismatch_ids"].update(
+                news_id for statement in affirming_outlets for news_id in statement["news_ids"]
+            )
+    values = [statement for statement in affirm if has_value(statement)]
+    if any(
+        len(value_groups([statement for statement in values if statement["unit"] == unit])) > 1
+        for unit in {statement["unit"] for statement in values}
+    ):
         contradicted = True
-    for s in (x for x in outlets if has_value(x) and values):
-        same_unit = [p for p in values if p["unit"] == s["unit"]]
+    for statement in (outlet_statement for outlet_statement in outlets if has_value(outlet_statement) and values):
+        same_unit = [
+            primary_statement for primary_statement in values if primary_statement["unit"] == statement["unit"]
+        ]
         if not same_unit:
             result["flags"].add(FLAG_UNIT_MISMATCH)
         elif not any(
-            values_match((p["value_num"], p.get("value_text")), (s["value_num"], s.get("value_text")))
-            and same_period(p.get("period"), s.get("period"))
-            for p in same_unit
+            values_match(
+                (primary_statement["value_num"], primary_statement.get("value_text")),
+                (statement["value_num"], statement.get("value_text")),
+            )
+            and same_period(primary_statement.get("period"), statement.get("period"))
+            for primary_statement in same_unit
         ):
             result["flags"].add(FLAG_MISMATCH_PRIMARY)
-            result["mismatch_ids"].update(s["news_ids"])
+            result["mismatch_ids"].update(statement["news_ids"])
     return contradicted
 
 
 def _outlets_disagree(factual: list[dict], result: dict) -> bool:
     """Without primary confirmation: outlet values or stances that disagree."""
-    affirming = [s for s in factual if s["stance"] == STANCE_AFFIRMS and has_value(s)]
+    affirming = [statement for statement in factual if statement["stance"] == STANCE_AFFIRMS and has_value(statement)]
     disagree = False
-    for unit in sorted({s["unit"] for s in affirming}):
-        if len(value_groups([s for s in affirming if s["unit"] == unit])) > 1:
+    for unit in sorted({statement["unit"] for statement in affirming}):
+        if len(value_groups([statement for statement in affirming if statement["unit"] == unit])) > 1:
             disagree = True
             result["flags"].add(FLAG_OUTLET_VALUES_DISAGREE)
-    if {s["stance"] for s in factual} == {STANCE_AFFIRMS, STANCE_DENIES}:
+    if {statement["stance"] for statement in factual} == {STANCE_AFFIRMS, STANCE_DENIES}:
         disagree = True
         result["flags"].add(FLAG_STANCES_DISAGREE)
     return disagree
@@ -169,47 +179,55 @@ def _outlets_disagree(factual: list[dict], result: dict) -> bool:
 
 def fact_status(statements: list[dict], verified_origin: dict[str, str]) -> dict:
     """Status of one fact from its statements. verified_origin: news id -> its verified origin group."""
-    primary = [s for s in statements if is_primary(s)]
-    outlets = [s for s in statements if not is_primary(s)]
-    factual = [s for s in outlets if not is_opinion(s) and not is_promotional(s)]
+    primary = [statement for statement in statements if is_primary(statement)]
+    outlets = [statement for statement in statements if not is_primary(statement)]
+    factual = [statement for statement in outlets if not is_opinion(statement) and not is_promotional(statement)]
     result = {"flags": set(), "mismatch_ids": set()}
     contradicted = _primary_checks(primary, outlets, result)
-    affirm = [s for s in primary if s["stance"] == STANCE_AFFIRMS]
-    primary_values = [s for s in affirm if has_value(s)]
-    outlet_values = any(has_value(s) for s in factual)
+    affirm = [statement for statement in primary if statement["stance"] == STANCE_AFFIRMS]
+    primary_values = [statement for statement in affirm if has_value(statement)]
+    outlet_values = any(has_value(statement) for statement in factual)
     if affirm and not primary_values and outlet_values:
         result["flags"].add(FLAG_PRIMARY_WITHOUT_VALUE)
     confirmed = bool(affirm) and not contradicted and (bool(primary_values) or not outlet_values)
     if not contradicted and not confirmed:
         contradicted = _outlets_disagree(factual, result)
-    origins = {verified_origin[n] for s in factual for n in s["news_ids"] if n in verified_origin}
+    origins = {
+        verified_origin[news_id]
+        for statement in factual
+        for news_id in statement["news_ids"]
+        if news_id in verified_origin
+    }
     if contradicted:
         status = STATUS_CONTRADICTED
     elif confirmed:
         status = STATUS_CONFIRMED_PRIMARY
     elif len(origins) >= 2:
         status = STATUS_CORROBORATED
-    elif any(is_rumour(s) for s in outlets):
+    elif any(is_rumour(statement) for statement in outlets):
         status = STATUS_RUMOUR
-    elif any(is_promotional(s) for s in outlets):
+    elif any(is_promotional(statement) for statement in outlets):
         status = STATUS_PROMOTIONAL
     else:
         status = STATUS_SINGLE_SOURCE if origins else STATUS_UNVERIFIED
-    numeric = [s for s in statements if has_value(s) and s["stance"] == STANCE_AFFIRMS]
+    numeric = [statement for statement in statements if has_value(statement) and statement["stance"] == STANCE_AFFIRMS]
     groups = [
-        g
-        for unit in sorted({s["unit"] for s in numeric})
-        for g in value_groups([s for s in numeric if s["unit"] == unit])
+        group
+        for unit in sorted({statement["unit"] for statement in numeric})
+        for group in value_groups([statement for statement in numeric if statement["unit"] == unit])
     ]
     return {
         "status": status,
         "flags": sorted(result["flags"]),
         "mismatch_ids": sorted(result["mismatch_ids"]),
-        "primary_ids": sorted({s["quote_source_id"] for s in affirm}),
-        "outlet_ids": sorted({n for s in outlets for n in s["news_ids"]}),
+        "primary_ids": sorted({statement["quote_source_id"] for statement in affirm}),
+        "outlet_ids": sorted({news_id for statement in outlets for news_id in statement["news_ids"]}),
         "origins": sorted(origins),
         "conflicts": conflict_rows(groups) if len(groups) > 1 else [],
-        "confirmed_at": min((s.get("source_published_at") or s["source_available_at"] for s in affirm), default=None)
+        "confirmed_at": min(
+            (statement.get("source_published_at") or statement["source_available_at"] for statement in affirm),
+            default=None,
+        )
         if confirmed
         else None,
     }
@@ -217,7 +235,12 @@ def fact_status(statements: list[dict], verified_origin: dict[str, str]) -> dict
 
 def verified_origins(cluster: dict) -> dict[str, str]:
     """News id -> origin label, for the cluster's verified origin groups (phase A)."""
-    return {n: g["origin"] for g in cluster.get("origin_groups") or [] if g.get("verified") for n in g["news_ids"]}
+    return {
+        news_id: group["origin"]
+        for group in cluster.get("origin_groups") or []
+        if group.get("verified")
+        for news_id in group["news_ids"]
+    }
 
 
 def base_status(cluster: dict) -> str:
@@ -239,8 +262,13 @@ def id_statuses(cluster: dict, status: str, mismatch_ids: set[str]) -> dict[str,
     status (rumour, promotional, contradicted): an unvetted copy of a rumour stays a rumour."""
     blocking = status in (STATUS_RUMOUR, STATUS_PROMOTIONAL, STATUS_CONTRADICTED)
     groups = cluster.get("origin_groups") or []
-    promo = {n for g in groups if g.get("promotional") for n in g["news_ids"]}
-    opinion = {n for g in groups if g.get("opinion") and not g.get("verified") for n in g["news_ids"]}
+    promo = {news_id for group in groups if group.get("promotional") for news_id in group["news_ids"]}
+    opinion = {
+        news_id
+        for group in groups
+        if group.get("opinion") and not group.get("verified")
+        for news_id in group["news_ids"]
+    }
     unvetted = set(cluster.get("unvetted_ids") or [])
     out = {}
     for nid in [*(cluster.get("news_ids") or []), *(cluster.get("duplicate_ids") or [])]:
@@ -259,23 +287,25 @@ def cluster_status(cluster: dict, statements: list[dict]) -> tuple[dict, dict[st
     """(cluster result, {fact_key: fact result}) for one cluster row and its claims."""
     origins = verified_origins(cluster)
     by_fact: dict[str, list[dict]] = {}
-    for s in statements:
-        by_fact.setdefault(s["fact_key"], []).append(s)
+    for statement in statements:
+        by_fact.setdefault(statement["fact_key"], []).append(statement)
     facts = {key: fact_status(rows, origins) for key, rows in sorted(by_fact.items())}
     for key, fact in facts.items():
-        if not any(not is_primary(s) and s["stance"] == STANCE_AFFIRMS for s in by_fact[key]):
+        if not any(not is_primary(statement) and statement["stance"] == STANCE_AFFIRMS for statement in by_fact[key]):
             fact["flags"] = sorted({*fact["flags"], FLAG_PRIMARY_ONLY})
-    event = [f for f in facts.values() if FLAG_PRIMARY_ONLY not in f["flags"]]  # facts the outlets state
-    status = highest([base_status(cluster), *(f["status"] for f in event)])
-    mismatch = {n for f in event for n in f["mismatch_ids"]}
-    confirmed = [f["confirmed_at"] for f in event if f["confirmed_at"] is not None]
+    event = [
+        fact_result for fact_result in facts.values() if FLAG_PRIMARY_ONLY not in fact_result["flags"]
+    ]  # facts the outlets state
+    status = highest([base_status(cluster), *(fact_result["status"] for fact_result in event)])
+    mismatch = {news_id for fact_result in event for news_id in fact_result["mismatch_ids"]}
+    confirmed = [fact_result["confirmed_at"] for fact_result in event if fact_result["confirmed_at"] is not None]
     result = {
         "status": status,
-        "flags": sorted({x for f in event for x in f["flags"]}),
+        "flags": sorted({flag for fact_result in event for flag in fact_result["flags"]}),
         "mismatch_ids": sorted(mismatch),
-        "primary_ids": sorted({p for f in event for p in f["primary_ids"]}),
-        "outlet_ids": sorted({o for f in event for o in f["outlet_ids"]}),
-        "conflicts": [c for f in event for c in f["conflicts"]],
+        "primary_ids": sorted({primary_id for fact_result in event for primary_id in fact_result["primary_ids"]}),
+        "outlet_ids": sorted({outlet_id for fact_result in event for outlet_id in fact_result["outlet_ids"]}),
+        "conflicts": [conflict for fact_result in event for conflict in fact_result["conflicts"]],
         "confirmed_at": min(confirmed) if status == STATUS_CONFIRMED_PRIMARY and confirmed else None,
         "ids": id_statuses(cluster, status, mismatch),
     }

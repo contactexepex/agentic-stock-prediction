@@ -19,9 +19,9 @@ from marketbrief.constants.articles import (
     EXTRACTOR_JSONLD,
     EXTRACTOR_NEWSPAPER,
     EXTRACTOR_TRAFILATURA,
+    MSG_EXTRACTOR_ERROR,
     MSG_UNPARSABLE_HTML,
 )
-from marketbrief.constants.articles import MSG_MESSAGE
 
 ARTICLE_TYPES = ("BlogPosting", "LiveBlogPosting")
 DATE_PUBLISHED_META = ("article:published_time", "datePublished", "parsely-pub-date", "publish-date", "pubdate")
@@ -148,7 +148,7 @@ def best_text(
         try:
             text = extract_jsonld(article) if name == EXTRACTOR_JSONLD else EXTRACTORS[name](html, url)
         except Exception as exc:
-            errors.append(MSG_MESSAGE.format(name=name, name_2=type(exc).__name__))
+            errors.append(MSG_EXTRACTOR_ERROR.format(name=name, error_type=type(exc).__name__))
             continue
         if len(text) > len(best):
             best, best_by = text, name
@@ -169,7 +169,9 @@ def parse_article(html: str, url: str, src: Sources, hints: dict | None = None) 
     except (ValueError, Exception):
         return {"access": ACCESS_PARTIAL, "text": "", "extractor": None, "note": MSG_UNPARSABLE_HTML}
     articles = json_ld_articles(document)
-    article = next((a for a in articles if a.get("articleBody")), articles[0] if articles else None)
+    article = next(
+        (candidate for candidate in articles if candidate.get("articleBody")), articles[0] if articles else None
+    )
     info = page_info(document, article)
     if is_paywalled(article):
         return {**info, "access": ACCESS_PAYWALLED, "text": info["description"], "extractor": EXTRACTOR_DESCRIPTION}

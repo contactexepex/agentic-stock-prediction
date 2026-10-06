@@ -12,27 +12,32 @@ from marketbrief.constants.validation import (
     MSG_BAD_CLOSE_ON_RECENT_BAR,
     MSG_BENCHMARK_VOL_INDEX_NO_BARS_STORED,
     MSG_BENCHMARK_VOL_INDEX_STALE,
-    MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION,
+    MSG_BIG_MOVE_WITHOUT_ACTION,
+    MSG_COLLECTOR_ERROR,
     MSG_COLLECTOR_FAILED,
     MSG_COLLECTOR_FILE_PROBLEM,
-    MSG_COLLECTOR_PROBLEM,
     MSG_DUPLICATED_KEYS,
-    MSG_IS_NOT_A_JSON_SUMMARY,
-    MSG_LATE_RUN_SESSION_HAS_CLOSED_BUT,
+    MSG_LATE_RUN_SESSION_HAS_NO_BAR,
     MSG_MARKET_SYMBOLS_STALE,
     MSG_MARKET_SYMBOLS_WITH_NO_BARS_STORED,
-    MSG_NEWEST_BAR_OLDER_THAN_THE_LAST,
+    MSG_NEWEST_BAR_BEHIND_LAST_SESSION,
     MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR,
     MSG_NO_STORED_PRICE_BARS,
+    MSG_NOT_A_JSON_SUMMARY,
     MSG_NOT_FETCHED_NO_ROWS,
     MSG_NOT_FETCHED_STALE,
-    MSG_PRICES_PRICE_BASIS_WARNING_S,
+    MSG_PRICE_BASIS_WARNINGS,
     MSG_ZERO_ROWS_WITHOUT_REASON,
     TRADING_DATE_KINDS,
 )
 from marketbrief.core import market_config, paths, schemas
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
-from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, tickers_in, todays_files
+from marketbrief.pipeline.validate.row_checks import (
+    check_rows,
+    read_rows,
+    tickers_in,
+    todays_files,
+)
 from marketbrief.utils.timefmt import as_utc_timestamp
 
 
@@ -48,7 +53,7 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
             if problems:
                 res.block(
                     "BAD_FILE",
-                    MSG_COLLECTOR_FILE_PROBLEM.format(rel=rel, value="; ".join(problems[:3])),
+                    MSG_COLLECTOR_FILE_PROBLEM.format(relative_path=rel, problems="; ".join(problems[:3])),
                     tickers_in(rows),
                 )
             if kind in TRADING_DATE_KINDS:
@@ -57,7 +62,11 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
             row_count += len(rows)
             bad = check_rows(kind, rows, path.suffix == ".csv", now, tol)
             if bad:
-                res.block("SCHEMA", MSG_COLLECTOR_FILE_PROBLEM.format(rel=rel, value="; ".join(bad)), tickers_in(rows))
+                res.block(
+                    "SCHEMA",
+                    MSG_COLLECTOR_FILE_PROBLEM.format(relative_path=rel, problems="; ".join(bad)),
+                    tickers_in(rows),
+                )
         counts[kind] = row_count
     return counts
 
@@ -74,7 +83,7 @@ def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict):
         if rows:
             res.block(
                 "DUPLICATE_ID",
-                MSG_DUPLICATED_KEYS.format(kind=kind, count=len(rows), key=key, value=[row[0] for row in rows[:5]]),
+                MSG_DUPLICATED_KEYS.format(kind=kind, count=len(rows), key=key, examples=[row[0] for row in rows[:5]]),
             )
 
 
@@ -124,7 +133,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
     if stale:
         res.block(
             "STALE_BARS",
-            MSG_NEWEST_BAR_OLDER_THAN_THE_LAST.format(need=need, value=stale[0], value_2=last[stale[0]]),
+            MSG_NEWEST_BAR_BEHIND_LAST_SESSION.format(need=need, ticker=stale[0], newest_date=last[stale[0]]),
             stale,
         )
     if run_status["late_run"]:
@@ -135,7 +144,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
         if no_bar:
             res.warn(
                 "LATE_RUN_NO_SESSION_BAR",
-                MSG_LATE_RUN_SESSION_HAS_CLOSED_BUT.format(sess=sess),
+                MSG_LATE_RUN_SESSION_HAS_NO_BAR.format(session=sess),
                 no_bar,
             )
     check_symbol_bars(res, cfg, last, need, validate_config)
@@ -155,7 +164,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
         if not corporate_action_near(con, ticker, day, validate_config):
             res.warn(
                 "BIG_MOVE",
-                MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION.format(ticker=ticker, row=row, day=day),
+                MSG_BIG_MOVE_WITHOUT_ACTION.format(ticker=ticker, one_day_return=row, day=day),
                 [ticker],
             )
 
@@ -223,7 +232,7 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
         try:
             collector_summary = json.loads(summary_path.read_text())
         except (json.JSONDecodeError, OSError) as error:
-            res.warn("COLLECTOR_SUMMARY", MSG_IS_NOT_A_JSON_SUMMARY.format(name=summary_path.name, error=error))
+            res.warn("COLLECTOR_SUMMARY", MSG_NOT_A_JSON_SUMMARY.format(name=summary_path.name, error=error))
             continue
         name = collector_summary.get("collector") or summary_path.stem.removeprefix("collect_")
         seen[name] = collector_summary
@@ -231,7 +240,7 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
             continue
         if collector_summary.get("error"):
             res.warn(
-                "COLLECTOR_ERROR", MSG_COLLECTOR_PROBLEM.format(name=name, value=str(collector_summary["error"])[:200])
+                "COLLECTOR_ERROR", MSG_COLLECTOR_ERROR.format(name=name, error=str(collector_summary["error"])[:200])
             )
         failed = collector_summary.get("failed")
         if failed:
@@ -247,7 +256,7 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
             ]
             res.warn(
                 "COLLECTOR_FAILED",
-                MSG_COLLECTOR_FAILED.format(name=name, count=len(what), value=what[:10]),
+                MSG_COLLECTOR_FAILED.format(name=name, count=len(what), failures=what[:10]),
                 [warning for warning in what if warning in cfg["tickers"]],
             )
         if name == "prices" and collector_summary.get(
@@ -256,9 +265,7 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
             warning_texts = [str(warning) for warning in collector_summary["warnings"]]
             res.warn(
                 "PRICE_BASIS",
-                MSG_PRICES_PRICE_BASIS_WARNING_S.format(
-                    count=len(warning_texts), value="; ".join(warning_texts[:5])[:600]
-                ),
+                MSG_PRICE_BASIS_WARNINGS.format(count=len(warning_texts), warnings="; ".join(warning_texts[:5])[:600]),
                 [warning.split(":", 1)[0] for warning in warning_texts if warning.split(":", 1)[0] in cfg["tickers"]],
             )
         key = (validate_config.get("expect_output") or {}).get(name)

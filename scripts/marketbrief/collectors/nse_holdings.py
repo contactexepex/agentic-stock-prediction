@@ -127,28 +127,28 @@ def dataset_rows(run: NseRun, dataset: tuple, due: list[str], by_ticker: dict[st
     """(records, calls answered, rows returned, aborted) of one dataset for the due tickers; aborted when the egress
     proxy refuses the host (every other symbol fails the same way)."""
     source, endpoint, _prefix, make = dataset
-    found, ok, total = [], 0, 0
+    found, calls_answered, total = [], 0, 0
     for ticker in due:
         try:
             rows = rows_of(run.nse.json(endpoint, {"index": "equities", "symbol": by_ticker[ticker]}))
         except FetchError as exc:
             run.problems.failed.append(exc.entry(f"holdings:{source}:{ticker}"))
             if exc.host:
-                return found, ok, total, True
+                return found, calls_answered, total, True
             continue
-        ok += 1
+        calls_answered += 1
         total += len(rows)
         if not rows:
             run.problems.notes.append(MSG_HOLDINGS_NO_ROWS.format(source=source, ticker=ticker))
-        records = [x for r in rows if (x := make(r, ticker, run.now))]
-        periods = sorted({x["period_end"] for x in records}, reverse=True)[:SEEN_KEEP_QUARTERS]
-        found += [x for x in records if x["period_end"] in periods]
-    return found, ok, total, False
+        records = [record for row in rows if (record := make(row, ticker, run.now))]
+        periods = sorted({record["period_end"] for record in records}, reverse=True)[:SEEN_KEEP_QUARTERS]
+        found += [record for record in records if record["period_end"] in periods]
+    return found, calls_answered, total, False
 
 
 def holdings(run: NseRun, limit: int | None) -> tuple[list[dict], int]:
     """The shareholding and pledge records of the tickers missing the latest quarter (at most `limit`)."""
-    found, ok = [], 0
+    found, calls_answered = [], 0
     by_ticker = {ticker: symbol for symbol, ticker in run.symbols.items()}
     for dataset in HOLDING_DATASETS:
         source, _endpoint, prefix, _make = dataset
@@ -158,13 +158,13 @@ def holdings(run: NseRun, limit: int | None) -> tuple[list[dict], int]:
         )
         records, answered, total, aborted = dataset_rows(run, dataset, due, by_ticker)
         found += records
-        ok += answered
+        calls_answered += answered
         if aborted:
-            return found, ok
+            return found, calls_answered
         if (
             due
             and total == 0
             and not any(failure["source"].startswith(f"holdings:{source}") for failure in run.problems.failed)
         ):
             coverage(MSG_HOLDINGS_CALLS.format(source=source, count=len(due)), 0, 0, run.problems)
-    return found, ok
+    return found, calls_answered

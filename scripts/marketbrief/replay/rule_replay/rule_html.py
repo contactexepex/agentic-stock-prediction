@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from marketbrief.constants.replay import CI_NOTE, MIN_MONTH_DAYS, RSI_HIGH, RSI_LOW, SCORE_NOTE
-from marketbrief.constants.replay_page import CSS, JS
+from marketbrief.constants.replay_page import CSS, REPLAY_SCRIPT
 from marketbrief.replay.html_parts import escape_html, legend, p_value_text, scaled_text
 from marketbrief.replay.rule_replay.aci_compare import aci_table, held_out_html
 from marketbrief.replay.rule_replay.rule_charts import svg_calibration, svg_regime, svg_time
@@ -145,7 +145,7 @@ def html_report(cfg: dict, stats: dict) -> str:
             f"<td>{score_cell(five_day_stats, 'score80')}</td>"
             f"<td>{score_cell(five_day_stats, 'naive_score80')}</td></tr>"
         )
-    opts = "".join(
+    sector_options = "".join(
         f'<option value="{escape_html(item)}">{escape_html(item)}</option>' for item in sorted(set(sector.values()))
     )
     lim = "".join(f"<li>{escape_html(item)}</li>" for item in stats["limitations"])
@@ -154,7 +154,7 @@ def html_report(cfg: dict, stats: dict) -> str:
         for horizon, enabled_inputs in stats["settings"]["inputs"].items()
     )
     dash = '<span><span class="dash"></span>perfect calibration</span>'
-    tgt = '<span><span class="dash"></span>promise 80%</span>'
+    target_legend = '<span><span class="dash"></span>promise 80%</span>'
     score_note = f'<p class="note">{escape_html(SCORE_NOTE)}</p>'
     index_cue = cfg.get("index_cue") or {}
     replayed_cue = (
@@ -163,7 +163,7 @@ def html_report(cfg: dict, stats: dict) -> str:
         and any(enabled_inputs.get("beta_split") for enabled_inputs in stats["settings"]["inputs"].values())
     )
     cue_name = (cfg["symbols"].get(index_cue.get("symbol")) or {}).get("name") or index_cue.get("symbol")
-    cue_txt = f", and the {escape_html(cue_name)} as an overnight cue" if replayed_cue else ""
+    cue_text = f", and the {escape_html(cue_name)} as an overnight cue" if replayed_cue else ""
     aci_settings = stats["settings"].get("aci") or {}
     aci_block = (
         ""
@@ -192,7 +192,7 @@ def html_report(cfg: dict, stats: dict) -> str:
 <p class="sub">Every past trading day from {escape_html(stats["start"])} to {escape_html(stats["end"])}, the price \
 ranges were rebuilt \
 using only what
-was known before the next session opened (prices up to that day's close, scheduled events{cue_txt}), then checked
+was known before the next session opened (prices up to that day's close, scheduled events{cue_text}), then checked
 against the actual close. Rule-based parts only, no AI. Research only,
 not investment advice.</p>
 <div class="card top">{top}</div>
@@ -204,11 +204,11 @@ not investment advice.</p>
 below it,
 too narrow. The large points are the published 50% and 80% ranges.</p></div>
 <h2>Coverage by market mood (regime)</h2>
-<div class="card">{legend(tgt)}{svg_regime(stats)}
+<div class="card">{legend(target_legend)}{svg_regime(stats)}
 <p class="caption">Look for: bars well above the dashed 80% line are market moods (CALM, TRENDING, EVENT_HEAVY around
 scheduled events, UNSTABLE in stress) where the ranges are wider than needed.</p></div>
 <h2>Coverage over time</h2>
-<div class="card">{legend(tgt)}{svg_time(stats)}
+<div class="card">{legend(target_legend)}{svg_time(stats)}
 <p class="caption">Look for: long runs below the 80% line, which would mean the ranges fell behind in some periods
 (months with fewer than {MIN_MONTH_DAYS} days are left out).</p></div>
 {aci_block}<h2>More detail</h2>
@@ -237,7 +237,7 @@ Momentum: call the sign of the last 1 or 5 days' return. RSI mean reversion: RSI
 {RSI_HIGH:g} calls down, otherwise no call (defined in replay.py; indicators.py computes RSI but has no \
 signal).</p></details>
 <details><summary>Per ticker</summary>
-<p>Filter by sector: <select id="sector"><option value="all">All sectors</option>{opts}</select></p>
+<p>Filter by sector: <select id="sector"><option value="all">All sectors</option>{sector_options}</select></p>
 <div class="scroll"><table id="tickers"><thead><tr><th>Ticker</th><th>Sector</th><th>n (1d)</th><th>1d 50%</th><th>1d \
 80%</th>
 <th>1d score</th><th>1d naive</th><th>5d 50%</th><th>5d 80%</th><th>5d score</th><th>5d naive</th></tr></thead>
@@ -252,4 +252,4 @@ inputs switched on
 {stats["data"]["tickers"]} tickers, {stats["data"]["earnings_events"]} earnings and {stats["data"]["dividends"]} \
 dividend events.
 Computed {escape_html(stats["computed_at"])}, runtime {stats["runtime_s"]:.0f} s.</p><ul>{lim}</ul></details>
-</main><div id="tip" class="tip"></div><script>{JS}</script></body></html>"""
+</main><div id="tip" class="tip"></div><script>{REPLAY_SCRIPT}</script></body></html>"""

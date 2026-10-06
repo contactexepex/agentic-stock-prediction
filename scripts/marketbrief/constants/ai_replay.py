@@ -65,8 +65,8 @@ FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows
 # so a deal dated <= D was public before the next pre-open (an assumption, listed in the summary).
 DATE_PUBLIC_AFTER_CLOSE = ("deals",)
 
-for _k in FIRST_SEEN_ONLY:
-    PUBLIC_AT[_k] = ["first_seen_at"]
+for _kind in FIRST_SEEN_ONLY:
+    PUBLIC_AT[_kind] = ["first_seen_at"]
 
 # kinds public by one date column: a bar and its provenance row share the bar date, a split or bonus applies from
 # its ex-date, and a day's bulk and block deals are public after that day's close
@@ -102,47 +102,47 @@ BACKFILL_KINDS = {
 }
 
 # ---------- ai replay: roots ----------
-MSG_FAILED_IN_EXIT = "{script} failed in {root} (exit {returncode}):\n{value}"
+MSG_SCRIPT_FAILED_IN_ROOT = "{script} failed in {root} (exit {returncode}):\n{error_output}"
 MSG_ROOT_MUST_NOT_BE_THE_SOURCE = "--root {root} must not be the source root or inside its data/"
 MSG_ROOT_MUST_NOT_CONTAIN_THE_SOURCE = "--root {root} must not contain the source root"
-MSG_ROOT_EXISTS_IS_NOT_EMPTY_AND = (
+MSG_ROOT_NOT_EMPTY_AND_NOT_A_REPLAY_ROOT = (
     "--root {root} exists, is not empty and is not an ai_replay root; choose another path"
 )
 MSG_ROOT_ALREADY_HOLDS_A_PREPARED_REPLAY = "--root {root} already holds a prepared replay; pass --force to rebuild it"
 
 # ---------- ai replay: backfill ----------
-MSG_SOURCE_EXISTS_IS_NOT_EMPTY_AND = (
+MSG_SOURCE_NOT_EMPTY_AND_NOT_A_REPLAY_SOURCE = (
     "--source {resolved} exists, is not empty and is not an ai_replay source; choose another path"
 )
 MSG_NO_BACKFILL_STEPS_FOR_MARKET = "no backfill steps for market {market}"
 MSG_SINCE_MUST_BE_BEFORE_TODAY = "--since must be before today"
-MSG_SOURCE_IS_THE_REPO_ITS_REAL = (
-    "--source {resolved} is the repo, its real data/ or contains them; use a scratch directory"
-)
-MSG_SOURCE_IS_INSIDE_THE_REAL_DATA = (
+MSG_SOURCE_IS_THE_REPO = "--source {resolved} is the repo, its real data/ or contains them; use a scratch directory"
+MSG_SOURCE_INSIDE_REAL_DATA = (
     "--source {resolved} is inside the real data/ of the checkout {parent}; use a scratch directory"
 )
 
 # ---------- ai replay: record ----------
-MSG_IS_NOT_A_PREPARED_AI_REPLAY = "{root} is not a prepared ai_replay root (run prepare first)"
-MSG_WAS_PREPARED_FOR_NOT = "{root} was prepared for {market} {as_of_date}, not {market_2} {as_of_day}"
-MSG_IS_ALREADY_RECORDED_IN_USE_A = (
+MSG_NOT_A_PREPARED_ROOT = "{root} is not a prepared ai_replay root (run prepare first)"
+MSG_ROOT_PREPARED_FOR_OTHER_DAY = (
+    "{root} was prepared for {prepared_market} {prepared_as_of_date}, not {requested_market} {requested_as_of_day}"
+)
+MSG_DAY_ALREADY_RECORDED = (
     "{market} {as_of_day} is already recorded in {store_directory}; use a new --results directory to re-run it"
 )
 
 # ---------- ai replay: prepare ----------
-MSG_IS_ON_OR_BEFORE_THE_MODEL = (
-    "{as_of_day} is on or before the model's training cutoff {model_cut} (config/settings.yaml "
+MSG_DAY_IN_TRAINING_PERIOD = (
+    "{as_of_day} is on or before the model's training cutoff {model_cutoff} (config/settings.yaml "
     "model_training_cutoff): contaminated, not a fair test. Pass --allow-training-period to prepare it "
     "anyway."
 )
-MSG_IS_NOT_A_TRADING_DAY = "{as_of_day} is not a {market} trading day"
-MSG_NO_BAR_DATED_IN_LATEST_KEPT = "no {bench} bar dated {as_of_day} in {src} (latest kept: {last})"
+MSG_NOT_A_TRADING_DAY = "{as_of_day} is not a {market} trading day"
+MSG_NO_BENCHMARK_BAR_FOR_DAY = "no {benchmark} bar dated {as_of_day} in {source_path} (latest kept: {latest_kept})"
 
 # ---------- ai replay: score ----------
-MSG_NOTHING_RECORDED_IN = "nothing recorded in {store_directory}"
+MSG_NOTHING_RECORDED = "nothing recorded in {store_directory}"
 
 # ---------- ai replay: cutoff ----------
-MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY = "{value} has no model_training_cutoff (YYYY-MM-DD)"
+MSG_NO_MODEL_TRAINING_CUTOFF = "{settings_path} has no model_training_cutoff (YYYY-MM-DD)"
 
 MSG_NOT_JSON = "not JSON: {error}"

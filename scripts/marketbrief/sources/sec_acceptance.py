@@ -56,9 +56,11 @@ def time_summary(edgar) -> dict:
     """Collector summary of the acceptance-time checks: {"ok": n, "shifted": [CIK], "unverified": {CIK: why}}."""
     checks = getattr(edgar, "time_checks", {})
     return {
-        STATUS_OK: sum(v == STATUS_OK for v in checks.values()),
-        STATUS_SHIFTED: sorted(c for c, v in checks.items() if v == STATUS_SHIFTED),
-        STATUS_UNVERIFIED: {c: v.split(": ", 1)[-1] for c, v in checks.items() if v.startswith(STATUS_UNVERIFIED)},
+        STATUS_OK: sum(status == STATUS_OK for status in checks.values()),
+        STATUS_SHIFTED: sorted(cik for cik, status in checks.items() if status == STATUS_SHIFTED),
+        STATUS_UNVERIFIED: {
+            cik: status.split(": ", 1)[-1] for cik, status in checks.items() if status.startswith(STATUS_UNVERIFIED)
+        },
     }
 
 

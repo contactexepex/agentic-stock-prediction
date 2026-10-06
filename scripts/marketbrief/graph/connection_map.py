@@ -7,18 +7,19 @@ from datetime import date
 from pathlib import Path
 
 from marketbrief.constants.connection_map import (
-    MSG_ALIASES_MUST_BE_A_LIST_OF,
+    MSG_ALIASES_MUST_BE_STRINGS,
     MSG_AS_OF_IS_IN_THE_FUTURE,
-    MSG_AS_OF_MUST_BE_YYYY_MM,
+    MSG_AS_OF_MUST_BE_ISO_DATE,
     MSG_NOT_JSON,
     MSG_RELATION_NOT_ONE_OF,
-    MSG_SOURCE_URL_MUST_BE_THE_HTTP,
+    MSG_REMOVING_MISSING_EDGE,
+    MSG_SOURCE_URL_MUST_BE_HTTP,
     MSG_STATUS_NOT_ONE_OF,
     MSG_TARGET_KIND_NOT_ONE_OF,
     MSG_TARGET_NAME_MISSING,
-    MSG_TARGET_TICKER_MUST_BE_A_STRING,
+    MSG_TARGET_TICKER_MUST_BE_STRING_OR_NULL,
     MSG_TICKER_NOT_IN_THE_WATCHLIST,
-    MSG_WEIGHT_MUST_BE_A_NUMBER_OR,
+    MSG_WEIGHT_MUST_BE_NUMBER_OR_NULL,
 )
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file
@@ -55,9 +56,9 @@ def edge_id(ticker: str, relation: str, target: str) -> str:
 def load_edges(con, ticker: str | None = None) -> list[dict]:
     """The latest version of every stored edge, optionally of one ticker."""
     sql = "SELECT * FROM graph_edges" + (" WHERE ticker = ?" if ticker else "") + " ORDER BY ticker, relation, target"
-    cur = con.execute(sql, [ticker] if ticker else [])
-    cols = [column[0] for column in cur.description]
-    return [dict(zip(cols, row)) for row in cur.fetchall()]
+    cursor = con.execute(sql, [ticker] if ticker else [])
+    column_names = [column[0] for column in cursor.description]
+    return [dict(zip(column_names, row)) for row in cursor.fetchall()]
 
 
 def normalise_as_of_and_aliases(record: dict, today: date) -> list[str]:
@@ -69,10 +70,10 @@ def normalise_as_of_and_aliases(record: dict, today: date) -> list[str]:
             errs.append(MSG_AS_OF_IS_IN_THE_FUTURE)
         record["as_of"] = str(as_of)
     except ValueError:
-        errs.append(MSG_AS_OF_MUST_BE_YYYY_MM)
+        errs.append(MSG_AS_OF_MUST_BE_ISO_DATE)
     aliases = record["aliases"] or []
     if not isinstance(aliases, list) or not all(isinstance(alias, str) for alias in aliases):
-        errs.append(MSG_ALIASES_MUST_BE_A_LIST_OF)
+        errs.append(MSG_ALIASES_MUST_BE_STRINGS)
     else:
         record["aliases"] = sorted({alias.strip() for alias in aliases if alias.strip()})
     return errs
@@ -91,15 +92,15 @@ def validate(row: dict, tickers: set[str], today: date) -> tuple[dict | None, li
     if record["target_kind"] not in TARGET_KINDS:
         errs.append(MSG_TARGET_KIND_NOT_ONE_OF.format(target_kind=record["target_kind"], target_kinds=TARGET_KINDS))
     if not str(record["source_url"] or "").startswith(("https://", "http://")):
-        errs.append(MSG_SOURCE_URL_MUST_BE_THE_HTTP)
+        errs.append(MSG_SOURCE_URL_MUST_BE_HTTP)
     record["status"] = record["status"] or "active"
     if record["status"] not in STATUSES:
         errs.append(MSG_STATUS_NOT_ONE_OF.format(status=record["status"], statuses=STATUSES))
     errs += normalise_as_of_and_aliases(record, today)
     if record["weight"] is not None and not isinstance(record["weight"], (int, float)):
-        errs.append(MSG_WEIGHT_MUST_BE_A_NUMBER_OR)
+        errs.append(MSG_WEIGHT_MUST_BE_NUMBER_OR_NULL)
     if record["target_ticker"] is not None and not isinstance(record["target_ticker"], str):
-        errs.append(MSG_TARGET_TICKER_MUST_BE_A_STRING)
+        errs.append(MSG_TARGET_TICKER_MUST_BE_STRING_OR_NULL)
     if errs:
         return None, errs
     record["target"] = record["target"].strip()
@@ -133,9 +134,7 @@ def add(cfg: dict, con, path: Path, dry_run: bool = False) -> dict:
             unchanged += 1
             continue
         if edge["status"] == "removed" and not old:
-            rejected.append(
-                {"line": line_number, "target": edge["target"], "errors": ["removing an edge that does not exist"]}
-            )
+            rejected.append({"line": line_number, "target": edge["target"], "errors": [MSG_REMOVING_MISSING_EDGE]})
             continue
         new[edge["id"]] = {
             "id": edge["id"],
@@ -163,9 +162,9 @@ def add(cfg: dict, con, path: Path, dry_run: bool = False) -> dict:
 
 def load_all_latest(con) -> list[dict]:
     """Latest version of every edge id, including removed ones (to compare before appending)."""
-    cur = con.execute("SELECT DISTINCT ON (id) * FROM graph ORDER BY id, added_at DESC")
-    cols = [column[0] for column in cur.description]
-    return [dict(zip(cols, row)) for row in cur.fetchall()]
+    cursor = con.execute("SELECT DISTINCT ON (id) * FROM graph ORDER BY id, added_at DESC")
+    column_names = [column[0] for column in cursor.description]
+    return [dict(zip(column_names, row)) for row in cursor.fetchall()]
 
 
 def comparable(value):

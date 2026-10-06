@@ -26,28 +26,28 @@ from marketbrief.constants.news_clusters import (
 class DisjointSets:
     """Union-find over 0..n-1; the smallest index is the root."""
 
-    def __init__(self, n: int):
-        """A union-find over n items, each in its own set."""
-        self.p = list(range(n))
+    def __init__(self, count: int):
+        """A union-find over `count` items, each in its own set."""
+        self.parents = list(range(count))
 
-    def find(self, i: int) -> int:
+    def find(self, index: int) -> int:
         """The root of i's set."""
-        while self.p[i] != i:
-            self.p[i] = self.p[self.p[i]]
-            i = self.p[i]
-        return i
+        while self.parents[index] != index:
+            self.parents[index] = self.parents[self.parents[index]]
+            index = self.parents[index]
+        return index
 
-    def union(self, a: int, b: int):
-        """Merge the sets of a and b."""
-        a, b = self.find(a), self.find(b)
-        if a != b:
-            self.p[max(a, b)] = min(a, b)
+    def union(self, first: int, second: int):
+        """Merge the sets of the two items."""
+        first, second = self.find(first), self.find(second)
+        if first != second:
+            self.parents[max(first, second)] = min(first, second)
 
 
 class NewsRow(NamedTuple):
     """One stored news row."""
 
-    id: str
+    news_id: str
     title: str | None
     url: str | None
     source: str | None
@@ -57,11 +57,11 @@ class NewsRow(NamedTuple):
     primary_tickers: list | None
 
 
-def to_utc(v) -> pd.Timestamp | None:
+def to_utc(value) -> pd.Timestamp | None:
     """A timestamp as UTC (None for missing values)."""
-    if v is None or (isinstance(v, float) and pd.isna(v)):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
-    timestamp = pd.Timestamp(v)
+    timestamp = pd.Timestamp(value)
     return timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
 
 
@@ -103,7 +103,7 @@ def row_fields(row: NewsRow, article: dict | None, src: Sources, learned: dict) 
     # e.g. Seeking Alpha: contributor articles are opinion; only its news desk (/news/) is not
     opinion = bool(news_path) and not (page and urlsplit(page).path.startswith(news_path))
     return {
-        "id": row.id,
+        "id": row.news_id,
         "title": row.title or "",
         "source": row.source,
         "domain": domain,
@@ -137,39 +137,54 @@ def row_fields(row: NewsRow, article: dict | None, src: Sources, learned: dict) 
 def load_items(con, cfg: dict, src: Sources, as_of: pd.Timestamp) -> list[dict]:
     """The news items of the lookback window about a watchlist ticker as primary subject, one per ticker."""
     since = as_of - pd.Timedelta(hours=float(src.clusters.get("lookback_hours", DEFAULT_LOOKBACK_HOURS)))
-    rows = [NewsRow(*r) for r in con.execute(NEWS_ROWS_SQL, [as_of.to_pydatetime(), since.to_pydatetime()]).fetchall()]
-    articles = {r["id"]: r for r in con.execute(ARTICLES_SQL, [as_of.to_pydatetime()]).df().to_dict("records")}
-    learned = label_domains(((r.source, r.source_domain) for r in rows), src)
+    rows = [
+        NewsRow(*database_row)
+        for database_row in con.execute(NEWS_ROWS_SQL, [as_of.to_pydatetime(), since.to_pydatetime()]).fetchall()
+    ]
+    articles = {
+        database_row["id"]: database_row
+        for database_row in con.execute(ARTICLES_SQL, [as_of.to_pydatetime()]).df().to_dict("records")
+    }
+    learned = label_domains(((database_row.source, database_row.source_domain) for database_row in rows), src)
     items = []
     for row in rows:
         tickers = [ticker for ticker in (row.primary_tickers or []) if ticker in cfg["tickers"]]
         if not tickers:
             continue
-        a = articles.get(row.id)
-        a = {k: (None if isinstance(v, float) and pd.isna(v) else v) for k, v in a.items()} if a else None
-        fields = row_fields(row, a, src, learned)
+        article = articles.get(row.news_id)
+        article = (
+            {
+                field: (None if isinstance(value, float) and pd.isna(value) else value)
+                for field, value in article.items()
+            }
+            if article
+            else None
+        )
+        fields = row_fields(row, article, src, learned)
         items.extend({**fields, "ticker": ticker} for ticker in tickers)
     return items
 
 
 def load_primaries(con, src: Sources, as_of: pd.Timestamp) -> dict[str, list[tuple]]:
     """{ticker: [(public time, id)]} of the SEC filings and NSE announcements that may confirm a story."""
-    cl = src.clusters
+    cluster_settings = src.clusters
     since = as_of - pd.Timedelta(
-        hours=float(cl.get("lookback_hours", DEFAULT_LOOKBACK_HOURS))
-        + float(cl.get("window_hours", DEFAULT_WINDOW_HOURS))
+        hours=float(cluster_settings.get("lookback_hours", DEFAULT_LOOKBACK_HOURS))
+        + float(cluster_settings.get("window_hours", DEFAULT_WINDOW_HOURS))
     )
     out: dict[str, list[tuple]] = defaultdict(list)
-    forms = list(cl.get("sec_forms") or [])
-    for tid, ticker, row in con.execute(FILINGS_SQL, [forms]).fetchall() + con.execute(ANNOUNCEMENTS_SQL).fetchall():
-        tt = to_utc(row)
-        if tt is not None and since <= tt <= as_of:
-            out[ticker].append((tt, tid))
+    forms = list(cluster_settings.get("sec_forms") or [])
+    for tid, ticker, published_at in (
+        con.execute(FILINGS_SQL, [forms]).fetchall() + con.execute(ANNOUNCEMENTS_SQL).fetchall()
+    ):
+        public_time = to_utc(published_at)
+        if public_time is not None and since <= public_time <= as_of:
+            out[ticker].append((public_time, tid))
     return out
 
 
 def drop_tokens(cfg: dict, ticker: str) -> set[str]:
     """The tokens of a company's own names, which carry no information about an event."""
-    m = cfg["tickers"][ticker]
-    names = [m["name"], *m.get("aliases", []), *(m.get("news_names") or []), ticker]
-    return {w for n in names for w in title_tokens(n)} | {ticker.lower()}
+    ticker_config = cfg["tickers"][ticker]
+    names = [ticker_config["name"], *ticker_config.get("aliases", []), *(ticker_config.get("news_names") or []), ticker]
+    return {token for name in names for token in title_tokens(name)} | {ticker.lower()}

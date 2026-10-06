@@ -64,7 +64,8 @@ def related_ciks(cfg: dict) -> dict[str, list[int]]:
     collector reads)."""
     found = (cfg.get(CFG_FUNDAMENTALS) or {}).get(CFG_PREDECESSOR_CIKS) or {}
     return {
-        str(ticker).upper(): [int(c) for c in (cs if isinstance(cs, list) else [cs])] for ticker, cs in found.items()
+        str(ticker).upper(): [int(cik) for cik in (ciks_value if isinstance(ciks_value, list) else [ciks_value])]
+        for ticker, ciks_value in found.items()
     }
 
 
@@ -78,21 +79,28 @@ def merge_recent(parts: list[tuple[int | str, dict]]) -> dict:
     if len(parts) == 1:
         cik, rec = parts[0]
         return {**rec, "cik": [cik] * len(rec["form"])}
-    cols = [c for c in dict.fromkeys(k for _, rec in parts for k in rec) if c not in ("name", "cik")]
+    cols = [
+        column
+        for column in dict.fromkeys(source_column for _, rec in parts for source_column in rec)
+        if column not in ("name", "cik")
+    ]
     rows, seen = [], set()
     for cik, rec in parts:
-        n = len(rec["form"])
-        accs = rec.get("accessionNumber") or [None] * n
-        for i in range(n):
-            if accs[i] is not None:
-                if accs[i] in seen:
+        count = len(rec["form"])
+        accs = rec.get("accessionNumber") or [None] * count
+        for index in range(count):
+            if accs[index] is not None:
+                if accs[index] in seen:
                     continue
-                seen.add(accs[i])
-            row = {c: (rec[c][i] if isinstance(rec.get(c), list) else None) for c in cols}
+                seen.add(accs[index])
+            row = {column: (rec[column][index] if isinstance(rec.get(column), list) else None) for column in cols}
             row["cik"] = cik
             rows.append(row)
-    rows.sort(key=lambda r: (r.get("filingDate") or "", r.get("acceptanceDateTime") or ""), reverse=True)
-    out = {c: [r[c] for r in rows] for c in [*cols, "cik"]}
+    rows.sort(
+        key=lambda merged_row: (merged_row.get("filingDate") or "", merged_row.get("acceptanceDateTime") or ""),
+        reverse=True,
+    )
+    out = {column: [merged_row[column] for merged_row in rows] for column in [*cols, "cik"]}
     out["name"] = parts[0][1].get("name")
     return out
 
@@ -105,36 +113,39 @@ def ticker_submissions(
     CIK, each through the Edgar throttle. Returns (merged block, failures): each CIK whose request
     fails is one failure {"ticker", "cik", "error"}, and the CIKs that answered are still merged;
     the block is None only when every CIK failed."""
-    ciks = [cik, *[c for c in (related or {}).get(str(ticker).upper(), []) if int(c) != int(cik)]]
+    ciks = [
+        cik,
+        *[related_cik for related_cik in (related or {}).get(str(ticker).upper(), []) if int(related_cik) != int(cik)],
+    ]
     parts, failed = [], []
-    for c in ciks:
+    for related_cik in ciks:
         try:
-            parts.append((c, edgar.recent(c)))
+            parts.append((related_cik, edgar.recent(related_cik)))
         except Exception as exc:
-            failed.append({"ticker": ticker, "cik": c, "error": str(exc)[:200]})
+            failed.append({"ticker": ticker, "cik": related_cik, "error": str(exc)[:200]})
     return (merge_recent(parts) if parts else None), failed
 
 
 def filings_of_forms(recent: dict, forms: set[str], since: date | None = None) -> list[dict]:
     """Filings of the given forms filed on/after `since`, in list order (newest first). `cik` is
     the CIK whose submission list holds the filing (merge_recent's column), else None."""
-    n, out = len(recent["form"]), []
-    accepted = recent.get("acceptanceDateTime") or [None] * n
-    reported = recent.get("reportDate") or [None] * n
-    ciks = recent.get("cik") or [None] * n
-    for i, form in enumerate(recent["form"]):
-        filed = recent["filingDate"][i]
+    count, out = len(recent["form"]), []
+    accepted = recent.get("acceptanceDateTime") or [None] * count
+    reported = recent.get("reportDate") or [None] * count
+    ciks = recent.get("cik") or [None] * count
+    for index, form in enumerate(recent["form"]):
+        filed = recent["filingDate"][index]
         if form not in forms or (since and date.fromisoformat(filed) < since):
             continue
         out.append(
             {
-                "accession": recent["accessionNumber"][i],
+                "accession": recent["accessionNumber"][index],
                 "form": form,
                 "filing_date": filed,
-                "accepted_at": accepted[i] or None,
-                "primary_doc": recent["primaryDocument"][i],
-                "report_date": reported[i] or None,
-                "cik": ciks[i],
+                "accepted_at": accepted[index] or None,
+                "primary_doc": recent["primaryDocument"][index],
+                "report_date": reported[index] or None,
+                "cik": ciks[index],
             }
         )
     return out

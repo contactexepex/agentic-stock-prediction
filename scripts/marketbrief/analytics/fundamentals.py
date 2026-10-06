@@ -68,7 +68,10 @@ def markdown(cfg: dict, con) -> str:
     if fresh:
         out.append(
             f"Filed in the last {FRESH_DAYS} days: "
-            + "; ".join(f"{ticker} {form} FY{fy} {fp} ({d})" for ticker, form, fy, fp, d in fresh)
+            + "; ".join(
+                f"{ticker} {form} FY{fiscal_year} {fiscal_period} ({filing_date})"
+                for ticker, form, fiscal_year, fiscal_period, filing_date in fresh
+            )
             + "\n"
         )
     for title, sql in SECTIONS:

@@ -70,12 +70,12 @@ def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, ar
     for kind in kinds:
         failures_before = len(run.problems.failed)
         try:
-            rows, ok = collect_kind(run, kind, settings, args)
+            rows, sources_ok = collect_kind(run, kind, settings, args)
         except FetchError as exc:
             run.problems.failed.append(exc.entry(kind))
             new[kind] = None
             continue
-        if not ok and len(run.problems.failed) > failures_before:
+        if not sources_ok and len(run.problems.failed) > failures_before:
             new[kind] = None
             continue
         new[kind] = store(market, kind, rows, run.today)

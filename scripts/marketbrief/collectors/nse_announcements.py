@@ -46,7 +46,7 @@ def announcements(run: NseRun, lookback: int, since: date | None = None) -> list
     coverage(
         MSG_ANNOUNCEMENTS_COVERAGE.format(label=label),
         len(rows),
-        sum((r.get("symbol") or "").strip().upper() in run.symbols for r in rows),
+        sum((listed_row.get("symbol") or "").strip().upper() in run.symbols for listed_row in rows),
         run.problems,
     )
     found = []

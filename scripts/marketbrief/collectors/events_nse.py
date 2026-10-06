@@ -58,12 +58,12 @@ def nse_results_filings(nse: Nse, symbol: str, backfill: bool) -> tuple[list[tup
     total = payload.get("totalCount") if isinstance(payload, dict) else None
     if isinstance(total, int) and total > len(rows):
         notes.append(MSG_INTEGRATED_LIST_PARTIAL.format(symbol=symbol, rows=len(rows), total=total))
-    found = [(parse_day(pick(r, NSE_FIELDS_QUARTER_END)), parse_ts(pick(r, *NSE_FIELDS_BROADCAST))) for r in rows]
+    found = [(parse_day(pick(row, NSE_FIELDS_QUARTER_END)), parse_ts(pick(row, *NSE_FIELDS_BROADCAST))) for row in rows]
     if backfill:
         rows = rows_of(nse.json(NSE_ENDPOINT_FINANCIAL, {"index": "equities", "period": "Quarterly", "symbol": symbol}))
         found += [
-            (parse_day(pick(r, NSE_FIELDS_FINANCIAL_TO)), parse_ts(pick(r, *NSE_FIELDS_FINANCIAL_BROADCAST)))
-            for r in rows
+            (parse_day(pick(row, NSE_FIELDS_FINANCIAL_TO)), parse_ts(pick(row, *NSE_FIELDS_FINANCIAL_BROADCAST)))
+            for row in rows
         ]
     return [(period_end, stamp) for period_end, stamp in found if period_end and stamp], notes
 
@@ -79,8 +79,8 @@ def nse_release_times(nse: Nse, symbol: str, start: date, today: date) -> list[d
     )
     return [
         stamp
-        for r in rows
-        if pick(r, "desc") in RESULTS_ANNOUNCEMENTS and (stamp := parse_ts(pick(r, *NSE_FIELDS_ANNOUNCED)))
+        for row in rows
+        if pick(row, "desc") in RESULTS_ANNOUNCEMENTS and (stamp := parse_ts(pick(row, *NSE_FIELDS_ANNOUNCED)))
     ]
 
 
@@ -102,7 +102,9 @@ def nse_reports(
         if not 0 < (filed - period_end).days <= max_filing_lag(period_end):
             late += 1
             continue
-        release = min([a for a in releases if stamp - RELEASE_WINDOW <= a <= stamp] + [stamp])
+        release = min(
+            [announcement for announcement in releases if stamp - RELEASE_WINDOW <= announcement <= stamp] + [stamp]
+        )
         day, when = timing(cfg, pd.Timestamp(release))
         found.append((day, when, PRIORITY_FILING))
     return found, late
@@ -131,7 +133,7 @@ def nse_due(stored: list[dict], tickers: list[str], today: date) -> dict[str, da
         if ticker not in has_nse:
             due[ticker] = None
         elif (today - last[ticker]).days >= NSE_STALE_DAYS or any(
-            last[ticker] + timedelta(days=NEAR_DAYS) < d <= today for d in known.get(ticker, [])
+            last[ticker] + timedelta(days=NEAR_DAYS) < known_day <= today for known_day in known.get(ticker, [])
         ):
             due[ticker] = last[ticker]
     return due

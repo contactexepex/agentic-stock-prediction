@@ -173,7 +173,7 @@ class ArticleRun:
 
     def decode_batch(self, chunk: list[dict]) -> dict[str, dict]:
         """The decoder's results for the Google News links of a batch ({link: result})."""
-        links = [c["url"] for c in chunk if host_of(c["url"]) == GOOGLE_HOST]
+        links = [candidate["url"] for candidate in chunk if host_of(candidate["url"]) == GOOGLE_HOST]
         if not links or self.decoder_broken is not None:
             return {}
         try:
@@ -281,7 +281,9 @@ class ArticleRun:
         for start in range(0, len(self.todo), batch):
             if time.monotonic() - self.started > self.max_seconds:
                 left = self.todo[start:]
-                self.deferred += len(left) + sum(len(self.same.get(c[COL_ID], [])) for c in left)
+                self.deferred += len(left) + sum(
+                    len(self.same.get(left_candidate[COL_ID], [])) for left_candidate in left
+                )
                 self.warnings.append(MSG_STOPPED_AFTER.format(seconds=self.max_seconds, left=len(left)))
                 break
             chunk = self.todo[start : start + batch]
@@ -296,7 +298,7 @@ class ArticleRun:
     def summary(self) -> dict:
         """The run's JSON summary."""
         undecoded = sum(1 for row in self.written if row["access"] == ACCESS_UNDECODED)
-        tried = sum(1 for c in self.todo if host_of(c["url"]) == GOOGLE_HOST)
+        tried = sum(1 for candidate in self.todo if host_of(candidate["url"]) == GOOGLE_HOST)
         if tried and undecoded / tried > UNDECODED_WARNING_SHARE:
             self.warnings.append(MSG_LINKS_NOT_DECODED.format(count=undecoded, tried=tried))
         return {
@@ -307,9 +309,13 @@ class ArticleRun:
             "deferred": self.deferred,
             "copied_same_article": len(self.copies),
             # outlets not on the allowlist (never requested), for review: vet and add, or ignore
-            "unvetted_domains": dict(Counter(r["key"] for r in self.unvetted).most_common(UNVETTED_LIMIT)),
-            "by_access": dict(Counter(r["access"] for r in self.written).most_common()),
-            "by_domain": dict(Counter(f"{r['domain']}:{r['access']}" for r in self.written).most_common()),
+            "unvetted_domains": dict(
+                Counter(stored_row["key"] for stored_row in self.unvetted).most_common(UNVETTED_LIMIT)
+            ),
+            "by_access": dict(Counter(stored_row["access"] for stored_row in self.written).most_common()),
+            "by_domain": dict(
+                Counter(f"{stored_row['domain']}:{stored_row['access']}" for stored_row in self.written).most_common()
+            ),
             "requests": {**self.requests_made, "total": sum(self.requests_made.values()), "note": NOTE_DECODE_REQUESTS},
             "seconds": round(time.monotonic() - self.started, 1),
             SUMMARY_FAILED: self.failed,

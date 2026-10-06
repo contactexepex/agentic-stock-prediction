@@ -9,7 +9,7 @@ from marketbrief.constants.ai_replay import (
     CONTAMINATED,
     CUTOFF_LOCAL,
     FAIR,
-    MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY,
+    MSG_NO_MODEL_TRAINING_CUTOFF,
     REGULAR_LEAD,
     SAMPLE_END,
     SAMPLE_START,
@@ -23,7 +23,7 @@ def training_cutoff() -> date:
     """`model_training_cutoff` from config/settings.yaml: the model may have seen data up to this date."""
     value = (load_settings() or {}).get("model_training_cutoff")
     if value is None:
-        raise SystemExit(MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY.format(value=paths.CONFIG / "settings.yaml"))
+        raise SystemExit(MSG_NO_MODEL_TRAINING_CUTOFF.format(settings_path=paths.CONFIG / "settings.yaml"))
     return value if isinstance(value, date) else date.fromisoformat(str(value))
 
 
@@ -39,7 +39,7 @@ def next_session(cfg: dict, as_of_day: date) -> date:
 
 
 def cutoff_for(cfg: dict, as_of_day: date) -> datetime:
-    """Pre-open time of the session after d (UTC): the routine's start on that session."""
+    """Pre-open time of the session after `as_of_day` (UTC): the routine's start on that session."""
     session = next_session(cfg, as_of_day)
     opens = calendar.session_open_utc(cfg, session)
     local = CUTOFF_LOCAL.get(cfg["market"])

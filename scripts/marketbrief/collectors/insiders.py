@@ -128,25 +128,25 @@ def to_rows(filing: dict, parsed: dict, ticker: str, url: str, now: str) -> list
         "filing_date": filing["filing_date"],
         "accepted_at": filing["accepted_at"],
         # joint filings (e.g. a fund and its manager) list every owner; the first owner's CIK and flags
-        "insider_name": "; ".join(o["name"] for o in owners if o["name"]) or None,
+        "insider_name": "; ".join(owner["name"] for owner in owners if owner["name"]) or None,
         "insider_cik": first["cik"],
-        "role": "; ".join(dict.fromkeys(o["role"] for o in owners if o["role"])) or None,
-        "is_director": any(o["is_director"] for o in owners),
-        "is_officer": any(o["is_officer"] for o in owners),
-        "is_ten_pct_owner": any(o["is_ten_pct_owner"] for o in owners),
+        "role": "; ".join(dict.fromkeys(owner["role"] for owner in owners if owner["role"])) or None,
+        "is_director": any(owner["is_director"] for owner in owners),
+        "is_officer": any(owner["is_officer"] for owner in owners),
+        "is_ten_pct_owner": any(owner["is_ten_pct_owner"] for owner in owners),
     }
     return [
         {
-            COL_ID: f"{filing['accession']}-{i}",
+            COL_ID: f"{filing['accession']}-{line_number}",
             COL_ACCESSION: filing["accession"],
-            "line": i,
+            "line": line_number,
             **head,
             **line,
             "plan_10b5_1": parsed["plan_10b5_1"],
             "url": url,
             "first_seen_at": now,
         }
-        for i, line in enumerate(parsed["lines"], start=1)
+        for line_number, line in enumerate(parsed["lines"], start=1)
     ]
 
 
@@ -160,7 +160,7 @@ def main() -> int:
     settings = cfg.get(CFG_RELATIONSHIPS, {}).get(COLLECTOR_INSIDERS, {})
     forms = set(settings.get("forms", DEFAULT_INSIDER_FORMS))
     since = utc_today() - timedelta(days=int(settings.get("lookback_days", DEFAULT_LOOKBACK_DAYS)))
-    seen = {i.rsplit("-", 1)[0] for i in recent_ids(market, KIND_INSIDERS, days=SEEN_LOOKBACK_DAYS)}
+    seen = {stored_id.rsplit("-", 1)[0] for stored_id in recent_ids(market, KIND_INSIDERS, days=SEEN_LOOKBACK_DAYS)}
     edgar, now = Edgar(user_agent), utc_now()
     ciks, skipped = watch_ciks(cfg, edgar)
     related = related_ciks(cfg)
@@ -200,8 +200,8 @@ def main() -> int:
                 "since": str(since),
                 "filings_read": read,
                 "new_rows": written,
-                "open_market_buys": sum(r["code"] == CODE_PURCHASE for r in rows),
-                "open_market_sales": sum(r["code"] == CODE_SALE for r in rows),
+                "open_market_buys": sum(row["code"] == CODE_PURCHASE for row in rows),
+                "open_market_sales": sum(row["code"] == CODE_SALE for row in rows),
                 "other_issuer_skipped": other_issuer,
                 "requests": edgar.requests,
                 "sec_times": time_summary(edgar),

@@ -38,7 +38,7 @@ def root_problem(root: Path) -> str | None:
     for marker in REPO_MARKERS:
         if (root / marker).exists():
             return MSG_ROOT_LOOKS_LIKE_REPO.format(root=root, marker=marker)
-    if any(p.is_file() for p in (root / "data").glob(PRICE_FILES_GLOB)):
+    if any(path.is_file() for path in (root / "data").glob(PRICE_FILES_GLOB)):
         return MSG_ROOT_HAS_PRICES.format(root=root)
     return None
 
@@ -58,7 +58,12 @@ def target_problem(target: Path, base: Path, real_data: Path) -> str | None:
         status = resolved.stat()
         if status.st_nlink > 1:
             return MSG_TARGET_HARD_LINKED.format(target=target, links=status.st_nlink)
-        real_inodes = {(s.st_dev, s.st_ino) for path in real_data.rglob("*") if path.is_file() for s in [path.stat()]}
+        real_inodes = {
+            (inode_status.st_dev, inode_status.st_ino)
+            for path in real_data.rglob("*")
+            if path.is_file()
+            for inode_status in [path.stat()]
+        }
         if (status.st_dev, status.st_ino) in real_inodes:
             return MSG_TARGET_SAME_FILE.format(target=target)
     return None

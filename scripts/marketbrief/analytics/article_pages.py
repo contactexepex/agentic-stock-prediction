@@ -69,7 +69,9 @@ def canonical_url(url: str | None) -> str | None:
     host = (parts.hostname or "").lower()
     for prefix in HOST_PREFIXES:
         host = host.removeprefix(prefix)
-    path = AMP_PATH.sub(lambda m: "/articleshow/" if "articleshow" in m.group(0) else "", parts.path or "/").rstrip("/")
+    path = AMP_PATH.sub(
+        lambda match: "/articleshow/" if "articleshow" in match.group(0) else "", parts.path or "/"
+    ).rstrip("/")
     return urlunsplit((HTTPS, host, path, "", ""))
 
 

@@ -20,15 +20,24 @@ import json
 from datetime import date, timedelta
 
 from marketbrief.analytics.features import load_bars
-from marketbrief.constants.review import DEFAULTS
+from marketbrief.constants.review import DEFAULTS, MSG_HISTORY_ABLATION_SKIPPED
 from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_ranges_config
 from marketbrief.core.storage import append_jsonl, day_file
-from marketbrief.pipeline.review.aci_review import aci_proposal, aci_state, latest_aci_replay
-from marketbrief.pipeline.review.helpers import clean, load_review_config, previous_week, week_bounds
+from marketbrief.pipeline.review.aci_review import (
+    aci_proposal,
+    aci_state,
+    latest_aci_replay,
+)
+from marketbrief.pipeline.review.helpers import (
+    clean,
+    load_review_config,
+    previous_week,
+    week_bounds,
+)
 from marketbrief.pipeline.review.history_ablation import history_ablation
 from marketbrief.pipeline.review.live_ablation import live_ablation
 from marketbrief.pipeline.review.markdown import markdown
@@ -41,7 +50,12 @@ from marketbrief.pipeline.review.summaries import (
     load_ranges,
     range_summary,
 )
-from marketbrief.pipeline.review.verdicts import confidence_advice, judge, proper_scores, proposals
+from marketbrief.pipeline.review.verdicts import (
+    confidence_advice,
+    judge,
+    proper_scores,
+    proposals,
+)
 
 
 def build(
@@ -91,7 +105,7 @@ def build(
     review_data["history_ablation"] = (
         history_ablation(cfg, ranges_config, review_config, load_bars(con), end)
         if history
-        else {"n": 0, "error": "skipped (--no-history)", "variants": []}
+        else {"n": 0, "error": MSG_HISTORY_ABLATION_SKIPPED, "variants": []}
     )
     for ablation in (review_data["live_ablation"], review_data["history_ablation"]):
         judge(ablation, review_config)

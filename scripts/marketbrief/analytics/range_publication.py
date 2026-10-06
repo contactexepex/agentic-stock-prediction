@@ -37,11 +37,11 @@ def build(cfg: dict, ranges_config: dict, con, now: str | None = None) -> list[d
     ctx = load_context(cfg, ranges_config, con, now)
     rows = []
     for horizon in ranges_config["horizons"]:
-        hc = horizon_context(ctx, horizon)
-        if hc is None:
+        horizon_info = horizon_context(ctx, horizon)
+        if horizon_info is None:
             continue
         for ticker in cfg["tickers"]:
-            row = range_row(ctx, hc, ticker)
+            row = range_row(ctx, horizon_info, ticker)
             if row is not None:
                 rows.append(row)
     return rows
@@ -49,9 +49,9 @@ def build(cfg: dict, ranges_config: dict, con, now: str | None = None) -> list[d
 
 def main() -> int:
     """Entry point of scripts/ranges.py."""
-    ap = market_arg(__doc__)
-    ap.add_argument("--now", help=HELP_NOW)
-    args = ap.parse_args()
+    parser = market_arg(__doc__)
+    parser.add_argument("--now", help=HELP_NOW)
+    args = parser.parse_args()
     cfg = require_market(args)
     now = args.now or utc_now()
     if datetime.fromisoformat(now).tzinfo is None:
@@ -72,7 +72,7 @@ def main() -> int:
                 "written": len(rows),
                 "late": late,
                 "in_session": in_session,
-                "tickers": sorted({r["ticker"] for r in rows}),
+                "tickers": sorted({row["ticker"] for row in rows}),
             },
             indent=2,
         )

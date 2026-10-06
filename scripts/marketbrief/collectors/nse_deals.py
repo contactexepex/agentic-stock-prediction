@@ -63,7 +63,7 @@ def deal_record(row: dict, deal_type: str, source: str, symbols: dict[str, str],
 
 def deal_records(rows: list[dict], deal_type: str, source: str, run: NseRun) -> list[dict]:
     """The watchlist deals among rows of one NSE shape."""
-    return [d for r in rows if (d := deal_record(r, deal_type, source, run.symbols, run.now))]
+    return [deal for row in rows if (deal := deal_record(row, deal_type, source, run.symbols, run.now))]
 
 
 def snapshot_deals(run: NseRun) -> list[dict]:
@@ -80,28 +80,28 @@ def snapshot_deals(run: NseRun) -> list[dict]:
 
 def archive_deals(run: NseRun) -> tuple[list[dict], int]:
     """(deals, sources read) from the bulk.csv and block.csv archive files, the fallback when the snapshot fails."""
-    found, ok = [], 0
+    found, sources_ok = [], 0
     for deal_type in DEAL_TYPES:
         try:
             rows = list(csv.DictReader(io.StringIO(run.nse.text(f"/content/equities/{deal_type}.csv"))))
         except FetchError as exc:
             run.problems.failed.append(exc.entry(f"deals:{deal_type}:archive"))
             continue
-        rows = [{(k or "").strip(): v for k, v in row.items()} for row in rows]
+        rows = [{(column or "").strip(): cell for column, cell in row.items()} for row in rows]
         rows = [row for row in rows if (row.get("Date") or "").strip().upper() != NO_RECORDS]
         records = deal_records(rows, deal_type, SOURCE_ARCHIVE, run)
         run.problems.notes.append(
             MSG_DEALS_ARCHIVE_NOTE.format(deal_type=deal_type, rows=len(rows), watchlist=len(records))
         )
         found += records
-        ok += 1
-    return found, ok
+        sources_ok += 1
+    return found, sources_ok
 
 
 def backfill_deals(run: NseRun, backfill_days: int) -> tuple[list[dict], int, bool]:
     """(deals, calls answered, aborted): the per-ticker historical API for the last `backfill_days` days; aborted
     when the egress proxy refuses the host (every other call fails the same way)."""
-    start, calls, found_rows, found, ok = run.today - timedelta(days=backfill_days), 0, 0, [], 0
+    start, calls, found_rows, found, calls_answered = run.today - timedelta(days=backfill_days), 0, 0, [], 0
     for symbol in run.symbols:
         for deal_type in DEAL_TYPES:
             try:
@@ -119,35 +119,35 @@ def backfill_deals(run: NseRun, backfill_days: int) -> tuple[list[dict], int, bo
             except FetchError as exc:
                 run.problems.failed.append(exc.entry(f"deals:{deal_type}:backfill:{symbol}"))
                 if exc.host:
-                    return found, ok, True
+                    return found, calls_answered, True
                 continue
-            ok += 1
+            calls_answered += 1
             calls, found_rows = calls + 1, found_rows + len(rows)
             if len(rows) >= BACKFILL_CAP_ROWS:
                 run.problems.notes.append(MSG_DEALS_CAP.format(deal_type=deal_type, symbol=symbol))
             found += deal_records(rows, deal_type, SOURCE_HISTORICAL, run)
     run.problems.notes.append(MSG_DEALS_BACKFILL_NOTE.format(calls=calls, since=start, found=found_rows))
-    return found, ok, False
+    return found, calls_answered, False
 
 
 def deals(run: NseRun, lookback: int, backfill_days: int = 0) -> tuple[list[dict], int]:
     """Latest session from the snapshot (archive CSV if it fails), plus optional per-ticker
     backfill. Ids ignore the source, so a deal seen twice is stored once. Returns (rows, sources_ok)."""
     since: date = run.today - timedelta(days=lookback)
-    found, ok = [], 0
+    found, sources_ok = [], 0
     try:
         found += snapshot_deals(run)
-        ok += 1
+        sources_ok += 1
     except FetchError as exc:
         run.problems.failed.append(exc.entry("deals:snapshot"))
         archived, archive_ok = archive_deals(run)
         found += archived
-        ok += archive_ok
+        sources_ok += archive_ok
     if backfill_days:
         backfilled, backfill_ok, aborted = backfill_deals(run, backfill_days)
         found += backfilled
-        ok += backfill_ok
+        sources_ok += backfill_ok
         if aborted:
-            return found, ok
+            return found, sources_ok
         since = run.today - timedelta(days=backfill_days)
-    return [d for d in found if d[COL_DATE] >= str(since)], ok
+    return [deal for deal in found if deal[COL_DATE] >= str(since)], sources_ok

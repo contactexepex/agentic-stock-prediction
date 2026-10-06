@@ -36,3 +36,5 @@ ACI_SETTING_KEYS = ("gamma", "max_shift", "min_history", "by_regime")
 
 # ---------- review helpers ----------
 MSG_WEEK_MUST_LOOK_LIKE_2026_W40 = "--week must look like 2026-W40, got {week!r}"
+MSG_HISTORY_ABLATION_SKIPPED = "skipped (--no-history)"
+MSG_NOT_ENOUGH_BENCHMARK_BARS = "not enough benchmark bars"

@@ -12,12 +12,12 @@ from marketbrief.constants.validation import (
     FETCH_COL,
     MSG_LOST_ITS_REPORT_DATA_LINE,
     MSG_NEWS_FEED_COUNT_UNAVAILABLE,
-    MSG_NO_RANGE_AS_OF_AND_NO,
-    MSG_NOT_WRITTEN,
-    MSG_NOT_WRITTEN_2,
+    MSG_NO_RANGE_AND_NO_SKIP_REASON,
     MSG_RANGE_SKIPPED_LATE_RUN,
     MSG_RANGE_SKIPPED_MID_SESSION,
     MSG_RANGE_SKIPPED_NO_FEATURES,
+    MSG_REPORT_NOT_WRITTEN,
+    MSG_SLACK_DRAFT_NOT_WRITTEN,
     MSG_SOURCE_QUERY_SKIPPED,
     MSG_STILL_HAS_AGENT_MARKERS,
     MSG_STILL_HAS_NUMBERED_AGENT_MARKERS,
@@ -35,11 +35,11 @@ def records(con, sql: str, params=(), notes: list | None = None) -> list[dict]:
     """Rows of a source query; a failure (e.g. a view a market does not have) is noted, not raised."""
     try:
         return con.execute(sql, list(params)).df().to_dict("records")
-    except Exception as e:  # noqa: BLE001 - noted in info.number_sources
+    except Exception as error:  # noqa: BLE001 - noted in info.number_sources
         if notes is not None:
             notes.append(
                 MSG_SOURCE_QUERY_SKIPPED.format(
-                    name=type(e).__name__, value=str(e).splitlines()[0][:120], value_2=sql[:80]
+                    error_type=type(error).__name__, error_text=str(error).splitlines()[0][:120], query=sql[:80]
                 )
             )
         return []
@@ -53,8 +53,8 @@ def build_pool(cfg: dict, con, validate_config: dict, today: date, texts: list[s
     filings and announcements under their own ids."""
     pool = narrative_numbers.Pool(narrative_numbers.Entities(cfg))
     notes = pool.notes
-    for ticker_name in texts:
-        pool.add_text(ticker_name, pct_sections=True)
+    for text in texts:
+        pool.add_text(text, pct_sections=True)
     pool.add_rows(
         records(
             con,
@@ -124,8 +124,8 @@ def build_pool(cfg: dict, con, validate_config: dict, today: date, texts: list[s
         from marketbrief.collectors.news import build_jobs
 
         pool.add(None, "plain", len(build_jobs(cfg.get("news") or {}, cfg)))
-    except Exception as e:  # noqa: BLE001 - only a source of numbers: noted, the check goes on
-        notes.append(MSG_NEWS_FEED_COUNT_UNAVAILABLE.format(name=type(e).__name__, error=e))
+    except Exception as error:  # noqa: BLE001 - only a source of numbers: noted, the check goes on
+        notes.append(MSG_NEWS_FEED_COUNT_UNAVAILABLE.format(name=type(error).__name__, error=error))
     steps = work_dir() / "steps"
     narrative_numbers.collector_summaries(pool, sorted(steps.glob("collect_*.json")) if steps.exists() else [])
     since = today - timedelta(days=validate_config["narrative_news_days"])
@@ -179,14 +179,18 @@ def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
     first = target_date(cfg, as_of, 1)
     skipped, missing = {}, []
     for horizon in ranges_config["horizons"]:
-        tgt = target_date(cfg, as_of, horizon)
+        target_day = target_date(cfg, as_of, horizon)
         for ticker in cfg["tickers"]:
             if (ticker, horizon) in have:
                 continue
-            if now >= calendar.session_close_utc(cfg, tgt):
-                skipped.setdefault(MSG_RANGE_SKIPPED_LATE_RUN.format(horizon=horizon, target=tgt), []).append(ticker)
-            elif tgt == first and now >= calendar.session_open_utc(cfg, first):
-                skipped.setdefault(MSG_RANGE_SKIPPED_MID_SESSION.format(horizon=horizon, target=tgt), []).append(ticker)
+            if now >= calendar.session_close_utc(cfg, target_day):
+                skipped.setdefault(MSG_RANGE_SKIPPED_LATE_RUN.format(horizon=horizon, target=target_day), []).append(
+                    ticker
+                )
+            elif target_day == first and now >= calendar.session_open_utc(cfg, first):
+                skipped.setdefault(MSG_RANGE_SKIPPED_MID_SESSION.format(horizon=horizon, target=target_day), []).append(
+                    ticker
+                )
             elif ticker not in feats:
                 skipped.setdefault(MSG_RANGE_SKIPPED_NO_FEATURES.format(horizon=horizon, as_of=as_of), []).append(
                     ticker
@@ -196,7 +200,7 @@ def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
     if missing:
         res.block(
             "MISSING_RANGE",
-            MSG_NO_RANGE_AS_OF_AND_NO.format(as_of=as_of, value=missing[:10]),
+            MSG_NO_RANGE_AND_NO_SKIP_REASON.format(as_of=as_of, tickers=missing[:10]),
             [missing_item.split()[0] for missing_item in missing],
         )
     res.info["ranges_skipped"] = {key: len(skipped_count) for key, skipped_count in skipped.items()}
@@ -229,8 +233,10 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
     if not report_path.exists():
         res.block(
             "MISSING_REPORT",
-            MSG_NOT_WRITTEN.format(
-                value=report_path.relative_to(paths.ROOT) if report_path.is_relative_to(paths.ROOT) else report_path
+            MSG_REPORT_NOT_WRITTEN.format(
+                report_path=report_path.relative_to(paths.ROOT)
+                if report_path.is_relative_to(paths.ROOT)
+                else report_path
             ),
         )
         return
@@ -244,7 +250,7 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
     if "<!-- report-data:" not in filled:
         res.block("REPORT_DATA_LINE", MSG_LOST_ITS_REPORT_DATA_LINE.format(name=report_path.name))
     if slack is None:
-        res.block("MISSING_SLACK_DRAFT", MSG_NOT_WRITTEN_2.format(name=slack_path.name))
+        res.block("MISSING_SLACK_DRAFT", MSG_SLACK_DRAFT_NOT_WRITTEN.format(name=slack_path.name))
     elif "<!-- AGENT:" in slack:
         res.block("AGENT_MARKERS", MSG_STILL_HAS_AGENT_MARKERS.format(name=slack_path.name))
     skel_r, skel_s = skeletons(cfg, session)

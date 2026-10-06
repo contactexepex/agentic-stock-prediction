@@ -76,7 +76,7 @@ def pending_filings(periodic: list[dict], recheck: date, stored_accessions: set[
 def company_facts(edgar: Edgar, ticker: str, cik: int, predecessors: dict[str, list[int]]) -> list[dict]:
     """The facts of the ticker's mapped CIK and its predecessor CIKs."""
     facts = []
-    for company in [cik, *[p for p in predecessors.get(ticker.upper(), []) if p != cik]]:
+    for company in [cik, *[predecessor for predecessor in predecessors.get(ticker.upper(), []) if predecessor != cik]]:
         facts += extract(edgar.json(facts_url(company)), company)
     return facts
 
@@ -110,7 +110,7 @@ def main() -> int:
             failed += errors
             continue
         periodic = filings_of_forms(recent, PERIODIC_FORMS)
-        accepted = {f[COL_ACCESSION]: f["accepted_at"] for f in periodic}
+        accepted = {periodic_filing[COL_ACCESSION]: periodic_filing["accepted_at"] for periodic_filing in periodic}
         pending = pending_filings(periodic, recheck, accessions[ticker])
         if accessions[ticker] and not pending and not args.force:
             up_to_date.append(ticker)
@@ -123,7 +123,7 @@ def main() -> int:
         loaded.append(ticker)
         got = new_rows(ticker, facts, ids, since, accepted, now)
         rows += got
-        got_accessions = {r[COL_ACCESSION] for r in got}
+        got_accessions = {row[COL_ACCESSION] for row in got}
         for filing in pending:
             # a filing without new values (e.g. a 10-K/A for Part III only, or not in the XBRL API yet)
             # adds no rows and is checked again until it is older than recheck_days
@@ -149,7 +149,7 @@ def main() -> int:
                 "loaded": loaded,
                 "up_to_date": len(up_to_date),
                 "new_filings": new_filings,
-                "revised_rows": sum(r["prev_value"] is not None for r in rows),
+                "revised_rows": sum(row["prev_value"] is not None for row in rows),
                 "filings_without_new_values": not_in_xbrl,
                 "requests": edgar.requests,
                 "sec_times": time_summary(edgar),

@@ -24,8 +24,8 @@ def aci_state(con, ranges_config: dict, week_end: date) -> dict:
 
 def same_aci_settings(stored: dict | None, ranges_config: dict) -> bool:
     """True when a stored replay used the ACI settings of the ranges config."""
-    cur = adaptive_conformal.settings(ranges_config)
-    return bool(stored) and all(stored.get(key) == cur[key] for key in ACI_SETTING_KEYS)
+    current_settings = adaptive_conformal.settings(ranges_config)
+    return bool(stored) and all(stored.get(key) == current_settings[key] for key in ACI_SETTING_KEYS)
 
 
 def latest_aci_replay(con, week_end: date, ranges_config: dict) -> dict | None:
@@ -73,10 +73,10 @@ def latest_aci_replay(con, week_end: date, ranges_config: dict) -> dict | None:
     return None
 
 
-def aci_passes(cmp: dict) -> tuple[bool, list[float], dict, dict, int]:
+def aci_passes(comparison: dict) -> tuple[bool, list[float], dict, dict, int]:
     """On every horizon: lower 80% and no higher 50% interval score, and both bands' coverage closer to target."""
     rel, passed, before80, after80, sample_size = [], True, {}, {}, 0
-    for horizon, groups in (cmp or {}).items():
+    for horizon, groups in (comparison or {}).items():
         before, after = groups["overall"]["before"], groups["overall"]["after"]
         if not before.get("n") or before.get("score80") is None or after.get("score80") is None:
             return False, [], {}, {}, 0

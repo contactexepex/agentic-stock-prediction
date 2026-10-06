@@ -25,23 +25,26 @@ def _us_macro(con) -> str:
     ).fetchall()
     if not rows:
         return "_none_\n"
-    rank = {s: i for i, s in enumerate(US_ORDER)}
-    rows.sort(key=lambda r: (rank.get(r[0], len(rank)), r[0]))
+    rank = {series: position for position, series in enumerate(US_ORDER)}
+    rows.sort(key=lambda row: (rank.get(row[0], len(rank)), row[0]))
 
-    def chg(unit, c, prev):
+    def chg(unit, change, prev):
         """A series change as basis points, percent of the previous value or points, by unit."""
-        if c is None:
+        if change is None:
             return ""
         if unit == "pct":
-            return f"{c * 100:+.0f} bp"
+            return f"{change * 100:+.0f} bp"
         if unit == "index":
-            return f"{c / prev * 100:+.2f}%" if prev else ""
-        return f"{c:+.2f}"
+            return f"{change / prev * 100:+.2f}%" if prev else ""
+        return f"{change:+.2f}"
 
     out = ["| series | name | date | value | chg 1 obs | chg 5 obs | 5 obs back |", "|---|---|---|---|---|---|---|"]
-    for s, name, unit, d, v, c1, c5, d5, p1, p5 in rows:
-        val = f"{v:.2f}%" if unit == "pct" else f"{v:.2f}"
-        out.append(f"| {s} | {name} | {d} | {val} | {chg(unit, c1, p1)} | {chg(unit, c5, p5)} | {d5 or ''} |")
+    for series, name, unit, latest_date, value, change_1, change_5, date_5, previous_1, previous_5 in rows:
+        val = f"{value:.2f}%" if unit == "pct" else f"{value:.2f}"
+        out.append(
+            f"| {series} | {name} | {latest_date} | {val} | {chg(unit, change_1, previous_1)} | "
+            f"{chg(unit, change_5, previous_5)} | {date_5 or ''} |"
+        )
     return (
         "Changes are versus the series' own previous observations (sessions for daily series). "
         "Credit spreads (OAS) widening = risk-off; put/call above ~1 = heavy hedging.\n\n" + "\n".join(out) + "\n"

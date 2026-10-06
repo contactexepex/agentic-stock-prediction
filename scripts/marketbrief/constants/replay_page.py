@@ -39,7 +39,7 @@ var(--ring);border-radius:12px;padding:10px 16px;margin:10px \
 summary{margin-bottom:8px}code{background:var(--chip);padding:1px 4px;border-radius:4px}
 """
 
-JS = """
+REPLAY_SCRIPT = """
 const tip=document.getElementById('tip');
 document.querySelectorAll('[data-tip]').forEach(el=>{
  el.addEventListener('mousemove',e=>{tip.style.display='block';tip.textContent=el.dataset.tip;

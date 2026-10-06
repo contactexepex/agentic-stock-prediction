@@ -10,7 +10,7 @@ import pandas as pd
 from marketbrief.analytics import indicators
 from marketbrief.analytics import regime as regime_rules
 from marketbrief.constants.regime import REGIME_ORDER
-from marketbrief.constants.review import BASELINE
+from marketbrief.constants.review import BASELINE, MSG_NOT_ENOUGH_BENCHMARK_BARS
 from marketbrief.core import calendar
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.pipeline.review.helpers import merge
@@ -70,14 +70,14 @@ def hist_summary(res: pd.DataFrame) -> dict:
 
 def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: dict, week_end: date) -> dict:
     """Ablation (b): the walk-forward on stored prices with each variant of the config."""
-    bkey = benchmark_key(cfg)
+    benchmark_ticker = benchmark_key(cfg)
     bars = {ticker: frame[frame.index <= pd.Timestamp(week_end)] for ticker, frame in bars.items()}
-    if bkey not in bars or len(bars[bkey]) < ranges_config["warmup_bars"] + 30:
-        return {"n": 0, "error": "not enough benchmark bars", "variants": []}
-    dates = list(bars[bkey].index)
-    rank = {position: date_position for date_position, position in enumerate(dates)}
+    if benchmark_ticker not in bars or len(bars[benchmark_ticker]) < ranges_config["warmup_bars"] + 30:
+        return {"n": 0, "error": MSG_NOT_ENOUGH_BENCHMARK_BARS, "variants": []}
+    dates = list(bars[benchmark_ticker].index)
+    index_by_timestamp = {timestamp: index for index, timestamp in enumerate(dates)}
     regimes, majors = history_context(cfg, bars, dates)
-    session_dates = [position.date() for position in dates]
+    session_dates = [timestamp.date() for timestamp in dates]
 
     def major_in(date_position: int, horizon: int) -> bool:
         """True when a major market event falls inside the horizon of a date position."""
@@ -88,13 +88,13 @@ def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: 
     cache, variants = {}, []
     for variant in [{"name": BASELINE, "set": {}}, *review_config["history_variants"]]:
         params = merge(ranges_config, variant.get("set"))
-        by_h, bar_count = {}, 0
+        by_horizon, bar_count = {}, 0
         for horizon in params["horizons"]:
             key = (params["ewma_lambda"], params["warmup_bars"], horizon)
             if key not in cache:
-                cache[key] = observations.observations(bars, cfg["tickers"], horizon, params, rank)
-            obs = cache[key]
-            if obs.empty:
+                cache[key] = observations.observations(bars, cfg["tickers"], horizon, params, index_by_timestamp)
+            session_rows = cache[key]
+            if session_rows.empty:
                 continue
             scale = {
                 date_position: params["regime_factor"].get(regimes[date_position], 1.0)
@@ -102,11 +102,13 @@ def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: 
                 for date_position in range(len(dates))
             }
             summary = hist_summary(
-                evaluation.evaluate(obs, horizon, params, review_config["history_eval_sessions"], scale=scale)
+                evaluation.evaluate(session_rows, horizon, params, review_config["history_eval_sessions"], scale=scale)
             )
-            by_h[f"{horizon}d"] = summary
+            by_horizon[f"{horizon}d"] = summary
             bar_count += summary["n"]
-        variants.append({"name": variant["name"], "set": variant.get("set") or {}, "n": bar_count, "by_h": by_h})
+        variants.append(
+            {"name": variant["name"], "set": variant.get("set") or {}, "n": bar_count, "by_h": by_horizon}
+        )
     share = {
         regime: round(
             regimes[-review_config["history_eval_sessions"] :].count(regime)

@@ -127,7 +127,10 @@ class PriceCollector:
         }
         market = cfg[CFG_MARKET]
         self.adjustments = load_adjustments(market)
-        self.seen = {(a[COL_TICKER], a[KEY_EX_DATE]) for a in load_adjustments(market, include_superseded=True)}
+        self.seen = {
+            (adjustment[COL_TICKER], adjustment[KEY_EX_DATE])
+            for adjustment in load_adjustments(market, include_superseded=True)
+        }
         self.written = 0
         self.failed: list[dict] = []
         self.splits: dict[str, list[date]] = {}
@@ -141,11 +144,11 @@ class PriceCollector:
             nse_check = NseBasisCheck(self.run, lambda: nse_box.setdefault("client", nse_session.nse_client(cfg)))
         self.detector = AdjustmentDetector(self.run, self.adjustments, nse_check)
 
-    def history(self, yf, symbol: str, **window):
+    def history(self, yfinance, symbol: str, **window):
         """One yfinance daily history request (unadjusted closes)."""
-        return yf.Ticker(symbol).history(**window, interval=YAHOO_INTERVAL_DAILY, auto_adjust=False)
+        return yfinance.Ticker(symbol).history(**window, interval=YAHOO_INTERVAL_DAILY, auto_adjust=False)
 
-    def with_overlap(self, yf, key: str, symbol: str, frame):
+    def with_overlap(self, yfinance, key: str, symbol: str, frame):
         """The frame, or a longer one fetched from before our newest stored bar when the frame covers too few
         stored bars for the basis check."""
         if frame is None or frame.empty or stored_overlap(self.cfg, key, frame, self.run.today) >= MIN_OVERLAP:
@@ -155,7 +158,7 @@ class PriceCollector:
         if not newest:
             return frame
         try:  # a gap: fetch from before our newest stored bar so the basis check has an overlap
-            longer = self.history(yf, symbol, start=(newest[0] - timedelta(days=GAP_REFETCH_DAYS)).isoformat())
+            longer = self.history(yfinance, symbol, start=(newest[0] - timedelta(days=GAP_REFETCH_DAYS)).isoformat())
             if longer is not None and not longer.empty and min(stamp.date() for stamp in longer.index) < first:
                 return longer
         except Exception as exc:  # the check below then compares across the gap
@@ -181,7 +184,7 @@ class PriceCollector:
     def hold_symbol(self, key: str, symbol: str) -> None:
         """Yahoo's frame is on a basis no source confirms: no new bar is written this run."""
         self.held.append(key)
-        entry = next((f for f in self.failed if f[COL_TICKER] == key), None)
+        entry = next((failure for failure in self.failed if failure[COL_TICKER] == key), None)
         if entry:
             entry[ENTRY_ERROR] += f"; {MSG_HELD_NOTE}"
         else:
@@ -216,14 +219,14 @@ class PriceCollector:
             write_bar(path, bar)
             self.written += 1
 
-    def process_symbol(self, yf, key: str, symbol: str) -> None:
+    def process_symbol(self, yfinance, key: str, symbol: str) -> None:
         """Fetch, check and store one symbol."""
         try:
-            frame = self.history(yf, symbol, period=self.period)
+            frame = self.history(yfinance, symbol, period=self.period)
         except Exception as exc:  # network or symbol errors must not stop other symbols
             self.failed.append({COL_TICKER: key, ENTRY_YAHOO: symbol, ENTRY_ERROR: str(exc)[:ERROR_TEXT_LIMIT]})
             return
-        frame = self.with_overlap(yf, key, symbol, frame)
+        frame = self.with_overlap(yfinance, key, symbol, frame)
         self.splits[key] = yahoo_splits(frame)
         error = frame_error(self.cfg, key, frame, self.run.today)
         if error:
@@ -258,10 +261,10 @@ class PriceCollector:
         summary[SUMMARY_FAILED] = self.failed
         return summary
 
-    def collect(self, yf) -> dict:
+    def collect(self, yfinance) -> dict:
         """Process every symbol and return the summary."""
         for key, symbol in self.targets.items():
-            self.process_symbol(yf, key, symbol)
+            self.process_symbol(yfinance, key, symbol)
         return self.summary()
 
 
@@ -271,9 +274,9 @@ def main() -> int:
     parser.add_argument("--period", default=DEFAULT_PERIOD, help="yfinance period, e.g. 1mo, 3mo, 1y, 2y")
     args = parser.parse_args()
     cfg = require_market(args)
-    import yfinance as yf  # imported here so the rest of the repo works without it
+    import yfinance  # imported here so the rest of the repo works without it
 
     collector = PriceCollector(cfg, args.period)
-    summary = collector.collect(yf)
+    summary = collector.collect(yfinance)
     print(json.dumps(summary, indent=2))
     return 1 if summary[SUMMARY_FAILED] and len(summary[SUMMARY_FAILED]) == len(collector.targets) else 0

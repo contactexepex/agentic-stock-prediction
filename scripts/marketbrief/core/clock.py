@@ -43,10 +43,10 @@ def utc_today() -> date:
     return clock().date()
 
 
-def freeze_sql(sql: str, at: datetime) -> str:
+def freeze_sql(sql: str, frozen_time: datetime) -> str:
     """SQL with DuckDB's clock functions replaced by the literal time `at` (UTC)."""
     for pattern, literal in _CLOCK_SQL:
-        sql = pattern.sub(literal.format(d=at.date().isoformat(), t=at.isoformat()), sql)
+        sql = pattern.sub(literal.format(d=frozen_time.date().isoformat(), t=frozen_time.isoformat()), sql)
     return sql
 
 
@@ -54,9 +54,9 @@ class FrozenClockConnection:
     """A DuckDB connection whose SQL sees `at` as the current date and time (MB_NOW). Every other
     attribute is the wrapped connection's; execute() returns that connection, as DuckDB's does."""
 
-    def __init__(self, con: duckdb.DuckDBPyConnection, at: datetime):
+    def __init__(self, con: duckdb.DuckDBPyConnection, frozen_time: datetime):
         """Wrap the connection and the frozen time."""
-        self._con, self._at = con, at
+        self._con, self._at = con, frozen_time
 
     def execute(self, query: str, *args, **kwargs):
         """Run the query with the clock frozen."""

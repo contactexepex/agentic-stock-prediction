@@ -48,7 +48,7 @@ def header_lines(cfg, rec, review_config, review_data) -> list[str]:
 def range_lines(review_config, review_data, win_names) -> list[str]:
     """Ranges: coverage against the 50% and 80% targets, in total and by regime, sector and note."""
     lines = []
-    hdr = [
+    header = [
         "Window",
         "H",
         "n",
@@ -73,7 +73,7 @@ def range_lines(review_config, review_data, win_names) -> list[str]:
         "Targets 50% and 80%. Width and interval score in % of price; score is lower-is-better. Naive = last "
         "close +/- 20-day volatility.",
         "",
-        markdown_table(hdr, rows),
+        markdown_table(header, rows),
     ]
     for title, key in (("By regime", "regime"), ("By sector", "sector"), ("By widening note", "note")):
         rows = [
@@ -81,7 +81,7 @@ def range_lines(review_config, review_data, win_names) -> list[str]:
             for window, per in review_data["breakdowns"].items()
             for group_name, stats in per[key].items()
         ]
-        lines += [f"### {title}", "", markdown_table(["Window", "Group · H", *hdr[2:]], rows)]
+        lines += [f"### {title}", "", markdown_table(["Window", "Group · H", *header[2:]], rows)]
     lines += [
         "Notes: `cue` overnight cue, `ai_call` AI direction (drift), `ai_widen` AI widened, `earnings` "
         "earnings in horizon, `event` major market event, `regime` regime widening, `none` no adjustment.",

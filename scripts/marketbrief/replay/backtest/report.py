@@ -19,10 +19,10 @@ def run(cfg: dict, ranges_config: dict, eval_sessions: int) -> dict:
     if bench is None:
         raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
     rank = {bar_date: position for position, bar_date in enumerate(bench.index)}
-    evdf = event_history.load_events(con)
+    events_frame = event_history.load_events(con)
     extra = {
-        "earnings": event_history.earnings_versions(evdf),
-        "dividends": event_history.dividend_events(evdf),
+        "earnings": event_history.earnings_versions(events_frame),
+        "dividends": event_history.dividend_events(events_frame),
         "bench": bench,
         "index_cue": index_cue_series(cfg, bars, ranges_config),
     }

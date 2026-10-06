@@ -49,7 +49,7 @@ def test_aci_update_matches_reference_formula():
     assert aci.aci_step(0.2, 0.2, 1.0, 0.01) == pytest.approx(0.192)
     assert aci.aci_step(0.2, 0.2, 0.0, 0.01) == pytest.approx(0.202)
     assert aci.aci_step(0.2, 0.2, 0.25, 0.01) == pytest.approx(0.1995)    # share of misses in a step
-    assert aci.aci_step(0.06, 0.2, 1.0, 0.1, lo=0.05) == 0.05               # clamped
+    assert aci.aci_step(0.06, 0.2, 1.0, 0.1, lower_bound=0.05) == 0.05               # clamped
 
 
 def test_aci_update_matches_mapie():
@@ -335,7 +335,7 @@ from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market, load_ranges_config
 cfg = load_market('testmkt'); rc = load_ranges_config('testmkt')
 tune_end = datetime.date.fromisoformat(sys.argv[1])
-ho = aci_compare.held_out(cfg, aci_compare.aci_rc(rc), connect('testmkt'), tune_end)
+ho = aci_compare.held_out(cfg, aci_compare.aci_ranges_config(rc), connect('testmkt'), tune_end)
 bars, extra = inputs.load_inputs(cfg, rc, connect('testmkt'))
 res, _ = range_rows.replay_rows(cfg, rc, bars, extra)
 n_test = {str(h): int(((g['date'] > tune_end) & g['actual'].notna()).sum()) for h, g in res.items()}

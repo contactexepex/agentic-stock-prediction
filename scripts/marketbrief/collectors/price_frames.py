@@ -104,7 +104,10 @@ def newest_stored_before(cfg: dict, key: str, day: date) -> tuple[date, float] |
     """(date, close) of `key`'s newest stored bar dated before `day` (within STORED_LOOKBACK_DAYS), or None."""
     base = data_dir(cfg["market"]) / KIND_PRICES
     oldest = (day - timedelta(days=STORED_LOOKBACK_DAYS)).isoformat()
-    for path in sorted((p for p in base.glob("**/*.csv") if oldest <= p.stem < day.isoformat()), reverse=True):
+    for path in sorted(
+        (prices_path for prices_path in base.glob("**/*.csv") if oldest <= prices_path.stem < day.isoformat()),
+        reverse=True,
+    ):
         row = stored_bars(path).get(key)
         if row and row.get(COL_CLOSE) not in (None, "") and float(row[COL_CLOSE]) > 0:
             return date.fromisoformat(path.stem), float(row[COL_CLOSE])
@@ -119,7 +122,9 @@ def stored_overlap(cfg: dict, key: str, frame, today: date) -> int:
 def has_stored_before(cfg: dict, key: str, day: date) -> bool:
     """True when any stored prices file dated before `day` holds a bar of `key`."""
     base = data_dir(cfg["market"]) / KIND_PRICES
-    files = sorted((p for p in base.glob("**/*.csv") if p.stem < day.isoformat()), reverse=True)
+    files = sorted(
+        (prices_path for prices_path in base.glob("**/*.csv") if prices_path.stem < day.isoformat()), reverse=True
+    )
     return any(key in stored_bars(path) for path in files)
 
 

@@ -67,4 +67,4 @@ NSE_FIELDS_FINANCIAL_BROADCAST = ("broadCastDate", "exchdisstime", "filingDate")
 NSE_FIELDS_ANNOUNCED = ("an_dt", "exchdisstime", "sort_date")
 
 # ---------- Yahoo earnings ----------
-MSG_MESSAGE = "{strip}: {value}"
+MSG_METHOD_ERROR = "{method}: {error}"

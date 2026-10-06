@@ -70,22 +70,16 @@ BOTH_KINDS = ("band", "rationale")  # with or without a % sign
 TIME_FIELDS = ("made_at", "settled_at", "available_from")
 
 # ---------- reflection log validation ----------
-MSG_DOES_NOT_EXIST = "{path} does not exist"
-MSG_PREDICTION_DOES_NOT_EXIST_OR_IS = (
-    "prediction {prediction_id!r} does not exist or is not settled (no stored outcome)"
-)
-MSG_A_LESSON_FOR_IS_ALREADY_STORED = "a lesson for {prediction_id} is already stored"
-MSG_DUPLICATE_LESSON_FOR_IN_THIS_FILE = "duplicate lesson for {prediction_id} in this file"
-MSG_NUMBER_IN_THE_LESSON_MATCHES_NOTHING = (
-    "number {sign}{num}{strip} in the lesson matches nothing in the call or its outcome"
-)
+MSG_PATH_DOES_NOT_EXIST = "{path} does not exist"
+MSG_PREDICTION_NOT_SETTLED = "prediction {prediction_id!r} does not exist or is not settled (no stored outcome)"
+MSG_LESSON_ALREADY_STORED = "a lesson for {prediction_id} is already stored"
+MSG_DUPLICATE_LESSON_IN_FILE = "duplicate lesson for {prediction_id} in this file"
+MSG_LESSON_NUMBER_MATCHES_NOTHING = "number {sign}{num}{unit} in the lesson matches nothing in the call or its outcome"
 MSG_MISSING_AGENT_FIELD = "missing {key}"
-MSG_PREDICTION_IS_SETTLED_BUT_ITS_RANGE = (
-    "prediction {prediction_id!r} is settled but its range is still open; wait for it"
-)
+MSG_RANGE_STILL_OPEN = "prediction {prediction_id!r} is settled but its range is still open; wait for it"
 MSG_LESSON_WORD_COUNT = "lesson must be 1-{max_words} words (got {word_count})"
-MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL = "return {sign}{num}% has the wrong sign (actual_return {actual_return:+.6f})"
-MSG_MUST_BE_TEXT = "{key} must be text"
-MSG_IS_BUT_THE_STORED_VALUE_IS = "{key} is {value!r} but the stored value is {value_2!r}"
+MSG_RETURN_HAS_WRONG_SIGN = "return {sign}{num}% has the wrong sign (actual_return {actual_return:+.6f})"
+MSG_FIELD_MUST_BE_TEXT = "{key} must be text"
+MSG_COPIED_FACT_DIFFERS = "{key} is {copied!r} but the stored value is {stored!r}"
 
 MSG_NOT_A_JSON_OBJECT = "not a JSON object"

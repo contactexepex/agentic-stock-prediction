@@ -37,14 +37,14 @@ def earnings_in_horizon(cfg: dict, events: list[tuple[date, str | None]], as_of:
     for day, timing in events:
         if day > target or day < as_of - timedelta(days=EARNINGS_LOOKBACK_DAYS):
             continue
-        if any(as_of < s <= target for s in affected_sessions(cfg, day, timing)):
+        if any(as_of < session <= target for session in affected_sessions(cfg, day, timing)):
             return True
     return False
 
 
 def past_moves(cfg: dict, close: pd.Series, sigma: pd.Series, events, warmup: int) -> list[tuple]:
     """(last session of the window, log move, daily sigma before it, sessions) per past report."""
-    position = {stamp.date(): i for i, stamp in enumerate(close.index)}
+    position = {stamp.date(): index for index, stamp in enumerate(close.index)}
     moves = []
     for day, timing in events:
         window = affected_sessions(cfg, day, timing)
@@ -63,7 +63,7 @@ def past_moves(cfg: dict, close: pd.Series, sigma: pd.Series, events, warmup: in
 def earnings_stats(moves: list[tuple], range_config: dict, as_of: date) -> tuple[float, int, float | None]:
     """(multiple, events used, median absolute move) from reactions completed by as_of."""
     history = range_config[INPUT_EARNINGS_HISTORY]
-    done = [m for m in moves if m[0] <= as_of][-int(history["lookback_events"]) :]
+    done = [move_row for move_row in moves if move_row[0] <= as_of][-int(history["lookback_events"]) :]
     multiple, used = range_math.earnings_multiple(
         [(move, sigma, sessions) for _, move, sigma, sessions in done],
         range_config["earnings_vol_multiple"],

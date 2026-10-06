@@ -38,28 +38,30 @@ def evidence(market: str, root: Path, cutoff: datetime, days: int = EVIDENCE_DAY
             frame = con.execute(sql).df()
             frame["kind"] = kind
             frames.append(frame)
-    ev_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-    ev_df = ev_df.drop_duplicates("id")
+    evidence_frame = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    evidence_frame = evidence_frame.drop_duplicates("id")
     since = pd.Timestamp(cutoff) - pd.Timedelta(days=days)
-    pub = pd.to_datetime(ev_df["public_at"], utc=True)
-    recent = ev_df[pub >= since]
+    pub = pd.to_datetime(evidence_frame["public_at"], utc=True)
+    recent = evidence_frame[pub >= since]
     counts = {
-        "total": int(len(ev_df)),
+        "total": int(len(evidence_frame)),
         f"last_{days}d": int(len(recent)),
-        "by_kind_total": {key: int((ev_df["kind"] == key).sum()) for key in EVIDENCE_KINDS},
+        "by_kind_total": {key: int((evidence_frame["kind"] == key).sum()) for key in EVIDENCE_KINDS},
         f"by_kind_last_{days}d": {key: int((recent["kind"] == key).sum()) for key in EVIDENCE_KINDS},
         "tickers_with_recent_ids": int(recent["ticker"].replace("", np.nan).dropna().nunique()),
         f"by_form_last_{days}d": {
             str(key): int(count) for key, count in recent["form"].fillna("").value_counts().items()
         },
     }
-    return ev_df, counts
+    return evidence_frame, counts
 
 
-def evidence_section(ev_df: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE_DAYS, limit: int = 200) -> str:
+def evidence_section(
+    evidence_frame: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE_DAYS, limit: int = 200
+) -> str:
     """The context pack's section listing the citable ids public before the cutoff."""
     since = pd.Timestamp(cutoff) - pd.Timedelta(days=days)
-    frame = ev_df.assign(public_at=pd.to_datetime(ev_df["public_at"], utc=True))
+    frame = evidence_frame.assign(public_at=pd.to_datetime(evidence_frame["public_at"], utc=True))
     frame = frame[frame["public_at"] >= since].sort_values(["public_at", "id"], ascending=[False, True])
     head = (
         f"## Citable evidence ids (as-of replay; public in the {days} days before {cutoff.isoformat()})\n\n"
@@ -70,9 +72,10 @@ def evidence_section(ev_df: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE
         return head + "_none: no citable ids in this window, so every call must be an abstention_\n"
     lines = ["| id | kind | ticker | form | public_utc | text |", "|---|---|---|---|---|---|"]
     for row in frame.head(limit).itertuples():
-        txt = str(row.text or "").replace("|", "/").replace("\n", " ")[:120]
+        row_text = str(row.text or "").replace("|", "/").replace("\n", " ")[:120]
         lines.append(
-            f"| {row.id} | {row.kind} | {row.ticker or ''} | {row.form or ''} | {str(row.public_at)[:16]} | {txt} |"
+            f"| {row.id} | {row.kind} | {row.ticker or ''} | {row.form or ''} | {str(row.public_at)[:16]} | "
+            f"{row_text} |"
         )
     more = (
         f"\n{len(frame) - limit} more in this window (query DuckDB in the replay root).\n"

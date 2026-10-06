@@ -128,9 +128,9 @@ def no_chain_reason(listed: bool, expiries: list[str], max_days: int) -> str:
 class OptionsCollector:
     """One run: a snapshot per near expiry of every watchlist ticker."""
 
-    def __init__(self, cfg: dict, yf, expiries: int, max_days: int):
+    def __init__(self, cfg: dict, yfinance, expiries: int, max_days: int):
         """The option collector's config, Yahoo client and limits."""
-        self.cfg, self.yf, self.expiries, self.max_days = cfg, yf, expiries, max_days
+        self.cfg, self.yfinance, self.expiries, self.max_days = cfg, yfinance, expiries, max_days
         self.market, self.now, self.today = cfg[CFG_MARKET], utc_now(), utc_today()
         self.seen = recent_ids(self.market, KIND_OPTIONS, days=SEEN_LOOKBACK_DAYS)
         self.rows: list[dict] = []
@@ -164,8 +164,12 @@ class OptionsCollector:
     def collect_ticker(self, key: str, meta: dict) -> None:
         """Snapshot the near expiries of one ticker; a ticker without any is a failure."""
         try:
-            ticker = self.yf.Ticker(meta[META_YAHOO])
-            expiries = [e for e in ticker.options if 1 <= (date.fromisoformat(e) - self.today).days <= self.max_days]
+            ticker = self.yfinance.Ticker(meta[META_YAHOO])
+            expiries = [
+                listed_expiry
+                for listed_expiry in ticker.options
+                if 1 <= (date.fromisoformat(listed_expiry) - self.today).days <= self.max_days
+            ]
             listed = bool(ticker.options)  # () when Yahoo's answer has no option result
             stored = sum(self.snapshot_expiry(key, ticker, expiry) for expiry in expiries[: self.expiries])
             if not stored:
@@ -221,6 +225,6 @@ def main() -> int:
             )
         )
         return 0
-    import yfinance as yf
+    import yfinance
 
-    return OptionsCollector(cfg, yf, args.expiries, args.max_days).collect()
+    return OptionsCollector(cfg, yfinance, args.expiries, args.max_days).collect()

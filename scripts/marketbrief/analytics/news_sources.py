@@ -36,20 +36,34 @@ class Sources:
         self.cfg = cfg
         self.sel = cfg.get("selection") or {}
         self.clusters = cfg.get("clusters") or {}
-        self.domains: dict[str, dict] = {d.lower(): (m or {}) for d, m in (cfg.get("domains") or {}).items()}
-        self.label_domain = {normalise_label(n): d for d, m in self.domains.items() for n in m.get("names") or []}
+        self.domains: dict[str, dict] = {
+            domain.lower(): (settings or {}) for domain, settings in (cfg.get("domains") or {}).items()
+        }
+        self.label_domain = {
+            normalise_label(name): domain
+            for domain, settings in self.domains.items()
+            for name in settings.get("names") or []
+        }
         self.wires: dict[str, dict] = cfg.get("wires") or {}
-        self.wire_names = {normalise_label(n): w for w, m in self.wires.items() for n in [w, *(m.get("names") or [])]}
-        self.wire_domains = {d: w for w, m in self.wires.items() for d in m.get("domains") or []}
+        self.wire_names = {
+            normalise_label(name): wire
+            for wire, settings in self.wires.items()
+            for name in [wire, *(settings.get("names") or [])]
+        }
+        self.wire_domains = {
+            domain: wire for wire, settings in self.wires.items() for domain in settings.get("domains") or []
+        }
         promo = cfg.get("promotional") or {}
-        self.promo_names = {normalise_label(n) for n in promo.get("providers") or []}
-        self.promo_domains = {d.lower() for d in promo.get("domains") or []}
-        self.promo_text = re.compile("|".join(f"(?:{p})" for p in promo.get("text") or []) or NEVER_MATCHES, re.I)
+        self.promo_names = {normalise_label(name) for name in promo.get("providers") or []}
+        self.promo_domains = {domain.lower() for domain in promo.get("domains") or []}
+        self.promo_text = re.compile(
+            "|".join(f"(?:{pattern})" for pattern in promo.get("text") or []) or NEVER_MATCHES, re.I
+        )
         self.material = [
             (int(weight), re.compile(r"\b(?:" + "|".join(patterns) + r")\b", re.I))
             for weight, patterns in (cfg.get("material_terms") or {}).items()
         ]
-        attribution = [n for m in self.wires.values() for n in m.get("attribution") or []]
+        attribution = [name for settings in self.wires.values() for name in settings.get("attribution") or []]
         alt = alternation(attribution)
         self._wire_att = re.compile(
             rf"\b(?:({alt})\s+(?i:has\s+|had\s+|first\s+)?(?i:reported|reports|said in a report|news agency reported)"
@@ -58,14 +72,18 @@ class Sources:
         )
         # "(With inputs from PTI)" closes an Indian agency-based story, so it is read anywhere
         self._inputs = re.compile(rf"(?i:with (?:additional )?inputs from )({alt})\b")
-        datelines = alternation([n for m in self.wires.values() for n in m.get("names") or []])
+        datelines = alternation([name for settings in self.wires.values() for name in settings.get("names") or []])
         self._dateline = re.compile(rf"\(({datelines})\)\s*[-–—:]?")
         self._title_wire = re.compile(
             rf"(?:\bBy\s+({alt}|AP)\s*$|[-:|]\s*({alt})(?:\s+reports?)?\s*$"
             rf"|\b({alt})\s+(?:reports?|reported)\b|\bciting\s+({alt})\b)",
             re.I,
         )
-        self._att_wire = {normalise_label(n): w for w, m in self.wires.items() for n in m.get("attribution") or []}
+        self._att_wire = {
+            normalise_label(name): wire
+            for wire, settings in self.wires.items()
+            for name in settings.get("attribution") or []
+        }
 
     # domains
     def lookup(self, host: str | None) -> tuple[str | None, dict | None]:
@@ -99,7 +117,9 @@ class Sources:
         if name and normalise_label(name) in self.promo_names:
             return f"provider {name}"
         host = (domain or "").lower()
-        if host and any(host == d or host.endswith("." + d) for d in self.promo_domains):
+        if host and any(
+            host == promo_domain or host.endswith("." + promo_domain) for promo_domain in self.promo_domains
+        ):
             return f"domain {domain}"
         if text:
             found = self.promo_text.search(text)
@@ -142,7 +162,7 @@ class Sources:
         # usually quotes background, not the story's origin
         found = self._wire_att.search(" ".join(sentences(text)[:LEDE_SENTENCES])) or self._inputs.search(text)
         if found:
-            return self._att_wire.get(normalise_label(next(g for g in found.groups() if g))), "attribution"
+            return self._att_wire.get(normalise_label(next(group for group in found.groups() if group))), "attribution"
         return None, None
 
     def detect_wire(

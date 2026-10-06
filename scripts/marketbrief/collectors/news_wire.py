@@ -24,7 +24,7 @@ def wire_exclusions(feeds: dict) -> re.Pattern | None:
     """`news.wire_exclude`: regexes for phrases that name another company or no company at all
     ("Apple Hospitality", "Merck KGaA", "meta-analysis"); removed from wire text before matching."""
     patterns = feeds.get("wire_exclude") or []
-    return re.compile("|".join(f"(?:{p})" for p in patterns), re.I) if patterns else None
+    return re.compile("|".join(f"(?:{pattern})" for pattern in patterns), re.I) if patterns else None
 
 
 def wire_tickers(text: str, patterns: dict[str, re.Pattern], exclude: re.Pattern | None) -> set[str]:

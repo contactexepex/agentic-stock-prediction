@@ -12,11 +12,11 @@ from pathlib import Path
 
 from marketbrief.constants.ai_replay import (
     MARKER,
-    MSG_FAILED_IN_EXIT,
     MSG_ROOT_ALREADY_HOLDS_A_PREPARED_REPLAY,
-    MSG_ROOT_EXISTS_IS_NOT_EMPTY_AND,
     MSG_ROOT_MUST_NOT_BE_THE_SOURCE,
     MSG_ROOT_MUST_NOT_CONTAIN_THE_SOURCE,
+    MSG_ROOT_NOT_EMPTY_AND_NOT_A_REPLAY_ROOT,
+    MSG_SCRIPT_FAILED_IN_ROOT,
 )
 from marketbrief.core import paths
 
@@ -56,8 +56,8 @@ def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout:
     process = run_script(script, root, market, *args, now=now)
     if process.returncode != 0:
         raise SystemExit(
-            MSG_FAILED_IN_EXIT.format(
-                script=script, root=root, returncode=process.returncode, value=process.stderr[-3000:]
+            MSG_SCRIPT_FAILED_IN_ROOT.format(
+                script=script, root=root, returncode=process.returncode, error_output=process.stderr[-3000:]
             )
         )
     if stdout is not None:
@@ -83,7 +83,7 @@ def check_root(root: Path, src: Path, force: bool) -> None:
         raise SystemExit(MSG_ROOT_MUST_NOT_CONTAIN_THE_SOURCE.format(root=root))
     if root.exists() and any(root.iterdir()):
         if not (root / MARKER).exists():
-            raise SystemExit(MSG_ROOT_EXISTS_IS_NOT_EMPTY_AND.format(root=root))
+            raise SystemExit(MSG_ROOT_NOT_EMPTY_AND_NOT_A_REPLAY_ROOT.format(root=root))
         if not force:
             raise SystemExit(MSG_ROOT_ALREADY_HOLDS_A_PREPARED_REPLAY.format(root=root))
         shutil.rmtree(root)

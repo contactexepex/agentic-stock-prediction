@@ -15,8 +15,8 @@ from marketbrief.constants.validation import (
     MSG_LINE_IS_NOT_JSON,
     MSG_MORE_PROBLEMS_OMITTED,
     MSG_ROW_FIELDS_NOT_IN_THE_SCHEMA,
-    MSG_ROW_IS_IN_THE_FUTURE_NOW,
     MSG_ROW_MISSING_ID,
+    MSG_ROW_TIME_IN_THE_FUTURE,
     MSG_ROW_TYPE_PROBLEM,
     TRADING_DATE_KINDS,
 )
@@ -75,7 +75,7 @@ def read_rows(path: Path) -> tuple[list[dict], list[str]]:
         try:
             row = json.loads(line)
         except json.JSONDecodeError as error:
-            problems.append(MSG_LINE_IS_NOT_JSON.format(index=index, msg=error.msg))
+            problems.append(MSG_LINE_IS_NOT_JSON.format(index=index, reason=error.msg))
             continue
         if not isinstance(row, dict):
             problems.append(MSG_LINE_IS_NOT_A_JSON_OBJECT.format(index=index))
@@ -152,8 +152,8 @@ def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, to
                 timestamp = as_utc_timestamp(row[key])
                 if timestamp is not None and timestamp > now + tol:
                     out.append(
-                        MSG_ROW_IS_IN_THE_FUTURE_NOW.format(
-                            index=index, key=key, value=row[key], isoformat=now.isoformat()
+                        MSG_ROW_TIME_IN_THE_FUTURE.format(
+                            index=index, key=key, value=row[key], now_text=now.isoformat()
                         )
                     )
         if len(out) >= 5:

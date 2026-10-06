@@ -15,18 +15,28 @@ from marketbrief.constants.ai_replay import (
     CUTOFF_LOCAL,
     FAIR,
     MARKER,
-    MSG_IS_NOT_A_TRADING_DAY,
-    MSG_IS_ON_OR_BEFORE_THE_MODEL,
-    MSG_NO_BAR_DATED_IN_LATEST_KEPT,
+    MSG_DAY_IN_TRAINING_PERIOD,
+    MSG_NO_BENCHMARK_BAR_FOR_DAY,
+    MSG_NOT_A_TRADING_DAY,
 )
 from marketbrief.core import calendar, paths
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import benchmark_key
 from marketbrief.core.storage import append_jsonl
 from marketbrief.replay.ai_replay.copy_asof import copy_asof
-from marketbrief.replay.ai_replay.cutoff import cutoff_for, leakage_label, next_session, training_cutoff
+from marketbrief.replay.ai_replay.cutoff import (
+    cutoff_for,
+    leakage_label,
+    next_session,
+    training_cutoff,
+)
 from marketbrief.replay.ai_replay.evidence import evidence, evidence_section
-from marketbrief.replay.ai_replay.roots import check_root, data_root, json_or_text, run_step
+from marketbrief.replay.ai_replay.roots import (
+    check_root,
+    data_root,
+    json_or_text,
+    run_step,
+)
 
 
 def assumed_earnings(cfg: dict, src: Path, as_of_day: date, cutoff: datetime, days: int) -> list[dict]:
@@ -38,14 +48,14 @@ def assumed_earnings(cfg: dict, src: Path, as_of_day: date, cutoff: datetime, da
     from marketbrief.analytics import event_history
 
     with data_root(src):
-        evdf = event_history.load_events(connect(cfg["market"]))
-    if evdf.empty:
+        events_frame = event_history.load_events(connect(cfg["market"]))
+    if events_frame.empty:
         return []
     out = []
-    for ticker, evs in event_history.earnings_events(evdf).items():
+    for ticker, earnings_dates in event_history.earnings_events(events_frame).items():
         if ticker not in cfg["tickers"]:
             continue
-        for day, timing in evs:
+        for day, timing in earnings_dates:
             if as_of_day < day <= as_of_day + timedelta(days=days):
                 name = cfg["tickers"][ticker].get("name", ticker)
                 out.append(
@@ -78,9 +88,9 @@ def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     src = Path(src or paths.ROOT)
     model_cut = training_cutoff()
     if leakage_label(as_of_day, model_cut) == CONTAMINATED and not allow_training_period:
-        raise SystemExit(MSG_IS_ON_OR_BEFORE_THE_MODEL.format(as_of_day=as_of_day, model_cut=model_cut))
+        raise SystemExit(MSG_DAY_IN_TRAINING_PERIOD.format(as_of_day=as_of_day, model_cutoff=model_cut))
     if not calendar.is_session(cfg, as_of_day):
-        raise SystemExit(MSG_IS_NOT_A_TRADING_DAY.format(as_of_day=as_of_day, market=market))
+        raise SystemExit(MSG_NOT_A_TRADING_DAY.format(as_of_day=as_of_day, market=market))
     check_root(root, src, force)
     session, cutoff = next_session(cfg, as_of_day), cutoff_for(cfg, as_of_day)
     root.mkdir(parents=True, exist_ok=True)
@@ -99,7 +109,9 @@ def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     with data_root(root):
         last = connect(market).execute("SELECT max(date) FROM ohlc WHERE ticker = ?", [bench]).fetchone()[0]
     if last is None or pd.Timestamp(last).date() != as_of_day:
-        raise SystemExit(MSG_NO_BAR_DATED_IN_LATEST_KEPT.format(bench=bench, as_of_day=as_of_day, src=src, last=last))
+        raise SystemExit(
+            MSG_NO_BENCHMARK_BAR_FOR_DAY.format(benchmark=bench, as_of_day=as_of_day, source_path=src, latest_kept=last)
+        )
     now = cutoff.isoformat()
     steps = {
         "features": json_or_text(run_step("features.py", root, market, now)),
@@ -108,9 +120,9 @@ def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     ctx = root / "work" / "context.md"
     run_step("context.py", root, market, now, stdout=ctx)
     steps["ranges"] = json_or_text(run_step("ranges.py", root, market, now, "--now", now))
-    ev_df, counts = evidence(market, root, cutoff)
+    evidence_frame, counts = evidence(market, root, cutoff)
     with ctx.open("a", encoding="utf-8") as frame:
-        frame.write("\n" + evidence_section(ev_df, cutoff))
+        frame.write("\n" + evidence_section(evidence_frame, cutoff))
     text = ctx.read_text(encoding="utf-8")
     if isinstance(steps["calibrate"], dict):  # keep the summary short
         steps["calibrate"] = {

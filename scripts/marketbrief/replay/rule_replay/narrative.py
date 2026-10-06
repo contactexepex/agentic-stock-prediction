@@ -76,11 +76,11 @@ def headline(_cfg: dict, summary: dict) -> list[str]:
             if not signal or not signal["calls"]:
                 continue
             difference, interval = signal["diff_vs_always_up"], signal["diff_ci95"]
-            sig = interval[0] is not None and (interval[0] > 0 or interval[1] < 0)
+            is_clear = interval[0] is not None and (interval[0] > 0 or interval[1] < 0)
             parts.append(
                 f"{signal['label']} {pct(signal['hit_rate'], 1)} ({signal['calls']:,} calls, "
                 f"{'+' if difference >= 0 else ''}{100 * difference:.1f} pts vs always-up on the same rows"
-                f"{', clear' if sig else ', within noise'})"
+                f"{', clear' if is_clear else ', within noise'})"
             )
         lines.append(
             f"{horizon}-day direction baselines: always-up was right {pct(always_up['hit_rate'], 1)} of the time "
@@ -134,15 +134,15 @@ def top_sentences(summary: dict) -> list[str]:
         highest = max(slices.items(), key=lambda key_value: key_value[1]["cover80"])
         lowest = min(slices.items(), key=lambda key_value: key_value[1]["cover80"])
         prep = lambda name: "in" if name.endswith("markets") else "with"  # noqa: E731
-        hi_txt = (
+        upper_text = (
             f"{'widest' if highest[1]['cover80'] > 0.8 else 'closest to 80%'} {prep(highest[0])} {highest[0]} "
             f"({pct(highest[1]['cover80'], 1)} held)"
         )
-        lo_txt = (
+        lower_text = (
             f"{'too narrow' if lowest[1]['cover80'] < 0.8 else 'closest to 80%'} {prep(lowest[0])} {lowest[0]} "
             f"({pct(lowest[1]['cover80'], 1)})"
         )
-        parts.append(f"{horizon}-day ranges were {hi_txt} and {lo_txt}")
+        parts.append(f"{horizon}-day ranges were {upper_text} and {lower_text}")
     if parts:
         out.append("Where are they too wide or too narrow? " + "; ".join(parts) + ".")
     baselines = summary.get("baselines", {})

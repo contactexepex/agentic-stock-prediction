@@ -121,5 +121,5 @@ def article_row(candidate: dict, page: FetchResult, src: Sources, names: list[st
     for field in DATE_FIELDS:
         if parsed.get(field) and not row[field]:
             unstored = MSG_DATE_NOT_STORED.format(field=field, value=str(parsed[field])[:DATE_VALUE_LIMIT])
-            row["note"] = "; ".join(x for x in (row["note"], unstored) if x)
+            row["note"] = "; ".join(note_part for note_part in (row["note"], unstored) if note_part)
     return row

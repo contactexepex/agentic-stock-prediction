@@ -44,10 +44,12 @@ CI_NOTE = (
 
 CMP_KEYS = ("n", "cover50", "cover80", "width50_pct", "width80_pct", "score50", "score80", "qs_pct")
 
-ACI_GRID = tuple((g, br) for g in (0.002, 0.005, 0.01, 0.02) for br in (False, True))  # held-out tuning grid
+ACI_GRID = tuple(
+    (gamma, by_regime) for gamma in (0.002, 0.005, 0.01, 0.02) for by_regime in (False, True)
+)  # held-out tuning grid
 
 MIN_EWMA_BARS = 31  # ranges.py needs an EWMA volatility of 31 bars
 
 # ---------- rule replay: cli ----------
-MSG_ACI_GAMMA_ACI_BY_REGIME_AND = "--aci-gamma, --aci-by-regime and --aci-tune-end need --aci"
+MSG_ACI_OPTIONS_NEED_ACI = "--aci-gamma, --aci-by-regime and --aci-tune-end need --aci"
 MSG_NO_TRADING_DAYS_IN_THE_WINDOW = "no trading days in the window"
