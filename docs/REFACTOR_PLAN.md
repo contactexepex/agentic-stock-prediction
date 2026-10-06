@@ -77,9 +77,9 @@ Fixed inputs:
 - each script runs as a subprocess with `MB_ROOT`/`MB_CONFIG` = the scratch root, `MB_MARKET`, a fixed
   `MB_NOW`, `PYTHONHASHSEED=0`, `TZ=UTC`, no Slack/Neo4j/SEC credentials or proxies (the seed sets a
   dummy `SEC_USER_AGENT`), and `tests/golden/site/sitecustomize.py` loaded: the test network guard
-  (any non-loopback connection is refused and logged; a refusal fails the comparison) and DuckDB on
-  one thread. The one-thread setting only fixes the order within the harness; it hides a production
-  defect, see "Known nondeterminism" below.
+  (any non-loopback connection is refused and logged; a refusal fails the comparison). DuckDB runs
+  with its default threads, as in production (the one-thread setting was removed when "Known
+  nondeterminism" below was fixed); `GOLDEN_DUCKDB_THREADS=N` sets N threads to stress it.
 
 Phases (seed first, then two per market, each with a frozen clock):
 
@@ -182,31 +182,48 @@ Parallel schedule (2026-10-06, 4 cores): `record --serial` at 2695ad7 took 310 s
 compared identical with a record made by the previous harness (one root, serial) at 2d90f32, so the
 per-market roots and the merge reproduce the shared-root run byte for byte.
 
-### Known nondeterminism (a production defect, outside the freeze)
+### Known nondeterminism (fixed)
 
-Production `common.connect` runs DuckDB with its default threads. Several queries have no full
-ORDER BY, or aggregate floats in scan order, so their row order, or a float's last digit, can differ
-between two runs on the same data. `GOLDEN_DUCKDB_PARALLEL=1 python tests/golden/golden.py compare`
-(default threads, same code) shows it: on 2026-10-06 it differed from the one-thread record in 25 of
-1621 files. The queries:
+Production `common.connect` runs DuckDB with its default threads. Several queries had no full
+ORDER BY, or aggregated floats in scan order, so their row order, or a float's last digit, could
+differ between two runs on the same data. One observation (2026-10-06): a compare with default
+threads against the then one-thread record differed in 25 of 1621 files.
 
-| query | defect | where it showed |
-|---|---|---|
-| `score_predictions.py` `SQL` (open_predictions ASOF JOIN bars, JOIN bars) | no ORDER BY: rows are scored and appended in scan order | row order of `data/<market>/outcomes/` (both markets) |
-| `scoring.summary`: `SELECT horizon_days, confidence, hit FROM track_record ...` | no ORDER BY; `reliability()` takes a pandas mean over the rows in that order | `mean_conf` (0.625 vs 0.6250000000000001) in score_predictions' summary (India, both phases); the same function feeds the context pack, review and HTML |
-| `view_data.py` `sc_calls` (`SELECT confidence, hit FROM track_record ...`) | same, fed to `scoring.reliability` | not seen in this data |
-| `context.py` "Open predictions" (`ORDER BY as_of_date, ticker`) | not a full key: a ticker's 1d and 5d calls of one day tie | row order in the context pack, incl. `ai_replay prepare`'s context.md, and so its `sha256` and `approx_tokens` in ai_replay.json and stdout (both markets) |
-| `report.py` `conf_bands` (`avg(confidence) ... GROUP BY band`) | float average summed in scan order | "0.60-0.69 63%" vs "62%" in the report, its skeleton and the saved previous report (both markets) |
-| `view_data.py` `bands` (`avg(confidence) ... GROUP BY band`) | same | `calibration[].stated` in the HTML report's data (US, field-checked: 0.55 vs 0.5499999999999999, 0.625 vs 0.6250000000000001, 0.7000000000000001 vs 0.6999999999999998; India's HTML differs in the same data line) and its Slack-plan copy, and so the HTML `bytes` in html_report's stdout and the Slack plan (both markets) |
+Fixed (commits f548309 and e2e499b): every query below now has a full ORDER BY (a unique key, or
+every output column), and float averages and sums that reach an output are order-independent:
+SQL sums over `TRY_CAST(x AS DECIMAL(38,10))` (integer arithmetic; `avg` of it is the exact sum
+divided by n; a NaN or infinite value becomes NULL and is skipped instead of making the result
+NaN), `scoring._mean` (exact rational sum, rounded once), split-factor products over a sorted list.
 
-Other `avg()` aggregates over unordered rows (e.g. context.py "Track record by horizon", review.py
-summaries) carry the same risk but were rounded enough not to differ here.
+| place | change |
+|---|---|
+| `score_predictions.py` `SQL`, `RANGE_SQL` | `ORDER BY base.id, base.made_at` / `ORDER BY r.id`: outcomes and range_outcomes appended in id order |
+| `scoring.summary` | calls `ORDER BY id, scored_at`, ranges `ORDER BY id`; Brier, log loss, `mean_conf` and the range means use `_mean` |
+| `view_data.py` | `SCORED_CALLS_SQL` ordered; `BANDS_SQL` exact average; per-ticker range/call records `ORDER BY ticker, h`; news `ORDER BY id` (ties in the item ranking and the same-title dedupe); announcements `ORDER BY id` (sources map); company events `ORDER BY date, ticker, type, name` |
+| `context.py` | "Open predictions" `ORDER BY as_of_date, ticker, horizon_days, id, direction, confidence`; news sentiment, "Range scorecard" and "Track record by horizon" averages exact; SEC filings and scored ranges full keys; upcoming company events `ORDER BY ALL`; judge FAILs `+ agent, round` |
+| `report.py` | `CONF_BANDS_SQL` (in view_data.py) exact; scorecard over `RANGE_RECORD_EXACT`; yesterday's calls `ORDER BY ticker, horizon_days, id`; quotes `ORDER BY symbol`; features `ORDER BY ticker`; scored ranges `+ id` |
+| `relations.py`, `smart_money.py`, `nse_context.py` | `+ id` after value/date keys (ties under `LIMIT`); FII/DII sums exact |
+| `macro_context.py` | NSDL 5-report net sum exact (printed rounded to whole crore) |
+| `calibrate.py`, `aci.py` | live pools `ORDER BY id` (weighted quantile with tied z values) |
+| `ai_replay.py` evidence, `lessons.evidence`, `spotcheck.evidence_rows`, `validate.evidence_times` | ordered, so the row kept per id and the output order are fixed (lessons: in the call's `evidence_ids` order) |
+| `validate.py` BAD_CLOSE, `ranges.py` options, `review.latest_aci_replay` | `ORDER BY 1`; `ORDER BY ticker, expiry, day`; `+ id DESC` |
+| `sql/views.sql` | `bar_factors` and `deals_scored` factor product `list_product(list_sort(list(...)))`; `insider_flow` dollar sums exact |
 
-The fix (full ORDER BY keys; aggregate in a defined order or round) changes output bytes, so it is a
-separate judged change outside the feature freeze, scheduled right after this step, followed by a
-golden re-record. Until then: the one-thread harness setting fixes the order only within the
-harness; refactor steps must keep each of these queries' ORDER BY and aggregation exactly as they are
-and must not describe their order as defined.
+Not changed, judged deterministic: plain scans and filters (DuckDB keeps insertion order);
+`holdings_quarter` sums of share counts and 13F dollar values (integer-valued doubles, exact below
+2^53); window averages in views, whose frames are ordered by a date unique per partition. Not
+covered: a `DISTINCT ON` whose ORDER BY ties on two different rows keeps either.
+
+Proof (2026-10-06): golden `record` with default threads at e2e499b, then two `compare` runs, both
+`"identical": true` over 1626 files. Against the one-thread record at 29fde83, 41 files differ,
+all row orderings or float last digits of the queries above: outcome rows (same lines, id order),
+"Open predictions" and SEC-filing row order in the context packs (and so the ai_replay context
+sha256), `mean_conf` and `calibration[].stated` (0.5499999999999999 -> 0.55, 0.7000000000000001 ->
+0.7, 0.6250000000000001 -> 0.625) in score summaries, review records and the HTML data (and so
+its byte counts), the report's "0.60-0.69" band 63% -> 62% (exact mean 0.625), yesterday's-calls
+row order, one INDIGO sentiment 0.15 -> 0.16 (exact mean 0.155, half up), and the copied
+`sql/views.sql` in the ai_replay roots. `tests/test_determinism.py` runs each fixed query 12 times
+with 8 threads on data built to expose ties and summation order.
 
 ## 2. Enforcement
 
