@@ -80,6 +80,7 @@ class HoldingsRun:
     """One holdings run over the configured filers."""
 
     def __init__(self, edgar: Edgar, accessions: set[str], cusips: dict[str, str], quarters: int, now: str):
+        """The 13F collector's client, accessions, CUSIPs, quarters and clock."""
         self.edgar, self.accessions, self.cusips, self.quarters, self.now = edgar, accessions, cusips, quarters, now
         self.tickers = sorted(set(cusips.values()))
         self.rows: list[dict] = []

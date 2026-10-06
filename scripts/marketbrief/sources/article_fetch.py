@@ -25,6 +25,7 @@ class Pacer:
     """Keeps at least `pause` seconds between two article fetches."""
 
     def __init__(self, pause: float):
+        """The fetcher's pause between requests."""
         self.pause, self.last = pause, 0.0
 
     def wait(self):

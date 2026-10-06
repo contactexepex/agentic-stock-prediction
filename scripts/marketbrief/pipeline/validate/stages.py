@@ -31,6 +31,7 @@ from marketbrief.constants.validation import (
 
 
 def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)
+    """Collect stage: files, duplicates, bars, fetches and the collectors' summaries."""
     kinds = [
         key
         for key in schemas.SCHEMAS
@@ -51,6 +52,7 @@ def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: 
 
 
 def stage_features(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)
+    """Features stage: every ticker has a current feature row; the regime row exists."""
     check_files(res, cfg, STAGE_KINDS["features"], today, now, validate_config)
     last = dict(con.execute("SELECT ticker, max(date) FROM bars GROUP BY 1").fetchall())
     feats = {
@@ -80,6 +82,7 @@ def stage_features(res, cfg, con, status, now, today, validate_config):  # noqa:
 def stage_context(  # noqa: PLR0913 (uniform stage signature)
     res, cfg, _con, _status, _now, today, _validate_config, path: Path | None = None
 ):
+    """Context stage: the context pack exists, has its header and names every ticker."""
     path = path or work_dir() / "context.md"
     if not path.exists() or path.stat().st_size == 0:
         res.block(

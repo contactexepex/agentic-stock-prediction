@@ -200,6 +200,7 @@ def read_file(path: Path) -> list:
 
 
 def check(cfg: dict, path: Path) -> tuple[list[dict], list[dict], int]:
+    """Read the reflector's file and validate its records against the settled calls."""
     con = connect(cfg["market"])
     recs = read_file(path)
     good, bad = validate_records(recs, settled(cfg, con), stored_ids(con))

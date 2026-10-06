@@ -100,6 +100,7 @@ class NewsCollector:
     """One run over the feed jobs of a market."""
 
     def __init__(self, watchlist: dict):
+        """The news collector's watchlist and market."""
         self.watchlist, self.market = watchlist, watchlist[CFG_MARKET]
         self.feeds = watchlist.get(CFG_NEWS, {})
         self.tagger = Tagger(watchlist)

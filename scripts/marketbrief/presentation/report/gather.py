@@ -40,6 +40,7 @@ def weekly_review(con, session) -> dict | None:
 
 
 def gather(cfg: dict, con) -> dict:
+    """Read the day's ranges, regime, features, scores and events from the data."""
     query = lambda sql, params=None: con.execute(sql, params or []).df()  # noqa: E731
     ranges = query("SELECT * FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)")
     if ranges.empty:

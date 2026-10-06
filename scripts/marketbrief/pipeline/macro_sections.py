@@ -29,6 +29,7 @@ def _us_macro(con) -> str:
     rows.sort(key=lambda r: (rank.get(r[0], len(rank)), r[0]))
 
     def chg(unit, c, prev):
+        """A series change as basis points, percent of the previous value or points, by unit."""
         if c is None:
             return ""
         if unit == "pct":
@@ -48,6 +49,7 @@ def _us_macro(con) -> str:
 
 
 def _us_shorts(con, tickers: list[str]) -> str:
+    """The short-selling section of the US context."""
     return (
         "Daily short-sale volume is FINRA-reported (off-exchange) volume only: compare with the ticker's "
         "own average, not across tickers. prior_avg_pct = average of the up to 20 sessions before the "
@@ -70,6 +72,7 @@ def _us_shorts(con, tickers: list[str]) -> str:
 
 
 def _india_fpi(con) -> str:
+    """The FPI flows section of the India context."""
     latest = cursor_markdown_table(
         con.execute("""
         SELECT reporting_date, asset_class, route, gross_purchases_cr, gross_sales_cr, net_cr, net_usd_mn
@@ -95,6 +98,7 @@ def _india_fpi(con) -> str:
 
 
 def _india_indices(con) -> str:
+    """The NSE index valuation section of the India context."""
     return cursor_markdown_table(
         con.execute("""
         SELECT index_name, coalesce(sector, '') AS watchlist_sector, date, round(close, 2) AS close,
@@ -104,6 +108,7 @@ def _india_indices(con) -> str:
 
 
 def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
+    """The macro, flows and short-selling sections of the context pack."""
     out = []
     if cfg.get("macro"):
         out.append(

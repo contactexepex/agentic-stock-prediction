@@ -42,18 +42,22 @@ def highest(statuses) -> str:
 
 
 def is_primary(statement: dict) -> bool:
+    """True when the statement comes from a primary source."""
     return statement["source_kind"] in PRIMARY_SOURCE_KINDS
 
 
 def is_opinion(statement: dict) -> bool:
+    """True for an opinion or an attributed opinion."""
     return statement["claim_type"] == CLAIM_TYPE_OPINION or statement["attribution"] == ATTRIBUTION_OPINION
 
 
 def is_promotional(statement: dict) -> bool:
+    """True for a promotional statement."""
     return statement["claim_type"] == CLAIM_TYPE_PROMOTIONAL
 
 
 def is_rumour(statement: dict) -> bool:
+    """True for a rumour or an attributed rumour."""
     return statement["claim_type"] == CLAIM_TYPE_RUMOUR or statement["attribution"] == ATTRIBUTION_SOURCES_SAY
 
 

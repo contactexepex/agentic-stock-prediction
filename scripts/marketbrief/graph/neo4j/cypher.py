@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 def prov(variable: str) -> str:
+    """The provenance properties set on a relationship or node variable."""
     return (
         f"{variable}.market = $market, {variable}.source_kind = $kind, {variable}.source_id = row.source_id, "
         f"{variable}.recorded_at = datetime(row.recorded_at), {variable}.synced_at = datetime($synced_at)"
@@ -26,6 +27,7 @@ MARKET = "MERGE (m:Market {id: $market}) ON CREATE SET m.market = $market"
 
 
 def holder_statement(rel: str, dates: tuple = (), datetimes: tuple = ()) -> str:
+    """The statement that merges a holder and its relationship to a company."""
     return f"""UNWIND $rows AS row
 MERGE (h:Holder {{id: row.holder_id}})
   ON CREATE SET h.name = row.holder_name, h.market = $market, h.source_kind = $kind, h.source_id = row.source_id,
@@ -49,6 +51,7 @@ def node_statement(label: str, dates: tuple = (), datetimes: tuple = (), extra_l
 
 
 def scored_statement(parent: str, dates: tuple, rel_props: str) -> str:
+    """The statement that merges a scored outcome under its parent call or range."""
     return f"""UNWIND $rows AS row
 MERGE (p:{parent} {{id: row.parent_id}})
   ON CREATE SET p.market = $market, p.record_id = row.parent_record, p.placeholder = true, p.source_kind = $kind,
@@ -60,6 +63,7 @@ SET {rel_props}{prov("r")}"""
 
 
 def source_statement(label: str, dates: tuple, datetimes: tuple) -> str:
+    """The statement that merges a source node (filing, announcement) and its company."""
     return (
         "UNWIND $rows AS row\nMERGE (n:Source {id: row.id})\nSET n += row.props"
         + casts("n", dates, datetimes)
@@ -73,6 +77,7 @@ def source_statement(label: str, dates: tuple, datetimes: tuple) -> str:
 
 
 def market_node_statement(label: str, rel: str, dates: tuple, datetimes: tuple) -> str:
+    """The statement that merges a node attached to the market."""
     return (
         "UNWIND $rows AS row\n"
         + node_statement(label, dates, datetimes)
@@ -84,6 +89,7 @@ def market_node_statement(label: str, rel: str, dates: tuple, datetimes: tuple) 
 
 
 def company_node_statement(label: str, rel: str, dates: tuple, datetimes: tuple) -> str:
+    """The statement that merges a node attached to a company."""
     return (
         "UNWIND $rows AS row\n"
         + node_statement(label, dates, datetimes)

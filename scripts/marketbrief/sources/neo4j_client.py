@@ -36,6 +36,7 @@ class Neo4jClient(HttpClient):
 
     def __init__(self, base_url: str, database: str, credentials: tuple[str, str],
                  timeout: float = NEO4J_TIMEOUT_SECONDS, retries: int = NEO4J_RETRIES, backoff: float | None = None):
+        """A client for the Neo4j HTTP Query API of one database."""
         user, password = credentials
         self.base_url, self.database = base_url.rstrip("/"), database
         self.url = f"{self.base_url}/db/{urllib.parse.quote(database, safe='')}/query/v2"

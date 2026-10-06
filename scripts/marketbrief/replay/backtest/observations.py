@@ -11,6 +11,7 @@ from marketbrief.core import calendar, market_config
 
 
 def rolling_beta(close: pd.Series, bench: pd.Series, window: int = TRADING_DAYS, min_obs: int = 60) -> pd.Series:
+    """The rolling beta of a stock against the benchmark."""
     inner_index = pd.concat([index_cue.log_returns(close), index_cue.log_returns(bench)], axis=1, join="inner").dropna()
     stock, benchmark = inner_index.iloc[:, 0], inner_index.iloc[:, 1]
     return (
@@ -59,6 +60,7 @@ def mark_window(length: int, positions: list[int], horizon: int) -> np.ndarray:
 def observations(  # noqa: PLR0913
     bars, tickers, horizon: int, ranges_config: dict, rank: dict, cfg: dict | None = None, extra: dict | None = None
 ) -> pd.DataFrame:
+    """The walk-forward observations: standardised outcomes per ticker and day."""
     out = []
     for ticker_symbol in tickers:
         frame = bars.get(ticker_symbol)

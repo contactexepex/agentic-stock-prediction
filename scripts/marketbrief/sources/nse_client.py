@@ -33,6 +33,7 @@ class Nse(HttpClient):
 
     def __init__(self, base: str = NSE_BASE_URL, archives: str = NSE_ARCHIVES_URL, replay: Path | None = None,
                  pause: float = NSE_DEFAULT_PAUSE_SECONDS):
+        """An NSE client with its base URLs and an optional replay folder."""
         policy = HttpPolicy(timeout=NSE_TIMEOUT_SECONDS, attempts=NSE_ATTEMPTS, pause=pause,
                             retry_wait=constant_wait(NSE_RETRY_WAIT_SECONDS),
                             network_errors=(urllib.error.URLError, OSError))

@@ -42,6 +42,7 @@ from marketbrief.constants.neo4j import MSG_PROBE_NEEDS_A_SERVER_NOT_DRY
 
 
 def main() -> int:
+    """Sync one market into Neo4j (or write the dry-run statements) and print the summary."""
     parser = market_arg(__doc__)
     parser.add_argument("--full", action="store_true", help="delete this market's projection and load everything")
     parser.add_argument("--dry-run", action="store_true", help="write statements to work/neo4j_dryrun/ instead")

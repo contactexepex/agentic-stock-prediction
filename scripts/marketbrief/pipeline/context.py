@@ -31,6 +31,7 @@ PCT = "round({} * 100, 2)"
 
 
 def sections(cfg: dict) -> list[tuple[str, str, list]]:
+    """The symbol sections (cues, factors, sector ETFs) of the context pack by role."""
     roles = {key: symbol.get("role") for key, symbol in cfg["symbols"].items()}
     names = {
         **{key: symbol.get("name", key) for key, symbol in cfg["symbols"].items()},
@@ -209,6 +210,7 @@ def sector_gaps(cfg: dict) -> str:
 
 
 def upcoming_events(cfg: dict, con) -> str:
+    """The events of the next 14 days as a markdown table."""
     start = local_today(cfg)
     session = calendar.next_session(cfg, start)
     rows = [
@@ -251,6 +253,7 @@ def judge_fails(con, today) -> str:
 
 
 def main() -> None:
+    """Print the context pack of one market."""
     cfg = require_market(market_arg(__doc__).parse_args())
     con = connect(cfg["market"])
     print(f"# Context pack: {cfg['name']}, {utc_today()} (UTC)\n")

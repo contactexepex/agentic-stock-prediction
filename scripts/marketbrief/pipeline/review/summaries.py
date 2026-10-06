@@ -11,6 +11,7 @@ from marketbrief.pipeline.review.helpers import note_tags, numeric_series, round
 
 
 def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
+    """The scored ranges up to the week's end, with interval scores, widths, tags and sector."""
     frame = con.execute("SELECT * FROM range_record WHERE target_date <= ? ORDER BY target_date, id", [week_end]).df()
     if frame.empty:
         return frame
@@ -18,6 +19,7 @@ def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
     base, actual_close = frame["base_close"].astype(float), frame["actual_close"].astype(float)
 
     def iscore(lower, upper, band):
+        """Interval scores in percent of the base close for lower and upper edges."""
         return [
             100 * range_math.interval_score(lower_edge, upper_edge, actual, band) / base_close
             if not (pd.isna(lower_edge) or pd.isna(upper_edge))
@@ -39,6 +41,7 @@ def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
 
 
 def range_summary(frame: pd.DataFrame) -> dict:
+    """Coverage, width, score and naive baselines of a set of scored ranges."""
     if frame.empty:
         return {"n": 0}
     return {
@@ -58,6 +61,7 @@ def range_summary(frame: pd.DataFrame) -> dict:
 
 
 def by_horizon(frame: pd.DataFrame, summarizer) -> dict:
+    """A summary of all rows and of each horizon's rows."""
     out = {"all": summarizer(frame)}
     for horizon, group in frame.groupby("horizon_days") if not frame.empty else []:
         out[f"{int(horizon)}d"] = summarizer(group)
@@ -65,6 +69,7 @@ def by_horizon(frame: pd.DataFrame, summarizer) -> dict:
 
 
 def breakdown(frame: pd.DataFrame, col: str) -> dict:
+    """A summary per value of a column (regime, sector, note tag) and horizon."""
     if frame.empty:
         return {}
     exploded = frame.explode(col) if col == "tags" else frame
@@ -75,6 +80,7 @@ def breakdown(frame: pd.DataFrame, col: str) -> dict:
 
 
 def load_calls(con, week_end: date) -> pd.DataFrame:
+    """The scored direction calls up to the week's end."""
     frame = con.execute("SELECT * FROM track_record WHERE target_date <= ? ORDER BY target_date, id", [week_end]).df()
     if not frame.empty:
         frame["target_date"] = pd.to_datetime(frame["target_date"]).dt.date
@@ -82,6 +88,7 @@ def load_calls(con, week_end: date) -> pd.DataFrame:
 
 
 def call_summary(frame: pd.DataFrame) -> dict:
+    """Hit rate, always-up baseline, edge and mean confidence of a set of calls."""
     if frame.empty:
         return {"n": 0}
     hit, up_moves = rounded_mean(frame["hit"]), rounded_mean(frame["actual_return"] > 0)
@@ -95,10 +102,12 @@ def call_summary(frame: pd.DataFrame) -> dict:
 
 
 def band_label(lower: float, upper: float) -> str:
+    """A confidence band as a label such as 60%-69%."""
     return f"{scoring.percent(lower)}-{scoring.percent(upper)}"
 
 
 def confidence_bands(frame: pd.DataFrame, edges: list[float]) -> dict:
+    """A call summary per confidence band, with the gap between hit rate and confidence."""
     out = {}
     for index, (lower, upper) in enumerate(zip(edges[:-1], edges[1:])):
         last = index == len(edges) - 2

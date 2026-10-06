@@ -52,6 +52,7 @@ def settings() -> dict:
 
 
 def now_floor() -> pd.Timestamp:
+    """The clock rounded down to the second."""
     return pd.Timestamp(clock()).floor("s")
 
 

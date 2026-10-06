@@ -33,6 +33,7 @@ def leakage_label(as_of_day, cutoff: date | None = None) -> str:
 
 
 def next_session(cfg: dict, as_of_day: date) -> date:
+    """The trading session after an as-of day."""
     return calendar.next_session(cfg, as_of_day, include=False)
 
 

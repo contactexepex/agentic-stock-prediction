@@ -9,6 +9,7 @@ from marketbrief.constants.lessons import RANGE_SQL, SETTLED_SQL
 
 
 def iso_utc_text(value) -> str | None:
+    """A value as an ISO 8601 UTC timestamp text, or None when missing."""
     if value is None or (not isinstance(value, str) and pd.isna(value)):
         return None
     timestamp = pd.Timestamp(value)
@@ -16,10 +17,12 @@ def iso_utc_text(value) -> str | None:
 
 
 def date_text(value) -> str | None:
+    """The first ten characters (YYYY-MM-DD) of a date-like value, or None when missing."""
     return None if value is None or (not isinstance(value, str) and pd.isna(value)) else str(value)[:10]
 
 
 def float_or_none(value):
+    """A value as a float, or None when missing or NaN."""
     return None if value is None or (isinstance(value, float) and math.isnan(value)) else float(value)
 
 
@@ -107,6 +110,7 @@ def settled(cfg: dict, con) -> dict[str, dict]:
 
 
 def stored_ids(con) -> set[str]:
+    """Ids of the lessons already stored."""
     return set(con.execute("SELECT DISTINCT id FROM lessons").df()["id"])
 
 

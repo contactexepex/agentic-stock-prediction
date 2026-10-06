@@ -23,6 +23,7 @@ from marketbrief.graph.neo4j.kinds import KINDS, Kind
 
 
 def schema_statements() -> list[str]:
+    """The constraints and indexes of the projection."""
     out = [f"CREATE CONSTRAINT {lab.lower()}_id IF NOT EXISTS FOR (n:{lab}) REQUIRE n.id IS UNIQUE" for lab in LABELS]
     out += [f"CREATE INDEX {lab.lower()}_{prop} IF NOT EXISTS FOR (n:{lab}) ON (n.{prop})" for lab, prop in INDEXES]
     out += [
@@ -33,6 +34,7 @@ def schema_statements() -> list[str]:
 
 
 def read_rows(kind: Kind, cfg: dict, con, since: str | None) -> list[dict]:
+    """The rows of a kind (all, or since the watermark), shaped and sorted by id."""
     market = cfg["market"]
     if kind.rows_fn:
         return kind.rows_fn(cfg, con, since)
@@ -47,6 +49,7 @@ def read_rows(kind: Kind, cfg: dict, con, since: str | None) -> list[dict]:
 
 
 def watermarks(client, market: str) -> dict[str, str]:
+    """The stored watermark of each kind of a market."""
     res = client.run(
         "MATCH (s:SyncState) WHERE s.market = $market AND s.kind IS NOT NULL "
         "RETURN s.kind AS kind, s.watermark AS watermark",
@@ -57,6 +60,7 @@ def watermarks(client, market: str) -> dict[str, str]:
 
 
 def ensure_schema(sink) -> None:
+    """Create the schema unless the stored schema version is current."""
     if not isinstance(sink, DryRunSink):
         res = sink.run("MATCH (s:SyncState {id: $id}) RETURN s.version AS version", {"id": "_schema"})
         values = (res.get("data") or {}).get("values") or []
@@ -73,6 +77,7 @@ def ensure_schema(sink) -> None:
 
 
 def delete_market(sink, market: str) -> int:
+    """Delete every node of the market in batches; return how many were deleted."""
     stmt = "MATCH (n) WHERE n.market = $market WITH n LIMIT $limit DETACH DELETE n RETURN count(*) AS deleted"
     total = 0
     while True:
@@ -97,10 +102,12 @@ class SyncRun:
 
     @property
     def market(self) -> str:
+        """The market being synced."""
         return self.cfg["market"]
 
     @property
     def dry(self) -> bool:
+        """True when the sink only writes the statements to files."""
         return isinstance(self.sink, DryRunSink)
 
 

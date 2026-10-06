@@ -12,6 +12,7 @@ from marketbrief.replay.backtest.observations import index_cue_series, observati
 
 
 def run(cfg: dict, ranges_config: dict, eval_sessions: int) -> dict:
+    """Run the walk-forward backtest for one market and collect the summaries."""
     con = database.connect(cfg["market"])
     bars = load_bars(con)
     bench = bars.get(market_config.benchmark_key(cfg))
@@ -56,6 +57,7 @@ def run(cfg: dict, ranges_config: dict, eval_sessions: int) -> dict:
 
 
 def markdown(cfg: dict, summary: dict) -> str:
+    """The backtest report as markdown tables."""
     lines = [
         f"# Range backtest: {cfg['name']}, data to {summary['as_of_date']}",
         "",

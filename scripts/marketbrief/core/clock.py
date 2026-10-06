@@ -50,6 +50,7 @@ class FrozenClockConnection:
     attribute is the wrapped connection's; execute() returns that connection, as DuckDB's does."""
 
     def __init__(self, con: duckdb.DuckDBPyConnection, at: datetime):
+        """Wrap the connection and the frozen time."""
         self._con, self._at = con, at
 
     def execute(self, query: str, *args, **kwargs):
@@ -61,4 +62,5 @@ class FrozenClockConnection:
         return self._con.sql(freeze_sql(query, self._at), *args, **kwargs)
 
     def __getattr__(self, name):
+        """Every other attribute comes from the wrapped connection."""
         return getattr(self._con, name)

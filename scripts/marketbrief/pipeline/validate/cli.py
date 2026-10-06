@@ -42,6 +42,7 @@ from marketbrief.pipeline.validate.stages import stage_collect, stage_context, s
 
 
 def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
+    """Run the chosen stage (or all) of the gate for one market and return the verdict as a dict."""
     paths = paths or {}
     validate_config = load_config()
     con = database.connect(cfg["market"])
@@ -82,6 +83,7 @@ def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
 
 
 def main() -> int:
+    """Parse the arguments, run the gate and print its JSON; the exit code is 1 on any failure."""
     parser = cli.market_arg(__doc__)
     parser.add_argument("--stage", required=True, choices=[*STAGES, "all"])
     for name in ("predictions", "enriched", "context", "report", "slack"):

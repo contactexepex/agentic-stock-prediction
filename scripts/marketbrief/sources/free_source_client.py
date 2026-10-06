@@ -34,6 +34,7 @@ class FreeSourceClient(HttpClient):
                  backoff: float = FREE_SOURCE_BACKOFF_SECONDS):
         # 3 attempts: fred.stlouisfed.org sometimes closes a connection without answering and
         # serves the same URL on the next try (seen 2026-10-05)
+        """A client for the free sources with its pause and user agent."""
         policy = HttpPolicy(timeout=timeout, attempts=attempts, pause=pause, retry_wait=constant_wait(backoff),
                             network_errors=(urllib.error.URLError, OSError, http.client.HTTPException))
         super().__init__(policy)

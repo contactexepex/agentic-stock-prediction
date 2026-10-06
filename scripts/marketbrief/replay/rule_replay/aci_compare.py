@@ -33,8 +33,9 @@ def aci_comparison(before: dict, after: dict) -> dict:
     return out
 
 
-def two_decimals_text(value, key: int = 2) -> str:
-    return "" if value is None else f"{value:.{key}f}"
+def two_decimals_text(value, decimals: int = 2) -> str:
+    """A number with the given decimals, empty when missing."""
+    return "" if value is None else f"{value:.{decimals}f}"
 
 
 ACI_SETTING_KEYS = ("gamma", "max_shift", "min_history", "by_regime")
@@ -51,6 +52,7 @@ def aci_tag(settings: dict, tune_end: date | None = None) -> str:
 
 
 def comparison_groups(group: pd.DataFrame, horizon: int) -> dict:
+    """Range summaries of all rows and of each regime."""
     out = {"overall": range_summary(group, horizon)}
     for key, regime_group in group.groupby("regime"):
         out[str(key)] = range_summary(regime_group, horizon)
@@ -78,6 +80,7 @@ def rows_comparison(fixed: dict, after: dict, keep) -> dict:
 
 
 def mean_rel_score80(cmp: dict) -> float | None:
+    """The mean relative change of the 80% score over the groups."""
     rel = [
         group["overall"]["after"]["score80"] / group["overall"]["before"]["score80"] - 1
         for group in cmp.values()
@@ -104,11 +107,13 @@ def held_out(
     )
 
     def tune(group: pd.DataFrame) -> pd.Series:  # outcome known by tune_end too (5-day targets cross it)
+        """The rows used to choose the settings (as-of date and outcome on or before the tune end)."""
         return (group["date"] <= tune_end) & group["bar_target"].map(
             lambda item: isinstance(item, date) and item <= tune_end
         )
 
     def test(group: pd.DataFrame) -> pd.Series:
+        """The rows after the tune end, used to test the chosen settings."""
         return group["date"] > tune_end
 
     variants, frames = [], {}
@@ -147,6 +152,7 @@ def held_out(
 
 
 def held_out_html(held_out_result: dict | None) -> str:
+    """The HTML of the held-out check, empty when there is none."""
     if not held_out_result:
         return '<p class="note">No held-out check in this run (replay.py --aci --aci-tune-end DATE).</p>'
     sel = held_out_result["selected"]
@@ -167,6 +173,7 @@ def held_out_html(held_out_result: dict | None) -> str:
 
 
 def aci_table(cmp: dict) -> str:
+    """The before and after table of fixed bands against ACI."""
     rows = []
     for horizon, groups in cmp.items():
         for key, group_row in groups.items():

@@ -42,6 +42,7 @@ from marketbrief.pipeline.lessons.validation import check
 
 
 def main() -> int:
+    """Run `prepare`, `validate` or `add` of the reflection log and print the JSON summary."""
     parser = market_arg(__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
     prepare_parser = sub.add_parser("prepare", help="write the facts of settled calls without a lesson")

@@ -64,6 +64,7 @@ class HorizonReplay:
     """Replay of one horizon: the pooled outcomes, each ticker's frame and the optional ACI tracker."""
 
     def __init__(self, cfg: dict, ranges_config: dict, bars: dict, horizon: int, extra: dict, rank: dict):
+        """Prepare the pool of outcomes, the ticker frames, the quantiles and the ACI tracker."""
         self.cfg, self.ranges_config, self.horizon, self.extra, self.rank = cfg, ranges_config, horizon, extra, rank
         self.market_name = cfg["market"]
         self.use = {
@@ -214,6 +215,7 @@ class HorizonReplay:
         in_horizon, sigma_h, center = self.sigma_and_center(ticker, observation, context)
 
         def band(z_quantile):
+            """The price at a standardised quantile around the centre."""
             return base * math.exp(center + z_quantile * sigma_h)
 
         quantiles, levels = context.quantiles, context.levels

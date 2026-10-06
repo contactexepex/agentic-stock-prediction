@@ -46,29 +46,33 @@ from marketbrief.pipeline.review.verdicts import confidence_advice, judge, prope
 def build(
     cfg: dict, ranges_config: dict, review_config: dict, con, week: str, history: bool = True
 ) -> tuple[dict, dict]:
+    """Build the review record and its data for one ISO week."""
     start, end = week_bounds(week)
     roll_start = end - timedelta(days=review_config["rolling_days"] - 1)
     ranges, calls = load_ranges(con, cfg, end), load_calls(con, end)
     windows = {"week": start, "rolling": roll_start, "all": date.min}
 
-    def win(frame, summary):
-        return frame[frame["target_date"] >= summary] if not frame.empty else frame
+    def win(frame, start_date):
+        """The rows of a frame whose target date is on or after the window start."""
+        return frame[frame["target_date"] >= start_date] if not frame.empty else frame
 
     review_data = {
         "partial_week": end >= utc_today(),
-        "ranges": {weight: by_horizon(win(ranges, summary), range_summary) for weight, summary in windows.items()},
-        "calls": {weight: by_horizon(win(calls, summary), call_summary) for weight, summary in windows.items()},
+        "ranges": {
+            window: by_horizon(win(ranges, start_date), range_summary) for window, start_date in windows.items()
+        },
+        "calls": {window: by_horizon(win(calls, start_date), call_summary) for window, start_date in windows.items()},
         "breakdowns": {
-            weight: {
-                "regime": breakdown(win(ranges, summary), "regime"),
-                "sector": breakdown(win(ranges, summary), "sector"),
-                "note": breakdown(win(ranges, summary), "tags"),
+            window: {
+                "regime": breakdown(win(ranges, start_date), "regime"),
+                "sector": breakdown(win(ranges, start_date), "sector"),
+                "note": breakdown(win(ranges, start_date), "tags"),
             }
-            for weight, summary in windows.items()
+            for window, start_date in windows.items()
         },
         "bands": {
-            weight: confidence_bands(win(calls, summary), review_config["confidence_bands"])
-            for weight, summary in windows.items()
+            window: confidence_bands(win(calls, start_date), review_config["confidence_bands"])
+            for window, start_date in windows.items()
         },
     }
     cal = con.execute(
@@ -90,7 +94,7 @@ def build(
         judge(ablation, review_config)
     review_data["proposals"] = proposals(ranges_config, review_data["live_ablation"], review_data["history_ablation"])
     review_data["scores"] = {
-        weight: proper_scores(win(ranges, summary), win(calls, summary)) for weight, summary in windows.items()
+        window: proper_scores(win(ranges, start_date), win(calls, start_date)) for window, start_date in windows.items()
     }
     review_data["aci"] = aci_state(con, ranges_config, end)
     review_data["aci"]["replay"] = latest_aci_replay(con, end, ranges_config)
@@ -135,6 +139,7 @@ def build(
 
 
 def main() -> int:
+    """Write the weekly review (markdown and stored record) and print its summary."""
     parser = market_arg(__doc__)
     parser.add_argument("--week", help="ISO week to review, e.g. 2026-W40 (default: the previous ISO week)")
     parser.add_argument("--if-due", action="store_true", help="do nothing if this week's review is already stored")

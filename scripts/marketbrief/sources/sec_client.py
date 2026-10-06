@@ -36,6 +36,7 @@ class Edgar(HttpClient):
     MB_SEC_FIXTURES=<dir> the URLs in <dir>/urls.json are served from files instead of the network."""
 
     def __init__(self, ua: str):
+        """An SEC EDGAR client with the contact user agent."""
         policy = HttpPolicy(timeout=SEC_TIMEOUT_SECONDS, attempts=SEC_ATTEMPTS, min_interval=SEC_MIN_INTERVAL_SECONDS,
                             retry_wait=sec_retry_wait, retry_statuses=SEC_RETRY_STATUSES, count_attempts=False)
         super().__init__(policy)

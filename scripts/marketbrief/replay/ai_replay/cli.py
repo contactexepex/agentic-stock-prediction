@@ -80,10 +80,12 @@ from marketbrief.replay.ai_replay.score import score
 
 
 def main() -> int:
+    """Run `dates`, `backfill`, `prepare`, `record` or `score` and print the JSON result."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     def add(name: str, help_: str) -> argparse.ArgumentParser:
+        """Add a subcommand that takes `--market`."""
         subparser = sub.add_parser(name, help=help_)
         subparser.add_argument("--market", default=os.environ.get("MB_MARKET"), help=f"one of {market_names()}")
         return subparser

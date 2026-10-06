@@ -68,6 +68,7 @@ def decompose(row, ranges_config: dict) -> dict | None:
 
 
 def replay_range(comp: dict, params: dict) -> dict:
+    """Rebuild one stored range under changed settings and score it on its outcome."""
     daily_sigma, horizon = comp["sd"], comp["h"]
     var = daily_sigma * daily_sigma * horizon + (
         (params["earnings_vol_multiple"] ** 2 - 1) * daily_sigma * daily_sigma if comp["earnings"] else 0.0
@@ -95,6 +96,7 @@ def replay_range(comp: dict, params: dict) -> dict:
 
 
 def replay_summary(res: pd.DataFrame) -> dict:
+    """Coverage, width and score of the replayed live ranges."""
     if res.empty:
         return {"n": 0}
     means = res.mean(numeric_only=True)
@@ -109,10 +111,12 @@ def replay_summary(res: pd.DataFrame) -> dict:
 
 
 def per_horizon(res: pd.DataFrame, horizons) -> dict:
+    """The replay summary of each horizon."""
     return {f"{horizon}d": replay_summary(res[res["horizon_days"] == horizon]) for horizon in horizons if not res.empty}
 
 
 def live_ablation(frame: pd.DataFrame, ranges_config: dict, review_config: dict) -> dict:
+    """Ablation (a): the stored live ranges replayed with each variant of the config."""
     comps = (
         [
             component

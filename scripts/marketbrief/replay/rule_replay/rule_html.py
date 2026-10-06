@@ -10,6 +10,7 @@ from marketbrief.replay.rule_replay.rule_charts import svg_calibration, svg_regi
 
 
 def range_table(groups: dict, label: str) -> str:
+    """A coverage table of grouped range summaries for 1 and 5 days."""
     rows = []
     for key, (one_day, five_day) in groups.items():
         cells = [esc(key)]
@@ -50,11 +51,13 @@ def score_cell(stats: dict, field: str) -> str:
 
 
 def html_report(cfg: dict, stats: dict) -> str:
+    """The replay's self-contained HTML page."""
     by_horizon = stats["horizons"]
     one_day, five_day = by_horizon.get("1", {}).get("overall", {}), by_horizon.get("5", {}).get("overall", {})
     always_up = {horizon: (stats["baselines"].get(horizon) or {}).get("always_up", {}) for horizon in ("1", "5")}
 
     def tile(label, value, confidence_interval, note):
+        """A tile with a value, its 95% interval and a note."""
         span = (
             ""
             if not confidence_interval or confidence_interval[0] is None
@@ -102,6 +105,7 @@ def html_report(cfg: dict, stats: dict) -> str:
     summary = "".join(f"<li>{esc(item)}</li>" for item in stats["summary"])
 
     def pair(key):
+        """The 1-day and 5-day summaries of each group of a section."""
         one_day_groups, five_day_groups = by_horizon.get("1", {}).get(key, {}), by_horizon.get("5", {}).get(key, {})
         return {
             group_name: (one_day_groups.get(group_name), five_day_groups.get(group_name))

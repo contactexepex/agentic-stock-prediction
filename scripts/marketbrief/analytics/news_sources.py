@@ -31,6 +31,7 @@ class Sources:
     """The settings of config/news_sources.yaml with lookups by host, label and wire name."""
 
     def __init__(self, cfg: dict):
+        """The news-source rules of a market config."""
         self.cfg = cfg
         self.sel = cfg.get("selection") or {}
         self.clusters = cfg.get("clusters") or {}

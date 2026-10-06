@@ -172,6 +172,7 @@ def range_row(ctx: RangeContext, hc: HorizonContext, t: str) -> dict | None:
     base, q = parts.base, hc.q
 
     def band(zq: float) -> float:
+        """A band edge: the base close moved by the centre and a standardised quantile, rounded."""
         return round(base * math.exp(parts.center + zq * parts.sigma_h), ROUND_PRICE)
 
     close = ctx.bars[t]["close"] if t in ctx.bars else None

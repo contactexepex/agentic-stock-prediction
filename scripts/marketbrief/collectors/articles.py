@@ -67,6 +67,7 @@ class ArticleRun:
     """One run: classify the candidates (skip, copy, read), then read the pages in batches."""
 
     def __init__(self, cfg: dict, src, now: pd.Timestamp):
+        """The article collector's config, source and clock."""
         self.cfg, self.src, self.now = cfg, src, now
         self.market, self.selection = cfg[CFG_MARKET], src.sel
         self.started = time.monotonic()

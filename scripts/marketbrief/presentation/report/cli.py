@@ -23,6 +23,7 @@ from marketbrief.presentation.report.gather import gather
 
 
 def main() -> int:
+    """Write the report skeleton and the Slack draft and print their paths."""
     parser = market_arg(__doc__)
     parser.add_argument(
         "--force", action="store_true", help="rebuild the report even if today's report was already filled in"

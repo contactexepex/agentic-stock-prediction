@@ -25,6 +25,7 @@ DEFAULTS = {"enabled": False, "gamma": 0.01, "max_shift": 0.15, "min_history": 2
 
 
 def settings(rc: dict) -> dict:
+    """The ACI settings: the defaults overridden by `aci:` in the ranges config."""
     return {**DEFAULTS, **(rc.get("aci") or {})}
 
 
@@ -59,14 +60,17 @@ class Tracker:
     """Running ACI state per (horizon, band, key); key = regime label when by_regime, else 'all'."""
 
     def __init__(self, rc: dict):
+        """Start with no alphas or step counts (an alpha starts at its target miss rate)."""
         self.s = settings(rc)
         self.alpha: dict[tuple, float] = {}
         self.steps: dict[tuple, int] = {}
 
     def key(self, regime: str | None) -> str:
+        """The alpha key of a regime (one per regime, or `all`)."""
         return (regime or "all") if self.s["by_regime"] else "all"
 
     def update(self, h: int, band: str, key: str, err: float) -> None:
+        """Move one band's alpha by one ACI step from the observed miss rate."""
         target = TARGET[band]
         k = (int(h), band, key)
         lo, hi = clamps(target, self.s["max_shift"])
@@ -101,6 +105,7 @@ class Tracker:
                     self.update(int(h), band, key, 1.0 - float(s[f"hit{band}"].astype(float).mean()))
 
     def snapshot(self) -> list[dict]:
+        """The current alphas of every horizon, band and key."""
         out = []
         for (h, band, key), a in sorted(self.alpha.items()):
             target = TARGET[band]

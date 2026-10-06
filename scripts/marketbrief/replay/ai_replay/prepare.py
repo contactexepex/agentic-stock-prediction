@@ -68,6 +68,7 @@ def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     allow_training_period: bool = False,
     assume_earnings_days: int = 0,
 ) -> dict:
+    """Build the as-of scratch root with its context pack and ranges for one past day."""
     market = cfg["market"]
     src = Path(src or paths.ROOT)
     model_cut = training_cutoff()
@@ -182,6 +183,7 @@ def upcoming(root: Path, market: str, as_of_day: date) -> dict:
 
 
 def limitations(copied: dict, counts: dict) -> list[str]:
+    """What the replay cannot reproduce for the prepared day."""
     key = copied["kinds"]
     out = [
         f"No news: stored news starts {copied['first_news_file']} (live collection only), so the news-analyst "

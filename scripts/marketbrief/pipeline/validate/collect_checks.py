@@ -56,6 +56,7 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
 
 
 def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict):
+    """No duplicated ids (or unique keys) in the stored kinds."""
     keys = {kind: "id" for kind in validate_config["unique_id_kinds"]} | dict(validate_config.get("unique_keys") or {})
     for kind, key in keys.items():
         if kind not in schemas.SCHEMAS:
@@ -110,6 +111,7 @@ def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_c
 
 
 def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: dict):
+    """Every watchlist ticker has a bar for the last completed session; closes are positive."""
     need = date.fromisoformat(run_status["previous_session"])
     last = dict(con.execute("SELECT ticker, max(date) FROM bars GROUP BY 1").fetchall())
     missing = [ticker for ticker in cfg["tickers"] if ticker not in last]
@@ -156,6 +158,7 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
 
 
 def corporate_action_near(con, ticker: str, day: date, validate_config: dict) -> bool:
+    """True when a split or corporate-action event is stored near the day."""
     window_start, window_end = (
         day - timedelta(days=validate_config["big_move_event_days"]),
         day + timedelta(days=validate_config["big_move_event_days"]),
@@ -180,6 +183,7 @@ def corporate_action_near(con, ticker: str, day: date, validate_config: dict) ->
 
 
 def fetch_kinds(cfg: dict) -> list[str]:
+    """The kinds whose fetch time must be recent for this market."""
     kinds = ["quotes", "news"]
     if cfg.get("filings") == "sec":
         kinds.append("filings")
@@ -189,6 +193,7 @@ def fetch_kinds(cfg: dict) -> list[str]:
 
 
 def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, validate_config: dict):
+    """The newest fetch of each source is recent enough."""
     for kind in fetch_kinds(cfg):
         col = FETCH_COL[kind]
         newest = con.execute(f"SELECT max({col}) FROM {kind}").fetchone()[0]

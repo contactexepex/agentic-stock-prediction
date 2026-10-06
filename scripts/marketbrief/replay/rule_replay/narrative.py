@@ -7,12 +7,13 @@ from marketbrief.utils.numbers import share_percent_text
 from marketbrief.constants.replay import LIMITATIONS, SIGNALS
 
 
-def pct(share, key: int = 0) -> str:
+def pct(share, decimals: int = 0) -> str:
     """A share as a whole percent by default (`k` decimals when given); 'n/a' when missing."""
-    return share_percent_text(share, key)
+    return share_percent_text(share, decimals)
 
 
 def headline(_cfg: dict, summary: dict) -> list[str]:
+    """The summary lines of a replay: coverage, accuracy, regimes, tickers and baselines."""
     lines = []
     for horizon, horizon_summary in summary["horizons"].items():
         overall = horizon_summary["overall"]
@@ -179,6 +180,7 @@ def top_sentences(summary: dict) -> list[str]:
 
 
 def limitations(cfg: dict, ranges_config: dict, summary: dict) -> list[str]:
+    """What the replay cannot reproduce, plus warnings for switched-on inputs."""
     market, out = cfg["market"], list(LIMITATIONS)
     index_cue = cfg.get("index_cue") or {}
     if index_cue.get("symbol") and range_switches.enabled(ranges_config, "beta_split", market):

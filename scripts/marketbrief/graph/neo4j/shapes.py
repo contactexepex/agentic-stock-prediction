@@ -29,6 +29,7 @@ def clean(value):
 
 
 def base_row(row: dict, node_id: str, source_id, drop: tuple = ()) -> dict:
+    """The common row shape: id, source id, recorded time and cleaned properties."""
     props = {key: clean(value) for key, value in row.items() if key not in ("id", "_ts") + drop}
     return {
         "id": node_id,
@@ -39,14 +40,17 @@ def base_row(row: dict, node_id: str, source_id, drop: tuple = ()) -> dict:
 
 
 def company_id(market: str, ticker: str | None) -> str:
+    """The Neo4j id of a company."""
     return f"{market}:{ticker}"
 
 
 def holder_id(market: str, cik, name) -> str:
+    """The Neo4j id of a holder by CIK or normalised name."""
     return f"{market}:cik:{cik}" if cik else f"{market}:name:{slugify_with_unknown_fallback(name)}"
 
 
 def shape_news(market: str, stored_row: dict) -> dict:
+    """A news row as statement parameters."""
     row = base_row(stored_row, f"{market}:{stored_row['id']}", stored_row["id"], drop=("day",))
     row["props"]["outlet"] = row["props"].pop("source", None)
     row["tickers"], row["day"] = row["props"].get("tickers") or [], clean(stored_row.get("day"))
@@ -58,18 +62,21 @@ def shape_news(market: str, stored_row: dict) -> dict:
 
 
 def shape_source(market: str, stored_row: dict) -> dict:
+    """A filing or announcement row as statement parameters."""
     row = base_row(stored_row, f"{market}:{stored_row['id']}", stored_row["id"])
     row["ticker"], row["company_id"] = stored_row.get("ticker"), company_id(market, stored_row.get("ticker"))
     return row
 
 
 def shape_event(market: str, stored_row: dict) -> dict:
+    """An event row as statement parameters."""
     row = base_row(stored_row, f"{market}:{stored_row['id']}", stored_row["id"])
     row["ticker"], row["company_id"] = stored_row.get("ticker"), company_id(market, stored_row.get("ticker"))
     return row
 
 
 def shape_insider(market: str, stored_row: dict) -> dict:
+    """An insider trade as statement parameters (holder, company, person flag)."""
     row = base_row(
         stored_row, f"{market}:insider:{stored_row['id']}", stored_row["id"], drop=("holder_name", "holder_cik")
     )
@@ -92,6 +99,7 @@ def shape_insider(market: str, stored_row: dict) -> dict:
 
 
 def shape_deal(market: str, stored_row: dict) -> dict:
+    """A bulk or block deal as statement parameters."""
     row = base_row(stored_row, f"{market}:deal:{stored_row['id']}", stored_row["id"])
     side = str(stored_row.get("side") or "").lower()
     row.update(
@@ -111,6 +119,7 @@ def shape_deal(market: str, stored_row: dict) -> dict:
 
 
 def shape_stake(market: str, stored_row: dict) -> dict:
+    """A 13D/13G stake as statement parameters."""
     row = base_row(stored_row, f"{market}:stake:{stored_row['id']}", stored_row["id"])
     row.update(
         ticker=stored_row["ticker"],
@@ -126,6 +135,7 @@ def shape_stake(market: str, stored_row: dict) -> dict:
 
 
 def shape_13f(market: str, stored_row: dict) -> dict:
+    """A 13F holding as statement parameters."""
     key = f"{stored_row['filer_cik']}|{stored_row['ticker']}|{clean(stored_row['period'])}"
     row = base_row(stored_row, f"{market}:13f:{key}", stored_row["id"], drop=("filer_name",))
     row.update(
@@ -142,6 +152,7 @@ def shape_13f(market: str, stored_row: dict) -> dict:
 
 
 def shape_shareholding(market: str, stored_row: dict) -> dict:
+    """A promoter or pledge shareholding row as statement parameters."""
     key = f"{stored_row['ticker']}|{clean(stored_row['period_end'])}"
     row = base_row(stored_row, f"{market}:shp:{key}", ",".join(stored_row["source_ids"] or []))
     row.update(
@@ -158,6 +169,7 @@ def shape_shareholding(market: str, stored_row: dict) -> dict:
 
 
 def shape_graph(market: str, stored_row: dict) -> dict:
+    """A connection-map edge as statement parameters."""
     row = base_row(stored_row, stored_row["id"], stored_row["id"])
     row["id"] = f"{market}:graph:{stored_row['id']}"
     row.update(
@@ -175,6 +187,7 @@ def shape_graph(market: str, stored_row: dict) -> dict:
 
 
 def shape_prediction(market: str, stored_row: dict) -> dict:
+    """A prediction as statement parameters, with its cited evidence ids."""
     row = base_row(stored_row, f"{market}:{stored_row['id']}", stored_row["id"])
     row.update(
         ticker=stored_row["ticker"],
@@ -189,6 +202,7 @@ def shape_prediction(market: str, stored_row: dict) -> dict:
 
 
 def shape_outcome(market: str, stored_row: dict) -> dict:
+    """A call outcome as statement parameters."""
     row = base_row(stored_row, f"{market}:call:{stored_row['prediction_id']}", stored_row["prediction_id"])
     row["props"]["kind"] = "call"
     row["parent_id"], row["parent_record"] = f"{market}:{stored_row['prediction_id']}", stored_row["prediction_id"]
@@ -196,6 +210,7 @@ def shape_outcome(market: str, stored_row: dict) -> dict:
 
 
 def shape_range(market: str, stored_row: dict) -> dict:
+    """A published range as statement parameters."""
     row = base_row(stored_row, f"{market}:{stored_row['id']}", stored_row["id"])
     row.update(
         ticker=stored_row["ticker"],
@@ -206,6 +221,7 @@ def shape_range(market: str, stored_row: dict) -> dict:
 
 
 def shape_range_outcome(market: str, stored_row: dict) -> dict:
+    """A range outcome as statement parameters."""
     row = base_row(stored_row, f"{market}:range:{stored_row['range_id']}", stored_row["range_id"])
     row["props"]["kind"] = "range"
     row["parent_id"], row["parent_record"] = f"{market}:{stored_row['range_id']}", stored_row["range_id"]
@@ -213,7 +229,9 @@ def shape_range_outcome(market: str, stored_row: dict) -> dict:
 
 
 def shape_market_day(key_fields: tuple) -> Callable[[str, dict], dict]:
+    """A shaper for market-level day rows keyed by the given fields."""
     def shape(market: str, row: dict) -> dict:
+        """One market-day row as statement parameters."""
         key = ":".join(str(clean(row.get(field))) for field in key_fields)
         return base_row(row, f"{market}:{key}", row.get("id") or key)
 
@@ -221,12 +239,14 @@ def shape_market_day(key_fields: tuple) -> Callable[[str, dict], dict]:
 
 
 def shape_feature(market: str, stored_row: dict) -> dict:
+    """A feature row as statement parameters."""
     row = base_row(stored_row, f"{market}:{stored_row['ticker']}:{clean(stored_row['as_of_date'])}", stored_row["id"])
     row.update(ticker=stored_row["ticker"], company_id=company_id(market, stored_row["ticker"]))
     return row
 
 
 def shape_fundamentals(market: str, stored_row: dict) -> dict:
+    """A fundamentals metrics row as statement parameters."""
     key = f"{stored_row['ticker']}:sec:{clean(stored_row['period_end'])}"
     row = base_row(
         stored_row,
@@ -239,6 +259,7 @@ def shape_fundamentals(market: str, stored_row: dict) -> dict:
 
 
 def shape_financials(market: str, stored_row: dict) -> dict:
+    """An NSE financial results row as statement parameters."""
     key = (
         f"{stored_row['ticker']}:{stored_row.get('basis')}:{clean(stored_row.get('period_start'))}:"
         f"{clean(stored_row['period_end'])}"

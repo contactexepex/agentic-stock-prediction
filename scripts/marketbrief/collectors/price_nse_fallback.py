@@ -118,6 +118,7 @@ class NseBarFiller:
 
     def __init__(self, run: PriceRun, splits: dict[str, list[date]] | None = None,
                  recorded: set[str] | frozenset = frozenset(), held: set[str] | frozenset = frozenset()):
+        """The NSE fallback's run, known splits and recorded and held bars."""
         self.run, self.splits, self.recorded, self.held = run, splits or {}, recorded, held
         self.symbols = nse_symbols(run.cfg)
         self.filled: list[dict] = []

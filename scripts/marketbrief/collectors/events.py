@@ -85,6 +85,7 @@ class StoredHistory:
     """What the stored events say: ids seen, past earnings dates per ticker (all sources, NSE's), dividend counts."""
 
     def __init__(self, stored: list[dict]):
+        """The stored events (to skip ids already seen) or the Yahoo collector's config."""
         self.seen = {row[COL_ID] for row in stored}
         self.earnings: dict[str, list[date]] = {}
         self.nse_dates: dict[str, list[date]] = {}
@@ -103,6 +104,7 @@ class EventsCollector:
     past earnings dates, merged into new event rows."""
 
     def __init__(self, cfg: dict, yf, no_history: bool, history_days: int):
+        """The stored events (to skip ids already seen) or the Yahoo collector's config."""
         self.cfg, self.yf, self.no_history = cfg, yf, no_history
         self.market, self.now, self.today = cfg[CFG_MARKET], utc_now(), utc_today()
         self.since = self.today - timedelta(days=history_days)

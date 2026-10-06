@@ -109,6 +109,7 @@ class OptionsCollector:
     """One run: a snapshot per near expiry of every watchlist ticker."""
 
     def __init__(self, cfg: dict, yf, expiries: int, max_days: int):
+        """The option collector's config, Yahoo client and limits."""
         self.cfg, self.yf, self.expiries, self.max_days = cfg, yf, expiries, max_days
         self.market, self.now, self.today = cfg[CFG_MARKET], utc_now(), utc_today()
         self.seen = recent_ids(self.market, KIND_OPTIONS, days=SEEN_LOOKBACK_DAYS)

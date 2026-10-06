@@ -23,11 +23,13 @@ from marketbrief.constants.validation import (
 
 
 def kind_files(market: str, kind: str) -> list[Path]:
+    """The day files of one kind, oldest first."""
     ext = schemas.SCHEMAS[kind][0]
     return sorted((paths.data_dir(market) / kind).glob(f"**/*.{ext}"))
 
 
 def file_day(path: Path) -> date | None:
+    """The date a day file is named after, or None."""
     try:
         return date.fromisoformat(path.stem[:10])
     except ValueError:
@@ -159,4 +161,5 @@ def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, to
 
 
 def tickers_in(rows: list[dict]) -> list[str]:
+    """The tickers named in rows."""
     return [str(row.get("ticker")) for row in rows if row.get("ticker")]

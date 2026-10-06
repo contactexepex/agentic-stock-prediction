@@ -22,12 +22,14 @@ from marketbrief.constants.ai_replay import (
 
 
 def store_dir(results: Path, market: str) -> Path:
+    """The results folder of a market (created when missing)."""
     directory = Path(results) / market
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
 
 def read_jsonl(path: Path) -> list[dict]:
+    """The rows of a JSONL file, or an empty list when it is missing."""
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -82,6 +84,7 @@ def validate(rec, ctx: dict, as_of_day: date, seen: set[str]) -> list[str]:
 
 
 def record(cfg: dict, as_of_day: date, root: Path, calls_file: Path, results: Path) -> dict:
+    """Validate the forecaster's calls and store the valid ones with the day's record."""
     market = cfg["market"]
     ctx = replay_context(cfg, root, as_of_day)
     store_directory = store_dir(results, market)

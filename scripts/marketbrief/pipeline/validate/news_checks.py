@@ -20,6 +20,7 @@ from marketbrief.constants.validation import (
 
 
 def registrable(host: str) -> str:
+    """The registrable domain (last two labels) of a host name."""
     parts = host.lower().split(".")
     if len(parts) >= 3 and len(parts[-1]) == 2 and parts[-2] in ("co", "com", "net", "org", "gov", "ac", "edu"):
         return ".".join(parts[-3:])
@@ -41,6 +42,7 @@ def allowed_news_sources(cfg: dict) -> tuple[set[str], dict[str, set[str]]]:
 
 
 def check_news_sources(res: Result, cfg: dict, con, today: date):
+    """Today's news rows come from allow-listed sources."""
     gdom, outlets = allowed_news_sources(cfg)
     rows = con.execute(
         "SELECT id, url, feed, tickers FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]
@@ -135,6 +137,7 @@ def enrichment_rule_problems(row: dict) -> list[str]:
 def stage_news(  # noqa: PLR0913 (uniform stage signature)
     res, _cfg, con, _status, now, today, validate_config, path: Path | None = None
 ):
+    """News stage: the news analyst's enrichment file against the rules."""
     path = path or work_dir() / "enriched.jsonl"
     if not path.exists():
         res.info["news"] = "no work/enriched.jsonl"

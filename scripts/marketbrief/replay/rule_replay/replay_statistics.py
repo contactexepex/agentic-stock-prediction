@@ -20,6 +20,7 @@ def binom_p_two_sided(hits: int, trials: int, probability: float = 0.5) -> float
         return None
 
     def log_probability(index):
+        """The log of the binomial probability of `index` successes."""
         return (
             math.lgamma(trials + 1)
             - math.lgamma(index + 1)
@@ -50,6 +51,7 @@ def clustered_ci(values: np.ndarray, blocks: np.ndarray, z_critical: float = 1.9
 
 
 def range_summary(group: pd.DataFrame, horizon: int) -> dict:
+    """Coverage, width, scores and naive baseline of the scored rows."""
     group = group[group["actual"].notna()] if "actual" in group.columns else group.iloc[0:0]
     if group.empty:
         return {"n": 0}
@@ -86,6 +88,7 @@ def range_summary(group: pd.DataFrame, horizon: int) -> dict:
 
 
 def calibration(group: pd.DataFrame) -> list[dict]:
+    """Stated against actual coverage over the levels of the calibration curve."""
     group = group[group["actual"].notna()] if "actual" in group.columns else group.iloc[0:0]
     if group.empty:
         return []
@@ -157,6 +160,7 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
 
 
 def summarize(cfg: dict, _ranges_config: dict, res: dict[int, pd.DataFrame], reg: pd.DataFrame) -> dict:
+    """The statistics of a replay: by horizon, regime, sector, ticker, month, year and baselines."""
     sector = {ticker: metadata.get("sector") or "Other" for ticker, metadata in cfg["tickers"].items()}
     out = {"horizons": {}, "baselines": {}}
     for horizon, group in res.items():

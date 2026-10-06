@@ -70,6 +70,7 @@ def statements_by_cluster(con, cluster_ids: list[str], now: pd.Timestamp) -> dic
 
 
 def state_hash(row: dict) -> str:
+    """A hash of the fields that define a status row's state."""
     return hashlib.sha1(json.dumps({k: row[k] for k in HASHED}, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
@@ -152,6 +153,7 @@ def run(cfg: dict) -> dict:
     order = {s: i for i, s in enumerate(STATUS_PRECEDENCE)}
 
     def counts(level: str) -> dict:
+        """The number of rows of each status at one level, in status precedence order."""
         found = Counter(r["status"] for r in current if r["level"] == level)
         return dict(sorted(found.items(), key=lambda kv: order[kv[0]]))
 

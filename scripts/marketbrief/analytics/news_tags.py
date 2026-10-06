@@ -167,6 +167,7 @@ class Tagger:
     """Tags news items with the watchlist tickers they name (see the module docstring)."""
 
     def __init__(self, watchlist: dict):
+        """Build the ticker patterns of a watchlist."""
         feeds = watchlist.get("news", {}) or {}
         wire_ex = _regex(feeds.get("wire_exclude") or [])
         self.rules: Rules = {}

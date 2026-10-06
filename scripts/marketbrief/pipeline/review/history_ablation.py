@@ -51,6 +51,7 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
 
 
 def hist_summary(res: pd.DataFrame) -> dict:
+    """Coverage, width and score of the walk-forward rows."""
     if res.empty:
         return {"n": 0}
     means = res.mean(numeric_only=True)
@@ -67,6 +68,7 @@ def hist_summary(res: pd.DataFrame) -> dict:
 
 
 def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: dict, week_end: date) -> dict:
+    """Ablation (b): the walk-forward on stored prices with each variant of the config."""
     bkey = benchmark_key(cfg)
     bars = {ticker: frame[frame.index <= pd.Timestamp(week_end)] for ticker, frame in bars.items()}
     if bkey not in bars or len(bars[bkey]) < ranges_config["warmup_bars"] + 30:
@@ -77,6 +79,7 @@ def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: 
     session_dates = [position.date() for position in dates]
 
     def major_in(date_position: int, horizon: int) -> bool:
+        """True when a major market event falls inside the horizon of a date position."""
         return date_position + horizon < len(session_dates) and major_event_between(
             majors, session_dates[date_position], session_dates[date_position + horizon]
         )

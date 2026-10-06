@@ -55,6 +55,7 @@ def evidence(market: str, root: Path, cutoff: datetime, days: int = EVIDENCE_DAY
 
 
 def evidence_section(ev_df: pd.DataFrame, cutoff: datetime, days: int = EVIDENCE_DAYS, limit: int = 200) -> str:
+    """The context pack's section listing the citable ids public before the cutoff."""
     since = pd.Timestamp(cutoff) - pd.Timedelta(days=days)
     frame = ev_df.assign(public_at=pd.to_datetime(ev_df["public_at"], utc=True))
     frame = frame[frame["public_at"] >= since].sort_values(["public_at", "id"], ascending=[False, True])

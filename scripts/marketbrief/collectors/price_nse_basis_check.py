@@ -38,6 +38,7 @@ class NseBasisCheck:
     """Confirms re-bases from NSE bhavcopies; `nse_getter` gives the run's one NSE client."""
 
     def __init__(self, run: PriceRun, nse_getter):
+        """The basis check's run and NSE getter, or a rebase claim and its cache."""
         self.run, self.nse_getter = run, nse_getter
         self.symbols = nse_symbols(run.cfg)
 
@@ -52,6 +53,7 @@ class _BasisScan:
     """One walk over the sessions after a re-based stored bar (bhavcopies cached for the walk)."""
 
     def __init__(self, check: NseBasisCheck, claim: RebaseClaim):
+        """The basis check's run and NSE getter, or a rebase claim and its cache."""
         self.check, self.claim, self.cache = check, claim, {}
 
     def bar(self, day: date) -> tuple[dict | None, str | None, str]:

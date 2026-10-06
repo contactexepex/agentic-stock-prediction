@@ -35,6 +35,7 @@ def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict, cutoff
 
 
 def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, label: str) -> dict:
+    """The scores of one leakage group: overall, by horizon, by band, abstention, per day."""
     frame = score_rows(cfg, calls, bars)
     scored = frame[frame["status"] == "scored"] if len(frame) else frame
     out = {
@@ -140,12 +141,13 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
     return out
 
 
-def pct(share, key: int = 1) -> str:
+def pct(share, decimals: int = 1) -> str:
     """A share as a percent with one decimal by default (`k` decimals when given); 'n/a' when missing."""
-    return share_percent_text(share, key)
+    return share_percent_text(share, decimals)
 
 
 def top_sentences(summary: dict) -> list[str]:
+    """The three plain-language answers at the top of a group's page."""
     overall, abstention = summary["overall"], summary["abstention"]["any"]
     if not overall.get("n"):
         return [

@@ -19,6 +19,7 @@ from marketbrief.constants.ai_replay import (
 
 
 def public_at(kind: str, row: dict) -> pd.Timestamp | None:
+    """When a row became public: the first available publication-time column."""
     for col in PUBLIC_AT.get(kind, []):
         if col.endswith("+1d"):
             timestamp = as_utc_timestamp(row.get(col[:-3]))
@@ -74,6 +75,7 @@ def keep_row(kind: str, row: dict, as_of_day: date, cutoff: pd.Timestamp, times:
 
 
 def rule_text(kind: str) -> str:
+    """The publication-time rule of a kind in words."""
     if kind in ("prices", "price_sources"):
         return "bar date <= D"
     if kind == "adjustments":
@@ -92,6 +94,7 @@ def rule_text(kind: str) -> str:
 def filter_jsonl_rows(
     text: str, kind: str, as_of_day: date, cutoff: pd.Timestamp, times: dict[str, str] | None = None
 ) -> tuple[list[str], int]:
+    """The JSONL lines public by the cutoff and the number of rows read."""
     kept, row_count = [], 0
     for line in text.splitlines():
         if not line.strip():
@@ -105,6 +108,7 @@ def filter_jsonl_rows(
 def filter_csv_rows(
     text: str, kind: str, as_of_day: date, cutoff: pd.Timestamp, times: dict[str, str] | None = None
 ) -> tuple[list[str], int]:
+    """The CSV lines (with header) public by the cutoff and the number of rows read."""
     lines = text.splitlines()
     if not lines:
         return [], 0
@@ -120,6 +124,7 @@ def filter_csv_rows(
 
 
 def earliest_news(src_market: Path) -> str | None:
+    """The date of the first stored news file, or None."""
     files = sorted((src_market / "news").glob("**/*.jsonl"))
     return files[0].stem if files else None
 

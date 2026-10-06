@@ -117,6 +117,7 @@ def score_ranges(cfg: dict, con, now: str) -> tuple[list[dict], int]:
 
 
 def main() -> int:
+    """Score open calls and ranges and print the summary with the proper scores."""
     cfg = require_market(market_arg(__doc__).parse_args())
     market = cfg["market"]
     con = connect(market)

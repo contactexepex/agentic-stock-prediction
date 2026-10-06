@@ -9,6 +9,7 @@ from marketbrief.replay.html_parts import esc, scaled_text
 
 
 def svg_calibration(summary: dict) -> str:
+    """Chart of stated against actual coverage."""
     width, height, left, right, top, bottom = 640, 360, 48, 16, 16, 40
     plot_width, plot_height = width - left - right, height - top - bottom
     scale_x = lambda tick: left + tick * plot_width  # noqa: E731
@@ -57,6 +58,7 @@ def svg_calibration(summary: dict) -> str:
 
 
 def svg_regime(summary: dict) -> str:
+    """Chart of the 80% coverage by regime."""
     regs = REGIME_ORDER
     width, height, left, right, top, bottom = 640, 300, 48, 16, 16, 44
     plot_width, plot_height = width - left - right, height - top - bottom
@@ -109,6 +111,7 @@ def svg_regime(summary: dict) -> str:
 
 
 def svg_time(summary: dict) -> str:
+    """Chart of the 80% coverage by month."""
     months = sorted(
         {
             month

@@ -50,6 +50,7 @@ class HttpClient:
     """Sends requests under an HttpPolicy; subclasses override the two failure hooks and read_response."""
 
     def __init__(self, policy: HttpPolicy, opener: urllib.request.OpenerDirector | None = None):
+        """An HTTP client with a policy and an optional opener."""
         self.policy, self.opener = policy, opener
         self.requests = 0
         self._last_attempt_started = 0.0

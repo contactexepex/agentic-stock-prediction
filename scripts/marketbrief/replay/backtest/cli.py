@@ -28,6 +28,7 @@ from marketbrief.replay.backtest.report import markdown, run
 
 
 def main() -> int:
+    """Run the backtest for one market, write the markdown report and print the summary."""
     parser = cli.market_arg(__doc__)
     parser.add_argument("--eval-sessions", type=int, default=250, help="trading days to evaluate (default 250)")
     parser.add_argument("--out", help="write the report here instead of reports/<market>/")

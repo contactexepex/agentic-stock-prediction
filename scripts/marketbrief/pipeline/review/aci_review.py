@@ -21,6 +21,7 @@ def aci_state(con, ranges_config: dict, week_end: date) -> dict:
 
 
 def same_aci_settings(stored: dict | None, ranges_config: dict) -> bool:
+    """True when a stored replay used the ACI settings of the ranges config."""
     cur = adaptive_conformal.settings(ranges_config)
     return bool(stored) and all(stored.get(key) == cur[key] for key in ACI_SETTING_KEYS)
 

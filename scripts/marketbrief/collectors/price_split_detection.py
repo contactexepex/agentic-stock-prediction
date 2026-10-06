@@ -64,6 +64,7 @@ class AdjustmentDetector:
     the NseBasisCheck (or None) that may confirm a re-base from NSE's bhavcopies."""
 
     def __init__(self, run: PriceRun, adjustments: list[dict], nse_check=None):
+        """The split detector's run, stored adjustments and NSE check."""
         self.run, self.adjustments, self.nse_check = run, adjustments, nse_check
 
     def stored_closes(self, key: str, yahoo_closes: dict[date, float]) -> dict[date, float]:

@@ -19,6 +19,7 @@ class DisjointSets:
     """Union-find over 0..n-1; the smallest index is the root."""
 
     def __init__(self, n: int):
+        """A union-find over n items, each in its own set."""
         self.p = list(range(n))
 
     def find(self, i: int) -> int:

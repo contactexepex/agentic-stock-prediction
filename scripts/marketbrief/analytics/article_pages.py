@@ -59,6 +59,7 @@ class FetchResult:
     requests made and why the URL was skipped (never requested)."""
 
     def __init__(self, status=None, final_url=None, html=None, error=None, requests=0, skipped=None):
+        """A fetched article page: status, final URL, HTML, error and request count."""
         self.status, self.final_url, self.html, self.error = status, final_url, html, error
         self.requests, self.skipped = requests, skipped
 

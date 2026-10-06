@@ -83,6 +83,7 @@ def copy_test(items: list[dict], cl: dict):
     min_shingles = int(cl.get("min_shingles", DEFAULT_MIN_SHINGLES))
 
     def copies(i: int, j: int) -> bool:
+        """True when the article texts of two items are copies (MinHash containment)."""
         a, b = items[i]["article"] or {}, items[j]["article"] or {}
         if (a.get("shingle_count") or 0) < min_shingles or (b.get("shingle_count") or 0) < min_shingles:
             return False

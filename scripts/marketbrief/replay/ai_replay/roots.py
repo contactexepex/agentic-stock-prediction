@@ -51,6 +51,7 @@ def run_script(
 
 
 def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout: Path | None = None) -> str:
+    """Run a script on the scratch root and return its stdout (exit on failure)."""
     process = run_script(script, root, market, *args, now=now)
     if process.returncode != 0:
         raise SystemExit(
@@ -65,6 +66,7 @@ def run_step(script: str, root: Path, market: str, now: str, *args: str, stdout:
 
 
 def json_or_text(text: str):
+    """Parse JSON, else return the last 2000 characters of the text."""
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -72,6 +74,7 @@ def json_or_text(text: str):
 
 
 def check_root(root: Path, src: Path, force: bool) -> None:
+    """Refuse a scratch root that is, contains or lies inside the source root."""
     root, src = root.resolve(), src.resolve()
     if root == src or src in root.parents and (src / "data") in [root, *root.parents]:
         raise SystemExit(MSG_ROOT_MUST_NOT_BE_THE_SOURCE.format(root=root))

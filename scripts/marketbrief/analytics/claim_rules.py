@@ -55,6 +55,7 @@ def claim_id(rec: dict) -> str:
 
 
 def _is_number(value) -> bool:
+    """True for an int or float that is not a bool."""
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 

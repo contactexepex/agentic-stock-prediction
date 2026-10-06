@@ -64,10 +64,12 @@ MIN_NAME = 3  # shorter names/aliases are never matched against headlines
 
 
 def edge_id(ticker: str, relation: str, target: str) -> str:
+    """The stable id of an edge from ticker, relation and target."""
     return f"{ticker}|{relation}|{slugify(target)}"
 
 
 def load_edges(con, ticker: str | None = None) -> list[dict]:
+    """The latest version of every stored edge, optionally of one ticker."""
     sql = "SELECT * FROM graph_edges" + (" WHERE ticker = ?" if ticker else "") + " ORDER BY ticker, relation, target"
     cur = con.execute(sql, [ticker] if ticker else [])
     cols = [column[0] for column in cur.description]
@@ -195,6 +197,7 @@ def same_value(first, second) -> bool:
 
 
 def status(cfg: dict, con) -> dict:
+    """Edge counts and ticker coverage of the connection map."""
     edges = load_edges(con)
     last = con.execute("SELECT max(added_at) FROM graph").fetchone()[0]
     last_run = con.execute("SELECT max(run_at) FROM graph_runs").fetchone()[0]
@@ -232,6 +235,7 @@ def attempt(cfg: dict, con, note: str | None = None) -> dict:
 
 
 def name_patterns(edges: list[dict]) -> list[tuple[dict, re.Pattern]]:
+    """A compiled name pattern for each edge's target and aliases."""
     out = []
     for edge in edges:
         names = [name for name in {edge["target"], *(edge.get("aliases") or [])} if len(name) >= MIN_NAME]
@@ -317,6 +321,7 @@ def context_section(cfg: dict, con, days: int = 1, limit: int = 40) -> tuple[str
 
 
 def main() -> int:
+    """Run `status`, `edges`, `hits`, `add`, `check` or `attempt` of the connection map."""
     parser = market_arg(__doc__)
     parser.add_argument("command", choices=["status", "edges", "hits", "check", "add", "attempt"])
     parser.add_argument("--note", help="short note for `attempt`, e.g. tickers that could not be sourced")

@@ -14,6 +14,7 @@ from marketbrief.constants.ai_replay import MSG_NOTHING_RECORDED_IN
 
 
 def score(cfg: dict, results: Path, out: Path) -> dict:
+    """Score the recorded calls on the real closes and write the HTML page and JSON."""
     store_directory = Path(results) / cfg["market"]
     calls, days = read_jsonl(store_directory / "calls.jsonl"), read_jsonl(store_directory / "days.jsonl")
     if not days:

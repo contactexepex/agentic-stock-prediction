@@ -49,6 +49,7 @@ from marketbrief.graph.neo4j.statements import (
 
 @dataclass
 class Kind:
+    """One projected kind: read query, shaper, statements and whether it syncs incrementally."""
     name: str
     sql: str | None  # rows come from DuckDB (must expose _ts) ...
     statements: list[tuple[str, Callable[[dict], bool] | None]]
@@ -59,6 +60,7 @@ class Kind:
 
 # config: Market, Sector, Company
 def config_rows(cfg: dict, _con, _since) -> list[dict]:
+    """The company and sector rows from the market config."""
     market, src = cfg["market"], f"config/markets/{cfg['market']}.yaml"
     rows = [
         {
@@ -93,6 +95,7 @@ def config_rows(cfg: dict, _con, _since) -> list[dict]:
 
 
 def events_current_rows(cfg: dict, con, _since) -> list[dict]:
+    """The ids of the current company events (to drop the ones no longer scheduled)."""
     ids = [row[0] for row in con.execute("SELECT id FROM company_events ORDER BY id").fetchall()]
     return [{"id": f"{cfg['market']}:events_current", "ids": ids, "source_id": "company_events", "recorded_at": None}]
 

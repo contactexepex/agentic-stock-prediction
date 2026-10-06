@@ -150,11 +150,13 @@ def skeletons(cfg: dict, session: str) -> tuple[str | None, str | None]:
 
 
 def agent_lines(filled: str, skeleton: str) -> list[str]:
+    """The lines of the filled report that the script-written skeleton does not have."""
     script = {line.strip() for line in skeleton.splitlines()}
     return [line for line in filled.splitlines() if line.strip() and line.strip() not in script]
 
 
 def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
+    """Every ticker has a published range for the session or a stored skip reason."""
     from marketbrief.analytics.range_context import target_date
 
     ranges_config = market_config.load_ranges_config(cfg["market"])
@@ -201,12 +203,14 @@ def report_session(con, status: dict) -> str:
 
 
 def report_file(cfg: dict, con, status: dict) -> Path:
+    """The path of the session's daily report."""
     return paths.ROOT / "reports" / cfg["market"] / f"{report_session(con, status)}.md"
 
 
 def stage_report(  # noqa: PLR0913 (uniform stage signature)
     res, cfg, con, status, now, today, validate_config, report_path: Path | None = None, slack_path: Path | None = None
 ):
+    """Report stage: markers, data stamp and narrative numbers of the filled report."""
     session = report_session(con, status)
     report_path = report_path or report_file(cfg, con, status)
     slack_path = slack_path or work_dir() / f"slack_{cfg['market']}.md"

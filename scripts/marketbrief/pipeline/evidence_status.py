@@ -30,10 +30,12 @@ class EvidenceStatuses:
     """Status lookups on one DuckDB connection, cached per time."""
 
     def __init__(self, con):
+        """Keep the connection and an empty per-time cache."""
         self.con = con
         self._by_time: dict[str, tuple[dict[str, dict[str, str]], set[tuple[str, str]]]] = {}
 
     def _tables(self, when) -> tuple[dict[str, dict[str, str]], set[tuple[str, str]]]:
+        """The status table and the confirming (id, ticker) pairs as of a time, cached."""
         key = instant(when)
         if key not in self._by_time:
             table: dict[str, dict[str, str]] = {}

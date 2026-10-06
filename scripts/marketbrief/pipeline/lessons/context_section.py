@@ -23,6 +23,7 @@ def context_section(cfg: dict, con, per_ticker: int = 3, market_wide: int = 3) -
         return title, "_none_\n"
 
     def table(rows: pd.DataFrame) -> str:
+        """A markdown table of lesson rows."""
         out = [
             "| ticker | call | conf | result | return % | close vs range | lesson |",
             "|---|---|---|---|---|---|---|",

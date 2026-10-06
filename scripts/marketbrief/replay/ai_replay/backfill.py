@@ -86,6 +86,7 @@ def stored_by_month(market: str, root: Path, kinds) -> dict:
 
 
 def backfill(cfg: dict, source: Path, since: date, timeout: int = 3600) -> dict:
+    """Copy the market's data to a scratch source and run the collectors into it from `since`."""
     market = cfg["market"]
     if market not in BACKFILL_STEPS:
         raise SystemExit(MSG_NO_BACKFILL_STEPS_FOR_MARKET.format(market=market))

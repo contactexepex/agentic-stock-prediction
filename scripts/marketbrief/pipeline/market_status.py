@@ -20,6 +20,7 @@ from marketbrief.constants.pipeline_messages import MSG_NOW_NEEDS_A_UTC_OFFSET_E
 
 
 def status(cfg: dict, now: datetime) -> dict:
+    """Whether the market trades today, the session being predicted and the run's timing flags."""
     now = now.astimezone(ZoneInfo(cfg["timezone"]))
     today = now.date()
     session = calendar.next_session(cfg, today)
@@ -39,6 +40,7 @@ def status(cfg: dict, now: datetime) -> dict:
 
 
 def main() -> int:
+    """Print the market status as JSON."""
     parser = market_arg(__doc__)
     parser.add_argument("--now", help="evaluate at this ISO 8601 time with offset instead of now (testing)")
     args = parser.parse_args()

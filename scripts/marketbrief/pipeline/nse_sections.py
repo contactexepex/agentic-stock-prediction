@@ -11,6 +11,7 @@ from marketbrief.utils.markdown import cursor_markdown_table
 
 
 def _flows(con) -> str:
+    """The FII/DII flows section of the India context."""
     rows = con.execute("""
         WITH d AS (SELECT date, CASE WHEN category ILIKE 'FII%' THEN 'fii' ELSE 'dii' END AS who,
                           TRY_CAST(net_cr AS DECIMAL(38,10)) AS net_cr FROM flows_daily),
@@ -32,6 +33,7 @@ def _flows(con) -> str:
 
 
 def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
+    """The NSE announcement, results, delivery and flows sections."""
     if (cfg.get("relations") or {}).get("source") != "nse":
         return []
     tickers, today = list(cfg["tickers"]), utc_today()

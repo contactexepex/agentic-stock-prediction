@@ -40,10 +40,12 @@ CHECKLIST = [
 
 
 def seed(market: str, week: str) -> int:
+    """The sampling seed of a market and ISO week."""
     return int.from_bytes(f"{market}:{week}".encode(), "big") % (2**32)
 
 
 def done(con, week: str) -> bool:
+    """True when a spot-check verdict for the week is already stored."""
     return bool(
         con.execute(
             "SELECT count(*) FROM judgments WHERE agent = 'spotcheck' AND id LIKE ?", [f"%-spotcheck-{week}-%"]
@@ -52,6 +54,7 @@ def done(con, week: str) -> bool:
 
 
 def evidence_rows(con, ids: list[str]) -> list[dict]:
+    """The stored rows of the evidence ids a sampled call cites."""
     out = []
     for kind, sql in (
         (
@@ -98,6 +101,7 @@ def evidence_rows(con, ids: list[str]) -> list[dict]:
 
 
 def sample(cfg: dict, week: str) -> dict:
+    """The deterministic sample of the week's forecasts and filled report."""
     market = cfg["market"]
     con = connect(market)
     start, end = week_bounds(week)
@@ -140,6 +144,7 @@ def sample(cfg: dict, week: str) -> dict:
 
 
 def main() -> int:
+    """Print the weekly spot-check sample, checklist and judgments record."""
     parser = market_arg(__doc__)
     parser.add_argument("--if-due", action="store_true", help="do nothing if this week's spot-check verdict is stored")
     parser.add_argument("--week", help="ISO week to sample, e.g. 2026-W40 (default: the previous ISO week)")

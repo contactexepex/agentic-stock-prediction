@@ -30,10 +30,12 @@ HEADER = ("| ticker | event | status | verified origins | unread vetted | primar
 
 
 def _short_time(value) -> str:
+    """A timestamp as a short text, empty when missing."""
     return "" if value is None or pd.isna(value) else pd.Timestamp(value).tz_convert("UTC").strftime("%Y-%m-%d %H:%M")
 
 
 def _conflicts(raw) -> str:
+    """The conflicting statements of an event as a short text."""
     rows = json.loads(raw) if isinstance(raw, str) else raw or []
     return " vs ".join(f"{r['value']:g} {r['unit']}" + (" (primary)" if r.get("primary") else "") for r in rows)
 

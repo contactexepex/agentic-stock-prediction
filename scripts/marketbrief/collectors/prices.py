@@ -81,6 +81,7 @@ class PriceCollector:
     """One prices run: fetch each symbol's Yahoo frame, check splits, write the new bars, run the NSE fallback."""
 
     def __init__(self, cfg: dict, period: str):
+        """The price collector's config and download period."""
         self.cfg, self.period = cfg, period
         self.run = PriceRun(cfg, utc_today(), utc_now())
         self.targets = {**{key: meta[META_YAHOO] for key, meta in cfg[CFG_SYMBOLS].items()},

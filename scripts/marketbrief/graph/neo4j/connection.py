@@ -24,6 +24,7 @@ def default_database(uri: str | None) -> str:
 
 
 def client_from_env() -> Neo4jClient | None:
+    """The Neo4j HTTP client from the environment, or None when it is not configured."""
     uri = os.environ.get("NEO4J_URI")
     base = os.environ.get("NEO4J_QUERY_URL")
     if not uri and not base:
@@ -44,12 +45,14 @@ class DryRunSink:
     """Writes each statement and its parameters to work/neo4j_dryrun/<market>/NNNN-<name>.json."""
 
     def __init__(self, out_dir: Path):
+        """Write the dry-run statements into an empty output folder."""
         if out_dir.exists():
             shutil.rmtree(out_dir)
         out_dir.mkdir(parents=True)
         self.dir, self.n = out_dir, 0
 
     def run(self, statement: str, parameters: dict | None = None, name: str = "statement") -> dict:
+        """Save one statement and its parameters instead of sending them."""
         self.n += 1
         path = self.dir / f"{self.n:04d}-{name}.json"
         path.write_text(
@@ -59,10 +62,12 @@ class DryRunSink:
 
 
 def add_counters(total: dict, res: dict) -> None:
+    """Add the counters of one response to the run's totals."""
     for key, value in (res.get("counters") or {}).items():
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             total[key] = total.get(key, 0) + value
 
 
 def run_stmt(sink, statement: str, params: dict, name: str) -> dict:
+    """Run one statement on the sink (real client or dry-run files)."""
     return sink.run(statement, params, name=name) if isinstance(sink, DryRunSink) else sink.run(statement, params)

@@ -50,6 +50,7 @@ from marketbrief.constants.replay import MSG_ACI_GAMMA_ACI_BY_REGIME_AND, MSG_NO
 
 
 def run(cfg: dict, ranges_config: dict, con, start: date | None = None, end: date | None = None) -> tuple[dict, dict]:
+    """Replay one market over the window and return the summary with its texts."""
     started_at = time.time()
     bars, extra = load_inputs(cfg, ranges_config, con)
     res, reg = replay_rows(cfg, ranges_config, bars, extra, start, end)
@@ -101,6 +102,7 @@ def run(cfg: dict, ranges_config: dict, con, start: date | None = None, end: dat
 
 
 def record(summary: dict, report: str) -> dict:
+    """The row appended to data/<market>/replays/ for a finished replay."""
     overall = {horizon: summary["horizons"].get(horizon, {}).get("overall", {}) for horizon in ("1", "5")}
     always_up = {horizon: (summary["baselines"].get(horizon) or {}).get("always_up", {}) for horizon in ("1", "5")}
     return {
@@ -129,6 +131,7 @@ def record(summary: dict, report: str) -> dict:
 
 
 def main() -> int:
+    """Run the replay (optionally with ACI), write the HTML and JSON and print the summary."""
     parser = cli.market_arg(__doc__)
     parser.add_argument("--start", type=date.fromisoformat, help="first as-of date (default: after the warm-up bars)")
     parser.add_argument("--end", type=date.fromisoformat, help="last as-of date (default: the last benchmark bar)")

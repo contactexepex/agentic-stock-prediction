@@ -77,6 +77,7 @@ def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
 
 
 def major_dates(cfg: dict, start: date, end: date) -> list[date]:
+    """The dates of major market events in a period."""
     return sorted({event["date"] for event in calendar.market_events(cfg, start, end) if event["major"]})
 
 
@@ -94,6 +95,7 @@ def rsi_series(close: pd.Series, window: int = 14) -> pd.Series:
 
 
 def window_days(bench: pd.DataFrame, ranges_config: dict, start: date | None, end: date | None) -> list[date]:
+    """The as-of days of the replay window."""
     idx = [timestamp.date() for timestamp in bench.index]
     first = idx[min(ranges_config["warmup_bars"], len(idx) - 1)] if idx else None
     first_day = max(start, first) if start else first
@@ -101,6 +103,7 @@ def window_days(bench: pd.DataFrame, ranges_config: dict, start: date | None, en
 
 
 def load_inputs(cfg: dict, ranges_config: dict, con) -> tuple[dict, dict]:
+    """The bars and the earnings, dividend and index-cue inputs of the replay."""
     bars = load_bars(con)
     bench = bars.get(benchmark_key(cfg))
     if bench is None or bench.empty:

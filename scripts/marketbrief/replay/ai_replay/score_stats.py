@@ -13,6 +13,7 @@ from marketbrief.constants.ai_replay import BANDS
 
 
 def band_of(confidence: float) -> str:
+    """The confidence band name of a confidence."""
     return next(name for name, lower, upper in BANDS if lower <= confidence < upper)
 
 
@@ -69,14 +70,15 @@ def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def hit_rate_stats(key: int, count: int) -> dict:
-    lower, upper = replay_statistics.wilson(key, count)
+def hit_rate_stats(hits: int, count: int) -> dict:
+    """Hit rate with its Wilson 95% interval and the binomial p-value against 50%."""
+    lower, upper = replay_statistics.wilson(hits, count)
     return {
         "n": count,
-        "hits": key,
-        "hit_rate": round_or_none(key / count) if count else None,
+        "hits": hits,
+        "hit_rate": round_or_none(hits / count) if count else None,
         "ci95": [round_or_none(lower), round_or_none(upper)],
-        "p_vs_50": None if not count else float(f"{replay_statistics.binom_p_two_sided(key, count):.3g}"),
+        "p_vs_50": None if not count else float(f"{replay_statistics.binom_p_two_sided(hits, count):.3g}"),
     }
 
 

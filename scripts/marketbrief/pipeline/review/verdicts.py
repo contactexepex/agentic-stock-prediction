@@ -35,6 +35,7 @@ def compare(base: dict, var: dict) -> dict | None:
 
 
 def verdict(cmp: dict | None, count: int, review_config: dict) -> str:
+    """The verdict of a variant: no data, low n, improves score or coverage, worse, under-covers."""
     if cmp is None or count < review_config["min_n_recommend"]:
         return "no data" if cmp is None else "low n"
     if (
@@ -123,6 +124,7 @@ def proper_scores(ranges: pd.DataFrame, calls: pd.DataFrame) -> dict:
 
 
 def confidence_advice(bands: dict, calls: dict, review_config: dict) -> list[str]:
+    """Advice lines for confidence bands that miss their stated confidence."""
     out = []
     for band, band_stats in bands.items():
         if (

@@ -11,6 +11,7 @@ from marketbrief.replay.ai_replay.summaries import pct
 
 
 def svg_hit_bars(summary: dict) -> str:
+    """Bar chart of the hit rate of the AI and of always-up by horizon."""
     groups = [("1-day", summary["by_horizon"]["1"]), ("5-day", summary["by_horizon"]["5"]), ("All", summary["overall"])]
     width, height, left, right, top, bottom = 640, 300, 48, 16, 16, 44
     plot_width, plot_height = width - left - right, height - top - bottom
@@ -67,6 +68,7 @@ def svg_hit_bars(summary: dict) -> str:
 
 
 def svg_calibration(summary: dict) -> str:
+    """Chart of stated confidence against the actual hit rate per band."""
     scored_bands = [band for band in summary["by_band"] if band.get("n")]
     width, height, left, right, top, bottom = 640, 340, 48, 16, 16, 40
     plot_width, plot_height = width - left - right, height - top - bottom
@@ -116,10 +118,12 @@ def svg_calibration(summary: dict) -> str:
 
 
 def pts(value) -> str:
+    """A share as signed percentage points."""
     return "" if value is None else f"{100 * value:+.1f} pts"
 
 
 def signed_pct(value) -> str:
+    """A share as a signed percent with two decimals."""
     return "" if value is None else f"{100 * value:+.2f}%"
 
 
@@ -176,6 +180,7 @@ def group_html(group: dict) -> str:
     overall, by_horizon, abstention = group["overall"], group["by_horizon"], group["abstention"]
 
     def tile(label, stats, note):
+        """A tile with a hit rate, its note and its 95% interval."""
         hit_rate = stats.get("hit_rate") if stats else None
         confidence_interval = (stats or {}).get("ci95") or [None, None]
         span = (

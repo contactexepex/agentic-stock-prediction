@@ -42,6 +42,7 @@ def aci_lines(review_data) -> list[str]:
     rep = aci.get("replay")
 
     def cmp_rows(cmp):
+        """Table rows comparing fixed bands with ACI per horizon and group."""
         return [
             [
                 f"{horizon}d",

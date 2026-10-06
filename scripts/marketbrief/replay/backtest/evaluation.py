@@ -9,6 +9,7 @@ from marketbrief.constants.backtest import INPUT_ARMS
 
 
 def score(base: float, actual_close: float, center: float, horizon_sigma: float, quantiles: tuple) -> dict:
+    """Interval scores and coverage of one range against its outcome."""
     q10, q25, q75, q90 = quantiles
     lo50, hi50 = base * math.exp(center + q25 * horizon_sigma), base * math.exp(center + q75 * horizon_sigma)
     lo80, hi80 = base * math.exp(center + q10 * horizon_sigma), base * math.exp(center + q90 * horizon_sigma)
@@ -43,6 +44,7 @@ def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dic
     )
 
     def cap(extra, switches):
+        """A centre shift limited to the maximum number of sigmas."""
         limit = ranges_config["max_center_shift_sigma"] * switches
         return max(-limit, min(limit, extra))
 
@@ -131,6 +133,7 @@ def evaluate(
 
 
 def summarize(res: pd.DataFrame) -> dict:
+    """Coverage, width and score of a set of backtest rows against the naive baseline."""
     if res.empty:
         return {"n": 0}
     means = res.mean(numeric_only=True)
@@ -149,6 +152,7 @@ def summarize(res: pd.DataFrame) -> dict:
 
 
 def arm_summary(res: pd.DataFrame, arm: str) -> dict:
+    """The summary of one arm (a variant of an input) of the backtest."""
     if res.empty:
         return {"n": 0}
     return {
@@ -173,6 +177,7 @@ def verdict(off: dict, on_summary: dict, min_gain: float) -> str:
 
 
 def compare_inputs(res: pd.DataFrame, min_gain: float = 0.005) -> dict:
+    """Off against on for each range input, scored where the input applies."""
     out = {}
     for name, (off, on_arm, col) in INPUT_ARMS.items():
         sub = res[res[col]] if col in res.columns else res.iloc[0:0]
