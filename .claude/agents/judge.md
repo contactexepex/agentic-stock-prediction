@@ -33,9 +33,11 @@ Method:
    - Tests: tests that assert nothing, skip, or only test mocks of the code under test.
    - Data: edits to or deletion of existing data lines (check `git diff` on `data/`).
    - Scope: requirements silently dropped; work outside the assignment that breaks something.
-4. For build work: check out the branch or worktree. Run `python -m pytest -q tests`. Read the
-   diff (`git diff <base>..<branch>`), and run each new script the way the routine would,
-   writing only to a scratch copy, never to the real `data/`.
+4. For build work: check out the branch or worktree. Run the full suite
+   `python -m pytest -q -n auto`, or cite the passing CI run for that exact commit and run the tests
+   specific to the change plus `python -m pytest -q tests/test_judgments.py` locally. Read the diff
+   (`git diff <base>..<branch>`), and run each new script the way the routine would, writing only to
+   a scratch copy, never to the real `data/`.
 
 Weekly spot-check (routine/PROMPT.md step 14a; the input is `scripts/spotcheck.py`'s JSON):
 for each sampled forecast and the sampled filled report, check

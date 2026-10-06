@@ -10,12 +10,12 @@ variables are removed so no request can reach the network through a local proxy.
 reach the network is marked `network` (only the opt-in live Neo4j test).
 
 Slow tier: the tests listed in SLOW (end-to-end runs of the scripts as subprocesses, replays, the full
-pipeline) get the `slow` marker here, in one place. A listed name that no longer exists fails the
-collection, so the list cannot go stale silently.
+pipeline) get the `slow` marker here, in one place. A listed file that no longer exists, or a listed
+name missing from a collected file, fails the collection, so the list cannot go stale silently.
 
 xdist: tests that use a module- or session-scoped fixture are put in one xdist group per module
-(run with --dist loadgroup, set in pytest.ini), so the expensive shared setup runs once per run,
-not once per worker."""
+(--dist loadgroup, set by pytest_cmdline_main below when xdist is installed), so the expensive
+shared setup runs once per run, not once per worker."""
 from __future__ import annotations
 
 import os
@@ -34,8 +34,9 @@ PROXY_VARS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_pro
 _saved_proxies = {k: os.environ[k] for k in PROXY_VARS if k in os.environ}
 
 # test file -> test function names (without parameters) in the slow tier: tests that took 1.5 s or
-# more in a serial run (each runs scripts as subprocesses: pipeline, replays, CLIs), plus every test
-# on test_ai_replay's shared `prepared` setup (three prepare runs). A new end-to-end test goes here.
+# more in either of two serial runs on 2026-10-06 (each runs scripts as subprocesses: pipeline,
+# replays, CLIs), plus every test on test_ai_replay's shared `prepared` setup (three prepare runs).
+# A new end-to-end test goes here.
 SLOW = {
     "tests/test_aci_scoring.py": {
         "test_aci_off_reproduces_ranges_byte_for_byte",
@@ -123,13 +124,21 @@ SLOW = {
     "tests/test_sec_times.py": {
         "test_stored_shifted_rows_are_corrected_on_read",
     },
+    "tests/test_split_adjust.py": {
+        "test_hold_persists_after_the_frame_moves_past_the_stored_bars",
+    },
     "tests/test_validate.py": {
         "test_cli_exit_code",
         "test_collector_summaries",
         "test_collector_summaries_are_sources_but_validate_outputs_are_not",
+        "test_context_pack",
         "test_features_and_regime",
+        "test_forecast_valid_and_absent",
+        "test_late_run_does_not_require_todays_bar",
+        "test_price_basis_warnings_surface",
         "test_report_stage_flags_planted_number",
         "test_spotcheck_if_due",
+        "test_spotcheck_sample_is_deterministic_and_in_week",
     },
 }
 
@@ -142,6 +151,15 @@ def pytest_configure(config):
     if str(NETGUARD) not in paths:
         os.environ["PYTHONPATH"] = os.pathsep.join([str(NETGUARD), *paths])
     mb_netguard.install()
+
+
+@pytest.hookimpl(tryfirst=True)       # before xdist turns -n into --dist load
+def pytest_cmdline_main(config):
+    """With pytest-xdist installed and no --dist given, distribute by group (--dist loadgroup); without
+    xdist nothing changes, so plain `pytest` works either way."""
+    if config.pluginmanager.hasplugin("xdist") and getattr(config.option, "dist", "no") == "no" \
+            and not getattr(config.option, "distload", False):
+        config.option.dist = "loadgroup"
 
 
 @pytest.hookimpl(tryfirst=True)       # before xdist reads the xdist_group markers
@@ -158,7 +176,8 @@ def pytest_collection_modifyitems(config, items):
         module_id = item.nodeid.split("::")[0]
         if any(d and d[-1].scope in ("module", "session") and d[-1].baseid == module_id for d in defs.values()):
             item.add_marker(pytest.mark.xdist_group(f"shared-{rel}"))
-    missing = [f"{rel}::{n}" for rel, names in SLOW.items() if rel in seen for n in names - seen[rel]]
+    missing = [rel for rel in SLOW if not (TESTS.parent / rel).is_file()]
+    missing += [f"{rel}::{n}" for rel, names in SLOW.items() if rel in seen for n in sorted(names - seen[rel])]
     if missing:
         raise pytest.UsageError(f"tests/conftest.py SLOW lists tests that do not exist: {missing}")
 
