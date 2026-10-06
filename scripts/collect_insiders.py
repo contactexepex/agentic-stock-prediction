@@ -132,7 +132,7 @@ def main() -> int:
         "collector": "insiders", "market": market, "since": str(since), "filings_read": read,
         "new_rows": written, "open_market_buys": sum(r["code"] == "P" for r in rows),
         "open_market_sales": sum(r["code"] == "S" for r in rows), "other_issuer_skipped": other_issuer,
-        "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
+        "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar), "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 
 

@@ -17,7 +17,7 @@ from datetime import date, timedelta
 
 from common import append_jsonl, day_file, market_arg, recent_ids, require_market, utc_now, utc_today
 
-from sec import Edgar, related_ciks, ticker_submissions, time_summary
+from sec import Edgar, related_ciks, ticker_submissions, time_summary, time_warnings
 
 # SEC renamed beneficial-ownership forms "SCHEDULE 13D/13G" (structured XML) in Dec 2024; keep both.
 DEFAULT_FORMS = ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G"]
@@ -76,7 +76,7 @@ def main() -> int:
     written = append_jsonl(day_file(market, "filings", utc_today()), rows)
     print(json.dumps({"collector": "filings", "market": market, "new_filings": written,
                       "skipped_not_sec": skipped, "failed": failed, "requests": edgar.requests,
-                      "sec_times": time_summary(edgar)}, indent=2))
+                      "sec_times": time_summary(edgar), "warnings": time_warnings(edgar)}, indent=2))
     return 1 if unanswered and unanswered == len(watchlist["tickers"]) - len(skipped) else 0
 
 

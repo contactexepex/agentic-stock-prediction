@@ -105,17 +105,17 @@ def test_shift_is_the_eastern_offset_and_unshift_inverts_it():
 
 def test_recent_corrects_a_shifted_file_and_keeps_a_right_one(edgar):
     jpm = edgar.recent(CIKS["JPM"])
-    assert edgar.requests == 2 and edgar.time_checks == {"19617": "shifted"}
+    assert edgar.requests == 3 and edgar.time_checks == {"19617": "shifted"}
     assert dict(zip(jpm["accessionNumber"], jpm["acceptanceDateTime"])) == {a: TRUE[a] for a in jpm["accessionNumber"]}
     assert jpm["acceptanceDateTimeJson"][1] == "2026-07-14T14:30:38.000Z"            # the served value is kept
     aapl = edgar.recent(CIKS["AAPL"])
     assert dict(zip(aapl["accessionNumber"], aapl["acceptanceDateTime"])) == {a: TRUE[a] for a in aapl["accessionNumber"]}
     tsla = edgar.recent(CIKS["TSLA"])
     assert dict(zip(tsla["accessionNumber"], tsla["acceptanceDateTime"])) == {a: TRUE[a] for a in tsla["accessionNumber"]}
-    assert "acceptanceDateTimeJson" not in tsla and edgar.requests == 6               # one header per CIK
+    assert "acceptanceDateTimeJson" not in tsla and edgar.requests == 9               # newest + oldest header per CIK
     assert sec.time_summary(edgar) == {"ok": 1, "shifted": ["19617", "320193"], "unverified": {}}
     edgar.recent(CIKS["JPM"])                                                         # header cached: no request
-    assert edgar.requests == 7
+    assert edgar.requests == 10
     # sec.filings (insiders, stakes, holdings, fundamentals) and the merged lists carry the fix
     f = sec.filings(jpm, {"8-K"})
     assert f[0]["accepted_at"] == TRUE["0001628280-26-048078"]
@@ -239,3 +239,109 @@ def test_stored_shifted_rows_are_corrected_on_read(tmp_path):
     assert utc(at) == utc(TRUE[acc])
     again = run("check_sec_times.py", root, cfg, fx)                                  # already checked: no request
     assert again["checked"] == 0 and again["requests"] == 0 and again["already_checked"] == len(raw)
+
+
+# ---------- round 2: mixed files, warnings, several checks per accession, ai_replay ----------
+
+def mixed_fixtures(d: Path, which: str) -> Path:
+    """AAPL's trimmed list with one end set to its true time: `which` = "oldest" (newest shifted,
+    oldest right) or "newest" (newest right, oldest shifted)."""
+    fx = fixtures(d)
+    sub = json.loads((FIX / "submissions_aapl_trimmed.json").read_text())
+    rec = sub["filings"]["recent"]
+    k = -1 if which == "oldest" else 0
+    rec["acceptanceDateTime"][k] = TRUE[rec["accessionNumber"][k]]
+    (fx / "sub_aapl_mixed.json").write_text(json.dumps(sub))
+    u = json.loads((fx / "urls.json").read_text())
+    u[f"https://data.sec.gov/submissions/CIK{CIKS['AAPL']:010d}.json"] = "sub_aapl_mixed.json"
+    (fx / "urls.json").write_text(json.dumps(u, indent=1))
+    return fx
+
+
+@pytest.mark.parametrize("which", ["oldest", "newest"])
+def test_mixed_file_is_unverified_and_never_unshifted(tmp_path, monkeypatch, which):
+    """A file with one right and one shifted end: unshifting it would move the right values 4-5h
+    EARLIER (look-ahead), so it is kept as served and reported."""
+    fx = mixed_fixtures(tmp_path / "sec", which)
+    monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
+    e = sec.Edgar("t t@example.com")
+    served = json.loads((fx / "sub_aapl_mixed.json").read_text())["filings"]["recent"]["acceptanceDateTime"]
+    rec = e.recent(CIKS["AAPL"])
+    assert rec["acceptanceDateTime"] == served and "acceptanceDateTimeJson" not in rec
+    assert e.time_checks["320193"].startswith("unverified: mixed file") and e.requests == 3
+    assert all(sec.parse_z(v) >= sec.parse_z(TRUE[a]) for a, v in zip(rec["accessionNumber"], rec["acceptanceDateTime"]))
+    w = sec.time_warnings(e)
+    assert len(w) == 1 and "CIK 320193 unverified" in w[0] and "mixed file" in w[0]
+    assert sec.time_warnings(sec.time_summary(e)) == w
+
+
+def test_collectors_put_unverified_ciks_in_warnings(tmp_path):
+    root, cfg, _ = setup(tmp_path)
+    fx = mixed_fixtures(tmp_path / "sec_mixed", "oldest")
+    out = run("collect_filings.py", root, cfg, fx)
+    assert out["sec_times"]["shifted"] == ["19617"] and list(out["sec_times"]["unverified"]) == ["320193"]
+    assert len(out["warnings"]) == 1 and out["warnings"][0].startswith("SEC acceptance times of CIK 320193 unverified")
+    clean_root, clean_cfg, clean_fx = setup(tmp_path / "clean")
+    assert run("collect_filings.py", clean_root, clean_cfg, clean_fx)["warnings"] == []
+
+
+def test_events_summary_warns_about_unverified_ciks(tmp_path, monkeypatch):
+    import collect_events as ce
+    fx = mixed_fixtures(tmp_path / "sec", "oldest")
+    monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
+    times: dict = {}
+    ce.sec_earnings({"market": "us", "calendar": "XNYS", "timezone": "America/New_York"},
+                    {"AAPL": {}, "JPM": {}}, "t t@example.com", {}, times)
+    assert times["shifted"] == ["19617"] and list(times["unverified"]) == ["320193"]
+    w = ce.time_warnings(times)
+    assert len(w) == 1 and w[0].startswith("SEC acceptance times of CIK 320193 unverified, stored as served")
+
+
+def test_several_checks_per_accession_keep_row_counts(tmp_path):
+    root, cfg, fx_none = setup(tmp_path, headers={})
+    run("collect_filings.py", root, cfg, fx_none)
+    n = len(query(root, cfg, "SELECT id FROM filings"))
+    acc = "0001140361-26-038674"
+    d = root / "data" / MARKET / "sec_times" / "2026" / "10"
+    d.mkdir(parents=True)
+    rows = [{"accession": acc, "cik": "320193", "accepted_at": at, "json_accepted_at": "2026-10-06T02:42:45.000Z",
+             "source": "sgml_header", "checked_at": chk}
+            for at, chk in (("2026-10-05T21:00:00Z", "2026-10-06T01:00:00Z"),        # older check
+                            (TRUE[acc], "2026-10-07T01:00:00Z"),                       # newest check wins
+                            ("2026-10-05T20:00:00Z", "2026-10-06T02:00:00Z"))]
+    (d / "2026-10-07.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    got = query(root, cfg, "SELECT id, accepted_at FROM filings")
+    assert len(got) == n and utc(dict(got)[acc]) == utc(TRUE[acc])
+    assert len(query(root, cfg, "SELECT id FROM filings WHERE id = '0001628280-26-064366'")) == 1
+
+
+def test_ai_replay_filters_sec_rows_by_the_header_time(tmp_path):
+    """The as-of copy keeps a filing stored 4h late (02:42Z) when its header time (22:42Z the day
+    before) is before the cutoff, and copies only the sec_times rows accepted by the cutoff."""
+    import ai_replay
+    src = tmp_path / "src"
+    base = src / "data" / "us"
+    acc = "0001140361-26-038674"
+    (base / "filings" / "2026" / "10").mkdir(parents=True)
+    (base / "filings" / "2026" / "10" / "2026-10-06.jsonl").write_text(
+        json.dumps({"id": acc, "ticker": "AAPL", "cik": "320193", "form": "4", "filing_date": "2026-10-05",
+                    "accepted_at": "2026-10-06T02:42:45.000Z", "first_seen_at": "2026-10-06T03:00:00+00:00"}) + "\n")
+    cutoff = datetime(2026, 10, 6, 0, 0, tzinfo=timezone.utc)
+    out = ai_replay.copy_asof("us", src, tmp_path / "no_fix", date(2026, 10, 5), cutoff)
+    assert out["kinds"]["filings"]["rows_kept"] == 0                                    # raw time: after the cutoff
+    (base / "sec_times" / "2026" / "10").mkdir(parents=True)
+    (base / "sec_times" / "2026" / "10" / "2026-10-07.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [
+        {"accession": acc, "cik": "320193", "accepted_at": TRUE[acc], "json_accepted_at": "2026-10-06T02:42:45.000Z",
+         "source": "sgml_header", "checked_at": "2026-10-07T01:00:00Z"},
+        {"accession": "9999999999-26-000001", "cik": "1", "accepted_at": "2026-10-06T13:00:00.000Z",
+         "json_accepted_at": "2026-10-06T17:00:00.000Z", "source": "sgml_header", "checked_at": "2026-10-07T01:00:00Z"}]))
+    dst = tmp_path / "fixed"
+    out = ai_replay.copy_asof("us", src, dst, date(2026, 10, 5), cutoff)
+    assert out["kinds"]["filings"]["rows_kept"] == 1 and "sec_times" not in out["excluded"]
+    assert out["kinds"]["sec_times"]["rows_kept"] == 1                                  # a later filing's time is not copied
+    copied = [json.loads(x) for f in (dst / "data" / "us" / "sec_times").glob("**/*.jsonl") for x in f.read_text().splitlines()]
+    assert [r["accession"] for r in copied] == [acc]
+    assert "SGML header" in out["kinds"]["filings"]["rule"]
+    # the correction can also move a row out: a header time after the cutoff wins over an earlier stored one
+    assert ai_replay.keep_row("filings", {"id": acc, "accepted_at": "2026-10-05T12:00:00Z"}, date(2026, 10, 4),
+                              pd.Timestamp("2026-10-05T13:00:00Z"), {acc: TRUE[acc]}) is False

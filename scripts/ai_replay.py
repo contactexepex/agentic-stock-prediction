@@ -69,7 +69,7 @@ import pandas as pd
 import common
 import events as ev
 import replay
-from common import CODE, SCHEMAS, connect, load_market, market_names, utc_now
+from common import ACCEPTED_KEYS, CODE, SCHEMAS, connect, load_market, market_names, utc_now
 from features import load_bars
 
 MODEL_CUTOFF = date(2026, 6, 30)            # the model may have seen prices up to about here
@@ -101,6 +101,9 @@ PUBLIC_AT: dict[str, list[str]] = {
     "reviews": ["computed_at"], "replays": ["computed_at"], "judgments": ["recorded_at"],
     "quotes": ["collected_at"], "options": ["collected_at"],
     "graph": ["added_at"], "graph_runs": ["run_at"],
+    # SEC acceptance times from the filing's SGML header (check_sec_times.py): a permanent fact
+    # about the filing, public from its acceptance; checked_at is only when we looked it up
+    "sec_times": ["accepted_at"],
 }
 FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows", "delivery")
 # Bulk and block deals have only a trade date; NSE publishes each session's deals after its close,
@@ -166,8 +169,27 @@ def public_at(kind: str, row: dict) -> pd.Timestamp | None:
     return None
 
 
-def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp) -> bool:
-    """True when the row was public by the cutoff (pre-open of the session after d)."""
+def load_sec_times(base: Path) -> dict[str, str]:
+    """Accession -> SGML-header acceptance time (newest check wins) from data/<market>/sec_times/,
+    the correction common.connect applies to accepted_at (see scripts/sec.py)."""
+    best: dict[str, tuple[str, str]] = {}
+    for f in sorted((base / "sec_times").glob("**/*.jsonl")):
+        for line in f.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            acc, at, checked = r.get("accession"), r.get("accepted_at"), str(r.get("checked_at") or "")
+            if acc and at and (acc not in best or checked >= best[acc][1]):
+                best[acc] = (at, checked)
+    return {a: at for a, (at, _) in best.items()}
+
+
+def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp, times: dict[str, str] | None = None) -> bool:
+    """True when the row was public by the cutoff (pre-open of the session after d). `times`
+    (load_sec_times) replaces a SEC row's stored accepted_at with its header time, as the
+    corrected views do: a value stored from a shifted submissions file is 4-5h late."""
+    if times and kind in ACCEPTED_KEYS and row.get(ACCEPTED_KEYS[kind]) in times:
+        row = {**row, "accepted_at": times[row[ACCEPTED_KEYS[kind]]]}
     if kind == "prices":
         t = _ts(row.get("date"))
         return t is not None and t.date() <= d
@@ -198,21 +220,25 @@ def rule_text(kind: str) -> str:
         return "first_seen_at <= cutoff, or a backfilled past event (*_history) dated <= D"
     cols = " else ".join(c.replace("+1d", " (end of day UTC)") for c in PUBLIC_AT[kind])
     extra = " and target_date <= D" if kind in TARGET_DATE_KINDS else ""
+    if kind in ACCEPTED_KEYS:
+        cols = cols.replace("accepted_at", "accepted_at (SGML header time from sec_times when checked)", 1)
     return f"{cols} <= cutoff{extra}"
 
 
-def _filter_jsonl(text: str, kind: str, d: date, cutoff: pd.Timestamp) -> tuple[list[str], int]:
+def _filter_jsonl(text: str, kind: str, d: date, cutoff: pd.Timestamp,
+                  times: dict[str, str] | None = None) -> tuple[list[str], int]:
     kept, n = [], 0
     for line in text.splitlines():
         if not line.strip():
             continue
         n += 1
-        if keep_row(kind, json.loads(line), d, cutoff):
+        if keep_row(kind, json.loads(line), d, cutoff, times):
             kept.append(line)
     return kept, n
 
 
-def _filter_csv(text: str, kind: str, d: date, cutoff: pd.Timestamp) -> tuple[list[str], int]:
+def _filter_csv(text: str, kind: str, d: date, cutoff: pd.Timestamp,
+                times: dict[str, str] | None = None) -> tuple[list[str], int]:
     lines = text.splitlines()
     if not lines:
         return [], 0
@@ -222,7 +248,7 @@ def _filter_csv(text: str, kind: str, d: date, cutoff: pd.Timestamp) -> tuple[li
         if not line.strip():
             continue
         n += 1
-        if keep_row(kind, dict(zip(header, next(csv.reader([line])))), d, cutoff):
+        if keep_row(kind, dict(zip(header, next(csv.reader([line])))), d, cutoff, times):
             kept.append(line)
     return ([lines[0]] + kept if kept else []), n
 
@@ -238,6 +264,7 @@ def copy_asof(market: str, src: Path, dst: Path, d: date, cutoff: datetime) -> d
     base, out_base = src / "data" / market, dst / "data" / market
     kinds, excluded = {}, {}
     first_news = earliest_news(base) or "none stored"
+    times = load_sec_times(base)       # SEC accepted_at corrected to the header time (sec_times)
     for kdir in sorted(p for p in base.iterdir() if p.is_dir()) if base.exists() else []:
         kind = kdir.name
         if kind in DROPPED:
@@ -250,7 +277,7 @@ def copy_asof(market: str, src: Path, dst: Path, d: date, cutoff: datetime) -> d
         stat = {"rule": rule_text(kind), "files_in": 0, "files_out": 0, "rows_in": 0, "rows_kept": 0}
         for f in sorted(kdir.glob(f"**/*.{ext}")):
             text = f.read_text(encoding="utf-8")
-            kept, n = (_filter_csv if ext == "csv" else _filter_jsonl)(text, kind, d, cut)
+            kept, n = (_filter_csv if ext == "csv" else _filter_jsonl)(text, kind, d, cut, times)
             stat["files_in"] += 1
             stat["rows_in"] += n
             rows = len(kept) - (1 if ext == "csv" and kept else 0)

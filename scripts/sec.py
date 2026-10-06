@@ -17,16 +17,21 @@ true: since 2026-10-05 some CIKs' submission files are served with every accepta
 later by the New York UTC offset of that moment (+4h in EDT, +5h in EST; the ET wall-clock time
 converted to UTC twice), while other CIKs' files are right (by 2026-10-06 the shifted files were
 exactly those regenerated after a new filing on 2026-10-05). The shift is uniform over a whole
-file, so `Edgar.recent` checks each file once against the authoritative time, the SGML header
-`<ACCEPTANCE-DATETIME>` (YYYYMMDDHHMMSS, US Eastern) of the newest listed filing (`<acc>.hdr.sgml`,
-the same time as the index page's "Accepted"), and either keeps the column ("ok"), corrects every
-value ("shifted": true = JSON minus the ET offset; the JSON value is kept in
-`acceptanceDateTimeJson`) or keeps it and says so ("unverified: ..." when the header cannot be
-read or the difference is not that offset). Statuses are in `Edgar.time_checks` (CIK -> status)
-for the collectors' summaries. Header times are immutable, so they are cached per accession in
-work/sec_acceptance.json (under MB_ROOT): a second collector in the same run, or a later run whose
-newest filing is unchanged, costs no extra request. Stored rows from a shifted file are corrected
-on read through `sec_times` (scripts/check_sec_times.py, see common.connect).
+file, so `Edgar.recent` checks each file against the authoritative time, the SGML header
+`<ACCEPTANCE-DATETIME>` (YYYYMMDDHHMMSS, US Eastern; `<acc>.hdr.sgml`, the same time as the index
+page's "Accepted") of its newest and its oldest listed filing. Both right: the column is kept
+("ok"). Both shifted: every value is corrected ("shifted": true = JSON minus the ET offset; the
+JSON value is kept in `acceptanceDateTimeJson`). Anything else (a header that cannot be read, a
+difference that is not that offset, or a mixed file with one right and one shifted) keeps the
+column as served and says so ("unverified: ..."): never unshift a value that may be right, which
+would make it 4-5h too early (look-ahead). Statuses are in `Edgar.time_checks` (CIK -> status);
+`time_summary` goes into the collectors' summaries as `sec_times`, and `time_warnings` puts each
+unverified CIK into their `warnings` (the routine lists them in data_quality). Header times are
+immutable, so they are cached per accession in work/sec_acceptance.json (under MB_ROOT): a second
+collector in the same run, or a later run whose newest filing is unchanged, costs no extra
+request. Stored rows (including those stored from an unverified file) are corrected on read
+through `sec_times`: scripts/check_sec_times.py, run by the routine after the SEC collectors,
+appends each new accession's header time, and common.connect applies them.
 
 Tests run offline: with MB_SEC_FIXTURES=<dir>, URLs are served from <dir>/urls.json
 ({url: file path, absolute or relative to <dir>}) instead of the network (a header missing from
@@ -167,33 +172,51 @@ class Edgar:
                     pass
         return cache[accession]
 
+    def _verdict(self, cik: int | str, accession: str, json_value: str) -> str:
+        """One filing: "ok" (JSON = header), "shifted" (JSON = header + ET offset) or
+        "unverified: <why>"."""
+        if (self.fixtures and accession not in self._cache()
+                and archive_url(cik, accession, f"{accession}.hdr.sgml") not in self.urls):
+            return "unverified: no header fixture"      # tests without header fixtures: no request
+        try:
+            true = self.acceptance(cik, accession)
+        except Exception as exc:
+            return f"unverified: header {accession}: {str(exc)[:100]}"
+        if true is None:
+            return f"unverified: no ACCEPTANCE-DATETIME in {accession}"
+        if parse_z(json_value) == parse_z(true):
+            return "ok"
+        if is_shifted(json_value, true):
+            return "shifted"
+        return f"unverified: {accession} JSON {json_value} vs header {true}"
+
     def check_times(self, cik: int | str, rec: dict) -> str:
-        """Check a submissions block's acceptanceDateTime against the SGML header of its newest
-        listed filing and correct the whole column in place when it is shifted (module doc)."""
+        """Check a submissions block's acceptanceDateTime against the SGML headers of its newest
+        and its oldest listed filing (one cached request each; one when they are the same filing)
+        and correct the whole column in place only when both are shifted. Both right: "ok".
+        Anything else, including a mixed file (one right, one shifted), is "unverified: ..." and
+        the column is kept as served: correcting a right value would make it 4-5h too early
+        (look-ahead), keeping a shifted one only makes it late."""
         acc = rec.get("accessionNumber") or []
         col = rec.get("acceptanceDateTime") or []
-        i = next((k for k, v in enumerate(col) if v and k < len(acc) and acc[k]), None)
-        if i is None:
+        idx = [k for k, v in enumerate(col) if v and k < len(acc) and acc[k]]
+        if not idx:
             status = "unverified: no acceptance time with an accession number"
-        elif (self.fixtures and acc[i] not in self._cache()
-              and archive_url(cik, acc[i], f"{acc[i]}.hdr.sgml") not in self.urls):
-            status = "unverified: no header fixture"      # tests without header fixtures: no request
         else:
-            try:
-                true = self.acceptance(cik, acc[i])
-            except Exception as exc:
-                true, status = None, f"unverified: header {acc[i]}: {str(exc)[:100]}"
+            probes = list(dict.fromkeys([idx[0], idx[-1]]))         # newest, oldest
+            verdicts = [self._verdict(cik, acc[k], col[k]) for k in probes]
+            bad = [v for v in verdicts if v.startswith("unverified")]
+            if bad:
+                status = bad[0]
+            elif len(set(verdicts)) > 1:
+                status = (f"unverified: mixed file (newest {acc[probes[0]]} {verdicts[0]}, "
+                          f"oldest {acc[probes[1]]} {verdicts[1]})")
+            elif verdicts[0] == "shifted":
+                rec["acceptanceDateTimeJson"] = list(col)
+                rec["acceptanceDateTime"] = [unshift(v) if v else v for v in col]
+                status = "shifted"
             else:
-                status = "unverified: no ACCEPTANCE-DATETIME" if true is None else None
-            if true is not None:
-                if parse_z(col[i]) == parse_z(true):
-                    status = "ok"
-                elif is_shifted(col[i], true):
-                    rec["acceptanceDateTimeJson"] = list(col)
-                    rec["acceptanceDateTime"] = [unshift(v) if v else v for v in col]
-                    status = "shifted"
-                else:
-                    status = f"unverified: {acc[i]} JSON {col[i]} vs header {true}"
+                status = "ok"
         self.time_checks[str(int(cik))] = status
         return status
 
@@ -212,6 +235,15 @@ def time_summary(edgar: Edgar) -> dict:
     return {"ok": sum(v == "ok" for v in checks.values()),
             "shifted": sorted(c for c, v in checks.items() if v == "shifted"),
             "unverified": {c: v.split(": ", 1)[-1] for c, v in checks.items() if v.startswith("unverified")}}
+
+
+def time_warnings(checked: Edgar | dict) -> list[str]:
+    """One warning per CIK whose acceptance times could not be verified (stored as served, maybe
+    4-5h late): for the collectors' `warnings` (the routine lists them in data_quality). Takes the
+    Edgar client or a time_summary dict."""
+    summary = checked if isinstance(checked, dict) else time_summary(checked)
+    return [f"SEC acceptance times of CIK {c} unverified, stored as served (maybe 4-5h late): {why}"
+            for c, why in (summary.get("unverified") or {}).items()]
 
 
 def related_ciks(cfg: dict) -> dict[str, list[int]]:

@@ -41,6 +41,7 @@ import pandas as pd
 import events as ev
 from common import append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
 from nse import IST, FetchError, Nse, nse_symbols, parse_day, parse_ts, pick, rows_of
+from sec import time_warnings
 
 FIELDS = {"Earnings Date": "earnings", "Ex-Dividend Date": "ex_dividend"}
 NEAR_DAYS = 3  # earnings dates this close together are the same report
@@ -466,7 +467,7 @@ def main() -> int:
     written = append_jsonl(day_file(market, "events", today), rows)
     print(json.dumps({"collector": "events", "market": market, "new_events": written - sum(hist.values()) - n_reports,
                       "new_history": hist, "earnings_history_sources": earn_sources,
-                      "sec_tickers": len(sec), "sec_reports": n_reports, "sec_error": sec_error, "sec_failed": sec_failed, **({"sec_times": sec_times} if sec_times else {}), **nse_info,
+                      "sec_tickers": len(sec), "sec_reports": n_reports, "sec_error": sec_error, "sec_failed": sec_failed, **({"sec_times": sec_times, "warnings": time_warnings(sec_times)} if sec_times else {}), **nse_info,
                       "failed": failed}, indent=2))
     # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
     no_calendar = {f["ticker"] for f in failed if f["what"] == "calendar"}

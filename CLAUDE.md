@@ -48,11 +48,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   accession once (`sec.ticker_submissions`).
 - SEC acceptance times: the submissions JSON `acceptanceDateTime` can be shifted later by the New
   York UTC offset (+4h EDT, +5h EST) for a whole CIK's file (seen from 2026-10-05). `Edgar.recent`
-  checks each file against the SGML header `<ACCEPTANCE-DATETIME>` (Eastern) of its newest filing
-  (one cached request per CIK, `work/sec_acceptance.json`) and corrects it; collector summaries
-  list `sec_times` (ok / shifted / unverified CIKs). Stored rows are fixed on read:
-  `check_sec_times.py` appends header times to `data/<market>/sec_times/` and `common.connect`
-  reads `accepted_at` of filings, insiders, stakes, holdings and fundamentals through them.
+  checks each file against the SGML header `<ACCEPTANCE-DATETIME>` (Eastern) of its newest and
+  oldest filing (cached requests, `work/sec_acceptance.json`) and corrects it only when both are
+  shifted; otherwise (mixed, unreadable) it keeps the served times and the collector lists the CIK
+  in `warnings` (summary key `sec_times`: ok / shifted / unverified). Stored rows are fixed on
+  read: `check_sec_times.py` (run by the routine after the SEC collectors) appends header times to
+  `data/<market>/sec_times/`; `common.connect` reads `accepted_at` of filings, insiders, stakes,
+  holdings and fundamentals through them, and `ai_replay` filters those kinds by the same times.
 - Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
   `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
   `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.

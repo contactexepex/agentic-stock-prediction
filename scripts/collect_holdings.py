@@ -211,7 +211,7 @@ def main() -> int:
     _, latest = stored(market)
     print(json.dumps({
         "collector": "holdings", "market": market, "quarter_due": due, "filings_loaded": loaded,
-        "reported_by_other_manager": notices, "new_rows": written, "requests": edgar.requests, "sec_times": sec.time_summary(edgar),
+        "reported_by_other_manager": notices, "new_rows": written, "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar),
         "waiting_on": [n for c, n in filers.items() if latest.get(str(c), "") < due], "failed": failed}, indent=2))
     return 0
 

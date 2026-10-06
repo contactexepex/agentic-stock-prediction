@@ -10,9 +10,10 @@ accession). One row per accession: accepted_at = the header's time (UTC), json_a
 stored value. common.connect() then reads accepted_at of those kinds through the newest row per
 accession, so a value stored from a shifted submissions file is corrected on read, without editing
 data/. --dry-run prints the summary without appending. Only for markets with `filings: sec`; needs
-SEC_USER_AGENT. Not part of the daily routine: the collectors store the corrected times
-themselves since this fix; run it once after upgrading, or after a run whose summary listed a CIK
-under `sec_times.unverified`."""
+SEC_USER_AGENT. The daily routine runs it after the SEC collectors (routine/PROMPT.md step 3):
+the collectors already store corrected times from a file proven shifted, so this catches rows
+stored from an unverified file (listed in the collectors' `warnings`) and rows stored before the
+fix; each new accession costs one request once. `failed` lists headers that could not be read."""
 from __future__ import annotations
 
 import json
