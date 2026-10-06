@@ -71,6 +71,19 @@ ACCESS: dict[str, Access] = {
     # news, announcements, filings, news_articles, news_clusters
     "news_clusters": access(but=(*NOT_FEATURE_KINDS, "lessons", "outcomes", "range_outcomes"),
                             data_writes=("news_clusters",)),
+    # news, news_clusters, news_articles, news_claims, primary_texts, filings, announcements (no SEC
+    # user agent in the golden environment: no filing text is fetched)
+    "claims_prepare": access(but=(*NOT_FEATURE_KINDS, "lessons", "outcomes", "range_outcomes"),
+                             data_writes=("primary_texts",), writes=("claim_inputs",)),
+    "claims_write": access(no_data=True, reads=("claim_inputs",), writes=("claims_work",)),
+    # news_clusters, news, news_articles, primary_texts, announcements, news_claims
+    "claims_validate": access(but=(*NOT_FEATURE_KINDS, "lessons", "outcomes", "range_outcomes"),
+                              reads=("claims_work",)),
+    "claims_add": access(but=(*NOT_FEATURE_KINDS, "lessons", "outcomes", "range_outcomes"), reads=("claims_work",),
+                         data_writes=("news_claims",)),
+    # news_clusters, news_claims, news_verified
+    "news_status": access(but=(*NOT_FEATURE_KINDS, "lessons", "outcomes", "range_outcomes"),
+                          data_writes=("news_verified",)),
     # context.py and the section modules it imports: no reviews or replays
     "context": access(but=NOT_REVIEWS, writes=("context",)),
     "context_after_ranges": access(but=NOT_REVIEWS, writes=("context",)),

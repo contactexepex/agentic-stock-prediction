@@ -517,3 +517,32 @@ def test_spotcheck_if_due(root):
     write_jsonl(root, "judgments", TODAY, [{**out["record"], "verdict": "SKIP"}])
     out = json.loads(subprocess.run(cmd, cwd=SCRIPTS, env=env, capture_output=True, text=True, check=True).stdout)
     assert out == {"step": "spotcheck", "market": MARKET, "week": "2026-W40", "due": False}
+
+
+
+def test_amount_tokens_currency_years_and_suffixes():
+    """Issue #32: one-token Rs amounts, euro/pound amounts in the year band and B/M suffixes after a
+    currency are checked; a bare whole number in 1900-2099 stays a year (documented residual)."""
+    assert nums("closed at Rs1915.85, Rs1,915 or Rs.1,915") == ["Rs 1915.85", "Rs 1,915", "Rs. 1,915"]
+    assert nums("€2050 and £1999") == ["€2050", "£1999"]
+    found = {n["token"]: n["value"] for n in nn.numbers("a $12B deal and ₹3.8M fee", NAMES, 10)}
+    assert found == {"$12 bn": 12e9, "₹3.8 mn": 3.8e6}
+    assert nums("closed at 1950 in 2026; 3M shares; 5m units") == []
+
+
+def test_report_stage_lists_skipped_source_queries(root, monkeypatch):
+    """Issue #32: a source query that fails is noted in info.number_sources (not raised)."""
+    real = v.build_pool
+
+    def with_note(*a, **k):
+        pool = real(*a, **k)
+        v.records(connect(MARKET), "SELECT * FROM no_such_view", notes=pool.notes)
+        return pool
+    monkeypatch.setattr(v, "build_pool", with_note)
+    (root / "reports" / "us").mkdir(parents=True)
+    report = "# Brief\n<!-- report-data: as_of=2026-10-05 -->\n"
+    (root / "reports" / "us" / "2026-10-06.md").write_text(report)
+    (root / "work" / "report_us_2026-10-06.skeleton.md").write_text(report)
+    (root / "work" / "slack_us.skeleton.md").write_text("*Brief*\n")
+    out = run("report")
+    assert any("no_such_view" in n for n in out["info"]["number_sources"])

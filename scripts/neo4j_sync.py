@@ -564,6 +564,9 @@ NOT_PROJECTED = {
     "news_enriched": "merged into NewsItem / Announcement and MENTIONS (latest analysis wins)",
     "news_articles": "article metadata, extracts and copy signatures (verification inputs), DuckDB only",
     "news_clusters": "per-run cluster snapshots read as of a time (news_clusters_asof), DuckDB only",
+    "news_claims": "claim statements quoted from articles and filings (verification inputs), DuckDB only",
+    "news_verified": "per-run verification status snapshots read as of a time (news_verified_asof), DuckDB only",
+    "primary_texts": "plain text of SEC filing documents quoted by claims, DuckDB only",
 }
 
 

@@ -165,11 +165,12 @@ class Sources:
 
 # ---------- outlets of source labels ----------
 
-def label_domains(pairs) -> dict[str, str]:
+def label_domains(pairs, src: "Sources | None" = None) -> dict[str, str]:
     """norm(source label) -> outlet domain, learned from (label, domain) pairs of one run's rows
     (Google News <source url>), so a label-only row and a domain row of one outlet are one outlet:
     a label used with exactly one domain ("The CSR Universe" -> thecsruniverse.com), and a label
-    without one whose letters equal a seen domain's first part ("Pluang" -> pluang.com)."""
+    without one whose letters equal a seen domain's first part ("Pluang" -> pluang.com) unless that
+    domain is allowlisted in `src` (vetting comes only from a configured name or the row's own domain)."""
     from news_tags import norm
     seen: dict[str, set] = {}
     labels = set()
@@ -187,7 +188,7 @@ def label_domains(pairs) -> dict[str, str]:
         k = norm(label)
         if k not in out:
             c = re.sub(r"[^a-z0-9]", "", label.lower())
-            if c in first:
+            if c in first and not (src and src.lookup(first[c])[0]):
                 out[k] = first[c]
     return out
 

@@ -171,9 +171,9 @@ recorded for the past. Design (adjust on read; data stays append-only):
 ### 3a. News verification, phase A (deterministic; built 2026-10-06)
 Headlines alone are not enough, so the routine reads the article behind material watchlist
 headlines where it is freely accessible, groups items about one event and counts independent
-origins. Phase A has no LLM step. Phase B, not built yet, adds the claim-extraction agent, a
-`news_verified` status with LLM value comparison, the forecaster and validate rules, and event
-badges in the context pack.
+origins. Phase A has no LLM step. Phase B (section 3b) adds the claim-checker agent, the
+deterministic `news_verified` status, the forecaster and validate rules, and the event table in
+the context pack.
 
 **Sources.** Free sources only, for personal non-commercial research. `config/news_sources.yaml`
 holds the allowlist of vetted outlets (112 domains). It is broad on purpose: any established,
@@ -351,6 +351,94 @@ the vendor sites. Most unvetted Indian items come from scanx.trade, LatestLY, In
 and Univest. Many US items are vendor content on Yahoo or AOL (TIKR, Zacks, Motley Fool, 24/7
 Wall St), which is flagged promotional and never counted. Outlets that block cloud traffic would
 be the second source for many US stories, so most US events stay `single_source`.
+
+### 3b. News verification, phase B (claims and status; built 2026-10-06)
+Reliability first: a call must rest on what a primary source or two independent outlets actually
+state, not on headlines. Free sources only, personal non-commercial research. The agent only
+extracts quoted statements; every check and every status is deterministic.
+
+**Primary text** (`claims.py prepare`, kind `primary_texts`). For the run's selected clusters, the
+main document and EX-99 exhibits (press releases) of their SEC 8-K/6-K candidates
+(`claims.primary_text_forms`) are read through the Edgar client (SEC_USER_AGENT; one throttle), turned
+into plain text (scripts, styles and hidden XBRL headers dropped, one line per block element) and
+stored once per document, cut at `primary_max_chars` (`truncated`). `available_at` is the filing's
+acceptance time. SEC filings are public-domain government records, so their text is stored (unlike
+articles). NSE announcements are quoted from their stored subject; their PDF attachments are not
+collected (not done).
+
+**Selection.** Clusters current as of the run (`news_clusters_asof`, an item in the last
+`window_hours`) whose best item title weighs at least `claims.min_priority` in `material_terms`;
+a cluster row that already has claims is skipped; highest weight, then newest, at most
+`max_clusters_per_run` (15). The input file lists each item (title, outlet, access, stored extract)
+and each primary source's stored text.
+
+**Claims** (`.claude/agents/claim-checker.md`, Sonnet 5.5, effort high; kind `news_claims`). One record
+per statement of one fact by one source: `fact_key` groups the statements of a fact; `claim_type`
+(earnings_guidance, deal_ma, regulatory_legal, mgmt_change, rating_target, macro, rumour, opinion,
+promotional), `attribution` (on_record, company_statement, outlet_reporting = an outlet's own
+unattributed reporting, a factual statement; sources_say = a rumour; analyst; opinion = never
+counted), `stance`
+(affirms, denies), `subject`, `predicate`, `value_num` + `unit` (usd, inr, eur, gbp, pct, bps,
+count), `period`, `effective_date`, `quote` (<= 40 words) and `quote_source_id`. Text is untrusted
+data. The gate `claims.py validate` checks: the cluster is current; the quoted source is one of its
+items or stored primary sources; the quote is verbatim (quotes and dashes unified, whitespace
+collapsed) in that source's stored extract, title or primary text; `value_num` with its unit is a
+number literal of the quote (scale applied: `480K`, `$3.8 billion`); every number in subject and
+predicate is in the quote; enums; no id twice. `add` stores the computed fields (`id` =
+`<cluster_id>|<fact_key>|<quote_source_id>`, `source_kind`, `quote_field`, `value_text` = the
+literal, `source_available_at` = when the quoted text was available to us, `extracted_at`), all or
+nothing (`--valid-only` after the one retry).
+
+**Status** (`news_status.py`, kind `news_verified`, rules in `marketbrief/analytics/verification_status.py`).
+Per fact, precedence contradicted > confirmed_primary > corroborated > rumour > promotional >
+single_source > unverified:
+- contradicted: primary sources disagree (values or stance), a primary source denies what an outlet
+  affirms, or, without primary confirmation, outlets state disagreeing values or opposite stances;
+- confirmed_primary: a primary source affirms it; when outlets state a value, a primary source must
+  state one and the values match within 1% of the larger or either literal's stated rounding
+  (`480K` states +-5,000, `$3.8 billion` +-0.05 bn); an outlet value or period that does not match is
+  flagged `mismatch_primary` and that news id's own status is contradicted (the filing wins);
+- corroborated: the outlet statements come from >= 2 verified independent origins (phase A's
+  origin groups); opinion and promotional statements never count;
+- rumour: a statement attributed to unnamed sources or typed rumour; promotional: typed promotional;
+- single_source: one verified origin; unverified: none.
+A value quoted from a headline (`quote_field` title) is never compared (headlines are cut and drop
+hedges): it neither needs a primary value nor contradicts one or another outlet.
+A fact stated only by a primary source (no outlet item affirms it) keeps its own row, flagged
+`primary_only`, but never raises the event: a cluster's status is the highest of its base status and
+the statuses of the facts its outlet items state, and only those facts give its confirming primary ids
+and `confirmed_at`. Base status (from the cluster row alone:
+>= 2 verified origins corroborated; `sources_say` rumour; promotional items and no verified origin
+promotional; one verified origin single_source; else unverified). Each news id has its own status:
+the cluster's, except contradicted (disagrees with a filing), promotional (vendor origin group) and
+unverified (unvetted outlet or opinion), but never weaker than a blocking cluster status: in a
+rumour, promotional or contradicted event an unvetted or opinion copy keeps that status.
+`confirmed_at` is when the confirming primary source was public (`source_published_at`: SEC
+acceptance, NSE dissemination); its text may have been stored later (`source_available_at`, the
+look-ahead time). Rows are appended per cluster (level cluster) and fact (level claim) when new or changed.
+
+**No look-ahead.** A run at T reads clusters as of T, claims with `extracted_at` <= T and
+`source_available_at` <= T (article fetched, filing accepted and its text stored, announcement
+disseminated); every row's inputs are <= `inputs_until` <= `as_of` = T. `news_verified_asof(ts)` takes
+the newest row per cluster and fact with `as_of` <= ts; `news_status_ids_asof(ts)` each news id's
+status per ticker. Days before the feature have no rows: their ids are unverified, never
+back-filled. `ai_replay prepare` keeps `primary_texts` by `fetched_at`, `news_claims` by
+`extracted_at` and `news_verified` by `as_of`; Neo4j does not project the three kinds.
+
+**Use.** The context pack shows "News events and verification status" (status, verified origins,
+unread vetted, confirming primary ids, conflicting values, ids to cite, first reported, confirmed)
+instead of the clusters' headlines; the news-analyst sets novelty from first reported / confirmed.
+The forecast gate (`validate.py --stage forecast`, `prediction_rules.check_news_status`) checks each
+cited id's status as of `made_at`. A filing or announcement id is confirmed_primary only when it is
+among the primary ids of a confirmed_primary event of the call's ticker; any other (another
+ticker's, a Form 4, a share allotment) is unverified:
+`NEWS_STATUS_MAIN` (the first id is not confirmed_primary or corroborated), `NEWS_STATUS_BLOCKED`
+(a rumour or promotional id), `NEWS_STATUS_CONTRADICTED` (a contradicted id without `range_widen`),
+`NEWS_STATUS_CONFIDENCE` (confidence above 0.85 with a single_source or unverified id: the rule is
+"lower by at least 0.05", and since the gate cannot know the confidence before the cut, the 0.85 cap
+is the part it checks). Before any
+status row existed the rules are not applied (`NEWS_STATUS_MISSING` warning). The report adds one
+evidence-status line per call; view_data passes each cited and listed id's status to the HTML data.
 
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
@@ -1106,13 +1194,14 @@ Each subagent's model and effort are set in its `.claude/agents/<name>.md` front
 | judge (code/process changes, weekly spot-check) | Claude Opus 5.5 | high |
 | reflector (lessons from settled calls) | Claude Sonnet 5.5 | medium |
 | headline aboutness check, once built | Claude Haiku 4.5 (`claude-haiku-4-5`; no effort setting) | - |
-| claim extraction and cross-checking, once built | Claude Sonnet 5.5 | high |
+| claim-checker (claim extraction from article extracts and filing texts; section 3b) | Claude Sonnet 5.5 | high |
 | orchestrator (the routine session itself, incl. report narrative) | the routine sessions' configured model: `claude-opus-5-5` (India and US routine sessions, checked 2026-10-06) | session default |
 
 Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the user chooses it manually for complex planning. Whether a
 scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
-(forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits), and a per-call `model` field on predictions is a planned follow-up.
+(forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits;
+forecast-v10, news-v8 and claims-v3 with news verification phase B), and a per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
 - **Reflection log** (section 5): TauricResearch/TradingAgents (https://github.com/TauricResearch/TradingAgents,

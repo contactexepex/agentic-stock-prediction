@@ -173,7 +173,7 @@ def main() -> int:
     learned = nv.label_domains(con.execute(
         "SELECT source, source_domain FROM news WHERE first_seen_at >= ? AND first_seen_at <= ?",
         [(now - pd.Timedelta(hours=float(sel.get("lookback_hours", 24)))).to_pydatetime(),
-         now.to_pydatetime()]).fetchall())
+         now.to_pydatetime()]).fetchall(), src)
     names = {t: [m["name"], *m.get("aliases", [])] for t, m in cfg["tickers"].items()}
     out_path = day_file(market, "news_articles", utc_today())
     pacer, cap = Pacer(float(sel.get("pause_seconds", 1.5))), int(sel.get("max_per_run", 80))

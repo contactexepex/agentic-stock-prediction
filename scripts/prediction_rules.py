@@ -1,7 +1,12 @@
 """The CLAUDE.md prediction rules as one record check, shared by the daily gate
-(validate.py --stage forecast) and the as-of replay (ai_replay.py record)."""
+(validate.py --stage forecast) and the as-of replay (ai_replay.py record), and the news-verification
+rules on the cited evidence (check_news_status; the daily gate only)."""
 from __future__ import annotations
 
+from marketbrief.constants.verification import (CODE_NEWS_STATUS_BLOCKED, CODE_NEWS_STATUS_CONFIDENCE,
+                                                CODE_NEWS_STATUS_CONTRADICTED, CODE_NEWS_STATUS_MAIN,
+                                                MAIN_EVIDENCE_STATUSES, NEVER_SUPPORT_STATUSES, WEAK_CONFIDENCE_PENALTY,
+                                                WEAK_STATUSES, WIDEN_ONLY_STATUSES)
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
 
@@ -79,3 +84,28 @@ def check_prediction(rec, ctx: dict, seen: set[str], as_of=None, require_made_at
             if f["days_to_earnings"] is not None and f["days_to_earnings"] <= 1:
                 errs.append(f"{t} has earnings within 1 day (days_to_earnings {f['days_to_earnings']})")
     return errs
+
+
+def check_news_status(rec: dict, statuses: list[str]) -> list[tuple[str, str]]:
+    """(code, reason) for each news-verification rule a valid record breaks (forecaster.md; empty = ok).
+    statuses: the status of each of rec["evidence_ids"] as of its made_at (evidence_status.py). The
+    first id is the main evidence: confirmed_primary or corroborated. rumour and promotional ids never
+    support a call; a contradicted id only with range_widen > 0; citing a single_source or unverified
+    id caps the confidence at CONF_MAX - 0.05."""
+    ids, out = rec["evidence_ids"], []
+    if statuses[0] not in MAIN_EVIDENCE_STATUSES:
+        out.append((CODE_NEWS_STATUS_MAIN, f"main evidence {ids[0]} is {statuses[0]}; it must be "
+                                           f"{' or '.join(MAIN_EVIDENCE_STATUSES)}"))
+    blocked = [f"{i} ({s})" for i, s in zip(ids, statuses) if s in NEVER_SUPPORT_STATUSES]
+    if blocked:
+        out.append((CODE_NEWS_STATUS_BLOCKED, f"evidence that cannot support a call: {', '.join(blocked)}"))
+    contradicted = [i for i, s in zip(ids, statuses) if s in WIDEN_ONLY_STATUSES]
+    if contradicted and not (rec.get("range_widen") or 0) > 0:
+        out.append((CODE_NEWS_STATUS_CONTRADICTED, f"contradicted evidence {contradicted} may only be cited "
+                                                   "to widen the range (range_widen > 0)"))
+    weak = [f"{i} ({s})" for i, s in zip(ids, statuses) if s in WEAK_STATUSES]
+    cap = round(CONF_MAX - WEAK_CONFIDENCE_PENALTY, 2)
+    if weak and rec["confidence"] > cap + 1e-9:
+        out.append((CODE_NEWS_STATUS_CONFIDENCE, f"confidence {rec['confidence']} above {cap:.2f} while citing "
+                                                 f"{', '.join(weak)}"))
+    return out

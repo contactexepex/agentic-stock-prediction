@@ -51,6 +51,12 @@ for each sampled forecast and the sampled filled report, check
   stored data (DuckDB) or the report's script-written tables;
 - no look-ahead: every cited id was public before the call's `made_at`, and the report uses
   nothing published after it was written;
+- news verification: each cited id's status as of `made_at` (`news_status_ids_asof(made_at)`; a
+  filing or announcement id is confirmed_primary) is allowed for its use (the first id
+  confirmed_primary or corroborated; no rumour or promotional id; contradicted only with
+  range_widen); re-check one claim quote of a cited event against its stored extract or primary
+  text (`news_claims`, `news_articles`, `primary_texts`), and that no status row it relies on has an
+  input later than its `as_of`;
 - the claims are true: no invented ids, events, causes or numbers, nothing from memory.
 Scripts already checked formats and rules (validate.py), so spend the review on meaning. The
 output is already published, so there is no retry: return PASS or FAIL with a summary of at most

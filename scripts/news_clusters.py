@@ -95,7 +95,7 @@ def load_items(con, cfg: dict, src: nv.Sources, as_of: pd.Timestamp) -> list[dic
     arts = {r["id"]: r for r in con.execute(
         "SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ? ORDER BY id, fetched_at DESC",
         [as_of.to_pydatetime()]).df().to_dict("records")}
-    learned = nv.label_domains((r[3], r[4]) for r in rows)
+    learned = nv.label_domains(((r[3], r[4]) for r in rows), src)
     items = []
     for nid, title, url, source, sdom, pub, seen, prim in rows:
         tickers = [t for t in (prim or []) if t in cfg["tickers"]]
@@ -275,7 +275,7 @@ def describe(items: list[dict], members: list[int], dups: dict, copies) -> dict:
     unread_vetted = sum(1 for g in origin_groups if g["unread_vetted"] and not g["verified"])
     for g in origin_groups:
         g["unread_vetted"] = g["unread_vetted"] and not g["verified"]
-    unvetted = sorted(i for g in origin_groups if not g["vetted"] for i in g["news_ids"])
+    unvetted = sorted(items[m]["id"] for m in members if not items[m]["vetted"])   # also inside a vetted group
     arts = [it["article"] for it in its if it["article"]]
     flags = []
     if any(it["promo"] for it in its):

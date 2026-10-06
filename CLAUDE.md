@@ -130,6 +130,16 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
     apart (`unread_vetted_origins`). Unvetted outlets, promotional items and opinion never count. It attaches SEC filing and NSE announcement
     candidates. Output goes to `data/<market>/news_clusters/` as per-run snapshots. Read them as
     of a time with the `news_clusters_asof(ts)` macro, which does not look ahead.
+- News verification, phase B (DESIGN.md section 3b; logic in `scripts/marketbrief/`): `claims.py
+  prepare` picks the run's high-materiality watchlist clusters (`claims:` in `config/news_sources.yaml`),
+  stores the text of their SEC 8-K/6-K primary sources (`data/<market>/primary_texts/`) and writes the
+  claim-checker agent's input; `claims.py validate|add` is the gate (ids exist, quotes verbatim in the
+  stored extract or primary text, numbers stated in the quote, enums) and appends to `news_claims`;
+  `news_status.py` computes each event's and fact's status deterministically (contradicted >
+  confirmed_primary > corroborated > rumour > promotional > single_source > unverified) into
+  `news_verified`, read with `news_verified_asof(ts)` / `news_status_ids_asof(ts)` (no look-ahead). The
+  context pack shows events with their status; the forecast gate checks each cited id's status as of
+  `made_at` (`prediction_rules.check_news_status`).
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
@@ -150,13 +160,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`
-- `.claude/agents/` subagents: reflector (one lesson per settled call, after scoring), news-analyst,
+- `.claude/agents/` subagents: reflector (one lesson per settled call, after scoring), claim-checker
+  (claims of material news events quoted from stored extracts and filing texts), news-analyst,
   bull-researcher, bear-researcher, forecaster (reads the lessons; never overriding the prediction rules),
   graph-builder (monthly connection map; every edge cites a public source), and judge
   (independent verifier of code, config, agent-instruction and process changes, the monthly
   graph-builder edges and the weekly spot-check sample).
-  Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, the
-  reflector and the researchers, Opus 5.5 for the forecaster, graph-builder and judge; table in DESIGN.md section 13).
+  Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, claim
+  checking, the reflector and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
+  table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
 - Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
   `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
@@ -237,6 +249,10 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - `direction` is `up` or `down`; `horizon_days` is 1 or 5 (trading days); `confidence` 0.50-0.90.
 - `as_of_date` = the latest price date in the context pack for that ticker.
 - `evidence_ids` must reference news/filing ids. Abstaining is always allowed and often right.
+- News verification (DESIGN.md 3b): the first evidence id (the main evidence) must be
+  `confirmed_primary` or `corroborated` as of `made_at`; `rumour` and `promotional` ids never support a
+  call; a `contradicted` id only with `range_widen`; a `single_source` or `unverified` id lowers
+  confidence by at least 0.05 (at most 0.85).
 - No new call for a ticker with indicator quality `BLOCKED`, or with earnings within 1 day
   (`days_to_earnings` <= 1). Lower confidence in `EVENT_HEAVY` and `UNSTABLE` regimes.
 - Price ranges are computed by `scripts/ranges.py`, never by hand. The forecaster may only

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Print a compact Markdown context pack for one market's agents: regime, upcoming events,
 overnight cues and global factors, PASDS indicators, prices and returns, news activity,
-filings, macro and flows (yields, credit spreads, put/call, short selling; India FPI and
-indices), open predictions and the track record, lessons from past calls (lessons.py; only those
-available by now), and the previous run's judge FAILs that its
-report could not list (for today's data_quality). Agents read this instead of raw files."""
+news events with their verification status (news_status.py), filings, macro and flows (yields,
+credit spreads, put/call, short selling; India FPI and indices), open predictions and the track
+record, lessons from past calls (lessons.py; only those available by now), and the previous run's
+judge FAILs that its report could not list (for today's data_quality). Agents read this instead of
+raw files."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -22,6 +23,7 @@ from score_predictions import is_late
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
+from marketbrief.presentation import news_events
 from marketbrief.utils.markdown import cursor_markdown_table
 from features import local_today
 
@@ -190,6 +192,8 @@ def main() -> None:
         if title.startswith("SEC") and cfg.get("filings") != "sec":
             continue
         print(f"## {title}\n\n{cursor_markdown_table(con.execute(sql, params))}")
+        if title.startswith("News activity"):   # news verification: events with their status (news_status.py)
+            print("## {}\n\n{}".format(*news_events.context_section(con)))
         if title.startswith("Sector ETFs") and sector_gaps(cfg):
             print(sector_gaps(cfg))
         if title.startswith("Track record by confidence band"):

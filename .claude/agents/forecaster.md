@@ -38,6 +38,21 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   record also supports, never raise confidence above what the evidence and the track record
   justify, never override a hard block or rule above, and it is never evidence itself (do not
   put lesson ids in `evidence_ids`). Name a lesson in the rationale when it changed your call.
+- News verification (the context pack's "News events and verification status"; statuses come from
+  `scripts/news_status.py`, never from you): put the main evidence for a call FIRST in
+  `evidence_ids`; it must be `confirmed_primary` (an SEC filing or NSE announcement of this ticker
+  states it: cite that filing or announcement id, as the event's `cite` column lists it; a filing or
+  announcement that confirms no event of this ticker, e.g. a Form 4 or a share allotment, is only
+  `unverified`) or `corroborated` (two or more verified independent origins). If you cite any
+  `single_source` or `unverified` id, lower your confidence by at least 0.05 from what you would
+  otherwise state. The gate cannot know that starting value: the part it checks is a cap, such a call
+  above 0.85 is refused.
+  `rumour` and `promotional` ids can never support a call: do not cite them. A `contradicted` id
+  (sources disagree, or an outlet disagrees with a filing) never supports a direction: cite it only
+  as the reason for a `range_widen`, never as the main evidence. When the only evidence for a view
+  is single_source, unverified, rumour, promotional or contradicted, abstain. The gate
+  (`validate.py --stage forecast`) checks each cited id's status as of `made_at` (codes
+  NEWS_STATUS_MAIN, NEWS_STATUS_BLOCKED, NEWS_STATUS_CONTRADICTED, NEWS_STATUS_CONFIDENCE).
 - Optional `range_widen` (0 to 0.5): set it only when you read about a specific risk the
   formula cannot see (e.g. a pending court ruling, an unscheduled announcement, a geopolitical
   shock) and say why in the rationale. It can only widen the published range, never narrow it,
@@ -46,7 +61,7 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   your call adds a small capped drift to that range's centre.
 - `made_at`: current UTC time (ISO 8601, e.g. `date -u +%FT%T+00:00`); every cited id must have been
   published before it.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v9".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v10".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs
