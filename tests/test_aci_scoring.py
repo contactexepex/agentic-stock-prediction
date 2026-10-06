@@ -286,7 +286,8 @@ def test_calibrate_uses_aci_levels_from_outcomes_scored_by_now():
 # ---------- weekly review: ACI proposal from the replay ----------
 
 def test_review_proposes_aci_only_when_score_and_coverage_improve():
-    import review
+    from marketbrief.constants import review
+    from marketbrief.pipeline.review import aci_review
 
     def grp(c50, c80, s50, s80):
         return {"n": 1000, "cover50": c50, "cover80": c80, "score50": s50, "score80": s80}
@@ -294,7 +295,7 @@ def test_review_proposes_aci_only_when_score_and_coverage_improve():
     good = {"id": "x-aci", "settings": dict(cur),
             "comparison": {h: {"overall": {"before": grp(.56, .855, 11.6, 17.3),
                                            "after": grp(.51, .81, 11.5, 16.9)}} for h in ("1", "5")}}
-    p = review.aci_proposal({"aci": {"enabled": False}}, good)
+    p = aci_review.aci_proposal({"aci": {"enabled": False}}, good)
     assert p["changes"] == [{"param": "aci.enabled", "current": False, "proposed": True}] and p["n"] == 2000
     assert p["rel_score"] == pytest.approx(16.9 / 17.3 - 1, abs=1e-4)
     # no held-out check: provisional, labelled in-sample
@@ -304,37 +305,39 @@ def test_review_proposes_aci_only_when_score_and_coverage_improve():
     # held-out test passes with the config's settings selected on the tuning dates: not provisional
     test = {h: {"overall": {"before": grp(.55, .85, 11.0, 17.0), "after": grp(.51, .81, 10.9, 16.7)}} for h in ("1", "5")}
     ho = {"tune_end": "2024-12-31", "selected": dict(cur), "selected_is_config": True, "test_selected": test}
-    p = review.aci_proposal({}, {**good, "held_out": ho})
+    p = aci_review.aci_proposal({}, {**good, "held_out": ho})
     assert not p["provisional"] and p["evidence"] == "out-of-sample" and "after 2024-12-31" in p["source"]
     assert p["rel_score"] == pytest.approx(16.7 / 17.0 - 1, abs=1e-4)
     # tuning picked other settings, or the held-out dates fail: back to provisional
-    p = review.aci_proposal({}, {**good, "held_out": {**ho, "selected_is_config": False}})
+    p = aci_review.aci_proposal({}, {**good, "held_out": {**ho, "selected_is_config": False}})
     assert p["provisional"] and "picked other settings" in p["source"]
     bad = {h: {"overall": {"before": grp(.55, .85, 11.0, 17.0), "after": grp(.51, .81, 10.9, 17.1)}} for h in ("1", "5")}
-    p = review.aci_proposal({}, {**good, "held_out": {**ho, "test_selected": bad}})
+    p = aci_review.aci_proposal({}, {**good, "held_out": {**ho, "test_selected": bad}})
     assert p["provisional"] and "do not pass" in p["source"]
     # a replay run with other ACI settings is never evidence
-    assert review.aci_proposal({}, {**good, "settings": {**cur, "gamma": 0.02}}) is None
-    assert review.aci_proposal({"aci": {"enabled": True}}, good) is None            # already on
-    assert review.aci_proposal({}, None) is None                                     # no replay
+    assert aci_review.aci_proposal({}, {**good, "settings": {**cur, "gamma": 0.02}}) is None
+    assert aci_review.aci_proposal({"aci": {"enabled": True}}, good) is None            # already on
+    assert aci_review.aci_proposal({}, None) is None                                     # no replay
     worse = {**good, "comparison": {**good["comparison"], "5": {"overall": {
         "before": grp(.56, .855, 11.6, 17.3), "after": grp(.51, .81, 11.5, 17.4)}}}}
-    assert review.aci_proposal({}, worse) is None                                    # 5d score worse
+    assert aci_review.aci_proposal({}, worse) is None                                    # 5d score worse
     over = {**good, "comparison": {**good["comparison"], "1": {"overall": {
         "before": grp(.53, .83, 4.9, 7.3), "after": grp(.40, .70, 4.8, 7.2)}}}}
-    assert review.aci_proposal({}, over) is None                                     # coverage further from target
+    assert aci_review.aci_proposal({}, over) is None                                     # coverage further from target
 
 
 HELD_OUT = """
 import json, sys, datetime
-import replay
+from marketbrief.replay.rule_replay import aci_compare
+from marketbrief.replay.rule_replay import inputs
+from marketbrief.replay.rule_replay import range_rows
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market, load_ranges_config
 cfg = load_market('testmkt'); rc = load_ranges_config('testmkt')
 tune_end = datetime.date.fromisoformat(sys.argv[1])
-ho = replay.held_out(cfg, replay.aci_rc(rc), connect('testmkt'), tune_end)
-bars, extra = replay.load_inputs(cfg, rc, connect('testmkt'))
-res, _ = replay.replay_rows(cfg, rc, bars, extra)
+ho = aci_compare.held_out(cfg, aci_compare.aci_rc(rc), connect('testmkt'), tune_end)
+bars, extra = inputs.load_inputs(cfg, rc, connect('testmkt'))
+res, _ = range_rows.replay_rows(cfg, rc, bars, extra)
 n_test = {str(h): int(((g['date'] > tune_end) & g['actual'].notna()).sum()) for h, g in res.items()}
 c80 = {str(h): float(g.loc[(g['date'] > tune_end) & g['actual'].notna(), 'hit80'].astype(float).mean())
        for h, g in res.items()}
@@ -364,11 +367,11 @@ def test_replay_held_out_selects_on_tuning_dates_and_reports_test_dates(tmp_path
 
 
 def test_review_skips_aci_replays_with_other_settings_and_ids_name_settings():
-    import replay
-    import review
+    from marketbrief.replay.rule_replay import aci_compare
+    from marketbrief.pipeline.review import aci_review
     a = aci.settings({})
-    assert replay.aci_tag(a) == "-aci-g0.01-regime-s0.15-m20"
-    assert replay.aci_tag({**a, "gamma": 0.002, "by_regime": False}, date(2024, 12, 31)) == "-aci-g0.002-all-s0.15-m20-t2024-12-31"
+    assert aci_compare.aci_tag(a) == "-aci-g0.01-regime-s0.15-m20"
+    assert aci_compare.aci_tag({**a, "gamma": 0.002, "by_regime": False}, date(2024, 12, 31)) == "-aci-g0.002-all-s0.15-m20-t2024-12-31"
     cmp = {h: {"overall": {"before": {"n": 10, "cover50": .56, "cover80": .855, "score50": 11.6, "score80": 17.3},
                            "after": {"n": 10, "cover50": .51, "cover80": .81, "score50": 11.5, "score80": 16.9}}}
            for h in ("1", "5")}
@@ -378,15 +381,15 @@ def test_review_skips_aci_replays_with_other_settings_and_ids_name_settings():
     def add(rid, at, settings):
         con.execute("INSERT INTO replays VALUES (?, '2026-10-05', ?, ?, ?)",
                     [rid, at, json.dumps({"aci": settings}), json.dumps({"aci_comparison": cmp})])
-    add("w" + replay.aci_tag({**a, "gamma": 0.02}), "2026-10-06T02:00:00+00:00", {**a, "gamma": 0.02, "enabled": True})
-    rep = review.latest_aci_replay(con, date(2026, 10, 11), {})
+    add("w" + aci_compare.aci_tag({**a, "gamma": 0.02}), "2026-10-06T02:00:00+00:00", {**a, "gamma": 0.02, "enabled": True})
+    rep = aci_review.latest_aci_replay(con, date(2026, 10, 11), {})
     assert rep["comparison"] is None and "none with the config/ranges.yaml ACI settings" in rep["note"]
-    assert review.aci_proposal({}, rep) is None
-    add("w" + replay.aci_tag(a), "2026-10-06T01:00:00+00:00", {**a, "enabled": True})   # older, matching
-    rep = review.latest_aci_replay(con, date(2026, 10, 11), {})
+    assert aci_review.aci_proposal({}, rep) is None
+    add("w" + aci_compare.aci_tag(a), "2026-10-06T01:00:00+00:00", {**a, "enabled": True})   # older, matching
+    rep = aci_review.latest_aci_replay(con, date(2026, 10, 11), {})
     assert rep["id"].endswith("-aci-g0.01-regime-s0.15-m20") and "1 newer ACI replay(s)" in rep["note"]
-    assert review.aci_proposal({}, rep)["provisional"]
+    assert aci_review.aci_proposal({}, rep)["provisional"]
     # the config changes gamma: the stored g0.01 replay no longer counts
     rc = {"aci": {"gamma": 0.005}}
-    rep = review.latest_aci_replay(con, date(2026, 10, 11), rc)
-    assert rep["comparison"] is None and review.aci_proposal(rc, rep) is None
+    rep = aci_review.latest_aci_replay(con, date(2026, 10, 11), rc)
+    assert rep["comparison"] is None and aci_review.aci_proposal(rc, rep) is None

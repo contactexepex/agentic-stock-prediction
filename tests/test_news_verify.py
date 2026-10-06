@@ -16,7 +16,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import ai_replay  # noqa: E402
+from marketbrief.replay.ai_replay import copy_asof  # noqa: E402
 from marketbrief.collectors import articles as collect_articles  # noqa: E402
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
@@ -532,10 +532,10 @@ def test_clusters_asof_has_no_lookahead(env, capsys):
 def test_ai_replay_filters_new_kinds_by_time():
     cutoff = pd.Timestamp("2026-10-06T12:15:00+00:00")
     d = date(2026, 10, 5)
-    assert ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:00:00+00:00"}, d, cutoff)
-    assert not ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:30:00+00:00"}, d, cutoff)
-    assert ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T12:00:00+00:00"}, d, cutoff)
-    assert not ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T13:00:00+00:00"}, d, cutoff)
+    assert copy_asof.keep_row("news_articles", {"fetched_at": "2026-10-06T12:00:00+00:00"}, d, cutoff)
+    assert not copy_asof.keep_row("news_articles", {"fetched_at": "2026-10-06T12:30:00+00:00"}, d, cutoff)
+    assert copy_asof.keep_row("news_clusters", {"as_of": "2026-10-06T12:00:00+00:00"}, d, cutoff)
+    assert not copy_asof.keep_row("news_clusters", {"as_of": "2026-10-06T13:00:00+00:00"}, d, cutoff)
 
 
 def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):

@@ -20,7 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from marketbrief.core import calendar as ev  # noqa: E402
 from marketbrief.analytics import indicators as ind  # noqa: E402
-import replay  # noqa: E402
+from marketbrief.constants import replay
+from marketbrief.replay import html_parts
+from marketbrief.replay.rule_replay import inputs
+from marketbrief.replay.rule_replay import replay_statistics  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, fat_tailed_walk, run, setup, write_bars  # noqa: E402
 
 XNYS = {"market": "x", "calendar": "XNYS", "timezone": "America/New_York"}
@@ -29,14 +32,18 @@ D_POS = N - 12          # the sample as-of day: its 1d and 5d targets are inside
 
 DUMP = """
 import json, sys, datetime
-import replay
+from marketbrief.constants import replay
+from marketbrief.replay import html_parts
+from marketbrief.replay.rule_replay import inputs
+from marketbrief.replay.rule_replay import range_rows
+from marketbrief.replay.rule_replay import replay_statistics  # noqa: E402
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market, load_ranges_config
 cfg = load_market('testmkt'); rc = load_ranges_config('testmkt')
-bars, extra = replay.load_inputs(cfg, rc, connect('testmkt'))
+bars, extra = inputs.load_inputs(cfg, rc, connect('testmkt'))
 start = datetime.date.fromisoformat(sys.argv[1]) if sys.argv[1] != '-' else None
 end = datetime.date.fromisoformat(sys.argv[2]) if sys.argv[2] != '-' else None
-res, reg = replay.replay_rows(cfg, rc, bars, extra, start, end)
+res, reg = range_rows.replay_rows(cfg, rc, bars, extra, start, end)
 rows = [r for h, g in res.items() for r in g.to_dict('records')]
 print(json.dumps(rows, default=str))
 """
@@ -229,7 +236,7 @@ def test_baseline_hit_rates_on_synthetic_series():
     rsi = np.where(np.arange(n) % 4 == 0, 20.0, np.where(np.arange(n) % 4 == 1, 80.0, 50.0))
     g = pd.DataFrame({"date": [date(2025, 1, 1) + timedelta(days=i) for i in range(n)], "rank": np.arange(n),
                       "ticker": "X", "fwd": fwd, "actual": 100 * np.exp(fwd), "ret1": ret1, "ret5": np.nan, "rsi": rsi})
-    b = replay.baseline_stats(g, 1)
+    b = replay_statistics.baseline_stats(g, 1)
     au = b["always_up"]
     assert au["calls"] == n and au["hits"] == 99 and au["hit_rate"] == pytest.approx(99 / n, abs=1e-4)
     m1 = b["momentum_1d"]
@@ -243,29 +250,29 @@ def test_baseline_hit_rates_on_synthetic_series():
 
 
 def test_tiny_p_values_print_as_less_than():
-    assert replay.fmt_p(0.0) == "<0.001" and replay.fmt_p(4.2e-9) == "<0.001"
-    assert replay.fmt_p(0.0123) == "0.0123" and replay.fmt_p(None) == ""
+    assert html_parts.fmt_p(0.0) == "<0.001" and html_parts.fmt_p(4.2e-9) == "<0.001"
+    assert html_parts.fmt_p(0.0123) == "0.0123" and html_parts.fmt_p(None) == ""
 
 
 def test_binomial_and_wilson():
-    assert replay.binom_p_two_sided(50, 100) == pytest.approx(1.0)
-    assert replay.binom_p_two_sided(60, 100) == pytest.approx(0.056887, abs=1e-5)
-    assert replay.binom_p_two_sided(0, 10) == pytest.approx(2 / 1024)
-    lo, hi = replay.wilson(50, 100)
+    assert replay_statistics.binom_p_two_sided(50, 100) == pytest.approx(1.0)
+    assert replay_statistics.binom_p_two_sided(60, 100) == pytest.approx(0.056887, abs=1e-5)
+    assert replay_statistics.binom_p_two_sided(0, 10) == pytest.approx(2 / 1024)
+    lo, hi = replay_statistics.wilson(50, 100)
     assert lo == pytest.approx(0.4038, abs=1e-4) and hi == pytest.approx(0.5962, abs=1e-4)
     # clustered interval: perfectly correlated blocks are as wide as the block count says
     v = np.repeat([1.0, 0.0] * 10, 5)
-    lo_c, hi_c = replay.clustered_ci(v, np.repeat(np.arange(20), 5))
-    lo_i, hi_i = replay.wilson(50, 100)
+    lo_c, hi_c = replay_statistics.clustered_ci(v, np.repeat(np.arange(20), 5))
+    lo_i, hi_i = replay_statistics.wilson(50, 100)
     assert hi_c - lo_c > hi_i - lo_i
 
 
 def test_rsi_and_returns_match_indicators():
     rng = np.random.default_rng(3)
     c = pd.Series(fat_tailed_walk(rng, 300, 100, 0.02), index=pd.bdate_range("2024-01-01", periods=300))
-    r = replay.rsi_series(c)
+    r = inputs.rsi_series(c)
     for i in (14, 15, 40, 150, 299):
         assert r.iloc[i] == pytest.approx(ind.rsi(c.iloc[:i + 1]), abs=1e-9)
     assert math.isnan(r.iloc[13])
     up = pd.Series(np.arange(1.0, 40.0))
-    assert replay.rsi_series(up).iloc[-1] == ind.rsi(up) == 100.0
+    assert inputs.rsi_series(up).iloc[-1] == ind.rsi(up) == 100.0

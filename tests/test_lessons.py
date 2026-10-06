@@ -269,10 +269,10 @@ def test_context_section_last3_per_ticker_and_market_wide(tmp_path):
 
 
 def test_ai_replay_keeps_lessons_by_available_from():
-    import ai_replay as ar
+    from marketbrief.replay.ai_replay import copy_asof
     d, cut = date(2026, 8, 14), pd.Timestamp("2026-08-17T12:15:00+00:00")
-    assert ar.keep_row("lessons", {"available_from": "2026-08-14T22:00:00+00:00", "target_date": "2026-08-14"}, d, cut)
-    assert not ar.keep_row("lessons", {"available_from": "2026-08-17T12:16:00+00:00", "target_date": "2026-08-14"},
+    assert copy_asof.keep_row("lessons", {"available_from": "2026-08-14T22:00:00+00:00", "target_date": "2026-08-14"}, d, cut)
+    assert not copy_asof.keep_row("lessons", {"available_from": "2026-08-17T12:16:00+00:00", "target_date": "2026-08-14"},
                            d, cut)                                          # available after the cutoff
-    assert not ar.keep_row("lessons", {"available_from": "2026-08-14T22:00:00+00:00", "target_date": "2026-08-17"},
+    assert not copy_asof.keep_row("lessons", {"available_from": "2026-08-14T22:00:00+00:00", "target_date": "2026-08-17"},
                            d, cut)                                          # target after D

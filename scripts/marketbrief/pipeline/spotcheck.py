@@ -23,7 +23,7 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core import paths
-from review import previous_week, week_bounds
+from marketbrief.pipeline.review.helpers import previous_week, week_bounds
 
 SAMPLE_CALLS, SAMPLE_REPORTS = 2, 1
 CHECKLIST = [

@@ -357,10 +357,11 @@ def test_ranges_config_per_market_override(tmp_path, monkeypatch):
     assert load_ranges_config("us")["earnings_vol_multiple"] == 3.0
     # every script loads the settings of the market it runs for (review's replay, calibrate, ...)
     import re
-    calls = {f"{f.name}:{m}" for f in sorted((Path(__file__).resolve().parents[1] / "scripts").rglob("*.py"))
+    calls = {f"{f.parent.name}/{f.name}:{m}" for f in sorted((Path(__file__).resolve().parents[1] / "scripts").rglob("*.py"))
              if f.name not in ("common.py", "market_config.py") for m in re.findall(r"load_ranges_config\(([^)]*)\)", f.read_text())}
-    assert {c.split(":")[0] for c in calls} >= {"backtest.py", "calibration.py", "range_publication.py",
-                                                    "relation_flags.py", "review.py"}
+    assert {c.split(":")[0] for c in calls} >= {"backtest/cli.py", "analytics/calibration.py",
+                                                    "analytics/range_publication.py", "analytics/relation_flags.py",
+                                                    "review/cli.py"}
     assert all(c.endswith(':cfg["market"]') for c in calls), calls
 
 

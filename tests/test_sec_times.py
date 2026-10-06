@@ -323,7 +323,7 @@ def test_several_checks_per_accession_keep_row_counts(tmp_path):
 def test_ai_replay_filters_sec_rows_by_the_header_time(tmp_path):
     """The as-of copy keeps a filing stored 4h late (02:42Z) when its header time (22:42Z the day
     before) is before the cutoff, and copies only the sec_times rows accepted by the cutoff."""
-    import ai_replay
+    from marketbrief.replay.ai_replay import copy_asof
     src = tmp_path / "src"
     base = src / "data" / "us"
     acc = "0001140361-26-038674"
@@ -332,7 +332,7 @@ def test_ai_replay_filters_sec_rows_by_the_header_time(tmp_path):
         json.dumps({"id": acc, "ticker": "AAPL", "cik": "320193", "form": "4", "filing_date": "2026-10-05",
                     "accepted_at": "2026-10-06T02:42:45.000Z", "first_seen_at": "2026-10-06T03:00:00+00:00"}) + "\n")
     cutoff = datetime(2026, 10, 6, 0, 0, tzinfo=timezone.utc)
-    out = ai_replay.copy_asof("us", src, tmp_path / "no_fix", date(2026, 10, 5), cutoff)
+    out = copy_asof.copy_asof("us", src, tmp_path / "no_fix", date(2026, 10, 5), cutoff)
     assert out["kinds"]["filings"]["rows_kept"] == 0                                    # raw time: after the cutoff
     (base / "sec_times" / "2026" / "10").mkdir(parents=True)
     (base / "sec_times" / "2026" / "10" / "2026-10-07.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [
@@ -341,12 +341,12 @@ def test_ai_replay_filters_sec_rows_by_the_header_time(tmp_path):
         {"accession": "9999999999-26-000001", "cik": "1", "accepted_at": "2026-10-06T13:00:00.000Z",
          "json_accepted_at": "2026-10-06T17:00:00.000Z", "source": "sgml_header", "checked_at": "2026-10-07T01:00:00Z"}]))
     dst = tmp_path / "fixed"
-    out = ai_replay.copy_asof("us", src, dst, date(2026, 10, 5), cutoff)
+    out = copy_asof.copy_asof("us", src, dst, date(2026, 10, 5), cutoff)
     assert out["kinds"]["filings"]["rows_kept"] == 1 and "sec_times" not in out["excluded"]
     assert out["kinds"]["sec_times"]["rows_kept"] == 1                                  # a later filing's time is not copied
     copied = [json.loads(x) for f in (dst / "data" / "us" / "sec_times").glob("**/*.jsonl") for x in f.read_text().splitlines()]
     assert [r["accession"] for r in copied] == [acc]
     assert "SGML header" in out["kinds"]["filings"]["rule"]
     # the correction can also move a row out: a header time after the cutoff wins over an earlier stored one
-    assert ai_replay.keep_row("filings", {"id": acc, "accepted_at": "2026-10-05T12:00:00Z"}, date(2026, 10, 4),
+    assert copy_asof.keep_row("filings", {"id": acc, "accepted_at": "2026-10-05T12:00:00Z"}, date(2026, 10, 4),
                               pd.Timestamp("2026-10-05T13:00:00Z"), {acc: TRUE[acc]}) is False
