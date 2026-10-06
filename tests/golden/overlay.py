@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import tarfile
 from datetime import date, timedelta
@@ -17,6 +18,9 @@ import yaml
 CODE = Path(__file__).resolve().parents[2]
 INPUT_COMMIT = "24749bdc4835bff242b2683f83e85f2a7e3a2ab0"
 INPUT_PATHS = ("data", "config", "reports")
+# config files newer than INPUT_COMMIT that the code under test needs (copied from this checkout)
+NEW_CONFIG_FILES = ("model.yaml", "costs.yaml")
+GOLDEN_ADJUSTMENT = 0.05   # the forecaster stand-in moves the model probability this much toward its side
 PAST_CALL_DATES = [date(2026, 9, 21) + timedelta(days=i) for i in range(5)]
 PAST_CALL_HOUR_UTC = {"india": "11:00:00", "us": "21:00:00"}
 PAST_CALL_TICKERS = 3
@@ -125,17 +129,48 @@ def write_forecaster_file(root: Path, market: str, clock: str) -> None:
     tickers = watchlist_head(root, market)
     news, primary = first_news_ids(root, market, tickers), confirming_primary_ids(root, market, tickers, clock)
 
+    scores = model_scores(root, market)
+
     def call(ticker: str, horizon: int, direction: str, confidence: float, evidence: list[str], widen: float) -> dict:
         as_of = latest_bar_date(root, market, ticker)
-        return {"id": f"{as_of}-{ticker}-{horizon}d", "made_at": clock, "as_of_date": as_of, "ticker": ticker,
-                "horizon_days": horizon, "direction": direction, "confidence": confidence,
-                "rationale": "golden forecaster call", "evidence_ids": evidence, "prompt_version": "golden",
-                "range_widen": widen}
+        rec = {"id": f"{as_of}-{ticker}-{horizon}d", "made_at": clock, "as_of_date": as_of, "ticker": ticker,
+               "horizon_days": horizon, "direction": direction, "confidence": confidence,
+               "rationale": "golden forecaster call", "evidence_ids": evidence, "prompt_version": "golden",
+               "range_widen": widen}
+        return anchor(rec, scores.get(rec["id"])) if confidence <= 0.9 else rec
     calls = [call(t, 5, "up" if i % 2 else "down", 0.6, [*([primary[t]] if t in primary else []), news[t]], 0.1)
              for i, t in enumerate(tickers) if t in news]
     calls.append(call(tickers[-1], 1, "up", 0.95, ["missing-id"], 0.0))
     (root / "work").mkdir(parents=True, exist_ok=True)
     (root / "work" / "predictions.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls))
+
+
+def model_scores(root: Path, market: str) -> dict[str, float]:
+    """id -> prob_up of the newest stored model score (model_scores.py ran before the forecaster)."""
+    newest: dict[str, tuple[str, float]] = {}
+    for path in sorted((root / "data" / market / "model_scores").rglob("*.jsonl")):
+        for line in path.read_text().splitlines():
+            row = json.loads(line)
+            if row["id"] not in newest or row["computed_at"] >= newest[row["id"]][0]:
+                newest[row["id"]] = (row["computed_at"], row["prob_up"])
+    return {k: v[1] for k, v in newest.items()}
+
+
+def anchor(rec: dict, model_prob: float | None) -> dict:
+    """A call anchored on the model as forecaster.md says: final = model_prob + GOLDEN_ADJUSTMENT toward the
+    intended side; direction and confidence follow from the final probability."""
+    if model_prob is None:
+        return rec
+    adjustment = GOLDEN_ADJUSTMENT if rec["direction"] == "up" else -GOLDEN_ADJUSTMENT
+    final = model_prob + adjustment
+    return {**rec, "direction": "up" if final > 0.5 else "down", "confidence": round(max(final, 1 - final), 2),
+            "model_prob": model_prob, "agent_adjustment": adjustment, "adjustment_reason": "golden adjustment"}
+
+
+def copy_model_config(root: Path, _market: str, _clock: str) -> None:
+    """The signal model's config files (newer than INPUT_COMMIT) from this checkout into the scratch root."""
+    for name in NEW_CONFIG_FILES:
+        shutil.copyfile(CODE / "config" / name, root / "config" / name)
 
 
 def append_valid_calls(root: Path, market: str, clock: str) -> None:

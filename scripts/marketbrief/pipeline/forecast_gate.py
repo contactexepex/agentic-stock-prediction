@@ -1,7 +1,8 @@
 """The forecast stage of the daily gate (validate.py --stage forecast): work/predictions.jsonl before it is
 appended. Every CLAUDE.md prediction rule (prediction_rules.check_prediction), evidence public before
 made_at, no calls on a late or mid-session run, and the news-verification rules on the cited evidence
-(prediction_rules.check_news_status, each id's status as of the record's made_at; codes NEWS_STATUS_*).
+(prediction_rules.check_news_status, each id's status as of the record's made_at; codes NEWS_STATUS_*), and
+the anchor on the signal model's score (marketbrief/model/forecast_rules.py; MODEL_ADJUSTMENT, MODEL_SCORE_MISSING).
 Before the first status row existed (days before the feature) the status rules are not applied and
 NEWS_STATUS_MISSING is a warning."""
 from __future__ import annotations
@@ -15,6 +16,7 @@ from marketbrief.constants.verification import CODE_FORECAST_RULE, CODE_NEWS_STA
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 from marketbrief.analytics.prediction_rules import check_news_status, check_prediction
+from marketbrief.model.forecast_rules import model_rules_pass
 
 
 def evidence_times(con) -> dict:
@@ -90,8 +92,9 @@ def stage_forecast(res, cfg, con, st, now, vc, path: Path) -> None:  # noqa: PLR
         if errs:
             res.block(CODE_FORECAST_RULE, f"line {i} ({rec.get('id') if isinstance(rec, dict) else '?'}): "
                       + "; ".join(errs), tk)
-        elif status_failures(res, rec, i, statuses):
-            good += 1
+        else:   # both rule sets report their own failures
+            news_ok, model_ok = status_failures(res, rec, i, statuses), model_rules_pass(res, con, rec, i)
+            good += int(news_ok and model_ok)
         if isinstance(rec, dict) and rec.get("id"):
             seen.add(rec["id"])
     res.info["forecast"] = {"records": len(lines), "valid": good}

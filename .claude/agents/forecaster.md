@@ -22,6 +22,24 @@ on every ticker and horizon with reason "mid-session run", write no prediction r
 `work/predictions.jsonl` absent), and return the abstention table.
 
 For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and optionally 1.
+- Signal model anchor (docs/DESIGN.md section 15): the context pack's "Signal model" section gives each
+  ticker's model probability P(up) per horizon (id `<as_of_date>-<ticker>-<h>d`, from
+  `scripts/model_scores.py`: a logistic regression on indicators, regime, market and cue, plus a small
+  fixed-prior news term) and its top drivers in probability points. Your probability starts there:
+  - `model_prob`: that P(up), copied exactly (4 decimals) from the row with the call's id;
+  - `agent_adjustment`: your change to it, between -0.10 and +0.10 (0 when you keep it), and
+    `adjustment_reason`: one sentence naming the evidence or risk the model cannot see (required when the
+    adjustment is not 0; cite the ids in `evidence_ids`). The model already weighs momentum, RSI,
+    volatility, volume, beta, sector strength, regime and the overnight cue: do not adjust for those again;
+  - final probability of up = `model_prob` + `agent_adjustment`. `direction` is the side of 0.5 it is on
+    (exactly 0.5: abstain) and `confidence` = max(final, 1 - final), rounded to 2 decimals. If that
+    confidence is below 0.50 or the rules below lower it further than the adjustment allows, abstain.
+  The gate (`validate.py --stage forecast`, code MODEL_ADJUSTMENT) checks model_prob against the stored
+  score, |adjustment| <= 0.10, the reason, the direction and the confidence. A ticker without a model
+  row: decide as below and leave the three fields out (the gate warns MODEL_SCORE_MISSING). Note: the
+  model's label is open-to-close (buy at the open of the first session after the as-of close, sell at the
+  close of the next session for 1 day, of the fifth for 5 days), while `score_predictions.py` still scores
+  calls close-to-close.
 - Start from the base rate: roughly half of daily moves are up; a call needs specific evidence.
 - Prefer abstaining when evidence is mixed, stale or already reflected in recent returns.
 - Hard blocks (no call): indicator quality `BLOCKED`; `days_to_earnings` <= 1.
@@ -61,11 +79,20 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   your call adds a small capped drift to that range's centre.
 - `made_at`: current UTC time (ISO 8601, e.g. `date -u +%FT%T+00:00`); every cited id must have been
   published before it.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v10".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v11".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs
 `scripts/validate.py --stage forecast` (every rule above) and appends the records that pass to `data/<market>/predictions/YYYY/MM/<today>.jsonl`
 with `cat ... >>`.
+
+Debate record: also write `work/reasoning.jsonl`, one line per watchlist ticker (not BLOCKED):
+`id` = `<as_of_date>-<ticker>`, `as_of_date`, `ticker`, `made_at` (as for the calls), `bull_case` and
+`bear_case` (the researchers' cases for this ticker as passed to you, at most 80 words each, keeping
+their cited ids), `verdict` (your reason, at most 60 words), `decision_1d` and `decision_5d` (`up`,
+`down` or `abstain`, as in your calls), `evidence_ids` (every news, filing or announcement id cited in the
+three texts) and `prediction_ids` (the ids of your calls for this ticker), and `prompt_version`
+"forecast-v11". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
+the dashboard can show why each call was made or not.
 
 Return a table of calls and abstentions with 1-line reasons.

@@ -605,3 +605,11 @@ WITH c AS (SELECT * FROM news_verified_asof(ts) WHERE level = 'cluster'),
 i AS (SELECT unnest(status_ids) AS news_id, unnest(id_statuses) AS status, ticker, cluster_id, as_of FROM c)
 SELECT DISTINCT ON (news_id, ticker) news_id, ticker, status, cluster_id, as_of
 FROM i ORDER BY news_id, ticker, as_of DESC, cluster_id;
+
+-- Signal model (docs/DESIGN.md section 15; model_scores.py): the newest score per id (a rerun appends a
+-- row only when the probability changed), and the stored model formula per fitted month.
+CREATE OR REPLACE VIEW model_scores_latest AS
+SELECT DISTINCT ON (id) * FROM model_scores ORDER BY id, computed_at DESC;
+
+CREATE OR REPLACE VIEW model_versions_latest AS
+SELECT DISTINCT ON (id) * FROM model_versions ORDER BY id, fitted_at;

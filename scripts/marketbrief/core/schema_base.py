@@ -77,6 +77,9 @@ BASE_SCHEMAS: Schemas = {
         "horizon_days": "INTEGER", "direction": "VARCHAR", "confidence": "DOUBLE",
         "rationale": "VARCHAR", "evidence_ids": "VARCHAR[]", "prompt_version": "VARCHAR",
         "range_widen": "DOUBLE",
+        # signal model anchor (forecast-v11; null on older rows): the stored model_scores prob_up, the
+        # forecaster's adjustment (|x| <= 0.10, final = model_prob + x) and its written reason
+        "model_prob": "DOUBLE", "agent_adjustment": "DOUBLE", "adjustment_reason": "VARCHAR",
     }),
     # Reflection log (lessons.py; pattern from TauricResearch/TradingAgents): one lesson per settled call.
     # Facts are copied deterministically from predictions/outcomes/ranges/range_outcomes; only `lesson`

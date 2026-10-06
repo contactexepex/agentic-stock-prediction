@@ -1,0 +1,27 @@
+# Round-trip trading costs for the model's paper strategy (scripts/model_backtest.py; docs/DESIGN.md
+# section 15). Research only: no trade is ever placed. Rates are fractions of traded value. Every value
+# is marked "verify": check it against the official source before relying on it. The rates below were
+# looked up on 2026-10-06; the backtest applies today's rates to every past date (earlier dates had other
+# rates, e.g. the SEC fee was $0 per million until 2026-04-03 per the advisory below).
+# Not modelled: bid-ask spread and slippage (fills assumed at the official open and close prices; set
+# slippage_each_side to stress-test), and India's flat DP charge per scrip sold (a rupee amount per sale,
+# not a rate; it depends on position size).
+india:
+  # Equity delivery (the holds span at least one night, so delivery rates apply, not intraday).
+  brokerage_each_side: 0.0          # verify: discount broker, Rs 0 on delivery
+  stt_each_side: 0.001              # verify: STT 0.1% on buy and sell (delivery); https://www.incometaxindia.gov.in
+  exchange_txn_each_side: 0.0000307 # verify: NSE cash 0.00307% from 2026-03-01 (0.00297% 2024-10-01..2026-02-28),
+                                    # NSE circular of 2026-02-27; https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+  sebi_fee_each_side: 0.000001      # verify: SEBI turnover fee Rs 10 per crore = 0.0001%; https://www.sebi.gov.in
+  stamp_duty_buy: 0.00015           # verify: 0.015% on the buy side (delivery), Indian Stamp Act as amended 2020
+  gst_rate: 0.18                    # verify: GST 18% on brokerage + exchange transaction + SEBI fees
+  slippage_each_side: 0.0
+us:
+  commission_each_side: 0.0         # verify: commission-free broker
+  sec_fee_sell: 0.0000206           # verify: Section 31 fee $20.60 per million on sales from 2026-04-04;
+                                    # https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2
+  finra_taf_per_share_sell: 0.000195  # verify: FINRA TAF $0.000195 per share sold, max $9.79 per trade (2026);
+  finra_taf_max_per_trade: 9.79       # FINRA paused it at $0 for 2026-10-01..2026-12-31 (SR-FINRA-2026-021):
+                                      # https://www.finra.org/rules-guidance/rule-filings/sr-finra-2026-021
+  notional_per_trade: 10000.0       # USD per position, only for the per-share TAF and its cap
+  slippage_each_side: 0.0

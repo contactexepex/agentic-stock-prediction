@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from marketbrief.constants.kinds import KIND_FUNDAMENTALS, KIND_SEC_TIMES
 from marketbrief.core.schema_base import BASE_SCHEMAS, FEATURE_COLS, Schemas
+from marketbrief.core.schema_model import MODEL_SCHEMAS
 from marketbrief.core.schema_filings import (ACCEPTED_KEYS, FUNDAMENTALS_SCHEMA, SEC_RELATIONSHIP_SCHEMAS,
                                              SEC_TIMES_SCHEMA)
 from marketbrief.core.schema_sources import FREE_SOURCE_SCHEMAS, RELATION_SCHEMAS
@@ -16,7 +17,7 @@ def build_schemas() -> Schemas:
     rows in `insiders`) becomes the union of both column sets, the earlier column keeping its type."""
     schemas: Schemas = {**BASE_SCHEMAS, **SEC_RELATIONSHIP_SCHEMAS, KIND_SEC_TIMES: SEC_TIMES_SCHEMA,
                         KIND_FUNDAMENTALS: FUNDAMENTALS_SCHEMA, **FREE_SOURCE_SCHEMAS,
-                        **VERIFICATION_SCHEMAS}
+                        **VERIFICATION_SCHEMAS, **MODEL_SCHEMAS}
     for kind, (file_format, columns) in RELATION_SCHEMAS.items():
         if kind in schemas:
             schemas[kind] = (schemas[kind][0], {**columns, **schemas[kind][1]})

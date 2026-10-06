@@ -19,15 +19,17 @@ step:
   twice, scores in range); the weekly spot-check reads enrichment summaries of sampled evidence;
 - bull and bear researchers: `--stage forecast` (every cited id exists and was public before the
   call) and the weekly spot-check (reasons match evidence);
-- forecaster: `--stage forecast` (every CLAUDE.md prediction rule, and each cited id's news
-  verification status as of `made_at`) and the weekly spot-check;
+- forecaster: `--stage forecast` (every CLAUDE.md prediction rule, each cited id's news
+  verification status as of `made_at`, and the anchor on the signal model's stored score: model_prob,
+  |agent_adjustment| <= 0.10 with a reason, direction and confidence from the final probability), the
+  debate record's gate `scripts/agent_reasoning.py validate` (step 9a) and the weekly spot-check;
 - summaries, report and Slack draft: `--stage report` (each number in agent-written text must
   match a number of the same kind, percent or plain, from the companies or symbols its sentence
   names, the market-level data or the news it cites; an invented number that happens to equal
   such a number still passes, which the weekly spot-check is for; no AGENT markers left, every range published or explained)
   and the weekly spot-check (claims are true).
 Agent records stay in `work/` until their gate passes; only then append them to `data/`.
-Delete `work/lessons.jsonl`, `work/claims.jsonl`, `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
+Delete `work/lessons.jsonl`, `work/claims.jsonl`, `work/enriched.jsonl`, `work/predictions.jsonl`, `work/reasoning.jsonl` and `work/graph.jsonl` before each agent
 runs and right after each append, so a stale file can never be appended twice.
 On a blocking failure, fix it once (send the failure list back to the agent, or fix your own
 narrative) and run the stage again. The daily run allows ONE retry because it is time-boxed. If it
@@ -49,7 +51,8 @@ still fails:
   announcement counts only when it confirms an event of that ticker),
   `NEWS_STATUS_BLOCKED` = a rumour or promotional id is cited, `NEWS_STATUS_CONTRADICTED` = a
   contradicted id is cited without `range_widen`, `NEWS_STATUS_CONFIDENCE` = confidence above 0.85
-  with a single_source or unverified id); on `CALLS_NOT_ALLOWED` (late or mid-session run) drop all;
+  with a single_source or unverified id, `MODEL_ADJUSTMENT` = the call does not anchor on the stored
+  model score as forecaster.md says); on `CALLS_NOT_ALLOWED` (late or mid-session run) drop all;
 - `report`: replace each section holding an unmatched number with "Narrative withheld: failed
   validation (<code>)"; the numbers, tables and charts written by the scripts stay. A daily
   summary with an unmatched number: correct the number from the pack, or remove the sentence.
@@ -174,6 +177,14 @@ Warnings never block: list them in `data_quality`.
    `python scripts/validate.py --stage features > work/steps/validate_features.json` (a feature
    row for every ticker's newest bar, a regime row).
 
+5a. Signal model (docs/DESIGN.md section 15; non-blocking): `python scripts/model_scores.py >
+    work/steps/model_scores.json`. It appends each ticker's model probability P(up) per horizon with its
+    explanation to `data/<market>/model_scores/` (the first run of a month also fits and stores that
+    month's model in `data/<market>/model_versions/`). List its `notes` (e.g. a ticker without a bar for
+    the as-of date) in the report's `data_quality`. If it fails, carry on: the context
+    pack then shows no model rows and the forecaster calls without the anchor (the gate warns
+    MODEL_SCORE_MISSING); say so in `data_quality`.
+
 6. Context: `python scripts/context.py > work/context.md`. Gate:
    `python scripts/validate.py --stage context > work/steps/validate_context.json`.
 
@@ -183,7 +194,10 @@ Warnings never block: list them in `data_quality`.
    `work/enriched.jsonl` should hold one record per new news id plus one per new `nse-ann-` id,
    and nothing else. Gate: `python scripts/validate.py --stage news > work/steps/validate_news.json`;
    if it passes, append `work/enriched.jsonl` to `data/<market>/news_enriched/YYYY/MM/TODAY.jsonl`
-   with `cat >>` and delete the work file.
+   with `cat >>` and delete the work file. Then run `python scripts/model_scores.py >
+   work/steps/model_scores_news.json` again (today's enriched news enter the model's news term; it
+   appends a row only where the probability changed) and rebuild the pack:
+   `python scripts/context.py > work/context.md`.
 
 8. Debate: run bull-researcher and bear-researcher in parallel, passing each the market and
    the news brief.
@@ -198,6 +212,15 @@ Warnings never block: list them in `data_quality`.
    empty data file, which the gates reject) and delete the work file. Only then run `python scripts/ranges.py`
    (it reads the appended calls and publishes the 50% and 80% price ranges), and
    `python scripts/context.py > work/context.md` again so the report shows calls and ranges.
+
+9a. Debate record (non-blocking): the forecaster also wrote `work/reasoning.jsonl` (per ticker: the bull
+    and bear cases, its verdict, its decisions and cited ids). After the calls were appended, for each call
+    the forecast gate dropped, set that ticker's `decision_<h>d` to `abstain` and remove the call's id from
+    `prediction_ids`. Then `python scripts/agent_reasoning.py validate work/reasoning.jsonl` (ids and
+    as-of dates, word limits, every cited id stored and public by `made_at`, every prediction id stored and
+    matching its decision); on exit 1 send the errors back to the forecaster once and validate again. Then
+    `python scripts/agent_reasoning.py add work/reasoning.jsonl` (or with `--valid-only` after the retry,
+    listing the dropped lines in `data_quality`) and delete the work file.
 
 10. Summaries (in `summaries/<market>/`):
    - Write `daily/TODAY.md` (max 400 words): regime, per ticker what changed and why, macro
