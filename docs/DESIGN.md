@@ -339,15 +339,33 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   security-wise bhavcopy (`sec_bhavdata_full_DDMMYYYY.csv` on nsearchives.nseindia.com, the file
   `collect_nse_india.py` reads for delivery %; series EQ, used only when its DATE1 is that
   session). Yahoo is asked first and a (date, ticker) is written once, so the fallback never
-  replaces a bar. The bhavcopy is unadjusted, like the stored Yahoo `close` (yfinance with
-  `auto_adjust=False`; `adj_close` = close on fallback rows, as Yahoo gives for a new bar). For
-  the 20 watchlist stocks on six sessions (2026-09-24 to 10-01, 120 stock-days) the stored Yahoo
-  bars matched the bhavcopy's open, high, low and close to within 0.0002 (Yahoo's float rounding,
-  e.g. 3858.3999 for 3858.40) and its volume exactly. The prices CSV has a fixed column list (`read_csv` with
-  `columns=`), so no source column was added: the collector summary lists each fallback bar in
-  `filled_from_nse` (source `nse_bhavcopy`, file URL), moves a Yahoo failure whose sessions are
-  now all stored to `resolved_by_nse`, and keeps a stock still missing a session in `failed`
-  (`missing_after_nse`).
+  replaces a bar. Price basis: the bhavcopy is as traded. yfinance's `Close` with
+  `auto_adjust=False` is not dividend-adjusted but is split/bonus-adjusted as of the collection
+  time, so stored bars collected after a split or bonus sit on the post-event basis: HDFCBANK
+  2025-08-22 (stored on 2026-10-05, after the 1:1 bonus with ex-date 2025-08-26) has close 982.3
+  and volume 19,833,502, while NSE's bhavcopy has 1964.60 and 9,916,751. The bhavcopy's
+  PREV_CLOSE is not adjusted either (26-Aug-2025: 1964.10). So a bhavcopy bar is written only
+  when its PREV_CLOSE is within 0.5% of our stored close of the previous session and the Yahoo
+  frame shows no split or bonus after that session; otherwise the stock stays in `failed` with
+  the reason (`missing_after_nse`). A bar on a split's ex-date is refused when the Yahoo frame
+  shows the split, or when our stored previous close was collected after the split (adjusted)
+  while PREV_CLOSE is not. (If Yahoo returned no frame and the stored previous close is itself
+  the unadjusted pre-split close, the check passes and the post-split bar is written next to
+  it: the same step a Yahoo collection made on that day leaves in the append-only store.) Where no split or bonus intervened the two
+  sources agree: for the 20 watchlist stocks on six sessions (2026-09-24 to 10-01, 120
+  stock-days) the stored Yahoo bars matched the bhavcopy's open, high, low and close to within
+  0.0002 (Yahoo's float rounding, e.g. 3858.3999 for 3858.40) and its volume exactly. `adj_close`
+  is set to the close on filled rows (as Yahoo gives for a new bar). The prices CSV has a fixed
+  column list (`read_csv` with `columns=`), so no source column was added; instead each filled
+  bar gets a row in `data/<market>/price_sources/` (id, date, ticker, source `nse_bhavcopy`, url,
+  filled_at; files dated by the bar's trading date) and the view `bar_sources` gives every
+  stored bar's source (`yahoo` unless a price_sources row names another). The collector summary
+  lists each fallback bar in `filled_from_nse`, moves a Yahoo failure to `resolved_by_nse` only
+  when every checked session is stored afterwards and its newest bar before the fallback was at
+  most `sessions` sessions behind, and otherwise keeps it in `failed` (`missing_after_nse` with
+  date and reason, or `newest_stored_bar` and `sessions_behind` for a gap older than the checked
+  sessions). For India, collect_prices therefore reads NSE and must not run alongside an NSE
+  collector.
 - Issue #9, done 2026-10-05 (no new network access needed):
   - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the
     close of the third Friday of March, June, September and December (the triple-witching day),

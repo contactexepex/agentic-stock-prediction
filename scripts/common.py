@@ -74,6 +74,12 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "low": "DOUBLE", "close": "DOUBLE", "adj_close": "DOUBLE", "volume": "BIGINT",
         "collected_at": "TIMESTAMPTZ",
     }),
+    # One row per bar collect_prices.py wrote from a source other than Yahoo (India: the NSE
+    # bhavcopy fallback); files dated by the bar's trading date, like prices. View `bar_sources`.
+    "price_sources": ("jsonl", {
+        "id": "VARCHAR", "date": "DATE", "ticker": "VARCHAR", "source": "VARCHAR", "url": "VARCHAR",
+        "filled_at": "TIMESTAMPTZ",
+    }),
     "quotes": ("jsonl", {
         "symbol": "VARCHAR", "yahoo": "VARCHAR", "ts": "TIMESTAMPTZ", "price": "DOUBLE",
         "prev_close": "DOUBLE", "change_pct": "DOUBLE", "collected_at": "TIMESTAMPTZ",

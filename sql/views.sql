@@ -47,6 +47,14 @@ CREATE OR REPLACE VIEW ohlc AS
 SELECT ticker, date, open, high, low, close, volume
 FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC);
 
+-- Where each stored bar came from: 'yahoo' unless data/<market>/price_sources/ names another
+-- source (India: 'nse_bhavcopy', bars collect_prices.py filled from NSE's bhavcopy).
+CREATE OR REPLACE VIEW bar_sources AS
+SELECT o.ticker, o.date, coalesce(s.source, 'yahoo') AS source, s.url, s.filled_at
+FROM ohlc o
+LEFT JOIN (SELECT DISTINCT ON (ticker, date) * FROM price_sources ORDER BY ticker, date, filled_at) s
+USING (ticker, date);
+
 -- Latest known date per (ticker, event type); a moved date is a newer row.
 -- Past events backfilled for the range engine (source ending in "_history") are left out here.
 CREATE OR REPLACE VIEW company_events AS

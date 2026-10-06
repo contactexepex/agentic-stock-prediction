@@ -61,6 +61,9 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
    pledges from NSE) and then `collect_nse_india.py` (announcements, quarterly results, FII/DII
    flows, delivery %), one after the other, never in parallel (NSE throttles each session).
+   For India, `collect_prices.py` also reads NSE (its bhavcopy fallback for missing bars), so it
+   never runs alongside an NSE collector (`collect_relations_india`, `collect_nse_india`,
+   `collect_events`, `collect_flows_india`) either.
    Keep each JSON summary; list its `warnings` (an endpoint that returned nothing at all) in
    the report's `data_quality` section.
    Macro, flows and short selling (issue #9; a market without the collector's config section
@@ -72,6 +75,8 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    latest session is only a note: it is published after the close).
    India: also list `collect_prices`' `filled_from_nse` bars (ticker, date) in `data_quality` as
    "bar from the NSE bhavcopy (Yahoo had none)"; they are official exchange prices, not a failure.
+   Its `failed` entries with `missing_after_nse` (e.g. a price-basis mismatch after a split or
+   bonus) or `sessions_behind` are real gaps: list them like any other failure.
    A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
    entry names a domain the environment's network settings must allow).
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`

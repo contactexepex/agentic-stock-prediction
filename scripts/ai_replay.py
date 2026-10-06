@@ -168,7 +168,7 @@ def public_at(kind: str, row: dict) -> pd.Timestamp | None:
 
 def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp) -> bool:
     """True when the row was public by the cutoff (pre-open of the session after d)."""
-    if kind == "prices":
+    if kind in ("prices", "price_sources"):   # a bar and its provenance row share the bar date
         t = _ts(row.get("date"))
         return t is not None and t.date() <= d
     if kind in DATE_PUBLIC_AFTER_CLOSE:
@@ -190,7 +190,7 @@ def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp) -> bool:
 
 
 def rule_text(kind: str) -> str:
-    if kind == "prices":
+    if kind in ("prices", "price_sources"):
         return "bar date <= D"
     if kind in DATE_PUBLIC_AFTER_CLOSE:
         return "trade date <= D (assumed: NSE publishes the day's deals after the close)"
@@ -243,7 +243,7 @@ def copy_asof(market: str, src: Path, dst: Path, d: date, cutoff: datetime) -> d
         if kind in DROPPED:
             excluded[kind] = DROPPED[kind].format(first=first_news)
             continue
-        if kind not in ("prices", "events", *DATE_PUBLIC_AFTER_CLOSE) and kind not in PUBLIC_AT:
+        if kind not in ("prices", "price_sources", "events", *DATE_PUBLIC_AFTER_CLOSE) and kind not in PUBLIC_AT:
             excluded[kind] = "no known publication-time rule for this kind"
             continue
         ext = SCHEMAS[kind][0] if kind in SCHEMAS else "jsonl"
