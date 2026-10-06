@@ -70,42 +70,52 @@ def read_rows(path: Path) -> tuple[list[dict], list[str]]:
     return rows, problems
 
 
+def number_problem(value, typ: str, csv_row: bool) -> str | None:
+    """Why a value is not a DOUBLE, INTEGER or BIGINT (None = fits)."""
+    if csv_row:
+        try:
+            number = float(value)
+        except ValueError:
+            return "not a number"
+    elif isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "not a number"
+    else:
+        number = float(value)
+    return "not an integer" if typ != "DOUBLE" and number != int(number) else None
+
+
+def date_problem(value) -> str | None:
+    """Why a value is not a YYYY-MM-DD date (None = fits)."""
+    try:
+        date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return "not YYYY-MM-DD"
+    return None if len(str(value)) == 10 else "not YYYY-MM-DD"
+
+
+def text_boolean_or_list_problem(value, typ: str, csv_row: bool) -> str | None:
+    """Why a value is not text, true/false, an ISO UTC timestamp or a list of text (None = fits or JSON)."""
+    if typ == "VARCHAR":
+        return None if isinstance(value, str) else "not text"
+    if typ == "BOOLEAN":
+        return None if isinstance(value, bool) or (csv_row and value in ("true", "false")) else "not true/false"
+    if typ == "TIMESTAMPTZ":
+        return None if isinstance(value, str) and ISO_UTC.match(value) else "not an ISO 8601 UTC timestamp"
+    if typ.endswith("[]"):
+        is_text_list = isinstance(value, list) and all(item is None or isinstance(item, str) for item in value)
+        return None if is_text_list else "not a list of text"
+    return None  # JSON
+
+
 def type_problem(value, typ: str, csv_row: bool) -> str | None:
     """Why a value does not fit a DuckDB column type (None = fits; null always fits)."""
     if value is None or (csv_row and value == ""):
         return None
-    if typ == "VARCHAR":
-        return None if isinstance(value, str) else "not text"
     if typ in ("DOUBLE", "INTEGER", "BIGINT"):
-        if csv_row:
-            try:
-                number = float(value)
-            except ValueError:
-                return "not a number"
-        else:
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                return "not a number"
-            number = float(value)
-        if typ != "DOUBLE" and number != int(number):
-            return "not an integer"
-        return None
-    if typ == "BOOLEAN":
-        return None if isinstance(value, bool) or (csv_row and value in ("true", "false")) else "not true/false"
+        return number_problem(value, typ, csv_row)
     if typ == "DATE":
-        try:
-            date.fromisoformat(str(value)[:10])
-            return None if len(str(value)) == 10 else "not YYYY-MM-DD"
-        except ValueError:
-            return "not YYYY-MM-DD"
-    if typ == "TIMESTAMPTZ":
-        return None if isinstance(value, str) and ISO_UTC.match(value) else "not an ISO 8601 UTC timestamp"
-    if typ.endswith("[]"):
-        return (
-            None
-            if isinstance(value, list) and all(number is None or isinstance(number, str) for number in value)
-            else "not a list of text"
-        )
-    return None  # JSON
+        return date_problem(value)
+    return text_boolean_or_list_problem(value, typ, csv_row)
 
 
 def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, tol: timedelta) -> list[str]:

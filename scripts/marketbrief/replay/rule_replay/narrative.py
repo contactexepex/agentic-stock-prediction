@@ -12,7 +12,7 @@ def pct(share, key: int = 0) -> str:
     return share_percent_text(share, key)
 
 
-def headline(cfg: dict, summary: dict) -> list[str]:
+def headline(_cfg: dict, summary: dict) -> list[str]:
     lines = []
     for horizon, horizon_summary in summary["horizons"].items():
         overall = horizon_summary["overall"]

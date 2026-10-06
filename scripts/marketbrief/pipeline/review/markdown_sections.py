@@ -17,7 +17,7 @@ def window_names(rec: dict, review_config: dict) -> dict:
     return win_names
 
 
-def header_lines(cfg, rec, review_config, review_data, win_names) -> list[str]:
+def header_lines(cfg, rec, review_config, review_data) -> list[str]:
     """Title, disclaimer, sample sizes and the low-sample and partial-week notes."""
     lines = [
         f"# Weekly review: {cfg['name']}, {rec['week']} ({rec['week_start']} to {rec['week_end']})",

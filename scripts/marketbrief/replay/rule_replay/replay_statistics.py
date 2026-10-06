@@ -156,7 +156,7 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
     return out
 
 
-def summarize(cfg: dict, ranges_config: dict, res: dict[int, pd.DataFrame], reg: pd.DataFrame) -> dict:
+def summarize(cfg: dict, _ranges_config: dict, res: dict[int, pd.DataFrame], reg: pd.DataFrame) -> dict:
     sector = {ticker: metadata.get("sector") or "Other" for ticker, metadata in cfg["tickers"].items()}
     out = {"horizons": {}, "baselines": {}}
     for horizon, group in res.items():

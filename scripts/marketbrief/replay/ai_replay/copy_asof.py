@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 from marketbrief.core.schemas import ACCEPTED_KEYS, SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
-from marketbrief.constants.ai_replay import DATE_PUBLIC_AFTER_CLOSE, DROPPED, PUBLIC_AT, TARGET_DATE_KINDS
+from marketbrief.constants.ai_replay import DATE_COLUMN_BY_KIND, DATE_PUBLIC_AFTER_CLOSE, DROPPED, PUBLIC_AT, TARGET_DATE_KINDS
 
 
 def public_at(kind: str, row: dict) -> pd.Timestamp | None:
@@ -46,14 +46,9 @@ def keep_row(kind: str, row: dict, as_of_day: date, cutoff: pd.Timestamp, times:
     corrected views do: a value stored from a shifted submissions file is 4-5h late."""
     if times and kind in ACCEPTED_KEYS and row.get(ACCEPTED_KEYS[kind]) in times:
         row = {**row, "accepted_at": times[row[ACCEPTED_KEYS[kind]]]}
-    if kind in ("prices", "price_sources"):  # a bar and its provenance row share the bar date
-        timestamp = as_utc_timestamp(row.get("date"))
-        return timestamp is not None and timestamp.date() <= as_of_day
-    if kind == "adjustments":  # a split/bonus applies to the root's bars only from its ex-date
-        timestamp = as_utc_timestamp(row.get("ex_date"))
-        return timestamp is not None and timestamp.date() <= as_of_day
-    if kind in DATE_PUBLIC_AFTER_CLOSE:
-        timestamp = as_utc_timestamp(row.get("date"))
+    date_column = DATE_COLUMN_BY_KIND.get(kind)
+    if date_column:
+        timestamp = as_utc_timestamp(row.get(date_column))
         return timestamp is not None and timestamp.date() <= as_of_day
     if kind == "events":
         seen = as_utc_timestamp(row.get("first_seen_at"))

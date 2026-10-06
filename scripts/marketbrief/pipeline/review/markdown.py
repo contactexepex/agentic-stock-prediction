@@ -23,7 +23,7 @@ def markdown(cfg: dict, review_config: dict, rec: dict, review_data: dict) -> st
     """The weekly review as markdown."""
     by_horizon = " / ".join(f"{horizon}d" for horizon in load_ranges_config(cfg["market"])["horizons"])
     win_names = window_names(rec, review_config)
-    lines = header_lines(cfg, rec, review_config, review_data, win_names)
+    lines = header_lines(cfg, rec, review_config, review_data)
     lines += range_lines(review_config, review_data, win_names)
     lines += call_lines(review_config, review_data, win_names)
     lines += score_lines(review_config, review_data, win_names)

@@ -16,7 +16,7 @@ def band_of(confidence: float) -> str:
     return next(name for name, lower, upper in BANDS if lower <= confidence < upper)
 
 
-def score_rows(cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
+def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
     """One row per call: base close at as_of_date, close `h` stored bars later, hit as
     score_predictions.py (a flat close is a miss), and the rule-baseline inputs known at as_of."""
     rows, cache = [], {}

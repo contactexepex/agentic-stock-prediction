@@ -19,7 +19,7 @@ from marketbrief.pipeline.validate.gate_result import work_dir
 from marketbrief.pipeline.validate.news_checks import check_articles, check_news_sources
 
 
-def stage_collect(res, cfg, con, status, now, today, validate_config):
+def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)
     kinds = [
         key
         for key in schemas.SCHEMAS
@@ -39,7 +39,7 @@ def stage_collect(res, cfg, con, status, now, today, validate_config):
     check_articles(res, cfg, today)
 
 
-def stage_features(res, cfg, con, status, now, today, validate_config):
+def stage_features(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)
     check_files(res, cfg, STAGE_KINDS["features"], today, now, validate_config)
     last = dict(con.execute("SELECT ticker, max(date) FROM bars GROUP BY 1").fetchall())
     feats = {
@@ -66,7 +66,9 @@ def stage_features(res, cfg, con, status, now, today, validate_config):
         res.block("MISSING_REGIME", f"no regime row as of {need} (newest {reg})")
 
 
-def stage_context(res, cfg, con, status, now, today, validate_config, path: Path | None = None):
+def stage_context(  # noqa: PLR0913 (uniform stage signature)
+    res, cfg, _con, _status, _now, today, _validate_config, path: Path | None = None
+):
     path = path or work_dir() / "context.md"
     if not path.exists() or path.stat().st_size == 0:
         res.block(
@@ -87,6 +89,8 @@ def stage_context(res, cfg, con, status, now, today, validate_config, path: Path
         res.block("CONTEXT_INCOMPLETE", "no 'Market regime' section")
 
 
-def stage_forecast(res, cfg, con, status, now, today, validate_config, path: Path | None = None):  # noqa: ARG001
+def stage_forecast(  # noqa: PLR0913 (uniform stage signature)
+    res, cfg, con, status, now, _today, validate_config, path: Path | None = None
+):
     """work/predictions.jsonl (or `path`) before it is appended."""
     forecast_gate.stage_forecast(res, cfg, con, status, now, validate_config, path or work_dir() / "predictions.jsonl")

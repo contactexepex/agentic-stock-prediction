@@ -69,6 +69,14 @@ DATE_PUBLIC_AFTER_CLOSE = ("deals",)
 for _k in FIRST_SEEN_ONLY:
     PUBLIC_AT[_k] = ["first_seen_at"]
 
+# kinds public by one date column: a bar and its provenance row share the bar date, a split or bonus applies from
+# its ex-date, and a day's bulk and block deals are public after that day's close
+DATE_COLUMN_BY_KIND = {
+    "prices": "date",
+    "price_sources": "date",
+    "adjustments": "ex_date",
+    **dict.fromkeys(DATE_PUBLIC_AFTER_CLOSE, "date"),
+}
 TARGET_DATE_KINDS = ("outcomes", "range_outcomes", "lessons")  # also need target_date <= D
 
 DROPPED = {

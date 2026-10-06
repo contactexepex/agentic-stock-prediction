@@ -34,7 +34,7 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
     return counts
 
 
-def check_duplicates(res: Result, cfg: dict, con, validate_config: dict):
+def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict):
     keys = {kind: "id" for kind in validate_config["unique_id_kinds"]} | dict(validate_config.get("unique_keys") or {})
     for kind, key in keys.items():
         if kind not in schemas.SCHEMAS:
@@ -46,30 +46,8 @@ def check_duplicates(res: Result, cfg: dict, con, validate_config: dict):
             res.block("DUPLICATE_ID", f"{kind}: {len(rows)} duplicated {key}(s), e.g. {[row[0] for row in rows[:5]]}")
 
 
-def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: dict):
-    need = date.fromisoformat(run_status["previous_session"])
-    last = dict(con.execute("SELECT ticker, max(date) FROM bars GROUP BY 1").fetchall())
-    missing = [ticker for ticker in cfg["tickers"] if ticker not in last]
-    stale = [ticker for ticker in cfg["tickers"] if ticker in last and last[ticker] < need]
-    if missing:
-        res.block("MISSING_BARS", "no stored price bars", missing)
-    if stale:
-        res.block(
-            "STALE_BARS",
-            f"newest bar older than the last completed session {need} (e.g. {stale[0]} {last[stale[0]]})",
-            stale,
-        )
-    if run_status["late_run"]:
-        # the run started after session_date closed: its bar is not required (the routine works as
-        # of the previous session), but a missing one is noted
-        sess = date.fromisoformat(run_status["session_date"])
-        no_bar = [ticker for ticker in cfg["tickers"] if ticker in last and last[ticker] < sess]
-        if no_bar:
-            res.warn(
-                "LATE_RUN_NO_SESSION_BAR",
-                f"late run: session {sess} has closed but has no stored bar (the run is as of the previous session)",
-                no_bar,
-            )
+def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_config: dict) -> None:
+    """Benchmark, vol index and the other market symbols: bars must exist and not be too old."""
     core = [key for role in ("benchmark", "vol_index") for key in market_config.symbols_by_role(cfg, role)]
     never = [key for key in core if key not in last]
     if never:
@@ -105,6 +83,33 @@ def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: d
             + ")",
             stale,
         )
+
+
+def check_bars(res: Result, cfg: dict, con, run_status: dict, validate_config: dict):
+    need = date.fromisoformat(run_status["previous_session"])
+    last = dict(con.execute("SELECT ticker, max(date) FROM bars GROUP BY 1").fetchall())
+    missing = [ticker for ticker in cfg["tickers"] if ticker not in last]
+    stale = [ticker for ticker in cfg["tickers"] if ticker in last and last[ticker] < need]
+    if missing:
+        res.block("MISSING_BARS", "no stored price bars", missing)
+    if stale:
+        res.block(
+            "STALE_BARS",
+            f"newest bar older than the last completed session {need} (e.g. {stale[0]} {last[stale[0]]})",
+            stale,
+        )
+    if run_status["late_run"]:
+        # the run started after session_date closed: its bar is not required (the routine works as
+        # of the previous session), but a missing one is noted
+        sess = date.fromisoformat(run_status["session_date"])
+        no_bar = [ticker for ticker in cfg["tickers"] if ticker in last and last[ticker] < sess]
+        if no_bar:
+            res.warn(
+                "LATE_RUN_NO_SESSION_BAR",
+                f"late run: session {sess} has closed but has no stored bar (the run is as of the previous session)",
+                no_bar,
+            )
+    check_symbol_bars(res, cfg, last, need, validate_config)
     # close > 0 on recent bars; big 1-day moves
     since = need - timedelta(days=14)
     bad = con.execute(

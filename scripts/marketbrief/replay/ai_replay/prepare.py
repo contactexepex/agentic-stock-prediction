@@ -54,7 +54,7 @@ def assumed_earnings(cfg: dict, src: Path, as_of_day: date, cutoff: datetime, da
     return out
 
 
-def prepare(
+def prepare(  # noqa: PLR0913 (the CLI options of `prepare`)
     cfg: dict,
     as_of_day: date,
     root: Path,

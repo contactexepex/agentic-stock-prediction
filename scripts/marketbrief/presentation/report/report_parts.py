@@ -53,8 +53,8 @@ class ReportParts:
     vol_name: object
 
 
-def prepare_parts(cfg: dict, day: dict) -> ReportParts:
-    """Compute the tables, lines and counts of one report from the gathered day data."""
+def report_basics(cfg, day):
+    """The market labels, the regime line, the chart helper and the stored ranges and features of the day."""
     cur, market, session = cfg.get("currency", ""), cfg["market"], day["session"]
     charts = f"charts/{session}"
     have = day.get("charts") or set()  # single-purpose PNGs charts.py wrote (file names)
@@ -76,6 +76,10 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
     range_by_ticker_horizon = {(row.ticker, int(row.horizon_days)): row for row in ranges.itertuples()}
     feats = day["features"].set_index("ticker") if not day["features"].empty else pd.DataFrame()
 
+    return cur, feats, img, market, range_by_ticker_horizon, reg, regime_line, session, vol_name
+
+def yesterday_tables(cfg, cur, day, feats):
+    """Yesterday: the market line, the ranges scored on the latest target date and the calls scored."""
     # yesterday: the market and the watchlist on the latest bar, then ranges scored on the latest target date
     names = {symbol: value.get("name", symbol) for symbol, value in cfg["symbols"].items()}
     market_by_ticker = {item.ticker: item for item in day["market"].itertuples()} if "market" in day else {}
@@ -131,6 +135,10 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
         for item in scored_calls.itertuples()
     ]
 
+    return call_rows, calls_hit, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows
+
+def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
+    """Today's ranges and calls by sector, and the number of late (never scored) stocks."""
     # today: ranges by sector
     today_rows, n_late = [], 0
     for sector, members in (cfg.get("sectors") or {"": list(cfg["tickers"])}).items():
@@ -196,6 +204,10 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
                 ]
             )
 
+    return n_late, today_rows
+
+def cue_tables(cfg, day):
+    """Overnight cues and global factors, and the ADR rows."""
     cue_rows = [
         [
             item.symbol,
@@ -217,6 +229,10 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
         if item.symbol.endswith(":ADR")
     ]
 
+    return adr_rows, cue_rows
+
+def calendar_lines(cfg, day, session):
+    """Upcoming market and company events, and the data released before the open."""
     mevents = calendar.market_events(cfg, day["as_of"] + timedelta(days=1), day["as_of"] + timedelta(days=21))
     upcoming = [(event["date"], event["name"], "major" if event["major"] else "") for event in mevents]
     # data published before the open on the session day (US CPI, jobs at 08:30 ET)
@@ -229,6 +245,10 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
     upcoming += [(pd.Timestamp(item.date).date(), item.name, "company") for item in day["company_events"].itertuples()]
     upcoming.sort()
 
+    return release_line, released, upcoming
+
+def track_record_rows(day, feats):
+    """Track-record tables (scorecard, regimes, direction, bands, calibration) and data-quality lists."""
     share = lambda value: "–" if value is None or pd.isna(value) else percent(value)  # noqa: E731
     num = lambda value, frame=".2f": "–" if value is None or pd.isna(value) else format(value, frame)  # noqa: E731
     sc_rows = [
@@ -263,6 +283,19 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
     partial = sorted(feats.index[feats["quality"] == "PARTIAL"]) if len(feats) else []
     blocked = sorted(feats.index[feats["quality"] == "BLOCKED"]) if len(feats) else []
 
+    return band_rows, blocked, cal_rows, dir_rows, partial, regime_rows, sc_rows
+
+
+def prepare_parts(cfg: dict, day: dict) -> ReportParts:
+    """Compute the tables, lines and counts of one report from the gathered day data."""
+    cur, feats, img, market, range_by_ticker_horizon, reg, regime_line, session, vol_name = report_basics(cfg, day)
+    (call_rows, calls_hit, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows) = (
+        yesterday_tables(cfg, cur, day, feats)
+    )
+    n_late, today_rows = today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon)
+    adr_rows, cue_rows = cue_tables(cfg, day)
+    release_line, released, upcoming = calendar_lines(cfg, day, session)
+    band_rows, blocked, cal_rows, dir_rows, partial, regime_rows, sc_rows = track_record_rows(day, feats)
     return ReportParts(
         adr_rows=adr_rows,
         band_rows=band_rows,

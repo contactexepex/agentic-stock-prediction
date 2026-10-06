@@ -233,7 +233,7 @@ def name_patterns(edges: list[dict]) -> list[tuple[dict, re.Pattern]]:
     return out
 
 
-def hits(cfg: dict, con, days: int = 1, today: date | None = None) -> list[dict]:
+def hits(_cfg: dict, con, days: int = 1, today: date | None = None) -> list[dict]:
     """Second-order news: an article that names a linked entity (or is tagged with a linked
     watchlist ticker) but is not itself tagged with the ticker. One row per (ticker, article)."""
     edges = load_edges(con)

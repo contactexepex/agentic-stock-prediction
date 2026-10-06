@@ -90,7 +90,42 @@ def check_articles(res: Result, cfg: dict, today: date):
         res.warn("ARTICLE_ROWS", f"{len(bad)} news_articles rows break the article rules, e.g. {bad[:3]}")
 
 
-def stage_news(res, cfg, con, status, now, today, validate_config, path: Path | None = None):
+def todays_new_ids(con, today) -> set[str]:
+    """Ids of the news and announcements first seen today (the ones that need an enrichment)."""
+    new_ids = {
+        row[0] for row in con.execute("SELECT id FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
+    }
+    new_ids |= {
+        row[0]
+        for row in con.execute("SELECT id FROM announcements WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
+    }
+    return new_ids
+
+
+def enrichment_rule_problems(row: dict) -> list[str]:
+    """Rule problems of one news_enriched record: score ranges, enumerations, summary length, required fields."""
+    why = []
+    for key, lower, upper in (("relevance", 0, 1), ("sentiment", -1, 1), ("novelty", 0, 1)):
+        value = row.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not lower <= value <= upper:
+            why.append(f"{key} {value!r} not in {lower}..{upper}")
+    why += [
+        f"{key} {row.get(key)!r} not one of {sorted(allowed)}"
+        for key, allowed in ENRICH_ENUMS.items()
+        if row.get(key) not in allowed
+    ]
+    if not isinstance(row.get("summary"), str) or len(row["summary"].split()) > 25:
+        why.append("summary missing or over 25 words")
+    if not row.get("prompt_version"):
+        why.append("prompt_version missing")
+    if not row.get("analyzed_at"):
+        why.append("analyzed_at missing")
+    return why
+
+
+def stage_news(  # noqa: PLR0913 (uniform stage signature)
+    res, _cfg, con, _status, now, today, validate_config, path: Path | None = None
+):
     path = path or work_dir() / "enriched.jsonl"
     if not path.exists():
         res.info["news"] = "no work/enriched.jsonl"
@@ -101,13 +136,7 @@ def stage_news(res, cfg, con, status, now, today, validate_config, path: Path | 
     bad = check_rows("news_enriched", rows, False, now, timedelta(minutes=validate_config["future_tolerance_minutes"]))
     if bad:
         res.block("SCHEMA", f"{path.name}: {'; '.join(bad)}")
-    new_ids = {
-        row[0] for row in con.execute("SELECT id FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
-    }
-    new_ids |= {
-        row[0]
-        for row in con.execute("SELECT id FROM announcements WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
-    }
+    new_ids = todays_new_ids(con, today)
     done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()}
     ids = [row.get("id") for row in rows]
     dup = sorted({index for index in ids if ids.count(index) > 1})
@@ -127,22 +156,7 @@ def stage_news(res, cfg, con, status, now, today, validate_config, path: Path | 
             "ENRICH_MISSING", f"{len(missing)} of today's news/announcement ids have no enrichment, e.g. {missing[:5]}"
         )
     for row in rows:
-        why = []
-        for key, lower, upper in (("relevance", 0, 1), ("sentiment", -1, 1), ("novelty", 0, 1)):
-            value = row.get(key)
-            if not isinstance(value, (int, float)) or isinstance(value, bool) or not lower <= value <= upper:
-                why.append(f"{key} {value!r} not in {lower}..{upper}")
-        why += [
-            f"{key} {row.get(key)!r} not one of {sorted(allowed)}"
-            for key, allowed in ENRICH_ENUMS.items()
-            if row.get(key) not in allowed
-        ]
-        if not isinstance(row.get("summary"), str) or len(row["summary"].split()) > 25:
-            why.append("summary missing or over 25 words")
-        if not row.get("prompt_version"):
-            why.append("prompt_version missing")
-        if not row.get("analyzed_at"):
-            why.append("analyzed_at missing")
+        why = enrichment_rule_problems(row)
         if why:
             res.block("ENRICH_RULE", f"{row.get('id')}: {'; '.join(why)}")
     res.info["news"] = {"records": len(rows), "new_ids_today": len(new_ids)}

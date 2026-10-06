@@ -46,3 +46,5 @@ CI_NOTE = (
 CMP_KEYS = ("n", "cover50", "cover80", "width50_pct", "width80_pct", "score50", "score80", "qs_pct")
 
 ACI_GRID = tuple((g, br) for g in (0.002, 0.005, 0.01, 0.02) for br in (False, True))  # held-out tuning grid
+
+MIN_EWMA_BARS = 31   # ranges.py needs an EWMA volatility of 31 bars

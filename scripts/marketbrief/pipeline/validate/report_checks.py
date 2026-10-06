@@ -189,7 +189,7 @@ def report_file(cfg: dict, con, status: dict) -> Path:
     return paths.ROOT / "reports" / cfg["market"] / f"{report_session(con, status)}.md"
 
 
-def stage_report(
+def stage_report(  # noqa: PLR0913 (uniform stage signature)
     res, cfg, con, status, now, today, validate_config, report_path: Path | None = None, slack_path: Path | None = None
 ):
     session = report_session(con, status)

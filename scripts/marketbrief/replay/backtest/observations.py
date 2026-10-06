@@ -56,7 +56,7 @@ def mark_window(length: int, positions: list[int], horizon: int) -> np.ndarray:
     return out
 
 
-def observations(
+def observations(  # noqa: PLR0913
     bars, tickers, horizon: int, ranges_config: dict, rank: dict, cfg: dict | None = None, extra: dict | None = None
 ) -> pd.DataFrame:
     out = []
