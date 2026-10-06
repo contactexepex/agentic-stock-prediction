@@ -24,6 +24,13 @@ The real collectors fill a separate scratch root (SEED_KINDS below) from the tes
   F13_VALUE_SCALE (a copy in the seed folder; tests/fixtures is unchanged), so the 13F section's
   value_bn is billions with two significant decimals instead of 0.0.
 The seed root's data files are then copied into the golden root (never over an existing file).
+- the collectors that need Yahoo, RSS feeds, article pages or SEC header pages (collect_prices,
+  collect_quotes, collect_events, collect_news, collect_articles, collect_filings, collect_options,
+  check_sec_times) run through tests/golden/seed_collectors.py (offline stand-ins for those services,
+  at the third-party boundary) on a copy of the seed root (`collectors_<market>`: the seeded kinds, the
+  pinned events and news, and the pinned prices up to PRICE_CUTOFF); their outputs are compared (the
+  copy is kept in run/seed/collectors_<market>) but not copied into the golden root, so the later steps
+  do not change.
 Every seed step's exit code, stdout and stderr is logged and compared like any other step."""
 from __future__ import annotations
 
@@ -54,6 +61,10 @@ SEED_KINDS = {
            "options", "sec_times"),
 }
 APPLE_CIK, BOFA_CIK, FILER_CIK = 320193, 70858, 9999200
+PRICE_CUTOFF = "2026-09-29"   # the collectors' copy holds the pinned bars up to this day; Yahoo's stand-in has all
+COLLECTOR_SCRIPTS = ("collect_prices.py", "collect_quotes.py", "collect_events.py", "collect_news.py",
+                      "collect_articles.py", "collect_filings.py", "collect_options.py", "check_sec_times.py")
+COLLECTOR_COPIED_KINDS = ("events", "news")   # pinned kinds the collectors' copy starts with
 F13_VALUE_SCALE = 1000164   # AAPL latest 25000 + 12500 -> 37,506,150,000 USD = 37.51 bn
 # year-ago quarter (2025-04-01..2025-06-30) of the fixtures' 2026 Q1 results: ticker, basis, revenue,
 # net profit (INR), eps, filed (UTC)
@@ -170,6 +181,84 @@ def synthetic_nse(target: Path) -> None:
         (target / source.name).write_text(text)
 
 
+def sec_collectors_map(target: Path) -> None:
+    """urls.json for the SEC-reading new collectors (filings, events, sec_times): Apple and Bank of America
+    with 8-K item 2.02 filings and SGML header fixtures (Apple's acceptance times right, Bank of America's
+    shifted by the New York offset, two stored accessions with headers)."""
+    target.mkdir(parents=True)
+    filed = "2026-10-02"
+    apple = [("0001140361-26-038307", "4", filed, "xslF345X06/form4.xml", ""),
+             ("0009999001-26-000001", "4", filed, "xslF345X05/doc4.xml", ""),
+             ("0002100119-26-000139", "SCHEDULE 13G", filed, "xslSCHEDULE_13G_X02/primary_doc.xml", ""),
+             ("0000320193-26-000030", "8-K", "2026-07-30", "doc8k.htm", ""),
+             ("0000320193-26-000020", "10-Q", "2026-07-31", "doc.htm", "2026-06-27"),
+             ("0000320193-26-000013", "10-Q", "2026-05-01", "doc.htm", "2026-03-28"),
+             ("0000320193-25-000079", "10-K", "2025-10-31", "doc.htm", "2025-09-27")]
+    bofa = [("0000070858-26-000394", "10-Q", "2026-07-31", "doc.htm", "2026-06-30"),
+            ("0000070858-26-000300", "8-K", "2026-07-15", "doc8k.htm", ""),
+            ("0000070858-26-000249", "10-Q", "2026-05-01", "doc.htm", "2026-03-31")]
+    urls = {"https://www.sec.gov/files/company_tickers.json": "tickers.json"}
+    (target / "tickers.json").write_text(json.dumps({"0": {"cik_str": APPLE_CIK, "ticker": "AAPL", "title": "Apple"},
+                                                     "1": {"cik_str": BOFA_CIK, "ticker": "BAC", "title": "BofA"}}))
+    for cik, name, filings in ((APPLE_CIK, "Apple Inc.", apple), (BOFA_CIK, "BANK OF AMERICA", bofa)):
+        data = submissions(name, filings)
+        data["filings"]["recent"]["items"] = ["2.02,9.01" if f[1] == "8-K" else "" for f in filings]
+        (target / f"sub_{cik}.json").write_text(json.dumps(data))
+        urls[ARCHIVES.format(cik=cik)] = f"sub_{cik}.json"
+    headers = {(APPLE_CIK, "0001140361-26-038307"): "20261002170000",
+               (APPLE_CIK, "0000320193-25-000079"): "20251031170000",
+               (APPLE_CIK, "0009999001-26-000001"): "20261002130000",
+               (APPLE_CIK, "0002100119-26-000139"): "20261002170000",
+               (BOFA_CIK, "0000070858-26-000394"): "20260731130000",
+               (BOFA_CIK, "0000070858-26-000249"): "20260501130000"}
+    for (cik, accession), eastern in headers.items():
+        name = f"hdr_{accession}.sgml"
+        (target / name).write_text(f"<SEC-HEADER>\n<ACCEPTANCE-DATETIME>{eastern}\n</SEC-HEADER>\n")
+        urls[f"{EDGAR}/{cik}/{accession.replace('-', '')}/{accession}.hdr.sgml"] = name
+    (target / "urls.json").write_text(json.dumps(urls, indent=1))
+
+
+def nse_replay_folder(target: Path) -> None:
+    """The NSE replay files of the collectors: the real snapshot's results lists and bhavcopies plus a
+    results-announcement list and an older results list for the three tickers that have results filings."""
+    target.mkdir(parents=True)
+    real = FIXTURES / "nse" / "real"
+    for pattern in ("integrated-filing-results_*.json", "sec_bhavdata_full_*.csv"):
+        for source in sorted(real.glob(pattern)):
+            shutil.copyfile(source, target / source.name)
+    for symbol in ("INFY", "HDFCBANK", "SBILIFE"):
+        (target / f"corporate-announcements_{symbol}.json").write_text(json.dumps({"data": [
+            {"desc": "Outcome of Board Meeting", "an_dt": "22-Jul-2026 15:10:00", "sort_date": "2026-07-22 15:10:00"},
+            {"desc": "Analysts/Institutional Investor Meet/Con. Call Updates", "an_dt": "21-Jul-2026 10:00:00"}]}))
+        (target / f"corporates-financial-results_{symbol}.json").write_text(json.dumps({"data": [
+            {"toDate": "31-DEC-2024", "broadCastDate": "05-Feb-2025 17:30:00"},
+            {"toDate": "30-SEP-2024", "broadCastDate": "04-Nov-2024 16:00:00"}]}))
+
+
+def collectors_root(scratch: Path, seed_root: Path, golden_root: Path, market: str) -> Path:
+    """A copy of the seed root for one market's collectors: the pinned events and news, and the pinned
+    bars up to PRICE_CUTOFF (Yahoo's stand-in serves the later ones)."""
+    target = scratch / f"collectors_{market}"
+    shutil.copytree(seed_root, target)
+    for kind in COLLECTOR_COPIED_KINDS:
+        source = golden_root / "data" / market / kind
+        if source.is_dir():
+            shutil.copytree(source, target / "data" / market / kind, dirs_exist_ok=True)
+    pinned_prices = golden_root / "data" / market / "prices"
+    for path in sorted(pinned_prices.rglob("*.csv")):
+        if path.stem <= PRICE_CUTOFF:
+            destination = target / "data" / market / "prices" / path.relative_to(pinned_prices)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, destination)
+    return target
+
+
+def collector_steps(market: str) -> list[tuple[str, str, list[str]]]:
+    """(market, label, argv) of the Yahoo, RSS, article and SEC-header collectors through seed_collectors.py."""
+    runner = str(CODE / "tests" / "golden" / "seed_collectors.py")
+    return [(market, script.removesuffix(".py"), ["{python}", runner, market, script]) for script in COLLECTOR_SCRIPTS]
+
+
 def seed_steps() -> list[tuple[str, str, list[str]]]:
     """(market, label, argv) in order; '{python}', '{seed_dir}' and '{fixtures}' are filled in by run_seed."""
     nse = ["--replay", "{fixtures}/nse/real", "--today", "2026-10-05", "--full"]
@@ -205,8 +294,12 @@ def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path, paral
         sec_fixture_map(run_dir / "seed" / "sec")
         rule_rows(seed_root)
         synthetic_nse(run_dir / "seed" / "nse_synthetic")
+        sec_collectors_map(run_dir / "seed" / "sec_collectors")
+        nse_replay_folder(run_dir / "seed" / "nse_replay")
         run_seed_steps(run_dir, seed_root, environment, scripts, parallel)
         shutil.copytree(seed_root, run_dir / "seed" / "root")
+        roots = {market: collectors_root(scratch, seed_root, golden_root, market) for market in SEED_CLOCKS}
+        run_collector_steps(run_dir, roots, golden_root, environment, scripts, parallel)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     copy_seeded(run_dir / "seed" / "root", golden_root, run_dir / "steps" / "seed")
@@ -230,11 +323,35 @@ def run_seed_steps(run_dir: Path, seed_root: Path, environment, scripts: Path, p
             run_seed_step(run_dir, seed_root, environment, scripts, step)
 
 
-def run_seed_step(run_dir: Path, seed_root: Path, environment, scripts: Path, step: tuple) -> None:
+def run_collector_steps(run_dir: Path, roots: dict[str, Path], golden_root: Path, environment,
+                        scripts: Path, parallel: bool = False) -> None:
+    """Run collector_steps() of each market on its own root (a collectors_root copy), then keep
+    each copy in run_dir/seed/collectors_<market>."""
+
+    def run_market(market: str) -> None:
+        extra = {"MB_SEC_FIXTURES": str(run_dir / "seed" / "sec_collectors"),
+                 "GOLDEN_NSE_REPLAY": str(run_dir / "seed" / "nse_replay"),
+                 "GOLDEN_PRICE_SOURCE": str(golden_root / "data" / market / "prices")}
+        for step in collector_steps(market):
+            run_seed_step(run_dir, roots[market], environment, scripts, step, extra)
+    if parallel:
+        with ThreadPoolExecutor(max_workers=len(SEED_CLOCKS)) as pool:
+            for future in [pool.submit(run_market, market) for market in SEED_CLOCKS]:
+                future.result()
+    else:
+        for market in SEED_CLOCKS:
+            run_market(market)
+    for market, root in roots.items():
+        shutil.copytree(root, run_dir / "seed" / f"collectors_{market}")
+
+
+def run_seed_step(run_dir: Path, seed_root: Path, environment, scripts: Path, step: tuple,
+                  extra_env: dict | None = None) -> None:
+    """One seed step on seed_root; its log files are named <market>.<label>.<stream>."""
     market, label, command = step
     env = environment(seed_root, market, SEED_CLOCKS[market])
     env.update({"MB_SEC_FIXTURES": str(run_dir / "seed" / "sec"), "MB_NETGUARD_LOG": str(run_dir / "netguard.log"),
-                "SEC_USER_AGENT": "market-brief golden golden@example.com"})
+                "SEC_USER_AGENT": "market-brief golden golden@example.com", **(extra_env or {})})
     argv = [a.format(python=sys.executable, seed_dir=run_dir / "seed", fixtures=FIXTURES) for a in command]
     proc = subprocess.run(argv, cwd=scripts, env=env, capture_output=True, text=True, check=False)
     log_dir = run_dir / "steps" / "seed"

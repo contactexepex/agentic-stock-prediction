@@ -547,6 +547,16 @@ Status: steps 1 and 2 were built as one batch (build/refactor-batch2). Not in it
 literals and the other exception messages outside the code those steps moved (they move with their modules; the
 four messages raised in more than one module are already constants).
 
+Status of steps 3 and 4: built as one batch (build/refactor-batch4). Step 3 moved every collector into
+`marketbrief/collectors/` (the `scripts/collect_*.py` and `check_sec_times.py` are thin entry points) and `sources`,
+`nse` and `sec` into `marketbrief/sources/` and `collectors/`; the golden seed first gained offline collector seeds
+(`tests/golden/seed_collectors.py`: faked Yahoo, feeds, article pages, NSE replay) whose outputs stay out of the
+golden root. Step 4 moved the formulas and the range and news analytics into `marketbrief/analytics/`
+(`range_math`, the range-input modules, `news_sources`/`article_*`/`text_measures`, `adaptive_conformal`,
+`calibration`, `range_publication`, ...); `scripts/features.py`, `calibrate.py`, `ranges.py`, `relations.py`
+and `news_clusters.py` are thin entry points. Removed from the allow-list: collect_prices.py,
+collect_events.py, news_verify.py, news_clusters.py, range_inputs.py.
+
 Proof required for every step 1-8 (all four, given to the judge with the commands' output):
 1. golden: `record` on the step's base commit, `compare` on the step's commit -> `"identical": true`;
 2. full suite `python -m pytest -q -n auto` and the fast tier `python -m pytest -q -n auto -m "not slow"`

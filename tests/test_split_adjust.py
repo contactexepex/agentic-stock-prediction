@@ -21,16 +21,17 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO / "tests"))
 
-import adjust  # noqa: E402
+from marketbrief.analytics import price_adjustments as adjust  # noqa: E402
 import ai_replay as ar  # noqa: E402
-import collect_prices  # noqa: E402
+from marketbrief.collectors import price_nse_fallback, price_rebase  # noqa: E402
+from marketbrief.collectors import prices as collect_prices  # noqa: E402
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
-import indicators as ind  # noqa: E402
+from marketbrief.analytics import indicators as ind  # noqa: E402
 import score_predictions  # noqa: E402
-from features import load_bars  # noqa: E402
+from marketbrief.analytics.features import load_bars  # noqa: E402
 from test_price_fallback import FakeTicker, make_env  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "nse"
@@ -377,9 +378,9 @@ def test_recorded_split_unblocks_the_bhavcopy_fill(tmp_path, monkeypatch):
     write_stored(e.root, "india", "HDFCBANK", {date(2025, 8, 25): 1964.1})
     cfg = load_market("india")
     bar = {"close": 973.4, "prev_close": 1964.1}
-    blocked = collect_prices.basis_problem(cfg, "HDFCBANK", date(2025, 8, 26), bar, [date(2025, 8, 26)])
+    blocked = price_nse_fallback.basis_problem(cfg, "HDFCBANK", date(2025, 8, 26), bar, [date(2025, 8, 26)])
     assert blocked == "Yahoo reports a split/bonus on 2025-08-26; price basis may differ"
-    assert collect_prices.basis_problem(cfg, "HDFCBANK", date(2025, 8, 26), bar, [date(2025, 8, 26)],
+    assert price_nse_fallback.basis_problem(cfg, "HDFCBANK", date(2025, 8, 26), bar, [date(2025, 8, 26)],
                                         {"HDFCBANK-2025-08-26"}) is None
 
 
@@ -393,7 +394,7 @@ def scoring_root(tmp_path, monkeypatch, detected_at: str, base: float, lo80: flo
     days = [date(2026, 9, 8), date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11), EX, date(2026, 9, 15)]
     write_stored(root, "us", "NVDA", {d: (100.0 if d < EX else 51.0) for d in days})
     append_jsonl(day_file("us", "adjustments", EX), [
-        adjust.record("NVDA", EX, 0.5, "yahoo_splits", detected_at, yahoo_ratio=2.0)])
+        adjust.adjustment_record("NVDA", EX, 0.5, "yahoo_splits", detected_at, yahoo_ratio=2.0)])
     made = "2026-09-14T12:00:00+00:00"                     # before the 13:30 UTC open
     append_jsonl(day_file("us", "predictions", date(2026, 9, 14)), [{
         "id": "2026-09-11-NVDA-1d", "made_at": made, "as_of_date": "2026-09-11", "ticker": "NVDA",
@@ -611,33 +612,33 @@ def test_india_1_10_bonus_without_the_next_session_is_held(tmp_path, monkeypatch
 
 
 def test_step_matches():
-    assert collect_prices.step_matches(973.4 / 1964.1, 0.5)
-    assert not collect_prices.step_matches(1964.1 / 1964.6, 0.5)
-    assert not collect_prices.step_matches(0.93, 0.8)            # nearer no step than the factor
-    assert collect_prices.step_matches(0.82, 0.8)
-    assert not collect_prices.step_matches(0.3, 0.5)
+    assert price_rebase.step_matches(973.4 / 1964.1, 0.5)
+    assert not price_rebase.step_matches(1964.1 / 1964.6, 0.5)
+    assert not price_rebase.step_matches(0.93, 0.8)            # nearer no step than the factor
+    assert price_rebase.step_matches(0.82, 0.8)
+    assert not price_rebase.step_matches(0.3, 0.5)
 
 
 def test_superseded_record_is_left_out(tmp_path, monkeypatch, capsys):
     """A wrong record is corrected by a later row naming it in `supersedes` (here factor 1.0, a
-    cancel): the views and adjust.load drop the wrong one, and the collector does not record the
+    cancel): the views and adjust.load_adjustments drop the wrong one, and the collector does not record the
     same (ticker, ex-date) again."""
     root = tmp_path / "root"
     monkeypatch.setattr(common, "ROOT", root)
     write_stored(root, "us", "NVDA", {date(2026, 9, 11): 100.0, EX: 101.0})
     path = day_file("us", "adjustments", EX)
-    append_jsonl(path, [adjust.record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T00:00:00+00:00")])
+    append_jsonl(path, [adjust.adjustment_record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T00:00:00+00:00")])
     con = connect("us")
     assert con.execute("SELECT close FROM ohlc WHERE ticker = 'NVDA' AND date = '2026-09-11'").fetchone()[0] == 50.0
-    fix = {**adjust.record("NVDA", EX, 1.0, "yahoo_splits", "2026-09-16T00:00:00+00:00"),
+    fix = {**adjust.adjustment_record("NVDA", EX, 1.0, "yahoo_splits", "2026-09-16T00:00:00+00:00"),
            "id": "NVDA-2026-09-14-fix1", "supersedes": "NVDA-2026-09-14", "note": "no split happened"}
     append_jsonl(path, [fix])
     con = connect("us")
     assert con.execute("SELECT close FROM ohlc WHERE ticker = 'NVDA' AND date = '2026-09-11'").fetchone()[0] == 100.0
     assert [r["id"] for r in con.execute("SELECT id FROM price_adjustments").df().to_dict("records")] == \
         ["NVDA-2026-09-14-fix1"]
-    assert [a["id"] for a in adjust.load("us")] == ["NVDA-2026-09-14-fix1"]
-    assert len(adjust.load("us", include_superseded=True)) == 2
+    assert [a["id"] for a in adjust.load_adjustments("us")] == ["NVDA-2026-09-14-fix1"]
+    assert len(adjust.load_adjustments("us", include_superseded=True)) == 2
 
 
 def test_factor_after_and_split_fraction():
@@ -663,7 +664,7 @@ def test_ai_replay_root_before_ex_date_is_unaffected(tmp_path, monkeypatch):
     days = [date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11), EX, date(2026, 9, 15)]
     write_stored(src, "us", "NVDA", {d: (100.0 if d < EX else 51.0) for d in days})
     append_jsonl(day_file("us", "adjustments", EX), [
-        adjust.record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T02:00:00+00:00", yahoo_ratio=2.0)])
+        adjust.adjustment_record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T02:00:00+00:00", yahoo_ratio=2.0)])
     row = adj_rows(src, "us")[0]
     cut = pd.Timestamp("2026-09-14T12:15:00+00:00")
     assert not ar.keep_row("adjustments", row, date(2026, 9, 11), cut)

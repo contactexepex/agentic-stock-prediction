@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: "22"
       - name: Install requirements
-        # MAPIE and scikit-learn are test-only (tests/test_aci_scoring.py compares aci.py with MAPIE)
+        # MAPIE and scikit-learn are test-only (tests/test_aci_scoring.py compares adaptive_conformal.py with MAPIE)
         run: pip install -r requirements.txt -r requirements-dev.txt MAPIE==1.5.0 scikit-learn==1.9.1
       - name: Install Playwright (tests/test_presentation.py renders the HTML report in Chromium)
         run: |

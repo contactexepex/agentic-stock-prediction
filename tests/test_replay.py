@@ -18,8 +18,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import events as ev  # noqa: E402
-import indicators as ind  # noqa: E402
+from marketbrief.core import calendar as ev  # noqa: E402
+from marketbrief.analytics import indicators as ind  # noqa: E402
 import replay  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, fat_tailed_walk, run, setup, write_bars  # noqa: E402
 
@@ -43,7 +43,7 @@ print(json.dumps(rows, default=str))
 
 FEATURES = """
 import json, sys, datetime
-import features
+from marketbrief.analytics import features
 from marketbrief.core.market_config import load_market
 cfg = load_market('testmkt')
 d = datetime.date.fromisoformat(sys.argv[1])

@@ -14,8 +14,8 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-import events as ev
-import scoring
+from marketbrief.core import calendar as ev
+from marketbrief.analytics import scoring
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.constants.formatting import CURRENCY_SYMBOLS
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES

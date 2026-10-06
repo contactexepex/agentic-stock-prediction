@@ -114,7 +114,7 @@ BASE_SCHEMAS: Schemas = {
         "id": "VARCHAR", "date": "DATE", "ticker": "VARCHAR", "source": "VARCHAR", "url": "VARCHAR",
         "filled_at": "TIMESTAMPTZ",
     }),
-    # Splits and bonus issues (issue #31; scripts/adjust.py, detected by collect_prices.py), one row
+    # Splits and bonus issues (issue #31; analytics/price_adjustments.py, detected by collect_prices.py), one row
     # per corporate action, files dated by the ex-date. factor = price multiplier for every bar
     # before ex_date (0.5 for a 1:1 bonus or a 2:1 split), volume_factor = 1/factor; the ohlc and
     # bars views apply them on read (ohlc_raw, bars_raw: as stored). source: yahoo_splits (a
@@ -141,7 +141,7 @@ BASE_SCHEMAS: Schemas = {
         # (earnings, when the source has a time). Past events carry a source ending in "_history".
         "amount": "DOUBLE", "timing": "VARCHAR",
         # periodic_report rows (SEC 10-Q/10-K acceptance, source sec_history): the fiscal period end.
-        # They date each quarter's results release among the 2.02 filings (range_inputs.results_filter).
+        # They date each quarter's results release among the 2.02 filings (event_history.results_filter).
         "period_end": "DATE",
     }),
     # Near-the-money implied volatility per ticker and expiry (collect_options.py, US only).
@@ -177,7 +177,7 @@ BASE_SCHEMAS: Schemas = {
         "id": "VARCHAR", "as_of_date": "DATE", "computed_at": "TIMESTAMPTZ", "horizon_days": "INTEGER",
         "q10": "DOUBLE", "q25": "DOUBLE", "q75": "DOUBLE", "q90": "DOUBLE",
         "n_history": "INTEGER", "n_live": "INTEGER", "source": "VARCHAR",
-        # ACI (aci.py), only when switched on in config/ranges.yaml: effective miss rates used for
+        # ACI (adaptive_conformal.py), only when switched on in config/ranges.yaml: effective miss rates used for
         # the 50% and 80% bands and the scored target dates behind them
         "aci_alpha50": "DOUBLE", "aci_alpha80": "DOUBLE", "aci_steps": "INTEGER",
     }),

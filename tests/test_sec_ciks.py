@@ -21,7 +21,7 @@ MARKET = "testciks"
 ARCH = "https://www.sec.gov/Archives/edgar/data"
 sys.path.insert(0, str(SCRIPTS))
 
-import sec  # noqa: E402
+from marketbrief.sources import sec_filings as sec  # noqa: E402
 from marketbrief.sources.sec_client import Edgar  # noqa: E402
 
 TODAY = datetime.now(timezone.utc).date()
@@ -212,7 +212,7 @@ def test_collect_insiders_and_stakes_follow_the_predecessor_cik(tmp_path):
 
 
 def test_sec_earnings_merges_xom_ciks_once(tmp_path, monkeypatch):
-    import collect_events as ce
+    from marketbrief.collectors import events_sec as ce
     setup(tmp_path)
     monkeypatch.setenv("MB_SEC_FIXTURES", str(tmp_path / "sec"))
     us = {"market": "us", "calendar": "XNYS", "timezone": "America/New_York"}

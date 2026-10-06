@@ -1,4 +1,4 @@
-"""News verification phase A (scripts/news_verify.py, collect_articles.py, news_clusters.py and the
+"""News verification phase A (marketbrief/analytics/news_sources.py, collect_articles.py, news_clusters.py and the
 news_clusters_asof macro). Offline: article pages are trimmed real pages in
 tests/fixtures/articles/ (provenance in its README), Google News decoding and HTTP are fakes, and
 every test runs with sockets disabled, so nothing here can reach the network."""
@@ -17,13 +17,14 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
 import ai_replay  # noqa: E402
-import collect_articles  # noqa: E402
+from marketbrief.collectors import articles as collect_articles  # noqa: E402
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
-import news_clusters  # noqa: E402
-import news_verify as nv  # noqa: E402
+from marketbrief.analytics import article_extraction, article_pages, cluster_items  # noqa: E402
+from marketbrief.analytics import news_clusters, news_sources, text_measures  # noqa: E402
+from marketbrief.sources import google_news_decoder  # noqa: E402
 import validate  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "articles"
@@ -57,27 +58,27 @@ def no_network(monkeypatch):
 
 @pytest.fixture(scope="module")
 def src():
-    return nv.load_sources()
+    return news_sources.load_sources()
 
 
-def parse(name: str, src: nv.Sources) -> dict:
+def parse(name: str, src: news_sources.Sources) -> dict:
     url = next(u for u, n in PAGES.items() if n == name)
-    return nv.parse_article(page(name), url, src, src.lookup(nv.host_of(url))[1])
+    return article_extraction.parse_article(page(name), url, src, src.lookup(article_pages.host_of(url))[1])
 
 
 # ---------- allowlist and fetching ----------
 
 def test_url_check(src):
-    assert nv.url_check(URLS["bnn"], src)[0]
-    assert nv.url_check("https://m.economictimes.com/markets/x.cms", src)[:2] == (True, "ok")
-    ok, why, _ = nv.url_check("http://www.bnnbloomberg.ca/x", src)
+    assert article_pages.url_check(URLS["bnn"], src)[0]
+    assert article_pages.url_check("https://m.economictimes.com/markets/x.cms", src)[:2] == (True, "ok")
+    ok, why, _ = article_pages.url_check("http://www.bnnbloomberg.ca/x", src)
     assert not ok and "not https" in why
-    ok, why, _ = nv.url_check("https://www.marketbeat.com/x", src)
+    ok, why, _ = article_pages.url_check("https://www.marketbeat.com/x", src)
     assert not ok and "not on the allowlist" in why
-    ok, why, dom = nv.url_check("https://www.reuters.com/x", src)     # listed, refuses cloud traffic
+    ok, why, dom = article_pages.url_check("https://www.reuters.com/x", src)     # listed, refuses cloud traffic
     assert not ok and dom == "reuters.com"
-    assert not nv.url_check("https://www.bnnbloomberg.ca:8443/x", src)[0]
-    assert not nv.url_check("https://evilbnnbloomberg.ca/x", src)[0]   # suffix match is per label
+    assert not article_pages.url_check("https://www.bnnbloomberg.ca:8443/x", src)[0]
+    assert not article_pages.url_check("https://evilbnnbloomberg.ca/x", src)[0]   # suffix match is per label
 
 
 class FakeResponse:
@@ -120,13 +121,13 @@ def test_fetch_never_requests_http_or_unlisted(src):
     s = FakeSession({"https://www.livemint.com/r": (302, "https://unlisted.example.org/x"),
                      "https://www.livemint.com/h": (301, "http://www.livemint.com/x"),
                      URLS["bnn"]: "bnn_chevron"})
-    assert nv.fetch_page(s, "http://www.livemint.com/a", src).skipped and s.calls == []
-    assert nv.fetch_page(s, "https://www.marketbeat.com/a", src).skipped and s.calls == []
-    r = nv.fetch_page(s, "https://www.livemint.com/r", src)       # redirect to an unlisted host: not followed
+    assert article_pages.fetch_page(s, "http://www.livemint.com/a", src).skipped and s.calls == []
+    assert article_pages.fetch_page(s, "https://www.marketbeat.com/a", src).skipped and s.calls == []
+    r = article_pages.fetch_page(s, "https://www.livemint.com/r", src)       # redirect to an unlisted host: not followed
     assert r.html is None and "not on the allowlist" in r.skipped and s.calls == ["https://www.livemint.com/r"]
-    r = nv.fetch_page(s, "https://www.livemint.com/h", src)       # redirect to http://: not followed
+    r = article_pages.fetch_page(s, "https://www.livemint.com/h", src)       # redirect to http://: not followed
     assert r.html is None and "not https" in r.skipped and s.calls[-1] == "https://www.livemint.com/h"
-    r = nv.fetch_page(s, URLS["bnn"], src)
+    r = article_pages.fetch_page(s, URLS["bnn"], src)
     assert r.status == 200 and "Chevron" in r.html and r.requests == 1
 
 
@@ -142,19 +143,19 @@ def test_extraction_order_jsonld_then_trafilatura_then_newspaper(monkeypatch, sr
         return f
     ld = '<script type="application/ld+json">{"@type": "NewsArticle", "articleBody": "%s"}</script>'
     long_body, short_body = "Long body sentence. " * 60, "Short."
-    monkeypatch.setitem(nv.EXTRACTORS, "trafilatura", fake("trafilatura", 50))
-    monkeypatch.setitem(nv.EXTRACTORS, "newspaper", fake("newspaper", 900))
-    a = nv.parse_article(f"<html><head>{ld % long_body}</head><body></body></html>", "https://x.test", src)
+    monkeypatch.setitem(article_extraction.EXTRACTORS, "trafilatura", fake("trafilatura", 50))
+    monkeypatch.setitem(article_extraction.EXTRACTORS, "newspaper", fake("newspaper", 900))
+    a = article_extraction.parse_article(f"<html><head>{ld % long_body}</head><body></body></html>", "https://x.test", src)
     assert a["extractor"] == "jsonld" and a["access"] == "full" and called == []
-    a = nv.parse_article(f"<html><head>{ld % short_body}</head><body></body></html>", "https://x.test", src)
+    a = article_extraction.parse_article(f"<html><head>{ld % short_body}</head><body></body></html>", "https://x.test", src)
     assert a["extractor"] == "newspaper" and called == ["trafilatura", "newspaper"] and a["access"] == "full"
     called.clear()
-    monkeypatch.setitem(nv.EXTRACTORS, "trafilatura", fake("trafilatura", 600))
-    a = nv.parse_article("<html><body><p>x</p></body></html>", "https://x.test", src)
+    monkeypatch.setitem(article_extraction.EXTRACTORS, "trafilatura", fake("trafilatura", 600))
+    a = article_extraction.parse_article("<html><body><p>x</p></body></html>", "https://x.test", src)
     assert a["extractor"] == "trafilatura" and called == ["trafilatura"] and a["access"] == "partial"  # < full_chars
     # per-domain order (config `extract`)
     called.clear()
-    a = nv.parse_article("<html><body><p>x</p></body></html>", "https://x.test", src,
+    a = article_extraction.parse_article("<html><body><p>x</p></body></html>", "https://x.test", src,
                          {"extract": ["newspaper", "trafilatura"]})
     assert called == ["newspaper"] and a["extractor"] == "newspaper"
 
@@ -188,20 +189,20 @@ def test_vendor_content_is_promotional(src):
 def test_reuters_copy_detected_by_shingles(src):
     """AOL (provider Reuters) and BNN Bloomberg (byline Reuters Staff) carry one Reuters story:
     6-shingle containment 0.958 on the full pages, about 0.90 on the trimmed fixtures."""
-    a, b = nv.shingles(parse("aol_chevron", src)["text"]), nv.shingles(parse("bnn_chevron", src)["text"])
-    assert nv.containment_exact(a, b) >= 0.85
-    est = nv.containment_est(nv.minhash_hex(a), len(a), nv.minhash_hex(b), len(b))
+    a, b = text_measures.shingles(parse("aol_chevron", src)["text"]), text_measures.shingles(parse("bnn_chevron", src)["text"])
+    assert text_measures.containment_exact(a, b) >= 0.85
+    est = text_measures.estimated_containment(text_measures.minhash_hex(a), len(a), text_measures.minhash_hex(b), len(b))
     assert est >= 0.5
 
 
 def test_mint_rewrite_only_caught_by_attribution(src):
     mint, bs = parse("mint_jio", src), parse("bs_jio", src)
-    a, b = nv.shingles(mint["text"]), nv.shingles(bs["text"])
-    assert nv.containment_exact(a, b) < 0.5                     # wording alone misses the rewrite
-    assert nv.containment_est(nv.minhash_hex(a), len(a), nv.minhash_hex(b), len(b)) < 0.5
+    a, b = text_measures.shingles(mint["text"]), text_measures.shingles(bs["text"])
+    assert text_measures.containment_exact(a, b) < 0.5                     # wording alone misses the rewrite
+    assert text_measures.estimated_containment(text_measures.minhash_hex(a), len(a), text_measures.minhash_hex(b), len(b)) < 0.5
     assert src.detect_wire(byline=mint["byline"], provider=mint["provider"], text=mint["text"]) == ("Reuters", "attribution")
     assert src.detect_wire(byline=bs["byline"], text=bs["text"]) == ("Reuters", "byline")
-    assert nv.sources_say(mint["text"]) and nv.sources_say(bs["text"])
+    assert text_measures.sources_say(mint["text"]) and text_measures.sources_say(bs["text"])
 
 
 @pytest.mark.parametrize("text,wire", [
@@ -224,11 +225,11 @@ def test_wire_in_title_and_source(src):
 
 
 def test_numbers_and_extract(src):
-    assert nv.numbers("raise about $3.8 billion; Rs 5,77,094 crore; up 24.7%; 486,532 cars in 2026; Q3 FY26") == \
+    assert text_measures.numbers("raise about $3.8 billion; Rs 5,77,094 crore; up 24.7%; 486,532 cars in 2026; Q3 FY26") == \
         ["3.8e+09 usd", "5.77094e+12 inr", "24.7 pct", "486532"]
-    assert nv.distinctive(nv.numbers("HDFC Bank shares rise 2% after Q3")) == set()
-    assert nv.distinctive(nv.numbers("Jio seeks to raise $3.8 bn")) == {"3.8e+09 usd"}
-    ext = nv.key_sentences(parse("bnn_chevron", src)["text"], ["Chevron"])
+    assert text_measures.distinctive(text_measures.numbers("HDFC Bank shares rise 2% after Q3")) == set()
+    assert text_measures.distinctive(text_measures.numbers("Jio seeks to raise $3.8 bn")) == {"3.8e+09 usd"}
+    ext = text_measures.key_sentences(parse("bnn_chevron", src)["text"], ["Chevron"])
     assert 1 <= len(ext) <= 3 and all(len(s.split()) <= 40 for s in ext)
 
 
@@ -461,11 +462,11 @@ def test_clusters_origins_duplicates_primaries(env, capsys):
 
 def test_title_links():
     cfg = {"tickers": {"TSLA": {"name": "Tesla"}}}
-    drop = news_clusters.drop_tokens(cfg, "TSLA")
-    a, b = nv.title_tokens("Tesla stock rises", drop), nv.title_tokens("Tesla stock falls", drop)
+    drop = cluster_items.drop_tokens(cfg, "TSLA")
+    a, b = text_measures.title_tokens("Tesla stock rises", drop), text_measures.title_tokens("Tesla stock falls", drop)
     assert not (a & b)                                           # company name and 'stock' never link titles
-    a = nv.title_tokens("Chevron elevates CFO to lead oil and gas operations", {"chevron"})
-    b = nv.title_tokens("Chevron elevates CFO to head oil and gas operations By Reuters", {"chevron"})
+    a = text_measures.title_tokens("Chevron elevates CFO to lead oil and gas operations", {"chevron"})
+    b = text_measures.title_tokens("Chevron elevates CFO to head oil and gas operations By Reuters", {"chevron"})
     assert len(a & b) / len(a | b) >= 0.5
 
 
@@ -478,7 +479,7 @@ def test_shared_round_amount_alone_does_not_link(src):
         return {"id": f"x{i}", "ticker": ticker, "title": title, "source": "s", "domain": f"d{i}.com", "tier": "tier2",
                 "t": pd.Timestamp("2026-10-05T10:00:00+00:00"), "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"),
                 "wire": None, "wire_ev": None, "provider": None, "promo": None, "canon": None, "outlet_key": f"d{i}.com",
-                "article": None, "fetched": None, "say": False, "nums": nv.distinctive(nv.numbers(title)),
+                "article": None, "fetched": None, "say": False, "nums": text_measures.distinctive(text_measures.numbers(title)),
                 "vetted": True, "read": False, "opinion": False}
     nvda = news_clusters.cluster_ticker(
         [item(1, "NVDA", "Nvidia Spent $20 Billion on Buybacks Last Quarter. Here's What That Means for You"),
@@ -586,8 +587,8 @@ def test_same_outlet_copy_keeps_its_own_origin(src):
     b, c = parse("mint_jio", src)["text"], parse("bs_jio", src)["text"] + " " + parse("yahoo_tikr_tesla", src)["text"]
 
     def art(text):
-        sh = nv.shingles(text)
-        return {"shingle_count": len(sh), "minhash": nv.minhash_hex(sh), "access": "full"}
+        sh = text_measures.shingles(text)
+        return {"shingle_count": len(sh), "minhash": text_measures.minhash_hex(sh), "access": "full"}
     arts = {1: art(a), 2: art(a + " " + c), 3: art(a + " " + b)}   # 2 and 3 share only text a: no copy
     cfg = {"tickers": {"HDFCBANK": {"name": "HDFC Bank"}}}
 
@@ -615,17 +616,17 @@ def test_attribution_only_in_the_lede(src):
 
 
 def test_clean_splits_glued_sentences():
-    assert nv.sentences(nv._clean("He wrote a post.HDFC Bank shares fell.The index rose.")) == \
+    assert text_measures.sentences(text_measures.clean_text("He wrote a post.HDFC Bank shares fell.The index rose.")) == \
         ["He wrote a post.", "HDFC Bank shares fell.", "The index rose."]
 
 
 def test_decoder_only_talks_to_google(monkeypatch, src):
     import httpx
     with pytest.raises(httpx.RequestError):
-        collect_articles.google_only(httpx.Request("POST", "https://evil.example.com/batchexecute"))
+        google_news_decoder.google_only(httpx.Request("POST", "https://evil.example.com/batchexecute"))
     with pytest.raises(httpx.RequestError):
-        collect_articles.google_only(httpx.Request("GET", "http://news.google.com/rss/articles/x"))
-    collect_articles.google_only(httpx.Request("POST", "https://news.google.com/_/DotsSplashUi/data/batchexecute"))
+        google_news_decoder.google_only(httpx.Request("GET", "http://news.google.com/rss/articles/x"))
+    google_news_decoder.google_only(httpx.Request("POST", "https://news.google.com/_/DotsSplashUi/data/batchexecute"))
 
     sent = []
 
@@ -655,7 +656,7 @@ def test_decoder_only_talks_to_google(monkeypatch, src):
             return out
     import googlenewsdecoder
     monkeypatch.setattr(googlenewsdecoder, "GoogleDecoder", FakeDecoder)
-    res = collect_articles.decode_google(["https://news.google.com/rss/articles/abc"], src)
+    res = google_news_decoder.decode_google(["https://news.google.com/rss/articles/abc"], src)
     assert res[0]["success"] is False and "refused" in res[0]["message"]
     assert sent == ["https://news.google.com/rss/articles/abc"]      # the redirect off Google was never sent
 
@@ -712,7 +713,7 @@ def test_items_vetted_read_and_opinion_from_stored_rows(env, capsys):
         news_row(42, "Chevron names Jeff Gustavson next CFO, Reuters reports", "CVX", source="Dubious Daily",
                  domain="dubiousdaily.xyz", conf="low")])
     con = connect(MARKET)
-    items = {i["id"]: i for i in news_clusters.load_items(con, load_market(MARKET), nv.load_sources(),
+    items = {i["id"]: i for i in cluster_items.load_items(con, load_market(MARKET), news_sources.load_sources(),
                                                           pd.Timestamp(NOW))}
     assert items["n40"]["opinion"] and not items["n41"]["opinion"]          # contributor piece vs news desk
     assert items["n42"]["wire"] == "Reuters" and not items["n42"]["vetted"]  # an agency named by an unvetted site
@@ -720,14 +721,14 @@ def test_items_vetted_read_and_opinion_from_stored_rows(env, capsys):
 
 
 def test_label_and_domain_keys_are_one_outlet(src):
-    learned = nv.label_domains([("Pluang", None), ("pluang.com", "pluang.com"), ("The CSR Universe", "thecsruniverse.com"),
+    learned = news_sources.label_domains([("Pluang", None), ("pluang.com", "pluang.com"), ("The CSR Universe", "thecsruniverse.com"),
                                 ("The CSR Universe", None), ("ad-hoc-news.de", None)])
-    keys = {nv.outlet_key(nv.outlet_of(lab, src, learned), lab)
+    keys = {news_sources.outlet_key(news_sources.outlet_of(lab, src, learned), lab)
             for lab in ("Pluang", "pluang.com")}
     assert keys == {"pluang.com"}
-    assert nv.outlet_key(nv.outlet_of("ad-hoc-news.de", src, learned), "ad-hoc-news.de") == "ad-hoc-news.de"
-    assert nv.outlet_key(nv.outlet_of("The CSR Universe", src, learned), "The CSR Universe") == "thecsruniverse.com"
-    assert nv.outlet_key(None, "Some Blog") == "label:some blog"
+    assert news_sources.outlet_key(news_sources.outlet_of("ad-hoc-news.de", src, learned), "ad-hoc-news.de") == "ad-hoc-news.de"
+    assert news_sources.outlet_key(news_sources.outlet_of("The CSR Universe", src, learned), "The CSR Universe") == "thecsruniverse.com"
+    assert news_sources.outlet_key(None, "Some Blog") == "label:some blog"
 
 
 
@@ -743,10 +744,10 @@ def test_agency_evidence_verifies_an_unread_vetted_headline(src):
 def test_agency_source_label_vets_an_item_without_an_allowlisted_domain(env):
     """Issue #37: the agency itself (its Google News source label) is vetted even when its domain is not
     allowlisted (afp.com)."""
-    src = nv.load_sources()
+    src = news_sources.load_sources()
     assert src.lookup("afp.com")[0] is None
     env.write("news", [news_row(43, "Chevron names Jeff Gustavson next CFO", "CVX", source="AFP", domain="afp.com")])
-    items = {i["id"]: i for i in news_clusters.load_items(connect(MARKET), load_market(MARKET), src, pd.Timestamp(NOW))}
+    items = {i["id"]: i for i in cluster_items.load_items(connect(MARKET), load_market(MARKET), src, pd.Timestamp(NOW))}
     assert items["n43"]["vetted"] and items["n43"]["wire"] == "AFP" and items["n43"]["wire_ev"] == "source"
 
 
@@ -767,6 +768,6 @@ def test_label_letters_never_map_to_an_allowlisted_domain(src):
     pairs = [("BNNBloomberg", None), ("BNN Bloomberg", "bnnbloomberg.ca"), ("Pluang", None),
              ("pluang.com", "pluang.com")]
     assert src.lookup("bnnbloomberg.ca")[0] and src.domain_of_label("BNNBloomberg") is None
-    assert nv.label_domains(pairs)["bnnbloomberg"] == "bnnbloomberg.ca"          # without the guard
-    learned = nv.label_domains(pairs, src)
+    assert news_sources.label_domains(pairs)["bnnbloomberg"] == "bnnbloomberg.ca"          # without the guard
+    learned = news_sources.label_domains(pairs, src)
     assert "bnnbloomberg" not in learned and learned["pluang"] == "pluang.com"

@@ -10,22 +10,22 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import events as ev
-import fundamentals as fu
+from marketbrief.core import calendar as ev
+from marketbrief.analytics import fundamentals as fu
 import graph
 import lessons
-import macro_context
-import nse_context
-import relations
-import scoring
-import smart_money as sm
+from marketbrief.pipeline import macro_sections as macro_context
+from marketbrief.pipeline import nse_sections as nse_context
+from marketbrief.analytics import relation_flags as relations
+from marketbrief.analytics import scoring
+from marketbrief.analytics import smart_money as sm
 from score_predictions import is_late
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
 from marketbrief.presentation import news_events
 from marketbrief.utils.markdown import cursor_markdown_table
-from features import local_today
+from marketbrief.analytics.features import local_today
 
 PCT = "round({} * 100, 2)"
 
@@ -69,7 +69,7 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
             FROM features_latest
             WHERE as_of_date = (SELECT max(as_of_date) FROM features_latest) AND list_contains(?, ticker)
             ORDER BY sector, ticker""", [tickers]),
-        # role/tag_confidence (scripts/news_tags.py): primary_7d = items about the ticker (named in
+        # role/tag_confidence (marketbrief/analytics/news_tags.py): primary_7d = items about the ticker (named in
         # the headline as the subject); low_conf_7d = tags to read with care (several companies in
         # the headline, a comparison or list, or named only in the summary)
         ("News activity and sentiment by window (primary = about the ticker; low_conf = mentioned or ambiguous tag)", """

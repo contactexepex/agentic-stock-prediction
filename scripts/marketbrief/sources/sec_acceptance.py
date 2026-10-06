@@ -1,7 +1,7 @@
 """SEC acceptance-time arithmetic: the New York offset, the SGML header time, the shift test and its inverse,
 and the collectors' summary of the checks.
 
-Background (docs in scripts/sec.py): the submissions JSON's `acceptanceDateTime` is sometimes shifted
+Background (docs in sources/sec_filings.py): the submissions JSON's `acceptanceDateTime` is sometimes shifted
 later by the New York UTC offset (+4h EDT, +5h EST) for a whole CIK's file; the SGML header's
 `<ACCEPTANCE-DATETIME>` (US Eastern) is the authority."""
 from __future__ import annotations

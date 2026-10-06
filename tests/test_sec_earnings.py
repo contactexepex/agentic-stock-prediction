@@ -1,4 +1,4 @@
-"""SEC item 2.02 filings vs results releases (range_inputs.results_filter): one release per fiscal
+"""SEC item 2.02 filings vs results releases (event_history.results_filter): one release per fiscal
 quarter, picked by the 10-Q/10-K reports, without look-ahead. Dates are real EDGAR acceptance
 dates (New York) and period ends, 2023-07 to 2026-10. Run: pytest -q"""
 from __future__ import annotations
@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import backtest as bt  # noqa: E402
-import collect_events as ce  # noqa: E402
-import events as ev  # noqa: E402
-import range_inputs as ri  # noqa: E402
+from marketbrief.constants import events as event_constants  # noqa: E402
+from marketbrief.core import calendar as ev  # noqa: E402
+from marketbrief.analytics import earnings_reaction, event_history  # noqa: E402
 from test_range_inputs import ALL_ON, XNYS, run_events_main  # noqa: E402
 
 
@@ -34,7 +34,7 @@ def reports(pairs):
 
 
 def kept(rows, reps, as_of=None) -> list[str]:
-    return sorted({str(d) for d, _, _ in ri.results_filter(rows, reps, as_of)})
+    return sorted({str(d) for d, _, _ in event_history.results_filter(rows, reps, as_of)})
 
 
 # Tesla: an 8-K item 2.02 with the quarter's deliveries about the 2nd of each quarter's first month,
@@ -84,9 +84,9 @@ def test_tesla_delivery_reports_are_not_earnings():
     for d in TSLA_DELIVERIES[5:]:
         assert d not in kept(rows, reps, D(d)), d
     # the 1-day range made the day before a delivery report no longer contains earnings
-    evs = [(d, tm) for d, tm, _ in ri.results_filter(rows, reps, D("2026-10-01"))]
-    assert not ri.earnings_in_horizon(XNYS, evs, D("2026-10-01"), D("2026-10-02"))
-    assert ri.earnings_in_horizon(XNYS, [(d, tm) for d, tm, _ in rows], D("2026-10-01"), D("2026-10-02"))
+    evs = [(d, tm) for d, tm, _ in event_history.results_filter(rows, reps, D("2026-10-01"))]
+    assert not earnings_reaction.earnings_in_horizon(XNYS, evs, D("2026-10-01"), D("2026-10-02"))
+    assert earnings_reaction.earnings_in_horizon(XNYS, [(d, tm) for d, tm, _ in rows], D("2026-10-01"), D("2026-10-02"))
 
 
 def test_allstate_preannouncements_are_not_earnings():
@@ -139,7 +139,7 @@ def test_no_look_ahead():
     # day; the 10-Q of 2023-11-01 shows it was not the release, but only from 2023-11-01 on
     assert "2023-10-19" in kept(rows, reps, D("2023-10-20"))
     assert "2023-10-19" not in kept(rows, reps, D("2023-11-01"))
-    v = {start: [str(d) for d, _ in evs] for start, evs in ri.earnings_versions(evframe("ALL", rows, reps))["ALL"]}
+    v = {start: [str(d) for d, _ in evs] for start, evs in event_history.earnings_versions(evframe("ALL", rows, reps))["ALL"]}
     assert "2023-10-19" in v[D("2023-08-01")] and "2023-10-19" not in v[D("2023-11-01")]
 
 
@@ -160,9 +160,9 @@ def test_backtest_uses_the_events_known_at_each_day():
     tsla_rows = sec_rows(TSLA_DELIVERIES, "before_open") + sec_rows(TSLA_RESULTS, "after_close")
     evdf = pd.concat([evframe("ALL", all_rows, reports(ALL_REPORTS)),
                       evframe("TSLA", tsla_rows, reports(TSLA_REPORTS))])
-    versions = ri.earnings_versions(evdf)
+    versions = event_history.earnings_versions(evdf)
     assert [s for s, _ in versions["TSLA"]] == [None] + [D(f) for f, _ in TSLA_REPORTS]
-    sessions = ev._xcal("XNYS").sessions_in_range("2023-01-03", "2026-10-02")
+    sessions = ev.exchange_calendar("XNYS").sessions_in_range("2023-01-03", "2026-10-02")
     n = len(sessions)
     close = 100 * np.exp(np.cumsum(np.random.default_rng(3).normal(0, 0.01, n)))
     df = pd.DataFrame({"open": close, "close": close}, index=sessions)
@@ -214,6 +214,6 @@ def test_collector_stores_periodic_reports_and_reader_uses_them(tmp_path, monkey
     s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))
     assert s["sec_reports"] == 0 and s["new_history"]["earnings"] == 0
     from marketbrief.core.database import connect
-    evdf = ri.load_events(connect("testsecrep"))
-    assert ri.earnings_events(evdf)["AAPL"] == [(D("2026-04-22"), "after_close"), (D("2026-10-29"), None)]
-    assert ce.REPORT_FORMS == ("10-Q", "10-K")
+    evdf = event_history.load_events(connect("testsecrep"))
+    assert event_history.earnings_events(evdf)["AAPL"] == [(D("2026-04-22"), "after_close"), (D("2026-10-29"), None)]
+    assert event_constants.REPORT_FORMS == ("10-Q", "10-K")

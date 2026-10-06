@@ -25,7 +25,7 @@ from marketbrief.utils.numbers import round_or_none  # noqa: E402
 from marketbrief.core.clock import freeze_sql, utc_now, utc_today  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
-import events as ev  # noqa: E402
+from marketbrief.core import calendar as ev  # noqa: E402
 import replay  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, fat_tailed_walk, setup, write_bars  # noqa: E402
 
@@ -504,11 +504,13 @@ class FakeNse:
 
 
 def test_collector_since_windows_and_default_unchanged():
-    import collect_nse_india as cni
-    import collect_relations_india as cri
+    from marketbrief.collectors.collector_store import Problems
+    from marketbrief.collectors.nse_announcements import announcements
+    from marketbrief.collectors.nse_insiders import insiders
+    from marketbrief.collectors.nse_runner import NseRun
     today = date(2026, 10, 5)
-    for fn, lookback in ((lambda n, s: cni.announcements(n, {}, today, 2, "now", [], [], s), 2),
-                         (lambda n, s: cri.insiders(n, {}, today, 14, "now", "nomarket", [], [], [], s), 14)):
+    for fn, lookback in ((lambda n, s: announcements(NseRun(n, {}, today, "now", "nomarket", Problems()), 2, s), 2),
+                         (lambda n, s: insiders(NseRun(n, {}, today, "now", "nomarket", Problems()), 14, s), 14)):
         n = FakeNse()
         fn(n, None)                                       # default: one call over the configured lookback
         assert len(n.calls) == 1
@@ -629,7 +631,7 @@ def test_training_cutoff_comes_from_config(prepared, tmp_path):
 def test_keep_row_price_sources_by_bar_date():
     """An NSE-fill provenance row (data/<market>/price_sources/) is kept like its bar: by bar date."""
     cut = pd.Timestamp(CUT)
-    row = {"id": f"{D}-AAPL", "date": str(D), "ticker": "AAPL", "source": "nse_bhavcopy",
+    row = {"id": f"{D}-INFY", "date": str(D), "ticker": "INFY", "source": "nse_bhavcopy",
            "filled_at": "2026-08-20T06:00:00+00:00"}
     assert ar.keep_row("price_sources", row, D, cut)
     assert not ar.keep_row("price_sources", {**row, "date": str(D + timedelta(days=1))}, D, cut)

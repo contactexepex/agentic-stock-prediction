@@ -11,7 +11,7 @@ scored where it applies (docs/DESIGN.md section 7: keep an input only if it impr
 - earnings_history: earnings widening sized from the stock's past earnings-day moves (only
   reactions completed before d) vs the fixed multiplier; earnings dates from event_history, with
   the SEC 2.02 filings that are not results releases dropped as known at d (only 10-Q/10-K
-  reports accepted by d are used: range_inputs.earnings_versions).
+  reports accepted by d are used: event_history.earnings_versions).
 - ex_dividend: centre shifted down by dividends going ex inside the horizon vs no shift.
 - beta_split: beta x index cue + own cue net of it vs the direct own cue. Historical cues are
   proxies: a numeric index_cue beta (US futures) uses the benchmark's next open gap; "fit" uses
@@ -29,12 +29,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import events as ev
-import range_inputs as ri
-import rangelib as rl
+from marketbrief.analytics import earnings_reaction, event_history, index_cue, range_switches
+from marketbrief.analytics import range_math as rl
+from marketbrief.constants.indicators import TRADING_DAYS
 from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
-from features import load_bars
-from marketbrief.core import cli, database, market_config, paths
+from marketbrief.analytics.features import load_bars
+from marketbrief.core import calendar as ev, cli, database, market_config, paths
 
 # input -> (arm when off, arm when on, column marking the rows where it applies)
 INPUTS = {"earnings_history": ("earn_fixed", "earn_hist", "earn"),
@@ -42,8 +42,8 @@ INPUTS = {"earnings_history": ("earn_fixed", "earn_hist", "earn"),
           "beta_split": ("cue_direct", "cue_beta", "has_cue")}
 
 
-def rolling_beta(close: pd.Series, bench: pd.Series, n: int = rl.TRADING_DAYS, min_obs: int = 60) -> pd.Series:
-    j = pd.concat([ri.log_returns(close), ri.log_returns(bench)], axis=1, join="inner").dropna()
+def rolling_beta(close: pd.Series, bench: pd.Series, n: int = TRADING_DAYS, min_obs: int = 60) -> pd.Series:
+    j = pd.concat([index_cue.log_returns(close), index_cue.log_returns(bench)], axis=1, join="inner").dropna()
     a, b = j.iloc[:, 0], j.iloc[:, 1]
     return (a.rolling(n, min_periods=min_obs).cov(b) / b.rolling(n, min_periods=min_obs).var()).reindex(close.index)
 
@@ -61,10 +61,10 @@ def index_cue_series(cfg: dict, bars: dict, rc: dict) -> pd.Series | None:
         return None
     nxt = pd.Series(bench.index[1:].tolist() + [pd.NaT], index=bench.index)
     a = pd.DataFrame({"asof": bench.index, "date": nxt.to_numpy()}).dropna()
-    rc_ = ri.log_returns(cue["close"]).dropna()
+    rc_ = index_cue.log_returns(cue["close"]).dropna()
     b = pd.DataFrame({"date": rc_.index, "r": rc_.to_numpy()})
     j = pd.merge_asof(a.sort_values("date"), b, on="date", allow_exact_matches=False).set_index("asof")["r"]
-    betas = pd.Series({d: ri.fit_cue_beta(bench["close"], cue["close"], d, int(rc["beta_split"]["fit_sessions"]))
+    betas = pd.Series({d: index_cue.fit_cue_beta(bench["close"], cue["close"], d, int(rc["beta_split"]["fit_sessions"]))
                        for d in j.index}, dtype=float)
     return (betas * j).reindex(bench.index)
 
@@ -108,7 +108,7 @@ def input_columns(cfg: dict, rc: dict, df: pd.DataFrame, t: str, h: int, extra: 
     pos = {d.date(): i for i, d in enumerate(idx)}
     cols = pd.DataFrame(index=idx)
     # earnings: each as-of date d uses the events as known at d (SEC 2.02 filings classified by
-    # the 10-Q/10-K reports accepted by d; ri.earnings_versions)
+    # the 10-Q/10-K reports accepted by d; event_history.earnings_versions)
     earn, mh = np.zeros(n, dtype=bool), np.full(n, np.nan)
     sigma = rl.ewma_sigma(c, rc["ewma_lambda"])
     days = np.array([d.date() for d in idx])
@@ -122,12 +122,12 @@ def input_columns(cfg: dict, rc: dict, df: pd.DataFrame, t: str, h: int, extra: 
             live &= days < end
         if not live.any():
             continue
-        eps = [pos[s] for d, tm in events for s in ri.affected_sessions(cfg, d, tm) if s in pos]
+        eps = [pos[s] for d, tm in events for s in earnings_reaction.affected_sessions(cfg, d, tm) if s in pos]
         win = mark_window(n, eps, h) & live
         earn |= win
-        moves = ri.past_moves(cfg, c, sigma, events, rc["warmup_bars"])
+        moves = earnings_reaction.past_moves(cfg, c, sigma, events, rc["warmup_bars"])
         for i in np.flatnonzero(win):
-            mh[i] = ri.earnings_stats(moves, rc, idx[i].date())[0]
+            mh[i] = earnings_reaction.earnings_stats(moves, rc, idx[i].date())[0]
     cols["earn"] = earn
     cols["m_hist"] = mh
     # dividends: log shift for ex-dates inside (d, d+h]
@@ -279,14 +279,14 @@ def run(cfg: dict, rc: dict, eval_sessions: int) -> dict:
     if bench is None:
         raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
     rank = {d: i for i, d in enumerate(bench.index)}
-    evdf = ri.load_events(con)
-    extra = {"earnings": ri.earnings_versions(evdf), "dividends": ri.dividend_events(evdf), "bench": bench,
+    evdf = event_history.load_events(con)
+    extra = {"earnings": event_history.earnings_versions(evdf), "dividends": event_history.dividend_events(evdf), "bench": bench,
              "index_cue": index_cue_series(cfg, bars, rc)}
     out = {"market": cfg["market"], "as_of_date": str(bench.index[-1].date()), "horizons": {}, "by_ticker": {},
            "inputs": {}, "event_history": {"earnings": sum(len(v[-1][1]) for v in extra["earnings"].values()),
                                            "dividends": sum(map(len, extra["dividends"].values()))}}
     for h in rc["horizons"]:
-        use = {k: ri.enabled(rc, k, cfg["market"], h) for k in INPUTS}
+        use = {k: range_switches.enabled(rc, k, cfg["market"], h) for k in INPUTS}
         res = evaluate(observations(bars, cfg["tickers"], h, rc, rank, cfg, extra), h, rc, eval_sessions, use)
         out["horizons"][h] = {"all": summarize(res),
                               "last_60_days": summarize(res[res["rank"] > res["rank"].max() - 60]) if len(res) else {"n": 0}}

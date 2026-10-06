@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from marketbrief.analytics import verification_status as vs  # noqa: E402
 from marketbrief.analytics.claim_numbers import half_step_of, quoted_numbers, values_match  # noqa: E402
-from prediction_rules import check_news_status  # noqa: E402
+from marketbrief.analytics.prediction_rules import check_news_status  # noqa: E402
 import test_validate  # noqa: E402
 from test_validate import GOOD_NEWS_ID, call, codes, forecast, write_jsonl  # noqa: E402
 

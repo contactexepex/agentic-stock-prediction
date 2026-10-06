@@ -23,10 +23,10 @@ FIX = REPO / "tests" / "fixtures" / "sec"
 MARKET = "testsec"
 sys.path.insert(0, str(SCRIPTS))
 
-import collect_holdings as ch  # noqa: E402
-import collect_insiders as ci  # noqa: E402
-import collect_stakes as cs  # noqa: E402
-import smart_money as sm  # noqa: E402
+from marketbrief.collectors import holdings_parsing as ch  # noqa: E402
+from marketbrief.collectors import insiders as ci  # noqa: E402
+from marketbrief.collectors import stakes as cs  # noqa: E402
+from marketbrief.analytics import smart_money as sm  # noqa: E402
 
 MARKET_YAML = """
 market: testsec
@@ -502,7 +502,7 @@ def test_edgar_backs_off_on_429_then_succeeds(monkeypatch):
 def test_collect_events_sec_earnings_timing_runs(tmp_path, monkeypatch):
     """collect_events' SEC earnings timing goes through Edgar (a broken import used to be
     swallowed as sec_error with exit 0). 8-K item 2.02 filings become (date, timing) rows."""
-    import collect_events as ce
+    from marketbrief.collectors import events_sec
     root, cfg = setup(tmp_path)
     fx = tmp_path / "sec"
     sub = json.loads((fx / "sub_320193.json").read_text())
@@ -512,7 +512,7 @@ def test_collect_events_sec_earnings_timing_runs(tmp_path, monkeypatch):
     (fx / "sub_320193.json").write_text(json.dumps(sub))
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
     us = {"market": "us", "calendar": "XNYS", "timezone": "America/New_York"}
-    out, failed = ce.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "test test@example.com")
+    out, failed = events_sec.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "test test@example.com")
     assert list(out) == ["AAPL"] and len(out["AAPL"]) == 1 and n > 1   # only the 8-K with item 2.02
     assert failed == []
     d, tm, rank = out["AAPL"][0]
@@ -523,11 +523,11 @@ def test_collect_events_lists_tickers_whose_sec_submissions_fail(tmp_path, monke
     """A ticker whose submissions request fails (NVDA: in the ticker map, no submissions fixture)
     is listed with its CIK and the error instead of being skipped silently; a ticker missing from
     SEC's ticker map (not SEC-registered) is not a failure."""
-    import collect_events as ce
+    from marketbrief.collectors import events_sec
     setup(tmp_path)
     monkeypatch.setenv("MB_SEC_FIXTURES", str(tmp_path / "sec"))
     us = {"market": "us", "calendar": "XNYS", "timezone": "America/New_York"}
-    out, failed = ce.sec_earnings(us, {"AAPL": {}, "NVDA": {}, "NOTSEC": {}}, "test test@example.com")
+    out, failed = events_sec.sec_earnings(us, {"AAPL": {}, "NVDA": {}, "NOTSEC": {}}, "test test@example.com")
     assert [f["ticker"] for f in failed] == ["NVDA"]
     assert failed[0]["cik"] == 1045810 and "no fixture" in failed[0]["error"]
     assert "NVDA" not in out

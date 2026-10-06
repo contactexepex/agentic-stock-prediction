@@ -59,7 +59,7 @@ sectors:
   Construction: [LT, ULTRACEMCO]
   Metals: [TATASTEEL, HINDALCO]
 
-# News tagging (scripts/news_tags.py): a ticker is tagged when one of its `news_names` (default:
+# News tagging (marketbrief/analytics/news_tags.py): a ticker is tagged when one of its `news_names` (default:
 # name + aliases) occurs as a whole word, case-insensitively, in the title (the plain-text summary
 # only when the title names no watchlist company),
 # after that ticker's `news_exclude` regexes were removed (other listed companies sharing a name).
@@ -134,7 +134,7 @@ filings: none             # SEC filings only exist for US companies
 # return on the cue's previous session return over the last year of stored bars.
 index_cue: {symbol: SPX, beta: fit}
 
-# NSE data (session code in scripts/nse.py): relationships from collect_relations_india.py
+# NSE data (session code in marketbrief/sources/nse_client.py): relationships from collect_relations_india.py
 # (DESIGN.md phase 5) and primary sources from collect_nse_india.py. NSE's public JSON needs
 # browser-like headers plus a cookie from the home page. The cloud environment must allow
 # www.nseindia.com and nsearchives.nseindia.com. NSE symbol = the Yahoo symbol without ".NS"

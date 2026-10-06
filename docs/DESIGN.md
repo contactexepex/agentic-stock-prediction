@@ -52,7 +52,7 @@ de-duplicated by accession number in `sec.ticker_submissions` (issue #23).
 | Sectors | One ETF per watchlist sector (10): eight SPDR sector ETFs, JETS (airlines), IAK (insurance) | Nifty Bank, IT and Pharma indices (none for the other seven sectors; see `config/markets/india.yaml`) |
 | News sources | Google News (US), CNBC, BBC; PR Newswire, Business Wire earnings and GlobeNewswire releases (watchlist names only) | Google News (IN), Economic Times, Moneycontrol, Livemint, Business Standard, BusinessLine |
 
-**News ticker tags** (`scripts/news_tags.py`, issues #28/#29): headline first. A ticker is
+**News ticker tags** (`marketbrief/analytics/news_tags.py`, issues #28/#29): headline first. A ticker is
 tagged when one of its `news_names` (default `name` + `aliases`; full names or unambiguous
 aliases such as "M&M", "L&T", "NVDA") occurs as a whole word, case-insensitively, in the TITLE,
 after the ticker's `news_exclude` phrases are removed ("Kotak Mahindra", "Tech Mahindra" for M&M;
@@ -102,7 +102,7 @@ bonus). History stored so far is consistent: it was downloaded in one go (HDFCBA
 either market moved more than 35% in a day except the vol indices (INDIAVIX 2025-04-07 +65.6%, VIX
 2024-12-18 +74.0% and four days in 2025-04 and 2026-06, real volatility spikes), so no adjustment is
 recorded for the past. Design (adjust on read; data stays append-only):
-- Detection (`collect_prices.py`, both markets, `scripts/adjust.py`): before a symbol's new bars
+- Detection (`collect_prices.py`, both markets, `marketbrief/analytics/price_adjustments.py`): before a symbol's new bars
   are written, Yahoo's frame (today's basis) is compared with our stored closes of the same dates.
   A `Stock Splits` row (ex-date E, ratio r) is recorded once as `data/<market>/adjustments/YYYY/MM/<E>.jsonl`
   (id `<ticker>-<E>`, `factor` = 1/r = price multiplier for every bar before E, `volume_factor` =
@@ -453,7 +453,7 @@ evidence-status line per call; view_data passes each cited and listed id's statu
 5. **Self-calibration:** track live coverage over the last ~60 scored ranges per market and band.
    If the 80% band hits less than 80%, widen it; if it hits clearly more, narrow it.
    Implemented two ways: `calibrate.py` re-estimates the pool quantiles daily (live scored ranges
-   added to the pool), and, switched off by default, **Adaptive Conformal Inference** (`aci.py`,
+   added to the pool), and, switched off by default, **Adaptive Conformal Inference** (`adaptive_conformal.py`,
    Gibbs & Candès 2021; `aci:` in `config/ranges.yaml`). ACI keeps per market x horizon x band an
    effective miss rate alpha_t, updated after each scored target date by
    alpha_{t+1} = alpha_t + gamma (alpha_target - err_t), err_t = share of that date's ranges whose
@@ -519,7 +519,7 @@ the same ticker's recent lessons plus recent ones from other tickers, point-in-t
 
 Reported per market, per horizon, per regime, and over rolling 30-day and since-start windows.
 
-**Proper scores** (`scripts/scoring.py`, hand-written, tested on synthetic data with exact values):
+**Proper scores** (`marketbrief/analytics/scoring.py`, hand-written, tested on synthetic data with exact values):
 - Calls: Brier score mean((p - y)^2) with p = stated confidence and y = hit (a coin flip scores
   0.250), log loss -mean(y ln p + (1 - y) ln(1 - p)) (coin flip 0.693), Brier skill 1 - Brier/0.25,
   and a reliability table: confidence bins [0.5, 0.6), [0.6, 0.7), [0.7, 0.8), [0.8, 0.9] with
@@ -544,7 +544,7 @@ with only what `ranges.py` would know pre-open the next session (bars up to d's 
 versions by the 10-Q/10-K reports accepted by that session date; dividends; major events).
 - Ranges: 1d and 5d 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles
   at d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches
-  on, centre cap, ex-dividend shift), reusing `rangelib`, `range_inputs` and `backtest` helpers.
+  on, centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and `backtest` helpers.
   Scored on the close h bars later: coverage overall and by regime, sector, ticker, month, year,
   earnings and major event in horizon; interval score and width vs the naive range; calibration
   (stated vs actual coverage, the two published bands plus other levels of the same pool).
@@ -759,7 +759,7 @@ always show the same numbers.
      announcements (scored by the news-analyst as primary sources), Integrated Filing results
      (quarter, half year, nine months, year; standalone and consolidated; Ind AS, banking and
      life-insurance taxonomies), FII/DII provisional flows and delivery % into
-     `data/india/announcements|financials|flows|delivery/`; `nse_context.py` adds them to the
+     `data/india/announcements|financials|flows|delivery/`; `nse_sections.py` adds them to the
      context pack. The news-analyst's scores for announcements (news_enriched rows with
      `nse-ann-` ids) feed its brief and the `announcements_enriched` view, which the context
      pack's announcement section shows (sentiment, materiality). Delivery % is context only,
@@ -962,7 +962,7 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   used daily and per-ticker backfill on demand. Earlier note, kept for history:
 - On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
   against live responses (NSE changes field names; built from public scrapers, not yet seen live).
-- Section 4 range inputs: **built** (`scripts/range_inputs.py`, switches in `config/ranges.yaml`):
+- Section 4 range inputs: **built** (`marketbrief/analytics/range_switches.py and its neighbours`, switches in `config/ranges.yaml`):
   past earnings-day moves (dates and before-open/after-close timing from yfinance and, US, SEC
   8-K item 2.02, India, NSE results filings; backfilled by `collect_events.py`), ex-dividend
   shift (dividend amounts now collected), index-then-stock beta split of the overnight cue (US: `ES`; India: previous `SPX`
@@ -976,7 +976,7 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   Caterpillar a director appointment (2024-10-11). A fresh backfill held 23 pairs of US earnings
   dates under 45 days apart among 283. `collect_events.py` now also stores each 10-Q/10-K
   acceptance (`periodic_report` rows with `period_end`), and
-  `range_inputs.results_filter` keeps, per report, the latest 2.02 after its period end and up to a
+  `event_history.results_filter` keeps, per report, the latest 2.02 after its period end and up to a
   day after its acceptance; other 2.02s are not earnings. A 2.02 whose 10-Q is not filed yet still
   counts, unless a year of releases is confirmed and it comes before the next period end or sooner
   after it than 0.75 x the shortest confirmed lag (a delivery report two days after the quarter end

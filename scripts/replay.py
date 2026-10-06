@@ -18,7 +18,7 @@ session, i.e. bars up to d's close and events as known then:
    indicators.py has no direction signal of its own, so the rule is defined here). Each with a hit
    rate, a 95% interval clustered by date blocks, a two-sided binomial test vs 50%, and the
    difference vs always-up on the same rows.
-Event dates: earnings via range_inputs.earnings_versions (SEC 2.02 filings judged only by the
+Event dates: earnings via event_history.earnings_versions (SEC 2.02 filings judged only by the
 10-Q/10-K reports accepted by the session date, as ranges.py), dividends via dividend_events.
 
 Not replayable, so left out (listed in the output): the AI's drift and widening, overnight own-stock
@@ -44,21 +44,18 @@ from statistics import NormalDist
 import numpy as np
 import pandas as pd
 
-import aci
 import backtest as bt
-import events as ev
-import indicators as ind
-import range_inputs as ri
-import rangelib as rl
-import regime as rg
-import scoring as sc
+from marketbrief.analytics import adaptive_conformal as aci, event_history, range_switches
+from marketbrief.analytics import indicators as ind, range_math as rl, regime as rg, scoring as sc
+from marketbrief.constants.range_inputs import INPUTS
+from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.core.clock import utc_now
 from marketbrief.core.market_config import benchmark_key, load_ranges_config, vol_index_key
 from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from marketbrief.utils.event_dates import major_event_between
 from marketbrief.utils.numbers import round_or_none, share_percent_text
-from features import load_bars
-from marketbrief.core import cli, database, paths, storage
+from marketbrief.analytics.features import load_bars
+from marketbrief.core import calendar as ev, cli, database, paths, storage
 
 LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)   # calibration curve (stated coverage)
 SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")
@@ -111,7 +108,7 @@ def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
         change = lvl / prev - 1 if lvl is not None and prev else None
         session = ev.next_session(cfg, d, include=False)
         near = ev.major_events_near(mev, session)
-        r5, v10 = ind.ret(tail, 5), ind.realized_vol(tail)
+        r5, v10 = ind.period_return(tail, 5), ind.realized_vol(tail)
         label, stress, _ = rg.classify(cfg["regime"], lvl, r5, v10, bool(near), change)
         rows.append({"date": d, "regime": label, "stress": stress, "vol_level": lvl, "bench_ret_5d": r5,
                      "bench_vol_10d": v10, "major_event": bool(near)})
@@ -155,7 +152,7 @@ def ticker_frame(cfg: dict, rc: dict, df: pd.DataFrame, t: str, h: int, extra: d
 def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], reg: pd.DataFrame,
                    extra: dict, rank: dict, majors: list[date]) -> pd.DataFrame:
     mk = cfg["market"]
-    use = {k: ri.enabled(rc, k, mk, h) for k in ri.INPUTS}
+    use = {k: range_switches.enabled(rc, k, mk, h) for k in INPUTS}
     pool = bt.observations(bars, cfg["tickers"], h, rc, rank)
     z_all = pool["z"].to_numpy() if len(pool) else np.array([])
     r_all = pool["rank"].to_numpy() if len(pool) else np.array([])
@@ -166,9 +163,9 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
               "q75": rl.normal_quantiles(0.5)[1], "q90": rl.normal_quantiles(0.8)[1]}
     fixed = rc["earnings_vol_multiple"]
     bs = rc["beta_split"]
-    # ACI (aci.py; off unless config/ranges.yaml or --aci switches it on): each day's quantile levels
+    # ACI (adaptive_conformal.py; off unless config/ranges.yaml or --aci switches it on): each day's quantile levels
     # come from the misses of ranges whose target close is on or before d (known pre-open next session)
-    tracker = aci.Tracker(rc) if ri.enabled(rc, "aci", mk, h) else None
+    tracker = aci.Tracker(rc) if range_switches.enabled(rc, "aci", mk, h) else None
     pending: dict[int, dict[str, list]] = {}   # target rank -> key -> [n, misses50, misses80]
     rows = []
     for d, ts in zip(days, day_ts):
@@ -272,10 +269,10 @@ def load_inputs(cfg: dict, rc: dict, con) -> tuple[dict, dict]:
     bench = bars.get(benchmark_key(cfg))
     if bench is None or bench.empty:
         raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
-    evdf = ri.load_events(con)
-    extra = {"earnings": known_versions(cfg, ri.earnings_versions(evdf)) if not evdf.empty else {},
-             "dividends": ri.dividend_events(evdf) if not evdf.empty else {}, "bench": bench,
-             "index_cue": bt.index_cue_series(cfg, bars, rc) if ri.enabled(rc, "beta_split", cfg["market"]) else None}
+    evdf = event_history.load_events(con)
+    extra = {"earnings": known_versions(cfg, event_history.earnings_versions(evdf)) if not evdf.empty else {},
+             "dividends": event_history.dividend_events(evdf) if not evdf.empty else {}, "bench": bench,
+             "index_cue": bt.index_cue_series(cfg, bars, rc) if range_switches.enabled(rc, "beta_split", cfg["market"]) else None}
     return bars, extra
 
 
@@ -418,7 +415,7 @@ def summarize(cfg: dict, rc: dict, res: dict[int, pd.DataFrame], reg: pd.DataFra
         for key, col in (("by_regime", "regime"), ("by_sector", "sector"), ("by_ticker", "ticker"),
                          ("by_month", "month"), ("by_year", "year")):
             hs[key] = {str(k): range_summary(x, h) for k, x in g.groupby(col)}
-        hs["by_regime"] = {k: hs["by_regime"][k] for k in rg.ORDER if k in hs["by_regime"]}
+        hs["by_regime"] = {k: hs["by_regime"][k] for k in REGIME_ORDER if k in hs["by_regime"]}
         hs["by_earnings"] = {"earnings in horizon": range_summary(g[g["earn"]], h),
                              "no earnings": range_summary(g[~g["earn"]], h)}
         hs["by_major_event"] = {"major event in horizon": range_summary(g[g["major"]], h),
@@ -433,7 +430,7 @@ def summarize(cfg: dict, rc: dict, res: dict[int, pd.DataFrame], reg: pd.DataFra
         out["horizons"][str(h)] = hs
         out["baselines"][str(h)] = baseline_stats(g, h)
     counts = reg["regime"].value_counts() if not reg.empty else pd.Series(dtype=int)
-    out["regime_days"] = {k: int(counts.get(k, 0)) for k in rg.ORDER}
+    out["regime_days"] = {k: int(counts.get(k, 0)) for k in REGIME_ORDER}
     out["regime_timeline"] = [{"date": str(d), "regime": r} for d, r in reg["regime"].items()] if not reg.empty else []
     return out
 
@@ -578,8 +575,8 @@ LIMITATIONS = [
 def limitations(cfg: dict, rc: dict, s: dict) -> list[str]:
     market, out = cfg["market"], list(LIMITATIONS)
     ic = cfg.get("index_cue") or {}
-    if ic.get("symbol") and ri.enabled(rc, "beta_split", market):
-        on = [h for h in rc["horizons"] if ri.enabled(rc, "beta_split", market, h)]
+    if ic.get("symbol") and range_switches.enabled(rc, "beta_split", market):
+        on = [h for h in rc["horizons"] if range_switches.enabled(rc, "beta_split", market, h)]
         if ic.get("beta", 1.0) == "fit":
             out.append(f"Index cue (beta split, on for {', '.join(f'{h}d' for h in on)}): {ic['symbol']}'s last session "
                        "return before the next session x the beta fitted on bars up to d, as the live pre-open quote gives it.")
@@ -593,7 +590,7 @@ def limitations(cfg: dict, rc: dict, s: dict) -> list[str]:
                    "sessions such as India's Muhurat trading, or a session without a bar).")
     if (rc.get("relation_widen") or {}).get("enabled") or float(rc.get("activist_13d_factor", 1.0)) != 1.0:
         out.append("WARNING: relationship or smart-money widening is switched on but cannot be replayed.")
-    if ri.enabled(rc, "implied_vol", market):
+    if range_switches.enabled(rc, "implied_vol", market):
         out.append("WARNING: implied_vol is switched on but cannot be replayed; replayed ranges omit it.")
     return out
 
@@ -680,7 +677,7 @@ def svg_calibration(s: dict) -> str:
 
 
 def svg_regime(s: dict) -> str:
-    regs = rg.ORDER
+    regs = REGIME_ORDER
     W, H, L, R, T, B = 640, 300, 48, 16, 16, 44
     pw, ph = W - L - R, H - T - B
     Y = lambda v: T + (1 - v) * ph  # noqa: E731
@@ -897,7 +894,7 @@ Momentum: call the sign of the last 1 or 5 days' return. RSI mean reversion: RSI
 <tbody>{"".join(trows)}</tbody></table></div>{score_note}</details>
 <details><summary>Method and limits</summary>
 <p>Each as-of day uses only bars up to its close and events as known pre-open the next session, built with the same code as
-the live ranges (scripts/rangelib.py, range_inputs.py, backtest.py helpers, regime.py). Range inputs switched on
+the live ranges (marketbrief/analytics/range_math.py, the range-input modules, backtest.py helpers, regime.py). Range inputs switched on
 (config/ranges.yaml): {esc(inputs)}. Data: {esc(s['data']['first_bar'])} to {esc(s['data']['last_bar'])},
 {s['data']['tickers']} tickers, {s['data']['earnings_events']} earnings and {s['data']['dividends']} dividend events.
 Computed {esc(s['computed_at'])}, runtime {s['runtime_s']:.0f} s.</p><ul>{lim}</ul></details>
@@ -1050,12 +1047,12 @@ def run(cfg: dict, rc: dict, con, start: date | None = None, end: date | None = 
     days = reg.index.tolist()
     s.update({"market": cfg["market"], "name": cfg.get("name"), "start": str(days[0]) if days else None,
               "end": str(days[-1]) if days else None, "computed_at": utc_now(),
-              "settings": {"inputs": {str(h): {k: ri.enabled(rc, k, cfg["market"], h) for k in ri.INPUTS}
+              "settings": {"inputs": {str(h): {k: range_switches.enabled(rc, k, cfg["market"], h) for k in INPUTS}
                                       for h in rc["horizons"]},
                            "regime_factor": rc["regime_factor"], "major_event_factor": rc["major_event_factor"],
                            "earnings_vol_multiple": rc["earnings_vol_multiple"], "history_sessions": rc["history_sessions"],
                            "half_life_sessions": rc["half_life_sessions"], "min_pool": rc["min_pool"],
-                           "aci": {**aci.settings(rc), "on": {str(h): ri.enabled(rc, "aci", cfg["market"], h)
+                           "aci": {**aci.settings(rc), "on": {str(h): range_switches.enabled(rc, "aci", cfg["market"], h)
                                                               for h in rc["horizons"]}}},
               "data": {"first_bar": str(bench.index[0].date()), "last_bar": str(bench.index[-1].date()),
                        "tickers": sum(1 for t in cfg["tickers"] if t in bars),
@@ -1089,7 +1086,7 @@ def main() -> int:
     ap.add_argument("--start", type=date.fromisoformat, help="first as-of date (default: after the warm-up bars)")
     ap.add_argument("--end", type=date.fromisoformat, help="last as-of date (default: the last benchmark bar)")
     ap.add_argument("--aci", action="store_true",
-                    help="also replay with Adaptive Conformal Inference on (aci.py) and compare on the same rows; "
+                    help="also replay with Adaptive Conformal Inference on (adaptive_conformal.py) and compare on the same rows; "
                          "writes replay-<end>-aci.html|json")
     ap.add_argument("--aci-gamma", type=float, help="with --aci: gamma instead of config/ranges.yaml aci.gamma")
     ap.add_argument("--aci-by-regime", choices=("on", "off"), help="with --aci: one alpha per regime (on) or one overall")

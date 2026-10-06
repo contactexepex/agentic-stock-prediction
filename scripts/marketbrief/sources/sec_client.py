@@ -1,5 +1,5 @@
 """The SEC EDGAR client: one throttled urllib client with fixtures for tests, the acceptance-time
-cache and the acceptance-time check of a submissions block (background in scripts/sec.py)."""
+cache and the acceptance-time check of a submissions block (background in marketbrief/sources/sec_filings.py)."""
 from __future__ import annotations
 
 import json

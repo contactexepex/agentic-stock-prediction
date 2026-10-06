@@ -17,7 +17,7 @@ from collections import Counter
 
 import pandas as pd
 
-import news_verify
+from marketbrief.analytics.news_sources import load_sources
 from marketbrief.analytics.verification_status import cluster_status
 from marketbrief.constants.verification import (KIND_NEWS_VERIFIED, LEVEL_CLAIM, LEVEL_CLUSTER, METHOD_VERSION_STATUS,
                                                 STATUS_PRECEDENCE)
@@ -86,7 +86,7 @@ def run(cfg: dict) -> dict:
     """Compute and append the run's status rows; returns the JSON summary."""
     market = cfg["market"]
     as_of = pd.Timestamp(clock()).floor("s")
-    lookback = float(news_verify.load_sources().clusters.get("lookback_hours", 144))
+    lookback = float(load_sources().clusters.get("lookback_hours", 144))
     con = connect(market)
     clusters = [c for c in current_clusters(con, as_of, lookback) if c["ticker"] in cfg["tickers"]]
     claims = statements_by_cluster(con, [c["cluster_id"] for c in clusters], as_of)

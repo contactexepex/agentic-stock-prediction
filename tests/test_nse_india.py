@@ -244,7 +244,7 @@ def test_transient_error_is_retried_once(monkeypatch):
 def test_due_tickers_order_and_quarter(monkeypatch):
     monkeypatch.syspath_prepend(str(SCRIPTS))
     from datetime import date
-    import collect_relations_india as cri
+    from marketbrief.collectors import nse_holdings as cri
     assert cri.latest_quarter_end(date(2026, 10, 5)) == date(2026, 9, 30)
     assert cri.latest_quarter_end(date(2026, 10, 1)) == date(2026, 9, 30)
     assert cri.latest_quarter_end(date(2027, 1, 2)) == date(2026, 12, 31)
