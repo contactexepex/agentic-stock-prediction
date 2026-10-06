@@ -26,6 +26,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -160,14 +161,27 @@ def seed_steps() -> list[tuple[str, str, list[str]]]:
 
 
 def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path) -> None:
-    """Fill run_dir/seed/root with the collectors, then copy SEED_KINDS into golden_root/data."""
-    seed_root = run_dir / "seed" / "root"
-    (seed_root / "data").mkdir(parents=True)
-    (seed_root / ".scratch-ok").write_text("golden seed root\n")
-    seed_config(golden_root, seed_root)
-    sec_fixture_map(run_dir / "seed" / "sec")
-    rule_rows(seed_root)
-    synthetic_nse(run_dir / "seed" / "nse_synthetic")
+    """Fill a scratch seed root with the collectors, keep a copy in run_dir/seed/root, then copy
+    SEED_KINDS into golden_root/data. The seed root lives outside the checkout (a temporary
+    directory): the NSE --replay guard refuses any write target inside a repository."""
+    scratch = Path(tempfile.mkdtemp(prefix="mb-golden-seed-"))
+    try:
+        seed_root = scratch / "root"
+        (seed_root / "data").mkdir(parents=True)
+        (seed_root / ".scratch-ok").write_text("golden seed root\n")
+        seed_config(golden_root, seed_root)
+        sec_fixture_map(run_dir / "seed" / "sec")
+        rule_rows(seed_root)
+        synthetic_nse(run_dir / "seed" / "nse_synthetic")
+        run_seed_steps(run_dir, seed_root, environment, scripts)
+        shutil.copytree(seed_root, run_dir / "seed" / "root")
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    copy_seeded(run_dir / "seed" / "root", golden_root, run_dir / "steps" / "seed")
+
+
+def run_seed_steps(run_dir: Path, seed_root: Path, environment, scripts: Path) -> None:
+    """Run seed_steps() on seed_root; logs in run_dir/steps/seed/ with the seed root's path as <SEED>."""
     log_dir = run_dir / "steps" / "seed"
     log_dir.mkdir(parents=True)
     for market, label, command in seed_steps():
@@ -177,7 +191,11 @@ def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path) -> No
         argv = [a.format(python=sys.executable, seed_dir=run_dir / "seed", fixtures=FIXTURES) for a in command]
         proc = subprocess.run(argv, cwd=scripts, env=env, capture_output=True, text=True, check=False)
         for stream, text in (("stdout", proc.stdout), ("stderr", proc.stderr), ("exit", f"{proc.returncode}\n")):
-            (log_dir / f"{market}.{label}.{stream}").write_text(text)
+            (log_dir / f"{market}.{label}.{stream}").write_text(text.replace(str(seed_root.parent), "<SEED>"))
+
+
+def copy_seeded(seed_root: Path, golden_root: Path, log_dir: Path) -> None:
+    """Copy each SEED_KINDS folder of seed_root/data into golden_root/data, never over a file."""
     for market, kinds in SEED_KINDS.items():
         for kind in kinds:
             source = seed_root / "data" / market / kind
