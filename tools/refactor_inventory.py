@@ -6,8 +6,9 @@
 Prints: line count, top-level functions and classes per module; string literals repeated across
 modules (docstrings and f-string fragments excluded), ranked by the number of modules then the total
 count; exception messages (raise X("...") / raise X(f"...") with f-string fields shown as {}) used more
-than once; function names defined in more than one module; and functions whose bodies are
-identical (same AST, names included) in different modules."""
+than once; function names defined in more than one module, each with its signature (parameters
+and defaults); and functions whose bodies are identical (same AST, names included) in different
+modules, with their signatures and whether those match too (a merge must keep each caller's defaults)."""
 from __future__ import annotations
 
 import argparse
@@ -54,7 +55,8 @@ def scan(top: int) -> dict:
     literal_modules: dict[str, set[str]] = defaultdict(set)
     messages: dict[str, list[str]] = defaultdict(list)
     function_modules: dict[str, set[str]] = defaultdict(set)
-    bodies: dict[str, list[str]] = defaultdict(list)
+    signatures: dict[str, set[tuple[str, str]]] = defaultdict(set)
+    bodies: dict[str, list[tuple[str, str]]] = defaultdict(list)
     per_module = {}
     for path in modules():
         rel = path.relative_to(REPO).as_posix()
@@ -77,18 +79,23 @@ def scan(top: int) -> dict:
                     messages[template].append(f"{rel}:{node.lineno}")
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 function_modules[node.name].add(rel)
+                signature = f"({ast.unparse(node.args)})"
+                signatures[node.name].add((rel, signature))
                 body = ast.dump(ast.Module(body=[s for s in node.body if not (
                     isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))], type_ignores=[]))
                 if len(node.body) > 1 or len(body) > 200:
-                    bodies[body].append(f"{rel}::{node.name}")
+                    bodies[body].append((f"{rel}::{node.name}", signature))
     shared = [(s, len(literal_modules[s]), n) for s, n in literal_total.items() if len(literal_modules[s]) > 1]
     repeated = sorted(shared, key=lambda x: (-x[1], -x[2], x[0]))[:top]
     return {
         "modules": per_module,
         "repeated_literals": [{"literal": s, "modules": m, "count": n} for s, m, n in repeated],
         "repeated_messages": {k: v for k, v in sorted(messages.items(), key=lambda kv: -len(kv[1])) if len(v) > 1},
-        "same_name_functions": {k: sorted(v) for k, v in sorted(function_modules.items()) if len(v) > 1},
-        "identical_bodies": [sorted(v) for v in bodies.values() if len({x.split("::")[0] for x in v}) > 1],
+        "same_name_functions": {k: [f"{rel}{sig}" for rel, sig in sorted(signatures[k])]
+                                for k, v in sorted(function_modules.items()) if len(v) > 1},
+        "identical_bodies": [{"functions": [f"{name}{sig}" for name, sig in sorted(group)],
+                              "same_signature": len({sig for _, sig in group}) == 1}
+                             for group in bodies.values() if len({name.split("::")[0] for name, _ in group}) > 1],
     }
 
 
@@ -115,7 +122,8 @@ def main() -> int:
         print(f"{name}: {', '.join(where)}")
     print("\n## Identical function bodies in different modules")
     for group in result["identical_bodies"]:
-        print(", ".join(group))
+        same = "same signature" if group["same_signature"] else "SIGNATURES DIFFER"
+        print(f"{same}: " + ", ".join(group["functions"]))
     return 0
 
 

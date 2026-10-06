@@ -35,26 +35,45 @@ Fixed inputs:
   (`work/predictions.jsonl`: one 5d call per ticker with news, citing a real stored news id, plus one
   call that breaks the rules: confidence 0.95 and an unknown evidence id), number-free lessons for
   the reflector's role, and number-free sentences in place of the report's AGENT markers;
+- seeded kinds (`tests/golden/seed.py`, `tests/golden/seed_sources.py`). The pinned data has no rows
+  of the relationship, fundamentals, macro, short-selling, NSE, graph, options, price-source and
+  SEC-time kinds, so the real collectors fill a separate scratch root from the test fixtures and their
+  data files are copied into the golden root (never over a file):
+  - India: `collect_relations_india.py` and `collect_nse_india.py --replay tests/fixtures/nse/real
+    --today 2026-10-05 --full` (insiders, holdings, announcements, financials, flows, delivery), then
+    `collect_relations_india.py --replay` on `tests/fixtures/nse/synthetic` with its `__Dn__` dates set
+    relative to 2026-10-05 (deals and insider trades of watchlist tickers; the real snapshot has none),
+    `graph.py add tests/fixtures/graph_edges.jsonl` (3 edges; the fixture's 4th edge is invalid on
+    purpose, so that step exits 1) and `graph.py attempt`, and `collect_flows_india` on
+    `tests/fixtures/sources` (fpi, indices);
+  - US: `collect_insiders`, `collect_stakes`, `collect_holdings` and `collect_fundamentals` with
+    `MB_SEC_FIXTURES` (a urls.json built as in tests/test_relationships.py and
+    tests/test_fundamentals.py; the seed config tracks the fixture 13F filer 9999200 in place of the
+    real filers), and `collect_macro` and `collect_shorts` on `tests/fixtures/sources`;
+  - rule-built rows for the kinds whose collectors need Yahoo or SEC header pages: options (AAPL,
+    JPM, NVDA), sec_times (one Form 4 accession), price_sources (one INFY bar);
+  - the seed root lives in a temporary directory outside the checkout (the NSE `--replay` guard
+    refuses any write target inside a repository) and is copied to `run/seed/root`; its paths appear
+    as `<SEED>` in the seed logs;
 - each script runs as a subprocess with `MB_ROOT`/`MB_CONFIG` = the scratch root, `MB_MARKET`, a fixed
-  `MB_NOW`, `PYTHONHASHSEED=0`, `TZ=UTC`, no Slack/Neo4j/SEC credentials or proxies, and
-  `tests/golden/site/sitecustomize.py` loaded: the test network guard (any non-loopback connection is
-  refused and logged; a refusal fails the comparison) and DuckDB on one thread. The one-thread setting
-  is needed because several queries have no full `ORDER BY`: with parallel scans, the order of the
-  scored outcomes and the context pack's call list changed between two runs of the same code (seen
-  2026-10-06; it also changed a float sum, `mean_conf` 0.625 vs 0.6250000000000001). It is a harness
-  setting only; the code under test is not changed.
+  `MB_NOW`, `PYTHONHASHSEED=0`, `TZ=UTC`, no Slack/Neo4j/SEC credentials or proxies (the seed sets a
+  dummy `SEC_USER_AGENT`), and `tests/golden/site/sitecustomize.py` loaded: the test network guard
+  (any non-loopback connection is refused and logged; a refusal fails the comparison) and DuckDB on
+  one thread. The one-thread setting only fixes the order within the harness; it hides a production
+  defect, see "Known nondeterminism" below.
 
-Two phases per market, each with a frozen clock:
+Phases (seed first, then two per market, each with a frozen clock):
 
 | phase | india MB_NOW | us MB_NOW | what it exercises |
 |---|---|---|---|
-| pre_open | 2026-10-05T02:40Z | 2026-10-05T12:15Z | bars current; rows collected later that day are flagged by validate (SCHEMA: time in the future); scoring of the W39 calls (27 India and 30 US outcomes); US publishes 40 ranges (1d and 5d); India's ranges for as-of 2026-10-01 are already stored (skip path); report, charts, HTML, Slack dry run |
+| seed | 2026-10-05T02:00Z | 2026-10-05T12:00Z | the collectors above, into the seed root |
+| pre_open | 2026-10-05T02:40Z | 2026-10-05T12:15Z | bars current; rows collected later that day are flagged by validate (SCHEMA: time in the future); scoring of the W39 calls (27 India and 30 US outcomes); US publishes 40 ranges (1d and 5d, using the seeded option IV); India's ranges for as-of 2026-10-01 are already stored (skip path); report, charts, HTML, Slack dry run |
 | late | 2026-10-06T02:30Z | 2026-10-06T12:15Z | every stored input visible; bars a session behind (STALE_BARS, MISSING_REGIME failures); scoring again (nothing new to score); lessons (27 and 30 added); news clusters (15 and 20 written); forecaster gate (the rule-breaking call dropped, 3 calls appended per market); ranges.py on the late path (as-of bars a session behind: target session closed, nothing published); review; spot-check; backtest; replays; ai_replay; Neo4j dry run |
 
-Commands covered (49 script runs per market, 98 per run, plus 5 synthetic-input steps per market;
-the step list is `steps()` in golden.py):
+Commands covered: 11 seed runs, then 49 script runs per market (98), plus 5 synthetic-input steps per
+market; the lists are `seed_steps()` in seed.py and `steps()` in golden.py:
 
-| script | invocations (per market) |
+| script | invocations (per market unless noted) |
 |---|---|
 | market_status.py | `--now` pre-open clock, mid-session 2026-10-05T15:00Z, late clock |
 | validate.py | `--stage collect` (x2), `features` (x2), `context` (x2), `forecast` (absent file; real file), `report` (x2), `all` |
@@ -68,57 +87,106 @@ the step list is `steps()` in golden.py):
 | charts.py, report.py, html_report.py | pre_open, late (`report.py --force` in late) |
 | notify_slack.py | `--dry-run` (pre_open) |
 | spotcheck.py | `--week 2026-W39` |
-| graph.py | `status` |
+| graph.py | `status`; seed (India): `add`, `attempt` |
 | backtest.py | `--eval-sessions 40` |
 | replay.py | `--start 2026-09-14 --end 2026-10-01`, and the same with `--aci` |
 | ai_replay.py | `dates`; `prepare --date 2026-09-25` (scratch root, source = the golden root); `record` with an empty calls file; `score` |
 | neo4j_sync.py | `--dry-run --full` (statements written to work/neo4j_dryrun/) |
+| seed (fixtures) | India: collect_relations_india (x2), collect_nse_india, collect_flows_india; US: collect_insiders, collect_stakes, collect_holdings, collect_fundamentals, collect_macro, collect_shorts |
 
-Library modules run through them: common, events, indicators, regime, rangelib, range_inputs, aci,
-scoring, adjust, prediction_rules, narrative_numbers, view_data, relations, smart_money, fundamentals,
-macro_context, nse_context, news_tags, news_verify (cluster and validate side). Not run: sec, nse,
-sources (imported only by collectors).
+What runs on rows (checked in the recorded set, late-phase context packs): every seeded context
+section is non-empty. US: "Macro & flows" (15 rows), "Short selling" (20), "Smart money" (insider
+flow 1, largest trades 2, 13D/13G 2, 13F 20) and "Fundamentals" (last quarter 2, balance sheet 1).
+India: insider trades 4, bulk/block deals 2, promoter holding and pledge 4, relationship risk flags 3,
+connections 12, FII/DII flows 1, NSE announcements 6, quarterly results 3, delivery 20, FPI 9, NSE
+indices 14. The Neo4j dry run reads rows of insiders, stakes, holdings_13f, fundamentals (US) and
+announcements, insiders, deals, shareholding, graph, financials, flows (India). So these run on real
+rows: common, events, indicators, regime, rangelib, range_inputs (incl. option IV), aci, scoring,
+adjust, prediction_rules, narrative_numbers, view_data, relations, smart_money, fundamentals,
+macro_context, nse_context, graph, news_tags, news_verify (cluster and validate side), and, through
+the seed, sec, nse, sources and the collectors named above. Their SQL views (insider_flow,
+insider_trades, stake_filings, activist_stakes, holdings_quarter/change/filings, fundamentals_*,
+macro_series/latest, shorts_*, short_interest_*, fpi_*, indices_*, deals_scored, holdings_quarterly,
+pledge_changes, graph_edges, announcements_*, financials_*, flows_daily, delivery_stats,
+options_latest) run on those rows.
+
+Still running on empty or no data (explicitly uncovered):
+- kinds with no rows: news_articles (collect_articles needs article pages), adjustments (no split in
+  the window), judgments, range_outcomes (the stored ranges' targets have no bars yet), US graph and
+  India stakes/fundamentals (not applicable to that market);
+- context sections that stay empty: in the late phase "Overnight cues" (the stored quotes are of
+  2026-10-05, the late clocks' day is 2026-10-06; the pre-open packs show 28 US and 15 India rows);
+  India "Sector ETFs and indices" (no such bars in the pinned data); "Ranges scored on the latest
+  target date", "Range scorecard", "Judge FAILs" and US "Connections" in both phases;
+- not run at all: collect_prices, collect_quotes, collect_events, collect_news, collect_filings,
+  collect_options, collect_articles and check_sec_times (Yahoo, RSS, article pages, SEC header pages;
+  covered by the fixture tests test_collectors, test_price_fallback, test_split_adjust,
+  test_range_inputs, test_news_verify, test_sec_times), `ai_replay.py backfill`, `notify_slack.py`
+  posting, `neo4j_sync.py` against a server, `relations.py` main and `graph.py hits|edges|check`.
 
 Compared per step: exit code, stdout, stderr. Compared files: every file under the run directory
-that the run created or changed (data/ appends, reports, charts PNG, HTML, work/ files, ai_replay
-roots and results, Neo4j dry-run statements), as sha256 of the normalised bytes; an input file the
-run deleted is a difference too. 1508 files per run when recorded on 2026-10-06.
+that the run created or changed (seed root and its copies into data/, data/ appends, reports, chart
+PNGs, HTML, work/ files, ai_replay roots and results, Neo4j dry-run statements), as sha256 of the
+normalised bytes; an input file the run deleted is a difference too. 1621 files per run when recorded
+at bef503b.
 
-Normalisation (the complete list; nothing else is masked):
+Normalisation (the complete list; nothing else is masked; `NORMALISED` in golden.py):
 - the run directory's absolute path -> `<RUN>`, this checkout's path -> `<CODE>` (outputs print paths);
-- JSON keys whose values come from the wall clock, not MB_NOW: `runtime_s` (replay.py),
-  `generated_at` (view_data.py, the HTML report's data), `prepared_at` (ai_replay.py prepare),
-  `seconds` (news_clusters.py summary);
-- the text `runtime N s.` in replay.py's HTML footer.
-
-Not covered, and why:
-- the collectors (`collect_*.py`, `check_sec_times.py`, `ai_replay.py backfill`): they read the
-  network (Yahoo, SEC, NSE, FINRA, Treasury, FRED, Cboe, NSDL, RSS, article pages); the golden run is
-  offline by design. They are covered by the fixture-based tests (test_collectors, test_sources,
-  test_nse_india, test_sec_*, test_fundamentals, test_relationships, test_price_fallback,
-  test_news_verify). Step 3 below first adds a golden collector mode (local fixture server, see there);
-- `notify_slack.py` posting, `neo4j_sync.py` against a server, `collect_articles.py`: network;
-- `graph.py add|attempt|hits` and `relations.py main`: covered by test_relations, no stored edges in
-  the pinned data.
+- wall-clock values that do not follow MB_NOW, each masked only in the outputs where it appears:
+  `runtime_s` (replay.py) in `root/data/*/replays/`, `root/reports/*/replay-*.json` and the replay
+  steps' stdout; the text `runtime N s.` in `root/reports/*/replay-*.html`; `generated_at`
+  (view_data.py) in `root/reports/*/<date>.html` and `root/work/slack_*_plan/<date>.html`;
+  `prepared_at` (ai_replay.py prepare) in `ai_replay_*/ai_replay.json` and its step stdout;
+  `seconds` (news_clusters.py) in its step stdout.
 
 How each later step proves byte-identical outputs:
 1. on the base commit of the step (before any change): `python tests/golden/golden.py record`;
 2. make the step's changes;
 3. `python tests/golden/golden.py compare` must print `"identical": true` and exit 0 (it reruns the
-   whole set; about 5 minutes); its output, the base commit and the step's commit go to the judge;
+   whole set; about 6 minutes); its output, the base commit and the step's commit go to the judge;
 4. any difference is a blocker, even a float's last digit; the normalisation list above may not grow
    in a refactor step (a new wall-clock field would be a behaviour change).
 
 The recorded set (manifest with hashes and exit codes plus a full copy of every output, used for
 diffs) lives in `work/golden/` (git-ignored). Committed are only `tests/golden/golden.py` (steps,
-runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs) and
-`tests/golden/site/sitecustomize.py`. Two consecutive runs of the same commit compared identical
-(2026-10-06), and a deliberate change (`rangelib.naive_range` widened by a factor 1.0001) made
-`compare` fail with 22 differing outputs (stored ranges, replays, backtests, review, Neo4j statements).
+runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs), `tests/golden/seed.py`
+and `tests/golden/seed_sources.py` (seeded kinds) and `tests/golden/site/sitecustomize.py`.
+Evidence (2026-10-06, harness at bef503b): `record` then two `compare` runs, both
+`"identical": true` over 1621 files with a clean network log; a deliberate change in a seeded module
+(`macro_context`: basis-point changes printed with one decimal) made `compare` fail on the US context
+packs (5 files: 4 context steps' stdout and work/context.md); earlier (before the seed) a change in
+`rangelib.naive_range` (factor 1.0001) failed with 22 differing outputs.
+
+### Known nondeterminism (a production defect, outside the freeze)
+
+Production `common.connect` runs DuckDB with its default threads. Several queries have no full
+ORDER BY, or aggregate floats in scan order, so their row order, or a float's last digit, can differ
+between two runs on the same data. `GOLDEN_DUCKDB_PARALLEL=1 python tests/golden/golden.py compare`
+(default threads, same code) shows it: on 2026-10-06 it differed from the one-thread record in 25 of
+1621 files. The queries:
+
+| query | defect | where it showed |
+|---|---|---|
+| `score_predictions.py` `SQL` (open_predictions ASOF JOIN bars, JOIN bars) | no ORDER BY: rows are scored and appended in scan order | row order of `data/<market>/outcomes/` (both markets) |
+| `scoring.summary`: `SELECT horizon_days, confidence, hit FROM track_record ...` | no ORDER BY; `reliability()` takes a pandas mean over the rows in that order | `mean_conf` (0.625 vs 0.6250000000000001) in score_predictions' summary (India, both phases); the same function feeds the context pack, review and HTML |
+| `view_data.py` `sc_calls` (`SELECT confidence, hit FROM track_record ...`) | same, fed to `scoring.reliability` | not seen in this data |
+| `context.py` "Open predictions" (`ORDER BY as_of_date, ticker`) | not a full key: a ticker's 1d and 5d calls of one day tie | row order in the context pack, incl. `ai_replay prepare`'s context.md, and so its `sha256` and `approx_tokens` in ai_replay.json and stdout (both markets) |
+| `report.py` `conf_bands` (`avg(confidence) ... GROUP BY band`) | float average summed in scan order | "0.60-0.69 63%" vs "62%" in the report, its skeleton and the saved previous report (both markets) |
+| `view_data.py` `bands` (`avg(confidence) ... GROUP BY band`) | same | `calibration[].stated` in the HTML report's data (US, field-checked: 0.55 vs 0.5499999999999999, 0.625 vs 0.6250000000000001, 0.7000000000000001 vs 0.6999999999999998; India's HTML differs in the same data line) and its Slack-plan copy, and so the HTML `bytes` in html_report's stdout and the Slack plan (both markets) |
+
+Other `avg()` aggregates over unordered rows (e.g. context.py "Track record by horizon", review.py
+summaries) carry the same risk but were rounded enough not to differ here.
+
+The fix (full ORDER BY keys; aggregate in a defined order or round) changes output bytes, so it is a
+separate judged change outside the feature freeze, scheduled right after this step, followed by a
+golden re-record. Until then: the one-thread harness setting fixes the order only within the
+harness; refactor steps must keep each of these queries' ORDER BY and aggregation exactly as they are
+and must not describe their order as defined.
 
 ## 2. Enforcement
 
-- `ruff.toml` (ruff pinned at 0.16.10 in requirements.txt): pycodestyle E/W (line length 120),
+- `ruff.toml` (ruff pinned at 0.16.10 in `requirements-dev.txt`, which CI installs with requirements.txt;
+  the routine installs requirements.txt only): pycodestyle E/W (line length 120),
   pyflakes F (unused imports/variables), pep8-naming N, unused arguments ARG, commented-out code ERA,
   mccabe C901 (max complexity 12), pylint PLR0911/0912/0913/0915 (max 6 returns, 12 branches,
   6 arguments, 50 statements). Run `python -m ruff check scripts --statistics`.
@@ -149,7 +217,10 @@ runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs) a
 - `tests/test_code_structure.py`: fails when a module or a class under `scripts/` (recursive, so the
   new package is included) exceeds 350 lines. Today's offenders are allow-listed with their line
   count; a listed module may not grow, and an entry must be removed once its module is within the limit
-  or gone, so the list only shrinks. No class exceeds 350 lines today (largest: sec.Edgar 131,
+  or gone, so the list only shrinks. A further test checks every entry against the module's line
+  count at commit 24749bd (via git; skipped when that commit is not available): an entry may not
+  name a module that did not exist then or list more lines than it had, so the list cannot be raised
+  by hand. No class exceeds 350 lines today (largest: sec.Edgar 131,
   news_verify.Sources 115, news_tags.Tagger 102).
 
   Module offenders (16): ai_replay 1215, replay 1143, review 857, neo4j_sync 818, validate 815,
@@ -225,7 +296,10 @@ runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs) a
 Identical bodies in different modules (AST-equal):
 - `report.money` = `view_data.money`; `report.table` = `review.table`;
 - `replay.major_between` = `review.major_between`;
-- `replay._r` = `scoring._r`; `replay.pct` = `ai_replay.pct` = `ai_replay._f`;
+- `replay._r` = `scoring._r`; `replay.pct` = `ai_replay.pct` = `ai_replay._f` in body only: the
+  default differs (`replay.pct(x, k=0)`, `ai_replay.pct(x, k=1)`, `ai_replay._f(x, k=1)`), so a merged
+  helper must keep each caller's default (pass `k` explicitly). `tools/refactor_inventory.py` prints
+  every same-name and same-body group with its signatures and flags differing ones;
 - `ai_replay._ts` = `prediction_rules.ts`.
 
 Same purpose, slightly different behaviour (merge with explicit options; golden proves equality):
@@ -378,7 +452,10 @@ scripts/
 Moving rules: the old module names (`common`, `events`, `sec`, `nse`, `sources`, `rangelib`, ...) stay
 importable as re-export shims until every caller (scripts and tests) is moved, then the shim is
 deleted in the step that empties it. Tests patch module globals today (`monkeypatch.setattr(common,
-"ROOT", ...)` in 10 test files; `collect_prices.utc_today`, `collect_events.data_dir`, `sec.Edgar`,
+"ROOT", ...)` in 11 test files: test_collectors, test_fundamentals, test_guard, test_judge_fails, test_news_tags,
+test_news_verify, test_price_fallback, test_relationships, test_sources, test_split_adjust,
+test_validate; 15 of the 16 test files that call `monkeypatch.setattr` patch an attribute of a scripts
+module, the 16th, test_nse_india, only a client instance; `collect_prices.utc_today`, `collect_events.data_dir`, `sec.Edgar`,
 `collect_articles.SESSION_FACTORY` ...): a patch on a shim does not reach moved code, so each step
 moves the patched names behind one lookup point (e.g. `core.paths.root()` reading a module variable)
 and updates those tests in the same step, keeping their assertions unchanged. Docs (CLAUDE.md,
@@ -391,7 +468,7 @@ README, DESIGN.md, routine/PROMPT.md) keep naming the entry points, which do not
 | 0 | this commit: golden harness, ruff, size test, inventory and plan | none |
 | 1 | `marketbrief/core`, `constants`, `utils`; common.py becomes a shim; identical helpers merged (money, table, major_between, _r, pct/_f, _ts); settings/validate YAML loads through core | common.py |
 | 2 | `sources/`: one HttpClient base; Edgar, Nse, Client, Slack and Neo4j HTTP on it; FetchError unified with the same messages | sec.py, (nse.py stays < 350) |
-| 3 | `collectors/` (first: golden collector mode, a local HTTP fixture server built from tests/fixtures plus recorded Yahoo frames, so collectors get byte-identical proof too; then one collector family per sub-step: prices, events, SEC, NSE, free sources, news/articles) | collect_prices.py, collect_events.py |
+| 3 | `collectors/` (the golden seed already runs the NSE, SEC-relationship, fundamentals and free-source collectors on fixtures; first extend it to collect_prices, collect_quotes, collect_events, collect_news, collect_filings, collect_options, collect_articles and check_sec_times with fixture clients and recorded Yahoo frames, so every collector gets byte-identical proof; then one collector family per sub-step: prices, events, SEC, NSE, free sources, news/articles) | collect_prices.py, collect_events.py |
 | 4 | `analytics/` | range_inputs.py, news_verify.py, news_clusters.py |
 | 5 | `pipeline/` (validate, review, lessons, context, ranges, scoring, spotcheck) | validate.py, review.py, lessons.py |
 | 6 | `replay/` (backtest, rule replay, ai_replay; shared HTML parts) | replay.py, ai_replay.py, backtest.py |

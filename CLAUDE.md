@@ -154,7 +154,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
 - Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
   `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
-  for the files it moves and shrinks the size allow-list in `tests/test_code_structure.py`
+  for the files it moves (ruff in `requirements-dev.txt`, dev and CI only) and shrinks the size
+  allow-list in `tests/test_code_structure.py`. Known defect outside the freeze: some DuckDB queries
+  have no full ORDER BY (plan, "Known nondeterminism"); refactor steps keep them exactly as they are
 
 ## Judging every change
 Every change to code, config, agent instructions or process is reviewed by the `judge` subagent

@@ -1,4 +1,4 @@
-# Lint settings for the refactor (docs/REFACTOR_PLAN.md). ruff is pinned in requirements.txt.
+# Lint settings for the refactor (docs/REFACTOR_PLAN.md). ruff is pinned in requirements-dev.txt.
 #   python -m ruff check scripts tests                      every finding
 #   python -m ruff check scripts --statistics               counts per rule
 # Step 0 only reports: existing findings are fixed package by package as code moves (each step

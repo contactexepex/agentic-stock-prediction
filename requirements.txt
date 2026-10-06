@@ -7,7 +7,6 @@ numpy>=1.26
 exchange_calendars>=4.5
 pytest>=8.0
 pytest-xdist==3.8.0
-ruff==0.16.10                # lint for the refactor (ruff.toml, docs/REFACTOR_PLAN.md); dev only
 matplotlib>=3.8
 pillow>=10.0
 # News verification phase A (collect_articles.py, news_clusters.py; docs/DESIGN.md 3a)

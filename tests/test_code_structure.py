@@ -7,11 +7,15 @@ limit (or gone), so each refactor step that splits an offender also deletes its 
 from __future__ import annotations
 
 import ast
+import subprocess
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 MAX_LINES = 350
+BASELINE_COMMIT = "24749bdc4835bff242b2683f83e85f2a7e3a2ab0"   # the code before the refactor
 
 # module (repo-relative) -> its line count when listed (2026-10-06, commit 24749bd)
 MODULE_ALLOWLIST: dict[str, int] = {
@@ -76,6 +80,32 @@ def test_modules_within_limit():
 
 def test_classes_within_limit():
     assert size_problems(class_lengths(), CLASS_ALLOWLIST, "class") == []
+
+
+def baseline_lengths() -> dict[str, int] | None:
+    """Module -> line count at BASELINE_COMMIT, or None when git or the commit is not available."""
+    listing = subprocess.run(["git", "-C", str(REPO), "ls-tree", "-r", "--name-only", BASELINE_COMMIT, "scripts"],
+                             capture_output=True, text=True, check=False)
+    if listing.returncode != 0:
+        return None
+    lengths = {}
+    for name in listing.stdout.split():
+        if name.endswith(".py"):
+            text = subprocess.run(["git", "-C", str(REPO), "show", f"{BASELINE_COMMIT}:{name}"],
+                                  capture_output=True, text=True, check=True).stdout
+            lengths[name] = len(text.splitlines())
+    return lengths
+
+
+def test_allowlist_never_above_the_baseline():
+    """An entry may only list a module that existed before the refactor, at no more than its line
+    count then: the allow-list cannot be raised by hand."""
+    baseline = baseline_lengths()
+    if baseline is None:
+        pytest.skip(f"commit {BASELINE_COMMIT} not available (shallow clone?)")
+    above = {name: (listed, baseline.get(name)) for name, listed in MODULE_ALLOWLIST.items()
+             if name not in baseline or listed > baseline[name]}
+    assert above == {}
 
 
 def test_size_problems_reports_each_case():

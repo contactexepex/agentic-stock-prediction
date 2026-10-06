@@ -1,0 +1,3 @@
+# Development tools, not installed by the routine (routine/PROMPT.md installs requirements.txt only).
+# CI installs this file too (.github/workflows/tests.yml). Lint: python -m ruff check scripts (ruff.toml).
+ruff==0.16.10
