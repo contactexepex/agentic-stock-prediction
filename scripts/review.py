@@ -195,7 +195,7 @@ def call_summary(df: pd.DataFrame) -> dict:
 
 
 def band_label(lo: float, hi: float) -> str:
-    return f"{lo:.0%}-{hi:.0%}"
+    return f"{scoring.percent(lo)}-{scoring.percent(hi)}"
 
 
 def confidence_bands(df: pd.DataFrame, edges: list[float]) -> dict:
@@ -475,7 +475,7 @@ def latest_aci_replay(con, week_end: date, rc: dict) -> dict | None:
     counted in `note`. Returns its before/after comparison and held-out check (if run)."""
     try:
         rows = con.execute("SELECT id, end_date, settings, detail FROM replays WHERE id LIKE '%-aci%' "
-                           "AND end_date <= ? ORDER BY computed_at DESC", [week_end]).fetchall()
+                           "AND end_date <= ? ORDER BY computed_at DESC, id DESC", [week_end]).fetchall()
     except Exception:  # no replays stored
         return None
     skipped = 0
@@ -551,11 +551,11 @@ def confidence_advice(bands: dict, calls: dict, rv: dict) -> list[str]:
     out = []
     for band, s in bands.items():
         if s.get("n", 0) >= rv["min_n_calls"] and s["gap"] < -rv["calibration_tolerance"]:
-            out.append(f"Calls at {band} confidence hit {s['hit_rate']:.0%} (mean stated {s['mean_confidence']:.0%}, "
+            out.append(f"Calls at {band} confidence hit {scoring.percent(s['hit_rate'])} (mean stated {scoring.percent(s['mean_confidence'])}, "
                        f"n={s['n']}): use lower confidence or abstain in this band.")
     a = calls.get("all", {})
     if a.get("n", 0) >= rv["min_n_calls"] and a["edge"] is not None and a["edge"] <= 0:
-        out.append(f"Calls hit {a['hit_rate']:.0%} vs always-up {a['always_up']:.0%} (n={a['n']}): no edge over the "
+        out.append(f"Calls hit {scoring.percent(a['hit_rate'])} vs always-up {scoring.percent(a['always_up'])} (n={a['n']}): no edge over the "
                    "baseline; abstain more.")
     return out
 
@@ -563,7 +563,7 @@ def confidence_advice(bands: dict, calls: dict, rv: dict) -> list[str]:
 # ---------- report ----------
 
 def fpct(v, digits: int = 0) -> str:
-    return "–" if v is None or (isinstance(v, float) and math.isnan(v)) else f"{v:.{digits}%}"
+    return scoring.percent(v, digits)
 
 
 def fnum(v, digits: int = 3) -> str:
@@ -635,14 +635,14 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
               "earnings in horizon, `event` major market event, `regime` regime widening, `none` no adjustment.", ""]
 
     rows = [[win_names[w], h, s["n"], fpct(s.get("hit_rate")), fpct(s.get("always_up")),
-             "–" if s.get("edge") is None else f"{s['edge']:+.0%}", fpct(s.get("mean_confidence")), flag(s["n"], rv)]
+             scoring.percent(s.get("edge"), sign=True), fpct(s.get("mean_confidence")), flag(s["n"], rv)]
             for w, per in d["calls"].items() for h, s in per.items()]
     lines += ["## Direction calls", "", "Hit rate vs the always-up baseline on the same tickers and dates.", "",
               table(["Window", "H", "n", "Hit rate", "Always-up", "Edge", "Mean conf.", "Flag"], rows),
               "### By confidence band", "",
               table(["Window", "Band", "n", "Mean conf.", "Hit rate", "Gap", "Flag"],
                     [[win_names[w], b, s["n"], fpct(s.get("mean_confidence")), fpct(s.get("hit_rate")),
-                      "–" if s.get("gap") is None else f"{s['gap']:+.0%}", flag(s["n"], rv)]
+                      scoring.percent(s.get("gap"), sign=True), flag(s["n"], rv)]
                      for w, per in d["bands"].items() for b, s in per.items()])]
 
     sc_rows = [[win_names[w], h, s["n"], fnum(s.get("brier")), fnum(s.get("log_loss")), fnum(s.get("brier_skill")),
@@ -730,7 +730,7 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
     hist = d["history_ablation"]
     lines += ["## Ablation: walk-forward on stored prices", ""]
     if hist.get("n"):
-        share = ", ".join(f"{k} {v:.0%}" for k, v in hist["regime_share"].items() if v)
+        share = ", ".join(f"{k} {scoring.percent(v)}" for k, v in hist["regime_share"].items() if v)
         lines += [f"Last {hist['sessions']} sessions up to {rec['week_end']}, built as `backtest.py` does (each day sees "
                   "only outcomes known before it), plus regime and market-event widening rebuilt from stored bars "
                   f"(regime mix: {share}). No AI, cue or earnings inputs.", "", table(ab_hdr, ablation_rows(hist))]
@@ -749,9 +749,9 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
                                     for h in p["cover80_after"]), p["variant"]])
     lines += [table(["Parameter", "Current", "Proposed", "Evidence", "n", "Score change", f"80% cover ({hz})", "Variant"], rows)
               if rows else f"_None: no variant cleared the thresholds (n >= {rv['min_n_recommend']}, score "
-              f"{rv['min_improvement']:.0%} better without coverage falling more than {rv['coverage_tolerance']:.0%} "
+              f"{scoring.percent(rv['min_improvement'])} better without coverage falling more than {scoring.percent(rv['coverage_tolerance'])} "
               f"further below target, or 80% coverage "
-              f"{rv['min_coverage_gain']:.0%} closer to target)._\n"]
+              f"{scoring.percent(rv['min_coverage_gain'])} closer to target)._\n"]
     drops = [p["variant"] for p in props if p["drop"]]
     lines += ["### What to drop", "", ("- " + "\n- ".join(drops)) if drops else "_Nothing: no input's removal "
               "cleared the thresholds._", "", "### Forecaster confidence", "",

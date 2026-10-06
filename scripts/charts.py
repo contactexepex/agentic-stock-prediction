@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from PIL import Image  # noqa: E402
 
+import scoring  # noqa: E402
 from common import ROOT, connect, market_arg, require_market  # noqa: E402
 from view_data import CURRENCY, gather_view, primary_horizon  # noqa: E402
 
@@ -81,7 +82,7 @@ def ranges_chart(view: dict, path) -> bool:
         if late:
             label += "  late, not a forecast"
         elif r["direction"]:
-            label += f"  {'▲ up' if r['direction'] == 'up' else '▼ down'} {r['confidence']:.0%}"
+            label += f"  {'▲ up' if r['direction'] == 'up' else '▼ down'} {scoring.percent(r['confidence'])}"
         ax.text(1.02, y, label, transform=ax.get_yaxis_transform(), va="center", fontsize=9, color=INK2)
     ax.set_yticks(range(len(rows)), [c["ticker"] for c, _ in reversed(rows)], fontsize=9.5)
     ax.tick_params(axis="y", length=0)

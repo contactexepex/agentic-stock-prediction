@@ -10,8 +10,10 @@ from common import md_table, utc_today
 
 def _flows(con) -> str:
     rows = con.execute("""
-        WITH d AS (SELECT date, CASE WHEN category ILIKE 'FII%' THEN 'fii' ELSE 'dii' END AS who, net_cr FROM flows_daily),
-             w AS (SELECT date, sum(net_cr) FILTER (WHERE who = 'fii') AS fii, sum(net_cr) FILTER (WHERE who = 'dii') AS dii
+        WITH d AS (SELECT date, CASE WHEN category ILIKE 'FII%' THEN 'fii' ELSE 'dii' END AS who,
+                          TRY_CAST(net_cr AS DECIMAL(38,10)) AS net_cr FROM flows_daily),
+             w AS (SELECT date, CAST(sum(net_cr) FILTER (WHERE who = 'fii') AS DOUBLE) AS fii,
+                          CAST(sum(net_cr) FILTER (WHERE who = 'dii') AS DOUBLE) AS dii
                    FROM d GROUP BY date ORDER BY date DESC LIMIT 5)
         SELECT * FROM w ORDER BY date DESC""").fetchall()
     if not rows:
@@ -37,7 +39,7 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
                    materiality, id
             FROM announcements_enriched
             WHERE published_at >= ? AND list_contains(?, ticker)
-            ORDER BY published_at DESC LIMIT 40""", [today - timedelta(days=2), tickers]))),
+            ORDER BY published_at DESC, id LIMIT 40""", [today - timedelta(days=2), tickers]))),
         ("Latest quarterly results (consolidated where filed; INR crore; y/y vs same quarter)", md_table(con.execute("""
             SELECT ticker, basis, period_end, round(revenue / 1e7, 0) AS revenue_cr,
                    round(revenue_yoy * 100, 1) AS rev_yoy_pct, round(net_profit / 1e7, 0) AS net_profit_cr,

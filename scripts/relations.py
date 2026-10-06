@@ -15,6 +15,7 @@ import json
 import sys
 from datetime import date, timedelta
 
+import scoring
 from common import connect, load_ranges_config, market_arg, md_table, require_market, utc_today
 
 CRORE = 1e7
@@ -39,7 +40,7 @@ def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
     for t, day, kind, side, client, shares, price, crore, adv in con.execute("""
             SELECT ticker, date, deal_type, side, client, shares, price, value_crore, adv_ratio FROM deals_scored
             WHERE date >= ? AND list_contains(?, ticker) AND (value >= ? OR adv_ratio >= ?)
-            ORDER BY date DESC, value DESC""",
+            ORDER BY date DESC, value DESC, id""",
             [since, tickers, th["big_deal_crore"] * CRORE, th["big_deal_adv"]]).fetchall():
         size = f"INR {crore:,.0f} cr" if crore is not None else "value n/a"
         flags.append({"ticker": t, "flag": "big_deal", "date": str(day),
@@ -58,7 +59,7 @@ def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
             SELECT ticker, CAST(coalesce(disclosed_at, first_seen_at) AS DATE), person, person_category,
                    "transaction", mode, shares, value FROM insider_trades
             WHERE CAST(coalesce(disclosed_at, first_seen_at) AS DATE) >= ? AND list_contains(?, ticker)
-            ORDER BY 2 DESC, value DESC NULLS LAST""", [since, tickers]).fetchall():
+            ORDER BY 2 DESC, value DESC NULLS LAST, id""", [since, tickers]).fetchall():
         txn_l, cat_l = (txn or "").lower(), (category or "").lower()
         who = f"{person} ({category})" if category else str(person)
         amount = f", INR {value / CRORE:,.1f} cr" if value else ""
@@ -87,7 +88,7 @@ def widen_by_ticker(cfg: dict, rc: dict, con) -> dict[str, tuple[float, str]]:
             total, names = out.get(f["ticker"], (0.0, set()))
             out[f["ticker"]] = (total + add if f["flag"] not in names else total, names | {f["flag"]})
     cap = float(w.get("max", 0.2))
-    return {t: (round(min(x, cap), 4), f"relation flags +{min(x, cap):.0%} ({', '.join(sorted(n))})")
+    return {t: (round(min(x, cap), 4), f"relation flags +{scoring.percent(min(x, cap))} ({', '.join(sorted(n))})")
             for t, (x, n) in out.items() if x > 0}
 
 
@@ -105,12 +106,13 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
                    holding_before_pct AS before_pct, holding_after_pct AS after_pct
             FROM insider_trades
             WHERE CAST(coalesce(disclosed_at, first_seen_at) AS DATE) >= ? AND list_contains(?, ticker)
-            ORDER BY disclosed DESC, value DESC NULLS LAST LIMIT 30""", [today - timedelta(days=ins_days), tickers]))),
+            ORDER BY disclosed DESC, value DESC NULLS LAST, id LIMIT 30""",
+            [today - timedelta(days=ins_days), tickers]))),
         (f"Bulk and block deals, last {deal_days} days", md_table(con.execute("""
             SELECT ticker, date, deal_type AS type, side, client, shares, price, value_crore AS value_cr,
                    adv_ratio AS x_20d_vol
             FROM deals_scored WHERE date >= ? AND list_contains(?, ticker)
-            ORDER BY date DESC, value DESC NULLS LAST LIMIT 30""", [today - timedelta(days=deal_days), tickers]))),
+            ORDER BY date DESC, value DESC NULLS LAST, id LIMIT 30""", [today - timedelta(days=deal_days), tickers]))),
         ("Promoter holding and pledge (latest quarter per ticker; changes in percentage points). promoter_pct: "
          "company-filed shareholding pattern; encumbered_*: promoter shares encumbered (depository data); "
          "depo_pledged_pct: all holders' pledges as % of demat shares", md_table(con.execute("""

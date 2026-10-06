@@ -28,6 +28,7 @@ import events as ev
 import range_inputs as ri
 import rangelib as rl
 import relations
+import scoring
 import smart_money as sm
 from common import (append_jsonl, connect, day_file, load_ranges_config, market_arg, require_market,
                     utc_now)
@@ -110,7 +111,8 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
                 index_cue = cue_beta * math.log1p(float(q[0]))
     opts = pd.DataFrame()
     if cfg.get("options") and "implied_vol" in rc:   # applied if switched on, else a shadow value
-        opts = con.execute("SELECT * FROM options_latest WHERE day >= ? AND collected_at <= ?",
+        opts = con.execute("SELECT * FROM options_latest WHERE day >= ? AND collected_at <= ? "
+                           "ORDER BY ticker, expiry, day",
                            [made.date() - timedelta(days=int(rc["implied_vol"]["max_age_days"])),
                             min(made, first_open)]).df()
         if not opts.empty:
@@ -210,7 +212,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
                 widen = min(max(widen, 0.0), rc["max_ai_widen"])
                 if widen:
                     sigma_h *= 1 + widen
-                    notes.append(f"AI widened +{widen:.0%}")
+                    notes.append(f"AI widened +{scoring.percent(widen)}")
             cap = rc["max_center_shift_sigma"] * sigma_h
             center = max(-cap, min(cap, center))
             if use["ex_dividend"]:   # a known price drop, outside the drift cap

@@ -17,16 +17,23 @@ The real collectors fill a separate scratch root (SEED_KINDS below) from the tes
 - graph.py add tests/fixtures/graph_edges.jsonl (India connection map; its 4th edge is invalid on
   purpose, so that step exits 1) and graph.py attempt (graph_runs);
 - small rule-built rows for options (US), price_sources (India) and sec_times (US), whose
-  collectors need Yahoo or the SEC header pages.
+  collectors need Yahoo or the SEC header pages, and India financials of the quarter a year before
+  the fixtures' latest one (INFY consolidated, HDFCBANK and SBILIFE standalone, 2025-04-01..06-30),
+  so the year-over-year columns of the "Latest quarterly results" section have values;
+- the fixture 13F tables are served with the AAPL common-share values multiplied by
+  F13_VALUE_SCALE (a copy in the seed folder; tests/fixtures is unchanged), so the 13F section's
+  value_bn is billions with two significant decimals instead of 0.0.
 The seed root's data files are then copied into the golden root (never over an existing file).
 Every seed step's exit code, stdout and stderr is logged and compared like any other step."""
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -47,6 +54,12 @@ SEED_KINDS = {
            "options", "sec_times"),
 }
 APPLE_CIK, BOFA_CIK, FILER_CIK = 320193, 70858, 9999200
+F13_VALUE_SCALE = 1000164   # AAPL latest 25000 + 12500 -> 37,506,150,000 USD = 37.51 bn
+# year-ago quarter (2025-04-01..2025-06-30) of the fixtures' 2026 Q1 results: ticker, basis, revenue,
+# net profit (INR), eps, filed (UTC)
+YEAR_AGO_RESULTS = (("INFY", "consolidated", 422790000000.0, 63680000000.0, 15.37, "2025-07-17T11:05:00+00:00"),
+                    ("HDFCBANK", "standalone", 711030000000.0, 161750000000.0, 21.15, "2025-07-19T10:40:00+00:00"),
+                    ("SBILIFE", "standalone", 186410000000.0, 5940000000.0, 5.93, "2025-07-25T11:30:00+00:00"))
 
 
 def submissions(name: str, filings: list[tuple]) -> dict:
@@ -94,7 +107,7 @@ def sec_fixture_map(target: Path) -> None:
                           ("9999200/000999920026000001", "13f_table_previous.xml")):
         urls[f"{EDGAR}/{folder}/index.json"] = str(SEC_FIXTURES / "13f_index.json")
         urls[f"{EDGAR}/{folder}/primary_doc.xml"] = str(SEC_FIXTURES / "13f_cover.xml")
-        urls[f"{EDGAR}/{folder}/infotable.xml"] = str(SEC_FIXTURES / table)
+        urls[f"{EDGAR}/{folder}/infotable.xml"] = str(scaled_13f_table(SEC_FIXTURES / table, target / table))
     (target / "urls.json").write_text(json.dumps(urls, indent=1))
 
 
@@ -123,10 +136,27 @@ def rule_rows(seed_root: Path) -> None:
     write("us", "sec_times", "2026-10-05", [
         {"accession": "0001140361-26-038307", "cik": str(APPLE_CIK), "accepted_at": "2026-10-02T17:00:00Z",
          "json_accepted_at": "2026-10-02T21:00:00Z", "source": "golden", "checked_at": us_now}])
+    write("india", "financials", "2025-07-25", [
+        {"id": f"nse-fin-{ticker}-{basis}-2025-04-01-2025-06-30-golden", "ticker": ticker, "basis": basis,
+         "period_type": "quarterly", "period_start": "2025-04-01", "period_end": "2025-06-30", "revenue": revenue,
+         "net_profit": profit, "eps_basic": eps, "eps_diluted": eps, "audited": "Unaudited", "filing_type": "Original",
+         "filed_at": filed, "seq_id": "golden", "first_seen_at": "2025-07-25T12:00:00+00:00"}
+        for ticker, basis, revenue, profit, eps, filed in YEAR_AGO_RESULTS])
     write("india", "price_sources", "2026-10-01", [
         {"id": "nse-bhav-2026-10-01-INFY", "date": "2026-10-01", "ticker": "INFY", "source": "nse_bhavcopy",
          "url": "https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_01102026.csv",
          "filled_at": SEED_CLOCKS["india"]}])
+
+
+def scaled_13f_table(source: Path, target: Path) -> Path:
+    """A copy of a fixture 13F table with each APPLE INC common-share line's <value> times F13_VALUE_SCALE."""
+    def scale(block: re.Match) -> str:
+        text = block.group(0)
+        if "<nameOfIssuer>APPLE INC</nameOfIssuer>" not in text or "<titleOfClass>COM</titleOfClass>" not in text:
+            return text
+        return re.sub(r"<value>(\d+)</value>", lambda m: f"<value>{int(m.group(1)) * F13_VALUE_SCALE}</value>", text)
+    target.write_text(re.sub(r"<infoTable>.*?</infoTable>", scale, source.read_text(), flags=re.S))
+    return target
 
 
 def synthetic_nse(target: Path) -> None:
@@ -160,10 +190,12 @@ def seed_steps() -> list[tuple[str, str, list[str]]]:
     ]
 
 
-def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path) -> None:
+def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path, parallel: bool = False) -> None:
     """Fill a scratch seed root with the collectors, keep a copy in run_dir/seed/root, then copy
     SEED_KINDS into golden_root/data. The seed root lives outside the checkout (a temporary
-    directory): the NSE --replay guard refuses any write target inside a repository."""
+    directory): the NSE --replay guard refuses any write target inside a repository. parallel: the
+    two markets' step lists run at the same time (each list in order; they write different
+    data/<market> folders)."""
     scratch = Path(tempfile.mkdtemp(prefix="mb-golden-seed-"))
     try:
         seed_root = scratch / "root"
@@ -173,25 +205,41 @@ def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path) -> No
         sec_fixture_map(run_dir / "seed" / "sec")
         rule_rows(seed_root)
         synthetic_nse(run_dir / "seed" / "nse_synthetic")
-        run_seed_steps(run_dir, seed_root, environment, scripts)
+        run_seed_steps(run_dir, seed_root, environment, scripts, parallel)
         shutil.copytree(seed_root, run_dir / "seed" / "root")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     copy_seeded(run_dir / "seed" / "root", golden_root, run_dir / "steps" / "seed")
 
 
-def run_seed_steps(run_dir: Path, seed_root: Path, environment, scripts: Path) -> None:
+def run_seed_steps(run_dir: Path, seed_root: Path, environment, scripts: Path, parallel: bool = False) -> None:
     """Run seed_steps() on seed_root; logs in run_dir/steps/seed/ with the seed root's path as <SEED>."""
     log_dir = run_dir / "steps" / "seed"
     log_dir.mkdir(parents=True)
-    for market, label, command in seed_steps():
-        env = environment(seed_root, market, SEED_CLOCKS[market])
-        env.update({"MB_SEC_FIXTURES": str(run_dir / "seed" / "sec"), "MB_NETGUARD_LOG": str(run_dir / "netguard.log"),
-                    "SEC_USER_AGENT": "market-brief golden golden@example.com"})
-        argv = [a.format(python=sys.executable, seed_dir=run_dir / "seed", fixtures=FIXTURES) for a in command]
-        proc = subprocess.run(argv, cwd=scripts, env=env, capture_output=True, text=True, check=False)
-        for stream, text in (("stdout", proc.stdout), ("stderr", proc.stderr), ("exit", f"{proc.returncode}\n")):
-            (log_dir / f"{market}.{label}.{stream}").write_text(text.replace(str(seed_root.parent), "<SEED>"))
+
+    def run_market(market: str) -> None:
+        for step_market, label, command in seed_steps():
+            if step_market == market:
+                run_seed_step(run_dir, seed_root, environment, scripts, (market, label, command))
+    if parallel:
+        with ThreadPoolExecutor(max_workers=len(SEED_CLOCKS)) as pool:
+            for future in [pool.submit(run_market, market) for market in SEED_CLOCKS]:
+                future.result()
+    else:
+        for step in seed_steps():
+            run_seed_step(run_dir, seed_root, environment, scripts, step)
+
+
+def run_seed_step(run_dir: Path, seed_root: Path, environment, scripts: Path, step: tuple) -> None:
+    market, label, command = step
+    env = environment(seed_root, market, SEED_CLOCKS[market])
+    env.update({"MB_SEC_FIXTURES": str(run_dir / "seed" / "sec"), "MB_NETGUARD_LOG": str(run_dir / "netguard.log"),
+                "SEC_USER_AGENT": "market-brief golden golden@example.com"})
+    argv = [a.format(python=sys.executable, seed_dir=run_dir / "seed", fixtures=FIXTURES) for a in command]
+    proc = subprocess.run(argv, cwd=scripts, env=env, capture_output=True, text=True, check=False)
+    log_dir = run_dir / "steps" / "seed"
+    for stream, text in (("stdout", proc.stdout), ("stderr", proc.stderr), ("exit", f"{proc.returncode}\n")):
+        (log_dir / f"{market}.{label}.{stream}").write_text(text.replace(str(seed_root.parent), "<SEED>"))
 
 
 def copy_seeded(seed_root: Path, golden_root: Path, log_dir: Path) -> None:

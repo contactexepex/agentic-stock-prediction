@@ -26,6 +26,20 @@ python tests/golden/golden.py record  [--dir work/golden]   # once, on the commi
 python tests/golden/golden.py compare [--dir work/golden]   # after the step: exit 0 = identical
 ```
 
+Both run the parallel schedule by default (`tests/golden/parallel.py`): the two markets at once, each
+on its own copy of the seeded root (a sibling directory whose path has the run directory's length),
+and within a market up to `--jobs` (default 3) steps at a time where they do not conflict. A step
+waits for every earlier step of its phase that writes what it reads or reads or writes what it
+writes; the reads and writes of each step are declared in `ACCESS` (data kinds, checked against the
+step's SQL, and named work/report files), and a step without a declaration waits for every earlier
+step. The late phase starts after the pre_open phase. Each market's copy is then merged back into the
+run directory in market order (its path rewritten to the run directory's). `--serial` runs every
+step in list order in one root, as the harness did before. Both give the same bytes, so a record of
+either compares with the other. The `ACCESS` declarations are checked by that equality only
+(`tests/test_golden_schedule.py` checks that every step has one and that the writers keep their
+order): after changing a step, its script's queries or `ACCESS`, and at least once per refactor
+step, run `record --serial` and a parallel `compare` against it.
+
 Fixed inputs:
 - `data/`, `config/` and `reports/` extracted with `git archive` from commit
   `24749bdc4835bff242b2683f83e85f2a7e3a2ab0` (`INPUT_COMMIT`), never the working tree, so daily-run
@@ -51,16 +65,24 @@ Fixed inputs:
     tests/test_fundamentals.py; the seed config tracks the fixture 13F filer 9999200 in place of the
     real filers), and `collect_macro` and `collect_shorts` on `tests/fixtures/sources`;
   - rule-built rows for the kinds whose collectors need Yahoo or SEC header pages: options (AAPL,
-    JPM, NVDA), sec_times (one Form 4 accession), price_sources (one INFY bar);
+    JPM, NVDA), sec_times (one Form 4 accession), price_sources (one INFY bar); and India financials
+    of the quarter a year before the fixtures' latest (2025-04-01..06-30 for INFY consolidated,
+    HDFCBANK and SBILIFE standalone), so the y/y columns of "Latest quarterly results" have values;
+  - the fixture 13F tables are served with the AAPL common-share values times 1,000,164 (copies in
+    `run/seed/sec/`; tests/fixtures unchanged), so the 13F `value_bn` is 37.51 instead of 0.0.
+    Checked: `round(value_usd / 1e9, 1)` in smart_money.py fails `compare` (5 files, the US context
+    packs) and `round(revenue_yoy * 100, 0)` in nse_context.py fails it (7 files: the India context
+    packs and the ai_replay context with its sha256); with the earlier seed both printed the same
+    (0.0, empty);
   - the seed root lives in a temporary directory outside the checkout (the NSE `--replay` guard
     refuses any write target inside a repository) and is copied to `run/seed/root`; its paths appear
     as `<SEED>` in the seed logs;
 - each script runs as a subprocess with `MB_ROOT`/`MB_CONFIG` = the scratch root, `MB_MARKET`, a fixed
   `MB_NOW`, `PYTHONHASHSEED=0`, `TZ=UTC`, no Slack/Neo4j/SEC credentials or proxies (the seed sets a
   dummy `SEC_USER_AGENT`), and `tests/golden/site/sitecustomize.py` loaded: the test network guard
-  (any non-loopback connection is refused and logged; a refusal fails the comparison) and DuckDB on
-  one thread. The one-thread setting only fixes the order within the harness; it hides a production
-  defect, see "Known nondeterminism" below.
+  (any non-loopback connection is refused and logged; a refusal fails the comparison). DuckDB runs
+  with its default threads, as in production (the one-thread setting was removed when "Known
+  nondeterminism" below was fixed); `GOLDEN_DUCKDB_THREADS=N` sets N threads to stress it.
 
 Phases (seed first, then two per market, each with a frozen clock):
 
@@ -143,45 +165,85 @@ How each later step proves byte-identical outputs:
 1. on the base commit of the step (before any change): `python tests/golden/golden.py record`;
 2. make the step's changes;
 3. `python tests/golden/golden.py compare` must print `"identical": true` and exit 0 (it reruns the
-   whole set; about 6 minutes); its output, the base commit and the step's commit go to the judge;
+   whole set; about 2 minutes, `--serial` about 5.5); its output, the base commit and the step's
+   commit go to the judge;
 4. any difference is a blocker, even a float's last digit; the normalisation list above may not grow
    in a refactor step (a new wall-clock field would be a behaviour change).
 
 The recorded set (manifest with hashes and exit codes plus a full copy of every output, used for
 diffs) lives in `work/golden/` (git-ignored). Committed are only `tests/golden/golden.py` (steps,
-runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs), `tests/golden/seed.py`
-and `tests/golden/seed_sources.py` (seeded kinds) and `tests/golden/site/sitecustomize.py`.
+runner, hashing, record/compare), `tests/golden/parallel.py` (the parallel schedule and the merge),
+`tests/golden/overlay.py` (synthetic inputs), `tests/golden/seed.py` and
+`tests/golden/seed_sources.py` (seeded kinds) and `tests/golden/site/sitecustomize.py`.
 Evidence (2026-10-06, harness at bef503b): `record` then two `compare` runs, both
 `"identical": true` over 1621 files with a clean network log; a deliberate change in a seeded module
 (`macro_context`: basis-point changes printed with one decimal) made `compare` fail on the US context
 packs (5 files: 4 context steps' stdout and work/context.md); earlier (before the seed) a change in
 `rangelib.naive_range` (factor 1.0001) failed with 22 differing outputs.
+Parallel schedule (2026-10-06, 4 cores): `record --serial` at 2695ad7 took 310 s; the parallel
+`compare` against it printed `"identical": true` over 1621 files in 115 s. The parallel run also
+compared identical with a record made by the previous harness (one root, serial) at 2d90f32, so the
+per-market roots and the merge reproduce the shared-root run byte for byte.
 
-### Known nondeterminism (a production defect, outside the freeze)
+### Known nondeterminism (fixed)
 
-Production `common.connect` runs DuckDB with its default threads. Several queries have no full
-ORDER BY, or aggregate floats in scan order, so their row order, or a float's last digit, can differ
-between two runs on the same data. `GOLDEN_DUCKDB_PARALLEL=1 python tests/golden/golden.py compare`
-(default threads, same code) shows it: on 2026-10-06 it differed from the one-thread record in 25 of
-1621 files. The queries:
+Production `common.connect` runs DuckDB with its default threads. Several queries had no full
+ORDER BY, or aggregated floats in scan order, so their row order, or a float's last digit, could
+differ between two runs on the same data. One observation (2026-10-06): a compare with default
+threads against the then one-thread record differed in 25 of 1621 files.
 
-| query | defect | where it showed |
-|---|---|---|
-| `score_predictions.py` `SQL` (open_predictions ASOF JOIN bars, JOIN bars) | no ORDER BY: rows are scored and appended in scan order | row order of `data/<market>/outcomes/` (both markets) |
-| `scoring.summary`: `SELECT horizon_days, confidence, hit FROM track_record ...` | no ORDER BY; `reliability()` takes a pandas mean over the rows in that order | `mean_conf` (0.625 vs 0.6250000000000001) in score_predictions' summary (India, both phases); the same function feeds the context pack, review and HTML |
-| `view_data.py` `sc_calls` (`SELECT confidence, hit FROM track_record ...`) | same, fed to `scoring.reliability` | not seen in this data |
-| `context.py` "Open predictions" (`ORDER BY as_of_date, ticker`) | not a full key: a ticker's 1d and 5d calls of one day tie | row order in the context pack, incl. `ai_replay prepare`'s context.md, and so its `sha256` and `approx_tokens` in ai_replay.json and stdout (both markets) |
-| `report.py` `conf_bands` (`avg(confidence) ... GROUP BY band`) | float average summed in scan order | "0.60-0.69 63%" vs "62%" in the report, its skeleton and the saved previous report (both markets) |
-| `view_data.py` `bands` (`avg(confidence) ... GROUP BY band`) | same | `calibration[].stated` in the HTML report's data (US, field-checked: 0.55 vs 0.5499999999999999, 0.625 vs 0.6250000000000001, 0.7000000000000001 vs 0.6999999999999998; India's HTML differs in the same data line) and its Slack-plan copy, and so the HTML `bytes` in html_report's stdout and the Slack plan (both markets) |
+Fixed (commits f548309 and e2e499b): every query below now has a full ORDER BY (a unique key, or
+every output column), and float averages and sums that reach an output are order-independent:
+SQL sums over `TRY_CAST(x AS DECIMAL(38,10))` (integer arithmetic; `avg` of it is the exact sum
+divided by n), `scoring._mean` (exact rational sum, rounded once), split-factor products over a
+sorted list. Limits of the decimal cast: each value is rounded to 10 decimals before the sum; NaN,
+infinities and values of 1e28 or more become NULL and are left out of `avg`/`sum` (before, they
+made the result NaN or inf), while `count(*)` beside them still counts their rows
+(`tests/test_determinism.py::test_exact_decimal_sum_limits`).
 
-Other `avg()` aggregates over unordered rows (e.g. context.py "Track record by horizon", review.py
-summaries) carry the same risk but were rounded enough not to differ here.
+Rounding convention for printed whole percents: half up on the value's decimal form, everywhere
+(1- and 2-decimal percents in backtest tables and range/validate notes keep Python formatting).
+`scoring.percent` (whole percent, `decimal` ROUND_HALF_UP) prints every share in the md report,
+the Slack text, the context pack's proper-score tables and view_data's call and record texts; the
+HTML report's JavaScript uses `pct0` (same rule). The weekly review, chart labels and range/regime
+notes use `scoring.percent` too; no `:.0%` format is left in `scripts/` (a test checks this). DuckDB's
+`round()` rounds half up on the double's binary value, so a 2-decimal SQL rounding can differ from
+`percent` on values like 1.005 (not used for printed whole percents). So an
+exact 0.625 (a band average, or 5 of 8 hits) prints 63% in the md report and the HTML alike
+(before: 62% from Python's half-to-even `:.0%` beside 63% from JavaScript's `Math.round`).
 
-The fix (full ORDER BY keys; aggregate in a defined order or round) changes output bytes, so it is a
-separate judged change outside the feature freeze, scheduled right after this step, followed by a
-golden re-record. Until then: the one-thread harness setting fixes the order only within the
-harness; refactor steps must keep each of these queries' ORDER BY and aggregation exactly as they are
-and must not describe their order as defined.
+| place | change |
+|---|---|
+| `score_predictions.py` `SQL`, `RANGE_SQL` | `ORDER BY base.id, base.made_at` / `ORDER BY r.id`: outcomes and range_outcomes appended in id order |
+| `scoring.summary` | calls `ORDER BY id, scored_at`, ranges `ORDER BY id`; Brier, log loss, `mean_conf` and the range means use `_mean` |
+| `view_data.py` | `SCORED_CALLS_SQL` ordered; `BANDS_SQL` exact average; per-ticker range/call records `ORDER BY ticker, h`; news `ORDER BY id` (ties in the item ranking and the same-title dedupe); announcements `ORDER BY id` (sources map); company events `ORDER BY date, ticker, type, name` |
+| `context.py` | "Open predictions" `ORDER BY as_of_date, ticker, horizon_days, id, direction, confidence`; news sentiment, "Range scorecard" and "Track record by horizon" averages exact; SEC filings and scored ranges full keys; upcoming company events `ORDER BY ALL`; judge FAILs `+ agent, round` |
+| `report.py` | `CONF_BANDS_SQL` (in view_data.py) exact; scorecard over `RANGE_RECORD_EXACT`; yesterday's calls `ORDER BY ticker, horizon_days, id`; quotes `ORDER BY symbol`; features `ORDER BY ticker`; scored ranges `+ id` |
+| `relations.py`, `smart_money.py`, `nse_context.py` | `+ id` after value/date keys (ties under `LIMIT`); FII/DII sums exact |
+| `macro_context.py` | NSDL 5-report net sum exact (printed rounded to whole crore) |
+| `calibrate.py`, `aci.py` | live pools `ORDER BY id` (weighted quantile with tied z values) |
+| `ai_replay.py` evidence, `lessons.evidence`, `spotcheck.evidence_rows`, `validate.evidence_times` | ordered, so the row kept per id and the output order are fixed (lessons: in the call's `evidence_ids` order) |
+| `validate.py` BAD_CLOSE, `ranges.py` options, `review.latest_aci_replay` | `ORDER BY 1`; `ORDER BY ticker, expiry, day`; `+ id DESC` |
+| `sql/views.sql` | `bar_factors` and `deals_scored` factor product `list_product(list_sort(list(...)))`; `insider_flow` dollar sums exact |
+
+Not changed, judged deterministic: plain scans and filters (DuckDB keeps insertion order);
+`holdings_quarter` sums of share counts and 13F dollar values (integer-valued doubles, exact below
+2^53); window averages in views, whose frames are ordered by a date unique per partition. Not
+covered: a `DISTINCT ON` whose ORDER BY ties on two different rows keeps either.
+
+Proof (2026-10-06): golden `record` with default threads at e2e499b, then two `compare` runs, both
+`"identical": true` over 1626 files. Against the one-thread record at 29fde83, 41 files differ,
+all row orderings or float last digits of the queries above: outcome rows (same lines, id order),
+"Open predictions" and SEC-filing row order in the context packs (and so the ai_replay context
+sha256), `mean_conf` and `calibration[].stated` (0.5499999999999999 -> 0.55, 0.7000000000000001 ->
+0.7, 0.6250000000000001 -> 0.625) in score summaries, review records and the HTML data (and so
+its byte counts), yesterday's-calls row order, one INDIGO sentiment 0.15 -> 0.16 (exact mean 0.155, half up), and the copied
+`sql/views.sql` in the ai_replay roots. `tests/test_determinism.py` runs each fixed query 12 times
+with 8 threads on data built to expose ties and summation order. With the half-up convention
+(golden record, then `compare` `"identical": true` over 1626 files) the 25 files that differ from
+the e2e499b record are the "0.60-0.69" / "0.60-0.70" rows (62% -> 63%) in the md reports, their
+skeleton and previous copies and the context packs' reliability table, and the HTML reports (the
+`pct0` script lines) with their Slack-plan copies and byte counts.
 
 ## 2. Enforcement
 

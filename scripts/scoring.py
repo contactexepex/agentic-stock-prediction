@@ -16,6 +16,8 @@ All range scores are in % of the base close, as the rest of the scorecard."""
 from __future__ import annotations
 
 import math
+from decimal import ROUND_HALF_UP, Decimal
+from fractions import Fraction
 
 import numpy as np
 import pandas as pd
@@ -45,9 +47,19 @@ def _py(p, y) -> tuple[np.ndarray, np.ndarray]:
     return p[ok], y[ok]
 
 
+def _mean(values) -> float | None:
+    """Mean of the non-NaN values, computed exactly (rational sum, rounded once), so it does not depend
+    on row order: the mean of n copies of 0.7 is 0.7. An infinite value gives the float mean."""
+    a = np.asarray(values, dtype=float)
+    a = a[~np.isnan(a)]
+    if not len(a):
+        return None
+    return float(sum(map(Fraction, a.tolist()), Fraction(0)) / len(a)) if np.isfinite(a).all() else float(a.mean())
+
+
 def brier(p, y) -> float | None:
     p, y = _py(p, y)
-    return float(np.mean((p - y) ** 2)) if len(p) else None
+    return _mean((p - y) ** 2)
 
 
 def log_loss(p, y) -> float | None:
@@ -55,7 +67,7 @@ def log_loss(p, y) -> float | None:
     if not len(p):
         return None
     p = np.clip(p, EPS, 1 - EPS)
-    return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+    return -_mean(y * np.log(p) + (1 - y) * np.log(1 - p))
 
 
 def reliability(p, y, edges=CALL_BINS) -> list[dict]:
@@ -69,7 +81,7 @@ def reliability(p, y, edges=CALL_BINS) -> list[dict]:
         n, k = int(m.sum()), int(y[m].sum())
         wl, wh = wilson(k, n)
         out.append({"bin": f"{lo:.2f}-{hi:.2f}", "lo": lo, "hi": hi, "n": n,
-                    "mean_conf": float(p[m].mean()) if n else None,
+                    "mean_conf": _mean(p[m]) if n else None,
                     "hit_rate": k / n if n else None, "wilson_lo": wl, "wilson_hi": wh})
     return out
 
@@ -113,12 +125,12 @@ def range_scores(df: pd.DataFrame) -> dict:
             for r in df[["lo50", "hi50", "lo80", "hi80", "actual_close", "base_close"]].itertuples(index=False)]
     s = pd.DataFrame(rows)
     base = df["base_close"].astype(float)
-    return {"n": int(len(df)), "cover50": _r(df["hit50"].astype(float).mean()),
-            "cover80": _r(df["hit80"].astype(float).mean()),
-            "is50_pct": _r(s["is50_pct"].mean()), "is80_pct": _r(s["is80_pct"].mean()),
-            "qs_pct": _r(s["qs_pct"].mean()),
-            "width50_pct": _r((100 * (df["hi50"] - df["lo50"]) / base).mean()),
-            "width80_pct": _r((100 * (df["hi80"] - df["lo80"]) / base).mean())}
+    return {"n": int(len(df)), "cover50": _r(_mean(df["hit50"].astype(float))),
+            "cover80": _r(_mean(df["hit80"].astype(float))),
+            "is50_pct": _r(_mean(s["is50_pct"])), "is80_pct": _r(_mean(s["is80_pct"])),
+            "qs_pct": _r(_mean(s["qs_pct"])),
+            "width50_pct": _r(_mean(100 * (df["hi50"] - df["lo50"]) / base)),
+            "width80_pct": _r(_mean(100 * (df["hi80"] - df["lo80"]) / base))}
 
 
 def _r(x, k: int = 4):
@@ -131,9 +143,9 @@ def summary(con) -> dict:
     """All-time proper scores from the scored track record: calls per horizon and overall
     (Brier, log loss, reliability) and ranges per horizon (coverage, interval and quantile scores)."""
     calls = con.execute("SELECT horizon_days, confidence, hit FROM track_record "
-                        "WHERE confidence IS NOT NULL AND hit IS NOT NULL").df()
+                        "WHERE confidence IS NOT NULL AND hit IS NOT NULL ORDER BY id, scored_at").df()
     rng = con.execute("SELECT horizon_days, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
-                      "FROM range_record WHERE actual_close IS NOT NULL").df()
+                      "FROM range_record WHERE actual_close IS NOT NULL ORDER BY id").df()
     out = {"calls": {"all": call_scores(calls)}, "ranges": {}}
     out["calls"]["all"]["reliability"] = reliability(calls["confidence"], calls["hit"]) if len(calls) else []
     for h, g in (calls.groupby("horizon_days") if len(calls) else []):
@@ -147,8 +159,18 @@ def _f(v, k: int = 3) -> str:
     return "–" if v is None else f"{v:.{k}f}"
 
 
+def percent(v, digits: int = 0, sign: bool = False) -> str:
+    """A share (0.625) as a percent rounded half up on its decimal value ('63%', digits=1 '62.5%',
+    sign=True '+63%'); '–' for a missing or non-finite value. The one convention for printed whole
+    percents, also in the HTML report's JavaScript (pct0)."""
+    if v is None or not math.isfinite(float(v)):
+        return "–"
+    value = Decimal(repr(float(v))).scaleb(2).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)
+    return f"{value:+}%" if sign else f"{value}%"
+
+
 def _p(v) -> str:
-    return "–" if v is None else f"{100 * v:.0f}%"
+    return "–" if v is None else percent(v)
 
 
 def markdown(s: dict) -> str:

@@ -21,7 +21,7 @@ FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, col
 -- Price multiplier per stored bar: the product of the factors of the ticker's adjustments with an
 -- ex-date after the bar (1 when none), which puts every bar on the newest basis.
 CREATE OR REPLACE VIEW bar_factors AS
-SELECT o.ticker, o.date, coalesce(product(a.factor), 1.0) AS factor
+SELECT o.ticker, o.date, coalesce(list_product(list_sort(list(a.factor))), 1.0) AS factor
 FROM ohlc_raw o LEFT JOIN price_adjustments a ON a.ticker = o.ticker AND a.ex_date > o.date
 GROUP BY o.ticker, o.date;
 
@@ -161,7 +161,7 @@ WITH adv AS (
                                            ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS adv20
     FROM ohlc
 ), d AS (
-    SELECT x.*, coalesce((SELECT product(a.factor) FROM price_adjustments a
+    SELECT x.*, coalesce((SELECT list_product(list_sort(list(a.factor))) FROM price_adjustments a
                           WHERE a.ticker = x.ticker AND a.ex_date > x.date), 1.0) AS _f
     FROM (SELECT DISTINCT ON (id) * FROM deals ORDER BY id, first_seen_at) x
 )
@@ -207,18 +207,19 @@ WHERE coalesce(status, 'active') = 'active';
 -- cluster_buy: 3 or more different insiders bought in the last 30 days.
 CREATE OR REPLACE VIEW insider_flow AS
 WITH t AS (
-    SELECT *, transaction_date >= current_date - 30 AS d30, transaction_date >= current_date - 90 AS d90
+    SELECT * REPLACE (TRY_CAST(value AS DECIMAL(38,10)) AS value),
+           transaction_date >= current_date - 30 AS d30, transaction_date >= current_date - 90 AS d90
     FROM insider_trades WHERE NOT derivative AND code IN ('P', 'S')
 )
 SELECT ticker,
-       coalesce(sum(value) FILTER (WHERE code = 'P' AND d30), 0) AS buy_value_30d,
-       coalesce(sum(value) FILTER (WHERE code = 'S' AND d30), 0) AS sell_value_30d,
-       coalesce(sum(CASE code WHEN 'P' THEN value ELSE -value END) FILTER (WHERE d30), 0) AS net_value_30d,
-       coalesce(sum(CASE code WHEN 'P' THEN value ELSE -value END) FILTER (WHERE d90), 0) AS net_value_90d,
+       CAST(coalesce(sum(value) FILTER (WHERE code = 'P' AND d30), 0) AS DOUBLE) AS buy_value_30d,
+       CAST(coalesce(sum(value) FILTER (WHERE code = 'S' AND d30), 0) AS DOUBLE) AS sell_value_30d,
+       CAST(coalesce(sum(CASE code WHEN 'P' THEN value ELSE -value END) FILTER (WHERE d30), 0) AS DOUBLE) AS net_value_30d,
+       CAST(coalesce(sum(CASE code WHEN 'P' THEN value ELSE -value END) FILTER (WHERE d90), 0) AS DOUBLE) AS net_value_90d,
        count(DISTINCT insider_name) FILTER (WHERE code = 'P' AND d30) AS buyers_30d,
        count(DISTINCT insider_name) FILTER (WHERE code = 'S' AND d30) AS sellers_30d,
-       round(coalesce(sum(value) FILTER (WHERE code = 'S' AND d30 AND plan_10b5_1), 0)
-             / nullif(sum(value) FILTER (WHERE code = 'S' AND d30), 0), 2) AS planned_sell_share_30d,
+       round(CAST(coalesce(sum(value) FILTER (WHERE code = 'S' AND d30 AND plan_10b5_1), 0) AS DOUBLE)
+             / nullif(CAST(sum(value) FILTER (WHERE code = 'S' AND d30) AS DOUBLE), 0), 2) AS planned_sell_share_30d,
        count(DISTINCT insider_name) FILTER (WHERE code = 'P' AND d30) >= 3 AS cluster_buy,
        max(transaction_date) FILTER (WHERE code = 'P') AS last_buy,
        max(transaction_date) FILTER (WHERE code = 'S') AS last_sale

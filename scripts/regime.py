@@ -6,6 +6,8 @@ conservative regime, never the more optimistic one.
 """
 from __future__ import annotations
 
+import scoring
+
 ORDER = ["CALM", "TRENDING", "EVENT_HEAVY", "UNSTABLE"]
 
 
@@ -16,7 +18,7 @@ def classify(th: dict, vol_level: float | None, bench_ret_5d: float | None,
     notes: list[str] = []
     stress = vol_change_1d is not None and vol_change_1d > th["stress_vol_jump"]
     if stress:
-        notes.append(f"stress: vol index jumped {vol_change_1d:.0%} in one day")
+        notes.append(f"stress: vol index jumped {scoring.percent(vol_change_1d)} in one day")
 
     if vol_level is None:
         notes.append("vol index unavailable: conservative EVENT_HEAVY floor")

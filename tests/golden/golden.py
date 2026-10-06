@@ -5,6 +5,10 @@ compare every output byte for byte with a recorded run (docs/REFACTOR_PLAN.md, "
   python tests/golden/golden.py record  [--dir work/golden]   record the golden set from this checkout
   python tests/golden/golden.py compare [--dir work/golden]   rerun into DIR/fresh and diff against DIR/run
   python tests/golden/golden.py run --out DIR                 one run into DIR, no comparison
+  each takes --serial (every step in list order in one root, as before; about 5.5 minutes) or
+  --jobs N (the default parallel schedule: both markets at once, each on its own copy of the seeded
+  root, up to N steps of a market at a time where they do not conflict; about 2 minutes on 4 cores;
+  tests/golden/parallel.py). Both give the same bytes, so a record of one compares with the other.
 
 Inputs are fixed: data/, config/ and reports/ come from git commit INPUT_COMMIT (never the working
 tree, so daily-run appends do not change them), plus a synthetic overlay built by rules in overlay.py
@@ -27,11 +31,11 @@ difference too. Normalisation, applied before hashing, is limited to:
 - the run directory's absolute path -> <RUN>, this checkout's absolute path -> <CODE>;
 - the NORMALISED entries: four wall-clock values (durations and build times that do not follow
   MB_NOW), each masked only in the output paths where it appears.
-Child processes load tests/golden/site/sitecustomize.py: the network guard, and DuckDB on one thread.
-The thread setting hides a production defect, it does not fix it: several queries have no full
-ORDER BY or aggregate floats in scan order, so with DuckDB's default threads their row order (and a
-float's last digit) varies between runs (docs/REFACTOR_PLAN.md, "Known nondeterminism").
-GOLDEN_DUCKDB_PARALLEL=1 turns the setting off to show it.
+Child processes load tests/golden/site/sitecustomize.py: the network guard. DuckDB runs with its
+default threads, as in production: the queries whose row order or float sums reach an output have a
+full ORDER BY or an order-independent aggregate (docs/REFACTOR_PLAN.md, "Known nondeterminism",
+fixed). GOLDEN_DUCKDB_THREADS=N sets N threads on every DuckDB connection (a stress check; the
+manifest records it).
 Nothing else is masked. The recorded set (manifest plus full copies, for diffs) lives under --dir,
 by default work/golden (git-ignored)."""
 from __future__ import annotations
@@ -41,13 +45,17 @@ import difflib
 import fnmatch
 import hashlib
 import json
+import multiprocessing
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+from parallel import copy_base, file_hashes, market_dir, merge_market, run_dag
 from seed import run_seed
 
 from overlay import (INPUT_COMMIT, append_valid_calls, fill_report, git_inputs, write_forecaster_file,
@@ -59,6 +67,8 @@ NETGUARD = CODE / "tests" / "netguard"
 GOLDEN_SITE = CODE / "tests" / "golden" / "site"
 DEFAULT_DIR = CODE / "work" / "golden"
 MARKETS = ("india", "us")
+PHASES = ("pre_open", "late")
+DEFAULT_JOBS = 3   # concurrent steps per market in the parallel schedule
 
 PHASE_CLOCKS = {
     "india": {"pre_open": "2026-10-05T02:40:00+00:00", "late": "2026-10-06T02:30:00+00:00"},
@@ -168,8 +178,9 @@ def environment(root: Path, market: str, clock: str) -> dict[str, str]:
     return env
 
 
-def run_all(run_dir: Path) -> dict:
-    """One full run into run_dir/root with step logs in run_dir/steps/<market>/; returns the outputs map."""
+def run_all(run_dir: Path, serial: bool = False, jobs: int = DEFAULT_JOBS) -> dict:
+    """One full run into run_dir/root with step logs in run_dir/steps/<market>/; returns the outputs map.
+    serial: every step in list order in one root; else the parallel schedule of parallel.py (same bytes)."""
     if run_dir.exists():
         shutil.rmtree(run_dir)
     root = run_dir / "root"
@@ -181,29 +192,77 @@ def run_all(run_dir: Path) -> dict:
     for market in MARKETS:
         write_past_calls(root, market)
     before = snapshot(run_dir)
-    run_seed(run_dir, root, environment, SCRIPTS)
-    for market in MARKETS:
-        (run_dir / "steps" / market).mkdir(parents=True, exist_ok=True)
-        for phase, label, command, stdout_file in steps(market):
-            clock = PHASE_CLOCKS[market][phase]
-            os.environ["GOLDEN_PHASE"] = phase
-            if callable(command):
-                command(root, market, clock)
-                continue
-            argv = [a.format(python=sys.executable, root=root, run=run_dir) for a in command]
-            proc = subprocess.run(argv, cwd=SCRIPTS, env=environment(root, market, clock), capture_output=True,
-                                  text=True, check=False)
-            prefix = run_dir / "steps" / market / f"{phase}.{label}"
-            prefix.with_name(prefix.name + ".stdout").write_text(proc.stdout)
-            prefix.with_name(prefix.name + ".stderr").write_text(proc.stderr)
-            prefix.with_name(prefix.name + ".exit").write_text(f"{proc.returncode}\n")
-            if stdout_file:
-                (root / stdout_file).write_text(proc.stdout)
+    run_seed(run_dir, root, environment, SCRIPTS, parallel=not serial)
+    overlaps = []
+    if serial:
+        for market in MARKETS:
+            run_market(run_dir, market, None)
+    else:
+        overlaps = run_markets_parallel(run_dir, jobs)
     after = snapshot(run_dir)
     outputs = {"changed": {p: h for p, h in after.items() if before.get(p) != h},
                "deleted": sorted(p for p in before if p not in after)}
+    if not serial:
+        outputs["market_overlaps"] = overlaps
     (run_dir / "outputs.json").write_text(json.dumps(outputs, indent=1, sort_keys=True))
     return outputs
+
+
+def run_market(run_dir: Path, market: str, jobs: int | None) -> None:
+    """Both phases of one market on run_dir/root; jobs None = one step at a time in list order."""
+    (run_dir / "steps" / market).mkdir(parents=True, exist_ok=True)
+    for phase in PHASES:
+        os.environ["GOLDEN_PHASE"] = phase
+        items = [s for s in steps(market) if s[0] == phase]
+        if jobs is None:
+            for item in items:
+                run_step(run_dir, market, item)
+        else:
+            run_dag([s[1] for s in items], lambda i, items=items: run_step(run_dir, market, items[i]), jobs)
+
+
+def run_step(run_dir: Path, market: str, item: tuple) -> None:
+    phase, label, command, stdout_file = item
+    root, clock = run_dir / "root", PHASE_CLOCKS[market][phase]
+    if callable(command):
+        command(root, market, clock)
+        return
+    argv = [a.format(python=sys.executable, root=root, run=run_dir) for a in command]
+    proc = subprocess.run(argv, cwd=SCRIPTS, env=environment(root, market, clock), capture_output=True,
+                          text=True, check=False)
+    prefix = run_dir / "steps" / market / f"{phase}.{label}"
+    prefix.with_name(prefix.name + ".stdout").write_text(proc.stdout)
+    prefix.with_name(prefix.name + ".stderr").write_text(proc.stderr)
+    prefix.with_name(prefix.name + ".exit").write_text(f"{proc.returncode}\n")
+    if stdout_file:
+        (root / stdout_file).write_text(proc.stdout)
+
+
+def run_markets_parallel(run_dir: Path, jobs: int) -> list[str]:
+    """Each market on its own copy of the seeded run directory, both at once (parallel.py); then merge
+    the copies back in MARKETS order. Returns the paths both markets wrote (the later market's kept)."""
+    def raw(content: bytes) -> str:
+        return hashlib.sha256(content).hexdigest()
+    skip = {"netguard.log"}
+    base = {p: h for p, h in file_hashes(run_dir, raw).items() if p not in skip}
+    dirs = {market: market_dir(run_dir, market) for market in MARKETS}
+    for target in dirs.values():
+        copy_base(run_dir, target)
+        (target / "netguard.log").unlink(missing_ok=True)
+    with ProcessPoolExecutor(max_workers=len(MARKETS), mp_context=multiprocessing.get_context("fork")) as pool:
+        for future in [pool.submit(run_market, dirs[m], m, jobs) for m in MARKETS]:
+            future.result()
+    seen, overlaps = set(), []
+    for market in MARKETS:
+        written, _ = merge_market(dirs[market], run_dir, base, raw, skip)
+        overlaps += sorted(seen & set(written))
+        seen |= set(written)
+        log = dirs[market] / "netguard.log"
+        if log.exists():
+            with (run_dir / "netguard.log").open("a") as handle:
+                handle.write(log.read_text())
+        shutil.rmtree(dirs[market])
+    return overlaps
 
 
 # ---------- hashing and comparison ----------
@@ -241,25 +300,31 @@ def exit_codes(run_dir: Path) -> dict[str, int]:
             for p in sorted((run_dir / "steps").glob("*/*.exit"))}
 
 
-def record(directory: Path) -> int:
+def record(directory: Path, serial: bool, jobs: int) -> int:
     run_dir = directory / "run"
-    outputs = run_all(run_dir)
+    started = time.monotonic()
+    outputs = run_all(run_dir, serial, jobs)
+    wall = round(time.monotonic() - started, 1)
     manifest = {**outputs, "input_commit": INPUT_COMMIT, "phase_clocks": PHASE_CLOCKS,
                 "normalised": [{"paths": list(p), "pattern": r.decode()} for p, r, _ in NORMALISED],
-                "duckdb_parallel": bool(os.environ.get("GOLDEN_DUCKDB_PARALLEL")), "code_commit": git_head(),
+                "duckdb_threads": os.environ.get("GOLDEN_DUCKDB_THREADS") or "default", "code_commit": git_head(),
+                "schedule": "serial" if serial else f"parallel, {jobs} steps per market",
                 "exit_codes": exit_codes(run_dir)}
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=True))
     clean = network_clean(run_dir)
     print(json.dumps({"recorded": str(directory), "files": len(outputs["changed"]), "network_clean": clean,
+                      "schedule": manifest["schedule"], "wall_s": wall,
                       "code_commit": manifest["code_commit"],
                       "nonzero_exits": {k: v for k, v in manifest["exit_codes"].items() if v}}, indent=1))
     return 0 if clean else 1
 
 
-def compare(directory: Path, max_diff_lines: int) -> int:
+def compare(directory: Path, max_diff_lines: int, serial: bool, jobs: int) -> int:
     golden = json.loads((directory / "manifest.json").read_text())
     fresh_dir = directory / "fresh"
-    fresh = run_all(fresh_dir)
+    started = time.monotonic()
+    fresh = run_all(fresh_dir, serial, jobs)
+    wall = round(time.monotonic() - started, 1)
     differing = sorted(p for p in set(golden["changed"]) | set(fresh["changed"])
                        if golden["changed"].get(p) != fresh["changed"].get(p))
     deleted_mismatch = sorted(set(golden["deleted"]) ^ set(fresh["deleted"]))
@@ -277,25 +342,34 @@ def compare(directory: Path, max_diff_lines: int) -> int:
     identical = not differing and not deleted_mismatch and clean
     print(json.dumps({"identical": identical, "compared_files": len(golden["changed"]), "differing": differing,
                       "deleted_mismatch": deleted_mismatch, "network_clean": clean,
-                      "golden_code_commit": golden.get("code_commit"), "fresh_code_commit": git_head()}, indent=1))
+                      "golden_code_commit": golden.get("code_commit"), "fresh_code_commit": git_head(),
+                      "golden_schedule": golden.get("schedule", "serial"),
+                      "fresh_schedule": "serial" if serial else f"parallel, {jobs} steps per market", "wall_s": wall},
+                     indent=1))
     return 0 if identical else 1
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("record", "compare"):
+    for name in ("record", "compare", "run"):
         p = sub.add_parser(name)
-        p.add_argument("--dir", type=Path, default=DEFAULT_DIR)
-        p.add_argument("--max-diff-lines", type=int, default=40)
-    sub.add_parser("run").add_argument("--out", type=Path, required=True)
+        if name == "run":
+            p.add_argument("--out", type=Path, required=True)
+        else:
+            p.add_argument("--dir", type=Path, default=DEFAULT_DIR)
+            p.add_argument("--max-diff-lines", type=int, default=40)
+        p.add_argument("--serial", action="store_true", help="every step in list order in one root (slower)")
+        p.add_argument("--jobs", type=int, default=DEFAULT_JOBS, help="concurrent steps per market (parallel run)")
     args = ap.parse_args()
     if args.cmd == "run":
-        run_all(args.out.resolve())
+        run_all(args.out.resolve(), args.serial, args.jobs)
         return 0
     directory = args.dir.resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    return record(directory) if args.cmd == "record" else compare(directory, args.max_diff_lines)
+    if args.cmd == "record":
+        return record(directory, args.serial, args.jobs)
+    return compare(directory, args.max_diff_lines, args.serial, args.jobs)
 
 
 if __name__ == "__main__":

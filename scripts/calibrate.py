@@ -49,7 +49,7 @@ def compute(cfg: dict, rc: dict, con, bars: dict[str, pd.DataFrame], now: str | 
     bench = bars[benchmark_key(cfg)]
     as_of = bench.index[-1].date()
     session_rank = {d: i for i, d in enumerate(bench.index)}
-    live = con.execute("SELECT horizon_days, as_of_date, z FROM range_record WHERE z IS NOT NULL").df()
+    live = con.execute("SELECT horizon_days, as_of_date, z FROM range_record WHERE z IS NOT NULL ORDER BY id").df()
     now, rows = now or utc_now(), []
     tracker, akey = None, "all"
     if any(ri.enabled(rc, "aci", cfg["market"], h) for h in rc["horizons"]):

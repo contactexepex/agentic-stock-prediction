@@ -114,7 +114,7 @@ class Tracker:
 LIVE_SQL = """SELECT r.horizon_days, r.target_date, r.regime, r.hit50, r.hit80
 FROM range_record r JOIN (SELECT range_id, min(scored_at) AS scored_at FROM range_outcomes GROUP BY range_id) o
   ON o.range_id = r.id
-WHERE o.scored_at <= ?::TIMESTAMPTZ AND r.hit50 IS NOT NULL AND r.hit80 IS NOT NULL"""
+WHERE o.scored_at <= ?::TIMESTAMPTZ AND r.hit50 IS NOT NULL AND r.hit80 IS NOT NULL ORDER BY r.id"""
 
 
 def live_tracker(con, rc: dict, now: str, until=None) -> Tracker:

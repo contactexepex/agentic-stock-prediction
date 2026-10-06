@@ -58,6 +58,10 @@ SLOW = {
         "test_score_cli_on_recorded_calls",
         "test_training_cutoff_comes_from_config",
     },
+    "tests/test_determinism.py": {
+        "test_score_predictions_queries",
+        "test_views_insider_flow_and_split_factors",
+    },
     "tests/test_fundamentals.py": {
         "test_collect_gate_new_filing_and_views",
     },

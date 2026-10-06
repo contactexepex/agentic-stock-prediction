@@ -63,7 +63,8 @@ def _india_fpi(con) -> str:
     trend = con.execute("""
         WITH e AS (SELECT reporting_date, net_cr FROM fpi_daily WHERE asset_class = 'Equity' AND route ILIKE 'sub-total'
                    ORDER BY reporting_date DESC LIMIT 5)
-        SELECT count(*), sum(net_cr), min(reporting_date), max(reporting_date) FROM e""").fetchone()
+        SELECT count(*), CAST(sum(TRY_CAST(net_cr AS DECIMAL(38,10))) AS DOUBLE), min(reporting_date),
+               max(reporting_date) FROM e""").fetchone()
     line = ""
     if trend and trend[0]:
         line = (f"Equity net over the last {trend[0]} stored reports ({trend[2]} to {trend[3]}): "

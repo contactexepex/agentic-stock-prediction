@@ -349,11 +349,11 @@ def evidence(market: str, root: Path, cutoff: datetime, days: int = EVIDENCE_DAY
         frames = []
         for kind, sql in (
             ("news", "SELECT id, array_to_string(tickers, ',') AS ticker, 'news' AS form, "
-                     "coalesce(published_at, first_seen_at) AS public_at, title AS text FROM news"),
+                     "coalesce(published_at, first_seen_at) AS public_at, title AS text FROM news ORDER BY ALL"),
             ("filings", "SELECT id, ticker, form, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ)) AS public_at, "
-                        "description AS text FROM filings"),
+                        "description AS text FROM filings ORDER BY ALL"),
             ("announcements", "SELECT id, ticker, category AS form, coalesce(published_at, first_seen_at) AS public_at, "
-                              "subject AS text FROM announcements"),
+                              "subject AS text FROM announcements ORDER BY ALL"),
         ):
             df = con.execute(sql).df()
             df["kind"] = kind

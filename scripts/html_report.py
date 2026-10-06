@@ -364,8 +364,8 @@ JS = r"""
 'use strict';
 const D = JSON.parse(document.getElementById('report-data').textContent);
 const $ = (s, el) => (el || document).querySelector(s);
-const NS = 'http://www.w3.org/2000/svg';
-const cur = D.symbol || '';
+const NS = 'http://www.w3.org/2000/svg', cur = D.symbol || '';
+const pct0 = v => (v == null || /e/i.test(String(v)) ? Math.round(v * 100) : Math.round(+(String(v) + 'e2'))) + '%';  // half up
 const fmtMoney = v => v == null ? '–' : cur + Number(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const fmtPct = (v, d) => { if (v == null) return '–'; const s = Math.abs(v * 100).toFixed(d == null ? 1 : d);
   return (+s === 0 ? '' : v > 0 ? '+' : '−') + s + '%'; };
@@ -540,7 +540,7 @@ function rangesChart(list){
     g.append(svg('rect', {x: xs(pctOf(c, r.lo80)), y: y - 5, width: Math.max(2, xs(pctOf(c, r.hi80)) - xs(pctOf(c, r.lo80))), height: 10, rx: 4, fill: r.late ? 'var(--late)' : 'var(--band80)'}));
     g.append(svg('rect', {x: xs(pctOf(c, r.lo50)), y: y - 5, width: Math.max(2, xs(pctOf(c, r.hi50)) - xs(pctOf(c, r.lo50))), height: 10, rx: 4, fill: r.late ? 'var(--late)' : 'var(--band50)'}));
     g.append(svg('circle', {cx: xs(pctOf(c, r.center_price)), cy: y, r: 4, fill: r.late ? 'var(--muted)' : 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2}));
-    const call = r.direction && !r.late ? (r.direction === 'up' ? ' ▲ ' : ' ▼ ') + Math.round(r.confidence * 100) + '%' : '';
+    const call = r.direction && !r.late ? (r.direction === 'up' ? ' ▲ ' : ' ▼ ') + pct0(r.confidence) : '';
     g.append(sText(W - R + 10, y + 4, fmtMoney(r.lo80) + '–' + fmtMoney(r.hi80).replace(cur, '') + (r.late ? '  late' : call), {fill: 'var(--ink2)'}));
     const hitbox = svg('rect', {x: 0, y: y - rowH / 2, width: W, height: rowH, fill: 'transparent'});
     g.append(hitbox);
@@ -549,7 +549,7 @@ function rangesChart(list){
   });
   box.append(s);
   box.append(tableView(['Company', '80% range', '50% range', 'Last close', 'Note'], rows.map(c => { const r = c.ranges.find(x => x.h === H);
-    return [c.ticker, fmtMoney(r.lo80) + '–' + fmtMoney(r.hi80), fmtMoney(r.lo50) + '–' + fmtMoney(r.hi50), fmtMoney(c.close), r.late ? 'late, not a forecast' : (r.direction ? r.direction + ' ' + Math.round(r.confidence * 100) + '%' : 'no call')]; })));
+    return [c.ticker, fmtMoney(r.lo80) + '–' + fmtMoney(r.hi80), fmtMoney(r.lo50) + '–' + fmtMoney(r.hi50), fmtMoney(c.close), r.late ? 'late, not a forecast' : (r.direction ? r.direction + ' ' + pct0(r.confidence) : 'no call')]; })));
   return box;
 }
 
@@ -597,8 +597,8 @@ function calibrationChart(){
   const s = svg('svg', {viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': 'Promised versus actual hit rate'});
   [0, .25, .5, .75, 1].forEach(v => {
     s.append(svg('line', {x1: L, x2: W - R, y1: ys(v), y2: ys(v), stroke: 'var(--grid)', 'stroke-width': 1}));
-    s.append(sText(L - 6, ys(v) + 4, Math.round(v * 100) + '%', {'text-anchor': 'end'}));
-    s.append(sText(xs(v), Hh - 18, Math.round(v * 100) + '%', {'text-anchor': 'middle'}));
+    s.append(sText(L - 6, ys(v) + 4, pct0(v), {'text-anchor': 'end'}));
+    s.append(sText(xs(v), Hh - 18, pct0(v), {'text-anchor': 'middle'}));
   });
   s.append(sText((L + W - R) / 2, Hh - 3, 'promised', {'text-anchor': 'middle'}));
   s.append(svg('line', {x1: xs(0), y1: ys(0), x2: xs(1), y2: ys(1), stroke: 'var(--axis)', 'stroke-width': 1}));
@@ -608,14 +608,14 @@ function calibrationChart(){
       : svg('rect', {x: cx - 5, y: cy - 5, width: 10, height: 10, rx: 2, fill: 'var(--call2)', stroke: 'var(--surface)', 'stroke-width': 2});
     s.append(mark);
     const hb = svg('circle', {cx: cx, cy: cy, r: 13, fill: 'transparent'}); s.append(hb);
-    hover(hb, () => [[p.label], ['promised', Math.round(p.stated * 100) + '%'], ['actual', Math.round(p.actual * 100) + '%'], ['checked cases', String(p.n)]]);
+    hover(hb, () => [[p.label], ['promised', pct0(p.stated)], ['actual', pct0(p.actual)], ['checked cases', String(p.n)]]);
   });
   box.append(s);
   const lg = el('div', {class: 'legend'});
   const a = el('span'); a.append(el('span', {class: 'sw', style: 'background:var(--accent);border-radius:50%;width:10px'}), document.createTextNode('Price ranges'));
   const b = el('span'); b.append(el('span', {class: 'sw', style: 'background:var(--call2);width:10px'}), document.createTextNode('Up/down calls'));
   lg.append(a, b); box.append(lg);
-  box.append(tableView(['What', 'Promised', 'Actual', 'Checked'], pts.map(p => [p.label, Math.round(p.stated * 100) + '%', Math.round(p.actual * 100) + '%', String(p.n)])));
+  box.append(tableView(['What', 'Promised', 'Actual', 'Checked'], pts.map(p => [p.label, pct0(p.stated), pct0(p.actual), String(p.n)])));
   box.append(reliabilityChart());
   return box;
 }
@@ -634,9 +634,9 @@ function reliabilityChart(){
   const s = svg('svg', {viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': 'Call confidence versus hit rate'});
   [0.4, 0.6, 0.8, 1].forEach(v => {
     s.append(svg('line', {x1: L, x2: W - R, y1: ys(v), y2: ys(v), stroke: 'var(--grid)', 'stroke-width': 1}));
-    s.append(sText(L - 6, ys(v) + 4, Math.round(v * 100) + '%', {'text-anchor': 'end'}));
+    s.append(sText(L - 6, ys(v) + 4, pct0(v), {'text-anchor': 'end'}));
   });
-  [0.5, 0.6, 0.7, 0.8, 0.9].forEach(v => s.append(sText(xs(v), Hh - 18, Math.round(v * 100) + '%', {'text-anchor': 'middle'})));
+  [0.5, 0.6, 0.7, 0.8, 0.9].forEach(v => s.append(sText(xs(v), Hh - 18, pct0(v), {'text-anchor': 'middle'})));
   s.append(sText((L + W - R) / 2, Hh - 3, 'stated confidence', {'text-anchor': 'middle'}));
   s.append(svg('line', {x1: xs(0.5), y1: ys(0.5), x2: xs(0.9), y2: ys(0.9), stroke: 'var(--axis)', 'stroke-width': 1, 'stroke-dasharray': '4 3'}));
   const clampY = v => ys(Math.max(lo, Math.min(hi, v)));
@@ -645,10 +645,10 @@ function reliabilityChart(){
     s.append(svg('line', {x1: cx, x2: cx, y1: clampY(r.wilson_lo), y2: clampY(r.wilson_hi), stroke: 'var(--call2)', 'stroke-width': 2, 'stroke-linecap': 'round'}));
     s.append(svg('circle', {cx: cx, cy: clampY(r.hit_rate), r: 5, fill: 'var(--call2)', stroke: 'var(--surface)', 'stroke-width': 2}));
     const hb = svg('circle', {cx: cx, cy: clampY(r.hit_rate), r: 13, fill: 'transparent'}); s.append(hb);
-    hover(hb, () => [['Confidence ' + r.bin.replace('-', ' to ')], ['stated (mean)', Math.round(r.mean_conf * 100) + '%'], ['right', Math.round(r.hit_rate * 100) + '%'], ['95% range', Math.round(r.wilson_lo * 100) + '% to ' + Math.round(r.wilson_hi * 100) + '%'], ['checked calls', String(r.n)]]);
+    hover(hb, () => [['Confidence ' + r.bin.replace('-', ' to ')], ['stated (mean)', pct0(r.mean_conf)], ['right', pct0(r.hit_rate)], ['95% range', pct0(r.wilson_lo) + ' to ' + pct0(r.wilson_hi)], ['checked calls', String(r.n)]]);
   });
   box.append(s);
-  box.append(tableView(['Confidence', 'Stated', 'Right', '95% range', 'Checked'], rows.map(r => [r.bin, Math.round(r.mean_conf * 100) + '%', Math.round(r.hit_rate * 100) + '%', Math.round(r.wilson_lo * 100) + '% to ' + Math.round(r.wilson_hi * 100) + '%', String(r.n)])));
+  box.append(tableView(['Confidence', 'Stated', 'Right', '95% range', 'Checked'], rows.map(r => [r.bin, pct0(r.mean_conf), pct0(r.hit_rate), pct0(r.wilson_lo) + ' to ' + pct0(r.wilson_hi), String(r.n)])));
   return box;
 }
 
@@ -667,7 +667,7 @@ function card(c){
   const top = el('div', {class: 'row'});
   const name = el('h3', null, c.name); name.append(el('span', {class: 'tk'}, c.ticker));
   const calls = c.calls;
-  const pill = calls.length ? el('span', {class: 'pill ' + calls[0].direction}, (calls[0].direction === 'up' ? '▲ Up' : '▼ Down') + ' call, ' + Math.round(calls[0].confidence * 100) + '% confidence')
+  const pill = calls.length ? el('span', {class: 'pill ' + calls[0].direction}, (calls[0].direction === 'up' ? '▲ Up' : '▼ Down') + ' call, ' + pct0(calls[0].confidence) + ' confidence')
     : el('span', {class: 'pill'}, 'No call');
   top.append(name, pill);
   const p = el('div', {class: 'price'});
@@ -687,7 +687,7 @@ function card(c){
       } else {
         const m = el('div', {class: 'main'}); m.append(document.createTextNode('80% chance between '), el('b', null, fmtMoney(r.lo80)), document.createTextNode(' and '), el('b', null, fmtMoney(r.hi80)));
         d.append(m, el('div', {class: 'second'}, '50% chance between ' + fmtMoney(r.lo50) + ' and ' + fmtMoney(r.hi50) + '.' +
-          (r.direction ? ' Call: ' + r.direction + ', ' + Math.round(r.confidence * 100) + '% confidence.' : ' No up/down call.')));
+          (r.direction ? ' Call: ' + r.direction + ', ' + pct0(r.confidence) + ' confidence.' : ' No up/down call.')));
       }
       a.append(d);
     });

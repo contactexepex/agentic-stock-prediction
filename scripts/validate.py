@@ -282,7 +282,7 @@ def check_bars(res: Result, cfg: dict, con, st: dict, vc: dict):
                  + ", ".join(f"{k} {last[k]}" for k in stale) + ")", stale)
     # close > 0 on recent bars; big 1-day moves
     since = need - timedelta(days=14)
-    bad = con.execute("SELECT DISTINCT ticker FROM prices WHERE date >= ? AND (close IS NULL OR close <= 0)",
+    bad = con.execute("SELECT DISTINCT ticker FROM prices WHERE date >= ? AND (close IS NULL OR close <= 0) ORDER BY 1",
                       [since]).fetchall()
     if bad:
         res.block("BAD_CLOSE", f"close missing or <= 0 on a bar since {since}", [b[0] for b in bad])
@@ -545,7 +545,7 @@ def evidence_times(con) -> dict:
     for sql in ("SELECT id, coalesce(published_at, first_seen_at) FROM news",
                 "SELECT id, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ), first_seen_at) FROM filings",
                 "SELECT id, coalesce(published_at, first_seen_at) FROM announcements"):
-        for i, t in con.execute(sql).fetchall():
+        for i, t in con.execute(f"SELECT * FROM ({sql}) ORDER BY 1, 2").fetchall():   # per id the earliest wins
             out.setdefault(i, ts(t))
     return out
 
