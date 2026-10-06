@@ -1,4 +1,5 @@
 """The run's clock (MB_NOW freezes it) and the frozen-clock DuckDB connection."""
+
 from __future__ import annotations
 
 import os
@@ -10,9 +11,13 @@ import duckdb
 from marketbrief.constants.environment import ENV_NOW
 from marketbrief.constants.messages import MSG_MB_NOW_NEEDS_OFFSET
 
-_CLOCK_SQL = [(re.compile(r"\bcurrent_date\b(\s*\(\s*\))?", re.I), "DATE '{d}'"),
-              (re.compile(r"\b(?:now|get_current_timestamp|current_timestamp)\s*\(\s*\)|\bcurrent_timestamp\b", re.I),
-               "TIMESTAMPTZ '{t}'")]
+_CLOCK_SQL = [
+    (re.compile(r"\bcurrent_date\b(\s*\(\s*\))?", re.I), "DATE '{d}'"),
+    (
+        re.compile(r"\b(?:now|get_current_timestamp|current_timestamp)\s*\(\s*\)|\bcurrent_timestamp\b", re.I),
+        "TIMESTAMPTZ '{t}'",
+    ),
+]
 
 
 def clock() -> datetime:
@@ -38,10 +43,10 @@ def utc_today() -> date:
     return clock().date()
 
 
-def freeze_sql(sql: str, at: datetime) -> str:
+def freeze_sql(sql: str, frozen_time: datetime) -> str:
     """SQL with DuckDB's clock functions replaced by the literal time `at` (UTC)."""
     for pattern, literal in _CLOCK_SQL:
-        sql = pattern.sub(literal.format(d=at.date().isoformat(), t=at.isoformat()), sql)
+        sql = pattern.sub(literal.format(d=frozen_time.date().isoformat(), t=frozen_time.isoformat()), sql)
     return sql
 
 
@@ -49,8 +54,9 @@ class FrozenClockConnection:
     """A DuckDB connection whose SQL sees `at` as the current date and time (MB_NOW). Every other
     attribute is the wrapped connection's; execute() returns that connection, as DuckDB's does."""
 
-    def __init__(self, con: duckdb.DuckDBPyConnection, at: datetime):
-        self._con, self._at = con, at
+    def __init__(self, con: duckdb.DuckDBPyConnection, frozen_time: datetime):
+        """Wrap the connection and the frozen time."""
+        self._con, self._at = con, frozen_time
 
     def execute(self, query: str, *args, **kwargs):
         """Run the query with the clock frozen."""
@@ -61,4 +67,5 @@ class FrozenClockConnection:
         return self._con.sql(freeze_sql(query, self._at), *args, **kwargs)
 
     def __getattr__(self, name):
+        """Every other attribute comes from the wrapped connection."""
         return getattr(self._con, name)

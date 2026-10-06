@@ -26,10 +26,10 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.storage import append_jsonl  # noqa: E402
 from marketbrief.utils.markdown import cursor_markdown_table  # noqa: E402
-import context  # noqa: E402
+from marketbrief.pipeline import context  # noqa: E402
 import html_report  # noqa: E402
-import report  # noqa: E402
-import score_predictions  # noqa: E402
+from marketbrief.presentation.report import gather, report_parts  # noqa: E402
+from marketbrief.pipeline import score_predictions  # noqa: E402
 from marketbrief.analytics import scoring  # noqa: E402
 from marketbrief.analytics import smart_money  # noqa: E402
 import view_data  # noqa: E402
@@ -167,8 +167,8 @@ def test_context_sections(cons):
 
 
 def test_report_queries(cons):
-    stable(cons, rows(report.CONF_BANDS_SQL))
-    stable(cons, rows(report.SCORECARD_SQL))
+    stable(cons, rows(view_data.CONF_BANDS_SQL))
+    stable(cons, rows(gather.SCORECARD_SQL))
 
 
 def test_views_insider_flow_and_split_factors(cons):
@@ -185,7 +185,7 @@ def test_percent_half_up_same_in_markdown_and_html():
     """The md report (scoring.percent) and the HTML report's JavaScript (pct0) print the same whole
     percent for every share, half up on its decimal value (0.625 and 5/8 -> 63%)."""
     assert scoring.percent(0.625) == scoring.percent(5 / 8) == "63%"
-    assert report.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
+    assert report_parts.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
     assert view_data.record_text(80, 50, "calls").endswith("(63%).")   # 50/80 = 0.625
     node = shutil.which("node")
     if not node:
@@ -212,11 +212,13 @@ def test_no_half_to_even_percent_format_left():
     """Every printed share uses scoring.percent (half up): no Python ':.0%' format remains in scripts/,
     and the weekly review prints 0.625 and 5/8 as 63% like the daily report."""
     import re
-    import review
+    from marketbrief.pipeline.review import markdown_cells
+    from marketbrief.pipeline.review import summaries
     scripts = Path(scoring.__file__).parent
     hits = [f"{p.relative_to(scripts)}:{i}" for p in sorted(scripts.rglob("*.py"))
             for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r"\{[^}]*:[+ ]?\.(0|\{[^}]+\})%\}", line)]
     assert hits == []
-    assert review.band_label(0.625, 5 / 8) == "63%-63%" and review.fpct(0.625) == review.fpct(5 / 8) == "63%"
+    assert summaries.band_label(0.625, 5 / 8) == "63%-63%"
+    assert markdown_cells.fpct(0.625) == markdown_cells.fpct(5 / 8) == "63%"
     assert scoring.percent(0.125, sign=True) == "+13%" and scoring.percent(float("inf")) == "–"
     assert scoring.percent(0.625, 1) == "62.5%" and scoring.percent(None) == "–"

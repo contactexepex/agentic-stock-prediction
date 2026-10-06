@@ -1,5 +1,6 @@
 """NSE part of the events collector (India): past results releases from the NSE results filings, polled only for
 tickers that are due (see nse_due), dated and timed by the filings and refined by the results announcements."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -8,15 +9,31 @@ import pandas as pd
 
 from marketbrief.collectors.event_timing import timing
 from marketbrief.constants.columns import COL_DATE, COL_SOURCE, COL_TICKER, COL_TYPE
-from marketbrief.constants.events import (ANNUAL_QUARTER_MONTH, EVENT_EARNINGS, HISTORY_SUFFIX,
-                                          LATE_FILING_DAYS_ANNUAL, LATE_FILING_DAYS_QUARTERLY,
-                                          MSG_INTEGRATED_LIST_PARTIAL, MSG_LATE_QUARTERS, NEAR_DAYS,
-                                          NSE_ENDPOINT_ANNOUNCEMENTS, NSE_ENDPOINT_FINANCIAL,
-                                          NSE_ENDPOINT_INTEGRATED, NSE_FIELDS_ANNOUNCED, NSE_FIELDS_BROADCAST,
-                                          NSE_FIELDS_FINANCIAL_BROADCAST, NSE_FIELDS_FINANCIAL_TO,
-                                          NSE_FIELDS_QUARTER_END, NSE_INTEGRATED_TYPE, NSE_SOURCE_PREFIX,
-                                          NSE_STALE_DAYS, PRIORITY_FILING, RELEASE_WINDOW_HOURS,
-                                          RESULTS_ANNOUNCEMENTS, SOURCE_NSE_HISTORY)
+from marketbrief.constants.events import (
+    ANNUAL_QUARTER_MONTH,
+    EVENT_EARNINGS,
+    HISTORY_SUFFIX,
+    LATE_FILING_DAYS_ANNUAL,
+    LATE_FILING_DAYS_QUARTERLY,
+    MSG_INTEGRATED_LIST_PARTIAL,
+    MSG_LATE_QUARTERS,
+    NEAR_DAYS,
+    NSE_ENDPOINT_ANNOUNCEMENTS,
+    NSE_ENDPOINT_FINANCIAL,
+    NSE_ENDPOINT_INTEGRATED,
+    NSE_FIELDS_ANNOUNCED,
+    NSE_FIELDS_BROADCAST,
+    NSE_FIELDS_FINANCIAL_BROADCAST,
+    NSE_FIELDS_FINANCIAL_TO,
+    NSE_FIELDS_QUARTER_END,
+    NSE_INTEGRATED_TYPE,
+    NSE_SOURCE_PREFIX,
+    NSE_STALE_DAYS,
+    PRIORITY_FILING,
+    RELEASE_WINDOW_HOURS,
+    RESULTS_ANNOUNCEMENTS,
+    SOURCE_NSE_HISTORY,
+)
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_client import Nse
 from marketbrief.sources.nse_parsing import IST, nse_symbols, parse_day, parse_ts, pick, rows_of
@@ -36,33 +53,40 @@ def nse_results_filings(nse: Nse, symbol: str, backfill: bool) -> tuple[list[tup
     Integrated Filing (Financials), used from the March 2025 quarter on, and, when backfilling,
     the older financial-results list (quarters to December 2024). Returns (filings, notes)."""
     notes = []
-    payload = nse.json(NSE_ENDPOINT_INTEGRATED, {"index": "equities", "symbol": symbol,
-                                                 "type": NSE_INTEGRATED_TYPE})
+    payload = nse.json(NSE_ENDPOINT_INTEGRATED, {"index": "equities", "symbol": symbol, "type": NSE_INTEGRATED_TYPE})
     rows = rows_of(payload)
     total = payload.get("totalCount") if isinstance(payload, dict) else None
     if isinstance(total, int) and total > len(rows):
         notes.append(MSG_INTEGRATED_LIST_PARTIAL.format(symbol=symbol, rows=len(rows), total=total))
-    found = [(parse_day(pick(r, NSE_FIELDS_QUARTER_END)), parse_ts(pick(r, *NSE_FIELDS_BROADCAST))) for r in rows]
+    found = [(parse_day(pick(row, NSE_FIELDS_QUARTER_END)), parse_ts(pick(row, *NSE_FIELDS_BROADCAST))) for row in rows]
     if backfill:
-        rows = rows_of(nse.json(NSE_ENDPOINT_FINANCIAL, {"index": "equities", "period": "Quarterly",
-                                                          "symbol": symbol}))
-        found += [(parse_day(pick(r, NSE_FIELDS_FINANCIAL_TO)), parse_ts(pick(r, *NSE_FIELDS_FINANCIAL_BROADCAST)))
-                  for r in rows]
+        rows = rows_of(nse.json(NSE_ENDPOINT_FINANCIAL, {"index": "equities", "period": "Quarterly", "symbol": symbol}))
+        found += [
+            (parse_day(pick(row, NSE_FIELDS_FINANCIAL_TO)), parse_ts(pick(row, *NSE_FIELDS_FINANCIAL_BROADCAST)))
+            for row in rows
+        ]
     return [(period_end, stamp) for period_end, stamp in found if period_end and stamp], notes
 
 
 def nse_release_times(nse: Nse, symbol: str, start: date, today: date) -> list[datetime]:
     """Times (UTC) of the symbol's results-type announcements (board meeting outcome, results
     PDF) from start to today: the first public release, usually before the XBRL filing."""
-    rows = rows_of(nse.json(NSE_ENDPOINT_ANNOUNCEMENTS, {"index": "equities", "symbol": symbol,
-                                                         "from_date": f"{start:%d-%m-%Y}",
-                                                         "to_date": f"{today:%d-%m-%Y}"}))
-    return [stamp for r in rows if pick(r, "desc") in RESULTS_ANNOUNCEMENTS
-            and (stamp := parse_ts(pick(r, *NSE_FIELDS_ANNOUNCED)))]
+    rows = rows_of(
+        nse.json(
+            NSE_ENDPOINT_ANNOUNCEMENTS,
+            {"index": "equities", "symbol": symbol, "from_date": f"{start:%d-%m-%Y}", "to_date": f"{today:%d-%m-%Y}"},
+        )
+    )
+    return [
+        stamp
+        for row in rows
+        if pick(row, "desc") in RESULTS_ANNOUNCEMENTS and (stamp := parse_ts(pick(row, *NSE_FIELDS_ANNOUNCED)))
+    ]
 
 
-def nse_reports(cfg: dict, filings: list[tuple[date, datetime]], releases: list[datetime],
-                after: date | None = None) -> tuple[list[tuple[date, str | None, int]], int]:
+def nse_reports(
+    cfg: dict, filings: list[tuple[date, datetime]], releases: list[datetime], after: date | None = None
+) -> tuple[list[tuple[date, str | None, int]], int]:
     """One (date, timing, priority 0) per reported quarter: the earliest filing for the period
     end (standalone or consolidated, original or revised), moved earlier to a results
     announcement up to RELEASE_WINDOW before it. Only quarters first filed after `after` (IST).
@@ -78,7 +102,9 @@ def nse_reports(cfg: dict, filings: list[tuple[date, datetime]], releases: list[
         if not 0 < (filed - period_end).days <= max_filing_lag(period_end):
             late += 1
             continue
-        release = min([a for a in releases if stamp - RELEASE_WINDOW <= a <= stamp] + [stamp])
+        release = min(
+            [announcement for announcement in releases if stamp - RELEASE_WINDOW <= announcement <= stamp] + [stamp]
+        )
         day, when = timing(cfg, pd.Timestamp(release))
         found.append((day, when, PRIORITY_FILING))
     return found, late
@@ -107,13 +133,15 @@ def nse_due(stored: list[dict], tickers: list[str], today: date) -> dict[str, da
         if ticker not in has_nse:
             due[ticker] = None
         elif (today - last[ticker]).days >= NSE_STALE_DAYS or any(
-                last[ticker] + timedelta(days=NEAR_DAYS) < d <= today for d in known.get(ticker, [])):
+            last[ticker] + timedelta(days=NEAR_DAYS) < known_day <= today for known_day in known.get(ticker, [])
+        ):
             due[ticker] = last[ticker]
     return due
 
 
-def nse_ticker_rows(cfg: dict, nse: Nse, symbol: str, last: date | None, window: tuple[date, date],
-                    notes: list[str]) -> tuple[list[tuple[date, str | None, int]], int]:
+def nse_ticker_rows(
+    cfg: dict, nse: Nse, symbol: str, last: date | None, window: tuple[date, date], notes: list[str]
+) -> tuple[list[tuple[date, str | None, int]], int]:
     """(rows, quarters filed late) of one ticker's NSE results, with the filings' notes added to `notes` as soon
     as they are known: a backfill (last is None) reaches back to `since`; a ticker with stored history only takes
     quarters filed more than NEAR_DAYS after its newest date. `window` = (since, today)."""
@@ -123,13 +151,13 @@ def nse_ticker_rows(cfg: dict, nse: Nse, symbol: str, last: date | None, window:
     notes += filing_notes
     filings = [(period_end, stamp) for period_end, stamp in filings if stamp.astimezone(IST).date() >= since]
     new = [stamp for _, stamp in filings if after is None or stamp.astimezone(IST).date() > after]
-    releases = (nse_release_times(nse, symbol, min(new).astimezone(IST).date() - timedelta(days=2), today)
-                if new else [])
+    releases = nse_release_times(nse, symbol, min(new).astimezone(IST).date() - timedelta(days=2), today) if new else []
     return nse_reports(cfg, filings, releases, after)
 
 
-def nse_earnings(cfg: dict, nse: Nse, due: dict[str, date | None], since: date,
-                 today: date) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict], list[str]]:
+def nse_earnings(
+    cfg: dict, nse: Nse, due: dict[str, date | None], since: date, today: date
+) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict], list[str]]:
     """Past results releases from NSE for the due tickers (see nse_due), dated and timed by the
     results filings and refined by the results announcements. Returns (rows per ticker, failures, notes);
     a host the egress proxy refuses stops the remaining calls."""

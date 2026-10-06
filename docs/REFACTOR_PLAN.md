@@ -178,7 +178,9 @@ The recorded set (manifest with hashes and exit codes plus a full copy of every 
 diffs) lives in `work/golden/` (git-ignored). Committed are only `tests/golden/golden.py` (steps,
 runner, hashing, record/compare), `tests/golden/parallel.py` (the parallel schedule and the merge),
 `tests/golden/overlay.py` (synthetic inputs), `tests/golden/seed.py` and
-`tests/golden/seed_sources.py` (seeded kinds) and `tests/golden/site/sitecustomize.py`.
+`tests/golden/seed_sources.py` (seeded kinds), `tests/golden/seed_fixtures.py` (the fixture maps, configs and
+rule-built rows `seed.py` runs) and, for the offline collector seeds, `seed_collectors.py` with `seed_common.py`,
+`seed_yahoo.py` and `seed_feeds.py` (all under 350 lines), and `tests/golden/site/sitecustomize.py`.
 Evidence (2026-10-06, harness at bef503b): `record` then two `compare` runs, both
 `"identical": true` over 1621 files with a clean network log; a deliberate change in a seeded module
 (`macro_context`: basis-point changes printed with one decimal) made `compare` fail on the US context
@@ -556,6 +558,35 @@ golden root. Step 4 moved the formulas and the range and news analytics into `ma
 `calibration`, `range_publication`, ...); `scripts/features.py`, `calibrate.py`, `ranges.py`, `relations.py`
 and `news_clusters.py` are thin entry points. Removed from the allow-list: collect_prices.py,
 collect_events.py, news_verify.py, news_clusters.py, range_inputs.py.
+
+Accepted exception, batch 4 (steps 3-4, judged at fcd8ac5, judgments/log.jsonl): its golden `compare` against its base
+listed 6 differing files, all text-only (comments and module names printed in outputs); the judge accepted them with
+each file shown line by line. From batch 5a on the compare is `"identical": true`, or each differing file is shown
+line by line as text-only, and nothing else is accepted.
+
+Status of steps 5, 6 and 8: built as one batch (build/refactor-batch5a), without the presentation layer. Step 5 moved
+the daily-run steps into `marketbrief/pipeline/`: `validate/` (gate_result, row_checks, collect_checks, news_checks,
+report_checks, stages, cli), `review/` (helpers, summaries, live_ablation, history_ablation, verdicts, aci_review,
+markdown_cells, markdown_sections, markdown_sections_scores, markdown, cli), `lessons/` (facts, validation,
+context_section, cli) and the single-file `context`, `score_predictions`, `spotcheck`, `market_status`. Step 6 moved
+`replay/backtest/` (observations, evaluation, report, cli), `replay/rule_replay/` (inputs, range_rows with the
+`HorizonReplay` class, replay_statistics, narrative, aci_compare, rule_charts, rule_html, cli), `replay/ai_replay/`
+(cutoff, copy_asof, roots, evidence, prepare, backfill, record, score_stats, summaries, ai_html, score, cli) and the
+shared `replay/html_parts.py`. Step 8 moved `graph/` (`connection_map`, `news_hits`, `cli`, `neo4j/` with connection,
+cypher, statements, shapes, kinds, sync, cli). `report.py` went to `presentation/report/` (formatting, gather,
+report_parts, report_text, slack_text, build, cli) because it was in the batch's list; the rest of step 7
+(`html_report.py`, `view_data.py`, `charts.py`, `notify_slack.py`, `narrative_numbers.py`) is untouched and
+`html_report.py` is the only entry left in the size allow-list. Removed from the allow-list: ai_replay.py,
+replay.py, review.py, neo4j_sync.py, validate.py, lessons.py, report.py, backtest.py. Every `scripts/<name>.py` of
+these is a thin entry point with the same flags and byte-identical `--help`. Constants and every exception and
+gate/log message of the moved code are in `marketbrief/constants/` (lessons, validation, review, connection_map,
+neo4j, ai_replay, replay, replay_page, backtest, report, pipeline_messages); the local one-letter names of the moved
+code are full names; the only short module alias left under `scripts/` is `ev` in the untouched `view_data.py`.
+Also in this batch: the CLAUDE.md rule 4 command (`from marketbrief.core.database import connect`), the stale
+`scripts/common.py` schema paths in the docs and agent files (news-analyst bumped to news-v9, reflector to reflect-v2),
+and `tests/test_doc_commands.py`, which runs every `python -c` snippet and every `python scripts/<name>.py` command
+of CLAUDE.md, routine/PROMPT.md and the agent files (`--help` for the scripts), so a moved module cannot break the
+daily run's commands silently.
 
 Proof required for every step 1-8 (all four, given to the judge with the commands' output):
 1. golden: `record` on the step's base commit, `compare` on the step's commit -> `"identical": true`;

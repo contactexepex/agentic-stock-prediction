@@ -9,6 +9,7 @@ expiry). Quotes with no bid or an implausible IV are ignored. Append-only: id
 <date>-<ticker>-<expiry> is written once per UTC day. ranges.py blends `atm_iv` into the width
 (docs/DESIGN.md section 4). A ticker that ends with no snapshot today (Yahoo returned no expiries,
 none in the window, or no usable chain) is listed in `failed` with the reason."""
+
 from __future__ import annotations
 
 import json
@@ -20,10 +21,23 @@ import pandas as pd
 from marketbrief.constants.columns import COL_ID, COL_TICKER
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_OPTIONS, CFG_TICKERS, META_YAHOO, OPTIONS_YFINANCE
 from marketbrief.constants.kinds import KIND_OPTIONS
-from marketbrief.constants.options import (COLLECTOR_OPTIONS, DEFAULT_EXPIRIES, DEFAULT_MAX_DAYS, ERROR_TEXT_LIMIT,
-                                           MAX_IV, MIN_IV, MIN_QUOTED_STRIKES, MSG_NO_EXPIRIES, MSG_NO_EXPIRY_IN_WINDOW,
-                                           MSG_NO_USABLE_CHAIN, MSG_SKIPPED_NO_CHAINS, OPTION_COLUMNS,
-                                           SEEN_LOOKBACK_DAYS, SNAPSHOT_DECIMALS, SOURCE_YFINANCE)
+from marketbrief.constants.options import (
+    COLLECTOR_OPTIONS,
+    DEFAULT_EXPIRIES,
+    DEFAULT_MAX_DAYS,
+    ERROR_TEXT_LIMIT,
+    MAX_IV,
+    MIN_IV,
+    MIN_QUOTED_STRIKES,
+    MSG_NO_EXPIRIES,
+    MSG_NO_EXPIRY_IN_WINDOW,
+    MSG_NO_USABLE_CHAIN,
+    MSG_SKIPPED_NO_CHAINS,
+    OPTION_COLUMNS,
+    SEEN_LOOKBACK_DAYS,
+    SNAPSHOT_DECIMALS,
+    SOURCE_YFINANCE,
+)
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_SKIPPED
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -90,9 +104,15 @@ def option_snapshot(calls: pd.DataFrame, puts: pd.DataFrame, spot: float) -> dic
     if not ivs or not spot or spot <= 0:
         return None
     strike, straddle_price = straddle(calls, puts, spot)
-    return {"spot": rounded(spot, 4), "strike": strike, "call_iv": rounded(call_iv), "put_iv": rounded(put_iv),
-            "atm_iv": rounded(sum(ivs) / len(ivs)), "straddle": rounded(straddle_price, 4),
-            "straddle_pct": rounded(straddle_price / spot) if straddle_price else None}
+    return {
+        "spot": rounded(spot, 4),
+        "strike": strike,
+        "call_iv": rounded(call_iv),
+        "put_iv": rounded(put_iv),
+        "atm_iv": rounded(sum(ivs) / len(ivs)),
+        "straddle": rounded(straddle_price, 4),
+        "straddle_pct": rounded(straddle_price / spot) if straddle_price else None,
+    }
 
 
 def no_chain_reason(listed: bool, expiries: list[str], max_days: int) -> str:
@@ -108,8 +128,9 @@ def no_chain_reason(listed: bool, expiries: list[str], max_days: int) -> str:
 class OptionsCollector:
     """One run: a snapshot per near expiry of every watchlist ticker."""
 
-    def __init__(self, cfg: dict, yf, expiries: int, max_days: int):
-        self.cfg, self.yf, self.expiries, self.max_days = cfg, yf, expiries, max_days
+    def __init__(self, cfg: dict, yfinance, expiries: int, max_days: int):
+        """The option collector's config, Yahoo client and limits."""
+        self.cfg, self.yfinance, self.expiries, self.max_days = cfg, yfinance, expiries, max_days
         self.market, self.now, self.today = cfg[CFG_MARKET], utc_now(), utc_today()
         self.seen = recent_ids(self.market, KIND_OPTIONS, days=SEEN_LOOKBACK_DAYS)
         self.rows: list[dict] = []
@@ -118,7 +139,7 @@ class OptionsCollector:
     def snapshot_expiry(self, key: str, ticker, expiry: str) -> bool:
         """Snapshot one expiry; True when it is stored (now or earlier today)."""
         option_id = f"{self.today}-{key}-{expiry}"
-        if option_id in self.seen:          # already snapshotted today
+        if option_id in self.seen:  # already snapshotted today
             return True
         chain = ticker.option_chain(expiry)
         underlying = getattr(chain, "underlying", None) or {}
@@ -126,19 +147,31 @@ class OptionsCollector:
         snapshot = option_snapshot(chain.calls, chain.puts, float(spot))
         if snapshot is None:
             return False
-        self.rows.append({COL_ID: option_id, COL_TICKER: key, "collected_at": self.now, "expiry": expiry,
-                          "days_to_expiry": (date.fromisoformat(expiry) - self.today).days, **snapshot,
-                          "source": SOURCE_YFINANCE})
+        self.rows.append(
+            {
+                COL_ID: option_id,
+                COL_TICKER: key,
+                "collected_at": self.now,
+                "expiry": expiry,
+                "days_to_expiry": (date.fromisoformat(expiry) - self.today).days,
+                **snapshot,
+                "source": SOURCE_YFINANCE,
+            }
+        )
         self.seen.add(option_id)
         return True
 
     def collect_ticker(self, key: str, meta: dict) -> None:
         """Snapshot the near expiries of one ticker; a ticker without any is a failure."""
         try:
-            ticker = self.yf.Ticker(meta[META_YAHOO])
-            expiries = [e for e in ticker.options if 1 <= (date.fromisoformat(e) - self.today).days <= self.max_days]
-            listed = bool(ticker.options)   # () when Yahoo's answer has no option result
-            stored = sum(self.snapshot_expiry(key, ticker, expiry) for expiry in expiries[:self.expiries])
+            ticker = self.yfinance.Ticker(meta[META_YAHOO])
+            expiries = [
+                listed_expiry
+                for listed_expiry in ticker.options
+                if 1 <= (date.fromisoformat(listed_expiry) - self.today).days <= self.max_days
+            ]
+            listed = bool(ticker.options)  # () when Yahoo's answer has no option result
+            stored = sum(self.snapshot_expiry(key, ticker, expiry) for expiry in expiries[: self.expiries])
             if not stored:
                 self.failed.append({COL_TICKER: key, "error": no_chain_reason(listed, expiries, self.max_days)})
         except Exception as exc:
@@ -149,25 +182,49 @@ class OptionsCollector:
         for key, meta in self.cfg[CFG_TICKERS].items():
             self.collect_ticker(key, meta)
         written = append_jsonl(day_file(self.market, KIND_OPTIONS, self.today), self.rows)
-        print(json.dumps({SUMMARY_COLLECTOR: COLLECTOR_OPTIONS, SUMMARY_MARKET: self.market, "written": written,
-                          "tickers": len({row[COL_TICKER] for row in self.rows}), SUMMARY_FAILED: self.failed},
-                         indent=2))
+        print(
+            json.dumps(
+                {
+                    SUMMARY_COLLECTOR: COLLECTOR_OPTIONS,
+                    SUMMARY_MARKET: self.market,
+                    "written": written,
+                    "tickers": len({row[COL_TICKER] for row in self.rows}),
+                    SUMMARY_FAILED: self.failed,
+                },
+                indent=2,
+            )
+        )
         return 1 if self.failed and len(self.failed) == len(self.cfg[CFG_TICKERS]) else 0
 
 
 def main() -> int:
     """Entry point of scripts/collect_options.py."""
     parser = market_arg(__doc__)
-    parser.add_argument("--expiries", type=int, default=DEFAULT_EXPIRIES,
-                        help=f"nearest expiries per ticker (default {DEFAULT_EXPIRIES})")
-    parser.add_argument("--max-days", type=int, default=DEFAULT_MAX_DAYS,
-                        help=f"ignore expiries further out (default {DEFAULT_MAX_DAYS})")
+    parser.add_argument(
+        "--expiries",
+        type=int,
+        default=DEFAULT_EXPIRIES,
+        help=f"nearest expiries per ticker (default {DEFAULT_EXPIRIES})",
+    )
+    parser.add_argument(
+        "--max-days",
+        type=int,
+        default=DEFAULT_MAX_DAYS,
+        help=f"ignore expiries further out (default {DEFAULT_MAX_DAYS})",
+    )
     args = parser.parse_args()
     cfg = require_market(args)
     if cfg.get(CFG_OPTIONS) != OPTIONS_YFINANCE:
-        print(json.dumps({SUMMARY_COLLECTOR: COLLECTOR_OPTIONS, SUMMARY_MARKET: cfg[CFG_MARKET],
-                          SUMMARY_SKIPPED: MSG_SKIPPED_NO_CHAINS}))
+        print(
+            json.dumps(
+                {
+                    SUMMARY_COLLECTOR: COLLECTOR_OPTIONS,
+                    SUMMARY_MARKET: cfg[CFG_MARKET],
+                    SUMMARY_SKIPPED: MSG_SKIPPED_NO_CHAINS,
+                }
+            )
+        )
         return 0
-    import yfinance as yf
+    import yfinance
 
-    return OptionsCollector(cfg, yf, args.expiries, args.max_days).collect()
+    return OptionsCollector(cfg, yfinance, args.expiries, args.max_days).collect()

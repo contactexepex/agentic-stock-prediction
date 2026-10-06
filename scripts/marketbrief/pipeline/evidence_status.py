@@ -5,6 +5,7 @@
   confirmed_primary (news_verified_asof). Any other filing or announcement (another ticker's, or one
   that confirms no event, e.g. a Form 4 or a share allotment) is unverified;
 - an id no row lists, or any id before the feature existed, is unverified."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -29,16 +30,18 @@ class EvidenceStatuses:
     """Status lookups on one DuckDB connection, cached per time."""
 
     def __init__(self, con):
+        """Keep the connection and an empty per-time cache."""
         self.con = con
         self._by_time: dict[str, tuple[dict[str, dict[str, str]], set[tuple[str, str]]]] = {}
 
     def _tables(self, when) -> tuple[dict[str, dict[str, str]], set[tuple[str, str]]]:
+        """The status table and the confirming (id, ticker) pairs as of a time, cached."""
         key = instant(when)
         if key not in self._by_time:
             table: dict[str, dict[str, str]] = {}
             for news_id, ticker, status in self.con.execute(IDS_SQL, [key]).fetchall():
                 table.setdefault(news_id, {})[ticker] = status
-            confirming = {(p, t) for p, t in self.con.execute(CONFIRMING_SQL, [key]).fetchall()}
+            confirming = {(news_id, ticker) for news_id, ticker in self.con.execute(CONFIRMING_SQL, [key]).fetchall()}
             self._by_time[key] = (table, confirming)
         return self._by_time[key]
 

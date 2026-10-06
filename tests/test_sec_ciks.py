@@ -127,7 +127,7 @@ def strip(rs: list[dict]) -> list[dict]:
     return sorted(({k: v for k, v in r.items() if k != "first_seen_at"} for r in rs), key=lambda r: r["id"])
 
 
-# ---------- shared mechanism (sec.py) ----------
+# ---------- shared mechanism (marketbrief/sources/sec_client.py, sec_filings.py) ----------
 
 def test_related_ciks_reads_the_fundamentals_key():
     assert sec.related_ciks({"fundamentals": {"predecessor_ciks": {"xom": [34088], "ABC": 7}}}) == {"XOM": [34088], "ABC": [7]}

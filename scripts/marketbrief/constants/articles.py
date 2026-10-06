@@ -1,4 +1,5 @@
 """Constants and messages of article reading (news verification phase A): access outcomes, tiers, extractors."""
+
 METHOD_VERSION_ARTICLES = "nv-a1"
 
 ACCESS_FULL = "full"
@@ -12,9 +13,9 @@ ACCESS = (ACCESS_FULL, ACCESS_PARTIAL, ACCESS_PAYWALLED, ACCESS_BLOCKED, ACCESS_
 TIER_PRIMARY, TIER_1, TIER_2, TIER_UNLISTED = "primary", "tier1", "tier2", "unlisted"
 TIER_RANK = {TIER_PRIMARY: 0, TIER_1: 1, TIER_2: 2, TIER_UNLISTED: 3}
 
-NUM_PERM = 128            # MinHash permutations
-LEDE_SENTENCES = 3        # an attribution phrase counts as the origin only in this many first sentences
-SHINGLE = 6               # words per shingle
+NUM_PERM = 128  # MinHash permutations
+LEDE_SENTENCES = 3  # an attribution phrase counts as the origin only in this many first sentences
+SHINGLE = 6  # words per shingle
 KEY_SENTENCES = 3
 KEY_SENTENCE_WORDS = 40
 MIN_SENTENCE_WORDS = 6
@@ -53,3 +54,6 @@ MSG_FETCH_ERROR = "{kind}: {error_type}: {detail}"
 FETCH_ERROR_TLS, FETCH_ERROR_NETWORK = "tls", "network"
 FETCH_ERROR_TEXT_LIMIT = 160
 CONTENT_TYPE_TEXT_LIMIT = 40
+
+# ---------- article extraction ----------
+MSG_EXTRACTOR_ERROR = "{name}: {error_type}"

@@ -19,7 +19,7 @@ Method:
 1. List every requirement in the assignment and every factual claim in the report, one per
    line. Include the implicit rules: CLAUDE.md data rules (append-only `data/`, UTC
    timestamps, no information after `made_at`), prediction rules, schemas in
-   `scripts/common.py`, and "no data/, reports/ or summaries/ in build commits".
+   `scripts/marketbrief/core/schemas.py`, and "no data/, reports/ or summaries/ in build commits".
 2. Check each one yourself with a command or a file read, and record the evidence: the
    command and the relevant output, or `path:line`. Never accept the agent's numbers, test results
    or summaries as evidence. Be proportionate: verify every requirement, but re-run expensive steps
@@ -31,7 +31,8 @@ Method:
    - Outputs: missing files; record counts that differ from the input; duplicate or invalid
      ids; malformed JSONL.
    - Fabrication: evidence ids or numbers that do not exist in the data or the context pack
-     (reflector lessons: re-run `python scripts/lessons.py validate work/lessons.jsonl`).
+     (in a build review of the reflection log, re-run `python scripts/lessons.py validate` on the
+     file under review; daily lessons are gated by that command, not by the judge).
    - Code: stubs, TODOs, `pass`, hard-coded results, swallowed exceptions; features that are
      configured but never called.
    - Tests: tests that assert nothing, skip, or only test mocks of the code under test.

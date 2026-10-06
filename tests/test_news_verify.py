@@ -16,7 +16,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import ai_replay  # noqa: E402
+from marketbrief.replay.ai_replay import copy_asof  # noqa: E402
 from marketbrief.collectors import articles as collect_articles  # noqa: E402
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
@@ -25,7 +25,9 @@ from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.analytics import article_extraction, article_pages, cluster_items  # noqa: E402
 from marketbrief.analytics import news_clusters, news_sources, text_measures  # noqa: E402
 from marketbrief.sources import google_news_decoder  # noqa: E402
-import validate  # noqa: E402
+from marketbrief.pipeline.validate import gate_result  # noqa: E402
+from marketbrief.pipeline.validate import news_checks  # noqa: E402
+from marketbrief.pipeline.validate import row_checks  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "articles"
 URLS = {
@@ -383,9 +385,9 @@ def test_collect_articles(env, capsys, src):
     full_text = parse("bnn_chevron", src)["text"]
     assert len(json.dumps(rows["n01"])) < len(full_text) + 1500     # extract + numbers + 1024-hex signature
     now = pd.Timestamp(NOW)
-    assert validate.check_rows("news_articles", list(rows.values()), False, now, timedelta(minutes=5)) == []
-    res = validate.Result()
-    validate.check_articles(res, load_market(MARKET), date(2026, 10, 5))
+    assert row_checks.check_rows("news_articles", list(rows.values()), False, now, timedelta(minutes=5)) == []
+    res = gate_result.Result()
+    news_checks.check_articles(res, load_market(MARKET), date(2026, 10, 5))
     assert res.failures == [] and res.warnings == []
     # idempotent: a rerun writes nothing and requests nothing
     n_calls, n_lines = len(env.session.calls), len(env.rows("news_articles"))
@@ -399,8 +401,8 @@ def test_validate_flags_bad_article_rows(env, capsys):
     bad2 = {**env.rows("news_articles")[0], "id": "bad2", "access": "full", "http_status": 200,
             "final_url": "http://www.bnnbloomberg.ca/x"}
     env.write("news_articles", [bad, bad2])
-    res = validate.Result()
-    validate.check_articles(res, load_market(MARKET), date(2026, 10, 5))
+    res = gate_result.Result()
+    news_checks.check_articles(res, load_market(MARKET), date(2026, 10, 5))
     assert [w["code"] for w in res.warnings] == ["ARTICLE_ROWS"] and "2 news_articles rows" in res.warnings[0]["detail"]
 
 
@@ -455,7 +457,7 @@ def test_clusters_origins_duplicates_primaries(env, capsys):
     assert "promotional_provider" in tsla["flags"] and tsla["independent_origins"] == 0
     assert all(r["as_of"] == NOW and r["inputs_until"] <= NOW for r in rows)
     assert s["written"] == len(rows)
-    assert validate.check_rows("news_clusters", rows, False, pd.Timestamp(NOW), timedelta(minutes=5)) == []
+    assert row_checks.check_rows("news_clusters", rows, False, pd.Timestamp(NOW), timedelta(minutes=5)) == []
     # rerun at the same time: nothing changed, nothing appended
     assert env.run(news_clusters, capsys)["written"] == 0 and len(env.rows("news_clusters")) == len(rows)
 
@@ -530,10 +532,10 @@ def test_clusters_asof_has_no_lookahead(env, capsys):
 def test_ai_replay_filters_new_kinds_by_time():
     cutoff = pd.Timestamp("2026-10-06T12:15:00+00:00")
     d = date(2026, 10, 5)
-    assert ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:00:00+00:00"}, d, cutoff)
-    assert not ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:30:00+00:00"}, d, cutoff)
-    assert ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T12:00:00+00:00"}, d, cutoff)
-    assert not ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T13:00:00+00:00"}, d, cutoff)
+    assert copy_asof.keep_row("news_articles", {"fetched_at": "2026-10-06T12:00:00+00:00"}, d, cutoff)
+    assert not copy_asof.keep_row("news_articles", {"fetched_at": "2026-10-06T12:30:00+00:00"}, d, cutoff)
+    assert copy_asof.keep_row("news_clusters", {"as_of": "2026-10-06T12:00:00+00:00"}, d, cutoff)
+    assert not copy_asof.keep_row("news_clusters", {"as_of": "2026-10-06T13:00:00+00:00"}, d, cutoff)
 
 
 def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):

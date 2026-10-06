@@ -1,0 +1,125 @@
+"""Replay inputs as known at each as-of day: earnings versions, regimes, major dates, RSI series."""
+
+from __future__ import annotations
+
+import bisect
+from datetime import date, timedelta
+
+import numpy as np
+import pandas as pd
+
+from marketbrief.analytics import event_history, indicators, range_switches
+from marketbrief.analytics import regime as regime_rules
+from marketbrief.analytics.features import load_bars
+from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
+from marketbrief.core import calendar
+from marketbrief.core.market_config import benchmark_key, vol_index_key
+from marketbrief.replay.backtest import observations
+
+
+def known_versions(cfg: dict, versions: dict) -> dict:
+    """Shift each earnings version's start (a 10-Q/10-K acceptance date) to the last session before
+    it: ranges.py made pre-open on session S uses the reports accepted by S, so an as-of day (S = the next
+    session after it) sees the version once it is on or after that session. observations.input_columns then applies \
+it."""
+    return {
+        ticker: [
+            (None if start is None else calendar.prev_session(cfg, start, include=False), end)
+            for start, end in version_list
+        ]
+        for ticker, version_list in versions.items()
+    }
+
+
+def next_earnings(versions: list, as_of_day: date) -> date | None:
+    """The first earnings date after `as_of_day` in the version active pre-open the next session (the
+    historical stand-in for ranges.py's upcoming `company_events` date when earnings_history is off)."""
+    if not versions:
+        return None
+    starts = [date.min if start is None else start for start, _ in versions]
+    key = bisect.bisect_right(starts, as_of_day) - 1
+    if key < 0:
+        return None
+    dates = [earnings_day for earnings_day, _ in versions[key][1]]
+    position = bisect.bisect_right(dates, as_of_day)
+    return dates[position] if position < len(dates) else None
+
+
+def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
+    """Regime per as-of day as features.py computes it (closes stand in for pre-open vol quotes)."""
+    bench = bars[benchmark_key(cfg)]["close"]
+    vol_key = vol_index_key(cfg)
+    vol = bars[vol_key]["close"] if vol_key in bars else pd.Series(dtype=float)
+    vdates = [timestamp.date() for timestamp in vol.index]
+    bdates = [timestamp.date() for timestamp in bench.index]
+    market_events = calendar.market_events(cfg, days[0], days[-1] + timedelta(days=40)) if days else []
+    rows = []
+    for day in days:
+        position = bisect.bisect_right(bdates, day)
+        tail = bench.iloc[max(0, position - 31) : position]
+        vol_position = bisect.bisect_right(vdates, day)
+        vol_level = float(vol.iloc[vol_position - 1]) if vol_position >= 1 else None
+        previous_vol_level = float(vol.iloc[vol_position - 2]) if vol_position >= 2 else None
+        change = vol_level / previous_vol_level - 1 if vol_level is not None and previous_vol_level else None
+        session = calendar.next_session(cfg, day, include=False)
+        near = calendar.major_events_near(market_events, session)
+        return_5d, v10 = indicators.period_return(tail, 5), indicators.realized_vol(tail)
+        label, stress, _ = regime_rules.classify(cfg["regime"], vol_level, return_5d, v10, bool(near), change)
+        rows.append(
+            {
+                "date": day,
+                "regime": label,
+                "stress": stress,
+                "vol_level": vol_level,
+                "bench_ret_5d": return_5d,
+                "bench_vol_10d": v10,
+                "major_event": bool(near),
+            }
+        )
+    return pd.DataFrame(rows).set_index("date") if rows else pd.DataFrame()
+
+
+def major_dates(cfg: dict, start: date, end: date) -> list[date]:
+    """The dates of major market events in a period."""
+    return sorted({event["date"] for event in calendar.market_events(cfg, start, end) if event["major"]})
+
+
+def rsi_series(close: pd.Series, window: int = 14) -> pd.Series:
+    """indicators.rsi at every date (the same causal Wilder smoothing, so the value at a date equals
+    indicators.rsi of the closes up to it; tests/test_replay.py checks it)."""
+    diff = close.diff()
+    gain = diff.clip(lower=0).iloc[1:].ewm(alpha=1 / window, adjust=False).mean()
+    loss = (-diff.clip(upper=0)).iloc[1:].ewm(alpha=1 / window, adjust=False).mean()
+    out = 100 - 100 / (1 + gain / loss)
+    out = out.where(loss != 0, np.where(gain > 0, 100.0, 50.0))
+    out = out.reindex(close.index)
+    out.iloc[:window] = np.nan
+    return out
+
+
+def window_days(bench: pd.DataFrame, ranges_config: dict, start: date | None, end: date | None) -> list[date]:
+    """The as-of days of the replay window."""
+    session_days = [timestamp.date() for timestamp in bench.index]
+    first = session_days[min(ranges_config["warmup_bars"], len(session_days) - 1)] if session_days else None
+    first_day = max(start, first) if start else first
+    return [day for day in session_days if first_day and day >= first_day and (end is None or day <= end)]
+
+
+def load_inputs(cfg: dict, ranges_config: dict, con) -> tuple[dict, dict]:
+    """The bars and the earnings, dividend and index-cue inputs of the replay."""
+    bars = load_bars(con)
+    bench = bars.get(benchmark_key(cfg))
+    if bench is None or bench.empty:
+        raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
+    events_frame = event_history.load_events(con)
+    extra = {
+        "earnings": known_versions(cfg, event_history.earnings_versions(events_frame))
+        if not events_frame.empty
+        else {},
+        "dividends": event_history.dividend_events(events_frame) if not events_frame.empty else {},
+        "bench": bench,
+        "index_cue": observations.index_cue_series(cfg, bars, ranges_config)
+        if range_switches.enabled(ranges_config, "beta_split", cfg["market"])
+        else None,
+    }
+    return bars, extra

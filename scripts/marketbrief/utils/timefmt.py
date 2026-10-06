@@ -1,4 +1,5 @@
 """Timestamp parsing and formatting shared by the scripts."""
+
 from __future__ import annotations
 
 import re

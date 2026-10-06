@@ -14,6 +14,7 @@ already closed is not published either; the other ranges are published for the r
 "late" (scoring and the report treat them as late, never scored). For every horizon an overnight
 cue or option snapshot quoted after that open is ignored (an intraday quote is not an overnight
 cue, it carries part of the session's outcome)."""
+
 from __future__ import annotations
 
 import json
@@ -31,16 +32,16 @@ from marketbrief.core.market_config import load_ranges_config
 from marketbrief.core.storage import append_jsonl, day_file
 
 
-def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
+def build(cfg: dict, ranges_config: dict, con, now: str | None = None) -> list[dict]:
     """The range rows of every ticker and horizon that are not stored yet."""
-    ctx = load_context(cfg, rc, con, now)
+    ctx = load_context(cfg, ranges_config, con, now)
     rows = []
-    for h in rc["horizons"]:
-        hc = horizon_context(ctx, h)
-        if hc is None:
+    for horizon in ranges_config["horizons"]:
+        horizon_info = horizon_context(ctx, horizon)
+        if horizon_info is None:
             continue
-        for t in cfg["tickers"]:
-            row = range_row(ctx, hc, t)
+        for ticker in cfg["tickers"]:
+            row = range_row(ctx, horizon_info, ticker)
             if row is not None:
                 rows.append(row)
     return rows
@@ -48,21 +49,32 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
 
 def main() -> int:
     """Entry point of scripts/ranges.py."""
-    ap = market_arg(__doc__)
-    ap.add_argument("--now", help=HELP_NOW)
-    args = ap.parse_args()
+    parser = market_arg(__doc__)
+    parser.add_argument("--now", help=HELP_NOW)
+    args = parser.parse_args()
     cfg = require_market(args)
     now = args.now or utc_now()
     if datetime.fromisoformat(now).tzinfo is None:
         raise SystemExit(MSG_NOW_NEEDS_OFFSET)
-    rc, con = load_ranges_config(cfg["market"]), connect(cfg["market"])
-    rows = build(cfg, rc, con, now)
+    ranges_config, con = load_ranges_config(cfg["market"]), connect(cfg["market"])
+    rows = build(cfg, ranges_config, con, now)
     if rows:
         append_jsonl(day_file(cfg["market"], "ranges", pd.Timestamp(rows[0]["as_of_date"]).date()), rows)
     as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
     made = datetime.fromisoformat(now)
     late = made >= first_target_close(cfg, as_of)
-    in_session = first_target_open(cfg, as_of) <= made and not late   # no 1-day ranges; 5-day ones late
-    print(json.dumps({"step": STEP_RANGES, "market": cfg["market"], "written": len(rows), "late": late,
-                      "in_session": in_session, "tickers": sorted({r["ticker"] for r in rows})}, indent=2))
+    in_session = first_target_open(cfg, as_of) <= made and not late  # no 1-day ranges; 5-day ones late
+    print(
+        json.dumps(
+            {
+                "step": STEP_RANGES,
+                "market": cfg["market"],
+                "written": len(rows),
+                "late": late,
+                "in_session": in_session,
+                "tickers": sorted({row["ticker"] for row in rows}),
+            },
+            indent=2,
+        )
+    )
     return 0

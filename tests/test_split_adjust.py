@@ -22,7 +22,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO / "tests"))
 
 from marketbrief.analytics import price_adjustments as adjust  # noqa: E402
-import ai_replay as ar  # noqa: E402
+from marketbrief.replay.ai_replay import copy_asof  # noqa: E402
 from marketbrief.collectors import price_nse_fallback, price_rebase  # noqa: E402
 from marketbrief.collectors import prices as collect_prices  # noqa: E402
 import common  # noqa: E402
@@ -30,7 +30,7 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
 from marketbrief.analytics import indicators as ind  # noqa: E402
-import score_predictions  # noqa: E402
+from marketbrief.pipeline import score_predictions  # noqa: E402
 from marketbrief.analytics.features import load_bars  # noqa: E402
 from test_price_fallback import FakeTicker, make_env  # noqa: E402
 
@@ -667,12 +667,12 @@ def test_ai_replay_root_before_ex_date_is_unaffected(tmp_path, monkeypatch):
         adjust.adjustment_record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T02:00:00+00:00", yahoo_ratio=2.0)])
     row = adj_rows(src, "us")[0]
     cut = pd.Timestamp("2026-09-14T12:15:00+00:00")
-    assert not ar.keep_row("adjustments", row, date(2026, 9, 11), cut)
-    assert ar.keep_row("adjustments", row, EX, cut)
-    assert ar.rule_text("adjustments").startswith("ex_date <= D")
+    assert not copy_asof.keep_row("adjustments", row, date(2026, 9, 11), cut)
+    assert copy_asof.keep_row("adjustments", row, EX, cut)
+    assert copy_asof.rule_text("adjustments").startswith("ex_date <= D")
 
     before = tmp_path / "before"
-    stats = ar.copy_asof("us", src, before, date(2026, 9, 11),
+    stats = copy_asof.copy_asof("us", src, before, date(2026, 9, 11),
                          datetime(2026, 9, 14, 12, 15, tzinfo=timezone.utc))
     assert stats["kinds"]["adjustments"]["rows_kept"] == 0 and "adjustments" not in stats["excluded"]
     monkeypatch.setattr(common, "ROOT", before)
@@ -681,7 +681,7 @@ def test_ai_replay_root_before_ex_date_is_unaffected(tmp_path, monkeypatch):
         [(date(2026, 9, 9), 100.0), (date(2026, 9, 10), 100.0), (date(2026, 9, 11), 100.0)]
 
     after = tmp_path / "after"
-    stats = ar.copy_asof("us", src, after, date(2026, 9, 15), datetime(2026, 9, 16, 12, 15, tzinfo=timezone.utc))
+    stats = copy_asof.copy_asof("us", src, after, date(2026, 9, 15), datetime(2026, 9, 16, 12, 15, tzinfo=timezone.utc))
     assert stats["kinds"]["adjustments"]["rows_kept"] == 1
     monkeypatch.setattr(common, "ROOT", after)
     con = connect("us")

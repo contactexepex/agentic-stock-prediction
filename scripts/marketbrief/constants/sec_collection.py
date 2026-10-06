@@ -1,4 +1,5 @@
 """Constants and messages of the SEC relationship collectors (insiders, stakes, holdings, fundamentals)."""
+
 COLLECTOR_INSIDERS = "insiders"
 COLLECTOR_STAKES = "stakes"
 COLLECTOR_HOLDINGS = "holdings"
@@ -24,7 +25,7 @@ AMENDMENT_SUFFIX = "/A"
 PURPOSE_LIMIT = 600
 
 # ---------- holdings (13F) ----------
-FILING_WINDOW_DAYS = 50   # 13F deadline is 45 days after quarter end
+FILING_WINDOW_DAYS = 50  # 13F deadline is 45 days after quarter end
 DEFAULT_QUARTERS = 2
 FORM_13F_HR, FORM_13F_NT = "13F-HR", "13F-NT"
 REPORT_TYPE_HOLDINGS = "13F HOLDINGS REPORT"
@@ -39,3 +40,8 @@ MSG_INCOMPLETE_CONFIDENTIAL = "holdings omitted as confidential"
 MSG_INCOMPLETE_PLACEHOLDER = "placeholder table (CUSIP 000000000)"
 MSG_INCOMPLETE_TABLE_LINES = "table has {lines} of {total} lines"
 MSG_NO_INFORMATION_TABLE = "no information table in filing"
+
+# ---------- 13F holdings ----------
+MSG_REPORTED_BY = "{filer} {period}: reported by {by}"
+MSG_HELD = "{filer} {period}: {held} held"
+MSG_HELD_INCOMPLETE = " (incomplete: {why})"

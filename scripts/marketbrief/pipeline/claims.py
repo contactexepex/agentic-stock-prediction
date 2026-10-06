@@ -17,6 +17,7 @@ its items or stored primary sources; the quote (<= 40 words) is verbatim in that
 (article extract or title; filing text; announcement subject); value_num with its unit is a number
 stated in the quote and every number in subject and predicate appears in it; enums; no claim id
 stored twice. Article and filing text is untrusted data, read only as data."""
+
 from __future__ import annotations
 
 import json
@@ -51,16 +52,20 @@ def settings() -> dict:
 
 
 def now_floor() -> pd.Timestamp:
+    """The clock rounded down to the second."""
     return pd.Timestamp(clock()).floor("s")
 
 
 def fetch_primary_texts(con, market: str, clusters: list[dict], conf: dict, now: pd.Timestamp) -> dict:
     """Store the text of the selected clusters' SEC 8-K/6-K primary sources not stored yet."""
-    wanted = sorted({p for c in clusters for p in c.get("primary_ids") or []})
-    stored = {r[0] for r in con.execute("SELECT DISTINCT primary_id FROM primary_texts").fetchall()}
+    wanted = sorted({primary_id for cluster in clusters for primary_id in cluster.get("primary_ids") or []})
+    stored = {row[0] for row in con.execute("SELECT DISTINCT primary_id FROM primary_texts").fetchall()}
     forms = list(conf.get("primary_text_forms") or ["8-K", "6-K"])
-    todo = [r for r in con.execute(FILINGS_SQL, [wanted, forms, now.isoformat()]).df().to_dict("records")
-            if r["id"] not in stored]
+    todo = [
+        row
+        for row in con.execute(FILINGS_SQL, [wanted, forms, now.isoformat()]).df().to_dict("records")
+        if row["id"] not in stored
+    ]
     summary = {"filings": len(todo), "documents": 0, "failed": [], "skipped": None, "requests": 0}
     user_agent = os.environ.get(ENV_SEC_USER_AGENT)
     if todo and not user_agent:
@@ -89,14 +94,23 @@ def prepare(cfg: dict, out: Path, fetch: bool) -> dict:
     clusters = current_clusters(con, now, window)
     selected, info = select_clusters(con, clusters, src, conf, now)
     fetched = {"skipped": "--no-fetch"} if not fetch else fetch_primary_texts(con, market, selected, conf, now)
-    con = connect(market)            # a kind first written above is only visible to a new connection
-    now = now_floor()                # the texts just stored (fetched_at) are available from now on
+    con = connect(market)  # a kind first written above is only visible to a new connection
+    now = now_floor()  # the texts just stored (fetched_at) are available from now on
     sources = sources_by_cluster(con, selected, now)
     records = input_records(con, cfg, selected, sources, conf, now)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("".join(json.dumps(r, ensure_ascii=False, default=str) + "\n" for r in records), encoding="utf-8")
-    return {"step": "claims.prepare", "market": market, "as_of": now.isoformat(), "inputs": str(out),
-            **info, "selected": len(records), "primary_texts": fetched}
+    out.write_text(
+        "".join(json.dumps(record, ensure_ascii=False, default=str) + "\n" for record in records), encoding="utf-8"
+    )
+    return {
+        "step": "claims.prepare",
+        "market": market,
+        "as_of": now.isoformat(),
+        "inputs": str(out),
+        **info,
+        "selected": len(records),
+        "primary_texts": fetched,
+    }
 
 
 def read_records(path: Path) -> list:
@@ -104,12 +118,12 @@ def read_records(path: Path) -> list:
     if not path.exists():
         return []
     out = []
-    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if line.strip():
             try:
                 out.append(json.loads(line))
             except json.JSONDecodeError as exc:
-                out.append(f"line {n}: not JSON ({exc.msg})")
+                out.append(f"line {line_number}: not JSON ({exc.msg})")
     return out
 
 
@@ -120,14 +134,19 @@ def check_file(cfg: dict, path: Path) -> tuple[list[dict], list[dict], int]:
     window = float(load_sources().clusters.get("window_hours", 72))
     clusters = current_clusters(con, now, window)
     sources = sources_by_cluster(con, clusters, now)
-    seen = {r[0] for r in con.execute("SELECT id FROM news_claims").fetchall()}
+    seen = {row[0] for row in con.execute("SELECT id FROM news_claims").fetchall()}
     good, bad = [], []
     recs = read_records(path)
-    for n, rec in enumerate(recs, 1):
+    for line_number, rec in enumerate(recs, 1):
         errors, stored = check_claim(rec, sources, seen) if not isinstance(rec, str) else ([rec], None)
         if errors:
-            bad.append({"line": n, "cluster_id": rec.get("cluster_id") if isinstance(rec, dict) else None,
-                        "errors": errors})
+            bad.append(
+                {
+                    "line": line_number,
+                    "cluster_id": rec.get("cluster_id") if isinstance(rec, dict) else None,
+                    "errors": errors,
+                }
+            )
         else:
             good.append(stored)
             seen.add(stored["id"])
@@ -136,30 +155,41 @@ def check_file(cfg: dict, path: Path) -> tuple[list[dict], list[dict], int]:
 
 def main() -> int:
     """prepare | validate F | add F [--valid-only]; prints a JSON summary."""
-    ap = market_arg(__doc__)
-    sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("prepare", help="select clusters, store primary texts, write the agent's input")
-    p.add_argument("--out", type=Path, default=paths.ROOT / "work" / "claim_inputs.jsonl")
-    p.add_argument("--no-fetch", action="store_true", help="do not request filing text from SEC")
+    parser = market_arg(__doc__)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    prepare_parser = sub.add_parser("prepare", help="select clusters, store primary texts, write the agent's input")
+    prepare_parser.add_argument("--out", type=Path, default=paths.ROOT / "work" / "claim_inputs.jsonl")
+    prepare_parser.add_argument("--no-fetch", action="store_true", help="do not request filing text from SEC")
     for name in ("validate", "add"):
-        q = sub.add_parser(name)
-        q.add_argument("file", type=Path)
+        file_parser = sub.add_parser(name)
+        file_parser.add_argument("file", type=Path)
         if name == "add":
-            q.add_argument("--valid-only", action="store_true", help="append the valid records, drop the others")
-    args = ap.parse_args()
+            file_parser.add_argument(
+                "--valid-only", action="store_true", help="append the valid records, drop the others"
+            )
+    args = parser.parse_args()
     cfg = require_market(args)
     if args.cmd == "prepare":
         print(json.dumps(prepare(cfg, args.out, not args.no_fetch), indent=2, default=str))
         return 0
-    good, bad, n = check_file(cfg, args.file)
-    summary = {"step": f"claims.{args.cmd}", "market": cfg["market"], "file": str(args.file), "records": n,
-               "valid": len(good), "errors": bad, "appended": 0}
+    good, bad, record_count = check_file(cfg, args.file)
+    summary = {
+        "step": f"claims.{args.cmd}",
+        "market": cfg["market"],
+        "file": str(args.file),
+        "records": record_count,
+        "valid": len(good),
+        "errors": bad,
+        "appended": 0,
+    }
     if args.cmd == "validate" or (bad and not args.valid_only):
         print(json.dumps(summary, indent=2, default=str))
         return 1 if bad else 0
-    rows = [{**g, "extracted_at": utc_now()} for g in good]
+    rows = [{**valid_record, "extracted_at": utc_now()} for valid_record in good]
     path = day_file(cfg["market"], KIND_NEWS_CLAIMS, utc_today())
-    summary.update({"appended": append_jsonl(path, rows), "to": str(path), "dropped": [b["line"] for b in bad]})
+    summary.update(
+        {"appended": append_jsonl(path, rows), "to": str(path), "dropped": [error_entry["line"] for error_entry in bad]}
+    )
     print(json.dumps(summary, indent=2, default=str))
     return 0
 

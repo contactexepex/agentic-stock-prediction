@@ -1,5 +1,6 @@
 """Number parsing and rounding helpers. The four `parse_*` / `json_safe_*` variants differ on purpose
 (each source writes numbers its own way), so they stay separate functions instead of one flag-driven one."""
+
 from __future__ import annotations
 
 import math

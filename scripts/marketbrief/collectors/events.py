@@ -21,6 +21,7 @@ yfinance hides most request errors behind empty answers, so `failed` lists the Y
 calendar lists an ex-dividend date in the backfill window) and `earnings_history` (both yfinance methods raised). The
 earnings-calendar page (finance.yahoo.com) is tried first; if it fails (e.g. a network that refuses the host) the
 screener fallback (query1) supplies the dates. `earnings_history_sources` counts which method was used."""
+
 from __future__ import annotations
 
 import json
@@ -33,16 +34,47 @@ from marketbrief.collectors.event_timing import as_dates, between_quarters, merg
 from marketbrief.collectors.events_nse import nse_due, nse_earnings
 from marketbrief.collectors.events_sec import sec_earnings
 from marketbrief.collectors.events_yahoo import read_calendar, read_dividends, yf_earnings
-from marketbrief.constants.columns import (COL_DATE, COL_FIRST_SEEN_AT, COL_ID, COL_NAME, COL_SOURCE, COL_TICKER,
-                                           COL_TYPE)
-from marketbrief.constants.config_keys import (CFG_FILINGS, CFG_MARKET, CFG_RELATIONS, CFG_TICKERS,
-                                               FILINGS_SOURCE_SEC, META_YAHOO, REL_SOURCE, REL_SOURCE_NSE)
+from marketbrief.constants.columns import (
+    COL_DATE,
+    COL_FIRST_SEEN_AT,
+    COL_ID,
+    COL_NAME,
+    COL_SOURCE,
+    COL_TICKER,
+    COL_TYPE,
+)
+from marketbrief.constants.config_keys import (
+    CFG_FILINGS,
+    CFG_MARKET,
+    CFG_RELATIONS,
+    CFG_TICKERS,
+    FILINGS_SOURCE_SEC,
+    META_YAHOO,
+    REL_SOURCE,
+    REL_SOURCE_NSE,
+)
 from marketbrief.constants.environment import ENV_SEC_USER_AGENT
-from marketbrief.constants.events import (CALENDAR_FIELDS, COLLECTOR_EVENTS, DEFAULT_HISTORY_DAYS, ERROR_TEXT_LIMIT,
-                                          EVENT_EARNINGS, EVENT_EX_DIVIDEND, EVENT_LABELS, EVENT_PERIODIC_REPORT,
-                                          HISTORY_SUFFIX, MSG_ESTIMATED_DIVIDEND, MSG_PERIODIC_REPORT, NEAR_DAYS,
-                                          PRIORITY_FILING, SOURCE_NSE_HISTORY, SOURCE_SEC_HISTORY, SOURCE_YFINANCE,
-                                          SOURCE_YFINANCE_HISTORY, WHAT_CALENDAR, WHAT_EARNINGS_HISTORY)
+from marketbrief.constants.events import (
+    CALENDAR_FIELDS,
+    COLLECTOR_EVENTS,
+    DEFAULT_HISTORY_DAYS,
+    ERROR_TEXT_LIMIT,
+    EVENT_EARNINGS,
+    EVENT_EX_DIVIDEND,
+    EVENT_LABELS,
+    EVENT_PERIODIC_REPORT,
+    HISTORY_SUFFIX,
+    MSG_ESTIMATED_DIVIDEND,
+    MSG_PERIODIC_REPORT,
+    NEAR_DAYS,
+    PRIORITY_FILING,
+    SOURCE_NSE_HISTORY,
+    SOURCE_SEC_HISTORY,
+    SOURCE_YFINANCE,
+    SOURCE_YFINANCE_HISTORY,
+    WHAT_CALENDAR,
+    WHAT_EARNINGS_HISTORY,
+)
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
 from marketbrief.constants.kinds import KIND_EVENTS
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET
@@ -67,6 +99,7 @@ def stored_events(market: str) -> list[dict]:
 @dataclass(frozen=True)
 class EventDetails:
     """What an event row carries besides its id, type, date and source."""
+
     amount: float | None = None
     when: str | None = None
     note: str = ""
@@ -85,6 +118,7 @@ class StoredHistory:
     """What the stored events say: ids seen, past earnings dates per ticker (all sources, NSE's), dividend counts."""
 
     def __init__(self, stored: list[dict]):
+        """The stored events (to skip ids already seen) or the Yahoo collector's config."""
         self.seen = {row[COL_ID] for row in stored}
         self.earnings: dict[str, list[date]] = {}
         self.nse_dates: dict[str, list[date]] = {}
@@ -102,8 +136,9 @@ class EventsCollector:
     """One events run: stored history, SEC and NSE earnings, then each ticker's Yahoo calendar, dividends and
     past earnings dates, merged into new event rows."""
 
-    def __init__(self, cfg: dict, yf, no_history: bool, history_days: int):
-        self.cfg, self.yf, self.no_history = cfg, yf, no_history
+    def __init__(self, cfg: dict, yfinance, no_history: bool, history_days: int):
+        """The stored events (to skip ids already seen) or the Yahoo collector's config."""
+        self.cfg, self.yfinance, self.no_history = cfg, yfinance, no_history
         self.market, self.now, self.today = cfg[CFG_MARKET], utc_now(), utc_today()
         self.since = self.today - timedelta(days=history_days)
         self.stored = stored_events(self.market)
@@ -120,18 +155,27 @@ class EventsCollector:
         self.earnings_sources: dict[str, int] = {}
         self.report_count = 0
 
-    def add(self, key: str, event_type: str, day: date, source: str,
-            details: EventDetails = NO_DETAILS) -> bool:
+    def add(self, key: str, event_type: str, day: date, source: str, details: EventDetails = NO_DETAILS) -> bool:
         """Add an event row unless its id (<ticker>-<type>-<date>) is stored; True when added."""
         event_id = f"{key}-{event_type}-{day}"
         if event_id in self.seen:
             return False
         label = EVENT_LABELS.get(event_type, event_type.replace("_", " "))
         name = self.cfg[CFG_TICKERS][key][COL_NAME]
-        self.rows.append({COL_ID: event_id, COL_DATE: day.isoformat(), COL_TYPE: event_type, COL_TICKER: key,
-                          COL_NAME: f"{name} {label}{details.note}", COL_SOURCE: source,
-                          COL_FIRST_SEEN_AT: self.now, "amount": details.amount, "timing": details.when,
-                          **(details.extra or {})})
+        self.rows.append(
+            {
+                COL_ID: event_id,
+                COL_DATE: day.isoformat(),
+                COL_TYPE: event_type,
+                COL_TICKER: key,
+                COL_NAME: f"{name} {label}{details.note}",
+                COL_SOURCE: source,
+                COL_FIRST_SEEN_AT: self.now,
+                "amount": details.amount,
+                "timing": details.when,
+                **(details.extra or {}),
+            }
+        )
         self.seen.add(event_id)
         return True
 
@@ -141,8 +185,9 @@ class EventsCollector:
         if self.no_history or self.cfg.get(CFG_FILINGS) != FILINGS_SOURCE_SEC or not user_agent:
             return
         try:
-            self.sec, self.sec_failed = sec_earnings(self.cfg, self.cfg[CFG_TICKERS], user_agent, self.sec_reports,
-                                                     self.sec_times)
+            self.sec, self.sec_failed = sec_earnings(
+                self.cfg, self.cfg[CFG_TICKERS], user_agent, self.sec_reports, self.sec_times
+            )
         except Exception as exc:
             self.sec_error = str(exc)[:ERROR_TEXT_LIMIT]
 
@@ -151,12 +196,17 @@ class EventsCollector:
         if self.no_history or (self.cfg.get(CFG_RELATIONS) or {}).get(REL_SOURCE) != REL_SOURCE_NSE:
             return
         due = nse_due(self.stored, list(self.cfg[CFG_TICKERS]), self.today)
-        self.nse_info = {"nse_polled": len(due), "nse_backfill": sum(v is None for v in due.values()),
-                         "nse_failed": [], "nse_notes": []}
+        self.nse_info = {
+            "nse_polled": len(due),
+            "nse_backfill": sum(last_date is None for last_date in due.values()),
+            "nse_failed": [],
+            "nse_notes": [],
+        }
         if due:
             client = nse_session.nse_client(self.cfg)
             self.nse, self.nse_info["nse_failed"], self.nse_info["nse_notes"] = nse_earnings(
-                self.cfg, client, due, self.since, self.today)
+                self.cfg, client, due, self.since, self.today
+            )
             self.nse_info["nse_requests"] = client.requests
         self.nse_info["nse_tickers"] = len(self.nse)
 
@@ -165,10 +215,14 @@ class EventsCollector:
         quarter's results release among the 2.02 rows by them. Same window as the 2.02 rows."""
         for key, reports in self.sec_reports.items():
             for day, when, form, period_end in sorted(reports, key=lambda report: report[0]):
-                details = EventDetails(when=when, note=MSG_PERIODIC_REPORT.format(form=form, period=period_end),
-                                       extra={"period_end": period_end.isoformat() if period_end else None})
-                if self.since <= day < self.today and self.add(key, EVENT_PERIODIC_REPORT, day, SOURCE_SEC_HISTORY,
-                                                               details):
+                details = EventDetails(
+                    when=when,
+                    note=MSG_PERIODIC_REPORT.format(form=form, period=period_end),
+                    extra={"period_end": period_end.isoformat() if period_end else None},
+                )
+                if self.since <= day < self.today and self.add(
+                    key, EVENT_PERIODIC_REPORT, day, SOURCE_SEC_HISTORY, details
+                ):
                     self.report_count += 1
 
     def add_upcoming(self, key: str, calendar: dict | None, dividends: dict[date, float]) -> None:
@@ -190,8 +244,9 @@ class EventsCollector:
         for day, amount in sorted(dividends.items()):
             if day >= self.today:
                 self.add(key, EVENT_EX_DIVIDEND, day, SOURCE_YFINANCE, EventDetails(amount=amount))
-            elif day >= self.since and self.add(key, EVENT_EX_DIVIDEND, day, SOURCE_YFINANCE_HISTORY,
-                                                EventDetails(amount=amount)):
+            elif day >= self.since and self.add(
+                key, EVENT_EX_DIVIDEND, day, SOURCE_YFINANCE_HISTORY, EventDetails(amount=amount)
+            ):
                 self.new_history[EVENT_EX_DIVIDEND] += 1
 
     def add_earnings_history(self, key: str, ticker) -> None:
@@ -203,9 +258,9 @@ class EventsCollector:
             self.failed.append({COL_TICKER: key, "what": WHAT_EARNINGS_HISTORY, "error": "; ".join(yahoo_errors)})
         # a yfinance date between two NSE results dates a quarter apart is either the same report
         # or not a results release (no quarter is missing there)
-        known_nse = self.history.nse_dates.get(key, []) + [d for d, _, _ in self.nse.get(key, [])]
-        yahoo_dates = [c for c in yahoo_dates if not between_quarters(c[0], known_nse)]
-        primary = SOURCE_NSE_HISTORY if self.nse_info else SOURCE_SEC_HISTORY   # the filings source of this market
+        known_nse = self.history.nse_dates.get(key, []) + [known_day for known_day, _, _ in self.nse.get(key, [])]
+        yahoo_dates = [candidate for candidate in yahoo_dates if not between_quarters(candidate[0], known_nse)]
+        primary = SOURCE_NSE_HISTORY if self.nse_info else SOURCE_SEC_HISTORY  # the filings source of this market
         for day, when, priority in merge_near(self.sec.get(key, []) + self.nse.get(key, []) + yahoo_dates):
             if not (self.since <= day < self.today):
                 continue
@@ -218,10 +273,11 @@ class EventsCollector:
 
     def collect_ticker(self, key: str, meta: dict) -> None:
         """Calendar, dividends and (unless --no-history) earnings history of one ticker."""
-        ticker = self.yf.Ticker(meta[META_YAHOO])
+        ticker = self.yfinance.Ticker(meta[META_YAHOO])
         calendar = read_calendar(ticker, key, self.failed)
-        dividends = read_dividends(ticker, key, calendar, self.history.dividend_counts.get(key, 0), self.since,
-                                   self.failed)
+        dividends = read_dividends(
+            ticker, key, calendar, self.history.dividend_counts.get(key, 0), self.since, self.failed
+        )
         self.add_upcoming(key, calendar, dividends)
         if self.no_history:
             return
@@ -230,13 +286,21 @@ class EventsCollector:
 
     def summary(self, written: int) -> dict:
         """The run's JSON summary."""
-        sec_times = ({"sec_times": self.sec_times, "warnings": time_warnings(self.sec_times)}
-                     if self.sec_times else {})
-        return {SUMMARY_COLLECTOR: COLLECTOR_EVENTS, SUMMARY_MARKET: self.market,
-                "new_events": written - sum(self.new_history.values()) - self.report_count,
-                "new_history": self.new_history, "earnings_history_sources": self.earnings_sources,
-                "sec_tickers": len(self.sec), "sec_reports": self.report_count, "sec_error": self.sec_error,
-                "sec_failed": self.sec_failed, **sec_times, **self.nse_info, SUMMARY_FAILED: self.failed}
+        sec_times = {"sec_times": self.sec_times, "warnings": time_warnings(self.sec_times)} if self.sec_times else {}
+        return {
+            SUMMARY_COLLECTOR: COLLECTOR_EVENTS,
+            SUMMARY_MARKET: self.market,
+            "new_events": written - sum(self.new_history.values()) - self.report_count,
+            "new_history": self.new_history,
+            "earnings_history_sources": self.earnings_sources,
+            "sec_tickers": len(self.sec),
+            "sec_reports": self.report_count,
+            "sec_error": self.sec_error,
+            "sec_failed": self.sec_failed,
+            **sec_times,
+            **self.nse_info,
+            SUMMARY_FAILED: self.failed,
+        }
 
     def collect(self) -> int:
         """Run everything, store the rows, print the summary; returns the exit code."""
@@ -248,7 +312,7 @@ class EventsCollector:
         written = append_jsonl(day_file(self.market, KIND_EVENTS, self.today), self.rows)
         print(json.dumps(self.summary(written), indent=2))
         # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
-        no_calendar = {f[COL_TICKER] for f in self.failed if f["what"] == WHAT_CALENDAR}
+        no_calendar = {failure[COL_TICKER] for failure in self.failed if failure["what"] == WHAT_CALENDAR}
         return 1 if no_calendar and len(no_calendar) == len(self.cfg[CFG_TICKERS]) else 0
 
 
@@ -256,10 +320,14 @@ def main() -> int:
     """Entry point of scripts/collect_events.py."""
     parser = market_arg(__doc__)
     parser.add_argument("--no-history", action="store_true", help="skip the past earnings/dividend backfill")
-    parser.add_argument("--history-days", type=int, default=DEFAULT_HISTORY_DAYS,
-                        help=f"how far back to backfill (default {DEFAULT_HISTORY_DAYS})")
+    parser.add_argument(
+        "--history-days",
+        type=int,
+        default=DEFAULT_HISTORY_DAYS,
+        help=f"how far back to backfill (default {DEFAULT_HISTORY_DAYS})",
+    )
     args = parser.parse_args()
     cfg = require_market(args)
-    import yfinance as yf
+    import yfinance
 
-    return EventsCollector(cfg, yf, args.no_history, args.history_days).collect()
+    return EventsCollector(cfg, yfinance, args.no_history, args.history_days).collect()

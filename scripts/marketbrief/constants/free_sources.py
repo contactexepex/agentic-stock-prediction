@@ -4,7 +4,7 @@ COLLECTOR_MACRO = "macro"
 TREASURY_URL = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
                 "daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve"
                 "&field_tdr_date_value={year}&page&_format=csv")
-FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}"
+FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={start}"
 CBOE_URL = "https://cdn.cboe.com/data/us/options/market_statistics/daily/{day}_daily_options"
 MACRO_VALUE_COLUMNS = ["value", "complete"]
 HEADERS_CSV = {"Accept": "text/csv"}

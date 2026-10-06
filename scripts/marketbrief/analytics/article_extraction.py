@@ -1,16 +1,27 @@
 """Metadata and body text of one article page: JSON-LD articleBody, then trafilatura, then newspaper4k (per-domain
 order in config/news_sources.yaml `extract`). A page whose JSON-LD says isAccessibleForFree=false is paywalled:
 only its description and OpenGraph text are read, never the body."""
+
 from __future__ import annotations
 
 import json
 
 from marketbrief.analytics.news_sources import Sources
 from marketbrief.analytics.text_measures import clean_text
-from marketbrief.constants.articles import (ACCESS_FULL, ACCESS_PARTIAL, ACCESS_PAYWALLED, DEFAULT_EXTRACT_ORDER,
-                                            DEFAULT_FULL_CHARS, DEFAULT_MIN_CHARS, EXTRACTOR_DESCRIPTION,
-                                            EXTRACTOR_JSONLD, EXTRACTOR_NEWSPAPER, EXTRACTOR_TRAFILATURA,
-                                            MSG_UNPARSABLE_HTML)
+from marketbrief.constants.articles import (
+    ACCESS_FULL,
+    ACCESS_PARTIAL,
+    ACCESS_PAYWALLED,
+    DEFAULT_EXTRACT_ORDER,
+    DEFAULT_FULL_CHARS,
+    DEFAULT_MIN_CHARS,
+    EXTRACTOR_DESCRIPTION,
+    EXTRACTOR_JSONLD,
+    EXTRACTOR_NEWSPAPER,
+    EXTRACTOR_TRAFILATURA,
+    MSG_EXTRACTOR_ERROR,
+    MSG_UNPARSABLE_HTML,
+)
 
 ARTICLE_TYPES = ("BlogPosting", "LiveBlogPosting")
 DATE_PUBLISHED_META = ("article:published_time", "datePublished", "parsely-pub-date", "publish-date", "pubdate")
@@ -36,7 +47,10 @@ def meta_content(document, *names) -> str | None:
 def is_article_type(types) -> bool:
     """True when a JSON-LD @type (one or a list) names an article."""
     types = types if isinstance(types, list) else [types]
-    return any(isinstance(t, str) and ("Article" in t or t in ARTICLE_TYPES) for t in types)
+    return any(
+        isinstance(article_type, str) and ("Article" in article_type or article_type in ARTICLE_TYPES)
+        for article_type in types
+    )
 
 
 def json_ld_articles(document) -> list[dict]:
@@ -80,20 +94,25 @@ def extract_jsonld(article: dict | None) -> str:
 def extract_trafilatura(html: str, url: str) -> str:
     """The article text trafilatura finds in a page."""
     import trafilatura
+
     return clean_text(trafilatura.extract(html, url=url, favor_precision=True, include_comments=False) or "")
 
 
 def extract_newspaper(html: str, url: str) -> str:
     """The article text newspaper4k finds in a page (fetch_images=False: it would otherwise download images)."""
     import newspaper
+
     article = newspaper.Article(url, fetch_images=False)
     article.download(input_html=html)
     article.parse()
     return clean_text(article.text)
 
 
-EXTRACTORS = {EXTRACTOR_JSONLD: None, EXTRACTOR_TRAFILATURA: extract_trafilatura,
-              EXTRACTOR_NEWSPAPER: extract_newspaper}
+EXTRACTORS = {
+    EXTRACTOR_JSONLD: None,
+    EXTRACTOR_TRAFILATURA: extract_trafilatura,
+    EXTRACTOR_NEWSPAPER: extract_newspaper,
+}
 
 
 def page_info(document, article: dict | None) -> dict:
@@ -115,11 +134,13 @@ def is_paywalled(article: dict | None) -> bool:
     parts = article.get("hasPart")
     parts = parts if isinstance(parts, list) else [parts] if parts else []
     return is_false_flag(article.get("isAccessibleForFree")) or any(
-        isinstance(part, dict) and is_false_flag(part.get("isAccessibleForFree")) for part in parts)
+        isinstance(part, dict) and is_false_flag(part.get("isAccessibleForFree")) for part in parts
+    )
 
 
-def best_text(html: str, url: str, article: dict | None, order: list[str],
-              min_chars: int) -> tuple[str, str | None, list]:
+def best_text(
+    html: str, url: str, article: dict | None, order: list[str], min_chars: int
+) -> tuple[str, str | None, list]:
     """(longest text, the extractor that gave it, errors): extractors are tried in `order` until one gives at
     least `min_chars` characters; an extractor failing on one page is not fatal."""
     best, best_by, errors = "", None, []
@@ -127,7 +148,7 @@ def best_text(html: str, url: str, article: dict | None, order: list[str],
         try:
             text = extract_jsonld(article) if name == EXTRACTOR_JSONLD else EXTRACTORS[name](html, url)
         except Exception as exc:
-            errors.append(f"{name}: {type(exc).__name__}")
+            errors.append(MSG_EXTRACTOR_ERROR.format(name=name, error_type=type(exc).__name__))
             continue
         if len(text) > len(best):
             best, best_by = text, name
@@ -141,13 +162,16 @@ def parse_article(html: str, url: str, src: Sources, hints: dict | None = None) 
     paywalled. Paywalled (isAccessibleForFree false on the article or a part of it): only the
     description / OpenGraph text."""
     from lxml import html as lxml_html
+
     hints = hints or {}
     try:
         document = lxml_html.fromstring(html)
     except (ValueError, Exception):
         return {"access": ACCESS_PARTIAL, "text": "", "extractor": None, "note": MSG_UNPARSABLE_HTML}
     articles = json_ld_articles(document)
-    article = next((a for a in articles if a.get("articleBody")), articles[0] if articles else None)
+    article = next(
+        (candidate for candidate in articles if candidate.get("articleBody")), articles[0] if articles else None
+    )
     info = page_info(document, article)
     if is_paywalled(article):
         return {**info, "access": ACCESS_PAYWALLED, "text": info["description"], "extractor": EXTRACTOR_DESCRIPTION}

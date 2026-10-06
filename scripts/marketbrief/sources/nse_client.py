@@ -5,6 +5,7 @@ cookies, then calls /api/... with a Referer, pausing between requests. Files on 
 (XBRL filings, CSV reports) are fetched through the same session. With `replay`, responses come from
 local files instead of the network (an API call reads <endpoint>[_<symbol>][_<optionType>].json, an
 archive file reads its base name)."""
+
 from __future__ import annotations
 
 import http.cookiejar
@@ -14,28 +15,53 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from marketbrief.constants.messages import (MSG_NSE_HTTP_STATUS, MSG_NSE_NO_REPLAY_FILE, MSG_NSE_NOT_JSON,
-                                            MSG_NSE_PROXY_DENIED, MSG_NSE_UNREACHABLE)
-from marketbrief.constants.sources import (ACCEPT_HTML_PAGES, ACCEPT_LANGUAGE_NSE, NSE_ARCHIVES_HOST,
-                                           NSE_ARCHIVES_URL, NSE_ATTEMPTS, NSE_BASE_URL,
-                                           NSE_DEFAULT_PAUSE_SECONDS, NSE_REFERER_PAGES, NSE_RETRY_WAIT_SECONDS,
-                                           NSE_TIMEOUT_SECONDS, NSE_USER_AGENT, PROXY_TUNNEL_FAILURE)
+from marketbrief.constants.messages import (
+    MSG_NSE_HTTP_STATUS,
+    MSG_NSE_NO_REPLAY_FILE,
+    MSG_NSE_NOT_JSON,
+    MSG_NSE_PROXY_DENIED,
+    MSG_NSE_UNREACHABLE,
+)
+from marketbrief.constants.sources import (
+    ACCEPT_HTML_PAGES,
+    ACCEPT_LANGUAGE_NSE,
+    NSE_ARCHIVES_HOST,
+    NSE_ARCHIVES_URL,
+    NSE_ATTEMPTS,
+    NSE_BASE_URL,
+    NSE_DEFAULT_PAUSE_SECONDS,
+    NSE_REFERER_PAGES,
+    NSE_RETRY_WAIT_SECONDS,
+    NSE_TIMEOUT_SECONDS,
+    NSE_USER_AGENT,
+    PROXY_TUNNEL_FAILURE,
+)
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.http import HttpClient, HttpPolicy, constant_wait, egress_proxy_denied
 
 ACCEPT_JSON = "application/json, text/plain, */*"
 ACCEPT_ARCHIVE = "text/csv,application/xml,*/*"
-PROXY_DENIAL_MARKERS = (PROXY_TUNNEL_FAILURE, "403")   # the proxy's refusal shows as a tunnel failure or a 403
+PROXY_DENIAL_MARKERS = (PROXY_TUNNEL_FAILURE, "403")  # the proxy's refusal shows as a tunnel failure or a 403
 
 
 class Nse(HttpClient):
     """Minimal NSE client: one cookie session, browser headers, polite pacing."""
 
-    def __init__(self, base: str = NSE_BASE_URL, archives: str = NSE_ARCHIVES_URL, replay: Path | None = None,
-                 pause: float = NSE_DEFAULT_PAUSE_SECONDS):
-        policy = HttpPolicy(timeout=NSE_TIMEOUT_SECONDS, attempts=NSE_ATTEMPTS, pause=pause,
-                            retry_wait=constant_wait(NSE_RETRY_WAIT_SECONDS),
-                            network_errors=(urllib.error.URLError, OSError))
+    def __init__(
+        self,
+        base: str = NSE_BASE_URL,
+        archives: str = NSE_ARCHIVES_URL,
+        replay: Path | None = None,
+        pause: float = NSE_DEFAULT_PAUSE_SECONDS,
+    ):
+        """An NSE client with its base URLs and an optional replay folder."""
+        policy = HttpPolicy(
+            timeout=NSE_TIMEOUT_SECONDS,
+            attempts=NSE_ATTEMPTS,
+            pause=pause,
+            retry_wait=constant_wait(NSE_RETRY_WAIT_SECONDS),
+            network_errors=(urllib.error.URLError, OSError),
+        )
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         super().__init__(policy, opener=opener)
         self.base, self.archives, self.replay = base.rstrip("/"), archives.rstrip("/"), replay
@@ -72,14 +98,14 @@ class Nse(HttpClient):
                 self._open(self.base + "/", ACCEPT_HTML_PAGES)
             except FetchError as exc:
                 self.warm_error = exc
-        if self.warm_error and self.warm_error.host:   # host not reachable at all: fail fast
+        if self.warm_error and self.warm_error.host:  # host not reachable at all: fail fast
             raise self.warm_error
 
     def json(self, endpoint: str, params: dict | None = None):
         """An /api/<endpoint> call parsed as JSON (or the replay file's content)."""
         params = params or {}
         if self.replay:
-            keys = [params[k] for k in ("symbol", "optionType") if params.get(k)]
+            keys = [params[param_name] for param_name in ("symbol", "optionType") if params.get(param_name)]
             return self._replay("_".join([endpoint.rsplit("/", 1)[-1], *keys]) + ".json", json.loads)
         url = f"{self.base}/api/{endpoint}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
         self._warm()

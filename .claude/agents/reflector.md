@@ -17,7 +17,7 @@ Each line is one settled call: the call (`direction`, `confidence`, `horizon_day
 prices or data after the call, no web.
 
 For each line write one JSON object to `work/lessons.jsonl`:
-`{"prediction_id": "<the line's prediction_id>", "lesson": "<text>", "prompt_version": "reflect-v1"}`.
+`{"prediction_id": "<the line's prediction_id>", "lesson": "<text>", "prompt_version": "reflect-v2"}`.
 The lesson is ONE paragraph of at most 60 words, plain prose, covering in order:
 1. the call and what happened, with the return (and where the close landed vs the range, if any);
 2. what the cited evidence did or did not predict (the rationale's reasoning held or failed);
@@ -36,7 +36,7 @@ Rules (`python scripts/lessons.py validate work/lessons.jsonl` checks them deter
   uninformative, say that in one sentence).
 
 Run `python scripts/lessons.py validate work/lessons.jsonl` yourself and fix every error before
-returning. Do not append to `data/`: the caller judges your file and, on PASS, runs
+returning. Do not append to `data/`: the caller runs the same `lessons.py validate` gate and then
 `python scripts/lessons.py add work/lessons.jsonl`.
 
 Return a table: prediction id, hit/miss, one-line takeaway.

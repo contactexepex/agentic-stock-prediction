@@ -1,4 +1,5 @@
 """Loading config/settings.yaml and config/validate.yaml from the current config folder."""
+
 from __future__ import annotations
 
 import yaml

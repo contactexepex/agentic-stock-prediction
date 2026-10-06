@@ -5,6 +5,7 @@ context pack and the range risk flags. Inputs are the SEC relationship views in 
 In ranges these are a risk flag only: a fresh activist 13D adds a note to the range, and widens
 it only if config/ranges.yaml sets `activist_13d_factor` above 1.0 (default 1.0, off until the
 weekly review shows that it improves coverage)."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -12,30 +13,42 @@ from datetime import date, timedelta
 from marketbrief.utils.markdown import cursor_markdown_table
 
 SECTIONS: list[tuple[str, str]] = [
-    ("Insider open-market trades by ticker (Form 4; USD; P buys vs S sales, last 30/90 days)", """
+    (
+        "Insider open-market trades by ticker (Form 4; USD; P buys vs S sales, last 30/90 days)",
+        """
         SELECT ticker, round(buy_value_30d) AS buys_30d, round(sell_value_30d) AS sales_30d,
                round(net_value_30d) AS net_30d, round(net_value_90d) AS net_90d,
                buyers_30d, sellers_30d, planned_sell_share_30d AS planned_sales_share, cluster_buy,
                last_buy, last_sale
-        FROM insider_flow ORDER BY cluster_buy DESC, net_value_30d DESC, ticker"""),
-    ("Largest insider buys and sales, last 7 days (P/S only)", """
+        FROM insider_flow ORDER BY cluster_buy DESC, net_value_30d DESC, ticker""",
+    ),
+    (
+        "Largest insider buys and sales, last 7 days (P/S only)",
+        """
         SELECT ticker, transaction_date AS date, insider_name, role, code, round(shares) AS shares,
                round(price, 2) AS price, round(value) AS value, round(shares_after) AS held_after, plan_10b5_1
         FROM insider_trades
         WHERE NOT derivative AND code IN ('P', 'S') AND transaction_date >= current_date - 7
-        ORDER BY code = 'P' DESC, value DESC NULLS LAST, id LIMIT 10"""),
-    ("13D/13G filings, last 30 days (13D = active holder >5%; 13G = passive)", """
+        ORDER BY code = 'P' DESC, value DESC NULLS LAST, id LIMIT 10""",
+    ),
+    (
+        "13D/13G filings, last 30 days (13D = active holder >5%; 13G = passive)",
+        """
         SELECT ticker, form, filing_date, filer_name, percent, round(shares) AS shares
         FROM stake_filings WHERE filing_date >= current_date - 30
-        ORDER BY kind = '13D' DESC, filing_date DESC, ticker, id LIMIT 15"""),
-    ("13F tracked filers: latest quarter vs previous (common shares; change and actions from "
-     "complete filings only, `incomplete` = filers with a partial or combination report)", """
+        ORDER BY kind = '13D' DESC, filing_date DESC, ticker, id LIMIT 15""",
+    ),
+    (
+        "13F tracked filers: latest quarter vs previous (common shares; change and actions from "
+        "complete filings only, `incomplete` = filers with a partial or combination report)",
+        """
         SELECT ticker, period, filers_holding, round(value_usd / 1e9, 2) AS value_bn,
                round(change_pct * 100, 1) AS change_pct, n_new, n_exit, n_add, n_trim,
                filers_incomplete AS incomplete
         FROM holdings_quarter
         WHERE period = (SELECT max(period) FROM holdings_quarter q WHERE q.ticker = holdings_quarter.ticker)
-        ORDER BY change_pct DESC NULLS LAST, ticker"""),
+        ORDER BY change_pct DESC NULLS LAST, ticker""",
+    ),
 ]
 
 
@@ -49,16 +62,19 @@ def markdown(cfg: dict, con) -> str:
     return "\n".join(out)
 
 
-def range_flags(con, as_of: date, rc: dict, made_at=None) -> dict[str, tuple[float, list[str]]]:
+def range_flags(con, as_of: date, ranges_config: dict, made_at=None) -> dict[str, tuple[float, list[str]]]:
     """ticker -> (sigma factor, notes) for fresh activist 13D stakes (filed on or after
     as_of - activist_13d_days). Factor 1.0 unless ranges.yaml turns the widen on. With made_at,
     only filings SEC had accepted by made_at count (CLAUDE.md: nothing published after made_at);
     a filing without an acceptance time counts from the end of its filing date."""
-    days = int(rc.get("activist_13d_days", 30))
-    factor = max(1.0, float(rc.get("activist_13d_factor", 1.0)))
-    cols = {r[0] for r in con.execute("DESCRIBE activist_stakes").fetchall()}
-    known = ("coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ))" if "accepted_at" in cols
-             else "CAST(filing_date + 1 AS TIMESTAMPTZ)")
+    days = int(ranges_config.get("activist_13d_days", 30))
+    factor = max(1.0, float(ranges_config.get("activist_13d_factor", 1.0)))
+    cols = {column[0] for column in con.execute("DESCRIBE activist_stakes").fetchall()}
+    known = (
+        "coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ))"
+        if "accepted_at" in cols
+        else "CAST(filing_date + 1 AS TIMESTAMPTZ)"
+    )
     sql = "SELECT ticker, filing_date, filer_name, percent FROM activist_stakes WHERE filing_date >= ?"
     params: list = [as_of - timedelta(days=days)]
     if made_at is not None:
@@ -67,7 +83,7 @@ def range_flags(con, as_of: date, rc: dict, made_at=None) -> dict[str, tuple[flo
     rows = con.execute(sql + " ORDER BY ticker, filing_date", params).fetchall()
     flags: dict[str, tuple[float, list[str]]] = {}
     for ticker, filed, filer, pct in rows:
-        f, notes = flags.get(ticker, (1.0, []))
+        previous_factor, notes = flags.get(ticker, (1.0, []))
         size = f" {pct:g}%" if pct is not None else ""
         notes.append(f"new 13D: {filer or 'unknown filer'}{size} filed {filed}" + (f" x{factor}" if factor > 1 else ""))
         flags[ticker] = (factor, notes)

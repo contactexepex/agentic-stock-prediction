@@ -15,6 +15,7 @@ summary names a watchlist company: case-insensitive whole-word matching on each 
 `wire_names` (full company names; default its name and aliases) after removing the
 `news.wire_exclude` phrases; `skipped_off_watchlist` counts the rest.
 Exit code 1 only if every feed failed."""
+
 from __future__ import annotations
 
 import json
@@ -23,15 +24,24 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
-from marketbrief.analytics.news_tags import (TAG_VERSION, Tagger, article_id, company_queries, item_id,
-                                             source_domain)
+from marketbrief.analytics.news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
 from marketbrief.constants.columns import COL_ID, COL_TITLE
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_NEWS
 from marketbrief.constants.kinds import KIND_NEWS
-from marketbrief.constants.news import (COLLECTOR_NEWS, DEFAULT_CATEGORY, DEFAULT_QUERY_TEMPLATE, DEFAULT_WINDOW,
-                                        FEED_PREFIX_GNEWS, FETCH_ATTEMPTS, MAX_AGE_DAYS, PERMANENT_STATUSES,
-                                        RETRY_PAUSE_SECONDS, SEEN_LOOKBACK_DAYS, SOCKET_TIMEOUT_SECONDS,
-                                        TITLE_SEPARATOR)
+from marketbrief.constants.news import (
+    COLLECTOR_NEWS,
+    DEFAULT_CATEGORY,
+    DEFAULT_QUERY_TEMPLATE,
+    DEFAULT_WINDOW,
+    FEED_PREFIX_GNEWS,
+    FETCH_ATTEMPTS,
+    MAX_AGE_DAYS,
+    PERMANENT_STATUSES,
+    RETRY_PAUSE_SECONDS,
+    SEEN_LOOKBACK_DAYS,
+    SOCKET_TIMEOUT_SECONDS,
+    TITLE_SEPARATOR,
+)
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -45,7 +55,9 @@ socket.setdefaulttimeout(SOCKET_TIMEOUT_SECONDS)
 def google_news_url(query: str, settings: dict) -> str:
     """The Google News RSS search URL of a query (window and parameters from the config)."""
     query = f"{query} when:{settings.get('window', DEFAULT_WINDOW)}"
-    params = "&".join(f"{k}={quote_plus(str(v))}" for k, v in settings.get("params", {}).items())
+    params = "&".join(
+        f"{param_name}={quote_plus(str(param_value))}" for param_name, param_value in settings.get("params", {}).items()
+    )
     return f"{settings['base']}?q={quote_plus(query)}&{params}"
 
 
@@ -57,15 +69,23 @@ def build_jobs(feeds: dict, watchlist: dict) -> list[dict]:
         template = google.get("query_template", DEFAULT_QUERY_TEMPLATE)
         for _ticker, query in company_queries(watchlist, template):
             # the query only finds candidates: many results never name the company
-            jobs.append({"url": google_news_url(query, google), "feed": f"{FEED_PREFIX_GNEWS}{query}",
-                         "category": "company"})
+            jobs.append(
+                {"url": google_news_url(query, google), "feed": f"{FEED_PREFIX_GNEWS}{query}", "category": "company"}
+            )
         for category, queries in feeds.get("categories", {}).items():
             for query in queries:
-                jobs.append({"url": google_news_url(query, google), "feed": f"{FEED_PREFIX_GNEWS}{query}",
-                             "category": category})
+                jobs.append(
+                    {"url": google_news_url(query, google), "feed": f"{FEED_PREFIX_GNEWS}{query}", "category": category}
+                )
     for outlet in feeds.get("outlets", []):
-        jobs.append({"url": outlet["url"], "feed": outlet["name"], "category": outlet.get("category", DEFAULT_CATEGORY),
-                     "watchlist_only": bool(outlet.get("watchlist_only"))})
+        jobs.append(
+            {
+                "url": outlet["url"],
+                "feed": outlet["name"],
+                "category": outlet.get("category", DEFAULT_CATEGORY),
+                "watchlist_only": bool(outlet.get("watchlist_only")),
+            }
+        )
     return jobs
 
 
@@ -100,6 +120,7 @@ class NewsCollector:
     """One run over the feed jobs of a market."""
 
     def __init__(self, watchlist: dict):
+        """The news collector's watchlist and market."""
         self.watchlist, self.market = watchlist, watchlist[CFG_MARKET]
         self.feeds = watchlist.get(CFG_NEWS, {})
         self.tagger = Tagger(watchlist)
@@ -114,11 +135,12 @@ class NewsCollector:
         """Note an outlet feed that answers but has nothing recent (it has stopped updating)."""
         if job["feed"].startswith(FEED_PREFIX_GNEWS):
             return
-        if any(t is None or self.now_dt - t <= MAX_AGE for t in times):
+        if any(ticker is None or self.now_dt - ticker <= MAX_AGE for ticker in times):
             return
-        newest = max((t for t in times if t), default=None)
-        self.stale.append({"feed": job["feed"], "entries": len(times),
-                           "newest": newest.isoformat() if newest else None})
+        newest = max((ticker for ticker in times if ticker), default=None)
+        self.stale.append(
+            {"feed": job["feed"], "entries": len(times), "newest": newest.isoformat() if newest else None}
+        )
 
     def add_entry(self, job: dict, entry) -> None:
         """Turn one feed entry into a news row unless it is empty, old, seen, or off the watchlist."""
@@ -134,28 +156,36 @@ class NewsCollector:
             return
         domain = source_domain(source_info.get("href"))
         news_id = item_id(title, source, domain)
-        if news_id in self.seen or article_id(title, source) in self.seen:   # also ids stored before domains
+        if news_id in self.seen or article_id(title, source) in self.seen:  # also ids stored before domains
             return
         # headline first; the plain-text summary only when the title names no company
         tags = self.tagger.classify_item(title, entry.get("summary"), source, wire=job.get("watchlist_only", False))
         if job.get("watchlist_only") and not tags["tickers"]:
-            self.skipped_off_watchlist += 1   # wire feeds: keep only releases naming a watchlist company
+            self.skipped_off_watchlist += 1  # wire feeds: keep only releases naming a watchlist company
             return
         if news_id in self.items:  # same article from several feeds: tags come from its text, keep the first
             return
         self.items[news_id] = {
-            COL_ID: news_id, COL_TITLE: title, "url": entry.get("link"), "source": source,
+            COL_ID: news_id,
+            COL_TITLE: title,
+            "url": entry.get("link"),
+            "source": source,
             "published_at": published.isoformat() if published else None,
-            "first_seen_at": self.now, "feed": job["feed"], "category": job["category"],
-            **tags, "source_domain": domain, "tag_version": TAG_VERSION,
+            "first_seen_at": self.now,
+            "feed": job["feed"],
+            "category": job["category"],
+            **tags,
+            "source_domain": domain,
+            "tag_version": TAG_VERSION,
         }
 
     def run_job(self, job: dict) -> None:
         """Fetch one feed and add its entries."""
         parsed, status = fetch_with_retry(job["url"])
         if is_failed(parsed, status):
-            self.failed.append({"feed": job["feed"], "status": status,
-                                "error": str(parsed.get("bozo_exception", ""))[:200]})
+            self.failed.append(
+                {"feed": job["feed"], "status": status, "error": str(parsed.get("bozo_exception", ""))[:200]}
+            )
             return
         self.check_stale(job, [parse_time(entry) for entry in parsed.entries])
         for entry in parsed.entries:
@@ -167,9 +197,20 @@ class NewsCollector:
         for job in jobs:
             self.run_job(job)
         written = append_jsonl(day_file(self.market, KIND_NEWS, utc_today()), self.items.values())
-        print(json.dumps({SUMMARY_COLLECTOR: COLLECTOR_NEWS, SUMMARY_MARKET: self.market, "feeds": len(jobs),
-                          SUMMARY_FAILED: self.failed, "stale": self.stale, "new_items": written,
-                          "skipped_off_watchlist": self.skipped_off_watchlist}, indent=2))
+        print(
+            json.dumps(
+                {
+                    SUMMARY_COLLECTOR: COLLECTOR_NEWS,
+                    SUMMARY_MARKET: self.market,
+                    "feeds": len(jobs),
+                    SUMMARY_FAILED: self.failed,
+                    "stale": self.stale,
+                    "new_items": written,
+                    "skipped_off_watchlist": self.skipped_off_watchlist,
+                },
+                indent=2,
+            )
+        )
         return 1 if jobs and len(self.failed) == len(jobs) else 0
 
 

@@ -3,6 +3,7 @@ macro, shorts, flows_india) and the NSE collectors.
 
 The HTTP clients are in marketbrief/sources/ and FetchError is marketbrief/sources/errors.py. Tests pass a fake
 client with the same `get` method, so nothing here touches the network."""
+
 from __future__ import annotations
 
 import json
@@ -11,9 +12,17 @@ from datetime import date
 
 from marketbrief.constants.columns import COL_COMPLETE, COL_DATE, COL_ID
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
-from marketbrief.constants.statuses import (SUMMARY_ALLOWLIST, SUMMARY_ALLOWLIST_NEEDED, SUMMARY_COLLECTOR,
-                                            SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_NEW, SUMMARY_NOTES,
-                                            SUMMARY_REQUESTS, SUMMARY_WARNINGS)
+from marketbrief.constants.statuses import (
+    SUMMARY_ALLOWLIST,
+    SUMMARY_ALLOWLIST_NEEDED,
+    SUMMARY_COLLECTOR,
+    SUMMARY_FAILED,
+    SUMMARY_MARKET,
+    SUMMARY_NEW,
+    SUMMARY_NOTES,
+    SUMMARY_REQUESTS,
+    SUMMARY_WARNINGS,
+)
 from marketbrief.core.calendar import prev_session
 from marketbrief.core.paths import data_dir
 from marketbrief.core.storage import append_jsonl, day_file
@@ -25,6 +34,7 @@ NOT_PUBLISHED_STATUSES = (403, 404)
 @dataclass
 class Problems:
     """What went wrong or is worth a note in one collector run: the summary's failed, notes and warnings lists."""
+
     failed: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
@@ -69,7 +79,7 @@ def store_changed(market: str, kind: str, rows: list[dict], today: date, value_c
     fresh: dict[str, dict] = {}
     for row in rows:
         old = stored.get(row[COL_ID])
-        if old is None or any(old.get(c) != row.get(c) for c in value_cols):
+        if old is None or any(old.get(column) != row.get(column) for column in value_cols):
             fresh[row[COL_ID]] = row
     return append_jsonl(day_file(market, kind, today), fresh.values()) if fresh else 0
 
@@ -77,9 +87,16 @@ def store_changed(market: str, kind: str, rows: list[dict], today: date, value_c
 def summary(collector: str, market: str, new: dict, problems: Problems, client) -> dict:
     """A collector's JSON summary; names the hosts to allowlist when the egress proxy refused some."""
     failed, notes, warnings = problems.failed, problems.notes, problems.warnings
-    out = {SUMMARY_COLLECTOR: collector, SUMMARY_MARKET: market, SUMMARY_NEW: new, SUMMARY_FAILED: failed,
-           SUMMARY_WARNINGS: warnings, SUMMARY_NOTES: notes, SUMMARY_REQUESTS: getattr(client, "requests", None)}
-    hosts = sorted({f[SUMMARY_ALLOWLIST] for f in failed if f.get(SUMMARY_ALLOWLIST)})
+    out = {
+        SUMMARY_COLLECTOR: collector,
+        SUMMARY_MARKET: market,
+        SUMMARY_NEW: new,
+        SUMMARY_FAILED: failed,
+        SUMMARY_WARNINGS: warnings,
+        SUMMARY_NOTES: notes,
+        SUMMARY_REQUESTS: getattr(client, "requests", None),
+    }
+    hosts = sorted({failure[SUMMARY_ALLOWLIST] for failure in failed if failure.get(SUMMARY_ALLOWLIST)})
     if hosts:
         out[SUMMARY_ALLOWLIST_NEEDED] = hosts
     return out
