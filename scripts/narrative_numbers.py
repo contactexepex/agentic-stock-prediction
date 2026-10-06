@@ -34,7 +34,11 @@ MASKS = [re.compile(p, re.I) for p in (
     r"\b\d{4}-\d{2}-\d{2}(?:T[\d:.+Z-]+)?\b", r"\b\d{4}-W\d{2}\b",
     rf"\b{MONTHS}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?(?:\s*[-–]\s*(?:{MONTHS}\.?\s+)?\d{{1,2}})?(?:,?\s+\d{{4}})?\b",
     rf"\b\d{{1,2}}(?:st|nd|rd|th)?\s*(?:[-–]\s*\d{{1,2}}\s+)?{MONTHS}\b(?:,?\s+\d{{4}})?",
-    r"\b\d{1,2}:\d{2}(?::\d{2})?\b", r"\b(?:19|20)\d{2}\b",
+    r"\b\d{1,2}:\d{2}(?::\d{2})?\b",
+    # a year: no decimals, no currency before, no unit after ("Rs 1915.85", "1950 crore" are amounts)
+    r"(?<![₹$\d.,])(?<!Rs)(?<!Rs\s)(?<!Rs\.)(?<!Rs\.\s)(?<!₹\s)(?<!\$\s)(?<!USD\s)(?<!INR\s)"
+    r"\b(?:19|20)\d{2}\b(?![.,]\d)"
+    r"(?!\s?(?:%|pp\b|bps?\b|x\b|k\b|cr\b|crore|lakh|mn\b|million|bn\b|billion|tn\b|trillion))",
     r"\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]*\w\b",      # tokens mixing letters and digits: 5d, Q2, FY26, W40, 10y
     r"^\s*(?:\d+[.)]|#+)\s",                             # list numbering, headings
 )]
@@ -130,6 +134,7 @@ class Pool:
         self.ents = ents
         self._raw: dict = defaultdict(lambda: {"pct": set(), "plain": set()})
         self._sorted: dict | None = None
+        self.notes: list[str] = []     # sources that could not be read (validate.py info.number_sources)
 
     def add(self, scope, kind: str, value) -> None:
         try:
@@ -220,5 +225,5 @@ def collector_summaries(pool: Pool, paths) -> None:
     for p in paths:
         try:
             pool.add_json(json.loads(p.read_text(encoding="utf-8")))
-        except (OSError, json.JSONDecodeError):
-            continue
+        except (OSError, json.JSONDecodeError) as e:
+            pool.notes.append(f"collector summary {p.name} unreadable ({e})")

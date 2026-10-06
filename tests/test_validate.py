@@ -306,6 +306,18 @@ def test_number_extraction_skips_dates_ids_and_names():
     assert nums(text) == ["1.2%", "$1,310.60"]
 
 
+def test_years_are_ignored_but_amounts_in_the_year_band_are_checked():
+    assert nums("ITC fell Rs 1915.85") == ["Rs 1915.85"]
+    assert nums("TCS rose 2050.3%") == ["2050.3%"]
+    assert nums("a 1950 crore order") == ["1950 crore"]
+    assert nums("₹1915.85, $2050 and 1999.5") == ["₹1915.85", "$2050", "1999.5"]
+    assert nums("in 2026, FY2026 guidance, on 2026-10-05, by 2030") == []
+    pool = pool_of(AAPL=[("plain", 1915.85)])
+    assert passes(pool, "AAPL fell to Rs 1915.85 in 2026.")
+    assert not passes(pool, "AAPL fell to Rs 1916.85 in 2026.")       # an invented amount in the year band
+    assert not passes(pool, "AAPL won a 1950 crore order.")
+
+
 def pool_of(**scoped) -> nn.Pool:
     """A pool from {scope: [(kind, value), ...]}; scope "market" = market level (None)."""
     pool = nn.Pool(ENTS)
@@ -363,6 +375,11 @@ def test_collector_summaries_are_sources_but_validate_outputs_are_not(root):
     (steps / "collect_news.json").write_text(json.dumps({"collector": "news", "feeds": 31, "new_items": 72}))
     pool = v.build_pool(CFG, common.connect(MARKET), v.load_config(), TODAY, [])
     assert passes(pool, "News: 31 feeds, 72 new items.")
+    assert passes(pool, "Quotes 15/15, news 31 feeds with 72 new items.")       # the real India lines
+    assert not passes(pool, "News: 47 feeds.")
+    (steps / "collect_quotes.json").write_text("{not json")
+    pool = v.build_pool(CFG, common.connect(MARKET), v.load_config(), TODAY, [])
+    assert any("collect_quotes.json" in n for n in pool.notes)                  # noted, not swallowed
 
 
 def test_planted_invented_percentages_are_caught(root):

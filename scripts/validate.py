@@ -567,10 +567,13 @@ def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):
 
 # ---------- report: numbers in narrative (matching in narrative_numbers.py) ----------
 
-def records(con, sql: str, params=()) -> list[dict]:
+def records(con, sql: str, params=(), notes: list | None = None) -> list[dict]:
+    """Rows of a source query; a failure (e.g. a view a market does not have) is noted, not raised."""
     try:
         return con.execute(sql, list(params)).df().to_dict("records")
-    except Exception:  # noqa: BLE001 - a kind a market does not have
+    except Exception as e:  # noqa: BLE001 - noted in info.number_sources
+        if notes is not None:
+            notes.append(f"source query skipped ({type(e).__name__}: {str(e).splitlines()[0][:120]}): {sql[:80]}")
         return []
 
 
@@ -581,27 +584,29 @@ def build_pool(cfg: dict, con, vc: dict, today: date, texts: list[str]) -> nn.Po
     market-level rows (regime, row counts), collector summaries, and the text of recent news,
     filings and announcements under their own ids."""
     pool = nn.Pool(nn.Entities(cfg))
+    notes = pool.notes
     for t in texts:
         pool.add_text(t, pct_sections=True)
     pool.add_rows(records(con, "SELECT DISTINCT ON (ticker) * EXCLUDE (warnings) FROM features_latest "
-                               "ORDER BY ticker, as_of_date DESC"), "ticker")
-    pool.add_rows(records(con, "SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1"), None)
-    pool.add_rows(records(con, "SELECT * FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)"),
+                               "ORDER BY ticker, as_of_date DESC", notes=notes), "ticker")
+    pool.add_rows(records(con, "SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1", notes=notes), None)
+    pool.add_rows(records(con, "SELECT * FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)",
+                          notes=notes),
                   "ticker")
     pool.add_rows(records(con, "SELECT symbol, price, prev_close, change_pct FROM quotes WHERE collected_at >= ?",
-                          [today - timedelta(days=3)]), "symbol")
+                          [today - timedelta(days=3)], notes), "symbol")
     pool.add_rows(records(con, "SELECT ticker, close, ret_1d, ret_5d, ret_20d FROM returns WHERE date >= ?",
-                          [today - timedelta(days=10)]), "ticker")
+                          [today - timedelta(days=10)], notes), "ticker")
     # row counts the narrative may quote ("902 headlines"): per kind today and in total
     for kind, col in (*FETCH_COL.items(), ("news_enriched", "analyzed_at"), ("predictions", "made_at"),
                       ("ranges", "made_at"), ("events", "first_seen_at")):
         for v in (records(con, f"SELECT count(*) FILTER (WHERE CAST({col} AS DATE) = ?) AS a, count(*) AS b FROM {kind}",
-                          [today]) or [{}])[0].values():
+                          [today], notes) or [{}])[0].values():
             pool.add(None, "plain", v)
         # rows per fetch batch today ("72 new items"): one batch per first_seen/collected minute
         if kind in FETCH_COL:
             for r in records(con, f"SELECT count(*) AS n FROM {kind} WHERE CAST({col} AS DATE) = ? "
-                                  f"GROUP BY date_trunc('minute', {col})", [today]):
+                                  f"GROUP BY date_trunc('minute', {col})", [today], notes):
                 pool.add(None, "plain", r["n"])
     # configured counts: watchlist size, market symbols, news feeds ("31 feeds")
     pool.add(None, "plain", len(cfg["tickers"]))
@@ -609,8 +614,8 @@ def build_pool(cfg: dict, con, vc: dict, today: date, texts: list[str]) -> nn.Po
     try:
         import collect_news
         pool.add(None, "plain", len(collect_news.build_jobs(cfg.get("news") or {}, cfg)))
-    except Exception:  # noqa: BLE001 - only a source of numbers
-        pass
+    except Exception as e:  # noqa: BLE001 - only a source of numbers: noted, the check goes on
+        notes.append(f"news feed count unavailable ({type(e).__name__}: {e})")
     steps = work_dir() / "steps"
     nn.collector_summaries(pool, sorted(steps.glob("collect_*.json")) if steps.exists() else [])
     since = today - timedelta(days=vc["narrative_news_days"])
@@ -705,6 +710,8 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
     pack = work_dir() / "context.md"
     pool = build_pool(cfg, con, vc, today, [skel_r or "", skel_s or "",
                                             pack.read_text(encoding="utf-8") if pack.exists() else ""])
+    if pool.notes:
+        res.info["number_sources"] = pool.notes
     small = vc["narrative_small_int"]
     targets = [(report_path, agent_lines(filled, skel_r or ""))]
     if slack is not None:
