@@ -101,6 +101,20 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "id": "VARCHAR", "date": "DATE", "ticker": "VARCHAR", "source": "VARCHAR", "url": "VARCHAR",
         "filled_at": "TIMESTAMPTZ",
     }),
+    # Splits and bonus issues (issue #31; scripts/adjust.py, detected by collect_prices.py), one row
+    # per corporate action, files dated by the ex-date. factor = price multiplier for every bar
+    # before ex_date (0.5 for a 1:1 bonus or a 2:1 split), volume_factor = 1/factor; the ohlc and
+    # bars views apply them on read (ohlc_raw, bars_raw: as stored). source: yahoo_splits (a
+    # `Stock Splits` row in Yahoo's frame) or nse_prev_close (NSE's bhavcopy; India). Evidence:
+    # check_date = the stored bar compared, stored_close and yahoo_close its two closes,
+    # measured_factor = yahoo_close / stored_close, yahoo_ratio = Yahoo's split value,
+    # nse_prev_close / nse_ex_close = the bhavcopy's PREV_CLOSE and close on the ex-date.
+    "adjustments": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "ex_date": "DATE", "factor": "DOUBLE",
+        "volume_factor": "DOUBLE", "source": "VARCHAR", "yahoo_ratio": "DOUBLE", "check_date": "DATE",
+        "stored_close": "DOUBLE", "yahoo_close": "DOUBLE", "measured_factor": "DOUBLE",
+        "nse_prev_close": "DOUBLE", "nse_ex_close": "DOUBLE", "url": "VARCHAR", "detected_at": "TIMESTAMPTZ",
+    }),
     "quotes": ("jsonl", {
         "symbol": "VARCHAR", "yahoo": "VARCHAR", "ts": "TIMESTAMPTZ", "price": "DOUBLE",
         "prev_close": "DOUBLE", "change_pct": "DOUBLE", "collected_at": "TIMESTAMPTZ",

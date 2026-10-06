@@ -50,6 +50,9 @@ prices/  Trimmed REAL bhavcopies for tests/test_price_fallback.py, fetched live 
        HDFCBANK's 1:1 bonus (ex-date 2025-08-26): its bhavcopy row is as traded (close 1964.60),
        while our stored Yahoo bars of those days are bonus-adjusted (2025-08-21 close 995.6).
        Kept out of real/ so the delivery replay (lookback from 2026-10-05) does not pick them up.
+       26082025 (fetched 2026-10-06 about 08:14 UTC for tests/test_split_adjust.py; header + the
+       first 2 rows + the HDFCBANK and INFY rows of 2,953, in file order): HDFCBANK's ex-date, as
+       traded (close 973.40) with an unadjusted PREV_CLOSE 1964.10 (its 25-Aug close).
 
 synthetic/  Hand-written SYNTHETIC files for cases the real responses on that day cannot show:
        a director's large market sale and a promoter pledge creation (corporates-pit-gg.json +

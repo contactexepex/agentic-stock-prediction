@@ -93,6 +93,50 @@ price vs 20-day high, ATR(14), 10-day realized vol, Bollinger width, OBV trend, 
 **Regime:** Calm / Trending / Event-heavy / Unstable from VIX, index 5-day return and volatility,
 and the event calendar.
 
+**Price basis: splits and bonus issues (issue #31, added 2026-10-06).** yfinance's `Close`
+(auto_adjust=False) is not dividend-adjusted but is split/bonus-adjusted as of the collection time,
+and a stored bar is written once. After a future split or bonus the bars stored before its ex-date
+would stay on the old basis and the new ones come on the new basis (a fake ~-50% day for a 1:1
+bonus). History stored so far is consistent: it was downloaded in one go (HDFCBANK's 1:1 bonus of
+2025-08-26 is already applied to every earlier stored bar), and on 2026-10-06 no stored bar of
+either market moved more than 35% in a day except the vol indices (INDIAVIX 2025-04-07 +65.6%, VIX
+2024-12-18 +74.0% and four days in 2025-04 and 2026-06, real volatility spikes), so no adjustment is
+recorded for the past. Design (adjust on read; data stays append-only):
+- Detection (`collect_prices.py`, both markets, `scripts/adjust.py`): before a symbol's new bars
+  are written, Yahoo's frame (today's basis) is compared with our stored closes of the same dates.
+  A `Stock Splits` row (ex-date E, ratio r) is recorded once as `data/<market>/adjustments/YYYY/MM/<E>.jsonl`
+  (id `<ticker>-<E>`, `factor` = 1/r = price multiplier for every bar before E, `volume_factor` =
+  r, `source` `yahoo_splits`, the compared date and closes as evidence, `detected_at`) when every
+  stored close in the frame before E (after any earlier split row) is Yahoo's x 1/factor within
+  1%. Stored closes already equal to Yahoo's (collected after the split) or no stored bar before E:
+  nothing to record. India: a re-based close with no split row is recorded (`nse_prev_close`) only
+  when NSE's bhavcopy of the presumed ex-date confirms it: its PREV_CLOSE (as traded, not adjusted:
+  HDFCBANK 26-Aug-2025 1964.10) equals our stored close of the session before (within 0.5%), the
+  re-based ratio Yahoo/stored is the same on every stored date up to then and within 0.1% of a
+  simple fraction p/q (p, q <= 20), Yahoo's close / PREV_CLOSE matches that fraction within 1%,
+  and the traded close on the ex-date stepped by about it (0.8-1.25x of the factor). Every other mismatch above 2% (mixed ratios, a
+  split row with no stored bar in the window to compare, an unconfirmed re-based close) goes to the
+  summary's `warnings` (validate.py: `PRICE_BASIS`), never to a record. An overlap ratio alone is
+  never a source. Dividends are never adjusted (ex-dividend handling is separate, in ranges).
+- After a recorded split, an older bar Yahoo serves on the new basis (a gap it fills late) is
+  written on its date's stored basis (prices / factor, volume x factor; summary `rebased_bars`),
+  and a recorded split no longer blocks the bhavcopy fallback (the as-traded bar fits the views).
+- Apply on read (`sql/views.sql`): `ohlc` and `bars` multiply each stored bar's prices by the
+  product of the factors of the ticker's adjustments with an ex-date after the bar (`bar_factors`,
+  exactly 1 with none) and divide its volume by it, so features, ranges, calibration, backtest,
+  replay, review, context, charts and the HTML report (all read `ohlc`/`bars`, via `load_bars`)
+  see one basis; `ohlc_raw` and `bars_raw` keep the bars as stored for audits; `deals_scored` puts
+  the adjusted average volume back on the deal date's basis. Stored features/regime rows stay as
+  written (snapshots); recomputed ones see no jump.
+- Scoring (`score_predictions.py`): a call's base and target closes both come from `bars`, so its
+  return is right across an ex-date; the closes stored in its outcome, and a range's target close,
+  are put in the basis the record was made on: view close / k, where k is the product of the
+  factors of adjustments with an ex-date after its as-of (base) date that were detected after its
+  `made_at` (1 otherwise). So stored edges, `actual_close` and `range_record` never mix bases.
+- As-of replay roots (`ai_replay.py prepare`): an adjustment is kept when its ex-date is on or
+  before D, whatever its `detected_at`: a root before the ex-date shows the bars exactly as stored
+  (as the live run saw them); after it, all bars on bar D's basis. Neo4j does not project the kind.
+
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
    where available, implied vol. Range = quantiles of recent standardized returns scaled by that

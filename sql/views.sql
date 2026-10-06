@@ -1,15 +1,45 @@
 -- Derived views on top of the base views created in scripts/common.py
--- (news, news_enriched, filings, predictions, outcomes, prices).
+-- (news, news_enriched, filings, predictions, outcomes, prices, adjustments, ...).
 -- Ad hoc aggregation example (swap the interval for 1 day, 1 week, 1 month):
 --   SELECT ticker, time_bucket(INTERVAL '2 weeks', day) AS period,
 --          count(*) AS articles, avg(sentiment) AS avg_sentiment
 --   FROM news_ticker_day GROUP BY ALL ORDER BY period;
 
--- One bar per ticker per trading day, numbered so horizons count trading days.
+-- Splits and bonus issues (issue #31; scripts/adjust.py): one row per corporate action, the
+-- first detected wins. Applied on read by ohlc and bars below.
+CREATE OR REPLACE VIEW price_adjustments AS
+SELECT DISTINCT ON (id) * FROM adjustments ORDER BY id, detected_at;
+
+-- Daily bars as stored (one per ticker per date, latest collection wins), for audits.
+CREATE OR REPLACE VIEW ohlc_raw AS
+SELECT ticker, date, open, high, low, close, adj_close, volume, collected_at
+FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC);
+
+-- Price multiplier per stored bar: the product of the factors of the ticker's adjustments with an
+-- ex-date after the bar (1 when none), which puts every bar on the newest basis.
+CREATE OR REPLACE VIEW bar_factors AS
+SELECT o.ticker, o.date, coalesce(product(a.factor), 1.0) AS factor
+FROM ohlc_raw o LEFT JOIN price_adjustments a ON a.ticker = o.ticker AND a.ex_date > o.date
+GROUP BY o.ticker, o.date;
+
+-- Full daily bars on one basis: prices x factor, volume / factor (rounded). With no adjustment the
+-- factor is exactly 1 and the bars are the stored ones. Every price consumer reads this (or bars).
+CREATE OR REPLACE VIEW ohlc AS
+SELECT o.ticker, o.date, o.open * f.factor AS open, o.high * f.factor AS high, o.low * f.factor AS low,
+       o.close * f.factor AS close, CAST(round(o.volume / f.factor) AS BIGINT) AS volume
+FROM ohlc_raw o JOIN bar_factors f USING (ticker, date);
+
+-- One bar per ticker per trading day, numbered so horizons count trading days (adjusted basis).
 CREATE OR REPLACE VIEW bars AS
 SELECT ticker, date, close,
        row_number() OVER (PARTITION BY ticker ORDER BY date) AS rn
-FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC);
+FROM ohlc;
+
+-- The same as stored (no split/bonus adjustment), for audits.
+CREATE OR REPLACE VIEW bars_raw AS
+SELECT ticker, date, close,
+       row_number() OVER (PARTITION BY ticker ORDER BY date) AS rn
+FROM ohlc_raw;
 
 CREATE OR REPLACE VIEW returns AS
 SELECT ticker, date, close,
@@ -61,16 +91,11 @@ CREATE OR REPLACE VIEW track_record AS
 SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at
 FROM predictions p JOIN outcomes o ON o.prediction_id = p.id;
 
--- Full daily bars (one per ticker per date, latest collection wins).
-CREATE OR REPLACE VIEW ohlc AS
-SELECT ticker, date, open, high, low, close, volume
-FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC);
-
 -- Where each stored bar came from: 'yahoo' unless data/<market>/price_sources/ names another
 -- source (India: 'nse_bhavcopy', bars collect_prices.py filled from NSE's bhavcopy).
 CREATE OR REPLACE VIEW bar_sources AS
 SELECT o.ticker, o.date, coalesce(s.source, 'yahoo') AS source, s.url, s.filled_at
-FROM ohlc o
+FROM ohlc_raw o
 LEFT JOIN (SELECT DISTINCT ON (ticker, date) * FROM price_sources ORDER BY ticker, date, filled_at) s
 USING (ticker, date);
 
@@ -124,14 +149,21 @@ FROM options ORDER BY ticker, expiry, CAST(collected_at AS DATE), collected_at D
 CREATE OR REPLACE VIEW insider_trades AS
 SELECT DISTINCT ON (id) * FROM insiders ORDER BY id, first_seen_at;
 
--- Bulk/block deals sized against the stock's average volume over the 20 sessions before.
+-- Bulk/block deals sized against the stock's average volume over the 20 sessions before. The
+-- deal's shares are as traded on its date; the average (adjusted ohlc volume, newest basis) is put
+-- back on that date's basis by the factors of the adjustments after it (1 when none).
 CREATE OR REPLACE VIEW deals_scored AS
 WITH adv AS (
     SELECT ticker, date, avg(volume) OVER (PARTITION BY ticker ORDER BY date
                                            ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) AS adv20
     FROM ohlc
-), d AS (SELECT DISTINCT ON (id) * FROM deals ORDER BY id, first_seen_at)
-SELECT d.*, round(d.value / 1e7, 2) AS value_crore, round(d.shares / nullif(adv.adv20, 0), 3) AS adv_ratio
+), d AS (
+    SELECT x.*, coalesce((SELECT product(a.factor) FROM price_adjustments a
+                          WHERE a.ticker = x.ticker AND a.ex_date > x.date), 1.0) AS _f
+    FROM (SELECT DISTINCT ON (id) * FROM deals ORDER BY id, first_seen_at) x
+)
+SELECT d.* EXCLUDE (_f), round(d.value / 1e7, 2) AS value_crore,
+       round(d.shares / nullif(adv.adv20 * d._f, 0), 3) AS adv_ratio
 FROM d ASOF LEFT JOIN adv ON d.ticker = adv.ticker AND d.date >= adv.date;
 
 -- One row per ticker and quarter (latest record per source wins). promoter_pct is the

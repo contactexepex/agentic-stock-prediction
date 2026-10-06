@@ -89,6 +89,9 @@ Warnings never block: list them in `data_quality`.
    "bar from the NSE bhavcopy (Yahoo had none)"; they are official exchange prices, not a failure.
    Its `failed` entries with `missing_after_nse` (e.g. a price-basis mismatch after a split or
    bonus) or `sessions_behind` are real gaps: list them like any other failure.
+   Both markets: list `collect_prices`' `adjustments` (a split or bonus recorded today; the bars
+   views apply it, so the price history has no jump) and its `warnings` (a re-based Yahoo close
+   no source confirms: that ticker's history may show a fake jump) in `data_quality`.
    A failed collector is not fatal: continue and report what failed (an `allowlist_needed`
    entry names a domain the environment's network settings must allow).
    Relationships (SEC, US; other markets print `skipped`): also run `collect_insiders.py`

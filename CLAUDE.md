@@ -13,7 +13,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
   Collectors: `collect_prices` (India: a watchlist bar Yahoo lacks for a recent session comes
   from NSE's bhavcopy when its price basis checks out, listed in `filled_from_nse` and recorded in
-  `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config), `collect_quotes`, `collect_events` (also backfills past earnings
+  `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config; both markets:
+  a split or bonus confirmed by a Yahoo `Stock Splits` row, or for India by NSE's bhavcopy, is recorded
+  once in `data/<market>/adjustments/` (`scripts/adjust.py`) and applied on read by the `ohlc`/`bars`
+  views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-based close is only a `warnings` entry;
+  DESIGN.md section 3), `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
@@ -112,7 +116,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except
-  prices/price_sources/features/regime which use the trading date)
+  prices/price_sources/features/regime which use the trading date, and adjustments: the ex-date)
 - `summaries/<market>/daily|weekly|monthly/` layered narrative memory written by Claude
 - `reports/<market>/<session_date>.md` the daily report (agent-editable source);
   `reports/<market>/<session_date>.html` the self-contained reader's report linked from Slack
