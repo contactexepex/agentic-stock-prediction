@@ -26,6 +26,17 @@ python tests/golden/golden.py record  [--dir work/golden]   # once, on the commi
 python tests/golden/golden.py compare [--dir work/golden]   # after the step: exit 0 = identical
 ```
 
+Both run the parallel schedule by default (`tests/golden/parallel.py`): the two markets at once, each
+on its own copy of the seeded root (a sibling directory whose path has the run directory's length),
+and within a market up to `--jobs` (default 3) steps at a time where they do not conflict. A step
+waits for every earlier step of its phase that writes what it reads or reads or writes what it
+writes; the reads and writes of each step are declared in `ACCESS` (data kinds, checked against the
+step's SQL, and named work/report files), and a step without a declaration waits for every earlier
+step. The late phase starts after the pre_open phase. Each market's copy is then merged back into the
+run directory in market order (its path rewritten to the run directory's). `--serial` runs every
+step in list order in one root, as the harness did before. Both give the same bytes, so a record of
+either compares with the other.
+
 Fixed inputs:
 - `data/`, `config/` and `reports/` extracted with `git archive` from commit
   `24749bdc4835bff242b2683f83e85f2a7e3a2ab0` (`INPUT_COMMIT`), never the working tree, so daily-run
@@ -143,14 +154,16 @@ How each later step proves byte-identical outputs:
 1. on the base commit of the step (before any change): `python tests/golden/golden.py record`;
 2. make the step's changes;
 3. `python tests/golden/golden.py compare` must print `"identical": true` and exit 0 (it reruns the
-   whole set; about 6 minutes); its output, the base commit and the step's commit go to the judge;
+   whole set; about 2 minutes, `--serial` about 5.5); its output, the base commit and the step's
+   commit go to the judge;
 4. any difference is a blocker, even a float's last digit; the normalisation list above may not grow
    in a refactor step (a new wall-clock field would be a behaviour change).
 
 The recorded set (manifest with hashes and exit codes plus a full copy of every output, used for
 diffs) lives in `work/golden/` (git-ignored). Committed are only `tests/golden/golden.py` (steps,
-runner, hashing, record/compare), `tests/golden/overlay.py` (synthetic inputs), `tests/golden/seed.py`
-and `tests/golden/seed_sources.py` (seeded kinds) and `tests/golden/site/sitecustomize.py`.
+runner, hashing, record/compare), `tests/golden/parallel.py` (the parallel schedule and the merge),
+`tests/golden/overlay.py` (synthetic inputs), `tests/golden/seed.py` and
+`tests/golden/seed_sources.py` (seeded kinds) and `tests/golden/site/sitecustomize.py`.
 Evidence (2026-10-06, harness at bef503b): `record` then two `compare` runs, both
 `"identical": true` over 1621 files with a clean network log; a deliberate change in a seeded module
 (`macro_context`: basis-point changes printed with one decimal) made `compare` fail on the US context

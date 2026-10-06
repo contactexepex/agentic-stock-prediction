@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -160,10 +161,12 @@ def seed_steps() -> list[tuple[str, str, list[str]]]:
     ]
 
 
-def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path) -> None:
+def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path, parallel: bool = False) -> None:
     """Fill a scratch seed root with the collectors, keep a copy in run_dir/seed/root, then copy
     SEED_KINDS into golden_root/data. The seed root lives outside the checkout (a temporary
-    directory): the NSE --replay guard refuses any write target inside a repository."""
+    directory): the NSE --replay guard refuses any write target inside a repository. parallel: the
+    two markets' step lists run at the same time (each list in order; they write different
+    data/<market> folders)."""
     scratch = Path(tempfile.mkdtemp(prefix="mb-golden-seed-"))
     try:
         seed_root = scratch / "root"
@@ -173,25 +176,41 @@ def run_seed(run_dir: Path, golden_root: Path, environment, scripts: Path) -> No
         sec_fixture_map(run_dir / "seed" / "sec")
         rule_rows(seed_root)
         synthetic_nse(run_dir / "seed" / "nse_synthetic")
-        run_seed_steps(run_dir, seed_root, environment, scripts)
+        run_seed_steps(run_dir, seed_root, environment, scripts, parallel)
         shutil.copytree(seed_root, run_dir / "seed" / "root")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     copy_seeded(run_dir / "seed" / "root", golden_root, run_dir / "steps" / "seed")
 
 
-def run_seed_steps(run_dir: Path, seed_root: Path, environment, scripts: Path) -> None:
+def run_seed_steps(run_dir: Path, seed_root: Path, environment, scripts: Path, parallel: bool = False) -> None:
     """Run seed_steps() on seed_root; logs in run_dir/steps/seed/ with the seed root's path as <SEED>."""
     log_dir = run_dir / "steps" / "seed"
     log_dir.mkdir(parents=True)
-    for market, label, command in seed_steps():
-        env = environment(seed_root, market, SEED_CLOCKS[market])
-        env.update({"MB_SEC_FIXTURES": str(run_dir / "seed" / "sec"), "MB_NETGUARD_LOG": str(run_dir / "netguard.log"),
-                    "SEC_USER_AGENT": "market-brief golden golden@example.com"})
-        argv = [a.format(python=sys.executable, seed_dir=run_dir / "seed", fixtures=FIXTURES) for a in command]
-        proc = subprocess.run(argv, cwd=scripts, env=env, capture_output=True, text=True, check=False)
-        for stream, text in (("stdout", proc.stdout), ("stderr", proc.stderr), ("exit", f"{proc.returncode}\n")):
-            (log_dir / f"{market}.{label}.{stream}").write_text(text.replace(str(seed_root.parent), "<SEED>"))
+
+    def run_market(market: str) -> None:
+        for step_market, label, command in seed_steps():
+            if step_market == market:
+                run_seed_step(run_dir, seed_root, environment, scripts, (market, label, command))
+    if parallel:
+        with ThreadPoolExecutor(max_workers=len(SEED_CLOCKS)) as pool:
+            for future in [pool.submit(run_market, market) for market in SEED_CLOCKS]:
+                future.result()
+    else:
+        for step in seed_steps():
+            run_seed_step(run_dir, seed_root, environment, scripts, step)
+
+
+def run_seed_step(run_dir: Path, seed_root: Path, environment, scripts: Path, step: tuple) -> None:
+    market, label, command = step
+    env = environment(seed_root, market, SEED_CLOCKS[market])
+    env.update({"MB_SEC_FIXTURES": str(run_dir / "seed" / "sec"), "MB_NETGUARD_LOG": str(run_dir / "netguard.log"),
+                "SEC_USER_AGENT": "market-brief golden golden@example.com"})
+    argv = [a.format(python=sys.executable, seed_dir=run_dir / "seed", fixtures=FIXTURES) for a in command]
+    proc = subprocess.run(argv, cwd=scripts, env=env, capture_output=True, text=True, check=False)
+    log_dir = run_dir / "steps" / "seed"
+    for stream, text in (("stdout", proc.stdout), ("stderr", proc.stderr), ("exit", f"{proc.returncode}\n")):
+        (log_dir / f"{market}.{label}.{stream}").write_text(text.replace(str(seed_root.parent), "<SEED>"))
 
 
 def copy_seeded(seed_root: Path, golden_root: Path, log_dir: Path) -> None:
