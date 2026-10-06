@@ -43,3 +43,5 @@ MSG_NO_INFORMATION_TABLE = "no information table in filing"
 
 # ---------- 13F holdings ----------
 MSG_REPORTED_BY = "{filer} {period}: reported by {by}"
+MSG_HELD = "{filer} {period}: {held} held"
+MSG_HELD_INCOMPLETE = " (incomplete: {why})"

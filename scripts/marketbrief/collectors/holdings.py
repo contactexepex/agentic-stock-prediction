@@ -59,7 +59,7 @@ from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.sources.sec_acceptance import time_summary, time_warnings
 from marketbrief.sources.sec_client import Edgar, archive_url
 from marketbrief.sources.sec_filings import filings_of_forms, require_sec
-from marketbrief.constants.sec_collection import MSG_REPORTED_BY
+from marketbrief.constants.sec_collection import MSG_HELD, MSG_HELD_INCOMPLETE, MSG_REPORTED_BY
 
 
 def stored(market: str) -> tuple[set[str], dict[str, str]]:
@@ -121,7 +121,8 @@ class HoldingsRun:
         self.rows.append(filing_row(ref, cover["report_type"], n_lines, why is None, why))
         self.rows += to_rows(ref, aggregates, self.tickers if why is None else [], cover["report_type"], why is None)
         held = sum(1 for (_, put_call), a in aggregates.items() if put_call is None and a["shares"] > 0)
-        self.loaded.append(f"{ref.filer} {period}: {held} held" + (f" (incomplete: {why})" if why else ""))
+        message = MSG_HELD.format(filer=ref.filer, period=period, held=held)
+        self.loaded.append(message + (MSG_HELD_INCOMPLETE.format(why=why) if why else ""))
 
     def load_period(self, cik: int, name: str, filing: dict, period: str) -> None:
         """Read one filing (its cover page, then its information table) and add its rows."""
