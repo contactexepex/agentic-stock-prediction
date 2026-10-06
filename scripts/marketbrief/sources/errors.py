@@ -1,4 +1,5 @@
 """The one error type of every source client."""
+
 from __future__ import annotations
 
 from marketbrief.constants.statuses import SUMMARY_ALLOWLIST
@@ -14,6 +15,7 @@ class FetchError(Exception):
     host: set when the egress proxy refused the host (it must be allowlisted)."""
 
     def __init__(self, url: str, error: str, status: int | None = None, host: str | None = None):
+        """A fetch error with the URL, status and host."""
         super().__init__(error)
         self.url, self.error, self.status, self.host = url, error, status, host
 

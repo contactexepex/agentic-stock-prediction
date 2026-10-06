@@ -85,7 +85,6 @@ NEWS_MATERIALITY_KEY = "materiality_weights"
 
 # ---------- messages ----------
 MSG_NO_MODEL_CONFIG = "config/{name} is missing (the signal model's settings; docs/DESIGN.md section 15)"
-MSG_NO_BARS = "no benchmark bars for {key}; run collect_prices.py first"
 MSG_TOO_LITTLE_HISTORY = "not enough resolved labels by {cutoff} to train ({sessions} sessions, need {need})"
 MSG_SCORE_STALE = "{ticker}: newest bar {last} is older than the as-of date {as_of}; no score"
 MSG_EXCLUDED_COVERAGE = "coverage {share:.0%} in the training rows < {need:.0%}"

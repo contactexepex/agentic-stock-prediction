@@ -20,13 +20,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import ai_replay as ar  # noqa: E402
+from marketbrief.replay.ai_replay import ai_html
+from marketbrief.replay.ai_replay import backfill
+from marketbrief.replay.ai_replay import copy_asof
+from marketbrief.replay.ai_replay import cutoff
+from marketbrief.replay.ai_replay import summaries  # noqa: E402
 from marketbrief.utils.numbers import round_or_none  # noqa: E402
 from marketbrief.core.clock import freeze_sql, utc_now, utc_today  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core import calendar as ev  # noqa: E402
-import replay  # noqa: E402
+from marketbrief.replay.rule_replay import replay_statistics  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, fat_tailed_walk, setup, write_bars  # noqa: E402
 
 XNYS = {"market": MARKET, "calendar": "XNYS", "timezone": "America/New_York"}
@@ -354,13 +358,13 @@ def test_score_synthetic():
                   "confidence": 0.7, "prompt_version": "v", "evidence_ids": ["e"]})
     rec.append({"date": str(last), "n_tickers": 4, "eligible": ["UP", "DN", "FL", "XX"], "n_calls": 1,
                 "n_rejected": 0, "citable_ids": 1})
-    full = ar.summarize(cfg, calls, rec, bars)
+    full = summaries.summarize(cfg, calls, rec, bars)
     s = full["fair"]                                    # every sample day is after the training cutoff
     assert full["contaminated"]["n_days"] == 0 and full["contaminated"]["n_calls"] == 0
     assert s["n_calls"] == 13 and s["n_scored"] == 12 and s["n_pending"] == 1
     o = s["overall"]
     assert o["n"] == 12 and o["hits"] == 4                       # only the UP calls hit
-    assert o["ci95"] == [round_or_none(x) for x in replay.wilson(4, 12)]
+    assert o["ci95"] == [round_or_none(x) for x in replay_statistics.wilson(4, 12)]
     assert o["always_up"]["hits"] == 4                           # UP rises; DN falls; FL flat (a miss)
     assert s["by_horizon"]["5"]["n"] == 8 and s["by_horizon"]["5"]["hits"] == 4
     assert s["by_horizon"]["1"]["hit_rate"] == 0.0
@@ -373,7 +377,7 @@ def test_score_synthetic():
     ab = s["abstention"]                                         # 5 days x 4 eligible tickers = 20 slots
     assert ab["5d"] == {"slots": 20, "calls": 9, "abstention_rate": round_or_none(11 / 20)}
     assert ab["1d"]["calls"] == 4 and ab["any"]["ticker_days_with_a_call"] == 13
-    page = ar.html_page(full)
+    page = ai_html.html_page(full)
     assert page.count("<svg") == 2 and page.count("<details") >= 5 and len(s["top"]) == 3
     assert "http" not in page.replace("http-equiv", "")          # self-contained
 
@@ -411,13 +415,13 @@ def test_sample_dates_cli():
         ds = [date.fromisoformat(x["as_of_date"]) for x in out["dates"]]
         all_sessions = [d for d in (date(2026, 7, 1) + timedelta(days=i) for i in range(87)) if ev.is_session(cfg, d)]
         assert ds == all_sessions[::5] and ds[0] == date(2026, 7, 1) and ds[-1] <= date(2026, 9, 25)
-        assert 12 <= len(ds) <= 13 and all(d > ar.training_cutoff() for d in ds)
+        assert 12 <= len(ds) <= 13 and all(d > cutoff.training_cutoff() for d in ds)
         for x in out["dates"]:       # cutoff: before the next session's open, on that session's date
             s = date.fromisoformat(x["session_date"])
             assert datetime.fromisoformat(x["cutoff_utc"]) < ev.session_open_utc(cfg, s)
             assert s == ev.next_session(cfg, date.fromisoformat(x["as_of_date"]), include=False)
-    assert ar.cutoff_for(load_market("us"), date(2026, 7, 1)).isoformat() == "2026-07-02T12:15:00+00:00"
-    assert ar.cutoff_for(load_market("india"), date(2026, 7, 1)).isoformat() == "2026-07-02T02:40:00+00:00"
+    assert cutoff.cutoff_for(load_market("us"), date(2026, 7, 1)).isoformat() == "2026-07-02T12:15:00+00:00"
+    assert cutoff.cutoff_for(load_market("india"), date(2026, 7, 1)).isoformat() == "2026-07-02T02:40:00+00:00"
 
 
 def test_frozen_clock_sql(monkeypatch):
@@ -485,13 +489,13 @@ def test_backfill_config_overrides_scratch_copy_only(tmp_path):
     import yaml
     shutil.copytree(REPO / "config", tmp_path / "config")
     before = (REPO / "config" / "markets" / "us.yaml").read_text()
-    changed = ar.backfill_config(tmp_path / "config", "us", date(2026, 6, 1), date(2026, 10, 5))
+    changed = backfill.backfill_config(tmp_path / "config", "us", date(2026, 6, 1), date(2026, 10, 5))
     assert changed == {"filing_lookback_days": 127, "relationships.insiders.lookback_days": 127,
                        "relationships.stakes.lookback_days": 127}
     cfg = yaml.safe_load((tmp_path / "config" / "markets" / "us.yaml").read_text())
     assert cfg["filing_lookback_days"] == 127 and cfg["relationships"]["stakes"]["lookback_days"] == 127
     assert (REPO / "config" / "markets" / "us.yaml").read_text() == before
-    assert ar.backfill_config(tmp_path / "config", "india", date(2026, 6, 1), date(2026, 10, 5)) == {}
+    assert backfill.backfill_config(tmp_path / "config", "india", date(2026, 6, 1), date(2026, 10, 5)) == {}
 
 
 class FakeNse:
@@ -572,7 +576,7 @@ def test_fair_and_contaminated_scored_separately():
                       "confidence": 0.6, "prompt_version": "v", "evidence_ids": ["e"]})
         rec.append({"date": str(d), "n_tickers": 2, "eligible": ["UP", "DN"], "n_calls": 1, "n_rejected": 0,
                     "citable_ids": 1})
-    s = ar.summarize(cfg, calls, rec, bars, cutoff=cut)
+    s = summaries.summarize(cfg, calls, rec, bars, cutoff=cut)
     f, c = s["fair"], s["contaminated"]
     assert s["model_training_cutoff"] == "2026-06-30" and "never pooled" in s["rule"]
     assert (f["n_days"], f["n_calls"], f["overall"]["hits"]) == (len(late), len(late), 0)
@@ -582,15 +586,16 @@ def test_fair_and_contaminated_scored_separately():
     assert {x["test"] for x in f["calls"]} == {"fair"} and {x["test"] for x in c["calls"]} == {"contaminated"}
     assert {x["test"] for x in f["per_day"]} == {"fair"} and {x["test"] for x in c["per_day"]} == {"contaminated"}
     assert f["abstention"]["any"]["slots"] == 2 * len(late) and c["abstention"]["any"]["slots"] == 2 * len(early)
-    page = ar.html_page(s)
+    page = ai_html.html_page(s)
     assert "Contaminated dates (on or before 2026-06-30): not a fair test" in page
     assert page.count("<td>contaminated</td>") == 2 * len(early)          # per-day and per-call rows
     assert page.count("<td>fair</td>") == 2 * len(late)
     assert page.index("<b>Group: fair</b>") < page.index("<b>Group: contaminated</b>")
     # only contaminated days: no fair result at all
-    only = ar.summarize(cfg, calls[:len(early)], rec[:len(early)], bars, cutoff=cut)
-    assert only["fair"]["n_days"] == 0 and "No fair-test day" in ar.html_page(only)
-    assert ar.leakage_label("2026-06-30", cut) == "contaminated" and ar.leakage_label(date(2026, 7, 1), cut) == "fair"
+    only = summaries.summarize(cfg, calls[:len(early)], rec[:len(early)], bars, cutoff=cut)
+    assert only["fair"]["n_days"] == 0 and "No fair-test day" in ai_html.html_page(only)
+    assert cutoff.leakage_label("2026-06-30", cut) == "contaminated"
+    assert cutoff.leakage_label(date(2026, 7, 1), cut) == "fair"
 
 
 def test_training_cutoff_comes_from_config(prepared, tmp_path):
@@ -633,6 +638,6 @@ def test_keep_row_price_sources_by_bar_date():
     cut = pd.Timestamp(CUT)
     row = {"id": f"{D}-INFY", "date": str(D), "ticker": "INFY", "source": "nse_bhavcopy",
            "filled_at": "2026-08-20T06:00:00+00:00"}
-    assert ar.keep_row("price_sources", row, D, cut)
-    assert not ar.keep_row("price_sources", {**row, "date": str(D + timedelta(days=1))}, D, cut)
-    assert ar.rule_text("price_sources") == "bar date <= D"
+    assert copy_asof.keep_row("price_sources", row, D, cut)
+    assert not copy_asof.keep_row("price_sources", {**row, "date": str(D + timedelta(days=1))}, D, cut)
+    assert copy_asof.rule_text("price_sources") == "bar date <= D"

@@ -14,6 +14,7 @@ stored bar `last` are walked in order, up to NSE_SCAN:
   (step_matches) also confirms e as the ex-date (no next session needed). For a factor of 0.9 or more (e.g. a
   1:10 bonus, 10/11) only the chain confirms, since an ordinary day's move can look like the step.
 No confirmation (yet) returns (None, reason): the caller warns and holds the symbol."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -22,12 +23,23 @@ from marketbrief.collectors.price_nse_fallback import bhavcopy_bars
 from marketbrief.collectors.price_run import PriceRun
 from marketbrief.collectors.price_rebase import RebaseClaim, step_matches
 from marketbrief.constants.config_keys import CFG_TICKERS
-from marketbrief.constants.prices import (BHAVCOPY_PATH, CHAIN_TOLERANCE, MSG_CHECK_BHAVCOPY_FAILED,
-                                          MSG_CHECK_CHAIN_BROKEN, MSG_CHECK_NO_EX_DATE,
-                                          MSG_CHECK_NO_ROW_WITH_PREV_CLOSE, MSG_CHECK_NO_STEP_PROOF,
-                                          MSG_CHECK_NOT_WATCHLIST, MSG_CHECK_PREV_CLOSE_OFF,
-                                          MSG_CHECK_PREVIOUS_UNKNOWN, NSE_ARCHIVES_FULL_URL, NSE_SCAN,
-                                          PREV_CLOSE_TOLERANCE, SOURCE_NSE_PREV_CLOSE, WEAK_FACTOR)
+from marketbrief.constants.prices import (
+    BHAVCOPY_PATH,
+    CHAIN_TOLERANCE,
+    MSG_CHECK_BHAVCOPY_FAILED,
+    MSG_CHECK_CHAIN_BROKEN,
+    MSG_CHECK_NO_EX_DATE,
+    MSG_CHECK_NO_ROW_WITH_PREV_CLOSE,
+    MSG_CHECK_NO_STEP_PROOF,
+    MSG_CHECK_NOT_WATCHLIST,
+    MSG_CHECK_PREV_CLOSE_OFF,
+    MSG_CHECK_PREVIOUS_UNKNOWN,
+    NSE_ARCHIVES_FULL_URL,
+    NSE_SCAN,
+    PREV_CLOSE_TOLERANCE,
+    SOURCE_NSE_PREV_CLOSE,
+    WEAK_FACTOR,
+)
 from marketbrief.core.calendar import prev_session
 from marketbrief.analytics.price_adjustments import adjustment_record
 from marketbrief.sources.errors import FetchError
@@ -38,6 +50,7 @@ class NseBasisCheck:
     """Confirms re-bases from NSE bhavcopies; `nse_getter` gives the run's one NSE client."""
 
     def __init__(self, run: PriceRun, nse_getter):
+        """The basis check's run and NSE getter, or a rebase claim and its cache."""
         self.run, self.nse_getter = run, nse_getter
         self.symbols = nse_symbols(run.cfg)
 
@@ -52,6 +65,7 @@ class _BasisScan:
     """One walk over the sessions after a re-based stored bar (bhavcopies cached for the walk)."""
 
     def __init__(self, check: NseBasisCheck, claim: RebaseClaim):
+        """The basis check's run and NSE getter, or a rebase claim and its cache."""
         self.check, self.claim, self.cache = check, claim, {}
 
     def bar(self, day: date) -> tuple[dict | None, str | None, str]:
@@ -64,8 +78,11 @@ class _BasisScan:
                 self.cache[day] = (None, MSG_CHECK_BHAVCOPY_FAILED.format(day=day, error=exc.error[:120]), url)
             else:
                 bar = bars.get(self.claim.key)
-                why = problem or (None if bar and bar.get("prev_close") else MSG_CHECK_NO_ROW_WITH_PREV_CLOSE.format(
-                    key=self.claim.key, day=day))
+                why = problem or (
+                    None
+                    if bar and bar.get("prev_close")
+                    else MSG_CHECK_NO_ROW_WITH_PREV_CLOSE.format(key=self.claim.key, day=day)
+                )
                 self.cache[day] = (None if why else bar, why, url)
         return self.cache[day]
 
@@ -73,11 +90,20 @@ class _BasisScan:
         """The adjustment record for ex-date `day`."""
         claim = self.claim
         measured = claim.yahoo_closes[claim.last] / (claim.stored_last * claim.known_factor)
-        record = adjustment_record(claim.key, day, claim.factor, SOURCE_NSE_PREV_CLOSE, self.check.run.now,
-                                   check_date=str(claim.last), stored_close=claim.stored_last,
-                                   yahoo_close=claim.yahoo_closes[claim.last], measured_factor=round(measured, 6),
-                                   nse_prev_close=bar["prev_close"], nse_ex_close=bar["close"],
-                                   url=NSE_ARCHIVES_FULL_URL.format(path=url))
+        record = adjustment_record(
+            claim.key,
+            day,
+            claim.factor,
+            SOURCE_NSE_PREV_CLOSE,
+            self.check.run.now,
+            check_date=str(claim.last),
+            stored_close=claim.stored_last,
+            yahoo_close=claim.yahoo_closes[claim.last],
+            measured_factor=round(measured, 6),
+            nse_prev_close=bar["prev_close"],
+            nse_ex_close=bar["close"],
+            url=NSE_ARCHIVES_FULL_URL.format(path=url),
+        )
         return record, None
 
     def expected_previous_close(self, previous: date) -> float | None:
@@ -101,8 +127,9 @@ class _BasisScan:
             return None, why
         prev_close = bar["prev_close"]
         if abs(prev_close / expected - 1) > PREV_CLOSE_TOLERANCE:
-            return None, MSG_CHECK_PREV_CLOSE_OFF.format(day=day, prev_close=prev_close, expected=expected,
-                                                         previous=previous)
+            return None, MSG_CHECK_PREV_CLOSE_OFF.format(
+                day=day, prev_close=prev_close, expected=expected, previous=previous
+            )
         if claim.factor < WEAK_FACTOR and step_matches(bar["close"] / prev_close, claim.factor):
             return self.found(day, bar, url)
         return self.chain(index, day, bar, url)
@@ -120,9 +147,13 @@ class _BasisScan:
         if abs(next_bar["prev_close"] / yahoo_close - 1) <= CHAIN_TOLERANCE:
             return self.found(day, bar, url)
         if abs(next_bar["prev_close"] * claim.factor * claim.known_factor / yahoo_close - 1) > CHAIN_TOLERANCE:
-            return None, MSG_CHECK_CHAIN_BROKEN.format(day=following, prev_close=next_bar["prev_close"],
-                                                       previous_day=day, yahoo_close=yahoo_close,
-                                                       factor=claim.factor)
+            return None, MSG_CHECK_CHAIN_BROKEN.format(
+                day=following,
+                prev_close=next_bar["prev_close"],
+                previous_day=day,
+                yahoo_close=yahoo_close,
+                factor=claim.factor,
+            )
         return None
 
     def run(self) -> tuple[dict | None, str | None]:

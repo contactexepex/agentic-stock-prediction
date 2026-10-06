@@ -1,5 +1,6 @@
 """The SEC EDGAR client: one throttled urllib client with fixtures for tests, the acceptance-time
 cache and the acceptance-time check of a submissions block (background in marketbrief/sources/sec_filings.py)."""
+
 from __future__ import annotations
 
 import json
@@ -8,12 +9,25 @@ from pathlib import Path
 
 from marketbrief.constants.environment import ENV_SEC_FIXTURES
 from marketbrief.constants.files import FILE_SEC_ACCEPTANCE_CACHE
-from marketbrief.constants.messages import (MSG_SEC_FIXTURE_MISSING, MSG_SEC_TIME_HEADER_FAILED,
-                                            MSG_SEC_TIME_MISMATCH, MSG_SEC_TIME_MIXED_FILE, MSG_SEC_TIME_NO_ACCEPTANCE,
-                                            MSG_SEC_TIME_NO_FIXTURE, MSG_SEC_TIME_NO_HEADER_TIME)
-from marketbrief.constants.sources import (ACCEPT_ENCODING_IDENTITY, SEC_ARCHIVE_URL, SEC_ATTEMPTS,
-                                           SEC_MIN_INTERVAL_SECONDS, SEC_RETRY_STATUSES, SEC_SUBMISSIONS_URL,
-                                           SEC_TICKER_MAP_URL, SEC_TIMEOUT_SECONDS)
+from marketbrief.constants.messages import (
+    MSG_SEC_FIXTURE_MISSING,
+    MSG_SEC_TIME_HEADER_FAILED,
+    MSG_SEC_TIME_MISMATCH,
+    MSG_SEC_TIME_MIXED_FILE,
+    MSG_SEC_TIME_NO_ACCEPTANCE,
+    MSG_SEC_TIME_NO_FIXTURE,
+    MSG_SEC_TIME_NO_HEADER_TIME,
+)
+from marketbrief.constants.sources import (
+    ACCEPT_ENCODING_IDENTITY,
+    SEC_ARCHIVE_URL,
+    SEC_ATTEMPTS,
+    SEC_MIN_INTERVAL_SECONDS,
+    SEC_RETRY_STATUSES,
+    SEC_SUBMISSIONS_URL,
+    SEC_TICKER_MAP_URL,
+    SEC_TIMEOUT_SECONDS,
+)
 from marketbrief.constants.statuses import STATUS_OK, STATUS_SHIFTED, STATUS_UNVERIFIED
 from marketbrief.core import paths
 from marketbrief.sources.http import HttpClient, HttpPolicy
@@ -35,16 +49,23 @@ class Edgar(HttpClient):
     """SEC EDGAR access: every request goes through one throttle and backs off on 429/5xx; with
     MB_SEC_FIXTURES=<dir> the URLs in <dir>/urls.json are served from files instead of the network."""
 
-    def __init__(self, ua: str):
-        policy = HttpPolicy(timeout=SEC_TIMEOUT_SECONDS, attempts=SEC_ATTEMPTS, min_interval=SEC_MIN_INTERVAL_SECONDS,
-                            retry_wait=sec_retry_wait, retry_statuses=SEC_RETRY_STATUSES, count_attempts=False)
+    def __init__(self, user_agent: str):
+        """An SEC EDGAR client with the contact user agent."""
+        policy = HttpPolicy(
+            timeout=SEC_TIMEOUT_SECONDS,
+            attempts=SEC_ATTEMPTS,
+            min_interval=SEC_MIN_INTERVAL_SECONDS,
+            retry_wait=sec_retry_wait,
+            retry_statuses=SEC_RETRY_STATUSES,
+            count_attempts=False,
+        )
         super().__init__(policy)
-        self.ua = ua
+        self.user_agent = user_agent
         fixtures_dir = os.environ.get(ENV_SEC_FIXTURES)
         self.fixtures = Path(fixtures_dir) if fixtures_dir else None
         self.urls = json.loads((self.fixtures / "urls.json").read_text()) if fixtures_dir else {}
-        self.time_checks: dict[str, str] = {}   # CIK -> ok | shifted | unverified: <why>
-        self._accepted: dict[str, str] | None = None   # accession -> true acceptance (format_utc_z)
+        self.time_checks: dict[str, str] = {}  # CIK -> ok | shifted | unverified: <why>
+        self._accepted: dict[str, str] | None = None  # accession -> true acceptance (format_utc_z)
 
     def _fixture(self, url: str) -> Path:
         """The fixture file that stands in for a URL."""
@@ -57,8 +78,9 @@ class Edgar(HttpClient):
         self.requests += 1
         if self.fixtures:
             return self._fixture(url).open("rb")
-        return self.send(url, headers={"User-Agent": self.ua, "Accept-Encoding": ACCEPT_ENCODING_IDENTITY},
-                         stream=True)
+        return self.send(
+            url, headers={"User-Agent": self.user_agent, "Accept-Encoding": ACCEPT_ENCODING_IDENTITY}, stream=True
+        )
 
     def get(self, url: str) -> bytes:
         """The body of a URL."""
@@ -72,7 +94,7 @@ class Edgar(HttpClient):
     def cik_map(self) -> dict[str, int]:
         """SEC's ticker -> CIK map."""
         data = self.json(SEC_TICKER_MAP_URL)
-        return {v["ticker"].upper(): int(v["cik_str"]) for v in data.values()}
+        return {entry["ticker"].upper(): int(entry["cik_str"]) for entry in data.values()}
 
     def _cache(self) -> dict[str, str]:
         """The accession -> acceptance-time cache, loaded once (not used with fixtures)."""
@@ -114,7 +136,7 @@ class Edgar(HttpClient):
         "unverified: <why>"."""
         header_url = archive_url(cik, accession, f"{accession}.hdr.sgml")
         if self.fixtures and accession not in self._cache() and header_url not in self.urls:
-            return unverified(MSG_SEC_TIME_NO_FIXTURE)      # tests without header fixtures: no request
+            return unverified(MSG_SEC_TIME_NO_FIXTURE)  # tests without header fixtures: no request
         try:
             true_value = self.acceptance(cik, accession)
         except Exception as exc:
@@ -136,22 +158,31 @@ class Edgar(HttpClient):
         (look-ahead), keeping a shifted one only makes it late."""
         accessions = block.get("accessionNumber") or []
         times = block.get("acceptanceDateTime") or []
-        listed = [k for k, v in enumerate(times) if v and k < len(accessions) and accessions[k]]
+        listed = [
+            index
+            for index, stored_time in enumerate(times)
+            if stored_time and index < len(accessions) and accessions[index]
+        ]
         if not listed:
             status = unverified(MSG_SEC_TIME_NO_ACCEPTANCE)
         else:
-            probes = list(dict.fromkeys([listed[0], listed[-1]]))         # newest, oldest
-            verdicts = [self._verdict(cik, accessions[k], times[k]) for k in probes]
-            bad = [v for v in verdicts if v.startswith(STATUS_UNVERIFIED)]
+            probes = list(dict.fromkeys([listed[0], listed[-1]]))  # newest, oldest
+            verdicts = [self._verdict(cik, accessions[position], times[position]) for position in probes]
+            bad = [verdict for verdict in verdicts if verdict.startswith(STATUS_UNVERIFIED)]
             if bad:
                 status = bad[0]
             elif len(set(verdicts)) > 1:
-                status = unverified(MSG_SEC_TIME_MIXED_FILE.format(
-                    newest=accessions[probes[0]], newest_verdict=verdicts[0],
-                    oldest=accessions[probes[1]], oldest_verdict=verdicts[1]))
+                status = unverified(
+                    MSG_SEC_TIME_MIXED_FILE.format(
+                        newest=accessions[probes[0]],
+                        newest_verdict=verdicts[0],
+                        oldest=accessions[probes[1]],
+                        oldest_verdict=verdicts[1],
+                    )
+                )
             elif verdicts[0] == STATUS_SHIFTED:
                 block["acceptanceDateTimeJson"] = list(times)
-                block["acceptanceDateTime"] = [unshift(v) if v else v for v in times]
+                block["acceptanceDateTime"] = [unshift(verdict) if verdict else verdict for verdict in times]
                 status = STATUS_SHIFTED
             else:
                 status = STATUS_OK

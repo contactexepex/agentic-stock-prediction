@@ -18,8 +18,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from marketbrief.analytics import range_math as rl  # noqa: E402
-import report  # noqa: E402
-import review  # noqa: E402
+from marketbrief.presentation.report import formatting
+from marketbrief.presentation.report import gather  # noqa: E402
+from marketbrief.constants import review
+from marketbrief.pipeline.review import cli
+from marketbrief.pipeline.review import helpers
+from marketbrief.pipeline.review import history_ablation
+from marketbrief.pipeline.review import live_ablation
+from marketbrief.pipeline.review import markdown_cells
+from marketbrief.pipeline.review import summaries
+from marketbrief.pipeline.review import verdicts  # noqa: E402
 from marketbrief.utils.event_dates import major_event_between  # noqa: E402
 import test_pipeline as tp  # noqa: E402  (helpers only; imported as a module so its tests are not re-collected)
 
@@ -64,15 +72,15 @@ def make_range(rc: dict, ticker: str, as_of, target, h: int, base: float, sd: fl
 # ---------- unit tests ----------
 
 def test_weeks():
-    assert review.week_bounds("2026-W40") == (date(2026, 9, 28), date(2026, 10, 4))
-    assert review.previous_week(date(2026, 10, 5)) == "2026-W40"
-    assert review.previous_week(date(2027, 1, 4)) == "2026-W53"
+    assert helpers.week_bounds("2026-W40") == (date(2026, 9, 28), date(2026, 10, 4))
+    assert helpers.previous_week(date(2026, 10, 5)) == "2026-W40"
+    assert helpers.previous_week(date(2027, 1, 4)) == "2026-W53"
 
 
 def test_note_tags():
-    assert review.note_tags([]) == ["none"]
-    assert review.note_tags(None) == ["none"]
-    tags = review.note_tags(["earnings in horizon (x3.0 day)", "regime UNSTABLE x1.25", "major event x1.15",
+    assert helpers.note_tags([]) == ["none"]
+    assert helpers.note_tags(None) == ["none"]
+    tags = helpers.note_tags(["earnings in horizon (x3.0 day)", "regime UNSTABLE x1.25", "major event x1.15",
                              "AI widened +20%", "cue -1.14% x0.5", "ex-dividend shift -1.00%"])
     assert tags == ["earnings", "regime", "event", "ai_widen", "cue", "ex-dividend"]
 
@@ -87,18 +95,18 @@ def test_replay_reproduces_published_ranges_and_changes_one_input():
     ]
     for r in rows:
         r["actual_close"] = r["base_close"]
-        comp = review.decompose(r, RC)
-        out = review.replay(comp, RC)
+        comp = live_ablation.decompose(r, RC)
+        out = live_ablation.replay_range(comp, RC)
         assert abs(out["lo80"] / r["lo80"] - 1) < 1e-6 and abs(out["hi80"] / r["hi80"] - 1) < 1e-6, r["notes"]
     # dropping the cue recentres the first range on the last close
-    comp = review.decompose(rows[0], RC)
-    no_cue = review.replay(comp, {**RC, "cue_weight": 0.0})
+    comp = live_ablation.decompose(rows[0], RC)
+    no_cue = live_ablation.replay_range(comp, {**RC, "cue_weight": 0.0})
     assert math.isclose(math.sqrt(no_cue["lo80"] * no_cue["hi80"]), 100.0, rel_tol=1e-4)
     # dropping regime, event, earnings and AI widening narrows the second range, never shifts the outcome
-    comp = review.decompose(rows[1], RC)
-    plain = review.replay(comp, {**RC, "regime_factor": {}, "major_event_factor": 1.0,
+    comp = live_ablation.decompose(rows[1], RC)
+    plain = live_ablation.replay_range(comp, {**RC, "regime_factor": {}, "major_event_factor": 1.0,
                                  "earnings_vol_multiple": 1.0, "max_ai_widen": 0.0})
-    published = review.replay(comp, RC)
+    published = live_ablation.replay_range(comp, RC)
     assert plain["width80"] < published["width80"] / 2
     assert comp["residual"] != 0                                    # the unknown ex-dividend shift is kept fixed
 
@@ -106,17 +114,20 @@ def test_replay_reproduces_published_ranges_and_changes_one_input():
 def test_gates_flag_small_samples():
     rv = {**review.DEFAULTS, "min_n_recommend": 200}
     good = {"rel_score": -0.10, "coverage_shortfall": 0.0, "coverage_gain": 0.05}
-    assert review.verdict(good, 50, rv) == "low n"
-    assert review.verdict(good, 500, rv) == "improves score"
-    assert review.verdict({"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.05}, 500, rv) == "improves coverage"
-    assert review.verdict({"rel_score": 0.05, "coverage_shortfall": 0.0, "coverage_gain": 0.0}, 500, rv) == "worse score"
-    assert review.verdict({"rel_score": -0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.0}, 500, rv) == "no material change"
+    assert verdicts.verdict(good, 50, rv) == "low n"
+    assert verdicts.verdict(good, 500, rv) == "improves score"
+    cmp_coverage = {"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.05}
+    assert verdicts.verdict(cmp_coverage, 500, rv) == "improves coverage"
+    cmp_worse = {"rel_score": 0.05, "coverage_shortfall": 0.0, "coverage_gain": 0.0}
+    assert verdicts.verdict(cmp_worse, 500, rv) == "worse score"
+    cmp_same = {"rel_score": -0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.0}
+    assert verdicts.verdict(cmp_same, 500, rv) == "no material change"
     calls = pd.DataFrame({"confidence": [0.55] * 10 + [0.85] * 60, "hit": [True] * 10 + [True] * 30 + [False] * 30,
                           "actual_return": [0.01] * 70})
-    bands = review.confidence_bands(calls, rv["confidence_bands"])
+    bands = summaries.confidence_bands(calls, rv["confidence_bands"])
     assert bands["50%-60%"]["n"] == 10 and bands["80%-90%"]["n"] == 60 and bands["60%-70%"]["n"] == 0
     assert bands["80%-90%"]["gap"] == -0.35
-    advice = review.confidence_advice(bands, {"all": review.call_summary(calls)}, rv)
+    advice = verdicts.confidence_advice(bands, {"all": summaries.call_summary(calls)}, rv)
     assert len(advice) == 2 and "80%-90%" in advice[0] and "always-up" in advice[1]   # small 50-60% band: no advice
 
 
@@ -125,11 +136,11 @@ def test_report_review_line():
     con.execute("SET TimeZone = 'UTC'")
     con.execute("CREATE TABLE review_latest (id VARCHAR, week VARCHAR, report VARCHAR, n_proposals INTEGER, "
                 "low_sample BOOLEAN, computed_at TIMESTAMPTZ)")
-    assert report.weekly_review(con, date(2026, 10, 5)) is None
+    assert gather.weekly_review(con, date(2026, 10, 5)) is None
     con.execute("INSERT INTO review_latest VALUES ('2026-W40', '2026-W40', 'reports/x/review-2026-W40.md', 1, true, now())")
-    rv = report.weekly_review(con, date(2026, 10, 6))            # any session in W41 sees the W40 review
+    rv = gather.weekly_review(con, date(2026, 10, 6))            # any session in W41 sees the W40 review
     assert rv["fresh"] and rv["week"] == "2026-W40"
-    line = report.review_line(rv, "https://example.com/r.md")
+    line = formatting.review_line(rv, "https://example.com/r.md")
     assert line == "Weekly review 2026-W40: 1 proposed range change for a human to decide (low sample) · https://example.com/r.md"
 
 
@@ -156,46 +167,47 @@ def test_summaries_match_hand_calculation():
         assert math.isclose(100 * rl.interval_score(95, 105, y, 0.8) / 100, stored)
         assert math.isclose(100 * rl.interval_score(nlo, nhi, y, 0.8) / 100, naive)
     cfg = {"tickers": {"A": {"sector": "Tech"}, "B": {"sector": "Energy"}}}
-    df = review.load_ranges(con, cfg, date(2026, 10, 4))
+    df = summaries.load_ranges(con, cfg, date(2026, 10, 4))
     # 50% score by hand: 4 + 4 x miss -> 4, 8, 36, 20; naive: width + 4 x miss -> 2, 6, 38, 22
     assert list(df["is50_pct"]) == [4.0, 8.0, 36.0, 20.0]
     assert list(df["naive_is50_pct"]) == [2.0, 6.0, 38.0, 22.0]
     assert list(df["width50_pct"]) == [4.0, 4.0, 4.0, 4.0]
     assert list(df["sector"]) == ["Tech", "Tech", "Energy", "Energy"]
     assert [t for t in df["tags"]] == [["cue"], ["none", "ai_call"], ["regime"], ["none"]]
-    s = review.range_summary(df)
+    s = summaries.range_summary(df)
     assert s == {"n": 4, "cover50": 0.25, "cover80": 0.5, "naive_cover50": 0.5, "naive_cover80": 0.5,
                  "width50_pct": 4.0, "width80_pct": 10.0, "naive_width80_pct": 6.75,
                  "score50_pct": 17.0, "naive_score50_pct": 17.0, "score80_pct": 25.0, "naive_score80_pct": 31.75}
-    by_h = review.by_horizon(df, review.range_summary)
+    by_h = summaries.by_horizon(df, summaries.range_summary)
     assert by_h["1d"]["cover80"] == 1.0 and by_h["5d"]["cover80"] == 0.0 and by_h["5d"]["score80_pct"] == 40.0
-    br = review.breakdown(df, "tags")
+    br = summaries.breakdown(df, "tags")
     assert br["none · 5d"]["n"] == 1 and br["none · 1d"]["cover50"] == 0.0 and br["cue · 1d"]["score50_pct"] == 4.0
 
     calls = pd.DataFrame({"hit": [True, True, False, False], "actual_return": [0.01, 0.02, 0.03, -0.01],
                           "confidence": [0.6, 0.7, 0.8, 0.9]})
-    c = review.call_summary(calls)
+    c = summaries.call_summary(calls)
     assert c == {"n": 4, "hit_rate": 0.5, "always_up": 0.75, "edge": -0.25, "mean_confidence": 0.75}
 
 
 def test_backtest_scale_widens_ranges():
-    import backtest as bt
+    from marketbrief.replay.backtest import evaluation
+    from marketbrief.replay.backtest import observations
     rng = np.random.default_rng(1)
     idx = pd.bdate_range("2025-01-01", periods=320)
     bars = {"A": pd.DataFrame({"close": tp.fat_tailed_walk(rng, 320, 100, 0.01)}, index=idx),
             "B": pd.DataFrame({"close": tp.fat_tailed_walk(rng, 320, 50, 0.02)}, index=idx)}
     rank = {d: i for i, d in enumerate(idx)}
-    obs = bt.observations(bars, ["A", "B"], 1, RC, rank)
-    plain = bt.evaluate(obs, 1, RC, 40)
-    ones = bt.evaluate(obs, 1, RC, 40, scale={i: 1.0 for i in range(320)})
-    double = bt.evaluate(obs, 1, RC, 40, scale={i: 2.0 for i in range(320)})
+    obs = observations.observations(bars, ["A", "B"], 1, RC, rank)
+    plain = evaluation.evaluate(obs, 1, RC, 40)
+    ones = evaluation.evaluate(obs, 1, RC, 40, scale={i: 1.0 for i in range(320)})
+    double = evaluation.evaluate(obs, 1, RC, 40, scale={i: 2.0 for i in range(320)})
     assert len(plain) == 80 and plain.equals(ones)                          # no scale = the formula as before
     ratio = double["width80"] / plain["width80"]
     assert ratio.between(1.95, 2.05).all() and (ratio != 1).all()           # log-width doubles exactly
     assert double["hit80"].mean() >= plain["hit80"].mean()
     assert not np.allclose(double["is80"], plain["is80"])
     # scale applies per start day only
-    half = bt.evaluate(obs, 1, RC, 40, scale={int(plain["rank"].max()): 2.0})
+    half = evaluation.evaluate(obs, 1, RC, 40, scale={int(plain["rank"].max()): 2.0})
     changed = half["width80"] != plain["width80"]
     assert set(half.loc[changed, "rank"]) == {int(plain["rank"].max())}
 
@@ -267,7 +279,7 @@ def records(root: Path) -> list[dict]:
 
 def test_review_end_to_end(tmp_path):
     root, cfg, days, n_ranges = build_market(tmp_path)
-    week = review.iso_week(days[-1])
+    week = helpers.iso_week(days[-1])
     r = tp.run("review.py", root, cfg, "--week", week)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
@@ -343,7 +355,7 @@ def test_review_end_to_end(tmp_path):
 
 def test_review_with_little_data_makes_no_live_proposal(tmp_path):
     root, cfg, days, _ = build_market(tmp_path)
-    week = review.iso_week(days[-40] + timedelta(days=7))          # a week into the live period
+    week = helpers.iso_week(days[-40] + timedelta(days=7))          # a week into the live period
     r = tp.run("review.py", root, cfg, "--week", week, "--no-history")
     assert r.returncode == 0, r.stderr
     [rec] = records(root)
@@ -390,12 +402,12 @@ def window_con(target_dates: list[date]):
 
 
 def test_window_boundaries_and_no_data_after_the_week():
-    start, end = review.week_bounds("2026-W40")                              # 2026-09-28 .. 2026-10-04
+    start, end = helpers.week_bounds("2026-W40")                              # 2026-09-28 .. 2026-10-04
     dates = [start - timedelta(days=1), start, end, end + timedelta(days=1),
              end - timedelta(days=29), end - timedelta(days=30)]
     rv = {**review.DEFAULTS, "rolling_days": 30}
     cfg = {"market": "testmkt", "tickers": {"A": {"sector": "Tech"}}}
-    rec, d = review.build(cfg, RC, rv, window_con(dates), "2026-W40", history=False)
+    rec, d = cli.build(cfg, RC, rv, window_con(dates), "2026-W40", history=False)
     # week: start, end · 30 days: end-29 .. end · since start: all up to end (end+1 is after the week)
     assert (rec["n_ranges_week"], rec["n_ranges_30d"], rec["n_ranges_all"]) == (2, 4, 5)
     assert {w: d["calls"][w]["all"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
@@ -408,7 +420,7 @@ def test_window_boundaries_and_no_data_after_the_week():
 def test_confidence_bands_edges():
     calls = pd.DataFrame({"confidence": [0.50, 0.59, 0.60, 0.70, 0.79, 0.80, 0.85, 0.90],
                           "hit": [True] * 8, "actual_return": [0.01] * 8})
-    bands = review.confidence_bands(calls, [0.5, 0.6, 0.7, 0.8, 0.9])
+    bands = summaries.confidence_bands(calls, [0.5, 0.6, 0.7, 0.8, 0.9])
     # lower edge inclusive, upper exclusive, except the top band which keeps 0.90 (the maximum allowed)
     assert {b: s["n"] for b, s in bands.items()} == {"50%-60%": 2, "60%-70%": 1, "70%-80%": 2, "80%-90%": 3}
     assert bands["80%-90%"]["mean_confidence"] == 0.85
@@ -422,18 +434,18 @@ def test_compare_coverage_terms():
         return {"1d": {"n": 100, "cover50": c50_1, "cover80": c80_1, "score80_pct": s1},
                 "5d": {"n": 100, "cover50": c50_5, "cover80": c80_5, "score80_pct": s5}}
     # 80% coverage moving away from target: negative gain, and a shortfall when it drops below
-    c = review.compare(base, var(0.50, 0.70, 5.0))
+    c = verdicts.compare(base, var(0.50, 0.70, 5.0))
     assert c == {"rel_score": 0.0, "coverage_shortfall": 0.1, "coverage_gain": -0.05}
-    assert review.compare(base, var(0.50, 0.90, 5.0))["coverage_gain"] == -0.05      # over-covering
-    assert review.compare(base, var(0.50, 0.90, 5.0))["coverage_shortfall"] == 0.0
+    assert verdicts.compare(base, var(0.50, 0.90, 5.0))["coverage_gain"] == -0.05      # over-covering
+    assert verdicts.compare(base, var(0.50, 0.90, 5.0))["coverage_shortfall"] == 0.0
     # a drop below target in the 50% band only still counts as a shortfall
-    c = review.compare(base, var(0.42, 0.80, 5.0))
+    c = verdicts.compare(base, var(0.42, 0.80, 5.0))
     assert c["coverage_shortfall"] == 0.08 and c["coverage_gain"] == 0.0
     # moving towards target from below: positive gain; scores averaged as relative changes
     worse = {**base, "1d": {**base["1d"], "cover80": 0.70}}
-    c = review.compare(worse, var(0.50, 0.78, 4.5, s5=11.0))
+    c = verdicts.compare(worse, var(0.50, 0.78, 4.5, s5=11.0))
     assert c == {"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.04}
-    assert review.compare(base, {"1d": {"n": 0}}) is None
+    assert verdicts.compare(base, {"1d": {"n": 0}}) is None
 
 
 def test_history_regime_uses_the_next_session():
@@ -443,7 +455,7 @@ def test_history_regime_uses_the_next_session():
             "VOLX": pd.DataFrame({"close": [15.0] * len(idx)}, index=idx)}
     cfg = {"market": "us", "calendar": "XNYS", "regime": TH,
            "symbols": {"BENCH": {"role": "benchmark"}, "VOLX": {"role": "vol_index"}}}
-    regimes, majors = review.history_context(cfg, bars, list(idx))
+    regimes, majors = history_ablation.history_context(cfg, bars, list(idx))
     assert date(2026, 10, 28) in majors                                        # FOMC (config/events.yaml)
     reg = dict(zip((d.date() for d in idx), regimes))
     assert reg[date(2026, 10, 22)] == "CALM"            # next session 10-23: window 10-23..10-25
@@ -454,14 +466,15 @@ def test_history_regime_uses_the_next_session():
 
 def test_flag_threshold():
     rv = {**review.DEFAULTS, "min_n": 30}
-    assert review.flag(29, rv) == "low n" and review.flag(30, rv) == "" and review.flag(0, rv) == "low n"
+    assert markdown_cells.flag(29, rv) == "low n" and markdown_cells.flag(30, rv) == ""
+    assert markdown_cells.flag(0, rv) == "low n"
 
 
 def test_coverage_gate_needs_a_score_no_worse():
     rv = {**review.DEFAULTS, "min_n_recommend": 200}
-    assert review.verdict({"rel_score": 0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.10}, 500, rv) \
+    assert verdicts.verdict({"rel_score": 0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.10}, 500, rv) \
         == "no material change"
-    assert review.verdict({"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.10}, 500, rv) \
+    assert verdicts.verdict({"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.10}, 500, rv) \
         == "improves coverage"
 
 
@@ -475,16 +488,16 @@ def ablation(name: str, setting: dict, verdict: str, rel: float) -> dict:
 def test_proposals_prefer_live_evidence():
     flat = {"regime_factor": {"CALM": 1.0, "TRENDING": 1.0, "EVENT_HEAVY": 1.0, "UNSTABLE": 1.0}}
     hist = ablation("drop regime widening", flat, "improves score", -0.05)
-    [p] = review.proposals(RC, {"variants": []}, hist)                      # history alone proposes
+    [p] = verdicts.proposals(RC, {"variants": []}, hist)                      # history alone proposes
     assert p["source"] == "history walk-forward" and p["changes"][0]["param"] == "regime_factor"
     assert p["changes"][0]["current"] == RC["regime_factor"] and p["drop"]
     # live evidence (n >= min) that the change is worse suppresses the history proposal
-    assert review.proposals(RC, ablation("drop regime widening", flat, "worse score", 0.04), hist) == []
-    assert review.proposals(RC, ablation("drop regime widening", flat, "under-covers", 0.0), hist) == []
+    assert verdicts.proposals(RC, ablation("drop regime widening", flat, "worse score", 0.04), hist) == []
+    assert verdicts.proposals(RC, ablation("drop regime widening", flat, "under-covers", 0.0), hist) == []
     # a live improvement wins over history for the same parameter
-    [p] = review.proposals(RC, ablation("drop regime widening", flat, "improves score", -0.03), hist)
+    [p] = verdicts.proposals(RC, ablation("drop regime widening", flat, "improves score", -0.03), hist)
     assert p["source"] == "live replay" and p["rel_score"] == -0.03
-    assert review.proposals(RC, ablation("x", {"cue_weight": 0.0}, "low n", -0.5), {"variants": []}) == []
+    assert verdicts.proposals(RC, ablation("x", {"cue_weight": 0.0}, "low n", -0.5), {"variants": []}) == []
 
 
 def test_major_event_counts_after_start_up_to_target():
@@ -512,9 +525,10 @@ def test_history_ablation_never_looks_past_the_week():
                                 "set": {"regime_factor": {k: 1.0 for k in RC["regime_factor"]}}}]}
     week_end = idx[-60].date()
     cut = {t: df[df.index <= pd.Timestamp(week_end)] for t, df in bars.items()}
-    past = review.history_ablation(cfg, RC, rv, bars, week_end)
-    assert past["n"] > 0 and past == review.history_ablation(cfg, RC, rv, cut, week_end)   # later bars change nothing
-    assert past != review.history_ablation(cfg, RC, rv, bars, idx[-1].date())
+    past = history_ablation.history_ablation(cfg, RC, rv, bars, week_end)
+    again = history_ablation.history_ablation(cfg, RC, rv, cut, week_end)
+    assert past["n"] > 0 and past == again   # later bars change nothing
+    assert past != history_ablation.history_ablation(cfg, RC, rv, bars, idx[-1].date())
 
 
 def test_weekly_review_written_earlier_is_not_fresh():
@@ -524,5 +538,5 @@ def test_weekly_review_written_earlier_is_not_fresh():
                 "low_sample BOOLEAN, computed_at TIMESTAMPTZ)")
     con.execute("INSERT INTO review_latest VALUES ('2026-W40', '2026-W40', 'reports/x/review-2026-W40.md', 0, false, "
                 "now() - INTERVAL 2 DAY)")
-    rv = report.weekly_review(con, date(2026, 10, 7))
+    rv = gather.weekly_review(con, date(2026, 10, 7))
     assert rv is not None and rv["fresh"] is False                          # linked in the report, no Slack line

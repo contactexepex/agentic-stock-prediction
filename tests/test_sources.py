@@ -1,7 +1,7 @@
 """Offline tests for the free-source collectors (issue #9): collect_macro.py (Treasury, FRED,
 Cboe), collect_shorts.py (FINRA short volume and short interest), collect_flows_india.py (NSDL
 FPI, NSE index closes), the new RSS outlets in collect_news.py and the context sections in
-macro_context.py. Fixtures in tests/fixtures/sources are trimmed REAL responses fetched on
+marketbrief/pipeline/macro_sections.py. Fixtures in tests/fixtures/sources are trimmed REAL responses fetched on
 2026-10-05 (provenance in tests/fixtures/sources/README). A fake client stands in for the network;
 collectors run in-process against a temporary MB_ROOT with the real market configs."""
 from __future__ import annotations

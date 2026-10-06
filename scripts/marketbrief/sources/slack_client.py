@@ -1,4 +1,5 @@
 """The HTTP POST behind the Slack Web API and incoming webhooks: one attempt, no retry."""
+
 from __future__ import annotations
 
 import urllib.error
@@ -11,6 +12,7 @@ class SlackHttp(HttpClient):
     """POSTs data and returns (status, body); an HTTP error status is an answer, not an exception."""
 
     def __init__(self):
+        """A Slack client with its timeout policy."""
         super().__init__(HttpPolicy(timeout=SLACK_TIMEOUT_SECONDS))
 
     def post(self, url: str, data: bytes, headers: dict) -> tuple[int, bytes]:

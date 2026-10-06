@@ -15,7 +15,7 @@ import common  # noqa: E402
 from marketbrief.core.clock import utc_today  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
-import context  # noqa: E402
+from marketbrief.pipeline import context  # noqa: E402
 from test_pipeline import MARKET, run, setup  # noqa: E402
 
 TODAY = date(2026, 10, 7)

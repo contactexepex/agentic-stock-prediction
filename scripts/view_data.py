@@ -22,7 +22,7 @@ from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.utils.money import format_money
 from marketbrief.utils.numbers import json_safe_float
-from score_predictions import is_late
+from marketbrief.pipeline.score_predictions import is_late
 
 CURRENCY = CURRENCY_SYMBOLS
 HISTORY_DAYS = 20        # trading days of closes shown before the forecast fan

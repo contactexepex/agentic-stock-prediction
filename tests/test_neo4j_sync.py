@@ -256,19 +256,19 @@ def env_for(f: FakeNeo4j, **extra) -> dict:
 
 def test_default_database_is_first_host_label(monkeypatch):
     sys.path.insert(0, str(SCRIPTS))
-    import neo4j_sync
+    from marketbrief.graph.neo4j import connection
     monkeypatch.delenv("NEO4J_DATABASE", raising=False)
-    assert neo4j_sync.default_database("neo4j+s://4132bc90.databases.neo4j.io") == "4132bc90"
-    assert neo4j_sync.default_database("neo4j+s://4132bc90.databases.neo4j.io:7687") == "4132bc90"
-    assert neo4j_sync.default_database("http://127.0.0.1:7474") == "neo4j"
-    assert neo4j_sync.default_database("bolt://localhost:7687") == "neo4j"
+    assert connection.default_database("neo4j+s://4132bc90.databases.neo4j.io") == "4132bc90"
+    assert connection.default_database("neo4j+s://4132bc90.databases.neo4j.io:7687") == "4132bc90"
+    assert connection.default_database("http://127.0.0.1:7474") == "neo4j"
+    assert connection.default_database("bolt://localhost:7687") == "neo4j"
     monkeypatch.setenv("NEO4J_DATABASE", "override")
-    assert neo4j_sync.default_database("neo4j+s://4132bc90.databases.neo4j.io") == "override"
+    assert connection.default_database("neo4j+s://4132bc90.databases.neo4j.io") == "override"
     monkeypatch.delenv("NEO4J_DATABASE")
     monkeypatch.setenv("NEO4J_URI", "neo4j+s://4132bc90.databases.neo4j.io")
     monkeypatch.setenv("NEO4J_PASSWORD", PASSWORD)
     monkeypatch.delenv("NEO4J_QUERY_URL", raising=False)
-    c = neo4j_sync.client_from_env()
+    c = connection.client_from_env()
     assert c.url == "https://4132bc90.databases.neo4j.io/db/4132bc90/query/v2"
     assert c.host == "4132bc90.databases.neo4j.io"
 

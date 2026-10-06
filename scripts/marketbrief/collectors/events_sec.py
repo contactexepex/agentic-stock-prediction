@@ -5,6 +5,7 @@ Not every 2.02 is a quarter's results release (Tesla's quarterly delivery report
 updates): every 2.02 is stored as it was filed, and analytics/event_history's results_filter keeps one release per
 quarter when the dates are read, using only the reports accepted by the as-of date (so the walk-forward backtest
 never looks ahead)."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -21,8 +22,9 @@ from marketbrief.sources.sec_filings import related_ciks, ticker_submissions
 ISO_DATE_LENGTH = 10
 
 
-def sec_earnings(cfg: dict, tickers: dict, user_agent: str, reports: dict | None = None, times: dict | None = None
-                 ) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
+def sec_earnings(
+    cfg: dict, tickers: dict, user_agent: str, reports: dict | None = None, times: dict | None = None
+) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
     """Item 2.02 filings from SEC EDGAR: 8-K/6-K filings with item 2.02 (results of operations),
     timed by acceptance. Given a dict, `reports` receives the 10-Q/10-K filings per ticker: (acceptance date,
     timing, form, period end). Acceptance times are the checked/corrected ones of Edgar.recent; given a dict,

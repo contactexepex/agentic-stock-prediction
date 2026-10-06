@@ -198,10 +198,10 @@ def test_rounding_and_percent_text_helpers():
 
 
 def test_replay_and_ai_replay_keep_their_percent_defaults():
-    import ai_replay
-    import replay
-    assert replay.pct(0.456) == "46%" and replay.pct(0.456, 1) == "45.6%" and replay.pct(None) == "n/a"
-    assert ai_replay.pct(0.456) == "45.6%" and ai_replay.pct(0.456, 0) == "46%"
+    from marketbrief.replay.ai_replay import summaries
+    from marketbrief.replay.rule_replay import narrative
+    assert narrative.pct(0.456) == "46%" and narrative.pct(0.456, 1) == "45.6%" and narrative.pct(None) == "n/a"
+    assert summaries.pct(0.456) == "45.6%" and summaries.pct(0.456, 0) == "46%"
 
 
 def test_text_markdown_and_money_helpers():

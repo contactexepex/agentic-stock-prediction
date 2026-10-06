@@ -16,6 +16,7 @@ summary; a failed source gets a "failed" entry (with the host to allowlist when 
 an endpoint that answers with no rows at all for the whole market gets a "warnings" entry, and
 "notes" give market-wide versus watchlist row counts.
 Exit code 1 only if every kind failed. Needs `relations.source: nse` in the market config."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -28,9 +29,15 @@ from marketbrief.collectors.nse_flows import flows
 from marketbrief.collectors.nse_runner import NseRun, collector_main, run_summary, since_arg, store
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_RELATIONS
 from marketbrief.constants.kinds import KIND_ANNOUNCEMENTS, KIND_FINANCIALS, KIND_FLOWS
-from marketbrief.constants.nse_collection import (COLLECTOR_NSE_INDIA, DEFAULT_ANNOUNCEMENT_LOOKBACK_DAYS,
-                                                  DEFAULT_DELIVERY_LOOKBACK_DAYS, DEFAULT_PER_TICKER_FILINGS,
-                                                  DEFAULT_SYMBOL_CALLS_PER_RUN, MSG_FULL_NSE_HELP, NSE_KINDS)
+from marketbrief.constants.nse_collection import (
+    COLLECTOR_NSE_INDIA,
+    DEFAULT_ANNOUNCEMENT_LOOKBACK_DAYS,
+    DEFAULT_DELIVERY_LOOKBACK_DAYS,
+    DEFAULT_PER_TICKER_FILINGS,
+    DEFAULT_SYMBOL_CALLS_PER_RUN,
+    MSG_FULL_NSE_HELP,
+    NSE_KINDS,
+)
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_client import Nse
@@ -63,12 +70,12 @@ def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, ar
     for kind in kinds:
         failures_before = len(run.problems.failed)
         try:
-            rows, ok = collect_kind(run, kind, settings, args)
+            rows, sources_ok = collect_kind(run, kind, settings, args)
         except FetchError as exc:
             run.problems.failed.append(exc.entry(kind))
             new[kind] = None
             continue
-        if not ok and len(run.problems.failed) > failures_before:
+        if not sources_ok and len(run.problems.failed) > failures_before:
             new[kind] = None
             continue
         new[kind] = store(market, kind, rows, run.today)
@@ -78,7 +85,7 @@ def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, ar
 def extra_args(parser) -> None:
     """The NSE primary-source collector's own options."""
     parser.add_argument("--full", action="store_true", help=MSG_FULL_NSE_HELP)
-    since_arg(parser)   # announcements by week, and every ticker's results filings broadcast since then
+    since_arg(parser)  # announcements by week, and every ticker's results filings broadcast since then
 
 
 def main() -> int:

@@ -5,6 +5,7 @@ Every source (free-source collectors, NSE, SEC EDGAR, Neo4j, Slack) is a small s
 HTTP statuses and network errors are retried) and turns a final failure into its own error by overriding
 `on_http_error` / `on_network_error`. Proxy settings and the CA bundle come from the environment, as for
 any urllib call (HTTPS_PROXY, SSL_CERT_FILE)."""
+
 from __future__ import annotations
 
 import time
@@ -50,12 +51,20 @@ class HttpClient:
     """Sends requests under an HttpPolicy; subclasses override the two failure hooks and read_response."""
 
     def __init__(self, policy: HttpPolicy, opener: urllib.request.OpenerDirector | None = None):
+        """An HTTP client with a policy and an optional opener."""
         self.policy, self.opener = policy, opener
         self.requests = 0
         self._last_attempt_started = 0.0
 
-    def send(self, url: str, *, headers: dict | None = None, data: bytes | None = None,
-             method: str | None = None, stream: bool = False):
+    def send(
+        self,
+        url: str,
+        *,
+        headers: dict | None = None,
+        data: bytes | None = None,
+        method: str | None = None,
+        stream: bool = False,
+    ):
         """The response body (read_response of the answer), or the open response when `stream`.
         Retries per the policy; a final failure goes to the hooks, which raise (or return a result)."""
         request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)

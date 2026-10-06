@@ -1,4 +1,5 @@
 """Price-step tests and the claim of a suspected re-base, shared by split detection and the NSE basis check."""
+
 from __future__ import annotations
 
 import math
@@ -21,6 +22,7 @@ class RebaseClaim:
     """A suspected re-base of one stock's stored closes: `last` is the newest re-based stored bar (stored close
     `stored_last`), `known_factor` the recorded adjustments after it, `factor` the suspected ratio, `later` the
     frame sessions after `last` and `yahoo_closes` Yahoo's closes."""
+
     key: str
     last: date
     stored_last: float

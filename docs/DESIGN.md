@@ -40,7 +40,7 @@ A ticker's SEC filings are read from the CIK in SEC's ticker map plus any earlie
 registrant still filing for it (`fundamentals.predecessor_ciks`; XOM maps to ExxonMobil Holdings
 2115436 since 2026-07-01, while Exxon Mobil Corp 34088 still lists filings: an 8-K on 2026-07-01, the
 Q2 10-Q jointly, Form 4s, a 13G, and the item 2.02 results releases up to May 2026), merged and
-de-duplicated by accession number in `sec.ticker_submissions` (issue #23).
+de-duplicated by accession number in `sec_filings.ticker_submissions` (issue #23).
 
 | Signal | US | India |
 |---|---|---|
@@ -962,7 +962,8 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   used daily and per-ticker backfill on demand. Earlier note, kept for history:
 - On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
   against live responses (NSE changes field names; built from public scrapers, not yet seen live).
-- Section 4 range inputs: **built** (`marketbrief/analytics/range_switches.py and its neighbours`, switches in `config/ranges.yaml`):
+- Section 4 range inputs: **built** (`marketbrief/analytics/range_switches.py` and its neighbours, switches in
+  `config/ranges.yaml`):
   past earnings-day moves (dates and before-open/after-close timing from yfinance and, US, SEC
   8-K item 2.02, India, NSE results filings; backfilled by `collect_events.py`), ex-dividend
   shift (dividend amounts now collected), index-then-stock beta split of the overnight cue (US: `ES`; India: previous `SPX`
@@ -1200,8 +1201,10 @@ Each subagent's model and effort are set in its `.claude/agents/<name>.md` front
 Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the user chooses it manually for complex planning. Whether a
 scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
-(forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits;
-forecast-v10, news-v8 and claims-v3 with news verification phase B), and a per-call `model` field on predictions is a planned follow-up.
+(forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits, forecast-v9
+also covering the forecaster's lessons bullet; forecast-v10, news-v8 and claims-v3 with news verification phase B;
+reflect-v1 started with the Sonnet 5.5 / medium frontmatter; news-v9 and reflect-v2 only reword the schema path and
+the lessons gate), and a per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
 - **Reflection log** (section 5): TauricResearch/TradingAgents (https://github.com/TauricResearch/TradingAgents,

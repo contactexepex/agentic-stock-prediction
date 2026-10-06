@@ -24,6 +24,7 @@ Settings: `fundamentals:` in config/markets/<market>.yaml (history_years, rechec
 predecessor_ciks for a ticker whose history sits under an earlier registrant; their submission
 lists are read too, so a 10-Q/10-K filed under a predecessor CIK triggers a download).
 Only for markets with `filings: sec`. Requires SEC_USER_AGENT (see marketbrief/sources/sec_filings.py)."""
+
 from __future__ import annotations
 
 import json
@@ -33,9 +34,14 @@ from datetime import date, timedelta
 from marketbrief.collectors.fundamentals_xbrl import extract, facts_url, new_rows
 from marketbrief.constants.columns import COL_ACCESSION, COL_TICKER
 from marketbrief.constants.config_keys import CFG_FUNDAMENTALS, CFG_MARKET
-from marketbrief.constants.fundamentals_collection import (COLLECTOR_FUNDAMENTALS, DAYS_PER_YEAR,
-                                                           DEFAULT_HISTORY_YEARS, DEFAULT_RECHECK_DAYS,
-                                                           ERROR_TEXT_LIMIT, PERIODIC_FORMS)
+from marketbrief.constants.fundamentals_collection import (
+    COLLECTOR_FUNDAMENTALS,
+    DAYS_PER_YEAR,
+    DEFAULT_HISTORY_YEARS,
+    DEFAULT_RECHECK_DAYS,
+    ERROR_TEXT_LIMIT,
+    PERIODIC_FORMS,
+)
 from marketbrief.constants.kinds import KIND_FUNDAMENTALS
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -43,8 +49,7 @@ from marketbrief.core.paths import data_dir
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.sources.sec_acceptance import time_summary, time_warnings
 from marketbrief.sources.sec_client import Edgar
-from marketbrief.sources.sec_filings import (filings_of_forms, related_ciks, require_sec, ticker_submissions,
-                                             watch_ciks)
+from marketbrief.sources.sec_filings import filings_of_forms, related_ciks, require_sec, ticker_submissions, watch_ciks
 
 
 def stored(market: str) -> tuple[set[str], dict[str, set[str]]]:
@@ -61,14 +66,17 @@ def stored(market: str) -> tuple[set[str], dict[str, set[str]]]:
 
 def pending_filings(periodic: list[dict], recheck: date, stored_accessions: set[str]) -> list[dict]:
     """The 10-Q/10-K filed since `recheck` whose accession is not stored yet."""
-    return [f for f in periodic if date.fromisoformat(f["filing_date"]) >= recheck
-            and f[COL_ACCESSION] not in stored_accessions]
+    return [
+        filing
+        for filing in periodic
+        if date.fromisoformat(filing["filing_date"]) >= recheck and filing[COL_ACCESSION] not in stored_accessions
+    ]
 
 
 def company_facts(edgar: Edgar, ticker: str, cik: int, predecessors: dict[str, list[int]]) -> list[dict]:
     """The facts of the ticker's mapped CIK and its predecessor CIKs."""
     facts = []
-    for company in [cik, *[p for p in predecessors.get(ticker.upper(), []) if p != cik]]:
+    for company in [cik, *[predecessor for predecessor in predecessors.get(ticker.upper(), []) if predecessor != cik]]:
         facts += extract(edgar.json(facts_url(company)), company)
     return facts
 
@@ -85,8 +93,9 @@ def main() -> int:
         return 0
     settings = cfg.get(CFG_FUNDAMENTALS, {})
     today = utc_today()
-    since = str(today - timedelta(days=round(DAYS_PER_YEAR * float(settings.get("history_years",
-                                                                                 DEFAULT_HISTORY_YEARS)))))
+    since = str(
+        today - timedelta(days=round(DAYS_PER_YEAR * float(settings.get("history_years", DEFAULT_HISTORY_YEARS))))
+    )
     recheck = today - timedelta(days=int(settings.get("recheck_days", DEFAULT_RECHECK_DAYS)))
     predecessors = related_ciks(cfg)
 
@@ -97,11 +106,11 @@ def main() -> int:
     for ticker, cik in ciks.items():
         # 10-Q/10-K listed under the mapped CIK or a predecessor CIK (each once) trigger a reload
         recent, errors = ticker_submissions(edgar, ticker, cik, predecessors)
-        if errors:   # a ticker is loaded only with every one of its submission lists
+        if errors:  # a ticker is loaded only with every one of its submission lists
             failed += errors
             continue
         periodic = filings_of_forms(recent, PERIODIC_FORMS)
-        accepted = {f[COL_ACCESSION]: f["accepted_at"] for f in periodic}
+        accepted = {periodic_filing[COL_ACCESSION]: periodic_filing["accepted_at"] for periodic_filing in periodic}
         pending = pending_filings(periodic, recheck, accessions[ticker])
         if accessions[ticker] and not pending and not args.force:
             up_to_date.append(ticker)
@@ -114,21 +123,41 @@ def main() -> int:
         loaded.append(ticker)
         got = new_rows(ticker, facts, ids, since, accepted, now)
         rows += got
-        got_accessions = {r[COL_ACCESSION] for r in got}
+        got_accessions = {row[COL_ACCESSION] for row in got}
         for filing in pending:
             # a filing without new values (e.g. a 10-K/A for Part III only, or not in the XBRL API yet)
             # adds no rows and is checked again until it is older than recheck_days
             (new_filings if filing[COL_ACCESSION] in got_accessions else not_in_xbrl).append(
-                {COL_TICKER: ticker, "form": filing["form"], COL_ACCESSION: filing[COL_ACCESSION],
-                 "filing_date": filing["filing_date"], "report_date": filing["report_date"]})
+                {
+                    COL_TICKER: ticker,
+                    "form": filing["form"],
+                    COL_ACCESSION: filing[COL_ACCESSION],
+                    "filing_date": filing["filing_date"],
+                    "report_date": filing["report_date"],
+                }
+            )
         accessions[ticker] |= got_accessions
 
     written = append_jsonl(day_file(market, KIND_FUNDAMENTALS, today), rows)
-    print(json.dumps({
-        "collector": COLLECTOR_FUNDAMENTALS, "market": market, "since": since, "new_rows": written,
-        "loaded": loaded, "up_to_date": len(up_to_date), "new_filings": new_filings,
-        "revised_rows": sum(r["prev_value"] is not None for r in rows),
-        "filings_without_new_values": not_in_xbrl,
-        "requests": edgar.requests, "sec_times": time_summary(edgar), "warnings": time_warnings(edgar),
-        "skipped_not_sec": skipped, "failed": failed}, indent=2))
+    print(
+        json.dumps(
+            {
+                "collector": COLLECTOR_FUNDAMENTALS,
+                "market": market,
+                "since": since,
+                "new_rows": written,
+                "loaded": loaded,
+                "up_to_date": len(up_to_date),
+                "new_filings": new_filings,
+                "revised_rows": sum(row["prev_value"] is not None for row in rows),
+                "filings_without_new_values": not_in_xbrl,
+                "requests": edgar.requests,
+                "sec_times": time_summary(edgar),
+                "warnings": time_warnings(edgar),
+                "skipped_not_sec": skipped,
+                "failed": failed,
+            },
+            indent=2,
+        )
+    )
     return 0

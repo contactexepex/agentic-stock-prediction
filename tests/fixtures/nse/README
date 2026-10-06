@@ -1,7 +1,7 @@
 NSE replay fixtures for tests/test_relations.py, tests/test_nse_india.py and tests/test_range_inputs.py.
 
 real/  Trimmed REAL responses, fetched live on 2026-10-05 (about 16:00-16:30 UTC) through the
-       collectors' own session (scripts/nse.py). Only rows were dropped; every kept row and
+       collectors' own session (marketbrief/sources/nse_client.py). Only rows were dropped; every kept row and
        field is as NSE served it (JSON re-serialised with indentation; CSVs keep their original
        lines; XBRL files are whole and unmodified). Replay with --today 2026-10-05.
        File (replay name)                              Source URL (www.nseindia.com/api/... unless noted)
@@ -28,7 +28,7 @@ real/  Trimmed REAL responses, fetched live on 2026-10-05 (about 16:00-16:30 UTC
                                                        02-10 was a holiday and NSE served the 01-10 file under that name)
 
 earnings/  REAL responses for collect_events.py's NSE earnings dates (tests/test_range_inputs.py),
-       fetched live on 2026-10-05 (about 19:00-19:15 UTC) through scripts/nse.py. Only rows were
+       fetched live on 2026-10-05 (about 19:00-19:15 UTC) through marketbrief/sources/nse_client.py. Only rows were
        dropped; kept rows are as NSE served them (JSON re-serialised with indentation).
        File (replay name)                              Source URL (www.nseindia.com/api/...)
        integrated-filing-results_<SYM>.json            integrated-filing-results?index=equities&symbol=<SYM>&type=Integrated Filing- Financials

@@ -21,7 +21,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 from marketbrief.collectors import articles as collect_articles  # noqa: E402
 from marketbrief.analytics import news_clusters  # noqa: E402
 import test_news_verify as nvt  # noqa: E402
-import validate  # noqa: E402
+from marketbrief.pipeline.validate import row_checks  # noqa: E402
 from marketbrief.analytics.claim_rules import normalise  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
@@ -262,7 +262,7 @@ def test_status_end_to_end_and_no_look_ahead(env, capsys):
     for r in env.rows("news_verified"):
         assert r["inputs_until"] <= r["as_of"]
     for kind in ("news_claims", "news_verified", "primary_texts"):
-        assert validate.check_rows(kind, env.rows(kind), False, pd.Timestamp(LATER), timedelta(minutes=5)) == []
+        assert row_checks.check_rows(kind, env.rows(kind), False, pd.Timestamp(LATER), timedelta(minutes=5)) == []
 
 
 def test_prepare_without_sec_user_agent_or_with_no_fetch_stores_no_text(env, capsys):

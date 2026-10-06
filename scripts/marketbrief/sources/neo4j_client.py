@@ -1,4 +1,5 @@
 """The Neo4j HTTPS Query API v2 client (one auto-commit transaction per statement)."""
+
 from __future__ import annotations
 
 import base64
@@ -9,8 +10,12 @@ import urllib.parse
 
 from marketbrief.constants.environment import ENV_NEO4J_RETRY_BACKOFF
 from marketbrief.constants.messages import MSG_NEO4J_CONNECTION_FAILED, MSG_NEO4J_HTTP_STATUS
-from marketbrief.constants.sources import (NEO4J_DEFAULT_BACKOFF_SECONDS, NEO4J_RETRIES, NEO4J_RETRY_STATUSES,
-                                           NEO4J_TIMEOUT_SECONDS)
+from marketbrief.constants.sources import (
+    NEO4J_DEFAULT_BACKOFF_SECONDS,
+    NEO4J_RETRIES,
+    NEO4J_RETRY_STATUSES,
+    NEO4J_TIMEOUT_SECONDS,
+)
 from marketbrief.sources.http import HttpClient, HttpPolicy, linear_wait
 
 ERROR_TEXT_LIMIT = 300
@@ -25,8 +30,10 @@ def error_text(body: str) -> str:
     """The Neo4j error codes and messages of an error body, or the body's first characters."""
     try:
         errors = json.loads(body).get("errors") or []
-        return "; ".join(f"{e.get('code', '')}: {e.get('message', '')}"[:ERROR_TEXT_LIMIT]
-                         for e in errors) or body[:ERROR_TEXT_LIMIT]
+        return (
+            "; ".join(f"{error.get('code', '')}: {error.get('message', '')}"[:ERROR_TEXT_LIMIT] for error in errors)
+            or body[:ERROR_TEXT_LIMIT]
+        )
     except (ValueError, AttributeError):
         return body[:ERROR_TEXT_LIMIT]
 
@@ -34,22 +41,40 @@ def error_text(body: str) -> str:
 class Neo4jClient(HttpClient):
     """Minimal client for the Neo4j Query API v2: retries throttled and failed requests with a growing wait."""
 
-    def __init__(self, base_url: str, database: str, credentials: tuple[str, str],
-                 timeout: float = NEO4J_TIMEOUT_SECONDS, retries: int = NEO4J_RETRIES, backoff: float | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        database: str,
+        credentials: tuple[str, str],
+        timeout: float = NEO4J_TIMEOUT_SECONDS,
+        retries: int = NEO4J_RETRIES,
+        backoff: float | None = None,
+    ):
+        """A client for the Neo4j HTTP Query API of one database."""
         user, password = credentials
         self.base_url, self.database = base_url.rstrip("/"), database
         self.url = f"{self.base_url}/db/{urllib.parse.quote(database, safe='')}/query/v2"
         token = base64.b64encode(f"{user}:{password}".encode()).decode()
-        self._headers = {"Authorization": f"Basic {token}", "Content-Type": "application/json",
-                         "Accept": "application/json"}
-        self._secrets = [s for s in (password, token) if s]
+        self._headers = {
+            "Authorization": f"Basic {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        self._secrets = [secret for secret in (password, token) if secret]
         self.timeout, self.retries = timeout, retries
-        self.backoff = (float(os.environ.get(ENV_NEO4J_RETRY_BACKOFF, NEO4J_DEFAULT_BACKOFF_SECONDS))
-                        if backoff is None else backoff)
-        policy = HttpPolicy(timeout=timeout, attempts=retries + 1, retry_wait=linear_wait(self.backoff),
-                            retry_statuses=NEO4J_RETRY_STATUSES,
-                            network_errors=(urllib.error.URLError, TimeoutError, ConnectionError, OSError),
-                            count_attempts=False)
+        self.backoff = (
+            float(os.environ.get(ENV_NEO4J_RETRY_BACKOFF, NEO4J_DEFAULT_BACKOFF_SECONDS))
+            if backoff is None
+            else backoff
+        )
+        policy = HttpPolicy(
+            timeout=timeout,
+            attempts=retries + 1,
+            retry_wait=linear_wait(self.backoff),
+            retry_statuses=NEO4J_RETRY_STATUSES,
+            network_errors=(urllib.error.URLError, TimeoutError, ConnectionError, OSError),
+            count_attempts=False,
+        )
         super().__init__(policy)
 
     @property

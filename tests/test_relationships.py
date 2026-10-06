@@ -454,7 +454,7 @@ def test_ranges_ignore_a_13d_accepted_after_made_at(tmp_path):
     assert got and not any("13D" in n for x in got.values() for n in x["notes"])
 
 
-# ---------- collect_filings goes through sec.py (throttle, backoff, JSON on failure) ----------
+# ---------- collect_filings goes through sources/sec_client.py (throttle, backoff, JSON on failure) ----------
 def test_collect_filings_uses_edgar_and_keeps_new_13d_forms(tmp_path):
     root, cfg = setup(tmp_path)
     r = run("collect_filings.py", root, cfg)

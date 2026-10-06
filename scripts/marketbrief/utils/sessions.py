@@ -1,4 +1,5 @@
 """Lists of a market's trading sessions. The two helpers answer different questions, so they stay separate."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -17,5 +18,5 @@ def last_completed_sessions(cfg: dict, today: date, count: int) -> list[date]:
 
 def sessions_in_window(cfg: dict, today: date, lookback_days: int) -> list[date]:
     """The market's sessions in the last `lookback_days` calendar days up to today, oldest first."""
-    days = [today - timedelta(days=n) for n in range(lookback_days, -1, -1)]
-    return [d for d in days if is_session(cfg, d)]
+    days = [today - timedelta(days=days_back) for days_back in range(lookback_days, -1, -1)]
+    return [day for day in days if is_session(cfg, day)]

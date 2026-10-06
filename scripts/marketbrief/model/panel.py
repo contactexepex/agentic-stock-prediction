@@ -14,7 +14,8 @@ import pandas as pd
 
 from marketbrief.constants.config_keys import CFG_TICKERS
 from marketbrief.constants.model import (FLOW_FEATURES, HORIZONS, LABEL_OPEN_TO_CLOSE, MARKET_FEATURES,
-                                         MSG_NO_BARS, REGIME_FEATURES, TECHNICAL_FEATURES)
+                                         REGIME_FEATURES, TECHNICAL_FEATURES)
+from marketbrief.constants.features import MSG_NO_BENCHMARK_FOR_KEY
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.model import market_panel
 from marketbrief.model.labels import end_offset, forward_labels
@@ -102,7 +103,7 @@ def build_panel(cfg: dict, inputs: dict, warmup: int) -> pd.DataFrame:
     bars = inputs["bars"]
     bench_key = benchmark_key(cfg)
     if bench_key not in bars:
-        raise SystemExit(MSG_NO_BARS.format(key=bench_key))
+        raise SystemExit(MSG_NO_BENCHMARK_FOR_KEY.format(key=bench_key))
     bench = bars[bench_key].sort_index()
     session_pos = pd.Series(np.arange(len(bench)), index=bench.index)
     parts = [ticker_rows(t, bars, bench, session_pos, warmup) for t in cfg[CFG_TICKERS] if t in bars]

@@ -41,6 +41,7 @@ held (`held`, `failed`) on every run until a later run can record it (a frame th
 covers our stored bars is refetched from before the newest one, so the check keeps its overlap). An
 older bar Yahoo serves after a recorded split is written on its date's stored basis (`rebased_bars`), and a
 recorded split no longer blocks the bhavcopy fallback."""
+
 from __future__ import annotations
 
 import json
@@ -48,24 +49,60 @@ from datetime import date, timedelta
 
 from marketbrief.analytics.price_adjustments import factor_after, load_adjustments
 from marketbrief.collectors import nse_session
-from marketbrief.collectors.price_frames import (frame_error, newest_stored_before, prices_file, stored_bars,
-                                                 stored_overlap, to_stored_basis, write_bar, yahoo_splits)
+from marketbrief.collectors.price_frames import (
+    frame_error,
+    newest_stored_before,
+    prices_file,
+    stored_bars,
+    stored_overlap,
+    to_stored_basis,
+    write_bar,
+    yahoo_splits,
+)
 from marketbrief.collectors.price_nse_basis_check import NseBasisCheck
 from marketbrief.collectors.price_nse_fallback import apply_fallback
 from marketbrief.collectors.price_run import PriceRun
 from marketbrief.collectors.price_split_detection import AdjustmentDetector
 from marketbrief.constants.columns import COL_DATE, COL_ID, COL_TICKER
-from marketbrief.constants.config_keys import (CFG_FALLBACK_SOURCE, CFG_MARKET, CFG_PRICE_FALLBACK, CFG_SYMBOLS,
-                                               CFG_TICKERS, META_YAHOO)
+from marketbrief.constants.config_keys import (
+    CFG_FALLBACK_SOURCE,
+    CFG_MARKET,
+    CFG_PRICE_FALLBACK,
+    CFG_SYMBOLS,
+    CFG_TICKERS,
+    META_YAHOO,
+)
 from marketbrief.constants.kinds import KIND_ADJUSTMENTS
 from marketbrief.constants.price_adjustments import KEY_EX_DATE
-from marketbrief.constants.prices import (COLLECTOR_PRICES, DEFAULT_PERIOD, ENTRY_ERROR, ENTRY_YAHOO,
-                                          ERROR_STALE_PREFIX, ERROR_TEXT_LIMIT, GAP_REFETCH_DAYS, MIN_OVERLAP,
-                                          MSG_HELD_NOTE, MSG_LONGER_HISTORY_FAILED, MSG_SPLIT_CHECK_FAILED,
-                                          PRICE_DECIMALS, SOURCE_NSE_BHAVCOPY, SUMMARY_ADJUSTMENTS, SUMMARY_HELD,
-                                          SUMMARY_NEW_BARS, SUMMARY_REBASED, SUMMARY_SYMBOLS, WARNING_TEXT_LIMIT,
-                                          YAHOO_ADJ_CLOSE, YAHOO_CLOSE, YAHOO_HIGH, YAHOO_INTERVAL_DAILY, YAHOO_LOW,
-                                          YAHOO_OHLC, YAHOO_OPEN, YAHOO_VOLUME)
+from marketbrief.constants.prices import (
+    COLLECTOR_PRICES,
+    DEFAULT_PERIOD,
+    ENTRY_ERROR,
+    ENTRY_YAHOO,
+    ERROR_STALE_PREFIX,
+    ERROR_TEXT_LIMIT,
+    GAP_REFETCH_DAYS,
+    MIN_OVERLAP,
+    MSG_HELD_NOTE,
+    MSG_LONGER_HISTORY_FAILED,
+    MSG_SPLIT_CHECK_FAILED,
+    PRICE_DECIMALS,
+    SOURCE_NSE_BHAVCOPY,
+    SUMMARY_ADJUSTMENTS,
+    SUMMARY_HELD,
+    SUMMARY_NEW_BARS,
+    SUMMARY_REBASED,
+    SUMMARY_SYMBOLS,
+    WARNING_TEXT_LIMIT,
+    YAHOO_ADJ_CLOSE,
+    YAHOO_CLOSE,
+    YAHOO_HIGH,
+    YAHOO_INTERVAL_DAILY,
+    YAHOO_LOW,
+    YAHOO_OHLC,
+    YAHOO_OPEN,
+    YAHOO_VOLUME,
+)
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_WARNINGS
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -81,13 +118,19 @@ class PriceCollector:
     """One prices run: fetch each symbol's Yahoo frame, check splits, write the new bars, run the NSE fallback."""
 
     def __init__(self, cfg: dict, period: str):
+        """The price collector's config and download period."""
         self.cfg, self.period = cfg, period
         self.run = PriceRun(cfg, utc_today(), utc_now())
-        self.targets = {**{key: meta[META_YAHOO] for key, meta in cfg[CFG_SYMBOLS].items()},
-                        **{key: meta[META_YAHOO] for key, meta in cfg[CFG_TICKERS].items()}}
+        self.targets = {
+            **{key: meta[META_YAHOO] for key, meta in cfg[CFG_SYMBOLS].items()},
+            **{key: meta[META_YAHOO] for key, meta in cfg[CFG_TICKERS].items()},
+        }
         market = cfg[CFG_MARKET]
         self.adjustments = load_adjustments(market)
-        self.seen = {(a[COL_TICKER], a[KEY_EX_DATE]) for a in load_adjustments(market, include_superseded=True)}
+        self.seen = {
+            (adjustment[COL_TICKER], adjustment[KEY_EX_DATE])
+            for adjustment in load_adjustments(market, include_superseded=True)
+        }
         self.written = 0
         self.failed: list[dict] = []
         self.splits: dict[str, list[date]] = {}
@@ -101,11 +144,11 @@ class PriceCollector:
             nse_check = NseBasisCheck(self.run, lambda: nse_box.setdefault("client", nse_session.nse_client(cfg)))
         self.detector = AdjustmentDetector(self.run, self.adjustments, nse_check)
 
-    def history(self, yf, symbol: str, **window):
+    def history(self, yfinance, symbol: str, **window):
         """One yfinance daily history request (unadjusted closes)."""
-        return yf.Ticker(symbol).history(**window, interval=YAHOO_INTERVAL_DAILY, auto_adjust=False)
+        return yfinance.Ticker(symbol).history(**window, interval=YAHOO_INTERVAL_DAILY, auto_adjust=False)
 
-    def with_overlap(self, yf, key: str, symbol: str, frame):
+    def with_overlap(self, yfinance, key: str, symbol: str, frame):
         """The frame, or a longer one fetched from before our newest stored bar when the frame covers too few
         stored bars for the basis check."""
         if frame is None or frame.empty or stored_overlap(self.cfg, key, frame, self.run.today) >= MIN_OVERLAP:
@@ -114,8 +157,8 @@ class PriceCollector:
         newest = newest_stored_before(self.cfg, key, first)
         if not newest:
             return frame
-        try:   # a gap: fetch from before our newest stored bar so the basis check has an overlap
-            longer = self.history(yf, symbol, start=(newest[0] - timedelta(days=GAP_REFETCH_DAYS)).isoformat())
+        try:  # a gap: fetch from before our newest stored bar so the basis check has an overlap
+            longer = self.history(yfinance, symbol, start=(newest[0] - timedelta(days=GAP_REFETCH_DAYS)).isoformat())
             if longer is not None and not longer.empty and min(stamp.date() for stamp in longer.index) < first:
                 return longer
         except Exception as exc:  # the check below then compares across the gap
@@ -141,7 +184,7 @@ class PriceCollector:
     def hold_symbol(self, key: str, symbol: str) -> None:
         """Yahoo's frame is on a basis no source confirms: no new bar is written this run."""
         self.held.append(key)
-        entry = next((f for f in self.failed if f[COL_TICKER] == key), None)
+        entry = next((failure for failure in self.failed if failure[COL_TICKER] == key), None)
         if entry:
             entry[ENTRY_ERROR] += f"; {MSG_HELD_NOTE}"
         else:
@@ -160,24 +203,30 @@ class PriceCollector:
             close = float(row[YAHOO_CLOSE])
             adj_close = float(row[YAHOO_ADJ_CLOSE]) if YAHOO_ADJ_CLOSE in row else close
             volume = int(row[YAHOO_VOLUME]) if row[YAHOO_VOLUME] == row[YAHOO_VOLUME] else 0
-            bar = [day.isoformat(), key, *(round(float(row[column]), PRICE_DECIMALS)
-                                           for column in (YAHOO_OPEN, YAHOO_HIGH, YAHOO_LOW)),
-                   round(close, PRICE_DECIMALS), round(adj_close, PRICE_DECIMALS), volume, self.run.now]
+            bar = [
+                day.isoformat(),
+                key,
+                *(round(float(row[column]), PRICE_DECIMALS) for column in (YAHOO_OPEN, YAHOO_HIGH, YAHOO_LOW)),
+                round(close, PRICE_DECIMALS),
+                round(adj_close, PRICE_DECIMALS),
+                volume,
+                self.run.now,
+            ]
             factor = factor_after(self.adjustments, key, day)
-            if factor != 1:   # an older bar Yahoo serves on today's basis, written on its stored basis
+            if factor != 1:  # an older bar Yahoo serves on today's basis, written on its stored basis
                 bar = to_stored_basis(bar, factor)
                 self.rebased.append({COL_TICKER: key, COL_DATE: day.isoformat(), "factor": factor})
             write_bar(path, bar)
             self.written += 1
 
-    def process_symbol(self, yf, key: str, symbol: str) -> None:
+    def process_symbol(self, yfinance, key: str, symbol: str) -> None:
         """Fetch, check and store one symbol."""
         try:
-            frame = self.history(yf, symbol, period=self.period)
+            frame = self.history(yfinance, symbol, period=self.period)
         except Exception as exc:  # network or symbol errors must not stop other symbols
             self.failed.append({COL_TICKER: key, ENTRY_YAHOO: symbol, ENTRY_ERROR: str(exc)[:ERROR_TEXT_LIMIT]})
             return
-        frame = self.with_overlap(yf, key, symbol, frame)
+        frame = self.with_overlap(yfinance, key, symbol, frame)
         self.splits[key] = yahoo_splits(frame)
         error = frame_error(self.cfg, key, frame, self.run.today)
         if error:
@@ -194,25 +243,28 @@ class PriceCollector:
 
     def summary(self) -> dict:
         """The run's JSON summary (the NSE fallback runs here, after the Yahoo pass)."""
-        summary = {SUMMARY_COLLECTOR: COLLECTOR_PRICES, SUMMARY_MARKET: self.cfg[CFG_MARKET],
-                   SUMMARY_SYMBOLS: len(self.targets), SUMMARY_NEW_BARS: self.written,
-                   SUMMARY_ADJUSTMENTS: self.new_adjustments}
+        summary = {
+            SUMMARY_COLLECTOR: COLLECTOR_PRICES,
+            SUMMARY_MARKET: self.cfg[CFG_MARKET],
+            SUMMARY_SYMBOLS: len(self.targets),
+            SUMMARY_NEW_BARS: self.written,
+            SUMMARY_ADJUSTMENTS: self.new_adjustments,
+        }
         if self.rebased:
             summary[SUMMARY_REBASED] = self.rebased
         if self.held:
             summary[SUMMARY_HELD] = self.held
         if uses_nse_fallback(self.cfg):
             recorded = {adjustment[COL_ID] for adjustment in self.adjustments}
-            summary.update(apply_fallback(self.run, self.targets, self.failed, self.splits, recorded,
-                                          set(self.held)))
+            summary.update(apply_fallback(self.run, self.targets, self.failed, self.splits, recorded, set(self.held)))
         summary[SUMMARY_WARNINGS] = self.warnings
         summary[SUMMARY_FAILED] = self.failed
         return summary
 
-    def collect(self, yf) -> dict:
+    def collect(self, yfinance) -> dict:
         """Process every symbol and return the summary."""
         for key, symbol in self.targets.items():
-            self.process_symbol(yf, key, symbol)
+            self.process_symbol(yfinance, key, symbol)
         return self.summary()
 
 
@@ -222,9 +274,9 @@ def main() -> int:
     parser.add_argument("--period", default=DEFAULT_PERIOD, help="yfinance period, e.g. 1mo, 3mo, 1y, 2y")
     args = parser.parse_args()
     cfg = require_market(args)
-    import yfinance as yf  # imported here so the rest of the repo works without it
+    import yfinance  # imported here so the rest of the repo works without it
 
     collector = PriceCollector(cfg, args.period)
-    summary = collector.collect(yf)
+    summary = collector.collect(yfinance)
     print(json.dumps(summary, indent=2))
     return 1 if summary[SUMMARY_FAILED] and len(summary[SUMMARY_FAILED]) == len(collector.targets) else 0
