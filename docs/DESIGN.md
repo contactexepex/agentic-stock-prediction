@@ -105,6 +105,20 @@ and the event calendar.
    moves; widen on F&O expiry and central-bank days.
 5. **Self-calibration:** track live coverage over the last ~60 scored ranges per market and band.
    If the 80% band hits less than 80%, widen it; if it hits clearly more, narrow it.
+   Implemented two ways: `calibrate.py` re-estimates the pool quantiles daily (live scored ranges
+   added to the pool), and, switched off by default, **Adaptive Conformal Inference** (`aci.py`,
+   Gibbs & Candès 2021; `aci:` in `config/ranges.yaml`). ACI keeps per market x horizon x band an
+   effective miss rate alpha_t, updated after each scored target date by
+   alpha_{t+1} = alpha_t + gamma (alpha_target - err_t), err_t = share of that date's ranges whose
+   close fell outside the band (0.5 target for the 50% band, 0.2 for the 80%). Only outcomes
+   scored at or before the calibration's time enter (`scored_at <= now`; no look-ahead).
+   `calibrate.py` then takes the pool quantiles at alpha_t/2 and 1 - alpha_t/2 (the 80% band never
+   narrower than the 50%), records `aci_alpha50|80` and `aci_steps`, and `ranges.py` uses them
+   unchanged. Settings: `gamma` (per scored date), `max_shift` (alpha stays within this of the
+   target), `min_history` (scored dates before alpha is used), `by_regime` (one alpha per regime
+   label). With ACI off the calibration rows and ranges are byte-for-byte as before
+   (`tests/test_aci_scoring.py`). Replay evidence (`replay.py --aci`) is in section 7; a human
+   switches it on (CLAUDE.md: ranges.yaml changes are proposed by `review.py`, applied by hand).
 
 ## 5. Role of the AI agents
 - **news-analyst:** classifies news with the PASDS scheme: sentiment, relevance, novelty, event
@@ -123,6 +137,18 @@ and the event calendar.
 | Confidence | Calibration by band (70% calls should hit ~70%) | Coin flip |
 
 Reported per market, per horizon, per regime, and over rolling 30-day and since-start windows.
+
+**Proper scores** (`scripts/scoring.py`, hand-written, tested on synthetic data with exact values):
+- Calls: Brier score mean((p - y)^2) with p = stated confidence and y = hit (a coin flip scores
+  0.250), log loss -mean(y ln p + (1 - y) ln(1 - p)) (coin flip 0.693), Brier skill 1 - Brier/0.25,
+  and a reliability table: confidence bins [0.5, 0.6), [0.6, 0.7), [0.7, 0.8), [0.8, 0.9] with
+  count, mean stated confidence, hit rate and Wilson 95% interval.
+- Ranges: the interval score per band (Gneiting-Raftery) and the quantile score, the mean pinball
+  loss over the four stored quantiles q10/q25/q75/q90 (= lo80/lo50/hi50/hi80; a coarse CRPS
+  estimate, QS = (0.1 IS80 + 0.25 IS50) / 4), in % of the base close.
+- Shown in `score_predictions.py`'s printed summary (`scores`), the context pack ("Proper scores
+  (all time)"), the weekly review ("Proper scores") and the HTML report's track record (one
+  reliability chart for calls with Wilson whiskers, Brier and log loss in its caption).
 
 ## 7. Testing approach
 | Part | How it is tested |
@@ -158,6 +184,60 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's
   fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
   synthetic series. About 22 s per market for five years of bars.
+- ACI mode (`--aci`, optional `--aci-gamma`, `--aci-by-regime on|off`, `--aci-tune-end DATE`): the
+  same replay with ACI on (each day's alpha from the misses of ranges whose target close is on or
+  before d), and a before/after table on the same rows (coverage at 50%/80%, width, interval
+  scores, quantile score; overall, by regime and by major event) in `replay-<end><tag>.html|json`
+  and a replays row with id `<start>_<end><tag>`; the tag names the settings, e.g.
+  `-aci-g0.01-regime-s0.15-m20`, plus `-t<DATE>` for a held-out run. Held-out check
+  (`--aci-tune-end`): each of 8 variants (gamma 0.002/0.005/0.01/0.02, one alpha or one per regime)
+  is replayed; the one with the lowest mean relative 80% interval score on the tuning rows (as-of
+  date and target close on or before DATE) is selected, and fixed bands vs that choice (and vs the
+  config's settings) are compared on the later as-of dates only.
+- The weekly review uses the newest such row whose ACI settings (gamma, max_shift, min_history,
+  by_regime) equal `config/ranges.yaml`'s; rows with other settings are skipped with a note. It
+  proposes `aci.enabled: true` only if, on every horizon, the 80% interval score is lower, the 50%
+  one no higher, and both bands' coverage closer to target. The proposal is out of sample only when
+  the held-out tuning selected the config's settings and the test dates pass; otherwise it is
+  marked PROVISIONAL ("in-sample: settings tuned on this replay").
+- Evidence on a 5-year scratch backfill (`collect_prices --period 5y`,
+  `collect_events --history-days 1900`, never the real data/; as-of days 2021-12-31 (US) and
+  2022-01-03 (India) to 2026-10-05), fixed bands -> ACI with the `config/ranges.yaml` settings
+  (gamma 0.01, max shift 0.15, min history 20, one alpha per regime), 80% interval score in % of
+  price:
+
+  | Market, horizon | 50% held | 80% held | 80% score | UNSTABLE 80% held | major event 80% held |
+  |---|---|---|---|---|---|
+  | US 1d | 53.8% -> 51.3% | 83.3% -> 81.2% | 7.330 -> 7.252 | 88.5% -> 85.5% | 86.9% -> 83.8% |
+  | US 5d | 56.0% -> 52.4% | 85.5% -> 82.3% | 17.302 -> 16.844 | 92.0% -> 88.6% | 88.4% -> 84.1% |
+  | India 1d | 53.5% -> 51.1% | 83.0% -> 81.1% | 5.674 -> 5.615 | 87.3% -> 85.2% | 88.5% -> 84.4% |
+  | India 5d | 55.7% -> 51.8% | 84.9% -> 81.9% | 12.978 -> 12.726 | 91.1% -> 88.1% | 87.1% -> 83.3% |
+
+  In every regime both bands' coverage moves closer to target, and the interval scores improve
+  except one flat cell (US 5d CALM 50% score 10.506 -> 10.509). Gamma and by_regime were chosen on
+  this same replay (a sweep of gamma 0.002/0.005/0.01/0.02 with and without regimes; all help, the
+  differences are small), so the gain is in-sample: one alpha for all regimes (gamma 0.01) reaches
+  80% overall but leaves CALM under target (76.7-78.2% of 80% ranges held) while UNSTABLE stays
+  wide, so alpha is kept per regime. UNSTABLE days are few, so their alpha moves slowly and the
+  bands there stay wider than promised.
+
+  Held-out check (`--aci-tune-end 2024-12-31`; tuning on as-of dates to 2024-12-31, test on
+  the as-of dates after it, to 2026-10-05). In both markets the tuning dates select gamma 0.02 with one alpha,
+  not the config's settings, so the review's proposal stays PROVISIONAL. Fixed bands -> that
+  selection on the unseen test dates:
+
+  | Market, horizon | n | 50% held | 80% held | 50% score | 80% score | CALM 80% held |
+  |---|---|---|---|---|---|---|
+  | US 1d | 8,780 | 52.4% -> 50.2% | 82.0% -> 80.1% | 5.020 -> 5.009 | 7.509 -> 7.478 | 80.1% -> 77.9% |
+  | US 5d | 8,700 | 55.6% -> 50.5% | 85.0% -> 80.2% | 11.480 -> 11.405 | 17.109 -> 16.865 | 82.0% -> 76.6% |
+  | India 1d | 8,675 | 52.46% -> 50.05% | 82.0% -> 80.0% | 3.582 -> 3.576 | 5.439 -> 5.415 | 79.5% -> 76.9% |
+  | India 5d | 8,610 | 55.3% -> 50.2% | 84.95% -> 80.4% | 8.267 -> 8.231 | 12.287 -> 12.087 | 81.6% -> 75.75% |
+
+  Out of sample, ACI with one alpha still brings both bands to target and lowers both interval
+  scores on every horizon, but CALM falls under target, as in-sample. On the same test dates the
+  config's settings (gamma 0.01, per regime) score 7.447 / 16.595 (US 1d / 5d 80%) and 5.386 /
+  11.985 (India) with CALM at 79.5-80.4%, but those settings were chosen on the whole window, so
+  that comparison is not out of sample.
 
 **AI replay harness** (`scripts/ai_replay.py`): the table above keeps AI judgement out of backtests
 because the model may have seen past outcomes. Days after its training data (as-of dates after

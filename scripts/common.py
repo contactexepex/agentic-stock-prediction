@@ -127,6 +127,9 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "id": "VARCHAR", "as_of_date": "DATE", "computed_at": "TIMESTAMPTZ", "horizon_days": "INTEGER",
         "q10": "DOUBLE", "q25": "DOUBLE", "q75": "DOUBLE", "q90": "DOUBLE",
         "n_history": "INTEGER", "n_live": "INTEGER", "source": "VARCHAR",
+        # ACI (aci.py), only when switched on in config/ranges.yaml: effective miss rates used for
+        # the 50% and 80% bands and the scored target dates behind them
+        "aci_alpha50": "DOUBLE", "aci_alpha80": "DOUBLE", "aci_steps": "INTEGER",
     }),
     "regime": ("jsonl", {
         "id": "VARCHAR", "as_of_date": "DATE", "session_date": "DATE", "computed_at": "TIMESTAMPTZ",

@@ -616,6 +616,39 @@ function calibrationChart(){
   const b = el('span'); b.append(el('span', {class: 'sw', style: 'background:var(--call2);width:10px'}), document.createTextNode('Up/down calls'));
   lg.append(a, b); box.append(lg);
   box.append(tableView(['What', 'Promised', 'Actual', 'Checked'], pts.map(p => [p.label, Math.round(p.stated * 100) + '%', Math.round(p.actual * 100) + '%', String(p.n)])));
+  box.append(reliabilityChart());
+  return box;
+}
+
+// ---------- chart: reliability of up/down calls (stated confidence vs hit rate, Wilson 95%) ----------
+function reliabilityChart(){
+  const box = el('div', {class: 'reliability'});
+  const rows = (D.reliability || []).filter(r => r.n > 0);
+  const cs = D.call_scores || {n: 0};
+  box.append(el('h3', null, 'Up/down calls: confidence vs hit rate'));
+  if (!rows.length) { box.append(el('p', {class: 'empty'}, 'No up/down call has been checked yet.')); return box; }
+  const f3 = v => v == null ? '–' : v.toFixed(3);
+  box.append(el('p', {class: 'cap'}, 'Each dot is a confidence group: how sure the calls said they were (across) and how often they were right (up), with the likely range of the true rate (line). Brier score ' + f3(cs.brier) + ' and log loss ' + f3(cs.log_loss) + ' over ' + cs.n + ' calls; a coin flip scores 0.250 and 0.693, lower is better.' + (cs.n < D.min_sample ? ' Not enough history yet: fewer than ' + D.min_sample + ' checked calls.' : '')));
+  const W = 360, L = 44, R = 12, T = 10, B = 34, Hh = 200, lo = 0.3, hi = 1;
+  const xs = v => L + (W - L - R) * (v - 0.5) / 0.4, ys = v => T + (Hh - T - B) * (1 - (v - lo) / (hi - lo));
+  const s = svg('svg', {viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': 'Call confidence versus hit rate'});
+  [0.4, 0.6, 0.8, 1].forEach(v => {
+    s.append(svg('line', {x1: L, x2: W - R, y1: ys(v), y2: ys(v), stroke: 'var(--grid)', 'stroke-width': 1}));
+    s.append(sText(L - 6, ys(v) + 4, Math.round(v * 100) + '%', {'text-anchor': 'end'}));
+  });
+  [0.5, 0.6, 0.7, 0.8, 0.9].forEach(v => s.append(sText(xs(v), Hh - 18, Math.round(v * 100) + '%', {'text-anchor': 'middle'})));
+  s.append(sText((L + W - R) / 2, Hh - 3, 'stated confidence', {'text-anchor': 'middle'}));
+  s.append(svg('line', {x1: xs(0.5), y1: ys(0.5), x2: xs(0.9), y2: ys(0.9), stroke: 'var(--axis)', 'stroke-width': 1, 'stroke-dasharray': '4 3'}));
+  const clampY = v => ys(Math.max(lo, Math.min(hi, v)));
+  rows.forEach(r => {
+    const cx = xs(r.mean_conf);
+    s.append(svg('line', {x1: cx, x2: cx, y1: clampY(r.wilson_lo), y2: clampY(r.wilson_hi), stroke: 'var(--call2)', 'stroke-width': 2, 'stroke-linecap': 'round'}));
+    s.append(svg('circle', {cx: cx, cy: clampY(r.hit_rate), r: 5, fill: 'var(--call2)', stroke: 'var(--surface)', 'stroke-width': 2}));
+    const hb = svg('circle', {cx: cx, cy: clampY(r.hit_rate), r: 13, fill: 'transparent'}); s.append(hb);
+    hover(hb, () => [['Confidence ' + r.bin.replace('-', ' to ')], ['stated (mean)', Math.round(r.mean_conf * 100) + '%'], ['right', Math.round(r.hit_rate * 100) + '%'], ['95% range', Math.round(r.wilson_lo * 100) + '% to ' + Math.round(r.wilson_hi * 100) + '%'], ['checked calls', String(r.n)]]);
+  });
+  box.append(s);
+  box.append(tableView(['Confidence', 'Stated', 'Right', '95% range', 'Checked'], rows.map(r => [r.bin, Math.round(r.mean_conf * 100) + '%', Math.round(r.hit_rate * 100) + '%', Math.round(r.wilson_lo * 100) + '% to ' + Math.round(r.wilson_hi * 100) + '%', String(r.n)])));
   return box;
 }
 

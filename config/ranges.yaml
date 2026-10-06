@@ -52,6 +52,19 @@ implied_vol:                # US option chains (collect_options.py); no backtest
   max_expiry_days: 30       # use the first expiry on/after the target date, at most this far out
   use_for_earnings: true    # earnings before that expiry: IV sets the earnings multiple instead
 
+# Adaptive Conformal Inference (scripts/aci.py, DESIGN section 4.5): per horizon and band an
+# effective miss rate alpha_t, updated after each scored target date by
+# alpha += gamma x (target miss rate - share of that day's ranges that missed), from live range
+# outcomes scored before the calibration runs; calibrate.py then takes the pool quantiles at
+# alpha_t/2 and 1 - alpha_t/2. Off by default: a human switches it on after the replay evidence
+# (replay.py --aci) and the weekly review. `enabled` takes the same forms as the range inputs.
+aci:
+  enabled: false
+  gamma: 0.01               # step per scored target date; chosen in-sample on the 5-year replay (held-out: DESIGN 7)
+  max_shift: 0.15           # alpha_t stays within this of the target (0.5 or 0.2)
+  min_history: 20           # scored target dates before the adjusted alpha is used
+  by_regime: true           # a separate alpha per regime label; chosen in-sample (CALM stays at target)
+
 # Relationship risk flags (scripts/relations.py; markets with a `relations:` block). Extra width
 # per flag type, summed per ticker and capped. Off by default: switch on only if the weekly
 # review shows flagged tickers' ranges miss more often than the rest.

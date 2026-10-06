@@ -18,7 +18,9 @@ Research only. Nothing here is investment advice, and the routines never trade.
    only), `collect_macro.py` (US: Treasury yield curve, FRED credit spreads, Cboe put/call),
    `collect_shorts.py` (US: FINRA short-sale volume and short interest) and
    `collect_flows_india.py` (India: NSDL FPI flows, NSE sector index closes and valuations).
-3. **Score** past predictions against actual prices (`score_predictions.py`).
+3. **Score** past predictions against actual prices (`score_predictions.py`), with proper scores
+   (`scoring.py`): Brier score, log loss and a reliability table for calls; interval and quantile
+   scores for ranges.
 4. **Indicators and regime** (`features.py`): PASDS file 06 indicators per ticker (returns, EMA
    ratio, RSI, ATR, realized and EWMA volatility, Bollinger width, OBV, volume ratio, beta,
    sector-relative strength) and the file 07 regime (CALM / TRENDING / EVENT_HEAVY / UNSTABLE)
@@ -99,7 +101,11 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
    and `python replay.py --market india` and `--market us` (historical replay of all rule-based
    parts: ranges, regime and direction baselines scored day by day; writes a self-contained
    `reports/<market>/replay-<end>.html` with a plain-language summary, a `.json` with every number,
-   and a row in `data/<market>/replays/`; `--start`/`--end` pick the as-of window),
+   and a row in `data/<market>/replays/`; `--start`/`--end` pick the as-of window;
+   `--aci` adds the same replay with Adaptive Conformal Inference on and a before/after table,
+   `replay-<end>-aci-<settings>.*`; `--aci-tune-end DATE` adds a held-out check, which the weekly
+   review reads to propose switching `aci:` on in
+   `config/ranges.yaml`; it stays off until a human edits it),
    commit, push. Then click **Run now** on each routine and read the transcript (a green
    status only means the session ran, not that the task succeeded).
 5. **After adding a symbol** to a market config, backfill it once the same way (bars already

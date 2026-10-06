@@ -5,7 +5,10 @@ scored on its target_date close. Writes outcome records; never edits predictions
 Late records are never scored: a range or call made at or after the open of the first session
 after its as_of_date (a mid-session or late run) already knew part of its outcome (CLAUDE.md:
 nothing after made_at), whatever its horizon, so it stays out of the track record and is counted
-under `late_skipped`."""
+under `late_skipped`.
+The printed summary adds `scores` (scoring.py) over the whole track record: Brier score, log loss
+and a reliability table (confidence bins vs hit rate, Wilson 95%) for calls; coverage, 50%/80%
+interval scores and the quantile score (mean pinball loss over q10/q25/q75/q90) for ranges."""
 from __future__ import annotations
 
 import json
@@ -17,6 +20,7 @@ import pandas as pd
 
 import events as ev
 import rangelib as rl
+import scoring
 from common import append_jsonl, connect, day_file, market_arg, require_market, utc_now, utc_today
 
 
@@ -92,10 +96,13 @@ def main() -> int:
     ranges, late_ranges = score_ranges(cfg, con, now)
     r_written = append_jsonl(day_file(market, "range_outcomes", utc_today()), ranges)
     r_open = con.execute("SELECT count(*) FROM open_ranges").fetchone()[0] - r_written - late_ranges
+    # proper scores over the whole track record, including what was just scored (fresh connection)
+    scores = scoring.summary(connect(market))
     print(json.dumps({"step": "score", "market": market, "scored": written, "still_open": open_left,
                       "late_skipped": {"calls": late_calls, "ranges": late_ranges},
                       "ranges_scored": r_written, "ranges_open": r_open,
-                      "hit80": sum(r["hit80"] for r in ranges), "hit50": sum(r["hit50"] for r in ranges)},
+                      "hit80": sum(r["hit80"] for r in ranges), "hit50": sum(r["hit50"] for r in ranges),
+                      "scores": scores},
                      indent=2))
     return 0
 

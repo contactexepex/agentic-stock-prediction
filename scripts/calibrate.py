@@ -4,15 +4,21 @@
 Pool = standardized returns of all watchlist tickers over the last `history_sessions` (from
 stored bars, no AI) plus live scored ranges (their realized z), weighted by recency and with
 live results counting `live_weight` times more. Writes the 10/25/75/90% quantiles per horizon
-to data/<market>/calibration/. Falls back to normal quantiles when the pool is too small."""
+to data/<market>/calibration/. Falls back to normal quantiles when the pool is too small.
+With `aci:` switched on in config/ranges.yaml (off by default), the four levels come from the ACI
+miss rates (aci.py) of live range outcomes scored by now, and the row adds aci_alpha50/80 and
+aci_steps; switched off, the rows are exactly as without ACI."""
 from __future__ import annotations
 
 import json
 import sys
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
 
+import aci
+import range_inputs as ri
 import rangelib as rl
 from common import (append_jsonl, benchmark_key, connect, day_file, load_ranges_config, market_arg,
                     require_market, utc_now)
@@ -39,13 +45,22 @@ def history_pool(bars: dict[str, pd.DataFrame], tickers, h: int, rc: dict,
     return np.array(zs), np.array(ages, dtype=float)
 
 
-def compute(cfg: dict, rc: dict, con, bars: dict[str, pd.DataFrame]) -> list[dict]:
+def compute(cfg: dict, rc: dict, con, bars: dict[str, pd.DataFrame], now: str | None = None) -> list[dict]:
     bench = bars[benchmark_key(cfg)]
     as_of = bench.index[-1].date()
     session_rank = {d: i for i, d in enumerate(bench.index)}
     live = con.execute("SELECT horizon_days, as_of_date, z FROM range_record WHERE z IS NOT NULL").df()
-    now, rows = utc_now(), []
+    now, rows = now or utc_now(), []
+    tracker, akey = None, "all"
+    if any(ri.enabled(rc, "aci", cfg["market"], h) for h in rc["horizons"]):
+        # ACI: only range outcomes scored by now; with by_regime the alpha of the latest regime
+        tracker = aci.live_tracker(con, rc, now)
+        reg = con.execute("SELECT regime FROM regime_latest WHERE as_of_date <= ? "
+                          "ORDER BY as_of_date DESC LIMIT 1", [as_of]).fetchone()
+        akey = tracker.key(reg[0] if reg else None)
     for h in rc["horizons"]:
+        use_aci = tracker is not None and ri.enabled(rc, "aci", cfg["market"], h)
+        levels = tracker.levels(h, akey) if use_aci else QS
         z_hist, age_hist = history_pool(bars, cfg["tickers"], h, rc, session_rank)
         w_hist = rl.recency_weights(age_hist, rc["half_life_sessions"])
         lv = live[live["horizon_days"] == h] if not live.empty else live
@@ -58,15 +73,22 @@ def compute(cfg: dict, rc: dict, con, bars: dict[str, pd.DataFrame]) -> list[dic
             w_live = np.array([])
         z, w = np.concatenate([z_hist, z_live]), np.concatenate([w_hist, w_live])
         if len(z) >= rc["min_pool"]:
-            q = {k: rl.weighted_quantile(z, w, v) for k, v in QS.items()}
+            q = {k: rl.weighted_quantile(z, w, v) for k, v in levels.items()}
             source = "pool"
-        else:
+        elif not use_aci:
             lo80, hi80 = rl.normal_quantiles(0.8)
             lo50, hi50 = rl.normal_quantiles(0.5)
             q, source = {"q10": lo80, "q25": lo50, "q75": hi50, "q90": hi80}, "normal"
-        rows.append({"id": f"{as_of}-{h}d", "as_of_date": str(as_of), "computed_at": now, "horizon_days": h,
-                     **{k: round(v, 5) for k, v in q.items()}, "n_history": int(len(z_hist)),
-                     "n_live": int(len(z_live)), "source": source})
+        else:
+            q, source = {k: NormalDist().inv_cdf(v) for k, v in levels.items()}, "normal"
+        row = {"id": f"{as_of}-{h}d", "as_of_date": str(as_of), "computed_at": now, "horizon_days": h,
+               **{k: round(v, 5) for k, v in q.items()}, "n_history": int(len(z_hist)),
+               "n_live": int(len(z_live)), "source": source}
+        if use_aci:   # only when switched on, so rows with ACI off stay exactly as before
+            row.update({"source": f"{source}+aci", "aci_alpha50": round(2 * levels["q25"], 5),
+                        "aci_alpha80": round(2 * levels["q10"], 5),
+                        "aci_steps": int(tracker.steps.get((h, "80", akey), 0))})
+        rows.append(row)
     return rows
 
 

@@ -27,11 +27,13 @@ import numpy as np
 import pandas as pd
 import yaml
 
+import aci
 import backtest as bt
 import events as ev
 import indicators as ind
 import rangelib as rl
 import regime as rg
+import scoring
 from common import (CONFIG, ROOT, append_jsonl, benchmark_key, connect, day_file, load_ranges_config,
                     market_arg, require_market, utc_now, utc_today, vol_index_key)
 from features import load_bars
@@ -434,9 +436,115 @@ def proposals(rc: dict, live: dict, hist: dict) -> list[dict]:
                              "changes": [{"param": k, "current": rc.get(k), "proposed": val} for k, val in v["set"].items()],
                              "drop": v["name"].lower().startswith("drop"),
                              "rel_score": v["vs_current"]["rel_score"],
-                             "cover80_now": {h: x.get("cover80") for h, x in base["by_h"].items()},
-                             "cover80_then": {h: x.get("cover80") for h, x in v["by_h"].items()}}
+                             "cover80_before": {h: x.get("cover80") for h, x in base["by_h"].items()},
+                             "cover80_after": {h: x.get("cover80") for h, x in v["by_h"].items()}}
     return sorted(best.values(), key=lambda p: p["rel_score"])
+
+
+def proper_scores(ranges: pd.DataFrame, calls: pd.DataFrame) -> dict:
+    """Brier, log loss and reliability for calls; interval and quantile scores for ranges (scoring.py)."""
+    c = calls[calls["confidence"].notna() & calls["hit"].notna()] if not calls.empty else calls
+    out = {"calls": by_horizon(c, scoring.call_scores) if not c.empty else {"all": {"n": 0}},
+           "reliability": scoring.reliability(c["confidence"], c["hit"]) if not c.empty else [],
+           "ranges": by_horizon(ranges, scoring.range_scores) if not ranges.empty else {"all": {"n": 0}}}
+    return out
+
+
+def aci_state(con, rc: dict, week_end: date) -> dict:
+    """Current ACI alpha per horizon and band from live outcomes scored by the end of the week
+    (shown whether or not ACI is switched on)."""
+    now = f"{week_end}T23:59:59+00:00"
+    try:
+        t = aci.live_tracker(con, rc, now, until=week_end)
+    except Exception:  # a connection without range_outcomes (nothing scored): no state
+        t = aci.Tracker(rc)
+    return {"settings": aci.settings(rc), "state": t.snapshot()}
+
+
+ACI_SETTING_KEYS = ("gamma", "max_shift", "min_history", "by_regime")
+
+
+def same_aci_settings(stored: dict | None, rc: dict) -> bool:
+    cur = aci.settings(rc)
+    return bool(stored) and all(stored.get(k) == cur[k] for k in ACI_SETTING_KEYS)
+
+
+def latest_aci_replay(con, week_end: date, rc: dict) -> dict | None:
+    """The newest `replay.py --aci` record ending by the week's end whose ACI settings (gamma, max_shift,
+    min_history, by_regime) equal config/ranges.yaml's; records with other settings are skipped and
+    counted in `note`. Returns its before/after comparison and held-out check (if run)."""
+    try:
+        rows = con.execute("SELECT id, end_date, settings, detail FROM replays WHERE id LIKE '%-aci%' "
+                           "AND end_date <= ? ORDER BY computed_at DESC", [week_end]).fetchall()
+    except Exception:  # no replays stored
+        return None
+    skipped = 0
+    for rid, end, settings, detail in rows:
+        settings = json.loads(settings) if isinstance(settings, str) else (settings or {})
+        detail = json.loads(detail) if isinstance(detail, str) else (detail or {})
+        if not detail.get("aci_comparison"):
+            continue
+        if not same_aci_settings(settings.get("aci"), rc):
+            skipped += 1
+            continue
+        return {"id": rid, "end_date": str(end)[:10], "comparison": detail["aci_comparison"],
+                "held_out": detail.get("aci_held_out"), "settings": settings.get("aci"),
+                "note": f"{skipped} newer ACI replay(s) with other settings than config/ranges.yaml skipped"
+                        if skipped else ""}
+    if skipped:
+        return {"id": None, "comparison": None, "held_out": None, "settings": None,
+                "note": f"{skipped} stored ACI replay(s), none with the config/ranges.yaml ACI settings "
+                        f"({', '.join(f'{k} {aci.settings(rc)[k]}' for k in ACI_SETTING_KEYS)}): no ACI proposal; "
+                        "run replay.py --aci with the current settings"}
+    return None
+
+
+def aci_passes(cmp: dict) -> tuple[bool, list[float], dict, dict, int]:
+    """On every horizon: lower 80% and no higher 50% interval score, and both bands' coverage closer to target."""
+    rel, ok, before80, after80, n = [], True, {}, {}, 0
+    for h, groups in (cmp or {}).items():
+        b, a = groups["overall"]["before"], groups["overall"]["after"]
+        if not b.get("n") or b.get("score80") is None or a.get("score80") is None:
+            return False, [], {}, {}, 0
+        n += b["n"]
+        better = a["score80"] < b["score80"] and a["score50"] <= b["score50"]
+        closer = all(abs(a[f"cover{k}"] - t) < abs(b[f"cover{k}"] - t) for k, t in TARGETS.items())
+        ok &= better and closer
+        rel.append(a["score80"] / b["score80"] - 1)
+        before80[f"{h}d"], after80[f"{h}d"] = b["cover80"], a["cover80"]
+    return ok and bool(rel), rel, before80, after80, n
+
+
+def aci_proposal(rc: dict, rep: dict | None) -> dict | None:
+    """Propose switching ACI on (never when it is already on, never from a replay with other settings).
+    Out of sample: the replay's held-out check (replay.py --aci-tune-end) selected the config's settings
+    on the tuning dates and they pass `aci_passes` on the later test dates. Otherwise, if the whole
+    window passes, the proposal is PROVISIONAL: in-sample, the settings were tuned on that replay."""
+    if rep is None or not rep.get("comparison") or (rc.get("aci") or {}).get("enabled"):
+        return None
+    if not same_aci_settings(rep.get("settings"), rc):
+        return None
+    ho = rep.get("held_out")
+    reason = "no held-out check (replay.py --aci --aci-tune-end)"
+    if ho:
+        ok_t, rel_t, b_t, a_t, n_t = aci_passes(ho.get("test_selected"))
+        if ho.get("selected_is_config") and ok_t:
+            return {"variant": f"ACI on (replay {rep['id']})", "n": n_t, "verdict": "improves score", "drop": False,
+                    "source": f"historical replay, out of sample (as-of dates after {ho['tune_end']})",
+                    "evidence": "out-of-sample", "provisional": False,
+                    "rel_score": round(float(np.mean(rel_t)), 4),
+                    "changes": [{"param": "aci.enabled", "current": False, "proposed": True}],
+                    "cover80_before": b_t, "cover80_after": a_t}
+        reason = ("held-out tuning picked other settings" if not ho.get("selected_is_config")
+                  else "held-out test dates do not pass")
+    ok, rel, b, a, n = aci_passes(rep["comparison"])
+    if not ok:
+        return None
+    return {"variant": f"ACI on (replay {rep['id']}), PROVISIONAL", "n": n, "verdict": "improves score (in-sample)",
+            "drop": False, "source": f"historical replay, in-sample: settings tuned on this replay; {reason}",
+            "evidence": "in-sample", "provisional": True, "rel_score": round(float(np.mean(rel)), 4),
+            "changes": [{"param": "aci.enabled", "current": False, "proposed": True}],
+            "cover80_before": b, "cover80_after": a}
 
 
 def confidence_advice(bands: dict, calls: dict, rv: dict) -> list[str]:
@@ -537,6 +645,70 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
                       "–" if s.get("gap") is None else f"{s['gap']:+.0%}", flag(s["n"], rv)]
                      for w, per in d["bands"].items() for b, s in per.items()])]
 
+    sc_rows = [[win_names[w], h, s["n"], fnum(s.get("brier")), fnum(s.get("log_loss")), fnum(s.get("brier_skill")),
+                flag(s["n"], rv)] for w, per in d["scores"].items() for h, s in per["calls"].items()]
+    rel_rows = [[r["bin"], r["n"], fpct(r["mean_conf"]), fpct(r["hit_rate"]),
+                 f"{fpct(r['wilson_lo'])} to {fpct(r['wilson_hi'])}" if r["n"] else "–"]
+                for r in d["scores"]["all"]["reliability"]]
+    rq_rows = [[win_names[w], h, s["n"], fpct(s.get("cover50")), fpct(s.get("cover80")), fnum(s.get("is50_pct")),
+                fnum(s.get("is80_pct")), fnum(s.get("qs_pct")), flag(s["n"], rv)]
+               for w, per in d["scores"].items() for h, s in per["ranges"].items()]
+    lines += ["## Proper scores", "",
+              "Calls: Brier score (a coin flip scores 0.250) and log loss (coin flip 0.693), lower is better; skill = "
+              "1 - Brier / 0.25 (above 0 beats a coin flip).", "",
+              table(["Window", "H", "n", "Brier", "Log loss", "Skill", "Flag"], sc_rows),
+              "### Reliability (since start): stated confidence vs hit rate", "",
+              table(["Confidence", "n", "Mean stated", "Hit rate", "Wilson 95%"], rel_rows),
+              "### Ranges: interval and quantile scores", "",
+              "In % of price, lower is better. Quantile score = mean pinball loss over the four published quantiles "
+              "(q10, q25, q75, q90), a coarse CRPS estimate.", "",
+              table(["Window", "H", "n", "50% cover", "80% cover", "50% score", "80% score", "Quantile score", "Flag"],
+                    rq_rows)]
+    a = d["aci"]
+    st = a["settings"]
+    lines += ["## Adaptive conformal inference (ACI)", "",
+              f"Switched **{'on' if st.get('enabled') else 'off'}** (`aci.enabled` in config/ranges.yaml: "
+              f"{fval(st.get('enabled'))}); gamma {st['gamma']}, max shift {st['max_shift']}, min history "
+              f"{st['min_history']} scored target dates, {'one alpha per regime' if st['by_regime'] else 'one alpha'}. "
+              "Current alpha from live outcomes scored by the week's end (the target miss rate is 0.50 for the 50% "
+              "band, 0.20 for the 80% band; below target = wider band).", "",
+              table(["H", "Band", "Key", "Steps", "Alpha", "Used (after min history)", "Implied coverage"],
+                    [[f"{s['horizon_days']}d", f"{s['band']}%", s["key"], s["steps"], fnum(s["alpha"], 3),
+                      fnum(s["effective_alpha"], 3), fpct(s["implied_coverage"], 1)] for s in a["state"]])]
+    rep = a.get("replay")
+
+    def cmp_rows(cmp):
+        return [[f"{h}d", g, v["before"].get("n"),
+                 f"{fpct(v['before'].get('cover50'), 1)} → {fpct(v['after'].get('cover50'), 1)}",
+                 f"{fpct(v['before'].get('cover80'), 1)} → {fpct(v['after'].get('cover80'), 1)}",
+                 f"{fnum(v['before'].get('score50'))} → {fnum(v['after'].get('score50'))}",
+                 f"{fnum(v['before'].get('score80'))} → {fnum(v['after'].get('score80'))}"]
+                for h, groups in cmp.items() for g, v in groups.items() if v["before"].get("n")]
+    cmp_hdr = ["H", "Group", "n", "50% cover", "80% cover", "50% score", "80% score"]
+    if rep and rep.get("note"):
+        lines += [f"> {rep['note']}.", ""]
+    if rep and rep.get("comparison"):
+        lines += [f"Historical replay `{rep['id']}` (`replay.py --aci`), fixed bands → ACI on the same rows. "
+                  "**In-sample: the ACI settings in config/ranges.yaml were tuned on this replay window**, so these "
+                  "gains are optimistic:", "", table(cmp_hdr, cmp_rows(rep["comparison"]))]
+        ho = rep.get("held_out")
+        if ho:
+            sel = ho["selected"]
+            lines += [f"Held-out check: gamma and the alpha scope (one, or one per regime) picked on as-of dates up to "
+                      f"{ho['tune_end']} only (selected gamma {sel['gamma']}, "
+                      f"{'per regime' if sel['by_regime'] else 'one alpha'}; "
+                      f"{'the config settings' if ho['selected_is_config'] else 'NOT the config settings'}). "
+                      "Out of sample, fixed bands → the selected settings on the later as-of dates:", "",
+                      table(cmp_hdr, cmp_rows(ho["test_selected"]))]
+            if not ho["selected_is_config"] and ho.get("test_config"):
+                lines += ["The config settings on the same later dates (not out of sample: they were chosen on the "
+                          "whole window):", "", table(cmp_hdr, cmp_rows(ho["test_config"]))]
+        else:
+            lines += ["_No held-out check stored (`replay.py --aci --aci-tune-end DATE`): any ACI proposal is "
+                      "provisional._", ""]
+    elif not rep:
+        lines += ["_No `replay.py --aci` record stored yet: no ACI proposal._", ""]
+
     lines += [f"## Calibration (latest as of {rec['week_end']})", "",
               table(["H", "Source", "History n", "Live n", "q10", "q25", "q75", "q90"],
                     [[f"{c['horizon_days']}d", c["source"], c["n_history"], c["n_live"],
@@ -573,8 +745,8 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
     for p in props:
         for ch in p["changes"]:
             rows.append([f"`{ch['param']}`", fval(ch["current"]), fval(ch["proposed"]), p["source"], p["n"], f"{p['rel_score']:+.1%}",
-                         " / ".join(f"{fpct(p['cover80_now'].get(h))} → {fpct(p['cover80_then'].get(h))}"
-                                    for h in p["cover80_then"]), p["variant"]])
+                         " / ".join(f"{fpct(p['cover80_before'].get(h))} → {fpct(p['cover80_after'].get(h))}"
+                                    for h in p["cover80_after"]), p["variant"]])
     lines += [table(["Parameter", "Current", "Proposed", "Evidence", "n", "Score change", f"80% cover ({hz})", "Variant"], rows)
               if rows else f"_None: no variant cleared the thresholds (n >= {rv['min_n_recommend']}, score "
               f"{rv['min_improvement']:.0%} better without coverage falling more than {rv['coverage_tolerance']:.0%} "
@@ -627,6 +799,12 @@ def build(cfg: dict, rc: dict, rv: dict, con, week: str, history: bool = True) -
     for ab in (d["live_ablation"], d["history_ablation"]):
         judge(ab, rv)
     d["proposals"] = proposals(rc, d["live_ablation"], d["history_ablation"])
+    d["scores"] = {w: proper_scores(win(ranges, s), win(calls, s)) for w, s in windows.items()}
+    d["aci"] = aci_state(con, rc, end)
+    d["aci"]["replay"] = latest_aci_replay(con, end, rc)
+    p = aci_proposal(rc, d["aci"]["replay"])
+    if p:
+        d["proposals"].append(p)
     d["advice"] = confidence_advice(d["bands"]["all"], d["calls"]["all"], rv)
 
     ra, ca = d["ranges"]["all"]["all"], d["calls"]["all"]["all"]
@@ -638,7 +816,8 @@ def build(cfg: dict, rc: dict, rv: dict, con, week: str, history: bool = True) -
            "naive_score80_all": ra.get("naive_score80_pct"), "call_hit_all": ca.get("hit_rate"),
            "always_up_all": ca.get("always_up"), "low_sample": ra["n"] < rv["min_n_recommend"],
            "n_proposals": len(d["proposals"]), "proposals": d["proposals"],
-           "detail": {k: d[k] for k in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice")} | {
+           "detail": {k: d[k] for k in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice",
+                                        "scores", "aci")} | {
                "live_ablation": d["live_ablation"], "history_ablation": d["history_ablation"],
                "thresholds": {k: rv[k] for k in DEFAULTS if not k.endswith("_variants")}}}
     return clean(rec), d
