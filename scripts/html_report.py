@@ -2,7 +2,7 @@
 """Build the self-contained HTML report for one market's day, and the report index.
 
 Run after the filled report (reports/<market>/<session_date>.md, no AGENT markers left) has
-passed the judge. Numbers, charts and labels come from the stored data (view_data.py); the
+passed the report gate (validate.py --stage report). Numbers, charts and labels come from the stored data (view_data.py); the
 narrative (headline, top 3, sector notes, outlook, data quality) is copied from the filled
 report, with every cited news/filing id turned into a link to its source. Writes
 reports/<market>/<session_date>.html (inline CSS/JS, data embedded as JSON, no network needed),
@@ -696,7 +696,7 @@ notes.append(el('h2', null, 'Analyst notes'));
   notes.append(d);
 });
 const ft = $('#footer');
-ft.append(el('p', null, 'Research log, not investment advice. Numbers come from the stored data; the text is written by research agents and checked by a separate judge agent.'));
+ft.append(el('p', null, 'Research log, not investment advice. Numbers come from the stored data; the text is written by research agents, checked by automated validation, and sampled weekly by a separate judge agent.'));
 const fl = el('p'); fl.append(document.createTextNode('Built ' + D.generated_at.replace('T', ' ').replace('+00:00', ' UTC') + ' · '));
 fl.append(el('a', {href: D.links.index}, 'All report days'), document.createTextNode(' · '), el('a', {href: D.links.md}, 'Text version')); ft.append(fl);
 

@@ -4,7 +4,7 @@
 Every number and table is written here from stored data; the agent only fills the
 `<!-- AGENT:... -->` markers with narrative (and must not change numbers). Writes
 reports/<market>/<session_date>.md and work/slack_<market>.md, and prints their paths.
-The filled report is the agent-editable source; once the judge has passed it, html_report.py
+The filled report is the agent-editable source; once the report gate (validate.py) has passed it, html_report.py
 builds reports/<market>/<session_date>.html (the reader's view, linked from Slack) from it.
 A report that was already filled in (no markers left) is kept unless --force, but only while
 its `report-data` line (as_of, regime) matches the data; otherwise it is rebuilt and the old
@@ -356,6 +356,10 @@ def main() -> int:
     spath = ROOT / "work" / f"slack_{cfg['market']}.md"
     spath.parent.mkdir(parents=True, exist_ok=True)
     spath.write_text(slack)
+    # The script-written skeletons: validate.py --stage report tells agent lines from script lines
+    # by them (a kept report's skeleton is rebuilt from the same data, so it is still current).
+    (ROOT / "work" / f"report_{cfg['market']}_{d['session']}.skeleton.md").write_text(report)
+    (ROOT / "work" / f"slack_{cfg['market']}.skeleton.md").write_text(slack)
     print(json.dumps({**out, "slack_draft": str(spath.relative_to(ROOT)), "url": url,
                       "agent_markers": 0 if kept else report.count("<!-- AGENT:")}, indent=2))
     return 0

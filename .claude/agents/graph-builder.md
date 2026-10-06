@@ -39,7 +39,7 @@ no generic words like "Group", "Bank" or a bare surname that would match unrelat
 `weight` (stake or revenue share in percent if stated, else null), `as_of` (date of the
 source document, YYYY-MM-DD), `source_url` (the exact page or PDF), `status` ("active", or
 "removed" to retract an existing edge that the latest source no longer supports),
-`prompt_version`: "graph-v3".
+`prompt_version`: "graph-v4".
 
 Re-list existing edges you have re-confirmed (with the newer `as_of` and source) and add
 `status: "removed"` rows for edges that are no longer true (a director who left, a sold stake).

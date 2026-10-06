@@ -230,7 +230,7 @@ always show the same numbers.
   the `AGENT` markers): yesterday (market and each stock, calls scored), top 3, today (table:
   ticker, T+1 and T+5 ranges, direction, confidence), tomorrow/week (events and risks), sector
   notes with bull and bear, track record tables, data quality.
-- `reports/<market>/YYYY-MM-DD.html` (`html_report.py`, after the judge passes the md): one
+- `reports/<market>/YYYY-MM-DD.html` (`html_report.py`, after the report gate passes the md): one
   self-contained file (inline CSS/JS, data embedded as JSON, light and dark, phone-friendly).
   A short summary (market mood in plain words, top 3, number of calls, data-quality warnings and
   a "How to read this" glossary collapsed); one filter row (all companies, a sector, or one
@@ -561,7 +561,7 @@ markets never share a node and `--full` for one market cannot touch the other.
 | `Outcome` | `<market>:call:<prediction id>` / `<market>:range:<range id>` (`kind` call or range) | outcomes / range_outcomes, first score per id (as `range_record`) |
 | `RegimeDay` | `<market>:<as_of_date>` | `regime_latest` |
 | `FeatureDay` | `<market>:<ticker>:<as_of_date>` | `features_latest` (close and every indicator) |
-| `Judgment` | `<market>:<judgment id>` | daily-run judge verdicts |
+| `Judgment` | `<market>:<judgment id>` | daily-run judge verdicts (graph-builder, weekly spot-check) |
 | `FinancialPeriod` | `<market>:<ticker>:sec:<period_end>` (US) / `<market>:<ticker>:<basis>:<start>:<end>` (India) | `fundamentals_metrics` / `financials_latest` |
 | `FlowDay` | `<market>:<date>:<category>` | `flows_daily` (FII/DII) |
 | `SyncState` | `<market>:<kind>` | written by the sync: the incremental watermark per kind |
@@ -695,5 +695,5 @@ Each subagent's model and effort are set in its `.claude/agents/<name>.md` front
 Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the user chooses it manually for complex planning. Whether a
 scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
-(forecast-v8, news-v6, graph-v3), and a per-call `model` field on predictions is a planned follow-up.
+(forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits), and a per-call `model` field on predictions is a planned follow-up.
 

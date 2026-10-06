@@ -2,40 +2,47 @@ Run the daily market-brief pipeline for MARKET=<india|us> in this repository. Fo
 CLAUDE.md. Work from the repo root. TODAY is the output of `date -u +%F`. Export
 `MB_MARKET=<market>` so every script uses this market. Research only: never place trades.
 
-Judge every agent and every narrative (CLAUDE.md "Judging every change"). Run the judge
-subagent with three inputs: the exact instructions you gave, the output's claims, and where the
-output lives. Judge:
-- the news-analyst (`work/enriched.jsonl` plus its brief);
-- each researcher (its returned case text; save it to `work/bull.md` / `work/bear.md` first);
-- the forecaster (`work/predictions.jsonl` plus its table);
-- the summaries you write in step 10;
-- the filled report and Slack draft in step 11;
-- the graph-builder (`work/graph.jsonl`) in step 14.
-Agent records stay in `work/` until the judge returns PASS; only then append them to `data/`.
+Daily runs are gated by deterministic checks, not by the judge (CLAUDE.md "Judging every
+change"): `python scripts/validate.py --stage <stage>` runs after each step below and prints a JSON
+summary (`ok`, `failures`, `warnings`, each with a `code`, a `detail` and the affected `tickers`).
+It exits 1 on a blocking failure. Save each summary as `work/steps/validate_<stage>.json`. List
+every failure and warning in the report's `data_quality` section (one line each: stage, code,
+detail, tickers), and never post silently: a blocked part is always named there.
+The judge subagent still runs (1) once a week on a sample of the past week's output (step 14a)
+and (2) on the monthly graph-builder edges (step 14). What replaces each former per-agent judge
+step:
+- news-analyst: `--stage news` (schema, ids are today's new news/announcement ids, nothing stored
+  twice, scores in range); the weekly spot-check reads enrichment summaries of sampled evidence;
+- bull and bear researchers: `--stage forecast` (every cited id exists and was public before the
+  call) and the weekly spot-check (reasons match evidence);
+- forecaster: `--stage forecast` (every CLAUDE.md prediction rule) and the weekly spot-check;
+- summaries, report and Slack draft: `--stage report` (each number in agent-written text must
+  match a number of the same kind, percent or plain, from the companies or symbols its sentence
+  names, the market-level data or the news it cites; an invented number that happens to equal
+  such a number still passes, which the weekly spot-check is for; no AGENT markers left, every range published or explained)
+  and the weekly spot-check (claims are true).
+Agent records stay in `work/` until their gate passes; only then append them to `data/`.
 Delete `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
 runs and right after each append, so a stale file can never be appended twice.
-On FAIL, send the fix list back once (to the agent, or fix your own narrative) and judge again.
-The daily run allows ONE retry because it is time-boxed; build work repeats until PASS. If it
+On a blocking failure, fix it once (send the failure list back to the agent, or fix your own
+narrative) and run the stage again. The daily run allows ONE retry because it is time-boxed. If it
 still fails:
-- append nothing from that agent;
-- news brief failed: the researchers and the forecaster get no brief and must abstain on any
-  call that needs news evidence;
-- one researcher failed: the forecaster gets only the passing case and must abstain unless both
-  sides were heard;
-- your narrative failed (summary or report): replace each failed section with "Narrative withheld:
-  failed review (<reason>)"; the numbers, tables and charts written by the scripts stay.
-Record every FAIL with its reason where it can still be read before the next commit: FAILs from
-steps 7-10 in both the report's `data_quality` section and the daily summary; a step 11 FAIL only
-in `data_quality` (the summary was already judged in step 10); a step 14 FAIL only in
-`data/<market>/judgments/` (the brief is already posted), and the next run lists it in its
-`data_quality`: the context pack's section "Judge FAILs from the previous run not yet in a
-report" shows it (step 11).
-Append each verdict, PASS or FAIL, as one line to `data/<market>/judgments/YYYY/MM/TODAY.jsonl`
-(via a work/ file and `cat >>`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>` (unique on a same-day rerun),
-`run_date`, `agent` (one of news-analyst, bull-researcher, bear-researcher, forecaster, summaries,
-report, slack, graph-builder), `round`, `verdict`, `summary` (max 40 words), `dropped` (what was not
-used, or null), `recorded_at` (ISO UTC). Verdicts from steps 10-11 are listed in `data_quality` and
-committed in step 12; the step 14 verdict is committed in step 14 (the brief is already posted).
+- `collect` (stale or missing bars, bad files or rows, off-source news): tell the forecaster the
+  affected tickers; it abstains on each with reason "data failed validation". Off-source or
+  malformed news rows are never cited. A failure with no tickers (e.g. a bad file) applies to
+  every ticker whose input it names; if unsure, abstain on all;
+- `news`: append nothing from the news-analyst; the researchers and the forecaster get no brief
+  and must abstain on any call that needs news evidence;
+- `features`: no calls for the tickers listed (no feature row) and none at all without a regime
+  row; the report says so;
+- `context`: rebuild the pack once (`python scripts/context.py > work/context.md`); if it still
+  fails, make no calls;
+- `forecast`: drop each failing record from `work/predictions.jsonl` (keep the valid ones) and
+  list each dropped id with its reason; on `CALLS_NOT_ALLOWED` (late or mid-session run) drop all;
+- `report`: replace each section holding an unmatched number with "Narrative withheld: failed
+  validation (<code>)"; the numbers, tables and charts written by the scripts stay. A daily
+  summary with an unmatched number: correct the number from the pack, or remove the sentence.
+Warnings never block: list them in `data_quality`.
 
 1. Prepare: `mkdir -p work`. If
    `python -c "import duckdb, feedparser, yfinance, pandas, exchange_calendars"` fails, run
@@ -61,7 +68,9 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and
    pledges from NSE) and then `collect_nse_india.py` (announcements, quarterly results, FII/DII
    flows, delivery %), one after the other, never in parallel (NSE throttles each session).
-   Keep each JSON summary; list its `warnings` (an endpoint that returned nothing at all) in
+   Save each JSON summary as `work/steps/<script name>.json` (e.g.
+   `python scripts/collect_prices.py > work/steps/collect_prices.json`; `mkdir -p work/steps` first)
+   and list its `warnings` (an endpoint that returned nothing at all) in
    the report's `data_quality` section.
    Macro, flows and short selling (issue #9; a market without the collector's config section
    prints `skipped`): run `collect_macro.py` (US: Treasury yield curve, FRED credit spreads and
@@ -90,25 +99,39 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    acceptance times are unverified, stored maybe 4-5h late) and every `failed` entry of
    `check_sec_times.py`; its `wrong` rows are corrected on read and need no action.
 
+   Gate: `python scripts/validate.py --stage collect > work/steps/validate_collect.json` (freshness
+   of bars against the exchange calendar and of this run's fetches, the collector summaries in
+   `work/steps/`, empty or truncated files, schemas, UTC timestamps, duplicate ids, closes, big
+   moves, news sources). On exit 1 act as the preamble says.
+
 4. Score: `python scripts/score_predictions.py`.
 
 5. Indicators, regime and calibration: `python scripts/features.py`, then
-   `python scripts/calibrate.py`. Keep both JSON summaries.
+   `python scripts/calibrate.py`. Keep both JSON summaries. Gate:
+   `python scripts/validate.py --stage features > work/steps/validate_features.json` (a feature
+   row for every ticker's newest bar, a regime row).
 
-6. Context: `python scripts/context.py > work/context.md`.
+6. Context: `python scripts/context.py > work/context.md`. Gate:
+   `python scripts/validate.py --stage context > work/steps/validate_context.json`.
 
 7. News: run the news-analyst subagent on today's `data/<market>/news/` file and, for India,
    also today's `data/india/announcements/YYYY/MM/<today>.jsonl` (NSE exchange filings; ids
-   `nse-ann-<seq_id>`, the one exception to the 16-character news id). Keep its brief. Give the
-   judge both input files: `work/enriched.jsonl` should hold one record per new news id plus
-   one per new `nse-ann-` id, and nothing else.
+   `nse-ann-<seq_id>`, the one exception to the 16-character news id). Keep its brief.
+   `work/enriched.jsonl` should hold one record per new news id plus one per new `nse-ann-` id,
+   and nothing else. Gate: `python scripts/validate.py --stage news > work/steps/validate_news.json`;
+   if it passes, append `work/enriched.jsonl` to `data/<market>/news_enriched/YYYY/MM/TODAY.jsonl`
+   with `cat >>` and delete the work file.
 
 8. Debate: run bull-researcher and bear-researcher in parallel, passing each the market and
    the news brief.
 
 9. Forecast and ranges: run the forecaster subagent with the market, the news brief and both
-   cases (only what passed the judge). Judge its output; on PASS append `work/predictions.jsonl`
-   to `data/<market>/predictions/` and delete the work file. Only then run `python scripts/ranges.py`
+   cases, and the tickers a `collect` or `features` gate blocked (it abstains on them). Gate:
+   `python scripts/validate.py --stage forecast > work/steps/validate_forecast.json` (every
+   CLAUDE.md prediction rule; evidence ids exist and were public before `made_at`; no calls on a
+   late or mid-session run). If it passes (or after the failing records were dropped as the
+   preamble says), append `work/predictions.jsonl` to
+   `data/<market>/predictions/YYYY/MM/TODAY.jsonl` and delete the work file. Only then run `python scripts/ranges.py`
    (it reads the appended calls and publishes the 50% and 80% price ranges), and
    `python scripts/context.py > work/context.md` again so the report shows calls and ranges.
 
@@ -119,8 +142,8 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
      exist for that week, write it from those daily summaries (max 500 words).
    - If `monthly/<previous month, e.g. 2026-09>.md` does not exist and weekly or daily
      summaries exist for that month, write it (max 600 words).
-   - Judge every summary you wrote (each id must support its claim; each number must match the
-     context pack or DuckDB) before step 12.
+   - Quote numbers only from the context pack or DuckDB: `validate.py --stage report` (step 11)
+     also checks the numbers in `daily/TODAY.md`.
 
 10a. Weekly review (first trading day of each ISO week): `python scripts/review.py --if-due`.
     It reviews the previous ISO week once (it does nothing if that review is already stored, so
@@ -142,24 +165,31 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     source) and the Slack draft `work/slack_<market>.md` (the thread's short summary message:
     regime, top 3, number of calls, link). Fill every `<!-- AGENT:... -->` marker in both files following
     `templates/report.md`, then delete the markers. Never change a number, table or chart
-    link written by the script, and keep the `<!-- report-data: ... -->` line. In `data_quality`,
-    copy every row of the context pack's "Judge FAILs from the previous run not yet in a report"
-    section (e.g. a failed monthly graph-builder run) as one line. If report.py
+    link written by the script, and keep the `<!-- report-data: ... -->` line (report.py also saves
+    the unfilled copies `work/report_<market>_<session_date>.skeleton.md` and
+    `work/slack_<market>.skeleton.md`, which tell the gate script lines from agent lines). In
+    `data_quality`, list every validate.py failure and warning of this run, and copy every row of the context pack's "Judge FAILs from the previous run not yet in a report"
+    section (e.g. a failed monthly graph-builder run or weekly spot-check) as one line. If report.py
     prints `"report_kept": true` (today's report was already filled by an earlier run from the
     same data), keep that report and fill only the Slack draft. If it prints a `warning` with
     `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative
-    only where it still holds.
+    only where it still holds. Gate:
+    `python scripts/validate.py --stage report > work/steps/validate_report.json` (no AGENT
+    markers; each number in the agent-written lines of the report, the Slack draft and
+    `summaries/<market>/daily/TODAY.md` matches a same-kind number of the companies or symbols its
+    sentence names, or of the market level, in the context pack, the script-written skeleton,
+    stored rows or the text of the news it cites; every ticker and horizon has a range or a calendar reason for none).
 
-11a. HTML report: only after the judge passed the filled report and Slack draft (or each failed
-    section was replaced as above), run `python scripts/html_report.py`. It refuses a report that
+11a. HTML report: only after the report gate passed (or each failed section was replaced as
+    above and listed in `data_quality`), run `python scripts/html_report.py`. It refuses a report that
     still has AGENT markers. It builds `reports/<market>/<session_date>.html` (the reader's view:
     filters by sector and company, a price chart and plain-language range per company, reasons,
-    track record) and `reports/<market>/index.html` from the judged report plus the stored data,
+    track record) and `reports/<market>/index.html` from the validated report plus the stored data,
     and lists the files for Slack in `work/slack_<market>_files.json`. It adds no narrative of its
-    own (numbers come from the data, text is copied from the judged report), so it needs no
-    further judging. If it fails, list the failure in the Slack failures line and post anyway.
+    own (numbers come from the data, text is copied from the validated report), so it needs no
+    further check. If it fails, list the failure in the Slack failures line and post anyway.
 
-12. Save (only after the judge passed the summaries, report and Slack draft, or each failed section was
+12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
@@ -174,8 +204,10 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
 
 14. Connection map (monthly): if `python scripts/graph.py status` reports `refresh_due: true`
     (no refresh attempt yet this month), delete `work/graph.jsonl`, run the graph-builder subagent
-    with the market, and judge `work/graph.jsonl` (each edge against its cited source). On PASS
-    run `python scripts/graph.py add work/graph.jsonl`; on FAIL (after one retry) add nothing.
+    with the market, and run the judge subagent on `work/graph.jsonl` (each edge against its cited
+    source; give it the exact instructions, the graph-builder's claims and the file). On PASS
+    run `python scripts/graph.py add work/graph.jsonl` (it validates every row again); on FAIL
+    (after one retry) add nothing. Record the verdict as in step 14a (`agent` graph-builder).
     Delete `work/graph.jsonl`, then always record the attempt, even if it added nothing:
     `python scripts/graph.py attempt --note "<one line from its summary>"`. Then commit only what
     exists and changed, and push as in step 12:
@@ -183,6 +215,26 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
     `git diff --cached --quiet || git commit -m "<market> connection map TODAY"`.
     It runs after the brief so it never delays it; new edges feed the "Connections" section
     from the next run.
+
+14a. Weekly spot-check (first trading day of each ISO week, after the brief so it never delays
+    it): `python scripts/spotcheck.py --if-due`. If it prints `due: false`, skip this step. If
+    `empty` is true (no calls and no filled report in the previous ISO week), append its `record`
+    as printed (verdict SKIP). Otherwise run the judge subagent on its sample (2 forecasts with
+    their evidence rows and outcome, 1 filled report of that week; the sample is seeded by market
+    and week, so a rerun picks the same items) with the instructions "Weekly spot-check
+    (.claude/agents/judge.md): check every item of `checklist`", the sample JSON as the claims,
+    and the report path and `data/<market>/` as where the work lives. One round only (no
+    retry: the output is already published). Append one verdict line to
+    `data/<market>/judgments/YYYY/MM/TODAY.jsonl` (via a work/ file and `cat >>`), using the
+    printed `record` with `verdict` PASS or FAIL and a `summary` of at most 40 words. Judgment
+    records (schema `judgments` in `scripts/common.py`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>`
+    (spot-check: `TODAY-spotcheck-<week>-<round>-<HHMMSS UTC>`), `run_date`, `agent`
+    (graph-builder or spotcheck), `round`, `verdict`, `summary`, `dropped` (what was not used, or
+    null), `recorded_at` (ISO UTC). A FAIL is listed in the next run's `data_quality` through the
+    context pack's "Judge FAILs from the previous run" section; if it shows a rule broken in the
+    daily output, open a GitHub issue so the gates or the agent instructions get fixed. Commit
+    and push as in step 14: `git add data/<market>/judgments` and
+    `git diff --cached --quiet || git commit -m "<market> spot-check <week>"`.
 
 15. Neo4j catch-up (final step, optional, non-blocking): `python scripts/neo4j_sync.py` again, so
     the verdicts and connection-map edges appended after step 10b reach Neo4j today. Whatever it

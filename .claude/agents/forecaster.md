@@ -36,11 +36,13 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   and applies only to tickers you make a call on.
 - Every ticker gets a published price range from `scripts/ranges.py` whether or not you call it;
   your call adds a small capped drift to that range's centre.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v8".
+- `made_at`: current UTC time (ISO 8601, e.g. `date -u +%FT%T+00:00`); every cited id must have been
+  published before it.
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v9".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
-Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs the
-judge subagent and, on PASS, appends them to `data/<market>/predictions/YYYY/MM/<today>.jsonl`
+Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs
+`scripts/validate.py --stage forecast` (every rule above) and appends the records that pass to `data/<market>/predictions/YYYY/MM/<today>.jsonl`
 with `cat ... >>`.
 
 Return a table of calls and abstentions with 1-line reasons.

@@ -20,4 +20,5 @@ is weak, say so plainly. Max 80 words per ticker; skip tickers with quality BLOC
 Never invent numbers or events. Every fact must come from `work/context.md`, the news brief,
 stored data (DuckDB) or a web page you opened in this run (cite its URL). No background from
 memory (e.g. "earlier reports date to April"), and no cause the cited headline does not state:
-cite an id only for what its headline or summary actually says. The judge checks every one.
+cite an id only for what its headline or summary actually says. Cited ids are checked by
+`scripts/validate.py`, and the weekly spot-check judge reads sampled reasons against their evidence.
