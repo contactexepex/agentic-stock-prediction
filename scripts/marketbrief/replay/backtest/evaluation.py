@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import math
+
 import pandas as pd
+
 from marketbrief.analytics import range_math
 from marketbrief.constants.backtest import INPUT_ARMS
 
@@ -43,10 +45,10 @@ def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dic
         beta, idx_cue, own, beta_split["index_weight"], beta_split["own_weight"], ranges_config["cue_weight"]
     )
 
-    def capped_shift(extra, switches):
+    def capped_shift(shift, sigma):
         """A centre shift limited to the maximum number of sigmas."""
-        limit = ranges_config["max_center_shift_sigma"] * switches
-        return max(-limit, min(limit, extra))
+        limit = ranges_config["max_center_shift_sigma"] * sigma
+        return max(-limit, min(limit, shift))
 
     div = observation.div_shift
     s_cfg = horizon_sigma["hist"] if use.get("earnings_history") else horizon_sigma["fixed"]
@@ -66,7 +68,7 @@ def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dic
 
 
 def evaluate(
-    obs: pd.DataFrame,
+    observation_frame: pd.DataFrame,
     horizon: int,
     ranges_config: dict,
     eval_sessions: int,
@@ -76,10 +78,10 @@ def evaluate(
 ) -> pd.DataFrame:
     """`use`: the range inputs switched on (config/ranges.yaml) for the per-input arms.
     `scale` (keyword only) widens sigma per start rank (regime/event factors replayed by review.py)."""
-    last = int(obs["rank"].max())
+    last = int(observation_frame["rank"].max())
     start = last - eval_sessions + 1
-    z_all, r_all = obs["z"].to_numpy(), obs["rank"].to_numpy()
-    with_inputs = "earn" in obs.columns
+    z_all, r_all = observation_frame["z"].to_numpy(), observation_frame["rank"].to_numpy()
+    with_inputs = "earn" in observation_frame.columns
     rows = []
     for position in range(start, last + 1):
         known = (r_all + horizon <= position) & (r_all > position - ranges_config["history_sessions"])
@@ -90,7 +92,7 @@ def evaluate(
         )
         z_pool = z_all[known]
         quantiles = tuple(range_math.weighted_quantile(z_pool, weights, level) for level in (0.10, 0.25, 0.75, 0.90))
-        today = obs[obs["rank"] == position]
+        today = observation_frame[observation_frame["rank"] == position]
         for observation in today.itertuples():
             base, horizon_sigma = (
                 observation.close,
@@ -164,12 +166,12 @@ def arm_summary(res: pd.DataFrame, arm: str) -> dict:
     }
 
 
-def verdict(off: dict, on_summary: dict, min_gain: float) -> str:
+def verdict(off_summary: dict, on_summary: dict, min_gain: float) -> str:
     """DESIGN section 7 rule: improves only if the interval score drops by more than min_gain
     (relative); a change within it is noise."""
-    if not off.get("n"):
+    if not off_summary.get("n"):
         return "no data"
-    off_score, on_score = off["score80"], on_summary["score80"]
+    off_score, on_score = off_summary["score80"], on_summary["score80"]
     if off_score == on_score:
         return "same"
     gain = (off_score - on_score) / off_score

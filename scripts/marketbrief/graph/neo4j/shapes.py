@@ -7,8 +7,9 @@ import math
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Callable
-from marketbrief.utils.text import slugify_with_unknown_fallback
+
 from marketbrief.constants.neo4j import PERSON_CATEGORIES
+from marketbrief.utils.text import slugify_with_unknown_fallback
 
 
 def clean(value):

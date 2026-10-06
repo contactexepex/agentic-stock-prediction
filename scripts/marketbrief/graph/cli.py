@@ -19,14 +19,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from marketbrief.core.cli import market_arg, require_market
-from marketbrief.core.database import connect
-from marketbrief.utils.markdown import cursor_markdown_table
+
 from marketbrief.constants.connection_map import (
     MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL,
 )
-from marketbrief.graph.news_hits import hits
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.database import connect
 from marketbrief.graph.connection_map import add, attempt, status
+from marketbrief.graph.news_hits import hits
+from marketbrief.utils.markdown import cursor_markdown_table
 
 
 def main() -> int:

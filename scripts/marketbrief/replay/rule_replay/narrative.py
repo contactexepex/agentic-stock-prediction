@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from marketbrief.analytics import range_switches
-from marketbrief.utils.numbers import share_percent_text
 from marketbrief.constants.replay import LIMITATIONS, SIGNALS
+from marketbrief.utils.numbers import share_percent_text
 
 
 def pct(share, decimals: int = 0) -> str:

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from marketbrief.analytics import scoring
-from marketbrief.utils.markdown import markdown_table
 from marketbrief.pipeline.review.markdown_cells import flag, fnum, fpct, range_row
+from marketbrief.utils.markdown import markdown_table
 
 
 def window_names(rec: dict, review_config: dict) -> dict:

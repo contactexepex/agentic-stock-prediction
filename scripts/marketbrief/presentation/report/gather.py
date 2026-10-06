@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from datetime import timedelta
+
 import pandas as pd
-from view_data import CONF_BANDS_SQL, RANGE_RECORD_EXACT
+
+from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
+from marketbrief.core import paths
 from marketbrief.core.clock import utc_today
 from marketbrief.core.market_config import benchmark_key, vol_index_key
-from marketbrief.core import paths
-from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
 from marketbrief.presentation.news_events import call_status_lines
-
+from view_data import CONF_BANDS_SQL, RANGE_RECORD_EXACT
 
 # Scored records twice: since start, and the rolling last 30 days (by target date).
 WINDOWS = """SELECT *, 'since start' AS win FROM {src}

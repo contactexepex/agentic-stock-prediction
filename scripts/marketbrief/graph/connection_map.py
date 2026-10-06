@@ -5,13 +5,12 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
-from marketbrief.core.clock import utc_now, utc_today
-from marketbrief.core.storage import append_jsonl, day_file
-from marketbrief.utils.text import slugify
+
 from marketbrief.constants.connection_map import (
     MSG_ALIASES_MUST_BE_A_LIST_OF,
     MSG_AS_OF_IS_IN_THE_FUTURE,
     MSG_AS_OF_MUST_BE_YYYY_MM,
+    MSG_NOT_JSON,
     MSG_RELATION_NOT_ONE_OF,
     MSG_SOURCE_URL_MUST_BE_THE_HTTP,
     MSG_STATUS_NOT_ONE_OF,
@@ -21,7 +20,9 @@ from marketbrief.constants.connection_map import (
     MSG_TICKER_NOT_IN_THE_WATCHLIST,
     MSG_WEIGHT_MUST_BE_A_NUMBER_OR,
 )
-
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.utils.text import slugify
 
 RELATIONS = ("board", "group", "subsidiary", "supplier", "customer", "competitor", "promoter", "major_holder")
 
@@ -121,7 +122,7 @@ def add(cfg: dict, con, path: Path, dry_run: bool = False) -> dict:
         try:
             row = json.loads(line)
         except json.JSONDecodeError as exc:
-            rejected.append({"line": line_number, "errors": [f"not JSON: {exc}"]})
+            rejected.append({"line": line_number, "errors": [MSG_NOT_JSON.format(error=exc)]})
             continue
         edge, errs = validate(row, tickers, today)
         if errs:

@@ -20,12 +20,12 @@ import sys
 
 import pandas as pd
 
+from marketbrief.constants.pipeline_messages import MSG_WEEK_MUST_LOOK_LIKE_2026_W40
+from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
-from marketbrief.core import paths
 from marketbrief.pipeline.review.helpers import previous_week, week_bounds
-from marketbrief.constants.pipeline_messages import MSG_WEEK_MUST_LOOK_LIKE_2026_W40
 
 SAMPLE_CALLS, SAMPLE_REPORTS = 2, 1
 CHECKLIST = [

@@ -4,18 +4,19 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from marketbrief.core import calendar, paths
-from marketbrief.core.settings import load_settings
+
 from marketbrief.constants.ai_replay import (
     CONTAMINATED,
     CUTOFF_LOCAL,
     FAIR,
+    MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY,
     REGULAR_LEAD,
     SAMPLE_END,
     SAMPLE_START,
     SAMPLE_STEP,
 )
-from marketbrief.constants.ai_replay import MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY
+from marketbrief.core import calendar, paths
+from marketbrief.core.settings import load_settings
 
 
 def training_cutoff() -> date:

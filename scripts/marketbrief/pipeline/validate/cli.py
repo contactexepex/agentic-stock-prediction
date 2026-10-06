@@ -32,9 +32,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 import pandas as pd
+
+from marketbrief.constants.validation import MSG_REPORT_SKIPPED_NOT_WRITTEN, STAGES
 from marketbrief.core import cli, clock, database
-from marketbrief.constants.validation import STAGES
 from marketbrief.pipeline.validate.gate_result import Result, load_config, run_status
 from marketbrief.pipeline.validate.news_checks import stage_news
 from marketbrief.pipeline.validate.report_checks import report_file, stage_report
@@ -67,7 +69,7 @@ def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
         elif stage_name == "report":
             report_path = paths.get("report") or report_file(cfg, con, status)
             if stage == "all" and not report_path.exists():
-                res.info["report"] = f"skipped: {report_path.name} not written yet"
+                res.info["report"] = MSG_REPORT_SKIPPED_NOT_WRITTEN.format(name=report_path.name)
                 continue
             stage_report(res, cfg, con, status, now, today, validate_config, report_path, paths.get("slack"))
     return {

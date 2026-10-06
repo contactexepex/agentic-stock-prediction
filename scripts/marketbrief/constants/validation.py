@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
 
 # kinds whose day files are named by the trading date, with the column that says when a row was written
@@ -98,3 +97,39 @@ MSG_FIRST_LINE_IS_NOT_TODAY_S = "first line is not today's pack header: {value!r
 MSG_THE_CONTEXT_PACK_CONTAINS_A_PYTHON = "the context pack contains a Python traceback"
 MSG_WATCHLIST_TICKERS_NOT_NAMED_IN_THE = "watchlist tickers not named in the context pack"
 MSG_NO_MARKET_REGIME_SECTION = "no 'Market regime' section"
+
+# ---------- validate: second pass (messages built from several parts) ----------
+MSG_BENCHMARK_VOL_INDEX_STALE = (
+    "benchmark / vol index bar older than {need} (the regime needs them; newest {newest})"
+)
+MSG_MARKET_SYMBOLS_STALE = (
+    "market symbols with no bar since {old} (cues, factors, sector ETFs; newest {newest})"
+)
+MSG_NOT_FETCHED_NO_ROWS = "{kind}: no stored rows at all"
+MSG_NOT_FETCHED_STALE = "{kind}: newest {column} {newest} is not from this run (today {today}, max age {limit} h)"
+MSG_NEWS_SOURCE_NOT_HTTPS = "scheme {scheme}"
+MSG_NEWS_SOURCE_GOOGLE_DOMAIN = "Google News feed but link domain {domain}"
+MSG_NEWS_SOURCE_OUTLET_DOMAIN = "outlet {feed} but link domain {domain} (allowed {allowed})"
+MSG_NEWS_SOURCE_UNKNOWN_OUTLET = "feed {feed!r} is not a configured outlet"
+MSG_NEWS_ROWS_FROM_UNCONFIGURED_SOURCES = "{count} news rows from unconfigured sources or not https, e.g. {examples}"
+MSG_ARTICLE_UNKNOWN_ACCESS = "{record_id}: access {access!r}"
+MSG_ARTICLE_EXTRACT_TOO_LONG = "{record_id}: extract longer than 3 sentences of 40 words"
+MSG_ARTICLE_URL_NOT_ALLOWLISTED = (
+    "{record_id}: read from a URL that is not an allowlisted https page ({final_url})"
+)
+MSG_ARTICLE_STATUS_WITHOUT_READ = "{record_id}: access {access} but an HTTP status is stored"
+MSG_ENRICH_SCORE_OUT_OF_RANGE = "{field} {value!r} not in {lower}..{upper}"
+MSG_ENRICH_NOT_ONE_OF = "{field} {value!r} not one of {allowed}"
+MSG_ENRICH_SUMMARY_TOO_LONG = "summary missing or over 25 words"
+MSG_ENRICH_PROMPT_VERSION_MISSING = "prompt_version missing"
+MSG_ENRICH_ANALYZED_AT_MISSING = "analyzed_at missing"
+MSG_REPORT_SKIPPED_NOT_WRITTEN = "skipped: {name} not written yet"
+MSG_RANGE_SKIPPED_LATE_RUN = "{horizon}d: target {target} closed (late run)"
+MSG_RANGE_SKIPPED_MID_SESSION = "{horizon}d: target {target} opened (mid-session run)"
+MSG_RANGE_SKIPPED_NO_FEATURES = "{horizon}d: no feature row as of {as_of}"
+MSG_UNMATCHED_NUMBERS = (
+    "{name}: {count} number(s) with no same-kind source number for the companies or symbols named "
+    "(context pack, script-written report, cited news text, stored rows): {examples}"
+)
+MSG_UNMATCHED_NUMBER_EXAMPLE = '{token!r} in "{sentence}"'
+

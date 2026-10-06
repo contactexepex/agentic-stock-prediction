@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import date
+
 import numpy as np
 import pandas as pd
-from marketbrief.analytics import range_math
-from marketbrief.analytics import scoring
+
+from marketbrief.analytics import range_math, scoring
 from marketbrief.pipeline.review.helpers import note_tags, numeric_series, rounded_mean
 
 

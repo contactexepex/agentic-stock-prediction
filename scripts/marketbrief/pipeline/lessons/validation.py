@@ -6,20 +6,15 @@ import json
 import math
 import re
 from pathlib import Path
+
 import pandas as pd
-from marketbrief.core.database import connect
+
 from marketbrief.constants.lessons import (
     AGENT_FIELDS,
     BOTH_KINDS,
     FACT_FIELDS,
     ID_RE,
     MAX_WORDS,
-    NUM_RE,
-    PCT_KINDS,
-    TIME_FIELDS,
-)
-from marketbrief.pipeline.lessons.facts import settled, stored_ids
-from marketbrief.constants.lessons import (
     MSG_A_LESSON_FOR_IS_ALREADY_STORED,
     MSG_DOES_NOT_EXIST,
     MSG_DUPLICATE_LESSON_FOR_IN_THIS_FILE,
@@ -27,11 +22,17 @@ from marketbrief.constants.lessons import (
     MSG_LESSON_WORD_COUNT,
     MSG_MISSING_AGENT_FIELD,
     MSG_MUST_BE_TEXT,
+    MSG_NOT_A_JSON_OBJECT,
     MSG_NUMBER_IN_THE_LESSON_MATCHES_NOTHING,
     MSG_PREDICTION_DOES_NOT_EXIST_OR_IS,
     MSG_PREDICTION_IS_SETTLED_BUT_ITS_RANGE,
     MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL,
+    NUM_RE,
+    PCT_KINDS,
+    TIME_FIELDS,
 )
+from marketbrief.core.database import connect
+from marketbrief.pipeline.lessons.facts import settled, stored_ids
 
 
 def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
@@ -170,7 +171,7 @@ def validate_records(recs: list, facts: dict, stored: set[str]) -> tuple[list[di
     good, bad, seen = [], [], set()
     for index, rec in enumerate(recs, 1):
         if not isinstance(rec, dict):
-            bad.append({"line": index, "prediction_id": None, "errors": ["not a JSON object"]})
+            bad.append({"line": index, "prediction_id": None, "errors": [MSG_NOT_A_JSON_OBJECT]})
             continue
         pid = rec.get("prediction_id")
         fact = facts.get(pid) if isinstance(pid, str) else None

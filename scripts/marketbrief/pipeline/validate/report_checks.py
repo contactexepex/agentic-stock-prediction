@@ -4,24 +4,31 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from pathlib import Path
+
 import pandas as pd
+
 import narrative_numbers
-from marketbrief.core.settings import load_settings
-from marketbrief.core import calendar, database, market_config, paths
-from marketbrief.constants.validation import FETCH_COL
-from marketbrief.pipeline.validate.collect_checks import check_files
-from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.constants.validation import (
+    FETCH_COL,
     MSG_LOST_ITS_REPORT_DATA_LINE,
     MSG_NEWS_FEED_COUNT_UNAVAILABLE,
+    MSG_NO_RANGE_AS_OF_AND_NO,
     MSG_NOT_WRITTEN,
     MSG_NOT_WRITTEN_2,
-    MSG_NO_RANGE_AS_OF_AND_NO,
+    MSG_RANGE_SKIPPED_LATE_RUN,
+    MSG_RANGE_SKIPPED_MID_SESSION,
+    MSG_RANGE_SKIPPED_NO_FEATURES,
     MSG_SOURCE_QUERY_SKIPPED,
-    MSG_STILL_HAS_NUMBERED_AGENT_MARKERS,
     MSG_STILL_HAS_AGENT_MARKERS,
+    MSG_STILL_HAS_NUMBERED_AGENT_MARKERS,
+    MSG_UNMATCHED_NUMBER_EXAMPLE,
+    MSG_UNMATCHED_NUMBERS,
     MSG_WORK_CONTEXT_MD_MISSING_NARRATIVE_NUMBERS,
 )
+from marketbrief.core import calendar, database, market_config, paths
+from marketbrief.core.settings import load_settings
+from marketbrief.pipeline.validate.collect_checks import check_files
+from marketbrief.pipeline.validate.gate_result import Result, work_dir
 
 
 def records(con, sql: str, params=(), notes: list | None = None) -> list[dict]:
@@ -140,8 +147,7 @@ def skeletons(cfg: dict, session: str) -> tuple[str | None, str | None]:
     slack_path = work_dir() / f"slack_{cfg['market']}.skeleton.md"
     if report_path.exists() and slack_path.exists():
         return report_path.read_text(encoding="utf-8"), slack_path.read_text(encoding="utf-8")
-    from marketbrief.presentation.report import build
-    from marketbrief.presentation.report import gather
+    from marketbrief.presentation.report import build, gather
 
     settings = load_settings()
     report_data = gather.gather(cfg, database.connect(cfg["market"]))
@@ -178,11 +184,13 @@ def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
             if (ticker, horizon) in have:
                 continue
             if now >= calendar.session_close_utc(cfg, tgt):
-                skipped.setdefault(f"{horizon}d: target {tgt} closed (late run)", []).append(ticker)
+                skipped.setdefault(MSG_RANGE_SKIPPED_LATE_RUN.format(horizon=horizon, target=tgt), []).append(ticker)
             elif tgt == first and now >= calendar.session_open_utc(cfg, first):
-                skipped.setdefault(f"{horizon}d: target {tgt} opened (mid-session run)", []).append(ticker)
+                skipped.setdefault(MSG_RANGE_SKIPPED_MID_SESSION.format(horizon=horizon, target=tgt), []).append(ticker)
             elif ticker not in feats:
-                skipped.setdefault(f"{horizon}d: no feature row as of {as_of}", []).append(ticker)
+                skipped.setdefault(MSG_RANGE_SKIPPED_NO_FEATURES.format(horizon=horizon, as_of=as_of), []).append(
+                    ticker
+                )
             else:
                 missing.append(f"{ticker} {horizon}d")
     if missing:
@@ -267,12 +275,15 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
         if bad:
             res.block(
                 "UNMATCHED_NUMBER",
-                f"{path.name}: {len(bad)} number(s) with no same-kind source number for "
-                "the companies or symbols named (context pack, script-written report, cited news text, "
-                "stored rows): "
-                + "; ".join(
-                    f'{narrative_number["token"]!r} in "{narrative_number["sentence"][:90]}"'
-                    for narrative_number in bad[:12]
+                MSG_UNMATCHED_NUMBERS.format(
+                    name=path.name,
+                    count=len(bad),
+                    examples="; ".join(
+                        MSG_UNMATCHED_NUMBER_EXAMPLE.format(
+                            token=narrative_number["token"], sentence=narrative_number["sentence"][:90]
+                        )
+                        for narrative_number in bad[:12]
+                    ),
                 ),
                 [
                     entity

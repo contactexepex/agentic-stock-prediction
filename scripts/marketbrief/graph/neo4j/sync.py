@@ -4,22 +4,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from marketbrief.core.clock import utc_now
-from marketbrief.sources.neo4j_client import Neo4jError
+
 from marketbrief.constants.neo4j import (
-    MSG_NEO4J_READ_FAILED,
-    MSG_NEO4J_WATERMARK_FAILED,
-    WATERMARK_STATEMENT,
     BATCH_SIZE,
     DELETE_BATCH,
     INDEXES,
     LABELS,
+    MSG_NEO4J_READ_FAILED,
+    MSG_NEO4J_WATERMARK_FAILED,
     OVERLAP_DAYS,
     REL_ID_TYPES,
     SCHEMA_VERSION,
+    WATERMARK_STATEMENT,
 )
+from marketbrief.core.clock import utc_now
 from marketbrief.graph.neo4j.connection import DryRunSink, add_counters, run_stmt
 from marketbrief.graph.neo4j.kinds import KINDS, Kind
+from marketbrief.sources.neo4j_client import Neo4jError
 
 
 def schema_statements() -> list[str]:
@@ -116,12 +117,12 @@ def upsert_batches(run: SyncRun, kind: Kind, rows: list[dict], record: dict) -> 
     errors = []
     for index in range(0, len(rows), run.batch_size):
         batch, batch_ok = rows[index : index + run.batch_size], True
-        for inner_index, (stmt, keep) in enumerate(kind.statements):
+        for statement_index, (stmt, keep) in enumerate(kind.statements):
             part = [row for row in batch if keep is None or keep(row)]
             if not part:
                 continue
             params = {"market": run.market, "kind": kind.name, "synced_at": run.synced_at, "rows": part}
-            name = f"{kind.name}-{inner_index}-b{index // run.batch_size}"
+            name = f"{kind.name}-{statement_index}-b{index // run.batch_size}"
             try:
                 add_counters(run.counters, run_stmt(run.sink, stmt, params, name))
             except Neo4jError as exc:

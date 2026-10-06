@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from marketbrief.constants.replay import CI_NOTE, MIN_MONTH_DAYS, RSI_HIGH, RSI_LOW, SCORE_NOTE
 from marketbrief.constants.replay_page import CSS, JS
-from marketbrief.replay.html_parts import escape_html, p_value_text, legend, scaled_text
+from marketbrief.replay.html_parts import escape_html, legend, p_value_text, scaled_text
 from marketbrief.replay.rule_replay.aci_compare import aci_table, held_out_html
 from marketbrief.replay.rule_replay.rule_charts import svg_calibration, svg_regime, svg_time
 
@@ -115,9 +115,13 @@ def html_report(cfg: dict, stats: dict) -> str:
     brows = []
     for horizon in ("1", "5"):
         for name, baseline in (stats["baselines"].get(horizon) or {}).items():
-            difference, (dlo, dhi) = baseline["diff_vs_always_up"], baseline["diff_ci95"]
+            difference, (difference_lower, difference_upper) = baseline["diff_vs_always_up"], baseline["diff_ci95"]
             difference_text = "" if name == "always_up" or difference is None else f"{100 * difference:+.1f} pts"
-            vs_ci = "" if name == "always_up" or dlo is None else f"{100 * dlo:+.1f} to {100 * dhi:+.1f}"
+            vs_ci = (
+                ""
+                if name == "always_up" or difference_lower is None
+                else f"{100 * difference_lower:+.1f} to {100 * difference_upper:+.1f}"
+            )
             brows.append(
                 f"<tr><td>{escape_html(baseline['label'])}</td><td>{horizon}d</td><td>{baseline['calls']:,}</td><td>{scaled_text(baseline['hit_rate'])}</td>"
                 f"<td>{scaled_text(baseline['ci95'][0])} to "

@@ -5,18 +5,33 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
-from marketbrief.constants.validation import ENRICH_ENUMS
-from marketbrief.pipeline.validate.gate_result import Result, work_dir
-from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, todays_files
+
 from marketbrief.constants.validation import (
-    MSG_IDS_ALREADY_IN_NEWS_ENRICHED_E,
-    MSG_IDS_ARE_NOT_NEWS_ANNOUNCEMENTS_FIRST,
+    ENRICH_ENUMS,
+    MSG_ARTICLE_EXTRACT_TOO_LONG,
+    MSG_ARTICLE_STATUS_WITHOUT_READ,
+    MSG_ARTICLE_UNKNOWN_ACCESS,
+    MSG_ARTICLE_URL_NOT_ALLOWLISTED,
+    MSG_ENRICH_ANALYZED_AT_MISSING,
+    MSG_ENRICH_NOT_ONE_OF,
+    MSG_ENRICH_PROMPT_VERSION_MISSING,
+    MSG_ENRICH_SCORE_OUT_OF_RANGE,
+    MSG_ENRICH_SUMMARY_TOO_LONG,
     MSG_ENRICHED_FILE_PROBLEM,
     MSG_ENRICHMENT_RULE_PROBLEM,
+    MSG_IDS_ALREADY_IN_NEWS_ENRICHED_E,
+    MSG_IDS_ARE_NOT_NEWS_ANNOUNCEMENTS_FIRST,
     MSG_NEWS_ARTICLES_ROWS_BREAK_THE_ARTICLE,
-    MSG_TODAYS_IDS_WITHOUT_ENRICHMENT,
+    MSG_NEWS_ROWS_FROM_UNCONFIGURED_SOURCES,
+    MSG_NEWS_SOURCE_GOOGLE_DOMAIN,
+    MSG_NEWS_SOURCE_NOT_HTTPS,
+    MSG_NEWS_SOURCE_OUTLET_DOMAIN,
+    MSG_NEWS_SOURCE_UNKNOWN_OUTLET,
     MSG_REPEATED_IDS,
+    MSG_TODAYS_IDS_WITHOUT_ENRICHMENT,
 )
+from marketbrief.pipeline.validate.gate_result import Result, work_dir
+from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, todays_files
 
 
 def registrable(host: str) -> str:
@@ -31,19 +46,19 @@ def allowed_news_sources(cfg: dict) -> tuple[set[str], dict[str, set[str]]]:
     """(domains of the Google News base, outlet name -> allowed link domains)."""
     news = cfg.get("news") or {}
     google_news = news.get("google_news") or {}
-    gdom = {registrable(urlparse(google_news["base"]).hostname)} if google_news.get("base") else set()
+    google_domains = {registrable(urlparse(google_news["base"]).hostname)} if google_news.get("base") else set()
     outlets = {}
     for outlet in news.get("outlets") or []:
         doms = {registrable(urlparse(outlet["url"]).hostname)} | {
             registrable(domain) for domain in outlet.get("link_domains") or []
         }
         outlets[outlet["name"]] = doms
-    return gdom, outlets
+    return google_domains, outlets
 
 
 def check_news_sources(res: Result, cfg: dict, con, today: date):
     """Today's news rows come from allow-listed sources."""
-    gdom, outlets = allowed_news_sources(cfg)
+    google_domains, outlets = allowed_news_sources(cfg)
     rows = con.execute(
         "SELECT id, url, feed, tickers FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]
     ).fetchall()
@@ -52,20 +67,27 @@ def check_news_sources(res: Result, cfg: dict, con, today: date):
         parsed_url = urlparse(url or "")
         dom = registrable(parsed_url.hostname or "")
         if parsed_url.scheme != "https":
-            bad.append((nid, f"scheme {parsed_url.scheme or 'none'}", tickers))
+            bad.append((nid, MSG_NEWS_SOURCE_NOT_HTTPS.format(scheme=parsed_url.scheme or "none"), tickers))
         elif str(feed).startswith("gnews:"):
-            if dom not in gdom:
-                bad.append((nid, f"Google News feed but link domain {dom}", tickers))
+            if dom not in google_domains:
+                bad.append((nid, MSG_NEWS_SOURCE_GOOGLE_DOMAIN.format(domain=dom), tickers))
         elif feed in outlets:
             if dom not in outlets[feed]:
-                bad.append((nid, f"outlet {feed} but link domain {dom} (allowed {sorted(outlets[feed])})", tickers))
+                bad.append(
+                    (
+                        nid,
+                        MSG_NEWS_SOURCE_OUTLET_DOMAIN.format(feed=feed, domain=dom, allowed=sorted(outlets[feed])),
+                        tickers,
+                    )
+                )
         else:
-            bad.append((nid, f"feed {feed!r} is not a configured outlet", tickers))
+            bad.append((nid, MSG_NEWS_SOURCE_UNKNOWN_OUTLET.format(feed=feed), tickers))
     if bad:
         res.block(
             "NEWS_SOURCE",
-            f"{len(bad)} news rows from unconfigured sources or not https, e.g. "
-            + "; ".join(f"{index}: {source}" for index, source, _ in bad[:5]),
+            MSG_NEWS_ROWS_FROM_UNCONFIGURED_SOURCES.format(
+                count=len(bad), examples="; ".join(f"{index}: {source}" for index, source, _ in bad[:5])
+            ),
             [tag for *_, ts_ in bad for tag in (ts_ or []) if tag in cfg["tickers"]],
         )
 
@@ -83,20 +105,21 @@ def check_articles(res: Result, cfg: dict, today: date):
         for row in read_rows(path)[0]:
             ext = row.get("extract") or []
             if row.get("access") not in ACCESS:
-                bad.append(f"{row.get('id')}: access {row.get('access')!r}")
+                bad.append(MSG_ARTICLE_UNKNOWN_ACCESS.format(record_id=row.get("id"), access=row.get("access")))
             elif len(ext) > 3 or any(len(str(extractor).split()) > 40 for extractor in ext):
-                bad.append(f"{row.get('id')}: extract longer than 3 sentences of 40 words")
+                bad.append(MSG_ARTICLE_EXTRACT_TOO_LONG.format(record_id=row.get("id")))
             elif (
                 row["access"] in ("full", "partial", "paywalled")
                 and row.get("http_status") is not None
                 and not url_check(row.get("final_url"), src)[0]
             ):
                 bad.append(
-                    f"{row.get('id')}: read from a URL that is not an allowlisted https page "
-                    f"({str(row.get('final_url'))[:60]})"
+                    MSG_ARTICLE_URL_NOT_ALLOWLISTED.format(
+                        record_id=row.get("id"), final_url=str(row.get("final_url"))[:60]
+                    )
                 )
             elif row["access"] in ("skipped_unlisted", "undecoded") and row.get("http_status") is not None:
-                bad.append(f"{row.get('id')}: access {row['access']} but an HTTP status is stored")
+                bad.append(MSG_ARTICLE_STATUS_WITHOUT_READ.format(record_id=row.get("id"), access=row["access"]))
     if bad:
         res.warn("ARTICLE_ROWS", MSG_NEWS_ARTICLES_ROWS_BREAK_THE_ARTICLE.format(count=len(bad), value=bad[:3]))
 
@@ -119,18 +142,18 @@ def enrichment_rule_problems(row: dict) -> list[str]:
     for key, lower, upper in (("relevance", 0, 1), ("sentiment", -1, 1), ("novelty", 0, 1)):
         value = row.get(key)
         if not isinstance(value, (int, float)) or isinstance(value, bool) or not lower <= value <= upper:
-            why.append(f"{key} {value!r} not in {lower}..{upper}")
+            why.append(MSG_ENRICH_SCORE_OUT_OF_RANGE.format(field=key, value=value, lower=lower, upper=upper))
     why += [
-        f"{key} {row.get(key)!r} not one of {sorted(allowed)}"
+        MSG_ENRICH_NOT_ONE_OF.format(field=key, value=row.get(key), allowed=sorted(allowed))
         for key, allowed in ENRICH_ENUMS.items()
         if row.get(key) not in allowed
     ]
     if not isinstance(row.get("summary"), str) or len(row["summary"].split()) > 25:
-        why.append("summary missing or over 25 words")
+        why.append(MSG_ENRICH_SUMMARY_TOO_LONG)
     if not row.get("prompt_version"):
-        why.append("prompt_version missing")
+        why.append(MSG_ENRICH_PROMPT_VERSION_MISSING)
     if not row.get("analyzed_at"):
-        why.append("analyzed_at missing")
+        why.append(MSG_ENRICH_ANALYZED_AT_MISSING)
     return why
 
 

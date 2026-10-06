@@ -5,20 +5,23 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 from pathlib import Path
+
 import pandas as pd
+
+from marketbrief.analytics.prediction_rules import RuleLabels, check_prediction
+from marketbrief.constants.ai_replay import (
+    MARKER,
+    MSG_IS_ALREADY_RECORDED_IN_USE_A,
+    MSG_IS_NOT_A_PREPARED_AI_REPLAY,
+    MSG_NOT_JSON,
+    MSG_WAS_PREPARED_FOR_NOT,
+)
 from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl
-from marketbrief.analytics.prediction_rules import RuleLabels, check_prediction
-from marketbrief.constants.ai_replay import MARKER
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.evidence import evidence
 from marketbrief.replay.ai_replay.roots import data_root
-from marketbrief.constants.ai_replay import (
-    MSG_IS_ALREADY_RECORDED_IN_USE_A,
-    MSG_IS_NOT_A_PREPARED_AI_REPLAY,
-    MSG_WAS_PREPARED_FOR_NOT,
-)
 
 
 def store_dir(results: Path, market: str) -> Path:
@@ -106,8 +109,8 @@ def record(cfg: dict, as_of_day: date, root: Path, calls_file: Path, results: Pa
     for index, line in enumerate(raw, 1):
         try:
             rec = json.loads(line)
-        except json.JSONDecodeError as e:
-            bad.append({"line": index, "id": None, "reasons": [f"not JSON: {e}"]})
+        except json.JSONDecodeError as error:
+            bad.append({"line": index, "id": None, "reasons": [MSG_NOT_JSON.format(error=error)]})
             continue
         errs = validate(rec, ctx, as_of_day, seen)
         if errs:

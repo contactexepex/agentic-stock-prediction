@@ -31,14 +31,14 @@ Prints one JSON summary (rows read, upserted and failed per kind). Exit 0 = all 
 from __future__ import annotations
 
 import json
+
+from marketbrief.constants.neo4j import BATCH_SIZE, MSG_PROBE_NEEDS_A_SERVER_NOT_DRY
+from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.database import connect
-from marketbrief.core import paths
-from marketbrief.sources.neo4j_client import Neo4jError
-from marketbrief.constants.neo4j import BATCH_SIZE
 from marketbrief.graph.neo4j.connection import DryRunSink, client_from_env
 from marketbrief.graph.neo4j.sync import sync
-from marketbrief.constants.neo4j import MSG_PROBE_NEEDS_A_SERVER_NOT_DRY
+from marketbrief.sources.neo4j_client import Neo4jError
 
 
 def main() -> int:

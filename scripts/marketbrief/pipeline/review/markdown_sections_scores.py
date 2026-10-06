@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from marketbrief.analytics import scoring
-from marketbrief.utils.markdown import markdown_table
 from marketbrief.pipeline.review.markdown_cells import ablation_rows, fnum, fpct, fval
+from marketbrief.utils.markdown import markdown_table
 
 
 def aci_lines(review_data) -> list[str]:

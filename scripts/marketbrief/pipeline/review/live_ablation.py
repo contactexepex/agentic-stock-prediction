@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import math
+
 import pandas as pd
+
 from marketbrief.analytics import range_math
 from marketbrief.constants.review import BASELINE, NOTE_PATTERNS
 from marketbrief.pipeline.review.helpers import merge, notes_list

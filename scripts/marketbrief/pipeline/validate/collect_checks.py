@@ -4,29 +4,36 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
+
 import pandas as pd
-from marketbrief.utils.timefmt import as_utc_timestamp
-from marketbrief.core import market_config, paths, schemas
-from marketbrief.constants.validation import FETCH_COL, TRADING_DATE_KINDS
-from marketbrief.pipeline.validate.gate_result import Result, work_dir
-from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, tickers_in, todays_files
+
 from marketbrief.constants.validation import (
-    MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION,
-    MSG_BENCHMARK_VOL_INDEX_NO_BARS_STORED,
+    FETCH_COL,
     MSG_BAD_CLOSE_ON_RECENT_BAR,
-    MSG_DUPLICATED_KEYS,
+    MSG_BENCHMARK_VOL_INDEX_NO_BARS_STORED,
+    MSG_BENCHMARK_VOL_INDEX_STALE,
+    MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION,
     MSG_COLLECTOR_FAILED,
-    MSG_ZERO_ROWS_WITHOUT_REASON,
+    MSG_COLLECTOR_FILE_PROBLEM,
+    MSG_COLLECTOR_PROBLEM,
+    MSG_DUPLICATED_KEYS,
     MSG_IS_NOT_A_JSON_SUMMARY,
     MSG_LATE_RUN_SESSION_HAS_CLOSED_BUT,
+    MSG_MARKET_SYMBOLS_STALE,
     MSG_MARKET_SYMBOLS_WITH_NO_BARS_STORED,
-    MSG_COLLECTOR_PROBLEM,
-    MSG_COLLECTOR_FILE_PROBLEM,
     MSG_NEWEST_BAR_OLDER_THAN_THE_LAST,
     MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR,
     MSG_NO_STORED_PRICE_BARS,
+    MSG_NOT_FETCHED_NO_ROWS,
+    MSG_NOT_FETCHED_STALE,
     MSG_PRICES_PRICE_BASIS_WARNING_S,
+    MSG_ZERO_ROWS_WITHOUT_REASON,
+    TRADING_DATE_KINDS,
 )
+from marketbrief.core import market_config, paths, schemas
+from marketbrief.pipeline.validate.gate_result import Result, work_dir
+from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, tickers_in, todays_files
+from marketbrief.utils.timefmt import as_utc_timestamp
 
 
 def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, validate_config: dict) -> dict:
@@ -85,9 +92,7 @@ def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_c
     if bad_core:
         res.block(
             "STALE_SYMBOL",
-            f"benchmark / vol index bar older than {need} (the regime needs them; newest "
-            + ", ".join(f"{key} {last[key]}" for key in bad_core)
-            + ")",
+            MSG_BENCHMARK_VOL_INDEX_STALE.format(need=need, newest=", ".join(f"{key} {last[key]}" for key in bad_core)),
             bad_core,
         )
     old = need - timedelta(days=validate_config["symbol_max_age_days"])
@@ -103,9 +108,7 @@ def check_symbol_bars(res: Result, cfg: dict, last: dict, need: date, validate_c
     if stale:
         res.warn(
             "STALE_SYMBOL",
-            f"market symbols with no bar since {old} (cues, factors, sector ETFs; newest "
-            + ", ".join(f"{key} {last[key]}" for key in stale)
-            + ")",
+            MSG_MARKET_SYMBOLS_STALE.format(old=old, newest=", ".join(f"{key} {last[key]}" for key in stale)),
             stale,
         )
 
@@ -200,13 +203,14 @@ def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, v
         limit = validate_config["fetch_max_age_hours"][kind]
         newest_time = as_utc_timestamp(newest)
         if newest_time is None:
-            res.add(validate_config["fetch_severity"], "NOT_FETCHED", f"{kind}: no stored rows at all")
+            res.add(validate_config["fetch_severity"], "NOT_FETCHED", MSG_NOT_FETCHED_NO_ROWS.format(kind=kind))
         elif newest_time.date() != today or now - newest_time > pd.Timedelta(hours=limit):
             res.add(
                 validate_config["fetch_severity"],
                 "NOT_FETCHED",
-                f"{kind}: newest {col} {newest_time.isoformat()} is not from this run (today {today}, max age "
-                f"{limit} h)",
+                MSG_NOT_FETCHED_STALE.format(
+                    kind=kind, column=col, newest=newest_time.isoformat(), today=today, limit=limit
+                ),
             )
 
 
@@ -218,8 +222,8 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
     for summary_path in sorted(steps.glob("collect_*.json")) if steps.exists() else []:
         try:
             collector_summary = json.loads(summary_path.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            res.warn("COLLECTOR_SUMMARY", MSG_IS_NOT_A_JSON_SUMMARY.format(name=summary_path.name, error=e))
+        except (json.JSONDecodeError, OSError) as error:
+            res.warn("COLLECTOR_SUMMARY", MSG_IS_NOT_A_JSON_SUMMARY.format(name=summary_path.name, error=error))
             continue
         name = collector_summary.get("collector") or summary_path.stem.removeprefix("collect_")
         seen[name] = collector_summary

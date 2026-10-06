@@ -6,17 +6,18 @@ import math
 from dataclasses import dataclass
 from datetime import date, timedelta
 from statistics import NormalDist
+
 import numpy as np
 import pandas as pd
-from marketbrief.replay.backtest import observations
-from marketbrief.analytics import adaptive_conformal, range_switches
-from marketbrief.analytics import range_math, scoring
+
+from marketbrief.analytics import adaptive_conformal, range_math, range_switches, scoring
 from marketbrief.constants.range_inputs import INPUTS
-from marketbrief.core.market_config import benchmark_key
-from marketbrief.utils.event_dates import major_event_between
-from marketbrief.core import calendar
 from marketbrief.constants.replay import DEFAULT_LEVELS, MIN_EWMA_BARS
+from marketbrief.core import calendar
+from marketbrief.core.market_config import benchmark_key
+from marketbrief.replay.backtest import observations
 from marketbrief.replay.rule_replay.inputs import major_dates, next_earnings, regimes, rsi_series, window_days
+from marketbrief.utils.event_dates import major_event_between
 
 
 def ticker_frame(

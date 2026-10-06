@@ -9,15 +9,16 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from marketbrief.core import paths
-from marketbrief.constants.ai_replay import MARKER
+
 from marketbrief.constants.ai_replay import (
+    MARKER,
     MSG_FAILED_IN_EXIT,
     MSG_ROOT_ALREADY_HOLDS_A_PREPARED_REPLAY,
     MSG_ROOT_EXISTS_IS_NOT_EMPTY_AND,
     MSG_ROOT_MUST_NOT_BE_THE_SOURCE,
     MSG_ROOT_MUST_NOT_CONTAIN_THE_SOURCE,
 )
+from marketbrief.core import paths
 
 
 @contextmanager

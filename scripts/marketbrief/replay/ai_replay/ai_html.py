@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import html
-from marketbrief.constants import replay
-from marketbrief.constants import replay_page
-from marketbrief.replay import html_parts
+
+from marketbrief.constants import replay, replay_page
 from marketbrief.constants.ai_replay import CONTAMINATED, FAIR
+from marketbrief.replay import html_parts
 from marketbrief.replay.ai_replay.summaries import pct
 
 
@@ -32,12 +32,12 @@ def svg_hit_bars(summary: dict) -> str:
         )
         if not group.get("n"):
             continue
-        for inner_index, (key, color, label) in enumerate(
+        for series_index, (key, color, label) in enumerate(
             (("ai", "var(--s1)", "AI"), ("au", "var(--s2)", "Always up"))
         ):
             series_stats = group if key == "ai" else group["always_up"]
             tick = series_stats["hit_rate"]
-            bar_left = center_x + (inner_index - 1) * (bar_width + 2) + 1
+            bar_left = center_x + (series_index - 1) * (bar_width + 2) + 1
             bottom_y, top_y = scale_y(0), scale_y(tick)
             bar_height = max(bottom_y - top_y, 0.5)
             corner_radius = min(4, bar_height)
@@ -219,7 +219,7 @@ def group_html(group: dict) -> str:
     )
     top = "".join(
         f'<p class="answer"><b>{escape_html(sentence.split("? ", 1)[0])}?</b> '
-        f'{escape_html(sentence.split("? ", 1)[1])}</p>'
+        f"{escape_html(sentence.split('? ', 1)[1])}</p>"
         for sentence in group["top"]
     )
     hrows = []

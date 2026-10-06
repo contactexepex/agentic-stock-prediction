@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+
 from marketbrief.analytics import scoring
 from marketbrief.constants.review import BASELINE, TARGETS
 from marketbrief.pipeline.review.summaries import by_horizon

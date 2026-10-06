@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 CSS = """
 :root{--surface:#fcfcfb;--page:#f9f9f7;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;
 --axis:#c3c2b7;--s1:#2a78d6;--s2:#eb6834;--ring:rgba(11,11,11,.10);--good:#006300;--bad:#d03b3b;--chip:#f0efec}

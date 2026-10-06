@@ -7,21 +7,26 @@ import json
 import shutil
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
 import pandas as pd
-from marketbrief.core import calendar, paths
-from marketbrief.core.database import connect
-from marketbrief.core.market_config import benchmark_key
-from marketbrief.core.storage import append_jsonl
-from marketbrief.constants.ai_replay import CONTAMINATED, CUTOFF_LOCAL, FAIR, MARKER
-from marketbrief.replay.ai_replay.copy_asof import copy_asof
-from marketbrief.replay.ai_replay.cutoff import cutoff_for, leakage_label, next_session, training_cutoff
-from marketbrief.replay.ai_replay.evidence import evidence, evidence_section
-from marketbrief.replay.ai_replay.roots import check_root, data_root, json_or_text, run_step
+
 from marketbrief.constants.ai_replay import (
+    CONTAMINATED,
+    CUTOFF_LOCAL,
+    FAIR,
+    MARKER,
     MSG_IS_NOT_A_TRADING_DAY,
     MSG_IS_ON_OR_BEFORE_THE_MODEL,
     MSG_NO_BAR_DATED_IN_LATEST_KEPT,
 )
+from marketbrief.core import calendar, paths
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import benchmark_key
+from marketbrief.core.storage import append_jsonl
+from marketbrief.replay.ai_replay.copy_asof import copy_asof
+from marketbrief.replay.ai_replay.cutoff import cutoff_for, leakage_label, next_session, training_cutoff
+from marketbrief.replay.ai_replay.evidence import evidence, evidence_section
+from marketbrief.replay.ai_replay.roots import check_root, data_root, json_or_text, run_step
 
 
 def assumed_earnings(cfg: dict, src: Path, as_of_day: date, cutoff: datetime, days: int) -> list[dict]:

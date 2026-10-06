@@ -22,10 +22,8 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from marketbrief.analytics import price_adjustments
+from marketbrief.analytics import price_adjustments, range_math, scoring
 from marketbrief.core import calendar
-from marketbrief.analytics import range_math
-from marketbrief.analytics import scoring
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect

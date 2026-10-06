@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+
 import numpy as np
 import pandas as pd
-from marketbrief.replay.backtest import evaluation
-from marketbrief.replay.backtest import observations
-from marketbrief.core import calendar
+
 from marketbrief.analytics import indicators
 from marketbrief.analytics import regime as regime_rules
 from marketbrief.constants.regime import REGIME_ORDER
-from marketbrief.core.market_config import benchmark_key, vol_index_key
-from marketbrief.utils.event_dates import major_event_between
 from marketbrief.constants.review import BASELINE
+from marketbrief.core import calendar
+from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.pipeline.review.helpers import merge
+from marketbrief.replay.backtest import evaluation, observations
+from marketbrief.utils.event_dates import major_event_between
 
 
 def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list[date]]:

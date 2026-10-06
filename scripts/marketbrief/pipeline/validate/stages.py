@@ -5,18 +5,7 @@ from __future__ import annotations
 import re
 from datetime import date
 from pathlib import Path
-from marketbrief.pipeline import forecast_gate
-from marketbrief.core import paths, schemas
-from marketbrief.constants.validation import STAGE_KINDS
-from marketbrief.pipeline.validate.collect_checks import (
-    check_bars,
-    check_duplicates,
-    check_fetches,
-    check_files,
-    check_summaries,
-)
-from marketbrief.pipeline.validate.gate_result import work_dir
-from marketbrief.pipeline.validate.news_checks import check_articles, check_news_sources
+
 from marketbrief.constants.validation import (
     MSG_FEATURE_ROW_OLDER_THAN_THE_TICKER,
     MSG_FIRST_LINE_IS_NOT_TODAY_S,
@@ -27,7 +16,19 @@ from marketbrief.constants.validation import (
     MSG_NO_REGIME_ROW_AS_OF_NEWEST,
     MSG_THE_CONTEXT_PACK_CONTAINS_A_PYTHON,
     MSG_WATCHLIST_TICKERS_NOT_NAMED_IN_THE,
+    STAGE_KINDS,
 )
+from marketbrief.core import paths, schemas
+from marketbrief.pipeline import forecast_gate
+from marketbrief.pipeline.validate.collect_checks import (
+    check_bars,
+    check_duplicates,
+    check_fetches,
+    check_files,
+    check_summaries,
+)
+from marketbrief.pipeline.validate.gate_result import work_dir
+from marketbrief.pipeline.validate.news_checks import check_articles, check_news_sources
 
 
 def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)

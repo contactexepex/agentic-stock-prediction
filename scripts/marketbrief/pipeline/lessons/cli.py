@@ -31,12 +31,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
+from marketbrief.constants.lessons import DEFAULT_MAX
+from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
-from marketbrief.core import paths
 from marketbrief.core.storage import append_jsonl, day_file
-from marketbrief.constants.lessons import DEFAULT_MAX
 from marketbrief.pipeline.lessons.facts import evidence, settled, stored_ids
 from marketbrief.pipeline.lessons.validation import check
 

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from marketbrief.presentation.report.report_parts import ReportParts
-from marketbrief.utils.markdown import markdown_table
 from marketbrief.constants.report import DISCLAIMER
 from marketbrief.presentation.report.formatting import data_stamp, md_link, review_line
+from marketbrief.presentation.report.report_parts import ReportParts
+from marketbrief.utils.markdown import markdown_table
 
 
 def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:

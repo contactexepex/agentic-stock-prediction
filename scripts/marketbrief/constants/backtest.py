@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 # input -> (arm when off, arm when on, column marking the rows where it applies)
 INPUT_ARMS = {
     "earnings_history": ("earn_fixed", "earn_hist", "earn"),

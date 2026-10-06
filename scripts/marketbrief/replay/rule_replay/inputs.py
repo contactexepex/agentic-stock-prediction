@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import bisect
 from datetime import date, timedelta
+
 import numpy as np
 import pandas as pd
-from marketbrief.replay.backtest import observations
-from marketbrief.analytics import event_history, range_switches
-from marketbrief.analytics import indicators, regime as regime_rules
-from marketbrief.core.market_config import benchmark_key, vol_index_key
-from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
+
+from marketbrief.analytics import event_history, indicators, range_switches
+from marketbrief.analytics import regime as regime_rules
 from marketbrief.analytics.features import load_bars
+from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from marketbrief.core import calendar
+from marketbrief.core.market_config import benchmark_key, vol_index_key
+from marketbrief.replay.backtest import observations
 
 
 def known_versions(cfg: dict, versions: dict) -> dict:
@@ -38,8 +40,8 @@ def next_earnings(versions: list, as_of_day: date) -> date | None:
     if key < 0:
         return None
     dates = [earnings_day for earnings_day, _ in versions[key][1]]
-    inner_index = bisect.bisect_right(dates, as_of_day)
-    return dates[inner_index] if inner_index < len(dates) else None
+    position = bisect.bisect_right(dates, as_of_day)
+    return dates[position] if position < len(dates) else None
 
 
 def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
@@ -49,25 +51,25 @@ def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
     vol = bars[vol_key]["close"] if vol_key in bars else pd.Series(dtype=float)
     vdates = [timestamp.date() for timestamp in vol.index]
     bdates = [timestamp.date() for timestamp in bench.index]
-    mev = calendar.market_events(cfg, days[0], days[-1] + timedelta(days=40)) if days else []
+    market_events = calendar.market_events(cfg, days[0], days[-1] + timedelta(days=40)) if days else []
     rows = []
     for day in days:
         position = bisect.bisect_right(bdates, day)
         tail = bench.iloc[max(0, position - 31) : position]
-        inner_index = bisect.bisect_right(vdates, day)
-        lvl = float(vol.iloc[inner_index - 1]) if inner_index >= 1 else None
-        prev = float(vol.iloc[inner_index - 2]) if inner_index >= 2 else None
-        change = lvl / prev - 1 if lvl is not None and prev else None
+        vol_position = bisect.bisect_right(vdates, day)
+        vol_level = float(vol.iloc[vol_position - 1]) if vol_position >= 1 else None
+        previous_vol_level = float(vol.iloc[vol_position - 2]) if vol_position >= 2 else None
+        change = vol_level / previous_vol_level - 1 if vol_level is not None and previous_vol_level else None
         session = calendar.next_session(cfg, day, include=False)
-        near = calendar.major_events_near(mev, session)
+        near = calendar.major_events_near(market_events, session)
         return_5d, v10 = indicators.period_return(tail, 5), indicators.realized_vol(tail)
-        label, stress, _ = regime_rules.classify(cfg["regime"], lvl, return_5d, v10, bool(near), change)
+        label, stress, _ = regime_rules.classify(cfg["regime"], vol_level, return_5d, v10, bool(near), change)
         rows.append(
             {
                 "date": day,
                 "regime": label,
                 "stress": stress,
-                "vol_level": lvl,
+                "vol_level": vol_level,
                 "bench_ret_5d": return_5d,
                 "bench_vol_10d": v10,
                 "major_event": bool(near),

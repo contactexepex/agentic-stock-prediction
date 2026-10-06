@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from datetime import date
+
 import numpy as np
 import pandas as pd
+
 from marketbrief.analytics import adaptive_conformal
-from marketbrief.utils.numbers import round_or_none
 from marketbrief.constants.replay import ACI_GRID, CMP_KEYS
 from marketbrief.replay.html_parts import escape_html, scaled_text
 from marketbrief.replay.rule_replay.inputs import load_inputs
 from marketbrief.replay.rule_replay.range_rows import replay_rows
 from marketbrief.replay.rule_replay.replay_statistics import range_summary
+from marketbrief.utils.numbers import round_or_none
 
 
 def aci_comparison(before: dict, after: dict) -> dict:

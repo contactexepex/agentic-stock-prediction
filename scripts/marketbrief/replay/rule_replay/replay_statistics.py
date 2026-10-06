@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import math
+
 import numpy as np
 import pandas as pd
+
 from marketbrief.analytics import scoring
 from marketbrief.constants.regime import REGIME_ORDER
-from marketbrief.utils.numbers import round_or_none
 from marketbrief.constants.replay import LEVELS, RSI_HIGH, RSI_LOW, SIGNAL_LABELS
-
+from marketbrief.utils.numbers import round_or_none
 
 wilson = scoring.wilson  # Wilson score interval (scoring.py)
 
@@ -130,19 +131,19 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
     group = group[group["actual"].notna()] if "actual" in group.columns else group.iloc[0:0]
     if group.empty:
         return {}
-    up_moves, down = group["fwd"] > 0, group["fwd"] < 0
-    au_hit = up_moves.astype(float)
+    up_moves, down_moves = group["fwd"] > 0, group["fwd"] < 0
+    always_up_hit = up_moves.astype(float)
     blocks = (group["rank"] // max(horizon, 1)).to_numpy()
     out = {}
     for name, signal in signals(group).items():
         call = signal != 0
-        hit = ((signal > 0) & up_moves) | ((signal < 0) & down)
+        hit = ((signal > 0) & up_moves) | ((signal < 0) & down_moves)
         calls, hit_count = int(call.sum()), int(hit[call].sum())
         rate = hit_count / calls if calls else None
         lower, upper = clustered_ci(hit[call].astype(float).to_numpy(), blocks[call.to_numpy()])
         wilson_lower, wilson_upper = wilson(hit_count, calls)
-        diff = (hit[call].astype(float) - au_hit[call]).to_numpy()
-        dlo, dhi = clustered_ci(diff, blocks[call.to_numpy()])
+        diff = (hit[call].astype(float) - always_up_hit[call]).to_numpy()
+        diff_lower, diff_upper = clustered_ci(diff, blocks[call.to_numpy()])
         out[name] = {
             "label": SIGNAL_LABELS[name],
             "calls": calls,
@@ -152,18 +153,20 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
             "ci95": [round_or_none(lower), round_or_none(upper)],
             "ci95_iid": [round_or_none(wilson_lower), round_or_none(wilson_upper)],
             "p_vs_50": None if not calls else float(f"{binom_p_two_sided(hit_count, calls):.3g}"),
-            "always_up_same_rows": round_or_none(au_hit[call].mean()) if calls else None,
+            "always_up_same_rows": round_or_none(always_up_hit[call].mean()) if calls else None,
             "diff_vs_always_up": round_or_none(diff.mean()) if calls else None,
-            "diff_ci95": [round_or_none(dlo), round_or_none(dhi)],
+            "diff_ci95": [round_or_none(diff_lower), round_or_none(diff_upper)],
         }
     return out
 
 
-def summarize(cfg: dict, _ranges_config: dict, res: dict[int, pd.DataFrame], reg: pd.DataFrame) -> dict:
+def summarize(
+    cfg: dict, _ranges_config: dict, rows_by_horizon: dict[int, pd.DataFrame], regime_frame: pd.DataFrame
+) -> dict:
     """The statistics of a replay: by horizon, regime, sector, ticker, month, year and baselines."""
     sector = {ticker: metadata.get("sector") or "Other" for ticker, metadata in cfg["tickers"].items()}
     out = {"horizons": {}, "baselines": {}}
-    for horizon, group in res.items():
+    for horizon, group in rows_by_horizon.items():
         if group.empty:
             out["horizons"][str(horizon)] = {"overall": {"n": 0}}
             continue
@@ -214,9 +217,11 @@ def summarize(cfg: dict, _ranges_config: dict, res: dict[int, pd.DataFrame], reg
         }
         out["horizons"][str(horizon)] = horizon_summary
         out["baselines"][str(horizon)] = baseline_stats(group, horizon)
-    counts = reg["regime"].value_counts() if not reg.empty else pd.Series(dtype=int)
+    counts = regime_frame["regime"].value_counts() if not regime_frame.empty else pd.Series(dtype=int)
     out["regime_days"] = {regime: int(counts.get(regime, 0)) for regime in REGIME_ORDER}
     out["regime_timeline"] = (
-        [{"date": str(day), "regime": row} for day, row in reg["regime"].items()] if not reg.empty else []
+        [{"date": str(day), "regime": regime} for day, regime in regime_frame["regime"].items()]
+        if not regime_frame.empty
+        else []
     )
     return out

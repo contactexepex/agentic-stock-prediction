@@ -13,9 +13,10 @@ Run after charts.py (the report embeds the single-purpose charts it wrote)."""
 from __future__ import annotations
 
 import json
+
+from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.database import connect
-from marketbrief.core import paths
 from marketbrief.core.settings import load_settings
 from marketbrief.presentation.report.build import build
 from marketbrief.presentation.report.formatting import data_stamp

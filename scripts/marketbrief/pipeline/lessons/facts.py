@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import math
+
 import pandas as pd
-from marketbrief.pipeline.score_predictions import is_late
+
 from marketbrief.constants.lessons import RANGE_SQL, SETTLED_SQL
+from marketbrief.pipeline.score_predictions import is_late
 
 
 def iso_utc_text(value) -> str | None:

@@ -5,12 +5,13 @@ from __future__ import annotations
 import math
 import re
 from datetime import date, timedelta
+
 import numpy as np
 import pandas as pd
 import yaml
+
+from marketbrief.constants.review import DEFAULTS, MSG_WEEK_MUST_LOOK_LIKE_2026_W40, NOTE_PATTERNS
 from marketbrief.core import paths
-from marketbrief.constants.review import DEFAULTS, NOTE_PATTERNS
-from marketbrief.constants.review import MSG_WEEK_MUST_LOOK_LIKE_2026_W40
 
 
 def load_review_config() -> dict:

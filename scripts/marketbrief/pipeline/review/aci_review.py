@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 from datetime import date
+
 import numpy as np
+
 from marketbrief.analytics import adaptive_conformal
 from marketbrief.constants.review import ACI_SETTING_KEYS, TARGETS
 

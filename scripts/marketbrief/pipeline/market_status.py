@@ -14,9 +14,9 @@ import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from marketbrief.constants.pipeline_messages import MSG_NOW_NEEDS_A_UTC_OFFSET_E
 from marketbrief.core import calendar
 from marketbrief.core.cli import market_arg, require_market
-from marketbrief.constants.pipeline_messages import MSG_NOW_NEEDS_A_UTC_OFFSET_E
 
 
 def status(cfg: dict, now: datetime) -> dict:

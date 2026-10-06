@@ -35,18 +35,19 @@ from __future__ import annotations
 import json
 import time
 from datetime import date
+
 from marketbrief.analytics import adaptive_conformal, range_switches
 from marketbrief.constants.range_inputs import INPUTS
+from marketbrief.constants.replay import MSG_ACI_GAMMA_ACI_BY_REGIME_AND, MSG_NO_TRADING_DAYS_IN_THE_WINDOW
+from marketbrief.core import cli, database, paths, storage
 from marketbrief.core.clock import utc_now
 from marketbrief.core.market_config import benchmark_key, load_ranges_config
-from marketbrief.core import cli, database, paths, storage
 from marketbrief.replay.rule_replay.aci_compare import aci_comparison, aci_rc, aci_tag, held_out
 from marketbrief.replay.rule_replay.inputs import load_inputs
 from marketbrief.replay.rule_replay.narrative import headline, limitations, top_sentences
 from marketbrief.replay.rule_replay.range_rows import replay_rows
 from marketbrief.replay.rule_replay.replay_statistics import summarize
 from marketbrief.replay.rule_replay.rule_html import html_report
-from marketbrief.constants.replay import MSG_ACI_GAMMA_ACI_BY_REGIME_AND, MSG_NO_TRADING_DAYS_IN_THE_WINDOW
 
 
 def run(cfg: dict, ranges_config: dict, con, start: date | None = None, end: date | None = None) -> tuple[dict, dict]:

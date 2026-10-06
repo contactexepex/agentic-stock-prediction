@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 from marketbrief.core import cli, market_config, paths
 from marketbrief.replay.backtest.report import markdown, run
 

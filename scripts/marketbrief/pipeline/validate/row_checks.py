@@ -6,20 +6,22 @@ import csv
 import json
 from datetime import date, timedelta
 from pathlib import Path
+
 import pandas as pd
-from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
-from marketbrief.core import paths, schemas
-from marketbrief.constants.validation import TRADING_DATE_KINDS
+
 from marketbrief.constants.validation import (
     MSG_LAST_LINE_HAS_NO_NEWLINE_TRUNCATED,
     MSG_LINE_IS_NOT_A_JSON_OBJECT,
     MSG_LINE_IS_NOT_JSON,
     MSG_MORE_PROBLEMS_OMITTED,
-    MSG_ROW_TYPE_PROBLEM,
     MSG_ROW_FIELDS_NOT_IN_THE_SCHEMA,
     MSG_ROW_IS_IN_THE_FUTURE_NOW,
     MSG_ROW_MISSING_ID,
+    MSG_ROW_TYPE_PROBLEM,
+    TRADING_DATE_KINDS,
 )
+from marketbrief.core import paths, schemas
+from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 
 
 def kind_files(market: str, kind: str) -> list[Path]:
@@ -72,8 +74,8 @@ def read_rows(path: Path) -> tuple[list[dict], list[str]]:
             continue
         try:
             row = json.loads(line)
-        except json.JSONDecodeError as e:
-            problems.append(MSG_LINE_IS_NOT_JSON.format(index=index, msg=e.msg))
+        except json.JSONDecodeError as error:
+            problems.append(MSG_LINE_IS_NOT_JSON.format(index=index, msg=error.msg))
             continue
         if not isinstance(row, dict):
             problems.append(MSG_LINE_IS_NOT_A_JSON_OBJECT.format(index=index))

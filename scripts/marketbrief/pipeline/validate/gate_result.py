@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from marketbrief.pipeline import market_status
-from marketbrief.core.settings import load_validate_config
+
 from marketbrief.core import clock, paths
+from marketbrief.core.settings import load_validate_config
+from marketbrief.pipeline import market_status
 
 
 def load_config() -> dict:

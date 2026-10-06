@@ -7,19 +7,23 @@ import shutil
 import subprocess
 from datetime import date, datetime, timezone
 from pathlib import Path
-from marketbrief.core import paths
-from marketbrief.core.clock import utc_today
-from marketbrief.utils.timefmt import as_utc_timestamp
-from marketbrief.constants.ai_replay import BACKFILL_KINDS, BACKFILL_STEPS, PUBLIC_AT, SOURCE_MARKER
-from marketbrief.replay.ai_replay.copy_asof import public_at
-from marketbrief.replay.ai_replay.roots import json_or_text, run_script
+
 from marketbrief.constants.ai_replay import (
+    BACKFILL_KINDS,
+    BACKFILL_STEPS,
     MSG_NO_BACKFILL_STEPS_FOR_MARKET,
     MSG_SINCE_MUST_BE_BEFORE_TODAY,
     MSG_SOURCE_EXISTS_IS_NOT_EMPTY_AND,
     MSG_SOURCE_IS_INSIDE_THE_REAL_DATA,
     MSG_SOURCE_IS_THE_REPO_ITS_REAL,
+    PUBLIC_AT,
+    SOURCE_MARKER,
 )
+from marketbrief.core import paths
+from marketbrief.core.clock import utc_today
+from marketbrief.replay.ai_replay.copy_asof import public_at
+from marketbrief.replay.ai_replay.roots import json_or_text, run_script
+from marketbrief.utils.timefmt import as_utc_timestamp
 
 
 def check_source(source: Path) -> Path:

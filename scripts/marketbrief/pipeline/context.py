@@ -10,22 +10,18 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from marketbrief.analytics import fundamentals, relation_flags, scoring, smart_money
+from marketbrief.analytics.features import local_today
 from marketbrief.core import calendar
-from marketbrief.analytics import fundamentals
-from marketbrief.graph import news_hits
-from marketbrief.pipeline.lessons import context_section
-from marketbrief.pipeline import macro_sections
-from marketbrief.pipeline import nse_sections
-from marketbrief.analytics import relation_flags
-from marketbrief.analytics import scoring
-from marketbrief.analytics import smart_money
-from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
+from marketbrief.graph import news_hits
+from marketbrief.pipeline import macro_sections, nse_sections
+from marketbrief.pipeline.lessons import context_section
+from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation import news_events
 from marketbrief.utils.markdown import cursor_markdown_table
-from marketbrief.analytics.features import local_today
 
 PCT = "round({} * 100, 2)"
 

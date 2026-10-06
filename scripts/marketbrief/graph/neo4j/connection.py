@@ -8,6 +8,7 @@ import re
 import shutil
 import urllib.parse
 from pathlib import Path
+
 from marketbrief.sources.neo4j_client import Neo4jClient
 
 

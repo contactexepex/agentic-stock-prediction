@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from marketbrief.presentation.report.report_parts import ReportParts
 import pandas as pd
+
 from marketbrief.pipeline.score_predictions import is_late
-from view_data import fmt_call
-from marketbrief.utils.money import format_money
 from marketbrief.presentation.report.formatting import review_line
 from marketbrief.presentation.report.gather import report_url
+from marketbrief.presentation.report.report_parts import ReportParts
+from marketbrief.utils.money import format_money
+from view_data import fmt_call
 
 
 def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tuple[str, str]:

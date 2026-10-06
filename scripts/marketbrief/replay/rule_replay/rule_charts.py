@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.constants.replay import MIN_MONTH_DAYS
 from marketbrief.replay.html_parts import escape_html, scaled_text
@@ -77,12 +78,12 @@ def svg_regime(summary: dict) -> str:
         days = summary.get("regime_days", {}).get(name, 0)
         out.append(f'<text x="{center_x:.1f}" y="{height - bottom + 16}" text-anchor="middle">{name}</text>')
         out.append(f'<text x="{center_x:.1f}" y="{height - bottom + 30}" text-anchor="middle">{days} days</text>')
-        for inner_index, (horizon, color) in enumerate((("1", "var(--s1)"), ("5", "var(--s2)"))):
+        for series_index, (horizon, color) in enumerate((("1", "var(--s1)"), ("5", "var(--s2)"))):
             regime_stats = summary["horizons"].get(horizon, {}).get("by_regime", {}).get(name)
             if not regime_stats or not regime_stats.get("n"):
                 continue
             tick = regime_stats["cover80"]
-            bar_left = center_x + (inner_index - 1) * (bar_width + 2) + 1
+            bar_left = center_x + (series_index - 1) * (bar_width + 2) + 1
             bottom_y, top_y = scale_y(0), scale_y(tick)
             bar_height = max(bottom_y - top_y, 0.5)
             corner_radius = min(4, bar_height)

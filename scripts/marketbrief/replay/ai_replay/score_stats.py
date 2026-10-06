@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import math
+
 import numpy as np
 import pandas as pd
+
 from marketbrief.constants import replay
-from marketbrief.replay.rule_replay import inputs
-from marketbrief.replay.rule_replay import replay_statistics
-from marketbrief.utils.numbers import round_or_none
 from marketbrief.constants.ai_replay import BANDS
+from marketbrief.replay.rule_replay import inputs, replay_statistics
+from marketbrief.utils.numbers import round_or_none
 
 
 def band_of(confidence: float) -> str:

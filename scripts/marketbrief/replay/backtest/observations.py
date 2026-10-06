@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from marketbrief.analytics import earnings_reaction, index_cue
-from marketbrief.analytics import range_math
+
+from marketbrief.analytics import earnings_reaction, index_cue, range_math
 from marketbrief.constants.indicators import TRADING_DAYS
 from marketbrief.core import calendar, market_config
 
 
 def rolling_beta(close: pd.Series, bench: pd.Series, window: int = TRADING_DAYS, min_obs: int = 60) -> pd.Series:
     """The rolling beta of a stock against the benchmark."""
-    inner_index = pd.concat([index_cue.log_returns(close), index_cue.log_returns(bench)], axis=1, join="inner").dropna()
-    stock, benchmark = inner_index.iloc[:, 0], inner_index.iloc[:, 1]
+    joined = pd.concat([index_cue.log_returns(close), index_cue.log_returns(bench)], axis=1, join="inner").dropna()
+    stock, benchmark = joined.iloc[:, 0], joined.iloc[:, 1]
     return (
         stock.rolling(window, min_periods=min_obs).cov(benchmark) / benchmark.rolling(window, min_periods=min_obs).var()
     ).reindex(close.index)
@@ -32,9 +32,9 @@ def index_cue_series(cfg: dict, bars: dict, ranges_config: dict) -> pd.Series | 
         return None
     nxt = pd.Series(bench.index[1:].tolist() + [pd.NaT], index=bench.index)
     asof_frame = pd.DataFrame({"asof": bench.index, "date": nxt.to_numpy()}).dropna()
-    rc_ = index_cue.log_returns(cue["close"]).dropna()
-    cue_frame = pd.DataFrame({"date": rc_.index, "r": rc_.to_numpy()})
-    inner_index = pd.merge_asof(
+    cue_returns = index_cue.log_returns(cue["close"]).dropna()
+    cue_frame = pd.DataFrame({"date": cue_returns.index, "r": cue_returns.to_numpy()})
+    cue_by_day = pd.merge_asof(
         asof_frame.sort_values("date"), cue_frame, on="date", allow_exact_matches=False
     ).set_index("asof")["r"]
     betas = pd.Series(
@@ -42,11 +42,11 @@ def index_cue_series(cfg: dict, bars: dict, ranges_config: dict) -> pd.Series | 
             position: index_cue.fit_cue_beta(
                 bench["close"], cue["close"], position, int(ranges_config["beta_split"]["fit_sessions"])
             )
-            for position in inner_index.index
+            for position in cue_by_day.index
         },
         dtype=float,
     )
-    return (betas * inner_index).reindex(bench.index)
+    return (betas * cue_by_day).reindex(bench.index)
 
 
 def mark_window(length: int, positions: list[int], horizon: int) -> np.ndarray:
@@ -97,13 +97,13 @@ def input_columns(
     beta at d and the cue proxies."""
     close, idx = frame["close"], frame.index
     length = len(idx)
-    pos = {dividend.date(): dividend_position for dividend_position, dividend in enumerate(idx)}
+    position_of_day = {timestamp.date(): position for position, timestamp in enumerate(idx)}
     cols = pd.DataFrame(index=idx)
     # earnings: each as-of date d uses the events as known at d (SEC 2.02 filings classified by
     # the 10-Q/10-K reports accepted by d; event_history.earnings_versions)
     earn, history_multiplier = np.zeros(length, dtype=bool), np.full(length, np.nan)
     sigma = range_math.ewma_sigma(close, ranges_config["ewma_lambda"])
-    days = np.array([dividend.date() for dividend in idx])
+    days = np.array([timestamp.date() for timestamp in idx])
     versions = extra["earnings"].get(ticker, [])
     for key, (start, events) in enumerate(versions):
         end = versions[key + 1][0] if key + 1 < len(versions) else None
@@ -114,29 +114,29 @@ def input_columns(
             live &= days < end
         if not live.any():
             continue
-        eps = [
-            pos[affected_session]
-            for dividend, timing in events
-            for affected_session in earnings_reaction.affected_sessions(cfg, dividend, timing)
-            if affected_session in pos
+        event_positions = [
+            position_of_day[affected_session]
+            for event_day, timing in events
+            for affected_session in earnings_reaction.affected_sessions(cfg, event_day, timing)
+            if affected_session in position_of_day
         ]
-        win = mark_window(length, eps, horizon) & live
-        earn |= win
+        window_rows = mark_window(length, event_positions, horizon) & live
+        earn |= window_rows
         moves = earnings_reaction.past_moves(cfg, close, sigma, events, ranges_config["warmup_bars"])
-        for dividend_position in np.flatnonzero(win):
-            history_multiplier[dividend_position] = earnings_reaction.earnings_stats(
-                moves, ranges_config, idx[dividend_position].date()
+        for row_position in np.flatnonzero(window_rows):
+            history_multiplier[row_position] = earnings_reaction.earnings_stats(
+                moves, ranges_config, idx[row_position].date()
             )[0]
     cols["earn"] = earn
     cols["m_hist"] = history_multiplier
     # dividends: log shift for ex-dates inside (d, d+h]
     shift = np.zeros(length)
-    for dividend, amount in extra["dividends"].get(ticker, []):
-        position = pos.get(calendar.next_session(cfg, dividend))
+    for ex_day, amount in extra["dividends"].get(ticker, []):
+        position = position_of_day.get(calendar.next_session(cfg, ex_day))
         if position is None or not amount:
             continue
-        for dividend_position in range(max(0, position - horizon), position):
-            shift[dividend_position] += range_math.ex_dividend_shift(float(close.iloc[dividend_position]), [amount])
+        for row_position in range(max(0, position - horizon), position):
+            shift[row_position] += range_math.ex_dividend_shift(float(close.iloc[row_position]), [amount])
     cols["div_shift"] = shift
     cols["has_div"] = shift != 0
     # cues

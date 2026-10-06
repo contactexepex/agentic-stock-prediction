@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)  # calibration curve (stated coverage)
 
 SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")

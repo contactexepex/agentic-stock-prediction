@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from marketbrief.analytics import event_history, range_switches
-from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from marketbrief.analytics.features import load_bars
-from marketbrief.core import database, market_config
 from marketbrief.constants.backtest import INPUT_ARMS
+from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
+from marketbrief.core import database, market_config
 from marketbrief.replay.backtest.evaluation import compare_inputs, evaluate, summarize
 from marketbrief.replay.backtest.observations import index_cue_series, observations
 

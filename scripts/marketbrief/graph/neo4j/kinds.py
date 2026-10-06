@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
+
 from marketbrief.graph.neo4j.cypher import (
     company_node_statement,
     holder_statement,
@@ -34,8 +35,8 @@ from marketbrief.graph.neo4j.shapes import (
 )
 from marketbrief.graph.neo4j.statements import (
     CONFIG_STATEMENTS,
-    EVENTS_CURRENT,
     EVENT_STATEMENTS,
+    EVENTS_CURRENT,
     GRAPH_STATEMENTS,
     HOLDINGS_13F_SQL,
     INSIDERS_SQL,

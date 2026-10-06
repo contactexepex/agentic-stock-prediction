@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, time, timedelta
 
-
 FAIR, CONTAMINATED = "fair", "contaminated"  # ForecastBench leakage rule (see the docstring)
 
 SAMPLE_START, SAMPLE_END, SAMPLE_STEP = date(2026, 7, 1), date(2026, 9, 25), 5
@@ -145,3 +144,5 @@ MSG_NOTHING_RECORDED_IN = "nothing recorded in {store_directory}"
 
 # ---------- ai replay: cutoff ----------
 MSG_HAS_NO_MODEL_TRAINING_CUTOFF_YYYY = "{value} has no model_training_cutoff (YYYY-MM-DD)"
+
+MSG_NOT_JSON = "not JSON: {error}"

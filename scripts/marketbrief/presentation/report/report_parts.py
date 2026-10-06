@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+
 import pandas as pd
-from marketbrief.core import calendar
-from marketbrief.pipeline.score_predictions import is_late
+
 from marketbrief.analytics.scoring import percent
-from view_data import fmt_call
+from marketbrief.core import calendar
 from marketbrief.core.market_config import benchmark_key, vol_index_key
-from marketbrief.utils.money import format_money
+from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation.report.formatting import mark, pct
+from marketbrief.utils.money import format_money
+from view_data import fmt_call
 
 
 @dataclass

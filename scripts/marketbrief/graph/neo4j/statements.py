@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from marketbrief.graph.neo4j.cypher import COMPANY, MARKET, casts, node_statement, prov
 
-
 CONFIG_STATEMENTS = [
     (
         "UNWIND $rows AS row\nMERGE (m:Market {id: row.id})\nSET m += row.props, " + prov("m"),
-        lambda r: r["node"] == "market",
+        lambda row: row["node"] == "market",
     ),
     (
         """UNWIND $rows AS row
@@ -30,7 +29,7 @@ MERGE (s)-[im:IN_MARKET]->(m) SET """
         + """
 MERGE (c)-[r:IN_SECTOR]->(s) SET """
         + prov("r"),
-        lambda r: r["node"] == "company",
+        lambda row: row["node"] == "company",
     ),
 ]
 
@@ -65,11 +64,11 @@ EVENT_NODE = "UNWIND $rows AS row\n" + node_statement("Event", ("date",), ("firs
 EVENT_STATEMENTS = [
     (
         EVENT_NODE + "\nWITH n, row\n" + COMPANY + "\nMERGE (c)-[r:HAS_EVENT]->(n)\nSET " + prov("r"),
-        lambda r: r["ticker"] is not None,
+        lambda row: row["ticker"] is not None,
     ),
     (
         EVENT_NODE + "\nWITH n, row\n" + MARKET + "\nMERGE (m)-[r:HAS_EVENT]->(n)\nSET " + prov("r"),
-        lambda r: r["ticker"] is None,
+        lambda row: row["ticker"] is None,
     ),
 ]
 
@@ -136,7 +135,7 @@ row.target_name,
       t.watchlist = false, t.source_kind = $kind, t.source_id = row.source_id, t.synced_at = datetime($synced_at)
 """
         + GRAPH_REL,
-        lambda r: r["status"] == "active" and r["target_ticker"],
+        lambda row: row["status"] == "active" and row["target_ticker"],
     ),
     (
         GRAPH_DROP
@@ -150,11 +149,11 @@ SET t.synced_at = datetime($synced_at)
 FOREACH (_ IN CASE WHEN row.target_person THEN [1] ELSE [] END | SET t:Person)
 """
         + GRAPH_REL,
-        lambda r: r["status"] == "active" and not r["target_ticker"],
+        lambda row: row["status"] == "active" and not row["target_ticker"],
     ),
     (
         "UNWIND $rows AS row\nOPTIONAL MATCH ()-[old:CONNECTED_TO {id: row.id}]->()\nDELETE old",
-        lambda r: r["status"] != "active",
+        lambda row: row["status"] != "active",
     ),
 ]
 

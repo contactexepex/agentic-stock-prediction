@@ -13,3 +13,5 @@ MSG_TARGET_TICKER_MUST_BE_A_STRING = "target_ticker must be a string or null"
 MSG_AS_OF_IS_IN_THE_FUTURE = "as_of is in the future"
 MSG_AS_OF_MUST_BE_YYYY_MM = "as_of must be YYYY-MM-DD (date of the source)"
 MSG_USAGE_GRAPH_PY_WORK_GRAPH_JSONL = "usage: graph.py {command} work/graph.jsonl"
+
+MSG_NOT_JSON = "not JSON: {error}"

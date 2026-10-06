@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-
 MAX_WORDS = 60
 
 DEFAULT_MAX = 40
@@ -88,3 +87,5 @@ MSG_LESSON_WORD_COUNT = "lesson must be 1-{max_words} words (got {word_count})"
 MSG_RETURN_HAS_THE_WRONG_SIGN_ACTUAL = "return {sign}{num}% has the wrong sign (actual_return {actual_return:+.6f})"
 MSG_MUST_BE_TEXT = "{key} must be text"
 MSG_IS_BUT_THE_STORED_VALUE_IS = "{key} is {value!r} but the stored value is {value_2!r}"
+
+MSG_NOT_A_JSON_OBJECT = "not a JSON object"

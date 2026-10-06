@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 BATCH_SIZE = 500
 
 OVERLAP_DAYS = 3  # incremental re-reads this much before the watermark (re-upserts are harmless)

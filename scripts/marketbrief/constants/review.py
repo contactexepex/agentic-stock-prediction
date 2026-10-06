@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-
 DEFAULTS = {
     "rolling_days": 30,
     "min_n": 30,

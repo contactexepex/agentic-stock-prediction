@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import math
 from datetime import date
-from marketbrief.core.clock import utc_now
-from marketbrief.utils.numbers import round_or_none, share_percent_text
-from marketbrief.constants.prediction_rules import HORIZONS
+
 from marketbrief.constants.ai_replay import BANDS, CONTAMINATED, FAIR
+from marketbrief.constants.prediction_rules import HORIZONS
+from marketbrief.core.clock import utc_now
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.score_stats import group_stats, hit_rate_stats, score_rows
+from marketbrief.utils.numbers import round_or_none, share_percent_text
 
 
 def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict, cutoff: date | None = None) -> dict:
@@ -171,8 +172,12 @@ def top_sentences(summary: dict) -> list[str]:
         f"(95% interval {pct(lower)} to {pct(upper)}), {verdict} (50%)."
     )
     difference = overall["diff_vs_always_up"]
-    dlo, dhi = difference["ci95"]
-    noise = "within noise" if dlo is None or (dlo <= 0 <= dhi) else "a clear difference"
+    difference_lower, difference_upper = difference["ci95"]
+    noise = (
+        "within noise"
+        if difference_lower is None or (difference_lower <= 0 <= difference_upper)
+        else "a clear difference"
+    )
     rules = [
         f"{row['label']} {pct(row['hit_rate'])} on its {row['n']} calls (AI {pct(row['ai_hit_rate_same_rows'])} there)"
         for row in overall["rules"].values()

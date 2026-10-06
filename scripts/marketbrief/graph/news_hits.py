@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, timedelta
+
 from marketbrief.core.clock import utc_today
 from marketbrief.graph.connection_map import MIN_NAME, load_edges, status
 

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from marketbrief.core.database import connect
+
 from marketbrief.analytics.features import load_bars
-from marketbrief.constants.ai_replay import CONTAMINATED, FAIR
+from marketbrief.constants.ai_replay import CONTAMINATED, FAIR, MSG_NOTHING_RECORDED_IN
+from marketbrief.core.database import connect
 from marketbrief.replay.ai_replay.ai_html import html_page
 from marketbrief.replay.ai_replay.record import read_jsonl
 from marketbrief.replay.ai_replay.summaries import summarize
-from marketbrief.constants.ai_replay import MSG_NOTHING_RECORDED_IN
 
 
 def score(cfg: dict, results: Path, out: Path) -> dict:

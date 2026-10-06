@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from marketbrief.core.database import connect
+
 from marketbrief.constants.ai_replay import EVIDENCE_DAYS, EVIDENCE_KINDS
+from marketbrief.core.database import connect
 from marketbrief.replay.ai_replay.roots import data_root
 
 
