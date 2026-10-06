@@ -90,6 +90,7 @@ def prepare(cfg: dict, out: Path, fetch: bool) -> dict:
     selected, info = select_clusters(con, clusters, src, conf, now)
     fetched = {"skipped": "--no-fetch"} if not fetch else fetch_primary_texts(con, market, selected, conf, now)
     con = connect(market)            # a kind first written above is only visible to a new connection
+    now = now_floor()                # the texts just stored (fetched_at) are available from now on
     sources = sources_by_cluster(con, selected, now)
     records = input_records(con, cfg, selected, sources, conf, now)
     out.parent.mkdir(parents=True, exist_ok=True)

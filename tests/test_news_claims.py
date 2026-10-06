@@ -297,3 +297,15 @@ def test_context_section_and_call_lines(env, capsys):
                                "rationale": "x", "evidence_ids": [TSLA_8K, "n30", "n31"], "prompt_version": "t"}])
     lines = news_events.call_status_lines(connect(MARKET), "2026-10-05")
     assert lines[2] == f"- TSLA 5d up: {TSLA_8K} confirmed_primary, n30 confirmed_primary, n31 contradicted"
+
+
+def test_text_stored_during_prepare_is_in_its_input(env, capsys, monkeypatch):
+    """A live run's clock moves while filings are fetched: text stored at t1 > the run's start t0
+    must still be in the input (sources are read as of after the fetch)."""
+    later = pd.Timestamp(NOW) + pd.Timedelta(seconds=7)
+    times = iter([pd.Timestamp(NOW), later])
+    monkeypatch.setattr(claims_cli, "now_floor", lambda: next(times))
+    monkeypatch.setattr(claims_cli, "utc_now", lambda: later.isoformat())
+    cli(env, capsys, "prepare")
+    tsla = inputs(env)[TSLA_C]
+    assert tsla["primary_without_text"] == [] and tsla["primary_sources"][0]["id"] == TSLA_8K
