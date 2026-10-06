@@ -536,10 +536,20 @@ i AS (SELECT unnest(news_ids) AS news_id, id AS row_id, cluster_id, ticker, as_o
 SELECT DISTINCT ON (news_id, ticker) news_id, ticker, cluster_id, row_id, as_of
 FROM i ORDER BY news_id, ticker, as_of DESC, row_id;
 
+-- A cluster is its newest row still holding an item (above). Ids a newer row of another cluster
+-- took over are removed from news_ids (and n_items) and listed in moved_ids; the other columns
+-- (origins, counts, flags) stay as computed at that row's as_of. Ids can move only when a
+-- cluster's earliest items left the builder's lookback (news_clusters.py), so this is rare.
+-- Clusters that stopped changing keep their last row: they are history, not stale state.
 CREATE OR REPLACE MACRO news_clusters_asof(ts) AS TABLE
-SELECT DISTINCT ON (c.cluster_id) c.* FROM news_clusters c
-WHERE c.id IN (SELECT row_id FROM news_cluster_items_asof(ts))
-ORDER BY c.cluster_id, c.as_of DESC;
+WITH m AS (SELECT * FROM news_cluster_items_asof(ts)),
+k AS (SELECT row_id, list(news_id) AS cur FROM m GROUP BY row_id),
+r AS (SELECT c.*, k.cur FROM news_clusters c JOIN k ON k.row_id = c.id)
+SELECT DISTINCT ON (cluster_id) * EXCLUDE (cur)
+    REPLACE (list_filter(news_ids, x -> list_contains(cur, x)) AS news_ids,
+             len(list_filter(news_ids, x -> list_contains(cur, x))) AS n_items),
+    list_filter(news_ids, x -> NOT list_contains(cur, x)) AS moved_ids
+FROM r ORDER BY cluster_id, as_of DESC;
 
 CREATE OR REPLACE VIEW news_clusters_latest AS
 SELECT * FROM news_clusters_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');

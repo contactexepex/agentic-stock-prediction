@@ -17,15 +17,21 @@ view, acceptance times corrected by sec_times), NSE announcements disseminated b
    a year) and at least one informative token, or their article texts are copies (MinHash
    containment >= `copy_containment`).
 4. Origins: an agency copy (byline, JSON-LD provider, dateline, "By Reuters" title, "Reuters
-   reported"-style attribution, a wire's own domain or label) is that agency's origin; else the
-   JSON-LD provider (vendor content on Yahoo/AOL); else the outlet domain. Items whose texts are
-   copies (6-shingle MinHash containment >= `copy_containment`) share an origin. Promotional or
-   vendor items (config `promotional`) never count. independent_origins = origin groups with a
-   non-promotional item; listed_origins = those with an allowlisted outlet or an agency.
+   reported"-style attribution in the lede, a wire's own domain or label) is that agency's origin;
+   else the JSON-LD provider (vendor content on Yahoo/AOL); else the outlet. The outlet is its
+   domain; a row without one (older Google News rows) is mapped from its source label (configured
+   names, a label that is a host, or the domain other rows of this run give that label). Items of
+   one outlet share an origin; items of different outlets whose texts are copies (6-shingle
+   MinHash containment >= `copy_containment`) share an origin. Only VETTED origins count: a group
+   with an item from an allowlisted outlet (any tier, also `fetch: false` ones) or attributed to
+   an agency, and with a non-promotional item. Items from unvetted outlets are informational
+   (`unvetted_ids`), and the summary lists their domains (`unvetted_domains`) for review.
+   independent_origins = the number of vetted, non-promotional origin groups.
 5. Primary candidates: the ticker's SEC filings of `sec_forms` and NSE announcements public from
    `window_hours` before the first report until now (not yet matched to the claims: phase B).
-Flags: promotional_provider, sources_say, single_source (<= 1 independent origin), low_tier_only
-(no allowlisted outlet and no agency), unread (no article text or description was read),
+Flags: promotional_provider, sources_say, single_source (<= 1 vetted independent origin),
+low_tier_only (no vetted item: no allowlisted outlet and no agency), unread (no article text or
+description was read),
 duplicates_removed. A cluster is appended (schema `news_clusters`) when it has an item first seen
 in the last `window_hours`, holds 2+ items or a fetched article, and is new or changed since its
 last stored row. Read the state at a time with the macro news_clusters_asof(ts) (sql/views.sql).
@@ -34,6 +40,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -74,6 +81,26 @@ def _iso(t: pd.Timestamp | None) -> str | None:
     return None if t is None else t.floor("s").isoformat()
 
 
+def label_domains(rows) -> dict[str, str]:
+    """Source label -> the domain other rows with that label give (Google News <source url>), so a
+    label-only row and a domain row of one outlet are one outlet ("The CSR Universe" /
+    thecsruniverse.com). A label used with several domains is left out."""
+    seen: dict[str, set] = defaultdict(set)
+    for r in rows:
+        if r[3] and r[4]:
+            seen[norm(r[3])].add(r[4])
+    return {k: next(iter(v)) for k, v in seen.items() if len(v) == 1}
+
+
+def outlet_of(source: str | None, src: nv.Sources, learned: dict[str, str]) -> str | None:
+    if not source:
+        return None
+    d = src.domain_of_label(source) or learned.get(norm(source))
+    if d is None and re.fullmatch(r"[A-Za-z0-9.-]+\.[A-Za-z]{2,}", source.strip()):
+        d = source.strip().lower().removeprefix("www.")
+    return d
+
+
 def load_items(con, cfg: dict, src: nv.Sources, as_of: pd.Timestamp) -> list[dict]:
     cl = src.clusters
     since = as_of - pd.Timedelta(hours=float(cl.get("lookback_hours", 144)))
@@ -82,8 +109,9 @@ def load_items(con, cfg: dict, src: nv.Sources, as_of: pd.Timestamp) -> list[dic
         "FROM news WHERE first_seen_at <= ? AND first_seen_at >= ? ORDER BY first_seen_at, id",
         [as_of.to_pydatetime(), since.to_pydatetime()]).fetchall()
     arts = {r["id"]: r for r in con.execute(
-        "SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ? ORDER BY id, fetched_at",
+        "SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ? ORDER BY id, fetched_at DESC",
         [as_of.to_pydatetime()]).df().to_dict("records")}
+    learned = label_domains(rows)
     items = []
     for nid, title, url, source, sdom, pub, seen, prim in rows:
         tickers = [t for t in (prim or []) if t in cfg["tickers"]]
@@ -92,8 +120,11 @@ def load_items(con, cfg: dict, src: nv.Sources, as_of: pd.Timestamp) -> list[dic
         a = arts.get(nid)
         a = {k: (None if isinstance(v, float) and pd.isna(v) else v) for k, v in a.items()} if a else None
         host = nv.host_of(url)
-        domain = ((a or {}).get("domain") if a and a.get("final_url") else None) or sdom or src.domain_of_label(source) \
-            or (host if host and host != "news.google.com" else None)
+        domain = ((a or {}).get("domain") if a and a.get("final_url") else None) or sdom \
+            or (host if host and host != "news.google.com" and src.lookup(host)[0] else None) \
+            or outlet_of(source, src, learned) or (host if host and host != "news.google.com" else None)
+        dom_l = src.lookup(domain)[0]
+        domain = dom_l or domain
         seen_t, pub_t = _ts(seen), _ts(pub)
         wire, ev = (a.get("origin_wire"), a.get("origin_evidence")) if a and a.get("origin_wire") else \
             src.detect_wire(title=title, source=source, domain=domain)
@@ -104,7 +135,7 @@ def load_items(con, cfg: dict, src: nv.Sources, as_of: pd.Timestamp) -> list[dic
         for t in tickers:
             items.append({
                 "id": nid, "ticker": t, "title": title or "", "source": source, "domain": domain,
-                "tier": src.tier(domain), "t": pub_t if pub_t is not None and pub_t <= seen_t else seen_t,
+                "tier": src.tier(domain), "vetted": bool(dom_l) or bool(wire), "t": pub_t if pub_t is not None and pub_t <= seen_t else seen_t,
                 "seen": seen_t, "wire": wire, "wire_ev": ev, "provider": provider if not src.wire_of_name(provider) else None,
                 "promo": promo, "canon": canon, "outlet_key": domain or f"label:{norm(source)}",
                 "article": a, "fetched": _ts((a or {}).get("fetched_at")),
@@ -213,7 +244,10 @@ def describe(items: list[dict], members: list[int], dups: dict, copies) -> dict:
             seen[lab] = k
     for a in range(len(members)):
         for b in range(a + 1, len(members)):
-            if o.find(a) != o.find(b) and copies(members[a], members[b]):
+            # copied text joins origins of different outlets only: two stories of one outlet share
+            # boilerplate or reuse its own paragraphs, which says nothing about an agency origin
+            ia, ib = items[members[a]], items[members[b]]
+            if ia["outlet_key"] != ib["outlet_key"] and o.find(a) != o.find(b) and copies(members[a], members[b]):
                 o.union(a, b)
     og = defaultdict(list)
     for k in range(len(members)):
@@ -225,16 +259,16 @@ def describe(items: list[dict], members: list[int], dups: dict, copies) -> dict:
             next((x for x in labs if x.startswith("provider:")), None) or labs[0]
         origin_groups.append({"origin": name, "news_ids": [items[members[k]]["id"] for k in ks],
                               "promotional": all(items[members[k]]["promo"] for k in ks),
-                              "listed": any(labels[k].startswith("wire:") or items[members[k]]["tier"] in nv.LISTED_TIERS
-                                            for k in ks)})
+                              "vetted": any(items[members[k]]["vetted"] for k in ks)})
     origin_groups.sort(key=lambda g: g["origin"])
     all_idx = members + [d for i in members for d in dups.get(i, [])]
     its = [items[i] for i in all_idx]
     rep = items[members[0]]
     outlets = sorted({it["outlet_key"] for it in its})
     tier_of = {it["outlet_key"]: it["tier"] for it in its}
-    independent = sum(1 for g in origin_groups if not g["promotional"])
-    listed = sum(1 for g in origin_groups if not g["promotional"] and g["listed"])
+    counted = [g for g in origin_groups if g["vetted"] and not g["promotional"]]
+    independent = len(counted)
+    unvetted = sorted(i for g in origin_groups if not g["vetted"] for i in g["news_ids"])
     arts = [it["article"] for it in its if it["article"]]
     flags = []
     if any(it["promo"] for it in its):
@@ -243,7 +277,7 @@ def describe(items: list[dict], members: list[int], dups: dict, copies) -> dict:
         flags.append("sources_say")
     if independent <= 1:
         flags.append("single_source")
-    if not any(it["wire"] or it["tier"] in nv.LISTED_TIERS for it in its):
+    if not any(it["vetted"] for it in its):
         flags.append("low_tier_only")
     if not any(a.get("access") in READ for a in arts):
         flags.append("unread")
@@ -254,19 +288,19 @@ def describe(items: list[dict], members: list[int], dups: dict, copies) -> dict:
         "news_ids": [items[i]["id"] for i in members],
         "duplicate_ids": sorted(items[d]["id"] for i in members for d in dups.get(i, [])),
         "n_items": len(members), "outlets": outlets, "tiers": [tier_of[x] for x in outlets],
-        "independent_origins": independent, "listed_origins": listed,
-        "origins": [g["origin"] for g in origin_groups],
-        "origin_groups": [{k: g[k] for k in ("origin", "news_ids", "promotional")} for g in origin_groups],
+        "independent_origins": independent, "unvetted_ids": unvetted,
+        "origins": [g["origin"] for g in counted], "origin_groups": origin_groups,
         "first_reported_at": min(it["t"] for it in its), "last_reported_at": max(it["t"] for it in its),
         "inputs_until": max([it["seen"] for it in its] + [it["fetched"] for it in its if it["fetched"] is not None]),
         "newest_seen": max(it["seen"] for it in its), "flags": flags, "n_articles": len(arts),
         "titles": [items[i]["title"] for i in members],
+        "unvetted_outlets": [it["outlet_key"] for it in its if not it["vetted"]],
     }
 
 
 def state_hash(c: dict) -> str:
-    keys = ("news_ids", "duplicate_ids", "primary_ids", "origins", "independent_origins", "listed_origins",
-            "flags", "outlets")
+    keys = ("news_ids", "duplicate_ids", "primary_ids", "origins", "origin_groups", "independent_origins",
+            "unvetted_ids", "flags", "outlets")
     return hashlib.sha1(json.dumps({k: c[k] for k in keys}, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
@@ -289,7 +323,7 @@ def main() -> int:
     current = []
     for c in clusters:
         lo = c["first_reported_at"] - window
-        p = [(t, i) for t, i in prim.get(c["ticker"], []) if lo <= t <= as_of]
+        p = [(t, i) for t, i in prim.get(c["ticker"], []) if lo <= t]   # load_primaries: <= as_of
         c["primary_ids"] = [i for _t, i in p]
         if p:
             c["inputs_until"] = max(c["inputs_until"], max(t for t, _i in p))
@@ -305,7 +339,7 @@ def main() -> int:
             "id": f"{c['cluster_id']}@{as_of:%Y%m%dT%H%M%SZ}", "as_of": _iso(as_of), "cluster_id": c["cluster_id"],
             "ticker": c["ticker"], "news_ids": c["news_ids"], "duplicate_ids": c["duplicate_ids"],
             "n_items": c["n_items"], "outlets": c["outlets"], "tiers": c["tiers"],
-            "independent_origins": c["independent_origins"], "listed_origins": c["listed_origins"],
+            "independent_origins": c["independent_origins"], "unvetted_ids": c["unvetted_ids"],
             "origins": c["origins"], "origin_groups": c["origin_groups"], "primary_ids": c["primary_ids"],
             "first_reported_at": _iso(c["first_reported_at"]), "last_reported_at": _iso(c["last_reported_at"]),
             "inputs_until": _iso(c["inputs_until"]), "flags": c["flags"], "state_hash": h,
@@ -319,11 +353,14 @@ def main() -> int:
         "not_written_single_or_old": skipped,
         "size_distribution": dict(sorted(Counter(min(c["n_items"], 10) for c in current).items())),
         "independent_origins_distribution": dict(sorted(Counter(c["independent_origins"] for c in current).items())),
+        "clusters_with_unvetted_items": sum(1 for c in current if c["unvetted_ids"]),
+        # outlets not on the allowlist (config/news_sources.yaml), for review: vet and add, or ignore
+        "unvetted_domains": dict(Counter(o for c in current for o in c["unvetted_outlets"]).most_common(40)),
         "flags": dict(Counter(f for c in current for f in c["flags"]).most_common()),
         "with_primary": sum(1 for c in current if c["primary_ids"]),
         "examples": [{"cluster_id": c["cluster_id"], "n_items": c["n_items"], "titles": c["titles"][:4],
                       "origins": c["origins"], "independent_origins": c["independent_origins"],
-                      "listed_origins": c["listed_origins"], "primary_ids": c["primary_ids"][:5],
+                      "unvetted_ids": c["unvetted_ids"], "primary_ids": c["primary_ids"][:5],
                       "flags": c["flags"]} for c in examples],
         "seconds": round(time.monotonic() - t0, 1),
     }, indent=2, default=str))

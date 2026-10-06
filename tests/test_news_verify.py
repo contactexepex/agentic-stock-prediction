@@ -275,8 +275,8 @@ def base_news() -> list[dict]:
     return [
         news_row(1, CVX_BNN, "CVX", source="BNN Bloomberg", domain="bnnbloomberg.ca"),
         news_row(2, CVX_AOL, "CVX", source="AOL.com", domain="aol.com"),
-        news_row(3, "Chevron names Gustavson CFO as Bonner moves to oil unit", "CVX", source="marketscreener.com",
-                 domain="marketscreener.com"),
+        news_row(3, "Chevron names Gustavson CFO as Bonner moves to oil unit", "CVX", source="SuaraGarut.ID",
+                 domain="suaragarut.id"),
         news_row(4, "Chevron CFO Bonner to lead oil business", "CVX", source="BNN Bloomberg", domain=None,
                  url="http://www.bnnbloomberg.ca/chevron-cfo"),
         news_row(5, "Chevron names Jeff Gustavson next CFO", "CVX", source="Reuters", domain="reuters.com"),
@@ -424,20 +424,28 @@ def test_clusters_origins_duplicates_primaries(env, capsys):
     env.write("news", [news_row(20, "Chevron elevates CFO to head oil and gas operations By Reuters", "CVX",
                                 source="Investing.com", domain="investing.com", conf="low")])
     env.write("filings", FILINGS)
+    # unvetted outlet, once with its domain and once label-only (an older row): one outlet, never counted
+    env.write("news", [news_row(21, "Chevron names Jeff Gustavson as new CFO", "CVX", source="The CSR Universe",
+                                domain="thecsruniverse.com", conf="low"),
+                       news_row(22, "Chevron names Jeff Gustavson CFO, Bonner to oil", "CVX", source="The CSR Universe",
+                                domain=None, conf="low")])
     s = env.run(news_clusters, capsys)
     rows = env.rows("news_clusters")
     cvx = [r for r in rows if r["ticker"] == "CVX" and "n01" in r["news_ids"]][0]
-    # AOL (provider Reuters), BNN (byline Reuters Staff), Investing ("By Reuters"), Reuters itself: one origin;
-    # (marketscreener's different headline does not join the cluster)
-    assert set(cvx["news_ids"]) >= {"n01", "n02", "n05", "n20"} and "n12" in cvx["duplicate_ids"]
-    groups = {g["origin"]: set(g["news_ids"]) for g in cvx["origin_groups"]}
-    assert groups["wire:Reuters"] >= {"n01", "n02", "n05", "n20"}
-    assert cvx["independent_origins"] == len(cvx["origins"]) and cvx["listed_origins"] == 1
+    # AOL (provider Reuters), BNN (byline Reuters Staff), Investing ("By Reuters"), Reuters itself: one origin
+    assert set(cvx["news_ids"]) >= {"n01", "n02", "n05", "n20", "n21", "n22"} and "n12" in cvx["duplicate_ids"]
+    groups = {g["origin"]: g for g in cvx["origin_groups"]}
+    assert set(groups["wire:Reuters"]["news_ids"]) >= {"n01", "n02", "n05", "n20"} and groups["wire:Reuters"]["vetted"]
+    assert set(groups["outlet:thecsruniverse.com"]["news_ids"]) == {"n21", "n22"}
+    assert groups["outlet:thecsruniverse.com"]["vetted"] is False and "outlet:label:the csr universe" not in groups
+    assert cvx["origins"] == ["wire:Reuters"] and cvx["independent_origins"] == 1 and "single_source" in cvx["flags"]
+    # n03 (suaragarut.id, unvetted) joins through the CSR Universe headlines; all three are informational
+    assert cvx["unvetted_ids"] == ["n03", "n21", "n22"] and s["unvetted_domains"]["thecsruniverse.com"] == 2
     assert cvx["primary_ids"] == ["0000093410-26-000188"]        # not the Form 4, not the 8-K after as_of
     assert "duplicates_removed" in cvx["flags"]
     jio = [r for r in rows if r["ticker"] == "RELIANCE"][0]
     assert set(jio["news_ids"]) == {"n13", "n14", "n15"} and jio["duplicate_ids"] == ["n16"]
-    assert jio["origins"] == ["wire:Reuters"] and jio["independent_origins"] == 1
+    assert jio["origins"] == ["wire:Reuters"] and jio["independent_origins"] == 1 and jio["unvetted_ids"] == []
     assert {"single_source", "sources_say", "duplicates_removed"} <= set(jio["flags"])
     tsla = [r for r in rows if r["ticker"] == "TSLA" and "n06" in r["news_ids"]][0]
     assert "promotional_provider" in tsla["flags"] and tsla["independent_origins"] == 0
@@ -467,7 +475,8 @@ def test_shared_round_amount_alone_does_not_link(src):
         return {"id": f"x{i}", "ticker": ticker, "title": title, "source": "s", "domain": f"d{i}.com", "tier": "tier2",
                 "t": pd.Timestamp("2026-10-05T10:00:00+00:00"), "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"),
                 "wire": None, "wire_ev": None, "provider": None, "promo": None, "canon": None, "outlet_key": f"d{i}.com",
-                "article": None, "fetched": None, "say": False, "nums": nv.distinctive(nv.numbers(title))}
+                "article": None, "fetched": None, "say": False, "nums": nv.distinctive(nv.numbers(title)),
+                "vetted": True}
     nvda = news_clusters.cluster_ticker(
         [item(1, "NVDA", "Nvidia Spent $20 Billion on Buybacks Last Quarter. Here's What That Means for You"),
          item(2, "NVDA", "Nvidia's $20bn licensing deal with Groq faces lawsuit from jilted engineers")], cfg, src)
@@ -521,3 +530,125 @@ def test_ai_replay_filters_new_kinds_by_time():
     assert not ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:30:00+00:00"}, d, cutoff)
     assert ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T12:00:00+00:00"}, d, cutoff)
     assert not ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T13:00:00+00:00"}, d, cutoff)
+
+
+def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):
+    """An article fetched after T1 that would change a cluster (here: show that a Fortune item is a
+    Reuters copy, so the cluster has one origin, not two) is not used by a run as of T1."""
+    env.run(collect_articles, capsys)
+    env.write("news", [news_row(31, "Chevron elevates CFO Bonner to lead oil and gas operations", "CVX",
+                                source="Fortune", domain="fortune.com", seen="2026-10-05T19:30:00+00:00", conf="low")])
+    env.run(news_clusters, capsys)                               # T1 = NOW: Fortune is its own origin
+    con = common.connect(MARKET)
+
+    def cvx_origins(ts: str) -> list:
+        return con.execute("SELECT origins FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ)) WHERE ticker = 'CVX' "
+                           "AND list_contains(news_ids, 'n31')", [ts]).fetchone()[0]
+    assert "outlet:fortune.com" in cvx_origins(NOW)
+    t2 = "2026-10-06T02:00:00+00:00"
+    late = {**[r for r in env.rows("news_articles") if r["id"] == "n01"][0], "id": "n31", "ticker": "CVX",
+            "fetched_at": "2026-10-06T01:00:00+00:00", "final_url": "https://fortune.com/2026/10/05/chevron-cfo/",
+            "domain": "fortune.com", "note": "late fetch"}
+    env.write("news_articles", [late], day="2026-10-06")
+    assert env.run(news_clusters, capsys)["written"] == 0       # rebuilt as of T1: the late article is unseen
+    env.set_now(t2)
+    assert env.run(news_clusters, capsys)["written"] >= 1
+    con = common.connect(MARKET)
+    assert "outlet:fortune.com" in cvx_origins(NOW) and "outlet:fortune.com" not in cvx_origins(t2)
+    assert "wire:Reuters" in cvx_origins(t2)
+
+
+def test_clusters_asof_drops_ids_that_moved(env):
+    env.write("news_clusters", [
+        {"id": "X@1", "as_of": "2026-10-05T19:00:00+00:00", "cluster_id": "CVX-n01", "ticker": "CVX",
+         "news_ids": ["n01", "n02"], "n_items": 2, "inputs_until": "2026-10-05T19:00:00+00:00"},
+        {"id": "Y@2", "as_of": "2026-10-05T19:30:00+00:00", "cluster_id": "CVX-n02", "ticker": "CVX",
+         "news_ids": ["n02", "n05"], "n_items": 2, "inputs_until": "2026-10-05T19:30:00+00:00"}])
+    con = common.connect(MARKET)
+    got = {r[0]: (r[1], r[2], r[3]) for r in con.execute(
+        "SELECT cluster_id, news_ids, n_items, moved_ids FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ))",
+        ["2026-10-05T20:00:00+00:00"]).fetchall()}
+    assert got == {"CVX-n01": (["n01"], 1, ["n02"]), "CVX-n02": (["n02", "n05"], 2, [])}
+    got = {r[0]: r[1] for r in con.execute("SELECT cluster_id, news_ids FROM news_clusters_asof("
+                                           "CAST(? AS TIMESTAMPTZ))", ["2026-10-05T19:10:00+00:00"]).fetchall()}
+    assert got == {"CVX-n01": ["n01", "n02"]}
+
+
+def test_same_outlet_copy_keeps_its_own_origin(src):
+    """Two stories of one outlet that share text (boilerplate, reused paragraphs) are not merged into
+    the agency origin one of them cites; a copy at another outlet is."""
+    a = " ".join(parse("bnn_chevron", src)["text"].split()[:60])
+    b, c = parse("mint_jio", src)["text"], parse("bs_jio", src)["text"] + " " + parse("yahoo_tikr_tesla", src)["text"]
+
+    def art(text):
+        sh = nv.shingles(text)
+        return {"shingle_count": len(sh), "minhash": nv.minhash_hex(sh), "access": "full"}
+    arts = {1: art(a), 2: art(a + " " + c), 3: art(a + " " + b)}   # 2 and 3 share only text a: no copy
+    cfg = {"tickers": {"HDFCBANK": {"name": "HDFC Bank"}}}
+
+    def item(i, outlet, wire, title):
+        return {"id": f"m{i}", "ticker": "HDFCBANK", "title": title, "source": outlet, "domain": outlet, "tier": "tier1",
+                "vetted": True, "t": pd.Timestamp("2026-10-05T10:00:00+00:00") + pd.Timedelta(minutes=i),
+                "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"), "wire": wire, "wire_ev": None, "provider": None,
+                "promo": None, "canon": None, "outlet_key": outlet, "article": arts[i], "fetched": None, "say": False,
+                "nums": set()}
+    out = news_clusters.cluster_ticker([
+        item(1, "moneycontrol.com", "Reuters", "HDFC Bank shares fall after CEO pick"),
+        item(2, "moneycontrol.com", None, "Brokerages bullish on HDFC Bank after Bagchi appointment"),
+        item(3, "livemint.com", None, "HDFC Bank names Anup Bagchi CEO")], cfg, src)
+    assert len(out) == 1
+    groups = {g["origin"]: g["news_ids"] for g in out[0]["origin_groups"]}
+    assert groups == {"wire:Reuters": ["m1", "m3"], "outlet:moneycontrol.com": ["m2"]}
+
+
+def test_attribution_only_in_the_lede(src):
+    lede = "Shares rose on Monday. The bank named a new chief. Analysts welcomed the pick. "
+    assert src.wire_in_text("Reuters reported the bank plans a listing. " + lede) == ("Reuters", "attribution")
+    assert src.wire_in_text(lede + "Earlier, Reuters reported the bank plans a listing.") == (None, None)
+    assert src.wire_in_text(lede + "More text here. (With inputs from PTI)") == ("PTI", "attribution")
+
+
+def test_clean_splits_glued_sentences():
+    assert nv.sentences(nv._clean("He wrote a post.HDFC Bank shares fell.The index rose.")) == \
+        ["He wrote a post.", "HDFC Bank shares fell.", "The index rose."]
+
+
+def test_decoder_only_talks_to_google(monkeypatch, src):
+    import httpx
+    with pytest.raises(httpx.RequestError):
+        collect_articles.google_only(httpx.Request("POST", "https://evil.example.com/batchexecute"))
+    with pytest.raises(httpx.RequestError):
+        collect_articles.google_only(httpx.Request("GET", "http://news.google.com/rss/articles/x"))
+    collect_articles.google_only(httpx.Request("POST", "https://news.google.com/_/DotsSplashUi/data/batchexecute"))
+
+    sent = []
+
+    class FakeDecoder:   # stands in for googlenewsdecoder.GoogleDecoder: its client follows a redirect
+        def __init__(self, **kw):
+            def handler(request):
+                sent.append(str(request.url))
+                if request.url.host == "news.google.com":
+                    return httpx.Response(302, headers={"location": "https://evil.example.com/next"})
+                return httpx.Response(200, text="ok")
+            self.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            self.client.close()
+
+        def decode_google_news_urls(self, links, interval=None):
+            out = []
+            for x in links:
+                try:
+                    self.client.post(x)
+                    out.append({"success": True, "decoded_url": "https://x"})
+                except httpx.HTTPError as e:
+                    out.append({"success": False, "message": str(e)})
+            return out
+    import googlenewsdecoder
+    monkeypatch.setattr(googlenewsdecoder, "GoogleDecoder", FakeDecoder)
+    res = collect_articles.decode_google(["https://news.google.com/rss/articles/abc"], src)
+    assert res[0]["success"] is False and "refused" in res[0]["message"]
+    assert sent == ["https://news.google.com/rss/articles/abc"]      # the redirect off Google was never sent

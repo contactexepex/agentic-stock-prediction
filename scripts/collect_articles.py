@@ -13,7 +13,8 @@ Per item (paced, `pause_seconds` between requests, one polite User-Agent, TLS ve
    allowlist: otherwise access=skipped_unlisted and nothing is requested; an allowlisted outlet with
    `fetch: false` (refuses cloud traffic) is access=blocked without a request;
 2. a Google News link is resolved to the publisher URL (googlenewsdecoder: one GET per link and
-   one POST per batch to news.google.com); on failure access=undecoded;
+   one POST per batch to news.google.com; a request hook refuses any request, redirects included,
+   that is not HTTPS to google.com); on failure access=undecoded;
 3. the publisher URL must be HTTPS on an allowlisted domain (each redirect hop too), else
    skipped_unlisted; a refused request (HTTP status, TLS or network error) is access=blocked;
 4. extraction: JSON-LD articleBody -> trafilatura -> newspaper4k; JSON-LD isAccessibleForFree=false
@@ -25,7 +26,8 @@ at most 3 key sentences of at most 40 words, normalised numbers, a content hash 
 signature of the 6-word shingles (copy detection in news_clusters.py). Never the article text.
 Article text is untrusted data: it is only measured, never followed as instructions.
 At most `max_per_run` items are requested per run (skipped ones do not count); the rest wait for
-the next run. Prints a JSON summary (counts by access and domain, requests, seconds).
+the next run. Prints a JSON summary (counts by access and domain, requests, seconds, and
+`unvetted_domains`: outlets not on the allowlist, with counts, to review and vet later).
 Exit 1 only when the run could not start (no config)."""
 from __future__ import annotations
 
@@ -56,11 +58,22 @@ class Pacer:
         self.last = time.monotonic()
 
 
+def google_only(request) -> None:
+    """httpx request hook for the decoder's client: it follows redirects itself (also on its POST),
+    so every request it sends, redirects included, must be HTTPS to google.com or a subdomain."""
+    import httpx
+    host = (request.url.host or "").lower()
+    if request.url.scheme != "https" or not (host == "google.com" or host.endswith(".google.com")):
+        raise httpx.RequestError(f"decoder request to {request.url.scheme}://{host} refused (not Google over HTTPS)",
+                                 request=request)
+
+
 def decode_google(links: list[str], src: nv.Sources) -> list[dict]:
     """googlenewsdecoder results for a batch of Google News links ({'success', 'decoded_url' | 'message'})."""
     from googlenewsdecoder import GoogleDecoder
     sel = src.sel
     with GoogleDecoder(timeout=float(sel.get("timeout_seconds", 20)), user_agent=sel.get("user_agent")) as d:
+        d.client.event_hooks = {"request": [google_only], "response": []}
         return d.decode_google_news_urls(links, interval=max(1, int(round(float(sel.get("pause_seconds", 1.5))))))
 
 
@@ -178,6 +191,7 @@ def main() -> int:
     written, failed, warnings, deferred = [], [], [], 0
 
     copies: list[str] = []
+    unvetted: list[dict] = []
     todo, same, first_key = [], {}, {}
 
     def emit(row: dict, c: dict | None = None):
@@ -194,6 +208,7 @@ def main() -> int:
 
     for c in cands:
         if c["tier"] == "unlisted":
+            unvetted.append({"domain": c["outlet"], "source_label": c["source"]})
             emit({**base_row(c, utc_now()), "access": "skipped_unlisted",
                   "note": f"outlet {c['outlet'] or c['source']!r} not on the allowlist (not requested)"})
             continue
@@ -284,6 +299,9 @@ def main() -> int:
     print(json.dumps({
         "collector": "articles", "market": market, "candidates": len(cands), "written": len(written),
         "deferred": deferred, "copied_same_article": len(copies),
+        # outlets not on the allowlist (never requested), for review: vet and add, or ignore
+        "unvetted_domains": dict(Counter(r["domain"] or "label:" + (r["source_label"] or "?")
+                                         for r in unvetted).most_common(40)),
         "by_access": dict(Counter(r["access"] for r in written).most_common()),
         "by_domain": dict(Counter(f"{r['domain']}:{r['access']}" for r in written).most_common()),
         "requests": {**requests_made, "total": sum(requests_made.values()),

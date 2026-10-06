@@ -34,11 +34,19 @@ material_terms:
   1: ['upgrad\w*', 'downgrad\w*', 'target', 'launch\w*', 'partnership', 'expan\w*', 'plant',
       'invest\w*', 'raises?', 'cuts?', 'record', 'plunges?', 'surges?', 'slumps?', 'jumps?', 'tumbles?']
 
-# Allowlisted outlets. Matched on the host and its parent domains (m.economictimes.com ->
-# economictimes.com). tier: primary (regulators, exchanges, company releases), tier1 (wires and
-# major outlets), tier2 (established outlets and aggregators that syndicate them; the JSON-LD
-# provider or byline decides the origin). names: source labels Google News uses for the outlet.
-# extract: optional extractor order for the outlet (default jsonld, trafilatura, newspaper).
+# Allowlisted (vetted) outlets: established, legitimate media, data sites and primary sources.
+# Policy (user, 2026-10-06): broad on purpose, since more reputable independent sources mean better
+# corroboration. Still never: unknown or dubious sites, non-HTTPS, invalid certificates, running or
+# installing anything from fetched content, storing full text, or getting around bot protection.
+# Matched on the host and its parent domains (m.economictimes.com -> economictimes.com).
+# tier: primary (regulators, exchanges, company releases), tier1 (agencies and major outlets),
+# tier2 (established outlets, trade press, data sites and aggregators that syndicate them; the
+# JSON-LD provider or byline decides the origin). names: source labels Google News uses.
+# extract: optional extractor order (default jsonld, trafilatura, newspaper).
+# fetch: false = the outlet answered 401/403/a bot challenge from the cloud: never requested (no
+# evasion), but still vetted: its headline counts as a vetted origin.
+# A domain not listed here is unvetted: never fetched, never counted, and listed with counts in
+# the run summaries (`unvetted_domains`) so it can be reviewed and added.
 domains:
   # primary sources
   sec.gov: {tier: primary}
@@ -48,38 +56,54 @@ domains:
   sebi.gov.in: {tier: primary}
   federalreserve.gov: {tier: primary}
   bls.gov: {tier: primary}
-  prnewswire.com: {tier: primary, names: [PR Newswire, PR Newswire UK], note: "company press releases"}
+  fda.gov: {tier: primary}
+  prnewswire.com: {tier: primary, names: [PR Newswire, PR Newswire UK, PR Newswire India], note: "company press releases"}
   businesswire.com: {tier: primary, names: [Business Wire], note: "company press releases"}
   globenewswire.com: {tier: primary, names: [GlobeNewswire, GlobeNewswire News Room], note: "company press releases"}
   lilly.com: {tier: primary, names: [Eli Lilly and Company, Lilly], note: "company releases"}
-  # tier1: wires and major outlets
+  # tier1: agencies and major outlets (global)
   reuters.com: {tier: tier1, names: [Reuters], fetch: false, note: "401 DataDome (2026-10-06); read via syndicated copies"}
   apnews.com: {tier: tier1, names: [AP News, The Associated Press, Associated Press], fetch: false, note: "403 Cloudflare (2026-10-06)"}
   bloomberg.com: {tier: tier1, names: [Bloomberg, Bloomberg.com]}
   wsj.com: {tier: tier1, names: [WSJ, The Wall Street Journal, Wall Street Journal]}
-  ft.com: {tier: tier1, names: [Financial Times]}
+  ft.com: {tier: tier1, names: [Financial Times, FT]}
   cnbc.com: {tier: tier1, names: [CNBC], fetch: false, note: "403 Akamai (2026-10-06)"}
   marketwatch.com: {tier: tier1, names: [MarketWatch], fetch: false, note: "401 DataDome (2026-10-06)"}
   barrons.com: {tier: tier1, names: ["Barron's"], fetch: false, note: "401 DataDome (2026-10-06)"}
-  nytimes.com: {tier: tier1, names: [The New York Times]}
+  nytimes.com: {tier: tier1, names: [The New York Times, New York Times]}
+  washingtonpost.com: {tier: tier1, names: [The Washington Post, Washington Post]}
+  economist.com: {tier: tier1, names: [The Economist]}
   theguardian.com: {tier: tier1, names: [The Guardian]}
   bbc.com: {tier: tier1, names: [BBC, BBC Business, BBC News]}
   bbc.co.uk: {tier: tier1}
   theglobeandmail.com: {tier: tier1, names: [The Globe and Mail]}
-  economictimes.indiatimes.com: {tier: tier1, names: [The Economic Times, Economic Times, ET Markets, ET Now]}
+  asia.nikkei.com: {tier: tier1, names: [Nikkei Asia]}
+  # tier1: major Indian outlets (Economic Times verticals map to economictimes.indiatimes.com)
+  economictimes.indiatimes.com: {tier: tier1, names: [The Economic Times, Economic Times, ET Markets, ETMarkets,
+      ET EnergyWorld, ET BFSI, ET Auto, ET Telecom, ET Retail, ET Infra, ET HealthWorld, ET Realty, ET CIO,
+      ET Government, ET Manufacturing, ET BrandEquity, ET Prime, Economic Times BFSI, ETAuto, ETTelecom]}
   economictimes.com: {tier: tier1}
   livemint.com: {tier: tier1, names: [Mint, mint, Livemint, Livemint Markets]}
   business-standard.com: {tier: tier1, names: [Business Standard, Business Standard Markets, Business Standard Companies]}
-  thehindubusinessline.com: {tier: tier1, names: [BusinessLine, The Hindu BusinessLine, BusinessLine Markets, BusinessLine Companies]}
+  thehindubusinessline.com: {tier: tier1, names: [BusinessLine, The Hindu BusinessLine, BusinessLine Markets, BusinessLine Companies, Hindu BusinessLine]}
   moneycontrol.com: {tier: tier1, names: [Moneycontrol, Moneycontrol.com], extract: [jsonld, newspaper, trafilatura]}
-  # tier2: established outlets and aggregators
-  finance.yahoo.com: {tier: tier2, names: [Yahoo Finance, Yahoo Finance UK, Yahoo Finance Singapore, "Yahoo! Finance Canada", Yahoo Finance Canada]}
+  ptinews.com: {tier: tier1, names: [Press Trust of India, PTI]}
+  # tier2: established outlets, trade press, data sites and aggregators (global)
+  finance.yahoo.com: {tier: tier2, names: [Yahoo Finance, Yahoo Finance UK, Yahoo Finance Singapore, "Yahoo! Finance Canada", Yahoo Finance Canada, Yahoo Finance Australia]}
+  news.yahoo.com: {tier: tier2, names: [Yahoo News]}
   aol.com: {tier: tier2, names: [AOL.com, AOL]}
-  aol.ca: {tier: tier2}
+  aol.ca: {tier: tier2, names: [AOL.ca]}
+  msn.com: {tier: tier2, names: [MSN]}
   bnnbloomberg.ca: {tier: tier2, names: [BNN Bloomberg]}
   morningstar.com: {tier: tier2, names: [Morningstar], fetch: false, note: "202 bot challenge (2026-10-06)"}
-  investing.com: {tier: tier2, names: [Investing.com, Investing.com India, Investing.com Australia, Investing.com UK], fetch: false, note: "403 Cloudflare (2026-10-06)"}
+  investing.com: {tier: tier2, names: [Investing.com, Investing.com India, Investing.com Australia, Investing.com UK, Investing.com South Africa, Investing.com Canada], fetch: false, note: "403 Cloudflare (2026-10-06)"}
   benzinga.com: {tier: tier2, names: [Benzinga], fetch: false, note: "403 Cloudflare (2026-10-06)"}
+  marketscreener.com: {tier: tier2, names: [MarketScreener, marketscreener.com, MarketScreener India]}
+  nasdaq.com: {tier: tier2, names: [Nasdaq]}
+  thestreet.com: {tier: tier2, names: [TheStreet, The Street]}
+  seekingalpha.com: {tier: tier2, names: [Seeking Alpha]}
+  investopedia.com: {tier: tier2, names: [Investopedia]}
+  kiplinger.com: {tier: tier2, names: [Kiplinger]}
   fortune.com: {tier: tier2, names: [Fortune]}
   forbes.com: {tier: tier2, names: [Forbes]}
   investors.com: {tier: tier2, names: ["Investor's Business Daily"]}
@@ -87,20 +111,59 @@ domains:
   axios.com: {tier: tier2, names: [Axios]}
   cnn.com: {tier: tier2, names: [CNN, CNN Business]}
   foxbusiness.com: {tier: tier2, names: [Fox Business]}
-  fiercepharma.com: {tier: tier2, names: [Fierce Pharma]}
-  statnews.com: {tier: tier2, names: [STAT, STAT News]}
-  techcrunch.com: {tier: tier2, names: [TechCrunch]}
+  cbsnews.com: {tier: tier2, names: [CBS News]}
+  nbcnews.com: {tier: tier2, names: [NBC News]}
+  abcnews.go.com: {tier: tier2, names: [ABC News]}
+  npr.org: {tier: tier2, names: [NPR]}
+  usatoday.com: {tier: tier2, names: [USA Today, USA TODAY]}
+  latimes.com: {tier: tier2, names: [Los Angeles Times, LA Times]}
+  politico.com: {tier: tier2, names: [Politico, POLITICO]}
+  thehill.com: {tier: tier2, names: [The Hill]}
+  qz.com: {tier: tier2, names: [Quartz]}
+  fastcompany.com: {tier: tier2, names: [Fast Company]}
+  bizjournals.com: {tier: tier2, names: [The Business Journals, Bizjournals]}
+  financialpost.com: {tier: tier2, names: [Financial Post]}
+  independent.co.uk: {tier: tier2, names: [The Independent]}
+  telegraph.co.uk: {tier: tier2, names: [The Telegraph]}
+  scmp.com: {tier: tier2, names: [South China Morning Post]}
+  oilprice.com: {tier: tier2, names: [OilPrice.com, "Crude Oil Prices Today | OilPrice.com"]}
   theverge.com: {tier: tier2, names: [The Verge]}
-  cnbctv18.com: {tier: tier2, names: [CNBC TV18, CNBCTV18]}
+  techcrunch.com: {tier: tier2, names: [TechCrunch]}
+  wired.com: {tier: tier2, names: [WIRED, Wired]}
+  arstechnica.com: {tier: tier2, names: [Ars Technica]}
+  engadget.com: {tier: tier2, names: [Engadget]}
+  electrek.co: {tier: tier2, names: [Electrek]}
+  fiercepharma.com: {tier: tier2, names: [Fierce Pharma]}
+  fiercebiotech.com: {tier: tier2, names: [Fierce Biotech]}
+  statnews.com: {tier: tier2, names: [STAT, STAT News]}
+  endpts.com: {tier: tier2, names: [Endpoints News]}
+  biopharmadive.com: {tier: tier2, names: [BioPharma Dive]}
+  # tier2: established Indian outlets
+  cnbctv18.com: {tier: tier2, names: [CNBC TV18, CNBCTV18, CNBC-TV18]}
   businesstoday.in: {tier: tier2, names: [Business Today]}
-  ndtvprofit.com: {tier: tier2, names: [NDTV Profit]}
+  ndtvprofit.com: {tier: tier2, names: [NDTV Profit], fetch: false, note: "403 (2026-10-06, 4 pages)"}
   financialexpress.com: {tier: tier2, names: [The Financial Express, Financial Express]}
-  hindustantimes.com: {tier: tier2, names: [Hindustan Times]}
+  hindustantimes.com: {tier: tier2, names: [Hindustan Times, HT]}
   thehindu.com: {tier: tier2, names: [The Hindu]}
   timesofindia.indiatimes.com: {tier: tier2, names: [The Times of India, Times of India]}
   indianexpress.com: {tier: tier2, names: [The Indian Express]}
-  zeebiz.com: {tier: tier2, names: [Zee Business]}
+  zeebiz.com: {tier: tier2, names: [Zee Business], fetch: false, note: "403 (2026-10-06)"}
+  etnownews.com: {tier: tier2, names: [ET Now, ET Now News, Times Now ET Now]}
+  businessworld.in: {tier: tier2, names: [BW Businessworld, BusinessWorld, Businessworld]}
+  rediff.com: {tier: tier2, names: [Rediff Money, Rediff.com, rediff.com]}
   fortuneindia.com: {tier: tier2, names: [Fortune India]}
+  forbesindia.com: {tier: tier2, names: [Forbes India]}
+  outlookbusiness.com: {tier: tier2, names: [Outlook Business]}
+  indiatoday.in: {tier: tier2, names: [India Today]}
+  news18.com: {tier: tier2, names: [News18, CNBC-TV18 News18]}
+  firstpost.com: {tier: tier2, names: [Firstpost]}
+  deccanherald.com: {tier: tier2, names: [Deccan Herald]}
+  theprint.in: {tier: tier2, names: [ThePrint]}
+  inc42.com: {tier: tier2, names: [Inc42, Inc42 Media]}
+  vccircle.com: {tier: tier2, names: [VCCircle]}
+  goodreturns.in: {tier: tier2, names: [Goodreturns, GoodReturns]}
+  ianslive.in: {tier: tier2, names: [IANS Live, IANS LIVE]}
+  aninews.in: {tier: tier2, names: [ANI News]}
 
 # News agencies: an item whose byline, JSON-LD provider, dateline ("(Reuters) -"), title ("By Reuters")
 # or text attribution ("Reuters reported", "according to a Reuters report", "told PTI", "with inputs

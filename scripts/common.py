@@ -73,12 +73,14 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
     # Same-event clusters per ticker (news_clusters.py), appended per run when a cluster is new or
     # changed: as_of = the run time; every input (item first_seen_at, article fetched_at, primary
     # accepted/published time) is <= inputs_until <= as_of. Read through news_clusters_asof(ts).
-    # origin_groups: JSON list of {origin, news_ids, promotional}; outlets/tiers are parallel lists.
+    # origin_groups: JSON list of {origin, news_ids, promotional, vetted}; outlets/tiers are parallel
+    # lists. independent_origins counts vetted, non-promotional groups only; origins lists them;
+    # unvetted_ids are items from outlets not on the allowlist (informational, never counted).
     "news_clusters": ("jsonl", {
         "id": "VARCHAR", "as_of": "TIMESTAMPTZ", "cluster_id": "VARCHAR", "ticker": "VARCHAR",
         "news_ids": "VARCHAR[]", "duplicate_ids": "VARCHAR[]", "n_items": "INTEGER",
         "outlets": "VARCHAR[]", "tiers": "VARCHAR[]", "independent_origins": "INTEGER",
-        "listed_origins": "INTEGER", "origins": "VARCHAR[]", "origin_groups": "JSON",
+        "unvetted_ids": "VARCHAR[]", "origins": "VARCHAR[]", "origin_groups": "JSON",
         "primary_ids": "VARCHAR[]", "first_reported_at": "TIMESTAMPTZ", "last_reported_at": "TIMESTAMPTZ",
         "inputs_until": "TIMESTAMPTZ", "flags": "VARCHAR[]", "state_hash": "VARCHAR", "method_version": "VARCHAR",
     }),

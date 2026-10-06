@@ -112,13 +112,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - News verification, phase A (DESIGN.md section 3a; deterministic, no LLM; helpers in
   `scripts/news_verify.py`):
   - `collect_articles` reads the article pages behind this run's material watchlist headlines.
-    It reads only from the HTTPS outlets allowlisted in `config/news_sources.yaml` (tiers, agency
-    names, promotional providers). An unlisted outlet is recorded as `skipped_unlisted` and never
-    requested. Output goes to `data/<market>/news_articles/`, one row per news id: access
+    It reads only from the HTTPS outlets allowlisted (vetted) in `config/news_sources.yaml`: a broad
+    list of established media, trade press, data sites and primary sources, with tiers, agency names
+    and promotional providers. An unlisted outlet is recorded as `skipped_unlisted`, never requested,
+    and listed in the summary's `unvetted_domains` for review. Outlets that answer 401/403/a bot
+    challenge are `fetch: false`: never requested, still vetted. Output goes to `data/<market>/news_articles/`, one row per news id: access
     full|partial|paywalled|blocked|undecoded|skipped_unlisted, metadata, agency origin, at most 3
     key sentences of <= 40 words, normalised numbers, and a MinHash. The full text is never stored.
-  - `news_clusters` groups same-event items per ticker and counts independent origins: copies of
-    one agency story, or of one text, count once. It attaches SEC filing and NSE announcement
+  - `news_clusters` groups same-event items per ticker and counts independent vetted origins:
+    copies of one agency story, or of one text, count once; unvetted outlets never count. It attaches SEC filing and NSE announcement
     candidates. Output goes to `data/<market>/news_clusters/` as per-run snapshots. Read them as
     of a time with the `news_clusters_asof(ts)` macro, which does not look ahead.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,

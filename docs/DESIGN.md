@@ -101,19 +101,28 @@ origins. Phase A has no LLM step. Phase B, not built yet, adds the claim-extract
 badges in the context pack.
 
 **Sources.** Free sources only, for personal non-commercial research. `config/news_sources.yaml`
-holds the outlet allowlist. Each domain has:
+holds the allowlist of vetted outlets (109 domains). It is broad on purpose: any established,
+legitimate media outlet, trade publication or data site qualifies, because more reputable
+independent sources give better corroboration. What stays forbidden: unknown or dubious sites,
+non-HTTPS, invalid certificates, running or installing anything from fetched content, storing full
+text, and getting around bot protection. Each domain has:
 - a tier: `primary` (SEC, NSE, RBI, SEBI, press-release wires, company releases), `tier1` (wires
   and major outlets) or `tier2` (established outlets, and aggregators that syndicate them);
 - the Google News source labels it appears under;
 - an optional extractor order;
 - `fetch: false` for outlets that refuse cloud traffic. These were tested 2026-10-06: Reuters,
-  AP, CNBC, MarketWatch, Barron's, Investing.com, Benzinga, Morningstar. Their items are recorded
-  as blocked and never requested, but their tier still counts.
+  AP, CNBC, MarketWatch, Barron's, Investing.com, Benzinga, Morningstar, NDTV Profit, Zee Business.
+  Their items are recorded as blocked and never requested (no attempt to evade), but they stay
+  vetted: their headline counts as a vetted origin, and their stories are read through legitimate
+  republications (AOL, Yahoo, BNN Bloomberg).
 
 Rules for what is requested:
 - Only HTTPS URLs on an allowlisted domain are ever requested, with TLS verification on.
 - Every redirect hop is checked the same way.
-- Anything else is recorded as `skipped_unlisted` and never requested.
+- Anything else is recorded as `skipped_unlisted` and never requested. Unvetted domains are listed
+  with counts in both run summaries (`unvetted_domains`) so they can be reviewed and added.
+- The Google News decoder's own client may only send HTTPS requests to google.com hosts, its
+  redirects included (an httpx request hook).
 
 The config also lists:
 - news agencies: Reuters, Bloomberg, AP, PTI, IANS, ANI, AFP and Dow Jones, with their bylines,
@@ -149,8 +158,9 @@ Requests are paced 1.5 s apart.
 - `datePublished` / `dateModified` in UTC;
 - byline and JSON-LD provider;
 - the agency origin and its evidence, which is the first match in this order: provider, byline,
-  source, title ("By Reuters"), dateline ("(Reuters) -"), attribution ("Reuters reported",
-  "told PTI", "with inputs from PTI");
+  source, title ("By Reuters"), dateline in the first 400 characters ("(Reuters) -"), attribution
+  in the lede, the first 3 sentences ("Reuters reported", "told PTI"), or "with inputs from PTI"
+  anywhere;
 - `sources_say` ("sources said", "people familiar");
 - `promotional`;
 - at most 3 key sentences of at most 40 words;
@@ -162,7 +172,9 @@ The full text is never stored. Article text is untrusted data: it is measured, n
 **Clusters** (`scripts/news_clusters.py`, kind `news_clusters`):
 
 *Items and duplicates.* The items are news rows of the last 144 h whose title names a watchlist
-ticker as primary. One article stored under two ids is kept once and the other ids are listed in
+ticker as primary. An item's outlet is its domain. A row without one (older Google News rows) is
+mapped from its source label: a configured name, a label that is itself a host, or the domain
+other rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under two ids is kept once and the other ids are listed in
 `duplicate_ids`. Two ids are the same article when they share the canonical publisher URL, or the
 same title from the same outlet, as with the labels "Business Today" and "businesstoday.in".
 
@@ -179,10 +191,13 @@ when any of these holds:
 - A wire copy is that agency's origin.
 - Otherwise the JSON-LD provider is the origin (vendor content on Yahoo or AOL).
 - Otherwise the outlet is the origin.
-- Copies (containment ≥ 0.5) share an origin, and so do items from the same outlet.
-- Promotional items never count.
-- `independent_origins` counts the non-promotional origin groups.
-- `listed_origins` counts those that include an allowlisted outlet or an agency.
+- Items from the same outlet share an origin. Copies (containment ≥ 0.5) at different outlets
+  share an origin; two stories of one outlet that share text (boilerplate, reused paragraphs) are
+  not merged into an agency origin one of them cites.
+- Only vetted origins count: a group with an item from an allowlisted outlet (any tier, also
+  `fetch: false`) or attributed to an agency, and with a non-promotional item.
+- `independent_origins` counts those groups and `origins` lists them; `single_source` means at
+  most one. Items from unvetted outlets are informational only (`unvetted_ids`).
 
 Measured examples:
 - AOL (provider Reuters) vs BNN Bloomberg (byline "Reuters Staff"): containment 0.96, one origin.
@@ -210,7 +225,11 @@ Items in no stored cluster are single items.
 if it was available by T):
 - `news_clusters_asof(ts)` uses only rows with `as_of` ≤ ts and `inputs_until` ≤ ts whose news
   ids were all first seen by ts. Each news id belongs to the newest such row listing it, so
-  clusters that were merged or changed are superseded.
+  clusters that were merged or changed are superseded. A cluster is its newest row that still
+  holds an item. Ids a newer row of another cluster took over are removed from its `news_ids`
+  and `n_items` and listed in `moved_ids`. Its origins, counts and flags stay as computed at that
+  row's `as_of`. Ids can move only when a cluster's earliest items left the 144 h lookback, so
+  this is rare. A cluster that stopped changing keeps its last row, as history.
 - `news_cluster_items_asof(ts)` maps each news id to its cluster at ts.
 - `news_articles_asof(ts)` returns the article rows fetched by ts.
 - `news_clusters_latest` is the current state.
@@ -218,18 +237,24 @@ if it was available by T):
 The builder itself only reads inputs known at its run time (MB_NOW in a replay). `ai_replay
 prepare` keeps article and cluster rows by `fetched_at` and `as_of`.
 
-**Live check, 2026-10-06** (scratch copy, one run per market, packages from requirements.txt):
-- US: 291 candidates. 38 full, 4 partial, 2 paywalled, 29 blocked (28 never requested, 1 HTTP 403)
-  and 218 skipped as unlisted. 102 requests (52 decode, 50 page) in 173 s. 282 cluster rows; 41
-  have a primary candidate.
-- India: 154 candidates. 52 full, 5 partial, 13 paywalled (11 of them Economic Times pages that
-  flag themselves not free), 9 blocked (4 never requested, 5 HTTP 403) and 75 skipped as unlisted.
-  15 of these rows are copies of an article already read in the run. 119 requests (54 decode, 65 page) in 194 s.
-  128 cluster rows.
+**Live check, 2026-10-06** (fresh scratch copy, one run per market, packages from requirements.txt,
+broad allowlist):
+- US: 304 candidates. 38 full, 5 partial, 2 paywalled, 46 blocked and 213 skipped as unlisted.
+  Of the blocked, 32 were never requested and 14 answered an error: 403 from Seeking Alpha (6),
+  MarketScreener (4), bizjournals, Fast Company and TheStreet; 402 from Investopedia. 132 requests
+  (68 decode, 64 page) in 226 s. 286 cluster rows. Vetted independent origins per cluster: 0 in
+  217, 1 in 60, 2 in 8, 3 in 1; 277 are `single_source`; 231 hold unvetted items.
+- India: 160 candidates. 60 full, 5 partial, 13 paywalled (11 Economic Times pages that flag
+  themselves not free), 15 blocked (9 never requested, 6 HTTP 403) and 67 skipped as unlisted.
+  18 of these rows are copies of an article already read in the run. 130 requests (59 decode,
+  71 page) in 214 s. 129 cluster rows. Vetted origins: 0 in 56, 1 in 63, 2 in 9, 6 in 1; 119
+  are `single_source`.
 
-Many US items are vendor content on Yahoo or AOL (TIKR, Zacks, Motley Fool, 24/7 Wall St), which
-is flagged promotional. The outlets blocked from the cloud would be the second source for many
-US stories, so many US events stay `single_source`.
+Most unvetted US items come from ad-hoc-news.de, MarketBeat, Stocktwits, Pluang, TradingKey and
+the vendor sites. Most unvetted Indian items come from scanx.trade, LatestLY, IndiaIPO, Kalkine
+and Univest. Many US items are vendor content on Yahoo or AOL (TIKR, Zacks, Motley Fool, 24/7
+Wall St), which is flagged promotional and never counted. Outlets that block cloud traffic would
+be the second source for many US stories, so most US events stay `single_source`.
 
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,

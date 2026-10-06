@@ -47,9 +47,10 @@ still fails:
   summary with an unmatched number: correct the number from the pack, or remove the sentence.
 Warnings never block: list them in `data_quality`.
 
-1. Prepare: `mkdir -p work`. If
-   `python -c "import duckdb, feedparser, yfinance, pandas, exchange_calendars, trafilatura, newspaper, googlenewsdecoder, datasketch"` fails, run
-   `pip install -q -r requirements.txt`.
+1. Prepare: `mkdir -p work`, then always run `pip install -q -r requirements.txt` (quick when
+   everything is installed; it also brings an installed package to its pinned version, e.g.
+   selectolax, which googlenewsdecoder needs at >= 0.4.12 and < 1.0). If it fails, note it in
+   `data_quality` and carry on; a collector whose package is missing fails on its own.
 
 2. Holiday check: `python scripts/market_status.py`. If `trading_day` is false, post one line
    to Slack #market-brief with

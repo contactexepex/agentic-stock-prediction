@@ -31,6 +31,7 @@ METHOD_VERSION = "nv-a1"
 ACCESS = ("full", "partial", "paywalled", "blocked", "undecoded", "skipped_unlisted")
 LISTED_TIERS = ("primary", "tier1", "tier2")
 NUM_PERM = 128
+LEDE_SENTENCES = 3
 SHINGLE = 6
 
 
@@ -65,7 +66,9 @@ class Sources:
         self._wire_att = re.compile(
             rf"\b(?:({alt})\s+(?i:has\s+|had\s+|first\s+)?(?i:reported|reports|said in a report|news agency reported)"
             rf"|(?i:according to (?:a |an )?)({alt})(?:\s+(?i:(?:news\s+)?report))?"
-            rf"|(?i:told )({alt})\b|(?i:citing (?:a |an )?)({alt})\b|(?i:with (?:additional )?inputs from )({alt})\b)")
+            rf"|(?i:told )({alt})\b|(?i:citing (?:a |an )?)({alt})\b)")
+        # "(With inputs from PTI)" closes an Indian agency-based story, so it is read anywhere
+        self._inputs = re.compile(rf"(?i:with (?:additional )?inputs from )({alt})\b")
         dl = "|".join(sorted(map(re.escape, [n for m in self.wires.values() for n in m.get("names") or []]),
                              key=len, reverse=True))
         self._dateline = re.compile(rf"\(({dl})\)\s*[-–—:]?")
@@ -129,12 +132,15 @@ class Sources:
         return "AP" if n.upper() == "AP" else self._att_wire.get(_name(n))
 
     def wire_in_text(self, text: str | None) -> tuple[str | None, str | None]:
-        """(agency, 'dateline'|'attribution') from an article's text, or (None, None)."""
+        """(agency, 'dateline'|'attribution') from an article's text, or (None, None): a dateline in
+        the first 400 characters, an attribution phrase in the lede, or "with inputs from" anywhere."""
         text = text or ""
         m = self._dateline.search(text[:400])
         if m:
             return self.wire_of_name(m.group(1)), "dateline"
-        m = self._wire_att.search(text)
+        # attribution only in the lede (first LEDE_SENTENCES sentences): a later "Reuters reported"
+        # usually quotes background, not the story's origin
+        m = self._wire_att.search(" ".join(sentences(text)[:LEDE_SENTENCES])) or self._inputs.search(text)
         if m:
             return self._att_wire.get(_name(next(g for g in m.groups() if g))), "attribution"
         return None, None
@@ -295,9 +301,9 @@ _ZERO_WIDTH = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
 
 def _clean(text: str | None) -> str:
     """Plain text: HTML entities decoded (JSON-LD bodies carry '&#39;', '&zwnj;'), zero-width characters
-    dropped, whitespace collapsed, and a space put back where paragraphs were glued ('said.The')."""
+    dropped, whitespace collapsed, and a space put back where paragraphs were glued ('said.The', 'post.HDFC')."""
     text = _ZERO_WIDTH.sub("", html_lib.unescape(text or ""))
-    text = re.sub(r"(?<=[A-Za-z0-9]{2}[.!?])(?=[A-Z][a-z])", " ", text)
+    text = re.sub(r"(?<=[A-Za-z0-9]{2}[.!?])(?=[A-Z][A-Za-z])", " ", text)   # 'said.The', 'post.HDFC'
     return re.sub(r"\s+", " ", text).strip()
 
 
