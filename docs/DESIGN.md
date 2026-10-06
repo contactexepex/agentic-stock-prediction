@@ -115,22 +115,40 @@ recorded for the past. Design (adjust on read; data stays append-only):
   India (`nse_prev_close`) when NSE's bhavcopies confirm it: the frame's sessions after our newest
   re-based bar are walked in order (up to 5); each one's PREV_CLOSE (as traded, not adjusted on an
   ex-date: HDFCBANK 26-Aug-2025 1964.10) must equal the as-traded close of its previous session
-  within 0.5% (our stored close for the first one, Yahoo's re-based close / factor after that),
-  and the first whose traded close / PREV_CLOSE steps by about the factor (0.8-1.25x of it and
-  nearer to it than to 1) is the ex-date. So a missed run (bars stored to E-2) is handled too.
-- Hold: a re-base or split row no source confirms (an unconfirmed re-base, mixed ratios before a
-  split row, a split row with no stored bar in the window, a step in Yahoo's own frame at E) is a
-  `warnings` entry (validate.py: `PRICE_BASIS`), and the symbol's new bars are not written this
-  run (summary `held`, an entry in `failed`; the India bhavcopy fallback skips it too), so no
-  new-basis bar lands next to old-basis ones; when the split row (or NSE confirmation) arrives, a
-  later run records it and writes the held bars through the basis conversion below. A mismatch
-  above 2% that is no re-base (one corrected bar, mixed ratios with no split row) is a warning
-  only. An overlap ratio alone is never a source. Dividends are never adjusted (ex-dividend
-  handling is separate, in ranges).
+  within 0.5% (our stored close for the first one, Yahoo's re-based close / factor after that).
+  A session e is the ex-date when the next session's PREV_CLOSE (e's traded close) equals Yahoo's
+  close of e within 0.1% (an exact chain: e is on the new basis; equal to Yahoo's close / factor
+  means e is still before it), or, for a factor below 0.9 only, when e's traded close / PREV_CLOSE
+  steps by about the factor (0.8-1.25x of it and nearer to it than to 1). For a factor of 0.9 or
+  more (a 1:10 bonus is 10/11) an ordinary day's move can look like the step, so only the chain
+  confirms, and an ex-date whose next session is not stored yet is held until the next run. So a
+  missed run (bars stored to E-2) is handled too.
+- Hold: a re-base or split row no source confirms (an unconfirmed re-base, also by a ratio that is
+  no simple fraction; mixed ratios before a split row; a split row with no stored bar in the
+  window; a split row whose stored closes match Yahoo's while Yahoo's own frame steps by about the
+  factor at E, i.e. neither history is adjusted, or match the factor while Yahoo's frame still
+  steps there) is a `warnings` entry (validate.py: `PRICE_BASIS`), and the symbol's new bars are
+  not written that run (summary `held`, an entry in `failed`; the India bhavcopy fallback skips
+  it too), so no new-basis bar lands next to old-basis ones. The hold lasts across runs: the held
+  symbol's newest stored bar stays where it was, and whenever Yahoo's frame (1 month by default)
+  covers fewer than 3 of our stored bars, the collector fetches Yahoo's history from 14 days
+  before our newest stored bar, so the check always compares overlapping dates and finds the same
+  re-base again (warned, held, in `failed` on every run). If Yahoo serves no stored date even then,
+  its first close is compared with our newest stored close across the gap, and a step of more
+  than 2% holds as well ("not verifiable"). The hold ends only when a split row or the NSE check
+  confirms the action (a later run records it and writes the held bars through the basis
+  conversion below) or a human corrects the data. A mismatch above 2% that is no single re-base
+  (one corrected bar, mixed ratios with no split row) is a warning only. An overlap ratio alone is
+  never a source. Dividends are never adjusted (ex-dividend handling is separate, in ranges).
 - A wrong record is corrected by appending a new one (own id, e.g. `<ticker>-<E>-fix1`,
   `supersedes` = the wrong id, `factor` 1.0 to cancel or the right factor, a `note`): the
   `price_adjustments` view and `adjust.load` leave the superseded record out, and the collector
-  never records that (ticker, ex-date) again.
+  never records that (ticker, ex-date) again. Records still open when the correction lands are
+  scored on the corrected basis: a call or range made between the wrong row's and the correction's
+  `detected_at` was built on bars carrying the wrong factor, while scoring (record_basis) only knows
+  the active rows, so its stored edges and closes do not match the corrected closes and its outcome
+  is off by that factor; outcomes already stored stay as written. List such records
+  (`made_at` between the two `detected_at`) in the correction's `note` and judge them by hand.
 - After a recorded split, an older bar Yahoo serves on the new basis (a gap it fills late) is
   written on its date's stored basis (prices / factor, volume x factor; summary `rebased_bars`),
   and a recorded split no longer blocks the bhavcopy fallback (the as-traded bar fits the views).

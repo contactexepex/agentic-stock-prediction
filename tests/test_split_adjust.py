@@ -9,7 +9,7 @@ import math
 import shutil
 import sys
 import types
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -203,7 +203,7 @@ def test_isolated_mismatch_warns_but_keeps_collecting(us, monkeypatch, capsys):
     out = run(monkeypatch, capsys, "us")
     assert out["adjustments"] == [] and "held" not in out and out["failed"] == []
     assert out["warnings"] == ["NVDA: Yahoo's close differs from the stored close on 1 date(s) 2026-09-03..2026-09-03 "
-                               "(Yahoo/stored 0.9500-0.9500); not a re-base by a split/bonus factor, not recorded"]
+                               "(Yahoo/stored 0.9500-0.9500); not one re-base of the stored history, not recorded"]
     assert common.connect("us").execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == \
         date(2026, 9, 17)
 
@@ -435,6 +435,176 @@ def test_call_and_range_made_before_ex_date_scored_after_it(tmp_path, monkeypatc
     con = common.connect("us")
     rr = con.execute("SELECT actual_close, lo80, hi80 FROM range_record").fetchone()
     assert rr[1] <= rr[0] <= rr[2]                                          # stored edges and close agree
+
+
+class RangeTicker:
+    """A fake yfinance Ticker over a full daily series: history(period=...) gives its last
+    PERIOD_BARS bars (a 1-month frame), history(start=...) everything from that date."""
+    series: dict[str, pd.DataFrame] = {}
+    PERIOD_BARS = 21
+
+    def __init__(self, symbol: str):
+        self.symbol = symbol
+
+    def history(self, period=None, start=None, **_):
+        df = self.series.get(self.symbol, pd.DataFrame())
+        if start is not None:
+            return df[[i.date() >= date.fromisoformat(start) for i in df.index]].copy()
+        return df.iloc[-self.PERIOD_BARS:].copy()
+
+
+def bdays(start: date, n: int) -> list[date]:
+    out, d = [], start
+    while len(out) < n:
+        if d.weekday() < 5 and d != date(2026, 9, 7):      # US Labor Day
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def test_hold_persists_after_the_frame_moves_past_the_stored_bars(us, monkeypatch, capsys):
+    """A re-base by 1/2 that no split row confirms for over a month: NVDA's stored bars end on
+    2026-08-14 (old basis). Each run's 1-month frame soon holds none of them; the collector then
+    fetches Yahoo's history from before the newest stored bar, so the re-base is seen again and
+    the bars stay held (listed in warnings, held and failed) on every run. When the split row
+    finally shows, the split is recorded and the held bars are written: no fake jump."""
+    shutil.rmtree(us.root / "data" / "us" / "prices")              # only this test's bars
+    old = bdays(date(2026, 8, 3), 10)                                # 08-03 .. 08-14
+    write_stored(us.root, "us", "NVDA", {d: 200.0 + i for i, d in enumerate(old)})
+    later = bdays(date(2026, 8, 17), 40)
+    ex = later[0]
+    full = old + later
+    closes = [(200.0 + i) / 2 for i in range(10)] + [105.0 + 0.1 * i for i in range(40)]
+    monkeypatch.setattr(sys.modules["yfinance"], "Ticker", RangeTicker)
+    RangeTicker.series = {"SPY": frame(full, [500.0] * len(full), "America/New_York"),
+                          "JPM": frame(full, [300.0] * len(full), "America/New_York")}
+    for k, today in enumerate((later[3], later[30], later[38])):
+        cut = [d for d in full if d < today]
+        RangeTicker.series["NVDA"] = frame(cut, closes[:len(cut)], "America/New_York",
+                                           splits={ex: 2.0} if k == 2 else None)
+        for sym in ("SPY", "JPM"):
+            RangeTicker.series[sym] = frame(cut, [500.0 if sym == "SPY" else 300.0] * len(cut), "America/New_York")
+        monkeypatch.setattr(collect_prices, "utc_today", lambda t=today: t)
+        monkeypatch.setattr(collect_prices, "utc_now", lambda t=today: f"{t}T12:00:00+00:00")
+        out = run(monkeypatch, capsys, "us")
+        con = common.connect("us")
+        newest = con.execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0]
+        if k < 2:     # held, also a month later when the 1-month frame no longer covers 08-14
+            assert out["held"] == ["NVDA"] and out["adjustments"] == []
+            assert out["warnings"] == [f"NVDA: Yahoo's close differs from the stored close on 10 date(s) "
+                                       f"2026-08-03..2026-08-14 (Yahoo/stored 0.5000-0.5000); a re-base by 1/2 that "
+                                       f"no Yahoo split row or NSE bhavcopy confirms (yet): not recorded, new bars held"]
+            assert any(f["ticker"] == "NVDA" and "new bars held" in f["error"] for f in out["failed"])
+            assert newest == date(2026, 8, 14)
+        else:
+            assert "held" not in out and out["warnings"] == []
+            assert [(a["id"], a["factor"]) for a in out["adjustments"]] == [("NVDA-2026-08-17", 0.5)]
+            assert newest == later[37]
+            assert con.execute("SELECT max(abs(ret_1d)) FROM returns WHERE ticker = 'NVDA'").fetchone()[0] < 0.01
+
+
+def test_no_overlap_even_after_the_longer_fetch_holds(us, monkeypatch, capsys):
+    """The judge's age-out case: Yahoo serves no bar we have stored, even when asked for more
+    history (the fake ignores `start`). The first close is compared with our newest stored close
+    across the gap: 105 vs 209 (x0.5024) cannot be verified, so the bars are held."""
+    shutil.rmtree(us.root / "data" / "us" / "prices")              # only this test's bars
+    old = bdays(date(2026, 8, 3), 10)
+    write_stored(us.root, "us", "NVDA", {d: 200.0 + i for i, d in enumerate(old)})
+    fb = bdays(date(2026, 8, 24), 20)
+    monkeypatch.setattr(collect_prices, "utc_today", lambda: fb[-1] + timedelta(days=1))
+    FakeTicker.frames = {"NVDA": frame(fb, [105.0 + 0.1 * i for i in range(20)], "America/New_York"),
+                         "SPY": frame(fb, [500.0] * 20, "America/New_York"),
+                         "JPM": frame(fb, [300.0] * 20, "America/New_York")}
+    write_stored(us.root, "us", "SPY", {d: 500.0 for d in fb[:5]})
+    write_stored(us.root, "us", "JPM", {d: 300.0 for d in fb[:5]})
+    for _ in range(2):    # and again on the next run
+        out = run(monkeypatch, capsys, "us")
+        assert out["held"] == ["NVDA"] and out["adjustments"] == []
+        assert out["warnings"] == [f"NVDA: no stored bar in Yahoo's frame to check the price basis; its first close "
+                                   f"(2026-08-24) is 0.5024x our newest stored close (2026-08-14): not verifiable, "
+                                   f"new bars held"]
+        assert common.connect("us").execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0] \
+            == date(2026, 8, 14)
+
+
+def test_split_row_with_unadjusted_yahoo_history_holds(us, monkeypatch, capsys):
+    """A split row while neither Yahoo's history nor ours is adjusted (Yahoo itself steps -50% at
+    the ex-date): a warning, no record, held."""
+    tr = traded()
+    write_stored(us.root, "us", "NVDA", dict(zip(US_DAYS[:9], tr[:9])))
+    FakeTicker.frames["NVDA"] = frame(US_DAYS, tr, "America/New_York", splits={EX: 2.0})
+    out = run(monkeypatch, capsys, "us")
+    assert out["adjustments"] == [] and out["held"] == ["NVDA"]
+    assert out["warnings"] == ["NVDA: Yahoo reports a split/bonus on 2026-09-14 (ratio 2) and steps by 0.5024 there, "
+                               "but neither its history nor ours is adjusted; not recorded, new bars held"]
+
+
+def test_rebase_by_a_non_simple_ratio_holds(us, monkeypatch, capsys):
+    """Every stored close re-based by 0.7391 (no simple fraction p/q with p, q <= 20 within 0.1%):
+    a warning, no record, held."""
+    tr = traded(9)
+    write_stored(us.root, "us", "NVDA", dict(zip(US_DAYS[:9], tr)))
+    FakeTicker.frames["NVDA"] = frame(US_DAYS, [c * 0.7391 for c in tr] + [160.0, 161.0, 162.0, 163.0],
+                                      "America/New_York")
+    out = run(monkeypatch, capsys, "us")
+    assert out["adjustments"] == [] and out["held"] == ["NVDA"]
+    assert out["warnings"][0].endswith("a re-base by a ratio that is no simple fraction: not recorded, new bars held")
+
+
+BHAV_HEADER = ("SYMBOL, SERIES, DATE1, PREV_CLOSE, OPEN_PRICE, HIGH_PRICE, LOW_PRICE, LAST_PRICE, CLOSE_PRICE, "
+               "AVG_PRICE, TTL_TRD_QNTY, TURNOVER_LACS, NO_OF_TRADES, DELIV_QTY, DELIV_PER")
+
+
+def synthetic_bhavcopy(replay: Path, day: date, prev_close: float, close: float):
+    """A SYNTHETIC sec_bhavdata_full file (real column layout) with one TCS EQ row."""
+    row = (f"TCS, EQ, {day:%d-%b-%Y}, {prev_close:.2f}, {close:.2f}, {close + 5:.2f}, {close - 5:.2f}, "
+           f"{close:.2f}, {close:.2f}, {close:.2f}, 100000, 1000.00, 5000, 50000, 50.00")
+    (replay / f"sec_bhavdata_full_{day:%d%m%Y}.csv").write_text(BHAV_HEADER + "\n" + row + "\n")
+
+
+def india_bonus_1_10(tmp_path, monkeypatch, today: date):
+    """TCS (synthetic): a 1:10 bonus (factor 10/11) with ex-date 2026-09-11, whose traded close
+    1062 is 6% above the bonus-adjusted previous close 1001.82, so the step alone looks like an
+    ordinary day. Stored as traded: 1100, 1101, 1102 (09-08..09-10). Yahoo serves them x10/11,
+    no split row."""
+    e = make_env(tmp_path, monkeypatch, ["TCS"], today)
+    monkeypatch.setattr(collect_prices, "utc_now", lambda: f"{today}T02:30:00+00:00")
+    stored_days = [date(2026, 9, 8), date(2026, 9, 9), date(2026, 9, 10)]
+    write_stored(e.root, "india", "TCS", dict(zip(stored_days, [1100.0, 1101.0, 1102.0])))
+    write_stored(e.root, "india", "NIFTY50", {d: 25000.0 for d in stored_days})
+    days = stored_days + [date(2026, 9, 11), date(2026, 9, 15)]
+    yahoo = [1100.0 * 10 / 11, 1101.0 * 10 / 11, 1102.0 * 10 / 11, 1062.0, 1065.0]
+    n = len([d for d in days if d < today])
+    FakeTicker.frames = {"^NSEI": frame(days[:n], [25000.0] * n, "Asia/Kolkata"),
+                         "TCS.NS": frame(days[:n], yahoo[:n], "Asia/Kolkata")}
+    synthetic_bhavcopy(e.replay, date(2026, 9, 11), 1102.0, 1062.0)
+    synthetic_bhavcopy(e.replay, date(2026, 9, 15), 1062.0, 1065.0)
+    return e
+
+
+def test_india_1_10_bonus_confirmed_by_the_prev_close_chain(tmp_path, monkeypatch, capsys):
+    """Factor 10/11 >= 0.9: the step (1062 / 1102 = 0.9637) proves nothing; the chain does:
+    PREV_CLOSE(09-11) 1102 = our stored close, PREV_CLOSE(09-15) 1062 = Yahoo's close of 09-11
+    (new basis), so 09-11 is the ex-date."""
+    e = india_bonus_1_10(tmp_path, monkeypatch, date(2026, 9, 16))
+    out = run(monkeypatch, capsys, "india")
+    assert out["warnings"] == [] and "held" not in out and out["failed"] == []
+    assert [(a["id"], a["source"], a["check_date"], a["nse_prev_close"], a["nse_ex_close"]) for a in out["adjustments"]] \
+        == [("TCS-2026-09-11", "nse_prev_close", "2026-09-10", 1102.0, 1062.0)]
+    assert out["adjustments"][0]["factor"] == pytest.approx(10 / 11)
+    con = common.connect("india")
+    closes = [c for _, c in con.execute("SELECT date, close FROM ohlc WHERE ticker = 'TCS' ORDER BY date").fetchall()]
+    assert closes == pytest.approx([1000.0, 1000.9091, 1001.8182, 1062.0, 1065.0], abs=1e-3)
+    assert len(adj_rows(e.root, "india")) == 1
+
+
+def test_india_1_10_bonus_without_the_next_session_is_held(tmp_path, monkeypatch, capsys):
+    """The same bonus seen on 09-15, before the next session's bhavcopy exists: no proof yet, held."""
+    india_bonus_1_10(tmp_path, monkeypatch, date(2026, 9, 15))
+    out = run(monkeypatch, capsys, "india")
+    assert out["adjustments"] == [] and out["held"] == ["TCS"]
+    assert "NSE check: 2026-09-11: no step proves the ex-date and the next session's bhavcopy is not available yet" \
+        in out["warnings"][0]
 
 
 def test_step_matches():
