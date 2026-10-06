@@ -625,6 +625,8 @@ NOT_PROJECTED = {
     "calibration": "range-engine internals", "delivery": "per-session time series (context only)",
     "reviews": "nested JSON tables; the review report is in reports/", "graph_runs": "refresh bookkeeping",
     "news_enriched": "merged into NewsItem / Announcement and MENTIONS (latest analysis wins)",
+    "news_articles": "article metadata, extracts and copy signatures (verification inputs), DuckDB only",
+    "news_clusters": "per-run cluster snapshots read as of a time (news_clusters_asof), DuckDB only",
 }
 
 
