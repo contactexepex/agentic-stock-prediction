@@ -16,6 +16,7 @@ All range scores are in % of the base close, as the rest of the scorecard."""
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 
 import numpy as np
 import pandas as pd
@@ -46,10 +47,13 @@ def _py(p, y) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _mean(values) -> float | None:
-    """Mean of the non-NaN values, summed exactly (math.fsum), so it does not depend on row order."""
+    """Mean of the non-NaN values, computed exactly (rational sum, rounded once), so it does not depend
+    on row order: the mean of n copies of 0.7 is 0.7. An infinite value gives the float mean."""
     a = np.asarray(values, dtype=float)
     a = a[~np.isnan(a)]
-    return math.fsum(a) / len(a) if len(a) else None
+    if not len(a):
+        return None
+    return float(sum(map(Fraction, a.tolist()), Fraction(0)) / len(a)) if np.isfinite(a).all() else float(a.mean())
 
 
 def brier(p, y) -> float | None:

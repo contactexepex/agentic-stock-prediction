@@ -8,7 +8,7 @@ and every run must equal the first."""
 from __future__ import annotations
 
 import json
-import math
+from fractions import Fraction
 import random
 import sys
 from datetime import date, timedelta
@@ -139,7 +139,8 @@ def test_scoring_summary(cons):
 def test_scoring_mean_is_order_independent():
     values = [0.1, 0.7, 0.2, 0.6000000000000001, 0.3] * 7
     means = {scoring._mean(random.Random(i).sample(values, len(values))) for i in range(50)}
-    assert means == {math.fsum(values) / len(values)}
+    assert means == {float(sum(map(Fraction, values)) / len(values))}
+    assert scoring._mean([0.7] * 12) == 0.7 and scoring._mean([0.55, 0.55, float("nan")]) == 0.55
 
 
 def test_view_data_bands_and_scored_calls(cons):
