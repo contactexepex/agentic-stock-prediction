@@ -292,6 +292,10 @@ def test_context_section_and_call_lines(env, capsys):
     tsla = next(line for line in body.splitlines() if line.startswith("| TSLA |") and "486,532" in line)
     assert "confirmed_primary [mismatch_primary]" in tsla and TSLA_8K in tsla
     assert "480000 count vs 486532 count (primary)" in tsla
+    cols = [c.strip() for c in tsla.split("|")]
+    assert cols[8] == f"{TSLA_8K}, n30"                                  # cite: the filing, then n30
+    jio = next(line for line in body.splitlines() if line.startswith("| RELIANCE |"))
+    assert "rumour" in jio and [c.strip() for c in jio.split("|")][8] == "–"   # a rumour is never cited
     env.write("predictions", [{"id": "2026-10-05-TSLA-5d", "made_at": LATER, "as_of_date": "2026-10-05",
                                "ticker": "TSLA", "horizon_days": 5, "direction": "up", "confidence": 0.6,
                                "rationale": "x", "evidence_ids": [TSLA_8K, "n30", "n31"], "prompt_version": "t"}])

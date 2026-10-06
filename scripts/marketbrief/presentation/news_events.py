@@ -6,7 +6,8 @@ import json
 
 import pandas as pd
 
-from marketbrief.constants.verification import STATUS_PRECEDENCE, STATUS_UNVERIFIED
+from marketbrief.constants.verification import (NEVER_SUPPORT_STATUSES, STATUS_PRECEDENCE, STATUS_UNVERIFIED,
+                                                WIDEN_ONLY_STATUSES)
 from marketbrief.core.clock import clock
 from marketbrief.pipeline.claim_sources import clean_row
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
@@ -38,10 +39,12 @@ def _conflicts(raw) -> str:
 
 
 def _cite(row: dict, status: str) -> list[str]:
-    """Up to 3 ids to cite: confirming primary ids first, then news ids whose own status is the event's."""
+    """Up to 3 ids a call may cite: confirming primary ids first, then news ids whose own status is the
+    event's, unless that status can never support a call (rumour, promotional, contradicted)."""
     own = dict(zip(row.get("status_ids") or [], row.get("id_statuses") or []))
-    ids = list(row.get("primary_ids") or []) + [i for i in row.get("news_ids") or [] if own.get(i) == status]
-    return ids[:3]
+    news = [] if status in (*NEVER_SUPPORT_STATUSES, *WIDEN_ONLY_STATUSES) else \
+        [i for i in row.get("news_ids") or [] if own.get(i, STATUS_UNVERIFIED) == status]
+    return (list(row.get("primary_ids") or []) + news)[:3]
 
 
 def event_rows(con, now, window_hours: float, per_ticker: int) -> list[dict]:
