@@ -14,7 +14,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
-  implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
+  implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
+  scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
+  scores, also in the context pack, weekly review and HTML track record), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
   PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
   the `AGENT` markers, see `templates/report.md`). After the judge passes, `html_report` builds
@@ -26,7 +28,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
   each past day's 1d/5d ranges as `ranges.py` builds them, the regime, and direction baselines
   (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
-  and `data/<market>/replays/` (DESIGN.md section 7). Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
+  and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
+  Adaptive Conformal Inference (`aci.py`: per horizon x band x regime miss rate alpha_t updated from
+  outcomes scored before `calibrate` runs; `aci:` in `config/ranges.yaml`, off by default; the weekly
+  review shows alpha_t and proposes switching it on from that replay). Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
   `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
   `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
   switchable in `config/ranges.yaml`).

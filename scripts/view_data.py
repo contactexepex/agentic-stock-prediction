@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 
 import events as ev
+import scoring
 from common import benchmark_key, vol_index_key
 from score_predictions import is_late
 
@@ -265,6 +266,13 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         points.append({"kind": "call", "label": f"Calls at {x.band} confidence", "stated": num(x.conf),
                        "actual": num(x.hit), "n": int(x.n)})
 
+    # proper scores of the scored calls (scoring.py): Brier, log loss, reliability with Wilson 95%
+    sc_calls = q("SELECT confidence, hit FROM track_record WHERE confidence IS NOT NULL AND hit IS NOT NULL")
+    call_scores = scoring.call_scores(sc_calls)
+    reliability = [{**r, "mean_conf": num(r["mean_conf"]), "hit_rate": num(r["hit_rate"]),
+                    "wilson_lo": num(r["wilson_lo"]), "wilson_hi": num(r["wilson_hi"])}
+                   for r in scoring.reliability(sc_calls["confidence"], sc_calls["hit"])] if len(sc_calls) else []
+
     n_calls = sum(len(c["calls"]) for c in companies)
     late = sum(1 for c in companies for r in c["ranges"] if r["late"])
     partial = sorted(feats.index[feats["quality"] == "PARTIAL"]) if len(feats) else []
@@ -281,6 +289,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         "generated_at": (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat(),
         "regime": regime_view, "sectors": sector_rows, "companies": companies,
         "calibration": points, "min_sample": MIN_SAMPLE,
+        "call_scores": call_scores, "reliability": reliability,
         "counts": {"calls": n_calls, "companies": len(companies),
                    "with_ranges": sum(1 for c in companies if c["ranges"]), "late_ranges": late,
                    "scored_ranges": int(cal["n"].sum()) if len(cal) else 0,

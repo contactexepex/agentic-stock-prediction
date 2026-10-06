@@ -44,12 +44,14 @@ from statistics import NormalDist
 import numpy as np
 import pandas as pd
 
+import aci
 import backtest as bt
 import events as ev
 import indicators as ind
 import range_inputs as ri
 import rangelib as rl
 import regime as rg
+import scoring as sc
 from common import (ROOT, append_jsonl, benchmark_key, connect, day_file, load_ranges_config, market_arg,
                     require_market, utc_now, vol_index_key)
 from features import load_bars
@@ -59,7 +61,8 @@ SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")
 SIGNAL_LABELS = {"always_up": "Always up", "momentum_1d": "1-day momentum", "momentum_5d": "5-day momentum",
                  "rsi_reversion": "RSI(14) mean reversion"}
 RSI_LOW, RSI_HIGH = 30.0, 70.0
-MIN_MONTH_DAYS = 5   # the coverage-over-time chart leaves out months with fewer as-of days (kept in the JSON)
+DEFAULT_LEVELS = {"q10": 0.10, "q25": 0.25, "q75": 0.75, "q90": 0.90}   # fixed band quantiles (ACI off)
+MIN_MONTH_DAYS = 5 # the coverage-over-time chart leaves out months with fewer as-of days (kept in the JSON)
 
 
 # ---------- inputs as known at d ----------
@@ -165,25 +168,38 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
               "q75": rl.normal_quantiles(0.5)[1], "q90": rl.normal_quantiles(0.8)[1]}
     fixed = rc["earnings_vol_multiple"]
     bs = rc["beta_split"]
+    # ACI (aci.py; off unless config/ranges.yaml or --aci switches it on): each day's quantile levels
+    # come from the misses of ranges whose target close is on or before d (known pre-open next session)
+    tracker = aci.Tracker(rc) if ri.enabled(rc, "aci", mk, h) else None
+    pending: dict[int, dict[str, list]] = {}   # target rank -> key -> [n, misses50, misses80]
     rows = []
     for d, ts in zip(days, day_ts):
         rd = rank.get(ts)
         if rd is None:
             continue
+        regime = reg.loc[d, "regime"] if d in reg.index else "EVENT_HEAVY"
+        levels, akey = DEFAULT_LEVELS, None
+        if tracker is not None:
+            for tr in sorted(k for k in pending if k <= rd):
+                for key, (n, m50, m80) in sorted(pending.pop(tr).items()):
+                    tracker.update(h, "50", key, m50 / n)
+                    tracker.update(h, "80", key, m80 / n)
+            akey = tracker.key(regime)
+            levels = tracker.levels(h, akey)
         known = (r_all + h <= rd) & (r_all > rd - rc["history_sessions"])
         if known.sum() >= rc["min_pool"]:       # calibrate.py: pool quantiles, else normal ones
             z, w = z_all[known], rl.recency_weights((rd - r_all[known]).astype(float), rc["half_life_sessions"])
-            q = {k: rl.weighted_quantile(z, w, p) for k, p in (("q10", .1), ("q25", .25), ("q75", .75), ("q90", .9))}
+            q = {k: rl.weighted_quantile(z, w, p) for k, p in levels.items()}
             order = np.argsort(z)
             zs, ws = z[order], w[order]
             cum = np.cumsum(ws) - 0.5 * ws
             pit = lambda x: float(np.interp(x, zs, cum) / ws.sum())   # noqa: E731  (inverse of weighted_quantile)
             source = "pool"
         else:
-            q, pit, source = normal, nd.cdf, "normal"
+            q = normal if levels is DEFAULT_LEVELS else {k: nd.inv_cdf(p) for k, p in levels.items()}
+            pit, source = nd.cdf, "normal"
         tgt_cal = ev.sessions_ahead(cfg, d + timedelta(days=1), h)[-1]   # ranges.target_date
         major = major_between(majors, d, tgt_cal)
-        regime = reg.loc[d, "regime"] if d in reg.index else "EVENT_HEAVY"
         for t, f in frames.items():
             if ts not in f.index:
                 continue
@@ -211,6 +227,7 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
                 center += float(o["div_shift"])
             band = lambda zq: base * math.exp(center + zq * sigma_h)  # noqa: E731
             row = {"date": d, "ticker": t, "rank": rd, "h": h, "regime": regime, "base": base,
+                   "alpha50": 2 * levels["q25"], "alpha80": 2 * levels["q10"],
                    "center": center, "sigma_h": sigma_h, "q_source": source, "earn": in_h,
                    "div": bool(use["ex_dividend"] and o["div_shift"]), "major": major,
                    "lo50": band(q["q25"]), "hi50": band(q["q75"]), "lo80": band(q["q10"]), "hi80": band(q["q90"]),
@@ -228,7 +245,13 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
                             "width80": 100 * (row["hi80"] - row["lo80"]) / base,
                             "is50": 100 * rl.interval_score(row["lo50"], row["hi50"], y, 0.5) / base,
                             "is80": 100 * rl.interval_score(row["lo80"], row["hi80"], y, 0.8) / base,
-                            "abs_err": 100 * abs(math.exp(float(o["fwd"])) - math.exp(center)), "pit": pit(zeff)})
+                            "abs_err": 100 * abs(math.exp(float(o["fwd"])) - math.exp(center)), "pit": pit(zeff),
+                            "qs": sc.range_scores_row(row["lo50"], row["hi50"], row["lo80"], row["hi80"], y, base)["qs_pct"]})
+                if tracker is not None:   # the outcome becomes known at the target close (rank rd + h)
+                    acc = pending.setdefault(rd + h, {}).setdefault(akey, [0, 0, 0])
+                    acc[0] += 1
+                    acc[1] += not row["hit50"]
+                    acc[2] += not row["hit80"]
                 if "naive_lo80" in row:
                     row.update({"naive_hit50": row["naive_lo50"] <= y <= row["naive_hi50"],
                                 "naive_hit80": row["naive_lo80"] <= y <= row["naive_hi80"],
@@ -273,14 +296,7 @@ def replay_rows(cfg: dict, rc: dict, bars: dict, extra: dict, start: date | None
 
 # ---------- statistics ----------
 
-def wilson(k: int, n: int, zc: float = 1.96) -> tuple[float | None, float | None]:
-    if not n:
-        return None, None
-    p = k / n
-    den = 1 + zc * zc / n
-    mid = (p + zc * zc / (2 * n)) / den
-    half = zc * math.sqrt(p * (1 - p) / n + zc * zc / (4 * n * n)) / den
-    return max(0.0, mid - half), min(1.0, mid + half)
+wilson = sc.wilson   # Wilson score interval (scoring.py)
 
 
 def binom_p_two_sided(k: int, n: int, p: float = 0.5) -> float | None:
@@ -327,6 +343,7 @@ def range_summary(g: pd.DataFrame, h: int) -> dict:
            "cover80_ci": [_r(lo), _r(hi)],
            "width50_pct": _r(g["width50"].mean(), 3), "width80_pct": _r(g["width80"].mean(), 3),
            "score50": _r(g["is50"].mean(), 3), "score80": _r(g["is80"].mean(), 3),
+           "qs_pct": _r(g["qs"].mean(), 4) if "qs" in g else None,
            "abs_err_pct": _r(g["abs_err"].mean(), 3)}
     if len(nv):
         out.update({"naive_n": int(len(nv)), "naive_cover50": _r(nv["naive_hit50"].astype(float).mean()),
@@ -412,6 +429,9 @@ def summarize(cfg: dict, rc: dict, res: dict[int, pd.DataFrame], reg: pd.DataFra
         sc = g[g["actual"].notna()] if "actual" in g else g.iloc[0:0]
         hs["calendar_mismatch"] = int((sc["bar_target"] != sc["target_date"]).sum()) if len(sc) else 0
         hs["pool_fallback_days"] = int(g.loc[g["q_source"] == "normal", "date"].nunique())
+        last = g[g["date"] == g["date"].max()]
+        hs["alpha"] = {"mean50": _r(g["alpha50"].mean()), "mean80": _r(g["alpha80"].mean()),
+                       "last50": _r(last["alpha50"].iloc[0]), "last80": _r(last["alpha80"].iloc[0])}
         out["horizons"][str(h)] = hs
         out["baselines"][str(h)] = baseline_stats(g, h)
     counts = reg["regime"].value_counts() if not reg.empty else pd.Series(dtype=int)
@@ -819,6 +839,15 @@ def html_report(cfg: dict, s: dict) -> str:
         u.get("beta_split") for u in s["settings"]["inputs"].values())
     cue_name = (cfg["symbols"].get(ic.get("symbol")) or {}).get("name") or ic.get("symbol")
     cue_txt = f", and the {esc(cue_name)} as an overnight cue" if replayed_cue else ""
+    a = s["settings"].get("aci") or {}
+    aci_block = "" if not s.get("aci_comparison") else (
+        "<h2>Adaptive bands (ACI): before and after</h2><div class=\"card\">"
+        f"<p>This page shows the ranges with Adaptive Conformal Inference on (gamma {a.get('gamma')}, at most "
+        f"{a.get('max_shift')} from the target miss rate, after {a.get('min_history')} scored days, "
+        f"{'one rate per regime' if a.get('by_regime') else 'one rate per horizon and band'}): each day the share "
+        "of past ranges that missed moves the band's quantile level. The table compares the same rows with fixed bands "
+        "(before) and ACI (after). Width and scores in % of the price, lower is better.</p>"
+        f"{aci_table(s['aci_comparison'])}</div>")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Historical Replay {esc(cfg['market'].upper())}</title>
 <style>{CSS}</style></head><body><main>
@@ -842,7 +871,7 @@ scheduled events, UNSTABLE in stress) where the ranges are wider than needed.</p
 <div class="card">{legend(tgt)}{svg_time(s)}
 <p class="caption">Look for: long runs below the 80% line, which would mean the ranges fell behind in some periods
 (months with fewer than {MIN_MONTH_DAYS} days are left out).</p></div>
-<h2>More detail</h2>
+{aci_block}<h2>More detail</h2>
 <details><summary>All findings, with every number</summary>
 <p class="note">{esc(CI_NOTE)} pts = percentage points. {esc(SCORE_NOTE)}</p><ul class="summary">{summary}</ul></details>
 <details><summary>Coverage by regime (table)</summary>{range_table(pair('by_regime'), 'Regime')}{score_note}</details>
@@ -877,6 +906,51 @@ Computed {esc(s['computed_at'])}, runtime {s['runtime_s']:.0f} s.</p><ul>{lim}</
 
 # ---------- run ----------
 
+CMP_KEYS = ("n", "cover50", "cover80", "width50_pct", "width80_pct", "score50", "score80", "qs_pct")
+
+
+def aci_comparison(before: dict, after: dict) -> dict:
+    """Same rows, fixed bands (before) vs ACI (after): overall, by regime and by major event."""
+    out = {}
+    for h, hb in before["horizons"].items():
+        ha = after["horizons"].get(h, {})
+        groups = {"overall": (hb.get("overall", {}), ha.get("overall", {}))}
+        for sect in ("by_regime", "by_major_event"):
+            for k, v in (hb.get(sect) or {}).items():
+                groups[k] = (v, (ha.get(sect) or {}).get(k, {}))
+        out[h] = {k: {"before": {c: b.get(c) for c in CMP_KEYS}, "after": {c: a.get(c) for c in CMP_KEYS}}
+                  for k, (b, a) in groups.items()}
+    return out
+
+
+def aci_table(cmp: dict) -> str:
+    rows = []
+    for h, groups in cmp.items():
+        for k, v in groups.items():
+            b, a = v["before"], v["after"]
+            if not b.get("n"):
+                continue
+            num = lambda x, k=2: "" if x is None else f"{x:.{k}f}"  # noqa: E731
+            rows.append(f"<tr><td>{h}d</td><td>{esc(k)}</td><td>{b['n']:,}</td>"
+                        + "".join(f"<td>{_f(b.get(c))} → {_f(a.get(c))}</td>" for c in ("cover50", "cover80"))
+                        + "".join(f"<td>{num(b.get(c))} → {num(a.get(c))}</td>"
+                                  for c in ("width80_pct", "score50", "score80"))
+                        + f"<td>{num(b.get('qs_pct'), 3)} → {num(a.get('qs_pct'), 3)}</td></tr>")
+    head = ("<tr><th>H</th><th>Group</th><th>n</th><th>50% held</th><th>80% held</th><th>80% width</th>"
+            "<th>50% score</th><th>80% score</th><th>Quantile score</th></tr>")
+    return f'<div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div>'
+
+
+def aci_rc(rc: dict, gamma: float | None = None, by_regime: bool | None = None) -> dict:
+    """A copy of the range settings with ACI switched on (optionally another gamma / by_regime)."""
+    a = {**aci.settings(rc), "enabled": True}
+    if gamma is not None:
+        a["gamma"] = gamma
+    if by_regime is not None:
+        a["by_regime"] = by_regime
+    return {**rc, "aci": a}
+
+
 def run(cfg: dict, rc: dict, con, start: date | None = None, end: date | None = None) -> tuple[dict, dict]:
     t0 = time.time()
     bars, extra = load_inputs(cfg, rc, con)
@@ -890,7 +964,9 @@ def run(cfg: dict, rc: dict, con, start: date | None = None, end: date | None = 
                                       for h in rc["horizons"]},
                            "regime_factor": rc["regime_factor"], "major_event_factor": rc["major_event_factor"],
                            "earnings_vol_multiple": rc["earnings_vol_multiple"], "history_sessions": rc["history_sessions"],
-                           "half_life_sessions": rc["half_life_sessions"], "min_pool": rc["min_pool"]},
+                           "half_life_sessions": rc["half_life_sessions"], "min_pool": rc["min_pool"],
+                           "aci": {**aci.settings(rc), "on": {str(h): ri.enabled(rc, "aci", cfg["market"], h)
+                                                              for h in rc["horizons"]}}},
               "data": {"first_bar": str(bench.index[0].date()), "last_bar": str(bench.index[-1].date()),
                        "tickers": sum(1 for t in cfg["tickers"] if t in bars),
                        "earnings_events": sum(len(v[-1][1]) for v in extra["earnings"].values() if v),
@@ -922,22 +998,39 @@ def main() -> int:
     ap = market_arg(__doc__)
     ap.add_argument("--start", type=date.fromisoformat, help="first as-of date (default: after the warm-up bars)")
     ap.add_argument("--end", type=date.fromisoformat, help="last as-of date (default: the last benchmark bar)")
+    ap.add_argument("--aci", action="store_true",
+                    help="also replay with Adaptive Conformal Inference on (aci.py) and compare on the same rows; "
+                         "writes replay-<end>-aci.html|json")
+    ap.add_argument("--aci-gamma", type=float, help="with --aci: gamma instead of config/ranges.yaml aci.gamma")
+    ap.add_argument("--aci-by-regime", choices=("on", "off"), help="with --aci: one alpha per regime (on) or one overall")
     args = ap.parse_args()
     cfg = require_market(args)
     rc = load_ranges_config(cfg["market"])
-    s, _ = run(cfg, rc, connect(cfg["market"]), args.start, args.end)
+    con = connect(cfg["market"])
+    s, _ = run(cfg, rc, con, args.start, args.end)
     if not s["end"]:
         raise SystemExit("no trading days in the window")
+    suffix = ""
+    if args.aci:
+        before = s
+        by = None if args.aci_by_regime is None else args.aci_by_regime == "on"
+        s, _ = run(cfg, aci_rc(rc, args.aci_gamma, by), con, args.start, args.end)
+        s["aci_comparison"] = aci_comparison(before, s)
+        suffix = "-aci"
     out = ROOT / "reports" / cfg["market"]
     out.mkdir(parents=True, exist_ok=True)
-    page, js = out / f"replay-{s['end']}.html", out / f"replay-{s['end']}.json"
+    page, js = out / f"replay-{s['end']}{suffix}.html", out / f"replay-{s['end']}{suffix}.json"
     page.write_text(html_report(cfg, s), encoding="utf-8")
     js.write_text(json.dumps(s, indent=1, default=str), encoding="utf-8")
     rel = str(page.relative_to(ROOT))
-    append_jsonl(day_file(cfg["market"], "replays", date.fromisoformat(s["end"])), [record(s, rel)])
+    rec = record(s, rel)
+    rec["id"] += suffix
+    append_jsonl(day_file(cfg["market"], "replays", date.fromisoformat(s["end"])), [rec])
     print(json.dumps({"step": "replay", "market": cfg["market"], "report": rel, "json": str(js.relative_to(ROOT)),
                       "start": s["start"], "end": s["end"], "runtime_s": s["runtime_s"],
+                      "aci": s["settings"]["aci"],
                       "overall": {h: v["overall"] for h, v in s["horizons"].items()},
+                      "aci_comparison": {h: v["overall"] for h, v in s.get("aci_comparison", {}).items()} or None,
                       "always_up": {h: (b or {}).get("always_up", {}).get("hit_rate") for h, b in s["baselines"].items()},
                       "summary": s["summary"]}, indent=2, default=str))
     return 0

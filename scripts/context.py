@@ -14,6 +14,7 @@ import graph
 import macro_context
 import nse_context
 import relations
+import scoring
 import smart_money as sm
 from score_predictions import is_late
 from common import connect, market_arg, md_table, require_market, utc_today
@@ -175,6 +176,8 @@ def main() -> None:
         print(f"## {title}\n\n{md_table(con.execute(sql, params))}")
         if title.startswith("Sector ETFs") and sector_gaps(cfg):
             print(sector_gaps(cfg))
+        if title.startswith("Track record by confidence band"):
+            print(f"## Proper scores (all time)\n\n{scoring.markdown(scoring.summary(con))}")
     # Relationships (phase 5): India insider trades, deals, pledges and flags; connections (both markets).
     # India primary sources from NSE (flows, announcements, results, delivery); empty elsewhere.
     # Macro & flows (US Treasury/FRED/Cboe and FINRA shorts; India NSDL FPI and NSE indices).
