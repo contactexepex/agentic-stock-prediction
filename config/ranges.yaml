@@ -52,7 +52,7 @@ implied_vol:                # US option chains (collect_options.py); no backtest
   max_expiry_days: 30       # use the first expiry on/after the target date, at most this far out
   use_for_earnings: true    # earnings before that expiry: IV sets the earnings multiple instead
 
-# Adaptive Conformal Inference (scripts/aci.py, DESIGN section 4.5): per horizon and band an
+# Adaptive Conformal Inference (marketbrief/analytics/adaptive_conformal.py, DESIGN section 4.5): per horizon and band an
 # effective miss rate alpha_t, updated after each scored target date by
 # alpha += gamma x (target miss rate - share of that day's ranges that missed), from live range
 # outcomes scored before the calibration runs; calibrate.py then takes the pool quantiles at
@@ -77,7 +77,7 @@ relation_widen:
   insider_sale: 0.05
   max: 0.20
 
-# Smart-money risk flag (scripts/smart_money.py): an original Schedule 13D (activist stake)
+# Smart-money risk flag (marketbrief/analytics/smart_money.py): an original Schedule 13D (activist stake)
 # filed within activist_13d_days before as_of adds a note to the ticker's ranges. The factor
 # widens sigma only when > 1.0 (e.g. 1.05 = +5%); keep 1.0 until the weekly review shows value.
 activist_13d_days: 30

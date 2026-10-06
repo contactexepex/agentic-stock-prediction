@@ -292,18 +292,18 @@ def test_live_failure_reports_hosts_to_allowlist(monkeypatch):
     """No network: the HTTP opener raises like the egress proxy does; nothing may be written."""
     import urllib.error
     monkeypatch.syspath_prepend(str(SCRIPTS))
-    import collect_relations_india as cri
-    import nse
+    from marketbrief.collectors import nse_runner, relations_india as cri
+    from marketbrief.sources.nse_client import Nse
 
     def no_write(*a, **k):
         raise AssertionError("nothing should be written when every source fails")
-    monkeypatch.setattr(nse, "append_jsonl", no_write)
+    monkeypatch.setattr(nse_runner, "append_jsonl", no_write)
     cfg = {"market": MARKET, "relations": {"source": "nse"},
            "tickers": {"INFY": {"yahoo": "INFY.NS"}, "RELIANCE": {"yahoo": "RELIANCE.NS"}}}
 
     def proxy_denied(req, timeout=None):
         raise urllib.error.URLError(OSError("Tunnel connection failed: 403 Forbidden"))
-    nse = cri.Nse("https://www.nseindia.com", "https://nsearchives.nseindia.com", pause=0)
+    nse = Nse("https://www.nseindia.com", "https://nsearchives.nseindia.com", pause=0)
     monkeypatch.setattr(nse.opener, "open", proxy_denied)
     out = cri.collect(cfg, nse, ["insiders", "deals", "holdings"])
     assert out["new"] == {"insiders": None, "deals": None, "holdings": None}
@@ -315,7 +315,7 @@ def test_live_failure_reports_hosts_to_allowlist(monkeypatch):
 
     def nse_refuses(req, timeout=None):
         raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
-    nse = cri.Nse("https://www.nseindia.com", "https://nsearchives.nseindia.com", pause=0)
+    nse = Nse("https://www.nseindia.com", "https://nsearchives.nseindia.com", pause=0)
     monkeypatch.setattr(nse.opener, "open", nse_refuses)
     out = cri.collect(cfg, nse, ["insiders"])
     assert out["new"] == {"insiders": None} and "allowlist_needed" not in out

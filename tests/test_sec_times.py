@@ -23,7 +23,7 @@ ARCH = "https://www.sec.gov/Archives/edgar/data"
 MARKET = "testsectimes"
 sys.path.insert(0, str(SCRIPTS))
 
-import sec  # noqa: E402
+from marketbrief.sources import sec_filings as sec  # noqa: E402
 from marketbrief.sources.sec_acceptance import (EASTERN, et_offset_hours, is_shifted, sgml_acceptance, time_summary,
                                                 time_warnings, unshift)  # noqa: E402
 from marketbrief.sources.sec_client import Edgar, archive_url  # noqa: E402
@@ -121,7 +121,7 @@ def test_recent_corrects_a_shifted_file_and_keeps_a_right_one(edgar):
     edgar.recent(CIKS["JPM"])                                                         # header cached: no request
     assert edgar.requests == 10
     # sec.filings (insiders, stakes, holdings, fundamentals) and the merged lists carry the fix
-    f = sec.filings(jpm, {"8-K"})
+    f = sec.filings_of_forms(jpm, {"8-K"})
     assert f[0]["accepted_at"] == TRUE["0001628280-26-048078"]
     merged, failed = sec.ticker_submissions(edgar, "JPM", CIKS["JPM"], {"JPM": [CIKS["TSLA"]]})
     assert failed == [] and set(merged["acceptanceDateTime"]) == {TRUE[a] for a in merged["accessionNumber"]}
@@ -203,14 +203,15 @@ def test_collect_filings_stores_the_header_times(tmp_path):
 
 def test_events_time_jpm_results_before_the_open(tmp_path, monkeypatch):
     """JPM's 8-K 2.02 of 2026-07-14: 06:30 ET (before the open), not 10:30 ET (during)."""
-    import collect_events as ce
+    from marketbrief.collectors import event_timing, events_sec
+    from marketbrief.sources import sec_acceptance
     _, _, fx = setup(tmp_path)
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
     cfg = {"market": "us", "calendar": "XNYS", "timezone": "America/New_York"}
     reports, times = {}, {}
-    rows, failed = ce.sec_earnings(cfg, {"JPM": {}}, "t t@example.com", reports, times)
+    rows, failed = events_sec.sec_earnings(cfg, {"JPM": {}}, "t t@example.com", reports, times)
     assert failed == [] and rows == {"JPM": [(date(2026, 7, 14), "before_open", 0)]}
-    assert ce.timing(cfg, pd.Timestamp("2026-07-14T14:30:38Z")) == (date(2026, 7, 14), "during")   # the JSON's
+    assert event_timing.timing(cfg, pd.Timestamp("2026-07-14T14:30:38Z")) == (date(2026, 7, 14), "during")   # the JSON's
     assert sorted(reports["JPM"]) == [(date(2026, 2, 13), "after_close", "10-K", date(2025, 12, 31)),
                                       (date(2026, 8, 6), "after_close", "10-Q", date(2026, 6, 30))]
     assert times == {"ok": 0, "shifted": ["19617"], "unverified": {}}
@@ -290,14 +291,15 @@ def test_collectors_put_unverified_ciks_in_warnings(tmp_path):
 
 
 def test_events_summary_warns_about_unverified_ciks(tmp_path, monkeypatch):
-    import collect_events as ce
+    from marketbrief.collectors import event_timing, events_sec
+    from marketbrief.sources import sec_acceptance
     fx = mixed_fixtures(tmp_path / "sec", "oldest")
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
     times: dict = {}
-    ce.sec_earnings({"market": "us", "calendar": "XNYS", "timezone": "America/New_York"},
+    events_sec.sec_earnings({"market": "us", "calendar": "XNYS", "timezone": "America/New_York"},
                     {"AAPL": {}, "JPM": {}}, "t t@example.com", {}, times)
     assert times["shifted"] == ["19617"] and list(times["unverified"]) == ["320193"]
-    w = ce.time_warnings(times)
+    w = sec_acceptance.time_warnings(times)
     assert len(w) == 1 and w[0].startswith("SEC acceptance times of CIK 320193 unverified, stored as served")
 
 

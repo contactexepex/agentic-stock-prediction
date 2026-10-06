@@ -17,18 +17,18 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import collect_flows_india as cfi  # noqa: E402
-import collect_macro as cm  # noqa: E402
-import collect_news as cn  # noqa: E402
-import collect_shorts as cs  # noqa: E402
+from marketbrief.collectors import collector_store, flows_parsing, macro_parsing, news_wire, shorts_parsing  # noqa: E402
+from marketbrief.collectors import flows_india as cfi  # noqa: E402
+from marketbrief.collectors import macro as cm  # noqa: E402
+from marketbrief.collectors import news as cn  # noqa: E402
+from marketbrief.collectors import shorts as cs  # noqa: E402
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.sources.free_source_client import FreeSourceClient  # noqa: E402
 from marketbrief.utils.numbers import parse_accounting_amount  # noqa: E402
-import macro_context  # noqa: E402
-import sources  # noqa: E402
+from marketbrief.pipeline import macro_sections as macro_context  # noqa: E402
 from marketbrief.sources.errors import FetchError  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "sources"
@@ -90,53 +90,53 @@ US_ROUTES = [
 
 def test_treasury_parse_maps_tenors_and_dates():
     text = (FIX / "treasury_2026.csv").read_text()
-    got = cm.parse_treasury(text, date(2026, 10, 1), NOW)
+    got = macro_parsing.parse_treasury(text, date(2026, 10, 1), NOW)
     by = {(r["series"], r["date"]): r["value"] for r in got}
     assert by[("UST_10Y", "2026-10-05")] == 5.31 and by[("UST_2Y", "2026-10-05")] == 4.84
     assert by[("UST_1.5M", "2026-10-02")] == 4.09 and by[("UST_30Y", "2026-10-01")] == 5.61
     assert min(r["date"] for r in got) == "2026-10-01"          # older rows dropped by `since`
     assert {r["series"] for r in got} >= {"UST_1M", "UST_3M", "UST_6M", "UST_1Y", "UST_5Y", "UST_20Y"}
-    assert cm.tenor_series("Date") is None and cm.tenor_series("4 Mo") == "UST_4M"
+    assert macro_parsing.tenor_series("Date") is None and macro_parsing.tenor_series("4 Mo") == "UST_4M"
 
 
 def test_fred_parse_skips_missing_marker_and_reads_both_headers():
-    got = cm.parse_fred((FIX / "fred_T10YIE.csv").read_text(), "T10YIE", date(2026, 9, 1), "pct", "BE", NOW)
+    got = macro_parsing.parse_fred((FIX / "fred_T10YIE.csv").read_text(), "T10YIE", date(2026, 9, 1), "pct", "BE", NOW)
     assert got and got[0] == {"id": "T10YIE-2026-09-21", "date": "2026-09-21", "series": "T10YIE", "name": "BE",
                               "value": 2.34, "unit": "pct", "source": "fred", "first_seen_at": NOW, "complete": True}
     old = "DATE,DGS10\n2026-10-01,4.10\n2026-10-02,.\n"
-    assert [r["value"] for r in cm.parse_fred(old, "DGS10", date(2026, 1, 1), "pct", "x", NOW)] == [4.10]
+    assert [r["value"] for r in macro_parsing.parse_fred(old, "DGS10", date(2026, 1, 1), "pct", "x", NOW)] == [4.10]
     # a file for another id has no values for this one
-    assert cm.parse_fred((FIX / "fred_T10YIE.csv").read_text(), "BAMLC0A0CM", date(2026, 1, 1), "pct", "x", NOW) == []
+    assert macro_parsing.parse_fred((FIX / "fred_T10YIE.csv").read_text(), "BAMLC0A0CM", date(2026, 1, 1), "pct", "x", NOW) == []
 
 
 def test_cboe_parse_ratios():
     payload = json.loads((FIX / "cboe_2026-10-02_daily_options.json").read_text())
     wanted = {"TOTAL PUT/CALL RATIO": "CBOE_PC_TOTAL", "EQUITY PUT/CALL RATIO": "CBOE_PC_EQUITY",
               "SPX + SPXW PUT/CALL RATIO": "CBOE_PC_SPX", "NOT A RATIO": "X"}
-    rows_, missing = cm.parse_cboe(payload, date(2026, 10, 2), wanted, NOW)
+    rows_, missing = macro_parsing.parse_cboe(payload, date(2026, 10, 2), wanted, NOW)
     assert {r["series"]: r["value"] for r in rows_} == {"CBOE_PC_TOTAL": 0.78, "CBOE_PC_EQUITY": 0.58, "CBOE_PC_SPX": 1.15}
     assert missing == ["NOT A RATIO"]                      # only the absent one, not the present ones
     assert all(r["complete"] is False for r in rows_)
-    full, none_missing = cm.parse_cboe(payload, date(2026, 10, 2), {"TOTAL PUT/CALL RATIO": "CBOE_PC_TOTAL"}, NOW)
+    full, none_missing = macro_parsing.parse_cboe(payload, date(2026, 10, 2), {"TOTAL PUT/CALL RATIO": "CBOE_PC_TOTAL"}, NOW)
     assert none_missing == [] and full[0]["complete"] is True
 
 
 def test_finra_volume_parse_and_trailer_check():
     cfg = load_market("us")
     text = (FIX / "CNMSshvol20261002.txt").read_text()
-    got, problem = cs.parse_volume(text, date(2026, 10, 2), cs.finra_symbols(cfg), NOW)
+    got, problem = shorts_parsing.parse_volume(text, date(2026, 10, 2), shorts_parsing.finra_symbols(cfg), NOW)
     assert problem is None and len(got) == 20                    # AA and SPY are not on the watchlist
     aapl = next(r for r in got if r["ticker"] == "AAPL")
     assert aapl["short_volume"] == 5692524.485666 and aapl["total_volume"] == 10528296.53797
     assert aapl["short_pct"] == round(5692524.485666 / 10528296.53797 * 100, 2) and aapl["markets"] == "B,Q,N"
     truncated = "\n".join(text.splitlines()[:-1] + ["12465"])
-    assert "trailer says 12465" in cs.parse_volume(truncated, date(2026, 10, 2), cs.finra_symbols(cfg), NOW)[1]
-    assert "holds date 20261002" in cs.parse_volume(text, date(2026, 10, 1), cs.finra_symbols(cfg), NOW)[1]
+    assert "trailer says 12465" in shorts_parsing.parse_volume(truncated, date(2026, 10, 2), shorts_parsing.finra_symbols(cfg), NOW)[1]
+    assert "holds date 20261002" in shorts_parsing.parse_volume(text, date(2026, 10, 1), shorts_parsing.finra_symbols(cfg), NOW)[1]
 
 
 def test_finra_short_interest_parse():
     cfg = load_market("us")
-    got = cs.parse_short_interest(json.loads((FIX / "finra_short_interest.json").read_text()), cs.finra_symbols(cfg), NOW)
+    got = shorts_parsing.parse_short_interest(json.loads((FIX / "finra_short_interest.json").read_text()), shorts_parsing.finra_symbols(cfg), NOW)
     assert len(got) == 40 and {r["settlement_date"] for r in got} == {"2026-08-31", "2026-09-15"}
     nvda = next(r for r in got if r["ticker"] == "NVDA" and r["settlement_date"] == "2026-08-31")
     assert nvda["short_interest"] == 298301619 and nvda["prev_short_interest"] == 285956804
@@ -144,7 +144,7 @@ def test_finra_short_interest_parse():
 
 
 def test_nsdl_fpi_parse():
-    got, problem = cfi.parse_fpi((FIX / "nsdl_fpi_latest.html").read_text(), NOW)
+    got, problem = flows_parsing.parse_fpi((FIX / "nsdl_fpi_latest.html").read_text(), NOW)
     assert problem is None and len(got) == 25
     by = {(r["asset_class"], r["route"]): r for r in got}
     eq = by[("Equity", "Stock Exchange")]
@@ -155,20 +155,20 @@ def test_nsdl_fpi_parse():
     assert by[("Mutual Funds", "Equity schemes")]["net_cr"] == 45.49
     assert by[("Total", "Total")]["net_cr"] == -9466.48
     assert len({r["id"] for r in got}) == 25
-    assert cfi.parse_fpi("<html>maintenance</html>", NOW)[1].startswith("report title")
+    assert flows_parsing.parse_fpi("<html>maintenance</html>", NOW)[1].startswith("report title")
 
 
 def test_nse_index_parse():
     cfg = load_market("india")
     names = cfg["india_flows"]["indices"]["names"]
-    got, missing, problem = cfi.parse_indices((FIX / "ind_close_all_05102026.csv").read_text(), TODAY, names, NOW)
+    got, missing, problem = flows_parsing.parse_indices((FIX / "ind_close_all_05102026.csv").read_text(), TODAY, names, NOW)
     assert problem is None and missing == [] and len(got) == len(names) == 14
     ins = next(r for r in got if r["index_name"] == "Nifty Insurance")
     assert ins["sector"] == "Insurance" and ins["open"] is None and ins["close"] == 1756.64 and ins["pe"] == 24.69
     gsec = next(r for r in got if r["index_name"] == "Nifty 10 yr Benchmark G-Sec")
     assert gsec["sector"] is None and gsec["pe"] is None and gsec["change_pct"] == -0.05
     assert "Nifty Media" not in {r["index_name"] for r in got}
-    _, missing, problem = cfi.parse_indices((FIX / "ind_close_all_05102026.csv").read_text(), date(2026, 10, 6),
+    _, missing, problem = flows_parsing.parse_indices((FIX / "ind_close_all_05102026.csv").read_text(), date(2026, 10, 6),
                                             {**names, "Nifty Nothing": None}, NOW)
     assert missing == ["Nifty Nothing"] and "holds ['2026-10-05']" in problem
 
@@ -331,7 +331,7 @@ def test_client_classifies_errors(monkeypatch):
     assert "not requested" in e.value.error and len(calls) == 4
     with pytest.raises(FetchError) as e:
         c.get("https://c.example/missing")
-    assert e.value.status == 403 and sources.not_published(e.value) and len(calls) == 5   # no retry on HTTP errors
+    assert e.value.status == 403 and collector_store.not_published(e.value) and len(calls) == 5   # no retry on HTTP errors
 
 
 # ---------- context sections ----------
@@ -428,8 +428,8 @@ WIRE_CASES = [
 def test_news_wire_matching(text, expected):
     """watchlist_only feeds: case-insensitive whole-word wire_names, wire_exclude phrases removed."""
     cfg = load_market("us")
-    pats, exclude = cn.wire_patterns(cfg), cn.wire_exclusions(cfg["news"])
-    assert cn.wire_tickers(text, pats, exclude) == expected
+    pats, exclude = news_wire.wire_patterns(cfg), news_wire.wire_exclusions(cfg["news"])
+    assert news_wire.wire_tickers(text, pats, exclude) == expected
 
 
 # ---------- incomplete days are fetched again; the views prefer the complete version ----------
@@ -501,7 +501,7 @@ def test_incomplete_index_and_cboe_days_are_refetched(root):
 def test_fpi_unreadable_numbers_and_missing_equity_are_failures(root):
     page = (FIX / "nsdl_fpi_latest.html").read_text()
     bad = page.replace("<td align='right'>108.28</td>", "<td align='right'>n/a</td>", 1)
-    got, problem = cfi.parse_fpi(bad, NOW)
+    got, problem = flows_parsing.parse_fpi(bad, NOW)
     assert "1 table rows with unreadable numbers" in problem and "Debt-General Limit | Stock Exchange" in problem
     assert len(got) == 24
     # no Equity sub-total: reported as a failure, never a StopIteration

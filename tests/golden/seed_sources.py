@@ -3,7 +3,7 @@ as tests/test_sources.py does, with a fixture client in place of the network.
 
   python tests/golden/seed_sources.py us|india     (MB_ROOT, MB_CONFIG and MB_NOW set by the caller)
 
-US: collect_macro (Treasury, FRED, Cboe) and collect_shorts (FINRA); India: collect_flows_india
+US: the macro (Treasury, FRED, Cboe) and shorts (FINRA) collectors; India: the flows_india collector
 (NSDL FPI, NSE index closes). Prints each collector's JSON summary."""
 from __future__ import annotations
 
@@ -16,9 +16,7 @@ CODE = Path(__file__).resolve().parents[2]
 FIXTURES = CODE / "tests" / "fixtures" / "sources"
 sys.path.insert(0, str(CODE / "scripts"))
 
-import collect_flows_india  # noqa: E402
-import collect_macro  # noqa: E402
-import collect_shorts  # noqa: E402
+from marketbrief.collectors import flows_india, macro, shorts  # noqa: E402
 from marketbrief.core.clock import utc_now  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.sources.errors import FetchError  # noqa: E402
@@ -61,9 +59,9 @@ def main() -> int:
     cfg, now = load_market(market), utc_now()
     if market == "us":
         cfg["macro"]["cboe"]["lookback_days"] = 4      # the fixture sessions, as in tests/test_sources.py
-        runs = [(collect_macro, "macro"), (collect_shorts, "shorts")]
+        runs = [(macro, "macro"), (shorts, "shorts")]
     else:
-        runs = [(collect_flows_india, "flows")]
+        runs = [(flows_india, "flows")]
     for module, routes in runs:
         print(json.dumps(module.collect(cfg, FixtureClient(ROUTES[routes]), FIXTURE_DAY, now), indent=1, default=str))
     return 0

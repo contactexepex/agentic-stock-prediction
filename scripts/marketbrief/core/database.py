@@ -52,7 +52,7 @@ def unretagged_news_function(_feed, _title, tickers, primary, mentioned, confide
 
 def register_news_retag(con: duckdb.DuckDBPyConnection, market: str) -> None:
     """Register `news_retag`, which the `news` view uses to re-tag rows from before the current tagger."""
-    from news_tags import RETAG_TYPE, Tagger
+    from marketbrief.analytics.news_tags import RETAG_TYPE, Tagger
     try:
         retag = Tagger(load_market(market)).retag_stored
     except SystemExit:   # no market config (some tests): tags stay as stored
@@ -65,7 +65,7 @@ def connect(market: str) -> duckdb.DuckDBPyConnection:
     """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql.
     With MB_NOW set, the connection's SQL sees that time as now (FrozenClockConnection).
     News is the exception: the stored rows are `news_stored`, and the `news` view (views.sql)
-    re-tags rows from before the current tagger with `news_retag` (scripts/news_tags.py)."""
+    re-tags rows from before the current tagger with `news_retag` (marketbrief/analytics/news_tags.py)."""
     con = duckdb.connect()
     register_news_retag(con, market)
     if os.environ.get(ENV_NOW):

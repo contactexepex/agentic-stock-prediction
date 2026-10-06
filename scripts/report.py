@@ -18,9 +18,9 @@ from datetime import timedelta
 
 import pandas as pd
 
-import events as ev
+from marketbrief.core import calendar as ev
 from score_predictions import is_late
-from scoring import percent
+from marketbrief.analytics.scoring import percent
 from view_data import CONF_BANDS_SQL, RANGE_RECORD_EXACT, fmt_call
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today

@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from PIL import Image  # noqa: E402
 
-import scoring  # noqa: E402
+from marketbrief.analytics import scoring  # noqa: E402
 from marketbrief.core.cli import market_arg, require_market  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core import paths  # noqa: E402

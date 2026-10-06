@@ -14,7 +14,7 @@ import pandas as pd
 from marketbrief.constants.verification import CODE_FORECAST_RULE, CODE_NEWS_STATUS_MISSING
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
-from prediction_rules import check_news_status, check_prediction
+from marketbrief.analytics.prediction_rules import check_news_status, check_prediction
 
 
 def evidence_times(con) -> dict:

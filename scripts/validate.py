@@ -40,14 +40,12 @@ from urllib.parse import urlparse
 
 import pandas as pd
 
-import events as ev
 import market_status
-from marketbrief.core.paths import data_dir
 import narrative_numbers as nn
 from marketbrief.core.settings import load_settings, load_validate_config
 from marketbrief.pipeline import forecast_gate
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
-from marketbrief.core import cli, clock, database, market_config, paths, schemas
+from marketbrief.core import calendar as ev, cli, clock, database, market_config, paths, schemas
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
 # kinds whose day files are named by the trading date, with the column that says when a row was written
@@ -90,7 +88,7 @@ def work_dir() -> Path:
 
 def kind_files(market: str, kind: str) -> list[Path]:
     ext = schemas.SCHEMAS[kind][0]
-    return sorted((data_dir(market) / kind).glob(f"**/*.{ext}"))
+    return sorted((paths.data_dir(market) / kind).glob(f"**/*.{ext}"))
 
 
 def file_day(p: Path) -> date | None:
@@ -410,17 +408,19 @@ def check_articles(res: Result, cfg: dict, today: date):
     """news_articles written today (collect_articles.py): a known access value, no stored article
     text (extract: at most 3 sentences of at most 40 words), and a page read only from an
     allowlisted https:// URL (config/news_sources.yaml)."""
-    import news_verify as nv
-    src, bad = nv.load_sources(), []
+    from marketbrief.analytics.article_pages import url_check
+    from marketbrief.analytics.news_sources import load_sources
+    from marketbrief.constants.articles import ACCESS
+    src, bad = load_sources(), []
     for p in todays_files(cfg["market"], "news_articles", today):
         for r in read_rows(p)[0]:
             ext = r.get("extract") or []
-            if r.get("access") not in nv.ACCESS:
+            if r.get("access") not in ACCESS:
                 bad.append(f"{r.get('id')}: access {r.get('access')!r}")
             elif len(ext) > 3 or any(len(str(s).split()) > 40 for s in ext):
                 bad.append(f"{r.get('id')}: extract longer than 3 sentences of 40 words")
             elif r["access"] in ("full", "partial", "paywalled") and r.get("http_status") is not None \
-                    and not nv.url_check(r.get("final_url"), src)[0]:
+                    and not url_check(r.get("final_url"), src)[0]:
                 bad.append(f"{r.get('id')}: read from a URL that is not an allowlisted https page "
                            f"({str(r.get('final_url'))[:60]})")
             elif r["access"] in ("skipped_unlisted", "undecoded") and r.get("http_status") is not None:
@@ -589,8 +589,8 @@ def build_pool(cfg: dict, con, vc: dict, today: date, texts: list[str]) -> nn.Po
     pool.add(None, "plain", len(cfg["tickers"]))
     pool.add(None, "plain", len(cfg["symbols"]))
     try:
-        import collect_news
-        pool.add(None, "plain", len(collect_news.build_jobs(cfg.get("news") or {}, cfg)))
+        from marketbrief.collectors.news import build_jobs
+        pool.add(None, "plain", len(build_jobs(cfg.get("news") or {}, cfg)))
     except Exception as e:  # noqa: BLE001 - only a source of numbers: noted, the check goes on
         notes.append(f"news feed count unavailable ({type(e).__name__}: {e})")
     steps = work_dir() / "steps"
@@ -625,7 +625,7 @@ def agent_lines(filled: str, skeleton: str) -> list[str]:
 
 
 def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
-    import ranges as rg
+    from marketbrief.analytics.range_context import target_date
     rc = market_config.load_ranges_config(cfg["market"])
     as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
     if as_of is None:
@@ -633,10 +633,10 @@ def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
     have = {(r[0], int(r[1])) for r in con.execute("SELECT ticker, horizon_days FROM ranges WHERE as_of_date = ?",
                                                     [as_of]).fetchall()}
     feats = {r[0] for r in con.execute("SELECT ticker FROM features_latest WHERE as_of_date = ?", [as_of]).fetchall()}
-    first = rg.target_date(cfg, as_of, 1)
+    first = target_date(cfg, as_of, 1)
     skipped, missing = {}, []
     for h in rc["horizons"]:
-        tgt = rg.target_date(cfg, as_of, h)
+        tgt = target_date(cfg, as_of, h)
         for t in cfg["tickers"]:
             if (t, h) in have:
                 continue

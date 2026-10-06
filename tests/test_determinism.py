@@ -30,8 +30,8 @@ import context  # noqa: E402
 import html_report  # noqa: E402
 import report  # noqa: E402
 import score_predictions  # noqa: E402
-import scoring  # noqa: E402
-import smart_money  # noqa: E402
+from marketbrief.analytics import scoring  # noqa: E402
+from marketbrief.analytics import smart_money  # noqa: E402
 import view_data  # noqa: E402
 from test_pipeline import MARKET, setup, weekdays  # noqa: E402
 
@@ -146,9 +146,9 @@ def test_scoring_summary(cons):
 
 def test_scoring_mean_is_order_independent():
     values = [0.1, 0.7, 0.2, 0.6000000000000001, 0.3] * 7
-    means = {scoring._mean(random.Random(i).sample(values, len(values))) for i in range(50)}
+    means = {scoring.exact_mean(random.Random(i).sample(values, len(values))) for i in range(50)}
     assert means == {float(sum(map(Fraction, values)) / len(values))}
-    assert scoring._mean([0.7] * 12) == 0.7 and scoring._mean([0.55, 0.55, float("nan")]) == 0.55
+    assert scoring.exact_mean([0.7] * 12) == 0.7 and scoring.exact_mean([0.55, 0.55, float("nan")]) == 0.55
 
 
 def test_view_data_bands_and_scored_calls(cons):

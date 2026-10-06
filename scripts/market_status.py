@@ -14,7 +14,7 @@ import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import events as ev
+from marketbrief.core import calendar as ev
 from marketbrief.core.cli import market_arg, require_market
 
 

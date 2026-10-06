@@ -16,9 +16,9 @@ import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_ranges_config  # noqa: E402
 from marketbrief.core.storage import day_file  # noqa: E402
-import events as ev  # noqa: E402
+from marketbrief.core import calendar as ev  # noqa: E402
 import market_status as ms  # noqa: E402
-import ranges  # noqa: E402
+from marketbrief.analytics import range_publication as ranges  # noqa: E402
 from test_pipeline import MARKET, run, setup, write_bars  # noqa: E402
 
 INDIA = {"market": "india", "calendar": "XBOM", "timezone": "Asia/Kolkata"}

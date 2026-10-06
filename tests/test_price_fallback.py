@@ -2,7 +2,7 @@
 (the 2026-10-05 gap: Yahoo jumped from 10-01 to 10-06 for SBILIFE, HDFCLIFE, DRREDDY, MARUTI and
 ULTRACEMCO), guarded against a different price basis (stored Yahoo bars are split/bonus-adjusted
 as of collection; the bhavcopy is as traded). Offline: a fake yfinance plus trimmed REAL
-bhavcopies replayed through scripts/nse.py (tests/fixtures/nse/prices/ and
+bhavcopies replayed through marketbrief/sources/nse_client.py (tests/fixtures/nse/prices/ and
 real/sec_bhavdata_full_01102026.csv; provenance in tests/fixtures/nse/README)."""
 from __future__ import annotations
 
@@ -22,7 +22,8 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import collect_prices  # noqa: E402
+from marketbrief.collectors import nse_session, price_nse_fallback  # noqa: E402
+from marketbrief.collectors import prices as collect_prices  # noqa: E402
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.sources.nse_client import Nse  # noqa: E402
@@ -100,7 +101,7 @@ def make_env(tmp_path, monkeypatch, keep: list[str], today: date, sessions: int 
         calls.append(1)
         return Nse(replay=rdir, pause=0)
 
-    monkeypatch.setattr(collect_prices, "nse_client", client)
+    monkeypatch.setattr(nse_session, "nse_client", client)
     FakeTicker.frames = {}
     return types.SimpleNamespace(root=root, replay=rdir, calls=calls)
 
@@ -282,9 +283,9 @@ def test_stock_stale_beyond_the_window_stays_failed(tmp_path, monkeypatch, capsy
 def test_bhavcopy_parse_matches_stored_yahoo_bars():
     """The real 01-10 bhavcopy against the Yahoo bars stored for 2026-10-01
     (data/india/prices/2026/10/2026-10-01.csv, collected 2026-10-05): identical OHLC and volume."""
-    from nse import nse_symbols
+    from marketbrief.sources.nse_parsing import nse_symbols
     cfg = yaml.safe_load((REPO / "config" / "markets" / "india.yaml").read_text())
-    got, problem = collect_prices.bhavcopy_bars((FIX / "real" / "sec_bhavdata_full_01102026.csv").read_text(),
+    got, problem = price_nse_fallback.bhavcopy_bars((FIX / "real" / "sec_bhavdata_full_01102026.csv").read_text(),
                                                 date(2026, 10, 1), nse_symbols(cfg))
     assert problem is None and len(got) == 20
     yahoo_0110 = {   # stored Yahoo bars: open, high, low, close, volume
@@ -297,10 +298,10 @@ def test_bhavcopy_parse_matches_stored_yahoo_bars():
     for t, v in yahoo_0110.items():
         b = got[t]
         assert (b["open"], b["high"], b["low"], b["close"], b["volume"]) == v
-    _, problem = collect_prices.bhavcopy_bars((FIX / "real" / "sec_bhavdata_full_02102026.csv").read_text(),
+    _, problem = price_nse_fallback.bhavcopy_bars((FIX / "real" / "sec_bhavdata_full_02102026.csv").read_text(),
                                               date(2026, 10, 2), nse_symbols(cfg))
     assert problem == "bhavcopy for 2026-10-02 holds 2026-10-01; not used"
-    got, _ = collect_prices.bhavcopy_bars((FIX / "prices" / "sec_bhavdata_full_22082025.csv").read_text(),
+    got, _ = price_nse_fallback.bhavcopy_bars((FIX / "prices" / "sec_bhavdata_full_22082025.csv").read_text(),
                                           date(2025, 8, 22), nse_symbols(cfg))
     assert (got["TATASTEEL"]["open"], got["TATASTEEL"]["volume"]) == (161.25, 16063984)   # EQ row, not T0
     assert (got["HDFCBANK"]["close"], got["HDFCBANK"]["prev_close"]) == (1964.6, 1991.2)

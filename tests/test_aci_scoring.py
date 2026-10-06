@@ -1,4 +1,4 @@
-"""Adaptive Conformal Inference (scripts/aci.py) and proper scores (scripts/scoring.py):
+"""Adaptive Conformal Inference (marketbrief/analytics/adaptive_conformal.py) and proper scores (marketbrief/analytics/scoring.py):
 the ACI update against two references, no look-ahead (live and replay), ACI off reproduces the
 current ranges exactly, and Brier / log loss / reliability / quantile score on synthetic data.
 Run: pytest -q"""
@@ -17,10 +17,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import aci  # noqa: E402
+from marketbrief.analytics import adaptive_conformal as aci  # noqa: E402
 from marketbrief.core.market_config import load_ranges_config  # noqa: E402
-import rangelib as rl  # noqa: E402
-import scoring  # noqa: E402
+from marketbrief.analytics import range_math as rl  # noqa: E402
+from marketbrief.analytics import scoring  # noqa: E402
 from test_pipeline import MARKET, fat_tailed_walk, run, setup, weekdays, write_bars  # noqa: E402
 from test_replay import D_POS, build, dump, fixture  # noqa: E402
 
@@ -255,7 +255,7 @@ def test_quantile_score_and_interval_score_identity():
 # ---------- calibrate.py with ACI on ----------
 
 def test_calibrate_uses_aci_levels_from_outcomes_scored_by_now():
-    import calibrate
+    from marketbrief.analytics import calibration as calibrate
     rng = np.random.default_rng(4)
     idx = pd.bdate_range("2024-01-01", periods=400)
     bars = {t: pd.DataFrame({"close": fat_tailed_walk(rng, 400, 100, 0.01)}, index=idx) for t in ("BENCH", "A")}

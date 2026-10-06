@@ -81,20 +81,20 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from marketbrief.core import paths
+from marketbrief.core import calendar as ev, paths
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import benchmark_key, load_market, market_names
 from marketbrief.core.storage import append_jsonl
-import events as ev
 import replay
 from marketbrief.core.schemas import ACCEPTED_KEYS, SCHEMAS
 from marketbrief.utils.numbers import round_or_none, share_percent_text
 from marketbrief.utils.timefmt import as_utc_timestamp
-from features import load_bars
+from marketbrief.analytics.features import load_bars
 from marketbrief.constants.messages import MSG_MARKET_REQUIRED
 from marketbrief.core.settings import load_settings
-from prediction_rules import HORIZONS, check_prediction
+from marketbrief.analytics.prediction_rules import RuleLabels, check_prediction
+from marketbrief.constants.prediction_rules import HORIZONS
 
 FAIR, CONTAMINATED = "fair", "contaminated"   # ForecastBench leakage rule (see the docstring)
 SAMPLE_START, SAMPLE_END, SAMPLE_STEP = date(2026, 7, 1), date(2026, 9, 25), 5
@@ -200,7 +200,7 @@ def public_at(kind: str, row: dict) -> pd.Timestamp | None:
 
 def load_sec_times(base: Path) -> dict[str, str]:
     """Accession -> SGML-header acceptance time (newest check wins) from data/<market>/sec_times/,
-    the correction connect applies to accepted_at (see scripts/sec.py)."""
+    the correction connect applies to accepted_at (see marketbrief/sources/sec_filings.py)."""
     best: dict[str, tuple[str, str]] = {}
     for f in sorted((base / "sec_times").glob("**/*.jsonl")):
         for line in f.read_text(encoding="utf-8").splitlines():
@@ -430,17 +430,17 @@ def check_root(root: Path, src: Path, force: bool) -> None:
 
 def assumed_earnings(cfg: dict, src: Path, d: date, cutoff: datetime, days: int) -> list[dict]:
     """ASSUMPTION (opt-in, --assume-earnings-known DAYS): the actual earnings dates in (D, D + DAYS]
-    from the source's backfilled past events (range_inputs.earnings_events over every *_history row,
+    from the source's backfilled past events (event_history.earnings_events over every *_history row,
     i.e. with today's knowledge) are treated as announced before the cutoff, as replay.py treats past
     event dates. Stored rows do not say when a date was first announced (companies usually announce
     2-4 weeks ahead), so this is labelled in the event name, the source and the prepare summary."""
-    import range_inputs as ri
+    from marketbrief.analytics import event_history
     with data_root(src):
-        evdf = ri.load_events(connect(cfg["market"]))
+        evdf = event_history.load_events(connect(cfg["market"]))
     if evdf.empty:
         return []
     out = []
-    for t, evs in ri.earnings_events(evdf).items():
+    for t, evs in event_history.earnings_events(evdf).items():
         if t not in cfg["tickers"]:
             continue
         for day, timing in evs:
@@ -696,8 +696,8 @@ def replay_context(cfg: dict, root: Path, d: date) -> dict:
 def validate(rec, ctx: dict, d: date, seen: set[str]) -> list[str]:
     """Reasons a forecaster record breaks the schema or the CLAUDE.md prediction rules (empty = valid):
     the shared check in prediction_rules.py, with the replay date as every ticker's as_of_date."""
-    return check_prediction(rec, ctx, seen, as_of=d, as_of_label="the replay date",
-                            evidence_label="the replay root's news/filings/announcements")
+    return check_prediction(rec, ctx, seen, as_of=d,
+                            labels=RuleLabels("the replay date", "the replay root's news/filings/announcements"))
 
 
 def record(cfg: dict, d: date, root: Path, calls_file: Path, results: Path) -> dict:

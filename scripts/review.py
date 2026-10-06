@@ -26,13 +26,14 @@ import numpy as np
 import pandas as pd
 import yaml
 
-import aci
+from marketbrief.analytics import adaptive_conformal as aci
 import backtest as bt
-import events as ev
-import indicators as ind
-import rangelib as rl
-import regime as rg
-import scoring
+from marketbrief.core import calendar as ev
+from marketbrief.analytics import indicators as ind
+from marketbrief.analytics import range_math as rl
+from marketbrief.analytics import regime as rg
+from marketbrief.constants.regime import REGIME_ORDER
+from marketbrief.analytics import scoring
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
@@ -41,7 +42,7 @@ from marketbrief.core import paths
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.utils.event_dates import major_event_between
 from marketbrief.utils.markdown import markdown_table
-from features import load_bars
+from marketbrief.analytics.features import load_bars
 
 DEFAULTS = {
     "rolling_days": 30, "min_n": 30, "min_n_recommend": 200, "min_n_calls": 50,
@@ -318,7 +319,7 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
         prev = None if i == 0 or pd.isna(vol.iloc[i - 1]) else float(vol.iloc[i - 1])
         session = dates[i + 1].date() if i + 1 < len(dates) else ev.next_session(cfg, d.date(), include=False)
         near = ev.major_events_near(events, session)
-        regimes.append(rg.classify(cfg["regime"], lvl, ind.ret(tail, 5), ind.realized_vol(tail), bool(near),
+        regimes.append(rg.classify(cfg["regime"], lvl, ind.period_return(tail, 5), ind.realized_vol(tail), bool(near),
                                    lvl / prev - 1 if lvl and prev else None)[0])
     return regimes, majors
 
@@ -364,7 +365,7 @@ def history_ablation(cfg: dict, rc: dict, rv: dict, bars: dict, week_end: date) 
             n += s["n"]
         variants.append({"name": v["name"], "set": v.get("set") or {}, "n": n, "by_h": by_h})
     share = {k: round(regimes[-rv["history_eval_sessions"]:].count(k) / min(len(regimes), rv["history_eval_sessions"]), 3)
-             for k in rg.ORDER}
+             for k in REGIME_ORDER}
     return {"n": variants[0]["n"] if variants else 0, "sessions": rv["history_eval_sessions"],
             "regime_share": share, "variants": variants}
 

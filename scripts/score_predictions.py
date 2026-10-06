@@ -22,10 +22,10 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-import adjust as adj
-import events as ev
-import rangelib as rl
-import scoring
+from marketbrief.analytics import price_adjustments as adj
+from marketbrief.core import calendar as ev
+from marketbrief.analytics import range_math as rl
+from marketbrief.analytics import scoring
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
@@ -65,7 +65,7 @@ ORDER BY r.id
 
 
 def load_adjustments(con) -> list[dict]:
-    """Recorded splits and bonus issues (view price_adjustments; scripts/adjust.py)."""
+    """Recorded splits and bonus issues (view price_adjustments; marketbrief/analytics/price_adjustments.py)."""
     return con.execute("SELECT ticker, ex_date, factor, detected_at FROM price_adjustments").df().to_dict("records")
 
 

@@ -20,7 +20,7 @@ FIX = REPO / "tests" / "fixtures" / "sec"
 MARKET = "testfund"
 sys.path.insert(0, str(SCRIPTS))
 
-import collect_fundamentals as cf  # noqa: E402
+from marketbrief.collectors import fundamentals_xbrl as cf  # noqa: E402
 
 MARKET_YAML = """
 market: testfund

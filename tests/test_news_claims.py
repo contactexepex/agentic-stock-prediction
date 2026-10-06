@@ -18,8 +18,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import collect_articles  # noqa: E402
-import news_clusters  # noqa: E402
+from marketbrief.collectors import articles as collect_articles  # noqa: E402
+from marketbrief.analytics import news_clusters  # noqa: E402
 import test_news_verify as nvt  # noqa: E402
 import validate  # noqa: E402
 from marketbrief.analytics.claim_rules import normalise  # noqa: E402
@@ -28,7 +28,7 @@ from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.pipeline.claim_inputs import input_records  # noqa: E402
 from marketbrief.pipeline.claim_sources import current_clusters, sources_by_cluster  # noqa: E402
 from marketbrief.pipeline.evidence_status import EvidenceStatuses  # noqa: E402
-from prediction_rules import check_news_status  # noqa: E402
+from marketbrief.analytics.prediction_rules import check_news_status  # noqa: E402
 from marketbrief.pipeline import claims as claims_cli  # noqa: E402
 from marketbrief.pipeline import news_status as status_cli  # noqa: E402
 from marketbrief.sources.primary_text import html_to_text  # noqa: E402

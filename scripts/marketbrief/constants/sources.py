@@ -1,4 +1,6 @@
 """Hosts, URLs, user agents, timeouts and retry settings of the data-source clients."""
+from zoneinfo import ZoneInfo
+
 FREE_SOURCE_USER_AGENT = "Mozilla/5.0 (compatible; market-brief/1.0; personal research, low volume)"
 NSE_USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                   "Chrome/126.0 Safari/537.36")
@@ -54,3 +56,9 @@ NSE_REFERER_PAGES = {  # Referer per API: NSE checks that the call comes from it
 PROXY_TUNNEL_FAILURE = "Tunnel connection failed"
 CONNECTION_CLOSED_MARKERS = ("RemoteDisconnected", "closed connection", "Connection reset", "EOF occurred",
                              "UNEXPECTED_EOF")
+
+NSE_DATE_FORMATS = ("%d-%b-%Y %H:%M:%S", "%d-%b-%Y %H:%M", "%d-%b-%Y", "%d-%m-%Y", "%Y-%m-%d", "%d %b %Y", "%d-%B-%Y",
+                    "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S")
+NSE_MISSING_VALUES = (None, "", "-", "Nil", "NA")
+NSE_YAHOO_SUFFIX = ".NS"
+TIMEZONE_IST = ZoneInfo("Asia/Kolkata")

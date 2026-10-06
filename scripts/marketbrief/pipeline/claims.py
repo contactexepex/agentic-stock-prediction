@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import news_verify
+from marketbrief.analytics.news_sources import load_sources
 from marketbrief.analytics.claim_rules import check_claim
 from marketbrief.constants.environment import ENV_SEC_USER_AGENT
 from marketbrief.constants.verification import KIND_NEWS_CLAIMS, KIND_PRIMARY_TEXTS
@@ -47,7 +47,7 @@ WHERE list_contains(?, id) AND list_contains(?, form) AND accepted_at <= ?::TIME
 
 def settings() -> dict:
     """The `claims:` section of config/news_sources.yaml."""
-    return news_verify.load_sources().cfg.get("claims") or {}
+    return load_sources().cfg.get("claims") or {}
 
 
 def now_floor() -> pd.Timestamp:
@@ -82,7 +82,7 @@ def fetch_primary_texts(con, market: str, clusters: list[dict], conf: dict, now:
 
 def prepare(cfg: dict, out: Path, fetch: bool) -> dict:
     """Select clusters, store their primary texts and write the claim-checker's input file."""
-    market, conf, src = cfg["market"], settings(), news_verify.load_sources()
+    market, conf, src = cfg["market"], settings(), load_sources()
     now = now_floor()
     window = float(src.clusters.get("window_hours", 72))
     con = connect(market)
@@ -117,7 +117,7 @@ def check_file(cfg: dict, path: Path) -> tuple[list[dict], list[dict], int]:
     """(valid records to store, errors by line, number of records)."""
     now = now_floor()
     con = connect(cfg["market"])
-    window = float(news_verify.load_sources().clusters.get("window_hours", 72))
+    window = float(load_sources().clusters.get("window_hours", 72))
     clusters = current_clusters(con, now, window)
     sources = sources_by_cluster(con, clusters, now)
     seen = {r[0] for r in con.execute("SELECT id FROM news_claims").fetchall()}

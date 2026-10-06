@@ -16,11 +16,12 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import collect_events as ce  # noqa: E402
-import collect_options as co  # noqa: E402
-import events as ev  # noqa: E402
-import range_inputs as ri  # noqa: E402
-import rangelib as rl  # noqa: E402
+from marketbrief.collectors import event_timing, events_nse, nse_session  # noqa: E402
+from marketbrief.collectors import events as ce  # noqa: E402
+from marketbrief.collectors import options as co  # noqa: E402
+from marketbrief.core import calendar as ev  # noqa: E402
+from marketbrief.analytics import earnings_reaction, event_history, index_cue, range_switches  # noqa: E402
+from marketbrief.analytics import range_math as rl  # noqa: E402
 from test_pipeline import MARKET, fat_tailed_walk, run, setup, weekdays, write_bars  # noqa: E402
 
 XNYS = {"market": "x", "calendar": "XNYS", "timezone": "America/New_York"}
@@ -85,41 +86,41 @@ def test_horizon_sigma_earnings_override():
 
 def test_event_timing_and_reaction_sessions():
     et = "America/New_York"
-    assert ce.timing(XNYS, pd.Timestamp("2026-07-14 06:45", tz=et)) == (date(2026, 7, 14), "before_open")
-    assert ce.timing(XNYS, pd.Timestamp("2026-07-14 12:00", tz=et)) == (date(2026, 7, 14), "during")
-    assert ce.timing(XNYS, pd.Timestamp("2026-07-14 16:20", tz=et)) == (date(2026, 7, 14), "after_close")
-    assert ce.timing(XNYS, pd.Timestamp("2026-07-11 10:00", tz=et))[1] == "before_open"   # Saturday
-    assert ce.timing(XNYS, "2026-07-14")[1] is None                                      # no time
+    assert event_timing.timing(XNYS, pd.Timestamp("2026-07-14 06:45", tz=et)) == (date(2026, 7, 14), "before_open")
+    assert event_timing.timing(XNYS, pd.Timestamp("2026-07-14 12:00", tz=et)) == (date(2026, 7, 14), "during")
+    assert event_timing.timing(XNYS, pd.Timestamp("2026-07-14 16:20", tz=et)) == (date(2026, 7, 14), "after_close")
+    assert event_timing.timing(XNYS, pd.Timestamp("2026-07-11 10:00", tz=et))[1] == "before_open"   # Saturday
+    assert event_timing.timing(XNYS, "2026-07-14")[1] is None                                      # no time
     # reaction sessions: Tuesday 2026-07-14
     tue, wed = date(2026, 7, 14), date(2026, 7, 15)
-    assert ri.affected_sessions(XNYS, tue, "before_open") == [tue]
-    assert ri.affected_sessions(XNYS, tue, "after_close") == [wed]
-    assert ri.affected_sessions(XNYS, tue, None) == [tue, wed]
-    assert ri.affected_sessions(XNYS, date(2026, 7, 11), None) == [date(2026, 7, 13)]
+    assert earnings_reaction.affected_sessions(XNYS, tue, "before_open") == [tue]
+    assert earnings_reaction.affected_sessions(XNYS, tue, "after_close") == [wed]
+    assert earnings_reaction.affected_sessions(XNYS, tue, None) == [tue, wed]
+    assert earnings_reaction.affected_sessions(XNYS, date(2026, 7, 11), None) == [date(2026, 7, 13)]
     # an after-close report on the as-of date reacts inside a 1-day horizon
-    assert ri.earnings_in_horizon(XNYS, [(tue, "after_close")], tue, wed)
-    assert not ri.earnings_in_horizon(XNYS, [(tue, "before_open")], tue, wed)
-    assert ri.earnings_in_horizon(XNYS, [(wed, "before_open")], tue, wed)
-    assert ri.dividends_in_horizon(XNYS, [(wed, 1.0), (tue, 2.0)], tue, wed) == [1.0]
+    assert earnings_reaction.earnings_in_horizon(XNYS, [(tue, "after_close")], tue, wed)
+    assert not earnings_reaction.earnings_in_horizon(XNYS, [(tue, "before_open")], tue, wed)
+    assert earnings_reaction.earnings_in_horizon(XNYS, [(wed, "before_open")], tue, wed)
+    assert earnings_reaction.dividends_in_horizon(XNYS, [(wed, 1.0), (tue, 2.0)], tue, wed) == [1.0]
     # merging the same report from several sources keeps the best source
-    kept = ce.merge_near([(date(2026, 7, 15), None, 2), (date(2026, 7, 14), "before_open", 0),
+    kept = event_timing.merge_near([(date(2026, 7, 15), None, 2), (date(2026, 7, 14), "before_open", 0),
                           (date(2026, 4, 14), "after_close", 1)])
     assert kept == [(date(2026, 7, 14), "before_open", 0), (date(2026, 4, 14), "after_close", 1)]
 
 
 def test_past_moves_and_event_cleanup():
-    idx = ev._xcal("XNYS").sessions_in_range("2026-01-05", "2026-08-31")[:120]
+    idx = ev.exchange_calendar("XNYS").sessions_in_range("2026-01-05", "2026-08-31")[:120]
     close = pd.Series(100.0, index=idx)
     d = idx[100].date()
     close.iloc[100:] = 110.0                    # +10% on the earnings day (before the open)
     sig = pd.Series(0.01, index=idx)
-    moves = ri.past_moves(XNYS, close, sig, [(d, "before_open"), (idx[10].date(), None)], warmup=60)
+    moves = earnings_reaction.past_moves(XNYS, close, sig, [(d, "before_open"), (idx[10].date(), None)], warmup=60)
     assert len(moves) == 1                      # the early one is inside the warm-up
     end, r, s, k = moves[0]
     assert end == d and abs(r - math.log(1.1)) < 1e-12 and s == 0.01 and k == 1
-    m, n, med = ri.earnings_stats(moves * 3, {"earnings_vol_multiple": 3.0, **ALL_ON}, d)
+    m, n, med = earnings_reaction.earnings_stats(moves * 3, {"earnings_vol_multiple": 3.0, **ALL_ON}, d)
     assert n == 3 and m > 3.0 and abs(med - math.log(1.1)) < 1e-12
-    assert ri.earnings_stats(moves, {"earnings_vol_multiple": 3.0, **ALL_ON}, d - timedelta(days=1))[1] == 0
+    assert earnings_reaction.earnings_stats(moves, {"earnings_vol_multiple": 3.0, **ALL_ON}, d - timedelta(days=1))[1] == 0
 
     t0 = pd.Timestamp("2026-01-01", tz="UTC")
     evdf = pd.DataFrame([
@@ -136,10 +137,10 @@ def test_past_moves_and_event_cleanup():
         {"ticker": "A", "type": "ex_dividend", "date": date(2026, 5, 5), "timing": None, "amount": None,
          "source": "yfinance", "first_seen_at": t0},
     ])
-    cleaned = ri._clean(evdf)
+    cleaned = event_history.drop_moved_upcoming(evdf)
     assert date(2026, 4, 20) not in set(cleaned["date"])
-    assert ri.earnings_events(cleaned)["A"] == [(date(2026, 1, 22), "after_close"), (date(2026, 4, 22), None)]
-    assert ri.dividend_events(cleaned)["A"] == [(date(2026, 2, 5), 0.5), (date(2026, 5, 5), 0.5)]
+    assert event_history.earnings_events(cleaned)["A"] == [(date(2026, 1, 22), "after_close"), (date(2026, 4, 22), None)]
+    assert event_history.dividend_events(cleaned)["A"] == [(date(2026, 2, 5), 0.5), (date(2026, 5, 5), 0.5)]
 
 
 def test_fit_cue_beta_recovers_slope():
@@ -149,11 +150,11 @@ def test_fit_cue_beta_recovers_slope():
     bench_r = np.r_[0.0, 0.4 * cue_r[:-1]] + rng.normal(0, 0.002, 300)    # reacts to yesterday's cue
     cue = pd.Series(100 * np.exp(np.cumsum(cue_r)), index=idx)
     bench = pd.Series(100 * np.exp(np.cumsum(bench_r)), index=idx)
-    b = ri.fit_cue_beta(bench, cue, None, 250)
+    b = index_cue.fit_cue_beta(bench, cue, None, 250)
     assert abs(b - 0.4) < 0.05
-    assert ri.fit_cue_beta(bench, cue, idx[30], 250) is None              # too little history
-    assert ri.enabled({"x": {"enabled": ["us"]}}, "x", "us") and not ri.enabled({"x": {"enabled": ["us"]}}, "x", "india")
-    assert not ri.enabled({}, "x", "us")
+    assert index_cue.fit_cue_beta(bench, cue, idx[30], 250) is None              # too little history
+    assert range_switches.enabled({"x": {"enabled": ["us"]}}, "x", "us") and not range_switches.enabled({"x": {"enabled": ["us"]}}, "x", "india")
+    assert not range_switches.enabled({}, "x", "us")
 
 
 # ---------- options collector ----------
@@ -168,10 +169,10 @@ def test_option_snapshot_interpolates_at_the_money():
     puts = chain([90, 95, 100, 105, 110], [0.42, 0.37, 0.32, 0.30, 0.29])
     assert abs(co.iv_at(calls, 102.5) - 0.29) < 1e-12
     assert co.iv_at(calls, 120) == 0.28        # the 1e-5 quote is ignored, nearest usable strike
-    snap = co.snapshot(calls, puts, 101.0)
+    snap = co.option_snapshot(calls, puts, 101.0)
     assert snap["strike"] == 100 and abs(snap["straddle"] - 2.2) < 1e-9
     assert abs(snap["atm_iv"] - (snap["call_iv"] + snap["put_iv"]) / 2) < 1e-6
-    assert co.snapshot(chain([], []), chain([], []), 100.0) is None
+    assert co.option_snapshot(chain([], []), chain([], []), 100.0) is None
 
 
 def test_options_collector_skips_markets_without_chains(tmp_path):
@@ -356,20 +357,21 @@ def test_ranges_config_per_market_override(tmp_path, monkeypatch):
     assert load_ranges_config("us")["earnings_vol_multiple"] == 3.0
     # every script loads the settings of the market it runs for (review's replay, calibrate, ...)
     import re
-    calls = {f"{f.name}:{m}" for f in sorted((Path(__file__).resolve().parents[1] / "scripts").glob("*.py"))
-             if f.name != "common.py" for m in re.findall(r"load_ranges_config\(([^)]*)\)", f.read_text())}
-    assert {c.split(":")[0] for c in calls} >= {"backtest.py", "calibrate.py", "ranges.py", "relations.py", "review.py"}
+    calls = {f"{f.name}:{m}" for f in sorted((Path(__file__).resolve().parents[1] / "scripts").rglob("*.py"))
+             if f.name not in ("common.py", "market_config.py") for m in re.findall(r"load_ranges_config\(([^)]*)\)", f.read_text())}
+    assert {c.split(":")[0] for c in calls} >= {"backtest.py", "calibration.py", "range_publication.py",
+                                                    "relation_flags.py", "review.py"}
     assert all(c.endswith(':cfg["market"]') for c in calls), calls
 
 
 def test_switches_per_market_and_horizon():
     rc = {"a": {"enabled": {"us": [1]}}, "b": {"enabled": {"india": True}}, "c": {"enabled": ["us"]},
           "d": {"enabled": True}}
-    assert ri.enabled(rc, "a", "us", 1) and not ri.enabled(rc, "a", "us", 5)
-    assert ri.enabled(rc, "a", "us") and not ri.enabled(rc, "a", "india", 1)
-    assert ri.enabled(rc, "b", "india", 5) and not ri.enabled(rc, "b", "us")
-    assert ri.enabled(rc, "c", "us", 5) and not ri.enabled(rc, "c", "india", 1)
-    assert ri.enabled(rc, "d", "india", 5) and not ri.enabled(rc, "e", "us", 1)
+    assert range_switches.enabled(rc, "a", "us", 1) and not range_switches.enabled(rc, "a", "us", 5)
+    assert range_switches.enabled(rc, "a", "us") and not range_switches.enabled(rc, "a", "india", 1)
+    assert range_switches.enabled(rc, "b", "india", 5) and not range_switches.enabled(rc, "b", "us")
+    assert range_switches.enabled(rc, "c", "us", 5) and not range_switches.enabled(rc, "c", "india", 1)
+    assert range_switches.enabled(rc, "d", "india", 5) and not range_switches.enabled(rc, "e", "us", 1)
 
 
 def test_event_dedupe_reads_every_file(tmp_path, monkeypatch):
@@ -469,21 +471,21 @@ def test_nse_earnings_from_real_results_filings():
     financial-results list before it, both bases), MARUTI incremental (quarters after its newest
     stored date). MARUTI's XBRL is filed after the close but its results announcement comes
     during the session, so the announcement time sets the timing."""
-    out, failed, notes = ce.nse_earnings(INDIA, replay_nse(), {"INFY": None, "MARUTI": date(2025, 1, 29)},
+    out, failed, notes = events_nse.nse_earnings(INDIA, replay_nse(), {"INFY": None, "MARUTI": date(2025, 1, 29)},
                                          date(2023, 10, 1), date(2026, 10, 5))
     assert failed == [] and notes == []
     assert [(d, tm) for d, tm, _ in out["INFY"]] == INFY_DATES
     assert [(d, tm) for d, tm, _ in out["MARUTI"]] == MARUTI_DATES
     assert {p for rows in out.values() for _, _, p in rows} == {0}          # filings beat yfinance
     # a ticker with stored history only takes quarters filed after it
-    out, _, _ = ce.nse_earnings(INDIA, replay_nse(), {"INFY": date(2026, 1, 14)}, date(2023, 10, 1), date(2026, 10, 5))
+    out, _, _ = events_nse.nse_earnings(INDIA, replay_nse(), {"INFY": date(2026, 1, 14)}, date(2023, 10, 1), date(2026, 10, 5))
     assert [(d, tm) for d, tm, _ in out["INFY"]] == INFY_DATES[-2:]
     # 2019 in the window: the March 2019 quarter was first filed in September (late XBRL), not used
-    out, _, notes = ce.nse_earnings(INDIA, replay_nse(), {"INFY": None}, date(2019, 1, 1), date(2026, 10, 5))
+    out, _, notes = events_nse.nse_earnings(INDIA, replay_nse(), {"INFY": None}, date(2019, 1, 1), date(2026, 10, 5))
     assert [(d, tm) for d, tm, _ in out["INFY"]] == [(date(2019, 10, 11), None)] + INFY_DATES   # calendar from 2020
     assert notes == ["INFY: 1 quarter(s) first filed after the SEBI deadline, not used"]
     # a symbol without responses is a failure for that ticker only
-    out, failed, _ = ce.nse_earnings(INDIA, replay_nse(), {"HDFCBANK": None, "INFY": date(2026, 1, 14)},
+    out, failed, _ = events_nse.nse_earnings(INDIA, replay_nse(), {"HDFCBANK": None, "INFY": date(2026, 1, 14)},
                                      date(2023, 10, 1), date(2026, 10, 5))
     assert [f["source"] for f in failed] == ["nse_earnings:HDFCBANK"] and list(out) == ["INFY"]
 
@@ -494,14 +496,14 @@ def test_nse_reports_release_window_and_deadline():
                (date(2025, 12, 31), ist("2026-01-14 08:00"))]                        # before the open
     releases = [ist("2026-07-23 13:30"),          # results PDF during the session, 4h10 before the XBRL
                 ist("2026-07-20 11:00")]          # board outcome 3 days earlier: another meeting
-    rows, late = ce.nse_reports(XBOM, filings, releases)
+    rows, late = events_nse.nse_reports(XBOM, filings, releases)
     assert late == 1
     assert rows == [(date(2026, 1, 14), "before_open", 0), (date(2026, 7, 23), "during", 0)]
-    rows, _ = ce.nse_reports(XBOM, filings, [ist("2026-07-21 23:00")])   # outside the 36h window
+    rows, _ = events_nse.nse_reports(XBOM, filings, [ist("2026-07-21 23:00")])   # outside the 36h window
     assert rows[-1] == (date(2026, 7, 23), "after_close", 0)
-    rows, late = ce.nse_reports(XBOM, filings, releases, after=date(2026, 1, 14))
+    rows, late = events_nse.nse_reports(XBOM, filings, releases, after=date(2026, 1, 14))
     assert rows == [(date(2026, 7, 23), "during", 0)] and late == 1
-    assert ce.max_filing_lag(date(2026, 3, 31)) == 63 and ce.max_filing_lag(date(2026, 6, 30)) == 48
+    assert events_nse.max_filing_lag(date(2026, 3, 31)) == 63 and events_nse.max_filing_lag(date(2026, 6, 30)) == 48
 
 
 def test_nse_due_polls_only_what_needs_it():
@@ -515,17 +517,17 @@ def test_nse_due_polls_only_what_needs_it():
               row("G", "2026-07-20", "nse_history"), row("G", "2026-07-22", "yfinance"),      # same report
               {"id": "A-ex_dividend-2026-10-02", "ticker": "A", "type": "ex_dividend", "date": "2026-10-02",
                "source": "yfinance"}]
-    due = ce.nse_due(stored, ["A", "B", "C", "D", "E", "F", "G"], date(2026, 10, 5))
+    due = events_nse.nse_due(stored, ["A", "B", "C", "D", "E", "F", "G"], date(2026, 10, 5))
     assert due == {"B": date(2026, 7, 1), "C": date(2026, 6, 20), "D": None, "E": None}
 
 
 def test_between_quarters():
     nse = [date(2024, 5, 22), date(2024, 8, 1), date(2025, 1, 10), date(2025, 4, 20)]
-    assert ce.between_quarters(date(2024, 7, 11), nse)          # 71 days apart: no quarter missing
-    assert ce.between_quarters(date(2024, 8, 1), nse)           # the report itself
-    assert not ce.between_quarters(date(2024, 10, 30), nse)     # 162-day gap: a quarter NSE lacks
-    assert not ce.between_quarters(date(2025, 5, 1), nse) and not ce.between_quarters(date(2024, 1, 1), nse)
-    assert not ce.between_quarters(date(2024, 7, 11), [])
+    assert event_timing.between_quarters(date(2024, 7, 11), nse)          # 71 days apart: no quarter missing
+    assert event_timing.between_quarters(date(2024, 8, 1), nse)           # the report itself
+    assert not event_timing.between_quarters(date(2024, 10, 30), nse)     # 162-day gap: a quarter NSE lacks
+    assert not event_timing.between_quarters(date(2025, 5, 1), nse) and not event_timing.between_quarters(date(2024, 1, 1), nse)
+    assert not event_timing.between_quarters(date(2024, 7, 11), [])
 
 
 class FakeTicker:
@@ -557,7 +559,7 @@ def run_events_main(monkeypatch, capsys, tmp_path, cfg: dict, yf_data: dict, tod
     monkeypatch.setattr(ce, "data_dir", lambda m: tmp_path / "data" / m)
     monkeypatch.setattr(paths, "data_dir", lambda m: tmp_path / "data" / m)
     monkeypatch.setattr(ce, "utc_today", lambda: today)
-    monkeypatch.setattr(ce, "nse_client", lambda c: replay_nse())
+    monkeypatch.setattr(nse_session, "nse_client", lambda c: replay_nse())
     monkeypatch.setattr(sys, "argv", ["collect_events.py"])
     assert ce.main() == 0
     return json.loads(capsys.readouterr().out)

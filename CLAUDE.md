@@ -15,12 +15,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   from NSE's bhavcopy when its price basis checks out, listed in `filled_from_nse` and recorded in
   `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config; both markets:
   a split or bonus confirmed by a Yahoo `Stock Splits` row, or for India by NSE's bhavcopy, is recorded
-  once in `data/<market>/adjustments/` (`scripts/adjust.py`) and applied on read by the `ohlc`/`bars`
+  once in `data/<market>/adjustments/` (`marketbrief/analytics/price_adjustments.py`) and applied on read by the `ohlc`/`bars`
   views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-base is a `warnings` entry and holds
   that symbol's new bars (`held`); a wrong record is cancelled by a later one with `supersedes`;
   DESIGN.md section 3), `collect_quotes`, `collect_events` (also backfills past earnings
-  days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
-  results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
+  days, India from NSE results filings, US from SEC 8-K item 2.02, every 2.02 stored as filed and kept only when it is a
+  quarter's results release when read (`event_history.results_filter`, anchored on stored 10-Q/10-K `periodic_report`
+  rows), and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
@@ -41,29 +42,30 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   each past day's 1d/5d ranges as `ranges.py` builds them, the regime, and direction baselines
   (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
   and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
-  Adaptive Conformal Inference (`aci.py`: per horizon x band x regime miss rate alpha_t updated from
+  Adaptive Conformal Inference (`adaptive_conformal.py`: per horizon x band x regime miss rate alpha_t updated from
   outcomes scored before `calibrate` runs; `aci:` in `config/ranges.yaml`, off by default; the weekly
   review shows alpha_t and proposes switching it on from a replay with the same settings, marked
   provisional unless its held-out check `--aci-tune-end` agrees). `ai_replay` replays the AI agents as of past
   days (never runs an LLM itself); ForecastBench leakage rule: only as-of dates after
   `model_training_cutoff` in `config/settings.yaml` are a fair test, earlier ones are labelled
   `contaminated` on every row and the score page and scored separately, never pooled. Formulas: `indicators.py` (PASDS file 06), `regime.py` (file 07),
-  `events.py` (calendar), `rangelib.py` (ranges; settings in `config/ranges.yaml`),
-  `range_inputs.py` (past earnings moves, ex-dividend shift, beta split, implied vol; each
+  `core/calendar.py` (exchange calendar and events), `range_math.py` (ranges; settings in `config/ranges.yaml`),
+  `event_history.py`, `earnings_reaction.py`, `index_cue.py`, `implied_volatility.py` and `range_switches.py` in
+  `marketbrief/analytics/` (past earnings moves, ex-dividend shift, beta split, implied vol; each
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them.
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
-  settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `prediction_rules.py`);
+  settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
-- India primary sources (NSE; shared session and replay guard in `nse.py`): `collect_nse_india`
+- India primary sources (NSE; shared session and replay guard in `marketbrief/collectors/nse_runner.py`, `nse_session.py` and `nse_replay_guard.py`): `collect_nse_india`
   -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
   Filing results per period and basis, FII/DII provisional flows, delivery %); context sections
-  from `nse_context.py`.
+  from `nse_sections.py`.
 - Relationships (DESIGN.md phase 5): `collect_relations_india` (NSE: SEBI PIT insider/promoter
   trades, bulk and block deals, shareholding and promoter pledges -> `data/india/insiders|deals|holdings/`),
-  `relations.py` (risk flags: big deals, pledge rises, insider sales; optional range widening in
+  `marketbrief/analytics/relation_flags.py` (risk flags: big deals, pledge rises, insider sales; optional range widening in
   `config/ranges.yaml`, off by default) and `graph.py` (connection map in `data/<market>/graph/`:
   `status`, `edges`, `hits` = second-order news, `add` = validate and append the graph-builder's edges,
   `attempt` = record the monthly refresh in `data/<market>/graph_runs/`)
@@ -79,12 +81,12 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   read: `check_sec_times.py` (run by the routine after the SEC collectors) appends header times to
   `data/<market>/sec_times/`; `core.database.connect` reads `accepted_at` of filings, insiders, stakes,
   holdings and fundamentals through them, and `ai_replay` filters those kinds by the same times.
-- Relationships, US (SEC EDGAR, helpers in `scripts/sec.py`): `collect_insiders` (Form 4),
+- Relationships, US (SEC EDGAR, helpers in `marketbrief/sources/sec_filings.py`): `collect_insiders` (Form 4),
   `collect_stakes` (13D/13G) and `collect_holdings` (13F for the filers and CUSIPs under
   `relationships:` in `config/markets/us.yaml`) write `data/us/insiders|stakes|holdings/`.
   Views `insider_flow`, `insider_cluster_buys`, `activist_stakes`, `holdings_filings`, `holdings_change` and
   `holdings_quarter` feed the context pack's "Smart money" section and a range risk note
-  (`scripts/smart_money.py`; the widen `activist_13d_factor` in `config/ranges.yaml` stays off).
+  (`marketbrief/analytics/smart_money.py`; the widen `activist_13d_factor` in `config/ranges.yaml` stays off).
 - Fundamentals, US (SEC XBRL company facts): `collect_fundamentals` writes 10-Q/10-K values
   (revenue, gross profit, operating and net income, diluted EPS, operating cash flow, capex, cash,
   debt parts, shares; quarter, H1/9M year-to-date and FY) to `data/us/fundamentals/`, one row per
@@ -92,7 +94,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/markets/us.yaml`). Views `fundamentals_latest` (newest filing wins), `fundamentals_quarterly`
   (Q4 = FY - 9M and quarterly cash flows derived, marked), `fundamentals_metrics` (YoY growth,
   margins, FCF), `fundamentals_balance` and `fundamentals_latest_report` feed the context pack's
-  "Fundamentals" section (`scripts/fundamentals.py`; no consensus estimates, so no "surprise").
+  "Fundamentals" section (`marketbrief/analytics/fundamentals.py`; no consensus estimates, so no "surprise").
   These views show today's knowledge (restatements replace originals); for anything as of a past
   time use the macros `fundamentals_latest_asof|quarterly_asof|metrics_asof(<timestamp>)`
 - Neo4j projection (DESIGN.md section 12): `neo4j_sync.py` copies each market's data and results
@@ -103,8 +105,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   through DuckDB; Neo4j is a derived copy that `--full` rebuilds from the repo. Idempotent MERGE
   batches, incremental by per-kind watermarks stored in Neo4j, `--dry-run` writes the statements to
   `work/neo4j_dryrun/`. Optional and non-blocking in the routine.
-- Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `scripts/sources.py`,
-  context sections in `scripts/macro_context.py`): `collect_macro` (US `macro:` config: Treasury
+- Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
+  context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
   `collect_shorts` (US `shorts:`: FINRA Reg SHO daily short-sale volume and short interest ->
   `data/us/shorts|short_interest/`), `collect_flows_india` (India `india_flows:`: NSDL daily FPI
@@ -115,7 +117,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   Press-release wire feeds (`watchlist_only: true`) match tickers on `wire_names` minus
   `news.wire_exclude`. BSE (api.bseindia.com) refuses cloud traffic, so India announcements stay NSE-only
 - News verification, phase A (DESIGN.md section 3a; deterministic, no LLM; helpers in
-  `scripts/news_verify.py`):
+  `marketbrief/analytics/news_sources.py`, `article_pages.py`, `article_extraction.py`, `text_measures.py`):
   - `collect_articles` reads the article pages behind this run's material watchlist headlines.
     It reads only from the HTTPS outlets allowlisted (vetted) in `config/news_sources.yaml`: a broad
     list of established media, trade press, data sites and primary sources, with tiers, agency names
@@ -145,7 +147,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
   `HttpClient` base under the Edgar, NSE, free-source, Neo4j and Slack clients; RSS and article-page access sit beside it). Callers import from
   it directly; `scripts/common.py` is only the patch point (`common.ROOT` and `common.CONFIG` read and write
-  `core.paths`; tests assign them), and `sources.py`, `nse.py`, `sec.py` keep the collectors' own helpers.
+  `core.paths`; tests assign them), and the collectors' own helpers live beside them: `collectors/` (the code of every `scripts/collect_*.py`, which are thin entry points), `analytics/` (formulas and range/news analytics; `scripts/features.py`, `calibrate.py`, `ranges.py`, `relations.py` and `news_clusters.py` are thin entry points), `pipeline/` and `presentation/`.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

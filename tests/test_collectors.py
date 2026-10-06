@@ -19,10 +19,11 @@ import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
-import collect_events  # noqa: E402
-import collect_options  # noqa: E402
-import collect_prices  # noqa: E402
-import collect_quotes  # noqa: E402
+from marketbrief.collectors import events as collect_events  # noqa: E402
+from marketbrief.collectors import events_sec, price_frames  # noqa: E402
+from marketbrief.collectors import options as collect_options  # noqa: E402
+from marketbrief.collectors import prices as collect_prices  # noqa: E402
+from marketbrief.collectors import quotes as collect_quotes  # noqa: E402
 from test_pipeline import MARKET, setup  # noqa: E402
 
 TODAY = date(2026, 10, 5)                    # Monday; XNYS previous session Friday 2026-10-02
@@ -164,9 +165,9 @@ def test_prices_stale_cue_after_a_week_and_empty_frame(env, monkeypatch, capsys)
 
 def test_prices_expected_bar_follows_the_exchange_calendar(env):
     cfg = load_market(MARKET)
-    assert collect_prices.expected_bar(cfg, "AAPL", date(2026, 11, 27)) == date(2026, 11, 25)  # Thanksgiving
-    assert collect_prices.expected_bar(cfg, "BENCH", date(2026, 10, 5)) == date(2026, 10, 2)
-    assert collect_prices.expected_bar(cfg, "CUE", date(2026, 10, 5)) == date(2026, 9, 28)
+    assert price_frames.expected_bar(cfg, "AAPL", date(2026, 11, 27)) == date(2026, 11, 25)  # Thanksgiving
+    assert price_frames.expected_bar(cfg, "BENCH", date(2026, 10, 5)) == date(2026, 10, 2)
+    assert price_frames.expected_bar(cfg, "CUE", date(2026, 10, 5)) == date(2026, 9, 28)
 
 
 # ---------- quotes ----------
@@ -308,10 +309,9 @@ def test_events_sec_errors_are_reported_beside_the_yahoo_failures(env, monkeypat
                 raise OSError("HTTP 503")
             return {"form": ["8-K"], "items": ["2.02"], "acceptanceDateTime": ["2026-07-30T16:30:00-04:00"]}
 
-    import sec
-    monkeypatch.setattr(sec, "Edgar", Edgar)
+    monkeypatch.setattr(events_sec, "Edgar", Edgar)
     us = {"market": "us", "calendar": "XNYS", "timezone": NY}
-    rows, failed = collect_events.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "t t@example.com")
+    rows, failed = events_sec.sec_earnings(us, {"AAPL": {}, "MSFT": {}}, "t t@example.com")
     assert list(rows) == ["AAPL"] and failed == [{"ticker": "MSFT", "cik": "789019", "error": "HTTP 503"}]
     path = common.CONFIG / "markets" / f"{MARKET}.yaml"
     path.write_text(path.read_text() + "filings: sec\n")
@@ -323,7 +323,7 @@ def test_events_sec_errors_are_reported_beside_the_yahoo_failures(env, monkeypat
     assert out["sec_failed"] == [{"ticker": "MSFT", "cik": "789019", "error": "HTTP 503"}]
     assert out["sec_error"] is None and out["sec_tickers"] == 1
     assert out["failed"] == [{"ticker": "MSFT", "what": "calendar", "error": "empty calendar"}]
-    monkeypatch.setattr(sec, "Edgar", None)                       # the whole SEC step fails
+    monkeypatch.setattr(events_sec, "Edgar", None)                       # the whole SEC step fails
     code, out = run_main(collect_events, monkeypatch, capsys)
     assert out["sec_error"] and out["sec_failed"] == []
     assert out["failed"] == [{"ticker": "MSFT", "what": "calendar", "error": "empty calendar"}]

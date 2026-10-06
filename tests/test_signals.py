@@ -12,9 +12,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-import events as ev  # noqa: E402
-import indicators as ind  # noqa: E402
-import regime as rg  # noqa: E402
+from marketbrief.core import calendar as ev  # noqa: E402
+from marketbrief.analytics import indicators as ind  # noqa: E402
+from marketbrief.analytics import regime as rg  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 
 TH = {"unstable_vol": 28, "event_vol": 20, "calm_vol": 16, "unstable_bench_vol": 0.25,
@@ -30,9 +30,9 @@ def bars(closes, spread=1.0, volume=None):
 
 def test_returns_and_nulls():
     df = bars([100, 110, 121])
-    assert ind.ret(df["close"], 1) == pytest.approx(0.10)
-    assert ind.ret(df["close"], 2) == pytest.approx(0.21)
-    assert ind.ret(df["close"], 5) is None                     # too few bars -> explicit null
+    assert ind.period_return(df["close"], 1) == pytest.approx(0.10)
+    assert ind.period_return(df["close"], 2) == pytest.approx(0.21)
+    assert ind.period_return(df["close"], 5) is None                     # too few bars -> explicit null
     assert ind.ema_ratio(df["close"]) is None
 
 

@@ -5,7 +5,7 @@
 --          count(*) AS articles, avg(sentiment) AS avg_sentiment
 --   FROM news_ticker_day GROUP BY ALL ORDER BY period;
 
--- Splits and bonus issues (issue #31; scripts/adjust.py): one row per corporate action, the
+-- Splits and bonus issues (issue #31; marketbrief/analytics/price_adjustments.py): one row per corporate action, the
 -- first detected wins; a record named by a later row's `supersedes` (a hand-made correction,
 -- factor 1.0 to cancel or the right factor) is left out. Applied on read by ohlc and bars below.
 CREATE OR REPLACE VIEW price_adjustments AS
@@ -54,7 +54,7 @@ WINDOW w AS (PARTITION BY ticker ORDER BY date);
 
 -- News with corrected ticker tags. Tags are derived, and rows are append-only, so rows written
 -- before the current tagger (tag_version NULL) are re-tagged on read by news_retag
--- (scripts/news_tags.py, registered in common.connect): headline first with the config's precise
+-- (marketbrief/analytics/news_tags.py, registered in common.connect): headline first with the config's precise
 -- names minus `news_exclude` (never from news.google.com links, source names or a query hit
 -- alone), split into primary_tickers / mentioned_tickers with tag_confidence. Old wire rows whose
 -- title names no company keep their tags as mentioned. `news_stored` is the rows as stored.
@@ -111,7 +111,7 @@ ORDER BY ticker, type, first_seen_at DESC, date;
 
 -- Every company event ever seen, once per id (past earnings days and dividends for ranges; SEC
 -- markets also hold `periodic_report` rows, 10-Q/10-K acceptances with period_end). Not every
--- sec_history earnings row is a results release: read earnings through range_inputs.earnings_events.
+-- sec_history earnings row is a results release: read earnings through event_history.earnings_events.
 CREATE OR REPLACE VIEW event_history AS
 SELECT DISTINCT ON (id) * FROM events WHERE ticker IS NOT NULL ORDER BY id, first_seen_at;
 

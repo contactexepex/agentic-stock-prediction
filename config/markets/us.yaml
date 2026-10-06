@@ -60,7 +60,7 @@ sectors:
   Retail: [WMT, COST]
   Industrials: [CAT, DE]
 
-# News tagging (scripts/news_tags.py): a ticker is tagged when one of its `news_names` (default:
+# News tagging (marketbrief/analytics/news_tags.py): a ticker is tagged when one of its `news_names` (default:
 # name + aliases) occurs as a whole word, case-insensitively, in the title (the plain-text summary
 # only when the title names no watchlist company),
 # after that ticker's `news_exclude` regexes were removed. Names and aliases must be unambiguous

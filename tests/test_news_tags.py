@@ -1,4 +1,4 @@
-"""News ticker tagging (scripts/news_tags.py): plain-text summaries (no tag from news.google.com
+"""News ticker tagging (marketbrief/analytics/news_tags.py): plain-text summaries (no tag from news.google.com
 links), precise names with per-ticker exclusions, Google News dedupe by title + source domain,
 and the re-tag on read of stored rows (the `news` view over `news_stored`)."""
 from __future__ import annotations
@@ -20,7 +20,7 @@ import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
-from news_tags import TAG_VERSION, Tagger, item_id, plain_text, source_domain  # noqa: E402
+from marketbrief.analytics.news_tags import TAG_VERSION, Tagger, item_id, plain_text, source_domain  # noqa: E402
 
 GNEWS_SUMMARY = ('<a href="https://news.google.com/rss/articles/CBMigAFBVV95cUxOZ2JWNUhN?oc=5" '
                  'target="_blank">{title}</a>&nbsp;&nbsp;<font color="#6f6f6f">{source}</font>')
@@ -196,7 +196,7 @@ def test_collector_same_title_from_two_domains_is_two_rows(tmp_path):
 
 def test_collector_skips_items_stored_under_the_old_id(tmp_path):
     """Rows stored before ids used the source domain (title + source label) are not re-collected."""
-    from news_tags import article_id
+    from marketbrief.analytics.news_tags import article_id
     root, cfg = tmp_path / "repo", tmp_path / "config"
     (cfg / "markets").mkdir(parents=True)
     t = "HDFC Bank shares slip 2% despite CEO clarity"
