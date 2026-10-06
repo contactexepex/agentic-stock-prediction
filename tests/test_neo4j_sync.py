@@ -56,9 +56,9 @@ SENTINELS = ["SENTINEL-TITLE-7731", "Jane SENTINEL Doe", "SENTINEL Big Fund", "S
 DATA: dict[str, list[dict]] = {
     "news": [
         {"id": "n1", "title": "SENTINEL-TITLE-7731 Alpha cuts guidance", "url": "https://e.com/n1", "source": "Wire",
-         "published_at": T1, "first_seen_at": T1, "feed": "f", "category": "c", "tickers": ["AAA"]},
+         "published_at": T1, "first_seen_at": T1, "feed": "f", "category": "c", "tickers": ["AAA"], "tag_version": 2},
         {"id": "n2", "title": "Alpha and Beta \"quoted\" 'name' } { ) news", "url": "https://e.com/n2", "source": "Wire",
-         "published_at": T2, "first_seen_at": T2, "feed": "f", "category": "c", "tickers": ["AAA", "BBB"]},
+         "published_at": T2, "first_seen_at": T2, "feed": "f", "category": "c", "tickers": ["AAA", "BBB"], "tag_version": 2},
     ],
     "news_enriched": [
         {"id": "n1", "analyzed_at": T1, "relevance": 0.9, "sentiment": -0.5, "materiality": "high",

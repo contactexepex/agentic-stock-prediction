@@ -52,6 +52,39 @@ de-duplicated by accession number in `sec.ticker_submissions` (issue #23).
 | Sectors | One ETF per watchlist sector (10): eight SPDR sector ETFs, JETS (airlines), IAK (insurance) | Nifty Bank, IT and Pharma indices (none for the other seven sectors; see `config/markets/india.yaml`) |
 | News sources | Google News (US), CNBC, BBC; PR Newswire, Business Wire earnings and GlobeNewswire releases (watchlist names only) | Google News (IN), Economic Times, Moneycontrol, Livemint, Business Standard, BusinessLine |
 
+**News ticker tags** (`scripts/news_tags.py`, issues #28/#29): headline first. A ticker is
+tagged when one of its `news_names` (default `name` + `aliases`; full names or unambiguous
+aliases such as "M&M", "L&T", "NVDA") occurs as a whole word, case-insensitively, in the TITLE,
+after the ticker's `news_exclude` phrases are removed ("Kotak Mahindra", "Tech Mahindra" for M&M;
+"ITC Hotels"; "Chevron deference"). Only when the title names no watchlist company is the
+plain-text summary used (HTML, URLs/domains and the outlet name removed: every Google News
+summary is a `news.google.com` link, which used to tag nearly everything GOOGL). Roles:
+`primary_tickers` = companies named in the title (all of them when several), except in a
+comparison ("X vs Y") or a list ("TCS, Infosys and Wipro ...", "Stocks to watch: A, B, C";
+commas or slashes, not ";"), where they are `mentioned_tickers`, as is a company found only in
+the summary, and a company acting on or holding another one (`Tagger.is_actor`): analyst
+actions ("JPMorgan cuts target for Aon", "target raised by JPMorgan", "Bank of America upgrades
+DraftKings"), holdings ("shares of X bought by Bank of America Corp", "takes stake in"), venues
+("present at Bank of America 2026 conference", "Bank of America Plaza"); tickers with
+`broker: true` (JPM, BAC) also as research arms, commentators ("JPMorgan sees", "says
+JPMorgan") and in their own picks or views ("JPMorgan's October stock picks"). Names also match
+as `(TICKER)`, `(TICKER:EXCH)` or `(EXCH: TICKER)`, case-sensitive.
+`tag_confidence` is high only for a title naming exactly one company as primary, low for every
+other tagged item: the hook for a later LLM aboutness check by the news-analyst (not built);
+`news_ticker_day` carries `role` and `tag_confidence`, and the context pack's news table counts
+`primary_7d` and `low_conf_7d`. A Google News query for a company only finds candidates: its
+results include market wraps and politics that never name the company, so the hit alone does
+not tag. Press-release wires match `wire_names` the same way. Identity: normalized title +
+the RSS `<source url>` domain, so "Business Today" and "businesstoday.in" copies of one article
+are one item (ids stored before that are still recognised as seen). Rows carry `tag_version`;
+because `tickers` is derived and `data/` is append-only, older rows are re-tagged on read: the
+stored rows are the DuckDB view `news_stored`, and `news` (used by `news_ticker_day`, the context
+pack, graph hits, view_data and the Neo4j copy) applies `news_retag` (registered in
+`common.connect`): stored title with the current rules (old wire rows whose title names no
+company keep their stored tags as mentioned, low). Old outlet rows lose tags found only in their
+summary (not stored). The Neo4j copy needs `neo4j_sync.py --full` once
+to drop mention edges synced before the fix.
+
 **Event calendar:** earnings, ex-dividend, F&O expiry, Fed/FOMC, RBI policy, CPI/jobs releases,
 index rebalances (S&P 500 quarterly, Nifty 50 semi-annual; listed, not major).
 

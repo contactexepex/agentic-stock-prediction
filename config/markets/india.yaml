@@ -59,6 +59,11 @@ sectors:
   Construction: [LT, ULTRACEMCO]
   Metals: [TATASTEEL, HINDALCO]
 
+# News tagging (scripts/news_tags.py): a ticker is tagged when one of its `news_names` (default:
+# name + aliases) occurs as a whole word, case-insensitively, in the title (the plain-text summary
+# only when the title names no watchlist company),
+# after that ticker's `news_exclude` regexes were removed (other listed companies sharing a name).
+# Names and aliases must be unambiguous; a Google News query hit alone does not tag.
 tickers:
   HDFCBANK:   {yahoo: HDFCBANK.NS, name: HDFC Bank, adr: HDB}
   ICICIBANK:  {yahoo: ICICIBANK.NS, name: ICICI Bank, adr: IBN}
@@ -66,17 +71,24 @@ tickers:
   TCS:        {yahoo: TCS.NS, name: Tata Consultancy Services, aliases: [TCS]}
   SBILIFE:    {yahoo: SBILIFE.NS, name: SBI Life Insurance, aliases: [SBI Life]}
   HDFCLIFE:   {yahoo: HDFCLIFE.NS, name: HDFC Life, aliases: [HDFC Life Insurance]}
-  ADANIPORTS: {yahoo: ADANIPORTS.NS, name: Adani Ports, aliases: [APSEZ]}
+  ADANIPORTS: {yahoo: ADANIPORTS.NS, name: Adani Ports, aliases: [APSEZ, Adani Ports and SEZ]}
   INDIGO:     {yahoo: INDIGO.NS, name: InterGlobe Aviation, aliases: [IndiGo]}
-  RELIANCE:   {yahoo: RELIANCE.NS, name: Reliance Industries, aliases: [RIL]}
+  RELIANCE:   {yahoo: RELIANCE.NS, name: Reliance Industries, aliases: [RIL, Reliance Jio, Jio Platforms, Reliance Retail]}
   ONGC:       {yahoo: ONGC.NS, name: ONGC, aliases: [Oil and Natural Gas Corporation]}
-  SUNPHARMA:  {yahoo: SUNPHARMA.NS, name: Sun Pharma, aliases: [Sun Pharmaceutical]}
+  SUNPHARMA:  {yahoo: SUNPHARMA.NS, name: Sun Pharma, aliases: [Sun Pharmaceutical],
+               news_exclude: ['Sun Pharma Advanced Research']}
   DRREDDY:    {yahoo: DRREDDY.NS, name: Dr Reddy's, aliases: ["Dr. Reddy's"], adr: RDY}
-  M&M:        {yahoo: M&M.NS, name: Mahindra & Mahindra, aliases: [Mahindra]}
-  MARUTI:     {yahoo: MARUTI.NS, name: Maruti Suzuki}
+  # "Mahindra" alone is the company ("Mahindra SUV sales rise") once other listed or unrelated
+  # companies with Mahindra in the name are removed (news_exclude)
+  M&M:        {yahoo: M&M.NS, name: Mahindra & Mahindra, aliases: [M&M, Mahindra and Mahindra, Mahindra],
+               news_exclude: ['Kotak Mahindra\w*', 'Tech Mahindra', 'SML Mahindra', 'Club Mahindra',
+                              'Mahindra (?:Lifespaces?|Holidays|Logistics|CIE|EPC|Finance|Manulife|Susten)\w*',
+                              'M&M Financ\w*', 'Mahindra (?:&|and) Mahindra Financ\w*']}
+  MARUTI:     {yahoo: MARUTI.NS, name: Maruti Suzuki, aliases: [Maruti]}
   HINDUNILVR: {yahoo: HINDUNILVR.NS, name: Hindustan Unilever, aliases: [HUL]}
-  ITC:        {yahoo: ITC.NS, name: ITC, queries: ['"ITC Ltd" share']}
-  LT:         {yahoo: LT.NS, name: Larsen & Toubro, aliases: [L&T]}
+  ITC:        {yahoo: ITC.NS, name: ITC, queries: ['"ITC Ltd" share'], news_exclude: ['ITC Hotels']}
+  LT:         {yahoo: LT.NS, name: Larsen & Toubro, aliases: [L&T],
+               news_exclude: ['L&T (?:Finance|Technology Services|Tech|Infotech)\w*', 'Larsen & Toubro Infotech']}
   ULTRACEMCO: {yahoo: ULTRACEMCO.NS, name: UltraTech Cement, aliases: [UltraTech]}
   TATASTEEL:  {yahoo: TATASTEEL.NS, name: Tata Steel}
   HINDALCO:   {yahoo: HINDALCO.NS, name: Hindalco}
