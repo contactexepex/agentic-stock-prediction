@@ -46,7 +46,8 @@ Fixed inputs:
   appends do not change the inputs;
 - a synthetic overlay built by rules in `tests/golden/overlay.py`: stored calls of ISO week 2026-W39
   (the first 3 tickers of each market, 1d and 5d, every weekday 2026-09-21..25), a forecaster file
-  (`work/predictions.jsonl`: one 5d call per ticker with news, citing a real stored news id, plus one
+  (`work/predictions.jsonl`: one 5d call per ticker with news, citing a real stored news id, preceded
+  by the ticker's first stored filing or NSE announcement when it has one, plus one
   call that breaks the rules: confidence 0.95 and an unknown evidence id), number-free lessons for
   the reflector's role, and number-free sentences in place of the report's AGENT markers;
 - seeded kinds (`tests/golden/seed.py`, `tests/golden/seed_sources.py`). The pinned data has no rows
@@ -90,9 +91,9 @@ Phases (seed first, then two per market, each with a frozen clock):
 |---|---|---|---|
 | seed | 2026-10-05T02:00Z | 2026-10-05T12:00Z | the collectors above, into the seed root |
 | pre_open | 2026-10-05T02:40Z | 2026-10-05T12:15Z | bars current; rows collected later that day are flagged by validate (SCHEMA: time in the future); scoring of the W39 calls (27 India and 30 US outcomes); US publishes 40 ranges (1d and 5d, using the seeded option IV); India's ranges for as-of 2026-10-01 are already stored (skip path); report, charts, HTML, Slack dry run |
-| late | 2026-10-06T02:30Z | 2026-10-06T12:15Z | every stored input visible; bars a session behind (STALE_BARS, MISSING_REGIME failures); scoring again (nothing new to score); lessons (27 and 30 added); news clusters (15 and 20 written); forecaster gate (the rule-breaking call dropped, 3 calls appended per market); ranges.py on the late path (as-of bars a session behind: target session closed, nothing published); review; spot-check; backtest; replays; ai_replay; Neo4j dry run |
+| late | 2026-10-06T02:30Z | 2026-10-06T12:15Z | every stored input visible; bars a session behind (STALE_BARS, MISSING_REGIME failures); scoring again (nothing new to score); lessons (27 and 30 added); news clusters (15 and 20 written); claims prepare (7 and 10 clusters selected; no filing text without an SEC user agent); news status (15 and 20 rows: India 3 single_source, 12 unverified; US 13 promotional, 1 single_source, 6 unverified); forecaster gate (the rule-breaking call dropped; the calls whose main evidence is an unverified news id dropped by NEWS_STATUS_MAIN; 1 call appended per market, citing a stored filing or announcement first); ranges.py on the late path (as-of bars a session behind: target session closed, nothing published); review; spot-check; backtest; replays; ai_replay; Neo4j dry run |
 
-Commands covered: 11 seed runs, then 49 script runs per market (98), plus 5 synthetic-input steps per
+Commands covered: 11 seed runs, then 51 script runs per market (102), plus 5 synthetic-input steps per
 market; the lists are `seed_steps()` in seed.py and `steps()` in golden.py:
 
 | script | invocations (per market unless noted) |
@@ -103,6 +104,8 @@ market; the lists are `seed_steps()` in seed.py and `steps()` in golden.py:
 | lessons.py | `prepare`, `validate F`, `add F` |
 | features.py, calibrate.py | pre_open, late |
 | news_clusters.py | late |
+| claims.py | `prepare` (late) |
+| news_status.py | late |
 | context.py | x4 (before and after ranges, both phases; stdout saved as work/context.md) |
 | ranges.py | pre_open, late |
 | review.py | `--week 2026-W39`, then `--if-due --week 2026-W39` (not-due path) |
@@ -133,7 +136,9 @@ pledge_changes, graph_edges, announcements_*, financials_*, flows_daily, deliver
 options_latest) run on those rows.
 
 Still running on empty or no data (explicitly uncovered):
-- kinds with no rows: news_articles (collect_articles needs article pages), adjustments (no split in
+- kinds with no rows: news_articles (collect_articles needs article pages), news_claims and
+  primary_texts (no claim-checker and no SEC text in the harness; tests/test_news_claims.py covers
+  them on fixtures), adjustments (no split in
   the window), judgments, range_outcomes (the stored ranges' targets have no bars yet), US graph and
   India stakes/fundamentals (not applicable to that market);
 - context sections that stay empty: in the late phase "Overnight cues" (the stored quotes are of

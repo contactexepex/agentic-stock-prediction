@@ -19,7 +19,8 @@ Stages (each runs after the routine step of the same name):
 - features: every watchlist ticker has a feature row for its latest bar and a regime row exists.
 - context:  work/context.md exists, is the pack of today and names every watchlist ticker.
 - forecast: work/predictions.jsonl before it is appended (prediction_rules.check_prediction,
-            evidence published before made_at, no calls on a late or mid-session run).
+            evidence published before made_at, no calls on a late or mid-session run, and each cited
+            id's news verification status as of made_at: NEWS_STATUS_* codes; forecast_gate.py).
 - report:   files appended since collect (news_enriched, predictions, ranges) as in collect; no
             AGENT markers left; each number in the agent-written lines of the report, the Slack
             draft and today's daily summary matches a source number of the same kind and scope
@@ -44,8 +45,8 @@ import market_status
 from marketbrief.core.paths import data_dir
 import narrative_numbers as nn
 from marketbrief.core.settings import load_settings, load_validate_config
-from marketbrief.utils.timefmt import as_utc_timestamp
-from prediction_rules import check_prediction
+from marketbrief.pipeline import forecast_gate
+from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 from marketbrief.core import cli, clock, database, market_config, paths, schemas
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
@@ -143,7 +144,6 @@ def read_rows(p: Path) -> tuple[list[dict], list[str]]:
     return rows, problems
 
 
-ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]00:?00)$")
 
 
 def type_problem(v, typ: str, csv_row: bool) -> str | None:
@@ -537,64 +537,10 @@ def stage_context(res, cfg, con, st, now, today, vc, path: Path | None = None):
         res.block("CONTEXT_INCOMPLETE", "no 'Market regime' section")
 
 
-# ---------- forecast ----------
+# ---------- forecast (marketbrief/pipeline/forecast_gate.py) ----------
 
-def evidence_times(con) -> dict:
-    """Citable id -> when it became public (UTC): news published_at, SEC acceptance (else the end
-    of the filing date), NSE announcement time; first_seen_at when nothing else is stored."""
-    out = {}
-    for sql in ("SELECT id, coalesce(published_at, first_seen_at) FROM news",
-                "SELECT id, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ), first_seen_at) FROM filings",
-                "SELECT id, coalesce(published_at, first_seen_at) FROM announcements"):
-        for i, t in con.execute(f"SELECT * FROM ({sql}) ORDER BY 1, 2").fetchall():   # per id the earliest wins
-            out.setdefault(i, as_utc_timestamp(t))
-    return out
-
-
-def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):
-    path = path or work_dir() / "predictions.jsonl"
-    if not path.exists() or path.stat().st_size == 0:
-        res.info["forecast"] = "no predictions (abstained or not run)"
-        return
-    raw = path.read_text(encoding="utf-8")
-    if not raw.endswith("\n"):
-        res.block("BAD_FILE", f"{path.name}: last line has no newline (truncated write?)")
-    lines = [x for x in raw.splitlines() if x.strip()]
-    if lines and (st["late_run"] or st["in_session"]):
-        why = "late run" if st["late_run"] else "mid-session run"
-        res.block("CALLS_NOT_ALLOWED", f"{why}: the forecaster must abstain on every ticker, but "
-                  f"{path.name} holds {len(lines)} record(s)")
-    feats = con.execute("SELECT DISTINCT ON (ticker) ticker, as_of_date, quality, days_to_earnings FROM features_latest "
-                        "ORDER BY ticker, as_of_date DESC").df()
-    ctx = {"tickers": set(cfg["tickers"]),
-           "features": {r.ticker: {"quality": r.quality,
-                                   "days_to_earnings": None if pd.isna(r.days_to_earnings) else int(r.days_to_earnings)}
-                        for r in feats.itertuples()}, "evidence": evidence_times(con)}
-    as_of = {r.ticker: pd.Timestamp(r.as_of_date).date() for r in feats.itertuples()}
-    seen = {r[0] for r in con.execute("SELECT id FROM predictions").fetchall()}
-    tol = pd.Timedelta(minutes=vc["future_tolerance_minutes"])
-    good = 0
-    for i, line in enumerate(lines, 1):
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError as e:
-            res.block("FORECAST_RULE", f"line {i}: not JSON ({e.msg})")
-            continue
-        errs = check_prediction(rec, ctx, seen, as_of=as_of, require_made_at=True)
-        made = as_utc_timestamp(rec.get("made_at")) if isinstance(rec, dict) else None
-        if made is not None:
-            if made > now + tol:
-                errs.append(f"made_at {rec['made_at']} is in the future")
-            if not ISO_UTC.match(str(rec["made_at"])):
-                errs.append("made_at is not ISO 8601 UTC")
-        tk = [rec.get("ticker")] if isinstance(rec, dict) and rec.get("ticker") else []
-        if errs:
-            res.block("FORECAST_RULE", f"line {i} ({rec.get('id') if isinstance(rec, dict) else '?'}): " + "; ".join(errs), tk)
-        else:
-            good += 1
-        if isinstance(rec, dict) and rec.get("id"):
-            seen.add(rec["id"])
-    res.info["forecast"] = {"records": len(lines), "valid": good}
+def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):  # noqa: ARG001
+    forecast_gate.stage_forecast(res, cfg, con, st, now, vc, path or work_dir() / "predictions.jsonl")
 
 
 # ---------- report: numbers in narrative (matching in narrative_numbers.py) ----------

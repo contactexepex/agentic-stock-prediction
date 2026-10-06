@@ -104,7 +104,7 @@ domains:
   nasdaq.com: {tier: tier2, names: [Nasdaq]}
   thestreet.com: {tier: tier2, names: [TheStreet, The Street]}
   # contributor articles are opinion (never an independent factual origin); its news desk is /news/
-  seekingalpha.com: {tier: tier2, names: [Seeking Alpha], opinion_unless_path: /news/}
+  seekingalpha.com: {tier: tier2, names: [Seeking Alpha], opinion_unless_path: /news/}   # no known URL (undecoded link): opinion
   investopedia.com: {tier: tier2, names: [Investopedia]}
   kiplinger.com: {tier: tier2, names: [Kiplinger]}
   fortune.com: {tier: tier2, names: [Fortune]}
@@ -210,3 +210,13 @@ clusters:
   copy_containment: 0.5         # MinHash 6-shingle containment at or above this = same origin (and same event)
   min_shingles: 30              # both texts need this many shingles for the copy test
   sec_forms: [8-K, 8-K/A, 6-K, 10-Q, 10-K, 20-F, SC 13D, SCHEDULE 13D, SC 13D/A, 425, S-1, DEFA14A]
+
+# News verification phase B (scripts/claims.py, scripts/news_status.py; docs/DESIGN.md 3b).
+claims:
+  min_priority: 3               # clusters whose best item title weighs this much in material_terms are claim-checked
+  max_clusters_per_run: 15      # highest weight, then newest first; a cluster row already checked is skipped
+  items_per_cluster: 20         # items listed per cluster in the claim-checker's input
+  input_max_chars: 12000        # primary text shown per source in the input (quotes are checked against all stored text)
+  primary_text_forms: [8-K, 8-K/A, 6-K]   # SEC forms whose main document and EX-99 exhibits are stored as text
+  primary_max_docs: 3           # documents per filing (the main document first, then EX-99 exhibits by name)
+  primary_max_chars: 40000      # characters of text kept per document (truncated: true beyond)

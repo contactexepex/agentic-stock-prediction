@@ -19,6 +19,7 @@ import scoring
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.constants.formatting import CURRENCY_SYMBOLS
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
+from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.utils.money import format_money
 from marketbrief.utils.numbers import json_safe_float
 from score_predictions import is_late
@@ -153,6 +154,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         sources[x.id] = {"title": f"{x.ticker}: {x.subject}", "url": safe_url(x.url), "source": x.source or "NSE",
                          "ts": _ts(x.published_at)}
 
+    statuses = EvidenceStatuses(con)   # news verification status of cited and listed news (evidence_status.py)
     mevents = ev.market_events(cfg, as_of + timedelta(days=1), as_of + timedelta(days=21))
     by = {(r.ticker, int(r.horizon_days)): r for r in ranges.itertuples()}
     pred_by = {(p.ticker, int(p.horizon_days)): p for p in preds.itertuples()} if len(preds) else {}
@@ -193,7 +195,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                     calls.append({"h": x["h"], "direction": x["direction"], "confidence": x["confidence"],
                                   "target_label": x["target_label"],
                                   "rationale": (p.rationale if p is not None else None),
-                                  "evidence": [{"id": i, **sources[i]} if i in sources else {"id": i} for i in ids]})
+                                  "evidence": [{"id": i, **sources.get(i, {}),   # status as of the call's made_at
+                                                "verification": statuses.of(i, t, p.made_at)} for i in ids]})
             cited = {e["id"] for c in calls for e in c["evidence"]}
             items = []
             for x in news.itertuples():
@@ -204,6 +207,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 if ts is None or (window_start is not None and not (window_start <= ts <= made_at)):
                     continue
                 items.append({"id": x.id, "title": x.title, "url": safe_url(x.url), "source": x.source, "ts": _ts(ts),
+                              "verification": statuses.of(x.id, t, made_at),
                               "cited": x.id in cited, "rank": (x.id in cited, MATERIALITY.get(x.materiality or "", 0),
                                                                json_safe_float(x.relevance) or 0.0, ts.isoformat())})
             items.sort(key=lambda i: i["rank"], reverse=True)

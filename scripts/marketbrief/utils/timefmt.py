@@ -1,9 +1,12 @@
 """Timestamp parsing and formatting shared by the scripts."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 import pandas as pd
+
+ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]00:?00)$")
 
 
 def as_utc_timestamp(value) -> pd.Timestamp | None:

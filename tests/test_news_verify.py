@@ -728,3 +728,44 @@ def test_label_and_domain_keys_are_one_outlet(src):
     assert nv.outlet_key(nv.outlet_of("ad-hoc-news.de", src, learned), "ad-hoc-news.de") == "ad-hoc-news.de"
     assert nv.outlet_key(nv.outlet_of("The CSR Universe", src, learned), "The CSR Universe") == "thecsruniverse.com"
     assert nv.outlet_key(None, "Some Blog") == "label:some blog"
+
+
+
+def test_agency_evidence_verifies_an_unread_vetted_headline(src):
+    """Issue #37: an unread headline from a vetted outlet that carries agency evidence (a "By Reuters"
+    title on Investing.com, which refuses cloud traffic) is a verified origin, not an unread one."""
+    c = news_clusters.cluster_ticker([
+        _item(1, "Chevron elevates CFO to head oil and gas operations By Reuters", outlet="investing.com",
+              vetted=True, wire="Reuters", ev="title")], CVX_CFG, src)[0]
+    assert c["origins"] == ["wire:Reuters"] and c["independent_origins"] == 1 and c["unread_vetted_origins"] == 0
+
+
+def test_agency_source_label_vets_an_item_without_an_allowlisted_domain(env, capsys):
+    """Issue #37: the agency itself (its Google News source label) is vetted even when its domain is not
+    allowlisted (afp.com)."""
+    src = nv.load_sources()
+    assert src.lookup("afp.com")[0] is None
+    env.write("news", [news_row(43, "Chevron names Jeff Gustavson next CFO", "CVX", source="AFP", domain="afp.com")])
+    items = {i["id"]: i for i in news_clusters.load_items(connect(MARKET), load_market(MARKET), src, pd.Timestamp(NOW))}
+    assert items["n43"]["vetted"] and items["n43"]["wire"] == "AFP" and items["n43"]["wire_ev"] == "source"
+
+
+def test_unvetted_item_inside_a_vetted_group_is_listed(src):
+    """Issue #37: an unvetted item that joined a vetted agency group is still listed in unvetted_ids."""
+    title = "Chevron names Jeff Gustavson next CFO, Reuters reports"
+    c = news_clusters.cluster_ticker([
+        _item(1, title, outlet="dubiousdaily.xyz", vetted=False, wire="Reuters", ev="title"),
+        _item(2, "Chevron names Jeff Gustavson next CFO", outlet="bnnbloomberg.ca", vetted=True, read=True,
+              wire="Reuters", ev="byline")], CVX_CFG, src)[0]
+    assert c["independent_origins"] == 1 and c["unvetted_ids"] == ["v1"]
+
+
+def test_label_letters_never_map_to_an_allowlisted_domain(src):
+    """Issue #37: a label-only row whose letters equal an allowlisted domain's first part ("BNNBloomberg",
+    not a configured name) is not mapped to that domain: vetting comes from a configured name or the
+    row's own domain. An unlisted domain is still learned this way ("Pluang" -> pluang.com)."""
+    pairs = [("BNNBloomberg", None), ("BNN Bloomberg", "bnnbloomberg.ca"), ("Pluang", None), ("pluang.com", "pluang.com")]
+    assert src.lookup("bnnbloomberg.ca")[0] and src.domain_of_label("BNNBloomberg") is None
+    assert nv.label_domains(pairs)["bnnbloomberg"] == "bnnbloomberg.ca"          # without the guard
+    learned = nv.label_domains(pairs, src)
+    assert "bnnbloomberg" not in learned and learned["pluang"] == "pluang.com"

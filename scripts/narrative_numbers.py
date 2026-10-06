@@ -13,6 +13,9 @@ rounds to it:
   filings and announcement text count only for the ids the sentence (or its line) cites.
 Ignored: dates, times, years, ids, links, tokens mixing letters and digits (5d, Q2, FY26), names
 with digits (S&P 500), list numbering, and bare integers up to `small_int` (counts and labels).
+Read as amounts before that: `Rs1915.85` (as `Rs 1915.85`), and a currency amount with a B or M
+suffix (`$12B` = 12 bn, `₹3.8M` = 3.8 mn). A bare whole number from 1900 to 2099 with no currency
+or unit (`closed at 1950`) is read as a year and not checked (residual).
 Residual risk: an invented number can still pass when it equals, after rounding, some source
 number of the same kind in scope (measured in the build report)."""
 from __future__ import annotations
@@ -36,7 +39,7 @@ MASKS = [re.compile(p, re.I) for p in (
     rf"\b\d{{1,2}}(?:st|nd|rd|th)?\s*(?:[-–]\s*\d{{1,2}}\s+)?{MONTHS}\b(?:,?\s+\d{{4}})?",
     r"\b\d{1,2}:\d{2}(?::\d{2})?\b",
     # a year: no decimals, no currency before, no unit after ("Rs 1915.85", "1950 crore" are amounts)
-    r"(?<![₹$\d.,])(?<!Rs)(?<!Rs\s)(?<!Rs\.)(?<!Rs\.\s)(?<!₹\s)(?<!\$\s)(?<!USD\s)(?<!INR\s)"
+    r"(?<![₹$€£\d.,])(?<!Rs)(?<!Rs\s)(?<!Rs\.)(?<!Rs\.\s)(?<!₹\s)(?<!\$\s)(?<!€\s)(?<!£\s)(?<!USD\s)(?<!INR\s)"
     r"\b(?:19|20)\d{2}\b(?![.,]\d)"
     r"(?!\s?(?:%|pp\b|bps?\b|x\b|k\b|cr\b|crore|lakh|mn\b|million|bn\b|billion|tn\b|trillion))",
     r"\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]*\w\b",      # tokens mixing letters and digits: 5d, Q2, FY26, W40, 10y
@@ -57,7 +60,16 @@ FRACTION_COLS = {"ret_1d", "ret_3d", "ret_5d", "ret_20d", "roc_10", "atr_pct", "
                  "vol_change_1d", "bench_ret_5d", "bench_vol_10d", "center", "sigma_h", "iv_sigma_h"}
 
 
+# Amounts written as one token, spelled out before masking: "Rs1915.85" -> "Rs 1915.85",
+# "$12B" -> "$12 bn", "₹3.8M" -> "₹3.8 mn" (a B or M suffix only after a currency symbol).
+AMOUNT_TOKENS = [(re.compile(r"\b(Rs\.?)(?=\d)"), r"\1 "),
+                 (re.compile(r"((?:[₹$€£]|Rs\.?\s?|US\$)\s?\d[\d,]*(?:\.\d+)?)\s?([bBmM])\b"),
+                  lambda m: f"{m.group(1)} {m.group(2).lower()}n")]
+
+
 def mask(text: str, names: list[str]) -> str:
+    for pattern, spelled in AMOUNT_TOKENS:
+        text = pattern.sub(spelled, text)
     for n in names:
         text = re.sub(rf"(?<!\w){re.escape(n)}(?!\w)", " ", text)
     for m in MASKS:

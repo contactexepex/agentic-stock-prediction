@@ -589,3 +589,19 @@ FROM r ORDER BY cluster_id, as_of DESC;
 
 CREATE OR REPLACE VIEW news_clusters_latest AS
 SELECT * FROM news_clusters_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
+
+-- News verification phase B (docs/DESIGN.md 3b). Status rows computed by a time (news_status.py
+-- appends a row per cluster and per fact when new or changed; every input of a row, claims by
+-- extracted_at and sources by availability, is <= inputs_until <= as_of): the newest row per cluster
+-- and fact with as_of <= ts. Days before the feature have no rows: their news ids are unverified.
+CREATE OR REPLACE MACRO news_verified_asof(ts) AS TABLE
+SELECT DISTINCT ON (cluster_id, coalesce(claim_id, '')) * FROM news_verified
+WHERE as_of <= ts AND coalesce(inputs_until, as_of) <= ts
+ORDER BY cluster_id, coalesce(claim_id, ''), as_of DESC, id;
+
+-- Each news id's own status per ticker as of a time (from the newest cluster row listing it).
+CREATE OR REPLACE MACRO news_status_ids_asof(ts) AS TABLE
+WITH c AS (SELECT * FROM news_verified_asof(ts) WHERE level = 'cluster'),
+i AS (SELECT unnest(status_ids) AS news_id, unnest(id_statuses) AS status, ticker, cluster_id, as_of FROM c)
+SELECT DISTINCT ON (news_id, ticker) news_id, ticker, status, cluster_id, as_of
+FROM i ORDER BY news_id, ticker, as_of DESC, cluster_id;

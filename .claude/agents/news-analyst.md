@@ -14,7 +14,10 @@ and `config/markets/<market>.yaml`. Skip ids that already appear in
 For each item produce one record with the `news_enriched` schema from `scripts/common.py`:
 - `relevance` 0-1: how much it matters for a watchlist ticker or the broad market
 - `sentiment` -1 to 1: direction of likely price impact for the tagged tickers (market if untagged)
-- `novelty` 0-1: 1 = genuinely new information, 0 = rehash of known news
+- `novelty` 0-1: 1 = genuinely new information, 0 = rehash of known news. Use the item's event in
+  the context pack's "News events and verification status" (`first reported`, `confirmed`): an item
+  published more than 24 h after its event was first reported, or after a filing or announcement
+  had already confirmed it (`confirmed` earlier than the item), is a rehash (novelty at most 0.3)
 - `materiality` low | medium | high. High means it could plausibly move a tagged stock by more
   than 2%: earnings, guidance, M&A, regulation, management change, major contract, litigation outcome
 - `event_type`: earnings | macro | product | legal | sector | analyst | ma | flows | other
@@ -23,7 +26,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/c
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v7"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v8"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually
@@ -42,7 +45,8 @@ Write records to `work/enriched.jsonl` only. Do not append to `data/`: the calle
 Report exactly how many records you wrote and how many input ids you skipped (and why).
 
 Return to the caller (max 300 words): for each ticker the up-to-3 most material events with
-their ids and sentiment, clusters of articles covering the same event, and 3 notable
+their ids, sentiment and verification status (from the context pack's news events; you never set a
+status), clusters of articles covering the same event, and 3 notable
 macro/category items (for India include FII/DII flow reports when present).
 Cite every item by its real `id` from the news file: the 16-character hex string in the
 record's `id` field (e.g. `3f9a0c1b7d2e4a65`), copied exactly. Never cite line numbers,

@@ -134,6 +134,8 @@ def steps(market: str) -> list[tuple[str, str, object, str | None]]:
         ("calibrate", [PY, "calibrate.py"], None),
         ("validate_features", [PY, "validate.py", "--stage", "features"], None),
         ("news_clusters", [PY, "news_clusters.py"], None),
+        ("claims_prepare", [PY, "claims.py", "prepare"], None),
+        ("news_status", [PY, "news_status.py"], None),
         ("context", [PY, "context.py"], "work/context.md"),
         ("validate_context", [PY, "validate.py", "--stage", "context"], None),
         ("forecaster_file", write_forecaster_file, None),

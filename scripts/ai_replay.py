@@ -49,8 +49,9 @@ Inclusion rules of `prepare` (per data kind; a row is kept only if public by the
 - predictions, ranges: made_at; outcomes, range_outcomes: scored_at and target_date <= D;
   lessons: available_from and target_date <= D;
   features, regime, calibration, reviews, replays: computed_at; judgments: recorded_at;
-  quotes, options: collected_at; graph: added_at; graph_runs: run_at; news_articles: fetched_at;
-  news_clusters: as_of (they cite news ids, which stay dropped, see below);
+  quotes, options: collected_at; graph: added_at; graph_runs: run_at; news_articles, primary_texts:
+  fetched_at; news_clusters, news_verified: as_of; news_claims: extracted_at (all cite news ids, which
+  stay dropped, see below; a claim's source was available before its extracted_at);
 - deals: trade date <= D (assumed: NSE publishes the day's bulk and block deals after the close);
 - kinds with only an observation date and no publication time (macro, shorts, short_interest,
   fpi, indices, flows, delivery): kept only if first_seen_at <= cutoff, i.e. backfilled rows are
@@ -128,6 +129,7 @@ PUBLIC_AT: dict[str, list[str]] = {
     # news verification phase A: an article row once fetched, a cluster row once computed (every
     # input of a cluster row is <= its as_of; news_clusters_asof() in sql/views.sql reads them)
     "news_articles": ["fetched_at"], "news_clusters": ["as_of"],
+    "primary_texts": ["fetched_at"], "news_claims": ["extracted_at"], "news_verified": ["as_of"],  # phase B
 }
 FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows", "delivery")
 # Bulk and block deals have only a trade date; NSE publishes each session's deals after its close,

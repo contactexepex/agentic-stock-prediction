@@ -53,6 +53,20 @@ def first_news_ids(root: Path, market: str, tickers: list[str]) -> dict[str, str
     return found
 
 
+def first_primary_ids(root: Path, market: str, tickers: list[str], clock: str) -> dict[str, str]:
+    """Ticker -> id of the first stored SEC filing or NSE announcement of it (file order) public by
+    clock: a primary source, which news verification counts as confirmed_primary evidence."""
+    found: dict[str, str] = {}
+    for kind, column in (("filings", "accepted_at"), ("announcements", "published_at")):
+        for path in sorted((root / "data" / market / kind).glob("**/*.jsonl")):
+            for line in path.read_text().splitlines():
+                row = json.loads(line)
+                public = row.get(column) or row.get("first_seen_at") or ""
+                if row.get("ticker") in tickers and row["ticker"] not in found and public[:19] <= clock[:19]:
+                    found[row["ticker"]] = row["id"]
+    return found
+
+
 def latest_bar_date(root: Path, market: str, ticker: str) -> str:
     """The newest stored price date of a ticker (the forecaster's as_of_date)."""
     for path in sorted((root / "data" / market / "prices").glob("**/*.csv"), reverse=True):
@@ -79,18 +93,21 @@ def write_past_calls(root: Path, market: str) -> None:
 
 def write_forecaster_file(root: Path, market: str, clock: str) -> None:
     """Today's forecaster output (work/predictions.jsonl): one 5d call per watchlist-head ticker with
-    news, plus one call that breaks the rules (confidence 0.95, unknown evidence id)."""
+    news, citing the ticker's first stored primary source (filing or announcement) first when it has one
+    (news verification: the main evidence must be confirmed_primary or corroborated), plus one call that
+    breaks the rules (confidence 0.95, unknown evidence id)."""
     tickers = watchlist_head(root, market)
-    news = first_news_ids(root, market, tickers)
+    news, primary = first_news_ids(root, market, tickers), first_primary_ids(root, market, tickers, clock)
 
-    def call(ticker: str, horizon: int, direction: str, confidence: float, evidence_id: str, widen: float) -> dict:
+    def call(ticker: str, horizon: int, direction: str, confidence: float, evidence: list[str], widen: float) -> dict:
         as_of = latest_bar_date(root, market, ticker)
         return {"id": f"{as_of}-{ticker}-{horizon}d", "made_at": clock, "as_of_date": as_of, "ticker": ticker,
                 "horizon_days": horizon, "direction": direction, "confidence": confidence,
-                "rationale": "golden forecaster call", "evidence_ids": [evidence_id], "prompt_version": "golden",
+                "rationale": "golden forecaster call", "evidence_ids": evidence, "prompt_version": "golden",
                 "range_widen": widen}
-    calls = [call(t, 5, "up" if i % 2 else "down", 0.6, news[t], 0.1) for i, t in enumerate(tickers) if t in news]
-    calls.append(call(tickers[-1], 1, "up", 0.95, "missing-id", 0.0))
+    calls = [call(t, 5, "up" if i % 2 else "down", 0.6, [*([primary[t]] if t in primary else []), news[t]], 0.1)
+             for i, t in enumerate(tickers) if t in news]
+    calls.append(call(tickers[-1], 1, "up", 0.95, ["missing-id"], 0.0))
     (root / "work").mkdir(parents=True, exist_ok=True)
     (root / "work" / "predictions.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls))
 

@@ -46,3 +46,14 @@ every `acceptanceDateTime` shifted later by the New York UTC offset and Tesla's 
 |---|---|
 | `hdr_<ticker>_<form>_<accession>.sgml` (9 files) | Real. SGML headers `https://www.sec.gov/Archives/edgar/data/<cik>/<accession without dashes>/<accession>.hdr.sgml` of every filing in the three trimmed lists below; `<ACCEPTANCE-DATETIME>` is US Eastern and equals the filing index page's "Accepted". |
 | `submissions_jpm_trimmed.json`, `submissions_aapl_trimmed.json`, `submissions_tsla_trimmed.json` | Real, trimmed. `https://data.sec.gov/submissions/CIK<10-digit cik>.json` as served on 2026-10-06, `filings.recent` cut to three filings (columns accessionNumber, filingDate, reportDate, acceptanceDateTime, form, items, primaryDocument, primaryDocDescription; values unchanged). JPM: 10-Q 0001628280-26-054343, 8-K 0001628280-26-048078, 10-K 0001628280-26-008131 (shifted, +4h/+4h/+5h). AAPL: Form 4 0001140361-26-038674, 10-Qs 0000320193-26-000020 and 0000320193-25-000008 (shifted). TSLA: 8-Ks 0001628280-26-064366 and 0001628280-26-063820, Form 4 0001104659-26-106432 (right). |
+
+Primary text for claim checking (`tests/test_news_claims.py`): real files downloaded unchanged from
+sec.gov on 2026-10-06.
+
+| File | Provenance |
+|---|---|
+| `8k_index_tsla_0001628280-26-064366.json` | Real. Folder listing of Tesla's 8-K (Q3 2026 production and deliveries, accepted 2026-10-02 09:04:26 ET): https://www.sec.gov/Archives/edgar/data/1318605/000162828026064366/index.json |
+| `8k_tsla-20261002.htm` | Real. Its main document (Item 2.02): https://www.sec.gov/Archives/edgar/data/1318605/000162828026064366/tsla-20261002.htm |
+| `8k_tsla_exhibit991111111.htm` | Real. Its EX-99.1 press release (486,532 delivered, 464,391 produced): https://www.sec.gov/Archives/edgar/data/1318605/000162828026064366/exhibit991111111.htm |
+| `8k_index_cvx_0000093410-26-000188.json` | Real. Folder listing of Chevron's 8-K (Item 5.02, CFO change, accepted 2026-10-05 09:01:20 ET; no exhibit): https://www.sec.gov/Archives/edgar/data/93410/000009341026000188/index.json |
+| `8k_cvx-20260930.htm` | Real. Its main document: https://www.sec.gov/Archives/edgar/data/93410/000009341026000188/cvx-20260930.htm |
