@@ -37,7 +37,7 @@ jobs:
       - name: Install Playwright (tests/test_presentation.py renders the HTML report in Chromium)
         run: |
           npm install -g playwright@1.56.1
-          npx playwright install --with-deps chromium
+          playwright install --with-deps chromium     # the global 1.56.1 CLI, not npx
       - name: Full suite (parallel)
         # test_every_logged_commit_exists is deselected here: judgments/log.jsonl logs commits that
         # live only on local, unpushed build branches (and PASS verdicts before their merge), which a

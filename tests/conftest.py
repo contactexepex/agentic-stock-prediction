@@ -1,21 +1,23 @@
 """Shared test setup: the network guard (the suite runs offline), the `slow` tier and xdist grouping.
 
   python -m pytest -m "not slow" -n auto     fast tier, on each edit
-  python -m pytest -n auto                   full suite, before review or merge (CI runs this)
+  python -m pytest -n auto                   full suite, before review or merge (CI runs it without
+                                             test_every_logged_commit_exists, see tests.yml)
 
 Network guard: every test runs with Python's socket module patched (tests/netguard/mb_netguard.py)
 in this process and, through tests/netguard/sitecustomize.py on PYTHONPATH, in every child Python
 process. A connection or name lookup to anything but loopback is refused and fails the test. Proxy
-variables are removed so no request can reach the network through a local proxy. A test that must
+variables are removed so no request can reach the network through a local proxy. Only Python
+sockets are seen: a C library or a node process opening its own sockets is not. A test that must
 reach the network is marked `network` (only the opt-in live Neo4j test).
 
 Slow tier: the tests listed in SLOW (end-to-end runs of the scripts as subprocesses, replays, the full
 pipeline) get the `slow` marker here, in one place. A listed file that no longer exists, or a listed
 name missing from a collected file, fails the collection, so the list cannot go stale silently.
 
-xdist: tests that use a module- or session-scoped fixture are put in one xdist group per module
-(--dist loadgroup, set by pytest_cmdline_main below when xdist is installed), so the expensive
-shared setup runs once per run, not once per worker."""
+xdist: tests that use a module- or session-scoped fixture defined in their own module are put in one
+xdist group per module (`--dist loadgroup` in pytest.ini's addopts; pytest-xdist is a required dev
+dependency in requirements.txt), so the expensive shared setup runs once per run, not once per worker."""
 from __future__ import annotations
 
 import os
@@ -102,6 +104,7 @@ SLOW = {
         "test_ranges_apply_inputs",
     },
     "tests/test_relations.py": {
+        "test_collector_skips_market_without_relations",
         "test_graph_add_hits_and_retract",
         "test_graph_refresh_due_once_per_month",
         "test_relations_collector_flags_and_context",
@@ -151,15 +154,6 @@ def pytest_configure(config):
     if str(NETGUARD) not in paths:
         os.environ["PYTHONPATH"] = os.pathsep.join([str(NETGUARD), *paths])
     mb_netguard.install()
-
-
-@pytest.hookimpl(tryfirst=True)       # before xdist turns -n into --dist load
-def pytest_cmdline_main(config):
-    """With pytest-xdist installed and no --dist given, distribute by group (--dist loadgroup); without
-    xdist nothing changes, so plain `pytest` works either way."""
-    if config.pluginmanager.hasplugin("xdist") and getattr(config.option, "dist", "no") == "no" \
-            and not getattr(config.option, "distload", False):
-        config.option.dist = "loadgroup"
 
 
 @pytest.hookimpl(tryfirst=True)       # before xdist reads the xdist_group markers
