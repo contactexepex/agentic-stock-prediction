@@ -169,6 +169,10 @@ Evidence (2026-10-06, harness at bef503b): `record` then two `compare` runs, bot
 (`macro_context`: basis-point changes printed with one decimal) made `compare` fail on the US context
 packs (5 files: 4 context steps' stdout and work/context.md); earlier (before the seed) a change in
 `rangelib.naive_range` (factor 1.0001) failed with 22 differing outputs.
+Parallel schedule (2026-10-06, 4 cores): `record --serial` at 2695ad7 took 310 s; the parallel
+`compare` against it printed `"identical": true` over 1621 files in 115 s. The parallel run also
+compared identical with a record made by the previous harness (one root, serial) at 2d90f32, so the
+per-market roots and the merge reproduce the shared-root run byte for byte.
 
 ### Known nondeterminism (a production defect, outside the freeze)
 
