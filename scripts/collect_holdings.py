@@ -29,7 +29,13 @@ import xml.etree.ElementTree as ET
 from datetime import date
 
 import sec
-from common import append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
+from marketbrief.sources.sec_acceptance import time_summary, time_warnings
+from marketbrief.sources.sec_client import Edgar, archive_url
+from marketbrief.utils.numbers import parse_sec_number
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.paths import data_dir
+from marketbrief.core.storage import append_jsonl, day_file
 
 FILING_WINDOW_DAYS = 50  # 13F deadline is 45 days after quarter end
 PLACEHOLDER_CUSIP = "000000000"
@@ -56,7 +62,7 @@ def stored(market: str) -> tuple[set[str], dict[str, str]]:
 def parse_cover(data: bytes) -> dict:
     """13F cover page (primary_doc.xml of a 13F-HR or 13F-NT)."""
     root = sec.xml_root(data)
-    total = sec.num(sec.text(root, "formData/summaryPage/tableEntryTotal"))
+    total = parse_sec_number(sec.text(root, "formData/summaryPage/tableEntryTotal"))
     return {"report_type": (sec.text(root, "formData/coverPage/reportType") or "").upper(),
             "entry_total": int(total) if total is not None else None,
             "confidential": bool(sec.flag(sec.text(root, "formData/summaryPage/isConfidentialOmitted"))),
@@ -83,8 +89,8 @@ def parse_info_table(stream, cusips: dict[str, str]) -> tuple[dict[tuple[str, st
                 pc = (g["putCall"].text or "").strip().upper() if "putCall" in g else None
                 agg = out.setdefault((ticker, pc or None), {"cusip": cusip, "shares": 0.0, "value_usd": 0.0, "n_lines": 0,
                                                             "issuer_name": (g["nameOfIssuer"].text or "").strip()})
-                agg["shares"] += sec.num(amt.get("sshPrnamt")) or 0.0
-                agg["value_usd"] += sec.num(g["value"].text if "value" in g else None) or 0.0
+                agg["shares"] += parse_sec_number(amt.get("sshPrnamt")) or 0.0
+                agg["value_usd"] += parse_sec_number(g["value"].text if "value" in g else None) or 0.0
                 agg["n_lines"] += 1
         el.clear()
     return out, total, placeholder
@@ -103,13 +109,13 @@ def incomplete_reason(cover: dict, n_lines: int, placeholder: bool) -> str | Non
     return None
 
 
-def info_table_url(edgar: sec.Edgar, cik: int, accession: str) -> str:
-    items = edgar.json(sec.archive_url(cik, accession, "index.json"))["directory"]["item"]
+def info_table_url(edgar: Edgar, cik: int, accession: str) -> str:
+    items = edgar.json(archive_url(cik, accession, "index.json"))["directory"]["item"]
     xmls = [i for i in items if i["name"].lower().endswith(".xml") and i["name"] != "primary_doc.xml"]
     if not xmls:
         raise ValueError("no information table in filing")
     best = max(xmls, key=lambda i: int(i.get("size") or 0))
-    return sec.archive_url(cik, accession, best["name"])
+    return archive_url(cik, accession, best["name"])
 
 
 def base_row(f: dict, cik: int, filer: str, url: str, now: str) -> dict:
@@ -169,7 +175,7 @@ def main() -> int:
         print(json.dumps({"collector": "holdings", "market": market, "skipped": reason, "not_filed": waiting}))
         return 0
 
-    edgar, now = sec.Edgar(ua), utc_now()
+    edgar, now = Edgar(ua), utc_now()
     tickers = sorted(set(cusips.values()))
     rows, loaded, notices, failed = [], [], [], []
     for cik, name in filers.items():
@@ -188,7 +194,7 @@ def main() -> int:
             if f["accession"] in accs:
                 continue
             try:
-                cover_url = sec.archive_url(cik, f["accession"], "primary_doc.xml")
+                cover_url = archive_url(cik, f["accession"], "primary_doc.xml")
                 cover = parse_cover(edgar.get(cover_url))
                 if f["form"] == "13F-NT":
                     by = "; ".join(cover["other_managers"]) or "unnamed manager"
@@ -211,7 +217,7 @@ def main() -> int:
     _, latest = stored(market)
     print(json.dumps({
         "collector": "holdings", "market": market, "quarter_due": due, "filings_loaded": loaded,
-        "reported_by_other_manager": notices, "new_rows": written, "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar),
+        "reported_by_other_manager": notices, "new_rows": written, "requests": edgar.requests, "sec_times": time_summary(edgar), "warnings": time_warnings(edgar),
         "waiting_on": [n for c, n in filers.items() if latest.get(str(c), "") < due], "failed": failed}, indent=2))
     return 0
 

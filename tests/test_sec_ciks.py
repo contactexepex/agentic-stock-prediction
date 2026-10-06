@@ -11,7 +11,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -22,6 +22,7 @@ ARCH = "https://www.sec.gov/Archives/edgar/data"
 sys.path.insert(0, str(SCRIPTS))
 
 import sec  # noqa: E402
+from marketbrief.sources.sec_client import Edgar  # noqa: E402
 
 TODAY = datetime.now(timezone.utc).date()
 D1, D2 = str(TODAY - timedelta(days=1)), str(TODAY - timedelta(days=2))
@@ -153,7 +154,7 @@ def test_merge_recent_dedupes_by_accession_and_keeps_one_cik_unchanged():
 def test_ticker_submissions_reports_each_failed_cik(tmp_path, monkeypatch):
     setup(tmp_path)
     monkeypatch.setenv("MB_SEC_FIXTURES", str(tmp_path / "sec"))
-    edgar = sec.Edgar("t t@example.com")
+    edgar = Edgar("t t@example.com")
     rec, failed = sec.ticker_submissions(edgar, "XOM", 2115436, {"XOM": [34088, 999]})
     assert set(rec["cik"]) == {2115436, PRED} and edgar.requests == 3
     assert [(f["ticker"], f["cik"]) for f in failed] == [("XOM", 999)] and "no fixture" in failed[0]["error"]

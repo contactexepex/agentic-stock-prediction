@@ -25,6 +25,9 @@ import adjust  # noqa: E402
 import ai_replay as ar  # noqa: E402
 import collect_prices  # noqa: E402
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
 import indicators as ind  # noqa: E402
 import score_predictions  # noqa: E402
 from features import load_bars  # noqa: E402
@@ -135,7 +138,7 @@ def test_two_for_one_split_recorded_once_and_applied_on_read(us, monkeypatch, ca
     raw0909 = (us.root / "data" / "us" / "prices" / "2026" / "09" / "2026-09-09.csv").read_text()
     assert "2026-09-09,NVDA,206.0,208.0,204.0,206.0,206.0,2000," in raw0909
 
-    con = common.connect("us")
+    con = connect("us")
     adjd = dict(con.execute("SELECT date, close FROM ohlc WHERE ticker = 'NVDA' ORDER BY date").fetchall())
     assert [adjd[d] for d in US_DAYS] == pytest.approx(yahoo, abs=1e-9)    # one basis, Yahoo's
     raw = dict(con.execute("SELECT date, close FROM ohlc_raw WHERE ticker = 'NVDA'").fetchall())
@@ -185,7 +188,7 @@ def test_unexplained_rebase_is_a_warning_and_holds_new_bars(us, monkeypatch, cap
     assert out["held"] == ["NVDA"]
     assert out["failed"] == [{"ticker": "NVDA", "yahoo": "NVDA",
                               "error": "price basis unconfirmed (split/bonus?): new bars held, see warnings"}]
-    con = common.connect("us")
+    con = connect("us")
     assert con.execute("SELECT count(*) FROM ohlc o JOIN ohlc_raw r USING (ticker, date) "
                        "WHERE o.close <> r.close").fetchone()[0] == 0
     assert con.execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == date(2026, 9, 11)
@@ -204,7 +207,7 @@ def test_isolated_mismatch_warns_but_keeps_collecting(us, monkeypatch, capsys):
     assert out["adjustments"] == [] and "held" not in out and out["failed"] == []
     assert out["warnings"] == ["NVDA: Yahoo's close differs from the stored close on 1 date(s) 2026-09-03..2026-09-03 "
                                "(Yahoo/stored 0.9500-0.9500); not one re-base of the stored history, not recorded"]
-    assert common.connect("us").execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == \
+    assert connect("us").execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == \
         date(2026, 9, 17)
 
 
@@ -253,7 +256,7 @@ def test_rebase_before_the_ex_date_bar_then_split_row(us, monkeypatch, capsys):
     o1 = run(monkeypatch, capsys, "us")
     assert o1["adjustments"] == [] and o1["held"] == ["NVDA"] and len(o1["warnings"]) == 1
     assert ",NVDA," not in (us.root / "data" / "us" / "prices" / "2026" / "09" / "2026-09-11.csv").read_text()
-    assert common.connect("us").execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == \
+    assert connect("us").execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == \
         date(2026, 9, 10)
     n = i_ex + 1
     monkeypatch.setattr(collect_prices, "utc_today", lambda: date(2026, 9, 15))
@@ -266,7 +269,7 @@ def test_rebase_before_the_ex_date_bar_then_split_row(us, monkeypatch, capsys):
     assert [(a["id"], a["factor"], a["source"], a["check_date"]) for a in o2["adjustments"]] == \
         [("NVDA-2026-09-14", 0.5, "yahoo_splits", "2026-09-10")]
     assert o2["rebased_bars"] == [{"ticker": "NVDA", "date": "2026-09-11", "factor": 0.5}]
-    con = common.connect("us")
+    con = connect("us")
     raw = dict(con.execute("SELECT date, close FROM ohlc_raw WHERE ticker = 'NVDA'").fetchall())
     assert raw[date(2026, 9, 11)] == 208.0 and raw[EX] == 104.5             # old basis, as traded
     closes = [c for _, c in con.execute("SELECT date, close FROM ohlc WHERE ticker = 'NVDA' ORDER BY date").fetchall()]
@@ -306,7 +309,7 @@ def test_india_bonus_confirmed_by_nse_bhavcopy(tmp_path, monkeypatch, capsys):
         "measured_factor": 0.5, "nse_prev_close": 1964.1, "nse_ex_close": 973.4,
         "url": "https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_26082025.csv"}
     assert "yahoo_ratio" not in rec
-    con = common.connect("india")
+    con = connect("india")
     closes = dict(con.execute("SELECT date, close FROM ohlc WHERE ticker = 'HDFCBANK'").fetchall())
     assert closes[date(2025, 8, 25)] == pytest.approx(982.05) and closes[ex] == 973.4
     assert con.execute("SELECT max(abs(ret_1d)) FROM returns WHERE ticker = 'HDFCBANK'").fetchone()[0] < 0.02
@@ -336,7 +339,7 @@ def test_india_missed_run_finds_the_ex_date(tmp_path, monkeypatch, capsys):
     assert [(a["id"], a["factor"], a["source"], a["check_date"], a["nse_prev_close"], a["nse_ex_close"])
             for a in out["adjustments"]] == [("HDFCBANK-2025-08-26", 0.5, "nse_prev_close", "2025-08-22", 1964.1, 973.4)]
     assert out["rebased_bars"] == [{"ticker": "HDFCBANK", "date": "2025-08-25", "factor": 0.5}]
-    con = common.connect("india")
+    con = connect("india")
     raw = dict(con.execute("SELECT date, close FROM ohlc_raw WHERE ticker = 'HDFCBANK'").fetchall())
     assert raw[date(2025, 8, 25)] == 1964.1 and raw[date(2025, 8, 26)] == 973.4
     assert con.execute("SELECT max(abs(ret_1d)) FROM returns WHERE ticker = 'HDFCBANK'").fetchone()[0] < 0.02
@@ -363,7 +366,7 @@ def test_india_mismatch_nse_unavailable_warns(tmp_path, monkeypatch, capsys):
     hd = {f["ticker"]: f for f in out["failed"]}["HDFCBANK"]
     assert hd["error"] == "price basis unconfirmed (split/bonus?): new bars held, see warnings"
     assert "HDFCBANK" not in out["resolved_by_nse"]
-    con = common.connect("india")
+    con = connect("india")
     assert con.execute("SELECT max(date) FROM ohlc WHERE ticker = 'HDFCBANK'").fetchone()[0] == date(2025, 8, 25)
 
 
@@ -372,7 +375,7 @@ def test_recorded_split_unblocks_the_bhavcopy_fill(tmp_path, monkeypatch):
     split is recorded (then it is applied on read and the as-traded bar fits the views)."""
     e = make_env(tmp_path, monkeypatch, ["HDFCBANK"], date(2025, 8, 27))
     write_stored(e.root, "india", "HDFCBANK", {date(2025, 8, 25): 1964.1})
-    cfg = common.load_market("india")
+    cfg = load_market("india")
     bar = {"close": 973.4, "prev_close": 1964.1}
     blocked = collect_prices.basis_problem(cfg, "HDFCBANK", date(2025, 8, 26), bar, [date(2025, 8, 26)])
     assert blocked == "Yahoo reports a split/bonus on 2025-08-26; price basis may differ"
@@ -389,14 +392,14 @@ def scoring_root(tmp_path, monkeypatch, detected_at: str, base: float, lo80: flo
     monkeypatch.setattr(common, "ROOT", root)
     days = [date(2026, 9, 8), date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11), EX, date(2026, 9, 15)]
     write_stored(root, "us", "NVDA", {d: (100.0 if d < EX else 51.0) for d in days})
-    common.append_jsonl(common.day_file("us", "adjustments", EX), [
+    append_jsonl(day_file("us", "adjustments", EX), [
         adjust.record("NVDA", EX, 0.5, "yahoo_splits", detected_at, yahoo_ratio=2.0)])
     made = "2026-09-14T12:00:00+00:00"                     # before the 13:30 UTC open
-    common.append_jsonl(common.day_file("us", "predictions", date(2026, 9, 14)), [{
+    append_jsonl(day_file("us", "predictions", date(2026, 9, 14)), [{
         "id": "2026-09-11-NVDA-1d", "made_at": made, "as_of_date": "2026-09-11", "ticker": "NVDA",
         "horizon_days": 1, "direction": "up", "confidence": 0.6, "rationale": "t", "evidence_ids": ["x"],
         "prompt_version": "t"}])
-    common.append_jsonl(common.day_file("us", "ranges", date(2026, 9, 11)), [{
+    append_jsonl(day_file("us", "ranges", date(2026, 9, 11)), [{
         "id": "2026-09-11-NVDA-1d", "made_at": made, "as_of_date": "2026-09-11", "session_date": "2026-09-14",
         "target_date": "2026-09-14", "ticker": "NVDA", "horizon_days": 1, "base_close": base, "center": 0.0,
         "sigma_h": 0.02, "lo50": base * 0.99, "hi50": base * 1.01, "lo80": lo80, "hi80": hi80,
@@ -432,7 +435,7 @@ def test_call_and_range_made_before_ex_date_scored_after_it(tmp_path, monkeypatc
     assert ro["hit80"] is True and ro["hit50"] is False
     assert ro["z"] == pytest.approx(math.log(1.02) / 0.02, rel=1e-6)
     assert ro["center_err_pct"] == pytest.approx(2.0, abs=1e-6)
-    con = common.connect("us")
+    con = connect("us")
     rr = con.execute("SELECT actual_close, lo80, hi80 FROM range_record").fetchone()
     assert rr[1] <= rr[0] <= rr[2]                                          # stored edges and close agree
 
@@ -487,7 +490,7 @@ def test_hold_persists_after_the_frame_moves_past_the_stored_bars(us, monkeypatc
         monkeypatch.setattr(collect_prices, "utc_today", lambda t=today: t)
         monkeypatch.setattr(collect_prices, "utc_now", lambda t=today: f"{t}T12:00:00+00:00")
         out = run(monkeypatch, capsys, "us")
-        con = common.connect("us")
+        con = connect("us")
         newest = con.execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0]
         if k < 2:     # held, also a month later when the 1-month frame no longer covers 08-14
             assert out["held"] == ["NVDA"] and out["adjustments"] == []
@@ -523,7 +526,7 @@ def test_no_overlap_even_after_the_longer_fetch_holds(us, monkeypatch, capsys):
         assert out["warnings"] == [f"NVDA: no stored bar in Yahoo's frame to check the price basis; its first close "
                                    f"(2026-08-24) is 0.5024x our newest stored close (2026-08-14): not verifiable, "
                                    f"new bars held"]
-        assert common.connect("us").execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0] \
+        assert connect("us").execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0] \
             == date(2026, 8, 14)
 
 
@@ -592,7 +595,7 @@ def test_india_1_10_bonus_confirmed_by_the_prev_close_chain(tmp_path, monkeypatc
     assert [(a["id"], a["source"], a["check_date"], a["nse_prev_close"], a["nse_ex_close"]) for a in out["adjustments"]] \
         == [("TCS-2026-09-11", "nse_prev_close", "2026-09-10", 1102.0, 1062.0)]
     assert out["adjustments"][0]["factor"] == pytest.approx(10 / 11)
-    con = common.connect("india")
+    con = connect("india")
     closes = [c for _, c in con.execute("SELECT date, close FROM ohlc WHERE ticker = 'TCS' ORDER BY date").fetchall()]
     assert closes == pytest.approx([1000.0, 1000.9091, 1001.8182, 1062.0, 1065.0], abs=1e-3)
     assert len(adj_rows(e.root, "india")) == 1
@@ -622,14 +625,14 @@ def test_superseded_record_is_left_out(tmp_path, monkeypatch, capsys):
     root = tmp_path / "root"
     monkeypatch.setattr(common, "ROOT", root)
     write_stored(root, "us", "NVDA", {date(2026, 9, 11): 100.0, EX: 101.0})
-    path = common.day_file("us", "adjustments", EX)
-    common.append_jsonl(path, [adjust.record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T00:00:00+00:00")])
-    con = common.connect("us")
+    path = day_file("us", "adjustments", EX)
+    append_jsonl(path, [adjust.record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T00:00:00+00:00")])
+    con = connect("us")
     assert con.execute("SELECT close FROM ohlc WHERE ticker = 'NVDA' AND date = '2026-09-11'").fetchone()[0] == 50.0
     fix = {**adjust.record("NVDA", EX, 1.0, "yahoo_splits", "2026-09-16T00:00:00+00:00"),
            "id": "NVDA-2026-09-14-fix1", "supersedes": "NVDA-2026-09-14", "note": "no split happened"}
-    common.append_jsonl(path, [fix])
-    con = common.connect("us")
+    append_jsonl(path, [fix])
+    con = connect("us")
     assert con.execute("SELECT close FROM ohlc WHERE ticker = 'NVDA' AND date = '2026-09-11'").fetchone()[0] == 100.0
     assert [r["id"] for r in con.execute("SELECT id FROM price_adjustments").df().to_dict("records")] == \
         ["NVDA-2026-09-14-fix1"]
@@ -659,7 +662,7 @@ def test_ai_replay_root_before_ex_date_is_unaffected(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "ROOT", src)
     days = [date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11), EX, date(2026, 9, 15)]
     write_stored(src, "us", "NVDA", {d: (100.0 if d < EX else 51.0) for d in days})
-    common.append_jsonl(common.day_file("us", "adjustments", EX), [
+    append_jsonl(day_file("us", "adjustments", EX), [
         adjust.record("NVDA", EX, 0.5, "yahoo_splits", "2026-09-15T02:00:00+00:00", yahoo_ratio=2.0)])
     row = adj_rows(src, "us")[0]
     cut = pd.Timestamp("2026-09-14T12:15:00+00:00")
@@ -672,7 +675,7 @@ def test_ai_replay_root_before_ex_date_is_unaffected(tmp_path, monkeypatch):
                          datetime(2026, 9, 14, 12, 15, tzinfo=timezone.utc))
     assert stats["kinds"]["adjustments"]["rows_kept"] == 0 and "adjustments" not in stats["excluded"]
     monkeypatch.setattr(common, "ROOT", before)
-    con = common.connect("us")
+    con = connect("us")
     assert con.execute("SELECT date, close FROM ohlc WHERE ticker = 'NVDA' ORDER BY date").fetchall() == \
         [(date(2026, 9, 9), 100.0), (date(2026, 9, 10), 100.0), (date(2026, 9, 11), 100.0)]
 
@@ -680,6 +683,6 @@ def test_ai_replay_root_before_ex_date_is_unaffected(tmp_path, monkeypatch):
     stats = ar.copy_asof("us", src, after, date(2026, 9, 15), datetime(2026, 9, 16, 12, 15, tzinfo=timezone.utc))
     assert stats["kinds"]["adjustments"]["rows_kept"] == 1
     monkeypatch.setattr(common, "ROOT", after)
-    con = common.connect("us")
+    con = connect("us")
     assert [c for _, c in con.execute("SELECT date, close FROM ohlc WHERE ticker = 'NVDA' ORDER BY date").fetchall()] \
         == [50.0, 50.0, 50.0, 51.0, 51.0]

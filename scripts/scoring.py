@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 import rangelib as rl
+from marketbrief.utils.numbers import round_or_none
 
 EPS = 1e-6
 CALL_BINS = (0.5, 0.6, 0.7, 0.8, 0.9)   # bins [0.5, 0.6), [0.6, 0.7), [0.7, 0.8), [0.8, 0.9]
@@ -93,8 +94,8 @@ def call_scores(df: pd.DataFrame) -> dict:
         return {"n": 0}
     p, y = df["confidence"].astype(float), df["hit"].astype(float)
     b, ll = brier(p, y), log_loss(p, y)
-    return {"n": int(len(df)), "brier": _r(b), "log_loss": _r(ll),
-            "brier_skill": _r(1 - b / 0.25) if b is not None else None}
+    return {"n": int(len(df)), "brier": round_or_none(b), "log_loss": round_or_none(ll),
+            "brier_skill": round_or_none(1 - b / 0.25) if b is not None else None}
 
 
 def pinball(q_value: float, level: float, y: float) -> float:
@@ -125,16 +126,12 @@ def range_scores(df: pd.DataFrame) -> dict:
             for r in df[["lo50", "hi50", "lo80", "hi80", "actual_close", "base_close"]].itertuples(index=False)]
     s = pd.DataFrame(rows)
     base = df["base_close"].astype(float)
-    return {"n": int(len(df)), "cover50": _r(_mean(df["hit50"].astype(float))),
-            "cover80": _r(_mean(df["hit80"].astype(float))),
-            "is50_pct": _r(_mean(s["is50_pct"])), "is80_pct": _r(_mean(s["is80_pct"])),
-            "qs_pct": _r(_mean(s["qs_pct"])),
-            "width50_pct": _r(_mean(100 * (df["hi50"] - df["lo50"]) / base)),
-            "width80_pct": _r(_mean(100 * (df["hi80"] - df["lo80"]) / base))}
-
-
-def _r(x, k: int = 4):
-    return None if x is None or (isinstance(x, float) and not math.isfinite(x)) else round(float(x), k)
+    return {"n": int(len(df)), "cover50": round_or_none(_mean(df["hit50"].astype(float))),
+            "cover80": round_or_none(_mean(df["hit80"].astype(float))),
+            "is50_pct": round_or_none(_mean(s["is50_pct"])), "is80_pct": round_or_none(_mean(s["is80_pct"])),
+            "qs_pct": round_or_none(_mean(s["qs_pct"])),
+            "width50_pct": round_or_none(_mean(100 * (df["hi50"] - df["lo50"]) / base)),
+            "width80_pct": round_or_none(_mean(100 * (df["hi80"] - df["lo80"]) / base))}
 
 
 # ---------- track-record summary (score_predictions, context pack, review, HTML) ----------
@@ -162,7 +159,8 @@ def _f(v, k: int = 3) -> str:
 def percent(v, digits: int = 0, sign: bool = False) -> str:
     """A share (0.625) as a percent rounded half up on its decimal value ('63%', digits=1 '62.5%',
     sign=True '+63%'); '–' for a missing or non-finite value. The one convention for printed whole
-    percents, also in the HTML report's JavaScript (pct0)."""
+    percents, also in the HTML report's JavaScript (pct0). Domain: finite values below about 1e26 in
+    magnitude (shares are 0 to 1); larger ones raise decimal.InvalidOperation."""
     if v is None or not math.isfinite(float(v)):
         return "–"
     value = Decimal(repr(float(v))).scaleb(2).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)

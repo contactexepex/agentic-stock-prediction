@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Walk-forward backtest of the range formula (no AI) on stored bars for one market.
 
-For each evaluation day d (the last --eval-sessions trading days) and horizon h, the range is
-built exactly as live (EWMA volatility at d, empirical quantiles from a recency-weighted pool of
-outcomes already known at d) and scored on the close h sessions later. The naive baseline is
-last close +/- 20-day realized volatility with normal quantiles. Regime and AI adjustments are
-not replayed, so the headline numbers test the core formula.
+For each evaluation day d (the last --eval-sessions trading days) and horizon h, the range is built exactly as live
+(EWMA volatility at d, empirical quantiles from a recency-weighted pool of outcomes already known at d) and scored on
+the close h sessions later. The naive baseline is last close +/- 20-day realized volatility with normal quantiles.
+Regime and AI adjustments are not replayed, so the headline numbers test the core formula.
 
 Range inputs (config/ranges.yaml, docs/DESIGN.md section 11) are then switched off and on, each
 scored where it applies (docs/DESIGN.md section 7: keep an input only if it improves accuracy):
@@ -33,8 +32,9 @@ import pandas as pd
 import events as ev
 import range_inputs as ri
 import rangelib as rl
-from common import ROOT, benchmark_key, connect, load_ranges_config, market_arg, require_market
+from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from features import load_bars
+from marketbrief.core import cli, database, market_config, paths
 
 # input -> (arm when off, arm when on, column marking the rows where it applies)
 INPUTS = {"earnings_history": ("earn_fixed", "earn_hist", "earn"),
@@ -51,7 +51,7 @@ def rolling_beta(close: pd.Series, bench: pd.Series, n: int = rl.TRADING_DAYS, m
 def index_cue_series(cfg: dict, bars: dict, rc: dict) -> pd.Series | None:
     """Historical proxy of the index cue (log move expected for the benchmark), by as-of date."""
     ic = cfg.get("index_cue") or {}
-    bench = bars.get(benchmark_key(cfg))
+    bench = bars.get(market_config.benchmark_key(cfg))
     if not ic.get("symbol") or bench is None:
         return None
     if ic.get("beta", 1.0) != "fit":
@@ -273,11 +273,11 @@ def compare_inputs(res: pd.DataFrame, min_gain: float = 0.005) -> dict:
 
 
 def run(cfg: dict, rc: dict, eval_sessions: int) -> dict:
-    con = connect(cfg["market"])
+    con = database.connect(cfg["market"])
     bars = load_bars(con)
-    bench = bars.get(benchmark_key(cfg))
+    bench = bars.get(market_config.benchmark_key(cfg))
     if bench is None:
-        raise SystemExit("no benchmark bars; run collect_prices.py --period 2y first")
+        raise SystemExit(MSG_NO_BENCHMARK_BARS_PERIOD)
     rank = {d: i for i, d in enumerate(bench.index)}
     evdf = ri.load_events(con)
     extra = {"earnings": ri.earnings_versions(evdf), "dividends": ri.dividend_events(evdf), "bench": bench,
@@ -335,14 +335,14 @@ def markdown(cfg: dict, s: dict) -> str:
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
+    ap = cli.market_arg(__doc__)
     ap.add_argument("--eval-sessions", type=int, default=250, help="trading days to evaluate (default 250)")
     ap.add_argument("--out", help="write the report here instead of reports/<market>/")
     args = ap.parse_args()
-    cfg = require_market(args)
-    rc = load_ranges_config(cfg["market"])
+    cfg = cli.require_market(args)
+    rc = market_config.load_ranges_config(cfg["market"])
     s = run(cfg, rc, args.eval_sessions)
-    path = Path(args.out) if args.out else ROOT / "reports" / cfg["market"] / f"backtest-{s['as_of_date']}.md"
+    path = Path(args.out) if args.out else paths.ROOT / "reports" / cfg["market"] / f"backtest-{s['as_of_date']}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(markdown(cfg, s))
     print(json.dumps({"step": "backtest", "report": str(path), "horizons": s["horizons"],

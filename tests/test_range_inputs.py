@@ -345,14 +345,15 @@ def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
 
 def test_ranges_config_per_market_override(tmp_path, monkeypatch):
     import common
+    from marketbrief.core.market_config import load_ranges_config
     (tmp_path / "ranges.yaml").write_text("earnings_vol_multiple: 3.0\nearnings_vol_multiple_by_market: {india: 2.0}\n")
     monkeypatch.setattr(common, "CONFIG", tmp_path)
-    assert common.load_ranges_config("india")["earnings_vol_multiple"] == 2.0
-    assert common.load_ranges_config("us")["earnings_vol_multiple"] == 3.0
-    assert common.load_ranges_config()["earnings_vol_multiple"] == 3.0
+    assert load_ranges_config("india")["earnings_vol_multiple"] == 2.0
+    assert load_ranges_config("us")["earnings_vol_multiple"] == 3.0
+    assert load_ranges_config()["earnings_vol_multiple"] == 3.0
     monkeypatch.setattr(common, "CONFIG", Path(__file__).resolve().parents[1] / "config")   # the shipped defaults
-    assert common.load_ranges_config("india")["earnings_vol_multiple"] == 2.0
-    assert common.load_ranges_config("us")["earnings_vol_multiple"] == 3.0
+    assert load_ranges_config("india")["earnings_vol_multiple"] == 2.0
+    assert load_ranges_config("us")["earnings_vol_multiple"] == 3.0
     # every script loads the settings of the market it runs for (review's replay, calibrate, ...)
     import re
     calls = {f"{f.name}:{m}" for f in sorted((Path(__file__).resolve().parents[1] / "scripts").glob("*.py"))
@@ -455,7 +456,7 @@ MARUTI_DATES = [(date(2025, 4, 25), "during"), (date(2025, 7, 31), "during"), (d
 
 
 def replay_nse():
-    from nse import Nse
+    from marketbrief.sources.nse_client import Nse
     return Nse(replay=NSE_FIX, pause=0)
 
 
@@ -548,13 +549,13 @@ def run_events_main(monkeypatch, capsys, tmp_path, cfg: dict, yf_data: dict, tod
     """collect_events.main() in-process: fake yfinance, NSE replayed from NSE_FIX, data under tmp_path."""
     import types
 
-    import common
+    from marketbrief.core import paths
     fake = types.ModuleType("yfinance")
     fake.Ticker = lambda sym: FakeTicker(yf_data.get(sym, {}))
     monkeypatch.setitem(sys.modules, "yfinance", fake)
     monkeypatch.setattr(ce, "require_market", lambda args: cfg)
     monkeypatch.setattr(ce, "data_dir", lambda m: tmp_path / "data" / m)
-    monkeypatch.setattr(common, "data_dir", lambda m: tmp_path / "data" / m)
+    monkeypatch.setattr(paths, "data_dir", lambda m: tmp_path / "data" / m)
     monkeypatch.setattr(ce, "utc_today", lambda: today)
     monkeypatch.setattr(ce, "nse_client", lambda c: replay_nse())
     monkeypatch.setattr(sys, "argv", ["collect_events.py"])

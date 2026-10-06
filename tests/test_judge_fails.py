@@ -12,6 +12,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.core.clock import utc_today  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
 import context  # noqa: E402
 from test_pipeline import MARKET, run, setup  # noqa: E402
 
@@ -25,11 +28,11 @@ def verdict(day: date, agent: str, rnd: int, v: str, at: str, summary: str = "s"
 
 def write(rows: list[dict]) -> None:
     for r in rows:
-        common.append_jsonl(common.day_file(MARKET, "judgments", date.fromisoformat(r["run_date"])), [r])
+        append_jsonl(day_file(MARKET, "judgments", date.fromisoformat(r["run_date"])), [r])
 
 
 def fails(today: date = TODAY) -> list[tuple]:
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     return [(str(d), a, r, s) for d, a, r, s, *_ in
             con.execute(context.JUDGE_FAILS_SQL, [today, today, context.JUDGE_LOOKBACK_DAYS]).fetchall()]
 
@@ -56,7 +59,7 @@ def test_lists_the_step_14_fail_of_the_previous_run_only(root):
         verdict(TODAY, "news-analyst", 1, "FAIL", "2026-10-07T02:50:00+00:00", "today's own"),
     ])
     assert fails() == [("2026-10-06", "graph-builder", 2, "two edges uncited")]
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     table = context.judge_fails(con, TODAY)
     assert "| 2026-10-06 | graph-builder | 2 | two edges uncited | all graph edges |" in table
 
@@ -88,11 +91,11 @@ def test_lookback_and_weekend_gap(root):
 
 def test_context_pack_prints_the_section(tmp_path):
     root, cfg = setup(tmp_path)
-    today = common.utc_today()
+    today = utc_today()
     prev = today - timedelta(days=1)
     p = root / "data" / MARKET / "judgments" / f"{prev:%Y}" / f"{prev:%m}" / f"{prev}.jsonl"
     p.parent.mkdir(parents=True)
-    common.append_jsonl(p, [verdict(prev, "slack", 1, "PASS", f"{prev}T03:11:00+00:00"),
+    append_jsonl(p, [verdict(prev, "slack", 1, "PASS", f"{prev}T03:11:00+00:00"),
                             verdict(prev, "graph-builder", 2, "FAIL", f"{prev}T03:25:00+00:00",
                                     "uncited edges", "all graph edges")])
     r = run("context.py", root, cfg)

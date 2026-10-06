@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+import common  # noqa: E402
 import html_report as hr  # noqa: E402
 import notify_slack as ns  # noqa: E402
 
@@ -362,7 +363,7 @@ def slack_root(tmp_path, monkeypatch):
     (root / "work" / "slack_us_files.json").write_text(json.dumps({
         "market": "us", "session": "2026-10-05", "html": "reports/us/2026-10-05.html",
         "images": ["reports/us/charts/2026-10-05/ranges.png", "reports/us/charts/2026-10-05/sectors.png"]}))
-    monkeypatch.setattr(ns, "ROOT", root)
+    monkeypatch.setattr(common, "ROOT", root)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
     return root

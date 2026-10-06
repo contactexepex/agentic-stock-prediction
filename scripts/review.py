@@ -16,7 +16,6 @@ proposal. Proposed config/ranges.yaml changes are written to the report, never a
 Appends a record to data/<market>/reviews/ and writes reports/<market>/review-YYYY-Www.md."""
 from __future__ import annotations
 
-import bisect
 import json
 import math
 import re
@@ -34,8 +33,14 @@ import indicators as ind
 import rangelib as rl
 import regime as rg
 import scoring
-from common import (CONFIG, ROOT, append_jsonl, benchmark_key, connect, day_file, load_ranges_config,
-                    market_arg, require_market, utc_now, utc_today, vol_index_key)
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import benchmark_key, load_ranges_config, vol_index_key
+from marketbrief.core import paths
+from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.utils.event_dates import major_event_between
+from marketbrief.utils.markdown import markdown_table
 from features import load_bars
 
 DEFAULTS = {
@@ -58,7 +63,7 @@ NOTE_PATTERNS = {
 
 
 def load_review_config() -> dict:
-    path = CONFIG / "review.yaml"
+    path = paths.CONFIG / "review.yaml"
     return {**DEFAULTS, **((yaml.safe_load(path.read_text()) or {}) if path.exists() else {})}
 
 
@@ -318,12 +323,6 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
     return regimes, majors
 
 
-def major_between(majors: list[date], start: date, end: date) -> bool:
-    """A major event after the as-of date and on or before the target date (as ranges.py)."""
-    k = bisect.bisect_right(majors, start)
-    return k < len(majors) and majors[k] <= end
-
-
 def hist_summary(res: pd.DataFrame) -> dict:
     if res.empty:
         return {"n": 0}
@@ -345,7 +344,7 @@ def history_ablation(cfg: dict, rc: dict, rv: dict, bars: dict, week_end: date) 
     day = [d.date() for d in dates]
 
     def major_in(i: int, h: int) -> bool:
-        return i + h < len(day) and major_between(majors, day[i], day[i + h])
+        return i + h < len(day) and major_event_between(majors, day[i], day[i + h])
 
     cache, variants = {}, []
     for v in [{"name": BASELINE, "set": {}}, *rv["history_variants"]]:
@@ -576,14 +575,6 @@ def fval(v) -> str:
     return str(v)
 
 
-def table(header: list[str], rows: list[list]) -> str:
-    if not rows:
-        return "_none_\n"
-    out = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
-    out += ["| " + " | ".join(str(c) for c in r) + " |" for r in rows]
-    return "\n".join(out) + "\n"
-
-
 def flag(n: int, rv: dict) -> str:
     return "low n" if n < rv["min_n"] else ""
 
@@ -627,10 +618,10 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
     rows = [range_row([win_names[w], h], s, rv) for w, per in d["ranges"].items() for h, s in per.items()]
     lines += ["## Ranges: coverage vs target", "",
               "Targets 50% and 80%. Width and interval score in % of price; score is lower-is-better. Naive = last "
-              "close +/- 20-day volatility.", "", table(hdr, rows)]
+              "close +/- 20-day volatility.", "", markdown_table(hdr, rows)]
     for title, key in (("By regime", "regime"), ("By sector", "sector"), ("By widening note", "note")):
         rows = [range_row([win_names[w], k], s, rv) for w, per in d["breakdowns"].items() for k, s in per[key].items()]
-        lines += [f"### {title}", "", table(["Window", "Group · H", *hdr[2:]], rows)]
+        lines += [f"### {title}", "", markdown_table(["Window", "Group · H", *hdr[2:]], rows)]
     lines += ["Notes: `cue` overnight cue, `ai_call` AI direction (drift), `ai_widen` AI widened, `earnings` "
               "earnings in horizon, `event` major market event, `regime` regime widening, `none` no adjustment.", ""]
 
@@ -638,9 +629,9 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
              scoring.percent(s.get("edge"), sign=True), fpct(s.get("mean_confidence")), flag(s["n"], rv)]
             for w, per in d["calls"].items() for h, s in per.items()]
     lines += ["## Direction calls", "", "Hit rate vs the always-up baseline on the same tickers and dates.", "",
-              table(["Window", "H", "n", "Hit rate", "Always-up", "Edge", "Mean conf.", "Flag"], rows),
+              markdown_table(["Window", "H", "n", "Hit rate", "Always-up", "Edge", "Mean conf.", "Flag"], rows),
               "### By confidence band", "",
-              table(["Window", "Band", "n", "Mean conf.", "Hit rate", "Gap", "Flag"],
+              markdown_table(["Window", "Band", "n", "Mean conf.", "Hit rate", "Gap", "Flag"],
                     [[win_names[w], b, s["n"], fpct(s.get("mean_confidence")), fpct(s.get("hit_rate")),
                       scoring.percent(s.get("gap"), sign=True), flag(s["n"], rv)]
                      for w, per in d["bands"].items() for b, s in per.items()])]
@@ -656,13 +647,14 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
     lines += ["## Proper scores", "",
               "Calls: Brier score (a coin flip scores 0.250) and log loss (coin flip 0.693), lower is better; skill = "
               "1 - Brier / 0.25 (above 0 beats a coin flip).", "",
-              table(["Window", "H", "n", "Brier", "Log loss", "Skill", "Flag"], sc_rows),
+              markdown_table(["Window", "H", "n", "Brier", "Log loss", "Skill", "Flag"], sc_rows),
               "### Reliability (since start): stated confidence vs hit rate", "",
-              table(["Confidence", "n", "Mean stated", "Hit rate", "Wilson 95%"], rel_rows),
+              markdown_table(["Confidence", "n", "Mean stated", "Hit rate", "Wilson 95%"], rel_rows),
               "### Ranges: interval and quantile scores", "",
               "In % of price, lower is better. Quantile score = mean pinball loss over the four published quantiles "
               "(q10, q25, q75, q90), a coarse CRPS estimate.", "",
-              table(["Window", "H", "n", "50% cover", "80% cover", "50% score", "80% score", "Quantile score", "Flag"],
+              markdown_table(["Window", "H", "n", "50% cover", "80% cover", "50% score", "80% score",
+              "Quantile score", "Flag"],
                     rq_rows)]
     a = d["aci"]
     st = a["settings"]
@@ -672,7 +664,7 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
               f"{st['min_history']} scored target dates, {'one alpha per regime' if st['by_regime'] else 'one alpha'}. "
               "Current alpha from live outcomes scored by the week's end (the target miss rate is 0.50 for the 50% "
               "band, 0.20 for the 80% band; below target = wider band).", "",
-              table(["H", "Band", "Key", "Steps", "Alpha", "Used (after min history)", "Implied coverage"],
+              markdown_table(["H", "Band", "Key", "Steps", "Alpha", "Used (after min history)", "Implied coverage"],
                     [[f"{s['horizon_days']}d", f"{s['band']}%", s["key"], s["steps"], fnum(s["alpha"], 3),
                       fnum(s["effective_alpha"], 3), fpct(s["implied_coverage"], 1)] for s in a["state"]])]
     rep = a.get("replay")
@@ -690,7 +682,7 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
     if rep and rep.get("comparison"):
         lines += [f"Historical replay `{rep['id']}` (`replay.py --aci`), fixed bands → ACI on the same rows. "
                   "**In-sample: the ACI settings in config/ranges.yaml were tuned on this replay window**, so these "
-                  "gains are optimistic:", "", table(cmp_hdr, cmp_rows(rep["comparison"]))]
+                  "gains are optimistic:", "", markdown_table(cmp_hdr, cmp_rows(rep["comparison"]))]
         ho = rep.get("held_out")
         if ho:
             sel = ho["selected"]
@@ -699,10 +691,10 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
                       f"{'per regime' if sel['by_regime'] else 'one alpha'}; "
                       f"{'the config settings' if ho['selected_is_config'] else 'NOT the config settings'}). "
                       "Out of sample, fixed bands → the selected settings on the later as-of dates:", "",
-                      table(cmp_hdr, cmp_rows(ho["test_selected"]))]
+                      markdown_table(cmp_hdr, cmp_rows(ho["test_selected"]))]
             if not ho["selected_is_config"] and ho.get("test_config"):
                 lines += ["The config settings on the same later dates (not out of sample: they were chosen on the "
-                          "whole window):", "", table(cmp_hdr, cmp_rows(ho["test_config"]))]
+                          "whole window):", "", markdown_table(cmp_hdr, cmp_rows(ho["test_config"]))]
         else:
             lines += ["_No held-out check stored (`replay.py --aci --aci-tune-end DATE`): any ACI proposal is "
                       "provisional._", ""]
@@ -710,7 +702,7 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
         lines += ["_No `replay.py --aci` record stored yet: no ACI proposal._", ""]
 
     lines += [f"## Calibration (latest as of {rec['week_end']})", "",
-              table(["H", "Source", "History n", "Live n", "q10", "q25", "q75", "q90"],
+              markdown_table(["H", "Source", "History n", "Live n", "q10", "q25", "q75", "q90"],
                     [[f"{c['horizon_days']}d", c["source"], c["n_history"], c["n_live"],
                       *(fnum(c[k], 2) for k in ("q10", "q25", "q75", "q90"))] for c in d["calibration"]])]
 
@@ -724,7 +716,7 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
         lines += [f"Round-trip consistency check against the current config: the replay rebuilds {live['reproduced']} "
                   f"of {live['n']} published ranges exactly (the rest used settings or inputs it holds fixed). This "
                   "checks the decomposition only; it is not an independent validation of the quantile model.", "",
-                  table(ab_hdr, ablation_rows(live))]
+                  markdown_table(ab_hdr, ablation_rows(live))]
     else:
         lines += ["_No scored live ranges yet._", ""]
     hist = d["history_ablation"]
@@ -733,7 +725,8 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
         share = ", ".join(f"{k} {scoring.percent(v)}" for k, v in hist["regime_share"].items() if v)
         lines += [f"Last {hist['sessions']} sessions up to {rec['week_end']}, built as `backtest.py` does (each day sees "
                   "only outcomes known before it), plus regime and market-event widening rebuilt from stored bars "
-                  f"(regime mix: {share}). No AI, cue or earnings inputs.", "", table(ab_hdr, ablation_rows(hist))]
+                  f"(regime mix: {share}). No AI, cue or earnings inputs.", "",
+                  markdown_table(ab_hdr, ablation_rows(hist))]
     else:
         lines += [f"_Not run: {hist.get('error', 'skipped')}._", ""]
 
@@ -747,7 +740,8 @@ def markdown(cfg: dict, rv: dict, rec: dict, d: dict) -> str:
             rows.append([f"`{ch['param']}`", fval(ch["current"]), fval(ch["proposed"]), p["source"], p["n"], f"{p['rel_score']:+.1%}",
                          " / ".join(f"{fpct(p['cover80_before'].get(h))} → {fpct(p['cover80_after'].get(h))}"
                                     for h in p["cover80_after"]), p["variant"]])
-    lines += [table(["Parameter", "Current", "Proposed", "Evidence", "n", "Score change", f"80% cover ({hz})", "Variant"], rows)
+    lines += [markdown_table(["Parameter", "Current", "Proposed", "Evidence", "n", "Score change",
+    f"80% cover ({hz})", "Variant"], rows)
               if rows else f"_None: no variant cleared the thresholds (n >= {rv['min_n_recommend']}, score "
               f"{scoring.percent(rv['min_improvement'])} better without coverage falling more than {scoring.percent(rv['coverage_tolerance'])} "
               f"further below target, or 80% coverage "
@@ -839,13 +833,13 @@ def main() -> int:
         return 0
     rv = load_review_config()
     rec, d = build(cfg, load_ranges_config(cfg["market"]), rv, con, week, history=not args.no_history)
-    path = ROOT / rec["report"]
+    path = paths.ROOT / rec["report"]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(markdown(cfg, rv, rec, d))
     out = day_file(cfg["market"], "reviews", utc_today())
     append_jsonl(out, [rec])
     print(json.dumps({"step": "review", "market": cfg["market"], "week": week, "due": True, "report": rec["report"],
-                      "record": str(out.relative_to(ROOT)), "n_ranges_week": rec["n_ranges_week"],
+                      "record": str(out.relative_to(paths.ROOT)), "n_ranges_week": rec["n_ranges_week"],
                       "n_ranges_all": rec["n_ranges_all"], "n_calls_all": rec["n_calls_all"],
                       "low_sample": rec["low_sample"],
                       "proposals": [{**c, "source": p["source"], "n": p["n"], "rel_score": p["rel_score"]}

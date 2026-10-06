@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Group news items about the same event and count independent origins (news verification
-phase A, deterministic; docs/DESIGN.md section 3a; settings under `clusters:` in
-config/news_sources.yaml). Run after collect_articles.py.
+"""Group news items about the same event and count independent origins (news verification phase A, deterministic;
+docs/DESIGN.md section 3a; settings under `clusters:` in config/news_sources.yaml). Run after collect_articles.py.
 
 As of now (MB_NOW in a replay), only inputs known by then are used: news rows first seen in the
 last `lookback_hours`, article rows fetched by then, SEC filings accepted by then (the `filings`
@@ -53,8 +52,8 @@ import pandas as pd
 from urllib.parse import urlsplit
 
 import news_verify as nv
-from common import append_jsonl, clock, connect, day_file, market_arg, require_market, utc_today
 from news_tags import norm
+from marketbrief.core import cli, clock, database, storage
 
 READ = ("full", "partial", "paywalled")
 
@@ -319,12 +318,12 @@ def state_hash(c: dict) -> str:
 
 
 def main() -> int:
-    cfg = require_market(market_arg(__doc__).parse_args())
+    cfg = cli.require_market(cli.market_arg(__doc__).parse_args())
     market, src = cfg["market"], nv.load_sources()
-    t0, as_of = time.monotonic(), pd.Timestamp(clock()).floor("s")
+    t0, as_of = time.monotonic(), pd.Timestamp(clock.clock()).floor("s")
     cl = src.clusters
     window = pd.Timedelta(hours=float(cl.get("window_hours", 72)))
-    con = connect(market)
+    con = database.connect(market)
     items = load_items(con, cfg, src, as_of)
     prim = load_primaries(con, cfg, src, as_of)
     stored = dict(con.execute("SELECT DISTINCT ON (cluster_id) cluster_id, state_hash FROM news_clusters "
@@ -360,7 +359,7 @@ def main() -> int:
             "inputs_until": _iso(c["inputs_until"]), "flags": c["flags"], "state_hash": h,
             "method_version": nv.METHOD_VERSION,
         })
-    written = append_jsonl(day_file(market, "news_clusters", utc_today()), rows) if rows else 0
+    written = storage.append_jsonl(storage.day_file(market, "news_clusters", clock.utc_today()), rows) if rows else 0
     examples = sorted(current, key=lambda c: (-c["n_items"], c["cluster_id"]))[:3]
     print(json.dumps({
         "step": "news_clusters", "market": market, "as_of": _iso(as_of), "items": len(items),

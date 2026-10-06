@@ -3,15 +3,15 @@
 
     python scripts/validate.py --market M --stage collect|news|features|context|forecast|report|all
 
-Prints one JSON summary: `ok`, `failures` and `warnings` (each with `code`, `detail` and the
-affected `tickers`), plus `info`. Exit 1 when any blocking failure is found, else 0.
+Prints one JSON summary: `ok`, `failures` and `warnings` (each with `code`, `detail` and the affected `tickers`), plus
+`info`. Exit 1 when any blocking failure is found, else 0.
 
 Stages (each runs after the routine step of the same name):
 - collect:  freshness of watchlist bars against the exchange calendar (the last completed session,
             market_status.py's `previous_session`; on a late run today's bar may still be missing),
             market symbols, and this run's fetches (quotes, news, filings, announcements); collector
             summaries saved in work/steps/ (or today's row counts); empty, truncated or malformed
-            files written today; row schemas (common.SCHEMAS); ISO UTC timestamps not in the
+            files written today; row schemas (marketbrief.core.schemas.SCHEMAS); ISO UTC timestamps not in the
             future; duplicate ids; close > 0; big 1-day moves; news only from configured outlets;
             today's news_articles rows (a warning: nothing reads them yet): known access, no stored
             article text (<= 3 sentences of <= 40 words), pages read only from allowlisted https URLs.
@@ -38,14 +38,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
-import yaml
 
 import events as ev
 import market_status
-from common import (CONFIG, ROOT, SCHEMAS, clock, connect, data_dir, load_ranges_config, market_arg,
-                    require_market, symbols_by_role, utc_today)
+from marketbrief.core.paths import data_dir
 import narrative_numbers as nn
-from prediction_rules import check_prediction, ts
+from marketbrief.core.settings import load_settings, load_validate_config
+from marketbrief.utils.timefmt import as_utc_timestamp
+from prediction_rules import check_prediction
+from marketbrief.core import cli, clock, database, market_config, paths, schemas
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
 # kinds whose day files are named by the trading date, with the column that says when a row was written
@@ -58,7 +59,7 @@ FETCH_COL = {"quotes": "collected_at", "news": "first_seen_at", "filings": "firs
 
 
 def load_config() -> dict:
-    return yaml.safe_load((CONFIG / "validate.yaml").read_text())
+    return load_validate_config()
 
 
 class Result:
@@ -79,15 +80,15 @@ class Result:
 # ---------- shared ----------
 
 def run_status(cfg: dict) -> dict:
-    return market_status.status(cfg, clock())
+    return market_status.status(cfg, clock.clock())
 
 
 def work_dir() -> Path:
-    return ROOT / "work"
+    return paths.ROOT / "work"
 
 
 def kind_files(market: str, kind: str) -> list[Path]:
-    ext = SCHEMAS[kind][0]
+    ext = schemas.SCHEMAS[kind][0]
     return sorted((data_dir(market) / kind).glob(f"**/*.{ext}"))
 
 
@@ -181,7 +182,7 @@ def type_problem(v, typ: str, csv_row: bool) -> str | None:
 
 def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, tol: timedelta) -> list[str]:
     """Schema and timestamp problems of one kind's rows (at most a few per kind)."""
-    cols = SCHEMAS[kind][1]
+    cols = schemas.SCHEMAS[kind][1]
     out = []
     for i, r in enumerate(rows, 1):
         unknown = [k for k in r if k not in cols]
@@ -196,7 +197,7 @@ def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, to
             if why:
                 out.append(f"row {i}: {k}={str(r[k])[:40]!r} {why}")
             elif typ == "TIMESTAMPTZ" and r[k]:
-                t = ts(r[k])
+                t = as_utc_timestamp(r[k])
                 if t is not None and t > now + tol:
                     out.append(f"row {i}: {k} {r[k]} is in the future (now {now.isoformat()})")
         if len(out) >= 5:
@@ -219,7 +220,7 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
         n = 0
         for p in files:
             rows, problems = read_rows(p)
-            rel = p.relative_to(ROOT).as_posix()
+            rel = p.relative_to(paths.ROOT).as_posix()
             if problems:
                 res.block("BAD_FILE", f"{rel}: {'; '.join(problems[:3])}", tickers_in(rows))
             if kind in TRADING_DATE_KINDS:
@@ -236,7 +237,7 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
 def check_duplicates(res: Result, cfg: dict, con, vc: dict):
     keys = {k: "id" for k in vc["unique_id_kinds"]} | dict(vc.get("unique_keys") or {})
     for kind, key in keys.items():
-        if kind not in SCHEMAS:
+        if kind not in schemas.SCHEMAS:
             continue
         rows = con.execute(f"SELECT {key}, count(*) FROM {kind} GROUP BY 1 HAVING count(*) > 1 ORDER BY 1 LIMIT 20").fetchall()
         if rows:
@@ -261,7 +262,7 @@ def check_bars(res: Result, cfg: dict, con, st: dict, vc: dict):
         if no_bar:
             res.warn("LATE_RUN_NO_SESSION_BAR", f"late run: session {sess} has closed but has no stored bar "
                      "(the run is as of the previous session)", no_bar)
-    core = [k for role in ("benchmark", "vol_index") for k in symbols_by_role(cfg, role)]
+    core = [k for role in ("benchmark", "vol_index") for k in market_config.symbols_by_role(cfg, role)]
     never = [k for k in core if k not in last]
     if never:
         res.block("MISSING_SYMBOL", "benchmark / vol index: no bars stored at all (never collected; the regime needs them)",
@@ -319,7 +320,7 @@ def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, v
         col = FETCH_COL[kind]
         newest = con.execute(f"SELECT max({col}) FROM {kind}").fetchone()[0]
         limit = vc["fetch_max_age_hours"][kind]
-        t = ts(newest)
+        t = as_utc_timestamp(newest)
         if t is None:
             res.add(vc["fetch_severity"], "NOT_FETCHED", f"{kind}: no stored rows at all")
         elif t.date() != today or now - t > pd.Timedelta(hours=limit):
@@ -431,7 +432,7 @@ def check_articles(res: Result, cfg: dict, today: date):
 
 
 def stage_collect(res, cfg, con, st, now, today, vc):
-    kinds = [k for k in SCHEMAS if k not in STAGE_KINDS["features"] and k not in ("ranges", "predictions",
+    kinds = [k for k in schemas.SCHEMAS if k not in STAGE_KINDS["features"] and k not in ("ranges", "predictions",
                                                                                   "news_enriched", "judgments")]
     counts = check_files(res, cfg, kinds, today, now, vc)
     check_duplicates(res, cfg, con, vc)
@@ -521,7 +522,7 @@ def stage_features(res, cfg, con, st, now, today, vc):
 def stage_context(res, cfg, con, st, now, today, vc, path: Path | None = None):
     path = path or work_dir() / "context.md"
     if not path.exists() or path.stat().st_size == 0:
-        res.block("MISSING_CONTEXT", f"{path.relative_to(ROOT) if path.is_relative_to(ROOT) else path} is missing or empty")
+        res.block("MISSING_CONTEXT", f"{path.relative_to(paths.ROOT) if path.is_relative_to(paths.ROOT) else path} is missing or empty")
         return
     text = path.read_text(encoding="utf-8")
     first = text.splitlines()[0] if text else ""
@@ -546,7 +547,7 @@ def evidence_times(con) -> dict:
                 "SELECT id, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ), first_seen_at) FROM filings",
                 "SELECT id, coalesce(published_at, first_seen_at) FROM announcements"):
         for i, t in con.execute(f"SELECT * FROM ({sql}) ORDER BY 1, 2").fetchall():   # per id the earliest wins
-            out.setdefault(i, ts(t))
+            out.setdefault(i, as_utc_timestamp(t))
     return out
 
 
@@ -568,8 +569,7 @@ def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):
     ctx = {"tickers": set(cfg["tickers"]),
            "features": {r.ticker: {"quality": r.quality,
                                    "days_to_earnings": None if pd.isna(r.days_to_earnings) else int(r.days_to_earnings)}
-                        for r in feats.itertuples()},
-           "evidence": evidence_times(con)}
+                        for r in feats.itertuples()}, "evidence": evidence_times(con)}
     as_of = {r.ticker: pd.Timestamp(r.as_of_date).date() for r in feats.itertuples()}
     seen = {r[0] for r in con.execute("SELECT id FROM predictions").fetchall()}
     tol = pd.Timedelta(minutes=vc["future_tolerance_minutes"])
@@ -581,7 +581,7 @@ def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):
             res.block("FORECAST_RULE", f"line {i}: not JSON ({e.msg})")
             continue
         errs = check_prediction(rec, ctx, seen, as_of=as_of, require_made_at=True)
-        made = ts(rec.get("made_at")) if isinstance(rec, dict) else None
+        made = as_utc_timestamp(rec.get("made_at")) if isinstance(rec, dict) else None
         if made is not None:
             if made > now + tol:
                 errs.append(f"made_at {rec['made_at']} is in the future")
@@ -668,8 +668,8 @@ def skeletons(cfg: dict, session: str) -> tuple[str | None, str | None]:
     if rp.exists() and sp.exists():
         return rp.read_text(encoding="utf-8"), sp.read_text(encoding="utf-8")
     import report as rpt
-    settings = yaml.safe_load((CONFIG / "settings.yaml").read_text())
-    d = rpt.gather(cfg, connect(cfg["market"]))
+    settings = load_settings()
+    d = rpt.gather(cfg, database.connect(cfg["market"]))
     r, s, _ = rpt.build(cfg, d, settings)
     return r, s
 
@@ -681,7 +681,7 @@ def agent_lines(filled: str, skeleton: str) -> list[str]:
 
 def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
     import ranges as rg
-    rc = load_ranges_config(cfg["market"])
+    rc = market_config.load_ranges_config(cfg["market"])
     as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
     if as_of is None:
         return
@@ -716,7 +716,7 @@ def report_session(con, st: dict) -> str:
 
 
 def report_file(cfg: dict, con, st: dict) -> Path:
-    return ROOT / "reports" / cfg["market"] / f"{report_session(con, st)}.md"
+    return paths.ROOT / "reports" / cfg["market"] / f"{report_session(con, st)}.md"
 
 
 def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = None, slack_path: Path | None = None):
@@ -726,7 +726,7 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
     check_files(res, cfg, ("news_enriched", "predictions", "ranges"), today, now, vc)   # appended since collect
     check_ranges(res, cfg, con, now)
     if not report_path.exists():
-        res.block("MISSING_REPORT", f"{report_path.relative_to(ROOT) if report_path.is_relative_to(ROOT) else report_path} not written")
+        res.block("MISSING_REPORT", f"{report_path.relative_to(paths.ROOT) if report_path.is_relative_to(paths.ROOT) else report_path} not written")
         return
     filled = report_path.read_text(encoding="utf-8")
     slack = slack_path.read_text(encoding="utf-8") if slack_path.exists() else None
@@ -748,13 +748,13 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
     targets = [(report_path, agent_lines(filled, skel_r or ""))]
     if slack is not None:
         targets.append((slack_path, agent_lines(slack, skel_s or "")))
-    summary = ROOT / "summaries" / cfg["market"] / "daily" / f"{today}.md"
+    summary = paths.ROOT / "summaries" / cfg["market"] / "daily" / f"{today}.md"
     if summary.exists():
         targets.append((summary, summary.read_text(encoding="utf-8").splitlines()))
     checked = {}
     for path, lines in targets:
         bad = nn.unmatched(lines, pool, small)
-        checked[path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)] = {
+        checked[path.relative_to(paths.ROOT).as_posix() if path.is_relative_to(paths.ROOT) else str(path)] = {
             "agent_lines": len(lines), "unmatched": len(bad)}
         if bad:
             res.block("UNMATCHED_NUMBER", f"{path.name}: {len(bad)} number(s) with no same-kind source number for "
@@ -771,8 +771,8 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
 def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
     paths = paths or {}
     vc = load_config()
-    con = connect(cfg["market"])
-    now, today = pd.Timestamp(clock()), utc_today()
+    con = database.connect(cfg["market"])
+    now, today = pd.Timestamp(clock.clock()), clock.utc_today()
     st = run_status(cfg)
     res = Result()
     res.info["run"] = {k: st[k] for k in ("session_date", "previous_session", "late_run", "in_session", "trading_day")}
@@ -799,12 +799,12 @@ def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
 
 
 def main() -> int:
-    ap = market_arg(__doc__)
+    ap = cli.market_arg(__doc__)
     ap.add_argument("--stage", required=True, choices=[*STAGES, "all"])
     for name in ("predictions", "enriched", "context", "report", "slack"):
         ap.add_argument(f"--{name}", type=Path, help=f"path of the {name} file (default: the routine's)")
     args = ap.parse_args()
-    cfg = require_market(args)
+    cfg = cli.require_market(args)
     out = run(cfg, args.stage, {k: getattr(args, k) for k in ("predictions", "enriched", "context", "report", "slack")
                                 if getattr(args, k)})
     print(json.dumps(out, indent=2, default=str))

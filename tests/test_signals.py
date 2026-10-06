@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import events as ev  # noqa: E402
 import indicators as ind  # noqa: E402
 import regime as rg  # noqa: E402
-from common import load_market  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
 
 TH = {"unstable_vol": 28, "event_vol": 20, "calm_vol": 16, "unstable_bench_vol": 0.25,
       "trend_return_5d": 0.015, "flat_return_5d": 0.005, "stress_vol_jump": 0.30}
@@ -184,7 +184,7 @@ def test_month_end_rule_and_session_offset(tmp_path):
 
 
 def test_sector_etfs_cover_the_watchlist():
-    from common import sector_etf_problems
+    from marketbrief.core.market_config import sector_etf_problems
     india, us = load_market("india"), load_market("us")
     for cfg in (india, us):
         assert sector_etf_problems(cfg) == []
@@ -199,7 +199,7 @@ def test_sector_etfs_cover_the_watchlist():
 
 
 def test_sector_etf_config_mistakes_are_reported_not_fatal():
-    from common import sector_etf_map, sector_etf_problems
+    from marketbrief.core.market_config import sector_etf_map, sector_etf_problems
     cfg = {"sectors": {"Tech": ["A"], "Energy": ["B"]},
            "symbols": {"T1": {"role": "sector_etf", "sectors": ["Tech"]},
                        "T2": {"role": "sector_etf", "sectors": ["Tech", "Tehc"]},

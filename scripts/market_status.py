@@ -15,7 +15,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import events as ev
-from common import market_arg, require_market
+from marketbrief.core.cli import market_arg, require_market
 
 
 def status(cfg: dict, now: datetime) -> dict:

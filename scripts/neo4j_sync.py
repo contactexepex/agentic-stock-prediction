@@ -3,7 +3,7 @@
 
 The repo's append-only files under data/ stay the source of truth. Neo4j is a derived copy that
 `--full` rebuilds from them at any time, so nothing is lost if the database is emptied. The script
-only reads data/ (through the DuckDB views in common.connect) and never writes there.
+only reads data/ (through the DuckDB views in core.database.connect) and never writes there.
 
   neo4j_sync.py --market us              incremental: rows recorded since the last sync (minus a
                                          3-day overlap), per kind
@@ -30,24 +30,25 @@ Prints one JSON summary (rows read, upserted and failed per kind). Exit 0 = all 
 1 = any failure, 2 = NEO4J_URI not set (nothing sent)."""
 from __future__ import annotations
 
-import base64
 import json
 import math
 import os
 import re
 import shutil
 import sys
-import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable
 
-from common import ROOT, connect, market_arg, require_market, utc_now
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now
+from marketbrief.core.database import connect
+from marketbrief.core import paths
+from marketbrief.sources.neo4j_client import Neo4jClient, Neo4jError
+from marketbrief.utils.text import slugify_with_unknown_fallback
 
 BATCH_SIZE = 500
 OVERLAP_DAYS = 3          # incremental re-reads this much before the watermark (re-upserts are harmless)
@@ -61,67 +62,7 @@ INDEXES = [("Company", "ticker"), ("Company", "market"), ("Holder", "market"), (
            ("Outcome", "market"), ("SyncState", "market")]
 
 
-# ---------- HTTP Query API ----------
-
-class Neo4jError(RuntimeError):
-    pass
-
-
-class Neo4jClient:
-    """Minimal client for the Neo4j Query API v2 (one auto-commit transaction per statement)."""
-
-    def __init__(self, base_url: str, database: str, user: str, password: str, timeout: float = 60,
-                 retries: int = 2, backoff: float | None = None):
-        self.base_url, self.database = base_url.rstrip("/"), database
-        self.url = f"{self.base_url}/db/{urllib.parse.quote(database, safe='')}/query/v2"
-        token = base64.b64encode(f"{user}:{password}".encode()).decode()
-        self._headers = {"Authorization": f"Basic {token}", "Content-Type": "application/json",
-                         "Accept": "application/json"}
-        self._secrets = [s for s in (password, token) if s]
-        self.timeout, self.retries = timeout, retries
-        self.backoff = float(os.environ.get("NEO4J_RETRY_BACKOFF", 2.0)) if backoff is None else backoff
-
-    @property
-    def host(self) -> str:
-        return urllib.parse.urlparse(self.base_url).hostname or "?"
-
-    def redact(self, text: str) -> str:
-        for s in self._secrets:
-            text = text.replace(s, "***")
-        return text
-
-    def run(self, statement: str, parameters: dict | None = None) -> dict:
-        body = json.dumps({"statement": statement, "parameters": parameters or {}, "includeCounters": True}).encode()
-        last = ""
-        for attempt in range(self.retries + 1):
-            if attempt:
-                time.sleep(self.backoff * attempt)
-            req = urllib.request.Request(self.url, data=body, headers=self._headers, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                    payload = json.loads(resp.read().decode() or "{}")
-            except urllib.error.HTTPError as exc:
-                detail = _error_text(exc.read().decode(errors="replace"))
-                last = f"HTTP {exc.code}: {detail}"
-                if exc.code in (429, 500, 502, 503, 504):
-                    continue
-                raise Neo4jError(self.redact(last)) from None
-            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
-                last = f"connection failed: {getattr(exc, 'reason', exc)}"
-                continue
-            if payload.get("errors"):
-                raise Neo4jError(self.redact(_error_text(json.dumps(payload))))
-            return payload
-        raise Neo4jError(self.redact(last))
-
-
-def _error_text(body: str) -> str:
-    try:
-        errs = json.loads(body).get("errors") or []
-        return "; ".join(f"{e.get('code', '')}: {e.get('message', '')}"[:300] for e in errs) or body[:300]
-    except (ValueError, AttributeError):
-        return body[:300]
-
+# ---------- HTTP Query API (client: marketbrief/sources/neo4j_client.py) ----------
 
 def default_database(uri: str | None) -> str:
     """NEO4J_DATABASE if set, else the first label of the URI host: on Aura the database is named
@@ -146,7 +87,7 @@ def client_from_env() -> Neo4jClient | None:
         port = f":{u.port}" if u.port and u.port != 7687 else ("" if secure else ":7474")
         base = f"{'https' if secure else 'http'}://{u.hostname}{port}"
     return Neo4jClient(base, default_database(uri or base),
-                       os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", ""))
+                       (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "")))
 
 
 # ---------- values ----------
@@ -166,10 +107,6 @@ def clean(v):
     if isinstance(v, dict):
         return json.dumps(v, default=str, sort_keys=True)
     return v
-
-
-def slug(text: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", str(text or "unknown").lower()).strip("-") or "unknown"
 
 
 # ---------- Cypher building blocks (static text only; values are parameters) ----------
@@ -335,7 +272,7 @@ PERSON_CATEGORIES = ("director", "key managerial", "kmp", "designated", "employe
 
 
 def holder_id(m: str, cik, name) -> str:
-    return f"{m}:cik:{cik}" if cik else f"{m}:name:{slug(name)}"
+    return f"{m}:cik:{cik}" if cik else f"{m}:name:{slugify_with_unknown_fallback(name)}"
 
 
 def shape_insider(m: str, r: dict) -> dict:
@@ -429,7 +366,7 @@ def shape_graph(m: str, r: dict) -> dict:
     row["id"] = f"{m}:graph:{r['id']}"
     row.update(ticker=r["ticker"], company_id=company_id(m, r["ticker"]), status=r.get("status") or "active",
                target_ticker=r.get("target_ticker"),
-               target_id=company_id(m, r["target_ticker"]) if r.get("target_ticker") else f"{m}:name:{slug(r.get('target'))}",
+               target_id=company_id(m, r["target_ticker"]) if r.get("target_ticker") else f"{m}:name:{slugify_with_unknown_fallback(r.get('target'))}",
                target_name=r.get("target"), target_person=r.get("target_kind") == "person")
     return row
 
@@ -786,7 +723,7 @@ def main() -> int:
     args = ap.parse_args()
     cfg = require_market(args)
     if args.dry_run:
-        sink = DryRunSink(ROOT / "work" / "neo4j_dryrun" / cfg["market"])
+        sink = DryRunSink(paths.ROOT / "work" / "neo4j_dryrun" / cfg["market"])
     else:
         sink = client_from_env()
         if sink is None:
@@ -808,7 +745,7 @@ def main() -> int:
     only = [k.strip() for k in args.kinds.split(",")] if args.kinds else None
     out = sync(cfg, con, sink, full=args.full, since=args.since, batch_size=args.batch_size, only=only)
     if args.dry_run:
-        out["dry_run_dir"] = str(sink.dir.relative_to(ROOT)) if sink.dir.is_relative_to(ROOT) else str(sink.dir)
+        out["dry_run_dir"] = str(sink.dir.relative_to(paths.ROOT)) if sink.dir.is_relative_to(paths.ROOT) else str(sink.dir)
         out["statements"] = sink.n
     print(json.dumps(out, indent=2, default=str))
     return 0 if out["ok"] else 1

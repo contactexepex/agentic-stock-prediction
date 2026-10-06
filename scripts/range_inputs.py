@@ -17,7 +17,7 @@ import pandas as pd
 import events as ev
 import rangelib as rl
 import scoring
-from common import benchmark_key
+from marketbrief.core.market_config import benchmark_key
 
 NEAR_DAYS = 3     # earnings dates this close together are the same report
 MOVED_DAYS = 45   # an upcoming date superseded by a newer one this close was moved

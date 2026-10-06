@@ -1,5 +1,5 @@
 """Ticker tagging and article identity for news items (collect_news.py writes, the `news` view
-re-tags on read). Standard library only, so common.connect can import it.
+re-tags on read). Standard library only, so core.database.connect can import it.
 
 Matching: a ticker's `news_names` (default: `name` + `aliases` in config/markets/<market>.yaml)
 as whole words, case-insensitively, after that ticker's own `news_exclude` regexes were removed
@@ -33,7 +33,7 @@ match), the hook for a later aboutness check of material items; null when nothin
 `tickers` = primary + mentioned (what news_ticker_day unnests).
 
 Stored rows are append-only, so rows written before this tagger (no `tag_version`) are re-tagged
-on read by `retag_stored` (DuckDB function `news_retag`, registered in common.connect; the
+on read by `retag_stored` (DuckDB function `news_retag`, registered in core.database.connect; the
 `news` view applies it and `news_stored` keeps the rows as stored). Their summaries were not
 stored, so they are tagged from the title; a title without a company leaves them untagged
 (Google News summaries repeat the headline, so nothing is lost there). Old wire rows whose title

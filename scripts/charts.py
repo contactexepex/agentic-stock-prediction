@@ -24,7 +24,9 @@ from matplotlib.lines import Line2D  # noqa: E402
 from PIL import Image  # noqa: E402
 
 import scoring  # noqa: E402
-from common import ROOT, connect, market_arg, require_market  # noqa: E402
+from marketbrief.core.cli import market_arg, require_market  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core import paths  # noqa: E402
 from view_data import CURRENCY, gather_view, primary_horizon  # noqa: E402
 
 # Reference palette (dataviz skill): light surface, blue ramp for ranges, blue/red diverging
@@ -157,12 +159,12 @@ CHARTS = (("ranges.png", ranges_chart), ("sectors.png", sectors_chart), ("track_
 
 def run(cfg: dict, view: dict | None = None) -> dict:
     view = view or gather_view(cfg, connect(cfg["market"]))
-    out = ROOT / "reports" / cfg["market"] / "charts" / view["session"]
+    out = paths.ROOT / "reports" / cfg["market"] / "charts" / view["session"]
     out.mkdir(parents=True, exist_ok=True)
     files = []
     for name, draw in CHARTS:
         if draw(view, out / name):
-            files.append(str((out / name).relative_to(ROOT)))
+            files.append(str((out / name).relative_to(paths.ROOT)))
     return {"step": "charts", "market": cfg["market"], "session_date": view["session"], "charts": files}
 
 

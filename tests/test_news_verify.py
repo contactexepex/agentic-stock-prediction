@@ -19,6 +19,9 @@ sys.path.insert(0, str(REPO / "scripts"))
 import ai_replay  # noqa: E402
 import collect_articles  # noqa: E402
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 import news_clusters  # noqa: E402
 import news_verify as nv  # noqa: E402
 import validate  # noqa: E402
@@ -375,13 +378,13 @@ def test_collect_articles(env, capsys, src):
     # no article text stored: at most 3 sentences of <= 40 words; the schema and gate accept the rows
     for r in rows.values():
         assert len(r["extract"] or []) <= 3 and all(len(x.split()) <= 40 for x in r["extract"] or [])
-        assert set(r) == set(common.SCHEMAS["news_articles"][1])
+        assert set(r) == set(SCHEMAS["news_articles"][1])
     full_text = parse("bnn_chevron", src)["text"]
     assert len(json.dumps(rows["n01"])) < len(full_text) + 1500     # extract + numbers + 1024-hex signature
     now = pd.Timestamp(NOW)
     assert validate.check_rows("news_articles", list(rows.values()), False, now, timedelta(minutes=5)) == []
     res = validate.Result()
-    validate.check_articles(res, common.load_market(MARKET), date(2026, 10, 5))
+    validate.check_articles(res, load_market(MARKET), date(2026, 10, 5))
     assert res.failures == [] and res.warnings == []
     # idempotent: a rerun writes nothing and requests nothing
     n_calls, n_lines = len(env.session.calls), len(env.rows("news_articles"))
@@ -396,7 +399,7 @@ def test_validate_flags_bad_article_rows(env, capsys):
             "final_url": "http://www.bnnbloomberg.ca/x"}
     env.write("news_articles", [bad, bad2])
     res = validate.Result()
-    validate.check_articles(res, common.load_market(MARKET), date(2026, 10, 5))
+    validate.check_articles(res, load_market(MARKET), date(2026, 10, 5))
     assert [w["code"] for w in res.warnings] == ["ARTICLE_ROWS"] and "2 news_articles rows" in res.warnings[0]["detail"]
 
 
@@ -499,7 +502,7 @@ def test_clusters_asof_has_no_lookahead(env, capsys):
     assert env.run(news_clusters, capsys)["written"] == 0
     env.set_now(t2)
     env.run(news_clusters, capsys)
-    con = common.connect(MARKET)
+    con = connect(MARKET)
 
     def cvx_ids(ts: str) -> set:
         r = con.execute("SELECT news_ids FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ)) WHERE ticker = 'CVX' "
@@ -516,7 +519,7 @@ def test_clusters_asof_has_no_lookahead(env, capsys):
               day="2026-10-06")
     env.write("news_clusters", [{**t1_row, "id": "bad-seen", "as_of": "2026-10-05T20:40:00+00:00",
                                  "news_ids": t1_row["news_ids"] + ["n30"]}], day="2026-10-06")
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     ids = {r[0] for r in con.execute("SELECT id FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ))",
                                      ["2026-10-05T23:00:00+00:00"]).fetchall()}
     assert "bad-inputs" not in ids and "bad-seen" not in ids and t1_row["id"] in ids
@@ -539,7 +542,7 @@ def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):
     env.write("news", [news_row(31, "Chevron elevates CFO Bonner to lead oil and gas operations", "CVX",
                                 source="Fortune", domain="fortune.com", seen="2026-10-05T19:30:00+00:00", conf="low")])
     env.run(news_clusters, capsys)                               # T1 = NOW: Fortune is its own origin
-    con = common.connect(MARKET)
+    con = connect(MARKET)
 
     def fortune_group(ts: str) -> dict:
         groups = con.execute("SELECT origin_groups FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ)) "
@@ -555,7 +558,7 @@ def test_late_fetched_article_is_ignored_before_its_fetch(env, capsys):
     assert env.run(news_clusters, capsys)["written"] == 0       # rebuilt as of T1: the late article is unseen
     env.set_now(t2)
     assert env.run(news_clusters, capsys)["written"] >= 1
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     assert fortune_group(NOW)["origin"] == "outlet:fortune.com"      # the T1 state is unchanged
     assert fortune_group(t2)["origin"] == "wire:Reuters"             # after the fetch: a Reuters copy
 
@@ -566,7 +569,7 @@ def test_clusters_asof_drops_ids_that_moved(env):
          "news_ids": ["n01", "n02"], "n_items": 2, "inputs_until": "2026-10-05T19:00:00+00:00"},
         {"id": "Y@2", "as_of": "2026-10-05T19:30:00+00:00", "cluster_id": "CVX-n02", "ticker": "CVX",
          "news_ids": ["n02", "n05"], "n_items": 2, "inputs_until": "2026-10-05T19:30:00+00:00"}])
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     got = {r[0]: (r[1], r[2], r[3]) for r in con.execute(
         "SELECT cluster_id, news_ids, n_items, moved_ids FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ))",
         ["2026-10-05T20:00:00+00:00"]).fetchall()}
@@ -708,8 +711,8 @@ def test_items_vetted_read_and_opinion_from_stored_rows(env, capsys):
                  url="https://seekingalpha.com/news/4500000-chevron-names-new-cfo"),
         news_row(42, "Chevron names Jeff Gustavson next CFO, Reuters reports", "CVX", source="Dubious Daily",
                  domain="dubiousdaily.xyz", conf="low")])
-    con = common.connect(MARKET)
-    items = {i["id"]: i for i in news_clusters.load_items(con, common.load_market(MARKET), nv.load_sources(),
+    con = connect(MARKET)
+    items = {i["id"]: i for i in news_clusters.load_items(con, load_market(MARKET), nv.load_sources(),
                                                           pd.Timestamp(NOW))}
     assert items["n40"]["opinion"] and not items["n41"]["opinion"]          # contributor piece vs news desk
     assert items["n42"]["wire"] == "Reuters" and not items["n42"]["vetted"]  # an agency named by an unvetted site

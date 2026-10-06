@@ -7,7 +7,7 @@ No consensus estimates are available for free, so there is no "surprise" here: g
 against the same fiscal quarter a year earlier, as reported to the SEC."""
 from __future__ import annotations
 
-from common import md_table
+from marketbrief.utils.markdown import cursor_markdown_table
 
 FRESH_DAYS = 5
 
@@ -59,5 +59,5 @@ def markdown(cfg: dict, con) -> str:
         out.append(f"Filed in the last {FRESH_DAYS} days: " + "; ".join(
             f"{t} {form} FY{fy} {fp} ({d})" for t, form, fy, fp, d in fresh) + "\n")
     for title, sql in SECTIONS:
-        out.append(f"### {title}\n\n{md_table(con.execute(sql))}")
+        out.append(f"### {title}\n\n{cursor_markdown_table(con.execute(sql))}")
     return "\n".join(out)

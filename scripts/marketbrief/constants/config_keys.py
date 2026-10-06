@@ -1,0 +1,22 @@
+"""Keys of the market config (config/markets/<market>.yaml) and of config/ranges.yaml."""
+CFG_MARKET = "market"
+CFG_TICKERS = "tickers"
+CFG_SYMBOLS = "symbols"
+CFG_SECTORS = "sectors"
+CFG_SECTOR_ETFS = "sector_etfs"
+CFG_FILINGS = "filings"
+CFG_FUNDAMENTALS = "fundamentals"
+CFG_PREDECESSOR_CIKS = "predecessor_ciks"
+
+META_YAHOO = "yahoo"
+META_SECTOR = "sector"
+META_SECTOR_ETF = "sector_etf"
+META_ROLE = "role"
+META_SECTORS = "sectors"
+
+ROLE_SECTOR_ETF = "sector_etf"
+ROLE_BENCHMARK = "benchmark"
+ROLE_VOL_INDEX = "vol_index"
+
+FILINGS_SOURCE_SEC = "sec"
+BY_MARKET_SUFFIX = "_by_market"

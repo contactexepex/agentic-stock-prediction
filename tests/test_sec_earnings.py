@@ -213,7 +213,7 @@ def test_collector_stores_periodic_reports_and_reader_uses_them(tmp_path, monkey
     # second run: nothing new (append-only, ids de-duplicated)
     s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))
     assert s["sec_reports"] == 0 and s["new_history"]["earnings"] == 0
-    from common import connect
+    from marketbrief.core.database import connect
     evdf = ri.load_events(connect("testsecrep"))
     assert ri.earnings_events(evdf)["AAPL"] == [(D("2026-04-22"), "after_close"), (D("2026-10-29"), None)]
     assert ce.REPORT_FORMS == ("10-Q", "10-K")

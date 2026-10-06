@@ -22,6 +22,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.storage import append_jsonl  # noqa: E402
+from marketbrief.utils.markdown import cursor_markdown_table  # noqa: E402
 import context  # noqa: E402
 import html_report  # noqa: E402
 import report  # noqa: E402
@@ -43,7 +47,7 @@ PCT_COLUMNS = ("is80_pct", "naive_is80_pct", "width80_pct", "naive_width80_pct",
 def jl(root: Path, kind: str, day: date, rows: list[dict], part: str = "") -> None:
     path = root / "data" / MARKET / kind / f"{day:%Y}" / f"{day:%m}" / f"{day}{part}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    common.append_jsonl(path, rows)
+    append_jsonl(path, rows)
 
 
 def build(root: Path) -> None:
@@ -106,7 +110,7 @@ def cons(tmp_path_factory):
         mp.setattr(common, "ROOT", root)
         mp.setattr(common, "CONFIG", cfg)
         mp.setenv("MB_NOW", NOW)
-        out = [common.connect(MARKET) for _ in range(CONNECTIONS)]
+        out = [connect(MARKET) for _ in range(CONNECTIONS)]
         for con in out:
             con.execute(f"SET threads TO {THREADS}")
         yield out
@@ -124,8 +128,8 @@ def rows(sql: str, params=None):
 
 
 def section(title: str):
-    sql, params = next((s, p) for t, s, p in context.sections(common.load_market(MARKET)) if t.startswith(title))
-    return lambda con: common.md_table(con.execute(sql, params))
+    sql, params = next((s, p) for t, s, p in context.sections(load_market(MARKET)) if t.startswith(title))
+    return lambda con: cursor_markdown_table(con.execute(sql, params))
 
 
 def test_score_predictions_queries(cons):
@@ -171,7 +175,7 @@ def test_views_insider_flow_and_split_factors(cons):
     flow = stable(cons, rows("SELECT * FROM insider_flow ORDER BY ticker"))
     assert flow and flow[0][1] > 0
     stable(cons, rows("SELECT ticker, date, factor FROM bar_factors WHERE ticker = 'T00' ORDER BY date"))
-    stable(cons, lambda con: common.md_table(con.execute(smart_money.SECTIONS[1][1])))
+    stable(cons, lambda con: cursor_markdown_table(con.execute(smart_money.SECTIONS[1][1])))
 
 
 SHARES = (0.625, 5 / 8, 0.575, 0.125, 0.5499999999999999, 0.6250000000000001, 0.995, 0.005, 1.0, 0.0, 1e-7)
@@ -210,7 +214,7 @@ def test_no_half_to_even_percent_format_left():
     import re
     import review
     scripts = Path(scoring.__file__).parent
-    hits = [f"{p.name}:{i}" for p in sorted(scripts.glob("*.py"))
+    hits = [f"{p.relative_to(scripts)}:{i}" for p in sorted(scripts.rglob("*.py"))
             for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r"\{[^}]*:[+ ]?\.(0|\{[^}]+\})%\}", line)]
     assert hits == []
     assert review.band_label(0.625, 5 / 8) == "63%-63%" and review.fpct(0.625) == review.fpct(5 / 8) == "63%"

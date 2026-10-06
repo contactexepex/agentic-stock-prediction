@@ -29,9 +29,11 @@ D_POS = N - 12          # the sample as-of day: its 1d and 5d targets are inside
 
 DUMP = """
 import json, sys, datetime
-import common, replay
-cfg = common.load_market('testmkt'); rc = common.load_ranges_config('testmkt')
-bars, extra = replay.load_inputs(cfg, rc, common.connect('testmkt'))
+import replay
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import load_market, load_ranges_config
+cfg = load_market('testmkt'); rc = load_ranges_config('testmkt')
+bars, extra = replay.load_inputs(cfg, rc, connect('testmkt'))
 start = datetime.date.fromisoformat(sys.argv[1]) if sys.argv[1] != '-' else None
 end = datetime.date.fromisoformat(sys.argv[2]) if sys.argv[2] != '-' else None
 res, reg = replay.replay_rows(cfg, rc, bars, extra, start, end)
@@ -41,8 +43,9 @@ print(json.dumps(rows, default=str))
 
 FEATURES = """
 import json, sys, datetime
-import common, features
-cfg = common.load_market('testmkt')
+import features
+from marketbrief.core.market_config import load_market
+cfg = load_market('testmkt')
 d = datetime.date.fromisoformat(sys.argv[1])
 print(json.dumps(features.run(cfg, today_local=d, utc_day=d), default=str))
 """
@@ -210,7 +213,7 @@ def test_replay_cli_writes_report_json_and_record(tmp_path):
         labels = x.replace("80%", "").replace("50%", "").replace("95%", "")   # band names, not measured rates
         assert not re.search(r"(?<![\d.])\d+%", labels), x
     assert s["horizons"]["1"]["overall"]["n"] > 400 and len(s["horizons"]["1"]["calibration"]) == len(replay.LEVELS)
-    rec = py("import common; print(common.connect('testmkt').execute("
+    rec = py("from marketbrief.core.database import connect; print(connect('testmkt').execute("
              "'SELECT count(*), max(cover80_1d), CAST(max(end_date) AS VARCHAR) FROM replays').fetchone())", root, cfg)
     assert rec.returncode == 0, rec.stderr
     assert rec.stdout.strip().startswith("(1, ") and end in rec.stdout

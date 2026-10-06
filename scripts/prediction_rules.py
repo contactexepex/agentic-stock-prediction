@@ -2,27 +2,13 @@
 (validate.py --stage forecast) and the as-of replay (ai_replay.py record)."""
 from __future__ import annotations
 
-import pandas as pd
-
-from common import SCHEMAS
+from marketbrief.core.schemas import SCHEMAS
+from marketbrief.utils.timefmt import as_utc_timestamp
 
 HORIZONS = (1, 5)
 CONF_MIN, CONF_MAX, WIDEN_MAX, RATIONALE_WORDS = 0.50, 0.90, 0.5, 40
 REQUIRED = ("id", "as_of_date", "ticker", "horizon_days", "direction", "confidence", "rationale",
             "evidence_ids", "prompt_version")
-
-
-def ts(v) -> pd.Timestamp | None:
-    """A value as a UTC timestamp (naive values are read as UTC), or None if it is not one."""
-    if v is None or v == "":
-        return None
-    try:
-        t = pd.Timestamp(v)
-    except (ValueError, TypeError):
-        return None
-    if pd.isna(t):
-        return None
-    return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
 
 
 def check_prediction(rec, ctx: dict, seen: set[str], as_of=None, require_made_at: bool = False,
@@ -67,7 +53,7 @@ def check_prediction(rec, ctx: dict, seen: set[str], as_of=None, require_made_at
         errs.append(f"rationale must be text of at most {RATIONALE_WORDS} words")
     made = None
     if rec.get("made_at") is not None:
-        made = ts(rec["made_at"])
+        made = as_utc_timestamp(rec["made_at"])
         if made is None:
             errs.append(f"made_at is not a timestamp ({rec['made_at']!r})")
     ids = rec["evidence_ids"]

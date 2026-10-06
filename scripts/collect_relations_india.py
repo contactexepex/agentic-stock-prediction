@@ -30,9 +30,12 @@ import io
 import sys
 from datetime import date, timedelta
 
-from nse import (FetchError, Nse, collector_main, coverage, date_windows, iso, nse_symbols, num, parse_day,  # noqa: F401
-                 parse_ts, pick, recent_ids, replay_problem, rows_of, short_hash, since_arg, store, summary_of,
-                 write_target, xbrl)
+from nse import (collector_main, coverage, date_windows, iso, nse_symbols, parse_day, parse_ts, pick,
+                 rows_of, short_hash, since_arg, store, summary_of, xbrl)
+from marketbrief.core.storage import recent_ids
+from marketbrief.sources.errors import FetchError
+from marketbrief.sources.nse_client import Nse
+from marketbrief.utils.numbers import parse_nse_number
 
 KEEP_QUARTERS = 4   # shareholding periods kept per ticker on a first fetch (enough for q/q changes)
 KINDS = ["insiders", "deals", "holdings"]
@@ -63,15 +66,15 @@ def pit_rows(xml: str, ticker: str, app: str, disclosed, url: str, now: str) -> 
     for ctx, f in sorted(facts.items()):
         if "NameOfThePerson" not in f:
             continue
-        pct = lambda k: round(v * 100, 4) if (v := num(f.get(k))) is not None else None  # noqa: E731
+        pct = lambda k: round(v * 100, 4) if (v := parse_nse_number(f.get(k))) is not None else None  # noqa: E731
         out.append({
             "id": f"nse-pit-{ticker}-{app}-{ctx}", "ticker": ticker, "source": "nse_pit",
             "person": f.get("NameOfThePerson"), "person_category": f.get("CategoryOfPerson"),
             "security_type": f.get("TypeOfInstrument"),
             "transaction": f.get("SecuritiesAcquiredOrDisposedTransactionType"),
             "mode": f.get("ModeOfAcquisitionOrDisposal"),
-            "shares": num(f.get("SecuritiesAcquiredOrDisposedNumberOfSecurity")),
-            "value": num(f.get("SecuritiesAcquiredOrDisposedValueOfSecurity")),
+            "shares": parse_nse_number(f.get("SecuritiesAcquiredOrDisposedNumberOfSecurity")),
+            "value": parse_nse_number(f.get("SecuritiesAcquiredOrDisposedValueOfSecurity")),
             # XBRL "pure" values are fractions (0.0019 = 0.19%); stored as percent
             "holding_before_pct": pct("SecuritiesHeldPriorToAcquisitionOrDisposalPercentageOfShareholding"),
             "holding_after_pct": pct("SecuritiesHeldPostAcquistionOrDisposalPercentageOfShareholding"),
@@ -129,8 +132,8 @@ def deal_record(r: dict, deal_type: str, source: str, symbols: dict[str, str], n
     day = parse_day(pick(r, "BD_DT_DATE", "date", "Date"))
     client = pick(r, "BD_CLIENT_NAME", "clientName", "Client Name")
     side = (pick(r, "BD_BUY_SELL", "buySell", "Buy/Sell", "Buy / Sell") or "").lower() or None
-    shares = num(pick(r, "BD_QTY_TRD", "qty", "Quantity Traded"))
-    price = num(pick(r, "BD_TP_WATP", "watp", "Trade Price / Wght. Avg. Price"))
+    shares = parse_nse_number(pick(r, "BD_QTY_TRD", "qty", "Quantity Traded"))
+    price = parse_nse_number(pick(r, "BD_TP_WATP", "watp", "Trade Price / Wght. Avg. Price"))
     if day is None or shares is None:
         return None
     return {
@@ -209,8 +212,9 @@ def shp_record(r: dict, ticker: str, now: str) -> dict | None:
     period = parse_day(pick(r, "date"))
     if period is None:
         return None
-    vals = {"promoter_pct": num(pick(r, "pr_and_prgrp")),   # "0" is a real 0 (no promoter), not a default
-            "public_pct": num(pick(r, "public_val")), "employee_trust_pct": num(pick(r, "employeeTrusts"))}
+    vals = {"promoter_pct": parse_nse_number(pick(r, "pr_and_prgrp")),   # "0" is a real 0 (no promoter), not a default
+            "public_pct": parse_nse_number(pick(r, "public_val")),
+            "employee_trust_pct": parse_nse_number(pick(r, "employeeTrusts"))}
     filed = parse_ts(pick(r, "broadcastDate", "submissionDate"))
     return {"id": f"nse-shp-{ticker}-{period}-" + short_hash(filed, *vals.values()), "ticker": ticker,
             "period_end": str(period), "source": "nse_shp", "filed_at": iso(filed), "url": pick(r, "xbrl"),
@@ -222,14 +226,15 @@ def pledge_record(r: dict, ticker: str, now: str) -> dict | None:
     if period is None:
         return None
     vals = {
-        "sdd_promoter_pct": num(pick(r, "percPromoterHolding")),          # depository-flagged promoters only
-        "promoter_shares": num(pick(r, "totPromoterHolding")),
-        "total_shares": num(pick(r, "totIssuedShares")),
-        "promoter_encumbered_shares": num(pick(r, "totPromoterShares")),
-        "pledged_pct_of_promoter": num(pick(r, "percPromoterShares")),    # encumbered / promoter holding
-        "pledged_pct_of_total": num(pick(r, "percTotShares")),            # encumbered / all shares
-        "depository_pledged_shares": num(pick(r, "numSharesPledged")),   # all holders' pledges
-        "depository_pledged_pct": num(pick(r, "percSharesPledged")),     # ... as % of demat shares
+        "sdd_promoter_pct": parse_nse_number(pick(r, "percPromoterHolding")),
+                 # depository-flagged promoters only
+        "promoter_shares": parse_nse_number(pick(r, "totPromoterHolding")),
+        "total_shares": parse_nse_number(pick(r, "totIssuedShares")),
+        "promoter_encumbered_shares": parse_nse_number(pick(r, "totPromoterShares")),
+        "pledged_pct_of_promoter": parse_nse_number(pick(r, "percPromoterShares")),    # encumbered / promoter holding
+        "pledged_pct_of_total": parse_nse_number(pick(r, "percTotShares")),            # encumbered / all shares
+        "depository_pledged_shares": parse_nse_number(pick(r, "numSharesPledged")),   # all holders' pledges
+        "depository_pledged_pct": parse_nse_number(pick(r, "percSharesPledged")),     # ... as % of demat shares
     }
     # NSE re-stamps broadcastDt on every daily refresh, so the id hashes the values only: a new
     # row is stored only when a number changes.
@@ -270,7 +275,7 @@ def holdings(nse: Nse, symbols: dict[str, str], today: date, now: str, market: s
 
 def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, args=None) -> dict:
     """Fetch, de-duplicate and append each kind; return the JSON summary."""
-    from common import utc_now, utc_today
+    from marketbrief.core.clock import utc_now, utc_today
     market, rel = cfg["market"], cfg.get("relations") or {}
     symbols, today, now = nse_symbols(cfg), today or utc_today(), utc_now()
     full = bool(getattr(args, "full", False))

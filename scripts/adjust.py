@@ -5,7 +5,7 @@ Why: yfinance's `Close` (auto_adjust=False) is not dividend-adjusted but IS spli
 as of the collection time, and bars in data/<market>/prices/ are written once. After a split or
 bonus the stored bars before its ex-date stay on the old basis while new bars come on the new
 one. Each confirmed corporate action is therefore recorded once in
-data/<market>/adjustments/YYYY/MM/<ex-date>.jsonl (schema `adjustments` in common.py) and applied
+data/<market>/adjustments/YYYY/MM/<ex-date>.jsonl (schema `adjustments` in marketbrief/core/schemas.py) and applied
 on read: the `ohlc` and `bars` views (sql/views.sql) multiply the prices of every bar before an
 ex-date by that action's `factor` (0.5 for a 1:1 bonus or a 2:1 split) and divide its volume by it,
 cumulatively over all later actions; `ohlc_raw` and `bars_raw` keep the bars as stored.
@@ -16,7 +16,7 @@ import json
 from datetime import date, datetime
 from fractions import Fraction
 
-from common import data_dir
+from marketbrief.core.paths import data_dir
 
 SPLIT_TOL = 0.01     # a measured price ratio vs a split factor (Yahoo rounds closes)
 MATCH_TOL = 0.02     # |Yahoo close / stored close - 1| above this: the stored bar is on another basis
@@ -88,6 +88,6 @@ def split_fraction(x: float) -> Fraction | None:
 
 
 def record(ticker: str, ex_date: date, factor: float, source: str, now: str, **evidence) -> dict:
-    """One adjustments row (schema `adjustments` in common.py)."""
+    """One adjustments row (schema `adjustments` in marketbrief/core/schemas.py)."""
     return {"id": f"{ticker}-{ex_date}", "ticker": ticker, "ex_date": str(ex_date), "factor": factor,
             "volume_factor": 1 / factor, "source": source, **evidence, "detected_at": now}

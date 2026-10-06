@@ -13,6 +13,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_ranges_config  # noqa: E402
+from marketbrief.core.storage import day_file  # noqa: E402
 import events as ev  # noqa: E402
 import market_status as ms  # noqa: E402
 import ranges  # noqa: E402
@@ -78,7 +81,7 @@ ALL = [f"{AS_OF}-{t}-{h}d" for t in ("AAPL", "MSFT") for h in (1, 5)]
 
 
 def jsonl(root: Path, kind: str, day: date, rows: list[dict]) -> None:
-    p = common.day_file(MARKET, kind, day)
+    p = day_file(MARKET, kind, day)
     with p.open("a") as f:
         f.writelines(json.dumps(r) + "\n" for r in rows)
 
@@ -108,11 +111,11 @@ def market(tmp_path, monkeypatch):
     jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
                                    "computed_at": "2026-10-05T11:00:00+00:00", "regime": "CALM"}])
     cfg = {**US, "market": MARKET, "tickers": {"AAPL": {}, "MSFT": {}}}
-    return root, cfg_dir, cfg, common.load_ranges_config()
+    return root, cfg_dir, cfg, load_ranges_config()
 
 
 def build(cfg, rc, now: str) -> dict[str, dict]:
-    return {r["id"]: r for r in ranges.build(cfg, rc, common.connect(MARKET), now)}
+    return {r["id"]: r for r in ranges.build(cfg, rc, connect(MARKET), now)}
 
 
 def assert_cue_applied(rows: dict, rc: dict) -> None:
@@ -205,7 +208,7 @@ def test_scoring_skips_records_made_after_the_first_session_closed(market):
     out = json.loads(r.stdout)
     assert out["late_skipped"] == {"calls": 1, "ranges": 1}       # MSFT 1d call (made at the close) and range
     assert (out["scored"], out["ranges_scored"]) == (1, 1)         # AAPL only; 5d targets have no bar yet
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     assert [x for (x,) in con.execute("SELECT prediction_id FROM outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
     assert [x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
     again = json.loads(run("score_predictions.py", root, cfg_dir).stdout)  # late ones are not "open" either
@@ -463,7 +466,7 @@ def test_scoring_skips_every_horizon_made_after_the_open(market):
     out = json.loads(r.stdout)
     assert out["late_skipped"] == {"calls": 2, "ranges": 2}       # MSFT 1d and 5d, calls and ranges
     assert (out["scored"], out["ranges_scored"]) == (2, 2)         # AAPL 1d and 5d
-    con = common.connect(MARKET)
+    con = connect(MARKET)
     assert sorted(x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()) == \
         [f"{AS_OF}-AAPL-1d", f"{AS_OF}-AAPL-5d"]
     assert sorted(x for (x,) in con.execute("SELECT prediction_id FROM outcomes").fetchall()) == \

@@ -26,8 +26,12 @@ import sys
 from datetime import date, datetime, timedelta
 
 from collect_relations_india import due_tickers, latest_quarter_end
-from nse import (IST, FetchError, Nse, collector_main, coverage, date_windows, iso, nse_symbols, num, parse_day,
-                 parse_ts, pick, recent_ids, rows_of, since_arg, store, summary_of, xbrl)
+from nse import (IST, collector_main, coverage, date_windows, iso, nse_symbols, parse_day, parse_ts, pick,
+                 rows_of, since_arg, store, summary_of, xbrl)
+from marketbrief.core.storage import recent_ids
+from marketbrief.sources.errors import FetchError
+from marketbrief.sources.nse_client import Nse
+from marketbrief.utils.numbers import parse_nse_number
 
 KINDS = ["announcements", "financials", "flows", "delivery"]
 
@@ -49,7 +53,7 @@ PERIOD_TYPES = {3: "quarterly", 6: "half_yearly", 9: "nine_months", 12: "annual"
 
 def first(f: dict, names: tuple) -> tuple[float | None, str | None]:
     for n in names:
-        v = num(f.get(n))
+        v = parse_nse_number(f.get(n))
         if v is not None:
             return v, n
     return None, None
@@ -176,8 +180,9 @@ def flows(nse: Nse, now: str, notes: list, warnings: list) -> list[dict]:
         if day is None or not cat:
             continue
         out.append({"id": f"nse-fiidii-{day}-{re.sub(r'[^a-z]+', '', cat.lower())}", "date": str(day),
-                    "category": cat, "buy_cr": num(pick(r, "buyValue")), "sell_cr": num(pick(r, "sellValue")),
-                    "net_cr": num(pick(r, "netValue")), "provisional": True, "source": "nse_fiidii",
+                    "category": cat, "buy_cr": parse_nse_number(pick(r, "buyValue")),
+                    "sell_cr": parse_nse_number(pick(r, "sellValue")),
+                    "net_cr": parse_nse_number(pick(r, "netValue")), "provisional": True, "source": "nse_fiidii",
                     "first_seen_at": now})
     return out
 
@@ -214,16 +219,19 @@ def delivery(nse: Nse, symbols: dict[str, str], today: date, lookback: int, now:
             matched += 1
             day = parse_day(r.get("DATE1")) or d
             out.append({"id": f"nse-dlv-{day}-{ticker}", "date": str(day), "ticker": ticker, "series": "EQ",
-                        "close": num(r.get("CLOSE_PRICE")), "volume": num(r.get("TTL_TRD_QNTY")),
-                        "delivery_qty": num(r.get("DELIV_QTY")), "delivery_pct": num(r.get("DELIV_PER")),
-                        "trades": num(r.get("NO_OF_TRADES")), "turnover_lacs": num(r.get("TURNOVER_LACS")),
+                        "close": parse_nse_number(r.get("CLOSE_PRICE")),
+                        "volume": parse_nse_number(r.get("TTL_TRD_QNTY")),
+                        "delivery_qty": parse_nse_number(r.get("DELIV_QTY")),
+                        "delivery_pct": parse_nse_number(r.get("DELIV_PER")),
+                        "trades": parse_nse_number(r.get("NO_OF_TRADES")),
+                        "turnover_lacs": parse_nse_number(r.get("TURNOVER_LACS")),
                         "source": "nse_bhavcopy", "first_seen_at": now})
         coverage(f"delivery: bhavcopy {d}", len(rows), matched, notes, warnings)
     return out, ok
 
 
 def collect(cfg: dict, nse: Nse, kinds: list[str], today: date | None = None, args=None) -> dict:
-    from common import utc_now, utc_today
+    from marketbrief.core.clock import utc_now, utc_today
     market, rel = cfg["market"], cfg.get("relations") or {}
     symbols, today, now = nse_symbols(cfg), today or utc_today(), utc_now()
     full = bool(getattr(args, "full", False))

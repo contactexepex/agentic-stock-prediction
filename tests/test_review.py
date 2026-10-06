@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import rangelib as rl  # noqa: E402
 import report  # noqa: E402
 import review  # noqa: E402
+from marketbrief.utils.event_dates import major_event_between  # noqa: E402
 import test_pipeline as tp  # noqa: E402  (helpers only; imported as a module so its tests are not re-collected)
 
 REPO = Path(__file__).resolve().parents[1]
@@ -370,7 +371,7 @@ TH = {"unstable_vol": 28, "event_vol": 20, "calm_vol": 16, "unstable_bench_vol":
 
 def window_con(target_dates: list[date]):
     """In-memory DuckDB with one scored range and one scored call per target date."""
-    from common import SCHEMAS
+    from marketbrief.core.schemas import SCHEMAS
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
     con.execute(f"CREATE TABLE calibration ({', '.join(f'{k} {v}' for k, v in SCHEMAS['calibration'][1].items())})")
@@ -488,11 +489,11 @@ def test_proposals_prefer_live_evidence():
 
 def test_major_event_counts_after_start_up_to_target():
     majors = [date(2026, 10, 2)]
-    assert not review.major_between(majors, date(2026, 10, 2), date(2026, 10, 9))   # on the as-of day: known
-    assert review.major_between(majors, date(2026, 10, 1), date(2026, 10, 2))        # on the target day
-    assert review.major_between(majors, date(2026, 9, 28), date(2026, 10, 5))        # inside the horizon
-    assert not review.major_between(majors, date(2026, 9, 25), date(2026, 10, 1))    # after the target
-    assert not review.major_between([], date(2026, 9, 25), date(2026, 10, 1))
+    assert not major_event_between(majors, date(2026, 10, 2), date(2026, 10, 9))   # on the as-of day: known
+    assert major_event_between(majors, date(2026, 10, 1), date(2026, 10, 2))        # on the target day
+    assert major_event_between(majors, date(2026, 9, 28), date(2026, 10, 5))        # inside the horizon
+    assert not major_event_between(majors, date(2026, 9, 25), date(2026, 10, 1))    # after the target
+    assert not major_event_between([], date(2026, 9, 25), date(2026, 10, 1))
 
 
 def test_history_ablation_never_looks_past_the_week():

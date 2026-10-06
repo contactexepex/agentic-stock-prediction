@@ -16,7 +16,11 @@ import sys
 from datetime import date, timedelta
 
 import scoring
-from common import connect, load_ranges_config, market_arg, md_table, require_market, utc_today
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.market_config import load_ranges_config
+from marketbrief.utils.markdown import cursor_markdown_table
 
 CRORE = 1e7
 DEFAULT_FLAGS = {"window_days": 5, "big_deal_crore": 250, "big_deal_adv": 0.5, "insider_sale_crore": 10,
@@ -100,7 +104,8 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
     rel, today, tickers = cfg["relations"], utc_today(), list(cfg["tickers"])
     ins_days, deal_days = int(rel.get("insider_lookback_days", 14)), int(rel.get("deal_lookback_days", 5))
     out = [
-        (f"Insider and promoter trades (SEBI PIT), disclosed in the last {ins_days} days", md_table(con.execute("""
+        (f"Insider and promoter trades (SEBI PIT), disclosed in the last {ins_days} days",
+         cursor_markdown_table(con.execute("""
             SELECT ticker, CAST(disclosed_at AS DATE) AS disclosed, person, person_category AS category,
                    "transaction", mode, shares, round(value / 1e7, 2) AS value_cr,
                    holding_before_pct AS before_pct, holding_after_pct AS after_pct
@@ -108,14 +113,14 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
             WHERE CAST(coalesce(disclosed_at, first_seen_at) AS DATE) >= ? AND list_contains(?, ticker)
             ORDER BY disclosed DESC, value DESC NULLS LAST, id LIMIT 30""",
             [today - timedelta(days=ins_days), tickers]))),
-        (f"Bulk and block deals, last {deal_days} days", md_table(con.execute("""
+        (f"Bulk and block deals, last {deal_days} days", cursor_markdown_table(con.execute("""
             SELECT ticker, date, deal_type AS type, side, client, shares, price, value_crore AS value_cr,
                    adv_ratio AS x_20d_vol
             FROM deals_scored WHERE date >= ? AND list_contains(?, ticker)
             ORDER BY date DESC, value DESC NULLS LAST, id LIMIT 30""", [today - timedelta(days=deal_days), tickers]))),
         ("Promoter holding and pledge (latest quarter per ticker; changes in percentage points). promoter_pct: "
          "company-filed shareholding pattern; encumbered_*: promoter shares encumbered (depository data); "
-         "depo_pledged_pct: all holders' pledges as % of demat shares", md_table(con.execute("""
+         "depo_pledged_pct: all holders' pledges as % of demat shares", cursor_markdown_table(con.execute("""
             SELECT ticker, period_end, promoter_pct, round(promoter_change_pp, 2) AS promoter_chg,
                    pledged_pct_of_promoter AS encumbered_of_promoter_pct, round(pledge_change_pp, 2) AS pledge_chg,
                    pledged_pct_of_total AS encumbered_of_total_pct, depository_pledged_pct AS depo_pledged_pct,

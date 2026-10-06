@@ -80,7 +80,7 @@ are one item (ids stored before that are still recognised as seen). Rows carry `
 because `tickers` is derived and `data/` is append-only, older rows are re-tagged on read: the
 stored rows are the DuckDB view `news_stored`, and `news` (used by `news_ticker_day`, the context
 pack, graph hits, view_data and the Neo4j copy) applies `news_retag` (registered in
-`common.connect`): stored title with the current rules (old wire rows whose title names no
+`core.database.connect`): stored title with the current rules (old wire rows whose title names no
 company keep their stored tags as mentioned, low). Old outlet rows lose tags found only in their
 summary (not stored). The Neo4j copy needs `neo4j_sync.py --full` once
 to drop mention edges synced before the fix.
@@ -412,7 +412,7 @@ the same ticker's recent lessons plus recent ones from other tickers, point-in-t
 - Availability: `settled_at` = the outcome's `scored_at`; `available_from` = the latest `scored_at`
   of the facts cited (outcome and range outcome). `context.py` adds "Lessons from past calls": the 3
   most recent lessons market-wide and each ticker's last 3, only with `available_from` <= the run's
-  clock (`common.clock()`, so an `MB_NOW` replay sees exactly what was settled by then; a newer
+  clock (`core.clock.clock()`, so an `MB_NOW` replay sees exactly what was settled by then; a newer
   version of the same lesson id replaces the older one). `ai_replay.py prepare` keeps lessons by
   `available_from` and `target_date` <= D. Tests (`tests/test_lessons.py`): no lesson visible before
   its `available_from`; perturbing outcomes and lessons that became known after a past made_at leaves
@@ -574,7 +574,7 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   announced. News is dropped (stored news starts with live collection), and so are `summaries/` and
   `reports/`. Then `features`, `calibrate`, `context` (`R/work/context.md`, plus a list of the
   citable filing/announcement ids) and `ranges` run with `MB_ROOT=R` and `MB_NOW` = the cutoff:
-  `common.clock()` freezes every "now"/"today" and `connect()` rewrites DuckDB's `current_date`.
+  `core.clock.clock()` freezes every "now"/"today" and `connect()` rewrites DuckDB's `current_date`.
   A JSON summary lists every kind kept or dropped and the context pack's size.
 - `record`: validates forecaster records (schema `predictions`, id format, as_of_date = D,
   horizon 1/5, confidence 0.50-0.90, `range_widen` <= 0.5, rationale <= 40 words, evidence ids
@@ -798,7 +798,7 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     seven of ten; only Nifty Bank, IT and Pharma are configured, see `config/markets/india.yaml`).
     JETS and IAK returned two years of daily bars through yfinance on 2026-10-05.
 - Issue #9, remaining free sources: **built 2026-10-05** after the hosts were allowlisted (checked
-  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in `sources.py`:
+  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in `marketbrief/sources/free_source_client.py`:
   identifying User-Agent, 0.5-1 s between requests, up to 3 attempts on a dropped connection, none
   on an HTTP error; every unread source or session file is listed in `failed`):
   - `collect_macro.py` (US): Treasury par yield curve CSV (`home.treasury.gov`, HTTP 200);
@@ -949,7 +949,7 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 All data and results are also loaded into a Neo4j database for graph questions (who is connected to
 whom, who traded before what, which evidence led to good calls). **The repo stays the source of
 truth**: `data/` is append-only and `scripts/neo4j_sync.py` only reads it (through the DuckDB views
-of `common.connect`). Neo4j is a derived copy; `--full` deletes one market's nodes and rebuilds them
+of `core.database.connect`). Neo4j is a derived copy; `--full` deletes one market's nodes and rebuilds them
 from the repo, so emptying or losing the database loses nothing.
 
 **Connection.** Environment variables `NEO4J_URI` (`neo4j+s://<id>.databases.neo4j.io`; only the

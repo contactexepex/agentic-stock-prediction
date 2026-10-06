@@ -20,7 +20,7 @@ Per item (paced, `pause_seconds` between requests, one polite User-Agent, TLS ve
 4. extraction: JSON-LD articleBody -> trafilatura -> newspaper4k; JSON-LD isAccessibleForFree=false
    -> access=paywalled and only the description/OpenGraph text is read; access=full when the body has
    at least `full_chars` characters, else partial.
-Stored per row (schema `news_articles` in common.py): metadata (final URL, domain, tier, status,
+Stored per row (schema `news_articles` in marketbrief/core/schemas.py): metadata (final URL, domain, tier, status,
 dates, byline, JSON-LD provider), the origin agency and its evidence, sources_say, promotional,
 at most 3 key sentences of at most 40 words, normalised numbers, a content hash and a MinHash
 signature of the 6-word shingles (copy detection in news_clusters.py). Never the article text.
@@ -38,24 +38,17 @@ from collections import Counter
 import pandas as pd
 
 import news_verify as nv
+from marketbrief.sources.article_fetch import Pacer, make_session
 from news_tags import norm
-from common import append_jsonl, clock, connect, day_file, market_arg, require_market, utc_now, utc_today
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import clock, utc_now, utc_today
+from marketbrief.core.database import connect
+from marketbrief.core.storage import append_jsonl, day_file
 
 GOOGLE_HOST = "news.google.com"
 TZ_ABBREV = {"EDT": -4 * 3600, "EST": -5 * 3600, "CDT": -5 * 3600, "CST": -6 * 3600, "MDT": -6 * 3600,
              "MST": -7 * 3600, "PDT": -7 * 3600, "PST": -8 * 3600, "IST": 5 * 3600 + 1800, "GMT": 0, "UTC": 0}
 CONF_RANK = {"high": 2, "low": 1}
-
-
-class Pacer:
-    def __init__(self, pause: float):
-        self.pause, self.last = pause, 0.0
-
-    def wait(self):
-        dt = time.monotonic() - self.last
-        if self.last and dt < self.pause:
-            time.sleep(self.pause - dt)
-        self.last = time.monotonic()
 
 
 def google_only(request) -> None:
@@ -78,12 +71,6 @@ def decode_google(links: list[str], src: nv.Sources) -> list[dict]:
 
 
 DECODER = decode_google   # tests replace this
-
-
-def make_session():
-    import requests
-    s = requests.Session()   # trust_env: the proxy and REQUESTS_CA_BUNDLE from the environment
-    return s
 
 
 SESSION_FACTORY = make_session   # tests replace this

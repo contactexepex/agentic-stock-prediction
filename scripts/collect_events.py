@@ -1,33 +1,27 @@
 #!/usr/bin/env python3
-"""Collect company events (earnings, ex-dividend) for watchlist tickers via yfinance
-into data/<market>/events/YYYY/MM/<today>.jsonl. Append-only: an event id
-(<ticker>-<type>-<date>) is written once; a moved date is a new event id, and the newest
-first_seen_at wins when reading (see the `company_events` view).
+"""Collect company events (earnings, ex-dividend) for watchlist tickers via yfinance into
+data/<market>/events/YYYY/MM/<today>.jsonl. Append-only: an event id (<ticker>-<type>-<date>) is written once; a moved
+date is a new event id, and the newest first_seen_at wins when reading (see the `company_events` view).
 
-Upcoming events come from the yfinance calendar; an ex-dividend row carries the dividend
-`amount` (the announced one if Yahoo lists it, else the last dividend paid, marked "est.").
-Unless --no-history, past events are backfilled for the range engine (source ending in
-"_history", read through the `event_history` view): dividends with amounts, and earnings
-dates with `timing` (before_open / during / after_close) from yfinance's earnings dates and,
-for SEC markets with SEC_USER_AGENT set, 8-K item 2.02 (results of operations) acceptance times;
-for SEC markets each 10-Q/10-K acceptance is also stored, as a `periodic_report` row with its
-`period_end`. Not every 2.02 is a quarter's results release (Tesla's quarterly delivery reports,
-pre-announcements, guidance updates): every 2.02 is stored as it was filed, and
-range_inputs.results_filter keeps one release per quarter when the dates are read, using only
-the reports accepted by the as-of date (so the walk-forward backtest never looks ahead); a
-past yfinance date within 45 days of a release that a 10-Q/10-K confirms loses to it (new report
-rows are counted as `sec_reports` in the summary). NSE markets (`relations.source: nse`) take
-earnings dates from NSE results filings (see nse_earnings), polled only for tickers that are due
-(see nse_due). Tickers whose SEC submissions or NSE requests fail are
-listed in the summary (`sec_failed`, `nse_failed`; a failed SEC step as a whole in `sec_error`).
+Upcoming events come from the yfinance calendar; an ex-dividend row carries the dividend `amount` (the announced one
+if Yahoo lists it, else the last dividend paid, marked "est."). Unless --no-history, past events are backfilled for
+the range engine (source ending in "_history", read through the `event_history` view): dividends with amounts, and
+earnings dates with `timing` (before_open / during / after_close) from yfinance's earnings dates and, for SEC markets
+with SEC_USER_AGENT set, 8-K item 2.02 (results of operations) acceptance times; for SEC markets each 10-Q/10-K
+acceptance is also stored, as a `periodic_report` row with its `period_end`. Not every 2.02 is a quarter's results
+release (Tesla's quarterly delivery reports, pre-announcements, guidance updates): every 2.02 is stored as it was
+filed, and range_inputs.results_filter keeps one release per quarter when the dates are read, using only the reports
+accepted by the as-of date (so the walk-forward backtest never looks ahead); a past yfinance date within 45 days of a
+release that a 10-Q/10-K confirms loses to it (new report rows are counted as `sec_reports` in the summary). NSE
+markets (`relations.source: nse`) take earnings dates from NSE results filings (see nse_earnings), polled only for
+tickers that are due (see nse_due). Tickers whose SEC submissions or NSE requests fail are listed in the summary
+(`sec_failed`, `nse_failed`; a failed SEC step as a whole in `sec_error`).
 
-yfinance hides most request errors behind empty answers, so `failed` lists the Yahoo gaps (with
-`what`): `calendar` (an error or an empty calendar), `dividends` (an error, or no dividends
-although some are stored for the ticker or its calendar lists an ex-dividend date in the backfill
-window) and `earnings_history` (both yfinance methods raised). The earnings-calendar page
-(finance.yahoo.com) is tried first; if it fails (e.g. a network that refuses the host) the
-screener fallback (query1) supplies the dates. `earnings_history_sources` counts which method was
-used."""
+yfinance hides most request errors behind empty answers, so `failed` lists the Yahoo gaps (with `what`): `calendar`
+(an error or an empty calendar), `dividends` (an error, or no dividends although some are stored for the ticker or its
+calendar lists an ex-dividend date in the backfill window) and `earnings_history` (both yfinance methods raised). The
+earnings-calendar page (finance.yahoo.com) is tried first; if it fails (e.g. a network that refuses the host) the
+screener fallback (query1) supplies the dates. `earnings_history_sources` counts which method was used."""
 from __future__ import annotations
 
 import json
@@ -39,9 +33,14 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 import events as ev
-from common import append_jsonl, data_dir, day_file, market_arg, require_market, utc_now, utc_today
-from nse import IST, FetchError, Nse, nse_symbols, parse_day, parse_ts, pick, rows_of
-from sec import time_warnings
+from marketbrief.core.cli import market_arg, require_market
+from marketbrief.core.clock import utc_now, utc_today
+from marketbrief.core.paths import data_dir
+from marketbrief.core.storage import append_jsonl, day_file
+from nse import IST, nse_symbols, parse_day, parse_ts, pick, rows_of
+from marketbrief.sources.errors import FetchError
+from marketbrief.sources.nse_client import Nse
+from marketbrief.sources.sec_acceptance import time_warnings
 
 FIELDS = {"Earnings Date": "earnings", "Ex-Dividend Date": "ex_dividend"}
 NEAR_DAYS = 3  # earnings dates this close together are the same report
@@ -151,7 +150,8 @@ def sec_earnings(cfg: dict, tickers: dict, ua: str, reports: dict | None = None,
     Returns (rows per ticker, one entry per ticker and CIK whose submissions request failed)."""
     # shared SEC client: one throttle, backoff on 429/503, test fixtures; a ticker's submissions
     # are those of its mapped CIK plus its predecessor/related CIKs, de-duplicated by accession
-    from sec import Edgar, related_ciks, ticker_submissions, time_summary
+    from sec import Edgar, related_ciks, ticker_submissions   # the test patches sec.Edgar
+    from marketbrief.sources.sec_acceptance import time_summary
 
     edgar = Edgar(ua)
     cik_by_ticker = edgar.cik_map()

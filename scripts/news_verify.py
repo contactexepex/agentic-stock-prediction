@@ -25,7 +25,8 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import yaml
 
-import common
+from marketbrief.core import paths
+from marketbrief.sources.article_fetch import get_article_page
 
 METHOD_VERSION = "nv-a1"
 ACCESS = ("full", "partial", "paywalled", "blocked", "undecoded", "skipped_unlisted")
@@ -38,7 +39,7 @@ SHINGLE = 6
 # ---------- config ----------
 
 def load_sources() -> "Sources":
-    return Sources(yaml.safe_load((common.CONFIG / "news_sources.yaml").read_text()))
+    return Sources(yaml.safe_load((paths.CONFIG / "news_sources.yaml").read_text()))
 
 
 def _name(s: str | None) -> str:
@@ -263,10 +264,7 @@ def fetch_page(session, url: str, src: Sources) -> FetchResult:
             return FetchResult(final_url=url, error=why, requests=n, skipped=why)
         try:
             n += 1
-            r = session.get(url, allow_redirects=False, stream=True, timeout=float(sel.get("timeout_seconds", 20)),
-                            headers={"User-Agent": sel.get("user_agent", "market-brief/1.0"),
-                                     "Accept": "text/html,application/xhtml+xml",
-                                     "Accept-Language": "en-US,en;q=0.9"}, verify=True)
+            r = get_article_page(session, url, sel)
         except Exception as e:   # TLS, proxy refusal, timeout: never retried without verification
             kind = "tls" if "SSL" in type(e).__name__ or "certificate" in str(e).lower() else "network"
             return FetchResult(final_url=url, error=f"{kind}: {type(e).__name__}: {str(e)[:160]}", requests=n)

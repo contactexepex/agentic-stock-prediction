@@ -17,6 +17,9 @@ SCRIPTS = REPO / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import common  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from news_tags import TAG_VERSION, Tagger, item_id, plain_text, source_domain  # noqa: E402
 
 GNEWS_SUMMARY = ('<a href="https://news.google.com/rss/articles/CBMigAFBVV95cUxOZ2JWNUhN?oc=5" '
@@ -25,12 +28,12 @@ GNEWS_SUMMARY = ('<a href="https://news.google.com/rss/articles/CBMigAFBVV95cUxO
 
 @pytest.fixture(scope="module")
 def us():
-    return Tagger(common.load_market("us"))
+    return Tagger(load_market("us"))
 
 
 @pytest.fixture(scope="module")
 def india():
-    return Tagger(common.load_market("india"))
+    return Tagger(load_market("india"))
 
 
 def gnews(tagger: Tagger, title: str, source: str = "Barron's") -> set[str]:
@@ -169,7 +172,7 @@ def test_collector_dedupes_source_labels_and_tags_plain_text(tmp_path):
     assert by_title[t1]["tickers"] == ["HDFCBANK"] and by_title[t1]["source_domain"] == "businesstoday.in"
     assert by_title[t2]["tickers"] == []               # "Kotak Mahindra" is not M&M
     assert all(r["tag_version"] == TAG_VERSION for r in rows)
-    assert set(rows[0]) == set(common.SCHEMAS["news"][1])
+    assert set(rows[0]) == set(SCHEMAS["news"][1])
     assert _run(root, cfg)["new_items"] == 0           # second run: all seen
 
 
@@ -230,7 +233,7 @@ def test_news_view_retags_old_rows_without_editing_them(tmp_path, monkeypatch):
     f = d / "2026-10-05.jsonl"
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
     before = f.read_bytes()
-    con = common.connect("us")
+    con = connect("us")
     got = dict(con.execute("SELECT id, tickers FROM news ORDER BY id").fetchall())
     assert got == {"a": ["NVDA"], "b": [], "c": ["GOOGL"], "d": ["MRK"], "e": ["CAT"]}
     stored = dict(con.execute("SELECT id, tickers FROM news_stored ORDER BY id").fetchall())
@@ -363,7 +366,7 @@ def test_news_view_roles_and_ticker_day(tmp_path, monkeypatch):
          "mentioned_tickers": ["NVDA"], "tag_confidence": "low", "tag_version": TAG_VERSION, "published_at": ts},
     ]
     (d / "2026-10-05.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-    con = common.connect("us")
+    con = connect("us")
     got = {r[0]: r[1:] for r in con.execute(
         "SELECT id, primary_tickers, mentioned_tickers, tag_confidence FROM news ORDER BY id").fetchall()}
     assert got == {"a": (["NVDA"], [], "high"), "b": ([], ["GOOGL"], "low"), "c": ([], ["NVDA"], "low")}
