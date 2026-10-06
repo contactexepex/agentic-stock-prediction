@@ -44,13 +44,31 @@ def test_recorded_at_is_iso_utc():
             f"line {n}: recorded_at must be ISO UTC, got {r['recorded_at']!r}"
 
 
+def round_problems(rows: list[dict]) -> list[str]:
+    """Rounds of one subject never go back, except that round 1 may start a new cycle after a PASS
+    (e.g. a later end-to-end `integration` review of new work); an unfinished FAIL cycle may not restart."""
+    problems, last = [], {}
+    for row in rows:
+        previous = last.get(row["subject"])
+        if previous is not None and row["round"] < previous["round"]:
+            if not (row["round"] == 1 and previous["verdict"] == "PASS"):
+                problems.append(f"round went back for {row['subject']}: {previous['round']} -> {row['round']}")
+        last[row["subject"]] = row
+    return problems
+
+
 def test_rounds_increase_per_subject():
-    """Within one review cycle the round never goes back; round 1 starts a new cycle for the
-    same subject (e.g. a later end-to-end `integration` review of new work)."""
-    last: dict[str, int] = {}
-    for r in entries():
-        assert r["round"] == 1 or r["round"] >= last.get(r["subject"], 0), f"round went back for {r['subject']}"
-        last[r["subject"]] = r["round"]
+    assert round_problems(entries()) == []
+
+
+def test_round_check_on_synthetic_logs():
+    def line(subject, round_, verdict):
+        return {"subject": subject, "round": round_, "verdict": verdict}
+
+    assert round_problems([line("a", 3, "PASS"), line("a", 2, "PASS")]) != []   # 3 -> 2 fails
+    assert round_problems([line("a", 2, "PASS"), line("a", 1, "PASS")]) == []   # PASS then 1 passes
+    assert round_problems([line("a", 2, "FAIL"), line("a", 1, "FAIL")]) != []   # FAIL then 1 fails
+    assert round_problems([line("a", 1, "FAIL"), line("a", 2, "PASS"), line("b", 1, "PASS")]) == []
 
 
 @pytest.mark.skipif(shutil.which("git") is None or not (REPO / ".git").exists(), reason="no git checkout")

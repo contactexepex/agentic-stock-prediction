@@ -116,9 +116,12 @@ def test_gates_flag_small_samples():
     good = {"rel_score": -0.10, "coverage_shortfall": 0.0, "coverage_gain": 0.05}
     assert verdicts.verdict(good, 50, rv) == "low n"
     assert verdicts.verdict(good, 500, rv) == "improves score"
-    assert verdicts.verdict({"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.05}, 500, rv) == "improves coverage"
-    assert verdicts.verdict({"rel_score": 0.05, "coverage_shortfall": 0.0, "coverage_gain": 0.0}, 500, rv) == "worse score"
-    assert verdicts.verdict({"rel_score": -0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.0}, 500, rv) == "no material change"
+    cmp_coverage = {"rel_score": 0.0, "coverage_shortfall": 0.0, "coverage_gain": 0.05}
+    assert verdicts.verdict(cmp_coverage, 500, rv) == "improves coverage"
+    cmp_worse = {"rel_score": 0.05, "coverage_shortfall": 0.0, "coverage_gain": 0.0}
+    assert verdicts.verdict(cmp_worse, 500, rv) == "worse score"
+    cmp_same = {"rel_score": -0.01, "coverage_shortfall": 0.0, "coverage_gain": 0.0}
+    assert verdicts.verdict(cmp_same, 500, rv) == "no material change"
     calls = pd.DataFrame({"confidence": [0.55] * 10 + [0.85] * 60, "hit": [True] * 10 + [True] * 30 + [False] * 30,
                           "actual_return": [0.01] * 70})
     bands = summaries.confidence_bands(calls, rv["confidence_bands"])
@@ -463,7 +466,8 @@ def test_history_regime_uses_the_next_session():
 
 def test_flag_threshold():
     rv = {**review.DEFAULTS, "min_n": 30}
-    assert markdown_cells.flag(29, rv) == "low n" and markdown_cells.flag(30, rv) == "" and markdown_cells.flag(0, rv) == "low n"
+    assert markdown_cells.flag(29, rv) == "low n" and markdown_cells.flag(30, rv) == ""
+    assert markdown_cells.flag(0, rv) == "low n"
 
 
 def test_coverage_gate_needs_a_score_no_worse():
@@ -522,7 +526,8 @@ def test_history_ablation_never_looks_past_the_week():
     week_end = idx[-60].date()
     cut = {t: df[df.index <= pd.Timestamp(week_end)] for t, df in bars.items()}
     past = history_ablation.history_ablation(cfg, RC, rv, bars, week_end)
-    assert past["n"] > 0 and past == history_ablation.history_ablation(cfg, RC, rv, cut, week_end)   # later bars change nothing
+    again = history_ablation.history_ablation(cfg, RC, rv, cut, week_end)
+    assert past["n"] > 0 and past == again   # later bars change nothing
     assert past != history_ablation.history_ablation(cfg, RC, rv, bars, idx[-1].date())
 
 

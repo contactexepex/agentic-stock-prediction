@@ -25,8 +25,8 @@ from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.analytics import article_extraction, article_pages, cluster_items  # noqa: E402
 from marketbrief.analytics import news_clusters, news_sources, text_measures  # noqa: E402
 from marketbrief.sources import google_news_decoder  # noqa: E402
-from marketbrief.pipeline.validate import gate_result
-from marketbrief.pipeline.validate import news_checks
+from marketbrief.pipeline.validate import gate_result  # noqa: E402
+from marketbrief.pipeline.validate import news_checks  # noqa: E402
 from marketbrief.pipeline.validate import row_checks  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures" / "articles"

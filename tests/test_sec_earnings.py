@@ -168,7 +168,8 @@ def test_backtest_uses_the_events_known_at_each_day():
     df = pd.DataFrame({"open": close, "close": close}, index=sessions)
     rc = {**ALL_ON, "ewma_lambda": 0.94, "warmup_bars": 60, "earnings_vol_multiple": 3.0}
     extra = {"earnings": versions, "dividends": {}, "bench": df, "index_cue": None}
-    cols = {t: observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, t, 1, extra) for t in ("ALL", "TSLA")}
+    config = {**XNYS, "premarket_quotes": False}
+    cols = {t: observations.input_columns(config, rc, df, t, 1, extra) for t in ("ALL", "TSLA")}
     at = lambda t, d: bool(cols[t].loc[pd.Timestamp(d), "earn"])  # noqa: E731
     # Allstate 2023-10-18: the 10-19 pre-announcement is pending as of then (the 10-Q that rules it
     # out comes on 11-01): it counts, as it would have live; a look-ahead replay would say no

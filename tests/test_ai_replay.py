@@ -594,7 +594,8 @@ def test_fair_and_contaminated_scored_separately():
     # only contaminated days: no fair result at all
     only = summaries.summarize(cfg, calls[:len(early)], rec[:len(early)], bars, cutoff=cut)
     assert only["fair"]["n_days"] == 0 and "No fair-test day" in ai_html.html_page(only)
-    assert cutoff.leakage_label("2026-06-30", cut) == "contaminated" and cutoff.leakage_label(date(2026, 7, 1), cut) == "fair"
+    assert cutoff.leakage_label("2026-06-30", cut) == "contaminated"
+    assert cutoff.leakage_label(date(2026, 7, 1), cut) == "fair"
 
 
 def test_training_cutoff_comes_from_config(prepared, tmp_path):

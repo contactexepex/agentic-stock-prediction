@@ -218,6 +218,7 @@ def test_no_half_to_even_percent_format_left():
     hits = [f"{p.relative_to(scripts)}:{i}" for p in sorted(scripts.rglob("*.py"))
             for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r"\{[^}]*:[+ ]?\.(0|\{[^}]+\})%\}", line)]
     assert hits == []
-    assert summaries.band_label(0.625, 5 / 8) == "63%-63%" and markdown_cells.fpct(0.625) == markdown_cells.fpct(5 / 8) == "63%"
+    assert summaries.band_label(0.625, 5 / 8) == "63%-63%"
+    assert markdown_cells.fpct(0.625) == markdown_cells.fpct(5 / 8) == "63%"
     assert scoring.percent(0.125, sign=True) == "+13%" and scoring.percent(float("inf")) == "–"
     assert scoring.percent(0.625, 1) == "62.5%" and scoring.percent(None) == "–"

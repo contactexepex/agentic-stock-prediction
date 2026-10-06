@@ -371,7 +371,8 @@ def test_review_skips_aci_replays_with_other_settings_and_ids_name_settings():
     from marketbrief.pipeline.review import aci_review
     a = aci.settings({})
     assert aci_compare.aci_tag(a) == "-aci-g0.01-regime-s0.15-m20"
-    assert aci_compare.aci_tag({**a, "gamma": 0.002, "by_regime": False}, date(2024, 12, 31)) == "-aci-g0.002-all-s0.15-m20-t2024-12-31"
+    tag = aci_compare.aci_tag({**a, "gamma": 0.002, "by_regime": False}, date(2024, 12, 31))
+    assert tag == "-aci-g0.002-all-s0.15-m20-t2024-12-31"
     cmp = {h: {"overall": {"before": {"n": 10, "cover50": .56, "cover80": .855, "score50": 11.6, "score80": 17.3},
                            "after": {"n": 10, "cover50": .51, "cover80": .81, "score50": 11.5, "score80": 16.9}}}
            for h in ("1", "5")}
@@ -381,7 +382,8 @@ def test_review_skips_aci_replays_with_other_settings_and_ids_name_settings():
     def add(rid, at, settings):
         con.execute("INSERT INTO replays VALUES (?, '2026-10-05', ?, ?, ?)",
                     [rid, at, json.dumps({"aci": settings}), json.dumps({"aci_comparison": cmp})])
-    add("w" + aci_compare.aci_tag({**a, "gamma": 0.02}), "2026-10-06T02:00:00+00:00", {**a, "gamma": 0.02, "enabled": True})
+    add("w" + aci_compare.aci_tag({**a, "gamma": 0.02}), "2026-10-06T02:00:00+00:00",
+        {**a, "gamma": 0.02, "enabled": True})
     rep = aci_review.latest_aci_replay(con, date(2026, 10, 11), {})
     assert rep["comparison"] is None and "none with the config/ranges.yaml ACI settings" in rep["note"]
     assert aci_review.aci_proposal({}, rep) is None
