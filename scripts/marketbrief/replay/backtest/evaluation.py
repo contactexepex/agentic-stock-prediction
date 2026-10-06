@@ -41,10 +41,11 @@ def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dic
     split = range_math.beta_split_center(
         beta, idx_cue, own, beta_split["index_weight"], beta_split["own_weight"], ranges_config["cue_weight"]
     )
-    cap = lambda extra, switches: max(
-        -ranges_config["max_center_shift_sigma"] * switches,
-        min(ranges_config["max_center_shift_sigma"] * switches, extra),
-    )  # noqa: E731
+
+    def cap(extra, switches):
+        limit = ranges_config["max_center_shift_sigma"] * switches
+        return max(-limit, min(limit, extra))
+
     div = observation.div_shift
     s_cfg = horizon_sigma["hist"] if use.get("earnings_history") else horizon_sigma["fixed"]
     return {

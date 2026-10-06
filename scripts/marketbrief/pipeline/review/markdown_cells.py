@@ -44,9 +44,10 @@ def ablation_rows(ablation: dict) -> list[list]:
     rows = []
     for variant in ablation.get("variants") or []:
         horizons = list(variant["by_h"])
-        join = lambda key, formatter: (
-            " / ".join(formatter(variant["by_h"][horizon].get(key)) for horizon in horizons) or "–"
-        )  # noqa: E731
+
+        def join(key, formatter, variant=variant, horizons=horizons):
+            return " / ".join(formatter(variant["by_h"][horizon].get(key)) for horizon in horizons) or "–"
+
         rel = (variant.get("vs_current") or {}).get("rel_score")
         rows.append(
             [

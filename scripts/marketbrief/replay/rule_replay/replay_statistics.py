@@ -14,18 +14,21 @@ from marketbrief.constants.replay import LEVELS, RSI_HIGH, RSI_LOW, SIGNAL_LABEL
 wilson = scoring.wilson  # Wilson score interval (scoring.py)
 
 
-def binom_p_two_sided(key: int, trials: int, probability: float = 0.5) -> float | None:
-    """Exact two-sided binomial test (sum of outcomes no more likely than k)."""
+def binom_p_two_sided(hits: int, trials: int, probability: float = 0.5) -> float | None:
+    """Exact two-sided binomial test (sum of outcomes no more likely than `hits`)."""
     if not trials:
         return None
-    log_probability = lambda index: (
-        math.lgamma(trials + 1)
-        - math.lgamma(index + 1)
-        - math.lgamma(trials - index + 1)  # noqa: E731
-        + index * math.log(probability)
-        + (trials - index) * math.log(1 - probability)
-    )
-    ref = log_probability(key)
+
+    def log_probability(index):
+        return (
+            math.lgamma(trials + 1)
+            - math.lgamma(index + 1)
+            - math.lgamma(trials - index + 1)
+            + index * math.log(probability)
+            + (trials - index) * math.log(1 - probability)
+        )
+
+    ref = log_probability(hits)
     total = sum(math.exp(log_probability(index)) for index in range(trials + 1) if log_probability(index) <= ref + 1e-9)
     return min(1.0, total)
 
@@ -131,21 +134,21 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
     for name, signal in signals(group).items():
         call = signal != 0
         hit = ((signal > 0) & up_moves) | ((signal < 0) & down)
-        calls, key = int(call.sum()), int(hit[call].sum())
-        rate = key / calls if calls else None
+        calls, hit_count = int(call.sum()), int(hit[call].sum())
+        rate = hit_count / calls if calls else None
         lower, upper = clustered_ci(hit[call].astype(float).to_numpy(), blocks[call.to_numpy()])
-        wilson_lower, wilson_upper = wilson(key, calls)
+        wilson_lower, wilson_upper = wilson(hit_count, calls)
         diff = (hit[call].astype(float) - au_hit[call]).to_numpy()
         dlo, dhi = clustered_ci(diff, blocks[call.to_numpy()])
         out[name] = {
             "label": SIGNAL_LABELS[name],
             "calls": calls,
             "coverage": round_or_none(calls / len(group)),
-            "hits": key,
+            "hits": hit_count,
             "hit_rate": round_or_none(rate),
             "ci95": [round_or_none(lower), round_or_none(upper)],
             "ci95_iid": [round_or_none(wilson_lower), round_or_none(wilson_upper)],
-            "p_vs_50": None if not calls else float(f"{binom_p_two_sided(key, calls):.3g}"),
+            "p_vs_50": None if not calls else float(f"{binom_p_two_sided(hit_count, calls):.3g}"),
             "always_up_same_rows": round_or_none(au_hit[call].mean()) if calls else None,
             "diff_vs_always_up": round_or_none(diff.mean()) if calls else None,
             "diff_ci95": [round_or_none(dlo), round_or_none(dhi)],

@@ -28,7 +28,7 @@ from marketbrief.core.storage import append_jsonl  # noqa: E402
 from marketbrief.utils.markdown import cursor_markdown_table  # noqa: E402
 from marketbrief.pipeline import context  # noqa: E402
 import html_report  # noqa: E402
-from marketbrief.presentation.report import build as report_build, gather  # noqa: E402
+from marketbrief.presentation.report import gather, report_parts  # noqa: E402
 from marketbrief.pipeline import score_predictions  # noqa: E402
 from marketbrief.analytics import scoring  # noqa: E402
 from marketbrief.analytics import smart_money  # noqa: E402
@@ -185,7 +185,7 @@ def test_percent_half_up_same_in_markdown_and_html():
     """The md report (scoring.percent) and the HTML report's JavaScript (pct0) print the same whole
     percent for every share, half up on its decimal value (0.625 and 5/8 -> 63%)."""
     assert scoring.percent(0.625) == scoring.percent(5 / 8) == "63%"
-    assert report_build.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
+    assert report_parts.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
     assert view_data.record_text(80, 50, "calls").endswith("(63%).")   # 50/80 = 0.625
     node = shutil.which("node")
     if not node:

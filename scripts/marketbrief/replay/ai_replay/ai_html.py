@@ -41,14 +41,16 @@ def svg_hit_bars(summary: dict) -> str:
             bar_height = max(bottom_y - top_y, 0.5)
             corner_radius = min(4, bar_height)
             bar_path = (
-                f"M{bar_left:.1f},{bottom_y:.1f} L{bar_left:.1f},{top_y + corner_radius:.1f} Q{bar_left:.1f},{top_y:.1f} "
+                f"M{bar_left:.1f},{bottom_y:.1f} L{bar_left:.1f},{top_y + corner_radius:.1f} "
+                f"Q{bar_left:.1f},{top_y:.1f} "
                 f"{bar_left + corner_radius:.1f},{top_y:.1f} "
                 f"L{bar_left + bar_width - corner_radius:.1f},{top_y:.1f} Q{bar_left + bar_width:.1f},{top_y:.1f} "
                 f"{bar_left + bar_width:.1f},{top_y + corner_radius:.1f} L{bar_left + bar_width:.1f},{bottom_y:.1f} Z"
             )
             confidence_interval = series_stats["ci95"]
             tip = (
-                f"{name}, {label}: right {pct(tick)} of {series_stats['n']} (95% interval {pct(confidence_interval[0])} to "
+                f"{name}, {label}: right {pct(tick)} of {series_stats['n']} (95% interval "
+                f"{pct(confidence_interval[0])} to "
                 f"{pct(confidence_interval[1])})"
             )
             out.append(f'<path class="mark" d="{bar_path}" fill="{color}" data-tip="{html.escape(tip, quote=True)}"/>')
@@ -102,7 +104,8 @@ def svg_calibration(summary: dict) -> str:
             f"(95% interval {pct(lower)} to {pct(upper)})"
         )
         out.append(
-            f'<circle class="mark" cx="{x_position:.1f}" cy="{y_position:.1f}" r="6" fill="var(--s1)" stroke="var(--surface)" '
+            f'<circle class="mark" cx="{x_position:.1f}" cy="{y_position:.1f}" r="6" fill="var(--s1)" '
+            f'stroke="var(--surface)" '
             f'stroke-width="2" data-tip="{html.escape(tip, quote=True)}"/>'
         )
         out.append(
