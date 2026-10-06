@@ -84,6 +84,11 @@ committed in step 12; the step 14 verdict is committed in step 14 (the brief is 
    also reads SEC (US earnings-date backfill) and, for India, NSE results filings (earnings dates;
    only tickers that are due), so never run it alongside the SEC or NSE collectors either. List its
    `sec_failed` / `nse_failed` tickers in `data_quality`.
+   SEC acceptance times (US; other markets print `skipped`): after the SEC collectors and
+   `collect_events.py`, run `python scripts/check_sec_times.py` (alone, like them). List in
+   `data_quality` every `warnings` entry of the SEC collectors and `collect_events.py` (a CIK whose
+   acceptance times are unverified, stored maybe 4-5h late) and every `failed` entry of
+   `check_sec_times.py`; its `wrong` rows are corrected on read and need no action.
 
 4. Score: `python scripts/score_predictions.py`.
 

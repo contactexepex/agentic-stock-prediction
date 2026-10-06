@@ -112,7 +112,7 @@ def main() -> int:
     print(json.dumps({
         "collector": "stakes", "market": market, "since": str(since), "filings_read": read,
         "new_rows": written, "new_13d": sum(r["kind"] == "13D" and not r["amendment"] for r in rows),
-        "as_investor_skipped": as_investor, "requests": edgar.requests,
+        "as_investor_skipped": as_investor, "requests": edgar.requests, "sec_times": sec.time_summary(edgar), "warnings": sec.time_warnings(edgar),
         "skipped_not_sec": skipped, "failed": failed}, indent=2))
     return 0
 
