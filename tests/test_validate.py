@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
 import spotcheck  # noqa: E402
+import narrative_numbers as nn  # noqa: E402
 import validate as v  # noqa: E402
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -119,6 +120,22 @@ def test_late_run_does_not_require_todays_bar(root, monkeypatch):
     out = run("collect")
     assert out["info"]["run"]["late_run"] is True
     assert "STALE_BARS" not in codes(out)
+    assert codes(out, "warnings")["LATE_RUN_NO_SESSION_BAR"]["tickers"] == sorted(TICKERS)   # 2026-10-06 closed
+    write_prices(root, date(2026, 10, 6), [(t, 106.0) for t in TICKERS], "2026-10-06T20:30:00+00:00")
+    assert "LATE_RUN_NO_SESSION_BAR" not in codes(run("collect"), "warnings")
+
+
+def test_symbols_never_collected_vs_stale(root):
+    for p in (root / "data" / MARKET / "prices").glob("**/*.csv"):
+        lines = p.read_text().splitlines()
+        keep = [x for x in lines if ",VIX," not in x and ",JETS," not in x]
+        if p.stem == "2026-10-05":
+            keep = [x for x in keep if ",XLF," not in x]
+        p.write_bytes(("\r\n".join(keep) + "\r\n").encode())
+    out = run("collect")
+    assert codes(out)["MISSING_SYMBOL"]["tickers"] == ["VIX"]                 # never collected: blocks
+    assert codes(out, "warnings")["MISSING_SYMBOL"]["tickers"] == ["JETS"]    # never collected: warning
+    assert "STALE_SYMBOL" not in codes(out, "warnings")                       # XLF 2026-10-02 is within 7 days
 
 
 def test_empty_truncated_and_bad_json_files_block(root):
@@ -275,11 +292,12 @@ def test_no_calls_on_late_or_mid_session_run(root, monkeypatch, now, why):
 
 # ---------- numbers in narrative ----------
 
-NAMES = v.name_masks(CFG)
+ENTS = nn.Entities(CFG)
+NAMES = ENTS.mask_names
 
 
 def nums(text: str) -> list[str]:
-    return [n["token"] for n in v.numbers(text, NAMES, 10)]
+    return [n["token"] for n in nn.numbers(text, NAMES, 10)]
 
 
 def test_number_extraction_skips_dates_ids_and_names():
@@ -288,16 +306,89 @@ def test_number_extraction_skips_dates_ids_and_names():
     assert nums(text) == ["1.2%", "$1,310.60"]
 
 
+def pool_of(**scoped) -> nn.Pool:
+    """A pool from {scope: [(kind, value), ...]}; scope "market" = market level (None)."""
+    pool = nn.Pool(ENTS)
+    for scope, vals in scoped.items():
+        for kind, val in vals:
+            pool.add(None if scope == "market" else scope, kind, val)
+    return pool
+
+
+def passes(pool: nn.Pool, sentence: str) -> bool:
+    return not nn.unmatched([sentence], pool, 10)
+
+
 def test_number_matcher_formatting_variants():
-    src = v.SourceNumbers([1310.6, 0.01234, 1.234, 22555.75, 35860.0, 0.25, 101.39, -0.84, 14.71])
-    ok = ["₹1,310.60", "$1,310.6", "1.2%", "-1.23%", "22,556", "22,555.75", "Rs 35,860 cr", "25 bp", "fell 0.84%",
-          "101.4", "14.7"]
-    for text in ok:
-        ns = v.numbers(text, NAMES, 10)
-        assert ns and all(src.has(n) for n in ns), text
-    for text in ["14.73", "7.77%", "₹1,311.60", "35,861"]:          # invented or over-precise numbers
-        ns = v.numbers(text, NAMES, 10)
-        assert ns and not any(src.has(n) for n in ns), text
+    pool = pool_of(AAPL=[("plain", 1310.6), ("pct", 1.234), ("plain", 35860.0), ("plain", 358600000.0), ("pct", -0.84)],
+                   market=[("plain", 22555.75), ("pct", 0.25), ("plain", 101.39), ("plain", 14.71)])
+    for text in ["AAPL ₹1,310.60", "AAPL $1,310.6", "AAPL rose 1.2%", "AAPL -1.23%", "AAPL Rs 35.86 cr", "AAPL 35,860", "AAPL fell 0.84%", "22,556", "22,555.75", "a 25 bp hike", "101.4", "14.7"]:
+        assert passes(pool, text), text
+    for text in ["14.73", "7.77%", "AAPL ₹1,311.60", "AAPL 35,861"]:   # invented or over-precise numbers
+        assert not passes(pool, text), text
+
+
+def test_number_kind_must_match():
+    pool = pool_of(AAPL=[("plain", 12.3), ("pct", 105.0)], market=[("plain", 24.8)])
+    assert not passes(pool, "AAPL revenue rose 12.3%.")     # a plain 12.3 is not 12.3%
+    assert not passes(pool, "AAPL trades at 105.")          # a 105% is not a price of 105
+    assert not passes(pool, "Margins were 24.8%.")
+    assert passes(pool, "AAPL trades at 12.3.") and passes(pool, "AAPL is up 105%.")
+
+
+def test_number_scope_follows_the_names_in_the_sentence():
+    pool = pool_of(NVDA=[("pct", 12.3)], AAPL=[("pct", 1.2)], market=[("pct", 0.6)])
+    assert passes(pool, "NVDA rose 12.3%.") and passes(pool, "Nvidia rose 12.3%.")
+    assert not passes(pool, "AAPL rose 12.3%.")              # another company's number
+    assert not passes(pool, "Revenue rose 12.3%.")           # names nothing: market level only
+    assert passes(pool, "AAPL rose 1.2% while the index rose 0.6%.")
+    assert passes(pool, "AAPL rose 1.2%. NVDA rose 12.3%.")  # each sentence its own scope
+    assert not passes(pool, "AAPL rose 1.2%; it rose 12.3% last week.")   # line names only AAPL
+
+
+def test_news_numbers_count_only_for_cited_ids():
+    pool = nn.Pool(ENTS)
+    pool.add_text("Apple to buy back 4.5% of its shares", scope_by_line=False, scope=("id", GOOD_NEWS_ID))
+    assert passes(pool, f"AAPL plans a 4.5% buyback ({GOOD_NEWS_ID}).")
+    assert not passes(pool, "AAPL plans a 4.5% buyback.")
+    assert not passes(pool, f"AAPL plans a 4.5% buyback ({OLD_NEWS_ID}).")
+
+
+def test_collector_summaries_are_sources_but_validate_outputs_are_not(root):
+    steps = root / "work" / "steps"
+    steps.mkdir()
+    (steps / "validate_report.json").write_text(json.dumps({"failures": [{"detail": "31 feeds"}], "n": 31}))
+    pool = v.build_pool(CFG, common.connect(MARKET), v.load_config(), TODAY, [])
+    assert not passes(pool, "News: 31 feeds.")
+    (steps / "collect_news.json").write_text(json.dumps({"collector": "news", "feeds": 31, "new_items": 72}))
+    pool = v.build_pool(CFG, common.connect(MARKET), v.load_config(), TODAY, [])
+    assert passes(pool, "News: 31 feeds, 72 new items.")
+
+
+def test_planted_invented_percentages_are_caught(root):
+    """Realistic invented numbers against real-shaped stored rows (newest features, quotes)."""
+    feats = {"AAPL": {"ret_1d": 0.0123, "ret_3d": 0.0177, "ret_5d": -0.0281, "ret_20d": 0.0645, "roc_10": 0.0302,
+                      "atr_pct": 0.0187, "realized_vol_10d": 0.214, "ewma_vol": 0.226, "bb_width": 0.0812,
+                      "rel_sector_5d": -0.0105, "cue_change_pct": 0.0042, "price_vs_20d_high": 0.9713,
+                      "rsi_14": 58.3, "atr_14": 4.12, "beta_1y": 1.21, "volume_ratio_20d": 1.34, "close": 226.4},
+             "NVDA": {"ret_1d": 0.123, "atr_pct": 0.035, "ret_5d": 0.091, "realized_vol_10d": 0.248, "close": 181.2}}
+    write_jsonl(root, "features", date(2026, 10, 5), [
+        {"id": f"2026-10-05-{t}", "as_of_date": "2026-10-05", "ticker": t, "computed_at": "2026-10-06T11:25:00+00:00",
+         "quality": "OK", "days_to_earnings": 20, **f} for t, f in feats.items()])
+    write_jsonl(root, "quotes", TODAY, [{"symbol": "WTI", "yahoo": "CL=F", "ts": "2026-10-06T11:00:00+00:00",
+                                         "price": 61.42, "prev_close": 60.93, "change_pct": 0.0081,
+                                         "collected_at": "2026-10-06T11:05:00+00:00"}])
+    pool = v.build_pool(CFG, common.connect(MARKET), v.load_config(), TODAY, [])
+    invented = ["Apple revenue rose 12.3% in the quarter.", "AAPL's margin was 24.8%.", "Apple guided 3.5% growth.",
+                "AAPL profit was up 9.1%.", "AAPL fell 2.7% on the news.", "WTI rose 4.6% overnight.",
+                "AAPL gained 1.25%.", "AAPL dropped 18%.", "Revenue rose 12.3% in the quarter.", "Margins were 24.8%."]
+    caught = [s for s in invented if not passes(pool, s)]
+    assert caught == invented
+    real = ["AAPL rose 1.2% and fell 2.8% over five days; its 20-day return is 6.5%.",
+            "Apple's RSI is 58.3, beta 1.21, and it trades at 226.40 with volume 1.34x average.",
+            "WTI rose 0.8% to 61.42.", "NVDA rose 12.3% (vol 24.8%)."]
+    for s in real:
+        assert passes(pool, s), s
 
 
 def test_report_stage_flags_planted_number(root):

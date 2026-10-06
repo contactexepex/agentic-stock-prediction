@@ -16,8 +16,10 @@ step:
 - bull and bear researchers: `--stage forecast` (every cited id exists and was public before the
   call) and the weekly spot-check (reasons match evidence);
 - forecaster: `--stage forecast` (every CLAUDE.md prediction rule) and the weekly spot-check;
-- summaries, report and Slack draft: `--stage report` (every number in agent-written text is a
-  stored or script-written number, no AGENT markers left, every range published or explained)
+- summaries, report and Slack draft: `--stage report` (each number in agent-written text must
+  match a number of the same kind, percent or plain, from the companies or symbols its sentence
+  names, the market-level data or the news it cites; an invented number that happens to equal
+  such a number still passes, which the weekly spot-check is for; no AGENT markers left, every range published or explained)
   and the weekly spot-check (claims are true).
 Agent records stay in `work/` until their gate passes; only then append them to `data/`.
 Delete `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
@@ -136,7 +138,7 @@ Warnings never block: list them in `data_quality`.
    - If `monthly/<previous month, e.g. 2026-09>.md` does not exist and weekly or daily
      summaries exist for that month, write it (max 600 words).
    - Quote numbers only from the context pack or DuckDB: `validate.py --stage report` (step 11)
-     also checks every number in `daily/TODAY.md`.
+     also checks the numbers in `daily/TODAY.md`.
 
 10a. Weekly review (first trading day of each ISO week): `python scripts/review.py --if-due`.
     It reviews the previous ISO week once (it does nothing if that review is already stored, so
@@ -168,9 +170,10 @@ Warnings never block: list them in `data_quality`.
     `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative
     only where it still holds. Gate:
     `python scripts/validate.py --stage report > work/steps/validate_report.json` (no AGENT
-    markers, every number in the agent-written lines of the report, the Slack draft and
-    `summaries/<market>/daily/TODAY.md` is in the context pack, the script-written skeleton, stored
-    news text or DuckDB; every ticker and horizon has a range or a calendar reason for none).
+    markers; each number in the agent-written lines of the report, the Slack draft and
+    `summaries/<market>/daily/TODAY.md` matches a same-kind number of the companies or symbols its
+    sentence names, or of the market level, in the context pack, the script-written skeleton,
+    stored rows or the text of the news it cites; every ticker and horizon has a range or a calendar reason for none).
 
 11a. HTML report: only after the report gate passed (or each failed section was replaced as
     above and listed in `data_quality`), run `python scripts/html_report.py`. It refuses a report that

@@ -19,17 +19,16 @@ Stages (each runs after the routine step of the same name):
 - forecast: work/predictions.jsonl before it is appended (prediction_rules.check_prediction,
             evidence published before made_at, no calls on a late or mid-session run).
 - report:   files appended since collect (news_enriched, predictions, ranges) as in collect; no
-            AGENT markers left; every number in the agent-written lines of the report, the Slack
-            draft and today's daily summary is found in the context pack, the script-written
-            skeleton, stored news text, collector summaries or DuckDB values; every ticker x
-            horizon has a range or a skip reason the calendar explains.
+            AGENT markers left; each number in the agent-written lines of the report, the Slack
+            draft and today's daily summary matches a source number of the same kind and scope
+            (narrative_numbers.py: the companies or symbols its sentence names plus market-level
+            rows, and the text of the news ids it cites); every ticker x horizon has a range or
+            a skip reason the calendar explains.
 - all:      every stage whose input exists."""
 from __future__ import annotations
 
-import bisect
 import csv
 import json
-import math
 import re
 import sys
 from datetime import date, timedelta
@@ -43,6 +42,7 @@ import events as ev
 import market_status
 from common import (CONFIG, ROOT, SCHEMAS, clock, connect, data_dir, load_ranges_config, market_arg,
                     require_market, symbols_by_role, utc_today)
+import narrative_numbers as nn
 from prediction_rules import check_prediction, ts
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
@@ -52,7 +52,6 @@ TRADING_DATE_KINDS = {"prices": "collected_at", "features": "computed_at", "regi
 STAGE_KINDS = {"features": ("features", "regime", "calibration")}
 FETCH_COL = {"quotes": "collected_at", "news": "first_seen_at", "filings": "first_seen_at",
              "announcements": "first_seen_at"}
-MONTHS = r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
 
 
 def load_config() -> dict:
@@ -250,14 +249,33 @@ def check_bars(res: Result, cfg: dict, con, st: dict, vc: dict):
     if stale:
         res.block("STALE_BARS", f"newest bar older than the last completed session {need} "
                   f"(e.g. {stale[0]} {last[stale[0]]})", stale)
+    if st["late_run"]:
+        # the run started after session_date closed: its bar is not required (the routine works as
+        # of the previous session), but a missing one is noted
+        sess = date.fromisoformat(st["session_date"])
+        no_bar = [t for t in cfg["tickers"] if t in last and last[t] < sess]
+        if no_bar:
+            res.warn("LATE_RUN_NO_SESSION_BAR", f"late run: session {sess} has closed but has no stored bar "
+                     "(the run is as of the previous session)", no_bar)
     core = [k for role in ("benchmark", "vol_index") for k in symbols_by_role(cfg, role)]
-    bad_core = [k for k in core if k not in last or last[k] < need]
+    never = [k for k in core if k not in last]
+    if never:
+        res.block("MISSING_SYMBOL", "benchmark / vol index: no bars stored at all (never collected; the regime needs them)",
+                  never)
+    bad_core = [k for k in core if k in last and last[k] < need]
     if bad_core:
-        res.block("STALE_SYMBOL", f"benchmark / vol index bar older than {need} (the regime needs them)", bad_core)
+        res.block("STALE_SYMBOL", f"benchmark / vol index bar older than {need} (the regime needs them; newest "
+                  + ", ".join(f"{k} {last[k]}" for k in bad_core) + ")", bad_core)
     old = need - timedelta(days=vc["symbol_max_age_days"])
-    other = [k for k in cfg["symbols"] if k not in core and (k not in last or last[k] < old)]
-    if other:
-        res.warn("STALE_SYMBOL", f"market symbols with no bar since {old} (cues, factors, sector ETFs)", other)
+    others = [k for k in cfg["symbols"] if k not in core]
+    never = [k for k in others if k not in last]
+    if never:
+        res.warn("MISSING_SYMBOL", "market symbols with no bars stored at all (never collected: cues, factors, "
+                 "sector ETFs)", never)
+    stale = [k for k in others if k in last and last[k] < old]
+    if stale:
+        res.warn("STALE_SYMBOL", f"market symbols with no bar since {old} (cues, factors, sector ETFs; newest "
+                 + ", ".join(f"{k} {last[k]}" for k in stale) + ")", stale)
     # close > 0 on recent bars; big 1-day moves
     since = need - timedelta(days=14)
     bad = con.execute("SELECT DISTINCT ticker FROM prices WHERE date >= ? AND (close IS NULL OR close <= 0)",
@@ -547,127 +565,63 @@ def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):
     res.info["forecast"] = {"records": len(lines), "valid": good}
 
 
-# ---------- report: numbers in narrative ----------
+# ---------- report: numbers in narrative (matching in narrative_numbers.py) ----------
 
-NUM = re.compile(r"(?<![\w.])([-+−]?)\s?([₹$€£]|Rs\.?\s?|US\$)?\s?(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
-                 r"(\s?%|\s?bps?\b|\s?pp\b|\s?(?:cr|crore|lakh|mn|million|bn|billion|tn|trillion|k)\b)?(?![\w.]*\d)", re.I)
-MASKS = [re.compile(p, re.I) for p in (
-    r"<!--.*?-->", r"https?://\S+", r"\]\([^)]*\)", r"!\[[^\]]*\]",
-    r"\bnse-ann-\d+\b", r"\b\d{10}-\d{2}-\d{6}\b", r"\b[0-9a-f]{16}\b",
-    r"\b\d{4}-\d{2}-\d{2}(?:T[\d:.+Z-]+)?\b", r"\b\d{4}-W\d{2}\b",
-    rf"\b{MONTHS}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?(?:\s*[-–]\s*(?:{MONTHS}\.?\s+)?\d{{1,2}})?(?:,?\s+\d{{4}})?\b",
-    rf"\b\d{{1,2}}(?:st|nd|rd|th)?\s*(?:[-–]\s*\d{{1,2}}\s+)?{MONTHS}\b(?:,?\s+\d{{4}})?",
-    r"\b\d{1,2}:\d{2}(?::\d{2})?\b", r"\b(?:19|20)\d{2}\b",
-    r"\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]*\w\b",      # tokens mixing letters and digits: 5d, Q2, FY26, W40, 10y
-    r"^\s*(?:\d+[.)]|#+)\s",                             # list numbering, headings
-)]
+def records(con, sql: str, params=()) -> list[dict]:
+    try:
+        return con.execute(sql, list(params)).df().to_dict("records")
+    except Exception:  # noqa: BLE001 - a kind a market does not have
+        return []
 
 
-def mask(text: str, names: list[str]) -> str:
-    """Text with what is not a quoted quantity blanked: names with digits (S&P 500), ids, dates,
-    times, links, letter-digit tokens (5d, Q2, FY26) and list numbering."""
-    for n in names:
-        text = re.sub(rf"(?<!\w){re.escape(n)}(?!\w)", " ", text)
-    for m in MASKS:
-        text = m.sub(" ", text)
-    return text
-
-
-def numbers(text: str, names: list[str], small_int: int | None = None) -> list[dict]:
-    """Numbers shown in text: value, decimals shown, unit (%, bp or none) and the token."""
-    out = []
-    for line in text.splitlines():
-        masked = mask(line, names)
-        for m in NUM.finditer(masked):
-            sign, cur, digits, unit = m.group(1), m.group(2), m.group(3), (m.group(4) or "").strip().lower()
-            val = float(digits.replace(",", ""))
-            dec = len(digits.split(".")[1]) if "." in digits else 0
-            if small_int is not None and dec == 0 and not unit and not cur and not sign and val <= small_int:
-                continue
-            out.append({"value": val, "decimals": dec, "unit": unit, "token": m.group(0).strip(), "line": line.strip()})
-    return out
-
-
-def name_masks(cfg: dict) -> list[str]:
-    names = set(cfg["tickers"]) | set(cfg["symbols"])
-    for meta in [*cfg["tickers"].values(), *cfg["symbols"].values()]:
-        for k in ("name", "yahoo"):
-            if meta.get(k):
-                names.add(str(meta[k]))
-    names |= {"S&P 500", "Nifty 50", "Nasdaq 100", "Nasdaq-100", "Nikkei 225", "FTSE 100", "DAX 40", "Sensex 30",
-              "Russell 2000", "Dow 30", "Nifty Bank", "COVID-19", "Section 232", "Item 2.02", "Form 4"}
-    return sorted((n for n in names if any(c.isdigit() for c in n) or len(n) > 2), key=len, reverse=True)
-
-
-class SourceNumbers:
-    """Absolute values of every number in the sources, sorted, with % conversions of DuckDB fractions."""
-
-    def __init__(self, values):
-        self.vals = sorted({round(abs(v), 10) for v in values if v is not None and math.isfinite(v)})
-
-    def has(self, n: dict) -> bool:
-        """True when a source value rounds to the shown number (sign ignored: "fell 2.8%" quotes -2.8%)."""
-        tol = 0.5 * 10 ** -n["decimals"] + 1e-9
-        cands = [(n["value"], tol)]
-        if n["unit"] in ("bp", "bps"):
-            cands.append((n["value"] / 100, tol / 100))       # 25 bp = 0.25 (%)
-        mult = UNIT_MULT.get(n["unit"])
-        if mult:
-            cands.append((n["value"] * mult, tol * mult))     # 1.2 cr = 12,000,000
-        for x, t in cands:
-            j = bisect.bisect_left(self.vals, x - t)
-            if j < len(self.vals) and self.vals[j] <= x + t:
-                return True
-        return False
-
-
-UNIT_MULT = {"cr": 1e7, "crore": 1e7, "lakh": 1e5, "mn": 1e6, "million": 1e6, "bn": 1e9, "billion": 1e9,
-             "tn": 1e12, "trillion": 1e12, "k": 1e3}
-
-
-def duckdb_values(cfg: dict, con, vc: dict, today: date) -> tuple[list[float], list[str]]:
-    """Numbers stored in DuckDB the narrative may quote (raw and x100 for fractions), and the stored
-    text of recent news, filings and announcements (headline numbers)."""
-    vals: list[float] = []
-
-    def add_df(df: pd.DataFrame):
-        for c in df.columns:
-            s = pd.to_numeric(df[c], errors="coerce").dropna() if df[c].dtype != bool else pd.Series(dtype=float)
-            for v in s:
-                vals.extend((float(v), float(v) * 100))
-    for sql in ("SELECT * EXCLUDE (warnings) FROM features_latest", "SELECT * FROM regime_latest",
-                "SELECT * FROM ranges_latest", "SELECT price, prev_close, change_pct FROM quotes "
-                "WHERE collected_at >= current_date - 3",
-                "SELECT close, ret_1d, ret_5d, ret_20d FROM returns WHERE date >= current_date - 30",
-                "SELECT * FROM track_record" if _has(con, "track_record") else "SELECT 1 WHERE false"):
-        try:
-            add_df(con.execute(sql).df())
-        except Exception:  # noqa: BLE001 - a view a market does not have
-            continue
+def build_pool(cfg: dict, con, vc: dict, today: date, texts: list[str]) -> nn.Pool:
+    """The numbers the narrative may quote, by kind and scope (see narrative_numbers.py): the
+    script-written texts (context pack, skeletons) line by line, stored rows per ticker or symbol
+    (newest features, the newest ranges, quotes of the last 3 days, returns of the last 10 days),
+    market-level rows (regime, row counts), collector summaries, and the text of recent news,
+    filings and announcements under their own ids."""
+    pool = nn.Pool(nn.Entities(cfg))
+    for t in texts:
+        pool.add_text(t, pct_sections=True)
+    pool.add_rows(records(con, "SELECT DISTINCT ON (ticker) * EXCLUDE (warnings) FROM features_latest "
+                               "ORDER BY ticker, as_of_date DESC"), "ticker")
+    pool.add_rows(records(con, "SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1"), None)
+    pool.add_rows(records(con, "SELECT * FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)"),
+                  "ticker")
+    pool.add_rows(records(con, "SELECT symbol, price, prev_close, change_pct FROM quotes WHERE collected_at >= ?",
+                          [today - timedelta(days=3)]), "symbol")
+    pool.add_rows(records(con, "SELECT ticker, close, ret_1d, ret_5d, ret_20d FROM returns WHERE date >= ?",
+                          [today - timedelta(days=10)]), "ticker")
     # row counts the narrative may quote ("902 headlines"): per kind today and in total
     for kind, col in (*FETCH_COL.items(), ("news_enriched", "analyzed_at"), ("predictions", "made_at"),
                       ("ranges", "made_at"), ("events", "first_seen_at")):
-        try:
-            vals.extend(float(x) for x in con.execute(
-                f"SELECT count(*) FILTER (WHERE CAST({col} AS DATE) = ?), count(*) FROM {kind}", [today]).fetchone())
-        except Exception:  # noqa: BLE001
-            continue
-    since = today - timedelta(days=vc["narrative_news_days"])
-    texts = []
-    steps = work_dir() / "steps"
-    texts += [p.read_text(encoding="utf-8") for p in sorted(steps.glob("*.json"))] if steps.exists() else []
-    for sql in ("SELECT title FROM news WHERE first_seen_at >= ?", "SELECT summary FROM news_enriched WHERE analyzed_at >= ?",
-                "SELECT description FROM filings WHERE first_seen_at >= ?", "SELECT subject FROM announcements WHERE first_seen_at >= ?"):
-        texts += [str(r[0]) for r in con.execute(sql, [since]).fetchall() if r[0]]
-    return vals, texts
-
-
-def _has(con, name: str) -> bool:
+        for v in (records(con, f"SELECT count(*) FILTER (WHERE CAST({col} AS DATE) = ?) AS a, count(*) AS b FROM {kind}",
+                          [today]) or [{}])[0].values():
+            pool.add(None, "plain", v)
+        # rows per fetch batch today ("72 new items"): one batch per first_seen/collected minute
+        if kind in FETCH_COL:
+            for r in records(con, f"SELECT count(*) AS n FROM {kind} WHERE CAST({col} AS DATE) = ? "
+                                  f"GROUP BY date_trunc('minute', {col})", [today]):
+                pool.add(None, "plain", r["n"])
+    # configured counts: watchlist size, market symbols, news feeds ("31 feeds")
+    pool.add(None, "plain", len(cfg["tickers"]))
+    pool.add(None, "plain", len(cfg["symbols"]))
     try:
-        con.execute(f"SELECT * FROM {name} LIMIT 0")
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+        import collect_news
+        pool.add(None, "plain", len(collect_news.build_jobs(cfg.get("news") or {}, cfg)))
+    except Exception:  # noqa: BLE001 - only a source of numbers
+        pass
+    steps = work_dir() / "steps"
+    nn.collector_summaries(pool, sorted(steps.glob("collect_*.json")) if steps.exists() else [])
+    since = today - timedelta(days=vc["narrative_news_days"])
+    for sql in ("SELECT id, title FROM news WHERE first_seen_at >= ?",
+                "SELECT id, summary FROM news_enriched WHERE analyzed_at >= ?",
+                "SELECT id, description FROM filings WHERE first_seen_at >= ?",
+                "SELECT id, subject FROM announcements WHERE first_seen_at >= ?"):
+        for i, text in con.execute(sql, [since]).fetchall():
+            if text:
+                pool.add_text(str(text), scope_by_line=False, scope=("id", i))
+    return pool
 
 
 def skeletons(cfg: dict, session: str) -> tuple[str | None, str | None]:
@@ -686,10 +640,6 @@ def skeletons(cfg: dict, session: str) -> tuple[str | None, str | None]:
 def agent_lines(filled: str, skeleton: str) -> list[str]:
     script = {x.strip() for x in skeleton.splitlines()}
     return [x for x in filled.splitlines() if x.strip() and x.strip() not in script]
-
-
-def unmatched_numbers(lines: list[str], src: SourceNumbers, names: list[str], small_int: int) -> list[dict]:
-    return [n for n in numbers("\n".join(lines), names, small_int) if not src.has(n)]
 
 
 def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
@@ -753,13 +703,8 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
         res.block("AGENT_MARKERS", f"{slack_path.name} still has AGENT marker(s)")
     skel_r, skel_s = skeletons(cfg, session)
     pack = work_dir() / "context.md"
-    names = name_masks(cfg)
-    src_texts = [skel_r or "", skel_s or "", pack.read_text(encoding="utf-8") if pack.exists() else ""]
-    db_vals, news_texts = duckdb_values(cfg, con, vc, today)
-    vals = list(db_vals)
-    for t in src_texts + news_texts:
-        vals += [n["value"] for n in numbers(t, names)]
-    src = SourceNumbers(vals)
+    pool = build_pool(cfg, con, vc, today, [skel_r or "", skel_s or "",
+                                            pack.read_text(encoding="utf-8") if pack.exists() else ""])
     small = vc["narrative_small_int"]
     targets = [(report_path, agent_lines(filled, skel_r or ""))]
     if slack is not None:
@@ -769,13 +714,14 @@ def stage_report(res, cfg, con, st, now, today, vc, report_path: Path | None = N
         targets.append((summary, summary.read_text(encoding="utf-8").splitlines()))
     checked = {}
     for path, lines in targets:
-        bad = unmatched_numbers(lines, src, names, small)
-        checked[path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)] = {"agent_lines": len(lines), "unmatched": len(bad)}
+        bad = nn.unmatched(lines, pool, small)
+        checked[path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)] = {
+            "agent_lines": len(lines), "unmatched": len(bad)}
         if bad:
-            tick = [t for n in bad for t in cfg["tickers"] if re.search(rf"(?<![\w&]){re.escape(t)}(?![\w&])", n["line"])]
-            res.block("UNMATCHED_NUMBER", f"{path.name}: {len(bad)} number(s) not in the context pack, the "
-                      "script-written report, stored news text or DuckDB: "
-                      + "; ".join(f"{n['token']!r} in \"{n['line'][:90]}\"" for n in bad[:12]), tick)
+            res.block("UNMATCHED_NUMBER", f"{path.name}: {len(bad)} number(s) with no same-kind source number for "
+                      "the companies or symbols named (context pack, script-written report, cited news text, "
+                      "stored rows): " + "; ".join(f"{n['token']!r} in \"{n['sentence'][:90]}\"" for n in bad[:12]),
+                      [t for n in bad for t in n["entities"] if t in cfg["tickers"]])
     if not pack.exists():
         res.warn("NO_CONTEXT_PACK", "work/context.md missing: narrative numbers checked against the skeleton and DuckDB only")
     res.info["report"] = checked

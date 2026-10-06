@@ -17,7 +17,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
   PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
-  the `AGENT` markers, see `templates/report.md`). After the judge passes, `html_report` builds
+  the `AGENT` markers, see `templates/report.md`). After the report gate passes, `html_report` builds
   the reader's HTML report from the filled md plus the data, and `notify_slack` posts a thread
   (summary, chart images, HTML file) with `SLACK_BOT_TOKEN`, or the summary text alone through
   `SLACK_WEBHOOK_URL`. Processing data (data/, context pack, summaries) and presentation (HTML,
@@ -108,7 +108,8 @@ Every change to code, config, agent instructions or process is reviewed by the `
 before it is merged or pushed to main, whoever made it: a subagent, a build agent, or the
 orchestrating session itself (its own edits and merge-conflict resolutions included).
 - Give the judge the exact instructions, the claimed result and where the work lives. Never
-  merge, push or append on an agent's word: only a judge PASS counts.
+  merge or push on an agent's word: only a judge PASS counts. (Daily-run appends to `data/` pass
+  on the `validate.py` gates instead; see below.)
 - Any FALSE claim makes the verdict FAIL, even if the code is right (the report must be true too).
 - Severity: every finding is a BLOCKER or COSMETIC. Blockers: broken or wrong functionality, wrong
   numbers, look-ahead, data loss or corruption, false claims or invented sources/data, broken rules,

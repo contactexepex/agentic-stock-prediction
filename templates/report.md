@@ -8,8 +8,10 @@ a filled report is still current). Never change a number, table or chart link th
 only from those tables or the context pack. Plain, short sentences. Every news id must support the exact
 claim it is attached to (its headline or summary says it); never carry over background or causes
 from the bull/bear cases unless they cite evidence for them. `scripts/validate.py --stage report`
-checks every number against the context pack, the script-written tables and DuckDB, and the weekly
-spot-check judge reads a sample for claims and ids.
+checks each number against the same kind of number (percent or plain) for the companies or symbols
+its sentence names, the market level, and the news ids it cites, so name the company and cite the id
+in the sentence that quotes their number. It cannot tell an invented number that equals a real one;
+the weekly spot-check judge reads a sample for claims, ids and numbers.
 
 The filled report is also the source of the HTML report (`scripts/html_report.py`, run after the
 report gate passes): it copies the narrative below verbatim from under each heading and turns every
