@@ -25,16 +25,20 @@ Compared: each step's exit code, stdout and stderr, and every file under the scr
 run created or changed (sha256 of the normalised bytes); an input file the run deleted is a
 difference too. Normalisation, applied before hashing, is limited to:
 - the run directory's absolute path -> <RUN>, this checkout's absolute path -> <CODE>;
-- the values of NORMALISED_FIELDS and the NORMALISED_TEXT patterns (wall-clock durations and
-  times that do not follow MB_NOW).
-Child processes load tests/golden/site/sitecustomize.py: the network guard, and DuckDB on one thread
-(queries without a full ORDER BY otherwise return rows in a varying order).
+- the NORMALISED entries: four wall-clock values (durations and build times that do not follow
+  MB_NOW), each masked only in the output paths where it appears.
+Child processes load tests/golden/site/sitecustomize.py: the network guard, and DuckDB on one thread.
+The thread setting hides a production defect, it does not fix it: several queries have no full
+ORDER BY or aggregate floats in scan order, so with DuckDB's default threads their row order (and a
+float's last digit) varies between runs (docs/REFACTOR_PLAN.md, "Known nondeterminism").
+GOLDEN_DUCKDB_PARALLEL=1 turns the setting off to show it.
 Nothing else is masked. The recorded set (manifest plus full copies, for diffs) lives under --dir,
 by default work/golden (git-ignored)."""
 from __future__ import annotations
 
 import argparse
 import difflib
+import fnmatch
 import hashlib
 import json
 import os
@@ -43,6 +47,8 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from seed import run_seed
 
 from overlay import (INPUT_COMMIT, append_valid_calls, fill_report, git_inputs, write_forecaster_file,
                      write_lessons, write_past_calls)
@@ -64,12 +70,19 @@ REPLAY_WINDOW = ("2026-09-14", "2026-10-01")
 BACKTEST_SESSIONS = "40"
 AI_REPLAY_DATE = "2026-09-25"
 
-# Values that come from the wall clock, not MB_NOW. JSON keys (replaced by "<normalised>" wherever
-# the key appears): replay.py runtime_s, view_data.py generated_at (the HTML report's data),
-# ai_replay.py prepare's prepared_at, news_clusters.py seconds. Text: replay.py's HTML footer
-# "runtime N s".
-NORMALISED_FIELDS = ("runtime_s", "generated_at", "prepared_at", "seconds")
-NORMALISED_TEXT = ((rb"runtime \d+ s\.", b"runtime <normalised> s."),)
+# Values that come from the wall clock, not MB_NOW, each masked only in the outputs (paths relative
+# to the run directory, fnmatch patterns) where it was seen: (paths, regex, replacement).
+NORMALISED = (
+    (("root/data/*/replays/*/*/*.jsonl", "root/reports/*/replay-*.json", "steps/*/late.replay*.stdout"),
+     rb'("runtime_s"\s*:\s*)(-?[0-9][0-9.eE+-]*)', rb'\1"<normalised>"'),               # replay.py
+    (("root/reports/*/replay-*.html",), rb"runtime \d+ s\.", b"runtime <normalised> s."),       # replay.py
+    (("root/reports/*/????-??-??.html", "root/work/slack_*_plan/????-??-??.html"),
+     rb'("generated_at"\s*:\s*)("[^"]*")', rb'\1"<normalised>"'),                         # view_data.py
+    (("ai_replay_*/ai_replay.json", "steps/*/late.ai_replay_prepare.stdout"),
+     rb'("prepared_at"\s*:\s*)("[^"]*")', rb'\1"<normalised>"'),                          # ai_replay.py
+    (("steps/*/late.news_clusters.stdout",),
+     rb'("seconds"\s*:\s*)(-?[0-9][0-9.eE+-]*)', rb'\1"<normalised>"'),                   # news_clusters.py
+)
 PY = "{python}"
 
 
@@ -168,6 +181,7 @@ def run_all(run_dir: Path) -> dict:
     for market in MARKETS:
         write_past_calls(root, market)
     before = snapshot(run_dir)
+    run_seed(run_dir, root, environment, SCRIPTS)
     for market in MARKETS:
         (run_dir / "steps" / market).mkdir(parents=True, exist_ok=True)
         for phase, label, command, stdout_file in steps(market):
@@ -194,22 +208,22 @@ def run_all(run_dir: Path) -> dict:
 
 # ---------- hashing and comparison ----------
 
-def normalise(content: bytes, run_dir: Path) -> bytes:
-    """Absolute run paths -> <RUN>, checkout paths -> <CODE>, NORMALISED_FIELDS values -> "<normalised>"."""
+def normalise(content: bytes, run_dir: Path, relative_path: str) -> bytes:
+    """Absolute run paths -> <RUN>, checkout paths -> <CODE>, then the NORMALISED entries for this path."""
     content = content.replace(str(run_dir.resolve()).encode(), b"<RUN>").replace(str(CODE).encode(), b"<CODE>")
-    for field in NORMALISED_FIELDS:
-        content = re.sub(rb'("' + field.encode() + rb'"\s*:\s*)(-?[0-9][0-9.eE+-]*|"[^"]*")',
-                         rb'\1"<normalised>"', content)
-    for pattern, replacement in NORMALISED_TEXT:
-        content = re.sub(pattern, replacement, content)
+    for paths, pattern, replacement in NORMALISED:
+        if any(fnmatch.fnmatch(relative_path, p) for p in paths):
+            content = re.sub(pattern, replacement, content)
     return content
 
 
 def snapshot(run_dir: Path) -> dict[str, str]:
     """Relative path -> sha256 of the normalised bytes, for every file of the run except bookkeeping."""
     skip = {"netguard.log", "outputs.json"}
-    return {p.relative_to(run_dir).as_posix(): hashlib.sha256(normalise(p.read_bytes(), run_dir)).hexdigest()
-            for p in sorted(run_dir.rglob("*")) if p.is_file() and p.name not in skip}
+    files = [p for p in sorted(run_dir.rglob("*")) if p.is_file() and p.name not in skip]
+    return {p.relative_to(run_dir).as_posix():
+            hashlib.sha256(normalise(p.read_bytes(), run_dir, p.relative_to(run_dir).as_posix())).hexdigest()
+            for p in files}
 
 
 def network_clean(run_dir: Path) -> bool:
@@ -231,8 +245,8 @@ def record(directory: Path) -> int:
     run_dir = directory / "run"
     outputs = run_all(run_dir)
     manifest = {**outputs, "input_commit": INPUT_COMMIT, "phase_clocks": PHASE_CLOCKS,
-                "normalised_fields": list(NORMALISED_FIELDS),
-                "normalised_text": [p.decode() for p, _ in NORMALISED_TEXT], "code_commit": git_head(),
+                "normalised": [{"paths": list(p), "pattern": r.decode()} for p, r, _ in NORMALISED],
+                "duckdb_parallel": bool(os.environ.get("GOLDEN_DUCKDB_PARALLEL")), "code_commit": git_head(),
                 "exit_codes": exit_codes(run_dir)}
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=True))
     clean = network_clean(run_dir)
@@ -255,8 +269,8 @@ def compare(directory: Path, max_diff_lines: int) -> int:
                  else "new in the fresh run" if not old.exists() else "differs")
         print(f"--- {path}: {state}")
         if old.exists() and new.exists() and not path.endswith(".png"):
-            a = normalise(old.read_bytes(), directory / "run").decode(errors="replace").splitlines()
-            b = normalise(new.read_bytes(), fresh_dir).decode(errors="replace").splitlines()
+            a = normalise(old.read_bytes(), directory / "run", path).decode(errors="replace").splitlines()
+            b = normalise(new.read_bytes(), fresh_dir, path).decode(errors="replace").splitlines()
             for line in list(difflib.unified_diff(a, b, lineterm="", n=1))[:max_diff_lines]:
                 print(line[:300])
     clean = network_clean(fresh_dir)

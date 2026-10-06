@@ -3,8 +3,9 @@ process deterministic without touching the code under test.
 
 - the test network guard (tests/netguard/mb_netguard.py) is installed, as in the test suite;
 - every DuckDB connection runs on one thread, so rows of a query without a full ORDER BY come back
-  in file order every time (several scripts write such rows; with parallel scans their order, and
-  float sums over them, vary between runs);
+  in file order every time. This hides a production defect (the routine runs DuckDB with its default
+  threads, where such rows and float sums over them vary between runs; docs/REFACTOR_PLAN.md,
+  "Known nondeterminism"); GOLDEN_DUCKDB_PARALLEL=1 leaves the default to show it;
 - then the interpreter's own sitecustomize runs, if there is one."""
 import importlib.util
 import os
@@ -33,7 +34,8 @@ def _single_thread_connect(*args, **kwargs):
     return connection
 
 
-duckdb.connect = _single_thread_connect
+if not os.environ.get("GOLDEN_DUCKDB_PARALLEL"):
+    duckdb.connect = _single_thread_connect
 
 for _path in sys.path:
     if os.path.abspath(_path or os.getcwd()) in (_here, _netguard):
