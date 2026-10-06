@@ -81,6 +81,14 @@ tickers:
   TATASTEEL:  {yahoo: TATASTEEL.NS, name: Tata Steel}
   HINDALCO:   {yahoo: HINDALCO.NS, name: Hindalco}
 
+# Official fallback for watchlist bars Yahoo lacks (scripts/collect_prices.py): a stock with no
+# stored bar for one of the last `sessions` completed sessions gets that day's OHLC and volume
+# from NSE's security-wise bhavcopy (unadjusted, like the stored Yahoo close). Each filled bar is
+# listed in the collector summary's `filled_from_nse` (the CSV has no source column).
+price_fallback:
+  source: nse_bhavcopy
+  sessions: 5
+
 # News. Every domain here must be allowed in the cloud environment's network settings.
 news:
   google_news:

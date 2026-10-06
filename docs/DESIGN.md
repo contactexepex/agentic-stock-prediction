@@ -332,6 +332,22 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
   a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
   and earnings dates when every method raised.
+- India price fallback, added 2026-10-06: Yahoo had no 2026-10-05 bar for SBILIFE, HDFCLIFE,
+  DRREDDY, MARUTI and ULTRACEMCO (it jumped from 10-01 to 10-06 although NSE traded on 10-05).
+  `collect_prices.py` now fills a watchlist stock's missing bar for any of the last
+  `price_fallback.sessions` (5) completed sessions of the exchange calendar from NSE's
+  security-wise bhavcopy (`sec_bhavdata_full_DDMMYYYY.csv` on nsearchives.nseindia.com, the file
+  `collect_nse_india.py` reads for delivery %; series EQ, used only when its DATE1 is that
+  session). Yahoo is asked first and a (date, ticker) is written once, so the fallback never
+  replaces a bar. The bhavcopy is unadjusted, like the stored Yahoo `close` (yfinance with
+  `auto_adjust=False`; `adj_close` = close on fallback rows, as Yahoo gives for a new bar). For
+  the 20 watchlist stocks on six sessions (2026-09-24 to 10-01, 120 stock-days) the stored Yahoo
+  bars matched the bhavcopy's open, high, low and close to within 0.0002 (Yahoo's float rounding,
+  e.g. 3858.3999 for 3858.40) and its volume exactly. The prices CSV has a fixed column list (`read_csv` with
+  `columns=`), so no source column was added: the collector summary lists each fallback bar in
+  `filled_from_nse` (source `nse_bhavcopy`, file URL), moves a Yahoo failure whose sessions are
+  now all stored to `resolved_by_nse`, and keeps a stock still missing a session in `failed`
+  (`missing_after_nse`).
 - Issue #9, done 2026-10-05 (no new network access needed):
   - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the
     close of the third Friday of March, June, September and December (the triple-witching day),

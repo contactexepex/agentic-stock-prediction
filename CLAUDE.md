@@ -11,7 +11,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (benchmark, vol index, cues, factors), regime thresholds, sectors, tickers, news feeds
 - `config/events.yaml` scheduled market events (rules and fixed dates)
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
-  Collectors: `collect_prices`, `collect_quotes`, `collect_events` (also backfills past earnings
+  Collectors: `collect_prices` (India: a watchlist bar Yahoo lacks for a recent session comes
+  from NSE's bhavcopy, listed in `filled_from_nse`; `price_fallback` in the market config), `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02 kept only when it is a quarter's
   results release, anchored on stored 10-Q/10-K `periodic_report` rows, and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges), `features` (indicators +
