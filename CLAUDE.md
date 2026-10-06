@@ -150,6 +150,12 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
   agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is
   merged or pushed to main before its PASS.
+- Tests (offline; a guard in `tests/conftest.py` fails any test that reaches the network): the fast
+  tier `python -m pytest -m "not slow" -n auto` on each edit, the full suite `python -m pytest -n auto`
+  before review or merge. GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
+  push and PR; a reviewer may cite the passing CI run for the reviewed commit as evidence of the full
+  suite instead of rerunning it, but still runs the tests specific to the change. A merge-conflict
+  review reruns tests only when a conflict touched code. New end-to-end tests go in `SLOW` there.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`), not by the judge: one retry (the run is time-boxed), then the failed
   output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's

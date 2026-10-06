@@ -434,6 +434,7 @@ def _query(url: str, auth: str, stmt: str) -> list:
         return json.loads(resp.read())["data"]["values"]
 
 
+@pytest.mark.network
 @pytest.mark.skipif(not os.environ.get("NEO4J_TEST_QUERY_URL"), reason="set NEO4J_TEST_QUERY_URL to a disposable server")
 def test_real_engine_full_then_idempotent_incremental(tmp_path):
     url = os.environ["NEO4J_TEST_QUERY_URL"]

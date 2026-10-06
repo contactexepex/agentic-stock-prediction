@@ -1,0 +1,33 @@
+name: tests
+
+# The full offline suite on every push and pull request. No secrets: the tests use fixtures and
+# synthetic data, and tests/conftest.py fails any test that reaches for the network (only pip does).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # tests/test_judgments.py checks that every logged commit exists
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install requirements
+        run: pip install -r requirements.txt
+      - name: Full suite (parallel)
+        run: python -m pytest -q -n auto
