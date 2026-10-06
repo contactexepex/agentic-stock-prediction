@@ -36,7 +36,7 @@ Group the statements of one fact with the same `fact_key` (a short slug you choo
  "value_num": 486532, "unit": "count", "period": "Q3 2026", "effective_date": null,
  "quote": "<verbatim words from that source, at most 40>", "quote_source_id": "<news id or filing/announcement id>",
  "attribution": "company_statement", "news_ids": ["<ids of the items carrying this statement>"],
- "prompt_version": "claims-v2"}
+ "prompt_version": "claims-v3"}
 ```
 
 Rules (the gate `python scripts/claims.py validate work/claims.jsonl` rejects every record that
@@ -67,6 +67,10 @@ breaks one):
   states them.
 - `news_ids`: the event's item ids that carry this same statement (copies); default is the quoted
   item itself; empty for a primary source.
+- Record a fact from a primary source only when it is the event the items report (or a fact of that
+  event). Do not record administrative filings that happen to sit beside the event (ESOP or share
+  allotments, compliance certificates, trading-window notices, routine SEBI/LODR intimations) as
+  facts of it: a primary-only fact never confirms the event anyway.
 - Skip statements already listed in the event's `stored_claims` (same `fact_key` and
   `quote_source_id`; they are stored and would be refused as repeats); reuse their `fact_key` for new
   statements of the same fact. Skip facts no source states in its stored text. Skip an event with nothing checkable. Abstaining

@@ -404,7 +404,10 @@ single_source > unverified:
 - single_source: one verified origin; unverified: none.
 A value quoted from a headline (`quote_field` title) is never compared (headlines are cut and drop
 hedges): it neither needs a primary value nor contradicts one or another outlet.
-A cluster's status is the highest of its facts' and its base status (from the cluster row alone:
+A fact stated only by a primary source (no outlet item affirms it) keeps its own row, flagged
+`primary_only`, but never raises the event: a cluster's status is the highest of its base status and
+the statuses of the facts its outlet items state, and only those facts give its confirming primary ids
+and `confirmed_at`. Base status (from the cluster row alone:
 >= 2 verified origins corroborated; `sources_say` rumour; promotional items and no verified origin
 promotional; one verified origin single_source; else unverified). Each news id has its own status:
 the cluster's, except contradicted (disagrees with a filing), promotional (vendor origin group) and
@@ -1198,7 +1201,7 @@ Claude Fable (current version `claude-fable-5-1` in the platform's model list) i
 scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
 (forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits;
-forecast-v10, news-v8 and claims-v2 with news verification phase B), and a per-call `model` field on predictions is a planned follow-up.
+forecast-v10, news-v8 and claims-v3 with news verification phase B), and a per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
 - **Reflection log** (section 5): TauricResearch/TradingAgents (https://github.com/TauricResearch/TradingAgents,

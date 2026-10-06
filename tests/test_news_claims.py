@@ -106,7 +106,7 @@ TSLA_C, CVX_C, JIO_C = "TSLA-n30", "CVX-n01", "RELIANCE-n13"
 def claim(cluster_id, fact, source, quote, **kw) -> dict:
     rec = {"cluster_id": cluster_id, "fact_key": fact, "claim_type": "earnings_guidance", "subject": "the company",
            "predicate": "states the fact", "quote": quote, "quote_source_id": source, "attribution": "on_record",
-           "prompt_version": "claims-v2"}
+           "prompt_version": "claims-v3"}
     rec.update(kw)
     return rec
 
@@ -273,6 +273,24 @@ def test_prepare_without_sec_user_agent_or_with_no_fetch_stores_no_text(env, cap
     assert cli(env, capsys, "prepare", "--no-fetch")["primary_texts"] == {"skipped": "--no-fetch"}
 
 
+def test_primary_only_fact_does_not_make_its_filing_main_evidence(env, capsys):
+    """An event confirmed by nothing its outlets say: a filing quoted only for a side fact neither
+    confirms the event nor becomes citable main evidence (NEWS_STATUS_MAIN)."""
+    cli(env, capsys, "prepare")
+    env.set_now(LATER)
+    side = claim(CVX_C, "board-meeting", CVX_8K, "On September 30, 2026, the Board of Directors",
+                 attribution="company_statement")
+    story = claim(CVX_C, "cfo-story", "n01", extract_quote(env, "n01"), claim_type="mgmt_change")
+    assert cli(env, capsys, "add", str(write_claims(env, [side, story])))["appended"] == 2
+    run_status(env, capsys)
+    after = statuses_asof(LATER)
+    assert after[(CVX_C, "board-meeting")] == "confirmed_primary" and after[(CVX_C, "*")] == "single_source"
+    con = connect(MARKET)
+    assert EvidenceStatuses(con).of(CVX_8K, "CVX", LATER) == "unverified"
+    rec = {"evidence_ids": [CVX_8K], "confidence": 0.9, "range_widen": None}
+    assert [c for c, _ in check_news_status(rec, ["unverified"])] == ["NEWS_STATUS_MAIN", "NEWS_STATUS_CONFIDENCE"]
+
+
 def test_late_primary_text_is_not_citable_or_counted_before_it_was_stored(env, capsys):
     env.set_now(LATER)
     cli(env, capsys, "prepare")                                          # filing text stored at T2
@@ -286,12 +304,15 @@ def test_late_primary_text_is_not_citable_or_counted_before_it_was_stored(env, c
            "stance": "affirms", "value_text": "486,532", "quote_field": "primary", "source_kind": "filing",
            "news_ids": [], "source_available_at": LATER, "extracted_at": NOW, "method_version": "nv-b1",
            "period": None, "effective_date": None}
-    env.write("news_claims", [row])
+    outlet = {**row, "id": f"{tsla}|q3-deliveries|n30", "quote": TSLA_MINT, "quote_source_id": "n30",
+              "quote_field": "title", "source_kind": "article", "news_ids": ["n30"],
+              "source_available_at": "2026-10-03T14:00:00+00:00"}       # the outlet statement was there at T1
+    env.write("news_claims", [row, outlet])
     s = run_status(env, capsys)
-    assert s["claims"] == 0 and statuses_asof(NOW)[(TSLA_C, "*")] != "confirmed_primary"
+    assert s["claims"] == 1 and statuses_asof(NOW)[(TSLA_C, "*")] != "confirmed_primary"
     env.set_now(LATER)
     s = run_status(env, capsys)
-    assert s["claims"] == 1 and statuses_asof(LATER)[(TSLA_C, "*")] == "confirmed_primary"
+    assert s["claims"] == 2 and statuses_asof(LATER)[(TSLA_C, "*")] == "confirmed_primary"
     assert statuses_asof(NOW)[(TSLA_C, "*")] != "confirmed_primary"   # the T1 row is unchanged history
 
 

@@ -38,6 +38,7 @@ FLAG_UNIT_MISMATCH = "unit_mismatch"
 FLAG_PRIMARY_DENIES = "primary_denies"
 FLAG_OUTLET_VALUES_DISAGREE = "outlet_values_disagree"
 FLAG_STANCES_DISAGREE = "stances_disagree"
+FLAG_PRIMARY_ONLY = "primary_only"     # a fact only a primary source states: never confirms the event
 
 # Claim record enums (claim-checker.md)
 CLAIM_TYPES = ("earnings_guidance", "deal_ma", "regulatory_legal", "mgmt_change", "rating_target", "macro",

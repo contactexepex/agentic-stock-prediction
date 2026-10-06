@@ -18,15 +18,18 @@ single_source > unverified. A fact is
 A value quoted from a headline (quote_field title) is never compared: headlines are cut and drop hedges,
 so such a statement neither needs nor contradicts a primary value. confirmed_at is when the confirming
 primary source was public (source_published_at: SEC acceptance, NSE dissemination).
-A cluster's status is the highest of its facts' and its base status (the cluster row alone)."""
+A cluster's status is the highest of its base status (the cluster row alone) and the statuses of the
+facts its outlet items state. A fact stated only by a primary source (no outlet item affirms it, e.g. a
+share allotment filed beside an unconfirmed story) keeps its own row, flagged primary_only, but never
+raises the cluster's status or confirmed_at, nor adds its primary ids to the confirming ids."""
 from __future__ import annotations
 
 from marketbrief.analytics.claim_numbers import values_match
 from marketbrief.constants.verification import (ATTRIBUTION_OPINION, ATTRIBUTION_SOURCES_SAY, CLAIM_TYPE_OPINION,
-                                                FIELD_TITLE,
-                                                CLAIM_TYPE_PROMOTIONAL, CLAIM_TYPE_RUMOUR, FLAG_MISMATCH_PRIMARY,
-                                                FLAG_OUTLET_VALUES_DISAGREE, FLAG_PRIMARY_DENIES,
-                                                FLAG_PRIMARY_WITHOUT_VALUE, FLAG_STANCES_DISAGREE, FLAG_UNIT_MISMATCH,
+                                                CLAIM_TYPE_PROMOTIONAL, CLAIM_TYPE_RUMOUR, FIELD_TITLE,
+                                                FLAG_MISMATCH_PRIMARY, FLAG_OUTLET_VALUES_DISAGREE,
+                                                FLAG_PRIMARY_DENIES, FLAG_PRIMARY_ONLY, FLAG_PRIMARY_WITHOUT_VALUE,
+                                                FLAG_STANCES_DISAGREE, FLAG_UNIT_MISMATCH,
                                                 PRIMARY_SOURCE_KINDS, STATUS_CONFIRMED_PRIMARY, STATUS_CONTRADICTED,
                                                 STATUS_CORROBORATED, STATUS_PRECEDENCE, STATUS_PROMOTIONAL,
                                                 STATUS_RUMOUR, STATUS_SINGLE_SOURCE, STATUS_UNVERIFIED,
@@ -214,14 +217,18 @@ def cluster_status(cluster: dict, statements: list[dict]) -> tuple[dict, dict[st
     for s in statements:
         by_fact.setdefault(s["fact_key"], []).append(s)
     facts = {key: fact_status(rows, origins) for key, rows in sorted(by_fact.items())}
-    status = highest([base_status(cluster), *(f["status"] for f in facts.values())])
-    mismatch = {n for f in facts.values() for n in f["mismatch_ids"]}
-    confirmed = [f["confirmed_at"] for f in facts.values() if f["confirmed_at"] is not None]
-    result = {"status": status, "flags": sorted({x for f in facts.values() for x in f["flags"]}),
+    for key, fact in facts.items():
+        if not any(not is_primary(s) and s["stance"] == STANCE_AFFIRMS for s in by_fact[key]):
+            fact["flags"] = sorted({*fact["flags"], FLAG_PRIMARY_ONLY})
+    event = [f for f in facts.values() if FLAG_PRIMARY_ONLY not in f["flags"]]   # facts the outlets state
+    status = highest([base_status(cluster), *(f["status"] for f in event)])
+    mismatch = {n for f in event for n in f["mismatch_ids"]}
+    confirmed = [f["confirmed_at"] for f in event if f["confirmed_at"] is not None]
+    result = {"status": status, "flags": sorted({x for f in event for x in f["flags"]}),
               "mismatch_ids": sorted(mismatch),
-              "primary_ids": sorted({p for f in facts.values() for p in f["primary_ids"]}),
-              "outlet_ids": sorted({o for f in facts.values() for o in f["outlet_ids"]}),
-              "conflicts": [c for f in facts.values() for c in f["conflicts"]],
+              "primary_ids": sorted({p for f in event for p in f["primary_ids"]}),
+              "outlet_ids": sorted({o for f in event for o in f["outlet_ids"]}),
+              "conflicts": [c for f in event for c in f["conflicts"]],
               "confirmed_at": min(confirmed) if status == STATUS_CONFIRMED_PRIMARY and confirmed else None,
               "ids": id_statuses(cluster, status, mismatch)}
     return result, facts

@@ -167,6 +167,16 @@ def test_confirmed_at_is_when_the_primary_was_public():
         == "corroborated"                                                # an outlet's own reporting is factual
 
 
+def test_primary_only_side_fact_never_confirms_the_event():
+    """ICICIBANK case: an unconfirmed outlet story plus an allotment quoted only from the exchange filing."""
+    res, facts = vs.cluster_status(cluster(), [
+        st("n1", fact="ceo-exit", quote_field="title"),
+        st("nse-ann-9", "announcement", fact="allotment", source_published_at="2026-10-05T04:00:00+00:00")])
+    assert facts["allotment"]["status"] == "confirmed_primary" and "primary_only" in facts["allotment"]["flags"]
+    assert res["status"] == "single_source" and res["primary_ids"] == [] and res["confirmed_at"] is None
+    assert "primary_only" not in res["flags"]
+
+
 def test_cluster_status_highest_of_facts_and_base():
     res, facts = vs.cluster_status(cluster(), [])
     assert res["status"] == "single_source" and facts == {}
