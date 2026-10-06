@@ -27,6 +27,8 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.pipeline.claim_inputs import input_records  # noqa: E402
 from marketbrief.pipeline.claim_sources import current_clusters, sources_by_cluster  # noqa: E402
+from marketbrief.pipeline.evidence_status import EvidenceStatuses  # noqa: E402
+from prediction_rules import check_news_status  # noqa: E402
 from marketbrief.pipeline import claims as claims_cli  # noqa: E402
 from marketbrief.pipeline import news_status as status_cli  # noqa: E402
 from marketbrief.sources.primary_text import html_to_text  # noqa: E402
@@ -52,6 +54,7 @@ FILINGS = [
 ]
 TSLA_MINT = "Tesla Q3 deliveries hit 486,532 vehicles, beating estimates"
 TSLA_WRONG = "Tesla Q3 deliveries hit 480K vehicles"
+JIO_COPY = "Jio Platforms to launch $3.8 billion IPO on October 21, sources say"      # an unvetted copy
 
 
 @pytest.fixture(autouse=True)
@@ -66,7 +69,9 @@ def env(tmp_path, monkeypatch, capsys):
     e.write("news", [nvt.news_row(30, TSLA_MINT, "TSLA", source="Mint", domain="livemint.com",
                                   pub="2026-10-03T13:30:00+00:00", seen="2026-10-03T14:00:00+00:00"),
                      nvt.news_row(31, TSLA_WRONG, "TSLA", source="TradingKey", domain="tradingkey.com",
-                                  pub="2026-10-04T09:00:00+00:00", seen="2026-10-04T09:30:00+00:00")])
+                                  pub="2026-10-04T09:00:00+00:00", seen="2026-10-04T09:30:00+00:00"),
+                     nvt.news_row(32, JIO_COPY, "RELIANCE", source="Dubious Daily", domain="dubiousdaily.xyz",
+                                  conf="low")])
     e.write("filings", FILINGS)
     fixtures = tmp_path / "sec"
     fixtures.mkdir()
@@ -101,7 +106,7 @@ TSLA_C, CVX_C, JIO_C = "TSLA-n30", "CVX-n01", "RELIANCE-n13"
 def claim(cluster_id, fact, source, quote, **kw) -> dict:
     rec = {"cluster_id": cluster_id, "fact_key": fact, "claim_type": "earnings_guidance", "subject": "the company",
            "predicate": "states the fact", "quote": quote, "quote_source_id": source, "attribution": "on_record",
-           "prompt_version": "claims-v1"}
+           "prompt_version": "claims-v2"}
     rec.update(kw)
     return rec
 
@@ -229,15 +234,25 @@ def test_status_end_to_end_and_no_look_ahead(env, capsys):
     con = connect(MARKET)
     ids = dict(con.execute("SELECT news_id, status FROM news_status_ids_asof(?::TIMESTAMPTZ) WHERE ticker = 'TSLA'",
                            [LATER]).fetchall())
-    assert ids["n31"] == "contradicted" and ids["n30"] == "confirmed_primary" and ids["n06"] == "promotional"
+    # n31's "480K" is quoted from a headline: never compared (headlines drop hedges), so no mismatch;
+    # TradingKey is a listed promotional (vendor) domain, so its own status is promotional
+    assert ids["n31"] == "promotional" and ids["n30"] == "confirmed_primary" and ids["n06"] == "promotional"
     row = con.execute("SELECT * FROM news_verified_asof(?::TIMESTAMPTZ) "
                       "WHERE cluster_id = 'TSLA-n30' AND level = 'cluster'",
                       [LATER]).df().iloc[0]
-    assert list(row["mismatch_ids"]) == ["n31"] and "mismatch_primary" in list(row["flags"])
-    assert pd.Timestamp(row["confirmed_at"]) == pd.Timestamp(NOW)        # the filing text was stored at NOW
-    assert json.loads(row["conflicts"]) == [{"value": 480000.0, "unit": "count", "ids": ["n31"], "primary": False},
-                                            {"value": 486532.0, "unit": "count", "ids": [TSLA_8K, "n30"],
-                                             "primary": True}]
+    assert list(row["mismatch_ids"]) == [] and json.loads(row["conflicts"]) == []
+    assert {r["quote_field"] for r in env.rows("news_claims") if r["quote_source_id"] in ("n30", "n31")} == {"title"}
+    # confirmed_at: when the filing was public (SEC acceptance), not when its text was stored (NOW)
+    assert pd.Timestamp(row["confirmed_at"]) == pd.Timestamp(FILINGS[0]["accepted_at"])
+    # an unvetted copy of the Jio rumour stays a rumour, so a call citing it is blocked
+    jio_ids = dict(con.execute("SELECT news_id, status FROM news_status_ids_asof(?::TIMESTAMPTZ) "
+                               "WHERE ticker = 'RELIANCE'", [LATER]).fetchall())
+    assert "n32" in env.rows("news_clusters")[-1]["unvetted_ids"] or any(
+        "n32" in r["unvetted_ids"] for r in env.rows("news_clusters"))
+    assert jio_ids["n32"] == jio_ids["n13"] == "rumour"
+    found = EvidenceStatuses(con).of("n32", "RELIANCE", LATER)
+    rec = {"evidence_ids": ["n32"], "confidence": 0.6, "range_widen": None}
+    assert [c for c, _ in check_news_status(rec, [found])] == ["NEWS_STATUS_MAIN", "NEWS_STATUS_BLOCKED"]
     # no look-ahead: as of T1 the claims (extracted at T2) are invisible, also to a recomputation at T1
     assert statuses_asof(NOW) == before
     env.set_now(NOW)
@@ -290,8 +305,7 @@ def test_context_section_and_call_lines(env, capsys):
     title, body = news_events.context_section(con)
     assert title.startswith("News events and verification status")
     tsla = next(line for line in body.splitlines() if line.startswith("| TSLA |") and "486,532" in line)
-    assert "confirmed_primary [mismatch_primary]" in tsla and TSLA_8K in tsla
-    assert "480000 count vs 486532 count (primary)" in tsla
+    assert "| confirmed_primary |" in tsla and TSLA_8K in tsla and "2026-10-02 13:04 |" in tsla   # confirmed
     cols = [c.strip() for c in tsla.split("|")]
     assert cols[8] == f"{TSLA_8K}, n30"                                  # cite: the filing, then n30
     jio = next(line for line in body.splitlines() if line.startswith("| RELIANCE |"))
@@ -300,7 +314,7 @@ def test_context_section_and_call_lines(env, capsys):
                                "ticker": "TSLA", "horizon_days": 5, "direction": "up", "confidence": 0.6,
                                "rationale": "x", "evidence_ids": [TSLA_8K, "n30", "n31"], "prompt_version": "t"}])
     lines = news_events.call_status_lines(connect(MARKET), "2026-10-05")
-    assert lines[2] == f"- TSLA 5d up: {TSLA_8K} confirmed_primary, n30 confirmed_primary, n31 contradicted"
+    assert lines[2] == f"- TSLA 5d up: {TSLA_8K} confirmed_primary, n30 confirmed_primary, n31 promotional"
 
 
 def test_text_stored_during_prepare_is_in_its_input(env, capsys, monkeypatch):

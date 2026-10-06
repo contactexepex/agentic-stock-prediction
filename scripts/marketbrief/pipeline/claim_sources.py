@@ -17,7 +17,8 @@ CLUSTERS_SQL = """
 SELECT * FROM news_clusters_asof(?::TIMESTAMPTZ)
 WHERE last_reported_at >= ?::TIMESTAMPTZ ORDER BY cluster_id"""
 ITEMS_SQL = """
-SELECT DISTINCT ON (id) id, title, source, first_seen_at FROM news
+SELECT DISTINCT ON (id) id, title, source, first_seen_at, coalesce(published_at, first_seen_at) AS published_at
+FROM news
 WHERE list_contains(?, id) AND first_seen_at <= ?::TIMESTAMPTZ ORDER BY id, first_seen_at"""
 ARTICLES_SQL = """
 SELECT id, access, domain, extract, fetched_at FROM news_articles_asof(?::TIMESTAMPTZ)
@@ -80,12 +81,13 @@ def primary_rows(con, ids: list[str], now: pd.Timestamp) -> dict[str, dict]:
     texts = con.execute(TEXTS_SQL, [ids, now.isoformat(), now.isoformat()]).df().to_dict("records")
     for r in sorted((clean_row(x) for x in texts), key=lambda x: x["id"]):
         entry = out.setdefault(r["primary_id"], {"kind": SOURCE_FILING, "label": r["form"], "docs": [],
-                                                 "available_at": iso(r["available_at"])})
+                                                 "available_at": iso(r["available_at"]),
+                                                 "published_at": iso(r["available_at"])})
         entry["docs"].append(r["text"] or "")
         entry["available_at"] = max(entry["available_at"], iso(r["fetched_at"]))
     for r in con.execute(ANNOUNCEMENTS_SQL, [ids, now.isoformat()]).df().to_dict("records"):
         out[r["id"]] = {"kind": SOURCE_ANNOUNCEMENT, "label": r["category"], "docs": [r["subject"] or ""],
-                        "available_at": iso(r["available_at"])}
+                        "available_at": iso(r["available_at"]), "published_at": iso(r["available_at"])}
     return out
 
 
@@ -103,12 +105,13 @@ def build_sources(cluster: dict, items: dict[str, dict], primaries: dict[str, di
         if article and article.get("access") in READ_ACCESS and article.get("extract"):
             fields[FIELD_EXTRACT] = " ".join(article["extract"])
             available = max(available, iso(article["fetched_at"]))
-        found.sources[nid] = SourceText(SOURCE_ARTICLE, fields, available)
+        found.sources[nid] = SourceText(SOURCE_ARTICLE, fields, available,
+                                        min(available, iso(item["published_at"]) or available))
     for pid in cluster.get("primary_ids") or []:
         entry = primaries.get(pid)
         if entry is not None:
             found.sources[pid] = SourceText(entry["kind"], {FIELD_PRIMARY: "\n".join(entry["docs"])},
-                                            entry["available_at"])
+                                            entry["available_at"], entry["published_at"])
     return found
 
 

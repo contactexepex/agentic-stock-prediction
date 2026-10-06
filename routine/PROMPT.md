@@ -45,7 +45,8 @@ still fails:
   fails, make no calls;
 - `forecast`: drop each failing record from `work/predictions.jsonl` (keep the valid ones) and
   list each dropped id with its reason (`FORECAST_RULE`, or a news verification code:
-  `NEWS_STATUS_MAIN` = the first cited id is not confirmed_primary or corroborated,
+  `NEWS_STATUS_MAIN` = the first cited id is not confirmed_primary or corroborated (a filing or
+  announcement counts only when it confirms an event of that ticker),
   `NEWS_STATUS_BLOCKED` = a rumour or promotional id is cited, `NEWS_STATUS_CONTRADICTED` = a
   contradicted id is cited without `range_widen`, `NEWS_STATUS_CONFIDENCE` = confidence above 0.85
   with a single_source or unverified id); on `CALLS_NOT_ALLOWED` (late or mid-session run) drop all;
@@ -193,7 +194,8 @@ Warnings never block: list them in `data_quality`.
    CLAUDE.md prediction rule; evidence ids exist and were public before `made_at`; no calls on a
    late or mid-session run; the news verification status of each cited id as of `made_at`). If it passes (or after the failing records were dropped as the
    preamble says), append `work/predictions.jsonl` to
-   `data/<market>/predictions/YYYY/MM/TODAY.jsonl` and delete the work file. Only then run `python scripts/ranges.py`
+   `data/<market>/predictions/YYYY/MM/TODAY.jsonl` (only if it still holds a record: never create an
+   empty data file, which the gates reject) and delete the work file. Only then run `python scripts/ranges.py`
    (it reads the appended calls and publishes the 50% and 80% price ranges), and
    `python scripts/context.py > work/context.md` again so the report shows calls and ranges.
 

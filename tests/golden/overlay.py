@@ -53,18 +53,44 @@ def first_news_ids(root: Path, market: str, tickers: list[str]) -> dict[str, str
     return found
 
 
-def first_primary_ids(root: Path, market: str, tickers: list[str], clock: str) -> dict[str, str]:
-    """Ticker -> id of the first stored SEC filing or NSE announcement of it (file order) public by
-    clock: a primary source, which news verification counts as confirmed_primary evidence."""
+def confirming_primary_ids(root: Path, market: str, tickers: list[str], clock: str) -> dict[str, str]:
+    """Ticker -> the first confirming primary id (sorted) of its newest confirmed_primary event status row
+    computed by clock (news_verified, level cluster): the evidence news verification accepts as main."""
+    newest: dict[str, dict] = {}
+    for path in sorted((root / "data" / market / "news_verified").glob("**/*.jsonl")):
+        for line in path.read_text().splitlines():
+            row = json.loads(line)
+            if row["level"] == "cluster" and row["as_of"][:19] <= clock[:19]:
+                if row["cluster_id"] not in newest or row["as_of"] >= newest[row["cluster_id"]]["as_of"]:
+                    newest[row["cluster_id"]] = row
     found: dict[str, str] = {}
-    for kind, column in (("filings", "accepted_at"), ("announcements", "published_at")):
-        for path in sorted((root / "data" / market / kind).glob("**/*.jsonl")):
-            for line in path.read_text().splitlines():
-                row = json.loads(line)
-                public = row.get(column) or row.get("first_seen_at") or ""
-                if row.get("ticker") in tickers and row["ticker"] not in found and public[:19] <= clock[:19]:
-                    found[row["ticker"]] = row["id"]
+    for cluster_id in sorted(newest):
+        row = newest[cluster_id]
+        if row["ticker"] in tickers and row["status"] == "confirmed_primary" and row["primary_ids"]:
+            found.setdefault(row["ticker"], sorted(row["primary_ids"])[0])
     return found
+
+
+def write_claims(root: Path, _market: str, _clock: str) -> None:
+    """The claim-checker's stand-in: for each prepared event with a stored primary text, one statement by
+    that primary source (its first words, verbatim) and one by the event's first item (its title)."""
+    inputs = root / "work" / "claim_inputs.jsonl"
+    rows = [json.loads(line) for line in inputs.read_text().splitlines() if line.strip()] if inputs.exists() else []
+    claims = []
+    for event in rows:
+        texts = [p for p in event["primary_sources"] if (p["text"] or "").strip()]
+        if not texts:
+            continue
+        base = {"cluster_id": event["cluster_id"], "fact_key": "golden-event", "claim_type": "regulatory_legal",
+                "subject": "the company", "predicate": "states the event", "prompt_version": "golden"}
+        first_line = next(line for line in texts[0]["text"].splitlines() if line.strip())
+        claims.append({**base, "quote": " ".join(first_line.split()[:12]), "quote_source_id": texts[0]["id"],
+                       "attribution": "company_statement"})
+        if event["items"]:
+            item = event["items"][0]
+            claims.append({**base, "quote": " ".join(item["title"].split()[:12]), "quote_source_id": item["id"],
+                           "attribution": "outlet_reporting"})
+    (root / "work" / "claims.jsonl").write_text("".join(json.dumps(c) + "\n" for c in claims))
 
 
 def latest_bar_date(root: Path, market: str, ticker: str) -> str:
@@ -93,11 +119,11 @@ def write_past_calls(root: Path, market: str) -> None:
 
 def write_forecaster_file(root: Path, market: str, clock: str) -> None:
     """Today's forecaster output (work/predictions.jsonl): one 5d call per watchlist-head ticker with
-    news, citing the ticker's first stored primary source (filing or announcement) first when it has one
-    (news verification: the main evidence must be confirmed_primary or corroborated), plus one call that
-    breaks the rules (confidence 0.95, unknown evidence id)."""
+    news, citing first the primary id that confirms one of the ticker's events (news_verified) when there
+    is one (news verification: the main evidence must be confirmed_primary or corroborated), plus one
+    call that breaks the rules (confidence 0.95, unknown evidence id)."""
     tickers = watchlist_head(root, market)
-    news, primary = first_news_ids(root, market, tickers), first_primary_ids(root, market, tickers, clock)
+    news, primary = first_news_ids(root, market, tickers), confirming_primary_ids(root, market, tickers, clock)
 
     def call(ticker: str, horizon: int, direction: str, confidence: float, evidence: list[str], widen: float) -> dict:
         as_of = latest_bar_date(root, market, ticker)
@@ -123,9 +149,10 @@ def append_valid_calls(root: Path, market: str, clock: str) -> None:
     calls = [json.loads(line) for line in work_file.read_text().splitlines() if line.strip()]
     kept = [c for c in calls if "*" not in failed_ids and c["id"] not in failed_ids]
     path = root / "data" / market / "predictions" / clock[:4] / clock[5:7] / f"{clock[:10]}.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as handle:
-        handle.writelines(json.dumps(c) + "\n" for c in kept)
+    if kept:                                   # nothing kept: no data file (an empty one fails validate)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as handle:
+            handle.writelines(json.dumps(c) + "\n" for c in kept)
     work_file.unlink()
 
 

@@ -59,7 +59,7 @@ from parallel import copy_base, file_hashes, market_dir, merge_market, run_dag
 from seed import run_seed
 
 from overlay import (INPUT_COMMIT, append_valid_calls, fill_report, git_inputs, write_forecaster_file,
-                     write_lessons, write_past_calls)
+                     write_claims, write_lessons, write_past_calls)
 
 CODE = Path(__file__).resolve().parents[2]
 SCRIPTS = CODE / "scripts"
@@ -135,6 +135,9 @@ def steps(market: str) -> list[tuple[str, str, object, str | None]]:
         ("validate_features", [PY, "validate.py", "--stage", "features"], None),
         ("news_clusters", [PY, "news_clusters.py"], None),
         ("claims_prepare", [PY, "claims.py", "prepare"], None),
+        ("claims_write", write_claims, None),
+        ("claims_validate", [PY, "claims.py", "validate", "{root}/work/claims.jsonl"], None),
+        ("claims_add", [PY, "claims.py", "add", "{root}/work/claims.jsonl"], None),
         ("news_status", [PY, "news_status.py"], None),
         ("context", [PY, "context.py"], "work/context.md"),
         ("validate_context", [PY, "validate.py", "--stage", "context"], None),

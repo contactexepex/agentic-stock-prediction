@@ -136,6 +136,37 @@ def cluster(**kw):
     return c
 
 
+@pytest.mark.parametrize("status", ["rumour", "promotional", "contradicted"])
+def test_ids_never_weaker_than_a_blocking_cluster_status(status):
+    """An unvetted or opinion copy of a rumour (or promotional / contradicted event) keeps that status."""
+    c = cluster(news_ids=["n1", "n4", "n7"], origin_groups=[
+        {"origin": "wire:Reuters", "news_ids": ["n1", "n4"], "verified": True},
+        {"origin": "outlet:sa.com", "news_ids": ["n7"], "opinion": True, "verified": False}])
+    ids = vs.id_statuses(c, status, set())
+    assert ids["n4"] == ids["n7"] == status                              # unvetted, opinion
+    assert vs.id_statuses(c, "single_source", set())["n4"] == "unverified"
+
+
+def test_headline_values_are_never_compared():
+    """A value quoted from a headline (cut, hedges dropped) neither needs nor contradicts a primary value."""
+    r = status([st("acc-1", "filing"), st("n1", value=480000, unit="count", text="480K", quote_field="title")])
+    assert r["status"] == "confirmed_primary" and r["mismatch_ids"] == [] and r["conflicts"] == []
+    r = status([st("acc-1", "filing", value=486532, unit="count", text="486,532"),
+                st("n1", value=480000, unit="count", text="480K", quote_field="extract")])
+    assert r["mismatch_ids"] == ["n1"]                                   # the same value in an article body
+    r = status([st("n1", value=1, unit="usd", text="$1", quote_field="title"),
+                st("n2", value=3, unit="usd", text="$3", quote_field="title")])
+    assert r["status"] == "corroborated"                                 # headline values: no conflict
+
+
+def test_confirmed_at_is_when_the_primary_was_public():
+    r = status([st("acc-1", "filing", source_published_at="2026-10-02T13:04:26+00:00",
+                   source_available_at="2026-10-06T18:33:02+00:00")])
+    assert r["confirmed_at"] == "2026-10-02T13:04:26+00:00"
+    assert status([st("n1", attribution="outlet_reporting"), st("n2", attribution="outlet_reporting")])["status"] \
+        == "corroborated"                                                # an outlet's own reporting is factual
+
+
 def test_cluster_status_highest_of_facts_and_base():
     res, facts = vs.cluster_status(cluster(), [])
     assert res["status"] == "single_source" and facts == {}
@@ -179,9 +210,14 @@ def test_check_news_status_codes(statuses, widen, conf, want):
     assert [code for code, _ in check_news_status(rec, statuses)] == want
 
 
-def status_row(news_ids, statuses, as_of="2026-10-06T11:00:00+00:00", cluster_id="AAPL-x"):
+FILING = "0000320193-26-000001"        # AAPL 8-K of the test tree
+
+
+def status_row(news_ids, statuses, as_of="2026-10-06T11:00:00+00:00", cluster_id="AAPL-x", primary_ids=(),
+               ticker="AAPL"):
     return {"id": f"{cluster_id}|*@{as_of[:19]}", "as_of": as_of, "cluster_id": cluster_id, "cluster_row_id": "r",
-            "claim_id": None, "level": "cluster", "ticker": "AAPL", "status": statuses[0], "primary_ids": [],
+            "claim_id": None, "level": "cluster", "ticker": ticker, "status": statuses[0],
+            "primary_ids": list(primary_ids),
             "outlet_ids": [], "mismatch_ids": [], "status_ids": news_ids, "id_statuses": statuses,
             "independent_origins": 1, "unread_vetted_origins": 0, "origins": [], "conflicts": [], "flags": [],
             "first_reported_at": as_of, "confirmed_at": None, "inputs_until": as_of, "state_hash": "h",
@@ -204,7 +240,9 @@ def test_forecast_gate_before_the_feature_only_warns(root):
     ("single_source", ["0000320193-26-000001", GOOD_NEWS_ID], 0.85, None, None),
 ])
 def test_forecast_gate_status_as_of_made_at(root, status, ids, conf, widen, code):
-    write_jsonl(root, "news_verified", date(2026, 10, 6), [status_row([GOOD_NEWS_ID], [status])])
+    write_jsonl(root, "news_verified", date(2026, 10, 6), [
+        status_row([GOOD_NEWS_ID], [status]),
+        status_row([], ["confirmed_primary"], cluster_id="AAPL-8k", primary_ids=[FILING])])   # the 8-K confirms
     out = forecast(root, [call(evidence_ids=ids, confidence=conf, range_widen=widen)])
     if code is None:
         assert out["ok"], out["failures"]
@@ -229,6 +267,32 @@ def test_forecast_gate_status_is_per_ticker(root):
     write_jsonl(root, "news_verified", date(2026, 10, 6), [other])
     out = forecast(root, [call()])
     assert "unverified" in codes(out)["NEWS_STATUS_MAIN"]["detail"]  # corroborated for MSFT, not for AAPL
+
+
+@pytest.mark.parametrize("confirming,why", [
+    (None, "a filing that confirms no event (e.g. a Form 4)"),
+    ({"cluster_id": "MSFT-x", "ticker": "MSFT"}, "a filing that confirms another ticker's event"),
+    ({"cluster_id": "AAPL-y"}, "a filing in an event that is not confirmed_primary"),
+])
+def test_unrelated_filing_is_not_main_evidence(root, confirming, why):
+    rows = [status_row([GOOD_NEWS_ID], ["single_source"])]
+    if confirming is not None:
+        status = "single_source" if confirming["cluster_id"] == "AAPL-y" else "confirmed_primary"
+        rows.append(status_row([], [status], primary_ids=[FILING], **confirming))
+    write_jsonl(root, "news_verified", date(2026, 10, 6), rows)
+    out = forecast(root, [call(evidence_ids=[FILING, GOOD_NEWS_ID])])
+    assert f"main evidence {FILING} is unverified" in codes(out)["NEWS_STATUS_MAIN"]["detail"], why
+
+
+def test_unrelated_announcement_is_not_main_evidence(root):
+    """An NSE-style announcement of the ticker (e.g. a share allotment) that confirms no event."""
+    write_jsonl(root, "announcements", date(2026, 10, 6), [{
+        "id": "nse-ann-1", "ticker": "AAPL", "company": "Apple", "published_at": "2026-10-06T09:00:00+00:00",
+        "category": "Allotment", "subject": "Allotment of 202836 shares", "url": "https://x", "source": "NSE",
+        "first_seen_at": "2026-10-06T09:05:00+00:00"}])
+    write_jsonl(root, "news_verified", date(2026, 10, 6), [status_row([GOOD_NEWS_ID], ["single_source"])])
+    out = forecast(root, [call(evidence_ids=["nse-ann-1"], confidence=0.9)])
+    assert {"NEWS_STATUS_MAIN", "NEWS_STATUS_CONFIDENCE"} <= set(codes(out))
 
 
 def test_forecast_gate_report_lists_codes_json(root):

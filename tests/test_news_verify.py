@@ -740,7 +740,7 @@ def test_agency_evidence_verifies_an_unread_vetted_headline(src):
     assert c["origins"] == ["wire:Reuters"] and c["independent_origins"] == 1 and c["unread_vetted_origins"] == 0
 
 
-def test_agency_source_label_vets_an_item_without_an_allowlisted_domain(env, capsys):
+def test_agency_source_label_vets_an_item_without_an_allowlisted_domain(env):
     """Issue #37: the agency itself (its Google News source label) is vetted even when its domain is not
     allowlisted (afp.com)."""
     src = nv.load_sources()
@@ -764,7 +764,8 @@ def test_label_letters_never_map_to_an_allowlisted_domain(src):
     """Issue #37: a label-only row whose letters equal an allowlisted domain's first part ("BNNBloomberg",
     not a configured name) is not mapped to that domain: vetting comes from a configured name or the
     row's own domain. An unlisted domain is still learned this way ("Pluang" -> pluang.com)."""
-    pairs = [("BNNBloomberg", None), ("BNN Bloomberg", "bnnbloomberg.ca"), ("Pluang", None), ("pluang.com", "pluang.com")]
+    pairs = [("BNNBloomberg", None), ("BNN Bloomberg", "bnnbloomberg.ca"), ("Pluang", None),
+             ("pluang.com", "pluang.com")]
     assert src.lookup("bnnbloomberg.ca")[0] and src.domain_of_label("BNNBloomberg") is None
     assert nv.label_domains(pairs)["bnnbloomberg"] == "bnnbloomberg.ca"          # without the guard
     learned = nv.label_domains(pairs, src)

@@ -22,10 +22,11 @@ QUOTE_CHARS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "�
 @dataclass
 class SourceText:
     """One citable source of a cluster: its kind (article | filing | announcement), its texts by field
-    (extract, title, primary) and when it became available to us."""
+    (extract, title, primary), when it became available to us and when it was public."""
     kind: str
     fields: dict[str, str]
     available_at: str
+    published_at: str | None = None
 
 
 @dataclass
@@ -114,7 +115,7 @@ def number_errors(rec: dict) -> tuple[list[str], str | None]:
 def check_claim(rec, clusters: dict[str, ClusterSources], seen: set[str]) -> tuple[list[str], dict | None]:
     """Problems of one claim-checker record (empty = valid) and, when valid, the record to store
     (computed fields added: id, cluster_row_id, ticker, source_kind, quote_field, value_text, news_ids,
-    source_available_at, method_version; extracted_at is set when it is appended)."""
+    source_available_at, source_published_at, method_version; extracted_at is set when it is appended)."""
     if not isinstance(rec, dict):
         return ["not a JSON object"], None
     errors = field_errors(rec)
@@ -150,5 +151,7 @@ def check_claim(rec, clusters: dict[str, ClusterSources], seen: set[str]) -> tup
     stored.update({"id": cid, "cluster_row_id": cluster.cluster_row_id, "ticker": cluster.ticker,
                    "stance": rec.get("stance", STANCE_AFFIRMS), "value_text": literal, "quote_field": where,
                    "source_kind": source.kind, "news_ids": sorted(news_ids),
-                   "source_available_at": source.available_at, "method_version": METHOD_VERSION_CLAIMS})
+                   "source_available_at": source.available_at,
+                   "source_published_at": source.published_at or source.available_at,
+                   "method_version": METHOD_VERSION_CLAIMS})
     return [], stored

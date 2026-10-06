@@ -44,7 +44,8 @@ def statements_by_cluster(con, cluster_ids: list[str], now: pd.Timestamp) -> dic
     rows = con.execute(CLAIMS_SQL, [cluster_ids, now.isoformat(), now.isoformat()]).df().to_dict("records")
     for row in rows:
         row = clean_row(row)
-        row["source_available_at"], row["extracted_at"] = iso(row["source_available_at"]), iso(row["extracted_at"])
+        for key in ("source_available_at", "source_published_at", "extracted_at"):
+            row[key] = iso(row.get(key))
         out.setdefault(row["cluster_id"], []).append(row)
     return out
 

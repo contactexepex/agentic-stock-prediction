@@ -11,14 +11,19 @@ single_source > unverified. A fact is
   mismatch_primary: the filing wins);
 - corroborated: >= 2 verified independent origins (news_clusters origin groups) among the outlets
   stating it (opinion and promotional statements never count);
-- rumour: an outlet statement attributed to unnamed sources or typed rumour;
+- rumour: an outlet statement attributed to unnamed sources or typed rumour (an outlet's own
+  unattributed reporting, attribution outlet_reporting, is an ordinary factual statement);
 - promotional: a statement typed promotional (marketing claims, vendor content);
 - single_source: exactly one verified origin; unverified: none.
+A value quoted from a headline (quote_field title) is never compared: headlines are cut and drop hedges,
+so such a statement neither needs nor contradicts a primary value. confirmed_at is when the confirming
+primary source was public (source_published_at: SEC acceptance, NSE dissemination).
 A cluster's status is the highest of its facts' and its base status (the cluster row alone)."""
 from __future__ import annotations
 
 from marketbrief.analytics.claim_numbers import values_match
 from marketbrief.constants.verification import (ATTRIBUTION_OPINION, ATTRIBUTION_SOURCES_SAY, CLAIM_TYPE_OPINION,
+                                                FIELD_TITLE,
                                                 CLAIM_TYPE_PROMOTIONAL, CLAIM_TYPE_RUMOUR, FLAG_MISMATCH_PRIMARY,
                                                 FLAG_OUTLET_VALUES_DISAGREE, FLAG_PRIMARY_DENIES,
                                                 FLAG_PRIMARY_WITHOUT_VALUE, FLAG_STANCES_DISAGREE, FLAG_UNIT_MISMATCH,
@@ -50,7 +55,9 @@ def is_rumour(statement: dict) -> bool:
 
 
 def has_value(statement: dict) -> bool:
-    return statement.get("value_num") is not None and statement.get("unit") is not None
+    """A value that takes part in comparisons: stated with a unit, and not quoted from a headline."""
+    return (statement.get("value_num") is not None and statement.get("unit") is not None
+            and statement.get("quote_field") != FIELD_TITLE)
 
 
 def same_period(first: str | None, second: str | None) -> bool:
@@ -156,7 +163,8 @@ def fact_status(statements: list[dict], verified_origin: dict[str, str]) -> dict
             "primary_ids": sorted({s["quote_source_id"] for s in affirm}),
             "outlet_ids": sorted({n for s in outlets for n in s["news_ids"]}),
             "origins": sorted(origins), "conflicts": conflict_rows(groups) if len(groups) > 1 else [],
-            "confirmed_at": min((s["source_available_at"] for s in affirm), default=None) if confirmed else None}
+            "confirmed_at": min((s.get("source_published_at") or s["source_available_at"] for s in affirm),
+                                default=None) if confirmed else None}
 
 
 def verified_origins(cluster: dict) -> dict[str, str]:
@@ -179,7 +187,9 @@ def base_status(cluster: dict) -> str:
 def id_statuses(cluster: dict, status: str, mismatch_ids: set[str]) -> dict[str, str]:
     """Each news id of the cluster with its own status: contradicted when it disagrees with a filing,
     promotional when its origin group is vendor content, unverified when its outlet is unvetted or it
-    is opinion, else the cluster's status."""
+    is opinion, else the cluster's status. An id never gets a status weaker than a blocking cluster
+    status (rumour, promotional, contradicted): an unvetted copy of a rumour stays a rumour."""
+    blocking = status in (STATUS_RUMOUR, STATUS_PROMOTIONAL, STATUS_CONTRADICTED)
     groups = cluster.get("origin_groups") or []
     promo = {n for g in groups if g.get("promotional") for n in g["news_ids"]}
     opinion = {n for g in groups if g.get("opinion") and not g.get("verified") for n in g["news_ids"]}
@@ -190,7 +200,7 @@ def id_statuses(cluster: dict, status: str, mismatch_ids: set[str]) -> dict[str,
             out[nid] = STATUS_CONTRADICTED
         elif nid in promo:
             out[nid] = STATUS_PROMOTIONAL
-        elif nid in unvetted or nid in opinion:
+        elif (nid in unvetted or nid in opinion) and not blocking:
             out[nid] = STATUS_UNVERIFIED
         else:
             out[nid] = status

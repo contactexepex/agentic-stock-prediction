@@ -40,10 +40,13 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   put lesson ids in `evidence_ids`). Name a lesson in the rationale when it changed your call.
 - News verification (the context pack's "News events and verification status"; statuses come from
   `scripts/news_status.py`, never from you): put the main evidence for a call FIRST in
-  `evidence_ids`; it must be `confirmed_primary` (an SEC filing or NSE announcement states it; a
-  filing or announcement id itself counts as one) or `corroborated` (two or more verified
-  independent origins). If you cite any `single_source` or `unverified` id, lower your confidence
-  by at least 0.05 from what you would otherwise state (the gate refuses such a call above 0.85).
+  `evidence_ids`; it must be `confirmed_primary` (an SEC filing or NSE announcement of this ticker
+  states it: cite that filing or announcement id, as the event's `cite` column lists it; a filing or
+  announcement that confirms no event of this ticker, e.g. a Form 4 or a share allotment, is only
+  `unverified`) or `corroborated` (two or more verified independent origins). If you cite any
+  `single_source` or `unverified` id, lower your confidence by at least 0.05 from what you would
+  otherwise state. The gate cannot know that starting value: the part it checks is a cap, such a call
+  above 0.85 is refused.
   `rumour` and `promotional` ids can never support a call: do not cite them. A `contradicted` id
   (sources disagree, or an outlet disagrees with a filing) never supports a direction: cite it only
   as the reason for a `range_widen`, never as the main evidence. When the only evidence for a view

@@ -42,7 +42,8 @@ FLAG_STANCES_DISAGREE = "stances_disagree"
 # Claim record enums (claim-checker.md)
 CLAIM_TYPES = ("earnings_guidance", "deal_ma", "regulatory_legal", "mgmt_change", "rating_target", "macro",
                "rumour", "opinion", "promotional")
-ATTRIBUTIONS = ("on_record", "company_statement", "sources_say", "analyst", "opinion")
+# outlet_reporting: the outlet's own reporting with no named source (a factual statement, not a rumour)
+ATTRIBUTIONS = ("on_record", "company_statement", "outlet_reporting", "sources_say", "analyst", "opinion")
 STANCES = ("affirms", "denies")
 STANCE_AFFIRMS, STANCE_DENIES = STANCES
 UNITS = ("usd", "inr", "eur", "gbp", "pct", "bps", "count")

@@ -18,15 +18,17 @@ VERIFICATION_SCHEMAS: Schemas = {
     # id = <cluster_id>|<fact_key>|<quote_source_id>. Statements of one fact share fact_key. quote (<= 40
     # words) is verbatim in the source's stored text (quote_field: extract | title | primary);
     # value_text is the literal in the quote that equals value_num. source_kind, quote_field,
-    # value_text and source_available_at are computed by claims.py, never copied from the agent.
+    # value_text, source_available_at (when its stored text was available to us) and source_published_at
+    # (when the source was public: SEC acceptance, NSE dissemination, news publication) are computed by
+    # claims.py, never copied from the agent.
     KIND_NEWS_CLAIMS: ("jsonl", {
         "id": "VARCHAR", "cluster_id": "VARCHAR", "cluster_row_id": "VARCHAR", "ticker": "VARCHAR",
         "fact_key": "VARCHAR", "claim_type": "VARCHAR", "subject": "VARCHAR", "predicate": "VARCHAR",
         "stance": "VARCHAR", "value_num": "DOUBLE", "unit": "VARCHAR", "value_text": "VARCHAR",
         "period": "VARCHAR", "effective_date": "DATE", "quote": "VARCHAR", "quote_source_id": "VARCHAR",
         "quote_field": "VARCHAR", "source_kind": "VARCHAR", "news_ids": "VARCHAR[]", "attribution": "VARCHAR",
-        "source_available_at": "TIMESTAMPTZ", "extracted_at": "TIMESTAMPTZ", "prompt_version": "VARCHAR",
-        "method_version": "VARCHAR",
+        "source_available_at": "TIMESTAMPTZ", "source_published_at": "TIMESTAMPTZ", "extracted_at": "TIMESTAMPTZ",
+        "prompt_version": "VARCHAR", "method_version": "VARCHAR",
     }),
     # Verification status (news_status.py), appended per run when new or changed: one row per cluster
     # (level cluster, claim_id null) and one per fact (level claim, claim_id = fact_key). Every input

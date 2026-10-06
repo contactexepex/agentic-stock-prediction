@@ -375,7 +375,9 @@ and each primary source's stored text.
 **Claims** (`.claude/agents/claim-checker.md`, Sonnet 5.5, effort high; kind `news_claims`). One record
 per statement of one fact by one source: `fact_key` groups the statements of a fact; `claim_type`
 (earnings_guidance, deal_ma, regulatory_legal, mgmt_change, rating_target, macro, rumour, opinion,
-promotional), `attribution` (on_record, company_statement, sources_say, analyst, opinion), `stance`
+promotional), `attribution` (on_record, company_statement, outlet_reporting = an outlet's own
+unattributed reporting, a factual statement; sources_say = a rumour; analyst; opinion = never
+counted), `stance`
 (affirms, denies), `subject`, `predicate`, `value_num` + `unit` (usd, inr, eur, gbp, pct, bps,
 count), `period`, `effective_date`, `quote` (<= 40 words) and `quote_source_id`. Text is untrusted
 data. The gate `claims.py validate` checks: the cluster is current; the quoted source is one of its
@@ -400,12 +402,17 @@ single_source > unverified:
   origin groups); opinion and promotional statements never count;
 - rumour: a statement attributed to unnamed sources or typed rumour; promotional: typed promotional;
 - single_source: one verified origin; unverified: none.
+A value quoted from a headline (`quote_field` title) is never compared (headlines are cut and drop
+hedges): it neither needs a primary value nor contradicts one or another outlet.
 A cluster's status is the highest of its facts' and its base status (from the cluster row alone:
 >= 2 verified origins corroborated; `sources_say` rumour; promotional items and no verified origin
 promotional; one verified origin single_source; else unverified). Each news id has its own status:
 the cluster's, except contradicted (disagrees with a filing), promotional (vendor origin group) and
-unverified (unvetted outlet or opinion). `confirmed_at` is when the confirming primary text was
-available. Rows are appended per cluster (level cluster) and fact (level claim) when new or changed.
+unverified (unvetted outlet or opinion), but never weaker than a blocking cluster status: in a
+rumour, promotional or contradicted event an unvetted or opinion copy keeps that status.
+`confirmed_at` is when the confirming primary source was public (`source_published_at`: SEC
+acceptance, NSE dissemination); its text may have been stored later (`source_available_at`, the
+look-ahead time). Rows are appended per cluster (level cluster) and fact (level claim) when new or changed.
 
 **No look-ahead.** A run at T reads clusters as of T, claims with `extracted_at` <= T and
 `source_available_at` <= T (article fetched, filing accepted and its text stored, announcement
@@ -419,10 +426,14 @@ back-filled. `ai_replay prepare` keeps `primary_texts` by `fetched_at`, `news_cl
 unread vetted, confirming primary ids, conflicting values, ids to cite, first reported, confirmed)
 instead of the clusters' headlines; the news-analyst sets novelty from first reported / confirmed.
 The forecast gate (`validate.py --stage forecast`, `prediction_rules.check_news_status`) checks each
-cited id's status as of `made_at` (a filing or announcement id is a primary source):
+cited id's status as of `made_at`. A filing or announcement id is confirmed_primary only when it is
+among the primary ids of a confirmed_primary event of the call's ticker; any other (another
+ticker's, a Form 4, a share allotment) is unverified:
 `NEWS_STATUS_MAIN` (the first id is not confirmed_primary or corroborated), `NEWS_STATUS_BLOCKED`
 (a rumour or promotional id), `NEWS_STATUS_CONTRADICTED` (a contradicted id without `range_widen`),
-`NEWS_STATUS_CONFIDENCE` (confidence above 0.85 with a single_source or unverified id). Before any
+`NEWS_STATUS_CONFIDENCE` (confidence above 0.85 with a single_source or unverified id: the rule is
+"lower by at least 0.05", and since the gate cannot know the confidence before the cut, the 0.85 cap
+is the part it checks). Before any
 status row existed the rules are not applied (`NEWS_STATUS_MISSING` warning). The report adds one
 evidence-status line per call; view_data passes each cited and listed id's status to the HTML data.
 
@@ -1187,7 +1198,7 @@ Claude Fable (current version `claude-fable-5-1` in the platform's model list) i
 scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
 (forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits;
-forecast-v10, news-v8 and claims-v1 with news verification phase B), and a per-call `model` field on predictions is a planned follow-up.
+forecast-v10, news-v8 and claims-v2 with news verification phase B), and a per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
 - **Reflection log** (section 5): TauricResearch/TradingAgents (https://github.com/TauricResearch/TradingAgents,
