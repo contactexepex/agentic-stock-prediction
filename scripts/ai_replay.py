@@ -34,6 +34,14 @@ lets the orchestrator run the agents on it, then records and scores their calls:
 
 Inclusion rules of `prepare` (per data kind; a row is kept only if public by the cutoff):
 - prices: bars dated <= D (every symbol, also foreign cues);
+- adjustments (splits and bonus issues, issue #31): ex_date <= D, whatever detected_at. The root's
+  bars all date <= D, so an adjustment with a later ex-date would only re-scale them to a basis
+  the live run never saw (its stored ranges and calls are on the old basis); one with ex_date <= D
+  puts the bars before it on the basis of bar D, as the live run saw once the collector had
+  recorded it (the run that collects the ex-date's bar). If it was recorded later than that, the
+  live run saw a jump the root does not show; the jump carries no information about direction
+  (an ex-date is announced in advance). An ex-date on the session S itself, recorded pre-open,
+  is left out (ex_date > D), so the root stays on the old basis there;
 - filings, fundamentals: SEC acceptance time, else the end of the filing date (UTC), as the
   fundamentals_*_asof macros in sql/views.sql; stakes, insiders, holdings: acceptance/disclosure/
   filing time, else first_seen_at; announcements: published_at; financials: filed_at;
@@ -212,6 +220,9 @@ def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp, times: dict[st
     if kind in ("prices", "price_sources"):   # a bar and its provenance row share the bar date
         t = _ts(row.get("date"))
         return t is not None and t.date() <= d
+    if kind == "adjustments":   # a split/bonus applies to the root's bars only from its ex-date
+        t = _ts(row.get("ex_date"))
+        return t is not None and t.date() <= d
     if kind in DATE_PUBLIC_AFTER_CLOSE:
         t = _ts(row.get("date"))
         return t is not None and t.date() <= d
@@ -233,6 +244,8 @@ def keep_row(kind: str, row: dict, d: date, cutoff: pd.Timestamp, times: dict[st
 def rule_text(kind: str) -> str:
     if kind in ("prices", "price_sources"):
         return "bar date <= D"
+    if kind == "adjustments":
+        return "ex_date <= D (detected_at ignored: see the docstring)"
     if kind in DATE_PUBLIC_AFTER_CLOSE:
         return "trade date <= D (assumed: NSE publishes the day's deals after the close)"
     if kind == "events":
@@ -289,7 +302,8 @@ def copy_asof(market: str, src: Path, dst: Path, d: date, cutoff: datetime) -> d
         if kind in DROPPED:
             excluded[kind] = DROPPED[kind].format(first=first_news)
             continue
-        if kind not in ("prices", "price_sources", "events", *DATE_PUBLIC_AFTER_CLOSE) and kind not in PUBLIC_AT:
+        if kind not in ("prices", "price_sources", "adjustments", "events", *DATE_PUBLIC_AFTER_CLOSE) \
+                and kind not in PUBLIC_AT:
             excluded[kind] = "no known publication-time rule for this kind"
             continue
         ext = SCHEMAS[kind][0] if kind in SCHEMAS else "jsonl"
@@ -525,7 +539,8 @@ def limitations(copied: dict, counts: dict) -> list[str]:
            "last close, not the pre-open quote.",
            "Upcoming earnings and ex-dividend dates first seen after the cutoff are dropped, so days_to_earnings "
            "is empty unless such a row was stored before the cutoff; the earnings-day block can then not apply.",
-           "Price bars are the stored (later) downloads: a split after D is already applied to earlier closes.",
+           "Price bars are as stored: history downloaded after a split is already on the post-split basis; "
+           "splits recorded in data/<market>/adjustments/ apply in the root only when their ex-date is on or before D.",
            "The model's own memory is the remaining risk: only as-of dates after "
            f"{training_cutoff()} (model_training_cutoff) are treated as a fair test; earlier ones are "
            "labelled contaminated and scored separately."]

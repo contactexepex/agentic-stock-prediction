@@ -29,7 +29,7 @@ symbol_max_age_days: 7
 # recomputations under the same id by design (news_enriched, features, regime, calibration,
 # macro and the other revised series, graph); prices keep re-collected bars (the bars view
 # keeps the newest).
-unique_id_kinds: [news, filings, events, predictions, ranges, judgments, announcements]
+unique_id_kinds: [news, filings, events, predictions, ranges, judgments, announcements, adjustments]
 unique_keys:
   outcomes: prediction_id
   range_outcomes: range_id

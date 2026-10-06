@@ -620,6 +620,7 @@ KINDS: list[Kind] = [
 NOT_PROJECTED = {
     "prices": "daily bars stay in DuckDB (FeatureDay nodes carry each day's close and indicators)",
     "price_sources": "provenance of bars filled from another source (view bar_sources), DuckDB only",
+    "adjustments": "split/bonus factors applied on read to the bars (views ohlc, bars), DuckDB only",
     "quotes": "intraday snapshots, operational", "options": "implied-vol snapshots, operational",
     "calibration": "range-engine internals", "delivery": "per-session time series (context only)",
     "reviews": "nested JSON tables; the review report is in reports/", "graph_runs": "refresh bookkeeping",

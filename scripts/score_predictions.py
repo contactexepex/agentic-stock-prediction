@@ -6,6 +6,10 @@ Late records are never scored: a range or call made at or after the open of the 
 after its as_of_date (a mid-session or late run) already knew part of its outcome (CLAUDE.md:
 nothing after made_at), whatever its horizon, so it stays out of the track record and is counted
 under `late_skipped`.
+Splits and bonus issues (issue #31): the bars are read on one basis (views ohlc/bars apply the
+adjustments in data/<market>/adjustments/), so a call's return is right across an ex-date; a range,
+and the closes stored with a call, are compared and stored in the basis the record was made on
+(record_basis), so stored edges and outcomes never mix two bases.
 The printed summary adds `scores` (scoring.py) over the whole track record: Brier score, log loss
 and a reliability table (confidence bins vs hit rate, Wilson 95%) for calls; coverage, 50%/80%
 interval scores and the quantile score (mean pinball loss over q10/q25/q75/q90) for ranges."""
@@ -18,6 +22,7 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
+import adjust as adj
 import events as ev
 import rangelib as rl
 import scoring
@@ -40,7 +45,7 @@ WITH base AS (
     FROM open_predictions p
     ASOF JOIN bars b ON p.ticker = b.ticker AND p.as_of_date >= b.date
 )
-SELECT base.id, base.as_of_date, base.made_at, base.base_date, base.base_close, t.date, t.close,
+SELECT base.id, base.ticker, base.as_of_date, base.made_at, base.base_date, base.base_close, t.date, t.close,
        t.close / base.base_close - 1 AS ret,
        CASE WHEN base.direction = 'up' THEN t.close > base.base_close
             ELSE t.close < base.base_close END AS hit
@@ -54,13 +59,31 @@ FROM open_ranges r JOIN ohlc b ON b.ticker = r.ticker AND b.date = r.target_date
 """
 
 
+def load_adjustments(con) -> list[dict]:
+    """Recorded splits and bonus issues (view price_adjustments; scripts/adjust.py)."""
+    return con.execute("SELECT ticker, ex_date, factor, detected_at FROM price_adjustments").df().to_dict("records")
+
+
+def record_basis(adjs: list[dict], ticker: str, base_date, made_at) -> float:
+    """Factor k that turns a close of the ohlc/bars views (newest basis) into the basis a record
+    made at `made_at` on bars up to `base_date` used: view close / k. k is the product of the
+    factors of the ticker's adjustments with an ex-date after base_date that were detected after
+    made_at (the ones the record did not see); 1 when there are none."""
+    return adj.factor_after(adjs, ticker, pd.Timestamp(base_date).date(), detected_after=made_at)
+
+
 def score_ranges(cfg: dict, con, now: str) -> tuple[list[dict], int]:
+    """Each range is scored in its own price basis: a split or bonus detected after it was made
+    (ex-date after its as_of_date) re-bases the ohlc view, so the target close is put back by
+    record_basis before it is compared with the stored edges; actual_close is stored in that basis."""
     out, late = [], 0
+    adjs = load_adjustments(con)
     for r in con.execute(RANGE_SQL).df().itertuples():
         if is_late(cfg, r.as_of_date, r.made_at):
             late += 1
             continue
-        y, base = float(r.actual), float(r.base_close)
+        k = record_basis(adjs, r.ticker, r.as_of_date, r.made_at)
+        y, base = float(r.actual) / k, float(r.base_close)
         pct = lambda v: round(100 * v / base, 4)  # noqa: E731
         naive = r.naive_lo80 is not None and not math.isnan(r.naive_lo80)
         out.append({
@@ -85,10 +108,16 @@ def main() -> int:
     con = connect(market)
     now = utc_now()
     rows, late_calls = [], 0
-    for pid, as_of, made_at, bd, bc, td, tc, ret, hit in con.execute(SQL).fetchall():
+    adjs = load_adjustments(con)
+    for pid, ticker, as_of, made_at, bd, bc, td, tc, ret, hit in con.execute(SQL).fetchall():
         if is_late(cfg, as_of, made_at):
             late_calls += 1
             continue
+        # base and target both come from the bars view (one basis), so the return and the hit hold
+        # across a split; the two closes are stored in the basis the call saw (record_basis)
+        k = record_basis(adjs, ticker, bd, made_at)
+        if k != 1:
+            bc, tc = bc / k, tc / k
         rows.append({"prediction_id": pid, "scored_at": now, "base_date": str(bd), "base_close": bc,
                      "target_date": str(td), "target_close": tc, "actual_return": round(ret, 6), "hit": bool(hit)})
     written = append_jsonl(day_file(market, "outcomes", utc_today()), rows)

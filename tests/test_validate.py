@@ -212,6 +212,34 @@ def test_collector_summaries(root):
     assert "EMPTY_OUTPUT" not in codes(run("collect"), "warnings")
 
 
+def test_adjustments_files_are_checked_whatever_their_ex_date(root):
+    """An adjustment written today is filed by its ex-date, which can be far back: todays_files
+    still finds it (by detected_at), so its rows are schema-checked."""
+    p = write_jsonl(root, "adjustments", date(2025, 1, 15), [
+        {"id": "AAPL-2025-01-15", "ticker": "AAPL", "ex_date": "2025-01-15", "factor": 0.5, "bogus": 1,
+         "detected_at": "2026-10-06T11:00:00+00:00"}])
+    write_jsonl(root, "adjustments", date(2025, 1, 10), [
+        {"id": "AAPL-2025-01-10", "ticker": "AAPL", "ex_date": "2025-01-10", "factor": 0.5,
+         "detected_at": "2026-09-01T11:00:00+00:00"}])
+    assert v.todays_files(MARKET, "adjustments", TODAY) == [p]
+    f = codes(run("collect"))["SCHEMA"]
+    assert "adjustments/2025/01/2025-01-15.jsonl" in f["detail"] and "bogus" in f["detail"]
+
+
+def test_price_basis_warnings_surface(root):
+    """collect_prices' split/bonus `warnings` (issue #31) become a PRICE_BASIS warning; none, none."""
+    steps = root / "work" / "steps"
+    steps.mkdir()
+    (steps / "collect_prices.json").write_text(json.dumps({"collector": "prices", "market": "us", "new_bars": 5,
+                                                           "adjustments": [], "warnings": [], "failed": []}))
+    assert "PRICE_BASIS" not in codes(run("collect"), "warnings")
+    msg = "AAPL: Yahoo's close differs from the stored close on 3 date(s) ...; not recorded"
+    (steps / "collect_prices.json").write_text(json.dumps({"collector": "prices", "market": "us", "new_bars": 5,
+                                                           "adjustments": [], "warnings": [msg], "failed": []}))
+    w = codes(run("collect"), "warnings")["PRICE_BASIS"]
+    assert w["tickers"] == ["AAPL"] and msg in w["detail"]
+
+
 # ---------- features / context ----------
 
 def test_features_and_regime(root):

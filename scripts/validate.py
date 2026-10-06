@@ -48,7 +48,8 @@ from prediction_rules import check_prediction, ts
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
 # kinds whose day files are named by the trading date, with the column that says when a row was written
 TRADING_DATE_KINDS = {"prices": "collected_at", "features": "computed_at", "regime": "computed_at",
-                      "calibration": "computed_at", "ranges": "made_at", "replays": "computed_at"}
+                      "calibration": "computed_at", "ranges": "made_at", "replays": "computed_at",
+                      "adjustments": "detected_at"}
 STAGE_KINDS = {"features": ("features", "regime", "calibration")}
 FETCH_COL = {"quotes": "collected_at", "news": "first_seen_at", "filings": "first_seen_at",
              "announcements": "first_seen_at"}
@@ -104,7 +105,8 @@ def todays_files(market: str, kind: str, today: date) -> list[Path]:
     col, out = TRADING_DATE_KINDS[kind], []
     for p in files:
         d = file_day(p)
-        if d is None or d < today - timedelta(days=10):
+        # adjustments are filed by ex-date, which can lie further back than 10 days: all files are read
+        if d is None or (kind != "adjustments" and d < today - timedelta(days=10)):
             continue
         if p.stat().st_size == 0 or any(r.get(col) and str(r[col])[:10] == str(today) for r in read_rows(p)[0]):
             out.append(p)
@@ -346,6 +348,10 @@ def check_summaries(res: Result, cfg: dict, counts: dict, vc: dict) -> dict:
                     if isinstance(f, dict) else str(f) for f in (failed if isinstance(failed, list) else [failed])]
             res.warn("COLLECTOR_FAILED", f"{name}: {len(what)} failed: {what[:10]}",
                      [w for w in what if w in cfg["tickers"]])
+        if name == "prices" and s.get("warnings"):   # split/bonus checks (issue #31): basis left unconfirmed
+            ws = [str(w) for w in s["warnings"]]
+            res.warn("PRICE_BASIS", f"prices: {len(ws)} price-basis warning(s): {'; '.join(ws[:5])[:600]}",
+                     [w.split(":", 1)[0] for w in ws if w.split(":", 1)[0] in cfg["tickers"]])
         key = (vc.get("expect_output") or {}).get(name)
         explained = s.get("failed") or s.get("warnings") or s.get("error") or s.get("skipped")
         if key and s.get(key) == 0 and not explained:
