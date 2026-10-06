@@ -26,7 +26,8 @@ Method:
 3. Look for what is commonly faked or skipped:
    - Outputs: missing files; record counts that differ from the input; duplicate or invalid
      ids; malformed JSONL.
-   - Fabrication: evidence ids or numbers that do not exist in the data or the context pack.
+   - Fabrication: evidence ids or numbers that do not exist in the data or the context pack
+     (reflector lessons: re-run `python scripts/lessons.py validate work/lessons.jsonl`).
    - Code: stubs, TODOs, `pass`, hard-coded results, swallowed exceptions; features that are
      configured but never called.
    - Tests: tests that assert nothing, skip, or only test mocks of the code under test.

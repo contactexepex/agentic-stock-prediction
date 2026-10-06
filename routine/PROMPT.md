@@ -11,6 +11,8 @@ detail, tickers), and never post silently: a blocked part is always named there.
 The judge subagent still runs (1) once a week on a sample of the past week's output (step 14a)
 and (2) on the monthly graph-builder edges (step 14). What replaces each former per-agent judge
 step:
+- reflector: `scripts/lessons.py validate` (step 4a: ids, numbers, no repeats); lessons are short
+  and only read as context, so no other per-run check;
 - news-analyst: `--stage news` (schema, ids are today's new news/announcement ids, nothing stored
   twice, scores in range); the weekly spot-check reads enrichment summaries of sampled evidence;
 - bull and bear researchers: `--stage forecast` (every cited id exists and was public before the
@@ -22,7 +24,7 @@ step:
   such a number still passes, which the weekly spot-check is for; no AGENT markers left, every range published or explained)
   and the weekly spot-check (claims are true).
 Agent records stay in `work/` until their gate passes; only then append them to `data/`.
-Delete `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
+Delete `work/lessons.jsonl`, `work/enriched.jsonl`, `work/predictions.jsonl` and `work/graph.jsonl` before each agent
 runs and right after each append, so a stale file can never be appended twice.
 On a blocking failure, fix it once (send the failure list back to the agent, or fix your own
 narrative) and run the stage again. The daily run allows ONE retry because it is time-boxed. If it
@@ -35,6 +37,7 @@ still fails:
   and must abstain on any call that needs news evidence;
 - `features`: no calls for the tickers listed (no feature row) and none at all without a regime
   row; the report says so;
+- `lessons.py validate` (step 4a): add nothing (the calls stay in the next run's `prepare`);
 - `context`: rebuild the pack once (`python scripts/context.py > work/context.md`); if it still
   fails, make no calls;
 - `forecast`: drop each failing record from `work/predictions.jsonl` (keep the valid ones) and
@@ -105,6 +108,20 @@ Warnings never block: list them in `data_quality`.
    moves, news sources). On exit 1 act as the preamble says.
 
 4. Score: `python scripts/score_predictions.py`.
+
+4a. Lessons (reflection log, after scoring): `python scripts/lessons.py prepare` writes the facts of
+    settled calls that have no lesson yet to `work/lesson_facts.jsonl` (deterministic: the call, its
+    evidence ids and rationale, the outcome and the close vs its published range; a call whose range
+    is still open waits). If its `n` is 0, skip to step 5. Otherwise delete `work/lessons.jsonl`, run
+    the reflector subagent with the market (it writes one lesson of at most 60 words per call to
+    `work/lessons.jsonl`), then run the gate `python scripts/lessons.py validate work/lessons.jsonl`
+    (exit 0 = every lesson cites an existing settled prediction id, no stored lesson repeats, and every
+    number in its text and every copied fact matches the stored call and outcome; exit 1 lists the
+    errors). Only when it passes: `python scripts/lessons.py add work/lessons.jsonl`
+    (it validates again and appends the facts recomputed from `data/` plus the text, all or nothing),
+    then delete `work/lessons.jsonl`. On FAIL after the one retry, add nothing (the calls stay in the
+    next run's `prepare`) and list it in `data_quality`. The context pack (step 6) shows each lesson
+    only from its `available_from` (the outcome's scoring time) on.
 
 5. Indicators, regime and calibration: `python scripts/features.py`, then
    `python scripts/calibrate.py`. Keep both JSON summaries. Gate:

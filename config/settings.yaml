@@ -4,3 +4,8 @@ branch: main
 slack_channel: "#market-brief"
 slack_channel_id: C0C6REB7QS2   # notify_slack.py posts the thread here with SLACK_BOT_TOKEN (bot must be a member)
 # pages_url: https://example.github.io/market-brief   # optional static host serving reports/; the Slack link then opens the HTML rendered
+# The AI model's training cutoff (ForecastBench leakage rule, docs/DESIGN.md section 7): ai_replay.py
+# treats only as-of dates AFTER this date as a fair test; dates on or before it are "contaminated"
+# (the model may have seen what happened), refused by `prepare` unless --allow-training-period, and
+# always scored separately, never pooled with fair ones. Change it when the model changes.
+model_training_cutoff: 2026-06-30
