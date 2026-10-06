@@ -16,6 +16,7 @@ import pandas as pd
 
 import events as ev
 import rangelib as rl
+import scoring
 from common import benchmark_key
 
 NEAR_DAYS = 3     # earnings dates this close together are the same report
@@ -271,8 +272,7 @@ def log_returns(close: pd.Series) -> pd.Series:
     return np.log(close / close.shift(1))
 
 
-def fit_cue_beta(bench: pd.Series, cue: pd.Series, upto: pd.Timestamp | None, n: int,
-                 min_obs: int = 60) -> float | None:
+def fit_cue_beta(bench: pd.Series, cue: pd.Series, upto: pd.Timestamp | None, n: int, min_obs: int = 60) -> float | None:
     """Slope of the benchmark's daily log return on the cue's previous-session log return (the
     last cue session strictly before the benchmark date), over the last n benchmark sessions."""
     rb = log_returns(bench).dropna()
@@ -331,7 +331,7 @@ def implied_sigma(cfg: dict, opts: pd.DataFrame, as_of: date, target: date, sigm
     if sessions < 1:
         return sigma_daily, None, []
     total = rl.implied_variance(float(row["atm_iv"]), (expiry - as_of).days)
-    iv_txt = f"IV {float(row['atm_iv']):.0%} to {expiry}"
+    iv_txt = f"IV {scoring.percent(float(row['atm_iv']))} to {expiry}"
     if earnings_in_horizon(cfg, earnings, as_of, expiry):
         if not iv_cfg.get("use_for_earnings", True):
             return sigma_daily, None, []

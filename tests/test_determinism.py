@@ -202,3 +202,15 @@ def test_exact_decimal_sum_limits():
     row = con.execute(f"SELECT count(*), count(TRY_CAST(v AS DECIMAL(38,10))), avg(TRY_CAST(v AS DECIMAL(38,10))), "
                       f"CAST(sum(TRY_CAST(v AS DECIMAL(38,10))) AS DOUBLE) FROM {vals} t(v)").fetchone()
     assert row == (6, 3, 0.2, 0.6)
+
+
+def test_no_half_to_even_percent_format_left():
+    """Every printed share uses scoring.percent (half up): no Python ':.0%' format remains in scripts/,
+    and the weekly review prints 0.625 and 5/8 as 63% like the daily report."""
+    import re
+    import review
+    scripts = Path(scoring.__file__).parent
+    hits = [f"{p.name}:{i}" for p in sorted(scripts.glob("*.py"))
+            for i, line in enumerate(p.read_text().splitlines(), 1) if re.search(r":\.0%\}", line)]
+    assert hits == []
+    assert review.band_label(0.625, 5 / 8) == "63%-63%"

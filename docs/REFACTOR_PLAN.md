@@ -204,7 +204,10 @@ made the result NaN or inf), while `count(*)` beside them still counts their row
 Rounding convention for printed shares: half up on the value's decimal form, everywhere.
 `scoring.percent` (whole percent, `decimal` ROUND_HALF_UP) prints every share in the md report,
 the Slack text, the context pack's proper-score tables and view_data's call and record texts; the
-HTML report's JavaScript uses `pct0` (same rule); DuckDB's `round()` also rounds half up. So an
+HTML report's JavaScript uses `pct0` (same rule). The weekly review, chart labels and range/regime
+notes use `scoring.percent` too; no `:.0%` format is left in `scripts/` (a test checks this). DuckDB's
+`round()` rounds half up on the double's binary value, so a 2-decimal SQL rounding can differ from
+`percent` on values like 1.005 (not used for printed whole percents). So an
 exact 0.625 (a band average, or 5 of 8 hits) prints 63% in the md report and the HTML alike
 (before: 62% from Python's half-to-even `:.0%` beside 63% from JavaScript's `Math.round`).
 

@@ -15,6 +15,7 @@ import json
 import sys
 from datetime import date, timedelta
 
+import scoring
 from common import connect, load_ranges_config, market_arg, md_table, require_market, utc_today
 
 CRORE = 1e7
@@ -87,7 +88,7 @@ def widen_by_ticker(cfg: dict, rc: dict, con) -> dict[str, tuple[float, str]]:
             total, names = out.get(f["ticker"], (0.0, set()))
             out[f["ticker"]] = (total + add if f["flag"] not in names else total, names | {f["flag"]})
     cap = float(w.get("max", 0.2))
-    return {t: (round(min(x, cap), 4), f"relation flags +{min(x, cap):.0%} ({', '.join(sorted(n))})")
+    return {t: (round(min(x, cap), 4), f"relation flags +{scoring.percent(min(x, cap))} ({', '.join(sorted(n))})")
             for t, (x, n) in out.items() if x > 0}
 
 

@@ -28,6 +28,7 @@ import events as ev
 import range_inputs as ri
 import rangelib as rl
 import relations
+import scoring
 import smart_money as sm
 from common import (append_jsonl, connect, day_file, load_ranges_config, market_arg, require_market,
                     utc_now)
@@ -211,7 +212,7 @@ def build(cfg: dict, rc: dict, con, now: str | None = None) -> list[dict]:
                 widen = min(max(widen, 0.0), rc["max_ai_widen"])
                 if widen:
                     sigma_h *= 1 + widen
-                    notes.append(f"AI widened +{widen:.0%}")
+                    notes.append(f"AI widened +{scoring.percent(widen)}")
             cap = rc["max_center_shift_sigma"] * sigma_h
             center = max(-cap, min(cap, center))
             if use["ex_dividend"]:   # a known price drop, outside the drift cap
