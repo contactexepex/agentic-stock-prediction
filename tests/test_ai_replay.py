@@ -184,9 +184,13 @@ def outputs(root: Path) -> dict:
 def prepared(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("ai_replay")
     res = {}
-    for name, kw in (("base", {}), ("perturbed", {"perturb": True}), ("control", {"perturb_before": True})):
-        src, cfg = build_source(tmp / f"src_{name}", **kw)
-        p = prepare(src, cfg, tmp / f"r_{name}")
+    from concurrent.futures import ThreadPoolExecutor
+    built = {name: build_source(tmp / f"src_{name}", **kw)
+             for name, kw in (("base", {}), ("perturbed", {"perturb": True}), ("control", {"perturb_before": True}))}
+    with ThreadPoolExecutor(len(built)) as pool:       # the three independent prepare runs side by side
+        runs = {name: pool.submit(prepare, src, cfg, tmp / f"r_{name}") for name, (src, cfg) in built.items()}
+    for name, (src, cfg) in built.items():
+        p = runs[name].result()
         assert p.returncode == 0, p.stderr
         res[name] = {"src": src, "cfg": cfg, "root": tmp / f"r_{name}", "summary": json.loads(p.stdout)}
     res["tmp"] = tmp

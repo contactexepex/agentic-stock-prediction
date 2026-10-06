@@ -169,6 +169,7 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
 ## Local development
 ```
 pip install -r requirements.txt
-pytest -q                      # offline tests with synthetic data and fixtures
+python -m pytest -m "not slow" -n auto   # fast tier (offline, synthetic data and fixtures): on each edit
+python -m pytest -n auto                 # full suite: before review or merge (CI runs it on every push and PR)
 cd scripts && python collect_prices.py --market us && python features.py --market us && python context.py --market us
 ```
