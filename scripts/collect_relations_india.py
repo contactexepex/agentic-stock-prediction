@@ -30,8 +30,9 @@ import io
 import sys
 from datetime import date, timedelta
 
-from nse import (collector_main, coverage, date_windows, iso, nse_symbols, parse_day, parse_ts, pick, recent_ids,
+from nse import (collector_main, coverage, date_windows, iso, nse_symbols, parse_day, parse_ts, pick,
                  rows_of, short_hash, since_arg, store, summary_of, xbrl)
+from marketbrief.core.storage import recent_ids
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_client import Nse
 from marketbrief.utils.numbers import parse_nse_number

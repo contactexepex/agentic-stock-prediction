@@ -27,7 +27,8 @@ from datetime import date, datetime, timedelta
 
 from collect_relations_india import due_tickers, latest_quarter_end
 from nse import (IST, collector_main, coverage, date_windows, iso, nse_symbols, parse_day, parse_ts, pick,
-                 recent_ids, rows_of, since_arg, store, summary_of, xbrl)
+                 rows_of, since_arg, store, summary_of, xbrl)
+from marketbrief.core.storage import recent_ids
 from marketbrief.sources.errors import FetchError
 from marketbrief.sources.nse_client import Nse
 from marketbrief.utils.numbers import parse_nse_number
