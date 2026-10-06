@@ -54,7 +54,7 @@ def safe(name: str) -> str:
 def fmt_call(direction, confidence) -> str:
     if direction not in ("up", "down") or confidence is None or pd.isna(confidence):
         return "no call"
-    return f"{'▲ up' if direction == 'up' else '▼ down'} {confidence:.0%}"
+    return f"{'▲ up' if direction == 'up' else '▼ down'} {scoring.percent(confidence)}"
 
 
 def money(cur: str, v) -> str:
@@ -121,7 +121,7 @@ def record_text(n: int, hits: int, what: str) -> str:
         return f"No {what} checked yet."
     if n < MIN_SAMPLE:
         return f"Not enough history yet: {hits} of {n} {what} were right so far."
-    return f"Right {hits} of {n} times ({hits / n:.0%})."
+    return f"Right {hits} of {n} times ({scoring.percent(hits / n)})."
 
 
 def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
@@ -149,7 +149,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                        e.materiality, e.relevance, e.summary
                 FROM (SELECT DISTINCT ON (id) * FROM news ORDER BY id, first_seen_at) n
                 LEFT JOIN enriched_latest e USING (id) ORDER BY id""")
-    filings = q("SELECT DISTINCT ON (id) id, ticker, form, url, accepted_at, description FROM filings ORDER BY id") \
+    filings = q("SELECT DISTINCT ON (id) id, ticker, form, url, accepted_at, description FROM filings "
+                "ORDER BY id, first_seen_at, ticker, form, url, accepted_at, description") \
         if _has_rows(con, "filings") else pd.DataFrame()
     anns = q("SELECT id, ticker, subject, url, published_at, source FROM announcements_latest ORDER BY id") \
         if _has_rows(con, "announcements") else pd.DataFrame()

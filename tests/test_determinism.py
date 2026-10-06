@@ -10,16 +10,20 @@ from __future__ import annotations
 import json
 from fractions import Fraction
 import random
+import shutil
+import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+import duckdb
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
 import context  # noqa: E402
+import html_report  # noqa: E402
 import report  # noqa: E402
 import score_predictions  # noqa: E402
 import scoring  # noqa: E402
@@ -168,3 +172,33 @@ def test_views_insider_flow_and_split_factors(cons):
     assert flow and flow[0][1] > 0
     stable(cons, rows("SELECT ticker, date, factor FROM bar_factors WHERE ticker = 'T00' ORDER BY date"))
     stable(cons, lambda con: common.md_table(con.execute(smart_money.SECTIONS[1][1])))
+
+
+SHARES = (0.625, 5 / 8, 0.575, 0.125, 0.5499999999999999, 0.6250000000000001, 0.995, 0.005, 1.0, 0.0, 1e-7)
+
+
+def test_percent_half_up_same_in_markdown_and_html():
+    """The md report (scoring.percent) and the HTML report's JavaScript (pct0) print the same whole
+    percent for every share, half up on its decimal value (0.625 and 5/8 -> 63%)."""
+    assert scoring.percent(0.625) == scoring.percent(5 / 8) == "63%"
+    assert report.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
+    assert view_data.record_text(80, 50, "calls").endswith("(63%).")   # 50/80 = 0.625
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    line = next(x for x in (Path(html_report.__file__).read_text().splitlines()) if x.startswith("const pct0 ="))
+    js = line.split("//")[0] + f"\nconsole.log(JSON.stringify({json.dumps(SHARES)}.map(pct0)));"
+    out = subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout
+    assert json.loads(out) == [scoring.percent(v) for v in SHARES]
+
+
+def test_exact_decimal_sum_limits():
+    """TRY_CAST(x AS DECIMAL(38,10)), used for order-independent sums and averages: values round to
+    10 decimals before the sum; NaN, infinities and values of 1e28 or more become NULL and are left
+    out of avg/sum (count(*) still counts their rows)."""
+    con = duckdb.connect()
+    con.execute("SET threads TO 8")
+    vals = "(VALUES (0.1::DOUBLE), (0.2), ('nan'::DOUBLE), ('inf'::DOUBLE), (1e30), (0.30000000000000004))"
+    row = con.execute(f"SELECT count(*), count(TRY_CAST(v AS DECIMAL(38,10))), avg(TRY_CAST(v AS DECIMAL(38,10))), "
+                      f"CAST(sum(TRY_CAST(v AS DECIMAL(38,10))) AS DOUBLE) FROM {vals} t(v)").fetchone()
+    assert row == (6, 3, 0.2, 0.6)

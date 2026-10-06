@@ -16,6 +16,7 @@ All range scores are in % of the base close, as the rest of the scorecard."""
 from __future__ import annotations
 
 import math
+from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
 
 import numpy as np
@@ -158,8 +159,14 @@ def _f(v, k: int = 3) -> str:
     return "–" if v is None else f"{v:.{k}f}"
 
 
+def percent(v) -> str:
+    """A share (0.625) as a whole percent rounded half up on its decimal value ('63%'): the one convention
+    for printed shares, also in the HTML report's JavaScript (pct0) and DuckDB's round()."""
+    return f"{Decimal(repr(float(v))).scaleb(2).quantize(Decimal(1), ROUND_HALF_UP)}%"
+
+
 def _p(v) -> str:
-    return "–" if v is None else f"{100 * v:.0f}%"
+    return "–" if v is None else percent(v)
 
 
 def markdown(s: dict) -> str:

@@ -35,7 +35,10 @@ step's SQL, and named work/report files), and a step without a declaration waits
 step. The late phase starts after the pre_open phase. Each market's copy is then merged back into the
 run directory in market order (its path rewritten to the run directory's). `--serial` runs every
 step in list order in one root, as the harness did before. Both give the same bytes, so a record of
-either compares with the other.
+either compares with the other. The `ACCESS` declarations are checked by that equality only
+(`tests/test_golden_schedule.py` checks that every step has one and that the writers keep their
+order): after changing a step, its script's queries or `ACCESS`, and at least once per refactor
+step, run `record --serial` and a parallel `compare` against it.
 
 Fixed inputs:
 - `data/`, `config/` and `reports/` extracted with `git archive` from commit
@@ -192,8 +195,18 @@ threads against the then one-thread record differed in 25 of 1621 files.
 Fixed (commits f548309 and e2e499b): every query below now has a full ORDER BY (a unique key, or
 every output column), and float averages and sums that reach an output are order-independent:
 SQL sums over `TRY_CAST(x AS DECIMAL(38,10))` (integer arithmetic; `avg` of it is the exact sum
-divided by n; a NaN or infinite value becomes NULL and is skipped instead of making the result
-NaN), `scoring._mean` (exact rational sum, rounded once), split-factor products over a sorted list.
+divided by n), `scoring._mean` (exact rational sum, rounded once), split-factor products over a
+sorted list. Limits of the decimal cast: each value is rounded to 10 decimals before the sum; NaN,
+infinities and values of 1e28 or more become NULL and are left out of `avg`/`sum` (before, they
+made the result NaN or inf), while `count(*)` beside them still counts their rows
+(`tests/test_determinism.py::test_exact_decimal_sum_limits`).
+
+Rounding convention for printed shares: half up on the value's decimal form, everywhere.
+`scoring.percent` (whole percent, `decimal` ROUND_HALF_UP) prints every share in the md report,
+the Slack text, the context pack's proper-score tables and view_data's call and record texts; the
+HTML report's JavaScript uses `pct0` (same rule); DuckDB's `round()` also rounds half up. So an
+exact 0.625 (a band average, or 5 of 8 hits) prints 63% in the md report and the HTML alike
+(before: 62% from Python's half-to-even `:.0%` beside 63% from JavaScript's `Math.round`).
 
 | place | change |
 |---|---|
@@ -220,10 +233,13 @@ all row orderings or float last digits of the queries above: outcome rows (same 
 "Open predictions" and SEC-filing row order in the context packs (and so the ai_replay context
 sha256), `mean_conf` and `calibration[].stated` (0.5499999999999999 -> 0.55, 0.7000000000000001 ->
 0.7, 0.6250000000000001 -> 0.625) in score summaries, review records and the HTML data (and so
-its byte counts), the report's "0.60-0.69" band 63% -> 62% (exact mean 0.625), yesterday's-calls
-row order, one INDIGO sentiment 0.15 -> 0.16 (exact mean 0.155, half up), and the copied
+its byte counts), yesterday's-calls row order, one INDIGO sentiment 0.15 -> 0.16 (exact mean 0.155, half up), and the copied
 `sql/views.sql` in the ai_replay roots. `tests/test_determinism.py` runs each fixed query 12 times
-with 8 threads on data built to expose ties and summation order.
+with 8 threads on data built to expose ties and summation order. With the half-up convention
+(golden record, then `compare` `"identical": true` over 1626 files) the 25 files that differ from
+the e2e499b record are the "0.60-0.69" / "0.60-0.70" rows (62% -> 63%) in the md reports, their
+skeleton and previous copies and the context packs' reliability table, and the HTML reports (the
+`pct0` script lines) with their Slack-plan copies and byte counts.
 
 ## 2. Enforcement
 

@@ -22,6 +22,7 @@ import yaml
 
 import events as ev
 from score_predictions import is_late
+from scoring import percent
 from view_data import CONF_BANDS_SQL, CURRENCY, RANGE_RECORD_EXACT, fmt_call
 from common import CONFIG, ROOT, benchmark_key, connect, market_arg, require_market, utc_today, vol_index_key
 
@@ -180,7 +181,7 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
              f"50% hit {int(s5['hit50'].sum())}/{len(s5)}." if len(s5) else "")
     cs = d["calls_scored"]
     calls_hit = int(cs["hit"].sum()) if not cs.empty else 0
-    call_rows = [[x.ticker, f"{x.horizon_days}d", x.direction, f"{x.confidence:.0%}", pct(x.actual_return, 2), mark(x.hit)]
+    call_rows = [[x.ticker, f"{x.horizon_days}d", x.direction, percent(x.confidence), pct(x.actual_return, 2), mark(x.hit)]
                  for x in cs.itertuples()]
 
     # today: ranges by sector
@@ -223,7 +224,7 @@ def build(cfg: dict, d: dict, settings: dict) -> tuple[str, str, str]:
     upcoming += [(pd.Timestamp(x.date).date(), x.name, "company") for x in d["company_events"].itertuples()]
     upcoming.sort()
 
-    share = lambda v: "–" if v is None or pd.isna(v) else f"{v:.0%}"  # noqa: E731
+    share = lambda v: "–" if v is None or pd.isna(v) else percent(v)  # noqa: E731
     num = lambda v, f=".2f": "–" if v is None or pd.isna(v) else format(v, f)  # noqa: E731
     sc_rows = [[f"{x.h}d", x.win, x.n, share(x.c50), share(x.c80), share(x.nc80), num(x.w), num(x.nw),
                 num(x.s, ".3f"), num(x.ns, ".3f"), num(x.ce), num(x.nce)] for x in d["scorecard"].itertuples()]
