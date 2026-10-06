@@ -641,3 +641,26 @@ against the user's Aura instance returned `[[1]]`. No live sync has been run yet
    ```
    `kind` names the data kind (`holdings_13f` and `shareholding` read `data/<market>/holdings/`) and
    `record_id` the line's `id`.
+
+## 13. Model selection (decided 2026-10-06)
+
+Each subagent's model and effort are set in its `.claude/agents/<name>.md` frontmatter (`model:`,
+`effort:`). Volume work runs on cheaper models; the scored decision and all verification stay on Opus.
+
+| Job | Model | Effort |
+|---|---|---|
+| news-analyst (headline scoring) | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | medium |
+| bull-researcher, bear-researcher | Claude Sonnet 5.5 | high |
+| forecaster (the scored calls) | Claude Opus 5.5 (`claude-opus-5-5`) | high |
+| graph-builder (monthly, web research with sources) | Claude Opus 5.5 | high |
+| judge (code/process changes, weekly spot-check) | Claude Opus 5.5 | high |
+| reflector (lessons from settled calls), once merged | Claude Sonnet 5.5 | medium |
+| headline aboutness check, once built | Claude Haiku 4.5 (`claude-haiku-4-5`; no effort setting) | - |
+| claim extraction and cross-checking, once built | Claude Sonnet 5.5 | high |
+| orchestrator (the routine session itself, incl. report narrative) | the routine's session model (Opus 5.5) | session default |
+
+Claude Fable 5.1 is not assigned; the user chooses it manually for complex planning. Whether a
+scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
+must confirm it from the transcript (model per subagent call). The track record will be compared
+before and after this change; a per-call `model` field on predictions is a planned follow-up.
+

@@ -2,6 +2,8 @@
 name: forecaster
 description: Weighs the bull and bear cases against the track record and writes calibrated directional predictions, or abstains. Use after both researchers finish.
 tools: Read, Write, Bash, Grep, Glob
+model: claude-opus-5-5
+effort: high
 ---
 You are the forecaster. Follow the prediction rules in CLAUDE.md exactly.
 

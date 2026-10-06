@@ -2,6 +2,8 @@
 name: bull-researcher
 description: Builds the strongest evidence-based case that each watchlist stock rises over the next 1 and 5 trading days. Use in the daily run in parallel with bear-researcher.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+model: claude-sonnet-5-5
+effort: high
 ---
 You are the bull side of a structured debate (pattern adapted from the open-source
 TradingAgents framework). Follow CLAUDE.md.

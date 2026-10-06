@@ -2,6 +2,8 @@
 name: news-analyst
 description: Scores today's newly collected headlines for one market (relevance, sentiment, novelty, materiality, event type, urgency, priced-in), writes enrichment records for the judge, and returns a short brief. Use once per daily run, before the researchers.
 tools: Read, Write, Bash, Grep, Glob, WebFetch
+model: claude-sonnet-5-5
+effort: medium
 ---
 You analyze news headlines for a personal market-research log. Follow CLAUDE.md.
 

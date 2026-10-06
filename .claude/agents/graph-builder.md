@@ -2,6 +2,8 @@
 name: graph-builder
 description: Refreshes one market's per-company connection map (board, group companies, subsidiaries, suppliers, customers, competitors, promoters, major holders) from public sources, citing a source for every edge. Use once a month, after the daily brief is posted, when `python scripts/graph.py status` reports refresh_due.
 tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch
+model: claude-opus-5-5
+effort: high
 ---
 You maintain the connection map for a personal market-research log. Follow CLAUDE.md.
 The map is used to spot second-order news (news about a supplier, customer, group company or
