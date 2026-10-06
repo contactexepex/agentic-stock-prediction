@@ -52,26 +52,28 @@ def build(
     ranges, calls = load_ranges(con, cfg, end), load_calls(con, end)
     windows = {"week": start, "rolling": roll_start, "all": date.min}
 
-    def win(frame, start_date):
+    def rows_since(frame, start_date):
         """The rows of a frame whose target date is on or after the window start."""
         return frame[frame["target_date"] >= start_date] if not frame.empty else frame
 
     review_data = {
         "partial_week": end >= utc_today(),
         "ranges": {
-            window: by_horizon(win(ranges, start_date), range_summary) for window, start_date in windows.items()
+            window: by_horizon(rows_since(ranges, start_date), range_summary) for window, start_date in windows.items()
         },
-        "calls": {window: by_horizon(win(calls, start_date), call_summary) for window, start_date in windows.items()},
+        "calls": {
+            window: by_horizon(rows_since(calls, start_date), call_summary) for window, start_date in windows.items()
+        },
         "breakdowns": {
             window: {
-                "regime": breakdown(win(ranges, start_date), "regime"),
-                "sector": breakdown(win(ranges, start_date), "sector"),
-                "note": breakdown(win(ranges, start_date), "tags"),
+                "regime": breakdown(rows_since(ranges, start_date), "regime"),
+                "sector": breakdown(rows_since(ranges, start_date), "sector"),
+                "note": breakdown(rows_since(ranges, start_date), "tags"),
             }
             for window, start_date in windows.items()
         },
         "bands": {
-            window: confidence_bands(win(calls, start_date), review_config["confidence_bands"])
+            window: confidence_bands(rows_since(calls, start_date), review_config["confidence_bands"])
             for window, start_date in windows.items()
         },
     }
@@ -94,7 +96,8 @@ def build(
         judge(ablation, review_config)
     review_data["proposals"] = proposals(ranges_config, review_data["live_ablation"], review_data["history_ablation"])
     review_data["scores"] = {
-        window: proper_scores(win(ranges, start_date), win(calls, start_date)) for window, start_date in windows.items()
+        window: proper_scores(rows_since(ranges, start_date), rows_since(calls, start_date))
+        for window, start_date in windows.items()
     }
     review_data["aci"] = aci_state(con, ranges_config, end)
     review_data["aci"]["replay"] = latest_aci_replay(con, end, ranges_config)

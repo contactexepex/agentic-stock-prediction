@@ -1,4 +1,5 @@
 """The connection map: edges between watchlist companies and the people and companies around them."""
+
 from __future__ import annotations
 
 import json

@@ -50,6 +50,7 @@ from marketbrief.graph.neo4j.statements import (
 @dataclass
 class Kind:
     """One projected kind: read query, shaper, statements and whether it syncs incrementally."""
+
     name: str
     sql: str | None  # rows come from DuckDB (must expose _ts) ...
     statements: list[tuple[str, Callable[[dict], bool] | None]]

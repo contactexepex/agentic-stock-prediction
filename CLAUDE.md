@@ -59,6 +59,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
+  Where the code of the daily steps lives (each `scripts/<name>.py` is a thin entry point with the same flags): `marketbrief/pipeline/` (validate, review and lessons as packages, `context`, `score_predictions`, `spotcheck`, `market_status`), `marketbrief/replay/` (`backtest/`, `rule_replay/`, `ai_replay/`), `marketbrief/graph/` (`connection_map`, `news_hits`, `neo4j/`) and `marketbrief/presentation/report/` (the report skeleton and Slack draft). Messages and constants of each live in `marketbrief/constants/`.
 - India primary sources (NSE; shared session and replay guard in `marketbrief/collectors/nse_runner.py`, `nse_session.py` and `nse_replay_guard.py`): `collect_nse_india`
   -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
   Filing results per period and basis, FII/DII provisional flows, delivery %); context sections

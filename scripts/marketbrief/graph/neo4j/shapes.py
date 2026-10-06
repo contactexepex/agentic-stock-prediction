@@ -230,6 +230,7 @@ def shape_range_outcome(market: str, stored_row: dict) -> dict:
 
 def shape_market_day(key_fields: tuple) -> Callable[[str, dict], dict]:
     """A shaper for market-level day rows keyed by the given fields."""
+
     def shape(market: str, row: dict) -> dict:
         """One market-day row as statement parameters."""
         key = ":".join(str(clean(row.get(field))) for field in key_fields)

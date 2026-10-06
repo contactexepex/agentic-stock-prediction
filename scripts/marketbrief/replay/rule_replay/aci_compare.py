@@ -8,7 +8,7 @@ import pandas as pd
 from marketbrief.analytics import adaptive_conformal
 from marketbrief.utils.numbers import round_or_none
 from marketbrief.constants.replay import ACI_GRID, CMP_KEYS
-from marketbrief.replay.html_parts import esc, scaled_text
+from marketbrief.replay.html_parts import escape_html, scaled_text
 from marketbrief.replay.rule_replay.inputs import load_inputs
 from marketbrief.replay.rule_replay.range_rows import replay_rows
 from marketbrief.replay.rule_replay.replay_statistics import range_summary
@@ -159,7 +159,8 @@ def held_out_html(held_out_result: dict | None) -> str:
     return (
         f"<h3>Held-out check</h3><p>gamma and one-or-per-regime alpha picked from {len(held_out_result['grid'])} "
         f"variants on "
-        f"as-of dates up to {esc(held_out_result['tune_end'])} only (lowest 80% interval score): gamma {sel['gamma']}, "
+        f"as-of dates up to {escape_html(held_out_result['tune_end'])} only (lowest 80% interval score): gamma "
+        f"{sel['gamma']}, "
         f"{'per regime' if sel['by_regime'] else 'one alpha'}"
         f"{' = the config settings' if held_out_result['selected_is_config'] else ' (not the config settings)'}. "
         f"Fixed bands vs that choice on the later, unseen as-of dates:</p>{aci_table(held_out_result['test_selected'])}"
@@ -181,7 +182,7 @@ def aci_table(cmp: dict) -> str:
             if not before.get("n"):
                 continue
             rows.append(
-                f"<tr><td>{horizon}d</td><td>{esc(key)}</td><td>{before['n']:,}</td>"
+                f"<tr><td>{horizon}d</td><td>{escape_html(key)}</td><td>{before['n']:,}</td>"
                 + "".join(
                     f"<td>{scaled_text(before.get(column))} → {scaled_text(after.get(column))}</td>"
                     for column in ("cover50", "cover80")

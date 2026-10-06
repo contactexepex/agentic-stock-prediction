@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from marketbrief.constants.replay import CI_NOTE, MIN_MONTH_DAYS, RSI_HIGH, RSI_LOW, SCORE_NOTE
 from marketbrief.constants.replay_page import CSS, JS
-from marketbrief.replay.html_parts import esc, fmt_p, legend, scaled_text
+from marketbrief.replay.html_parts import escape_html, p_value_text, legend, scaled_text
 from marketbrief.replay.rule_replay.aci_compare import aci_table, held_out_html
 from marketbrief.replay.rule_replay.rule_charts import svg_calibration, svg_regime, svg_time
 
@@ -13,7 +13,7 @@ def range_table(groups: dict, label: str) -> str:
     """A coverage table of grouped range summaries for 1 and 5 days."""
     rows = []
     for key, (one_day, five_day) in groups.items():
-        cells = [esc(key)]
+        cells = [escape_html(key)]
         for stats in (one_day, five_day):
             if stats and stats.get("n"):
                 cells += [
@@ -28,7 +28,7 @@ def range_table(groups: dict, label: str) -> str:
                 cells += ["0", "", "", "", "", ""]
         rows.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>")
     head = (
-        f"<tr><th>{esc(label)}</th>"
+        f"<tr><th>{escape_html(label)}</th>"
         + "".join(
             f"<th>{horizon_label} n</th><th>{horizon_label} 50%</th><th>{horizon_label} 80%</th><th>{horizon_label} "
             f"80% width</th>"
@@ -64,8 +64,8 @@ def html_report(cfg: dict, stats: dict) -> str:
             else f"95% interval {scaled_text(confidence_interval[0])} to {scaled_text(confidence_interval[1])}"
         )
         return (
-            f'<div class="card tile"><div class="l">{esc(label)}</div><div class="v">{scaled_text(value)}</div>'
-            f'<div class="n">{esc(note)}</div><div class="n">{span}</div></div>'
+            f'<div class="card tile"><div class="l">{escape_html(label)}</div><div class="v">{scaled_text(value)}</div>'
+            f'<div class="n">{escape_html(note)}</div><div class="n">{span}</div></div>'
         )
 
     tiles = "".join(
@@ -97,12 +97,12 @@ def html_report(cfg: dict, stats: dict) -> str:
         ]
     )
     top = "".join(
-        f'<p class="answer"><b>{esc(item.split("? ", 1)[0])}?</b> {esc(item.split("? ", 1)[1])}</p>'
+        f'<p class="answer"><b>{escape_html(item.split("? ", 1)[0])}?</b> {escape_html(item.split("? ", 1)[1])}</p>'
         if "? " in item
-        else f'<p class="answer">{esc(item)}</p>'
+        else f'<p class="answer">{escape_html(item)}</p>'
         for item in stats.get("top", [])
     )
-    summary = "".join(f"<li>{esc(item)}</li>" for item in stats["summary"])
+    summary = "".join(f"<li>{escape_html(item)}</li>" for item in stats["summary"])
 
     def pair(key):
         """The 1-day and 5-day summaries of each group of a section."""
@@ -119,9 +119,9 @@ def html_report(cfg: dict, stats: dict) -> str:
             difference_text = "" if name == "always_up" or difference is None else f"{100 * difference:+.1f} pts"
             vs_ci = "" if name == "always_up" or dlo is None else f"{100 * dlo:+.1f} to {100 * dhi:+.1f}"
             brows.append(
-                f"<tr><td>{esc(baseline['label'])}</td><td>{horizon}d</td><td>{baseline['calls']:,}</td><td>{scaled_text(baseline['hit_rate'])}</td>"
+                f"<tr><td>{escape_html(baseline['label'])}</td><td>{horizon}d</td><td>{baseline['calls']:,}</td><td>{scaled_text(baseline['hit_rate'])}</td>"
                 f"<td>{scaled_text(baseline['ci95'][0])} to "
-                f"{scaled_text(baseline['ci95'][1])}</td><td>{esc(fmt_p(baseline['p_vs_50']))}</td>"
+                f"{scaled_text(baseline['ci95'][1])}</td><td>{escape_html(p_value_text(baseline['p_vs_50']))}</td>"
                 f"<td>{difference_text}</td><td>{vs_ci}</td></tr>"
             )
     sector = {ticker: ticker_config.get("sector") or "Other" for ticker, ticker_config in cfg["tickers"].items()}
@@ -132,7 +132,8 @@ def html_report(cfg: dict, stats: dict) -> str:
         if not one_day_stats.get("n") and not five_day_stats.get("n"):
             continue
         trows.append(
-            f'<tr data-sector="{esc(sector[ticker])}"><td>{esc(ticker)}</td><td>{esc(sector[ticker])}</td>'
+            f'<tr data-sector="{escape_html(sector[ticker])}"><td>{escape_html(ticker)}</td>'
+            f"<td>{escape_html(sector[ticker])}</td>"
             f"<td>{one_day_stats.get('n', 0):,}</td>"
             f"<td>{share_cell(one_day_stats, 'cover50')}</td><td>{share_cell(one_day_stats, 'cover80')}</td>"
             f"<td>{score_cell(one_day_stats, 'score80')}</td><td>{score_cell(one_day_stats, 'naive_score80')}</td>"
@@ -140,15 +141,17 @@ def html_report(cfg: dict, stats: dict) -> str:
             f"<td>{score_cell(five_day_stats, 'score80')}</td>"
             f"<td>{score_cell(five_day_stats, 'naive_score80')}</td></tr>"
         )
-    opts = "".join(f'<option value="{esc(item)}">{esc(item)}</option>' for item in sorted(set(sector.values())))
-    lim = "".join(f"<li>{esc(item)}</li>" for item in stats["limitations"])
+    opts = "".join(
+        f'<option value="{escape_html(item)}">{escape_html(item)}</option>' for item in sorted(set(sector.values()))
+    )
+    lim = "".join(f"<li>{escape_html(item)}</li>" for item in stats["limitations"])
     inputs = "; ".join(
         f"{horizon}d: " + (", ".join(input_name for input_name, value in enabled_inputs.items() if value) or "none")
         for horizon, enabled_inputs in stats["settings"]["inputs"].items()
     )
     dash = '<span><span class="dash"></span>perfect calibration</span>'
     tgt = '<span><span class="dash"></span>promise 80%</span>'
-    score_note = f'<p class="note">{esc(SCORE_NOTE)}</p>'
+    score_note = f'<p class="note">{escape_html(SCORE_NOTE)}</p>'
     index_cue = cfg.get("index_cue") or {}
     replayed_cue = (
         index_cue.get("symbol")
@@ -156,7 +159,7 @@ def html_report(cfg: dict, stats: dict) -> str:
         and any(enabled_inputs.get("beta_split") for enabled_inputs in stats["settings"]["inputs"].values())
     )
     cue_name = (cfg["symbols"].get(index_cue.get("symbol")) or {}).get("name") or index_cue.get("symbol")
-    cue_txt = f", and the {esc(cue_name)} as an overnight cue" if replayed_cue else ""
+    cue_txt = f", and the {escape_html(cue_name)} as an overnight cue" if replayed_cue else ""
     aci_settings = stats["settings"].get("aci") or {}
     aci_block = (
         ""
@@ -179,17 +182,18 @@ def html_report(cfg: dict, stats: dict) -> str:
     )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Historical Replay \
-{esc(cfg["market"].upper())}</title>
+{escape_html(cfg["market"].upper())}</title>
 <style>{CSS}</style></head><body><main>
-<h1>Historical replay: {esc(cfg.get("name", cfg["market"]))}</h1>
-<p class="sub">Every past trading day from {esc(stats["start"])} to {esc(stats["end"])}, the price ranges were rebuilt \
+<h1>Historical replay: {escape_html(cfg.get("name", cfg["market"]))}</h1>
+<p class="sub">Every past trading day from {escape_html(stats["start"])} to {escape_html(stats["end"])}, the price \
+ranges were rebuilt \
 using only what
 was known before the next session opened (prices up to that day's close, scheduled events{cue_txt}), then checked
 against the actual close. Rule-based parts only, no AI. Research only,
 not investment advice.</p>
 <div class="card top">{top}</div>
 <div class="tiles">{tiles}</div>
-<p class="note">An 80% range promises to contain the later closing price 8 times in 10. {esc(CI_NOTE)}</p>
+<p class="note">An 80% range promises to contain the later closing price 8 times in 10. {escape_html(CI_NOTE)}</p>
 <h2>Do the ranges hold as often as they promise?</h2>
 <div class="card">{legend(dash)}{svg_calibration(stats)}
 <p class="caption">Look for: points above the dashed line mean the ranges held more often than promised (too wide); \
@@ -205,7 +209,7 @@ scheduled events, UNSTABLE in stress) where the ranges are wider than needed.</p
 (months with fewer than {MIN_MONTH_DAYS} days are left out).</p></div>
 {aci_block}<h2>More detail</h2>
 <details><summary>All findings, with every number</summary>
-<p class="note">{esc(CI_NOTE)} pts = percentage points. {esc(SCORE_NOTE)}</p><ul \
+<p class="note">{escape_html(CI_NOTE)} pts = percentage points. {escape_html(SCORE_NOTE)}</p><ul \
 class="summary">{summary}</ul></details>
 <details><summary>Coverage by regime (table)</summary>{range_table(pair("by_regime"), "Regime")}{score_note}</details>
 <details><summary>Earnings, market events and years</summary>
@@ -216,7 +220,8 @@ class="summary">{summary}</ul></details>
 <details><summary>Direction baselines (simple up/down rules, not the product's forecasts)</summary>
 <p>Simple rules the AI forecaster must beat later. A call is right if the close h days later moved in the called \
 direction
-(no change counts as wrong). {esc(CI_NOTE)} "vs always-up" compares each rule with always-up on the same stocks and \
+(no change counts as wrong). {escape_html(CI_NOTE)} "vs always-up" compares each rule with always-up on the same \
+stocks and \
 days,
 in pts (percentage points).</p>
 <div class="scroll"><table><thead><tr><th>Rule</th><th>Horizon</th><th>Calls</th><th>Hit rate</th><th>95% interval</th>
@@ -238,8 +243,9 @@ signal).</p></details>
 code as
 the live ranges (marketbrief/analytics/range_math.py, the range-input modules, backtest.py helpers, regime.py). Range \
 inputs switched on
-(config/ranges.yaml): {esc(inputs)}. Data: {esc(stats["data"]["first_bar"])} to {esc(stats["data"]["last_bar"])},
+(config/ranges.yaml): {escape_html(inputs)}. Data: {escape_html(stats["data"]["first_bar"])} to \
+{escape_html(stats["data"]["last_bar"])},
 {stats["data"]["tickers"]} tickers, {stats["data"]["earnings_events"]} earnings and {stats["data"]["dividends"]} \
 dividend events.
-Computed {esc(stats["computed_at"])}, runtime {stats["runtime_s"]:.0f} s.</p><ul>{lim}</ul></details>
+Computed {escape_html(stats["computed_at"])}, runtime {stats["runtime_s"]:.0f} s.</p><ul>{lim}</ul></details>
 </main><div id="tip" class="tip"></div><script>{JS}</script></body></html>"""

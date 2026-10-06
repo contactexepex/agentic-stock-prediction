@@ -43,7 +43,7 @@ def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dic
         beta, idx_cue, own, beta_split["index_weight"], beta_split["own_weight"], ranges_config["cue_weight"]
     )
 
-    def cap(extra, switches):
+    def capped_shift(extra, switches):
         """A centre shift limited to the maximum number of sigmas."""
         limit = ranges_config["max_center_shift_sigma"] * switches
         return max(-limit, min(limit, extra))
@@ -55,11 +55,11 @@ def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dic
         "earn_fixed": (0.0, horizon_sigma["fixed"]),
         "earn_hist": (0.0, horizon_sigma["hist"]),
         "exdiv": (div, horizon_sigma["core"]),
-        "cue_direct": (cap(direct, horizon_sigma["core"]), horizon_sigma["core"]),
-        "cue_beta": (cap(split, horizon_sigma["core"]), horizon_sigma["core"]),
-        "current": (cap(direct, horizon_sigma["fixed"]), horizon_sigma["fixed"]),
+        "cue_direct": (capped_shift(direct, horizon_sigma["core"]), horizon_sigma["core"]),
+        "cue_beta": (capped_shift(split, horizon_sigma["core"]), horizon_sigma["core"]),
+        "current": (capped_shift(direct, horizon_sigma["fixed"]), horizon_sigma["fixed"]),
         "configured": (
-            cap(split if use.get("beta_split") else direct, s_cfg) + (div if use.get("ex_dividend") else 0.0),
+            capped_shift(split if use.get("beta_split") else direct, s_cfg) + (div if use.get("ex_dividend") else 0.0),
             s_cfg,
         ),
     }

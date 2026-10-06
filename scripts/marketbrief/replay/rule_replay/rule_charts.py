@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.constants.replay import MIN_MONTH_DAYS
-from marketbrief.replay.html_parts import esc, scaled_text
+from marketbrief.replay.html_parts import escape_html, scaled_text
 
 
 def svg_calibration(summary: dict) -> str:
@@ -51,7 +51,7 @@ def svg_calibration(summary: dict) -> str:
             out.append(
                 f'<circle class="mark" cx="{scale_x(point["stated"]):.1f}" '
                 f'cy="{scale_y(point["actual"]):.1f}" r="{radius}" fill="{color}" '
-                f'stroke="var(--surface)" stroke-width="2" data-tip="{esc(tipx)}"/>'
+                f'stroke="var(--surface)" stroke-width="2" data-tip="{escape_html(tipx)}"/>'
             )
     out.append("</svg>")
     return "".join(out)
@@ -97,7 +97,7 @@ def svg_regime(summary: dict) -> str:
                 f"{name}, {horizon}-day: 80% coverage {scaled_text(tick)} over {regime_stats['n']:,} ranges "
                 f"({regime_stats['days']} days)"
             )
-            out.append(f'<path class="mark" d="{bar_path}" fill="{color}" data-tip="{esc(tipx)}"/>')
+            out.append(f'<path class="mark" d="{bar_path}" fill="{color}" data-tip="{escape_html(tipx)}"/>')
     out.append(
         f'<line x1="{left}" x2="{width - right}" y1="{scale_y(0.8):.1f}" y2="{scale_y(0.8):.1f}" '
         f'stroke="var(--ink2)" stroke-dasharray="4 4"/>'
@@ -171,7 +171,7 @@ def svg_time(summary: dict) -> str:
             out.append(
                 f'<circle class="mark" cx="{scale_x(index):.1f}" cy="{scale_y(stats["cover80"]):.1f}" r="4" '
                 f'fill="{color}" '
-                f'stroke="var(--surface)" stroke-width="2" data-tip="{esc(tipx)}"/>'
+                f'stroke="var(--surface)" stroke-width="2" data-tip="{escape_html(tipx)}"/>'
             )
     out.append("</svg>")
     return "".join(out)

@@ -14,6 +14,7 @@ and status "removed" retracts it (view graph_edges).
                              every graph-builder run, even one that added nothing)
 A refresh is due when no attempt has been recorded in the current UTC month, so a run that
 finds nothing to add is not repeated until the next month."""
+
 from __future__ import annotations
 
 import json

@@ -250,8 +250,8 @@ def test_baseline_hit_rates_on_synthetic_series():
 
 
 def test_tiny_p_values_print_as_less_than():
-    assert html_parts.fmt_p(0.0) == "<0.001" and html_parts.fmt_p(4.2e-9) == "<0.001"
-    assert html_parts.fmt_p(0.0123) == "0.0123" and html_parts.fmt_p(None) == ""
+    assert html_parts.p_value_text(0.0) == "<0.001" and html_parts.p_value_text(4.2e-9) == "<0.001"
+    assert html_parts.p_value_text(0.0123) == "0.0123" and html_parts.p_value_text(None) == ""
 
 
 def test_binomial_and_wilson():

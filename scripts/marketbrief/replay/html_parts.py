@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 
 
-def esc(value) -> str:
+def escape_html(value) -> str:
     """HTML-escape a value."""
     return html.escape(str(value), quote=True)
 
@@ -15,7 +15,7 @@ def scaled_text(value, decimals=1, suffix="%", scale=100.0) -> str:
     return "n/a" if value is None else f"{scale * value:.{decimals}f}{suffix}"
 
 
-def fmt_p(p_value) -> str:
+def p_value_text(p_value) -> str:
     """A p-value as text (<0.001 for very small ones)."""
     return "" if p_value is None else ("<0.001" if p_value < 0.001 else f"{p_value:.3g}")
 

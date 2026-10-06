@@ -18,7 +18,7 @@ def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
     frame["target_date"] = pd.to_datetime(frame["target_date"]).dt.date
     base, actual_close = frame["base_close"].astype(float), frame["actual_close"].astype(float)
 
-    def iscore(lower, upper, band):
+    def interval_scores(lower, upper, band):
         """Interval scores in percent of the base close for lower and upper edges."""
         return [
             100 * range_math.interval_score(lower_edge, upper_edge, actual, band) / base_close
@@ -29,8 +29,8 @@ def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
             )
         ]
 
-    frame["is50_pct"] = iscore(frame["lo50"], frame["hi50"], 0.5)
-    frame["naive_is50_pct"] = iscore(frame["naive_lo50"], frame["naive_hi50"], 0.5)
+    frame["is50_pct"] = interval_scores(frame["lo50"], frame["hi50"], 0.5)
+    frame["naive_is50_pct"] = interval_scores(frame["naive_lo50"], frame["naive_hi50"], 0.5)
     frame["width50_pct"] = 100 * (frame["hi50"] - frame["lo50"]) / base
     frame["tags"] = [
         note_tags(notes) + (["ai_call"] if isinstance(direction, str) and direction in ("up", "down") else [])

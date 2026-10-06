@@ -1,4 +1,5 @@
 """Second-order news: articles that name an entity linked to a watchlist company."""
+
 from __future__ import annotations
 
 import re

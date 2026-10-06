@@ -45,8 +45,9 @@ MSG_DUPLICATED_KEYS = "{kind}: {count} duplicated {key}(s), e.g. {value}"
 MSG_LATE_RUN_SESSION_HAS_CLOSED_BUT = (
     "late run: session {sess} has closed but has no stored bar (the run is as of the previous session)"
 )
-MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION = ("{ticker} 1-day return {row:+.1%} on {day} with no split/corporate-action "
-                                       "event on file")
+MSG_BIG_ONE_DAY_MOVE_WITHOUT_ACTION = (
+    "{ticker} 1-day return {row:+.1%} on {day} with no split/corporate-action event on file"
+)
 MSG_COLLECTOR_PROBLEM = "{name}: {value}"
 MSG_COLLECTOR_FAILED = "{name}: {count} failed: {value}"
 MSG_PRICES_PRICE_BASIS_WARNING_S = "prices: {count} price-basis warning(s): {value}"

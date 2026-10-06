@@ -15,6 +15,7 @@ def load_config() -> dict:
 
 class Result:
     """Failures, warnings and info collected while the gate runs."""
+
     def __init__(self):
         """Start with no failures, warnings or info."""
         self.failures, self.warnings, self.info = [], [], {}

@@ -41,7 +41,7 @@ def aci_lines(review_data) -> list[str]:
     ]
     rep = aci.get("replay")
 
-    def cmp_rows(cmp):
+    def comparison_rows(cmp):
         """Table rows comparing fixed bands with ACI per horizon and group."""
         return [
             [
@@ -67,7 +67,7 @@ def aci_lines(review_data) -> list[str]:
             "**In-sample: the ACI settings in config/ranges.yaml were tuned on this replay window**, so these "
             "gains are optimistic:",
             "",
-            markdown_table(cmp_hdr, cmp_rows(rep["comparison"])),
+            markdown_table(cmp_hdr, comparison_rows(rep["comparison"])),
         ]
         held_out = rep.get("held_out")
         if held_out:
@@ -79,14 +79,14 @@ def aci_lines(review_data) -> list[str]:
                 f"{'the config settings' if held_out['selected_is_config'] else 'NOT the config settings'}). "
                 "Out of sample, fixed bands → the selected settings on the later as-of dates:",
                 "",
-                markdown_table(cmp_hdr, cmp_rows(held_out["test_selected"])),
+                markdown_table(cmp_hdr, comparison_rows(held_out["test_selected"])),
             ]
             if not held_out["selected_is_config"] and held_out.get("test_config"):
                 lines += [
                     "The config settings on the same later dates (not out of sample: they were chosen on the "
                     "whole window):",
                     "",
-                    markdown_table(cmp_hdr, cmp_rows(held_out["test_config"])),
+                    markdown_table(cmp_hdr, comparison_rows(held_out["test_config"])),
                 ]
         else:
             lines += [

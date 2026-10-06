@@ -1,4 +1,5 @@
 """Constants and messages of the SEC relationship collectors (insiders, stakes, holdings, fundamentals)."""
+
 COLLECTOR_INSIDERS = "insiders"
 COLLECTOR_STAKES = "stakes"
 COLLECTOR_HOLDINGS = "holdings"
@@ -24,7 +25,7 @@ AMENDMENT_SUFFIX = "/A"
 PURPOSE_LIMIT = 600
 
 # ---------- holdings (13F) ----------
-FILING_WINDOW_DAYS = 50   # 13F deadline is 45 days after quarter end
+FILING_WINDOW_DAYS = 50  # 13F deadline is 45 days after quarter end
 DEFAULT_QUARTERS = 2
 FORM_13F_HR, FORM_13F_NT = "13F-HR", "13F-NT"
 REPORT_TYPE_HOLDINGS = "13F HOLDINGS REPORT"

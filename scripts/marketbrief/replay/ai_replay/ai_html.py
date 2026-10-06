@@ -117,7 +117,7 @@ def svg_calibration(summary: dict) -> str:
     return "".join(out)
 
 
-def pts(value) -> str:
+def points_text(value) -> str:
     """A share as signed percentage points."""
     return "" if value is None else f"{100 * value:+.1f} pts"
 
@@ -130,9 +130,9 @@ def signed_pct(value) -> str:
 def html_page(summary: dict) -> str:
     """The score page: the fair group (as-of dates after the training cutoff) is the result; the
     contaminated group, if any, is a separate, labelled section scored on its own rows only."""
-    esc = html_parts.esc
+    escape_html = html_parts.escape_html
     fair, contaminated = summary[FAIR], summary[CONTAMINATED]
-    cut = esc(summary["model_training_cutoff"])
+    cut = escape_html(summary["model_training_cutoff"])
     banner = (
         f'<p class="note"><b>Fair test</b> = an as-of date after {cut}, the model\'s training cutoff '
         "(<code>model_training_cutoff</code> in config/settings.yaml; ForecastBench leakage rule). Dates on or "
@@ -142,7 +142,8 @@ def html_page(summary: dict) -> str:
     if fair["n_days"]:
         sub = (
             f'<p class="sub">On {fair["n_days"]} past trading days after the model\'s training data '
-            f"({esc(fair['dates'][0])} to {esc(fair['dates'][-1])}), the AI forecaster saw only what was known "
+            f"({escape_html(fair['dates'][0])} to {escape_html(fair['dates'][-1])}), the AI forecaster saw only what "
+            f"was known "
             f"before the "
             "next session opened, and its up/down calls were checked against the actual closes. Research only, not "
             "investment advice.</p>"
@@ -158,24 +159,25 @@ def html_page(summary: dict) -> str:
         body += (
             f'<section class="contaminated"><h2>Contaminated dates (on or before {cut}): not a fair test</h2>'
             f'<p class="note bad">CONTAMINATED: {contaminated["n_days"]} as-of dates '
-            f"({esc(contaminated['dates'][0])} to "
-            f"{esc(contaminated['dates'][-1])}) fall inside the model's training period, so it may have seen these "
+            f"({escape_html(contaminated['dates'][0])} to "
+            f"{escape_html(contaminated['dates'][-1])}) fall inside the model's training period, so it may have seen "
+            f"these "
             f"prices. "
             "They are scored on their own below, never pooled with the fair result.</p>"
             f"{group_html(contaminated)}</section>"
         )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Replay \
-{esc(summary["market"].upper())}</title>
+{escape_html(summary["market"].upper())}</title>
 <style>{replay_page.CSS}</style></head><body><main>
-<h1>AI forecaster replay: {esc(summary.get("name") or summary["market"])}</h1>
+<h1>AI forecaster replay: {escape_html(summary.get("name") or summary["market"])}</h1>
 {sub}{banner}{body}
 </main><div id="tip" class="tip"></div><script>{replay_page.JS}</script></body></html>"""
 
 
 def group_html(group: dict) -> str:
     """One leakage group's results (fair or contaminated): answers, tiles, charts and detail tables."""
-    esc = html_parts.esc
+    escape_html = html_parts.escape_html
     lab = group["test"]
     overall, by_horizon, abstention = group["overall"], group["by_horizon"], group["abstention"]
 
@@ -189,8 +191,8 @@ def group_html(group: dict) -> str:
             else f"95% interval {pct(confidence_interval[0])} to {pct(confidence_interval[1])}"
         )
         return (
-            f'<div class="card tile"><div class="l">{esc(label)}</div><div class="v">{pct(hit_rate)}</div>'
-            f'<div class="n">{esc(note)}</div><div class="n">{span}</div></div>'
+            f'<div class="card tile"><div class="l">{escape_html(label)}</div><div class="v">{pct(hit_rate)}</div>'
+            f'<div class="n">{escape_html(note)}</div><div class="n">{span}</div></div>'
         )
 
     tiles = "".join(
@@ -216,7 +218,8 @@ def group_html(group: dict) -> str:
         ]
     )
     top = "".join(
-        f'<p class="answer"><b>{esc(sentence.split("? ", 1)[0])}?</b> {esc(sentence.split("? ", 1)[1])}</p>'
+        f'<p class="answer"><b>{escape_html(sentence.split("? ", 1)[0])}?</b> '
+        f'{escape_html(sentence.split("? ", 1)[1])}</p>'
         for sentence in group["top"]
     )
     hrows = []
@@ -228,9 +231,9 @@ def group_html(group: dict) -> str:
         hrows.append(
             f"<tr><td>{name}</td><td>{horizon_stats['n']}</td><td>{pct(horizon_stats['hit_rate'])}</td>"
             f"<td>{pct(horizon_stats['ci95'][0])} to "
-            f"{pct(horizon_stats['ci95'][1])}</td><td>{esc(html_parts.fmt_p(horizon_stats['p_vs_50']))}</td>"
+            f"{pct(horizon_stats['ci95'][1])}</td><td>{escape_html(html_parts.p_value_text(horizon_stats['p_vs_50']))}</td>"
             f"<td>{pct(horizon_stats['mean_confidence'])}</td><td>{pct(horizon_stats['always_up']['hit_rate'])}</td>"
-            f"<td>{pts(difference['pts'])}</td></tr>"
+            f"<td>{points_text(difference['pts'])}</td></tr>"
         )
     rrows = []
     for name, horizon_stats in (("1-day", by_horizon["1"]), ("5-day", by_horizon["5"]), ("All", overall)):
@@ -238,7 +241,7 @@ def group_html(group: dict) -> str:
             if not stats.get("n"):
                 continue
             rrows.append(
-                f"<tr><td>{esc(stats['label'])}</td><td>{name}</td><td>{stats['n']}</td><td>{pct(stats['hit_rate'])}</td>"
+                f"<tr><td>{escape_html(stats['label'])}</td><td>{name}</td><td>{stats['n']}</td><td>{pct(stats['hit_rate'])}</td>"
                 f"<td>{pct(stats['ci95'][0])} to "
                 f"{pct(stats['ci95'][1])}</td><td>{pct(stats['ai_hit_rate_same_rows'])}</td></tr>"
             )
@@ -261,11 +264,11 @@ def group_html(group: dict) -> str:
         for day_row in group["per_day"]
     )
     crows = "".join(
-        f"<tr><td>{esc(str(call['date']))}</td><td>{esc(call['test'])}</td><td>{esc(call['ticker'])}</td><td>{call['h']}d</td><td>{esc(call['direction'])}</td>"
-        f"<td>{call['confidence']:.2f}</td><td>{esc(call['status'])}</td>"
+        f"<tr><td>{escape_html(str(call['date']))}</td><td>{escape_html(call['test'])}</td><td>{escape_html(call['ticker'])}</td><td>{call['h']}d</td><td>{escape_html(call['direction'])}</td>"
+        f"<td>{call['confidence']:.2f}</td><td>{escape_html(call['status'])}</td>"
         f"<td>{signed_pct(call.get('ret'))}</td>"
         f"<td>{'' if call.get('hit') is None else ('right' if call['hit'] else 'wrong')}</td>"
-        f"<td>{esc(', '.join(call.get('evidence_ids') or []))}</td></tr>"
+        f"<td>{escape_html(', '.join(call.get('evidence_ids') or []))}</td></tr>"
         for call in group["calls"]
     )
     legend = (
@@ -274,7 +277,7 @@ def group_html(group: dict) -> str:
         '<span><span class="dash"></span>coin flip 50%</span></div>'
     )
     tag = (
-        f'<p class="note"><b>Group: {esc(lab)}</b> ({group["n_days"]} as-of days, {group["n_calls"]} calls); '
+        f'<p class="note"><b>Group: {escape_html(lab)}</b> ({group["n_days"]} as-of days, {group["n_calls"]} calls); '
         "every number in this group uses only its own rows.</p>"
     )
     return f"""{tag}
@@ -334,6 +337,6 @@ class="scroll"><table><thead><tr><th>As-of</th><th>Test</th><th>Ticker</th><th>H
 announcements and other records only if public before the routine's pre-open start on the next session.</li>
 <li>No news before live collection began, so calls could cite only SEC filings (US) or NSE announcements (India).</li>
 <li>Scored on the real stored closes, {group["n_pending"]} calls still pending (target after the last stored bar).</li>
-<li>Prompt versions: {esc(", ".join(group["prompt_versions"]) or "none")}.</li>
+<li>Prompt versions: {escape_html(", ".join(group["prompt_versions"]) or "none")}.</li>
 <li>A small sample: a dozen days per market cannot show a small edge; treat the result as a smoke \
 test.</li></ul></details>"""
