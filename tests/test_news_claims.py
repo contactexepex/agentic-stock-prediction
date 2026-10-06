@@ -24,6 +24,9 @@ import test_news_verify as nvt  # noqa: E402
 import validate  # noqa: E402
 from marketbrief.analytics.claim_rules import normalise  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.pipeline.claim_inputs import input_records  # noqa: E402
+from marketbrief.pipeline.claim_sources import current_clusters, sources_by_cluster  # noqa: E402
 from marketbrief.pipeline import claims as claims_cli  # noqa: E402
 from marketbrief.pipeline import news_status as status_cli  # noqa: E402
 from marketbrief.sources.primary_text import html_to_text  # noqa: E402
@@ -211,6 +214,13 @@ def test_status_end_to_end_and_no_look_ahead(env, capsys):
     env.set_now(LATER)                                                   # claims extracted at T2
     assert cli(env, capsys, "add", str(write_claims(env, scenario_claims(env))))["appended"] == 6
     second = run_status(env, capsys)
+    # a rerun of prepare skips the checked rows; a new row of the cluster would list what is stored
+    assert cli(env, capsys, "prepare")["already_checked"] == 3
+    con, now = connect(MARKET), pd.Timestamp(LATER)
+    rows = [c for c in current_clusters(con, now, 72) if c["cluster_id"] == TSLA_C]
+    record = input_records(con, load_market(MARKET), rows, sources_by_cluster(con, rows, now), {}, now)[0]
+    assert record["stored_claims"] == [{"fact_key": "q3-deliveries", "quote_source_id": q}
+                                       for q in (TSLA_8K, "n30", "n31")]
     after = statuses_asof(LATER)
     assert after[(TSLA_C, "*")] == after[(TSLA_C, "q3-deliveries")] == "confirmed_primary"
     assert after[(CVX_C, "*")] == after[(CVX_C, "cfo")] == "confirmed_primary"

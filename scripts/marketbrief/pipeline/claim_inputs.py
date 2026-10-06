@@ -8,6 +8,9 @@ from marketbrief.constants.verification import FIELD_EXTRACT, FIELD_PRIMARY, SOU
 from marketbrief.pipeline.claim_sources import cluster_ids, iso, item_rows
 
 CHECKED_SQL = "SELECT DISTINCT cluster_row_id FROM news_claims WHERE extracted_at <= ?::TIMESTAMPTZ"
+STORED_SQL = """
+SELECT cluster_id, fact_key, quote_source_id FROM news_claims
+WHERE list_contains(?, cluster_id) AND extracted_at <= ?::TIMESTAMPTZ ORDER BY cluster_id, fact_key, quote_source_id"""
 GROUP_KEYS = ("origin", "news_ids", "verified", "promotional", "opinion", "unread_vetted")
 
 
@@ -37,10 +40,14 @@ def select_clusters(con, clusters: list[dict], src, conf: dict, now: pd.Timestam
 def input_records(con, cfg: dict, clusters: list[dict], sources: dict[str, ClusterSources], conf: dict,
                   now: pd.Timestamp) -> list[dict]:
     """One input record per selected cluster: the cluster's origins and flags, each item (title, outlet,
-    article extract) and each primary source's stored text (cut to input_max_chars for reading; quotes
-    are checked against the full stored text)."""
+    article extract), each primary source's stored text (cut to input_max_chars for reading; quotes
+    are checked against the full stored text) and the statements already stored for the cluster."""
     per_doc, per_cluster = int(conf.get("input_max_chars", 12000)), int(conf.get("items_per_cluster", 20))
     items = item_rows(con, sorted({i for c in clusters for i in cluster_ids(c)}), now)
+    stored: dict[str, list[dict]] = {}
+    for cluster_id, fact_key, source_id in con.execute(STORED_SQL, [[c["cluster_id"] for c in clusters],
+                                                                    now.isoformat()]).fetchall():
+        stored.setdefault(cluster_id, []).append({"fact_key": fact_key, "quote_source_id": source_id})
     out = []
     for c in clusters:
         found = sources[c["cluster_id"]]
@@ -66,5 +73,6 @@ def input_records(con, cfg: dict, clusters: list[dict], sources: dict[str, Clust
             "origin_groups": [{k: g.get(k) for k in GROUP_KEYS} for g in c.get("origin_groups") or []],
             "items": listed, "primary_sources": primaries,
             "primary_without_text": [p for p in c.get("primary_ids") or [] if p not in found.sources],
+            "stored_claims": stored.get(c["cluster_id"], []),
         })
     return out

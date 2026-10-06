@@ -144,8 +144,6 @@ def read_rows(p: Path) -> tuple[list[dict], list[str]]:
     return rows, problems
 
 
-
-
 def type_problem(v, typ: str, csv_row: bool) -> str | None:
     """Why a value does not fit a DuckDB column type (None = fits; null always fits)."""
     if v is None or (csv_row and v == ""):
@@ -540,6 +538,7 @@ def stage_context(res, cfg, con, st, now, today, vc, path: Path | None = None):
 # ---------- forecast (marketbrief/pipeline/forecast_gate.py) ----------
 
 def stage_forecast(res, cfg, con, st, now, today, vc, path: Path | None = None):  # noqa: ARG001
+    """work/predictions.jsonl (or `path`) before it is appended."""
     forecast_gate.stage_forecast(res, cfg, con, st, now, vc, path or work_dir() / "predictions.jsonl")
 
 

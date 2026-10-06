@@ -24,6 +24,12 @@ Research only. Nothing here is investment advice, and the routines never trade.
      at most 3 key sentences and a copy signature, never the full text.
    - `news_clusters.py` groups same-event items, counts independent origins and lists candidate SEC
      filings and NSE announcements.
+   News verification, phase B (docs/DESIGN.md 3b): `claims.py prepare` picks the material events and
+   stores the text of their SEC 8-K/6-K filings; the claim-checker subagent quotes what each source
+   states; `claims.py validate|add` checks every quote verbatim against the stored text; and
+   `news_status.py` sets each event's status (contradicted, confirmed_primary, corroborated, rumour,
+   promotional, single_source, unverified). A call's main evidence must be confirmed_primary or
+   corroborated.
 3. **Score** past predictions against actual prices (`score_predictions.py`), with proper scores
    (`scoring.py`): Brier score, log loss and a reliability table for calls; interval and quantile
    scores for ranges. Then **reflect** (`lessons.py`): for each newly settled call the script lists the facts (call, evidence, return,

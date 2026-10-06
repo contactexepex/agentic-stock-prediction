@@ -23,7 +23,7 @@ MODULE_ALLOWLIST: dict[str, int] = {
     "scripts/replay.py": 1143,
     "scripts/review.py": 857,
     "scripts/neo4j_sync.py": 818,
-    "scripts/validate.py": 761,
+    "scripts/validate.py": 760,
     "scripts/html_report.py": 772,
     "scripts/collect_prices.py": 641,
     "scripts/news_verify.py": 570,
