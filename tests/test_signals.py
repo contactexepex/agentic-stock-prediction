@@ -211,7 +211,7 @@ def test_sector_etf_config_mistakes_are_reported_not_fatal():
 
 
 def test_context_lists_sectors_without_an_etf():
-    import context
+    from marketbrief.pipeline import context
     india = load_market("india")
     gaps = context.sector_gaps(india)
     for s in ("Insurance", "Transport", "Energy", "Autos", "Consumer goods", "Construction", "Metals"):
@@ -231,7 +231,7 @@ def test_market_events_shift_to_previous_session():
 
 def test_scorecard_last_30_days_and_since_start():
     import duckdb
-    import report
+    from marketbrief.presentation.report import build, gather
     con = duckdb.connect()
     con.execute("""CREATE TABLE range_record (horizon_days INTEGER, target_date DATE, hit50 BOOLEAN, hit80 BOOLEAN,
                    naive_hit80 BOOLEAN, width80_pct DOUBLE, naive_width80_pct DOUBLE, is80_pct DOUBLE,
@@ -240,7 +240,7 @@ def test_scorecard_last_30_days_and_since_start():
         (1, current_date - 3,   true,  true,  true,  4.0, 5.0, 4.0, 5.0, 1.0, 1.5),
         (1, current_date - 20,  false, false, true,  4.0, 5.0, 9.0, 6.0, 3.0, 2.0),
         (1, current_date - 200, true,  true,  false, 6.0, 5.0, 6.0, 9.0, 1.0, 1.0)""")
-    sc = con.execute(report.SCORECARD_SQL).df()
+    sc = con.execute(gather.SCORECARD_SQL).df()
     rows = {r.win: r for r in sc.itertuples()}
     assert list(sc["win"]) == ["since start", "last 30 days"]
     assert rows["last 30 days"].n == 2 and rows["last 30 days"].c80 == 0.5 and rows["last 30 days"].nc80 == 1.0
@@ -256,7 +256,7 @@ def test_scorecard_last_30_days_and_since_start():
          "scored": empty, "last_target": None, "calls_scored": empty, "scorecard": sc, "by_regime": empty,
          "direction": empty, "conf_bands": empty, "market": empty, "calibration": empty,
          "company_events": pd.DataFrame(columns=["date", "name"])}
-    rep, _, _ = report.build(us, d, {"repo_url": "https://example.com/r", "branch": "main"})
+    rep, _, _ = build.build(us, d, {"repo_url": "https://example.com/r", "branch": "main"})
     assert "| 1d | last 30 days | 2 | 50% | 50% | 100% |" in rep and "| 1d | since start | 3 |" in rep
 
 
@@ -299,7 +299,7 @@ def plt_close(fig):
 
 
 def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
-    import report
+    from marketbrief.presentation.report import build
     us = load_market("us")
     rows = [{"ticker": t, "horizon_days": 1, "direction": "up", "confidence": 0.6, "base_close": 100.0,
              "lo80": 98.0, "hi80": 102.0, "lo50": 99.0, "hi50": 101.0, "notes": [], "target_date": "2026-10-06"}
@@ -311,7 +311,7 @@ def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
          "direction": empty, "conf_bands": empty, "market": empty, "calibration": empty,
          "company_events": pd.DataFrame(columns=["date", "name"])}
     settings = {"repo_url": "https://example.com/r", "branch": "main"}
-    _, slack, _ = report.build(us, d, settings)
+    _, slack, _ = build.build(us, d, settings)
     filled = re.sub(r"<!-- AGENT:top3[^>]*-->", "• a\n• b\n• c", slack)
     assert len(filled.strip().splitlines()) <= 12               # 9 calls used to give 15 lines
     # the summary names the number of calls and at most three of them; details are in the report
@@ -320,6 +320,6 @@ def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
     assert "market mood" not in slack.splitlines()[0]           # no regime row in this fixture
     # US CPI at 08:30 ET on the session day: the brief says the calls were made before it
     d["session"] = date(2026, 10, 14)
-    rep, slack, _ = report.build(us, d, settings)
+    rep, slack, _ = build.build(us, d, settings)
     assert "Calls made before release: US CPI (September) at 08:30 ET." in rep
     assert "calls made before US CPI (September) (08:30 ET)" in slack.splitlines()[0]

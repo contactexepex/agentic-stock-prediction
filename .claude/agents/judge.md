@@ -19,7 +19,7 @@ Method:
 1. List every requirement in the assignment and every factual claim in the report, one per
    line. Include the implicit rules: CLAUDE.md data rules (append-only `data/`, UTC
    timestamps, no information after `made_at`), prediction rules, schemas in
-   `scripts/common.py`, and "no data/, reports/ or summaries/ in build commits".
+   `scripts/marketbrief/core/schemas.py`, and "no data/, reports/ or summaries/ in build commits".
 2. Check each one yourself with a command or a file read, and record the evidence: the
    command and the relevant output, or `path:line`. Never accept the agent's numbers, test results
    or summaries as evidence. Be proportionate: verify every requirement, but re-run expensive steps

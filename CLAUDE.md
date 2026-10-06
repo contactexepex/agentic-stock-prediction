@@ -230,7 +230,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Every verdict, PASS or FAIL, is appended as one line: build work to `judgments/log.jsonl`
   (subject, work, commit, round, verdict, summary, recorded_at as ISO UTC); daily-run verdicts
   (graph-builder, spot-check) to `data/<market>/judgments/` (schema `judgments` in
-  `scripts/common.py`). Both are append-only, and `tests/test_judgments.py` checks the build log's
+  `scripts/marketbrief/core/schemas.py`). Both are append-only, and `tests/test_judgments.py` checks the build log's
   format and that every commit exists.
 
 ## Data rules
@@ -240,7 +240,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
    tool that overwrites an existing data file.
 3. All timestamps are ISO 8601 UTC. Never use information published after a prediction's `made_at`.
 4. Numbers come from `scripts/context.py` or DuckDB (run from `scripts/`:
-   `python -c "from common import connect; print(connect('us').execute('...').df())"`),
+   `python -c "from marketbrief.core.database import connect; print(connect('us').execute('...').df())"`),
    never from memory or estimation.
 5. Don't read raw data files in bulk. Use the context pack, DuckDB queries and the summaries.
 6. A market's agents only read and write that market's `data/<market>/`, `summaries/<market>/`

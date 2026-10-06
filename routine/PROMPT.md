@@ -291,7 +291,7 @@ Warnings never block: list them in `data_quality`.
     retry: the output is already published). Append one verdict line to
     `data/<market>/judgments/YYYY/MM/TODAY.jsonl` (via a work/ file and `cat >>`), using the
     printed `record` with `verdict` PASS or FAIL and a `summary` of at most 40 words. Judgment
-    records (schema `judgments` in `scripts/common.py`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>`
+    records (schema `judgments` in `scripts/marketbrief/core/schemas.py`): `id` = `TODAY-<agent>-<round>-<HHMMSS UTC>`
     (spot-check: `TODAY-spotcheck-<week>-<round>-<HHMMSS UTC>`), `run_date`, `agent`
     (graph-builder or spotcheck), `round`, `verdict`, `summary`, `dropped` (what was not used, or
     null), `recorded_at` (ISO UTC). A FAIL is listed in the next run's `data_quality` through the

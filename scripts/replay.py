@@ -44,9 +44,9 @@ from statistics import NormalDist
 import numpy as np
 import pandas as pd
 
-import backtest as bt
-from marketbrief.analytics import adaptive_conformal as aci, event_history, range_switches
-from marketbrief.analytics import indicators as ind, range_math as rl, regime as rg, scoring as sc
+from marketbrief.replay.backtest import observations
+from marketbrief.analytics import adaptive_conformal, event_history, range_switches
+from marketbrief.analytics import indicators, range_math, regime as regime_rules, scoring
 from marketbrief.constants.range_inputs import INPUTS
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.core.clock import utc_now
@@ -55,7 +55,7 @@ from marketbrief.constants.messages import MSG_NO_BENCHMARK_BARS_PERIOD
 from marketbrief.utils.event_dates import major_event_between
 from marketbrief.utils.numbers import round_or_none, share_percent_text
 from marketbrief.analytics.features import load_bars
-from marketbrief.core import calendar as ev, cli, database, paths, storage
+from marketbrief.core import calendar, cli, database, paths, storage
 
 LEVELS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)   # calibration curve (stated coverage)
 SIGNALS = ("always_up", "momentum_1d", "momentum_5d", "rsi_reversion")
@@ -71,8 +71,8 @@ MIN_MONTH_DAYS = 5   # the coverage-over-time chart leaves out months with fewer
 def known_versions(cfg: dict, versions: dict) -> dict:
     """Shift each earnings version's start (a 10-Q/10-K acceptance date c) to the last session before
     c: ranges.py made pre-open on session S uses the reports accepted by S, so as-of d (S = the next
-    session after d) sees the version once d >= that session. backtest.input_columns then applies it."""
-    return {t: [(None if s is None else ev.prev_session(cfg, s, include=False), e) for s, e in vs]
+    session after d) sees the version once d >= that session. observations.input_columns then applies it."""
+    return {t: [(None if s is None else calendar.prev_session(cfg, s, include=False), e) for s, e in vs]
             for t, vs in versions.items()}
 
 
@@ -97,7 +97,7 @@ def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
     vol = bars[vk]["close"] if vk in bars else pd.Series(dtype=float)
     vdates = [x.date() for x in vol.index]
     bdates = [x.date() for x in bench.index]
-    mev = ev.market_events(cfg, days[0], days[-1] + timedelta(days=40)) if days else []
+    mev = calendar.market_events(cfg, days[0], days[-1] + timedelta(days=40)) if days else []
     rows = []
     for d in days:
         i = bisect.bisect_right(bdates, d)
@@ -106,17 +106,17 @@ def regimes(cfg: dict, bars: dict, days: list[date]) -> pd.DataFrame:
         lvl = float(vol.iloc[j - 1]) if j >= 1 else None
         prev = float(vol.iloc[j - 2]) if j >= 2 else None
         change = lvl / prev - 1 if lvl is not None and prev else None
-        session = ev.next_session(cfg, d, include=False)
-        near = ev.major_events_near(mev, session)
-        r5, v10 = ind.period_return(tail, 5), ind.realized_vol(tail)
-        label, stress, _ = rg.classify(cfg["regime"], lvl, r5, v10, bool(near), change)
+        session = calendar.next_session(cfg, d, include=False)
+        near = calendar.major_events_near(mev, session)
+        r5, v10 = indicators.period_return(tail, 5), indicators.realized_vol(tail)
+        label, stress, _ = regime_rules.classify(cfg["regime"], lvl, r5, v10, bool(near), change)
         rows.append({"date": d, "regime": label, "stress": stress, "vol_level": lvl, "bench_ret_5d": r5,
                      "bench_vol_10d": v10, "major_event": bool(near)})
     return pd.DataFrame(rows).set_index("date") if rows else pd.DataFrame()
 
 
 def major_dates(cfg: dict, start: date, end: date) -> list[date]:
-    return sorted({e["date"] for e in ev.market_events(cfg, start, end) if e["major"]})
+    return sorted({e["date"] for e in calendar.market_events(cfg, start, end) if e["major"]})
 
 
 def rsi_series(close: pd.Series, n: int = 14) -> pd.Series:
@@ -137,11 +137,11 @@ def rsi_series(close: pd.Series, n: int = 14) -> pd.Series:
 def ticker_frame(cfg: dict, rc: dict, df: pd.DataFrame, t: str, h: int, extra: dict) -> pd.DataFrame:
     """Per as-of date of one ticker: close, EWMA sigma, 20-day sigma (naive), outcome, range inputs."""
     c = df["close"]
-    f = pd.DataFrame({"close": c, "sigma": rl.ewma_sigma(c, rc["ewma_lambda"]),
+    f = pd.DataFrame({"close": c, "sigma": range_math.ewma_sigma(c, rc["ewma_lambda"]),
                       "s20": np.log(c / c.shift(1)).rolling(20).std(ddof=1),
                       "fwd": np.log(c.shift(-h) / c), "bars": np.arange(1, len(c) + 1),
                       "ret1": c / c.shift(1) - 1, "ret5": c / c.shift(5) - 1, "rsi": rsi_series(c)})
-    f = f.join(bt.input_columns(cfg, rc, df, t, h, extra))
+    f = f.join(observations.input_columns(cfg, rc, df, t, h, extra))
     f["own"] = np.nan                      # no stored pre-market/ADR history (next open = look-ahead)
     if (cfg.get("index_cue") or {}).get("beta", 1.0) != "fit":
         f["idx_cue"] = np.nan              # numeric beta: futures before the open, not stored
@@ -153,19 +153,19 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
                    extra: dict, rank: dict, majors: list[date]) -> pd.DataFrame:
     mk = cfg["market"]
     use = {k: range_switches.enabled(rc, k, mk, h) for k in INPUTS}
-    pool = bt.observations(bars, cfg["tickers"], h, rc, rank)
+    pool = observations.observations(bars, cfg["tickers"], h, rc, rank)
     z_all = pool["z"].to_numpy() if len(pool) else np.array([])
     r_all = pool["rank"].to_numpy() if len(pool) else np.array([])
     frames = {t: ticker_frame(cfg, rc, bars[t], t, h, extra) for t in cfg["tickers"] if t in bars}
     day_ts = [pd.Timestamp(d) for d in days]
     nd = NormalDist()
-    normal = {"q10": rl.normal_quantiles(0.8)[0], "q25": rl.normal_quantiles(0.5)[0],
-              "q75": rl.normal_quantiles(0.5)[1], "q90": rl.normal_quantiles(0.8)[1]}
+    normal = {"q10": range_math.normal_quantiles(0.8)[0], "q25": range_math.normal_quantiles(0.5)[0],
+              "q75": range_math.normal_quantiles(0.5)[1], "q90": range_math.normal_quantiles(0.8)[1]}
     fixed = rc["earnings_vol_multiple"]
     bs = rc["beta_split"]
     # ACI (adaptive_conformal.py; off unless config/ranges.yaml or --aci switches it on): each day's quantile levels
     # come from the misses of ranges whose target close is on or before d (known pre-open next session)
-    tracker = aci.Tracker(rc) if range_switches.enabled(rc, "aci", mk, h) else None
+    tracker = adaptive_conformal.Tracker(rc) if range_switches.enabled(rc, "aci", mk, h) else None
     pending: dict[int, dict[str, list]] = {}   # target rank -> key -> [n, misses50, misses80]
     rows = []
     for d, ts in zip(days, day_ts):
@@ -183,8 +183,8 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
             levels = tracker.levels(h, akey)
         known = (r_all + h <= rd) & (r_all > rd - rc["history_sessions"])
         if known.sum() >= rc["min_pool"]:       # calibrate.py: pool quantiles, else normal ones
-            z, w = z_all[known], rl.recency_weights((rd - r_all[known]).astype(float), rc["half_life_sessions"])
-            q = {k: rl.weighted_quantile(z, w, p) for k, p in levels.items()}
+            z, w = z_all[known], range_math.recency_weights((rd - r_all[known]).astype(float), rc["half_life_sessions"])
+            q = {k: range_math.weighted_quantile(z, w, p) for k, p in levels.items()}
             order = np.argsort(z)
             zs, ws = z[order], w[order]
             cum = np.cumsum(ws) - 0.5 * ws
@@ -193,7 +193,7 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
         else:
             q = normal if levels is DEFAULT_LEVELS else {k: nd.inv_cdf(p) for k, p in levels.items()}
             pit, source = nd.cdf, "normal"
-        tgt_cal = ev.sessions_ahead(cfg, d + timedelta(days=1), h)[-1]   # ranges.target_date
+        tgt_cal = calendar.sessions_ahead(cfg, d + timedelta(days=1), h)[-1]   # ranges.target_date
         major = major_event_between(majors, d, tgt_cal)
         for t, f in frames.items():
             if ts not in f.index:
@@ -210,11 +210,11 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
             else:
                 e = next_earnings(extra["earnings"].get(t, []), d)
                 in_h, mult = bool(e and e <= tgt_cal), None
-            sigma_h, _ = rl.horizon_sigma(float(sd), h, in_h, rc, regime, major, mult)
+            sigma_h, _ = range_math.horizon_sigma(float(sd), h, in_h, rc, regime, major, mult)
             center = 0.0
             beta, idx_cue = o["beta"], o["idx_cue"]
             if use["beta_split"] and idx_cue == idx_cue and beta == beta:
-                center += rl.beta_split_center(float(beta), float(idx_cue), None, bs["index_weight"],
+                center += range_math.beta_split_center(float(beta), float(idx_cue), None, bs["index_weight"],
                                                bs["own_weight"], rc["cue_weight"])
             cap = rc["max_center_shift_sigma"] * sigma_h
             center = max(-cap, min(cap, center))
@@ -229,8 +229,8 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
                    "target_date": tgt_cal, "ret1": o["ret1"], "ret5": o["ret5"], "rsi": o["rsi"]}
             s20 = o["s20"]
             if s20 == s20 and s20 > 0:
-                row["naive_lo50"], row["naive_hi50"] = rl.naive_range(base, float(s20), h, 0.5)
-                row["naive_lo80"], row["naive_hi80"] = rl.naive_range(base, float(s20), h, 0.8)
+                row["naive_lo50"], row["naive_hi50"] = range_math.naive_range(base, float(s20), h, 0.5)
+                row["naive_lo80"], row["naive_hi80"] = range_math.naive_range(base, float(s20), h, 0.8)
             if o["fwd"] == o["fwd"]:
                 y = base * math.exp(float(o["fwd"]))
                 zeff = (float(o["fwd"]) - center) / sigma_h
@@ -238,10 +238,10 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
                             "hit50": row["lo50"] <= y <= row["hi50"], "hit80": row["lo80"] <= y <= row["hi80"],
                             "width50": 100 * (row["hi50"] - row["lo50"]) / base,
                             "width80": 100 * (row["hi80"] - row["lo80"]) / base,
-                            "is50": 100 * rl.interval_score(row["lo50"], row["hi50"], y, 0.5) / base,
-                            "is80": 100 * rl.interval_score(row["lo80"], row["hi80"], y, 0.8) / base,
+                            "is50": 100 * range_math.interval_score(row["lo50"], row["hi50"], y, 0.5) / base,
+                            "is80": 100 * range_math.interval_score(row["lo80"], row["hi80"], y, 0.8) / base,
                             "abs_err": 100 * abs(math.exp(float(o["fwd"])) - math.exp(center)), "pit": pit(zeff),
-                            "qs": sc.range_scores_row(row["lo50"], row["hi50"], row["lo80"], row["hi80"], y, base)["qs_pct"]})
+                            "qs": scoring.range_scores_row(row["lo50"], row["hi50"], row["lo80"], row["hi80"], y, base)["qs_pct"]})
                 if tracker is not None:   # the outcome becomes known at the target close (rank rd + h)
                     acc = pending.setdefault(rd + h, {}).setdefault(akey, [0, 0, 0])
                     acc[0] += 1
@@ -251,8 +251,8 @@ def replay_horizon(cfg: dict, rc: dict, bars: dict, h: int, days: list[date], re
                     row.update({"naive_hit50": row["naive_lo50"] <= y <= row["naive_hi50"],
                                 "naive_hit80": row["naive_lo80"] <= y <= row["naive_hi80"],
                                 "naive_width80": 100 * (row["naive_hi80"] - row["naive_lo80"]) / base,
-                                "naive_is50": 100 * rl.interval_score(row["naive_lo50"], row["naive_hi50"], y, 0.5) / base,
-                                "naive_is80": 100 * rl.interval_score(row["naive_lo80"], row["naive_hi80"], y, 0.8) / base})
+                                "naive_is50": 100 * range_math.interval_score(row["naive_lo50"], row["naive_hi50"], y, 0.5) / base,
+                                "naive_is80": 100 * range_math.interval_score(row["naive_lo80"], row["naive_hi80"], y, 0.8) / base})
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -272,7 +272,7 @@ def load_inputs(cfg: dict, rc: dict, con) -> tuple[dict, dict]:
     evdf = event_history.load_events(con)
     extra = {"earnings": known_versions(cfg, event_history.earnings_versions(evdf)) if not evdf.empty else {},
              "dividends": event_history.dividend_events(evdf) if not evdf.empty else {}, "bench": bench,
-             "index_cue": bt.index_cue_series(cfg, bars, rc) if range_switches.enabled(rc, "beta_split", cfg["market"]) else None}
+             "index_cue": observations.index_cue_series(cfg, bars, rc) if range_switches.enabled(rc, "beta_split", cfg["market"]) else None}
     return bars, extra
 
 
@@ -291,7 +291,7 @@ def replay_rows(cfg: dict, rc: dict, bars: dict, extra: dict, start: date | None
 
 # ---------- statistics ----------
 
-wilson = sc.wilson   # Wilson score interval (scoring.py)
+wilson = scoring.wilson   # Wilson score interval (scoring.py)
 
 
 def binom_p_two_sided(k: int, n: int, p: float = 0.5) -> float | None:
@@ -967,7 +967,7 @@ def held_out(cfg: dict, rc: dict, con, tune_end: date, start: date | None = None
     (as-of date and target close on or before tune_end) is selected, and fixed bands vs that variant (and
     vs the config's settings) are compared on the TEST rows only (as-of date after tune_end)."""
     bars, extra = load_inputs(cfg, rc, con)
-    fixed, _ = replay_rows(cfg, {**rc, "aci": {**aci.settings(rc), "enabled": False}}, bars, extra, start, end)
+    fixed, _ = replay_rows(cfg, {**rc, "aci": {**adaptive_conformal.settings(rc), "enabled": False}}, bars, extra, start, end)
 
     def tune(g: pd.DataFrame) -> pd.Series:   # outcome known by tune_end too (5-day targets cross it)
         return (g["date"] <= tune_end) & g["bar_target"].map(lambda x: isinstance(x, date) and x <= tune_end)
@@ -1030,7 +1030,7 @@ def aci_table(cmp: dict) -> str:
 
 def aci_rc(rc: dict, gamma: float | None = None, by_regime: bool | None = None) -> dict:
     """A copy of the range settings with ACI switched on (optionally another gamma / by_regime)."""
-    a = {**aci.settings(rc), "enabled": True}
+    a = {**adaptive_conformal.settings(rc), "enabled": True}
     if gamma is not None:
         a["gamma"] = gamma
     if by_regime is not None:
@@ -1052,7 +1052,7 @@ def run(cfg: dict, rc: dict, con, start: date | None = None, end: date | None = 
                            "regime_factor": rc["regime_factor"], "major_event_factor": rc["major_event_factor"],
                            "earnings_vol_multiple": rc["earnings_vol_multiple"], "history_sessions": rc["history_sessions"],
                            "half_life_sessions": rc["half_life_sessions"], "min_pool": rc["min_pool"],
-                           "aci": {**aci.settings(rc), "on": {str(h): range_switches.enabled(rc, "aci", cfg["market"], h)
+                           "aci": {**adaptive_conformal.settings(rc), "on": {str(h): range_switches.enabled(rc, "aci", cfg["market"], h)
                                                               for h in rc["horizons"]}}},
               "data": {"first_bar": str(bench.index[0].date()), "last_bar": str(bench.index[-1].date()),
                        "tickers": sum(1 for t in cfg["tickers"] if t in bars),

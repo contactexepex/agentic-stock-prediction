@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from marketbrief.analytics import range_math as rl  # noqa: E402
-import report  # noqa: E402
+from marketbrief.presentation.report import formatting
+from marketbrief.presentation.report import gather  # noqa: E402
 import review  # noqa: E402
 from marketbrief.utils.event_dates import major_event_between  # noqa: E402
 import test_pipeline as tp  # noqa: E402  (helpers only; imported as a module so its tests are not re-collected)
@@ -125,11 +126,11 @@ def test_report_review_line():
     con.execute("SET TimeZone = 'UTC'")
     con.execute("CREATE TABLE review_latest (id VARCHAR, week VARCHAR, report VARCHAR, n_proposals INTEGER, "
                 "low_sample BOOLEAN, computed_at TIMESTAMPTZ)")
-    assert report.weekly_review(con, date(2026, 10, 5)) is None
+    assert gather.weekly_review(con, date(2026, 10, 5)) is None
     con.execute("INSERT INTO review_latest VALUES ('2026-W40', '2026-W40', 'reports/x/review-2026-W40.md', 1, true, now())")
-    rv = report.weekly_review(con, date(2026, 10, 6))            # any session in W41 sees the W40 review
+    rv = gather.weekly_review(con, date(2026, 10, 6))            # any session in W41 sees the W40 review
     assert rv["fresh"] and rv["week"] == "2026-W40"
-    line = report.review_line(rv, "https://example.com/r.md")
+    line = formatting.review_line(rv, "https://example.com/r.md")
     assert line == "Weekly review 2026-W40: 1 proposed range change for a human to decide (low sample) · https://example.com/r.md"
 
 
@@ -179,23 +180,24 @@ def test_summaries_match_hand_calculation():
 
 
 def test_backtest_scale_widens_ranges():
-    import backtest as bt
+    from marketbrief.replay.backtest import evaluation
+    from marketbrief.replay.backtest import observations
     rng = np.random.default_rng(1)
     idx = pd.bdate_range("2025-01-01", periods=320)
     bars = {"A": pd.DataFrame({"close": tp.fat_tailed_walk(rng, 320, 100, 0.01)}, index=idx),
             "B": pd.DataFrame({"close": tp.fat_tailed_walk(rng, 320, 50, 0.02)}, index=idx)}
     rank = {d: i for i, d in enumerate(idx)}
-    obs = bt.observations(bars, ["A", "B"], 1, RC, rank)
-    plain = bt.evaluate(obs, 1, RC, 40)
-    ones = bt.evaluate(obs, 1, RC, 40, scale={i: 1.0 for i in range(320)})
-    double = bt.evaluate(obs, 1, RC, 40, scale={i: 2.0 for i in range(320)})
+    obs = observations.observations(bars, ["A", "B"], 1, RC, rank)
+    plain = evaluation.evaluate(obs, 1, RC, 40)
+    ones = evaluation.evaluate(obs, 1, RC, 40, scale={i: 1.0 for i in range(320)})
+    double = evaluation.evaluate(obs, 1, RC, 40, scale={i: 2.0 for i in range(320)})
     assert len(plain) == 80 and plain.equals(ones)                          # no scale = the formula as before
     ratio = double["width80"] / plain["width80"]
     assert ratio.between(1.95, 2.05).all() and (ratio != 1).all()           # log-width doubles exactly
     assert double["hit80"].mean() >= plain["hit80"].mean()
     assert not np.allclose(double["is80"], plain["is80"])
     # scale applies per start day only
-    half = bt.evaluate(obs, 1, RC, 40, scale={int(plain["rank"].max()): 2.0})
+    half = evaluation.evaluate(obs, 1, RC, 40, scale={int(plain["rank"].max()): 2.0})
     changed = half["width80"] != plain["width80"]
     assert set(half.loc[changed, "rank"]) == {int(plain["rank"].max())}
 
@@ -524,5 +526,5 @@ def test_weekly_review_written_earlier_is_not_fresh():
                 "low_sample BOOLEAN, computed_at TIMESTAMPTZ)")
     con.execute("INSERT INTO review_latest VALUES ('2026-W40', '2026-W40', 'reports/x/review-2026-W40.md', 0, false, "
                 "now() - INTERVAL 2 DAY)")
-    rv = report.weekly_review(con, date(2026, 10, 7))
+    rv = gather.weekly_review(con, date(2026, 10, 7))
     assert rv is not None and rv["fresh"] is False                          # linked in the report, no Slack line

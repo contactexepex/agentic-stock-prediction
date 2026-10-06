@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from marketbrief.analytics import indicators as ind
+from marketbrief.analytics import indicators
 from marketbrief.analytics import regime as regime_rules
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_SECTORS, CFG_TICKERS, CFG_TIMEZONE
 from marketbrief.constants.features import (EX_DIVIDEND_WINDOW_DAYS, MSG_CALENDAR_NOT_COVERED, MSG_NO_BENCHMARK,
@@ -62,7 +62,7 @@ def ticker_values(key: str, bars: dict[str, pd.DataFrame], bench: pd.DataFrame, 
     frame = frame[frame.index <= pd.Timestamp(as_of)] if frame is not None else None
     if frame is None or frame.empty:
         return {"bars": 0, "quality": QUALITY_BLOCKED, "warnings": [MSG_NO_PRICE_DATA]}
-    values = ind.compute(frame, bench["close"])
+    values = indicators.compute(frame, bench["close"])
     if frame.index[-1].date() < as_of:
         values["warnings"].append(MSG_STALE_BAR.format(day=frame.index[-1].date()))
         values["quality"] = QUALITY_PARTIAL if values["quality"] == QUALITY_OK else values["quality"]
@@ -107,8 +107,8 @@ def regime_row(cfg: dict, bench: pd.DataFrame, as_of: date, session: date, input
                now: str) -> tuple[dict, list]:
     """(the regime row, the upcoming market events) for the day; `inputs` = (vol level, vol change, today)."""
     vol_level, vol_change, today_local = inputs
-    bench_ret_5d = ind.period_return(bench["close"], 5)
-    bench_vol_10d = ind.realized_vol(bench["close"])
+    bench_ret_5d = indicators.period_return(bench["close"], 5)
+    bench_vol_10d = indicators.realized_vol(bench["close"])
     upcoming = market_events(cfg, today_local, session + timedelta(days=UPCOMING_EVENT_DAYS))
     near = major_events_near(upcoming, session)
     regime, stress, notes = regime_rules.classify(cfg["regime"], vol_level, bench_ret_5d, bench_vol_10d,

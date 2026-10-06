@@ -15,7 +15,9 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import lessons  # noqa: E402
+from marketbrief.constants import lessons
+from marketbrief.pipeline.lessons import facts
+from marketbrief.pipeline.lessons import validation  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, setup  # noqa: E402
 
 P1, P2, P3 = "2026-08-03-AAPL-5d", "2026-08-10-MSFT-1d", "2026-08-12-AAPL-1d"
@@ -179,16 +181,16 @@ def test_validate_unit_checks():
     f = {"prediction_id": P1, "ticker": "AAPL", "horizon_days": 5, "confidence": 0.62, "actual_return": 0.032,
          "base_close": 100.0, "target_close": 103.2, "range_actual_close": 103.2, "lo80": 95.0, "lo50": 98.0,
          "hi50": 102.0, "hi80": 104.0, "evidence_ids": ["n1"], "rationale": "RSI 45."}
-    assert lessons.text_number_errors(GOOD1, f) == []
-    assert lessons.text_number_errors("Closed 1.2% above the 50% band on 2026-08-10; RSI 45 misled.", f) == []
-    assert lessons.text_number_errors("Rose +3.2%, conf 62%, 5-day call.", f) == []
-    assert lessons.text_number_errors("Fell -3.2%.", f)                      # wrong sign
-    assert lessons.text_number_errors("Rose 3.5%.", f)                       # wrong return
-    assert lessons.text_number_errors("Rose 3%.", f) == []                   # rounding to what is shown
-    assert lessons.text_number_errors("Rose 7%.", f)                         # matches no % value
-    assert lessons.text_number_errors("Closed at 3.2.", f)                   # a return needs its % sign
-    assert lessons.text_number_errors("Closed 103.2%.", f)                   # a close is not a percentage
-    assert lessons.position(94, 95, 98, 102, 104) == "below_80" and lessons.position(100, 95, 98, 102, 104) == "in_50"
+    assert validation.text_number_errors(GOOD1, f) == []
+    assert validation.text_number_errors("Closed 1.2% above the 50% band on 2026-08-10; RSI 45 misled.", f) == []
+    assert validation.text_number_errors("Rose +3.2%, conf 62%, 5-day call.", f) == []
+    assert validation.text_number_errors("Fell -3.2%.", f)                      # wrong sign
+    assert validation.text_number_errors("Rose 3.5%.", f)                       # wrong return
+    assert validation.text_number_errors("Rose 3%.", f) == []                   # rounding to what is shown
+    assert validation.text_number_errors("Rose 7%.", f)                         # matches no % value
+    assert validation.text_number_errors("Closed at 3.2.", f)                   # a return needs its % sign
+    assert validation.text_number_errors("Closed 103.2%.", f)                   # a close is not a percentage
+    assert facts.position(94, 95, 98, 102, 104) == "below_80" and facts.position(100, 95, 98, 102, 104) == "in_50"
 
 
 def test_add_appends_once_with_recomputed_facts(tmp_path):

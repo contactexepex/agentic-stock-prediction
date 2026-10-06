@@ -14,7 +14,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import backtest as bt  # noqa: E402
+from marketbrief.replay.backtest import observations  # noqa: E402
 from marketbrief.constants import events as event_constants  # noqa: E402
 from marketbrief.core import calendar as ev  # noqa: E402
 from marketbrief.analytics import earnings_reaction, event_history  # noqa: E402
@@ -168,7 +168,7 @@ def test_backtest_uses_the_events_known_at_each_day():
     df = pd.DataFrame({"open": close, "close": close}, index=sessions)
     rc = {**ALL_ON, "ewma_lambda": 0.94, "warmup_bars": 60, "earnings_vol_multiple": 3.0}
     extra = {"earnings": versions, "dividends": {}, "bench": df, "index_cue": None}
-    cols = {t: bt.input_columns({**XNYS, "premarket_quotes": False}, rc, df, t, 1, extra) for t in ("ALL", "TSLA")}
+    cols = {t: observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, t, 1, extra) for t in ("ALL", "TSLA")}
     at = lambda t, d: bool(cols[t].loc[pd.Timestamp(d), "earn"])  # noqa: E731
     # Allstate 2023-10-18: the 10-19 pre-announcement is pending as of then (the 10-Q that rules it
     # out comes on 11-01): it counts, as it would have live; a look-ahead replay would say no

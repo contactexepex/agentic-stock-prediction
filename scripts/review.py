@@ -26,12 +26,13 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from marketbrief.analytics import adaptive_conformal as aci
-import backtest as bt
-from marketbrief.core import calendar as ev
-from marketbrief.analytics import indicators as ind
-from marketbrief.analytics import range_math as rl
-from marketbrief.analytics import regime as rg
+from marketbrief.analytics import adaptive_conformal
+from marketbrief.replay.backtest import evaluation
+from marketbrief.replay.backtest import observations
+from marketbrief.core import calendar
+from marketbrief.analytics import indicators
+from marketbrief.analytics import range_math
+from marketbrief.analytics import regime as regime_rules
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.analytics import scoring
 from marketbrief.core.cli import market_arg, require_market
@@ -145,7 +146,7 @@ def load_ranges(con, cfg: dict, week_end: date) -> pd.DataFrame:
     base, y = df["base_close"].astype(float), df["actual_close"].astype(float)
 
     def iscore(lo, hi, band):
-        return [100 * rl.interval_score(a, b, v, band) / bc if not (pd.isna(a) or pd.isna(b)) else np.nan
+        return [100 * range_math.interval_score(a, b, v, band) / bc if not (pd.isna(a) or pd.isna(b)) else np.nan
                 for a, b, v, bc in zip(_num(lo), _num(hi), y, base)]
     df["is50_pct"] = iscore(df["lo50"], df["hi50"], 0.5)
     df["naive_is50_pct"] = iscore(df["naive_lo50"], df["naive_hi50"], 0.5)
@@ -266,8 +267,8 @@ def replay(comp: dict, p: dict) -> dict:
     b = {k: base * math.exp(center + v * s) for k, v in q.items()}
     return {"horizon_days": h, "lo80": b["q10"], "hi80": b["q90"],
             "hit50": b["q25"] <= y <= b["q75"], "hit80": b["q10"] <= y <= b["q90"],
-            "is50": 100 * rl.interval_score(b["q25"], b["q75"], y, 0.5) / base,
-            "is80": 100 * rl.interval_score(b["q10"], b["q90"], y, 0.8) / base,
+            "is50": 100 * range_math.interval_score(b["q25"], b["q75"], y, 0.5) / base,
+            "is80": 100 * range_math.interval_score(b["q10"], b["q90"], y, 0.8) / base,
             "width80": 100 * (b["q90"] - b["q10"]) / base}
 
 
@@ -310,16 +311,16 @@ def history_context(cfg: dict, bars: dict, dates: list) -> tuple[list[str], list
     vk = vol_index_key(cfg)
     vol = bars[vk]["close"].reindex(bench.index) if vk in bars else pd.Series(np.nan, index=bench.index)
     first, last = dates[0].date(), dates[-1].date()
-    events = ev.market_events(cfg, first, last + timedelta(days=30))
+    events = calendar.market_events(cfg, first, last + timedelta(days=30))
     majors = sorted({e["date"] for e in events if e["major"]})
     regimes = []
     for i, d in enumerate(dates):
         tail = bench.iloc[max(0, i - 30): i + 1]
         lvl = None if pd.isna(vol.iloc[i]) else float(vol.iloc[i])
         prev = None if i == 0 or pd.isna(vol.iloc[i - 1]) else float(vol.iloc[i - 1])
-        session = dates[i + 1].date() if i + 1 < len(dates) else ev.next_session(cfg, d.date(), include=False)
-        near = ev.major_events_near(events, session)
-        regimes.append(rg.classify(cfg["regime"], lvl, ind.period_return(tail, 5), ind.realized_vol(tail), bool(near),
+        session = dates[i + 1].date() if i + 1 < len(dates) else calendar.next_session(cfg, d.date(), include=False)
+        near = calendar.major_events_near(events, session)
+        regimes.append(regime_rules.classify(cfg["regime"], lvl, indicators.period_return(tail, 5), indicators.realized_vol(tail), bool(near),
                                    lvl / prev - 1 if lvl and prev else None)[0])
     return regimes, majors
 
@@ -354,13 +355,13 @@ def history_ablation(cfg: dict, rc: dict, rv: dict, bars: dict, week_end: date) 
         for h in p["horizons"]:
             key = (p["ewma_lambda"], p["warmup_bars"], h)
             if key not in cache:
-                cache[key] = bt.observations(bars, cfg["tickers"], h, p, rank)
+                cache[key] = observations.observations(bars, cfg["tickers"], h, p, rank)
             obs = cache[key]
             if obs.empty:
                 continue
             scale = {i: p["regime_factor"].get(regimes[i], 1.0) * (p["major_event_factor"] if major_in(i, h) else 1.0)
                      for i in range(len(dates))}
-            s = hist_summary(bt.evaluate(obs, h, p, rv["history_eval_sessions"], scale=scale))
+            s = hist_summary(evaluation.evaluate(obs, h, p, rv["history_eval_sessions"], scale=scale))
             by_h[f"{h}d"] = s
             n += s["n"]
         variants.append({"name": v["name"], "set": v.get("set") or {}, "n": n, "by_h": by_h})
@@ -455,17 +456,17 @@ def aci_state(con, rc: dict, week_end: date) -> dict:
     (shown whether or not ACI is switched on)."""
     now = f"{week_end}T23:59:59+00:00"
     try:
-        t = aci.live_tracker(con, rc, now, until=week_end)
+        t = adaptive_conformal.live_tracker(con, rc, now, until=week_end)
     except Exception:  # a connection without range_outcomes (nothing scored): no state
-        t = aci.Tracker(rc)
-    return {"settings": aci.settings(rc), "state": t.snapshot()}
+        t = adaptive_conformal.Tracker(rc)
+    return {"settings": adaptive_conformal.settings(rc), "state": t.snapshot()}
 
 
 ACI_SETTING_KEYS = ("gamma", "max_shift", "min_history", "by_regime")
 
 
 def same_aci_settings(stored: dict | None, rc: dict) -> bool:
-    cur = aci.settings(rc)
+    cur = adaptive_conformal.settings(rc)
     return bool(stored) and all(stored.get(k) == cur[k] for k in ACI_SETTING_KEYS)
 
 
@@ -494,7 +495,7 @@ def latest_aci_replay(con, week_end: date, rc: dict) -> dict | None:
     if skipped:
         return {"id": None, "comparison": None, "held_out": None, "settings": None,
                 "note": f"{skipped} stored ACI replay(s), none with the config/ranges.yaml ACI settings "
-                        f"({', '.join(f'{k} {aci.settings(rc)[k]}' for k in ACI_SETTING_KEYS)}): no ACI proposal; "
+                        f"({', '.join(f'{k} {adaptive_conformal.settings(rc)[k]}' for k in ACI_SETTING_KEYS)}): no ACI proposal; "
                         "run replay.py --aci with the current settings"}
     return None
 

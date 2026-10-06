@@ -81,7 +81,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from marketbrief.core import calendar as ev, paths
+from marketbrief.core import calendar, paths
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import benchmark_key, load_market, market_names
@@ -159,13 +159,13 @@ def leakage_label(d, cutoff: date | None = None) -> str:
 
 
 def next_session(cfg: dict, d: date) -> date:
-    return ev.next_session(cfg, d, include=False)
+    return calendar.next_session(cfg, d, include=False)
 
 
 def cutoff_for(cfg: dict, d: date) -> datetime:
     """Pre-open time of the session after d (UTC): the routine's start on that session."""
     s = next_session(cfg, d)
-    opens = ev.session_open_utc(cfg, s)
+    opens = calendar.session_open_utc(cfg, s)
     local = CUTOFF_LOCAL.get(cfg["market"])
     at = (datetime.combine(s, local, ZoneInfo(cfg["timezone"])).astimezone(timezone.utc) if local
           else opens - REGULAR_LEAD)
@@ -176,7 +176,7 @@ def sample_dates(cfg: dict, start: date = SAMPLE_START, end: date = SAMPLE_END, 
     """Every `step`-th exchange trading day from start to end (inclusive), starting with the first."""
     days, d = [], start
     while d <= end:
-        if ev.is_session(cfg, d):
+        if calendar.is_session(cfg, d):
             days.append(d)
         d += timedelta(days=1)
     return days[::step]
@@ -462,7 +462,7 @@ def prepare(cfg: dict, d: date, root: Path, src: Path | None = None, force: bool
         raise SystemExit(f"{d} is on or before the model's training cutoff {model_cut} (config/settings.yaml "
                          "model_training_cutoff): contaminated, not a fair test. "
                          "Pass --allow-training-period to prepare it anyway.")
-    if not ev.is_session(cfg, d):
+    if not calendar.is_session(cfg, d):
         raise SystemExit(f"{d} is not a {market} trading day")
     check_root(root, src, force)
     session, cutoff = next_session(cfg, d), cutoff_for(cfg, d)

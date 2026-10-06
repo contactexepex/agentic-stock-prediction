@@ -17,7 +17,7 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_ranges_config  # noqa: E402
 from marketbrief.core.storage import day_file  # noqa: E402
 from marketbrief.core import calendar as ev  # noqa: E402
-import market_status as ms  # noqa: E402
+from marketbrief.pipeline import market_status as ms  # noqa: E402
 from marketbrief.analytics import range_publication as ranges  # noqa: E402
 from test_pipeline import MARKET, run, setup, write_bars  # noqa: E402
 
@@ -238,8 +238,8 @@ def test_report_labels_late_ranges_and_links_the_review(market):
     assert line["AAPL"].split(" | ")[7] != "–"
     assert "late:" not in line["AAPL"]
     assert "1 stock(s) have ranges made after the first session they cover had opened" in text
-    import report
-    assert report.md_link("review-2026-W40.md") == "[review-2026-W40.md](review-2026-W40.md)"
+    from marketbrief.presentation.report import formatting
+    assert formatting.md_link("review-2026-W40.md") == "[review-2026-W40.md](review-2026-W40.md)"
 
 
 def test_context_pack_labels_late_ranges(market):
@@ -292,7 +292,7 @@ def test_in_session(cfg, now, trading, session, in_session, late):
 
 
 def test_is_late_from_the_open_for_every_horizon():
-    from score_predictions import is_late
+    from marketbrief.pipeline.score_predictions import is_late
     assert not is_late(US, AS_OF, "2026-10-05T13:29:59+00:00")
     assert is_late(US, AS_OF, "2026-10-05T13:30:00+00:00")                    # the open of 2026-10-05
     assert is_late(US, AS_OF, "2026-10-05T20:00:00+00:00")                    # and after the close

@@ -26,10 +26,10 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.storage import append_jsonl  # noqa: E402
 from marketbrief.utils.markdown import cursor_markdown_table  # noqa: E402
-import context  # noqa: E402
+from marketbrief.pipeline import context  # noqa: E402
 import html_report  # noqa: E402
-import report  # noqa: E402
-import score_predictions  # noqa: E402
+from marketbrief.presentation.report import build as report_build, gather  # noqa: E402
+from marketbrief.pipeline import score_predictions  # noqa: E402
 from marketbrief.analytics import scoring  # noqa: E402
 from marketbrief.analytics import smart_money  # noqa: E402
 import view_data  # noqa: E402
@@ -167,8 +167,8 @@ def test_context_sections(cons):
 
 
 def test_report_queries(cons):
-    stable(cons, rows(report.CONF_BANDS_SQL))
-    stable(cons, rows(report.SCORECARD_SQL))
+    stable(cons, rows(view_data.CONF_BANDS_SQL))
+    stable(cons, rows(gather.SCORECARD_SQL))
 
 
 def test_views_insider_flow_and_split_factors(cons):
@@ -185,7 +185,7 @@ def test_percent_half_up_same_in_markdown_and_html():
     """The md report (scoring.percent) and the HTML report's JavaScript (pct0) print the same whole
     percent for every share, half up on its decimal value (0.625 and 5/8 -> 63%)."""
     assert scoring.percent(0.625) == scoring.percent(5 / 8) == "63%"
-    assert report.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
+    assert report_build.percent is scoring.percent and view_data.fmt_call("up", 0.625).endswith("63%")
     assert view_data.record_text(80, 50, "calls").endswith("(63%).")   # 50/80 = 0.625
     node = shutil.which("node")
     if not node:

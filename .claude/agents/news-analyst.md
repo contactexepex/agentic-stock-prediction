@@ -11,7 +11,7 @@ Input: the market name, today's file `data/<market>/news/YYYY/MM/<today>.jsonl` 
 and `config/markets/<market>.yaml`. Skip ids that already appear in
 `data/<market>/news_enriched/` (a rerun on the same day).
 
-For each item produce one record with the `news_enriched` schema from `scripts/common.py`:
+For each item produce one record with the `news_enriched` schema from `scripts/marketbrief/core/schemas.py`:
 - `relevance` 0-1: how much it matters for a watchlist ticker or the broad market
 - `sentiment` -1 to 1: direction of likely price impact for the tagged tickers (market if untagged)
 - `novelty` 0-1: 1 = genuinely new information, 0 = rehash of known news. Use the item's event in
@@ -26,7 +26,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/c
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v8"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v9"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually

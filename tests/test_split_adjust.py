@@ -30,7 +30,7 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.storage import append_jsonl, day_file  # noqa: E402
 from marketbrief.analytics import indicators as ind  # noqa: E402
-import score_predictions  # noqa: E402
+from marketbrief.pipeline import score_predictions  # noqa: E402
 from marketbrief.analytics.features import load_bars  # noqa: E402
 from test_price_fallback import FakeTicker, make_env  # noqa: E402
 

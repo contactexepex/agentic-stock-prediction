@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from marketbrief.analytics import range_math as rl
+from marketbrief.analytics import range_math
 from marketbrief.analytics.earnings_reaction import dividends_in_horizon, earnings_in_horizon, earnings_stats
 from marketbrief.analytics.implied_volatility import implied_sigma
 from marketbrief.analytics.index_cue import clip_beta
@@ -60,7 +60,7 @@ def horizon_width(ctx: RangeContext, hc: HorizonContext, basis: WidthBasis,
         if n >= ctx.rc[INPUT_EARNINGS_HISTORY]["min_events"]:
             mult, earnings_note = m, NOTE_PAST_MOVES.format(count=n, median=median)
             names.append(INPUT_EARNINGS_HISTORY)
-    sigma_h, horizon_notes = rl.horizon_sigma(sigma, hc.h, in_h, ctx.rc, ctx.reg["regime"], hc.major, mult,
+    sigma_h, horizon_notes = range_math.horizon_sigma(sigma, hc.h, in_h, ctx.rc, ctx.reg["regime"], hc.major, mult,
                                               earnings_note)
     return sigma_h, notes + horizon_notes, names
 
@@ -92,7 +92,7 @@ def cue_center(ctx: RangeContext, t: str, f: pd.Series, use_split: bool, notes: 
         notes.append(ctx.index_cue_note)
     if use_split and ctx.index_cue is not None and beta is not None:
         bs = rc[INPUT_BETA_SPLIT]
-        center += rl.beta_split_center(beta, ctx.index_cue, own, bs["index_weight"], bs["own_weight"],
+        center += range_math.beta_split_center(beta, ctx.index_cue, own, bs["index_weight"], bs["own_weight"],
                                        rc["cue_weight"])
         note = MSG_INDEX_CUE.format(index=ctx.index_cue, symbol=ctx.cfg["index_cue"]["symbol"], beta=beta,
                                     weight=bs["index_weight"])
@@ -128,7 +128,7 @@ def ex_dividend_center(ctx: RangeContext, hc: HorizonContext, t: str, base: floa
         return 0.0
     notes.append(MSG_EX_DIVIDEND.format(amount=sum(amounts), share=sum(amounts) / base))
     inputs.append(INPUT_EX_DIVIDEND)
-    return rl.ex_dividend_shift(base, amounts)
+    return range_math.ex_dividend_shift(base, amounts)
 
 
 def range_parts(ctx: RangeContext, hc: HorizonContext, t: str, f: pd.Series) -> RangeParts:
@@ -175,9 +175,9 @@ def range_row(ctx: RangeContext, hc: HorizonContext, t: str) -> dict | None:
         return round(base * math.exp(parts.center + zq * parts.sigma_h), ROUND_PRICE)
 
     close = ctx.bars[t]["close"] if t in ctx.bars else None
-    s20 = rl.realized_sigma(close[close.index <= pd.Timestamp(ctx.as_of)]) if close is not None else None
-    n50 = tuple(round(x, ROUND_PRICE) for x in rl.naive_range(base, s20, hc.h, 0.5)) if s20 else (None, None)
-    n80 = tuple(round(x, ROUND_PRICE) for x in rl.naive_range(base, s20, hc.h, 0.8)) if s20 else (None, None)
+    s20 = range_math.realized_sigma(close[close.index <= pd.Timestamp(ctx.as_of)]) if close is not None else None
+    n50 = tuple(round(x, ROUND_PRICE) for x in range_math.naive_range(base, s20, hc.h, 0.5)) if s20 else (None, None)
+    n80 = tuple(round(x, ROUND_PRICE) for x in range_math.naive_range(base, s20, hc.h, 0.8)) if s20 else (None, None)
     return {
         "id": rid, "made_at": ctx.now, "as_of_date": str(ctx.as_of), "session_date": str(ctx.reg["session_date"])[:10],
         "target_date": str(hc.target), "ticker": t, "horizon_days": hc.h, "base_close": base,

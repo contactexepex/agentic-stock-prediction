@@ -204,7 +204,6 @@ def test_collect_filings_stores_the_header_times(tmp_path):
 def test_events_time_jpm_results_before_the_open(tmp_path, monkeypatch):
     """JPM's 8-K 2.02 of 2026-07-14: 06:30 ET (before the open), not 10:30 ET (during)."""
     from marketbrief.collectors import event_timing, events_sec
-    from marketbrief.sources import sec_acceptance
     _, _, fx = setup(tmp_path)
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))
     cfg = {"market": "us", "calendar": "XNYS", "timezone": "America/New_York"}
@@ -291,7 +290,7 @@ def test_collectors_put_unverified_ciks_in_warnings(tmp_path):
 
 
 def test_events_summary_warns_about_unverified_ciks(tmp_path, monkeypatch):
-    from marketbrief.collectors import event_timing, events_sec
+    from marketbrief.collectors import events_sec
     from marketbrief.sources import sec_acceptance
     fx = mixed_fixtures(tmp_path / "sec", "oldest")
     monkeypatch.setenv("MB_SEC_FIXTURES", str(fx))

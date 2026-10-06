@@ -19,9 +19,12 @@ import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
-import spotcheck  # noqa: E402
+from marketbrief.pipeline import spotcheck  # noqa: E402
 import narrative_numbers as nn  # noqa: E402
-import validate as v  # noqa: E402
+from marketbrief.pipeline.validate import cli
+from marketbrief.pipeline.validate import gate_result
+from marketbrief.pipeline.validate import report_checks
+from marketbrief.pipeline.validate import row_checks  # noqa: E402
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 MARKET = "us"
@@ -92,7 +95,7 @@ def root(tmp_path, monkeypatch):
 
 
 def run(stage: str, **paths) -> dict:
-    return v.run(CFG, stage, paths)
+    return cli.run(CFG, stage, paths)
 
 
 def codes(out: dict, key: str = "failures") -> dict:
@@ -222,7 +225,7 @@ def test_adjustments_files_are_checked_whatever_their_ex_date(root):
     write_jsonl(root, "adjustments", date(2025, 1, 10), [
         {"id": "AAPL-2025-01-10", "ticker": "AAPL", "ex_date": "2025-01-10", "factor": 0.5,
          "detected_at": "2026-09-01T11:00:00+00:00"}])
-    assert v.todays_files(MARKET, "adjustments", TODAY) == [p]
+    assert row_checks.todays_files(MARKET, "adjustments", TODAY) == [p]
     f = codes(run("collect"))["SCHEMA"]
     assert "adjustments/2025/01/2025-01-15.jsonl" in f["detail"] and "bogus" in f["detail"]
 
@@ -399,15 +402,15 @@ def test_collector_summaries_are_sources_but_validate_outputs_are_not(root):
     steps = root / "work" / "steps"
     steps.mkdir()
     (steps / "validate_report.json").write_text(json.dumps({"failures": [{"detail": "31 feeds"}], "n": 31}))
-    pool = v.build_pool(CFG, connect(MARKET), v.load_config(), TODAY, [])
+    pool = report_checks.build_pool(CFG, connect(MARKET), gate_result.load_config(), TODAY, [])
     assert not passes(pool, "News: 31 feeds.")
     (steps / "collect_news.json").write_text(json.dumps({"collector": "news", "feeds": 31, "new_items": 72}))
-    pool = v.build_pool(CFG, connect(MARKET), v.load_config(), TODAY, [])
+    pool = report_checks.build_pool(CFG, connect(MARKET), gate_result.load_config(), TODAY, [])
     assert passes(pool, "News: 31 feeds, 72 new items.")
     assert passes(pool, "Quotes 15/15, news 31 feeds with 72 new items.")       # the real India lines
     assert not passes(pool, "News: 47 feeds.")
     (steps / "collect_quotes.json").write_text("{not json")
-    pool = v.build_pool(CFG, connect(MARKET), v.load_config(), TODAY, [])
+    pool = report_checks.build_pool(CFG, connect(MARKET), gate_result.load_config(), TODAY, [])
     assert any("collect_quotes.json" in n for n in pool.notes)                  # noted, not swallowed
 
 
@@ -424,7 +427,7 @@ def test_planted_invented_percentages_are_caught(root):
     write_jsonl(root, "quotes", TODAY, [{"symbol": "WTI", "yahoo": "CL=F", "ts": "2026-10-06T11:00:00+00:00",
                                          "price": 61.42, "prev_close": 60.93, "change_pct": 0.0081,
                                          "collected_at": "2026-10-06T11:05:00+00:00"}])
-    pool = v.build_pool(CFG, connect(MARKET), v.load_config(), TODAY, [])
+    pool = report_checks.build_pool(CFG, connect(MARKET), gate_result.load_config(), TODAY, [])
     invented = ["Apple revenue rose 12.3% in the quarter.", "AAPL's margin was 24.8%.", "Apple guided 3.5% growth.",
                 "AAPL profit was up 9.1%.", "AAPL fell 2.7% on the news.", "WTI rose 4.6% overnight.",
                 "AAPL gained 1.25%.", "AAPL dropped 18%.", "Revenue rose 12.3% in the quarter.", "Margins were 24.8%."]
@@ -532,13 +535,13 @@ def test_amount_tokens_currency_years_and_suffixes():
 
 def test_report_stage_lists_skipped_source_queries(root, monkeypatch):
     """Issue #32: a source query that fails is noted in info.number_sources (not raised)."""
-    real = v.build_pool
+    real = report_checks.build_pool
 
     def with_note(*a, **k):
         pool = real(*a, **k)
-        v.records(connect(MARKET), "SELECT * FROM no_such_view", notes=pool.notes)
+        report_checks.records(connect(MARKET), "SELECT * FROM no_such_view", notes=pool.notes)
         return pool
-    monkeypatch.setattr(v, "build_pool", with_note)
+    monkeypatch.setattr(report_checks, "build_pool", with_note)
     (root / "reports" / "us").mkdir(parents=True)
     report = "# Brief\n<!-- report-data: as_of=2026-10-05 -->\n"
     (root / "reports" / "us" / "2026-10-06.md").write_text(report)

@@ -15,8 +15,8 @@ from statistics import NormalDist
 import numpy as np
 import pandas as pd
 
-from marketbrief.analytics import adaptive_conformal as aci
-from marketbrief.analytics import range_math as rl
+from marketbrief.analytics import adaptive_conformal
+from marketbrief.analytics import range_math
 from marketbrief.analytics.features import load_bars
 from marketbrief.analytics.range_switches import enabled
 from marketbrief.constants.calibration import (CALIBRATION_QUANTILES, LIVE_RANGE_SQL, MSG_NO_BENCHMARK, ROUND_DECIMALS,
@@ -37,7 +37,7 @@ def history_pool(bars: dict[str, pd.DataFrame], tickers, h: int, rc: dict,
         df = bars.get(t)
         if df is None or len(df) < rc["warmup_bars"] + h + 1:
             continue
-        s = rl.standardized(df["close"], h, rc["ewma_lambda"], rc["warmup_bars"])
+        s = range_math.standardized(df["close"], h, rc["ewma_lambda"], rc["warmup_bars"])
         s = s[np.isfinite(s["z"])]
         for d, z in zip(s.index, s["z"], strict=False):
             r = session_rank.get(d)
@@ -55,7 +55,7 @@ def live_pool(live: pd.DataFrame, h: int, bench: pd.DataFrame, session_rank: dic
         return np.array([]), np.array([])
     last = len(bench) - 1
     ages = np.array([max(0, last - session_rank.get(pd.Timestamp(d), last)) for d in lv["as_of_date"]], dtype=float)
-    weights = rl.recency_weights(ages, rc["half_life_sessions"]) * rc["live_weight"]
+    weights = range_math.recency_weights(ages, rc["half_life_sessions"]) * rc["live_weight"]
     return lv["z"].to_numpy(dtype=float), weights
 
 
@@ -64,7 +64,7 @@ def aci_state(con, cfg: dict, rc: dict, as_of, now: str):
     if not any(enabled(rc, SWITCH_ACI, cfg["market"], h) for h in rc["horizons"]):
         return None, "all"
     # only range outcomes scored by now; with by_regime the alpha of the latest regime
-    tracker = aci.live_tracker(con, rc, now)
+    tracker = adaptive_conformal.live_tracker(con, rc, now)
     reg = con.execute("SELECT regime FROM regime_latest WHERE as_of_date <= ? "
                       "ORDER BY as_of_date DESC LIMIT 1", [as_of]).fetchone()
     return tracker, tracker.key(reg[0] if reg else None)
@@ -73,11 +73,11 @@ def aci_state(con, cfg: dict, rc: dict, as_of, now: str):
 def quantiles(z: np.ndarray, w: np.ndarray, levels: dict, rc: dict, use_aci: bool) -> tuple[dict, str]:
     """(the quantiles of the pool, their source): normal ones when the pool is too small."""
     if len(z) >= rc["min_pool"]:
-        return {k: rl.weighted_quantile(z, w, v) for k, v in levels.items()}, SOURCE_POOL
+        return {k: range_math.weighted_quantile(z, w, v) for k, v in levels.items()}, SOURCE_POOL
     if use_aci:
         return {k: NormalDist().inv_cdf(v) for k, v in levels.items()}, SOURCE_NORMAL
-    lo80, hi80 = rl.normal_quantiles(0.8)
-    lo50, hi50 = rl.normal_quantiles(0.5)
+    lo80, hi80 = range_math.normal_quantiles(0.8)
+    lo50, hi50 = range_math.normal_quantiles(0.5)
     return {"q10": lo80, "q25": lo50, "q75": hi50, "q90": hi80}, SOURCE_NORMAL
 
 
@@ -93,7 +93,7 @@ def compute(cfg: dict, rc: dict, con, bars: dict[str, pd.DataFrame], now: str | 
         use_aci = tracker is not None and enabled(rc, SWITCH_ACI, cfg["market"], h)
         levels = tracker.levels(h, akey) if use_aci else CALIBRATION_QUANTILES
         z_hist, age_hist = history_pool(bars, cfg["tickers"], h, rc, session_rank)
-        w_hist = rl.recency_weights(age_hist, rc["half_life_sessions"])
+        w_hist = range_math.recency_weights(age_hist, rc["half_life_sessions"])
         z_live, w_live = live_pool(live, h, bench, session_rank, rc)
         z, w = np.concatenate([z_hist, z_live]), np.concatenate([w_hist, w_live])
         q, source = quantiles(z, w, levels, rc, use_aci)

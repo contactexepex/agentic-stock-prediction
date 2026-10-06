@@ -7,9 +7,9 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from marketbrief.analytics import range_math as rl
-from marketbrief.analytics import relation_flags as relations
-from marketbrief.analytics import smart_money as sm
+from marketbrief.analytics import range_math
+from marketbrief.analytics import relation_flags
+from marketbrief.analytics import smart_money
 from marketbrief.analytics.event_history import dividend_events, earnings_events, load_events
 from marketbrief.analytics.earnings_reaction import past_moves
 from marketbrief.analytics.features import load_bars
@@ -130,9 +130,9 @@ def load_context(cfg: dict, rc: dict, con, now: str | None = None) -> RangeConte
     existing = set(con.execute("SELECT id FROM ranges").df()["id"])
     bars = load_bars(con)
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
-    rwiden = relations.widen_by_ticker(cfg, rc, con)   # {} unless relation_widen.enabled
+    rwiden = relation_flags.widen_by_ticker(cfg, rc, con)   # {} unless relation_widen.enabled
     now = now or utc_now()
-    smart = sm.range_flags(con, as_of, rc, now)   # fresh activist 13D accepted by made_at; widen off by default
+    smart = smart_money.range_flags(con, as_of, rc, now)   # fresh activist 13D accepted by made_at; widen off by default
     made = datetime.fromisoformat(now)
     first_open, first_close = first_target_open(cfg, as_of), first_target_close(cfg, as_of)
     # SEC 2.02 filings that are not results releases are dropped using the 10-Q/10-K reports
@@ -140,7 +140,7 @@ def load_context(cfg: dict, rc: dict, con, now: str | None = None) -> RangeConte
     events = load_events(con)
     known_by = pd.Timestamp(made).tz_convert(cfg["timezone"]).date()
     earn_ev = earnings_events(events, as_of=known_by)
-    sigma = {t: rl.ewma_sigma(bars[t]["close"], rc["ewma_lambda"]) for t in cfg["tickers"] if t in bars}
+    sigma = {t: range_math.ewma_sigma(bars[t]["close"], rc["ewma_lambda"]) for t in cfg["tickers"] if t in bars}
     moves = {t: past_moves(cfg, bars[t]["close"], sigma[t], earn_ev.get(t, []), rc["warmup_bars"])
              for t in cfg["tickers"] if t in bars} if enabled(rc, INPUT_EARNINGS_HISTORY, cfg["market"]) else {}
     index_cue, index_cue_note = load_index_cue(con, cfg, rc, bars, reg, first_open)
@@ -166,7 +166,7 @@ def horizon_context(ctx: RangeContext, h: int) -> HorizonContext | None:
         q = {"q10": c.q10, "q25": c.q25, "q75": c.q75, "q90": c.q90}
         cal_id = CALIBRATION_ID.format(id=c.id, source=c.source, history=c.n_history, live=c.n_live)
     else:
-        lo80, hi80 = rl.normal_quantiles(0.8)
-        lo50, hi50 = rl.normal_quantiles(0.5)
+        lo80, hi80 = range_math.normal_quantiles(0.8)
+        lo50, hi50 = range_math.normal_quantiles(0.5)
         q, cal_id = {"q10": lo80, "q25": lo50, "q75": hi50, "q90": hi80}, NO_CALIBRATION_ID
     return HorizonContext(h=h, target=tgt, q=q, cal_id=cal_id, major=major)
