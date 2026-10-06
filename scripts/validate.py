@@ -12,7 +12,9 @@ Stages (each runs after the routine step of the same name):
             market symbols, and this run's fetches (quotes, news, filings, announcements); collector
             summaries saved in work/steps/ (or today's row counts); empty, truncated or malformed
             files written today; row schemas (common.SCHEMAS); ISO UTC timestamps not in the
-            future; duplicate ids; close > 0; big 1-day moves; news only from configured outlets.
+            future; duplicate ids; close > 0; big 1-day moves; news only from configured outlets;
+            today's news_articles rows (a warning: nothing reads them yet): known access, no stored
+            article text (<= 3 sentences of <= 40 words), pages read only from allowlisted https URLs.
 - news:     work/enriched.jsonl (news-analyst output) before it is appended.
 - features: every watchlist ticker has a feature row for its latest bar and a regime row exists.
 - context:  work/context.md exists, is the pack of today and names every watchlist ticker.
@@ -399,6 +401,29 @@ def check_news_sources(res: Result, cfg: dict, con, today: date):
                   [t for *_, ts_ in bad for t in (ts_ or []) if t in cfg["tickers"]])
 
 
+def check_articles(res: Result, cfg: dict, today: date):
+    """news_articles written today (collect_articles.py): a known access value, no stored article
+    text (extract: at most 3 sentences of at most 40 words), and a page read only from an
+    allowlisted https:// URL (config/news_sources.yaml)."""
+    import news_verify as nv
+    src, bad = nv.load_sources(), []
+    for p in todays_files(cfg["market"], "news_articles", today):
+        for r in read_rows(p)[0]:
+            ext = r.get("extract") or []
+            if r.get("access") not in nv.ACCESS:
+                bad.append(f"{r.get('id')}: access {r.get('access')!r}")
+            elif len(ext) > 3 or any(len(str(s).split()) > 40 for s in ext):
+                bad.append(f"{r.get('id')}: extract longer than 3 sentences of 40 words")
+            elif r["access"] in ("full", "partial", "paywalled") and r.get("http_status") is not None \
+                    and not nv.url_check(r.get("final_url"), src)[0]:
+                bad.append(f"{r.get('id')}: read from a URL that is not an allowlisted https page "
+                           f"({str(r.get('final_url'))[:60]})")
+            elif r["access"] in ("skipped_unlisted", "undecoded") and r.get("http_status") is not None:
+                bad.append(f"{r.get('id')}: access {r['access']} but an HTTP status is stored")
+    if bad:
+        res.warn("ARTICLE_ROWS", f"{len(bad)} news_articles rows break the article rules, e.g. {bad[:3]}")
+
+
 def stage_collect(res, cfg, con, st, now, today, vc):
     kinds = [k for k in SCHEMAS if k not in STAGE_KINDS["features"] and k not in ("ranges", "predictions",
                                                                                   "news_enriched", "judgments")]
@@ -408,6 +433,7 @@ def stage_collect(res, cfg, con, st, now, today, vc):
     check_fetches(res, cfg, con, now, today, vc)
     res.info["collect"] = check_summaries(res, cfg, {k: v for k, v in counts.items() if v or k in ("prices", "quotes", "news")}, vc)
     check_news_sources(res, cfg, con, today)
+    check_articles(res, cfg, today)
 
 
 # ---------- news (work/enriched.jsonl) ----------

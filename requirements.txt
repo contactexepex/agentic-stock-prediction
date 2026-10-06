@@ -8,3 +8,12 @@ exchange_calendars>=4.5
 pytest>=8.0
 matplotlib>=3.8
 pillow>=10.0
+# News verification phase A (collect_articles.py, news_clusters.py; docs/DESIGN.md 3a)
+requests>=2.31
+lxml>=5.0
+python-dateutil>=2.8
+trafilatura==2.3.0
+newspaper4k==0.9.6
+googlenewsdecoder==0.2.1     # pulls httpx[http2]; it needs selectolax>=0.4.12
+selectolax>=0.4.12,<1.0      # in 1.0 selectolax.parser (imported by googlenewsdecoder 0.2.1) raises ImportError
+datasketch==2.0.0

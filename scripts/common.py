@@ -54,6 +54,34 @@ SCHEMAS: dict[str, tuple[str, dict[str, str]]] = {
         "event_type": "VARCHAR", "urgency": "VARCHAR", "geopolitical": "BOOLEAN",
         "priced_in": "BOOLEAN", "summary": "VARCHAR", "prompt_version": "VARCHAR",
     }),
+    # News verification phase A (docs/DESIGN.md 3a; config/news_sources.yaml). One row per news id
+    # (collect_articles.py): the article page behind a material watchlist headline. access: full |
+    # partial | paywalled (isAccessibleForFree false: description only) | blocked (refused, or an
+    # outlet that refuses cloud traffic) | undecoded (Google News link not resolved) | skipped_unlisted
+    # (not an allowlisted HTTPS host: never requested). No article text: extract = at most 3 key
+    # sentences of <= 40 words; numbers normalised ('3.8e+09 usd', '24.7 pct'); minhash = hex MinHash
+    # (128 x 32-bit) of the 6-word shingles, shingle_count their number (copy detection).
+    "news_articles": ("jsonl", {
+        "id": "VARCHAR", "fetched_at": "TIMESTAMPTZ", "ticker": "VARCHAR", "source_url": "VARCHAR",
+        "final_url": "VARCHAR", "domain": "VARCHAR", "tier": "VARCHAR", "http_status": "INTEGER",
+        "access": "VARCHAR", "extractor": "VARCHAR", "chars": "INTEGER", "date_published": "TIMESTAMPTZ",
+        "date_modified": "TIMESTAMPTZ", "byline": "VARCHAR", "provider": "VARCHAR", "origin_wire": "VARCHAR",
+        "origin_evidence": "VARCHAR", "sources_say": "BOOLEAN", "promotional": "VARCHAR",
+        "extract": "VARCHAR[]", "numbers": "VARCHAR[]", "content_hash": "VARCHAR", "shingle_count": "INTEGER",
+        "minhash": "VARCHAR", "note": "VARCHAR", "method_version": "VARCHAR",
+    }),
+    # Same-event clusters per ticker (news_clusters.py), appended per run when a cluster is new or
+    # changed: as_of = the run time; every input (item first_seen_at, article fetched_at, primary
+    # accepted/published time) is <= inputs_until <= as_of. Read through news_clusters_asof(ts).
+    # origin_groups: JSON list of {origin, news_ids, promotional}; outlets/tiers are parallel lists.
+    "news_clusters": ("jsonl", {
+        "id": "VARCHAR", "as_of": "TIMESTAMPTZ", "cluster_id": "VARCHAR", "ticker": "VARCHAR",
+        "news_ids": "VARCHAR[]", "duplicate_ids": "VARCHAR[]", "n_items": "INTEGER",
+        "outlets": "VARCHAR[]", "tiers": "VARCHAR[]", "independent_origins": "INTEGER",
+        "listed_origins": "INTEGER", "origins": "VARCHAR[]", "origin_groups": "JSON",
+        "primary_ids": "VARCHAR[]", "first_reported_at": "TIMESTAMPTZ", "last_reported_at": "TIMESTAMPTZ",
+        "inputs_until": "TIMESTAMPTZ", "flags": "VARCHAR[]", "state_hash": "VARCHAR", "method_version": "VARCHAR",
+    }),
     "filings": ("jsonl", {
         "id": "VARCHAR", "ticker": "VARCHAR", "cik": "VARCHAR", "form": "VARCHAR",
         "filing_date": "DATE", "accepted_at": "TIMESTAMPTZ", "description": "VARCHAR",

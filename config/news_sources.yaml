@@ -1,0 +1,143 @@
+# News verification, phase A (deterministic, no LLM): docs/DESIGN.md section 3a.
+# scripts/collect_articles.py fetches article pages ONLY from the domains listed under `domains`
+# (HTTPS only, TLS verification on); anything else is recorded as access=skipped_unlisted and never
+# requested. scripts/news_clusters.py groups same-event items and counts independent origins.
+# Free sources only, personal non-commercial research; no full article text is stored.
+# Outlet behaviour below was tested from the cloud environment on 2026-10-06 (see the design note
+# in DESIGN.md 3a): `fetch: false` = the outlet refuses cloud traffic (bot protection), so it is
+# never requested (its items are recorded access=blocked without a request); its tier still counts.
+
+selection:
+  min_tag_confidence: high      # high = only items whose title names exactly one watchlist company (primary)
+  lookback_hours: 24            # news rows first seen in the last N hours (this run's collection)
+  max_age_hours: 48             # skip items published longer ago than this
+  max_per_run: 80               # pages requested per run (decode + fetch count as one item)
+  min_priority: 1               # sum of matching `material_terms` weights in the title
+  pause_seconds: 1.5            # between requests (per run, all hosts)
+  timeout_seconds: 20
+  max_bytes: 4000000            # larger pages are cut (a Yahoo article page is ~1.1 MB)
+  max_redirects: 5              # every hop must be HTTPS and on an allowlisted domain
+  max_seconds: 900              # stop fetching after this many seconds (rows not written are tried next run)
+  decode_batch: 10              # Google News links decoded per batch (one GET each + one POST)
+  user_agent: "market-brief/1.0 (personal non-commercial research; low volume)"
+  full_chars: 800               # extracted body at least this long = access full, shorter = partial
+  min_chars: 400                # an extractor's text shorter than this falls through to the next one
+
+# Title terms that make an item material enough to read (case-insensitive regexes, weight summed).
+material_terms:
+  3: ['results?', 'earnings', 'profit', 'net income', 'revenue', 'guidance', 'outlook', 'forecasts?',
+      'deliveries', 'acqui\w*', 'merger', 'takeover', 'buyout', 'IPO', 'stake', 'CEO', 'CFO', 'chairman',
+      'appoint\w*', 'resign\w*', 'steps? down', 'FDA', 'approv\w*', 'recall\w*', 'lawsuit', 'sued',
+      'probe', 'investigation', 'penalty', 'fine[ds]?', 'settle\w*', 'SEBI', 'antitrust', 'bankrupt\w*',
+      'default', 'dividend', 'buyback', 'split', 'bonus', 'layoffs?', 'job cuts', 'strike', 'order',
+      'contract', 'deal', 'Q[1-4]', 'quarter\w*']
+  1: ['upgrad\w*', 'downgrad\w*', 'target', 'launch\w*', 'partnership', 'expan\w*', 'plant',
+      'invest\w*', 'raises?', 'cuts?', 'record', 'plunges?', 'surges?', 'slumps?', 'jumps?', 'tumbles?']
+
+# Allowlisted outlets. Matched on the host and its parent domains (m.economictimes.com ->
+# economictimes.com). tier: primary (regulators, exchanges, company releases), tier1 (wires and
+# major outlets), tier2 (established outlets and aggregators that syndicate them; the JSON-LD
+# provider or byline decides the origin). names: source labels Google News uses for the outlet.
+# extract: optional extractor order for the outlet (default jsonld, trafilatura, newspaper).
+domains:
+  # primary sources
+  sec.gov: {tier: primary}
+  nseindia.com: {tier: primary}
+  bseindia.com: {tier: primary, fetch: false, note: "api.bseindia.com refuses cloud traffic"}
+  rbi.org.in: {tier: primary}
+  sebi.gov.in: {tier: primary}
+  federalreserve.gov: {tier: primary}
+  bls.gov: {tier: primary}
+  prnewswire.com: {tier: primary, names: [PR Newswire, PR Newswire UK], note: "company press releases"}
+  businesswire.com: {tier: primary, names: [Business Wire], note: "company press releases"}
+  globenewswire.com: {tier: primary, names: [GlobeNewswire, GlobeNewswire News Room], note: "company press releases"}
+  lilly.com: {tier: primary, names: [Eli Lilly and Company, Lilly], note: "company releases"}
+  # tier1: wires and major outlets
+  reuters.com: {tier: tier1, names: [Reuters], fetch: false, note: "401 DataDome (2026-10-06); read via syndicated copies"}
+  apnews.com: {tier: tier1, names: [AP News, The Associated Press, Associated Press], fetch: false, note: "403 Cloudflare (2026-10-06)"}
+  bloomberg.com: {tier: tier1, names: [Bloomberg, Bloomberg.com]}
+  wsj.com: {tier: tier1, names: [WSJ, The Wall Street Journal, Wall Street Journal]}
+  ft.com: {tier: tier1, names: [Financial Times]}
+  cnbc.com: {tier: tier1, names: [CNBC], fetch: false, note: "403 Akamai (2026-10-06)"}
+  marketwatch.com: {tier: tier1, names: [MarketWatch], fetch: false, note: "401 DataDome (2026-10-06)"}
+  barrons.com: {tier: tier1, names: ["Barron's"], fetch: false, note: "401 DataDome (2026-10-06)"}
+  nytimes.com: {tier: tier1, names: [The New York Times]}
+  theguardian.com: {tier: tier1, names: [The Guardian]}
+  bbc.com: {tier: tier1, names: [BBC, BBC Business, BBC News]}
+  bbc.co.uk: {tier: tier1}
+  theglobeandmail.com: {tier: tier1, names: [The Globe and Mail]}
+  economictimes.indiatimes.com: {tier: tier1, names: [The Economic Times, Economic Times, ET Markets, ET Now]}
+  economictimes.com: {tier: tier1}
+  livemint.com: {tier: tier1, names: [Mint, mint, Livemint, Livemint Markets]}
+  business-standard.com: {tier: tier1, names: [Business Standard, Business Standard Markets, Business Standard Companies]}
+  thehindubusinessline.com: {tier: tier1, names: [BusinessLine, The Hindu BusinessLine, BusinessLine Markets, BusinessLine Companies]}
+  moneycontrol.com: {tier: tier1, names: [Moneycontrol, Moneycontrol.com], extract: [jsonld, newspaper, trafilatura]}
+  # tier2: established outlets and aggregators
+  finance.yahoo.com: {tier: tier2, names: [Yahoo Finance, Yahoo Finance UK, Yahoo Finance Singapore, "Yahoo! Finance Canada", Yahoo Finance Canada]}
+  aol.com: {tier: tier2, names: [AOL.com, AOL]}
+  aol.ca: {tier: tier2}
+  bnnbloomberg.ca: {tier: tier2, names: [BNN Bloomberg]}
+  morningstar.com: {tier: tier2, names: [Morningstar], fetch: false, note: "202 bot challenge (2026-10-06)"}
+  investing.com: {tier: tier2, names: [Investing.com, Investing.com India, Investing.com Australia, Investing.com UK], fetch: false, note: "403 Cloudflare (2026-10-06)"}
+  benzinga.com: {tier: tier2, names: [Benzinga], fetch: false, note: "403 Cloudflare (2026-10-06)"}
+  fortune.com: {tier: tier2, names: [Fortune]}
+  forbes.com: {tier: tier2, names: [Forbes]}
+  investors.com: {tier: tier2, names: ["Investor's Business Daily"]}
+  businessinsider.com: {tier: tier2, names: [Business Insider, Markets Insider]}
+  axios.com: {tier: tier2, names: [Axios]}
+  cnn.com: {tier: tier2, names: [CNN, CNN Business]}
+  foxbusiness.com: {tier: tier2, names: [Fox Business]}
+  fiercepharma.com: {tier: tier2, names: [Fierce Pharma]}
+  statnews.com: {tier: tier2, names: [STAT, STAT News]}
+  techcrunch.com: {tier: tier2, names: [TechCrunch]}
+  theverge.com: {tier: tier2, names: [The Verge]}
+  cnbctv18.com: {tier: tier2, names: [CNBC TV18, CNBCTV18]}
+  businesstoday.in: {tier: tier2, names: [Business Today]}
+  ndtvprofit.com: {tier: tier2, names: [NDTV Profit]}
+  financialexpress.com: {tier: tier2, names: [The Financial Express, Financial Express]}
+  hindustantimes.com: {tier: tier2, names: [Hindustan Times]}
+  thehindu.com: {tier: tier2, names: [The Hindu]}
+  timesofindia.indiatimes.com: {tier: tier2, names: [The Times of India, Times of India]}
+  indianexpress.com: {tier: tier2, names: [The Indian Express]}
+  zeebiz.com: {tier: tier2, names: [Zee Business]}
+  fortuneindia.com: {tier: tier2, names: [Fortune India]}
+
+# News agencies: an item whose byline, JSON-LD provider, dateline ("(Reuters) -"), title ("By Reuters")
+# or text attribution ("Reuters reported", "according to a Reuters report", "told PTI", "with inputs
+# from PTI") names one is a copy of that agency's story: one origin, however many outlets carry it.
+# names: matched as the whole byline/provider/source label; attribution: names used in the text
+# patterns (ambiguous short names such as AP are left out there).
+wires:
+  Reuters: {names: [Reuters, Reuters Staff, Thomson Reuters], attribution: [Reuters], domains: [reuters.com]}
+  Bloomberg: {names: [Bloomberg, Bloomberg News], attribution: [Bloomberg, Bloomberg News], domains: [bloomberg.com]}
+  AP: {names: [AP, Associated Press, The Associated Press], attribution: [Associated Press, The Associated Press], domains: [apnews.com]}
+  PTI: {names: [PTI, Press Trust of India], attribution: [PTI, Press Trust of India], domains: [ptinews.com]}
+  IANS: {names: [IANS, IANS Live], attribution: [IANS], domains: [ianslive.in]}
+  ANI: {names: [ANI, Asian News International], attribution: [ANI], domains: [aninews.in]}
+  AFP: {names: [AFP, Agence France-Presse], attribution: [AFP, Agence France-Presse], domains: [afp.com]}
+  Dow Jones: {names: [Dow Jones, Dow Jones Newswires], attribution: [Dow Jones Newswires], domains: [dowjones.com]}
+
+# Vendor or promotional content, flagged `promotional` and never counted as an independent origin:
+# matched on the JSON-LD provider, the byline or the source label (whole name, case-insensitive),
+# on the domain, or on marker phrases in the text.
+promotional:
+  providers: [TIKR, TIKR.com, Simply Wall St, Simply Wall St., Simply Wall Street, Zacks, Zacks Investment Research,
+              Zacks Equity Research, The Motley Fool, Motley Fool, InvestorPlace, 24/7 Wall St., 247wallst.com,
+              Insider Monkey, insidermonkey.com, MarketBeat, StockStory, Kalkine Media, kalkine.ca, kalkinemedia.com,
+              Intellectia, Intellectia AI, Pluang, TradingKey, ad-hoc-news.de, Stock Titan, Trefis, GuruFocus, TipRanks,
+              ChartMill, FinanceBuzz]
+  domains: [tikr.com, simplywall.st, zacks.com, fool.com, investorplace.com, 247wallst.com, insidermonkey.com,
+            marketbeat.com, stockstory.org, kalkine.ca, kalkinemedia.com, intellectia.ai, pluang.com, tradingkey.com,
+            ad-hoc-news.de, stocktitan.net, trefis.com, gurufocus.com, tipranks.com, chartmill.com]
+  text: ['Potential Total Return', 'Target Price \(Mid\)', 'Zacks Rank #', 'Simply Wall St has no position',
+         'The Motley Fool has positions in', 'sponsored (?:content|post)', 'paid (?:promotion|advertisement)',
+         'advertorial']
+
+clusters:
+  window_hours: 72              # items of one ticker within this many hours can share a cluster
+  lookback_hours: 144           # items considered per run (clusters are written only when one of their items is in the last window_hours)
+  title_jaccard: 0.5            # informative title tokens (stopwords and the company's own name removed)
+  title_min_shared: 2           # ... and at least this many shared tokens
+  copy_containment: 0.5         # MinHash 6-shingle containment at or above this = same origin (and same event)
+  min_shingles: 30              # both texts need this many shingles for the copy test
+  sec_forms: [8-K, 8-K/A, 6-K, 10-Q, 10-K, 20-F, SC 13D, SCHEDULE 13D, SC 13D/A, 425, S-1, DEFA14A]

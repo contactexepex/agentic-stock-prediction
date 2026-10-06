@@ -1,0 +1,523 @@
+"""News verification phase A (scripts/news_verify.py, collect_articles.py, news_clusters.py and the
+news_clusters_asof macro). Offline: article pages are trimmed real pages in
+tests/fixtures/articles/ (provenance in its README), Google News decoding and HTTP are fakes, and
+every test runs with sockets disabled, so nothing here can reach the network."""
+from __future__ import annotations
+
+import json
+import socket
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+
+import ai_replay  # noqa: E402
+import collect_articles  # noqa: E402
+import common  # noqa: E402
+import news_clusters  # noqa: E402
+import news_verify as nv  # noqa: E402
+import validate  # noqa: E402
+
+FIX = REPO / "tests" / "fixtures" / "articles"
+URLS = {
+    "aol": "https://www.aol.com/articles/chevron-elevates-cfo-head-oil-132520000.html",
+    "bnn": "https://www.bnnbloomberg.ca/markets/oil/2026/10/05/chevron-names-jeff-gustavson-as-next-cfo/",
+    "yahoo": "https://finance.yahoo.com/markets/stocks/articles/tesla-delivered-22-141-more-154841680.html",
+    "mint_premium": "https://www.livemint.com/industry/banking/anup-bagchi-hdfc-bank-rbi-private-banks-bank-ceos-"
+                    "banking-leadership-kaizad-bharucha-succession-plan-11790914216055.html",
+    "bs_jio": "https://www.business-standard.com/companies/news/jio-platforms-likely-to-launch-ipo-on-october-21-"
+              "seeks-to-raise-3-8-bn-126100500424_1.html",
+    "mint_jio": "https://www.livemint.com/market/stock-market-news/jio-platforms-to-launch-3-8-billion-ipo-on-"
+                "october-21-set-to-be-india-s-biggest-listing-report-11791196582417.html",
+}
+PAGES = {URLS["aol"]: "aol_chevron", URLS["bnn"]: "bnn_chevron", URLS["yahoo"]: "yahoo_tikr_tesla",
+         URLS["mint_premium"]: "mint_hdfc_premium", URLS["bs_jio"]: "bs_jio", URLS["mint_jio"]: "mint_jio"}
+
+
+def page(name: str) -> str:
+    return (FIX / f"{name}.html").read_text(encoding="utf-8")
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    def refuse(*a, **k):
+        raise AssertionError(f"network access attempted: {a[:2]}")
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+
+
+@pytest.fixture(scope="module")
+def src():
+    return nv.load_sources()
+
+
+def parse(name: str, src: nv.Sources) -> dict:
+    url = next(u for u, n in PAGES.items() if n == name)
+    return nv.parse_article(page(name), url, src, src.lookup(nv.host_of(url))[1])
+
+
+# ---------- allowlist and fetching ----------
+
+def test_url_check(src):
+    assert nv.url_check(URLS["bnn"], src)[0]
+    assert nv.url_check("https://m.economictimes.com/markets/x.cms", src)[:2] == (True, "ok")
+    ok, why, _ = nv.url_check("http://www.bnnbloomberg.ca/x", src)
+    assert not ok and "not https" in why
+    ok, why, _ = nv.url_check("https://www.marketbeat.com/x", src)
+    assert not ok and "not on the allowlist" in why
+    ok, why, dom = nv.url_check("https://www.reuters.com/x", src)     # listed, refuses cloud traffic
+    assert not ok and dom == "reuters.com"
+    assert not nv.url_check("https://www.bnnbloomberg.ca:8443/x", src)[0]
+    assert not nv.url_check("https://evilbnnbloomberg.ca/x", src)[0]   # suffix match is per label
+
+
+class FakeResponse:
+    def __init__(self, status=200, html="", location=None):
+        self.status_code, self._html = status, html
+        self.headers = {"content-type": "text/html; charset=utf-8"}
+        if location:
+            self.headers["location"] = location
+        self.is_redirect = location is not None
+        self.encoding = "utf-8"
+
+    def iter_content(self, n):
+        b = self._html.encode("utf-8")
+        for i in range(0, len(b), n):
+            yield b[i:i + n]
+
+    def close(self):
+        pass
+
+
+class FakeSession:
+    def __init__(self, routes: dict):
+        self.routes, self.calls = routes, []
+
+    def get(self, url, **kw):
+        assert kw.get("verify") is True and kw.get("allow_redirects") is False
+        self.calls.append(url)
+        r = self.routes.get(url)
+        if r is None:
+            return FakeResponse(404)
+        if isinstance(r, tuple):
+            return FakeResponse(r[0], location=r[1])
+        return FakeResponse(200, page(r))
+
+    def close(self):
+        pass
+
+
+def test_fetch_never_requests_http_or_unlisted(src):
+    s = FakeSession({"https://www.livemint.com/r": (302, "https://unlisted.example.org/x"),
+                     "https://www.livemint.com/h": (301, "http://www.livemint.com/x"),
+                     URLS["bnn"]: "bnn_chevron"})
+    assert nv.fetch_page(s, "http://www.livemint.com/a", src).skipped and s.calls == []
+    assert nv.fetch_page(s, "https://www.marketbeat.com/a", src).skipped and s.calls == []
+    r = nv.fetch_page(s, "https://www.livemint.com/r", src)       # redirect to an unlisted host: not followed
+    assert r.html is None and "not on the allowlist" in r.skipped and s.calls == ["https://www.livemint.com/r"]
+    r = nv.fetch_page(s, "https://www.livemint.com/h", src)       # redirect to http://: not followed
+    assert r.html is None and "not https" in r.skipped and s.calls[-1] == "https://www.livemint.com/h"
+    r = nv.fetch_page(s, URLS["bnn"], src)
+    assert r.status == 200 and "Chevron" in r.html and r.requests == 1
+
+
+# ---------- extraction ----------
+
+def test_extraction_order_jsonld_then_trafilatura_then_newspaper(monkeypatch, src):
+    called = []
+
+    def fake(name, n):
+        def f(html, url):
+            called.append(name)
+            return "x" * n
+        return f
+    ld = '<script type="application/ld+json">{"@type": "NewsArticle", "articleBody": "%s"}</script>'
+    long_body, short_body = "Long body sentence. " * 60, "Short."
+    monkeypatch.setitem(nv.EXTRACTORS, "trafilatura", fake("trafilatura", 50))
+    monkeypatch.setitem(nv.EXTRACTORS, "newspaper", fake("newspaper", 900))
+    a = nv.parse_article(f"<html><head>{ld % long_body}</head><body></body></html>", "https://x.test", src)
+    assert a["extractor"] == "jsonld" and a["access"] == "full" and called == []
+    a = nv.parse_article(f"<html><head>{ld % short_body}</head><body></body></html>", "https://x.test", src)
+    assert a["extractor"] == "newspaper" and called == ["trafilatura", "newspaper"] and a["access"] == "full"
+    called.clear()
+    monkeypatch.setitem(nv.EXTRACTORS, "trafilatura", fake("trafilatura", 600))
+    a = nv.parse_article("<html><body><p>x</p></body></html>", "https://x.test", src)
+    assert a["extractor"] == "trafilatura" and called == ["trafilatura"] and a["access"] == "partial"  # < full_chars
+    # per-domain order (config `extract`)
+    called.clear()
+    a = nv.parse_article("<html><body><p>x</p></body></html>", "https://x.test", src,
+                         {"extract": ["newspaper", "trafilatura"]})
+    assert called == ["newspaper"] and a["extractor"] == "newspaper"
+
+
+def test_real_pages_extraction(src):
+    bnn, aol = parse("bnn_chevron", src), parse("aol_chevron", src)
+    assert bnn["extractor"] == "jsonld" and bnn["byline"] == "Reuters Staff" and bnn["access"] == "full"
+    assert aol["extractor"] == "trafilatura" and aol["provider"] == "Reuters"
+    assert aol["date_published"] == "2026-10-05T13:25:20+00:00"
+    assert src.detect_wire(byline=bnn["byline"], provider=bnn["provider"], text=bnn["text"]) == ("Reuters", "byline")
+    assert src.detect_wire(byline=aol["byline"], provider=aol["provider"], text=aol["text"]) == ("Reuters", "provider")
+
+
+def test_paywall_reads_description_only(src):
+    a = parse("mint_hdfc_premium", src)
+    assert a["access"] == "paywalled" and a["extractor"] == "description"
+    assert a["text"].startswith("Anup Bagchi’s appointment as HDFC Bank CEO adds to a recent string")
+    html = page("mint_hdfc_premium")
+    assert "Announced late on 1 October" in html            # the paywalled part is in the page ...
+    assert "Announced late on 1 October" not in a["text"]   # ... and never read
+
+
+def test_vendor_content_is_promotional(src):
+    a = parse("yahoo_tikr_tesla", src)
+    assert a["provider"] == "TIKR"
+    assert src.is_promotional(name=a["provider"]) == "provider TIKR"
+    assert src.is_promotional(name="24/7 Wall St") and src.is_promotional(name="The Motley Fool")
+    assert src.is_promotional(name="Reuters") is None
+
+
+def test_reuters_copy_detected_by_shingles(src):
+    """AOL (provider Reuters) and BNN Bloomberg (byline Reuters Staff) carry one Reuters story:
+    6-shingle containment 0.958 on the full pages, about 0.90 on the trimmed fixtures."""
+    a, b = nv.shingles(parse("aol_chevron", src)["text"]), nv.shingles(parse("bnn_chevron", src)["text"])
+    assert nv.containment_exact(a, b) >= 0.85
+    est = nv.containment_est(nv.minhash_hex(a), len(a), nv.minhash_hex(b), len(b))
+    assert est >= 0.5
+
+
+def test_mint_rewrite_only_caught_by_attribution(src):
+    mint, bs = parse("mint_jio", src), parse("bs_jio", src)
+    a, b = nv.shingles(mint["text"]), nv.shingles(bs["text"])
+    assert nv.containment_exact(a, b) < 0.5                     # wording alone misses the rewrite
+    assert nv.containment_est(nv.minhash_hex(a), len(a), nv.minhash_hex(b), len(b)) < 0.5
+    assert src.detect_wire(byline=mint["byline"], provider=mint["provider"], text=mint["text"]) == ("Reuters", "attribution")
+    assert src.detect_wire(byline=bs["byline"], text=bs["text"]) == ("Reuters", "byline")
+    assert nv.sources_say(mint["text"]) and nv.sources_say(bs["text"])
+
+
+@pytest.mark.parametrize("text,wire", [
+    ("HOUSTON, Oct 5 (Reuters) - Chevron said", ("Reuters", "dateline")),
+    ("Mumbai, Oct 5 (PTI) The company said", ("PTI", "dateline")),
+    ("The bank plans a listing, according to a Bloomberg News report.", ("Bloomberg", "attribution")),
+    ("The CEO told PTI on Monday that orders rose.", ("PTI", "attribution")),
+    ("Shares rose 2%. (With inputs from PTI)", ("PTI", "attribution")),
+    ("Prices rose, the company said in a statement.", (None, None)),
+])
+def test_wire_in_text(src, text, wire):
+    assert src.wire_in_text(text) == wire
+
+
+def test_wire_in_title_and_source(src):
+    assert src.detect_wire(title="Chevron elevates CFO to head oil and gas operations By Reuters") == ("Reuters", "title")
+    assert src.detect_wire(title="Jio Platforms IPO: $3.8 Billion Issue Set To Launch October 21, Reuters Reports") == ("Reuters", "title")
+    assert src.detect_wire(title="Chevron names new CFO", source="Reuters") == ("Reuters", "source")
+    assert src.detect_wire(title="Chevron names new CFO", source="BNN Bloomberg") == (None, None)
+
+
+def test_numbers_and_extract(src):
+    assert nv.numbers("raise about $3.8 billion; Rs 5,77,094 crore; up 24.7%; 486,532 cars in 2026; Q3 FY26") == \
+        ["3.8e+09 usd", "5.77094e+12 inr", "24.7 pct", "486532"]
+    assert nv.distinctive(nv.numbers("HDFC Bank shares rise 2% after Q3")) == set()
+    assert nv.distinctive(nv.numbers("Jio seeks to raise $3.8 bn")) == {"3.8e+09 usd"}
+    ext = nv.key_sentences(parse("bnn_chevron", src)["text"], ["Chevron"])
+    assert 1 <= len(ext) <= 3 and all(len(s.split()) <= 40 for s in ext)
+
+
+# ---------- collector (in-process, fake decoder and HTTP) ----------
+
+MARKET = "nvmkt"
+NOW = "2026-10-05T20:00:00+00:00"
+MARKET_YAML = """
+market: nvmkt
+name: News verification test market
+calendar: XNYS
+timezone: America/New_York
+currency: USD
+symbols: {}
+sectors:
+  Energy: [CVX]
+  Autos: [TSLA]
+  Conglomerates: [RELIANCE]
+tickers:
+  CVX: {name: Chevron}
+  TSLA: {name: Tesla}
+  RELIANCE: {name: Reliance Industries, aliases: [Jio Platforms]}
+news: {}
+"""
+
+
+def gn(i: int) -> str:
+    return f"https://news.google.com/rss/articles/CBMi{i:04d}?oc=5"
+
+
+def news_row(i: int, title: str, ticker: str, *, source: str, domain: str | None, url: str | None = None,
+             conf: str = "high", seen: str = "2026-10-05T19:00:00+00:00", pub: str = "2026-10-05T14:00:00+00:00") -> dict:
+    return {"id": f"n{i:02d}", "title": title, "url": url or gn(i), "source": source, "published_at": pub,
+            "first_seen_at": seen, "feed": "gnews:test", "category": "company", "tickers": [ticker],
+            "primary_tickers": [ticker], "mentioned_tickers": [], "tag_confidence": conf,
+            "source_domain": domain, "tag_version": 2}
+
+
+CVX_AOL = "Chevron elevates CFO to lead oil and gas operations"
+CVX_BNN = "Chevron names Jeff Gustavson as next CFO"
+JIO_BS = "Jio Platforms likely to launch IPO on October 21, seeks to raise $3.8 bn"
+JIO_MINT = "Jio Platforms to launch $3.8 billion IPO on October 21, set to be India's biggest listing: Report"
+JIO_BT = "Jio Platforms IPO: $3.8 Billion Issue Set To Launch October 21, Reuters Reports"
+
+
+def base_news() -> list[dict]:
+    return [
+        news_row(1, CVX_BNN, "CVX", source="BNN Bloomberg", domain="bnnbloomberg.ca"),
+        news_row(2, CVX_AOL, "CVX", source="AOL.com", domain="aol.com"),
+        news_row(3, "Chevron names Gustavson CFO as Bonner moves to oil unit", "CVX", source="marketscreener.com",
+                 domain="marketscreener.com"),
+        news_row(4, "Chevron CFO Bonner to lead oil business", "CVX", source="BNN Bloomberg", domain=None,
+                 url="http://www.bnnbloomberg.ca/chevron-cfo"),
+        news_row(5, "Chevron names Jeff Gustavson next CFO", "CVX", source="Reuters", domain="reuters.com"),
+        news_row(6, "Tesla Delivered 22,141 More Vehicles Than It Built in Q3", "TSLA", source="Yahoo Finance",
+                 domain="finance.yahoo.com"),
+        news_row(7, "Tesla Q3 deliveries: what the numbers mean", "TSLA", source="Mint", domain="livemint.com"),
+        news_row(8, "Tesla CFO comments on Q3 deliveries", "TSLA", source="Mint", domain="livemint.com"),
+        news_row(9, "Tesla recalls vehicles in Q3 probe", "TSLA", source="Mint", domain="livemint.com"),
+        news_row(10, "Tesla quarter deliveries record", "TSLA", source="Mint", domain="livemint.com"),
+        news_row(11, "Chevron CFO change: what it means", "CVX", source="Barron's", domain="barrons.com", conf="low"),
+        news_row(12, CVX_BNN, "CVX", source="BNN Bloomberg", domain=None),   # same article, older label-only row
+        news_row(13, JIO_BS, "RELIANCE", source="Business Standard", domain="business-standard.com"),
+        news_row(14, JIO_MINT, "RELIANCE", source="Mint", domain="livemint.com"),
+        news_row(15, JIO_BT, "RELIANCE", source="Business Today", domain=None, conf="low"),
+        news_row(16, JIO_BT, "RELIANCE", source="businesstoday.in", domain=None, conf="low"),
+    ]
+
+
+DECODED = {gn(1): URLS["bnn"], gn(2): URLS["aol"], gn(6): URLS["yahoo"],
+           gn(7): "https://evil.example.com/tesla",          # decoded to an unlisted host
+           gn(8): "http://www.livemint.com/tesla-cfo",       # decoded to plain http
+           gn(9): "https://www.livemint.com/r",              # redirects off the allowlist
+           gn(13): URLS["bs_jio"], gn(14): URLS["mint_jio"]}   # gn(10): decoder fails
+
+
+class Env:
+    def __init__(self, tmp: Path, monkeypatch):
+        self.root, self.cfg, self.mp = tmp / "repo", tmp / "config", monkeypatch
+        (self.cfg / "markets").mkdir(parents=True)
+        (self.cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML)
+        for name in ("news_sources.yaml", "validate.yaml", "ranges.yaml", "settings.yaml", "events.yaml"):
+            (self.cfg / name).write_text((REPO / "config" / name).read_text())
+        ns = self.cfg / "news_sources.yaml"   # no pacing against the fakes
+        ns.write_text(ns.read_text().replace("pause_seconds: 1.5", "pause_seconds: 0"))
+        monkeypatch.setattr(common, "ROOT", self.root)
+        monkeypatch.setattr(common, "CONFIG", self.cfg)
+        self.decoded_links: list[str] = []
+        self.session = FakeSession({**{u: n for u, n in PAGES.items()},
+                                    "https://www.livemint.com/r": (302, "https://unlisted.example.org/x")})
+
+        def decoder(links, _src):
+            self.decoded_links += links
+            return [{"success": True, "decoded_url": DECODED[x]} if x in DECODED else
+                    {"success": False, "message": "fake decode failure"} for x in links]
+        monkeypatch.setattr(collect_articles, "DECODER", decoder)
+        monkeypatch.setattr(collect_articles, "SESSION_FACTORY", lambda: self.session)
+        self.set_now(NOW)
+
+    def set_now(self, t: str):
+        self.mp.setenv("MB_NOW", t)
+
+    def write(self, kind: str, rows: list[dict], day: str = "2026-10-05"):
+        p = self.root / "data" / MARKET / kind / day[:4] / day[5:7] / f"{day}.jsonl"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+
+    def run(self, module, capsys) -> dict:
+        self.mp.setattr(sys, "argv", [module.__name__, "--market", MARKET])
+        assert module.main() == 0
+        return json.loads(capsys.readouterr().out)
+
+    def rows(self, kind: str) -> list[dict]:
+        return [json.loads(l) for f in sorted((self.root / "data" / MARKET / kind).glob("**/*.jsonl"))
+                for l in f.read_text().splitlines() if l.strip()]
+
+
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    e = Env(tmp_path, monkeypatch)
+    e.write("news", base_news())
+    return e
+
+
+def test_collect_articles(env, capsys, src):
+    s = env.run(collect_articles, capsys)
+    rows = {r["id"]: r for r in env.rows("news_articles")}
+    access = {k: r["access"] for k, r in rows.items()}
+    assert access == {
+        "n01": "full", "n02": "full", "n03": "skipped_unlisted", "n04": "skipped_unlisted", "n05": "blocked",
+        "n06": "full", "n07": "skipped_unlisted", "n08": "skipped_unlisted", "n09": "skipped_unlisted",
+        "n10": "undecoded", "n12": "full", "n13": "full", "n14": "full"}
+    assert "n11" not in rows and "n15" not in rows               # low tag confidence: not selected
+    # only allowlisted, fetchable https pages were requested; unlisted / reuters / http never
+    assert sorted(env.session.calls) == sorted([URLS["bnn"], URLS["aol"], URLS["yahoo"], "https://www.livemint.com/r",
+                                                URLS["bs_jio"], URLS["mint_jio"]])
+    assert gn(3) not in env.decoded_links and gn(5) not in env.decoded_links and gn(12) not in env.decoded_links
+    assert rows["n12"]["note"].startswith("same article as n01") and rows["n12"]["minhash"] == rows["n01"]["minhash"]
+    assert rows["n09"]["final_url"] == "https://unlisted.example.org/x" and rows["n09"]["http_status"] is None
+    assert rows["n05"]["http_status"] is None and "not requested" in rows["n05"]["note"]
+    assert rows["n01"]["origin_wire"] == "Reuters" and rows["n02"]["origin_evidence"] == "provider"
+    assert rows["n06"]["promotional"] == "provider TIKR"
+    assert rows["n14"]["origin_evidence"] == "attribution" and rows["n14"]["sources_say"] is True
+    assert s["by_access"]["full"] == 6 and s["requests"]["fetch"] == 6 and s["copied_same_article"] == 1
+    # no article text stored: at most 3 sentences of <= 40 words; the schema and gate accept the rows
+    for r in rows.values():
+        assert len(r["extract"] or []) <= 3 and all(len(x.split()) <= 40 for x in r["extract"] or [])
+        assert set(r) == set(common.SCHEMAS["news_articles"][1])
+    full_text = parse("bnn_chevron", src)["text"]
+    assert len(json.dumps(rows["n01"])) < len(full_text) + 1500     # extract + numbers + 1024-hex signature
+    now = pd.Timestamp(NOW)
+    assert validate.check_rows("news_articles", list(rows.values()), False, now, timedelta(minutes=5)) == []
+    res = validate.Result()
+    validate.check_articles(res, common.load_market(MARKET), date(2026, 10, 5))
+    assert res.failures == [] and res.warnings == []
+    # idempotent: a rerun writes nothing and requests nothing
+    n_calls, n_lines = len(env.session.calls), len(env.rows("news_articles"))
+    s2 = env.run(collect_articles, capsys)
+    assert s2["written"] == 0 and len(env.session.calls) == n_calls and len(env.rows("news_articles")) == n_lines
+
+
+def test_validate_flags_bad_article_rows(env, capsys):
+    env.run(collect_articles, capsys)
+    bad = {**env.rows("news_articles")[0], "id": "bad1", "extract": ["one two three"] * 4}
+    bad2 = {**env.rows("news_articles")[0], "id": "bad2", "access": "full", "http_status": 200,
+            "final_url": "http://www.bnnbloomberg.ca/x"}
+    env.write("news_articles", [bad, bad2])
+    res = validate.Result()
+    validate.check_articles(res, common.load_market(MARKET), date(2026, 10, 5))
+    assert [w["code"] for w in res.warnings] == ["ARTICLE_ROWS"] and "2 news_articles rows" in res.warnings[0]["detail"]
+
+
+# ---------- clusters ----------
+
+FILINGS = [
+    {"id": "0000093410-26-000188", "ticker": "CVX", "cik": "93410", "form": "8-K", "filing_date": "2026-10-05",
+     "accepted_at": "2026-10-05T13:01:20+00:00", "description": "8-K", "url": "https://www.sec.gov/x",
+     "first_seen_at": "2026-10-05T14:00:00+00:00"},
+    {"id": "0000093410-26-000190", "ticker": "CVX", "cik": "93410", "form": "4", "filing_date": "2026-10-05",
+     "accepted_at": "2026-10-05T15:00:00+00:00", "description": "4", "url": "https://www.sec.gov/y",
+     "first_seen_at": "2026-10-05T16:00:00+00:00"},
+    {"id": "0000093410-26-000199", "ticker": "CVX", "cik": "93410", "form": "8-K", "filing_date": "2026-10-06",
+     "accepted_at": "2026-10-06T01:00:00+00:00", "description": "8-K later", "url": "https://www.sec.gov/z",
+     "first_seen_at": "2026-10-06T01:30:00+00:00"},
+]
+
+
+def clusters_by_ticker(rows: list[dict]) -> dict:
+    return {r["ticker"]: r for r in rows}
+
+
+def test_clusters_origins_duplicates_primaries(env, capsys):
+    env.run(collect_articles, capsys)
+    env.write("news", [news_row(20, "Chevron elevates CFO to head oil and gas operations By Reuters", "CVX",
+                                source="Investing.com", domain="investing.com", conf="low")])
+    env.write("filings", FILINGS)
+    s = env.run(news_clusters, capsys)
+    rows = env.rows("news_clusters")
+    cvx = [r for r in rows if r["ticker"] == "CVX" and "n01" in r["news_ids"]][0]
+    # AOL (provider Reuters), BNN (byline Reuters Staff), Investing ("By Reuters"), Reuters itself: one origin;
+    # (marketscreener's different headline does not join the cluster)
+    assert set(cvx["news_ids"]) >= {"n01", "n02", "n05", "n20"} and "n12" in cvx["duplicate_ids"]
+    groups = {g["origin"]: set(g["news_ids"]) for g in cvx["origin_groups"]}
+    assert groups["wire:Reuters"] >= {"n01", "n02", "n05", "n20"}
+    assert cvx["independent_origins"] == len(cvx["origins"]) and cvx["listed_origins"] == 1
+    assert cvx["primary_ids"] == ["0000093410-26-000188"]        # not the Form 4, not the 8-K after as_of
+    assert "duplicates_removed" in cvx["flags"]
+    jio = [r for r in rows if r["ticker"] == "RELIANCE"][0]
+    assert set(jio["news_ids"]) == {"n13", "n14", "n15"} and jio["duplicate_ids"] == ["n16"]
+    assert jio["origins"] == ["wire:Reuters"] and jio["independent_origins"] == 1
+    assert {"single_source", "sources_say", "duplicates_removed"} <= set(jio["flags"])
+    tsla = [r for r in rows if r["ticker"] == "TSLA" and "n06" in r["news_ids"]][0]
+    assert "promotional_provider" in tsla["flags"] and tsla["independent_origins"] == 0
+    assert all(r["as_of"] == NOW and r["inputs_until"] <= NOW for r in rows)
+    assert s["written"] == len(rows)
+    assert validate.check_rows("news_clusters", rows, False, pd.Timestamp(NOW), timedelta(minutes=5)) == []
+    # rerun at the same time: nothing changed, nothing appended
+    assert env.run(news_clusters, capsys)["written"] == 0 and len(env.rows("news_clusters")) == len(rows)
+
+
+def test_title_links():
+    cfg = {"tickers": {"TSLA": {"name": "Tesla"}}}
+    drop = news_clusters.drop_tokens(cfg, "TSLA")
+    a, b = nv.title_tokens("Tesla stock rises", drop), nv.title_tokens("Tesla stock falls", drop)
+    assert not (a & b)                                           # company name and 'stock' never link titles
+    a = nv.title_tokens("Chevron elevates CFO to lead oil and gas operations", {"chevron"})
+    b = nv.title_tokens("Chevron elevates CFO to head oil and gas operations By Reuters", {"chevron"})
+    assert len(a & b) / len(a | b) >= 0.5
+
+
+def test_shared_round_amount_alone_does_not_link(src):
+    """Live 2026-10-06: 'Nvidia Spent $20 Billion on Buybacks' and 'Nvidia's $20bn licensing deal with
+    Groq faces lawsuit' share only the amount: two events. The Jio titles share the amount and words."""
+    cfg = {"tickers": {"NVDA": {"name": "Nvidia"}, "RELIANCE": {"name": "Reliance Industries", "aliases": ["Jio Platforms"]}}}
+
+    def item(i, ticker, title):
+        return {"id": f"x{i}", "ticker": ticker, "title": title, "source": "s", "domain": f"d{i}.com", "tier": "tier2",
+                "t": pd.Timestamp("2026-10-05T10:00:00+00:00"), "seen": pd.Timestamp("2026-10-05T11:00:00+00:00"),
+                "wire": None, "wire_ev": None, "provider": None, "promo": None, "canon": None, "outlet_key": f"d{i}.com",
+                "article": None, "fetched": None, "say": False, "nums": nv.distinctive(nv.numbers(title))}
+    nvda = news_clusters.cluster_ticker(
+        [item(1, "NVDA", "Nvidia Spent $20 Billion on Buybacks Last Quarter. Here's What That Means for You"),
+         item(2, "NVDA", "Nvidia's $20bn licensing deal with Groq faces lawsuit from jilted engineers")], cfg, src)
+    assert sorted(c["n_items"] for c in nvda) == [1, 1]
+    jio = news_clusters.cluster_ticker([item(3, "RELIANCE", JIO_BS), item(4, "RELIANCE", JIO_MINT)], cfg, src)
+    assert [c["n_items"] for c in jio] == [2]
+
+
+def test_clusters_asof_has_no_lookahead(env, capsys):
+    env.run(collect_articles, capsys)
+    env.run(news_clusters, capsys)                               # T1 = NOW
+    t2 = "2026-10-06T02:00:00+00:00"
+    late = news_row(30, "Chevron elevates CFO Bonner to lead oil and gas operations", "CVX", source="Fortune",
+                    domain="fortune.com", seen="2026-10-06T01:00:00+00:00", pub="2026-10-06T00:30:00+00:00", conf="low")
+    env.write("news", [late], day="2026-10-06")
+    # an article fetched after T1 for a T1 item
+    env.write("news_articles", [{**env.rows("news_articles")[0], "id": "n03", "fetched_at": "2026-10-06T01:30:00+00:00",
+                                 "access": "full", "note": "late fetch"}], day="2026-10-06")
+    # a rebuild as of T1 with the later rows on disk uses none of them: nothing changes
+    assert env.run(news_clusters, capsys)["written"] == 0
+    env.set_now(t2)
+    env.run(news_clusters, capsys)
+    con = common.connect(MARKET)
+
+    def cvx_ids(ts: str) -> set:
+        r = con.execute("SELECT news_ids FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ)) WHERE ticker = 'CVX' "
+                        "AND list_contains(news_ids, 'n01')", [ts]).fetchone()
+        return set(r[0]) if r else set()
+    assert "n30" not in cvx_ids(NOW) and "n30" in cvx_ids(t2)
+    assert cvx_ids("2026-10-05T19:59:59+00:00") == set()         # nothing computed before T1
+    assert con.execute("SELECT count(*) FROM news_articles_asof(CAST(? AS TIMESTAMPTZ)) WHERE note = 'late fetch'",
+                       [NOW]).fetchone()[0] == 0
+    # a stored row whose inputs postdate the query time is never returned, even with an early as_of
+    t1_row = [r for r in env.rows("news_clusters") if r["ticker"] == "CVX" and r["as_of"] == NOW][0]
+    env.write("news_clusters", [{**t1_row, "id": "bad-inputs", "as_of": "2026-10-05T20:30:00+00:00",
+                                 "inputs_until": "2026-10-06T03:00:00+00:00"}],
+              day="2026-10-06")
+    env.write("news_clusters", [{**t1_row, "id": "bad-seen", "as_of": "2026-10-05T20:40:00+00:00",
+                                 "news_ids": t1_row["news_ids"] + ["n30"]}], day="2026-10-06")
+    con = common.connect(MARKET)
+    ids = {r[0] for r in con.execute("SELECT id FROM news_clusters_asof(CAST(? AS TIMESTAMPTZ))",
+                                     ["2026-10-05T23:00:00+00:00"]).fetchall()}
+    assert "bad-inputs" not in ids and "bad-seen" not in ids and t1_row["id"] in ids
+    assert con.execute("SELECT count(*) FROM news_clusters_latest").fetchone()[0] >= 1
+
+
+def test_ai_replay_filters_new_kinds_by_time():
+    cutoff = pd.Timestamp("2026-10-06T12:15:00+00:00")
+    d = date(2026, 10, 5)
+    assert ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:00:00+00:00"}, d, cutoff)
+    assert not ai_replay.keep_row("news_articles", {"fetched_at": "2026-10-06T12:30:00+00:00"}, d, cutoff)
+    assert ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T12:00:00+00:00"}, d, cutoff)
+    assert not ai_replay.keep_row("news_clusters", {"as_of": "2026-10-06T13:00:00+00:00"}, d, cutoff)

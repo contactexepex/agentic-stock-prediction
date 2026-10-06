@@ -109,6 +109,18 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   "Short selling". A per-session file stored incomplete (`complete` false) is fetched again next run.
   Press-release wire feeds (`watchlist_only: true`) match tickers on `wire_names` minus
   `news.wire_exclude`. BSE (api.bseindia.com) refuses cloud traffic, so India announcements stay NSE-only
+- News verification, phase A (DESIGN.md section 3a; deterministic, no LLM; helpers in
+  `scripts/news_verify.py`):
+  - `collect_articles` reads the article pages behind this run's material watchlist headlines.
+    It reads only from the HTTPS outlets allowlisted in `config/news_sources.yaml` (tiers, agency
+    names, promotional providers). An unlisted outlet is recorded as `skipped_unlisted` and never
+    requested. Output goes to `data/<market>/news_articles/`, one row per news id: access
+    full|partial|paywalled|blocked|undecoded|skipped_unlisted, metadata, agency origin, at most 3
+    key sentences of <= 40 words, normalised numbers, and a MinHash. The full text is never stored.
+  - `news_clusters` groups same-event items per ticker and counts independent origins: copies of
+    one agency story, or of one text, count once. It attaches SEC filing and NSE announcement
+    candidates. Output goes to `data/<market>/news_clusters/` as per-run snapshots. Read them as
+    of a time with the `news_clusters_asof(ts)` macro, which does not look ahead.
 - `sql/views.sql` derived DuckDB views (bars, returns, latest features/regime/quotes, events,
   news by ticker/day, track record)
 - `data/<market>/<kind>/YYYY/MM/YYYY-MM-DD.<ext>` raw, append-only records (UTC dates, except

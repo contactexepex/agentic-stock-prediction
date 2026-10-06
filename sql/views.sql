@@ -514,3 +514,32 @@ SELECT a.* EXCLUDE (k), (a.close / b.close - 1) * 100 AS ret_1_pct, b.date AS da
 FROM r a LEFT JOIN r b ON b.index_name = a.index_name AND b.k = 2
          LEFT JOIN r c ON c.index_name = a.index_name AND c.k = 6
 WHERE a.k = 1;
+
+-- News verification phase A (docs/DESIGN.md 3a). Articles fetched by a time (collect_articles.py
+-- writes one row per news id; the latest fetch wins should a later version ever add one).
+CREATE OR REPLACE MACRO news_articles_asof(ts) AS TABLE
+SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ts ORDER BY id, fetched_at DESC;
+
+-- Cluster state as of a time, without look-ahead: only rows computed by then (as_of <= ts) whose
+-- inputs were all known by then (inputs_until <= ts: item first_seen_at, article fetched_at, filing
+-- accepted_at, NSE dissemination time) and whose news ids were all first seen by then. Each news
+-- id belongs to the newest such row that lists it (a cluster that merged into another, or
+-- changed, is superseded); a cluster is that row.
+CREATE OR REPLACE MACRO news_cluster_items_asof(ts) AS TABLE
+WITH r AS (
+    SELECT c.* FROM news_clusters c
+    WHERE c.as_of <= ts AND coalesce(c.inputs_until, c.as_of) <= ts
+      AND NOT EXISTS (SELECT 1 FROM news_stored n
+                      WHERE list_contains(c.news_ids, n.id) AND n.first_seen_at > ts)
+),
+i AS (SELECT unnest(news_ids) AS news_id, id AS row_id, cluster_id, ticker, as_of FROM r)
+SELECT DISTINCT ON (news_id, ticker) news_id, ticker, cluster_id, row_id, as_of
+FROM i ORDER BY news_id, ticker, as_of DESC, row_id;
+
+CREATE OR REPLACE MACRO news_clusters_asof(ts) AS TABLE
+SELECT DISTINCT ON (c.cluster_id) c.* FROM news_clusters c
+WHERE c.id IN (SELECT row_id FROM news_cluster_items_asof(ts))
+ORDER BY c.cluster_id, c.as_of DESC;
+
+CREATE OR REPLACE VIEW news_clusters_latest AS
+SELECT * FROM news_clusters_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');

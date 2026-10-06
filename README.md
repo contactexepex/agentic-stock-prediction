@@ -18,6 +18,12 @@ Research only. Nothing here is investment advice, and the routines never trade.
    only), `collect_macro.py` (US: Treasury yield curve, FRED credit spreads, Cboe put/call),
    `collect_shorts.py` (US: FINRA short-sale volume and short interest) and
    `collect_flows_india.py` (India: NSDL FPI flows, NSE sector index closes and valuations).
+   News verification, phase A (docs/DESIGN.md 3a; no LLM):
+   - `collect_articles.py` reads the article behind material watchlist headlines, only from the
+     HTTPS outlets allowlisted in `config/news_sources.yaml`. It stores metadata, the agency origin,
+     at most 3 key sentences and a copy signature, never the full text.
+   - `news_clusters.py` groups same-event items, counts independent origins and lists candidate SEC
+     filings and NSE announcements.
 3. **Score** past predictions against actual prices (`score_predictions.py`), with proper scores
    (`scoring.py`): Brier score, log loss and a reliability table for calls; interval and quantile
    scores for ranges. Then **reflect** (`lessons.py`): for each newly settled call the script lists the facts (call, evidence, return,
@@ -91,6 +97,14 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
      `www.business-standard.com`, `www.thehindubusinessline.com`, `www.prnewswire.com`,
      `feed.businesswire.com`, `www.globenewswire.com`.
      (Moneycontrol and CNBC come in through Google News queries, so their own domains are not needed.)
+     News verification (`collect_articles.py`) reads article pages from the outlets in
+     `config/news_sources.yaml`. Allow the hosts of the outlets you want read. Tested 2026-10-06:
+     - US: `www.aol.com`, `finance.yahoo.com`, `www.bnnbloomberg.ca`, `www.theglobeandmail.com`;
+     - India: `www.livemint.com`, `www.business-standard.com`, `economictimes.indiatimes.com`,
+       `m.economictimes.com`, `www.moneycontrol.com`, `www.thehindubusinessline.com`,
+       `www.businesstoday.in`, `www.cnbctv18.com`.
+
+     A host the proxy refuses is recorded as `blocked` and does not stop the run.
    - Environment variable: `SEC_USER_AGENT=your-name your@email.com` (SEC requires contact info).
    - Optional, Neo4j copy: `NEO4J_URI` (`neo4j+s://<id>.databases.neo4j.io`), `NEO4J_USER`,
      `NEO4J_PASSWORD` (and `NEO4J_DATABASE` only if it is not the `<id>` in the host, as on Aura),

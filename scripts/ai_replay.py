@@ -41,7 +41,8 @@ Inclusion rules of `prepare` (per data kind; a row is kept only if public by the
 - predictions, ranges: made_at; outcomes, range_outcomes: scored_at and target_date <= D;
   lessons: available_from and target_date <= D;
   features, regime, calibration, reviews, replays: computed_at; judgments: recorded_at;
-  quotes, options: collected_at; graph: added_at; graph_runs: run_at;
+  quotes, options: collected_at; graph: added_at; graph_runs: run_at; news_articles: fetched_at;
+  news_clusters: as_of (they cite news ids, which stay dropped, see below);
 - deals: trade date <= D (assumed: NSE publishes the day's bulk and block deals after the close);
 - kinds with only an observation date and no publication time (macro, shorts, short_interest,
   fpi, indices, flows, delivery): kept only if first_seen_at <= cutoff, i.e. backfilled rows are
@@ -109,6 +110,9 @@ PUBLIC_AT: dict[str, list[str]] = {
     # SEC acceptance times from the filing's SGML header (check_sec_times.py): a permanent fact
     # about the filing, public from its acceptance; checked_at is only when we looked it up
     "sec_times": ["accepted_at"],
+    # news verification phase A: an article row once fetched, a cluster row once computed (every
+    # input of a cluster row is <= its as_of; news_clusters_asof() in sql/views.sql reads them)
+    "news_articles": ["fetched_at"], "news_clusters": ["as_of"],
 }
 FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows", "delivery")
 # Bulk and block deals have only a trade date; NSE publishes each session's deals after its close,

@@ -93,6 +93,144 @@ price vs 20-day high, ATR(14), 10-day realized vol, Bollinger width, OBV trend, 
 **Regime:** Calm / Trending / Event-heavy / Unstable from VIX, index 5-day return and volatility,
 and the event calendar.
 
+### 3a. News verification, phase A (deterministic; built 2026-10-06)
+Headlines alone are not enough, so the routine reads the article behind material watchlist
+headlines where it is freely accessible, groups items about one event and counts independent
+origins. Phase A has no LLM step. Phase B, not built yet, adds the claim-extraction agent, a
+`news_verified` status with LLM value comparison, the forecaster and validate rules, and event
+badges in the context pack.
+
+**Sources.** Free sources only, for personal non-commercial research. `config/news_sources.yaml`
+holds the outlet allowlist. Each domain has:
+- a tier: `primary` (SEC, NSE, RBI, SEBI, press-release wires, company releases), `tier1` (wires
+  and major outlets) or `tier2` (established outlets, and aggregators that syndicate them);
+- the Google News source labels it appears under;
+- an optional extractor order;
+- `fetch: false` for outlets that refuse cloud traffic. These were tested 2026-10-06: Reuters,
+  AP, CNBC, MarketWatch, Barron's, Investing.com, Benzinga, Morningstar. Their items are recorded
+  as blocked and never requested, but their tier still counts.
+
+Rules for what is requested:
+- Only HTTPS URLs on an allowlisted domain are ever requested, with TLS verification on.
+- Every redirect hop is checked the same way.
+- Anything else is recorded as `skipped_unlisted` and never requested.
+
+The config also lists:
+- news agencies: Reuters, Bloomberg, AP, PTI, IANS, ANI, AFP and Dow Jones, with their bylines,
+  domains and attribution names;
+- vendor or promotional providers, by name (TIKR, Simply Wall St, Zacks, Motley Fool, ...), by
+  domain or by marker phrase.
+
+**Articles** (`scripts/collect_articles.py`, kind `news_articles`, one row per news id, written
+once):
+
+*Which items.* News first seen in the last 24 h with these properties:
+- the title names a watchlist company as primary subject, with `tag_confidence` high;
+- published in the last 48 h;
+- the title matches the configured material terms;
+- highest weight first.
+
+At most 80 items are requested per run. Items recorded without a request (unlisted, `fetch: false`,
+or a copy of an article already read) do not count toward that cap.
+Requests are paced 1.5 s apart.
+
+*How each page is read.*
+1. Google News links are resolved with `googlenewsdecoder`: one GET per link and one POST per
+   batch. A link that fails to resolve is recorded as `undecoded`.
+2. The text is extracted from JSON-LD `articleBody` first, then trafilatura, then newspaper4k.
+3. If JSON-LD says `isAccessibleForFree` is false, the row is `paywalled` and only the description
+   or OpenGraph text is read.
+4. The row is `full` when the extracted text has at least 800 characters, otherwise `partial`.
+5. A refused request (HTTP error status, TLS or network error) is `blocked`.
+6. One article stored under several news ids is fetched once; the other ids get a copy of the row.
+
+*What is stored.*
+- final URL, domain, tier, HTTP status, extractor and length;
+- `datePublished` / `dateModified` in UTC;
+- byline and JSON-LD provider;
+- the agency origin and its evidence, which is the first match in this order: provider, byline,
+  source, title ("By Reuters"), dateline ("(Reuters) -"), attribution ("Reuters reported",
+  "told PTI", "with inputs from PTI");
+- `sources_say` ("sources said", "people familiar");
+- `promotional`;
+- at most 3 key sentences of at most 40 words;
+- the numbers, normalised (`3.8e+09 usd`, `24.7 pct`);
+- a content hash and a 128-permutation MinHash of the 6-word shingles.
+
+The full text is never stored. Article text is untrusted data: it is measured, never followed.
+
+**Clusters** (`scripts/news_clusters.py`, kind `news_clusters`):
+
+*Items and duplicates.* The items are news rows of the last 144 h whose title names a watchlist
+ticker as primary. One article stored under two ids is kept once and the other ids are listed in
+`duplicate_ids`. Two ids are the same article when they share the canonical publisher URL, or the
+same title from the same outlet, as with the labels "Business Today" and "businesstoday.in".
+
+*Linking items into events.* Items of one ticker at most 72 h apart are linked (single linkage)
+when any of these holds:
+- their title tokens have Jaccard ≥ 0.5 with ≥ 2 shared tokens (stopwords and the company's own
+  name removed);
+- their titles share a distinctive number (a currency amount, a percent with decimals, or a
+  number ≥ 1000 that is not a year) and at least one informative token, because a round amount
+  such as "$20 billion" alone is common;
+- their texts are copies: MinHash containment ≥ 0.5.
+
+*Origins.*
+- A wire copy is that agency's origin.
+- Otherwise the JSON-LD provider is the origin (vendor content on Yahoo or AOL).
+- Otherwise the outlet is the origin.
+- Copies (containment ≥ 0.5) share an origin, and so do items from the same outlet.
+- Promotional items never count.
+- `independent_origins` counts the non-promotional origin groups.
+- `listed_origins` counts those that include an allowlisted outlet or an agency.
+
+Measured examples:
+- AOL (provider Reuters) vs BNN Bloomberg (byline "Reuters Staff"): containment 0.96, one origin.
+- Mint's rewrite of the Jio IPO story vs Business Standard's Reuters copy: containment 0.16–0.20,
+  tied to Reuters only by "Reuters reported, citing sources".
+
+*Primary candidates, flags and storage.* The primary candidates are not yet matched to claims;
+that is phase B. They are:
+- the ticker's SEC filings of the configured forms (8-K, 10-Q, 13D, ...; not Form 4), by
+  `accepted_at` from the sec_times-corrected `filings` view;
+- its NSE announcements, by dissemination time;
+
+each public from 72 h before the first report up to the run.
+
+Flags: `promotional_provider`, `sources_say`, `single_source`, `low_tier_only`, `unread`,
+`duplicates_removed`.
+
+A cluster row is appended when it is new or changed, one of its items was first seen in the last
+72 h, and it has 2+ items or a fetched article. `as_of` is the run time, and every input is at or
+before `inputs_until` ≤ `as_of`.
+
+Items in no stored cluster are single items.
+
+**As of a time.** These macros apply the no-look-ahead rule (a source counts at time T only
+if it was available by T):
+- `news_clusters_asof(ts)` uses only rows with `as_of` ≤ ts and `inputs_until` ≤ ts whose news
+  ids were all first seen by ts. Each news id belongs to the newest such row listing it, so
+  clusters that were merged or changed are superseded.
+- `news_cluster_items_asof(ts)` maps each news id to its cluster at ts.
+- `news_articles_asof(ts)` returns the article rows fetched by ts.
+- `news_clusters_latest` is the current state.
+
+The builder itself only reads inputs known at its run time (MB_NOW in a replay). `ai_replay
+prepare` keeps article and cluster rows by `fetched_at` and `as_of`.
+
+**Live check, 2026-10-06** (scratch copy, one run per market, packages from requirements.txt):
+- US: 291 candidates. 38 full, 4 partial, 2 paywalled, 29 blocked (28 never requested, 1 HTTP 403)
+  and 218 skipped as unlisted. 102 requests (52 decode, 50 page) in 173 s. 282 cluster rows; 41
+  have a primary candidate.
+- India: 154 candidates. 52 full, 5 partial, 13 paywalled (11 of them Economic Times pages that
+  flag themselves not free), 9 blocked (4 never requested, 5 HTTP 403) and 75 skipped as unlisted.
+  15 of these rows are copies of an article already read in the run. 119 requests (54 decode, 65 page) in 194 s.
+  128 cluster rows.
+
+Many US items are vendor content on Yahoo or AOL (TIKR, Zacks, Motley Fool, 24/7 Wall St), which
+is flagged promotional. The outlets blocked from the cloud would be the second source for many
+US stories, so many US events stay `single_source`.
+
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
    where available, implied vol. Range = quantiles of recent standardized returns scaled by that
