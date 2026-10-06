@@ -7,10 +7,12 @@ delete the marker. Keep the `<!-- report-data: ... -->` line (report.py uses it 
 a filled report is still current). Never change a number, table or chart link the script wrote; quote numbers
 only from those tables or the context pack. Plain, short sentences. Every news id must support the exact
 claim it is attached to (its headline or summary says it); never carry over background or causes
-from the bull/bear cases unless they cite evidence for them. The judge checks each id and number.
+from the bull/bear cases unless they cite evidence for them. `scripts/validate.py --stage report`
+checks every number against the context pack, the script-written tables and DuckDB, and the weekly
+spot-check judge reads a sample for claims and ids.
 
 The filled report is also the source of the HTML report (`scripts/html_report.py`, run after the
-judge passes): it copies the narrative below verbatim from under each heading and turns every
+report gate passes): it copies the narrative below verbatim from under each heading and turns every
 cited id into a link to its source. So write each section only under its own heading, cite ids
 in parentheses as usual, and keep it readable for a novice (explain any jargon in a few words).
 Numbers, ranges, charts and per-company news and events in the HTML come from the data, never
@@ -35,9 +37,11 @@ Report markers:
   session closed, so no calls were made and closed-session ranges were not published. On a
   mid-session run (`in_session: true`) say first that the run started after the session opened,
   so no calls or 1-day ranges were made and the 5-day ranges are late (shown, never scored).
-  Then the judge's verdicts: one line per agent (PASS, or FAIL with the reason and what was dropped).
+  Then the validation gates (`validate.py`, routine/PROMPT.md): one line per failure or warning
+  (stage, code, detail, tickers, and what was dropped or withheld); "validation: all gates passed"
+  if there were none.
   Then one line per row of the context pack's "Judge FAILs from the previous run not yet in a
-  report" section (e.g. the monthly graph-builder, judged after the previous brief was posted):
+  report" section (e.g. the monthly graph-builder or the weekly spot-check, judged after the previous brief was posted):
   run date, agent, reason, what was dropped. Leave it out if that section shows `_none_`.
 
 Slack draft markers (the draft is the first message of the day's thread and stays at most 12

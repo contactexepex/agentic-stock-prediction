@@ -71,6 +71,7 @@ import events as ev
 import replay
 from common import CODE, SCHEMAS, connect, load_market, market_names, utc_now
 from features import load_bars
+from prediction_rules import HORIZONS, check_prediction
 
 MODEL_CUTOFF = date(2026, 6, 30)            # the model may have seen prices up to about here
 SAMPLE_START, SAMPLE_END, SAMPLE_STEP = date(2026, 7, 1), date(2026, 9, 25), 5
@@ -81,8 +82,6 @@ REGULAR_LEAD = timedelta(minutes=75)
 MARKER = ".ai_replay_root"
 EVIDENCE_KINDS = ("news", "filings", "announcements")   # ids a call may cite (CLAUDE.md: news/filing ids)
 EVIDENCE_DAYS = 14
-HORIZONS = (1, 5)
-CONF_MIN, CONF_MAX, WIDEN_MAX, RATIONALE_WORDS = 0.50, 0.90, 0.5, 40
 BANDS = (("0.50-0.59", 0.50, 0.60), ("0.60-0.69", 0.60, 0.70), ("0.70-0.90", 0.70, 0.9001))
 
 # kind -> columns tried in order for when a row became public (first non-null wins).
@@ -626,59 +625,10 @@ def replay_context(cfg: dict, root: Path, d: date) -> dict:
 
 
 def validate(rec, ctx: dict, d: date, seen: set[str]) -> list[str]:
-    """Reasons a forecaster record breaks the schema or the CLAUDE.md prediction rules (empty = valid)."""
-    if not isinstance(rec, dict):
-        return ["not a JSON object"]
-    cols = SCHEMAS["predictions"][1]
-    errs = [f"unknown field {k!r}" for k in rec if k not in cols]
-    for k in ("id", "as_of_date", "ticker", "horizon_days", "direction", "confidence", "rationale",
-              "evidence_ids", "prompt_version"):
-        if rec.get(k) in (None, ""):
-            errs.append(f"missing {k}")
-    if errs:
-        return errs
-    t, h = rec["ticker"], rec["horizon_days"]
-    if t not in ctx["tickers"]:
-        errs.append(f"unknown ticker {t!r}")
-    if not isinstance(h, int) or isinstance(h, bool) or h not in HORIZONS:
-        errs.append(f"horizon_days must be 1 or 5 (got {h!r})")
-    if str(rec["as_of_date"]) != str(d):
-        errs.append(f"as_of_date {rec['as_of_date']} is not the replay date {d}")
-    if rec["id"] != f"{rec['as_of_date']}-{t}-{h}d":
-        errs.append(f"id must be <as_of_date>-<ticker>-<horizon>d = {rec['as_of_date']}-{t}-{h}d (got {rec['id']!r})")
-    if rec["id"] in seen:
-        errs.append(f"id {rec['id']} already recorded")
-    if rec["direction"] not in ("up", "down"):
-        errs.append(f"direction must be up or down (got {rec['direction']!r})")
-    c = rec["confidence"]
-    if not isinstance(c, (int, float)) or isinstance(c, bool) or not (CONF_MIN <= c <= CONF_MAX):
-        errs.append(f"confidence must be {CONF_MIN:.2f}-{CONF_MAX:.2f} (got {c!r})")
-    w = rec.get("range_widen")
-    if w is not None and (not isinstance(w, (int, float)) or isinstance(w, bool) or not 0 <= w <= WIDEN_MAX):
-        errs.append(f"range_widen must be 0-{WIDEN_MAX} (got {w!r})")
-    if not isinstance(rec["rationale"], str) or len(rec["rationale"].split()) > RATIONALE_WORDS:
-        errs.append(f"rationale must be text of at most {RATIONALE_WORDS} words")
-    ids = rec["evidence_ids"]
-    if not isinstance(ids, list) or not ids or not all(isinstance(x, str) for x in ids):
-        errs.append("evidence_ids must be a non-empty list of ids")
-    else:
-        unknown = [x for x in ids if x not in ctx["evidence"]]
-        if unknown:
-            errs.append(f"evidence ids not in the replay root's news/filings/announcements: {unknown}")
-    if not isinstance(rec["prompt_version"], str):
-        errs.append("prompt_version must be text")
-    f = ctx["features"].get(t)
-    if t in ctx["tickers"]:
-        if f is None:
-            errs.append(f"no indicator snapshot for {t} on {d}")
-        else:
-            if f["quality"] == "BLOCKED":
-                errs.append(f"{t} indicator quality is BLOCKED")
-            if f["days_to_earnings"] is not None and f["days_to_earnings"] <= 1:
-                errs.append(f"{t} has earnings within 1 day (days_to_earnings {f['days_to_earnings']})")
-    if rec.get("made_at") is not None and _ts(rec["made_at"]) is None:
-        errs.append(f"made_at is not a timestamp ({rec['made_at']!r})")
-    return errs
+    """Reasons a forecaster record breaks the schema or the CLAUDE.md prediction rules (empty = valid):
+    the shared check in prediction_rules.py, with the replay date as every ticker's as_of_date."""
+    return check_prediction(rec, ctx, seen, as_of=d, as_of_label="the replay date",
+                            evidence_label="the replay root's news/filings/announcements")
 
 
 def record(cfg: dict, d: date, root: Path, calls_file: Path, results: Path) -> dict:

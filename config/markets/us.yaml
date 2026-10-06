@@ -99,7 +99,9 @@ news:
     trade: ["US tariffs trade"]
     markets: ["stock market today site:cnbc.com"]   # CNBC headlines via Google News
   outlets:   # CNBC's own RSS returns 403 to cloud servers (rechecked 2026-10-05), see `markets` above
-    - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general}
+    # link_domains: where an outlet's article links point when that is not the feed's own domain
+    # (scripts/validate.py checks each stored news url against them)
+    - {name: BBC Business, url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: general, link_domains: [bbc.co.uk, bbc.com]}
     # Press-release wires (checked 2026-10-05). They carry hundreds of small-company releases a
     # day, so `watchlist_only` keeps just the items that name a watchlist company (`wire_names`
     # above, minus `wire_exclude` below). www.businesswire.com refuses cloud traffic; Business

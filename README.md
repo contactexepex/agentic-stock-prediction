@@ -34,8 +34,8 @@ Research only. Nothing here is investment advice, and the routines never trade.
 9. **Remember**: daily summaries, rolled up into weekly and monthly ones, per market.
 10. **Charts and report** (`charts.py`, `report.py`, `html_report.py`): three single-purpose
     chart images (price ranges, sector moves, track record); the markdown report and the Slack
-    draft carry every number from the scripts, the agents add only narrative; after the judge
-    passes, a self-contained HTML report per day (filters by sector and company, a price chart,
+    draft carry every number from the scripts, the agents add only narrative; after the
+    validation gate (`validate.py`, which also checks every narrative number) passes, a self-contained HTML report per day (filters by sector and company, a price chart,
     plain-language range and reasons per company) is built from the filled report and the data.
 11. **Save** to this repo (append-only data) and **notify** Slack: one thread per market (summary,
     chart images, the HTML file).

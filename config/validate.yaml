@@ -1,0 +1,49 @@
+# Deterministic daily-run gates (scripts/validate.py; routine/PROMPT.md runs one stage after each
+# step). A blocking failure exits 1 and the routine drops or withholds the affected part; a
+# warning is only listed in the report's data_quality section.
+
+# Correctness: a watchlist ticker's latest 1-day move above this (absolute, as a fraction) is a
+# warning unless a split / bonus / dividend / corporate-action event or announcement is on file
+# within `big_move_event_days` calendar days.
+big_move_1d: 0.25
+big_move_event_days: 3
+big_move_event_words: [split, bonus, demerger, spin, rights, consolidation, corporate action, ex_dividend]
+
+# A stored timestamp may be at most this far after the validation time (clock skew).
+future_tolerance_minutes: 5
+
+# Freshness of this run's fetches: the newest collected_at / first_seen_at of each kind must be
+# today (UTC) and at most this many hours old. Kinds the market does not collect are skipped
+# (filings: markets with `filings: sec`; announcements: India).
+fetch_max_age_hours:
+  quotes: 12
+  news: 12
+  filings: 12
+  announcements: 12
+fetch_severity: warning          # a failed collector is not fatal (PROMPT step 3): list it
+# Market-level symbols that are not the benchmark or vol index (cues, factors, sector ETFs; often
+# on other exchanges): newest bar at most this many calendar days old, else a warning.
+symbol_max_age_days: 7
+
+# Kinds whose ids must be unique across all stored files. Other kinds append corrections or
+# recomputations under the same id by design (news_enriched, features, regime, calibration,
+# macro and the other revised series, graph); prices keep re-collected bars (the bars view
+# keeps the newest).
+unique_id_kinds: [news, filings, events, predictions, ranges, judgments, announcements]
+unique_keys:
+  outcomes: prediction_id
+  range_outcomes: range_id
+
+# Collectors whose zero output on a run is unexplained unless the summary says why (failed,
+# warnings, error or skipped): summary key holding the count.
+expect_output:
+  prices: new_bars
+  quotes: written
+  news: new_items
+
+# Numbers in narrative (stage report): a bare integer from 0 to this value (no %, currency,
+# sign or decimals) is a count or label and is not looked up.
+narrative_small_int: 10
+# Headlines and summaries of news, filings and announcements first seen in the last N days are
+# sources too (the agents quote numbers from them).
+narrative_news_days: 7

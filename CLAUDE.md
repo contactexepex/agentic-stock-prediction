@@ -32,6 +32,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them.
+  `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
+  settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `prediction_rules.py`);
+  `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/common.py`.
 - India primary sources (NSE; shared session and replay guard in `nse.py`): `collect_nse_india`
   -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
@@ -96,13 +99,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `data/<market>/judgments/`
 - `.claude/agents/` subagents: news-analyst, bull-researcher, bear-researcher, forecaster,
   graph-builder (monthly connection map; every edge cites a public source), and judge
-  (independent verifier; every agent's output is judged before it is appended, committed or posted)
+  (independent verifier of code, config, agent-instruction and process changes, the monthly
+  graph-builder edges and the weekly spot-check sample)
 - `routine/PROMPT.md` the routines' saved prompt (one per market)
 
 ## Judging every change
-Every change is reviewed by the `judge` subagent before it is merged, pushed to main, appended to
-`data/` or posted, whoever made it: a subagent, a build agent, or the orchestrating session
-itself (its own edits, merge-conflict resolutions and daily-run narrative included).
+Every change to code, config, agent instructions or process is reviewed by the `judge` subagent
+before it is merged or pushed to main, whoever made it: a subagent, a build agent, or the
+orchestrating session itself (its own edits and merge-conflict resolutions included).
 - Give the judge the exact instructions, the claimed result and where the work lives. Never
   merge, push or append on an agent's word: only a judge PASS counts.
 - Any FALSE claim makes the verdict FAIL, even if the code is right (the report must be true too).
@@ -116,12 +120,17 @@ itself (its own edits, merge-conflict resolutions and daily-run narrative includ
   executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
   agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is
   merged or pushed to main before its PASS.
-- Daily runs: one retry (the run is time-boxed), then the failed output is dropped or withheld
-  as `routine/PROMPT.md` says, and the failure is listed in the report's `data_quality`.
+- Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
+  in `config/validate.yaml`), not by the judge: one retry (the run is time-boxed), then the failed
+  output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's
+  `data_quality`. The judge still checks the monthly graph-builder edges, and once a week
+  (`scripts/spotcheck.py --if-due`) a deterministic sample of the past week's output (2 forecasts
+  with their evidence, 1 filled report) for what scripts cannot see.
 - Every verdict, PASS or FAIL, is appended as one line: build work to `judgments/log.jsonl`
-  (subject, work, commit, round, verdict, summary, recorded_at as ISO UTC); daily runs to
-  `data/<market>/judgments/` (schema `judgments` in `scripts/common.py`). Both are append-only,
-  and `tests/test_judgments.py` checks the build log's format and that every commit exists.
+  (subject, work, commit, round, verdict, summary, recorded_at as ISO UTC); daily-run verdicts
+  (graph-builder, spot-check) to `data/<market>/judgments/` (schema `judgments` in
+  `scripts/common.py`). Both are append-only, and `tests/test_judgments.py` checks the build log's
+  format and that every commit exists.
 
 ## Data rules
 1. Files under `data/` are append-only. Never edit, reorder or delete existing lines or files.
