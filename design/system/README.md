@@ -7,30 +7,36 @@ screenshots `styleguide-1280-full.png`, `styleguide-390-full.png`, `styleguide-3
 ## Files
 | File | What |
 |---|---|
-| `tokens.css` | `:root` custom properties: M3 colour roles (`--md-sys-color-*`), tonal-palette steps, semantic finance tokens (`--mb-color-up/down/neutral/warn`, hit/miss, Live/Back-test/Mock/Paper), chart tokens (`--mb-chart-*`), the M3 type scale (`--md-sys-typescale-*` + `.md-body-medium` style classes), shape, elevation, state-layer opacities, spacing, motion, focus ring |
+| `tokens.css`, `tokens-variant-*.css` | `:root` custom properties: M3 colour roles (`--md-sys-color-*`), tonal-palette steps, semantic finance tokens (`--mb-color-up/down/neutral/warn`, hit/miss, Live/Back-test/Mock/Paper), chart tokens (`--mb-chart-*`), the M3 type scale (`--md-sys-typescale-*` + `.md-body-medium` style classes), shape, elevation, state-layer opacities, spacing, motion, focus ring |
 | `components.css` | App shell (`.mb-app`, `.mb-rail`, `.mb-navbar`, `.mb-topbar`, `.mb-content`), cards (`.md-card.elevated/filled/outlined`), buttons (`.md-btn.filled/tonal/outlined/text`, `.md-icon-btn`, `.md-help`), segmented buttons (`.md-segmented[.dense]`), chips (`.md-chip.assist/filter/small`), provenance tags (`.mb-tag.live/bt/mock/paper/derived/coming`), badges (`.md-badge` incl. verification statuses), direction squares (`.mb-dir.up/dn/flat/unk`), outcome marks (`.mb-mark.ok/no/na`), tooltip (`.md-tooltip`), data table (`.md-table`), key-value list (`.md-kv`), odds meter (`.mb-odds`), strength bar (`.mb-bar`), progress (`.md-progress`), KPI tile (`.mb-kpi`), expansion panel (`details.md-expansion`), `.md-pre` |
 | `icons.svg` | 40 Material Symbols Outlined glyphs as `<symbol id="ms-NAME">` (Apache 2.0, `LICENSE-material-symbols.txt`, copied unchanged from google/material-design-icons) |
 | `system.py` | `inline_system(html, icons=None)`: replaces `<!--@@SYSTEM_CSS@@-->` with both stylesheets and `<!--@@ICONS@@-->` with the sprite (all icons or a named subset) |
 | `check_page.js` | Playwright check of a built page at 1280 and 390 px (console errors, external requests, horizontal overflow) with screenshots; uses the pre-installed Chromium |
 
 ## Palette
-One seed, `#3B6EA8` (HCT hue 256.4, chroma 42.1, tone 45.5), through Google's `@material/material-color-utilities`
-0.4.0 `SchemeTonalSpot` (the Material You default) at contrast level 0. Light scheme only. Key roles and WCAG
-contrast on their "on" colour (text on a container needs 4.5:1):
+One seed, `#1A73E8` (HCT hue 265.6, chroma 65.1, tone 49.9), through Google's `@material/material-color-utilities`
+0.4.0 `SchemeVibrant` (the high-chroma Material You scheme) at contrast level 0. Light scheme only. The first
+pass used a muted seed with the tonal-spot scheme and read grey; the owner rejected it, so the system now uses
+the vibrant scheme, white cards on a tinted `surface-container-low` page, 24 px card corners, pill chips and
+tags, and the primary container for the decision header. Two alternative schemes with the same structure are
+kept as override files for mockups: `tokens-variant-indigo.css` (seed `#4F46E5`) and `tokens-variant-teal.css`
+(seed `#00796B`, tonal spot); build a page with `MB_TOKENS_EXTRA=design/system/tokens-variant-indigo.css` to
+see it. Side by side on the real HDFC Bank page: `mockup-variants.png` (blue, indigo, teal).
+
+Key roles and WCAG contrast on their "on" colour (text on a container needs 4.5:1):
 
 | Role | Hex | On | Contrast |
 |---|---|---|---|
-| primary | `#39608f` | `#ffffff` | 6.5:1 |
-| primary container | `#d3e4ff` | `#1e4875` | 7.3:1 |
-| secondary | `#545f70` | `#ffffff` | 6.5:1 |
-| secondary container | `#d7e3f8` | `#3c4758` | 7.3:1 |
-| tertiary | `#6c5677` | `#ffffff` | 6.5:1 |
-| tertiary container (Paper tag) | `#f5d9ff` | `#533f5e` | 7.3:1 |
+| primary | `#005bc0` | `#ffffff` | 7.2:1 |
+| primary container (decision header, selected states) | `#d8e2ff` | `#004493` | 8.4:1 |
+| secondary | `#585c7e` | `#ffffff` | 6.3:1 |
+| secondary container | `#dfe0ff` | `#414465` | 7.6:1 |
+| tertiary container (Paper tag) | `#e7deff` | `#4d4273` | 7.4:1 |
 | error | `#ba1a1a` | `#ffffff` | 6.5:1 |
-| surface | `#f8f9ff` | `#191c20` | 16.3:1 |
-| surface variant | `#dfe2eb` | `#43474e` | 7.2:1 |
-| outline | `#73777f` | on surface | 4.3:1 |
-| inverse surface (tooltips) | `#2e3035` | `#eff0f7` | 11.6:1 |
+| surface | `#f9f9ff` | `#191b23` | 16.1:1 |
+| surface container low (page) / container (tiles) | `#f1f3ff` / `#ebedfa` | `#191b23` | 14.6:1 / 13.8:1 |
+| outline on surface | `#727785` | | 4.5:1 |
+| inverse surface (tooltips) | `#2c303a` | `#f0f0fb` | 12.4:1 |
 
 Semantic tokens are HCT tonal palettes on fixed hues, so they sit in the same tone system as the roles:
 up `#00732e` (hue 150, 5.7:1 on the surface), down `#c92f29` (hue 25, 5.1:1), neutral `#73777d` (4.3:1, icons
@@ -43,19 +49,21 @@ tags carry a texture (Back-test hatched, Mock dashed, derived dotted) besides th
 is why that rule is a rule.
 
 ## Chart colours (dataviz skill)
-The M3 roles are deliberately low-chroma (tonal spot caps primary chroma at 36), below the dataviz chroma floor
-for series colours, so charts use a separate validated set on the same seed hue:
+Series 1 is the primary role itself (vibrant enough for the dataviz chroma floor); the other slots are a
+validated set:
 
 | Slot | Hex | Note |
 |---|---|---|
-| series 1 | `#0079d1` | ranges, the model, everything "ours"; bands at alpha .32 (50%) and .14 (80%) |
+| series 1 | `#005bc0` | the primary: ranges, the model, everything "ours"; bands at alpha .34 (50%) and .14 (80%) |
 | series 2 | `#df7d00` | 2.83:1 on the surface: direct labels or the table view required |
 | series 3 | `#876cc8` | |
 | series 4 | `#009486` | |
 
-Validator runs (light, surface `#f8f9ff`): series 1-4 adjacent pass (worst CVD ΔE 11.1, normal-vision 20.4;
-series 2 contrast WARN); slots 1, 2, 4 pass all-pairs (scatter/maps; worst CVD 12.2, normal-vision 15.8);
-up/down/series-1 all-pairs pass with up vs down in the warn band. Ink line = on-surface, grid =
+Validator runs: series 2-4 with `#0079d1` as slot 1 (light, surface `#f8f9ff`) pass adjacent (worst CVD ΔE 11.1,
+normal-vision 20.4; series 2 contrast WARN) and slots 1, 2, 4 pass all-pairs (worst CVD 12.2, normal-vision
+15.8); the primary `#005bc0` against up and down (all pairs, white surface) passes every hard gate with up vs
+down in the warn band (ΔE 6.8). Rerun the four-slot check if slots 2-4 are ever used beside the primary in one
+chart. Ink line = on-surface, grid =
 surface-container-high, labels = on-surface-variant, future area = surface-container-low.
 
 ## How a page uses it
@@ -72,5 +80,7 @@ surface-container-high, labels = on-surface-variant, future area = surface-conta
    `design/decision/template.html` (hover, focus, tap; Escape closes).
 
 Typography is the system sans stack (no web font); numbers in tables use `.md-numeric` (tabular figures).
-Breakpoints: shell rail from 600 px (navigation bar below); pages keep their own content breakpoint (the
+Surfaces: the page is `surface-container-low`, cards are `surface-container-lowest` (white, 24 px corners, no
+shadow), tiles and columns inside a card are `surface-container` (16 px), the rail and navigation bar are
+`surface-container`. Breakpoints: shell rail from 600 px (navigation bar below); pages keep their own content breakpoint (the
 decision page uses 760 px). Phone gutter 16 px, no horizontal page scroll.

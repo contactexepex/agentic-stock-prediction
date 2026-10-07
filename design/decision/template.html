@@ -12,14 +12,14 @@
 :root{ --radius: var(--md-sys-shape-corner-medium); --gutter: var(--mb-gutter); }
 body{font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
 .wrap{max-width:var(--mb-content-max);margin:0 auto}
-header.top{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--radius);box-shadow:var(--md-sys-elevation-1);margin-top:var(--mb-space-4)}
+header.top{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--mb-card-radius);margin-top:var(--mb-space-2)}
 header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:14px 22px}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
-.logo{width:40px;height:40px;border-radius:var(--md-sys-shape-corner-small);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);display:grid;place-items:center;font-weight:700;letter-spacing:.5px;font-size:13px}
+.logo{width:44px;height:44px;border-radius:var(--md-sys-shape-corner-medium);background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);display:grid;place-items:center;font-weight:700;letter-spacing:.5px;font-size:13px}
 .brand h1{font-size:20px;margin:0;line-height:1.2;font-weight:600}
 .brand .sub{color:var(--md-sys-color-on-surface-variant);font-size:13px}
 .price{margin-left:auto;text-align:right}
-.price .big{font-size:26px;font-weight:700;line-height:1.1}
+.price .big{font-size:30px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
 .price .chg{font-size:13px;color:var(--md-sys-color-on-surface-variant)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;width:100%;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
 .chips .md-chip{height:26px;padding:0 10px;font:var(--md-sys-typescale-label-medium);letter-spacing:0;gap:6px}
@@ -29,7 +29,7 @@ header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;paddin
 main{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:18px}
 main>*,.dbody>div,.plan .col,.kpi,.dcol,.drv .t,.ev .what,.newsl li>div{min-width:0}
 .why,.lede,.note{overflow-wrap:anywhere}
-.card{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--md-sys-elevation-1)}
+.card{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--mb-card-radius);padding:22px 24px}
 .card h2{font-size:17px;font-weight:600;margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .card h2 .n{width:24px;height:24px;border-radius:50%;background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);font-size:12px;display:grid;place-items:center;font-weight:700}
 .lede{color:var(--md-sys-color-on-surface-variant);font-size:13px;margin:0 0 14px}
@@ -38,13 +38,13 @@ main>*,.dbody>div,.plan .col,.kpi,.dcol,.drv .t,.ev .what,.newsl li>div{min-widt
 
 /* decision */
 .decision{padding:0;overflow:hidden}
-.dhead{display:grid;grid-template-columns:auto 1fr;gap:18px 22px;padding:22px;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);align-items:center}
+.dhead{display:grid;grid-template-columns:auto 1fr;gap:18px 22px;padding:24px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);align-items:center}
 .dhead.yes{background:var(--mb-color-up-container);color:var(--mb-color-on-up-container)}
 .verdict{display:flex;align-items:center;gap:14px}
-.verdict .ico{width:68px;height:68px;border-radius:var(--md-sys-shape-corner-large);background:var(--md-sys-color-secondary);color:var(--md-sys-color-on-secondary);display:grid;place-items:center}
+.verdict .ico{width:72px;height:72px;border-radius:var(--md-sys-shape-corner-extra-large);background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);display:grid;place-items:center}
 .dhead.yes .verdict .ico{background:var(--mb-color-up);color:var(--mb-color-on-up)}
 .verdict .ico .ms{width:44px;height:44px}
-.verdict .word{font-size:56px;font-weight:800;line-height:.95;letter-spacing:-1px;color:var(--md-sys-color-on-secondary-container)}
+.verdict .word{font-size:56px;font-weight:800;line-height:.95;letter-spacing:-1px;color:var(--md-sys-color-on-primary-container)}
 .dhead.yes .verdict .word{color:var(--mb-color-on-up-container)}
 .verdict .word small{display:block;font-size:15px;font-weight:600;letter-spacing:0;margin-top:6px}
 .why{font-size:17px;line-height:1.4;margin:0}
@@ -52,22 +52,24 @@ main>*,.dbody>div,.plan .col,.kpi,.dcol,.drv .t,.ev .what,.newsl li>div{min-widt
 .why .meta{display:block;font-size:13px;opacity:.85;margin-top:6px}
 .dbody{display:grid;grid-template-columns:1fr 1.25fr;gap:0}
 .dbody>div{padding:18px 22px}
-.dbody>div+div{border-left:1px solid var(--md-sys-color-outline-variant)}
+.dbody>div+div{border-left:1px solid var(--md-sys-color-surface-container-high)}
 .dbody h3{font-size:14px;margin:0 0 10px;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:8px}
 .checks{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .checks li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:start;font-size:14px}
 .checks .now{color:var(--md-sys-color-on-surface-variant);font-size:13px;white-space:nowrap}
 .plan{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.plan .col{border-radius:var(--md-sys-shape-corner-small);padding:12px 14px;background:var(--md-sys-color-surface-container-low)}
+.plan .col{border-radius:var(--mb-panel-radius);padding:14px 16px;background:var(--md-sys-color-surface-container)}
 .plan .col h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:6px}
-.plan dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:13.5px}
+.plan dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;font-size:13.5px}
 .plan dt{color:var(--md-sys-color-on-surface-variant)}
 .plan dd{margin:0;font-weight:600;text-align:right}
 .plan dd .r{color:var(--mb-color-down)} .plan dd .g{color:var(--mb-color-up)}
-.plan .hero{font-size:22px;font-weight:800;letter-spacing:-.3px}
+.plan .hero{font-size:22px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
+.plan dt.wide{grid-column:1/-1;margin-top:4px} .plan dd.wide{grid-column:1/-1;text-align:left;margin-bottom:4px}
 .plan .hero small{font-size:12px;font-weight:500;color:var(--md-sys-color-on-surface-variant);display:block}
 .tr{margin-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.tr .kpi{border-radius:var(--md-sys-shape-corner-small);padding:10px 12px;background:var(--md-sys-color-surface-container-low)}
+.tr .kpi{border-radius:var(--mb-panel-radius);padding:12px 14px;background:var(--md-sys-color-surface-container)}
+.tr .kpi:first-child{background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)} .tr .kpi:first-child .l{color:inherit;opacity:.85}
 .tr .kpi .v{font-size:22px;font-weight:800;line-height:1.1}
 .tr .kpi .l{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
 .note{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0}
@@ -89,9 +91,10 @@ main>*,.dbody>div,.plan .col,.kpi,.dcol,.drv .t,.ev .what,.newsl li>div{min-widt
 
 /* strip */
 .strip{width:100%;border-collapse:collapse;font-size:13px}
-.strip th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--md-sys-color-on-surface-variant);text-align:left;font-weight:600;padding:6px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+.strip th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--md-sys-color-on-surface-variant);text-align:left;font-weight:600;padding:8px 6px;background:var(--md-sys-color-surface-container);white-space:nowrap}
+.strip th:first-child{border-radius:10px 0 0 10px} .strip th:last-child{border-radius:0 10px 10px 0}
 .strip td{padding:5px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
-.strip tr.fut td{color:var(--md-sys-color-on-surface-variant);background:var(--md-sys-color-surface-container-low)}
+.strip tr.fut td{color:var(--md-sys-color-on-surface-variant)}
 .strip .d{font-weight:600}
 .strip .d small{display:block;font-weight:400;color:var(--md-sys-color-on-surface-variant);font-size:11px}
 .meter{ /* = design-system .mb-odds */ }
@@ -104,18 +107,19 @@ main>*,.dbody>div,.plan .col,.kpi,.dcol,.drv .t,.ev .what,.newsl li>div{min-widt
 
 /* drivers */
 .drivers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.dcol{border-radius:var(--md-sys-shape-corner-medium);padding:12px 14px;background:var(--md-sys-color-surface-container-low)}
+.dcol{border-radius:var(--mb-panel-radius);padding:14px 16px;background:var(--md-sys-color-surface-container)}
 .dcol h3{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
 .dcol h3 .net{margin-left:auto;font-size:12px;color:var(--md-sys-color-on-surface-variant);font-weight:500}
-.drv{display:grid;grid-template-columns:20px 1fr 64px;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--md-sys-color-surface-container-highest);font-size:13px}
+.drv{display:grid;grid-template-columns:20px 1fr 64px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-highest);font-size:13px}
 .drv:first-of-type{border-top:0}
 .drv .t{min-width:0}
 .drv .t small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* coming */
 .events{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.ev{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;border-radius:var(--md-sys-shape-corner-small);padding:10px 12px;background:var(--md-sys-color-surface-container-low)}
-.ev.major{border-left:4px solid var(--md-sys-color-primary)}
+.ev{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;border-radius:var(--mb-panel-radius);padding:12px 14px;background:var(--md-sys-color-surface-container)}
+.ev.major{box-shadow:inset 4px 0 0 var(--md-sys-color-primary)}
+.ev .when b{color:var(--md-sys-color-primary)}
 .ev .when{text-align:center;line-height:1.1}
 .ev .when b{display:block;font-size:20px}
 .ev .when small{font-size:11px;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase}
@@ -139,7 +143,8 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
 @media (max-width: 760px){
   body{font-size:14px}
   header .wrap{padding:14px}
-  .card{padding:16px 14px}
+  .card{padding:16px 14px;border-radius:20px}
+  header.top{border-radius:20px}
   .dhead{grid-template-columns:1fr;padding:18px 14px;gap:12px}
   .verdict .word{font-size:48px}
   .why{font-size:15.5px}
@@ -403,8 +408,8 @@ function planCol(title, h, rng) {
   const stop = el('dd', {}, el('span', {class:'r'}, `below ${money(lo80,0)}`));
   const dts = el('dt', {}, 'Exit early'); dts.append(help(`Stop = lower edge of the 80% range (${money(lo80,2)}, ${sgn((lo80/base-1)*100,1)} from ${asofDow}'s close). Only 1 in 10 normal days should close below it, so a close below means the forecast is broken, not unlucky.`));
   dl.append(dts, stop);
-  const likely = el('dd', {}, el('span', {class:'hero'}, el('span', {class:'r'}, '−'+money(-out(lo50),0)), ' to ', el('span', {class:'g'}, '+'+money(out(hi50),0)), el('small', {}, `8 in 10 days: −${money(-out(lo80),0)} to +${money(out(hi80),0)}`)));
-  const dtl = el('dt', {}, `On ${money(stake)}`); dtl.append(help(`From the published range after costs: 50% band ${money(lo50,2)}–${money(hi50,2)} (${sgn((lo50/base-1)*100,1)} to ${sgn((hi50/base-1)*100,1)}), 80% band ${money(lo80,2)}–${money(hi80,2)}, both relative to ${asofDow}'s close ${money(base,2)}. Round-trip costs ${money(costR,2)} (${(rt*100).toFixed(4)}% of traded value; config/costs.yaml, ${P.market} section, every rate marked "verify"; brokerage assumed ${money(0)}, slippage not modelled).`));
+  const likely = el('dd', {class:'wide'}, el('span', {class:'hero'}, el('span', {class:'r'}, '−'+money(-out(lo50),0)), ' to ', el('span', {class:'g'}, '+'+money(out(hi50),0)), el('small', {}, `8 in 10 days: −${money(-out(lo80),0)} to +${money(out(hi80),0)}`)));
+  const dtl = el('dt', {class:'wide'}, `On ${money(stake)}`); dtl.append(help(`From the published range after costs: 50% band ${money(lo50,2)}–${money(hi50,2)} (${sgn((lo50/base-1)*100,1)} to ${sgn((hi50/base-1)*100,1)}), 80% band ${money(lo80,2)}–${money(hi80,2)}, both relative to ${asofDow}'s close ${money(base,2)}. Round-trip costs ${money(costR,2)} (${(rt*100).toFixed(4)}% of traded value; config/costs.yaml, ${P.market} section, every rate marked "verify"; brokerage assumed ${money(0)}, slippage not modelled).`));
   dl.append(dtl, likely);
   const pr = h===1 ? p1 : p5, lv = h===1 ? live1 : live5;
   add('Chance of a rise', pr == null ? '— no score' : `${pct(pr)}%`, lv ? `The live model score for ${h}-day (model_scores, ${hm(lv.computed_at)} UTC): P(up) ${pr.toFixed(4)}; base rate ${lv.base_rate}. The forecaster may adjust by at most ±0.10 with a reason.` : 'No live model score stored.');

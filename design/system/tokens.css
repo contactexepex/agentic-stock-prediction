@@ -1,6 +1,6 @@
 /* market-brief cockpit: Material 3 (Material You) LIGHT design tokens.
-   Generated from ONE seed colour, #3B6EA8 (HCT hue 256.4, chroma 42.1, tone 45.5), with Google's
-   @material/material-color-utilities 0.4.0 SchemeTonalSpot (the default "Material You" scheme,
+   Generated from ONE seed colour, #1A73E8 (HCT hue 265.6, chroma 65.1, tone 49.9), with Google's
+   @material/material-color-utilities 0.4.0 SchemeVibrant (the high-chroma "Material You" scheme,
    contrast level 0). Every --md-sys-color-* value below is that scheme's light role, unchanged.
    Semantic and chart tokens (--mb-*) are HCT tonal palettes on fixed hues (see README.md): the
    chart series are higher-chroma than the M3 roles on purpose (the dataviz checker's chroma floor).
@@ -9,53 +9,55 @@
 :root {
   color-scheme: light;
 
-  /* ---- M3 colour roles (light) --------------------------------------------------------- */
-  --md-sys-color-primary: #39608f;                 /* tone 40 */
+  /* ---- M3 colour roles (light): SchemeVibrant from seed #1A73E8 (HCT hue 265.6, chroma 65.1,
+     tone 49.9), contrast level 0. Alternatives with the same structure: tokens-variant-indigo.css,
+     tokens-variant-teal.css (override files for mockups; the chosen one is pasted here). ------ */
+  --md-sys-color-primary: #005bc0;
   --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #d3e4ff;       /* tone 90 */
-  --md-sys-color-on-primary-container: #1e4875;    /* tone 30 */
-  --md-sys-color-secondary: #545f70;
+  --md-sys-color-primary-container: #d8e2ff;
+  --md-sys-color-on-primary-container: #004493;
+  --md-sys-color-secondary: #585c7e;
   --md-sys-color-on-secondary: #ffffff;
-  --md-sys-color-secondary-container: #d7e3f8;
-  --md-sys-color-on-secondary-container: #3c4758;
-  --md-sys-color-tertiary: #6c5677;
+  --md-sys-color-secondary-container: #dfe0ff;
+  --md-sys-color-on-secondary-container: #414465;
+  --md-sys-color-tertiary: #615789;
   --md-sys-color-on-tertiary: #ffffff;
-  --md-sys-color-tertiary-container: #f5d9ff;
-  --md-sys-color-on-tertiary-container: #533f5e;
+  --md-sys-color-tertiary-container: #e7deff;
+  --md-sys-color-on-tertiary-container: #494070;
   --md-sys-color-error: #ba1a1a;
   --md-sys-color-on-error: #ffffff;
   --md-sys-color-error-container: #ffdad6;
   --md-sys-color-on-error-container: #93000a;
-  --md-sys-color-surface: #f8f9ff;
-  --md-sys-color-on-surface: #191c20;
-  --md-sys-color-surface-variant: #dfe2eb;
-  --md-sys-color-on-surface-variant: #43474e;
-  --md-sys-color-surface-dim: #d8dae0;
-  --md-sys-color-surface-bright: #f8f9ff;
+  --md-sys-color-surface: #f9f9ff;
+  --md-sys-color-on-surface: #181c25;
+  --md-sys-color-surface-variant: #dee2f2;
+  --md-sys-color-on-surface-variant: #424753;
+  --md-sys-color-surface-dim: #d7d9e6;
+  --md-sys-color-surface-bright: #f9f9ff;
   --md-sys-color-surface-container-lowest: #ffffff;
-  --md-sys-color-surface-container-low: #f2f3fa;
-  --md-sys-color-surface-container: #ecedf4;
-  --md-sys-color-surface-container-high: #e7e8ee;
-  --md-sys-color-surface-container-highest: #e1e2e8;
-  --md-sys-color-outline: #73777f;
-  --md-sys-color-outline-variant: #c3c6cf;
-  --md-sys-color-inverse-surface: #2e3035;
-  --md-sys-color-inverse-on-surface: #eff0f7;
-  --md-sys-color-inverse-primary: #a3c9fe;
-  --md-sys-color-background: #f8f9ff;
-  --md-sys-color-on-background: #191c20;
-  --md-sys-color-surface-tint: #39608f;
-  --md-sys-color-scrim: #000000;
-  --md-sys-color-shadow: #000000;
-  --md-sys-color-primary-fixed: #d3e4ff;
-  --md-sys-color-primary-fixed-dim: #a3c9fe;
-  --md-sys-color-on-primary-fixed: #001c38;
-  --md-sys-color-on-primary-fixed-variant: #1e4875;
+  --md-sys-color-surface-container-low: #f1f3ff;
+  --md-sys-color-surface-container: #ebedfa;
+  --md-sys-color-surface-container-high: #e5e8f5;
+  --md-sys-color-surface-container-highest: #dfe2ef;
+  --md-sys-color-outline: #727785;
+  --md-sys-color-outline-variant: #c2c6d6;
+  --md-sys-color-inverse-surface: #2c303a;
+  --md-sys-color-inverse-on-surface: #eef0fd;
+  --md-sys-color-inverse-primary: #adc7ff;
+  --md-sys-color-surface-tint: #005bc0;
+  --md-sys-color-primary-fixed: #d8e2ff;
+  --md-sys-color-primary-fixed-dim: #adc7ff;
+  --md-sys-color-on-primary-fixed: #001a41;
+  --md-sys-color-on-primary-fixed-variant: #004493;
+  --md-sys-color-secondary-fixed: #dfe0ff;
+  --md-sys-color-secondary-fixed-dim: #c1c4eb;
+  --md-sys-color-on-secondary-fixed: #151937;
+  --md-sys-color-on-secondary-fixed-variant: #414465;
+  --md-sys-color-tertiary-fixed: #e7deff;
+  --md-sys-color-tertiary-fixed-dim: #cbbff8;
+  --md-sys-color-on-tertiary-fixed: #1d1341;
+  --md-sys-color-on-tertiary-fixed-variant: #494070;
 
-  /* Tonal palettes (the steps the roles above are picked from), for the rare page that needs one */
-  --md-ref-palette-primary30: #1e4875; --md-ref-palette-primary40: #39608f; --md-ref-palette-primary50: #5379a9;
-  --md-ref-palette-primary60: #6d93c5; --md-ref-palette-primary80: #a3c9fe; --md-ref-palette-primary90: #d3e4ff; --md-ref-palette-primary95: #eaf1ff;
-  --md-ref-palette-neutral50: #73777d; --md-ref-palette-neutral60: #8d9196; --md-ref-palette-neutral70: #a8abb1; --md-ref-palette-neutral90: #dfe3e8;
 
   /* ---- Semantic tokens (finance) --------------------------------------------------------
      Never colour alone: every up/down/hit/miss mark also carries a glyph (arrow, tick, cross) and a
@@ -93,7 +95,7 @@
   --mb-color-live-container: var(--md-sys-color-primary-container);
   --mb-color-on-live-container: var(--md-sys-color-on-primary-container);
   --mb-color-backtest: var(--md-sys-color-primary);
-  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(57,96,143,.16) 0 3px, transparent 3px 6px);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(0,91,192,.16) 0 3px, transparent 3px 6px);
   --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
   --mb-color-mock: var(--md-sys-color-outline);
   --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
@@ -103,13 +105,13 @@
 
   /* ---- Chart tokens (dataviz skill: validated with scripts/validate_palette.js, see README) ---- */
   --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
-  --mb-chart-1: #0079d1;   /* series 1, the seed hue (HCT 256) at chroma 64: ranges, model, everything "ours" */
+  --mb-chart-1: #005bc0;   /* series 1 = the primary role: ranges, model, everything "ours" (4.3:1 passes) */
   --mb-chart-2: #df7d00;   /* series 2 (2.83:1 on the surface: needs direct labels or a table view) */
   --mb-chart-3: #876cc8;   /* series 3 */
   --mb-chart-4: #009486;   /* series 4 */
-  --mb-chart-band-50: rgba(0,121,209,.32);   /* inner band, series 1 */
-  --mb-chart-band-80: rgba(0,121,209,.14);   /* outer band */
-  --mb-chart-fan: rgba(0,121,209,.10);
+  --mb-chart-band-50: rgba(0,91,192,.34);    /* inner band, series 1 */
+  --mb-chart-band-80: rgba(0,91,192,.14);    /* outer band */
+  --mb-chart-fan: rgba(0,91,192,.10);
   --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
   --mb-chart-grid: var(--md-sys-color-surface-container-high);
   --mb-chart-axis: var(--md-sys-color-outline-variant);
@@ -150,6 +152,8 @@
   --md-sys-shape-corner-large: 16px;
   --md-sys-shape-corner-extra-large: 28px;
   --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 24px;        /* cards and panels (M3 expressive large containers) */
+  --mb-panel-radius: 16px;       /* tiles and columns inside a card */
 
   /* ---- Elevation (M3 light shadows, levels 0-5) ----------------------------------------- */
   --md-sys-elevation-0: none;

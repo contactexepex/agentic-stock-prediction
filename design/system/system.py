@@ -9,6 +9,7 @@ read at build time, so a page never carries a stale copy of the system knowingly
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -18,7 +19,10 @@ MARK_ICONS = "<!--@@ICONS@@-->"
 
 
 def tokens_css() -> str:
-    return (HERE / "tokens.css").read_text()
+    """tokens.css, plus the override file named by MB_TOKENS_EXTRA (colour-scheme mockups), if any."""
+    css = (HERE / "tokens.css").read_text()
+    extra = os.environ.get("MB_TOKENS_EXTRA")
+    return css + ("\n" + Path(extra).read_text() if extra else "")
 
 
 def components_css() -> str:

@@ -83,9 +83,11 @@ tooltip (hover, focus or tap). Status is never colour alone: tick/cross glyphs, 
 ## Recolour to Material 3 (2026-10-07)
 
 - **Only the skin.** Same sections, order, grids, chart, strip, drivers, events and the three expansion panels.
-  Colours now come from `design/system/tokens.css`: page on `surface`, elevated cards on `surface-container-lowest`,
-  the decision head on `secondary-container` with the NO in `secondary` (calm, not alarming: NO means "no edge",
-  not "sell"; a YES would use the up container), numbered section badges in `primary`, hit/miss marks in the
+  Colours now come from `design/system/tokens.css` (vibrant Material You scheme from seed #1A73E8; the first,
+  muted tonal-spot pass was rejected as grey): page on the tinted `surface-container-low`, white cards with 24 px
+  corners and no shadow, tiles and columns on `surface-container`, the decision head on `primary-container` with
+  the verdict box in `primary` (NO means "no edge", not "sell"; a YES would use the up container), numbered
+  section badges in `primary`, the first KPI tile in `primary-container`, hit/miss marks in the
   up/down tokens with tick/cross glyphs, direction squares in the up/down/neutral/unclear containers, Live /
   Back-test (hatched) / Mock (dashed) / Paper (tertiary) tags from the system, bands and fan in chart series 1
   (`--mb-chart-1`), the actual line in on-surface ink, tooltips on the inverse surface.
