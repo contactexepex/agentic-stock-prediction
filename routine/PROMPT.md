@@ -81,7 +81,10 @@ Warnings never block: list them in `data_quality`.
    record, never scored), and ignores cues and option snapshots quoted after the open. Say so in
    `data_quality` too.
 
-3. Collect: run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
+3. Collect: first import the inbox when the web tier is live: `python scripts/company.py import-inbox`
+   (needs `MOTHERDUCK_INBOX_TOKEN`; skip when it is unset). Company commands that `onboard.yml` could not
+   finish (logged `failed`) are retried here; list refused or failed ones in `data_quality`.
+   Then run `python scripts/collect_prices.py`, `collect_quotes.py`, `collect_events.py`,
    `collect_news.py`, `collect_filings.py` and `collect_options.py` (all in `scripts/`;
    options are US only, India skips), and for India also
    `collect_relations_india.py` (insider/promoter trades, bulk and block deals, shareholding and

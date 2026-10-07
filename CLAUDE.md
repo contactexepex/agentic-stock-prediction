@@ -141,6 +141,21 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Planned, not built: the API under `/api/v1` (WS2) and the Next.js app on
   Vercel (WS3) reading only `rm`; contract in `api/openapi.yaml` (checked by `tests/test_openapi.py`).
+- Company lifecycle (F8, B1; docs/ws/b1.md; code `marketbrief/lifecycle/`, settings `config/lifecycle.yaml`): the
+  watchlist is data. `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox`
+  validates and appends `data/<market>/watchlist_events/` (every command also gets a `command_log` row; delete needs
+  `--confirm <ticker>` and is never allowed from Slack). `load_market` rebuilds the company lists from the events as of
+  the run's clock (MB_NOW-aware): `cfg["tickers"]` = every collected company (active and inactive, never deleted;
+  collectors keep reading it), `cfg["sectors"]` rebuilt, `cfg["active_tickers"]` = active only; code that predicts or
+  displays uses `lifecycle.loader.active_tickers(cfg)` / `active_sectors(cfg)`; replays and new code use
+  `contracts.watchlist.watchlist(market, as_of, state)`. An event counts once both effective_from and recorded_at have
+  passed, except the seed's add events (channel `seed`, the 40 config companies, effective from the start of stored
+  history), which restate the config list and count from effective_from. Without events the config's `tickers:` act
+  as adds. Add runs the deterministic onboarding (identifiers from NSE's equity list or SEC's ticker/exchange file plus
+  Yahoo; no ETFs, BSE-only or unknown symbols; sector from `sector_rules`; backfill of prices from the first stored day,
+  15 years of daily history into the long-history cache `work/model_history/`, news, filings or announcements; the
+  candidate's collect gate) before its event is appended.
+  `.github/workflows/onboard.yml` imports the MotherDuck inbox (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
   context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
@@ -372,6 +387,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   confidence by at least 0.05 (at most 0.85).
 - No new call for a ticker with indicator quality `BLOCKED`, or with earnings within 1 day
   (`days_to_earnings` <= 1). Lower confidence in `EVENT_HEAVY` and `UNSTABLE` regimes.
+  No call for a company that is not active (`cfg["active_tickers"]`: inactive or deleted companies are never
+  predicted or traded; their open paper trades still settle).
 - Price ranges are computed by `scripts/ranges.py`, never by hand. The forecaster may only
   widen a range (`range_widen` 0-0.5), never narrow it.
 - Calibrate against the track record: if a confidence band hits less often than its stated
