@@ -9,13 +9,14 @@ Probability by signal:
   strategy (weight 1, every status and materiality) reproduces the score's prob_up; news_weight 0 is model-only.
 - always_up: direction up, no probability; momentum: up when the as-of close is above the previous close.
 Rules (F2.6): no prediction (an abstention row) with quality BLOCKED or days_to_earnings <= 1; regime_filter:
-written with qualifies false in UNSTABLE / EVENT_HEAVY; cross_market true: abstains until a cross-market model
-score exists (B10). target_price = the range's base_close x exp(center) (center is a log shift, not a price);
-the range as ranges.py publishes it (never narrowed)."""
+written with qualifies false in UNSTABLE / EVENT_HEAVY; cross_market true: reads the cross_market model variant's
+scores (B10's model_variant_scores) instead of the base scores, and abstains on a horizon without one.
+target_price = the range's base_close x exp(center) (center is a log shift, not a price); the range as
+ranges.py publishes it (never narrowed)."""
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from marketbrief.constants.kinds import KIND_STRATEGY_ABSTENTIONS, KIND_STRATEGY_PREDICTIONS
 from marketbrief.core.schemas import SCHEMAS
@@ -32,8 +33,9 @@ STATUS_ORDER = {"confirmed_primary": 0, "corroborated": 1, "single_source": 2}
 
 @dataclass
 class TickerInputs:
-    """One company's inputs on one as-of day. scores / ranges: {k: HorizonScore / HorizonRange};
-    news: [{id, sentiment, relevance, materiality, event_type, status}] as of the score time."""
+    """One company's inputs on one as-of day. scores / ranges: {k: HorizonScore / HorizonRange}; cross_scores:
+    {k: HorizonScore} of the cross_market model variant; news: [{id, sentiment, relevance, materiality,
+    event_type, status}] as of the score time."""
     market: str
     ticker: str
     as_of_date: str
@@ -48,6 +50,7 @@ class TickerInputs:
     amount: float
     currency: str
     scores: dict[int, dict] = field(default_factory=dict)
+    cross_scores: dict[int, dict] = field(default_factory=dict)
     ranges: dict[int, dict] = field(default_factory=dict)
     news: list[dict] = field(default_factory=list)
 
@@ -168,13 +171,12 @@ def company_rows(specs: list[dict], inputs: TickerInputs, news_cfg: dict) -> tup
             skipped.append(abstention(spec, inputs, block, None, list(spec["horizons"])))
             continue
         model_based = spec["parameters"]["signal"] not in (SIGNAL_ALWAYS_UP, SIGNAL_MOMENTUM)
-        if spec["parameters"].get("cross_market"):
-            skipped.append(abstention(spec, inputs, ABSTAIN_ABSTAINED, MSG_NO_CROSS_SCORE, list(spec["horizons"])))
-            continue
-        usable = [k for k in wanted if not model_based or k in inputs.scores]
+        cross = bool(spec["parameters"].get("cross_market"))
+        own = replace(inputs, scores=inputs.cross_scores) if cross else inputs
+        usable = [k for k in wanted if not model_based or k in own.scores]
         missing = [k for k in spec["horizons"] if k not in usable]
         if missing:
-            skipped.append(abstention(spec, inputs, ABSTAIN_ABSTAINED, "no model score or range for these horizons",
-                                      missing))
-        preds += [prediction(spec, inputs, k, news_cfg) for k in usable]
+            reason = MSG_NO_CROSS_SCORE if cross else "no model score or range for these horizons"
+            skipped.append(abstention(spec, own, ABSTAIN_ABSTAINED, reason, missing))
+        preds += [prediction(spec, own, k, news_cfg) for k in usable]
     return preds, skipped
