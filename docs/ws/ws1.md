@@ -247,6 +247,8 @@ untouched tree.
 ## Judge verdicts
 - Round 1: FAIL, commit 4883deff0d24aae821b49f06f94189dafc57703a. The code was verified; there were two
   false doc statements: `ws1-judgments.jsonl` listed as created but missing, and wrong statement counts.
+- Round 2: PASS, commit 5bf0ae3f4799f7d00e9b22b18e03386156bb7e35 (re-check of the two blockers and the fix
+  diff; no new findings).
 
 ## Proposed edits to shared docs
 
