@@ -17,3 +17,8 @@ model_training_cutoff: 2026-06-30
 call_scoring:
   label_basis: open_to_close
   from: "2026-10-08T00:00:00+00:00"
+  # Horizons N+k (decision 37, docs/SPEC.md F2.7; session B10): an open-to-close call of horizon k is sold at the
+  # close of the k-th session after D. 5-day calls made before `n_plus_k_from` keep the old window (sold at D+4's
+  # close, label legacy_5d_d4) and are never pooled with N+5; 1-day calls were N+1 already. Set it to when the
+  # B10 code runs live (the same moment as `from` when B10 is live before the first open-to-close call).
+  n_plus_k_from: "2026-10-08T00:00:00+00:00"

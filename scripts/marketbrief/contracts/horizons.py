@@ -17,7 +17,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TypedDict
 
-HORIZON_LABELS: tuple[str, ...] = ("n_plus_k", "legacy_cc", "legacy_5d_d4")
+from marketbrief.analytics import horizon_records as records
+from marketbrief.core.horizons import horizons as horizon_list
+
+HORIZON_LABELS: tuple[str, ...] = ("n_plus_k", "legacy_cc", "legacy_5d_d4")   # = constants/horizons.HORIZON_LABELS
 HORIZON_LABEL_N_PLUS_K = "n_plus_k"
 
 
@@ -84,16 +87,16 @@ class HorizonRange(TypedDict):
 
 def horizons() -> tuple[int, ...]:
     """The horizon list of config/strategies.yaml (`horizons`), read by the model, ranges.py, the strategies and
-    the scoreboard instead of the HORIZONS constants."""
-    raise NotImplementedError("session B10")
+    the scoreboard instead of the HORIZONS constants (core/horizons.py)."""
+    return horizon_list()
 
 
 def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonScore]:
-    """The newest model score per ticker and horizon computed by `as_of` (no look-ahead)."""
-    raise NotImplementedError("session B10")
+    """The newest model score per ticker and horizon computed by `as_of` (no look-ahead; N+k rows only)."""
+    return records.scores_asof(market, as_of, horizon_days)
 
 
 def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonRange]:
     """The first published range per ticker and horizon for the session after the newest as-of date made by
-    `as_of` (the range a strategy prediction copies)."""
-    raise NotImplementedError("session B10")
+    `as_of` (the range a strategy prediction copies; N+k rows only)."""
+    return records.ranges_asof(market, as_of, horizon_days)

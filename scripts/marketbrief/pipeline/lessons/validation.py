@@ -32,14 +32,14 @@ from marketbrief.constants.lessons import (
     TIME_FIELDS,
 )
 from marketbrief.core.database import connect
+from marketbrief.core.horizons import horizons
 from marketbrief.pipeline.lessons.facts import settled, stored_ids
 
 
 def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
     """(value, what) pairs a lesson's text may cite, as absolute values."""
     allowed_values = [
-        (1.0, "horizon"),
-        (5.0, "horizon"),
+        *((float(horizon), "horizon") for horizon in horizons()),
         (float(fact["horizon_days"]), "horizon"),
         (50.0, "band"),
         (80.0, "band"),

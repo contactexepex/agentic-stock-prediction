@@ -1,5 +1,6 @@
 # Range engine settings (docs/DESIGN.md section 4). Shared by both markets.
-horizons: [1, 5]            # trading days ahead
+# Horizons: the list `horizons` of config/strategies.yaml (N+k, decision 37: the range of the close of the k-th
+# session after D, the first session after the as-of close; core/horizons.py). Not set here.
 # Published bands are fixed: a 50% range and an 80% range.
 
 ewma_lambda: 0.94           # volatility decay; recent days count more

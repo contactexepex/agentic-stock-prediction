@@ -6,23 +6,26 @@ from datetime import timedelta
 
 import pandas as pd
 
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
 from marketbrief.core import paths
 from marketbrief.core.clock import utc_today
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.presentation.news_events import call_status_lines
-from view_data import CONF_BANDS_SQL, RANGE_RECORD_EXACT
+from view_data import BASIS_KEY_SQL, CONF_BANDS_SQL, RANGE_RECORD_EXACT
 
 # Scored records twice: since start, and the rolling last 30 days (by target date).
 WINDOWS = """SELECT *, 'since start' AS win FROM {src}
              UNION ALL SELECT *, 'last 30 days' AS win FROM {src} WHERE target_date >= current_date - 30"""
 
+# per horizon and horizon label (core/horizons.py): ranges of an old window (legacy_cc) never pooled with N+k
 SCORECARD_SQL = f"""
-    SELECT horizon_days AS h, win, count(*) AS n, avg(hit50::INT) AS c50, avg(hit80::INT) AS c80,
-           avg(naive_hit80::INT) AS nc80, avg(width80_pct) AS w, avg(naive_width80_pct) AS nw,
+    SELECT horizon_days AS h, horizon_label AS label, win, count(*) AS n, avg(hit50::INT) AS c50,
+           avg(hit80::INT) AS c80, avg(naive_hit80::INT) AS nc80, avg(width80_pct) AS w, avg(naive_width80_pct) AS nw,
            avg(is80_pct) AS s, avg(naive_is80_pct) AS ns,
            avg(center_err_pct) AS ce, avg(naive_center_err_pct) AS nce
-    FROM ({WINDOWS.format(src=RANGE_RECORD_EXACT)}) GROUP BY ALL ORDER BY h, win DESC"""
+    FROM ({WINDOWS.format(src=RANGE_RECORD_EXACT)}) GROUP BY h, label, win
+    ORDER BY h, label <> '{LABEL_N_PLUS_K}', label, win DESC"""
 
 
 def weekly_review(con, session) -> dict | None:
@@ -65,11 +68,14 @@ def gather(cfg: dict, con) -> dict:
         ),
         # scoring per horizon over the last 30 days and since start (docs/DESIGN.md section 6)
         "scorecard": query(SCORECARD_SQL),
-        "by_regime": query("""SELECT horizon_days AS h, coalesce(regime, '?') AS regime, count(*) AS n,
-                                 avg(hit50::INT) AS c50, avg(hit80::INT) AS c80, avg(naive_hit80::INT) AS nc80
-                          FROM range_record GROUP BY ALL ORDER BY h, regime"""),
-        "direction": query(f"""SELECT horizon_days AS h, label_basis, win, count(*) AS n, avg(hit::INT) AS hit,
-                                  avg((actual_return > 0)::INT) AS up
+        "by_regime": query(f"""SELECT horizon_days AS h, horizon_label AS label, coalesce(regime, '?') AS regime,
+                                  count(*) AS n, avg(hit50::INT) AS c50, avg(hit80::INT) AS c80,
+                                  avg(naive_hit80::INT) AS nc80
+                           FROM range_record GROUP BY h, label, regime
+                           ORDER BY h, label <> '{LABEL_N_PLUS_K}', label, regime"""),
+        # per scoring basis key (scoring.basis_key): old D+4 open-to-close calls never pooled with N+k
+        "direction": query(f"""SELECT horizon_days AS h, {BASIS_KEY_SQL} AS label_basis, win, count(*) AS n,
+                                  avg(hit::INT) AS hit, avg((actual_return > 0)::INT) AS up
                            FROM ({WINDOWS.format(src="track_record")}) GROUP BY ALL
                            ORDER BY h, label_basis, win DESC"""),
         "conf_bands": query(CONF_BANDS_SQL),

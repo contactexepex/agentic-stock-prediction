@@ -131,11 +131,14 @@ def proper_scores(ranges: pd.DataFrame, calls: pd.DataFrame) -> dict:
         else {"all": {"n": 0}},
         "reliability": {
             call_basis.label(basis): scoring.reliability(group["confidence"], group["hit"])
-            for basis, group in scored_calls.groupby("label_basis", sort=True)
+            for basis, group in scored_calls.assign(_basis=[
+                scoring.basis_key(basis, label)
+                for basis, label in zip(scored_calls["label_basis"], scored_calls["horizon_label"], strict=True)
+            ]).groupby("_basis", sort=True)
         }
         if not scored_calls.empty
         else {},
-        "ranges": by_horizon(ranges, scoring.range_scores) if not ranges.empty else {"all": {"n": 0}},
+        "ranges": by_horizon(ranges, scoring.range_scores, labels=True) if not ranges.empty else {"all": {"n": 0}},
     }
     return out
 

@@ -17,6 +17,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+from marketbrief.core.horizons import horizons, window_sessions  # noqa: E402
 from marketbrief.analytics import range_math as rl  # noqa: E402
 from marketbrief.presentation.report import formatting
 from marketbrief.presentation.report import gather  # noqa: E402
@@ -32,14 +33,16 @@ from marketbrief.utils.event_dates import major_event_between  # noqa: E402
 import test_pipeline as tp  # noqa: E402  (helpers only; imported as a module so its tests are not re-collected)
 
 REPO = Path(__file__).resolve().parents[1]
-RC = yaml.safe_load((REPO / "config" / "ranges.yaml").read_text())
+RAW_RC = yaml.safe_load((REPO / "config" / "ranges.yaml").read_text())
+RC = {**RAW_RC, "horizons": list(horizons())}   # as load_ranges_config() gives it: horizons from strategies.yaml
+H = horizons()
 
 
 def make_range(rc: dict, ticker: str, as_of, target, h: int, base: float, sd: float, *, regime="CALM",
                major=False, earnings=False, cue=None, extra_shift=0.0, direction=None, confidence=None,
                widen=0.0, naive_sd=None) -> dict:
-    """A published range built the way ranges.py builds it (same notes, cap and rounding)."""
-    sigma_h, notes = rl.horizon_sigma(sd, h, earnings, rc, regime, major)
+    """A published N+k range built the way ranges.py builds it (same notes, cap and rounding; k + 1 sessions)."""
+    sigma_h, notes = rl.horizon_sigma(sd, window_sessions(h), earnings, rc, regime, major)
     center = 0.0
     if cue is not None:
         center += rc["cue_weight"] * math.log1p(cue)
@@ -57,8 +60,8 @@ def make_range(rc: dict, ticker: str, as_of, target, h: int, base: float, sd: fl
     lo80, hi80 = rl.normal_quantiles(0.8)
     lo50, hi50 = rl.normal_quantiles(0.5)
     band = lambda q: round(base * math.exp(center + q * sigma_h), 4)  # noqa: E731
-    n50 = rl.naive_range(base, naive_sd or sd, h, 0.5)
-    n80 = rl.naive_range(base, naive_sd or sd, h, 0.8)
+    n50 = rl.naive_range(base, naive_sd or sd, window_sessions(h), 0.5)
+    n80 = rl.naive_range(base, naive_sd or sd, window_sessions(h), 0.8)
     return {"id": f"{as_of}-{ticker}-{h}d", "made_at": f"{as_of}T22:00:00+00:00", "as_of_date": str(as_of),
             "session_date": str(as_of), "target_date": str(target), "ticker": ticker, "horizon_days": h,
             "base_close": base, "center": round(center, 6), "sigma_h": round(sigma_h, 6),
@@ -66,7 +69,8 @@ def make_range(rc: dict, ticker: str, as_of, target, h: int, base: float, sd: fl
             "naive_lo50": round(n50[0], 4), "naive_hi50": round(n50[1], 4),
             "naive_lo80": round(n80[0], 4), "naive_hi80": round(n80[1], 4),
             "direction": direction, "confidence": confidence, "regime": regime,
-            "calibration_id": "test (normal)", "notes": notes}
+            "calibration_id": "test (normal)", "notes": notes, "horizon_label": "n_plus_k",
+            "exit_date": str(target)}
 
 
 # ---------- unit tests ----------
@@ -87,11 +91,11 @@ def test_note_tags():
 
 def test_replay_reproduces_published_ranges_and_changes_one_input():
     rows = [
-        make_range(RC, "A", "2026-10-01", "2026-10-02", 1, 100.0, 0.015, cue=0.004),
-        make_range(RC, "A", "2026-10-01", "2026-10-08", 5, 100.0, 0.015, regime="UNSTABLE", major=True,
+        make_range(RC, "A", "2026-10-01", "2026-10-05", 1, 100.0, 0.015, cue=0.004),
+        make_range(RC, "A", "2026-10-01", "2026-10-09", 5, 100.0, 0.015, regime="UNSTABLE", major=True,
                    earnings=True, direction="up", confidence=0.8, widen=0.3, extra_shift=-0.002),
-        make_range(RC, "B", "2026-10-01", "2026-10-02", 1, 50.0, 0.02, cue=0.05),       # hits the centre cap
-        make_range(RC, "C", "2026-10-01", "2026-10-02", 1, 10.0, 0.01, direction="down", confidence=0.6),
+        make_range(RC, "B", "2026-10-01", "2026-10-05", 1, 50.0, 0.02, cue=0.05),       # hits the centre cap
+        make_range(RC, "C", "2026-10-01", "2026-10-05", 1, 10.0, 0.01, direction="down", confidence=0.6),
     ]
     for r in rows:
         r["actual_close"] = r["base_close"]
@@ -161,6 +165,7 @@ def test_summaries_match_hand_calculation():
         t(id, target_date, ticker, horizon_days, base_close, actual_close, lo50, hi50, lo80, hi80,
           naive_lo50, naive_hi50, naive_lo80, naive_hi80, direction, regime, notes,
           hit50, hit80, naive_hit50, naive_hit80, is80_pct, naive_is80_pct, width80_pct, naive_width80_pct)""")
+    con.execute("ALTER TABLE range_record ADD COLUMN horizon_label VARCHAR DEFAULT 'n_plus_k'")
     # stored is80 matches the interval score by hand: width + (2/0.2) x miss distance
     naive80 = [(97, 103), (96, 105), (97, 103), (97, 103)]
     for y, stored, (nlo, nhi), naive in zip(ys, (10.0, 10.0, 60.0, 20.0), naive80, (6.0, 9.0, 76.0, 36.0)):
@@ -187,6 +192,14 @@ def test_summaries_match_hand_calculation():
                           "confidence": [0.6, 0.7, 0.8, 0.9]})
     c = summaries.call_summary(calls)
     assert c == {"n": 4, "hit_rate": 0.5, "always_up": 0.75, "edge": -0.25, "mean_confidence": 0.75}
+
+    # ranges of the old windows (legacy_cc, before B10) are summarised apart and left out of "all"
+    old = df.assign(horizon_label=["legacy_cc", "n_plus_k", "legacy_cc", "n_plus_k"])
+    by_label = summaries.by_horizon(old, summaries.range_summary, labels=True)
+    assert list(by_label) == ["all", "1d", "5d", "1d legacy_cc", "5d legacy_cc"]
+    assert by_label["all"]["n"] == 2 and by_label["1d"]["n"] == by_label["1d legacy_cc"]["n"] == 1
+    assert set(summaries.breakdown(old, "regime")) == {"CALM · 1d", "CALM · 5d", "CALM · 1d legacy_cc",
+                                                      "UNSTABLE · 5d legacy_cc"}
 
 
 def test_backtest_scale_widens_ranges():
@@ -243,12 +256,12 @@ def build_market(tmp: Path):
         close = pd.Series(series[t], index=pd.to_datetime(days))
         sig = rl.ewma_sigma(close, RC["ewma_lambda"])
         for i in range(n - 41, n - 1):
-            for h in (1, 5):
-                if i + h >= n:
+            for h in H:
+                if i + h + 1 >= n:
                     continue
                 k = len(ranges)
                 ranges.append(make_range(
-                    RC, t, days[i], days[i + h], h, round(series[t][i], 4), float(sig.iloc[i]),
+                    RC, t, days[i], days[i + h + 1], h, round(series[t][i], 4), float(sig.iloc[i]),
                     naive_sd=rl.realized_sigma(close.iloc[: i + 1]),
                     regime="EVENT_HEAVY" if k % 4 == 0 else "CALM", major=k % 6 == 0,
                     cue=float(rng.choice([-0.03, 0.03])),            # pure noise: the review should drop it
@@ -292,7 +305,7 @@ def test_review_end_to_end(tmp_path):
     [rec] = records(root)
     assert rec["id"] == week and rec["report"] == f"reports/{tp.MARKET}/review-{week}.md"
     d = rec["detail"]
-    assert set(d["ranges"]) == {"week", "rolling", "all"} and set(d["ranges"]["all"]) == {"all", "1d", "5d"}
+    assert set(d["ranges"]) == {"week", "rolling", "all"} and set(d["ranges"]["all"]) == {"all", *(f"{h}d" for h in H)}
     b = d["breakdowns"]
     assert set(b) == {"week", "rolling", "all"} and set(d["bands"]) == {"week", "rolling", "all"}
     assert any(k.startswith("Energy") for k in b["all"]["sector"])
@@ -322,7 +335,7 @@ def test_review_end_to_end(tmp_path):
     base = hist["current config"]["by_h"]
     for name in ("drop regime widening", "EWMA lambda 0.97"):               # each variant really changes the ranges
         var = hist[name]["by_h"]
-        assert set(var) == set(base) == {"1d", "5d"}
+        assert set(var) == set(base) == {f"{h}d" for h in H}
         assert any(var[h]["width80_pct"] != base[h]["width80_pct"] for h in base), name
         assert any(var[h]["score80_pct"] != base[h]["score80_pct"] for h in base), name
     assert all(hist["drop regime widening"]["by_h"][h]["width80_pct"] < base[h]["width80_pct"] for h in base)
@@ -344,12 +357,12 @@ def test_review_end_to_end(tmp_path):
     section = text.split("## Ranges: coverage vs target")[1].split("###")[0]
     rows = [[c.strip() for c in line.strip("|").split("|")] for line in section.splitlines()
             if line.startswith("| ") and not line.startswith("| Window")]
-    assert len(rows) == 9
+    assert len(rows) == 3 * (1 + len(H))                                      # 3 windows x (all + each horizon)
     assert all((r[-1] == "low n") == (int(r[2]) < 30) for r in rows), rows
     assert {r[-1] for r in rows} == {"low n", ""}
     assert [r[-1] for r in rows if r[0] == f"week {week}" and r[1] == "1d"] == ["low n"]
     # config is never touched
-    assert yaml.safe_load((cfg / "ranges.yaml").read_text()) == RC
+    assert yaml.safe_load((cfg / "ranges.yaml").read_text()) == RAW_RC
 
     # the review record is readable through DuckDB (schema + view)
     q = tp.run("review.py", root, cfg, "--week", week, "--if-due")
@@ -359,7 +372,7 @@ def test_review_end_to_end(tmp_path):
 
 def test_review_with_little_data_makes_no_live_proposal(tmp_path):
     root, cfg, days, _ = build_market(tmp_path)
-    week = helpers.iso_week(days[-40] + timedelta(days=7))          # a week into the live period
+    week = helpers.iso_week(days[-40])                              # the first week of the live period
     r = tp.run("review.py", root, cfg, "--week", week, "--no-history")
     assert r.returncode == 0, r.stderr
     [rec] = records(root)
@@ -396,11 +409,12 @@ def window_con(target_dates: list[date]):
         "center": 0.0, "sigma_h": 0.02, "lo50": 98.0, "hi50": 102.0, "lo80": 95.0, "hi80": 105.0,
         "naive_lo50": 99.0, "naive_hi50": 101.0, "naive_lo80": 97.0, "naive_hi80": 103.0, "direction": None,
         "confidence": None, "regime": "CALM", "notes": [], "hit50": True, "hit80": True, "naive_hit50": True,
-        "naive_hit80": True, "is80_pct": 10.0, "naive_is80_pct": 6.0, "width80_pct": 10.0, "naive_width80_pct": 6.0}
-        for i, d in enumerate(target_dates)])
+        "naive_hit80": True, "is80_pct": 10.0, "naive_is80_pct": 6.0, "width80_pct": 10.0, "naive_width80_pct": 6.0,
+        "horizon_label": "n_plus_k"} for i, d in enumerate(target_dates)])
     calls = pd.DataFrame([{"id": f"c{i}", "target_date": d, "horizon_days": 1,  # noqa: F841
                            "confidence": 0.85, "hit": True, "actual_return": 0.01, "label_basis": "close_to_close",
-                           "made_at": pd.Timestamp(d, tz="UTC")} for i, d in enumerate(target_dates)])
+                           "horizon_label": "legacy_cc", "made_at": pd.Timestamp(d, tz="UTC")}
+                          for i, d in enumerate(target_dates)])
     con.execute("CREATE TABLE range_record AS SELECT * FROM ranges")
     con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
     return con
@@ -508,7 +522,7 @@ def test_proposals_prefer_live_evidence():
 
 
 def test_review_tracks_5d_earnings_day_coverage():
-    """Issue #16: the review shows the 5-day earnings-in-horizon coverage per window, or _none_ before any."""
+    """Issue #16: the review shows the earnings-in-horizon coverage per window and horizon, or _none_ before any."""
     from marketbrief.pipeline.review.markdown_sections import range_lines
 
     rv = {**review.DEFAULTS, "rolling_days": 30}
@@ -518,9 +532,10 @@ def test_review_tracks_5d_earnings_day_coverage():
     data = {"ranges": {w: {"all": {"n": 0}} for w in names},
             "breakdowns": {"week": empty, "rolling": empty,
                            "all": {**empty, "note": {"earnings · 5d": stats, "earnings · 1d": stats}}}}
-    text = "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage, 5-day ranges")[1]
+    text = "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage per horizon")[1]
     rows = [line for line in text.split("Notes:")[0].splitlines() if line.startswith("| since")]
-    assert len(rows) == 1 and rows[0].startswith("| since start | earnings · 5d | 40 | 45% | 75% |")
+    assert len(rows) == 2 and rows[0].startswith("| since start | earnings · 1d | 40 | 45% | 75% |")
+    assert rows[1].startswith("| since start | earnings · 5d | 40 | 45% | 75% |")
     data["breakdowns"]["all"] = empty
     assert "_none_" in "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage")[1]
 
@@ -628,8 +643,8 @@ def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
     monkeypatch.setattr(backtest, "load_model_config", lambda: SETTINGS)
     out = cli.model_check("us", {**review.DEFAULTS}, True)
     assert out["json"].startswith("work/model_backtest/model-backtest-us-") and (tmp_path / out["json"]).exists()
-    assert {row["key"] for row in out["scores"]} == {"1d close_to_close", "1d open_to_close", "5d close_to_close",
-                                                     "5d open_to_close"}
+    assert {row["key"] for row in out["scores"]} == {f"{h}d {c}" for h in H for c in ("close_to_close",
+                                                                                        "open_to_close")}
     assert out["verdict"].startswith(("Yes:", "No:")) and not (tmp_path / "data" / "us" / "reviews").exists()
     monkeypatch.setattr(model_skill, "run_backtest", lambda _markets: 1 / 0)
     assert cli.model_check("us", {**review.DEFAULTS}, True) == {"error": "the backtest failed: division by zero"}

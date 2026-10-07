@@ -11,7 +11,18 @@ MANIFEST_KEY = "dashboard"
 BAR_CALENDAR_DAYS = 380  # OHLC history embedded per ticker (enough for the 1-year span)
 NEWS_PER_TICKER = 10  # latest headlines per ticker
 NEWS_CANDIDATES = 30  # rows read per ticker before same-title copies are dropped
-HORIZONS = (1, 5)
+# Horizon names (the horizon list itself comes from config/strategies.yaml via core.horizons.horizons()):
+# an N+k row (buy at the open of D, sell at the close of D+k) is "N+k"; a row of an old window keeps the wording the
+# page used before B10, so the two are never shown under one name (core/horizons.py, docs/SPEC.md decision 37).
+NAME_N_PLUS_K = "N+{h}"
+NAME_N_PLUS_K_MODEL = "N+{h}: sell at the close of D+{h}"
+NAME_LEGACY_MODEL = {1: "Buy today, sell tomorrow"}  # else "Buy today, sell within {h} days"
+NAME_LEGACY_MODEL_OTHER = "Buy today, sell within {h} days"
+NAME_LEGACY_RANGE = {1: "Next session"}  # else "{h} sessions"
+NAME_LEGACY_RANGE_OTHER = "{h} sessions"
+NAME_LEGACY_CALLS = {1: "1 day"}  # else "{h} days"
+NAME_LEGACY_CALLS_OTHER = "{h} days"
+NAME_LEGACY_REPLAY = "{h} day"  # the replay record's per-horizon fields (cover80_<h>d, ...)
 SPANS = (("1W", "1 week", 7), ("1M", "1 month", 31), ("3M", "3 months", 92), ("1Y", "1 year", 366))
 DEFAULT_SPAN = "3M"
 EARNINGS_TYPE = "earnings"

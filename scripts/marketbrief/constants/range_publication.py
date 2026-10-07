@@ -18,6 +18,10 @@ MSG_CUE = "cue {cue:+.2%} x{weight}"
 MSG_EX_DIVIDEND = "ex-dividend {amount:g} ({share:.2%})"
 NOTE_OPTIONS_IMPLIED = ", options-implied"
 NOTE_PAST_MOVES = ", {count} past moves, median {median:.1%}"
+# The newest N+k calibration per horizon (B10): rows from before B10 (no horizon_label) were fitted on the old
+# windows and are not used; until the first N+k calibration a horizon falls back to normal quantiles.
+CALIBRATION_SQL = ("SELECT DISTINCT ON (horizon_days) * FROM calibration WHERE horizon_label = 'n_plus_k' "
+                   "ORDER BY horizon_days, as_of_date DESC, computed_at DESC")
 LATEST_REGIME_SQL = "SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1"
 PREDICTIONS_SQL = ("SELECT ticker, horizon_days, direction, confidence, range_widen FROM predictions "
                    "WHERE as_of_date = ? QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at DESC) = 1")

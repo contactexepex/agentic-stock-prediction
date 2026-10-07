@@ -1,11 +1,13 @@
 """The daily model score (scripts/model_scores.py; routine step 5a, after features.py, before context.py).
 
-For the as-of date (the benchmark's newest bar, as features.py) and each horizon: the month's model is the
+For the as-of date (the benchmark's newest bar, as features.py) and each horizon N+k of config/strategies.yaml
+(core/horizons.py; buy at the open of D, sell at the close of the k-th session after D): the month's model is the
 stored model_versions row fitted at the month's first as-of date, or, the first time the month is scored,
 the walk-forward fit up to the as-of date (walk_forward.py; the same fit the backtest uses for that month),
 which is then appended. Each watchlist ticker with a bar on the as-of date gets a model_scores row: the
 issued probability (Platt-calibrated once enough past out-of-sample rows resolved), the fixed-prior news
-term as of now, and the explanation (explain.py). A rerun appends a row only when the probability changed."""
+term as of now, and the explanation (explain.py), labelled n_plus_k with D (entry_date) and the exit session
+(exit_date) from the market calendar. A rerun appends a row only when the probability changed."""
 from __future__ import annotations
 
 import json
@@ -13,11 +15,13 @@ import json
 import pandas as pd
 
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_TICKERS
-from marketbrief.constants.model import (HORIZONS, KIND_MODEL_SCORES, KIND_MODEL_VERSIONS, LABEL_OPEN_TO_CLOSE,
+from marketbrief.constants.model import (KIND_MODEL_SCORES, KIND_MODEL_VERSIONS, LABEL_OPEN_TO_CLOSE,
                                          MSG_NEWS_NOT_TRAINED, MSG_SCORE_STALE, MSG_TOO_LITTLE_HISTORY)
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_now, utc_today
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.core.database import connect
+from marketbrief.core.horizons import entry_exit, horizons
 from marketbrief.core.market_config import benchmark_key
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.model.explain import explain_row
@@ -33,15 +37,18 @@ STEP_NAME = "model_scores"
 
 
 def version_id(market: str, horizon: int, model_version: str, cutoff) -> str:
-    """<market>-<h>d-open_to_close-<model_version>-<cutoff date>."""
-    return f"{market}-{horizon}d-{LABEL_OPEN_TO_CLOSE}-{model_version}-{pd.Timestamp(cutoff).date()}"
+    """<market>-1d-open_to_close-<model_version>-<cutoff date> for N+1 (the same label as before B10, so its stored
+    fits stay valid) and <market>-<k>d-n_plus_k-<model_version>-<cutoff date> for N+k, k >= 2 (a new label: the
+    stored 5-day fits of the old D+4 label, ids with open_to_close, are never reused for N+5)."""
+    tag = LABEL_OPEN_TO_CLOSE if int(horizon) == 1 else LABEL_N_PLUS_K
+    return f"{market}-{horizon}d-{tag}-{model_version}-{pd.Timestamp(cutoff).date()}"
 
 
 def version_record(market: str, horizon: int, fit: MonthlyFit, settings: dict) -> dict:
     """The model_versions row of a fit (the formula as JSON, no pickles)."""
     platt = fit.platt or (None, None)
     return {"id": version_id(market, horizon, settings["model_version"], fit.cutoff), "market": market,
-            "horizon_days": horizon, "label_convention": LABEL_OPEN_TO_CLOSE,
+            "horizon_days": horizon, "label_convention": LABEL_OPEN_TO_CLOSE, "horizon_label": LABEL_N_PLUS_K,
             "model_version": settings["model_version"], "trained_until": str(fit.cutoff.date()),
             "fitted_at": utc_now(), "train_rows": fit.train_rows, "train_sessions": fit.train_sessions,
             "base_rate": fit.base_rate, "model": fit.model.to_json(), "platt_slope": platt[0],
@@ -80,7 +87,8 @@ def latest_probabilities(con) -> dict[str, tuple[float, str]]:
 
 
 def score_record(fit: MonthlyFit, row: pd.DataFrame, news: dict, meta: dict) -> dict:
-    """One model_scores row. meta: ticker, horizon, as_of, model_id, model_version."""
+    """One model_scores row. meta: ticker, horizon, as_of, model_id, model_version, entry and exit (D and the exit
+    session of N+k)."""
     explanation = explain_row(fit, row, news["logit"], news["text"])
     explanation["news"] = {k: news[k] for k in ("score", "items", "ids", "by_event_type")}
     explanation["news"]["note"] = MSG_NEWS_NOT_TRAINED
@@ -92,7 +100,8 @@ def score_record(fit: MonthlyFit, row: pd.DataFrame, news: dict, meta: dict) -> 
             "base_rate": round(fit.base_rate, PROB_DECIMALS), "news_score": news["score"],
             "news_logit": round(news["logit"], 6), "contributions": explanation,
             "model_version": meta["model_version"], "model_id": meta["model_id"],
-            "trained_until": str(fit.cutoff.date()), "computed_at": utc_now()}
+            "trained_until": str(fit.cutoff.date()), "computed_at": utc_now(), "horizon_label": LABEL_N_PLUS_K,
+            "entry_date": str(meta["entry"]), "exit_date": str(meta["exit"])}
 
 
 def run(cfg: dict) -> dict:
@@ -107,15 +116,17 @@ def run(cfg: dict) -> dict:
     stored = latest_probabilities(con)
     today_rows = panel[panel["date"] == as_of].set_index("ticker") if len(panel) else pd.DataFrame()
     scores, versions, notes, unchanged = [], [], [], 0
-    for horizon in HORIZONS:
+    for horizon in horizons():
         fit, record = month_fit(con, panel, (market, horizon), as_of, settings) if len(panel) else (None, None)
         if fit is None:
             notes.append(MSG_TOO_LITTLE_HISTORY.format(cutoff=as_of.date(), sessions=panel["date"].nunique()
                                                        if len(panel) else 0, need=settings["min_train_sessions"]))
             continue
         versions += [record] if record else []
+        entry, exit_day = entry_exit(cfg, as_of.date(), horizon)
         meta = {"horizon": horizon, "as_of": as_of, "model_version": settings["model_version"],
-                "model_id": version_id(market, horizon, settings["model_version"], fit.cutoff)}
+                "model_id": version_id(market, horizon, settings["model_version"], fit.cutoff), "entry": entry,
+                "exit": exit_day}
         for ticker in tickers:
             if ticker not in today_rows.index:
                 last = inputs["bars"][ticker].index[-1].date() if ticker in inputs["bars"] else None

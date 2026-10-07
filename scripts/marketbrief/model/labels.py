@@ -1,10 +1,11 @@
 """Labels of the signal model (library, pure functions; the owner's trade convention).
 
-For an as-of date d (a benchmark session with the ticker's bar), D is the first session after d.
-- Primary, open_to_close: buy at the open of D, sell at the close of D+1 for the 1-day horizon
-  (two sessions held) and at the close of D+4 for the 5-day horizon (five sessions held).
-- Secondary, close_to_close: the as-of close to the close of D (1-day) or D+4 (5-day), as
-  score_predictions.py scores calls (base close = the as-of close, target = h sessions later).
+For an as-of date d (a benchmark session with the ticker's bar), D is the first session after d. Horizon k is
+N+k (decision 37, core/horizons.py): the exit is the close of the k-th session after D, k + 1 sessions after d.
+- Primary, open_to_close: buy at the open of D, sell at the exit close (N+1: the close of D+1, two sessions held;
+  N+5: the close of D+5). N+1 is the old 1-day label; the old 5-day label (close of D+4) is legacy_5d_d4.
+- Secondary, close_to_close: the as-of close to the same exit close (k + 1 sessions after d). Before B10 it ended
+  h sessions after d (D for 1-day, D+4 for 5-day), as score_predictions.py still scores legacy calls.
 Each return comes with its end date (the session whose close resolves it): a training fit at cutoff c
 uses only labels whose end date is on or before c. A label is missing when the ticker lacks a bar on
 any benchmark session it spans (no gaps are bridged). `up` = return > 0; the cost-aware label is
@@ -15,14 +16,14 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.constants.model import LABEL_CLOSE_TO_CLOSE, LABEL_OPEN_TO_CLOSE
+from marketbrief.core.horizons import exit_offset
 
 
 def end_offset(convention: str, horizon: int) -> int:
-    """Sessions after d whose close resolves the label: open_to_close 1d -> 2 (D+1), 5d -> 5 (D+4);
-    close_to_close h -> h."""
-    if convention == LABEL_OPEN_TO_CLOSE:
-        return 2 if horizon == 1 else horizon
-    return horizon
+    """Sessions after d whose close resolves the label of N+k, for either convention: k + 1 (N+1 -> 2, the close
+    of D+1; N+5 -> 6, the close of D+5). `convention` is kept for the callers; both share the exit."""
+    del convention
+    return exit_offset(horizon)
 
 
 def forward_labels(frame: pd.DataFrame, session_pos: pd.Series, horizon: int) -> pd.DataFrame:

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+SERIES_COLORS = 5  # chart series colours --s1 ... --s5 (one per horizon N+1 ... N+5; cycled beyond)
+
 CSS = """
 :root{--surface:#fcfcfb;--page:#f9f9f7;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;
---axis:#c3c2b7;--s1:#2a78d6;--s2:#eb6834;--ring:rgba(11,11,11,.10);--good:#006300;--bad:#d03b3b;--chip:#f0efec}
+--axis:#c3c2b7;--s1:#2a78d6;--s2:#eb6834;--s3:#1b9e77;--s4:#7b4fc9;--s5:#b88a00;--ring:rgba(11,11,11,.10);
+--good:#006300;--bad:#d03b3b;--chip:#f0efec}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface:#1a1a19;--page:#0d0d0d;--ink:#fff;
---ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s1:#3987e5;--s2:#d95926;--ring:rgba(255,255,255,.10);
---good:#0ca30c;--bad:#e66767;--chip:#383835}}
+--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s1:#3987e5;--s2:#d95926;--s3:#2bb38c;--s4:#9a74e0;
+--s5:#d6a419;--ring:rgba(255,255,255,.10);--good:#0ca30c;--bad:#e66767;--chip:#383835}}
 :root[data-theme="dark"]{--surface:#1a1a19;--page:#0d0d0d;--ink:#fff;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;
---axis:#383835;--s1:#3987e5;--s2:#d95926;--ring:rgba(255,255,255,.10);--good:#0ca30c;--bad:#e66767;--chip:#383835}
+--axis:#383835;--s1:#3987e5;--s2:#d95926;--s3:#2bb38c;--s4:#9a74e0;--s5:#d6a419;--ring:rgba(255,255,255,.10);
+--good:#0ca30c;--bad:#e66767;--chip:#383835}
 *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);
 font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:980px;margin:0 auto;padding:24px 16px 64px}h1{font-size:26px;margin:0 0 4px}

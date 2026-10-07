@@ -253,16 +253,18 @@ def test_scorecard_last_30_days_and_since_start():
     import duckdb
     from marketbrief.presentation.report import build, gather
     con = duckdb.connect()
-    con.execute("""CREATE TABLE range_record (horizon_days INTEGER, target_date DATE, hit50 BOOLEAN, hit80 BOOLEAN,
-                   naive_hit80 BOOLEAN, width80_pct DOUBLE, naive_width80_pct DOUBLE, is80_pct DOUBLE,
-                   naive_is80_pct DOUBLE, center_err_pct DOUBLE, naive_center_err_pct DOUBLE)""")
+    con.execute("""CREATE TABLE range_record (horizon_days INTEGER, horizon_label VARCHAR, target_date DATE,
+                   hit50 BOOLEAN, hit80 BOOLEAN, naive_hit80 BOOLEAN, width80_pct DOUBLE, naive_width80_pct DOUBLE,
+                   is80_pct DOUBLE, naive_is80_pct DOUBLE, center_err_pct DOUBLE, naive_center_err_pct DOUBLE)""")
     con.execute("""INSERT INTO range_record VALUES
-        (1, current_date - 3,   true,  true,  true,  4.0, 5.0, 4.0, 5.0, 1.0, 1.5),
-        (1, current_date - 20,  false, false, true,  4.0, 5.0, 9.0, 6.0, 3.0, 2.0),
-        (1, current_date - 200, true,  true,  false, 6.0, 5.0, 6.0, 9.0, 1.0, 1.0)""")
+        (1, 'n_plus_k',  current_date - 3,   true,  true,  true,  4.0, 5.0, 4.0, 5.0, 1.0, 1.5),
+        (1, 'n_plus_k',  current_date - 20,  false, false, true,  4.0, 5.0, 9.0, 6.0, 3.0, 2.0),
+        (1, 'n_plus_k',  current_date - 200, true,  true,  false, 6.0, 5.0, 6.0, 9.0, 1.0, 1.0),
+        (1, 'legacy_cc', current_date - 210, false, false, false, 6.0, 5.0, 6.0, 9.0, 1.0, 1.0)""")
     sc = con.execute(gather.SCORECARD_SQL).df()
-    rows = {r.win: r for r in sc.itertuples()}
-    assert list(sc["win"]) == ["since start", "last 30 days"]
+    rows = {r.win: r for r in sc[sc["label"] == "n_plus_k"].itertuples()}
+    assert list(sc["win"]) == ["since start", "last 30 days", "since start"]   # the old window after N+1, apart
+    assert list(sc["label"]) == ["n_plus_k", "n_plus_k", "legacy_cc"]
     assert rows["last 30 days"].n == 2 and rows["last 30 days"].c80 == 0.5 and rows["last 30 days"].nc80 == 1.0
     assert rows["since start"].n == 3 and abs(rows["since start"].c80 - 2 / 3) < 1e-9
     assert rows["last 30 days"].ce == 2.0 and rows["last 30 days"].nce == 1.75
@@ -278,6 +280,7 @@ def test_scorecard_last_30_days_and_since_start():
          "company_events": pd.DataFrame(columns=["date", "name"])}
     rep, _, _ = build.build(us, d, {"repo_url": "https://example.com/r", "branch": "main"})
     assert "| 1d | last 30 days | 2 | 50% | 50% | 100% |" in rep and "| 1d | since start | 3 |" in rep
+    assert "| 1d legacy_cc | since start | 1 | 0% |" in rep
 
 
 def _view_company(ticker, ranges, close=110.0):
@@ -286,8 +289,12 @@ def _view_company(ticker, ranges, close=110.0):
             "record": {"ranges": {}, "calls": {"n": 0, "hits": 0, "text": ""}}}
 
 
-def _rng(h, late=False, direction=None, confidence=None):
-    return {"h": h, "target_date": "2026-10-09", "target_label": "Fri 9 Oct", "base_close": 110.0,
+def _rng(h, late=False, direction=None, confidence=None, horizon_label="legacy_cc"):
+    nk = horizon_label == "n_plus_k"
+    phrase = f"in {h + 1} trading days (N+{h})" if nk else (
+        "after the next trading day" if h == 1 else f"in {h} trading days")
+    return {"h": h, "horizon_label": horizon_label, "phrase": phrase, "target_date": "2026-10-09",
+            "target_label": "Fri 9 Oct", "base_close": 110.0,
             "center_price": 110.0, "lo50": 107.0, "hi50": 113.0, "lo80": 104.0, "hi80": 116.0,
             "direction": direction, "confidence": confidence, "late": late, "notes": []}
 
@@ -310,6 +317,14 @@ def test_ranges_chart_uses_5d_when_1d_was_skipped_and_labels_late(monkeypatch):
     charts.ranges_chart(view, "unused.png")
     texts = [t.get_text() for t in captured["fig"].axes[0].texts]
     assert any("▼ down 60%" in t for t in texts)
+    plt_close(captured["fig"])
+    # N+k ranges (decision 37): the shortest horizon with a range that is not late, named by its window
+    view["companies"][0]["ranges"] = [_rng(1, late=True, horizon_label="n_plus_k"),
+                                      _rng(3, horizon_label="n_plus_k"), _rng(5, horizon_label="n_plus_k")]
+    captured.clear()
+    charts.ranges_chart(view, "unused.png")
+    texts = [t.get_text() for t in captured["fig"].texts]
+    assert any("Where each price may be in 4 trading days (N+3) (by Fri 9 Oct)" in t for t in texts)
     plt_close(captured["fig"])
 
 

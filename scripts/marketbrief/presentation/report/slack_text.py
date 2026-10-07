@@ -5,6 +5,8 @@ from __future__ import annotations
 import pandas as pd
 
 from marketbrief.analytics.call_basis import label as basis_label
+from marketbrief.analytics.scoring import basis_key
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.constants.report import MSG_RANGES_LATE
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation.report.formatting import review_line
@@ -15,9 +17,19 @@ from view_data import fmt_call
 
 
 def calls_by_basis(scored_calls: pd.DataFrame) -> str:
-    """Scored calls per scoring basis, never pooled: '2/3 close→close, 1/1 open→close'."""
-    return ", ".join(f"{int(group['hit'].sum())}/{len(group)} {basis_label(basis)}"
-                     for basis, group in scored_calls.groupby("label_basis", sort=True))
+    """Scored calls per scoring basis key, never pooled: '2/3 close→close, 1/1 open→close' (old D+4 open-to-close
+    calls, horizon_label legacy_5d_d4, apart: scoring.basis_key)."""
+    labels = scored_calls["horizon_label"] if "horizon_label" in scored_calls else [None] * len(scored_calls)
+    keys = [basis_key(basis, label) for basis, label in zip(scored_calls["label_basis"], labels, strict=True)]
+    return ", ".join(f"{int(group['hit'].sum())}/{len(group)} {basis_label(key)}"
+                     for key, group in scored_calls.groupby(pd.Series(keys, index=scored_calls.index), sort=True))
+
+
+def call_horizon(item) -> str:
+    """A call's horizon in the Slack line: 'N+k' for an N+k range, the old 'next day' / '<h> days' otherwise."""
+    if getattr(item, "horizon_label", None) == LABEL_N_PLUS_K:
+        return f"N+{item.horizon_days}"
+    return "next day" if item.horizon_days == 1 else f"{item.horizon_days} days"
 
 
 def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tuple[str, str]:
@@ -51,14 +63,13 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
             head += f" ({vol_name} {reg['vol_level']:.1f})"
     if released:
         head += " · calls made before " + ", ".join(f"{event['name']} ({event['release']})" for event in released)
-    by_horizon = lambda item: "next day" if item.horizon_days == 1 else f"{item.horizon_days} days"  # noqa: E731
     if not calls:  # issue #21: the line says when the ranges are late (made after the first session's open)
         call_line = f"Calls today: none. Price ranges for all {len(cfg['tickers'])} stocks are in the report" + (
             MSG_RANGES_LATE if parts.n_late else "."
         )
     elif len(calls) <= 3:
         call_line = f"Calls today: {len(calls)} · " + " · ".join(
-            f"{ticker_symbol} {fmt_call(item.direction, item.confidence)} ({by_horizon(item)}, 80% range "
+            f"{ticker_symbol} {fmt_call(item.direction, item.confidence)} ({call_horizon(item)}, 80% range "
             f"{format_money(cur, item.lo80)}–{format_money(cur, item.hi80)})"
             for ticker_symbol, item in calls
         )
@@ -76,8 +87,9 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
         '<!-- AGENT:top3 (three lines, each starting with "• ": the report\'s Top 3 points, one line each) -->',
         call_line,
         (
-            f"Yesterday: next-day 80% ranges hit {h80}/{one_day_count} (naive {nh80}/{one_day_count}) · 50% hit "
-            f"{h50}/{one_day_count}" + (f" · calls {calls_by_basis(scored_calls)}" if len(scored_calls) else "")
+            f"Yesterday: {parts.one_day_name} 80% ranges hit {h80}/{one_day_count} (naive {nh80}/{one_day_count})"
+            f" · 50% hit {h50}/{one_day_count}"
+            + (f" · calls {calls_by_basis(scored_calls)}" if len(scored_calls) else "")
         )
         if one_day_count
         else "Yesterday: no ranges matured yet.",

@@ -24,6 +24,8 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.analytics import range_math
+from marketbrief.constants.horizons import LABEL_LEGACY_5D_D4
+from marketbrief.core.horizons import horizon_key
 from marketbrief.constants.scoring import (
     BASIS_NOTE,
     BASIS_SHORT,
@@ -176,24 +178,35 @@ def range_scores(scored_ranges: pd.DataFrame) -> dict:
 def summary(con) -> dict:
     """All-time proper scores from the scored track record: calls per scoring basis (call_basis.py; never
     pooled), per horizon and overall (Brier, log loss, reliability), and ranges per horizon (coverage,
-    interval and quantile scores)."""
+    interval and quantile scores). Horizon labels (core/horizons.py) are never pooled either: open-to-close 5-day
+    calls of the old D+4 window form their own basis key `open_to_close legacy_5d_d4`, and ranges of the old
+    windows their own horizon keys (`1d legacy_cc`)."""
     calls = con.execute(
-        "SELECT label_basis, horizon_days, confidence, hit FROM track_record "
+        "SELECT label_basis, horizon_label, horizon_days, confidence, hit FROM track_record "
         "WHERE confidence IS NOT NULL AND hit IS NOT NULL ORDER BY id, scored_at"
     ).df()
     rng = con.execute(
-        "SELECT horizon_days, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
+        "SELECT horizon_days, horizon_label, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
         "FROM range_record WHERE actual_close IS NOT NULL ORDER BY id"
     ).df()
     out = {"calls": {}, "ranges": {}}
-    for basis, by_basis in calls.groupby("label_basis", sort=True) if len(calls) else []:
+    if len(calls):
+        calls["basis_key"] = [basis_key(basis, label) for basis, label in zip(calls["label_basis"],
+                                                                                calls["horizon_label"], strict=True)]
+    for basis, by_basis in calls.groupby("basis_key", sort=True) if len(calls) else []:
         entry = out["calls"][basis] = {"all": call_scores(by_basis)}
         entry["all"]["reliability"] = reliability(by_basis["confidence"], by_basis["hit"])
         for horizon, group in by_basis.groupby("horizon_days"):
             entry[f"{int(horizon)}d"] = call_scores(group)
-    for horizon, group in rng.groupby("horizon_days") if len(rng) else []:
-        out["ranges"][f"{int(horizon)}d"] = range_scores(group)
+    for (label, horizon), group in rng.groupby(["horizon_label", "horizon_days"]) if len(rng) else []:
+        out["ranges"][horizon_key(horizon, label)] = range_scores(group)
+    out["ranges"] = dict(sorted(out["ranges"].items(), key=lambda item: (" " in item[0], item[0])))
     return out
+
+
+def basis_key(basis: str, label: str) -> str:
+    """The summary key of a scoring basis: the basis, or '<basis> legacy_5d_d4' for old D+4 open-to-close calls."""
+    return f"{basis} {label}" if label == LABEL_LEGACY_5D_D4 else basis
 
 
 def format_number(value, digits: int = 3) -> str:
