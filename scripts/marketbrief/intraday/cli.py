@@ -6,12 +6,18 @@
                              -> data/<market>/intraday_checks/ (one row per ticker) and intraday_runs/ (one row per
                              check). Market closed: the run row only. A check time already stored writes nothing.
                              --out DIR writes the same tree under DIR instead of data/ (live tests).
+                             B9: every open paper trade (all strategies and horizons, both views) gets a
+                             trade_checks row (price vs entry, target and its own range; flags outside_range,
+                             far_from_target, against_prediction) and a trade_check_details row (quality,
+                             target reached so far); the alerts feed -> data/<market>/intraday_alerts/.
+  alerts [--check ID]        the alerts of a check (default the newest), as JSON (the feed for Slack alerts)
   prepare [--check ID] [--out F]   the flagged rows of a check (default the newest) without a note
                              -> F (default work/intraday_flags.jsonl), for the deviation-explainer agent
   validate F                 checks the explainer's records (JSON summary; exit 1 on any error)
   add F                      validate, then append to data/<market>/intraday_explanations/ (all or nothing)
 
-The explainer writes one JSON object per flagged row: {"check_row_id", "text", "cited_ids", "attribution",
+The prepared rows carry `trades` (the row's flagged open trade checks). The explainer writes one JSON object per
+flagged row: {"check_row_id", "text", "cited_ids", "attribution",
 "prompt_version"}. Research only: a note never predicts and never recommends a trade."""
 
 from __future__ import annotations
@@ -38,6 +44,8 @@ def parser():
     prepare_parser = sub.add_parser("prepare", help="flagged rows without a note, for the explainer")
     prepare_parser.add_argument("--check", default=None, help="check id (default: the newest check)")
     prepare_parser.add_argument("--out", type=Path, default=paths.ROOT / "work" / "intraday_flags.jsonl")
+    alerts_parser = sub.add_parser("alerts", help="the alerts of a check, as JSON")
+    alerts_parser.add_argument("--check", default=None, help="check id (default: the newest check)")
     for name in ("validate", "add"):
         sub.add_parser(name).add_argument("file", type=Path)
     return parser
@@ -56,6 +64,11 @@ def main() -> int:
         return 0
     if args.cmd == "prepare":
         print_summary({"step": "intraday.prepare", "market": market, **explain.prepare(con, args.out, args.check)})
+        return 0
+    if args.cmd == "alerts":
+        check = args.check or explain.latest_check_id(con)
+        print_summary({"step": "intraday.alerts", "market": market, "check_id": check,
+                       "alerts": explain.check_alerts(con, check)})
         return 0
     good, bad, count, rows = explain.check_file(con, args.file, settings)
     summary = {"step": f"intraday.{args.cmd}", "market": market, "file": str(args.file), "records": count,

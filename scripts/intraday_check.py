@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Intraday checks of the watchlist against the day's ranges and calls, and the deviation explainer's gate.
+"""Intraday checks of the watchlist and of every open paper trade against the day's ranges, targets and calls, the
+alerts feed, and the deviation explainer's gate.
 
 Thin entry point; the code is in marketbrief/intraday/cli.py (`--help` shows its description)."""
 import sys

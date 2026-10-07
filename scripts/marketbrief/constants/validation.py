@@ -5,7 +5,7 @@ from __future__ import annotations
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
 # The news-only light run's gate (routine/NEWS_PROMPT.md): never part of `all`
 STAGE_NEWS_COLLECT = "news_collect"
-NEWS_COLLECT_KINDS = ("news", "news_runs", "news_articles", "news_clusters", "announcements")
+NEWS_COLLECT_KINDS = ("news", "news_runs", "news_updates", "news_articles", "news_clusters", "announcements")
 
 # kinds whose day files are named by the trading date, with the column that says when a row was written
 TRADING_DATE_KINDS = {

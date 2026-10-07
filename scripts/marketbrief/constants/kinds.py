@@ -1,6 +1,7 @@
 """Names of the stored data kinds (data/<market>/<kind>/...) and their file formats."""
 KIND_NEWS = "news"
 KIND_NEWS_RUNS = "news_runs"   # one row per collect_news.py run: its catch-up window and outcome
+KIND_NEWS_UPDATES = "news_updates"   # a later headline of a stored item at the same article link (collect_news.py)
 KIND_FUNDAMENTALS = "fundamentals"
 KIND_SEC_TIMES = "sec_times"
 

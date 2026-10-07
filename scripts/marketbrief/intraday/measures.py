@@ -4,6 +4,7 @@ since the open, the beta-adjusted residual and the direction of open calls, and 
 from __future__ import annotations
 
 import math
+import re
 
 from marketbrief.intraday.constants import (
     BAND_ABOVE50,
@@ -17,10 +18,12 @@ from marketbrief.intraday.constants import (
     FLAG_AGAINST_MODEL,
     FLAG_LARGE_MOVE,
     FLAG_LARGE_RESIDUAL,
-    FLAG_OUTSIDE_1D_50,
-    FLAG_OUTSIDE_1D_80,
-    FLAG_OUTSIDE_5D_80,
+    OUTSIDE_50_TEMPLATE,
+    OUTSIDE_80_RE,
+    OUTSIDE_80_TEMPLATE,
 )
+
+LEGACY_BAND_RE = r"band_(\d+)d"
 
 
 def band_position(price: float | None, band: dict | None) -> str | None:
@@ -84,15 +87,24 @@ def judge_call(call: dict, last_price: float, sigma: float | None, sessions: flo
             "ret": rounded(ret), "z": rounded(z, 3), "against": against}
 
 
+def band_by_horizon(row: dict) -> dict[int, str | None]:
+    """{horizon k: band position} of a row: its `bands` JSON (every published horizon), else the legacy band_<k>d
+    columns."""
+    if row.get("bands"):
+        return {int(k): value.get("band") for k, value in row["bands"].items()}
+    return {int(m.group(1)): value for key, value in row.items() if (m := re.fullmatch(LEGACY_BAND_RE, key))}
+
+
 def flags_for(row: dict, calls: list[dict], settings: dict) -> list[str]:
-    """Every flag the row's measures raise (trigger flags and information flags)."""
+    """Every flag the row's measures raise (trigger flags and information flags). Band flags for every horizon k:
+    outside_<k>d_80, and outside_<k>d_50 for the shortest horizon (WS5's 1-day 50% flag)."""
     thresholds, flags = settings["thresholds"], []
-    if row.get("band_1d") in (BAND_BELOW80, BAND_ABOVE80):
-        flags.append(FLAG_OUTSIDE_1D_80)
-    if row.get("band_1d") in (BAND_BELOW80, BAND_BELOW50, BAND_ABOVE50, BAND_ABOVE80):
-        flags.append(FLAG_OUTSIDE_1D_50)
-    if row.get("band_5d") in (BAND_BELOW80, BAND_ABOVE80):
-        flags.append(FLAG_OUTSIDE_5D_80)
+    bands = band_by_horizon(row)
+    for k in sorted(bands):
+        if bands[k] in (BAND_BELOW80, BAND_ABOVE80):
+            flags.append(OUTSIDE_80_TEMPLATE.format(k=k))
+        if k == min(bands) and bands[k] in (BAND_BELOW80, BAND_BELOW50, BAND_ABOVE50, BAND_ABOVE80):
+            flags.append(OUTSIDE_50_TEMPLATE.format(k=k))
     if row.get("move_z") is not None and abs(row["move_z"]) >= thresholds["move_z"]:
         flags.append(FLAG_LARGE_MOVE)
     if row.get("residual_z") is not None and abs(row["residual_z"]) >= thresholds["residual_z"]:
@@ -102,6 +114,12 @@ def flags_for(row: dict, calls: list[dict], settings: dict) -> list[str]:
     if any(call["against"] for call in calls if call["source"] == CALL_MODEL):
         flags.append(FLAG_AGAINST_MODEL)
     return flags
+
+
+def is_trigger(flag: str, flag_on: list[str]) -> bool:
+    """A flag marks the row flagged: listed in flag_on, or an outside_<k>d_80 flag when flag_on lists the
+    template outside_{k}d_80 (every horizon)."""
+    return flag in flag_on or (OUTSIDE_80_TEMPLATE in flag_on and re.fullmatch(OUTSIDE_80_RE, flag) is not None)
 
 
 def rounded(value: float | None, digits: int = 6) -> float | None:
