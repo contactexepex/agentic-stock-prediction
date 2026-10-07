@@ -99,10 +99,11 @@ def test_tracker_steps_per_target_date_min_history_and_nesting():
 def live_con(rows):
     con = duckdb.connect()
     con.execute("CREATE TABLE range_record (id VARCHAR, horizon_days INTEGER, target_date DATE, regime VARCHAR, "
-                "hit50 BOOLEAN, hit80 BOOLEAN)")
+                "hit50 BOOLEAN, hit80 BOOLEAN, horizon_label VARCHAR)")
     con.execute("CREATE TABLE range_outcomes (range_id VARCHAR, scored_at TIMESTAMPTZ)")
     for r in rows:
-        con.execute("INSERT INTO range_record VALUES (?, ?, ?, ?, ?, ?)", [r[0], 1, r[1], "CALM", r[2], r[3]])
+        con.execute("INSERT INTO range_record VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [r[0], 1, r[1], "CALM", r[2], r[3], "n_plus_k"])
         con.execute("INSERT INTO range_outcomes VALUES (?, ?)", [r[0], r[4]])
     return con
 
@@ -264,14 +265,16 @@ def test_calibrate_uses_aci_levels_from_outcomes_scored_by_now():
     rc["aci"] = {**rc["aci"], "enabled": True, "gamma": 0.05, "min_history": 3, "by_regime": False}
     con = duckdb.connect()
     con.execute("CREATE TABLE range_record (id VARCHAR, horizon_days INTEGER, as_of_date DATE, target_date DATE, "
-                "regime VARCHAR, hit50 BOOLEAN, hit80 BOOLEAN, z DOUBLE)")
+                "regime VARCHAR, hit50 BOOLEAN, hit80 BOOLEAN, z DOUBLE, horizon_label VARCHAR DEFAULT 'n_plus_k')")
     con.execute("CREATE TABLE range_outcomes (range_id VARCHAR, scored_at TIMESTAMPTZ)")
     con.execute("CREATE TABLE regime_latest (as_of_date DATE, regime VARCHAR)")
     now = f"{idx[-1].date()}T23:00:00+00:00"
     for i, d in enumerate(idx[-11:-1]):   # ten scored dates, every range missed both bands
-        con.execute("INSERT INTO range_record VALUES (?, 1, ?, ?, 'CALM', false, false, NULL)", [f"r{i}", d.date(), d.date()])
+        con.execute("INSERT INTO range_record VALUES (?, 1, ?, ?, 'CALM', false, false, NULL, DEFAULT)",
+                    [f"r{i}", d.date(), d.date()])
         con.execute("INSERT INTO range_outcomes VALUES (?, ?)", [f"r{i}", f"{d.date()}T22:00:00+00:00"])
-    con.execute("INSERT INTO range_record VALUES ('late', 1, ?, ?, 'CALM', true, true, NULL)", [idx[-1].date(), idx[-1].date()])
+    con.execute("INSERT INTO range_record VALUES ('late', 1, ?, ?, 'CALM', true, true, NULL, DEFAULT)",
+                [idx[-1].date(), idx[-1].date()])
     con.execute("INSERT INTO range_outcomes VALUES ('late', ?)", [f"{idx[-1].date()}T23:30:00+00:00"])   # after now
     [row] = calibrate.compute(cfg, rc, con, bars, now)
     a80 = aci.aci_path([1.0] * 10, 0.2, 0.05, *aci.clamps(0.2, 0.15))[-1]

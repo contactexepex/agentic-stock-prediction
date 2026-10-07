@@ -182,7 +182,8 @@ def test_claim_enforces_the_day_budget_across_both_tables():
 def test_b1_imports_the_rows_the_tool_layer_writes(tmp_path, monkeypatch):
     """The wire: rows written by web/lib/tools (inbox_wire.fixture.json, checked by inbox_wire.test.ts) go through the
     real claim statements into a DuckDB file built from mcp/inbox.sql, and B1's import-inbox appends the company
-    commands to data/ with the identity from the row; the paper trade stays in inbox.requests (no importer yet)."""
+    commands to data/ with the identity from the row; B2's portfolio reader finds the paper trade in inbox.requests and
+    builds its trade input from the row (B2's own tests cover storing it)."""
     import common
     from marketbrief.lifecycle import inbox as b1_inbox
     from marketbrief.lifecycle.cli import main as company_cli
@@ -234,6 +235,20 @@ def test_b1_imports_the_rows_the_tool_layer_writes(tmp_path, monkeypatch):
     con.close()
     assert stored == [("wire-amount-aapl-01", None, None),
                       ("wire-deact-dal-01", "C0C6REB7QS2", "1791400000.000101")]
+
+    # The paper trade: B2's reader (marketbrief/portfolio/inbox_import.py) finds the row and builds its trade input
+    # with the row's identity, channel and key (B2's own tests cover validation and storing).
+    from datetime import datetime, timezone
+
+    from marketbrief.portfolio import inbox_import as b2_inbox
+    reader = b1_inbox.open_inbox(str(path))
+    trades = b2_inbox.pending_requests(reader, "us", datetime(2026, 10, 7, 12, tzinfo=timezone.utc))
+    reader.close()
+    assert [row["inbox_id"] for row in trades] == ["wire-trade-aapl-01"]
+    entry = b2_inbox.trade_input(trades[0], b2_inbox.arguments_of(trades[0]))
+    assert (entry.ticker, entry.side, entry.quantity, str(entry.trade_date), entry.price_basis, entry.source,
+            entry.idempotency_key, entry.submitted_by) == (
+        "AAPL", "buy", 2, "2026-10-06", "close", "claude_app", "wire-trade-aapl-01", "github:owner-login")
 
 
 def test_inbox_sql_adds_the_slack_columns_to_older_tables():

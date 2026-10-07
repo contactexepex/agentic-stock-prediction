@@ -1,4 +1,6 @@
-"""Publish today's 50% and 80% price ranges per ticker and horizon for one market.
+"""Publish today's 50% and 80% price ranges per ticker and horizon N+k for one market (k from config/strategies.yaml
+`horizons`; the range of the close of the k-th session after D, the first session after the as-of close; rows carry
+horizon_label n_plus_k, entry_date = D and exit_date = target_date; docs/SPEC.md F2.7).
 
 Run after features.py, calibrate.py and the forecaster. Inputs (all stored, never live APIs):
 latest indicator snapshot and regime, latest calibration quantiles, upcoming events, and
@@ -7,11 +9,11 @@ today's predictions (AI direction/confidence and optional `range_widen`). Switch
 implied_volatility): past earnings-day moves, ex-dividend shift, beta split of the overnight cue, and
 option-implied volatility (US; when switched off its horizon sigma is still recorded as the shadow
 value `iv_sigma_h`). Appends to data/<market>/ranges/; ids <as_of_date>-<ticker>-<h>d are written once.
-Late and mid-session guard: once the first target session has opened at made_at (a manual run
-after the open, or a late run after the close), part of every horizon's outcome is public. The
-1-day range (its target is that session) is not published; a range whose target session had
-already closed is not published either; the other ranges are published for the record, noted
-"late" (scoring and the report treat them as late, never scored). For every horizon an overnight
+Late and mid-session guard: once D has opened at made_at (a manual run after the open, or a late run
+after the close), part of every horizon's outcome is public. A range whose target session had already
+closed is not published; the other ranges are published for the record, noted "late" (scoring and
+the report treat them as late, never scored). Before B10 the 1-day range targeted D itself and was not
+published mid-session; no N+k range targets D. For every horizon an overnight
 cue or option snapshot quoted after that open is ignored (an intraday quote is not an overnight
 cue, it carries part of the session's outcome)."""
 
@@ -63,7 +65,7 @@ def main() -> int:
     as_of = con.execute("SELECT max(as_of_date) FROM regime_latest").fetchone()[0]
     made = datetime.fromisoformat(now)
     late = made >= first_target_close(cfg, as_of)
-    in_session = first_target_open(cfg, as_of) <= made and not late  # no 1-day ranges; 5-day ones late
+    in_session = first_target_open(cfg, as_of) <= made and not late  # every range is published late
     print(
         json.dumps(
             {

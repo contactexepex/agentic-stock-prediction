@@ -32,7 +32,7 @@
     var t = D.track.calls;
     if (!t.length) return '<div class="card section"><h2>Live calls</h2>' + MB.empty('No live calls scored yet. Scores appear here once calls reach their target day.') + '</div>';
     return t.map(function (b) {
-      var rows = [['All horizons', b.all]].concat(Object.keys(b.by_horizon).map(function (k) { return [k === '1d' ? '1 day' : '5 days', b.by_horizon[k]]; }));
+      var rows = [['All horizons', b.all]].concat(Object.keys(b.by_horizon).map(function (k) { return [esc(b.by_horizon[k].name), b.by_horizon[k]]; }));
       return '<div class="card section"><h2>Live calls, scored ' + esc(b.label) + '</h2><p class="sub small">Each scoring basis is shown on its own; they are never added together.</p>' +
         '<div class="table-wrap"><table><thead><tr><th>Horizon</th><th class="r">Calls right</th><th class="r">Always-up baseline</th><th class="r">Edge</th><th class="r">Mean stated</th><th class="r">Brier</th><th class="r">Log loss</th></tr></thead><tbody>' +
         rows.map(function (r) {
@@ -48,7 +48,7 @@
     var r = D.track.ranges;
     var body = r.length ? '<div class="table-wrap"><table><thead><tr><th>Horizon</th><th class="r">Inside 50% range (target 50%)</th><th class="r">Inside 80% range (target 80%)</th><th class="r">Mean 80% width</th></tr></thead><tbody>' +
       r.map(function (x) {
-        return '<tr><td>' + (x.h === 1 ? 'Next session' : x.h + ' sessions') + sample(x.inside80.n) + '</td><td class="r">' + ci(x.inside50) + '</td><td class="r">' + ci(x.inside80) +
+        return '<tr><td>' + esc(x.name) + sample(x.inside80.n) + '</td><td class="r">' + ci(x.inside50) + '</td><td class="r">' + ci(x.inside80) +
           '</td><td class="r">' + (MB.isNum(x.scores.width80_pct) ? MB.num(x.scores.width80_pct, 2) + '%' : '–') + '</td></tr>';
       }).join('') + '</tbody></table></div>' : MB.empty('No live ranges scored yet.');
     return '<div class="card section"><h2>Live ranges held</h2><p class="sub small">How often the actual close landed inside the published range. A well-sized 80% range holds about 80% of the time.</p>' + body + '</div>';
@@ -93,8 +93,8 @@
   function replaySection() {
     var r = D.track.replay;
     var body = r ? '<div class="table-wrap"><table><thead><tr><th>Horizon</th><th class="r">Inside 50%</th><th class="r">Inside 80%</th><th class="r">80% score</th><th class="r">Naive 80% score</th><th class="r">Always up</th></tr></thead><tbody>' +
-      [1, 5].map(function (h) {
-        return '<tr><td>' + h + ' day</td><td class="r">' + MB.pct(r['cover50_' + h + 'd'], 1, false) + '</td><td class="r">' + MB.pct(r['cover80_' + h + 'd'], 1, false) + '</td><td class="r">' + fixed(r['score80_' + h + 'd'], 2) +
+      r.horizons.map(function (h) {
+        return '<tr><td>' + esc(r.names[String(h)]) + '</td><td class="r">' + MB.pct(r['cover50_' + h + 'd'], 1, false) + '</td><td class="r">' + MB.pct(r['cover80_' + h + 'd'], 1, false) + '</td><td class="r">' + fixed(r['score80_' + h + 'd'], 2) +
           '</td><td class="r">' + fixed(r['naive_score80_' + h + 'd'], 2) + '</td><td class="r">' + MB.pct(r['always_up_' + h + 'd'], 1, false) + '</td></tr>';
       }).join('') + '</tbody></table></div><p class="small muted">' + esc(r.start_date) + ' to ' + esc(r.end_date) + ', ' + MB.num(r.n_days, 0) + ' days, ' + MB.num(r.n_ranges, 0) + ' ranges; computed ' + esc(MB.stamp(r.computed_at)) + '.</p>' :
       MB.empty('No historical replay stored yet (scripts/replay.py).');

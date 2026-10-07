@@ -516,6 +516,12 @@ def test_unwatched_ticker_rows_and_alerts_cli_dates(market, monkeypatch, capsys)
     assert cli.main() == 0
     alerts = json.loads(capsys.readouterr().out)["alerts"]
     assert alerts and {row["session_date"] for row in alerts} == {SESSION}
+    assert configured_horizons() == (1, 2, 3, 4, 5)                  # B10's contract (built)
+    from marketbrief.contracts import horizons as horizon_contract
+
+    def not_built():
+        raise NotImplementedError("session B10")
+    monkeypatch.setattr(horizon_contract, "horizons", not_built)    # the fallback: strategies.yaml, cached
     before = _horizons_in.cache_info().hits
     assert configured_horizons() == configured_horizons() == (1, 2, 3, 4, 5)
     assert _horizons_in.cache_info().hits >= before + 1
@@ -562,3 +568,82 @@ def test_stored_bars_apply_a_correction_only_once_detected(market):
     before_split = datetime(2026, 10, 7, 4, 45, tzinfo=timezone.utc)                # bars known, split not yet
     assert aapl_close(before_split) == pytest.approx(333.63)
 
+
+
+def test_old_five_day_score_keeps_its_d4_window(market):
+    """Issue #94: a 5-day open-to-close score computed before call_scoring.n_plus_k_from (config/settings.yaml) is
+    legacy_5d_d4: bought at the open of D (09-30) and sold at the close of D+4 (10-06), so it is no longer open on
+    10-07. Under N+5 it would end at D+5 = 10-07."""
+    from marketbrief.intraday.inputs import open_calls
+
+    root, cfg, _settings = market
+    jl(root, "model_scores", "2026-09-30", [
+        {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00"},
+        {"id": "2026-10-02-NVDA-5d", "as_of_date": "2026-10-02", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-10-05T04:40:00+00:00"}])
+    calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), CHECK)
+    found = {call["id"]: call for call in calls.get("NVDA", [])}
+    assert "2026-09-29-NVDA-5d" not in found                     # ended at D+4 = 10-06
+    assert found["2026-10-02-NVDA-5d"]["horizon_label"] == "legacy_5d_d4"
+    assert found["2026-10-02-NVDA-5d"]["last_session"] == "2026-10-09"   # D = 10-05, D+4 = 10-09
+
+
+def test_score_window_follows_its_stored_label_not_its_time(market):
+    """Issue #94 (judge round 1): a model score's window is the label it is stored with, as B10's other readers do,
+    whatever its computed_at: a 5-day score stored n_plus_k ends at D+5 even when computed before
+    call_scoring.n_plus_k_from; an unlabelled 5-day score is legacy_5d_d4 (D+4) even when computed after it."""
+    from marketbrief.intraday.inputs import open_calls
+
+    root, cfg, _settings = market
+    jl(root, "model_scores", "2026-10-07", [
+        {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00",
+         "horizon_label": "n_plus_k"},
+        {"id": "2026-09-29-AAPL-5d", "as_of_date": "2026-09-29", "ticker": "AAPL", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6,
+         "computed_at": "2026-10-07T22:00:00+00:00"}])                 # after n_plus_k_from, before the check
+    late = datetime(2026, 10, 7, 23, 0, tzinfo=timezone.utc)          # after n_plus_k_from (2026-10-07T21:19Z)
+    calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), late)
+    nvda = {call["id"]: call for call in calls.get("NVDA", [])}
+    assert nvda["2026-09-29-NVDA-5d"]["horizon_label"] == "n_plus_k"
+    assert nvda["2026-09-29-NVDA-5d"]["last_session"] == "2026-10-07"   # D = 09-30, D+5 = 10-07
+    assert "2026-09-29-AAPL-5d" not in {call["id"] for call in calls.get("AAPL", [])}   # D+4 = 10-06: ended
+
+
+def test_delayed_exit_trade_is_watched_until_settled(market):
+    """Issue #93: a trade past its exit date without a paper_trades_settled row (exit close missing) is still
+    checked, noted exit_delayed, with the rest of today as the sessions left; a settlement row stored by the check
+    closes it (whatever its status); more than trades.max_sessions_past_exit sessions late: listed only."""
+    root, cfg, settings = market
+    jl(root, "strategy_predictions", "2026-10-01", [
+        # D = 10-02, exit N+1 = 10-05: two sessions late on 10-07 (10-06, 10-07)
+        custom("rule.b9_delayed.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z"),
+        # the same, but settled at 10-06 22:15 (before the check): closed
+        custom("rule.b9_settled.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z"),
+        # settled only after the check (17:00): still watched at 16:27 (no look-ahead)
+        custom("rule.b9_late_settle.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z"),
+        # D = 09-25, exit N+1 = 09-28: 7 sessions late, beyond max_sessions_past_exit (5)
+        custom("rule.b9_ancient.v1:2026-09-24-NVDA-1d", ("2026-09-24", "2026-09-25", "2026-09-28"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-09-25T11:45:00Z")])
+    jl(root, "paper_trades_settled", "2026-10-06", [
+        {"id": "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d@20261006T221500Z",
+         "trade_id": "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d", "status": "no_entry",
+         "settled_at": "2026-10-06T22:15:00Z"},
+        {"id": "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d@20261007T170000Z",
+         "trade_id": "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d", "status": "settled",
+         "settled_at": "2026-10-07T17:00:00Z"}])
+    summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
+    trades = trade_view(root)
+    delayed = trades["acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d"]
+    assert "exit_delayed" in delayed["notes"] and delayed["session_number"] == 4          # 10-02, 05, 06, 07
+    assert delayed["sessions_left"] == pytest.approx(1 - ELAPSED, abs=1e-4)
+    assert "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d" in trades
+    assert "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d" not in trades
+    assert "acc:rule.b9_ancient.v1:2026-09-24-NVDA-1d" not in trades
+    assert summary["skipped_trades"]["delayed_too_long"] == ["acc:rule.b9_ancient.v1:2026-09-24-NVDA-1d"]
+    on_time = trades["acc:rule.model_news.v1:2026-09-29-NVDA-5d"]                     # exits today: not delayed
+    assert "exit_delayed" not in on_time["notes"]

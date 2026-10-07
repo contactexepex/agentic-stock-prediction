@@ -17,7 +17,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TypedDict
 
-HORIZON_LABELS: tuple[str, ...] = ("n_plus_k", "legacy_cc", "legacy_5d_d4")
+from marketbrief.analytics import horizon_records as records
+from marketbrief.core.horizons import horizons as horizon_list
+
+HORIZON_LABELS: tuple[str, ...] = ("n_plus_k", "legacy_cc", "legacy_5d_d4")   # = constants/horizons.HORIZON_LABELS
 HORIZON_LABEL_N_PLUS_K = "n_plus_k"
 
 
@@ -45,12 +48,14 @@ class HorizonScore(TypedDict):
     horizon_label: str        # new: n_plus_k
     entry_date: date          # new: D
     exit_date: date           # new: the k-th session after D
+    model_variant: str | None  # new (B10): base (null on older rows) or cross_market
 
 
 class HorizonRange(TypedDict):
     """One `ranges` row per ticker x horizon x as-of date (id <as_of_date>-<ticker>-<k>d): the 50% and 80% bands
-    of the exit close (target_date = exit_date) around `center`, from base_close (the as-of close). A strategy's
-    target price defaults to `center`; its range may only be wider (range_widen 0-0.5)."""
+    of the exit close (target_date = exit_date) from base_close (the as-of close). `center` is a LOG SHIFT, not a
+    price: the band edges are base_close * exp(center + q * sigma_h), and the centre price, a strategy's default
+    target price, is base_close * exp(center). A strategy's range may only be wider (range_widen 0-0.5)."""
 
     id: str
     made_at: datetime
@@ -60,7 +65,7 @@ class HorizonRange(TypedDict):
     ticker: str
     horizon_days: int
     base_close: float
-    center: float
+    center: float             # log shift of the centre (price = base_close * exp(center))
     sigma_h: float
     lo50: float
     hi50: float
@@ -84,16 +89,19 @@ class HorizonRange(TypedDict):
 
 def horizons() -> tuple[int, ...]:
     """The horizon list of config/strategies.yaml (`horizons`), read by the model, ranges.py, the strategies and
-    the scoreboard instead of the HORIZONS constants."""
-    raise NotImplementedError("session B10")
+    the scoreboard instead of the HORIZONS constants (core/horizons.py)."""
+    return horizon_list()
 
 
-def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonScore]:
-    """The newest model score per ticker and horizon computed by `as_of` (no look-ahead)."""
-    raise NotImplementedError("session B10")
+def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None,
+                variant: str = "base") -> list[HorizonScore]:
+    """The newest model score per ticker and horizon computed by `as_of` (no look-ahead; N+k rows only). variant:
+    "base" (config/model.yaml as written; the default) or "cross_market" (every cross-market feature group on, for
+    strategies with `cross_market: true`; ids end in -cross_market)."""
+    return records.scores_asof(market, as_of, horizon_days, variant=variant)
 
 
 def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonRange]:
     """The first published range per ticker and horizon for the session after the newest as-of date made by
-    `as_of` (the range a strategy prediction copies)."""
-    raise NotImplementedError("session B10")
+    `as_of` (the range a strategy prediction copies; N+k rows only)."""
+    return records.ranges_asof(market, as_of, horizon_days)

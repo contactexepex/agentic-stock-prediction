@@ -1,4 +1,5 @@
-"""The rule replay's SVG charts: calibration, coverage by regime and coverage over time."""
+"""The rule replay's SVG charts: calibration, coverage by regime and coverage over time, one series per horizon
+N+k present in the summary."""
 
 from __future__ import annotations
 
@@ -6,7 +7,7 @@ import math
 
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.constants.replay import MIN_MONTH_DAYS
-from marketbrief.replay.html_parts import escape_html, scaled_text
+from marketbrief.replay.html_parts import escape_html, horizon_keys, scaled_text, series_color
 
 
 def svg_calibration(summary: dict) -> str:
@@ -37,7 +38,9 @@ def svg_calibration(summary: dict) -> str:
         f'<line x1="{scale_x(0)}" y1="{scale_y(0)}" x2="{scale_x(1)}" y2="{scale_y(1)}" stroke="var(--muted)" '
         f'stroke-dasharray="4 4"/>'
     )
-    for horizon, color in (("1", "var(--s1)"), ("5", "var(--s2)")):
+    present = horizon_keys(summary["horizons"])
+    for horizon in present:
+        color = series_color(present, horizon)
         pts = summary["horizons"].get(horizon, {}).get("calibration") or []
         if not pts:
             continue
@@ -49,7 +52,7 @@ def svg_calibration(summary: dict) -> str:
         for point in pts:
             radius = 6 if point["published"] else 4
             tipx = (
-                f"{horizon}-day {'published ' if point['published'] else ''}{int(point['stated'] * 100)}% "
+                f"N+{horizon} {'published ' if point['published'] else ''}{int(point['stated'] * 100)}% "
                 f"range: "
                 f"actual {scaled_text(point['actual'])}"
             )
@@ -76,18 +79,20 @@ def svg_regime(summary: dict) -> str:
         )
         out.append(f'<text x="{left - 6}" y="{scale_y(tick) + 4:.1f}" text-anchor="end">{int(tick * 100)}%</text>')
     slot = plot_width / len(regs)
-    bar_width = min(24, slot / 3)
+    present = horizon_keys(summary["horizons"])
+    bar_width = min(24, slot / (len(present) + 1))
     for index, name in enumerate(regs):
         center_x = left + slot * (index + 0.5)
         days = summary.get("regime_days", {}).get(name, 0)
         out.append(f'<text x="{center_x:.1f}" y="{height - bottom + 16}" text-anchor="middle">{name}</text>')
         out.append(f'<text x="{center_x:.1f}" y="{height - bottom + 30}" text-anchor="middle">{days} days</text>')
-        for series_index, (horizon, color) in enumerate((("1", "var(--s1)"), ("5", "var(--s2)"))):
+        for series_index, horizon in enumerate(present):
+            color = series_color(present, horizon)
             regime_stats = summary["horizons"].get(horizon, {}).get("by_regime", {}).get(name)
             if not regime_stats or not regime_stats.get("n"):
                 continue
             tick = regime_stats["cover80"]
-            bar_left = center_x + (series_index - 1) * (bar_width + 2) + 1
+            bar_left = center_x + (series_index - len(present) / 2) * (bar_width + 2) + 1
             bottom_y, top_y = scale_y(0), scale_y(tick)
             bar_height = max(bottom_y - top_y, 0.5)
             corner_radius = min(4, bar_height)
@@ -99,7 +104,7 @@ def svg_regime(summary: dict) -> str:
                 f"{bar_left + bar_width:.1f},{top_y + corner_radius:.1f} L{bar_left + bar_width:.1f},{bottom_y:.1f} Z"
             )
             tipx = (
-                f"{name}, {horizon}-day: 80% coverage {scaled_text(tick)} over {regime_stats['n']:,} ranges "
+                f"{name}, N+{horizon}: 80% coverage {scaled_text(tick)} over {regime_stats['n']:,} ranges "
                 f"({regime_stats['days']} days)"
             )
             out.append(f'<path class="mark" d="{bar_path}" fill="{color}" data-tip="{escape_html(tipx)}"/>')
@@ -117,10 +122,11 @@ def svg_regime(summary: dict) -> str:
 
 def svg_time(summary: dict) -> str:
     """Chart of the 80% coverage by month."""
+    present = horizon_keys(summary["horizons"])
     months = sorted(
         {
             month
-            for horizon in ("1", "5")
+            for horizon in present
             for month, value in summary["horizons"].get(horizon, {}).get("by_month", {}).items()
             if value.get("days", 0) >= MIN_MONTH_DAYS
         }
@@ -131,7 +137,7 @@ def svg_time(summary: dict) -> str:
     plot_width, plot_height = width - left - right, height - top - bottom
     values = [
         value["cover80"]
-        for horizon in ("1", "5")
+        for horizon in present
         for value in summary["horizons"].get(horizon, {}).get("by_month", {}).values()
         if value.get("days", 0) >= MIN_MONTH_DAYS
     ]
@@ -155,7 +161,8 @@ def svg_time(summary: dict) -> str:
         f'<line x1="{left}" x2="{width - right}" y1="{scale_y(0.8):.1f}" y2="{scale_y(0.8):.1f}" '
         f'stroke="var(--ink2)" stroke-dasharray="4 4"/>'
     )
-    for horizon, color in (("1", "var(--s1)"), ("5", "var(--s2)")):
+    for horizon in present:
+        color = series_color(present, horizon)
         by_month = summary["horizons"].get(horizon, {}).get("by_month", {})
         pts = [
             (index, by_month[month])
@@ -171,7 +178,7 @@ def svg_time(summary: dict) -> str:
         out.append(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round"/>')
         for index, stats in pts:
             tipx = (
-                f"{months[index]}, {horizon}-day: 80% coverage {scaled_text(stats['cover80'])} ({stats['n']:,} ranges)"
+                f"{months[index]}, N+{horizon}: 80% coverage {scaled_text(stats['cover80'])} ({stats['n']:,} ranges)"
             )
             out.append(
                 f'<circle class="mark" cx="{scale_x(index):.1f}" cy="{scale_y(stats["cover80"]):.1f}" r="4" '

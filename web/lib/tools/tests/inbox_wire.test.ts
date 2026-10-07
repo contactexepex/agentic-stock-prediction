@@ -25,8 +25,8 @@ test("the inbox rows of each write kind match the fixture B1's importer is teste
       trade_date: "2026-10-06", price_basis: "close", idempotency_key: "wire-trade-aapl-01" }),
   ];
   assert.deepEqual(outcomes.map((outcome) => outcome.result), ["pending", "pending", "pending", "pending"]);
-  assert.equal(r.dispatcher.calls, 3, "only company commands start onboard.yml");
-  assert.match(outcomes[3].message ?? "", /paper-trade import is not built yet/);
+  assert.equal(r.dispatcher.calls, 4, "every write starts onboard.yml; paper trades are imported by B2's portfolio.py");
+  assert.match(outcomes[3].message ?? "", /^Pending: Paper buy 2 AAPL \(US\) on 2026-10-06 at the close \(a record, not an order\)\. It shows as pending until the import writes it to the record\.$/);
   assert.deepEqual(r.inbox.requests.map((row) => [row.slack_channel, row.slack_ts]), [
     ["C0C6REB7QS2", "1791400000.000101"], [null, null], ["C0C6REB7QS2", "1791400000.000102"], [null, null],
   ], "Slack ids are kept for the slack channel only (the Claude app's thread is ignored)");

@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from marketbrief.core import calendar as ev  # noqa: E402
 from marketbrief.analytics import indicators as ind  # noqa: E402
 from marketbrief.constants import replay
+from marketbrief.core.horizons import horizons
 from marketbrief.replay import html_parts
 from marketbrief.replay.rule_replay import inputs
 from marketbrief.replay.rule_replay import replay_statistics  # noqa: E402
@@ -121,6 +122,8 @@ def dump(root: Path, cfg: Path, start: str = "-", end: str = "-") -> list[dict]:
     return json.loads(r.stdout)
 
 
+HORIZONS = horizons()   # config/strategies.yaml: N+1 ... N+5
+
 RANGE_FIELDS = ("lo50", "hi50", "lo80", "hi80", "center", "sigma_h", "base")
 
 
@@ -146,7 +149,7 @@ def test_replay_ranges_equal_ranges_py(tmp_path, cue):
     assert r.returncode == 0, r.stderr
     live = {(x["ticker"], x["horizon_days"]): x for f in (live_root / "data" / MARKET / "ranges").glob("**/*.jsonl")
             for x in map(json.loads, f.read_text().splitlines())}
-    assert len(live) == 4
+    assert len(live) == 2 * len(HORIZONS)   # AAPL, MSFT x every horizon N+k
     notes = " ".join(n for x in live.values() for n in x["notes"])
     assert "earnings in horizon" in notes and "past moves" in notes and "ex-dividend" in notes
     assert ("expected from CUE" in notes) is cue
@@ -168,7 +171,8 @@ def test_replay_ranges_equal_ranges_py(tmp_path, cue):
         assert rp["sigma_h"] == pytest.approx(lv["sigma_h"], abs=2e-6)
         for k in ("lo50", "hi50", "lo80", "hi80", "naive_lo50", "naive_hi50", "naive_lo80", "naive_hi80"):
             assert rp[k] == pytest.approx(lv[k], abs=2e-4), (key, k)
-        assert rp["actual"] == pytest.approx(series[key[0]][D_POS + key[1]], rel=1e-9)   # scored on the h-th close
+        # scored on the exit close of N+k: the close of the k-th session after D, k + 1 bars after d
+        assert rp["actual"] == pytest.approx(series[key[0]][D_POS + key[1] + 1], rel=1e-9)
     assert rows[("AAPL", 1)]["earn"] and rows[("AAPL", 5)]["earn"] and rows[("MSFT", 5)]["div"]
 
 
@@ -183,7 +187,7 @@ def test_replay_has_no_lookahead(tmp_path):
     b = {(x["ticker"], int(x["h"]), x["date"]): x for x in dump(pert_root, pert_cfg)}
     assert a.keys() == b.keys()
     on_d = [k for k in a if k[2] == str(d)]
-    assert len(on_d) == 4
+    assert len(on_d) == 2 * len(HORIZONS)
     for k in on_d:   # everything known at d is unchanged; only the outcome moved
         for f in (*RANGE_FIELDS, "regime", "earn", "div", "major", "rsi", "ret1", "ret5"):
             assert a[k][f] == b[k][f], (k, f)
@@ -209,7 +213,8 @@ def test_replay_cli_writes_report_json_and_record(tmp_path):
                    "Look for:", "interval score", "pts = percentage points", "95% interval ="):
         assert needle in page, needle
     assert "http://" not in page and "https://" not in page          # self-contained, no network
-    assert page.count("<svg") == 3 and page.count("<details>") == 6 and page.count('class="card tile"') == 4
+    assert page.count("<svg") == 3 and page.count("<details>") == 6
+    assert page.count('class="card tile"') == 2 * len(HORIZONS)   # N+k ranges held, then always-up per horizon
     assert "textContent" in page and "innerHTML" not in page
     # the dense parts sit in collapsed sections: before the first <details> only the answers, tiles and charts
     head = page.split("<details>")[0]

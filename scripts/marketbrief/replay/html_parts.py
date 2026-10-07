@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import html
 
+from marketbrief.constants.replay_page import SERIES_COLORS
+
 
 def escape_html(value) -> str:
     """HTML-escape a value."""
@@ -20,9 +22,25 @@ def p_value_text(p_value) -> str:
     return "" if p_value is None else ("<0.001" if p_value < 0.001 else f"{p_value:.3g}")
 
 
-def legend(extra: str = "") -> str:
-    """The legend of the 1-day and 5-day series, with extra entries."""
+def horizon_keys(by_horizon: dict) -> list[str]:
+    """The horizon keys of a summary ("1", "2", ...), ascending in k: every horizon present in the data."""
+    return sorted(by_horizon, key=int)
+
+
+def series_color(horizon_keys_present: list[str], horizon: str) -> str:
+    """The chart colour of a horizon: the n-th series colour (--s1 ... --s5, cycled) by its position."""
+    return f"var(--s{horizon_keys_present.index(horizon) % SERIES_COLORS + 1})"
+
+
+def legend(horizons: list[str], extra: str = "") -> str:
+    """The legend of the N+k range series (one entry per horizon present), with extra entries."""
     return (
-        '<div class="legend"><span><span class="sw" style="background:var(--s1)"></span>1-day ranges</span>'
-        '<span><span class="sw" style="background:var(--s2)"></span>5-day ranges</span>' + extra + "</div>"
+        '<div class="legend">'
+        + "".join(
+            f'<span><span class="sw" style="background:{series_color(horizons, horizon)}"></span>N+{horizon} '
+            "ranges</span>"
+            for horizon in horizons
+        )
+        + extra
+        + "</div>"
     )

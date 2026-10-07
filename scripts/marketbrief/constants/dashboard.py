@@ -11,7 +11,6 @@ MANIFEST_KEY = "dashboard"
 BAR_CALENDAR_DAYS = 380  # OHLC history embedded per ticker (enough for the 1-year span)
 NEWS_PER_TICKER = 10  # latest headlines per ticker
 NEWS_CANDIDATES = 30  # rows read per ticker before same-title copies are dropped
-HORIZONS = (1, 5)
 SPANS = (("1W", "1 week", 7), ("1M", "1 month", 31), ("3M", "3 months", 92), ("1Y", "1 year", 366))
 DEFAULT_SPAN = "3M"
 EARNINGS_TYPE = "earnings"

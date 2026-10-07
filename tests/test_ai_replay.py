@@ -30,6 +30,7 @@ from marketbrief.core.clock import freeze_sql, utc_now, utc_today  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core import calendar as ev  # noqa: E402
+from marketbrief.core.horizons import horizons  # noqa: E402
 from marketbrief.replay.rule_replay import replay_statistics  # noqa: E402
 from test_pipeline import MARKET, SCRIPTS, fat_tailed_walk, setup, write_bars  # noqa: E402
 
@@ -211,7 +212,7 @@ def test_prepare_no_look_ahead(prepared):
         prepared["perturbed"]["summary"]["included"]["filings"]["rows_in"]
     # ... yet the context pack, ranges, indicators, regime and calibration are byte-for-byte the same
     assert base["context"] == pert["context"]
-    assert base["ranges"] == pert["ranges"] and len(base["ranges"]) == 4   # AAPL, MSFT x 1d, 5d
+    assert base["ranges"] == pert["ranges"] and len(base["ranges"]) == 2 * len(horizons())   # AAPL, MSFT x N+k
     assert base["features"] == pert["features"] and base["regime"] == pert["regime"]
     assert base["calibration"] == pert["calibration"]
     assert base["kept"] == pert["kept"] and base["evidence"] == pert["evidence"]
@@ -324,7 +325,7 @@ def test_record_validation(prepared, tmp_path):
             call(h=1, ev_ids=("nse-ann-1",), direction="down", conf=0.55),            # valid too
             dict(good),                                                               # duplicate id
             call(id=f"{D}-MSFT-5", h=5),                                              # bad id
-            call(ticker="MSFT", h=3, id=f"{D}-MSFT-3d"),                              # bad horizon
+            call(ticker="MSFT", h=max(horizons()) + 1, id=f"{D}-MSFT-{max(horizons()) + 1}d"),   # not configured
             call(ticker="AAPL", conf=0.95),                                           # confidence too high
             call(ticker="AAPL", conf=0.45),                                           # too low
             call(ticker="AAPL", ev_ids=("0001-26-000004",)),                          # filed after the cutoff
@@ -430,8 +431,8 @@ def test_score_cli_on_recorded_calls(prepared, tmp_path):
                                                      .glob("**/*.csv"))])
     msft = bars[bars["ticker"] == "MSFT"].set_index("date")["close"]
     i = list(msft.index).index(str(D))
-    exp5 = msft.iloc[i + 5] > msft.iloc[i]
-    exp1 = msft.iloc[i + 1] < msft.iloc[i]
+    exp5 = msft.iloc[i + 6] > msft.iloc[i]          # N+5: the close of D+5, 6 bars after the as-of close
+    exp1 = msft.iloc[i + 2] < msft.iloc[i]          # N+1: the close of D+1
     got = {c["id"]: c["hit"] for c in s["calls"]}
     assert got == {f"{D}-MSFT-5d": bool(exp5), f"{D}-MSFT-1d": bool(exp1)}
     assert s["n_scored"] == 2 and out.exists() and "AI forecaster replay" in out.read_text()

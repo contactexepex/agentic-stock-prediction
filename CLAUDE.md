@@ -177,8 +177,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   idempotency key; company commands are confirmed (summary; typed for delete, dashboard only), paper trades come from
   the `/trade` form (or a tool call) without a summary step. Writes are appended to the inbox
   (`mcp/inbox.sql`, database `market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`): company commands to
-  `inbox.company_commands` (read by `company.py import-inbox`; dispatches `onboard.yml`), paper trades to
-  `inbox.requests` (no importer yet, issue #112); pending until imported. Every call is logged in `inbox.command_log`
+  `inbox.company_commands` (read by `company.py import-inbox`), paper trades to `inbox.requests` (read by
+  `portfolio.py import-inbox`); each write dispatches `onboard.yml`; pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
   Vercel project `market-brief-gateway`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
   `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
@@ -318,6 +318,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   numbers, enums, no prediction words) -> `intraday_explanations/`. Views `intraday_checks_latest`,
   `intraday_deviations`, `intraday_today`, `intraday_explanation_close`; `intraday/outcomes.py` pairs each note with
   the close (held / reversed / faded); `intraday/payload.py` is the cockpit's read model.
+  B9 (docs/ws/b9.md): every open paper trade (a qualifying `strategy_predictions` row or a picked
+  `head_to_head_picks` row whose window D..exit_date contains the session, made before D's open; every
+  strategy, horizon N+1..N+5 and view; past exit_date while it has no `paper_trades_settled` row, at most
+  `trades.max_sessions_past_exit` sessions, note `exit_delayed`) gets a `trade_checks` row per check (W1's format:
+  price vs entry, target and its own range, band, target_z; flags outside_range | far_from_target |
+  against_prediction) and a `trade_check_details` row (quality, today's price basis, target reached so far);
+  views `trade_check_rows`, `trade_checks_latest`; a ticker with a flagged open trade is flagged
+  `open_trade_flagged`, and the explainer's input carries its flagged trades. Band flags exist for every published
+  horizon (`outside_<k>d_80`; `bands` JSON on each check row). The intraday alerts feed (`intraday_alerts`, view `intraday_alerts_feed`,
+  `intraday_check.py alerts`): flagged open trades per ticker and material news on a company with an open trade,
+  once per session; read by B6's `alerts.py intraday`. Monitoring only, nothing is traded.
 - Slack notifications (B6, SPEC F9; `scripts/alerts.py`, code `marketbrief/alerts/`, notes `docs/ws/b6.md`): one
   thread per market per day in #market-brief: `morning` (top 5 by agreement at N+1 with the strongest other horizon,
   the day's head-to-head picks and whether each is viable at the owner's cost: expected gain after your cost > 0),

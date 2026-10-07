@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from marketbrief.analytics import range_switches
 from marketbrief.constants.replay import LIMITATIONS, SIGNALS
+from marketbrief.replay.html_parts import horizon_keys
 from marketbrief.utils.numbers import share_percent_text
 
 
@@ -13,7 +14,7 @@ def pct(share, decimals: int = 0) -> str:
 
 
 def headline(_cfg: dict, summary: dict) -> list[str]:
-    """The summary lines of a replay: coverage, accuracy, regimes, tickers and baselines."""
+    """The summary lines of a replay per horizon N+k: coverage, accuracy, regimes, tickers and baselines."""
     lines = []
     for horizon, horizon_summary in summary["horizons"].items():
         overall = horizon_summary["overall"]
@@ -31,14 +32,14 @@ def headline(_cfg: dict, summary: dict) -> list[str]:
         )
         interval = overall["cover80_ci"]
         lines.append(
-            f"{horizon}-day ranges: the 80% band contained the actual close {pct(c80, 1)} of the time "
+            f"N+{horizon} ranges: the 80% band contained the exit close {pct(c80, 1)} of the time "
             f"(95% interval {pct(interval[0], 1)} to {pct(interval[1], 1)}; target 80%) and the 50% band "
             f"{pct(c50, 1)} (target 50%) over {overall['n']:,} ranges on {overall['days']} days: {verdict}."
         )
         if overall.get("naive_score80") is not None:
             better = overall["score80_same_rows"] < overall["naive_score80"]
             lines.append(
-                f"{horizon}-day accuracy vs the naive range (last close +/- 20-day volatility): interval score "
+                f"N+{horizon} accuracy vs the naive range (last close +/- 20-day volatility): interval score "
                 f"{overall['score80_same_rows']:.2f} vs {overall['naive_score80']:.2f} (lower is better), width "
                 f"{overall['width80_pct']:.2f}% vs {overall['naive_width80_pct']:.2f}% of the price; the formula is "
                 f"{'better' if better else 'not better'} than the naive range."
@@ -48,13 +49,13 @@ def headline(_cfg: dict, summary: dict) -> list[str]:
             worst = min(regs.items(), key=lambda key_value: key_value[1]["cover80"])
             best = max(regs.items(), key=lambda key_value: key_value[1]["cover80"])
             lines.append(
-                f"{horizon}-day by regime: 80% coverage ranges from {pct(worst[1]['cover80'], 1)} in {worst[0]} "
+                f"N+{horizon} by regime: 80% coverage ranges from {pct(worst[1]['cover80'], 1)} in {worst[0]} "
                 f"to {pct(best[1]['cover80'], 1)} in {best[0]}."
             )
         earnings = horizon_summary["by_earnings"]["earnings in horizon"]
         if earnings.get("n"):
             lines.append(
-                f"{horizon}-day with earnings inside the horizon: 80% coverage {pct(earnings['cover80'], 1)} "
+                f"N+{horizon} with earnings inside the horizon: 80% coverage {pct(earnings['cover80'], 1)} "
                 f"over {earnings['n']} ranges (no earnings: "
                 f"{pct(horizon_summary['by_earnings']['no earnings'].get('cover80'), 1)})."
             )
@@ -62,7 +63,7 @@ def headline(_cfg: dict, summary: dict) -> list[str]:
         low = sorted(tick.items(), key=lambda key_value: key_value[1]["cover80"])[:3]
         if low:
             lines.append(
-                f"{horizon}-day lowest 80% coverage by ticker: "
+                f"N+{horizon} lowest 80% coverage by ticker: "
                 + ", ".join(f"{ticker} {pct(value['cover80'], 1)}" for ticker, value in low)
                 + "."
             )
@@ -83,7 +84,7 @@ def headline(_cfg: dict, summary: dict) -> list[str]:
                 f"{', clear' if is_clear else ', within noise'})"
             )
         lines.append(
-            f"{horizon}-day direction baselines: always-up was right {pct(always_up['hit_rate'], 1)} of the time "
+            f"N+{horizon} direction baselines: always-up was right {pct(always_up['hit_rate'], 1)} of the time "
             f"(95% interval {pct(always_up['ci95'][0], 1)} to {pct(always_up['ci95'][1], 1)}); "
             + "; ".join(parts)
             + "."
@@ -105,12 +106,24 @@ def coverage_groups(horizon_summary: dict, min_n: int = 100) -> dict[str, dict]:
     }
 
 
+def span(values: list[tuple[str, float]]) -> str:
+    """The spread of one rate over the horizons, short: '84.5% (N+1) to 86.3% (N+3)'; one value: '84.5% at N+1'."""
+    if len(values) == 1:
+        return f"{pct(values[0][1], 1)} at N+{values[0][0]}"
+    low, high = min(values, key=lambda item: item[1]), max(values, key=lambda item: item[1])
+    if pct(low[1], 1) == pct(high[1], 1):
+        return f"{pct(low[1], 1)} at every horizon (N+{values[0][0]} to N+{values[-1][0]})"
+    return f"{pct(low[1], 1)} (N+{low[0]}) to {pct(high[1], 1)} (N+{high[0]})"
+
+
 def top_sentences(summary: dict) -> list[str]:
-    """At most three short sentences for the top of the page, one per question (exact figures, one decimal)."""
+    """At most three short sentences for the top of the page, one per question (exact figures, one decimal),
+    over every horizon N+k the replay scored (the lowest and highest horizon named)."""
     by_horizon, out = summary["horizons"], []
-    overall = {horizon: by_horizon.get(horizon, {}).get("overall", {}) for horizon in ("1", "5")}
-    if overall["1"].get("n") and overall["5"].get("n"):
-        coverage = [overall["1"]["cover80"], overall["5"]["cover80"]]
+    scored = [horizon for horizon in horizon_keys(by_horizon) if by_horizon[horizon].get("overall", {}).get("n")]
+    overall = {horizon: by_horizon[horizon]["overall"] for horizon in scored}
+    if scored:
+        coverage = [overall[horizon]["cover80"] for horizon in scored]
         verdict = (
             "about right"
             if all(abs(item - 0.8) <= 0.03 for item in coverage)
@@ -121,42 +134,42 @@ def top_sentences(summary: dict) -> list[str]:
             else "mixed"
         )
         out.append(
-            f"Do the ranges keep their promise? The 80% ranges contained the later close {pct(coverage[0], 1)} of the "
-            f"time 1 day ahead and {pct(coverage[1], 1)} 5 days ahead, and the 50% ranges "
-            f"{pct(overall['1']['cover50'], 1)} "
-            f"and {pct(overall['5']['cover50'], 1)}, so overall they are {verdict}."
+            "Do the ranges keep their promise? The 80% ranges contained the exit close "
+            + span([(horizon, overall[horizon]["cover80"]) for horizon in scored])
+            + " of the time, and the 50% ranges "
+            + span([(horizon, overall[horizon]["cover50"]) for horizon in scored])
+            + f", so overall they are {verdict}."
         )
-    parts = []
-    for horizon in ("1", "5"):
-        slices = coverage_groups(by_horizon.get(horizon, {}))
-        if not slices:
-            continue
-        highest = max(slices.items(), key=lambda key_value: key_value[1]["cover80"])
-        lowest = min(slices.items(), key=lambda key_value: key_value[1]["cover80"])
+    slices = [
+        (horizon, name, stats)
+        for horizon in scored
+        for name, stats in coverage_groups(by_horizon.get(horizon, {})).items()
+    ]
+    if slices:
+        highest = max(slices, key=lambda item: item[2]["cover80"])
+        lowest = min(slices, key=lambda item: item[2]["cover80"])
         prep = lambda name: "in" if name.endswith("markets") else "with"  # noqa: E731
         upper_text = (
-            f"{'widest' if highest[1]['cover80'] > 0.8 else 'closest to 80%'} {prep(highest[0])} {highest[0]} "
-            f"({pct(highest[1]['cover80'], 1)} held)"
+            f"N+{highest[0]} ranges were {'widest' if highest[2]['cover80'] > 0.8 else 'closest to 80%'} "
+            f"{prep(highest[1])} {highest[1]} ({pct(highest[2]['cover80'], 1)} held)"
         )
         lower_text = (
-            f"{'too narrow' if lowest[1]['cover80'] < 0.8 else 'closest to 80%'} {prep(lowest[0])} {lowest[0]} "
-            f"({pct(lowest[1]['cover80'], 1)})"
+            f"N+{lowest[0]} ranges were {'too narrow' if lowest[2]['cover80'] < 0.8 else 'closest to 80%'} "
+            f"{prep(lowest[1])} {lowest[1]} ({pct(lowest[2]['cover80'], 1)})"
         )
-        parts.append(f"{horizon}-day ranges were {upper_text} and {lower_text}")
-    if parts:
-        out.append("Where are they too wide or too narrow? " + "; ".join(parts) + ".")
+        out.append(f"Where are they too wide or too narrow? {upper_text}; {lower_text}.")
     baselines = summary.get("baselines", {})
-    always_up = {horizon: (baselines.get(horizon) or {}).get("always_up") for horizon in ("1", "5")}
-    if always_up["1"] and always_up["5"]:
+    called = [horizon for horizon in horizon_keys(baselines) if (baselines.get(horizon) or {}).get("always_up")]
+    if called:
         better, worse, noise = [], 0, 0
-        for horizon in ("1", "5"):
+        for horizon in called:
             for name in SIGNALS[1:]:
                 item = (baselines.get(horizon) or {}).get(name)
                 if not item or not item["calls"] or item["diff_ci95"][0] is None:
                     continue
                 if item["diff_ci95"][0] > 0:
                     better.append(
-                        f"{item['label']} {horizon}-day (+{100 * item['diff_vs_always_up']:.1f} percentage points)"
+                        f"{item['label']} N+{horizon} (+{100 * item['diff_vs_always_up']:.1f} percentage points)"
                     )
                 elif item["diff_ci95"][1] < 0:
                     worse += 1
@@ -172,9 +185,10 @@ def top_sentences(summary: dict) -> list[str]:
             f"worse, the rest "
             "within noise)"
         )
+        rates = span([(horizon, baselines[horizon]["always_up"]["hit_rate"]) for horizon in called])
         out.append(
-            f'Do simple up/down rules work? Always calling "up" was right {pct(always_up["1"]["hit_rate"], 1)} of the '
-            f"time 1 day ahead and {pct(always_up['5']['hit_rate'], 1)} 5 days ahead (a coin flip is 50%), and {tail}."
+            f'Do simple up/down rules work? Always calling "up" was right {rates} of the time (a coin flip is 50%), '
+            f"and {tail}."
         )
     return out
 
@@ -191,7 +205,7 @@ def limitations(cfg: dict, ranges_config: dict, summary: dict) -> list[str]:
         ]
         if index_cue.get("beta", 1.0) == "fit":
             out.append(
-                f"Index cue (beta split, on for {', '.join(f'{horizon}d' for horizon in enabled_horizons)}): "
+                f"Index cue (beta split, on for {', '.join(f'N+{horizon}' for horizon in enabled_horizons)}): "
                 f"{index_cue['symbol']}'s last session "
                 "return before the next session x the beta fitted on bars up to d, as the live pre-open quote gives it."
             )
@@ -208,8 +222,8 @@ def limitations(cfg: dict, ranges_config: dict, summary: dict) -> list[str]:
     }
     if mism:
         out.append(
-            "Ranges are scored on the close h stored bars later. On "
-            + ", ".join(f"{rows} {horizon}d" for horizon, rows in mism.items())
+            "Ranges are scored on the close k + 1 stored bars after the as-of bar (the exit of N+k). On "
+            + ", ".join(f"{rows} N+{horizon}" for horizon, rows in mism.items())
             + " rows that bar is not the exchange-calendar target date a live range names (bars on special "
             "sessions such as India's Muhurat trading, or a session without a bar)."
         )

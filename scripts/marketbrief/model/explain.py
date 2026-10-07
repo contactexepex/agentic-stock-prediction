@@ -11,6 +11,8 @@ base_rate * (1 - base_rate), the slope at the base rate), so the points add up e
 100 * (p - base_rate) before rounding (the stored points are rounded to 2 decimals)."""
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -24,15 +26,13 @@ from marketbrief.model.walk_forward import MonthlyFit
 
 POINTS_DECIMALS = 2
 SMALL = 1e-12
-HORIZON_SUFFIXES = ("_1d", "_5d")
+HORIZON_SUFFIX = re.compile(r"_\d+d$")   # per-horizon event features: earnings_in_window_<k>d
 
 
 def base_name(feature: str) -> str:
     """The feature name without a per-horizon suffix (earnings_in_window_5d -> earnings_in_window)."""
-    for suffix in HORIZON_SUFFIXES:
-        if feature.endswith(suffix) and feature.removesuffix(suffix) in FEATURE_TEXT:
-            return feature.removesuffix(suffix)
-    return feature
+    stripped = HORIZON_SUFFIX.sub("", feature)
+    return stripped if stripped != feature and stripped in FEATURE_TEXT else feature
 
 
 def group_of(feature: str) -> str:

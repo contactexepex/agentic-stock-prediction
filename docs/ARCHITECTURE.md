@@ -337,6 +337,7 @@ import) is bounded to entries since the last run and visible as pending.
 | 2 | WS7 MCP + governance | `mcp/` (server, agent definitions, evals, injection suite), `docs/ws/ws7.md` | section 10 |
 | 2 | WS8 alerts | `scripts/marketbrief/alerts/`, `scripts/alerts.py`, `config/alerts.yaml`, `tests/test_alerts*.py`, `docs/ws/ws8.md` | read models + Slack; never trade signals beyond the paper label |
 | 2 (waves of SPEC section 10) | B3 AI traders | `marketbrief/traders/`, `.claude/agents/trader-*.md`, `forecaster.md`, `eod-analyst.md`, `research-director.md`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md`, `docs/ws/b3.md` | SPEC F4, F6 |
+| 2 (waves of SPEC section 10) | B9 monitoring | `marketbrief/intraday/` (`trades.py`, `trade_rows.py`, `alerts.py`), `core/schema_intraday.py` (`trade_check_details`, `intraday_alerts`), `sql/views.sql` B9 block, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | SPEC F5; docs/ws/b9.md |
 | 3 | WS3 frontend | `app/` except `app/api/`, frontend tests, `docs/ws/ws3.md` | the spec only (never MotherDuck directly) |
 | 3 | consolidation | shared docs, routine prompts, wiring steps into the routine, end-to-end run of both markets | everything |
 
