@@ -1,0 +1,92 @@
+[
+  {
+    "inbox_id": "wire-deact-dal-01",
+    "kind": "watchlist_events",
+    "tool": "deactivate_company",
+    "market": "us",
+    "arguments": {
+      "market": "us",
+      "ticker": "DAL",
+      "reason": "pause airlines",
+      "idempotency_key": "wire-deact-dal-01"
+    },
+    "preview": null,
+    "channel": "slack",
+    "submitted_by": "slack:U07ABCD123",
+    "agent": "slack-gateway",
+    "command_id": "cmd-20261007T100000Z-f779a45b",
+    "submitted_at": "2026-10-07T10:00:00.000Z",
+    "args_sha256": "bc5e067a612eea4cff942dddd47b01ed36d9ad07ece586e4e6d5dca9ad4feef2"
+  },
+  {
+    "inbox_id": "wire-amount-aapl-01",
+    "kind": "watchlist_events",
+    "tool": "set_paper_amount",
+    "market": "us",
+    "arguments": {
+      "market": "us",
+      "ticker": "AAPL",
+      "amount": 1500,
+      "idempotency_key": "wire-amount-aapl-01"
+    },
+    "preview": null,
+    "channel": "claude_app",
+    "submitted_by": "github:owner-login",
+    "agent": "claude-app",
+    "command_id": "cmd-20261007T100000Z-9a83843f",
+    "submitted_at": "2026-10-07T10:00:00.000Z",
+    "args_sha256": "7e17b3f7d7725b587d175a68647705d60bad5a41aad295d9f79042ce6b34a8ec"
+  },
+  {
+    "inbox_id": "wire-add-msft-01",
+    "kind": "watchlist_events",
+    "tool": "add_company",
+    "market": "us",
+    "arguments": {
+      "market": "us",
+      "symbol": "MSFT",
+      "idempotency_key": "wire-add-msft-01"
+    },
+    "preview": {
+      "market": "us",
+      "symbol": "MSFT",
+      "name": "Microsoft Corporation",
+      "exchange": "NASDAQ",
+      "sector": "Technology",
+      "yahoo": "MSFT",
+      "nse_symbol": null,
+      "cik": "0000789019",
+      "amount": 1000,
+      "amount_is_default": true,
+      "currency": "USD"
+    },
+    "channel": "slack",
+    "submitted_by": "slack:U07ABCD123",
+    "agent": "slack-gateway",
+    "command_id": "cmd-20261007T100000Z-04ac2be2",
+    "submitted_at": "2026-10-07T10:00:00.000Z",
+    "args_sha256": "59f746c77c46153530ee80898bc4b1f458e0bf274196adbb96f12cafea8fd863"
+  },
+  {
+    "inbox_id": "wire-trade-aapl-01",
+    "kind": "portfolio_trades",
+    "tool": "add_paper_trade",
+    "market": "us",
+    "arguments": {
+      "market": "us",
+      "ticker": "AAPL",
+      "side": "buy",
+      "quantity": 2,
+      "trade_date": "2026-10-06",
+      "price_basis": "close",
+      "idempotency_key": "wire-trade-aapl-01"
+    },
+    "preview": null,
+    "channel": "claude_app",
+    "submitted_by": "github:owner-login",
+    "agent": "claude-app",
+    "command_id": "cmd-20261007T100000Z-453719c8",
+    "submitted_at": "2026-10-07T10:00:00.000Z",
+    "args_sha256": "58425b06fbb00d469d90e504ad327b268dc3dd5ab0df4f7966ef19d46385895f"
+  }
+]

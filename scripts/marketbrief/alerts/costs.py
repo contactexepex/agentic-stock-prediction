@@ -48,7 +48,7 @@ def pick_gain(row: dict) -> float | None:
 
 
 def verdict(gain: float | None, cost) -> str:
-    """'expected gain -0.74% after your cost 0.30% — not viable' (or '— viable'); '' without the numbers."""
+    """'expected gain -0.71% after your cost 0.30% — not viable' (or '— viable'); '' without the numbers."""
     if gain is None:
         return ""
     return (f"expected gain {fmt.pct(gain)} after your cost {float(cost):.2f}% — "
@@ -56,7 +56,7 @@ def verdict(gain: float | None, cost) -> str:
 
 
 def pick_cost_text(row: dict) -> str:
-    """' Expected gain -0.74% after your cost 0.30% — not viable.' for a pick line, '' without the numbers."""
+    """' Expected gain -0.71% after your cost 0.30% — not viable.' for a pick line, '' without the numbers."""
     text = verdict(pick_gain(row), row.get(YOUR_COST_PCT))
     return f" {text[0].upper()}{text[1:]}." if text else ""
 
