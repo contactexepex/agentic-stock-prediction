@@ -346,8 +346,9 @@ it; it is joined to the other records on `record_id`. W1 keeps it as B2's kind r
 strategies compete on.
 
 **Pending the owner:** which definition of "viable" is canonical. As built, it is "expected move > your cost"
-(`expected_move_pct > your_cost_pct`). The alternative is "expected gain after your cost > 0". The field may change
-meaning when the owner decides.
+(`expected_move_pct > your_cost_pct`). The alternative is "expected gain after your cost > 0". The Slack morning
+picks (session B6) already use that alternative in their "viable / not viable" words. So the same example NVDA pick
+reads "viable" in the alert while its `cost_viable` is false. The field may change meaning when the owner decides.
 
 Example file: `cost_view.json` (199 rows, built with B2's own row functions):
 - 118 prediction rows: every qualifying prediction of NVDA and RELIANCE on 7 Oct;
@@ -459,7 +460,7 @@ Status: kind `eod_analyses`; session **B3** writes it. Example file: `eod_analys
 
 How a strategy is doing (F7). There is one row per market × view × strategy × horizon, plus a row with every
 horizon pooled. Rows per company and per pick rule are cut the same way. Status: **derived for pages** (B2
-computes, B4 serves `rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (78 rows computed from the
+computes, B4 serves `rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (73 rows computed from the
 example trades, so every count matches `paper_trade.json`).
 
 | Field | Meaning | Source | Unit | Example |

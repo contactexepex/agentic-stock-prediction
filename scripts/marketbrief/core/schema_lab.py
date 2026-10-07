@@ -124,10 +124,10 @@ LAB_SCHEMAS: Schemas = {
     # by check_at), entry_adj, target_adj, lo80_adj..hi80_adj the trade's prices on that basis; last_time = the
     # 5-minute bar of last_price; sigma_1d, elapsed_fraction (share of today's session elapsed), sessions_held =
     # session_number - 1 + elapsed_fraction, sessions_left = sessions to the exit close (the rest of today
-    # included), z_since_entry = return since entry / (sigma_1d x sqrt(sessions_held)); target_reached /
-    # target_reached_session (F1.9 so far: a session high from D up to the check at or above target_adj; 1 = D; null
-    # = unknown); high_since_entry_pct / low_since_entry_pct vs entry_adj; notes no_bar_<date> | no_sigma |
-    # not_on_watchlist.
+    # included, never below B9's min_elapsed_fraction), z_since_entry = return since entry / (sigma_1d x
+    # sqrt(sessions_held)); target_reached / target_reached_session (F1.9 so far: a session high from D up to the
+    # check at or above target_adj; 1 = D; null = unknown); high_since_entry_pct / low_since_entry_pct vs entry_adj;
+    # notes no_bar_<date> | no_sigma | not_on_watchlist.
     KIND_TRADE_CHECKS: ("jsonl", {
         "id": "VARCHAR", "check_id": "VARCHAR", "check_row_id": "VARCHAR", "check_at": "TIMESTAMPTZ",
         "session_date": "DATE", "market": "VARCHAR", "ticker": "VARCHAR", "trade_id": "VARCHAR",

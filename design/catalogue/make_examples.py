@@ -120,11 +120,11 @@ def strategies() -> list[dict]:
     return yaml.safe_load((REPO / "config" / "strategies.yaml").read_text())["strategies"]
 
 
-def cost_views(market: str, entry_value: float, exit_value: float, quantity: float, holding_days: int = 0) -> dict:
+def cost_views(market: str, entry_value: float, exit_value: float, quantity: float) -> dict:
     """Both views of one round trip with B2's engine (marketbrief/lab/costs.py, config/costs.yaml `broker:` rates);
     US orders converted at the example EUR/USD."""
     return lab_costs.cost_views(market, lab_costs.rates(market), (entry_value, exit_value), quantity,
-                                {"eurusd": (EURUSD, EURUSD), "holding_days": holding_days})
+                                {"eurusd": (EURUSD, EURUSD)})
 
 
 def costs(market: str, entry_value: float, exit_value: float, quantity: float) -> tuple[float, dict]:
