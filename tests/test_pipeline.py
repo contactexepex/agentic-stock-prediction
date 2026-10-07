@@ -63,8 +63,10 @@ def setup(tmp: Path) -> tuple[Path, Path]:
                          ("Apple raises guidance", "duplicate in same feed")]))
     (cfg / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML % feed)
     (cfg / "events.yaml").write_text((REPO / "config" / "events.yaml").read_text().replace("[us]", "[us, testmkt]"))
-    for name in ("ranges.yaml", "settings.yaml"):
-        (cfg / name).write_text((REPO / "config" / name).read_text())
+    (cfg / "ranges.yaml").write_text((REPO / "config" / "ranges.yaml").read_text())
+    # the live pages_url (hosted reports) is left out, so report links stay the repo links asserted below
+    live_settings = (REPO / "config" / "settings.yaml").read_text()
+    (cfg / "settings.yaml").write_text(re.sub(r"(?m)^pages_url:.*\n", "", live_settings))
     return root, cfg
 
 

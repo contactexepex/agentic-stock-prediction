@@ -186,7 +186,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (filters by sector and company; no network needed) and `reports/<market>/index.html` (all days);
   chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
   `config/settings.yaml` holds the repo URL, optional `pages_url`, the Slack channel id and the AI
-  model's `model_training_cutoff` (ai_replay's fair vs contaminated split)
+  model's `model_training_cutoff` (ai_replay's fair vs contaminated split). `pages_url` is the owner's
+  private Vercel site serving `reports/` (Vercel Authentication on all deployments), so Slack links open
+  the rendered pages; `reports/index.html` is its hand-written landing page (the one file under
+  `reports/` that build work may change; no script writes it)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`
