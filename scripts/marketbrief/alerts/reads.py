@@ -47,9 +47,14 @@ def records(con, kind: str, sql: str, params: list) -> list[dict]:
 
 
 def feed_asof(rows: list[dict], now: datetime) -> list[dict]:
-    """Alert feed records checked (and computed, when stated) by `now`; a record without check_at is dropped."""
+    """Alert feed records checked (and computed, when stated) by `now`; a record without check_at is dropped. A
+    time without a UTC offset is read as UTC (data rule 3: every timestamp is UTC)."""
+    def utc(value) -> pd.Timestamp:
+        stamp = pd.Timestamp(value)
+        return stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp.tz_convert("UTC")
+
     def by_now(value) -> bool:
-        return value is not None and pd.Timestamp(value).tz_convert("UTC") <= pd.Timestamp(now).tz_convert("UTC")
+        return value is not None and utc(value) <= utc(now)
     return [r for r in rows if by_now(r.get("check_at"))
             and (r.get("computed_at") is None or by_now(r.get("computed_at")))]
 
