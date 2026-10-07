@@ -189,8 +189,6 @@ export interface CompanyResolver {
 export interface ToolSettings {
   /** MB_GATEWAY=1: the dashboard channel is refused (it is only served behind Vercel Authentication). */
   gatewayMode: boolean;
-  /** MB_KILL_SWITCH: agent names, or "*" for all. */
-  killSwitch: string[];
   /** Secret values to scrub from every message, log row and report. */
   secrets: string[];
 }

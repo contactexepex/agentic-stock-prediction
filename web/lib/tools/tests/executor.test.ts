@@ -106,10 +106,14 @@ test("the per-agent day budget stops writes and resets the next UTC day", async 
   assert.equal(tomorrow.result, "pending");
 });
 
-test("the kill switch stops every call: environment, inbox controls row, and all agents", async () => {
-  const off = rig({ killSwitch: ["claude-app"] });
+test("the kill switch stops every call before its arguments are checked: the agent's controls row, and '*' for all", async () => {
+  const off = rig();
+  off.inbox.controls.push({ agent: "claude-app", enabled: false });
   assert.equal((await off.layer.execute(app, "get_overview", { market: "us" })).refusal_code, "kill_switch");
-  const all = rig({ killSwitch: ["*"] });
+  assert.equal((await off.layer.execute(app, "get_overview", { market: "nowhere" })).refusal_code, "kill_switch",
+    "invalid arguments are refused as kill_switch while the switch is off");
+  const all = rig();
+  all.inbox.controls.push({ agent: "*", enabled: false });
   assert.equal((await all.layer.execute(slack, "explain", { market: "us", question: "why?" })).refusal_code, "kill_switch");
   const controlled = rig();
   controlled.inbox.controls.push({ agent: "claude-app", enabled: false });

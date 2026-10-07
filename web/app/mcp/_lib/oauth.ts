@@ -1,11 +1,14 @@
 // OAuth for /mcp (MCP authorization spec; RFC 9728, 8414, 7591, 7636): this gateway is both the protected resource and
-// the authorization server, and federates sign-in to GitHub. Only the owner's GitHub account is accepted (decision 22).
+// the authorization server, and federates sign-in to GitHub. Only the owner's GitHub account is accepted (decision 22):
+// its numeric id MB_OWNER_GITHUB_ID and its login MCP_ALLOWED_GITHUB_LOGIN must both match.
+// Public paths (web/middleware.ts rewrites them to these handlers under /mcp/oauth/): /oauth/authorize, /oauth/token,
+// /oauth/register, /oauth/github/callback and /.well-known/oauth-*.
 // Stateless (no store on Vercel): client ids, the GitHub state, authorization codes and tokens are HMAC-signed
-// (crypto.ts) with MCP_TOKEN_SECRET. PKCE S256 is required; redirect URIs must be on the allowlist. The GitHub access
+// (crypto.ts) with SESSION_SECRET. PKCE S256 is required; redirect URIs must be on the allowlist. The GitHub access
 // token is used once to read the account and then discarded.
 import { randomKey, sha256Base64url, signToken, verifyToken } from "../../../lib/tools/crypto.ts";
 import type { FetchLike } from "../../../lib/tools/http.ts";
-import { type McpConfig, resourceMetadataUrl, resourceUrl } from "./config.ts";
+import { type McpConfig, githubCallbackUrl, resourceMetadataUrl, resourceUrl } from "./config.ts";
 
 export const CODE_SECONDS = 120;
 export const ACCESS_SECONDS = 3600;
@@ -13,6 +16,7 @@ export const REFRESH_SECONDS = 30 * 24 * 3600;
 const STATE_SECONDS = 600;
 const CLIENT_SECONDS = 365 * 24 * 3600;
 const NONCE_COOKIE = "mb_oauth_nonce";
+const COOKIE_PATH = "/oauth";
 const CHALLENGE = /^[A-Za-z0-9_-]{43,128}$/;
 const VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
 
@@ -43,9 +47,9 @@ export function protectedResourceMetadata(cfg: McpConfig): Response {
 export function authorizationServerMetadata(cfg: McpConfig): Response {
   return json({
     issuer: cfg.baseUrl,
-    authorization_endpoint: `${cfg.baseUrl}/mcp/oauth/authorize`,
-    token_endpoint: `${cfg.baseUrl}/mcp/oauth/token`,
-    registration_endpoint: `${cfg.baseUrl}/mcp/oauth/register`,
+    authorization_endpoint: `${cfg.baseUrl}/oauth/authorize`,
+    token_endpoint: `${cfg.baseUrl}/oauth/token`,
+    registration_endpoint: `${cfg.baseUrl}/oauth/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
@@ -80,7 +84,7 @@ async function client(cfg: McpConfig, clientId: string | null, nowSeconds: numbe
   return payload?.typ === "client" && Array.isArray(payload.redirect_uris) ? (payload.redirect_uris as string[]) : null;
 }
 
-/** GET /mcp/oauth/authorize: checks the client, redirect URI and PKCE, then sends the browser to GitHub. */
+/** GET /oauth/authorize: checks the client, redirect URI and PKCE, then sends the browser to GitHub. */
 export async function authorize(request: Request, cfg: McpConfig, nowSeconds: number): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const clientId = params.get("client_id");
@@ -107,14 +111,14 @@ export async function authorize(request: Request, cfg: McpConfig, nowSeconds: nu
   });
   const github = new URL("https://github.com/login/oauth/authorize");
   github.searchParams.set("client_id", cfg.githubClientId);
-  github.searchParams.set("redirect_uri", `${cfg.baseUrl}/mcp/oauth/callback`);
+  github.searchParams.set("redirect_uri", githubCallbackUrl(cfg));
   github.searchParams.set("state", state);
   github.searchParams.set("allow_signup", "false");
   return new Response(null, {
     status: 302,
     headers: {
       Location: github.toString(), ...noStore,
-      "Set-Cookie": `${NONCE_COOKIE}=${nonce}; Path=/mcp/oauth; Max-Age=${STATE_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
+      "Set-Cookie": `${NONCE_COOKIE}=${nonce}; Path=${COOKIE_PATH}; Max-Age=${STATE_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
     },
   });
 }
@@ -134,7 +138,7 @@ export interface CallbackDeps {
   onRefused: (login: string | null) => Promise<void>;
 }
 
-/** GET /mcp/oauth/callback: GitHub's answer. Exchanges the code, reads the account, accepts only the owner. */
+/** GET /oauth/github/callback: GitHub's answer. Exchanges the code, reads the account, accepts only the owner. */
 export async function callback(request: Request, cfg: McpConfig, deps: CallbackDeps, nowSeconds: number): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const state = await verifyToken(cfg.tokenSecret, params.get("state") ?? "", nowSeconds);
@@ -150,7 +154,7 @@ export async function callback(request: Request, cfg: McpConfig, deps: CallbackD
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json", "User-Agent": "market-brief-gateway" },
       body: JSON.stringify({ client_id: cfg.githubClientId, client_secret: cfg.githubClientSecret, code,
-        redirect_uri: `${cfg.baseUrl}/mcp/oauth/callback` }),
+        redirect_uri: githubCallbackUrl(cfg) }),
     });
     const token = ((await exchange.json()) as { access_token?: string }).access_token;
     if (!token) return page("GitHub did not accept the sign-in.", 502);
@@ -163,7 +167,7 @@ export async function callback(request: Request, cfg: McpConfig, deps: CallbackD
   } catch {
     return page("GitHub could not be reached.", 502);
   }
-  const loginOk = !cfg.ownerGithubLogin || login?.toLowerCase() === cfg.ownerGithubLogin.toLowerCase();
+  const loginOk = login?.toLowerCase() === cfg.ownerGithubLogin.toLowerCase();
   if (!login || id !== cfg.ownerGithubId || !loginOk) {
     await deps.onRefused(login);
     return page("Only the owner's GitHub account can use this connector.", 403);
@@ -177,7 +181,7 @@ export async function callback(request: Request, cfg: McpConfig, deps: CallbackD
   if (state.state) url.searchParams.set("state", String(state.state));
   return new Response(null, {
     status: 302,
-    headers: { Location: url.toString(), ...noStore, "Set-Cookie": `${NONCE_COOKIE}=; Path=/mcp/oauth; Max-Age=0; HttpOnly; Secure; SameSite=Lax` },
+    headers: { Location: url.toString(), ...noStore, "Set-Cookie": `${NONCE_COOKIE}=; Path=${COOKIE_PATH}; Max-Age=0; HttpOnly; Secure; SameSite=Lax` },
   });
 }
 
@@ -190,7 +194,7 @@ async function issue(cfg: McpConfig, sub: string, gid: string, clientId: string,
   });
 }
 
-/** POST /mcp/oauth/token: authorization_code (with the PKCE verifier) or refresh_token. */
+/** POST /oauth/token: authorization_code (with the PKCE verifier) or refresh_token. */
 export async function token(request: Request, cfg: McpConfig, nowSeconds: number): Promise<Response> {
   const form = new URLSearchParams(await request.text());
   const clientId = form.get("client_id") ?? "";
@@ -235,6 +239,6 @@ export async function authenticate(request: Request, cfg: McpConfig, nowSeconds:
     return unauthorized(cfg, true);
   }
   const login = String(payload.sub ?? "");
-  if (cfg.ownerGithubLogin && login.toLowerCase() !== cfg.ownerGithubLogin.toLowerCase()) return unauthorized(cfg, true);
+  if (login.toLowerCase() !== cfg.ownerGithubLogin.toLowerCase()) return unauthorized(cfg, true);
   return { login };
 }

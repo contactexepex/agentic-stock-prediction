@@ -65,17 +65,23 @@ test("gateway mode serves only the Slack routes, /mcp and its OAuth routes", () 
   assert.deepEqual(gatewayDecision("/slack/interactions", "POST", true), { action: "slack" });
   assert.deepEqual(gatewayDecision("/slack/commands", "GET", true), { action: "not_found" });
   assert.deepEqual(gatewayDecision("/mcp", "POST", true), { action: "next" });
-  assert.deepEqual(gatewayDecision("/mcp/oauth/token", "POST", true), { action: "next" });
-  assert.deepEqual(gatewayDecision("/mcp/oauth/token", "GET", true), { action: "not_found" });
+  assert.deepEqual(gatewayDecision("/oauth/authorize", "GET", true), { action: "rewrite", target: "/mcp/oauth/authorize" });
+  assert.deepEqual(gatewayDecision("/oauth/token", "POST", true), { action: "rewrite", target: "/mcp/oauth/token" });
+  assert.deepEqual(gatewayDecision("/oauth/register", "POST", true), { action: "rewrite", target: "/mcp/oauth/register" });
+  assert.deepEqual(gatewayDecision("/oauth/github/callback", "GET", true), { action: "rewrite", target: "/mcp/oauth/callback" });
+  assert.deepEqual(gatewayDecision("/oauth/token", "GET", true), { action: "not_found" });
   assert.deepEqual(gatewayDecision("/.well-known/oauth-protected-resource/mcp", "GET", true), { action: "rewrite", target: "/mcp/oauth/protected-resource" });
   assert.deepEqual(gatewayDecision("/.well-known/oauth-authorization-server", "GET", true), { action: "rewrite", target: "/mcp/oauth/metadata" });
+  for (const path of ["/mcp/oauth/token", "/mcp/oauth/callback", "/oauth/constructor", "/oauth/__proto__"]) {
+    assert.deepEqual(gatewayDecision(path, "POST", true), { action: "not_found" }, `${path}: only reached through the public paths`);
+  }
   for (const path of ["/", "/api/v1/markets", "/api/assistant", "/markets/us", "/slack/other", "/mcp/../api", "/_next/static/x.js", "/favicon.ico"]) {
     assert.deepEqual(gatewayDecision(path, "GET", true), { action: "not_found" }, path);
   }
 });
 
 test("the dashboard deployment never serves the gateway routes", () => {
-  for (const path of ["/slack/commands", "/mcp", "/mcp/oauth/authorize", "/.well-known/oauth-authorization-server"]) {
+  for (const path of ["/slack/commands", "/mcp", "/mcp/oauth/authorize", "/oauth/token", "/oauth/github/callback", "/.well-known/oauth-authorization-server"]) {
     assert.deepEqual(gatewayDecision(path, "POST", false), { action: "not_found" }, path);
   }
   assert.deepEqual(gatewayDecision("/", "GET", false), { action: "next" });

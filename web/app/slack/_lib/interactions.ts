@@ -1,6 +1,7 @@
 // Slack interactivity: modal submissions (add form -> summary -> Confirm; paper trade) and the Confirm / Cancel
 // buttons of /company deactivate, reactivate and amount. The payload was verified with Slack's signing secret; the
-// actor is the payload's user id. Work that may take longer than Slack's 3 seconds runs after the answer (defer).
+// actor is the payload's user id. Buttons are honoured only in #market-brief; a modal can only have been opened by a
+// command given there. Work that may take longer than Slack's 3 seconds runs after the answer (defer).
 import type { CompanyPreview, ToolArgs, ToolOutcome } from "../../../lib/tools/types.ts";
 import { slackContext } from "../../../lib/tools/identity.ts";
 import type { SlackDeps, SlackReply } from "./commands.ts";
@@ -138,12 +139,6 @@ function blockAction(payload: Payload, deps: SlackDeps, userId: string): SlackRe
 export async function handleInteraction(payload: Payload, deps: SlackDeps): Promise<SlackReply> {
   const userId = payload.user?.id ?? "";
   if (!SLACK_USER.test(userId)) return ok();
-  const team = payload.team?.id ?? payload.user?.team_id ?? null;
-  if (!deps.teamId || team !== deps.teamId) {
-    await deps.tools.record(slackContext(userId), { tool: null, kind: null, market: null, args: {}, result: "refused",
-      code: "unknown_actor", message: "This Slack workspace is not allowed" });
-    return ok();
-  }
   if (payload.type === "view_submission") return viewSubmission(payload, deps, userId);
   if (payload.type === "block_actions") return blockAction(payload, deps, userId);
   return ok();

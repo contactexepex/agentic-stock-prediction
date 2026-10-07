@@ -4,6 +4,7 @@ import { toolLayerFromEnv } from "../../../lib/tools/index.ts";
 import { randomKey } from "../../../lib/tools/crypto.ts";
 import { allowlistedFetch } from "../../../lib/tools/http.ts";
 import { type Env, value } from "../../../lib/tools/env.ts";
+import { SLACK_CHANNEL_ID } from "../../../lib/tools/constants.ts";
 import { SlackWebApi } from "./api.ts";
 import type { SlackDeps, SlackReply } from "./commands.ts";
 import { ephemeral } from "./views.ts";
@@ -19,8 +20,7 @@ export function slackDepsFromEnv(env: Env = process.env): SlackDeps {
         // the command log and the owner report already carry what happened; never echo errors to Slack
       }
     }),
-    teamId: value(env, "SLACK_TEAM_ID"),
-    channelId: value(env, "SLACK_CHANNEL_ID"),
+    channelId: SLACK_CHANNEL_ID,
     newKey: () => randomKey("slk-"),
   };
 }

@@ -6,8 +6,6 @@ import type { AgentUsage, CommandLogRow, InboxRequest, InboxStore, ReadModelRow,
 import { READ_MODEL_TABLES } from "./reads.ts";
 import { INBOX_SQL_STATEMENTS as SQL, READ_MODEL_COLUMNS } from "./sql.ts";
 
-export const DEFAULT_PG_HOST = "pg.eu-central-1-aws.motherduck.com";
-
 export interface PgSettings {
   host: string;
   database: string;

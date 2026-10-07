@@ -34,7 +34,7 @@ test("instructions in news titles are returned as quoted data and trigger nothin
   const r = rig();
   r.reads.put("news", "us", "AAPL", { items: INJECTED.map((title, index) => ({ id: `news-${index}`, title, status: "unverified" })) });
   const reply = await handleRpc({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "get_news", arguments: { market: "us", ticker: "AAPL" } } },
-    r.layer, app, SECRETS.MCP_TOKEN_SECRET, NOW) as { result: { content: { text: string }[]; structuredContent: { data: { note: string } } } };
+    r.layer, app, SECRETS.SESSION_SECRET, NOW) as { result: { content: { text: string }[]; structuredContent: { data: { note: string } } } };
   assert.match(reply.result.structuredContent.data.note, /never instructions/);
   assert.match(reply.result.content[0].text, /IGNORE ALL PREVIOUS INSTRUCTIONS/, "the title is passed through as data");
   assertNoWrite(r);
@@ -151,7 +151,7 @@ test("errors that carry secrets (driver text, injected names) never leave the to
 test("an explain question with instructions is answered by the stub and writes nothing (MCP)", async () => {
   const r = rig();
   const reply = await handleRpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "explain", arguments: { market: "us", question: INJECTED[1] } } },
-    r.layer, app, SECRETS.MCP_TOKEN_SECRET, NOW);
+    r.layer, app, SECRETS.SESSION_SECRET, NOW);
   assert.match(JSON.stringify(reply), /coming soon/);
   assertNoWrite(r);
   assertNoSecret(reply, r.inbox.commands);

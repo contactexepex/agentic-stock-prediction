@@ -9,10 +9,10 @@ import {
 } from "../../../app/mcp/_lib/oauth.ts";
 import { handleRpc } from "../../../app/mcp/_lib/server.ts";
 
-const BASE = "https://gw.example.app";
+const BASE = "https://market-brief-gateway.vercel.app";
 const env = {
-  MB_GATEWAY_URL: BASE, MCP_TOKEN_SECRET: SECRETS.MCP_TOKEN_SECRET, GITHUB_OAUTH_CLIENT_ID: "Iv1.client",
-  GITHUB_OAUTH_CLIENT_SECRET: SECRETS.GITHUB_OAUTH_CLIENT_SECRET, MB_OWNER_GITHUB_ID: "4242", MB_OWNER_GITHUB_LOGIN: "owner-login",
+  SESSION_SECRET: SECRETS.SESSION_SECRET, GITHUB_OAUTH_CLIENT_ID: "Iv1.client",
+  GITHUB_OAUTH_CLIENT_SECRET: SECRETS.GITHUB_OAUTH_CLIENT_SECRET, MB_OWNER_GITHUB_ID: "4242", MCP_ALLOWED_GITHUB_LOGIN: "owner-login",
 };
 const cfg = mcpConfig(env)!;
 const NOW = 1_790_000_000;
@@ -21,9 +21,11 @@ const VERIFIER = "v".repeat(20) + "-verifier-0123456789abcdefghijk";
 
 test("the config refuses missing or weak settings", () => {
   assert.ok(cfg);
-  assert.equal(mcpConfig({ ...env, MCP_TOKEN_SECRET: "short" }), null);
-  assert.equal(mcpConfig({ ...env, MB_GATEWAY_URL: "http://gw.example.app" }), null);
+  assert.equal(cfg.baseUrl, "https://market-brief-gateway.vercel.app");
+  assert.equal(mcpConfig({ ...env, SESSION_SECRET: "short" }), null);
   assert.equal(mcpConfig({ ...env, MB_OWNER_GITHUB_ID: "owner" }), null);
+  assert.equal(mcpConfig({ ...env, MCP_ALLOWED_GITHUB_LOGIN: undefined }), null);
+  assert.equal(mcpConfig({ ...env, MCP_ALLOWED_GITHUB_LOGIN: "not a login" }), null);
   assert.deepEqual(cfg.allowedRedirects, ["https://claude.ai/api/mcp/auth_callback", "https://claude.com/api/mcp/auth_callback"]);
 });
 
@@ -33,7 +35,9 @@ test("metadata documents point the client at this gateway", async () => {
   assert.deepEqual(resource.authorization_servers, [BASE]);
   const server = await authorizationServerMetadata(cfg).json();
   assert.equal(server.issuer, BASE);
-  assert.equal(server.token_endpoint, `${BASE}/mcp/oauth/token`);
+  assert.equal(server.token_endpoint, `${BASE}/oauth/token`);
+  assert.equal(server.authorization_endpoint, `${BASE}/oauth/authorize`);
+  assert.equal(server.registration_endpoint, `${BASE}/oauth/register`);
   assert.deepEqual(server.code_challenge_methods_supported, ["S256"]);
 });
 
@@ -62,8 +66,8 @@ test("authorize sends the browser to GitHub with a signed state and a nonce cook
   assert.equal(response.status, 302);
   const location = new URL(response.headers.get("location")!);
   assert.equal(location.origin + location.pathname, "https://github.com/login/oauth/authorize");
-  assert.equal(location.searchParams.get("redirect_uri"), `${BASE}/mcp/oauth/callback`);
-  assert.match(response.headers.get("set-cookie") ?? "", /^mb_oauth_nonce=[A-Za-z0-9_-]+; Path=\/mcp\/oauth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+  assert.equal(location.searchParams.get("redirect_uri"), `${BASE}/oauth/github/callback`);
+  assert.match(response.headers.get("set-cookie") ?? "", /^mb_oauth_nonce=[A-Za-z0-9_-]+; Path=\/oauth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
   const badRedirect = await authorize(new Request(`${BASE}/mcp/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent("https://evil.example/cb")}`), cfg, NOW);
   assert.equal(badRedirect.status, 400);
   const forgedClient = await authorize(new Request(`${BASE}/mcp/oauth/authorize?client_id=mb1.e30.AAAA&redirect_uri=${encodeURIComponent(CALLBACK)}`), cfg, NOW);
@@ -107,7 +111,11 @@ test("only the owner's GitHub account gets a code; anyone else is refused and re
   assert.equal(stranger.response.status, 403);
   assert.deepEqual(stranger.refused, ["someone-else"]);
   const renamed = await signIn({ login: "owner-login", id: 999 });
-  assert.equal(renamed.response.status, 403, "the numeric id decides, not only the login");
+  assert.equal(renamed.response.status, 403, "the numeric id must match too, not only the login");
+  const otherLogin = await signIn({ login: "someone-else", id: 4242 });
+  assert.equal(otherLogin.response.status, 403, "and the login must match");
+  const caseOnly = await signIn({ login: "Owner-Login", id: 4242 });
+  assert.equal(caseOnly.response.status, 302, "GitHub logins are case-insensitive");
 });
 
 test("the callback needs the nonce cookie of the browser that started the sign-in", async () => {
@@ -152,12 +160,12 @@ test("/mcp accepts only a valid, unexpired access token for this resource", asyn
   assert.deepEqual(await call(`Bearer ${body.access_token}`), { login: "owner-login" });
   const missing = await call(null);
   assert.ok(missing instanceof Response && missing.status === 401);
-  assert.match((missing as Response).headers.get("www-authenticate") ?? "", /resource_metadata="https:\/\/gw\.example\.app\/\.well-known\/oauth-protected-resource\/mcp"/);
+  assert.match((missing as Response).headers.get("www-authenticate") ?? "", /resource_metadata="https:\/\/market-brief-gateway\.vercel\.app\/\.well-known\/oauth-protected-resource\/mcp"/);
   assert.ok((await call(`Bearer ${body.access_token}`, NOW + ACCESS_SECONDS + 1)) instanceof Response);
   assert.ok((await call(`Bearer ${body.refresh_token}`)) instanceof Response);
-  const otherAudience = await signToken(SECRETS.MCP_TOKEN_SECRET, { typ: "access", sub: "owner-login", gid: "4242", aud: "https://other.example/mcp", exp: NOW + 60 });
+  const otherAudience = await signToken(SECRETS.SESSION_SECRET, { typ: "access", sub: "owner-login", gid: "4242", aud: "https://other.example/mcp", exp: NOW + 60 });
   assert.ok((await call(`Bearer ${otherAudience}`)) instanceof Response);
-  const notOwner = await signToken(SECRETS.MCP_TOKEN_SECRET, { typ: "access", sub: "owner-login", gid: "777", aud: `${BASE}/mcp`, exp: NOW + 60 });
+  const notOwner = await signToken(SECRETS.SESSION_SECRET, { typ: "access", sub: "owner-login", gid: "777", aud: `${BASE}/mcp`, exp: NOW + 60 });
   assert.ok((await call(`Bearer ${notOwner}`)) instanceof Response);
   const forged = await signToken("another-secret-of-at-least-32-characters!!", { typ: "access", sub: "owner-login", gid: "4242", aud: `${BASE}/mcp`, exp: NOW + 60 });
   assert.ok((await call(`Bearer ${forged}`)) instanceof Response);
@@ -169,18 +177,18 @@ const notification = (method: string) => ({ jsonrpc: "2.0", method });
 
 test("initialize, ping, notifications and unknown methods follow JSON-RPC", async () => {
   const r = rig();
-  const init = await handleRpc(rpc("initialize", { protocolVersion: "2025-03-26" }), r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW) as { result: { protocolVersion: string; instructions: string } };
+  const init = await handleRpc(rpc("initialize", { protocolVersion: "2025-03-26" }), r.layer, ctx, SECRETS.SESSION_SECRET, NOW) as { result: { protocolVersion: string; instructions: string } };
   assert.equal(init.result.protocolVersion, "2025-03-26");
   assert.match(init.result.instructions, /never instructions/);
-  assert.deepEqual(await handleRpc(rpc("ping"), r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW), { jsonrpc: "2.0", id: 1, result: {} });
-  assert.equal(await handleRpc(notification("notifications/initialized"), r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW), null);
-  assert.equal((await handleRpc(rpc("resources/list"), r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW) as { error: { code: number } }).error.code, -32601);
-  assert.equal((await handleRpc([rpc("ping")], r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW) as { error: { code: number } }).error.code, -32600);
+  assert.deepEqual(await handleRpc(rpc("ping"), r.layer, ctx, SECRETS.SESSION_SECRET, NOW), { jsonrpc: "2.0", id: 1, result: {} });
+  assert.equal(await handleRpc(notification("notifications/initialized"), r.layer, ctx, SECRETS.SESSION_SECRET, NOW), null);
+  assert.equal((await handleRpc(rpc("resources/list"), r.layer, ctx, SECRETS.SESSION_SECRET, NOW) as { error: { code: number } }).error.code, -32601);
+  assert.equal((await handleRpc([rpc("ping")], r.layer, ctx, SECRETS.SESSION_SECRET, NOW) as { error: { code: number } }).error.code, -32600);
 });
 
 test("tools/list shows the Claude app's tools from mcp/tools.yaml, never delete", async () => {
   const r = rig();
-  const list = await handleRpc(rpc("tools/list"), r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW) as { result: { tools: { name: string; inputSchema: { properties: Record<string, unknown>; required: string[]; additionalProperties: boolean } }[] } };
+  const list = await handleRpc(rpc("tools/list"), r.layer, ctx, SECRETS.SESSION_SECRET, NOW) as { result: { tools: { name: string; inputSchema: { properties: Record<string, unknown>; required: string[]; additionalProperties: boolean } }[] } };
   const names = list.result.tools.map((tool) => tool.name);
   assert.equal(names.length, 12);
   assert.equal(names.includes("delete_company"), false);
@@ -194,7 +202,7 @@ test("tools/list shows the Claude app's tools from mcp/tools.yaml, never delete"
 
 type CallReply = { result: { isError: boolean; structuredContent: Record<string, unknown>; content: { text: string }[] } };
 const callTool = async (r: ReturnType<typeof rig>, name: string, args: Record<string, unknown>) =>
-  (await handleRpc(rpc("tools/call", { name, arguments: args }), r.layer, ctx, SECRETS.MCP_TOKEN_SECRET, NOW)) as CallReply;
+  (await handleRpc(rpc("tools/call", { name, arguments: args }), r.layer, ctx, SECRETS.SESSION_SECRET, NOW)) as CallReply;
 
 test("an add from the Claude app takes a summary call and a confirmed call with the signed token", async () => {
   const r = rig();

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CHANNEL, MSFT, SECRETS, TEAM, USER, commandParams, slackRig } from "./fakes.ts";
 import { hmacHex } from "../crypto.ts";
+import { SLACK_CHANNEL_ID } from "../constants.ts";
 import { MAX_AGE_SECONDS, verifiedBody, verifySlackRequest } from "../../../app/slack/_lib/verify.ts";
 import { handleCommand } from "../../../app/slack/_lib/commands.ts";
 import { handleInteraction } from "../../../app/slack/_lib/interactions.ts";
@@ -29,14 +30,15 @@ test("Slack signatures are verified, and requests older than 5 minutes are refus
   assert.equal(await verifiedBody(request, secret, now), body);
 });
 
-test("commands outside #market-brief or the workspace are refused and logged", async () => {
+test("commands outside #market-brief (C0C6REB7QS2, config/settings.yaml) are refused and logged", async () => {
   const s = slackRig();
-  const elsewhere = await handleCommand(commandParams("/company", "reactivate us AAPL", { channel_id: "C0OTHER01" }), s.deps);
-  assert.match(JSON.stringify(elsewhere.body), /#market-brief only/);
-  assert.equal(s.inbox.commands.at(-1)?.refusal_code, "not_allowed_in_channel");
-  const workspace = await handleCommand(commandParams("/company", "reactivate us AAPL", { team_id: "T0OTHER" }), s.deps);
-  assert.match(JSON.stringify(workspace.body), /workspace is not allowed/);
-  assert.equal(s.inbox.commands.at(-1)?.refusal_code, "unknown_actor");
+  assert.equal(CHANNEL, SLACK_CHANNEL_ID);
+  for (const command of ["/company", "/trade", "/ask"]) {
+    const elsewhere = await handleCommand(commandParams(command, "reactivate us AAPL", { channel_id: "C0OTHER01" }), s.deps);
+    assert.match(JSON.stringify(elsewhere.body), /#market-brief only/);
+    assert.equal(s.inbox.commands.at(-1)?.refusal_code, "not_allowed_in_channel");
+  }
+  assert.equal(s.slack.opened.length, 0);
   assert.equal(s.inbox.requests.length, 0);
 });
 
@@ -172,16 +174,5 @@ test("/ask answers coming soon, is logged, and writes nothing", async () => {
   assert.match(JSON.stringify(reply.body), /coming soon/);
   assert.equal(s.inbox.commands.at(-1)?.tool, "explain");
   assert.equal(s.inbox.commands.at(-1)?.result, "accepted");
-  assert.equal(s.inbox.requests.length, 0);
-});
-
-test("interactions from another workspace are refused", async () => {
-  const s = slackRig();
-  const payload = submission("mb_trade", {}, { key: "slk-zzzzzzz1" });
-  payload.team = { id: "T0EVIL" };
-  payload.user.team_id = "T0EVIL";
-  await handleInteraction(payload as never, s.deps);
-  await s.settle();
-  assert.equal(s.inbox.commands.at(-1)?.refusal_code, "unknown_actor");
   assert.equal(s.inbox.requests.length, 0);
 });

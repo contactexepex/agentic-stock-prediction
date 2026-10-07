@@ -1,6 +1,7 @@
 // Slash commands /company, /trade and /ask (docs/SPEC.md F8.7, F10, F11). The request was verified with Slack's
 // signing secret before this runs; identity is the signed request's user id. Any member of #market-brief may give
-// commands (decision 15): commands are accepted only in that channel and workspace. Only Confirm writes.
+// commands (decision 15): commands are accepted only in that channel (its id is unique across workspaces, so it also
+// pins the workspace). Only Confirm writes.
 import type { ToolLayer } from "../../../lib/tools/executor.ts";
 import { COMING_SOON } from "../../../lib/tools/executor.ts";
 import type { CallContext, RefusalCode } from "../../../lib/tools/types.ts";
@@ -12,8 +13,7 @@ export interface SlackDeps {
   tools: ToolLayer;
   slack: SlackApi;
   defer: (task: () => Promise<void>) => void;
-  teamId: string | null;
-  channelId: string | null;
+  channelId: string;
   newKey: () => string;
 }
 
@@ -39,7 +39,7 @@ function amount(token: string | undefined): number | null | string {
   return Number.isFinite(parsed) ? parsed : token;
 }
 
-/** Workspace and channel checks; a refusal is logged (the user id comes from the signed request). */
+/** The channel check; a refusal is logged (the user id comes from the signed request). */
 async function admitted(params: URLSearchParams, deps: SlackDeps, tool: string | null): Promise<CallContext | SlackReply> {
   const userId = params.get("user_id") ?? "";
   if (!SLACK_USER.test(userId)) return ok(ephemeral("This request has no Slack user."));
@@ -48,8 +48,7 @@ async function admitted(params: URLSearchParams, deps: SlackDeps, tool: string |
     await deps.tools.record(ctx, { tool, kind: null, market: null, args: { text: params.get("text") ?? "" }, result: "refused", code, message });
     return ok(ephemeral(message));
   };
-  if (!deps.teamId || params.get("team_id") !== deps.teamId) return refuse("unknown_actor", "This Slack workspace is not allowed.");
-  if (!deps.channelId || params.get("channel_id") !== deps.channelId) {
+  if (params.get("channel_id") !== deps.channelId) {
     return refuse("not_allowed_in_channel", "market-brief commands work in #market-brief only.");
   }
   return ctx;

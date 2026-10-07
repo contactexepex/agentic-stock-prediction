@@ -121,3 +121,9 @@ def test_read_model_statement_runs_on_duckdb():
 def test_agent_files_use_plain_booleans(path):
     text = path.read_text(encoding="utf-8")
     assert not re.search(r":\s*(yes|no|on|off)\s*(#|$)", text, flags=re.M | re.I)
+
+
+def test_fixed_slack_channel_matches_settings():
+    settings = yaml.safe_load((REPO / "config" / "settings.yaml").read_text(encoding="utf-8"))
+    constants = (REPO / "web" / "lib" / "tools" / "constants.ts").read_text(encoding="utf-8")
+    assert f'SLACK_CHANNEL_ID = "{settings["slack_channel_id"]}"' in constants

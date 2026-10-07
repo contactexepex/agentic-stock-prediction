@@ -14,7 +14,7 @@ export const SECRETS = {
   SLACK_SIGNING_SECRET: "slack-signing-SECRET-abcdef",
   SLACK_BOT_TOKEN: "xoxb-1111-2222-SECRETSECRET",
   GITHUB_OAUTH_CLIENT_SECRET: "gh-oauth-client-SECRET-xyz",
-  MCP_TOKEN_SECRET: "mcp-token-secret-at-least-32-characters-long-SECRET",
+  SESSION_SECRET: "session-secret-at-least-32-characters-long-SECRET",
 };
 export const SECRET_VALUES = Object.values(SECRETS);
 
@@ -127,7 +127,7 @@ export function rig(settings: Partial<ToolSettings> = {}): Rig {
   const now = { value: new Date("2026-10-07T10:00:00Z") };
   const layer = new ToolLayer({
     readStore: reads, inbox, dispatcher, notifier, resolver, clock: () => now.value,
-    settings: { gatewayMode: true, killSwitch: [], secrets: SECRET_VALUES, ...settings },
+    settings: { gatewayMode: true, secrets: SECRET_VALUES, ...settings },
   });
   return { layer, inbox, reads, dispatcher, notifier, resolver, now };
 }
@@ -160,7 +160,7 @@ export function slackRig(settings: Partial<ToolSettings> = {}) {
   const deferred: Promise<void>[] = [];
   let counter = 0;
   const deps: SlackDeps = {
-    tools: base.layer, slack, teamId: TEAM, channelId: CHANNEL,
+    tools: base.layer, slack, channelId: CHANNEL,
     defer: (task) => { deferred.push(task()); },
     newKey: () => `slk-testkey${String(++counter).padStart(4, "0")}`,
   };

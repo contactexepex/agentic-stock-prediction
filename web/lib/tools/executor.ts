@@ -1,6 +1,6 @@
 // The policy enforcement point of every channel (ARCHITECTURE.md section 10; docs/SPEC.md F10). Order of checks:
-// identity -> tool exists -> channel permission -> kill switch -> arguments -> command-log usage (inbox controls and
-// the per-agent day budget) -> confirmation -> idempotency -> inbox append -> workflow dispatch. Every call is logged
+// identity -> tool exists -> channel permission -> kill switch (agent file, then the inbox controls table) ->
+// arguments -> per-agent day budget -> confirmation -> idempotency -> inbox append -> workflow dispatch. Every call is logged
 // in the inbox command log; refusals and failures are reported to the owner in Slack; nothing is retried here.
 import type {
   AgentDefinition,
@@ -112,12 +112,7 @@ export class ToolLayer {
     if (!allowedInChannel(tool, ctx.channel) || !agent.tools.includes(tool.name)) {
       return stop("not_allowed_in_channel", `${tool.name} is not available in ${ctx.channel}`);
     }
-    const switched = this.deps.settings.killSwitch;
-    if (!agent.enabled || switched.includes("*") || switched.includes(agent.agent)) {
-      return stop("kill_switch", `The ${agent.agent} agent is switched off`);
-    }
-    const validation = validateArguments(tool, raw, now.toISOString().slice(0, 10));
-    if (!validation.ok) return stop("validation_failed", validation.message);
+    if (!agent.enabled) return stop("kill_switch", `The ${agent.agent} agent is switched off`);
     let usage: AgentUsage;
     try {
       usage = await this.deps.inbox.usage(agent.agent, utcDayStart(now));
@@ -125,6 +120,8 @@ export class ToolLayer {
       return stop(null, "The command log is unavailable, so nothing was done", null, "failed");
     }
     if (usage.enabled === false) return stop("kill_switch", `The ${agent.agent} agent is switched off`, usage);
+    const validation = validateArguments(tool, raw, now.toISOString().slice(0, 10));
+    if (!validation.ok) return stop("validation_failed", validation.message, usage);
     if (tool.kind === "write" ? usage.writes >= agent.daily_write_budget : usage.reads >= agent.daily_read_budget) {
       return stop("budget_exceeded", `The ${agent.agent} agent has used today's ${tool.kind === "write" ? "write" : "read"} budget`, usage);
     }

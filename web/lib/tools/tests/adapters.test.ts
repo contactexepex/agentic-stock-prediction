@@ -41,17 +41,18 @@ test("the dispatch posts workflow_dispatch of onboard.yml on main with the token
   assert.deepEqual(await refused.dispatch(), { ok: false, reason: "GitHub answered 422" });
 });
 
-test("the owner report is a DM, escaped so user text cannot ping or link", async () => {
+test("the owner report is posted to #market-brief, escaped so user text cannot ping or link", async () => {
   const { calls, fetcher } = recorder(() => Response.json({ ok: true }));
-  const notifier = new SlackOwnerNotifier("xoxb-test", "U0OWNER01", fetcher);
+  const notifier = new SlackOwnerNotifier("xoxb-test", "C0C6REB7QS2", fetcher);
   const report = { command_id: "cmd-1", tool: "add_company", channel: "slack" as const, actor: "slack:U07ABCD123",
     result: "refused" as const, refusal_code: "validation_failed" as const, message: "<!channel> see <https://evil.example|here>" };
   assert.equal(await notifier.notify(report), true);
   const body = JSON.parse(String(calls[0].init?.body));
-  assert.equal(body.channel, "U0OWNER01");
+  assert.equal(body.channel, "C0C6REB7QS2");
+  assert.match(body.text, /for the owner/);
   assert.doesNotMatch(body.text, /<!channel>|<https/);
   assert.match(ownerReportText(report), /&lt;!channel&gt;/);
-  assert.equal(await new SlackOwnerNotifier(null, "U0OWNER01", fetcher).notify(report), false);
+  assert.equal(await new SlackOwnerNotifier(null, "C0C6REB7QS2", fetcher).notify(report), false);
 });
 
 const yahoo = (quotes: unknown[]) => Response.json({ quotes });
