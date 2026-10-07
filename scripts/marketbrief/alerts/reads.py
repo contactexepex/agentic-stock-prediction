@@ -89,6 +89,22 @@ def settled_today(con, session_date: str, timezone: str, now: datetime) -> list[
         ORDER BY trade_id""", [timezone, session_date, now])
 
 
+def corrections(con, session_date: str, timezone: str, after: str, now: datetime) -> list[dict]:
+    """Settlement rows that supersede another row (a re-settlement, F1.5) of a trade first settled on the session's
+    local date, written after `after` (the close post) and by `now`; each with the superseded row's net_pnl and
+    return_pct as was_net_pnl and was_return_pct."""
+    return records(con, KIND_PAPER_TRADES_SETTLED, f"""
+        WITH first AS (SELECT trade_id, min(settled_at) AS first_at FROM {KIND_PAPER_TRADES_SETTLED}
+                       GROUP BY trade_id)
+        SELECT r.*, o.net_pnl AS was_net_pnl, o.return_pct AS was_return_pct
+        FROM {KIND_PAPER_TRADES_SETTLED} r
+        JOIN {KIND_PAPER_TRADES_SETTLED} o ON o.id = r.supersedes
+        JOIN first f ON f.trade_id = r.trade_id
+        WHERE CAST(timezone(?, f.first_at) AS DATE) = ?::DATE
+          AND r.settled_at > ?::TIMESTAMPTZ AND r.settled_at <= ?::TIMESTAMPTZ
+        ORDER BY r.settled_at, r.id""", [timezone, session_date, after, now])
+
+
 def eod_analysis(con, session_date: str, now: datetime) -> dict | None:
     """The session's end-of-day analysis written by `now` (the newest)."""
     rows = records(con, KIND_EOD_ANALYSES, f"""

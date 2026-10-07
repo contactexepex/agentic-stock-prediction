@@ -15,6 +15,7 @@ from marketbrief.alerts.constants import (
     ENV_SLACK_BOT_TOKEN,
     KIND_SLACK_POSTS,
     METHOD_VERSION,
+    POST_BRIEF,
     MSG_NO_CHANNEL,
     MSG_NO_TOKEN,
     SETTING_CHANNEL_ID,
@@ -99,3 +100,12 @@ def publisher(market: str, *, dry_run: bool, http=None, channel: str | None = No
     if not channel:
         raise NotConfiguredError(MSG_NO_CHANNEL)
     return Publisher(market, SlackClient(token, http), Ledger(paths.data_dir(market) / KIND_SLACK_POSTS), channel)
+
+
+def post_brief(market: str, session_date: str, text: str, *, dry_run: bool = False, http=None) -> dict:
+    """notify_slack.py's daily brief in the day's thread (one thread per market per day, owner 2026-10-07): a reply
+    to the thread the morning picks started, or the thread's first message when it is the day's first post (later
+    posts then reply to it). Posted once per market and day; the summary's thread_ts is where notify_slack.py
+    uploads its charts, report and dashboard."""
+    msg = Message(POST_BRIEF, f"{POST_BRIEF}:{market}:{session_date}", text, f"{market}:{session_date}")
+    return publisher(market, dry_run=dry_run, http=http).publish(msg)

@@ -3,6 +3,7 @@
   alerts.py --market india morning   [--date D]                 morning paper picks (starts the day's thread)
   alerts.py --market india intraday  [--date D] [--check-id ID] [--feed FILE]   alerts of one check run
   alerts.py --market india close     [--date D]                 close results (into the day's thread)
+  alerts.py --market india corrections [--days 30]              a reply per trade re-settled after its close post
   alerts.py --market us weekly       [--week 2026-W41]          the weekly research report (its own post)
   alerts.py --market us onboarding   --command-id ID --channel C --thread-ts TS   reply to a command
 
@@ -22,12 +23,15 @@ import yaml
 from marketbrief.alerts import reads
 from marketbrief.alerts.close import build_close
 from marketbrief.alerts.constants import (
+    CORRECTION_DAYS,
     MSG_NOTHING,
     POST_ALERTS,
     POST_CLOSE,
+    POST_CORRECTION,
     POST_MORNING,
     POST_WEEKLY,
 )
+from marketbrief.alerts.corrections import close_posts, correction_key, correction_text, session_of
 from marketbrief.alerts.intraday import build_alerts
 from marketbrief.alerts.morning import build_morning
 from marketbrief.alerts.onboarding import post_onboarding_confirmation
@@ -54,6 +58,8 @@ def parser():
         if name == "intraday":
             p.add_argument("--check-id", help="the check run (default: the newest by the clock)")
             p.add_argument("--feed", help="a JSONL file of alert records (B9's feed) instead of trade_checks")
+    sub.add_parser("corrections").add_argument("--days", type=int, default=CORRECTION_DAYS,
+                                               help="check the close posts of this many past days")
     sub.add_parser("weekly").add_argument("--week", help="ISO week, e.g. 2026-W41 (default: the newest)")
     p = sub.add_parser("onboarding")
     p.add_argument("--command-id", required=True)
@@ -114,6 +120,20 @@ def build(args, cfg: dict) -> Message | None:
     return Message(POST_ALERTS, f"{POST_ALERTS}:{market}:{run}", text, thread)
 
 
+def post_corrections(cfg: dict, args, http=None) -> dict:
+    """One reply per trade re-settled after its day's close post, into that day's thread."""
+    market, now = cfg["market"], clock()
+    pub = publisher(market, dry_run=args.dry_run, http=http)
+    con, names, results = connect(market), display_names(cfg), []
+    for post in close_posts(pub.ledger, now, args.days):
+        day = session_of(post)
+        for row in reads.corrections(con, day, cfg["timezone"], post["posted_at"], now):
+            text = correction_text(row, names, cfg.get("currency"))
+            results.append(pub.publish(Message(POST_CORRECTION, correction_key(market, row), text, f"{market}:{day}")))
+    out = {"mode": pub.client.mode, "posts": results, "posted": [p for r in results for p in r["posted"]]}
+    return out if results else {**out, "reason": MSG_NOTHING}
+
+
 def main(argv: list[str] | None = None, http=None) -> int:
     """Build and post one notification; prints a JSON summary (never the token)."""
     args = parser().parse_args(argv)
@@ -126,6 +146,8 @@ def main(argv: list[str] | None = None, http=None) -> int:
                 print(json.dumps({**out, "error": f"command {args.command_id} not found"}))
                 return 1
             res = post_onboarding_confirmation(cmd, args.channel, args.thread_ts, dry_run=args.dry_run, http=http)
+        elif args.post == "corrections":
+            res = post_corrections(cfg, args, http)
         else:
             msg = build(args, cfg)
             if msg is None:
