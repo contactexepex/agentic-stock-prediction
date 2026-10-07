@@ -61,9 +61,7 @@ REDACTED = "***"
 # The MotherDuck extension, installed over HTTPS only (marketbrief/warehouse/extension.py)
 EXTENSION_HOSTS = ("extensions.duckdb.org", "ext.motherduck.com")
 LOADER_URL = "https://extensions.duckdb.org/{duckdb_version}/{platform}/motherduck.duckdb_extension.gz"
-IMPLEMENTATION_URL = (
-    "https://ext.motherduck.com/{duckdb_version}/{platform}/motherduck_impl.{implementation_version}.duckdb_extension.gz"
-)
+IMPLEMENTATION_URL = "https://ext.motherduck.com/{duckdb_version}/{platform}/motherduck_impl.{implementation_version}.duckdb_extension.gz"
 IMPLEMENTATION_FILE = "motherduck_impl.{implementation_version}.duckdb_extension"
 LOADER_FILE = "motherduck.duckdb_extension"
 ENV_IMPLEMENTATION_VERSION = "MOTHERDUCK_EXT_VERSION"  # read by the loader: use this implementation, fetch nothing

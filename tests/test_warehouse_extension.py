@@ -11,6 +11,7 @@ import gzip
 import re
 import sys
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 import duckdb
@@ -123,7 +124,8 @@ def test_download_failures_are_clear_errors(monkeypatch):
 
 
 def test_missing_files_are_downloaded_installed_and_pinned(tmp_path, monkeypatch):
-    monkeypatch.delenv("MOTHERDUCK_EXT_VERSION", raising=False)
+    monkeypatch.setenv("MOTHERDUCK_EXT_VERSION", "unset-by-the-test")  # restored after the test
+    monkeypatch.delenv("MOTHERDUCK_EXT_VERSION")
     con, downloader = FakeConnection(tmp_path), FakeDownloader()
     extension.load_motherduck(con, WAREHOUSE_CFG, downloader)
     loader_url, implementation_url = PIN.urls(PLATFORM)
@@ -137,7 +139,8 @@ def test_missing_files_are_downloaded_installed_and_pinned(tmp_path, monkeypatch
 
 
 def test_files_already_present_are_not_downloaded_again(tmp_path, monkeypatch):
-    monkeypatch.delenv("MOTHERDUCK_EXT_VERSION", raising=False)
+    monkeypatch.setenv("MOTHERDUCK_EXT_VERSION", "unset-by-the-test")  # restored after the test
+    monkeypatch.delenv("MOTHERDUCK_EXT_VERSION")
     folder(tmp_path).mkdir(parents=True)
     (folder(tmp_path) / "motherduck.duckdb_extension").write_bytes(b"loader")
     (folder(tmp_path) / f"motherduck_impl.{PIN.implementation_version}.duckdb_extension").write_bytes(b"impl")
@@ -153,3 +156,26 @@ def test_default_extension_directory_when_the_setting_is_empty():
     assert extension.extension_folder(con, PIN, PLATFORM) == (
         Path.home() / ".duckdb" / "extensions" / PIN.duckdb_version / PLATFORM
     )
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["http://extensions.duckdb.org/v1.5.6/x.gz", "https://example.com/x.gz"],
+)
+def test_redirects_to_other_urls_are_refused(target):
+    request = urllib.request.Request(PIN.urls(PLATFORM)[0])
+    with pytest.raises(WarehouseError, match="refused extension URL"):
+        extension.AllowedRedirects().redirect_request(request, None, 302, "Found", {}, target)
+
+
+def test_a_redirect_to_an_allowed_url_is_followed():
+    request = urllib.request.Request(PIN.urls(PLATFORM)[0])
+    implementation_url = PIN.urls(PLATFORM)[1]
+    redirected = extension.AllowedRedirects().redirect_request(request, None, 302, "Found", {}, implementation_url)
+    assert redirected.full_url == implementation_url
+
+
+def test_a_failed_decompression_leaves_no_partial_file(tmp_path):
+    with pytest.raises(gzip.BadGzipFile):
+        extension.write_gunzipped(b"not gzip", tmp_path / "motherduck.duckdb_extension")
+    assert list(tmp_path.iterdir()) == []

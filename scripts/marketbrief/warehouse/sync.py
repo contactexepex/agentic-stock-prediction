@@ -72,7 +72,7 @@ class Staged:
 
 
 class PhaseTimer:
-    """Seconds spent in each named phase of a run (`<phase>_s`, rounded to 0.01 s)."""
+    """Seconds spent in each named phase of a run that completed (`<phase>_s`, rounded to 0.01 s)."""
 
     def __init__(self):
         """No phase timed yet."""
@@ -80,12 +80,10 @@ class PhaseTimer:
 
     @contextmanager
     def phase(self, name: str):
-        """Time the block as phase `name`, also when it raises."""
+        """Time the block as phase `name`; a block that raises is not recorded."""
         started = time.monotonic()
-        try:
-            yield
-        finally:
-            self.seconds[f"{name}_s"] = round(time.monotonic() - started, 2)
+        yield
+        self.seconds[f"{name}_s"] = round(time.monotonic() - started, 2)
 
 
 def write_market(warehouse, market: str, staged: Staged, full: bool) -> dict:
@@ -113,14 +111,16 @@ def write_market(warehouse, market: str, staged: Staged, full: bool) -> dict:
 class SyncRun:
     """One writing sync of a market: stage it locally, connect, check the monthly ceiling, write, record."""
 
-    def __init__(self, cfg: dict, warehouse_cfg: dict, mode: str, kind: str, target: Target, cutoff_time: datetime):
-        """A run that has not started: its sync_runs row, no connection, nothing counted."""
+    def __init__(self, cfg: dict, warehouse_cfg: dict, mode: str, kind: str, target: Target, clocks: tuple):
+        """A run that has not started: its sync_runs row, no connection, nothing counted. `clocks` is
+        (cutoff_time, started_at): the data's cut-off and the wall time the sync started, before any work."""
+        cutoff_time, started_at = clocks
         self.cfg, self.market, self.kind, self.target = cfg, cfg["market"], kind, target
         self.full = mode == MODE_FULL
         self.ceiling = warehouse_cfg.get("monthly_hours_ceiling")
         self.cutoff_time = cutoff_time
         self.commit = source_commit()
-        self.row = new_run_row(self.market, mode, wall_now(), cutoff_time.isoformat(), target.label())
+        self.row = new_run_row(self.market, mode, started_at, cutoff_time.isoformat(), target.label())
         self.timer = PhaseTimer()
         self.warehouse = None
         self.facts: dict = {}
@@ -184,12 +184,18 @@ class SyncRun:
         return build
 
     def summary_fields(self, build: dict) -> dict:
-        """The run's part of the step summary; a ceiling skip counts as ok."""
+        """The run's part of the step summary, in the order the steps happen; a ceiling skip counts as ok."""
         fields = {key: self.row[key] for key in ("run_id", "ok", "error", "rows", "read_models")}
-        fields.update(tables=self.row["table_rows"], **self.facts, **self.timer.seconds, **self.page_counts)
+        fields.update(tables=self.row["table_rows"], **self.facts)
+        fields.update({key: self.timer.seconds[key] for key in ("stage_s", "connect_s") if key in self.timer.seconds})
+        if self.skipped:
+            fields["skipped"] = self.skipped
+        fields.update(self.page_counts)
+        if "write_s" in self.timer.seconds:
+            fields["write_s"] = self.timer.seconds["write_s"]
         fields["build_ok"] = build["ok"]
         if self.skipped:
-            fields.update(ok=True, skipped=self.skipped)
+            fields["ok"] = True
         return fields
 
 
@@ -212,7 +218,7 @@ def sync_market(
     mode = MODE_DRY_RUN if dry_run_only else (MODE_FULL if full else MODE_REPLACE)
     kind = KIND_FULL if full else kind
     target = select_target(warehouse_cfg, force_local=force_local, require_token=not dry_run_only)
-    cutoff_time, run_started = clock(), time.monotonic()
+    cutoff_time, started_at, run_started = clock(), wall_now(), time.monotonic()
     summary = {"step": WAREHOUSE_STEP, "market": market, "mode": mode, "kind": kind, "target": target.label()}
     summary["cutoff"] = cutoff_time.isoformat()
     if not warehouse_cfg.get("enabled", True) and not dry_run_only:
@@ -223,7 +229,7 @@ def sync_market(
         commit = source_commit()
         planned = dry_run(cfg, con, cutoff_time, commit)
         return {**summary, "source_commit": commit, **planned, "elapsed_s": round(time.monotonic() - run_started, 2)}
-    sync_run = SyncRun(cfg, warehouse_cfg, mode, kind, target, cutoff_time)
+    sync_run = SyncRun(cfg, warehouse_cfg, mode, kind, target, (cutoff_time, started_at))
     sync_run.run(con)
     build = sync_run.record()
     summary.update(source_commit=sync_run.commit, **sync_run.summary_fields(build))

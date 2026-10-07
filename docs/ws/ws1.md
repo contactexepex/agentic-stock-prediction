@@ -324,7 +324,21 @@ This container also allows direct plain HTTP, so it never failed here.
 - Short names are replaced by descriptive ones (`warehouse`, `warehouse_cfg`, ...).
 - A failed ROLLBACK no longer hides the original error (tested).
 
-**No output change.**
+**Judge round 1 of this follow-up (FAIL) and its fix.** The first version took the run's start time after
+the ~3 s local `database.connect`, not before it as main does. That shifted `started_at`, the run id and
+`built_at`, and shortened the run time recorded in `meta.sync_runs`, which the kill switch adds up. The
+summary file also changed: `write_s` came before the page counts, and a failed run listed phases that had
+not completed. Fixed: `sync_market` takes the start time before the connect and passes it into `SyncRun`,
+`PhaseTimer` records only completed phases, and the summary keeps main's key order. The same `us` local
+sync, with main's code (7dbac3b) and with this code, plus a forced write failure:
+```
+success summary keys identical (order): True
+failure summary keys identical (order): True
+recorded run time  base: 4.39 new: 4.64
+sync_market wall   base: 4.62 new: 4.87
+```
+
+**No output change in the stored tables.**
 - Both markets synced locally with `--full` and `MB_NOW=2026-10-07T05:00:00+00:00`, once with main's code
   (7dbac3b) and once with this code. Every table was compared, `built_at` (wall clock) excluded:
   ```
@@ -403,6 +417,13 @@ could hide the original error were fixed in the follow-up below.
 - CLI flag naming: contract 4.4 calls the rebuild `--rebuild-rm`; WS1's `--full` covers it.
 - `tests/test_warehouse_sync.py`: the look-ahead test covers features, news, reviews and bars, not ranges,
   predictions or lessons.
+- `extension.py`: an implementation file already in the extension folder that fails its signature check is
+  not downloaded again; it has to be deleted by hand (DuckDB refuses to load it, so this is safe).
+- `extension.py`: `MOTHERDUCK_EXT_VERSION` is set in the process environment, because that is where the
+  loader reads it; the variable stays set for the rest of the process.
+- Fixed in the follow-up's round 2: a redirect is followed only to HTTPS on the two official hosts; a
+  failed decompression leaves no partial file; `cli.py` and `postgres.py` import from `errors.py`; the
+  test environment no longer leaks `MOTHERDUCK_EXT_VERSION`; the `SLOW` comment in conftest.
 - A changed page (delete and re-insert of the same key in one transaction) is not exercised live on
   MotherDuck; locally it is covered by the `--full` and invalid-page paths.
 

@@ -17,6 +17,7 @@ import os
 import tempfile
 import urllib.error
 import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -57,25 +58,38 @@ class ExtensionPin:
         return loader, implementation
 
 
+def allowed_url(url: str) -> str:
+    """The URL when it is HTTPS on one of the two official hosts; any other URL is refused."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" or parts.hostname not in EXTENSION_HOSTS:
+        raise WarehouseError(MSG_EXTENSION_URL_REFUSED.format(url=url))
+    return url
+
+
+class AllowedRedirects(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to an allowed URL (HTTPS on the two official hosts)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        """The redirected request, after checking its URL."""
+        return super().redirect_request(req, fp, code, msg, headers, allowed_url(newurl))
+
+
 class ExtensionDownloader(HttpClient):
-    """Fetches the extension files: HTTPS on the two official hosts only, a generic User-Agent."""
+    """Fetches the extension files: HTTPS on the two official hosts only (redirects included), a generic
+    User-Agent."""
 
     def __init__(self):
         """One retry on a network error; no retry on an HTTP error."""
-        super().__init__(
-            HttpPolicy(
-                timeout=EXTENSION_TIMEOUT_SECONDS,
-                attempts=EXTENSION_ATTEMPTS,
-                network_errors=(urllib.error.URLError, TimeoutError),
-            )
+        policy = HttpPolicy(
+            timeout=EXTENSION_TIMEOUT_SECONDS,
+            attempts=EXTENSION_ATTEMPTS,
+            network_errors=(urllib.error.URLError, TimeoutError),
         )
+        super().__init__(policy, opener=urllib.request.build_opener(AllowedRedirects))
 
     def download(self, url: str) -> bytes:
         """The response body of an allowed URL; any other URL is refused before a request is made."""
-        parts = urllib.parse.urlsplit(url)
-        if parts.scheme != "https" or parts.hostname not in EXTENSION_HOSTS:
-            raise WarehouseError(MSG_EXTENSION_URL_REFUSED.format(url=url))
-        return self.send(url, headers={"User-Agent": EXTENSION_USER_AGENT})
+        return self.send(allowed_url(url), headers={"User-Agent": EXTENSION_USER_AGENT})
 
     def on_http_error(self, url: str, exc: urllib.error.HTTPError):
         """An HTTP error status ends the install with the URL and the status."""
@@ -113,9 +127,13 @@ def write_gunzipped(compressed: bytes, target: Path) -> None:
     """Decompress into `target` atomically: a temporary file in the same folder, then a rename."""
     target.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(dir=target.parent, prefix=f"{target.name}.part-")
-    with os.fdopen(handle, "wb") as extension_file:
-        extension_file.write(gzip.decompress(compressed))
-    os.replace(temporary, target)
+    try:
+        with os.fdopen(handle, "wb") as extension_file:
+            extension_file.write(gzip.decompress(compressed))
+        os.replace(temporary, target)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
 
 
 def install_loader(con: duckdb.DuckDBPyConnection, url: str, downloader: ExtensionDownloader) -> None:
