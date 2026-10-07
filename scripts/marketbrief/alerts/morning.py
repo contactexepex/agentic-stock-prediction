@@ -6,12 +6,14 @@ from __future__ import annotations
 
 import statistics
 
+from marketbrief.alerts import costs
 from marketbrief.alerts import text as fmt
 from marketbrief.alerts.constants import (
     FAMILY_LABELS,
     LABEL_PAPER_ONLY,
     MSG_FOOTER,
     MSG_NO_HEAD_TO_HEAD,
+    MSG_NONE_VIABLE,
     MSG_NO_PICKS,
     MSG_NO_PREDICTIONS,
     MSG_NO_STRONG,
@@ -43,7 +45,7 @@ def agreement(preds: list[dict], horizon_days: int) -> list[dict]:
             "avg_prob_up": round(statistics.mean(probs), 4) if probs else None,
             "avg_target": round(statistics.mean(targets), 2) if targets else None,
             "base_close": mine[0].get("base_close"), "amount": mine[0].get("amount"),
-            "currency": mine[0].get("currency"),
+            "currency": mine[0].get("currency"), costs.YOUR_COST_PCT: costs.first_cost(mine),
         })
     rows.sort(key=lambda r: (-r["buy"], -(r["avg_prob_up"] or 0), r["ticker"]))
     for rank, row in enumerate(rows, 1):
@@ -91,7 +93,7 @@ def head_to_head_lines(pick_rows: list[dict], preds_by_id: dict, names: dict) ->
             f"   • {side}:"
             f" {fmt.who(p['strategy_id'], names)} at {fmt.horizon(p['horizon_days'])},"
             f" P(up) {fmt.prob(p.get('prob_up'))}{target}, expected gain {fmt.pct(p.get('expected_gain_pct'))},"
-            f" {fmt.money(cur, p.get('amount'))} {PAPER}")
+            f" {fmt.money(cur, p.get('amount'))}{costs.head_to_head_cost_text(p)} {PAPER}")
     return lines
 
 
@@ -106,7 +108,8 @@ def pick_lines(row: dict, other: dict | None, company: str) -> list[str]:
     return [
         f"{row['rank']}. *{company} ({row['ticker']})* {PAPER} — {row['buy']} of {row['of']} strategies buy at"
         f" N+1 ({family_split(row)}); average P(up) {fmt.prob(row['avg_prob_up'])}; {target}"
-        f" (last close {fmt.money(cur, row['base_close'])}); {fmt.money(cur, row['amount'])} per trade.",
+        f" (last close {fmt.money(cur, row['base_close'])}); {fmt.money(cur, row['amount'])} per trade."
+        f"{costs.pick_cost_text(row)}",
         f"   Strongest other horizon: {other_text}.",
     ]
 
@@ -123,6 +126,9 @@ def build_morning(market: str, session_date: str, preds: list[dict], h2h: list[d
         lines.append(MSG_NO_PREDICTIONS)
     elif not top:
         lines.append(MSG_NO_PICKS)
+    verdicts = [costs.pick_viable(row) for row in top]
+    if verdicts and None not in verdicts and not any(verdicts):
+        lines.append(MSG_NONE_VIABLE)
     preds_by_id = {p["id"]: p for p in preds}
     for row in top:
         other = strongest_other(preds, row["ticker"], horizons)
