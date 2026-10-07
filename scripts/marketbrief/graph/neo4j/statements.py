@@ -37,8 +37,9 @@ NEWS_SQL = """
 SELECT n.*, e.analyzed_at, e.relevance, e.sentiment, e.novelty, e.materiality, e.event_type, e.urgency,
        e.geopolitical, e.priced_in, e.summary, e.prompt_version,
        CAST(coalesce(n.published_at, n.first_seen_at) AS DATE) AS day,
-       greatest(n.first_seen_at, e.analyzed_at) AS _ts
-FROM (SELECT DISTINCT ON (id) * FROM news ORDER BY id, first_seen_at) n LEFT JOIN enriched_latest e USING (id)"""
+       greatest(n.first_seen_at, e.analyzed_at, t.seen_at) AS _ts
+FROM (SELECT DISTINCT ON (id) * FROM news ORDER BY id, first_seen_at) n LEFT JOIN enriched_latest e USING (id)
+LEFT JOIN news_title_asof(now()) t USING (id)"""
 
 NEWS_STATEMENT = (
     """UNWIND $rows AS row

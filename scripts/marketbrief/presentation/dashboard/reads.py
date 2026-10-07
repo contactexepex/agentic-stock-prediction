@@ -39,7 +39,7 @@ VERSIONS_SQL = """SELECT DISTINCT ON (id) * FROM model_versions WHERE fitted_at 
                   ORDER BY id, fitted_at DESC, CAST(model AS VARCHAR), platt_rows"""
 REASONING_SQL = """SELECT DISTINCT ON (ticker) * FROM agent_reasoning
                    WHERE as_of_date = ? AND written_at <= ?::TIMESTAMPTZ ORDER BY ticker, written_at DESC, id"""
-NEWS_SQL = """WITH n AS (SELECT DISTINCT ON (id) * FROM news WHERE first_seen_at <= ?::TIMESTAMPTZ
+NEWS_SQL = """WITH n AS (SELECT DISTINCT ON (id) * FROM news_asof(?::TIMESTAMPTZ)
                          ORDER BY id, first_seen_at),
               t AS (SELECT id, title, url, source, coalesce(published_at, first_seen_at) AS ts,
                            unnest(tickers) AS ticker FROM n)
@@ -47,7 +47,7 @@ NEWS_SQL = """WITH n AS (SELECT DISTINCT ON (id) * FROM news WHERE first_seen_at
                              FROM t WHERE ts <= ?::TIMESTAMPTZ)
               WHERE k <= ? ORDER BY ticker, ts DESC, id"""
 NEWS_BY_ID_SQL = """SELECT DISTINCT ON (id) id, title, url, source, coalesce(published_at, first_seen_at) AS ts
-                    FROM news WHERE first_seen_at <= ?::TIMESTAMPTZ ORDER BY id, first_seen_at"""
+                    FROM news_lookup_asof(?::TIMESTAMPTZ) ORDER BY id, first_seen_at"""
 # the company_events view (latest known date per ticker and type, "_history" sources left out) built from the
 # event rows first seen by the cut-off; the next earnings date is that date when it is after the as-of date
 EARNINGS_SQL = """
@@ -123,7 +123,8 @@ def news(con, cutoff: str, per_ticker: int) -> pd.DataFrame:
 
 
 def news_by_id(con, cutoff: str) -> pd.DataFrame:
-    """Every headline stored by the cut-off (for the ids the agents cite)."""
+    """Every item stored by the cut-off with its headline then, under each of its ids (for the ids the agents
+    cite; a stored duplicate's id gives its item)."""
     return frame(con, NEWS_BY_ID_SQL, [cutoff])
 
 

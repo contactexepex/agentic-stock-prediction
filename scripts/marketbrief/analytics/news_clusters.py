@@ -17,8 +17,9 @@ view, acceptance times corrected by sec_times), NSE announcements disseminated b
 4. Origins: an agency copy (byline, JSON-LD provider, dateline, "By Reuters" title, "Reuters
    reported"-style attribution in the lede, a wire's own domain or label) is that agency's origin;
    else the JSON-LD provider (vendor content on Yahoo/AOL); else the outlet. The outlet is its
-   domain; a row without one (older Google News rows) is mapped from its source label
-   (news_sources.outlet_of). Items of one outlet share an origin; items of different outlets whose
+   domain, keyed by news_dedup.OutletKeys (host prefixes, allowlisted domain and its `same_as`: one outlet
+   under two hosts is one origin); a row without one (older Google News rows) is mapped from its source
+   label (news_sources.outlet_of). Items of one outlet share an origin; items of different outlets whose
    texts are copies (6-shingle MinHash containment >= `copy_containment`) share an origin.
    An item is VETTED only by an allowlisted outlet (any tier, also `fetch: false`) or by being the
    agency itself (its source label); an agency named in an unvetted item's title joins that

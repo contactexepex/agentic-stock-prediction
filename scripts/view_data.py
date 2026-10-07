@@ -150,8 +150,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         if _has_rows(con, "predictions") else pd.DataFrame()
     news = q("""SELECT n.id, n.title, n.url, n.source, coalesce(n.published_at, n.first_seen_at) AS ts, n.tickers,
                        e.materiality, e.relevance, e.summary
-                FROM (SELECT DISTINCT ON (id) * FROM news ORDER BY id, first_seen_at) n
-                LEFT JOIN enriched_latest e USING (id) ORDER BY id""")
+                FROM (SELECT DISTINCT ON (id) * FROM news_asof(coalesce($at, now())) ORDER BY id, first_seen_at) n
+                LEFT JOIN news_enriched_asof(coalesce($at, now())) e USING (id) ORDER BY id""", {"at": now})
     filings = q("SELECT DISTINCT ON (id) id, ticker, form, url, accepted_at, description FROM filings "
                 "ORDER BY id, first_seen_at, ticker, form, url, accepted_at, description") \
         if _has_rows(con, "filings") else pd.DataFrame()

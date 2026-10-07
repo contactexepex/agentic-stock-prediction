@@ -7,7 +7,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from marketbrief.constants.kinds import KIND_NEWS_RUNS
+from marketbrief.constants.kinds import KIND_NEWS, KIND_NEWS_RUNS, NEWS_STORED_VIEW
 from marketbrief.constants.prices import HELD_ESCALATE_SESSIONS, SUMMARY_HELD_TOO_LONG
 from marketbrief.constants.validation import (
     FETCH_COL,
@@ -77,6 +77,11 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
     return counts
 
 
+def stored_table(kind: str) -> str:
+    """The view of a kind's stored rows: `news_stored` for news (the `news` view leaves stored duplicates out)."""
+    return NEWS_STORED_VIEW if kind == KIND_NEWS else kind
+
+
 def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict, only_kinds=None):
     """No duplicated ids (or unique keys) in the stored kinds (or in `only_kinds` of them)."""
     keys = {kind: "id" for kind in validate_config["unique_id_kinds"]} | dict(validate_config.get("unique_keys") or {})
@@ -84,7 +89,7 @@ def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict, only_k
         if kind not in schemas.SCHEMAS or (only_kinds is not None and kind not in only_kinds):
             continue
         rows = con.execute(
-            f"SELECT {key}, count(*) FROM {kind} GROUP BY 1 HAVING count(*) > 1 ORDER BY 1 LIMIT 20"
+            f"SELECT {key}, count(*) FROM {stored_table(kind)} GROUP BY 1 HAVING count(*) > 1 ORDER BY 1 LIMIT 20"
         ).fetchall()
         if rows:
             res.block(
@@ -214,7 +219,7 @@ def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, v
     """The newest fetch of each source is recent enough."""
     for kind in fetch_kinds(cfg):
         col = FETCH_COL[kind]
-        newest = con.execute(f"SELECT max({col}) FROM {kind}").fetchone()[0]
+        newest = con.execute(f"SELECT max({col}) FROM {stored_table(kind)}").fetchone()[0]
         limit = validate_config["fetch_max_age_hours"][kind]
         newest_time = as_utc_timestamp(newest)
         if newest_time is None:
