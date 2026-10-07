@@ -145,7 +145,12 @@ def test_slice_days_cover_the_window_in_pacific_days():
     now = utc("2026-10-05T02:30:00+00:00")
     assert nw.slice_days(nw.catch_up_window(None, now), now) == []
     days = nw.slice_days(nw.catch_up_window(utc("2026-10-02T02:30:00+00:00"), now), now)
-    assert days == [date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3), date(2026, 10, 4), date(2026, 10, 5)]
+    # issue #51: the window starts 2026-10-02T01:30Z = 10-01 18:30 PDT and now is 10-04 19:30 PDT; the old slices
+    # also asked 09-30 and 10-05 (Pacific), days that hold nothing the run keeps
+    assert days == [date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3), date(2026, 10, 4)]
+    later = utc("2026-10-05T16:00:00+00:00")                       # 09:00 PDT; window from 10-02 13:30Z = 06:30 PDT
+    days = nw.slice_days(nw.catch_up_window(utc("2026-10-02T14:30:00+00:00"), later), later)
+    assert days == [date(2026, 10, 2), date(2026, 10, 3), date(2026, 10, 4), date(2026, 10, 5)]
 
 
 def test_google_news_urls_carry_the_window():
@@ -231,11 +236,12 @@ def test_collector_asks_per_day_when_a_query_fills_the_cap(root, monkeypatch, ca
 
     out, asked = run_collector(monkeypatch, capsys, now, answer)
     sliced = [parse_qs(urlparse(url).query)["q"][0] for url in asked if "after%3A" in url]
-    assert len(sliced) == 5 and all(query.startswith('"HDFC Bank"') and "when:" not in query for query in sliced)
-    assert out["sliced_queries"] == 5 and out["google_queries"] == 2
+    # the Pacific days 10-01..10-04 of the window (issue #51: no empty day before or after it)
+    assert len(sliced) == 4 and all(query.startswith('"HDFC Bank"') and "when:" not in query for query in sliced)
+    assert out["sliced_queries"] == 4 and out["google_queries"] == 2
     assert out["new_items"] == 101                     # the per-day answer added the item the cap hid
     run = stored(root, "news_runs")[-1]
-    assert run["sliced_queries"] == 5 and run["ok"]
+    assert run["sliced_queries"] == 4 and run["ok"]
 
 
 @pytest.mark.usefixtures("root")
@@ -311,6 +317,17 @@ def test_pending_covers_everything_since_the_last_enrichment():
     assert "o1" not in {row["id"] for row in rows}                  # before the window: not asked again
 
 
+def test_pending_keeps_a_skipped_item_of_the_newest_enriched_run(weekend):
+    """Issue #51: a collector run stamps all its items with one first_seen_at; f1b came in Friday's run with f1,
+    the analyst enriched f1 only, so f1b (first seen at since) stays pending until it is scored."""
+    write_rows(weekend, "news", date(2026, 10, 2), [news_row("f1b", "2026-10-02T02:30:00+00:00")])
+    con = connect(MARKET)
+    since, rows = news_pending.pending_rows(con, NOW_MONDAY)
+    assert since == pd.Timestamp("2026-10-02T02:30:00+00:00")
+    assert [row["id"] for row in rows] == ["f1b", "f2", "s1", "m1", "nse-ann-1"]     # f1 is scored: not again
+    assert {"f1", "f1b"} <= news_pending.window_ids(con, NOW_MONDAY)[1]
+
+
 def test_pending_without_enrichment_is_today_and_capped_at_seven_days(root):
     write_rows(root, "news", date(2026, 10, 5), [news_row("m1", "2026-10-05T02:30:00+00:00")])
     write_rows(root, "news", date(2026, 10, 4), [news_row("y1", "2026-10-04T20:00:00+00:00")])
@@ -359,6 +376,34 @@ def test_news_gate_accepts_weekend_items_and_blocks_older_ones(weekend, monkeypa
     assert "f2" in missing["detail"] and "m1" in missing["detail"]
     out = validate_news(weekend, monkeypatch, [enriched("f1", stamp)])
     assert "ENRICH_ALREADY_STORED" in {f["code"] for f in out["failures"]}
+
+
+def test_pending_lists_watchlist_items_first(weekend):
+    """Issue #46: untagged items are `background` and come after the watchlist items (each group oldest first)."""
+    write_rows(weekend, "news", date(2026, 10, 3), [news_row("bg1", "2026-10-03T07:00:00+00:00", tickers=[],
+                                                            category="macro")])
+    rows = news_pending.pending_rows(connect(MARKET), NOW_MONDAY)[1]
+    assert [(row["id"], row["priority"]) for row in rows] == [
+        ("f2", "watchlist"), ("s1", "watchlist"), ("m1", "watchlist"), ("nse-ann-1", "watchlist"), ("bg1", "background")]
+
+
+def test_news_gate_warns_on_templated_watchlist_summaries(weekend, monkeypatch):
+    """Issue #46: ENRICH_TEMPLATED when more than 30% of at least 20 watchlist records repeat another's summary."""
+    stamp = "2026-10-05T02:44:00+00:00"
+    ids = [f"w{index:02d}" for index in range(24)]
+    write_rows(weekend, "news", date(2026, 10, 4), [news_row(i, "2026-10-04T08:00:00+00:00") for i in ids])
+    write_rows(weekend, "news", date(2026, 10, 4), [news_row(f"b{index}", "2026-10-04T08:00:00+00:00", tickers=[])
+                                                    for index in range(30)])
+    background = [{**enriched(f"b{index}", stamp), "summary": "Market news, no watchlist impact."} for index in range(30)]
+    own = [{**enriched(i, stamp), "summary": f"HDFC Bank item {i} in its own words."} for i in ids]
+    out = validate_news(weekend, monkeypatch, own + background)          # background may share a summary
+    assert "ENRICH_TEMPLATED" not in {w["code"] for w in out["warnings"]}
+    templated = [{**row, "summary": "Bank stock news;  low impact."} if index < 8 else row for index, row in enumerate(own)]
+    out = validate_news(weekend, monkeypatch, templated + background)    # 8 of 24 = 33% > 30%
+    warning = next(w for w in out["warnings"] if w["code"] == "ENRICH_TEMPLATED")
+    assert warning["detail"].startswith("8 of 24 watchlist records")
+    out = validate_news(weekend, monkeypatch, templated[:19] + background)   # fewer than 20 watchlist records
+    assert "ENRICH_TEMPLATED" not in {w["code"] for w in out["warnings"]}
 
 
 @pytest.mark.usefixtures("weekend")
@@ -536,7 +581,7 @@ def test_routine_step_7_uses_the_window_since_the_last_enrichment():
     assert "python scripts/news_pending.py" in step7 and "work/news_pending.jsonl" in step7
     assert "today's `data/<market>/news/` file" not in step7
     analyst = (REPO / ".claude" / "agents" / "news-analyst.md").read_text()
-    assert "work/news_pending.jsonl" in analyst and '"news-v11"' in analyst
+    assert "work/news_pending.jsonl" in analyst and '"news-v12"' in analyst and "`background`" in analyst
 
 
 def test_news_prompt_runs_no_agent_and_commits_data_only():

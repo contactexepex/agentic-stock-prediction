@@ -3,8 +3,8 @@
 - Trading days come from exchange_calendars (config `calendar`, e.g. XNYS, XBOM). Outside the
   library's covered range we fall back to Monday-Friday and say so. Dates listed under the
   market config's `holidays` are always closed (exchange circulars the library lacks); dates under
-  `special_sessions` always trade (NSE's Diwali Muhurat sessions on a holiday; their open and close
-  are taken as the regular hours). Without the exchange_calendars package nothing falls back
+  `special_sessions` always trade (NSE's Diwali Muhurat sessions on a holiday; their open and close are the
+  `special_session_hours` of the config, else the regular hours). Without the exchange_calendars package nothing falls back
   silently: CalendarUnavailableError is raised.
 - Market events come from config/events.yaml (rules + fixed dates) plus company earnings and
   ex-dividend dates collected into data/<market>/events/ by the events collector.
@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import calendar as month_calendar
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
@@ -52,6 +52,7 @@ from marketbrief.constants.config_keys import (
     CFG_CALENDAR,
     CFG_HOLIDAYS,
     CFG_MARKET,
+    CFG_SPECIAL_SESSION_HOURS,
     CFG_SPECIAL_SESSIONS,
     CFG_TIMEZONE,
 )
@@ -86,6 +87,17 @@ def extra_holidays(cfg: dict) -> set[date]:
 def special_sessions(cfg: dict) -> set[date]:
     """The market config's extra trading days on exchange holidays (issue #41)."""
     return config_dates(cfg, CFG_SPECIAL_SESSIONS)
+
+
+def special_session_hours(cfg: dict, day: date) -> tuple[time, time] | None:
+    """(open, close) exchange-local times of a special session listed under `special_session_hours`
+    ("HH:MM-HH:MM"; issue #45: NSE's one-hour Muhurat slot), or None."""
+    for listed, hours in (cfg.get(CFG_SPECIAL_SESSION_HOURS) or {}).items():
+        listed_day = listed if isinstance(listed, date) else date.fromisoformat(str(listed))
+        if listed_day == day:
+            open_text, close_text = str(hours).split("-")
+            return time.fromisoformat(open_text.strip()), time.fromisoformat(close_text.strip())
+    return None
 
 
 def calendar_covers(cfg: dict, day: date) -> bool:
@@ -128,6 +140,10 @@ def prev_session(cfg: dict, day: date, include: bool = True) -> date:
 
 def _session_edge_utc(cfg: dict, day: date, edge: str) -> datetime:
     """Open or close of session `day` as an aware UTC datetime."""
+    special = special_session_hours(cfg, day) if day in special_sessions(cfg) else None
+    if special is not None:
+        local_time = special[0] if edge == EDGE_OPEN else special[1]
+        return datetime.combine(day, local_time, ZoneInfo(cfg[CFG_TIMEZONE])).astimezone(timezone.utc)
     try:
         calendar = exchange_calendar(cfg[CFG_CALENDAR])
         if calendar_covers(cfg, day) and calendar.is_session(day.isoformat()):

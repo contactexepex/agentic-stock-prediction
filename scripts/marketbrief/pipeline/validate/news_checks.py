@@ -30,7 +30,8 @@ from marketbrief.constants.validation import (
     MSG_NEWS_SOURCE_UNKNOWN_OUTLET,
     MSG_REPEATED_IDS,
 )
-from marketbrief.pipeline.news_pending import rescore_ids, window_ids
+from marketbrief.constants.news_pending import MSG_TEMPLATED_SUMMARIES, PRIORITY_WATCHLIST
+from marketbrief.pipeline.news_pending import rescore_ids, window_priorities
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, todays_files
 
@@ -165,7 +166,8 @@ def stage_news(  # noqa: PLR0913 (uniform stage signature)
     bad = check_rows("news_enriched", rows, False, now, timedelta(minutes=validate_config["future_tolerance_minutes"]))
     if bad:
         res.block("SCHEMA", MSG_ENRICHED_FILE_PROBLEM.format(name=path.name, problems="; ".join(bad)))
-    since, new_ids = window_ids(con, now)
+    since, priorities = window_priorities(con, now)
+    new_ids = set(priorities)
     # an item whose headline changed after its enrichment is scored again (news_pending.rescore_ids)
     done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()} - rescore_ids(
         con, since, now
@@ -195,4 +197,32 @@ def stage_news(  # noqa: PLR0913 (uniform stage signature)
             res.block(
                 "ENRICH_RULE", MSG_ENRICHMENT_RULE_PROBLEM.format(record_id=row.get("id"), problems="; ".join(why))
             )
+    check_templated_summaries(res, rows, priorities, validate_config)
     res.info["news"] = {"records": len(rows), "since": since.isoformat(), "ids_in_window": len(new_ids)}
+
+
+def summary_key(row: dict) -> str:
+    """A record's summary, lower-cased with its whitespace collapsed (ENRICH_TEMPLATED compares these)."""
+    return " ".join(str(row.get("summary") or "").lower().split())
+
+
+def check_templated_summaries(res, rows: list[dict], priorities: dict[str, str], validate_config: dict) -> None:
+    """ENRICH_TEMPLATED warning (issue #46): too many watchlist records whose summary another record of the file
+    repeats word for word, the mark of a keyword-rule pass (measured on the stored runs: India 2026-10-07, the
+    flagged run, 0.67; the US runs of 2026-10-07 0.09 and 0.12). Background items may be scored in groups."""
+    rules = validate_config["news_templated"]
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[summary_key(row)] = counts.get(summary_key(row), 0) + 1
+    watchlist = [row for row in rows if priorities.get(row.get("id")) == PRIORITY_WATCHLIST]
+    if len(watchlist) < rules["min_records"]:
+        return
+    shared = [row for row in watchlist if counts[summary_key(row)] > 1]
+    if len(shared) > rules["max_shared_summary_share"] * len(watchlist):
+        res.warn(
+            "ENRICH_TEMPLATED",
+            MSG_TEMPLATED_SUMMARIES.format(
+                shared=len(shared), records=len(watchlist), limit=rules["max_shared_summary_share"],
+                example=str(shared[0].get("summary"))[:80],
+            ),
+        )
