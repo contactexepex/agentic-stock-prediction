@@ -3,7 +3,9 @@
 # from config/costs.yaml (the same rates as the signal model's paper strategy).
 
 trades:
-  sources: [claude_code, slack, form]       # allowed `source` values of a trade or a watchlist request
+  # allowed `source` values of a trade or a watchlist request; dashboard and claude_app arrive through the inbox
+  # import (portfolio.py import-inbox, issue #112: the inbox row's channel)
+  sources: [claude_code, slack, form, dashboard, claude_app]
   price_bases: [open, close, manual]        # open/close = the stored bar's; manual = checked against its low-high
   # A manual price may sit this fraction outside the stored bar's low-high (rounding of a typed price); 0 = none.
   manual_price_tolerance: 0.0

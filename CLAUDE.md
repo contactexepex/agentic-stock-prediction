@@ -169,6 +169,23 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (`routine/WEEKLY_PROMPT.md`, Saturday 10:00 local): the `research-director` agent and its gate
   `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
   `reports/<market>/research-<week>.md`.
+- Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
+  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines). The governed tool layer
+  `web/lib/tools/` implements `mcp/tools.yaml`; `mcp/build_registry.py` generates `registry.generated.ts` from it and
+  `mcp/agents/*.yaml` (allowed tools, day budgets, kill switch per agent; `assistant` has read tools only), checked by
+  `tests/test_b5_tools.py`. Identity comes only from the channel's auth, never from arguments. Every write needs an
+  idempotency key; company commands are confirmed (summary; typed for delete, dashboard only), paper trades come from
+  the `/trade` form (or a tool call) without a summary step. Writes are appended to the inbox
+  (`mcp/inbox.sql`, database `market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`): company commands to
+  `inbox.company_commands` (read by `company.py import-inbox`; dispatches `onboard.yml`), paper trades to
+  `inbox.requests` (no importer yet, issue #112); pending until imported. Every call is logged in `inbox.command_log`
+  (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
+  Vercel project `market-brief-gateway`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
+  `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
+  `/slack/commands` and `/slack/interactions`). Slack:
+  `/company`, `/trade`, `/ask` (stub until B8), in #market-brief only; Confirm posts a visible request message whose
+  `slack_channel`/`slack_ts` go into the inbox row for B6's onboarding reply. Web tests: `npm test` in `web/` (node test
+  runner, offline, with the prompt-injection suite), CI `.github/workflows/web-tests.yml`.
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
   context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
