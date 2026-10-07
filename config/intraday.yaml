@@ -44,10 +44,9 @@ trade_flag_on: [outside_range, far_from_target, against_prediction]
 
 # B9: the intraday alerts feed (intraday_alerts) read by the Slack alerts (session B6). A news item on a ticker
 # with an open paper trade is alerted once per session when its enrichment (as of the check) has one of these
-# materiality levels; items first seen since the previous session's close are read, at most max_news per ticker.
+# materiality levels; every item first seen since the previous session's close is read (no count limit).
 alerts:
   news_materiality: [high]
-  max_news: 20
 
 attribution:
   # News and announcements first seen from `open` (the session's open; default) or from `prev_close` (the

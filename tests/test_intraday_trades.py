@@ -435,3 +435,36 @@ def test_payload_rows_pass_the_schema_gate_and_india_price_skip(market, monkeypa
     assert early["trades"] == [] and early["alerts"] == []
     assert skipped_for_price("india", 100000.0, 150000.0) and not skipped_for_price("india", 100000.0, 99999.0)
     assert not skipped_for_price("us", 1000.0, 5000.0)
+
+
+def test_busy_ticker_alerts_every_material_item(market):
+    """More news than any count limit on one ticker: every high-materiality item is alerted, late ones too."""
+    root, cfg, settings = market
+    items = [(f"nv-bulk-{n:02d}", f"2026-10-07T14:{n:02d}:00Z", "high" if n >= 25 else "low") for n in range(30)]
+    jl(root, "news", SESSION, [
+        {"id": ident, "title": f"Nvidia bulk {ident}", "url": "u", "source": "Wire", "published_at": seen,
+         "first_seen_at": seen, "feed": "f", "category": "company", "tickers": ["NVDA"], "primary_tickers": ["NVDA"],
+         "mentioned_tickers": [], "tag_confidence": "high", "tag_version": 99} for ident, seen, _ in items])
+    jl(root, "news_enriched", SESSION, [
+        {"id": ident, "analyzed_at": "2026-10-07T15:00:00Z", "relevance": 0.9, "sentiment": 0.1, "materiality": level}
+        for ident, _, level in items])
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
+    alerts = stored(root, "intraday_alerts")
+    news = {row["news_id"] for row in alerts if row["alert_type"] == "material_news_open_trade"}
+    assert news == {"nv-high", "nv-overnight"} | {ident for ident, _, level in items if level == "high"}
+
+
+def test_gate_allows_only_the_horizons_a_row_knows(market):
+    root, cfg, settings = market
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
+    con = connect(MARKET)
+    rows = explain.flagged_rows(con)
+    row = rows[f"{CHECK_ID}-NVDA"]
+    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v1"}}
+    base = {"check_row_id": row["id"], "attribution": "idiosyncratic", "cited_ids": [],
+            "prompt_version": "deviation-v1"}
+    good, _ = validate_records([{**base, "text": "NVDA sits above its N+5 range."}], rows, set(), rules)
+    assert len(good) == 1
+    _, bad = validate_records([{**base, "text": "NVDA sits above its N+7 range."}], rows, set(), rules)
+    assert any("7" in error for error in bad[0]["errors"])
+

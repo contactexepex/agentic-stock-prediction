@@ -35,6 +35,7 @@ from marketbrief.intraday.constants import (
     NUM_RE,
     SKIP_RE,
 )
+from marketbrief.intraday.measures import band_by_horizon
 from marketbrief.intraday.settings import configured_horizons
 
 # measures stored as fractions (cited in %), measures cited as plain numbers
@@ -52,11 +53,14 @@ TRADE_SIGNED_PLAIN = ("target_z", "z_since_entry")
 
 
 def horizon_numbers(row: dict) -> list[tuple[float, str, bool, bool]]:
-    """Every horizon the row knows: its bands, its calls, its trades and the configured list (N+k, k-day)."""
+    """Every horizon the row knows: its bands (or, on rows stored before B9, its legacy band_<k>d columns), its
+    calls, its trades and the configured list (N+k, k-day). No horizon is allowed by default."""
     found = set(configured_horizons()) | {int(k) for k in (row.get("bands") or {})}
     found |= {int(call["horizon_days"]) for call in row.get("calls") or [] if call.get("horizon_days")}
     found |= {int(trade["horizon_days"]) for trade in row.get("trades") or [] if trade.get("horizon_days")}
-    return [(float(k), "horizon", False, False) for k in sorted(found | {1, 5})]
+    found |= {k for k, band in band_by_horizon({key: value for key, value in row.items() if key != "bands"}).items()
+              if band is not None}
+    return [(float(k), "horizon", False, False) for k in sorted(found)]
 
 
 def trade_numbers(trade: dict) -> list[tuple[float, str, bool, bool]]:

@@ -69,7 +69,7 @@ class CheckContext:
         """Every horizon with a published range for this session (any ticker), or the configured ones when none
         is published (each missing horizon is then noted on every row, as WS5 noted no_range_1d/5d)."""
         found = {horizon for bands in self.ranges.values() for horizon in bands}
-        return found or set(configured_horizons()) or set(LEGACY_HORIZONS)
+        return found or set(configured_horizons())
 
     def ret(self, key: str | None) -> float | None:
         """Return since the open of a symbol whose quote is fresh."""

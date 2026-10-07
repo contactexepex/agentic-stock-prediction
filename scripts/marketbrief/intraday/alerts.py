@@ -68,13 +68,14 @@ def build_alerts(ctx, earlier: list[dict]) -> list[dict]:
 
 def news_alerts(ctx, by_ticker: dict[str, list[dict]], earlier: list[dict]) -> list[dict]:
     """Material news (config/intraday.yaml alerts.news_materiality, enrichment as of check_at) on tickers with an
-    open trade, first seen since the previous session's close and not alerted earlier this session."""
+    open trade, first seen since the previous session's close and not alerted earlier this session. Every such
+    item is read (no count limit before the materiality filter), so none is dropped on a busy ticker."""
     settings = ctx.settings["alerts"]
     since = session_close_utc(ctx.cfg, prev_session(ctx.cfg, ctx.session_date, include=False))
     done = {(alert["ticker"], alert["news_id"]) for alert in earlier if alert["alert_type"] == ALERT_MATERIAL_NEWS}
     out = []
     for ticker, checks in sorted(by_ticker.items()):
-        for item in inputs.news_since(ctx.con, ticker, since, ctx.check_at, settings["max_news"]):
+        for item in inputs.news_since(ctx.con, ticker, since, ctx.check_at, None):
             if item.get("materiality") not in settings["news_materiality"] or (ticker, item["id"]) in done:
                 continue
             out.append({

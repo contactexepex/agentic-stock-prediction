@@ -16,14 +16,15 @@ from marketbrief.core.calendar import next_session, sessions_ahead
 from marketbrief.intraday.constants import CALL_MODEL, CALL_PREDICTION, EVENT_TYPES
 from marketbrief.intraday.settings import configured_horizons
 
-CALL_LOOKBACK_DAYS = 12   # calendar days back that cover the as-of dates of open 5-day calls (the minimum)
+CALL_LOOKBACK_DAYS = 12   # the minimum: covers the as-of dates of WS5's stored calls, whatever the horizon list
 CALENDAR_DAYS_PER_SESSION = 2   # B9: a generous calendar-day bound per session of the longest horizon
 
 
 def call_lookback_days(horizons: tuple[int, ...]) -> int:
-    """Calendar days back to the oldest as-of date whose call can still be open: enough for the longest horizon
-    (configured or 5) plus the entry session, weekends and holidays; the exact window is checked per call."""
-    longest = max((*horizons, 5))
+    """Calendar days back to the oldest as-of date whose call can still be open: enough for the longest configured
+    horizon plus the entry session, weekends and holidays (never below CALL_LOOKBACK_DAYS); the exact window is
+    checked per call."""
+    longest = max(horizons, default=0)
     return max(CALL_LOOKBACK_DAYS, CALENDAR_DAYS_PER_SESSION * (longest + 1) + 7)
 
 
@@ -172,9 +173,10 @@ def daily_sigma(bands: dict[int, dict], features: dict | None) -> tuple[float | 
     return None, "no_sigma"
 
 
-def news_since(con, ticker: str, since: datetime, check_at: datetime, limit: int) -> list[dict]:
+def news_since(con, ticker: str, since: datetime, check_at: datetime, limit: int | None) -> list[dict]:
     """News tagged with the ticker first seen in [since, check_at] and published by check_at, with each id's
-    verification status as of check_at (unverified when no status row lists it) and its enrichment by then."""
+    verification status as of check_at (unverified when no status row lists it) and its enrichment by then. limit
+    None: every item."""
     frame = con.execute(
         "WITH s AS (SELECT news_id, status FROM news_status_ids_asof(?) WHERE ticker = ?), "
         "e AS (SELECT DISTINCT ON (id) id, materiality, sentiment FROM news_enriched WHERE analyzed_at <= ? "
