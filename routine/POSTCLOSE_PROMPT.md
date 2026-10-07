@@ -16,8 +16,9 @@ Every step prints a JSON summary: save it under `work/steps/`.
    stop: no session closed today (post nothing; the next post-close run settles anything due).
 
 3. Close bars: `python scripts/collect_prices.py > work/steps/collect_prices.json`, then
-   `python scripts/validate.py --stage collect > work/steps/validate_collect.json`. On a blocking failure settle
-   nothing for the tickers it lists: they settle on the next stored close (flagged `exit_delayed` by the engine).
+   `python scripts/validate.py --stage collect > work/steps/validate_collect.json`. On a blocking failure, list it in
+   your final message and still run step 4: the engine settles a trade only once its exit bar is stored and final;
+   a trade without one settles on the next stored final close, flagged `exit_delayed`.
 
 4. Settle: `python scripts/lab.py settle > work/steps/lab_settle.json` (session B2's engine, docs/ws/b2.md). It
    settles every paper trade whose exit bar is final, in both views (accuracy, head-to-head), exactly once, and
@@ -54,5 +55,6 @@ Every step prints a JSON summary: save it under `work/steps/`.
 
 10. Save: `git add data && git commit -m "<market> post-close TODAY"` (TODAY = `date -u +%F`; this includes
     `data/<market>/slack_posts`), then `git push origin HEAD:main`; if the push is rejected,
-    `git pull --rebase origin main` and push again. End with a short message: settled trades per view, refused or
-    pending trades, the EOD gate result, any dropped lines and the Slack result.
+    `git pull --rebase origin main` and push again. End with a short message: from step 4's summary the trades written
+    per status (`written`, `by_status`), `refused_not_locked` and, for the US, `waiting_for_eurusd`; the EOD gate
+    result, any dropped lines and the Slack result.
