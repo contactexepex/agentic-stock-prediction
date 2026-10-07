@@ -4,6 +4,7 @@ and 10 biggest losses of the other rows, with the count of the rest (owner, 2026
 `paper_trades_settled` value or a sum of them; the EOD analyst's gated summary is quoted when it exists."""
 from __future__ import annotations
 
+from marketbrief.alerts import costs
 from marketbrief.alerts import text as fmt
 from marketbrief.alerts.constants import (
     CLOSE_TOP_LOSSES,
@@ -22,13 +23,15 @@ def tally(rows: list[dict]) -> dict:
     """Trades, wins (net profit > 0) and net profit of settled rows (no_entry and skipped rows are not trades)."""
     done = [r for r in rows if r.get("status") == "settled"]
     return {"trades": len(done), "wins": sum((r.get("net_pnl") or 0) > 0 for r in done),
-            "net_pnl": round(sum(r.get("net_pnl") or 0 for r in done), 2)}
+            "net_pnl": round(sum(r.get("net_pnl") or 0 for r in done), 2), "your_net_pnl": costs.your_net_total(done)}
 
 
 def tally_text(t: dict, currency: str) -> str:
-    """'3 trades, 2 wins, net +$12.40'."""
-    return f"{t['trades']} trade{'s' if t['trades'] != 1 else ''}, {t['wins']} win{'s' if t['wins'] != 1 else ''}, " \
-           f"net {fmt.signed_money(currency, t['net_pnl'])}"
+    """'3 trades, 2 wins, net +$12.40' (plus ' (after your costs +$9.10)' when the rows have the owner's costs)."""
+    yours = (f" (after your costs {fmt.signed_money(currency, t['your_net_pnl'])})"
+             if t.get("your_net_pnl") is not None else "")
+    return (f"{t['trades']} trade{'s' if t['trades'] != 1 else ''}, {t['wins']} win{'s' if t['wins'] != 1 else ''}, "
+            f"net {fmt.signed_money(currency, t['net_pnl'])}{yours}")
 
 
 def rule_vs_ai_lines(rows: list[dict], currency: str) -> list[str]:
@@ -82,7 +85,8 @@ def trade_line(row: dict, names: dict, currency: str) -> str:
     return (f"{head}: bought {fmt.money(currency, row.get('entry_price'))} on {row.get('entry_date')}, sold"
             f" {fmt.money(currency, row.get('exit_price'))} on {row.get('exit_date_actual') or row.get('exit_date')};"
             f" net {fmt.signed_money(currency, row.get('net_pnl'))} ({fmt.pct(row.get('return_pct'))}) after"
-            f" {fmt.money(currency, row.get('costs'))} costs; {target}, {rng}; main reason"
+            f" {fmt.money(currency, row.get('costs'))} market costs{costs.trade_cost_text(row, currency)};"
+            f" {target}, {rng}; main reason"
             f" {row.get('reason_code') or 'none'}.{flags} {PAPER}")
 
 

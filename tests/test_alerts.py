@@ -190,7 +190,8 @@ def test_close_results_from_examples():
     assert f"Rule {rule['trades']} trade" in msg
     assert "Analyst note (eod-us-2026-10-01): Two paper trades settled." in msg
     line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
-    assert "bought $229.27 on 2026-09-30, sold $230.86 on 2026-10-01; net +$4.60 (+0.46%) after $2.34 costs" in line
+    assert ("bought $229.27 on 2026-09-30, sold $230.86 on 2026-10-01; net +$4.60 (+0.46%) after $2.34 market"
+            " costs") in line
     assert "target reached, closed inside its 80% range; main reason sector_lift" in line
     assert len(signal_lines(msg)) == len(rows)
     assert all(PAPER in line for line in signal_lines(msg))
@@ -513,3 +514,47 @@ def test_daily_brief_joins_the_day_thread(monkeypatch):
     assert "thread_ts" not in http.calls[-1]["form"]
     publisher("us", dry_run=False, http=http).publish(Message("morning", "morning:us:2026-10-08", "p", "us:2026-10-08"))
     assert http.calls[-1]["form"]["thread_ts"] == first["thread_ts"]
+
+
+# ---------- the owner's own costs (decisions 50-51; field names assumed until B2's docs/ws/b2.md) ----------
+
+def with_your_cost(preds: list[dict], cost: float) -> list[dict]:
+    """Fixture values in B6's assumed naming: your_cost_pct on every call, cost_viable = move > cost."""
+    return [{**p, "your_cost_pct": cost,
+             "cost_viable": (p["target_price"] / p["base_close"] - 1) * 100 > cost} for p in preds]
+
+
+def test_morning_pick_says_whether_it_clears_your_cost():
+    preds = of_market(examples("prediction"), "us")
+    row = agreement(preds, 1)[0]
+    move = round((row["avg_target"] / row["base_close"] - 1) * 100, 2)   # the buyers' average target vs last close
+    viable = build_morning("us", "2026-10-07", with_your_cost(preds, move - 0.05), [], HORIZONS)
+    assert f"Expected {move:+.2f}% vs your cost {move - 0.05:.2f}% — viable." in viable
+    assert "No pick clears your costs today." not in viable
+    costly = build_morning("us", "2026-10-07", with_your_cost(preds, 2.7), [], HORIZONS)
+    assert f"Expected {move:+.2f}% vs your cost 2.70% — not viable at your costs." in costly
+    assert "No pick clears your costs today." in costly.splitlines()[2]
+    plain = build_morning("us", "2026-10-07", preds, [], HORIZONS)       # no cost fields stored: no cost text
+    assert "your cost" not in plain
+
+
+def test_head_to_head_line_shows_the_stored_flag():
+    preds = of_market(examples("prediction"), "us")
+    h2h = [{**p, "cost_viable": p["family"] == "rule"}
+           for p in of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07")]
+    lines = [x for x in build_morning("us", "2026-10-07", preds, h2h, HORIZONS).splitlines() if x.startswith("   • ")]
+    assert all("; viable at your costs [Paper]" in x for x in lines if x.startswith("   • Rule"))
+    assert all("; not viable at your costs [Paper]" in x for x in lines if x.startswith("   • AI"))
+
+
+def test_close_shows_your_cost_result_beside_market_cost():
+    rows = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
+    mine = [{**r, "your_costs": round(r["costs"] + 0.46, 2), "your_net_pnl": round(r["net_pnl"] - 0.46, 2),
+             "your_return_pct": round((r["net_pnl"] - 0.46) / r["amount"] * 100, 2)} for r in rows]
+    msg = build_close("us", "2026-10-01", mine, None, {}, "USD")
+    line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
+    assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in line
+    rule = [r for r in mine if r["view"] == "accuracy" and r["family"] == "rule"]
+    total = sum(r["your_net_pnl"] for r in rule)
+    assert f"(after your costs {text.signed_money('USD', round(total, 2))})" in msg
+    assert "your costs" not in build_close("us", "2026-10-01", rows, None, {}, "USD")
