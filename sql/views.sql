@@ -646,3 +646,35 @@ SELECT DISTINCT ON (id) * FROM model_scores ORDER BY id, computed_at DESC, prob_
 
 CREATE OR REPLACE VIEW model_versions_latest AS
 SELECT DISTINCT ON (id) * FROM model_versions ORDER BY id, fitted_at DESC, CAST(model AS VARCHAR), platt_rows;
+
+-- WS5: intraday checks and the deviation explainer (scripts/intraday_check.py; docs/ws/ws5.md). Rows are written
+-- once per check time (id = <check_id>-<ticker>); the first stored row per id wins.
+-- The newest check row per session and ticker (any quality; stale rows carry no measures).
+CREATE OR REPLACE VIEW intraday_checks_latest AS
+SELECT DISTINCT ON (session_date, ticker) * FROM intraday_checks
+ORDER BY session_date, ticker, check_at DESC, id;
+
+-- Every flagged check row with the explainer's note (null until one is stored).
+CREATE OR REPLACE VIEW intraday_deviations AS
+SELECT c.*, x.id AS explanation_id, x.attribution, x.text AS explanation, x.cited_ids,
+       x.prompt_version AS explanation_prompt_version, x.created_at AS explained_at
+FROM (SELECT DISTINCT ON (id) * FROM intraday_checks ORDER BY id, computed_at) c
+LEFT JOIN (SELECT DISTINCT ON (check_row_id) * FROM intraday_explanations ORDER BY check_row_id, created_at, id) x
+  ON x.check_row_id = c.id
+WHERE c.flagged;
+
+-- Today's deviations by the clock (MB_NOW-aware): flagged rows of the current UTC date's sessions.
+CREATE OR REPLACE VIEW intraday_today AS
+SELECT * FROM intraday_deviations WHERE session_date = current_date AND check_at <= now()
+ORDER BY check_at, ticker;
+
+-- Learning loop: each explained deviation with the session's stored close (as stored, the basis of the
+-- intraday bars). outcomes.py classifies held / reversed / faded from these columns.
+CREATE OR REPLACE VIEW intraday_explanation_close AS
+SELECT d.id AS check_row_id, d.explanation_id, d.ticker, d.session_date, d.check_at, d.flags, d.attribution,
+       d.explanation, d.cited_ids, d.explained_at, d.open_price, d.last_price, d.ret_since_open, d.band_1d,
+       d.lo80_1d, d.hi80_1d, o.close AS session_close, o.collected_at AS close_collected_at,
+       o.close / d.open_price - 1 AS close_ret_since_open, o.close / d.last_price - 1 AS ret_after_check
+FROM intraday_deviations d
+LEFT JOIN ohlc_raw o ON o.ticker = d.ticker AND o.date = d.session_date
+WHERE d.explanation_id IS NOT NULL;
