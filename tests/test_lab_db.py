@@ -5,6 +5,7 @@ plus the owner portfolio's EUR view and the lab CLI."""
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -226,7 +227,8 @@ def horizon_rows(k: int, exit_day: str) -> tuple[dict, dict]:
              "model_id": f"us-{k}d-test", "trained_until": "2026-09-30", "computed_at": "2026-10-05T10:00:00+00:00",
              "horizon_label": "n_plus_k", "entry_date": "2026-10-05", "exit_date": exit_day}
     band = {"id": rid, "made_at": "2026-10-05T10:00:00+00:00", "as_of_date": "2026-10-02", "session_date": "2026-10-05",
-            "target_date": exit_day, "ticker": "AAPL", "horizon_days": k, "base_close": 101.0, "center": 102.0 + k,
+            "target_date": exit_day, "ticker": "AAPL", "horizon_days": k, "base_close": 101.0,
+            "center": math.log((102.0 + k) / 101.0),           # a log shift (B10): target 102 + k
             "sigma_h": 0.02, "lo50": 100.0, "hi50": 104.0 + k, "lo80": 98.0, "hi80": 106.0 + k, "naive_lo50": 100.0,
             "naive_hi50": 104.0, "naive_lo80": 98.0, "naive_hi80": 106.0, "direction": None, "confidence": None,
             "regime": "TRENDING", "calibration_id": None, "notes": [], "inputs": [], "iv_sigma_h": None,
