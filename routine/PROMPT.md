@@ -24,6 +24,9 @@ step:
   verification status as of `made_at`, and the anchor on the signal model's stored score: model_prob,
   |agent_adjustment| <= 0.10 with a reason, direction and confidence from the final probability), the
   debate record's gate `scripts/agent_reasoning.py validate` (step 9a) and the weekly spot-check;
+- AI traders: `python -m marketbrief.traders add` (step 9b: the CLAUDE.md prediction rules as SPEC F2.6 changes them,
+  the news-verification rules, the model anchor for the combined traders, ranges only widened, the deadline 15
+  minutes before the open; one retry, then abstention records);
 - results-analyst: `scripts/results_digest.py validate` (step 3e: release and source ids, verbatim quotes, numbers
   from the quote or the release's deterministic numbers, enums, no forecast or advice);
 - summaries, report and Slack draft: `--stage report` (each number in agent-written text must
@@ -244,6 +247,25 @@ Warnings never block: list them in `data_quality`.
     matching its decision); on exit 1 send the errors back to the forecaster once and validate again. Then
     `python scripts/agent_reasoning.py add work/reasoning.jsonl` (or with `--valid-only` after the retry,
     listing the dropped lines in `data_quality`) and delete the work file.
+
+9b. AI traders (docs/SPEC.md F4; never blocks the brief; needs session B10's per-horizon ranges and scores).
+    Export `PYTHONPATH=scripts`.
+    1. `python -m marketbrief.traders check > work/steps/traders_check.json`. On exit 1, skip the traders and list
+       the problems in `data_quality`.
+    2. For each of the four traders: `python -m marketbrief.traders prepare --strategy <id> >
+       work/steps/traders_prepare_<id>.json`. Exit 2 (per-horizon inputs missing): skip the traders and note it in
+       `data_quality`. The summary gives the deadline (D's open - 15 minutes) and whether the trader is `enabled`.
+    3. Run the enabled traders in parallel as subagents, each with the market and its input
+       `work/traders/<id>.md`: trader-news-results, trader-pattern-mood, trader-combined, and the forecaster in its
+       trader run (ai.combined.opus.v1). Do not run a disabled trader (kill switch).
+    4. For each trader (finished, disabled or still running at the deadline):
+       `python -m marketbrief.traders add --strategy <id> work/traders/<id>.jsonl --attempt 1 >
+       work/steps/traders_add_<id>.json`. On exit 1, send the errors to that trader once, then run
+       `add ... --attempt 2`. `add` stores `killed` for a disabled trader and `timeout` past the deadline. List
+       every abstention code count in `data_quality`.
+    5. Delete `work/traders/*.jsonl`. All of 9b runs before session B2's `python scripts/lab.py pick`, which ranks
+       the families and writes the head-to-head picks from every stored qualifying prediction, AI included, and
+       refuses to run at or after D's open.
 
 10. Summaries (in `summaries/<market>/`):
    - Write `daily/TODAY.md` (max 400 words): regime, per ticker what changed and why, macro

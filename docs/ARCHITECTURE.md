@@ -330,6 +330,7 @@ import) is bounded to entries since the last run and visible as pending.
 | 2 | WS8 alerts | `scripts/marketbrief/alerts/`, `scripts/alerts.py`, `config/alerts.yaml`, `tests/test_alerts*.py`, `docs/ws/ws8.md` | read models + Slack; never trade signals beyond the paper label |
 | 3 | WS3 frontend | `app/` except `app/api/`, frontend tests, `docs/ws/ws3.md` | the spec only (never MotherDuck directly) |
 | 3 | consolidation | shared docs, routine prompts, wiring steps into the routine, end-to-end run of both markets | everything |
+| 2 (waves of SPEC section 10) | B3 AI traders | `marketbrief/traders/`, `.claude/agents/trader-*.md`, `forecaster.md`, `eod-analyst.md`, `research-director.md`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md`, `docs/ws/b3.md` | SPEC F4, F6 |
 
 Shared files follow the additive rules of the wave plan (one import + one spread line in
 `core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks appended at the end). Spec changes
