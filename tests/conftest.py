@@ -106,6 +106,9 @@ SLOW = {
         "test_relations_on_real_responses",
         "test_transient_error_is_retried_once",
     },
+    "tests/test_news_coverage.py": {
+        "test_light_run_end_to_end_appends_only",
+    },
     "tests/test_pipeline.py": {
         "test_backtest_coverage_is_calibrated",
         "test_calibrate_ranges_and_scoring",

@@ -26,7 +26,10 @@ Stages (each runs after the routine step of the same name):
             (narrative_numbers.py: the companies or symbols its sentence names plus market-level
             rows, and the text of the news ids it cites); every ticker x horizon has a range or
             a skip reason the calendar explains.
-- all:      every stage whose input exists."""
+- all:      every stage whose input exists.
+- news_collect (not part of `all`): the news-only light run (routine/NEWS_PROMPT.md): files and rows of the
+            news kinds written today, their duplicate ids, this run's news_runs row (from today, recent, ok),
+            the collectors' summaries in work/steps/, news sources and article rows; no price or calendar check."""
 
 from __future__ import annotations
 
@@ -35,12 +38,18 @@ from pathlib import Path
 
 import pandas as pd
 
-from marketbrief.constants.validation import MSG_REPORT_SKIPPED_NOT_WRITTEN, STAGES
+from marketbrief.constants.validation import MSG_REPORT_SKIPPED_NOT_WRITTEN, STAGE_NEWS_COLLECT, STAGES
 from marketbrief.core import cli, clock, database
 from marketbrief.pipeline.validate.gate_result import Result, load_config, run_status
 from marketbrief.pipeline.validate.news_checks import stage_news
 from marketbrief.pipeline.validate.report_checks import report_file, stage_report
-from marketbrief.pipeline.validate.stages import stage_collect, stage_context, stage_features, stage_forecast
+from marketbrief.pipeline.validate.stages import (
+    stage_collect,
+    stage_context,
+    stage_features,
+    stage_forecast,
+    stage_news_collect,
+)
 
 
 def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
@@ -56,7 +65,9 @@ def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
     }
     stages = STAGES if stage == "all" else (stage,)
     for stage_name in stages:
-        if stage_name == "collect":
+        if stage_name == STAGE_NEWS_COLLECT:
+            stage_news_collect(res, cfg, con, status, now, today, validate_config)
+        elif stage_name == "collect":
             stage_collect(res, cfg, con, status, now, today, validate_config)
         elif stage_name == "news":
             stage_news(res, cfg, con, status, now, today, validate_config, paths.get("enriched"))
@@ -87,7 +98,7 @@ def run(cfg: dict, stage: str, paths: dict | None = None) -> dict:
 def main() -> int:
     """Parse the arguments, run the gate and print its JSON; the exit code is 1 on any failure."""
     parser = cli.market_arg(__doc__)
-    parser.add_argument("--stage", required=True, choices=[*STAGES, "all"])
+    parser.add_argument("--stage", required=True, choices=[*STAGES, STAGE_NEWS_COLLECT, "all"])
     for name in ("predictions", "enriched", "context", "report", "slack"):
         parser.add_argument(f"--{name}", type=Path, help=f"path of the {name} file (default: the routine's)")
     args = parser.parse_args()

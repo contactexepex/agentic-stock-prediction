@@ -1,6 +1,6 @@
 """Collect RSS headlines (Google News queries + outlet feeds from the market config's `news`
 section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the
-last 7 days. Prints a JSON summary; outlet feeds that answer but carry nothing from the last
+last 9 daily files. Prints a JSON summary; outlet feeds that answer but carry nothing from the last
 3 days are listed as `stale`. Tags come from marketbrief/analytics/news_tags.py, headline first: companies
 named in the title (a ticker's `news_names`, default name and aliases, whole words,
 case-insensitive, minus its `news_exclude` phrases); only when the title names none, the
@@ -14,6 +14,12 @@ An outlet with `watchlist_only: true` (press-release wires) keeps only items who
 summary names a watchlist company: case-insensitive whole-word matching on each ticker's
 `wire_names` (full company names; default its name and aliases) after removing the
 `news.wire_exclude` phrases; `skipped_off_watchlist` counts the rest.
+Catch-up window (marketbrief/collectors/news_window.py): the Google News `when:` and the oldest item
+kept follow the time since the market's last successful collection (+1 h, at most 7 days, never below
+the config's `news.google_news.window` and 3 days); a Google News query that fills its 100-item answer
+over a window longer than a day is asked again per day (`sliced_queries`). Each run appends one row
+to data/<market>/news_runs/ (ran_at, window, Google News queries and failures, ok) and the summary
+shows the `window` used.
 Exit code 1 only if every feed failed."""
 
 from __future__ import annotations
@@ -21,13 +27,14 @@ from __future__ import annotations
 import json
 import socket
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
 from marketbrief.analytics.news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
+from marketbrief.collectors.news_window import run_ok, slice_days, window_for
 from marketbrief.constants.columns import COL_ID, COL_TITLE
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_NEWS
-from marketbrief.constants.kinds import KIND_NEWS
+from marketbrief.constants.kinds import KIND_NEWS, KIND_NEWS_RUNS
 from marketbrief.constants.news import (
     COLLECTOR_NEWS,
     DEFAULT_CATEGORY,
@@ -35,7 +42,9 @@ from marketbrief.constants.news import (
     DEFAULT_WINDOW,
     FEED_PREFIX_GNEWS,
     FETCH_ATTEMPTS,
+    GOOGLE_NEWS_ITEM_CAP,
     MAX_AGE_DAYS,
+    MAX_SLICE_QUERIES_PER_RUN,
     PERMANENT_STATUSES,
     RETRY_PAUSE_SECONDS,
     SEEN_LOOKBACK_DAYS,
@@ -48,20 +57,38 @@ from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file, recent_ids
 from marketbrief.sources.rss import fetch_feed
 
-MAX_AGE = timedelta(days=MAX_AGE_DAYS)
+STALE_AGE = timedelta(days=MAX_AGE_DAYS)  # an outlet feed with nothing newer is `stale`
 socket.setdefaulttimeout(SOCKET_TIMEOUT_SECONDS)
 
 
-def google_news_url(query: str, settings: dict) -> str:
-    """The Google News RSS search URL of a query (window and parameters from the config)."""
-    query = f"{query} when:{settings.get('window', DEFAULT_WINDOW)}"
+def google_news_url(query: str, settings: dict, when: str | None = None) -> str:
+    """The Google News RSS search URL of a query. `when:` is the run's window (None: the config's `window`);
+    an empty `when` adds none (a query that carries its own `after:`/`before:` dates)."""
+    if when != "":
+        query = f"{query} when:{when or settings.get('window', DEFAULT_WINDOW)}"
     params = "&".join(
         f"{param_name}={quote_plus(str(param_value))}" for param_name, param_value in settings.get("params", {}).items()
     )
     return f"{settings['base']}?q={quote_plus(query)}&{params}"
 
 
-def build_jobs(feeds: dict, watchlist: dict) -> list[dict]:
+def google_job(query: str, google: dict, category: str, when: str | None = None) -> dict:
+    """One Google News query job; the query is kept for the per-day re-asks."""
+    return {
+        "url": google_news_url(query, google, when),
+        "feed": f"{FEED_PREFIX_GNEWS}{query}",
+        "category": category,
+        "query": query,
+    }
+
+
+def slice_job(job: dict, google: dict, day: date) -> dict:
+    """One day of a query that filled Google News' item cap, stored under the query's own feed name."""
+    dated = f"{job['query']} after:{day.isoformat()} before:{(day + timedelta(days=1)).isoformat()}"
+    return {**job, "url": google_news_url(dated, google, ""), "slice": day.isoformat()}
+
+
+def build_jobs(feeds: dict, watchlist: dict, when: str | None = None) -> list[dict]:
     """The feed jobs of a run: a Google News query per company and category, and the outlet feeds."""
     jobs = []
     google = feeds.get("google_news")
@@ -69,14 +96,10 @@ def build_jobs(feeds: dict, watchlist: dict) -> list[dict]:
         template = google.get("query_template", DEFAULT_QUERY_TEMPLATE)
         for _ticker, query in company_queries(watchlist, template):
             # the query only finds candidates: many results never name the company
-            jobs.append(
-                {"url": google_news_url(query, google), "feed": f"{FEED_PREFIX_GNEWS}{query}", "category": "company"}
-            )
+            jobs.append(google_job(query, google, "company", when))
         for category, queries in feeds.get("categories", {}).items():
             for query in queries:
-                jobs.append(
-                    {"url": google_news_url(query, google), "feed": f"{FEED_PREFIX_GNEWS}{query}", "category": category}
-                )
+                jobs.append(google_job(query, google, category, when))
     for outlet in feeds.get("outlets", []):
         jobs.append(
             {
@@ -120,22 +143,26 @@ class NewsCollector:
     """One run over the feed jobs of a market."""
 
     def __init__(self, watchlist: dict):
-        """The news collector's watchlist and market."""
+        """The news collector's watchlist and market, and this run's catch-up window."""
         self.watchlist, self.market = watchlist, watchlist[CFG_MARKET]
         self.feeds = watchlist.get(CFG_NEWS, {})
+        self.google = self.feeds.get("google_news") or {}
         self.tagger = Tagger(watchlist)
         self.seen = recent_ids(self.market, KIND_NEWS, days=SEEN_LOOKBACK_DAYS)
         self.now, self.now_dt = utc_now(), now_utc()
+        self.window = window_for(self.market, self.now_dt, self.google.get("window", DEFAULT_WINDOW))
+        self.slice_days = slice_days(self.window, self.now_dt)
         self.items: dict[str, dict] = {}
         self.failed: list[dict] = []
         self.stale: list[dict] = []
         self.skipped_off_watchlist = 0
+        self.google_queries = self.google_failed = self.sliced_queries = self.slices_skipped = 0
 
     def check_stale(self, job: dict, times: list) -> None:
         """Note an outlet feed that answers but has nothing recent (it has stopped updating)."""
         if job["feed"].startswith(FEED_PREFIX_GNEWS):
             return
-        if any(ticker is None or self.now_dt - ticker <= MAX_AGE for ticker in times):
+        if any(ticker is None or self.now_dt - ticker <= STALE_AGE for ticker in times):
             return
         newest = max((ticker for ticker in times if ticker), default=None)
         self.stale.append(
@@ -152,7 +179,7 @@ class NewsCollector:
         if source and title.endswith(f"{TITLE_SEPARATOR}{source}"):
             title = title[: -len(f"{TITLE_SEPARATOR}{source}")]
         published = parse_time(entry)
-        if published and self.now_dt - published > MAX_AGE:
+        if published and self.now_dt - published > self.window.max_age:
             return
         domain = source_domain(source_info.get("href"))
         news_id = item_id(title, source, domain)
@@ -180,23 +207,55 @@ class NewsCollector:
         }
 
     def run_job(self, job: dict) -> None:
-        """Fetch one feed and add its entries."""
+        """Fetch one feed and add its entries; a Google News query that fills the item cap over a window longer
+        than a day is asked again per day."""
         parsed, status = fetch_with_retry(job["url"])
+        is_google = job["feed"].startswith(FEED_PREFIX_GNEWS)
+        if is_google:
+            self.sliced_queries += 1 if job.get("slice") else 0
+            self.google_queries += 0 if job.get("slice") else 1
         if is_failed(parsed, status):
-            self.failed.append(
-                {"feed": job["feed"], "status": status, "error": str(parsed.get("bozo_exception", ""))[:200]}
-            )
+            self.google_failed += 1 if is_google and not job.get("slice") else 0
+            failure = {"feed": job["feed"], "status": status, "error": str(parsed.get("bozo_exception", ""))[:200]}
+            self.failed.append({**failure, "slice": job["slice"]} if job.get("slice") else failure)
             return
         self.check_stale(job, [parse_time(entry) for entry in parsed.entries])
         for entry in parsed.entries:
             self.add_entry(job, entry)
+        if is_google and not job.get("slice") and len(parsed.entries) >= GOOGLE_NEWS_ITEM_CAP and self.slice_days:
+            for day in self.slice_days:
+                if self.sliced_queries >= MAX_SLICE_QUERIES_PER_RUN:
+                    self.slices_skipped += 1
+                    continue
+                self.run_job(slice_job(job, self.google, day))
+
+    def failed_feeds(self) -> int:
+        """Failed feeds of the run (a failed per-day re-ask is listed in `failed` but not counted here)."""
+        return sum(1 for failure in self.failed if not failure.get("slice"))
+
+    def run_record(self, feeds: int, written: int) -> dict:
+        """This run's news_runs row: when it ran, its window and whether it counts as a successful collection."""
+        return {
+            COL_ID: f"{self.market}-{self.now}",
+            "ran_at": self.now,
+            "ok": run_ok(self.google_queries, self.google_failed, feeds, self.failed_feeds()),
+            **self.window.summary(),
+            "feeds": feeds,
+            "failed": self.failed_feeds(),
+            "google_queries": self.google_queries,
+            "google_failed": self.google_failed,
+            "sliced_queries": self.sliced_queries,
+            "new_items": written,
+        }
 
     def collect(self) -> int:
-        """Run every job, store the rows, print the summary; returns the exit code."""
-        jobs = build_jobs(self.feeds, self.watchlist)
+        """Run every job, store the rows and the run record, print the summary; returns the exit code."""
+        jobs = build_jobs(self.feeds, self.watchlist, self.window.google_when)
         for job in jobs:
             self.run_job(job)
         written = append_jsonl(day_file(self.market, KIND_NEWS, utc_today()), self.items.values())
+        record = self.run_record(len(jobs), written)
+        append_jsonl(day_file(self.market, KIND_NEWS_RUNS, utc_today()), [record])
         print(
             json.dumps(
                 {
@@ -207,11 +266,17 @@ class NewsCollector:
                     "stale": self.stale,
                     "new_items": written,
                     "skipped_off_watchlist": self.skipped_off_watchlist,
+                    "window": self.window.summary(),
+                    "ok": record["ok"],
+                    "google_queries": self.google_queries,
+                    "google_failed": self.google_failed,
+                    "sliced_queries": self.sliced_queries,
+                    "slices_skipped": self.slices_skipped,
                 },
                 indent=2,
             )
         )
-        return 1 if jobs and len(self.failed) == len(jobs) else 0
+        return 1 if jobs and self.failed_feeds() == len(jobs) else 0
 
 
 def main() -> int:

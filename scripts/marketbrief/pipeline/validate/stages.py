@@ -16,6 +16,7 @@ from marketbrief.constants.validation import (
     MSG_NO_MARKET_REGIME_SECTION,
     MSG_NO_REGIME_ROW_FOR_SESSION,
     MSG_WATCHLIST_NOT_IN_CONTEXT_PACK,
+    NEWS_COLLECT_KINDS,
     STAGE_KINDS,
 )
 from marketbrief.core import paths, schemas
@@ -25,6 +26,7 @@ from marketbrief.pipeline.validate.collect_checks import (
     check_duplicates,
     check_fetches,
     check_files,
+    check_news_run,
     check_summaries,
 )
 from marketbrief.pipeline.validate.gate_result import work_dir
@@ -47,6 +49,20 @@ def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: 
         cfg,
         {key: value for key, value in counts.items() if value or key in ("prices", "quotes", "news")},
         validate_config,
+    )
+    check_news_sources(res, cfg, con, today)
+    check_articles(res, cfg, today)
+
+
+def stage_news_collect(res, cfg, con, _status, now, today, validate_config):  # noqa: PLR0913 (uniform signature)
+    """The news-only light run (routine/NEWS_PROMPT.md): the news kinds' files and rows written today, their
+    duplicate ids, this run's news_runs row, the collectors' summaries, news sources and article rows. No price,
+    calendar or session check: light runs also run on weekends and holidays."""
+    counts = check_files(res, cfg, NEWS_COLLECT_KINDS, today, now, validate_config)
+    check_duplicates(res, cfg, con, validate_config, only_kinds=NEWS_COLLECT_KINDS)
+    check_news_run(res, con, now, today, validate_config)
+    res.info["news_collect"] = check_summaries(
+        res, cfg, {key: value for key, value in counts.items() if value or key == "news"}, validate_config
     )
     check_news_sources(res, cfg, con, today)
     check_articles(res, cfg, today)

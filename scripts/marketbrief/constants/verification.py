@@ -6,6 +6,10 @@ KIND_PRIMARY_TEXTS = "primary_texts"
 KIND_NEWS_CLUSTERS = "news_clusters"
 KIND_NEWS_ARTICLES = "news_articles"
 
+# `clusters:` defaults of config/news_sources.yaml read by claims.py and news_status.py
+DEFAULT_CLAIMS_WINDOW_HOURS = 72
+DEFAULT_CLUSTER_LOOKBACK_HOURS = 144
+
 METHOD_VERSION_CLAIMS = "nv-b1"
 METHOD_VERSION_STATUS = "nv-b1"
 

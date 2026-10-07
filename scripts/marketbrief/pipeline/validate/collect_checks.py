@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from marketbrief.constants.kinds import KIND_NEWS_RUNS
 from marketbrief.constants.prices import HELD_ESCALATE_SESSIONS, SUMMARY_HELD_TOO_LONG
 from marketbrief.constants.validation import (
     FETCH_COL,
@@ -26,6 +27,7 @@ from marketbrief.constants.validation import (
     MSG_NO_STORED_PRICE_BARS,
     MSG_NOT_A_JSON_SUMMARY,
     MSG_NOT_FETCHED_NO_ROWS,
+    MSG_NEWS_RUN_NOT_OK,
     MSG_NOT_FETCHED_STALE,
     MSG_PRICE_BASIS_WARNINGS,
     MSG_PRICE_HELD_TOO_LONG,
@@ -41,6 +43,8 @@ from marketbrief.pipeline.validate.row_checks import (
     todays_files,
 )
 from marketbrief.utils.timefmt import as_utc_timestamp
+
+NEWEST_NEWS_RUN_SQL = "SELECT ran_at, ok FROM news_runs ORDER BY ran_at DESC LIMIT 1"
 
 
 def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, validate_config: dict) -> dict:
@@ -73,11 +77,11 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
     return counts
 
 
-def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict):
-    """No duplicated ids (or unique keys) in the stored kinds."""
+def check_duplicates(res: Result, _cfg: dict, con, validate_config: dict, only_kinds=None):
+    """No duplicated ids (or unique keys) in the stored kinds (or in `only_kinds` of them)."""
     keys = {kind: "id" for kind in validate_config["unique_id_kinds"]} | dict(validate_config.get("unique_keys") or {})
     for kind, key in keys.items():
-        if kind not in schemas.SCHEMAS:
+        if kind not in schemas.SCHEMAS or (only_kinds is not None and kind not in only_kinds):
             continue
         rows = con.execute(
             f"SELECT {key}, count(*) FROM {kind} GROUP BY 1 HAVING count(*) > 1 ORDER BY 1 LIMIT 20"
@@ -223,6 +227,27 @@ def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, v
                     kind=kind, column=col, newest=newest_time.isoformat(), today=today, limit=limit
                 ),
             )
+
+
+def check_news_run(res: Result, con, now: pd.Timestamp, today: date, validate_config: dict):
+    """The light run's news collection ran: the newest news_runs row is from today and recent (else NOT_FETCHED at
+    `fetch_severity`); a run that does not count as successful (most Google News queries failed) is a warning."""
+    newest = con.execute(NEWEST_NEWS_RUN_SQL).fetchone()
+    limit = validate_config["fetch_max_age_hours"]["news"]
+    ran_at = as_utc_timestamp(newest[0]) if newest else None
+    if ran_at is None:
+        res.add(validate_config["fetch_severity"], "NOT_FETCHED", MSG_NOT_FETCHED_NO_ROWS.format(kind=KIND_NEWS_RUNS))
+        return
+    if ran_at.date() != today or now - ran_at > pd.Timedelta(hours=limit):
+        res.add(
+            validate_config["fetch_severity"],
+            "NOT_FETCHED",
+            MSG_NOT_FETCHED_STALE.format(
+                kind=KIND_NEWS_RUNS, column="ran_at", newest=ran_at.isoformat(), today=today, limit=limit
+            ),
+        )
+    if not newest[1]:
+        res.warn("NEWS_RUN_NOT_OK", MSG_NEWS_RUN_NOT_OK.format(ran_at=ran_at.isoformat()))
 
 
 def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict) -> dict:

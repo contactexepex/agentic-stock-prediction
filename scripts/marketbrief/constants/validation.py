@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 STAGES = ("collect", "news", "features", "context", "forecast", "report")
+# The news-only light run's gate (routine/NEWS_PROMPT.md): never part of `all`
+STAGE_NEWS_COLLECT = "news_collect"
+NEWS_COLLECT_KINDS = ("news", "news_runs", "news_articles", "news_clusters", "announcements")
 
 # kinds whose day files are named by the trading date, with the column that says when a row was written
 TRADING_DATE_KINDS = {
@@ -66,9 +69,17 @@ MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR = "{kind}: no rows written today (no coll
 MSG_ARTICLE_ROWS_BREAK_RULES = "{count} news_articles rows break the article rules, e.g. {examples}"
 MSG_ENRICHED_FILE_PROBLEM = "{name}: {problems}"
 MSG_REPEATED_IDS = "{name}: repeated ids {ids}"
-MSG_IDS_NOT_FIRST_SEEN_TODAY = "{count} ids are not news/announcements first seen today, e.g. {ids}"
+MSG_IDS_NOT_FIRST_SEEN_IN_WINDOW = (
+    "{count} ids are not news/announcements first seen since the last enrichment ({since}), e.g. {ids}"
+)
+MSG_NEWS_RUN_NOT_OK = (
+    "the news run at {ran_at} does not count as a successful collection (most Google News queries failed): "
+    "the next run reaches back further"
+)
 MSG_IDS_ALREADY_ENRICHED = "{count} ids already in news_enriched, e.g. {ids}"
-MSG_IDS_WITHOUT_ENRICHMENT = "{count} of today's news/announcement ids have no enrichment, e.g. {ids}"
+MSG_IDS_WITHOUT_ENRICHMENT = (
+    "{count} news/announcement ids first seen since the last enrichment ({since}) have no enrichment, e.g. {ids}"
+)
 MSG_ENRICHMENT_RULE_PROBLEM = "{record_id}: {problems}"
 
 # ---------- validate: report_checks ----------

@@ -28,6 +28,17 @@ BASE_SCHEMAS: Schemas = {
         "primary_tickers": "VARCHAR[]", "mentioned_tickers": "VARCHAR[]", "tag_confidence": "VARCHAR",
         "source_domain": "VARCHAR", "tag_version": "INTEGER",
     }),
+    # One row per collect_news.py run (marketbrief/collectors/news_window.py): ran_at = the run's start;
+    # since = the last successful collection the window reaches back to (null on a first run);
+    # window_hours / google_when = the span asked from Google News; max_age_hours = oldest item kept;
+    # reason = first_run | since_last_run | since_last_news | no_recent_success; ok = not every feed
+    # failed and at most half of the Google News queries failed (the next run's window starts here).
+    "news_runs": ("jsonl", {
+        "id": "VARCHAR", "ran_at": "TIMESTAMPTZ", "ok": "BOOLEAN", "since": "TIMESTAMPTZ",
+        "window_hours": "DOUBLE", "google_when": "VARCHAR", "max_age_hours": "DOUBLE", "reason": "VARCHAR",
+        "feeds": "INTEGER", "failed": "INTEGER", "google_queries": "INTEGER", "google_failed": "INTEGER",
+        "sliced_queries": "INTEGER", "new_items": "INTEGER",
+    }),
     "news_enriched": ("jsonl", {
         "id": "VARCHAR", "analyzed_at": "TIMESTAMPTZ", "relevance": "DOUBLE",
         "sentiment": "DOUBLE", "novelty": "DOUBLE", "materiality": "VARCHAR",

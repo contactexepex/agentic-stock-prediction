@@ -106,6 +106,12 @@ news:
     global: ["oil prices", "geopolitical tensions markets"]
     trade: ["US tariffs trade"]
     markets: ["stock market today site:cnbc.com"]   # CNBC headlines via Google News
+    # Overseas drivers (each query checked live 2026-10-07 with when:1d, en-US: relevant results)
+    china: ["China economy"]
+    europe: ["European Central Bank", "European stocks"]
+    japan: ["Bank of Japan", "yen dollar"]
+    semis_supply: ["TSMC", "Samsung semiconductor"]
+    asia: ["Asian stocks"]
   outlets:   # CNBC's own RSS returns 403 to cloud servers (rechecked 2026-10-05), see `markets` above
     # link_domains: where an outlet's article links point when that is not the feed's own domain
     # (scripts/validate.py checks each stored news url against them)

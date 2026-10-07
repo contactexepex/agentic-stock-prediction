@@ -27,7 +27,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   days, India from NSE results filings, US from SEC 8-K item 2.02, every 2.02 stored as filed and kept only when it is a
   quarter's results release when read (`event_history.results_filter`, anchored on stored 10-Q/10-K `periodic_report`
   rows), and dividends; also Yahoo's consensus EPS point in time -> `earnings_estimates`, read with
-  `earnings_estimates_asof(ts)`, context only), `collect_news`, `collect_filings`, `collect_options` (US option-chain
+  `earnings_estimates_asof(ts)`, context only), `collect_news` (catch-up window: Google News `when:` and the oldest item
+  kept reach back to the market's last successful news run, +1 h, at most 7 days, never below 1 day / 3 days;
+  a query filling Google News' 100-item answer is re-asked per day; one row per run in `data/<market>/news_runs/`;
+  `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"), `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
@@ -202,7 +205,12 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, claim
   checking, the reflector and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
   table in DESIGN.md section 13).
-- `routine/PROMPT.md` the routines' saved prompt (one per market)
+- `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
+  run (one per market, every 6 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
+  India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
+  session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
+  scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
+  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window)
 - Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
   `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
   for the files it moves (ruff in `requirements-dev.txt`, dev and CI only) and shrinks the size

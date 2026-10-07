@@ -15,8 +15,9 @@ step:
   and only read as context, so no other per-run check;
 - claim-checker: `scripts/claims.py validate` (step 3: ids, verbatim quotes, numbers in quotes,
   enums); statuses are computed by `scripts/news_status.py`, never by an agent;
-- news-analyst: `--stage news` (schema, ids are today's new news/announcement ids, nothing stored
-  twice, scores in range); the weekly spot-check reads enrichment summaries of sampled evidence;
+- news-analyst: `--stage news` (schema, ids are news/announcement ids first seen since the last
+  enrichment, the window `scripts/news_pending.py` lists, nothing stored twice, scores in range); the
+  weekly spot-check reads enrichment summaries of sampled evidence;
 - bull and bear researchers: `--stage forecast` (every cited id exists and was public before the
   call) and the weekly spot-check (reasons match evidence);
 - forecaster: `--stage forecast` (every CLAUDE.md prediction rule, each cited id's news
@@ -87,6 +88,10 @@ Warnings never block: list them in `data_quality`.
    For India, `collect_prices.py` also reads NSE (its bhavcopy fallback for missing bars), so it
    never runs alongside an NSE collector (`collect_relations_india`, `collect_nse_india`,
    `collect_events`, `collect_flows_india`) either.
+   `collect_news.py` reaches back to the market's last successful news collection (the light runs of
+   routine/NEWS_PROMPT.md or the previous pre-open run; +1 h, at most 7 days, never less than a day):
+   its summary shows the `window` (`google_when`, `since`, `reason`) and `ok`; when `ok` is false (most
+   Google News queries failed) add a `data_quality` line, the next run reaches back over this one.
    Save each JSON summary as `work/steps/<script name>.json` (e.g.
    `python scripts/collect_prices.py > work/steps/collect_prices.json`; `mkdir -p work/steps` first)
    and list its `warnings` (an endpoint that returned nothing at all) in
@@ -135,7 +140,9 @@ Warnings never block: list them in `data_quality`.
       `python scripts/news_clusters.py > work/steps/news_clusters.json` (same-event clusters,
       independent origins, primary-source candidates);
    b. `python scripts/claims.py prepare > work/steps/claims_prepare.json` (selects this run's
-      high-materiality watchlist clusters, at most `claims.max_clusters_per_run`, stores the text
+      high-materiality watchlist clusters, among those reported in the last 72 h or since the last
+      enrichment when that is longer, e.g. over a weekend of light runs or a holiday, at most 144 h
+      (`window_hours` in its summary), at most `claims.max_clusters_per_run`, stores the text
       of their SEC 8-K/6-K primary sources through SEC, and writes `work/claim_inputs.jsonl`). If
       its `selected` is 0, skip to d. Otherwise delete `work/claims.jsonl`, run the claim-checker
       subagent with the market (it writes claim records quoting the stored extracts and filing
@@ -190,14 +197,19 @@ Warnings never block: list them in `data_quality`.
 6. Context: `python scripts/context.py > work/context.md`. Gate:
    `python scripts/validate.py --stage context > work/steps/validate_context.json`.
 
-7. News: run the news-analyst subagent on today's `data/<market>/news/` file and, for India,
-   also today's `data/india/announcements/YYYY/MM/<today>.jsonl` (NSE exchange filings; ids
-   `nse-ann-<seq_id>`, the one exception to the 16-character news id). Keep its brief.
-   `work/enriched.jsonl` should hold one record per new news id plus one per new `nse-ann-` id,
-   and nothing else. Gate: `python scripts/validate.py --stage news > work/steps/validate_news.json`;
+7. News: `python scripts/news_pending.py > work/steps/news_pending.json` writes
+   `work/news_pending.jsonl`: every news item and, for India, every NSE announcement (ids
+   `nse-ann-<seq_id>`, the one exception to the 16-character news id) first seen since the last
+   enrichment and not enriched yet. That covers the news-only light runs (routine/NEWS_PROMPT.md, every
+   6 hours, weekends and holidays included) and a failed earlier run, not just today's file: the window
+   starts at the earlier of the start of today (UTC) and the newest already-enriched item's
+   `first_seen_at`, at most 7 days back (`since` in its summary). Delete `work/enriched.jsonl`, then run
+   the news-analyst subagent on `work/news_pending.jsonl`. Keep its brief.
+   `work/enriched.jsonl` should hold one record per pending id, and nothing else. Gate: `python scripts/validate.py --stage news > work/steps/validate_news.json`;
    if it passes, append `work/enriched.jsonl` to `data/<market>/news_enriched/YYYY/MM/TODAY.jsonl`
-   with `cat >>` and delete the work file. Then run `python scripts/model_scores.py >
-   work/steps/model_scores_news.json` again (today's enriched news enter the model's news term; it
+   with `cat >>` and delete the work file (the gate checks the same window: an id first seen before
+   it is `ENRICH_UNKNOWN_ID`, a pending id left out is the warning `ENRICH_MISSING`). Then run
+   `python scripts/model_scores.py > work/steps/model_scores_news.json` again (the enriched news enter the model's news term; it
    appends a row only where the probability changed) and rebuild the pack:
    `python scripts/context.py > work/context.md`.
 
