@@ -48,6 +48,11 @@ export class FakeInbox implements InboxStore {
     return { claimed: true, existing: null };
   }
 
+  async findRequest(inboxId: string) {
+    if (this.down) throw new Error("inbox down");
+    return this.requests.find((item) => item.inbox_id === inboxId) ?? null;
+  }
+
   async appendCommand(row: CommandLogRow) {
     if (this.failAppend) throw new Error("append failed");
     this.commands.push(structuredClone(row));
