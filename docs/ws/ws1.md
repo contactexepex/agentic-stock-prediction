@@ -261,6 +261,9 @@ untouched tree.
   false doc statements: `ws1-judgments.jsonl` listed as created but missing, and wrong statement counts.
 - Round 2: PASS, commit 5bf0ae3f4799f7d00e9b22b18e03386156bb7e35 (re-check of the two blockers and the fix
   diff; no new findings).
+- Follow-up (HTTPS extension install, clean-code pass), round 1: FAIL, commit b23f94f (the run's start time
+  moved after the local connect; summary key order and failure keys changed).
+- Follow-up, round 2: PASS, commit da70e29.
 
 ## Follow-up 2026-10-07: HTTPS-only extension install and clean-code pass
 Owner decisions (this session): fix the extension install only (no new tokens, no inbox database), tidy the
@@ -424,6 +427,9 @@ could hide the original error were fixed in the follow-up below.
 - Fixed in the follow-up's round 2: a redirect is followed only to HTTPS on the two official hosts; a
   failed decompression leaves no partial file; `cli.py` and `postgres.py` import from `errors.py`; the
   test environment no longer leaks `MOTHERDUCK_EXT_VERSION`; the `SLOW` comment in conftest.
+- From the follow-up's round 2: no committed test fixes the summary's key order (checked by a one-off
+  script against main's code); no test checks that the downloader's opener uses `AllowedRedirects` (checked
+  by hand); `tests/conftest.py` has 2 ruff ARG001 findings and needs a reformat, both from before WS1.
 - A changed page (delete and re-insert of the same key in one transaction) is not exercised live on
   MotherDuck; locally it is covered by the `--full` and invalid-page paths.
 
