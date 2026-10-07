@@ -1,0 +1,9 @@
+import { authorize } from "../../_lib/oauth.ts";
+import { nowSeconds, withConfig } from "../../_lib/http.ts";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export function GET(request: Request): Promise<Response> {
+  return withConfig((cfg) => authorize(request, cfg, nowSeconds()));
+}

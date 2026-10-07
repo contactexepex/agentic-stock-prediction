@@ -29,8 +29,7 @@ from marketbrief.pipeline.evidence_status import EvidenceStatuses
 
 ITEMS_SQL = """
 WITH n AS (SELECT id, unnest(primary_tickers) AS ticker, coalesce(published_at, first_seen_at) AS ts FROM news),
-e AS (SELECT DISTINCT ON (id) id, sentiment, relevance, materiality, event_type FROM news_enriched
-      WHERE analyzed_at <= ?::TIMESTAMPTZ ORDER BY id, analyzed_at DESC)
+e AS (SELECT id, sentiment, relevance, materiality, event_type FROM news_enriched_asof(?::TIMESTAMPTZ))
 SELECT n.ticker, n.id, n.ts, e.sentiment, e.relevance, e.materiality, e.event_type
 FROM n JOIN e USING (id)
 WHERE n.ts <= ?::TIMESTAMPTZ AND n.ts > ?::TIMESTAMPTZ

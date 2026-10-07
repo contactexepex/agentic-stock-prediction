@@ -29,8 +29,8 @@ SELECT * FROM news_clusters_asof(?::TIMESTAMPTZ)
 WHERE last_reported_at >= ?::TIMESTAMPTZ ORDER BY cluster_id"""
 ITEMS_SQL = """
 SELECT DISTINCT ON (id) id, title, source, first_seen_at, coalesce(published_at, first_seen_at) AS published_at
-FROM news
-WHERE list_contains(?, id) AND first_seen_at <= ?::TIMESTAMPTZ ORDER BY id, first_seen_at"""
+FROM news_lookup_asof(?::TIMESTAMPTZ)
+WHERE list_contains(?, id) ORDER BY id, first_seen_at"""
 ARTICLES_SQL = """
 SELECT id, access, domain, extract, fetched_at FROM news_articles_asof(?::TIMESTAMPTZ)
 WHERE list_contains(?, id) ORDER BY id"""
@@ -90,7 +90,7 @@ def cluster_ids(cluster: dict) -> list[str]:
 def item_rows(con, ids: list[str], now: pd.Timestamp) -> dict[str, dict]:
     """News rows (title, source, first seen) and their article rows fetched by now, by id."""
     items = {
-        row["id"]: clean_row(row) for row in con.execute(ITEMS_SQL, [ids, now.isoformat()]).df().to_dict("records")
+        row["id"]: clean_row(row) for row in con.execute(ITEMS_SQL, [now.isoformat(), ids]).df().to_dict("records")
     }
     for row in con.execute(ARTICLES_SQL, [now.isoformat(), ids]).df().to_dict("records"):
         if row["id"] in items:

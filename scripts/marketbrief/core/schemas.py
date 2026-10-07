@@ -4,6 +4,7 @@ The tables themselves live in schema_base, schema_filings and schema_sources; th
 
 from __future__ import annotations
 
+from marketbrief.alerts.schema import ALERTS_SCHEMAS  # B6
 from marketbrief.constants.kinds import KIND_FUNDAMENTALS, KIND_SEC_TIMES
 from marketbrief.core.schema_b2 import B2_SCHEMAS  # B2
 from marketbrief.core.schema_base import BASE_SCHEMAS, FEATURE_COLS, Schemas
@@ -38,6 +39,7 @@ def build_schemas() -> Schemas:
         **RESULTS_SCHEMAS,  # WS6
         **W1_SCHEMAS,  # W1
         **B2_SCHEMAS,  # B2
+        **ALERTS_SCHEMAS,  # B6
     }
     for kind, (file_format, columns) in RELATION_SCHEMAS.items():
         if kind in schemas:

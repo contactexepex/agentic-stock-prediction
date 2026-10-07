@@ -1,0 +1,138 @@
+"""The stored records each post needs, read through DuckDB (core.database.connect) as of the run's clock
+(MB_NOW-aware): nothing made, checked, settled or written after `now` is used."""
+from __future__ import annotations
+
+import json
+import math
+from datetime import date, datetime
+
+import numpy as np
+import pandas as pd
+
+from marketbrief.constants.kinds import (
+    KIND_COMMAND_LOG,
+    KIND_EOD_ANALYSES,
+    KIND_HEAD_TO_HEAD_PICKS,
+    KIND_PAPER_TRADES_SETTLED,
+    KIND_RESEARCH_REVIEWS,
+    KIND_STRATEGY_PREDICTIONS,
+    KIND_TRADE_CHECKS,
+)
+from marketbrief.core.schemas import SCHEMAS
+
+
+def plain(value, is_json: bool = False):
+    """A DuckDB/pandas value as plain JSON-ready Python (ISO strings for times and dates)."""
+    if isinstance(value, np.ndarray | list):
+        return [plain(v) for v in list(value)]
+    if value is pd.NaT or value is None:
+        return None
+    if isinstance(value, pd.Timestamp | datetime | date):
+        return value.isoformat()
+    value = value.item() if isinstance(value, np.generic) else value
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return json.loads(value) if is_json and isinstance(value, str) else value
+
+
+def records(con, kind: str, sql: str, params: list) -> list[dict]:
+    """Rows of a query on one kind as dicts, its JSON columns parsed and its DATE columns as 'YYYY-MM-DD'."""
+    types = SCHEMAS[kind][1]
+    frame = con.execute(sql, params).df()
+    out = []
+    for row in frame.to_dict("records"):
+        rec = {c: plain(v, types.get(c) == "JSON") for c, v in row.items()}
+        out.append({c: v[:10] if types.get(c) == "DATE" and isinstance(v, str) else v for c, v in rec.items()})
+    return out
+
+
+def feed_asof(rows: list[dict], now: datetime) -> list[dict]:
+    """Alert feed records checked (and computed, when stated) by `now`; a record without check_at is dropped."""
+    def by_now(value) -> bool:
+        return value is not None and pd.Timestamp(value).tz_convert("UTC") <= pd.Timestamp(now).tz_convert("UTC")
+    return [r for r in rows if by_now(r.get("check_at"))
+            and (r.get("computed_at") is None or by_now(r.get("computed_at")))]
+
+
+def session_predictions(con, session_date: str, now: datetime) -> list[dict]:
+    """The session's strategy predictions made by `now` (one row per id, the first made)."""
+    return records(con, KIND_STRATEGY_PREDICTIONS, f"""
+        SELECT * FROM {KIND_STRATEGY_PREDICTIONS} WHERE session_date = ?::DATE AND made_at <= ?::TIMESTAMPTZ
+        QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at) = 1 ORDER BY id""", [session_date, now])
+
+
+def session_picks(con, session_date: str, now: datetime) -> list[dict]:
+    """The session's head-to-head picks made by `now`."""
+    return records(con, KIND_HEAD_TO_HEAD_PICKS, f"""
+        SELECT * FROM {KIND_HEAD_TO_HEAD_PICKS} WHERE session_date = ?::DATE AND made_at <= ?::TIMESTAMPTZ
+        QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at) = 1 ORDER BY id""", [session_date, now])
+
+
+def latest_check(con, session_date: str, now: datetime, check_id: str | None = None) -> list[dict]:
+    """The trade checks of one check run of the session (the newest by `now` unless `check_id` is given)."""
+    if check_id is None:
+        newest = con.execute(f"""SELECT check_id FROM {KIND_TRADE_CHECKS} WHERE session_date = ?::DATE
+            AND check_at <= ?::TIMESTAMPTZ AND computed_at <= ?::TIMESTAMPTZ
+            ORDER BY check_at DESC, check_id DESC LIMIT 1""", [session_date, now, now]).fetchone()
+        if newest is None:
+            return []
+        check_id = newest[0]
+    return records(con, KIND_TRADE_CHECKS, f"""
+        SELECT * FROM {KIND_TRADE_CHECKS} WHERE check_id = ? AND check_at <= ?::TIMESTAMPTZ
+        AND computed_at <= ?::TIMESTAMPTZ
+        QUALIFY row_number() OVER (PARTITION BY id ORDER BY computed_at) = 1 ORDER BY id""", [check_id, now, now])
+
+
+def settled_today(con, session_date: str, timezone: str, now: datetime) -> list[dict]:
+    """The trades first settled on the session's local date, each as its newest row by `now`. A trade first settled
+    on an earlier day and re-settled on this one is not listed here: it is a correction of that day (corrections)."""
+    return records(con, KIND_PAPER_TRADES_SETTLED, f"""
+        WITH first AS (SELECT trade_id, min(settled_at) AS first_at FROM {KIND_PAPER_TRADES_SETTLED}
+                       WHERE settled_at <= ?::TIMESTAMPTZ GROUP BY trade_id)
+        SELECT t.* FROM {KIND_PAPER_TRADES_SETTLED} t JOIN first f ON f.trade_id = t.trade_id
+        WHERE CAST(timezone(?, f.first_at) AS DATE) = ?::DATE AND t.settled_at <= ?::TIMESTAMPTZ
+        QUALIFY row_number() OVER (PARTITION BY t.trade_id ORDER BY t.settled_at DESC, t.id DESC) = 1
+        ORDER BY t.trade_id""", [now, timezone, session_date, now])
+
+
+def corrections(con, session_date: str, timezone: str, after: str, now: datetime) -> list[dict]:
+    """Settlement rows that supersede another row (a re-settlement, F1.5) of a trade first settled on the session's
+    local date, written after `after` (the close post) and by `now`; each with the superseded row's net_pnl and
+    return_pct as was_net_pnl and was_return_pct."""
+    return records(con, KIND_PAPER_TRADES_SETTLED, f"""
+        WITH first AS (SELECT trade_id, min(settled_at) AS first_at FROM {KIND_PAPER_TRADES_SETTLED}
+                       GROUP BY trade_id)
+        SELECT r.*, o.net_pnl AS was_net_pnl, o.return_pct AS was_return_pct
+        FROM {KIND_PAPER_TRADES_SETTLED} r
+        JOIN {KIND_PAPER_TRADES_SETTLED} o ON o.id = r.supersedes
+        JOIN first f ON f.trade_id = r.trade_id
+        WHERE CAST(timezone(?, f.first_at) AS DATE) = ?::DATE
+          AND r.settled_at > ?::TIMESTAMPTZ AND r.settled_at <= ?::TIMESTAMPTZ
+        ORDER BY r.settled_at, r.id""", [timezone, session_date, after, now])
+
+
+def eod_analysis(con, session_date: str, now: datetime) -> dict | None:
+    """The session's end-of-day analysis written by `now` (the newest)."""
+    rows = records(con, KIND_EOD_ANALYSES, f"""
+        SELECT * FROM {KIND_EOD_ANALYSES} WHERE session_date = ?::DATE AND created_at <= ?::TIMESTAMPTZ
+        ORDER BY created_at DESC, id DESC LIMIT 1""", [session_date, now])
+    return rows[0] if rows else None
+
+
+def research_review(con, now: datetime, iso_week: str | None = None) -> dict | None:
+    """The newest research review written by `now` (of `iso_week` when given)."""
+    week_sql, params = ("AND iso_week = ?", [now, iso_week]) if iso_week else ("", [now])
+    rows = records(con, KIND_RESEARCH_REVIEWS, f"""
+        SELECT * FROM {KIND_RESEARCH_REVIEWS} WHERE written_at <= ?::TIMESTAMPTZ {week_sql}
+        ORDER BY written_at DESC, id DESC LIMIT 1""", params)
+    return rows[0] if rows else None
+
+
+def command(con, command_id: str, now: datetime) -> dict | None:
+    """A command_log record as of `now`: the newest row of that id received (and, when completed, completed)
+    by then."""
+    rows = records(con, KIND_COMMAND_LOG, f"""
+        SELECT * FROM {KIND_COMMAND_LOG} WHERE id = ? AND received_at <= ?::TIMESTAMPTZ
+        AND (completed_at IS NULL OR completed_at <= ?::TIMESTAMPTZ)
+        ORDER BY completed_at DESC NULLS LAST LIMIT 1""", [command_id, now, now])
+    return rows[0] if rows else None

@@ -30,7 +30,7 @@ from marketbrief.constants.validation import (
     MSG_NEWS_SOURCE_UNKNOWN_OUTLET,
     MSG_REPEATED_IDS,
 )
-from marketbrief.pipeline.news_pending import window_ids
+from marketbrief.pipeline.news_pending import rescore_ids, window_ids
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, todays_files
 
@@ -58,10 +58,13 @@ def allowed_news_sources(cfg: dict) -> tuple[set[str], dict[str, set[str]]]:
 
 
 def check_news_sources(res: Result, cfg: dict, con, today: date):
-    """Today's news rows come from allow-listed sources."""
+    """Today's stored news rows and headline updates come from allow-listed sources."""
     google_domains, outlets = allowed_news_sources(cfg)
     rows = con.execute(
-        "SELECT id, url, feed, tickers FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]
+        "SELECT id, url, feed, tickers FROM news_tagged WHERE CAST(first_seen_at AS DATE) = ? "
+        "UNION ALL SELECT u.id, u.url, u.feed, n.tickers FROM news_updates u "
+        "LEFT JOIN news_lookup n ON n.id = u.news_id WHERE CAST(u.seen_at AS DATE) = ? ORDER BY 1",
+        [today, today],
     ).fetchall()
     bad = []
     for nid, url, feed, tickers in rows:
@@ -163,7 +166,10 @@ def stage_news(  # noqa: PLR0913 (uniform stage signature)
     if bad:
         res.block("SCHEMA", MSG_ENRICHED_FILE_PROBLEM.format(name=path.name, problems="; ".join(bad)))
     since, new_ids = window_ids(con, now)
-    done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()}
+    # an item whose headline changed after its enrichment is scored again (news_pending.rescore_ids)
+    done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()} - rescore_ids(
+        con, since, now
+    )
     ids = [row.get("id") for row in rows]
     duplicates = sorted({index for index in ids if ids.count(index) > 1})
     if duplicates:

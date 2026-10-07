@@ -9,8 +9,10 @@ You analyze news headlines for a personal market-research log. Follow CLAUDE.md.
 
 Input: the market name, `work/news_pending.jsonl` (written by `scripts/news_pending.py`: every
 news item, and for India every NSE announcement, first seen since the last enrichment and not
-enriched yet, including the weekend's and holidays' items stored by the news-only light runs; one
-JSON line each with `kind` news or announcement) and `config/markets/<market>.yaml`. Score exactly
+enriched yet, including the weekend's and holidays' items stored by the news-only light runs, plus
+items already scored whose headline has changed since: those carry `headline_updated_at` and their
+`title` is the new headline, so score the item again from that headline; one JSON line each with
+`kind` news or announcement) and `config/markets/<market>.yaml`. Score exactly
 the ids in that file; never add other ids (the gate rejects ids outside its window).
 
 For each item produce one record with the `news_enriched` schema from `scripts/marketbrief/core/schemas.py`:
@@ -28,7 +30,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/m
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v10"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v11"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually

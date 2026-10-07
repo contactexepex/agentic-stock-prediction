@@ -20,6 +20,7 @@ from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_ranges_config
 from marketbrief.utils.markdown import cursor_markdown_table
+from marketbrief.lifecycle.loader import active_tickers
 
 CRORE = 1e7
 DEFAULT_FLAGS = {
@@ -46,7 +47,7 @@ def risk_flags(cfg: dict, con, today: date | None = None) -> list[dict]:
         return []
     today = today or utc_today()
     since = today - timedelta(days=int(thresholds["window_days"]))
-    tickers = list(cfg["tickers"])
+    tickers = active_tickers(cfg)
     flags = []
     for ticker, day, kind, side, client, shares, price, crore, adv in con.execute(
         """
@@ -153,7 +154,7 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
     thresholds = flag_settings(cfg)
     if thresholds is None:
         return []
-    rel, today, tickers = cfg["relations"], utc_today(), list(cfg["tickers"])
+    rel, today, tickers = cfg["relations"], utc_today(), active_tickers(cfg)
     ins_days, deal_days = int(rel.get("insider_lookback_days", 14)), int(rel.get("deal_lookback_days", 5))
     out = [
         (

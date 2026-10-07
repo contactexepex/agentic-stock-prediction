@@ -9,7 +9,8 @@ from urllib.parse import urlsplit
 import pandas as pd
 
 from marketbrief.analytics.article_pages import canonical_url, host_of
-from marketbrief.analytics.news_sources import Sources, label_domains, outlet_key, outlet_of
+from marketbrief.analytics.news_dedup import OutletKeys
+from marketbrief.analytics.news_sources import Sources, label_domains, outlet_of
 from marketbrief.analytics.text_measures import distinctive, numbers, sources_say, title_tokens
 from marketbrief.constants.news_clusters import (
     ANNOUNCEMENTS_SQL,
@@ -83,8 +84,12 @@ def resolve_domain(article: dict | None, row: NewsRow, host: str, src: Sources, 
     return fetched or row.source_domain or listed_host or outlet_of(row.source, src, learned) or other_host
 
 
-def row_fields(row: NewsRow, article: dict | None, src: Sources, learned: dict) -> dict:
-    """The per-row item fields shared by all tickers the row is about."""
+def row_fields(
+    row: NewsRow, article: dict | None, src: Sources, learned: dict, outlets: OutletKeys | None = None
+) -> dict:
+    """The per-row item fields shared by all tickers the row is about. The outlet key is news de-duplication's
+    (analytics/news_dedup.py: host prefixes, allowlisted domain and its `same_as`), so one outlet under two hosts
+    is one origin."""
     host = host_of(row.url)
     domain = resolve_domain(article, row, host, src, learned)
     listed = src.lookup(domain)[0]
@@ -126,7 +131,7 @@ def row_fields(row: NewsRow, article: dict | None, src: Sources, learned: dict) 
             or src.is_promotional(text=row.title)
         ),
         "canon": canonical_url(own_page(article, row.url, host)),
-        "outlet_key": outlet_key(domain, row.source),
+        "outlet_key": (outlets or OutletKeys(src)).key(row.source, domain),
         "article": article,
         "fetched": to_utc(art.get("fetched_at")),
         "say": bool(art.get("sources_say")) or sources_say(row.title),
@@ -146,6 +151,7 @@ def load_items(con, cfg: dict, src: Sources, as_of: pd.Timestamp) -> list[dict]:
         for database_row in con.execute(ARTICLES_SQL, [as_of.to_pydatetime()]).df().to_dict("records")
     }
     learned = label_domains(((database_row.source, database_row.source_domain) for database_row in rows), src)
+    outlets = OutletKeys(src)
     items = []
     for row in rows:
         tickers = [ticker for ticker in (row.primary_tickers or []) if ticker in cfg["tickers"]]
@@ -160,7 +166,7 @@ def load_items(con, cfg: dict, src: Sources, as_of: pd.Timestamp) -> list[dict]:
             if article
             else None
         )
-        fields = row_fields(row, article, src, learned)
+        fields = row_fields(row, article, src, learned, outlets)
         items.extend({**fields, "ticker": ticker} for ticker in tickers)
     return items
 

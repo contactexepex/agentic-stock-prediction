@@ -30,7 +30,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `earnings_estimates_asof(ts)`, context only), `collect_news` (catch-up window: Google News `when:` and the oldest item
   kept reach back to the market's last successful news run, +1 h, at most 7 days, never below 1 day / 3 days;
   a query filling Google News' 100-item answer is re-asked per day; one row per run in `data/<market>/news_runs/`;
-  `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"), `collect_filings`, `collect_options` (US option-chain
+  `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"; de-duplication, once per market:
+  the same article link or the same normalised title from the same outlet (outlet key: host without www./m./amp.,
+  allowlisted domain and its `same_as`, or a configured outlet name) within 9 days is not stored again, a new
+  headline at a stored link is a `news_updates` row; different outlets stay separate; stored duplicates are hidden
+  on read via `news_id_map` (`news` view: one row per item with its latest headline by now, `news_asof(ts)`,
+  `news_aliases`, `news_lookup` for any stored id; `marketbrief/analytics/news_dedup.py`, DESIGN.md section 3
+  "News de-duplication")), `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
