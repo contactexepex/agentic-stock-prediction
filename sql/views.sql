@@ -13,10 +13,15 @@ SELECT DISTINCT ON (id) * FROM adjustments
 WHERE id NOT IN (SELECT supersedes FROM adjustments WHERE supersedes IS NOT NULL)
 ORDER BY id, detected_at;
 
--- Daily bars as stored (one per ticker per date, latest collection wins), for audits.
+-- Daily bars as stored (one per ticker per date, latest collection wins), minus the bars Yahoo
+-- serves on days the market's own exchange is closed (a flat zero-volume bar on an exchange
+-- holiday, issue #40). own_closed_days (ticker, date) is built by marketbrief.core.database.connect from
+-- the market calendar for the market's stocks and its own-exchange indices (benchmark, vol index, sector
+-- indices); cues and factors trade on other calendars and are never listed. Stored rows stay.
 CREATE OR REPLACE VIEW ohlc_raw AS
 SELECT ticker, date, open, high, low, close, adj_close, volume, collected_at
-FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC);
+FROM (SELECT DISTINCT ON (ticker, date) * FROM prices ORDER BY ticker, date, collected_at DESC) p
+WHERE NOT EXISTS (SELECT 1 FROM own_closed_days c WHERE c.ticker = p.ticker AND c.date = p.date);
 
 -- Price multiplier per stored bar: the product of the factors of the ticker's adjustments with an
 -- ex-date after the bar (1 when none), which puts every bar on the newest basis.

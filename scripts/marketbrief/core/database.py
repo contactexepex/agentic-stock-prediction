@@ -8,6 +8,7 @@ from pathlib import Path
 import duckdb
 
 from marketbrief.constants.columns import COL_ACCEPTED_AT, COL_ACCESSION, COL_CHECKED_AT
+from marketbrief.constants.config_keys import CFG_SYMBOLS, CFG_TICKERS, META_ROLE
 from marketbrief.constants.environment import ENV_NOW
 from marketbrief.constants.files import DIR_SQL, FILE_VIEWS_SQL, JSONL_GLOB
 from marketbrief.constants.kinds import (
@@ -16,7 +17,9 @@ from marketbrief.constants.kinds import (
     KIND_SEC_TIMES,
     NEWS_STORED_VIEW,
 )
+from marketbrief.constants.prices import OWN_EXCHANGE_ROLES
 from marketbrief.core import paths
+from marketbrief.core.calendar import is_session
 from marketbrief.core.clock import FrozenClockConnection, clock
 from marketbrief.core.market_config import load_market
 from marketbrief.core.schemas import ACCEPTED_KEYS, SCHEMAS
@@ -89,6 +92,32 @@ def register_news_retag(con: duckdb.DuckDBPyConnection, market: str) -> None:
     )
 
 
+def own_exchange_keys(cfg: dict) -> list[str]:
+    """The config's stocks and own-exchange indices (cues and factors trade on other calendars)."""
+    return list(cfg[CFG_TICKERS]) + [
+        key for key, meta in cfg[CFG_SYMBOLS].items() if meta.get(META_ROLE) in OWN_EXCHANGE_ROLES
+    ]
+
+
+def register_own_closed_days(con: duckdb.DuckDBPyConnection, market: str) -> None:
+    """Create the `own_closed_days` table (ticker, date) the ohlc_raw view reads (issue #40): every stored price
+    date that is no session of the market's own exchange, for each stock and own-exchange index of the config.
+    Built set-based from the distinct stored dates. No market config (some tests): the table is empty."""
+    con.execute("CREATE TABLE own_closed_days (ticker VARCHAR, date DATE)")
+    try:
+        cfg = load_market(market)
+    except SystemExit:  # no market config (some tests): nothing is excluded
+        return
+    stored = [row[0] for row in con.execute("SELECT DISTINCT date FROM prices").fetchall()]
+    closed = [day for day in stored if not is_session(cfg, day)]
+    if closed:
+        con.execute(
+            "INSERT INTO own_closed_days SELECT k.ticker, d.day FROM (SELECT unnest(?) AS ticker) k "
+            "CROSS JOIN (SELECT unnest(?) AS day) d",
+            [own_exchange_keys(cfg), closed],
+        )
+
+
 def connect(market: str) -> duckdb.DuckDBPyConnection:
     """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql.
     With MB_NOW set, the connection's SQL sees that time as now (FrozenClockConnection).
@@ -111,5 +140,6 @@ def connect(market: str) -> duckdb.DuckDBPyConnection:
         else:
             column_sql = ", ".join(f"{column_name} {column_type}" for column_name, column_type in columns.items())
             con.execute(f"CREATE TABLE {name} ({column_sql})")
+    register_own_closed_days(con, market)
     con.execute((paths.CODE / DIR_SQL / FILE_VIEWS_SQL).read_text())
     return con
