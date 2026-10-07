@@ -98,7 +98,7 @@ def _inline(text: str, sources: dict, used: set) -> str:
             return park(html.escape(m.group(0), quote=False))
         return park(f'<a href="{html.escape(url, quote=True)}" target="_blank" rel="noopener">'
                     f'{html.escape(m.group(1), quote=False)}</a>')
-    s = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", md_link, text)
+    s = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", md_link, text.replace("\x00", ""))  # NULs mark parked parts
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"(?<![\w/])_(.+?)_(?!\w)", r"<em>\1</em>", s)
@@ -116,9 +116,9 @@ def _inline(text: str, sources: dict, used: set) -> str:
         if url is None:  # known source without a safe link: name it, do not link it
             return f'<span class="ref" title="{title}">{label}</span>'
         return f'<a class="ref" href="{html.escape(url, quote=True)}" title="{title}" target="_blank" rel="noopener">{label}</a>'
-    s = NEWS_ID.sub(link, s)
-    s = re.sub(r"\b(Bull|Bear):", r'<strong class="\1">\1:</strong>', s)
+    s = re.sub(r"\b(Bull|Bear):", r'<strong class="\1">\1:</strong>', s)  # before the id links: never in a title
     s = s.replace('class="Bull"', 'class="bull"').replace('class="Bear"', 'class="bear"')
+    s = NEWS_ID.sub(link, s)
     return re.sub(r"\x00(\d+)\x00", lambda m: parked[int(m.group(1))], s)
 
 
@@ -240,7 +240,7 @@ CSS = r"""
   color-scheme:dark;}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 var(--font)}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 var(--font);overflow-wrap:anywhere}
 .wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
 a{color:var(--accent-ink)} a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
@@ -628,7 +628,7 @@ function reliabilityChart(){
   box.append(el('h3', null, 'Up/down calls: confidence vs hit rate'));
   if (!rows.length) { box.append(el('p', {class: 'empty'}, 'No up/down call has been checked yet.')); return box; }
   const f3 = v => v == null ? '–' : v.toFixed(3);
-  box.append(el('p', {class: 'cap'}, 'Each dot is a confidence group: how sure the calls said they were (across) and how often they were right (up), with the likely range of the true rate (line). Brier score ' + f3(cs.brier) + ' and log loss ' + f3(cs.log_loss) + ' over ' + cs.n + ' calls; a coin flip scores 0.250 and 0.693, lower is better.' + (cs.n < D.min_sample ? ' Not enough history yet: fewer than ' + D.min_sample + ' checked calls.' : '')));
+  box.append(el('p', {class: 'cap'}, 'Each dot is a confidence group: how sure the calls said they were (across) and how often they were right (up), with the likely range of the true rate (line). Brier score ' + f3(cs.brier) + ' and log loss ' + f3(cs.log_loss) + ' over ' + cs.n + ' calls; a coin flip scores 0.250 and 0.693, lower is better.' + (cs.basis_note || '') + (cs.n < D.min_sample ? ' Not enough history yet: fewer than ' + D.min_sample + ' checked calls.' : '')));
   const W = 360, L = 44, R = 12, T = 10, B = 34, Hh = 200, lo = 0.3, hi = 1;
   const xs = v => L + (W - L - R) * (v - 0.5) / 0.4, ys = v => T + (Hh - T - B) * (1 - (v - lo) / (hi - lo));
   const s = svg('svg', {viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': 'Call confidence versus hit rate'});

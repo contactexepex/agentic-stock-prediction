@@ -46,11 +46,17 @@ def test_session_close_utc():
     (INDIA, "2026-10-05T02:40:00+00:00", True, "2026-10-05", False),    # 08:10 IST, pre-open
     (INDIA, "2026-10-05T09:59:00+00:00", True, "2026-10-05", False),    # 15:29 IST, still open
     (INDIA, "2026-10-05T10:00:00+00:00", True, "2026-10-05", True),     # 15:30 IST, the close
-    (INDIA, "2026-10-05T14:40:00+00:00", True, "2026-10-05", True),     # 20:10 IST, the incident
+    (INDIA, "2026-10-05T11:59:00+00:00", True, "2026-10-05", True),     # 17:29 IST, the bar is still settling
+    # issue #20: from the close plus BAR_SETTLE_MINUTES the day's bar is final (collect_prices stores it), so the
+    # run predicts the next session and is not late, also before UTC midnight (20:10 IST, the incident)
+    (INDIA, "2026-10-05T12:00:00+00:00", True, "2026-10-06", False),
+    (INDIA, "2026-10-05T14:40:00+00:00", True, "2026-10-06", False),
+    (INDIA, "2026-10-05T23:59:00+00:00", True, "2026-10-06", False),    # 05:29 IST on 10-06: local date moved on
     (INDIA, "2026-10-02T14:40:00+00:00", False, "2026-10-05", False),   # Gandhi Jayanti holiday
     (INDIA, "2026-10-03T14:40:00+00:00", False, "2026-10-05", False),   # Saturday
     (US, "2026-10-05T12:00:00+00:00", True, "2026-10-05", False),       # 08:00 ET
     (US, "2026-10-05T20:30:00+00:00", True, "2026-10-05", True),        # 16:30 ET
+    (US, "2026-10-05T22:00:00+00:00", True, "2026-10-06", False),       # 18:00 ET: the bar is final
     (US, "2026-11-26T22:00:00+00:00", False, "2026-11-27", False),      # Thanksgiving
     (US, "2026-11-27T17:30:00+00:00", True, "2026-11-27", False),       # before the 13:00 ET early close
     (US, "2026-11-27T18:30:00+00:00", True, "2026-11-27", True),        # after it
@@ -179,6 +185,80 @@ def test_ranges_cli_late_flag(market):
             for x in f.read_text().splitlines()]
     assert {r["made_at"] for r in rows} == {"2026-10-05T20:40:00+00:00", "2026-10-05T11:30:00+00:00"}
     assert run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00").returncode != 0   # needs an offset
+
+
+def test_ranges_filter_earnings_by_made_at(market, monkeypatch):
+    """Issue #24: ranges.py reads the earnings events as known at made_at (time and local date), not all of them."""
+    from marketbrief.analytics import event_history, range_context
+
+    root, _, cfg, rc = market
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    seen = []
+
+    def spy(events, as_of=None, made_at=None):
+        seen.append((as_of, made_at))
+        return event_history.earnings_events(events, as_of=as_of, made_at=made_at)
+    monkeypatch.setattr(range_context, "earnings_events", spy)
+    build(cfg, rc, "2026-10-05T11:30:00+00:00")
+    assert seen == [(date(2026, 10, 5), at("2026-10-05T11:30:00+00:00"))]
+
+
+@pytest.mark.parametrize("now, late", [("2026-10-05T11:30:00+00:00", False), ("2026-10-05T20:40:00+00:00", True)])
+def test_slack_ranges_line_says_late(market, now, late):
+    """Issue #21: with no calls, the Slack line about the ranges says when they are late."""
+    root, cfg_dir, _, _ = market
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
+                                   "computed_at": "2026-10-05T11:01:00+00:00", "regime": "CALM", "stress": False,
+                                   "vol_level": 15.0, "notes": [], "major_event": False, "major_event_names": []}])
+    assert run("ranges.py", root, cfg_dir, "--now", now).returncode == 0
+    rep = run("report.py", root, cfg_dir)
+    assert rep.returncode == 0, rep.stderr
+    slack = (root / json.loads(rep.stdout)["slack_draft"]).read_text()
+    line = next(x for x in slack.splitlines() if x.startswith("Calls today: none."))
+    assert line.endswith("(late: made after the open of the first session they cover, so never scored).") is late
+    assert line.endswith("are in the report.") is not late
+
+
+def full_regime(root: Path) -> None:
+    jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
+                                   "computed_at": "2026-10-05T11:01:00+00:00", "regime": "CALM", "stress": False,
+                                   "vol_level": 15.0, "notes": [], "major_event": False, "major_event_names": []}])
+
+
+@pytest.mark.parametrize("now, late", [("2026-10-05T11:30:00+00:00", False), ("2026-10-05T20:40:00+00:00", True)])
+def test_late_calls_left_out_of_slack_count_and_news_window(market, monkeypatch, now, late):
+    """Issue #26: a call on a late range is not counted in Slack or the HTML calls; a company's news is the news
+    published in the NEWS_LOOKBACK_DAYS before the ranges' made_at, nothing after it."""
+    import common
+    import view_data
+    from marketbrief.core.market_config import load_market
+
+    root, cfg_dir, _, _ = market
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    full_regime(root)
+    jsonl(root, "predictions", AS_OF, [{"id": f"{AS_OF}-AAPL-5d", "made_at": "2026-10-05T11:20:00+00:00",
+                                        "as_of_date": str(AS_OF), "ticker": "AAPL", "horizon_days": 5,
+                                        "direction": "up", "confidence": 0.6, "rationale": "t", "evidence_ids": [],
+                                        "prompt_version": "test", "range_widen": None}])
+    made = at(now)
+    base = {"url": "https://example.com/n", "source": "Fixture", "tickers": ["AAPL"], "primary_tickers": ["AAPL"],
+            "mentioned_tickers": [], "tag_confidence": "high"}
+    jsonl(root, "news", AS_OF, [
+        {**base, "id": f"n{k}", "title": f"Apple {k}", "published_at": (made + shift).isoformat(),
+         "first_seen_at": (made + shift).isoformat()}
+        for k, shift in (("old", -timedelta(days=view_data.NEWS_LOOKBACK_DAYS, hours=1)), ("in", -timedelta(days=1)),
+                         ("after", timedelta(hours=1)))])
+    assert run("ranges.py", root, cfg_dir, "--now", now).returncode == 0
+    rep = run("report.py", root, cfg_dir)
+    assert rep.returncode == 0, rep.stderr
+    slack = (root / json.loads(rep.stdout)["slack_draft"]).read_text()
+    assert slack.count("Calls today: none.") == int(late) and ("Calls today: 1 · AAPL" in slack) is not late
+    monkeypatch.setattr(common, "CONFIG", cfg_dir)
+    view = view_data.gather_view(load_market(MARKET), connect(MARKET))
+    aapl = next(c for c in view["companies"] if c["ticker"] == "AAPL")
+    assert len(aapl["calls"]) == (0 if late else 1)
+    assert [n["id"] for n in aapl["news"]] == ["nin"]
 
 
 # ---------- scoring never counts late records ----------

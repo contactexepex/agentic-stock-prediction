@@ -53,3 +53,9 @@ MIN_EWMA_BARS = 31  # ranges.py needs an EWMA volatility of 31 bars
 # ---------- rule replay: cli ----------
 MSG_ACI_OPTIONS_NEED_ACI = "--aci-gamma, --aci-by-regime and --aci-tune-end need --aci"
 MSG_NO_TRADING_DAYS_IN_THE_WINDOW = "no trading days in the window"
+
+# ---------- rule replay: tiles (rule_html.coin_note, issue #27) ----------
+COIN_FLIP = 0.5
+MSG_COIN_FLIP = "a coin flip is 50%"
+MSG_EXCLUDES_COIN = "; the 95% interval excludes 50%"
+MSG_INCLUDES_COIN = "; the 95% interval includes 50%"

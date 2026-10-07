@@ -27,7 +27,11 @@ STEP_RATIO_LOW, STEP_RATIO_HIGH = 0.8, 1.25   # a price step is "the split facto
 NSE_SCAN = 5        # frame sessions after the newest re-based stored bar searched for the ex-date
 CHAIN_TOLERANCE = 0.001   # NSE PREV_CLOSE vs Yahoo's close of the same session (they agree to ~0.0002)
 WEAK_FACTOR = 0.9   # from here to 1 a factor is within a normal day's move: the step alone proves nothing
-# (the threshold is a judgement: a daily move of 10% or more is rare for a watchlist stock; issue #36 item 3)
+# Why 0.9 (issue #36 item 3): step_matches takes a step s as factor f when s is log-nearer to f than to 1, i.e. a
+# fall of more than 1 - sqrt(f): 2.5% for f = 0.95, 5.1% for 0.9, 10.6% for 0.8, 29.3% for 0.5. Above 0.9 an
+# ordinary day of under 5% would pass, which happens often; at 0.9 a fall of over 5.1% is still needed, on the very
+# session whose PREV_CLOSE ties to our stored close, after a re-base by f was already seen in Yahoo's history (the
+# step only places the ex-date). The cut is a judgement, not measured; for f >= 0.9 only the exact chain confirms.
 
 SOURCE_NSE_BHAVCOPY = "nse_bhavcopy"
 SOURCE_YAHOO_SPLITS = "yahoo_splits"
@@ -44,6 +48,9 @@ SUMMARY_NEW_BARS = "new_bars"
 SUMMARY_ADJUSTMENTS = "adjustments"
 SUMMARY_REBASED = "rebased_bars"
 SUMMARY_HELD = "held"
+SUMMARY_HELD_TOO_LONG = "held_too_long"
+SUMMARY_SESSIONS = "sessions"
+SUMMARY_NEWEST = "newest_stored"
 SUMMARY_DROPPED_NON_SESSION = "dropped_non_session"
 SUMMARY_FILLED_FROM_NSE = "filled_from_nse"
 SUMMARY_RESOLVED_BY_NSE = "resolved_by_nse"
@@ -65,6 +72,9 @@ WARNING_TEXT_LIMIT = 160
 
 MSG_STALE = "stale: newest bar {newest}, expected {expected} or later"
 MSG_HELD_NOTE = "price basis unconfirmed (split/bonus?): new bars held, see warnings"
+HELD_ESCALATE_SESSIONS = 5  # a week of sessions without a new bar while held needs a human (issue #36)
+MSG_HELD_TOO_LONG = ("{key}: held with no new bar for {sessions} sessions (newest stored bar {newest}); no source "
+                     "has confirmed the price basis, a human must record the split or bonus (DESIGN.md section 3)")
 MSG_HELD_BY_YAHOO_FRAME = "price basis unconfirmed (split/bonus?); held, see warnings"
 MSG_NO_NEWEST_STORED = "none in the last {sessions} sessions"
 MSG_BEYOND_WINDOW = "the fallback checks only sessions from {start}"
@@ -78,7 +88,6 @@ MSG_BHAVCOPY_NO_DATED_ROWS = "no dated rows"
 MSG_BHAVCOPY_PROBLEM = "nse {problem}"
 MSG_BHAVCOPY_FETCH_FAILED = "nse bhavcopy {day}: {error}"
 MSG_NO_EQ_ROW = "no EQ row for {ticker} in the bhavcopy"
-MSG_NOT_FILLED = "nse {day} {ticker}: {reason}; not filled"
 MSG_SPLIT_AFTER_PREVIOUS = "Yahoo reports a split/bonus on {day}; price basis may differ"
 MSG_NO_STORED_CLOSE = "no stored close for the previous session {previous} to check the price basis"
 MSG_NO_PREV_CLOSE = "bhavcopy has no PREV_CLOSE to check the price basis against {previous}"
@@ -101,6 +110,8 @@ MSG_SPLIT_RATIOS_UNEXPLAINED = ("{key}: Yahoo reports a split/bonus on {day} (ra
 MSG_CLOSE_MISMATCH = ("{key}: Yahoo's close differs from the stored close on {count} date(s) {first}..{last} "
                       "(Yahoo/stored {low:.4f}-{high:.4f})")
 MSG_NOT_ONE_REBASE = "; not one re-base of the stored history, not recorded"
+MSG_ONE_CORRECTED_BAR = ("; one date only and our stored closes show no step by that ratio after it: a bar Yahoo "
+                         "corrected, not a re-base; not recorded, not held")
 MSG_REBASE_NOT_FRACTION = "; a re-base by a ratio that is no simple fraction: not recorded, new bars held"
 MSG_NSE_CHECK_SUFFIX = "; NSE check: {why}"
 MSG_REBASE_UNCONFIRMED = ("; a re-base by {fraction} that no Yahoo split row or NSE bhavcopy confirms (yet): "
@@ -116,3 +127,5 @@ MSG_CHECK_NO_STEP_PROOF = "{day}: no step proves the ex-date and the next sessio
 MSG_CHECK_CHAIN_BROKEN = ("{day}: PREV_CLOSE {prev_close:g} is neither Yahoo's close of {previous_day} "
                           "({yahoo_close:g}) nor it / {factor:.4f}")
 MSG_CHECK_NO_EX_DATE = "no ex-date found in the bhavcopies of {first}..{last}"
+MSG_NO_MARKET_CONFIG_CLOSED_DAYS = ("warning: no config/markets/{market}.yaml, so no closed-day bars are left out of "
+                                    "the price views (own_closed_days is empty)")

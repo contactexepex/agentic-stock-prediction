@@ -63,9 +63,10 @@ def aci_lines(review_data) -> list[str]:
         lines += [f"> {rep['note']}.", ""]
     if rep and rep.get("comparison"):
         lines += [
-            f"Historical replay `{rep['id']}` (`replay.py --aci`), fixed bands → ACI on the same rows. "
-            "**In-sample: the ACI settings in config/ranges.yaml were tuned on this replay window**, so these "
-            "gains are optimistic:",
+            f"Historical replay `{rep['id']}` (`replay.py --aci`, as-of dates up to {rep['end_date']}), fixed bands "
+            "→ ACI on the same rows. **In-sample when the ACI settings in config/ranges.yaml were chosen on a "
+            "replay of this window** (as a proposal from this review is): then these gains are optimistic; the "
+            "held-out check below is the out-of-sample test:",
             "",
             markdown_table(comparison_header, comparison_rows(rep["comparison"])),
         ]

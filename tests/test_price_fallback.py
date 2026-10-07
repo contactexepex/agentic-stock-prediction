@@ -236,7 +236,7 @@ def test_split_like_basis_mismatch_is_not_filled(tmp_path, monkeypatch, capsys):
     assert hd["missing_after_nse"] == [{"date": "2025-08-22", "reason":
         "price basis mismatch: bhavcopy PREV_CLOSE 1991.2 vs stored close 995.6 on 2025-08-21 (+100.0%); "
         "split, bonus or other corporate action"}]
-    assert any(n.startswith("nse 2025-08-22 HDFCBANK: price basis mismatch") for n in out["nse_notes"])
+    assert not any("HDFCBANK" in n for n in out["nse_notes"])        # listed once, in failed (issue #35)
     assert "HDFCBANK" not in bars(e.root, date(2025, 8, 22))
     assert [r["ticker"] for r in sources(e.root)] == ["INFY"]
     assert [f["ticker"] for f in out["resolved_by_nse"]] == ["INFY"]

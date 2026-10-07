@@ -3,9 +3,9 @@
 # is marked "verify": check it against the official source before relying on it. Looked up on
 # 2026-10-06/07. Each line says what backs it:
 #   ASSUMPTION      a broker choice, not a published rate; no source.
-#   OFFICIAL, READ  read on the official page named (sec.gov).
+#   OFFICIAL, READ  read on the official page named (sec.gov, finra.org).
 #   SEARCH ONLY     the official site (nseindia.com, sebi.gov.in, incometaxindia.gov.in, cbic.gov.in,
-#                   ccilindia.com, finra.org) refused this environment's traffic, so the value comes from
+#                   ccilindia.com) refused this environment's traffic, so the value comes from
 #                   web-search results quoting it; the official URL given was NOT opened.
 # The backtest applies these rates to every past date (earlier dates had other rates, e.g. the SEC fee was
 # $0 per million until 2026-04-03 per the advisory below).
@@ -33,10 +33,10 @@ us:
   commission_each_side: 0.0         # verify. ASSUMPTION: a commission-free broker
   sec_fee_sell: 0.0000206           # verify. OFFICIAL, READ: Section 31 fee $20.60 per million on sales from
                                     # 2026-04-04 ($0.00 before): https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2
-  # FINRA TAF on sales of covered equity securities. OFFICIAL, READ (the SEC's copy of FINRA's filing; finra.org
-  # was unreachable): Release 34-106409, SR-FINRA-2026-021 (2026-09-18) sets it to $0.00 per share, max $0.00, for
-  # transactions 2026-10-01..2026-12-31; the rate it replaces, which resumes 2027-01-01, is $0.000195 per share,
-  # max $9.79 per trade (Exhibit 5): https://www.sec.gov/files/rules/sro/finra/2026/34-106409-ex5.pdf
+  # FINRA TAF on sales of covered equity securities. OFFICIAL, READ (FINRA's own filing, opened 2026-10-07):
+  # SR-FINRA-2026-021 pauses the TAF at $0.00 per share, max $0.00, from 2026-10-01 through 2026-12-31; the rate
+  # it replaces, which resumes 2027-01-01, is $0.000195 per share, max $9.79 per trade (Exhibit 5):
+  # https://www.finra.org/sites/default/files/2026-09/SR-FINRA-2026-021.pdf
   # Below: the rate in force on 2026-10-07 ($0).
   finra_taf_per_share_sell: 0.0     # verify (0.000195 from 2027-01-01)
   finra_taf_max_per_trade: 0.0      # verify (9.79 from 2027-01-01)

@@ -4,7 +4,9 @@ Reads stored bars, quotes and events (never live APIs), then appends:
 - data/<market>/features/YYYY/MM/<as_of_date>.jsonl: one row per watchlist ticker
 - data/<market>/regime/YYYY/MM/<as_of_date>.jsonl: one row for the market
 and prints a JSON summary. as_of_date = latest benchmark bar; session_date = the trading day
-being predicted (today in the exchange's timezone if it is a session, else the next one)."""
+being predicted: the first session after as_of_date (the same session ranges.py targets first and
+the report and charts are named after, issue #21; on a normal pre-open run it is today's session in
+the exchange's timezone, or the next one)."""
 
 from __future__ import annotations
 
@@ -165,12 +167,12 @@ def run(cfg: dict, today_local: date | None = None, utc_day: date | None = None)
     con = connect(market)
     bars = load_bars(con)
     today_local = today_local or local_today(cfg)
-    session = next_session(cfg, today_local)
     bench_key, vol_key = benchmark_key(cfg), vol_index_key(cfg)
     bench = bars.get(bench_key)
     if bench is None or bench.empty:
         raise SystemExit(MSG_NO_BENCHMARK_FOR_KEY.format(key=bench_key))
     as_of = bench.index[-1].date()
+    session = next_session(cfg, as_of, include=False)  # the session after the data, as ranges and the report label it
     quotes = quotes_today(con, utc_day or utc_today())
     company = company_events(con, session)
     now = utc_now()

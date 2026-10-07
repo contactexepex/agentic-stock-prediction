@@ -16,7 +16,8 @@ EARNINGS_LOOKBACK_DAYS = 7  # an earnings date this far before the as-of date no
 MIN_CUE_OBSERVATIONS = 60
 
 EVENT_TYPES_SQL = "('earnings', 'ex_dividend', 'periodic_report')"
-LOAD_EVENTS_SQL = ("SELECT ticker, type, date, timing, amount, source, first_seen_at, period_end FROM event_history "
+LOAD_EVENTS_SQL = ("SELECT ticker, type, date, timing, amount, source, first_seen_at, period_end, accepted_at "
+                   "FROM event_history "
                    f"WHERE type IN {EVENT_TYPES_SQL} ORDER BY ticker, type, date")
 TYPE_EARNINGS, TYPE_EX_DIVIDEND, TYPE_PERIODIC_REPORT = "earnings", "ex_dividend", "periodic_report"
 SOURCE_SEC_HISTORY, SOURCE_YFINANCE_HISTORY = "sec_history", "yfinance_history"

@@ -45,6 +45,10 @@ class EvidenceStatuses:
             self._by_time[key] = (table, confirming)
         return self._by_time[key]
 
+    def preload(self, when) -> None:
+        """Load the tables of a time now (e.g. while connect() points at a replay root); of() reuses them."""
+        self._tables(when)
+
     def active(self, when) -> bool:
         """True when a status row existed by then (the feature was running)."""
         return self.con.execute(ACTIVE_SQL, [instant(when)]).fetchone()[0] > 0

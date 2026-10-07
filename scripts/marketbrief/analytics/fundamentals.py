@@ -3,8 +3,8 @@ reported quarter per ticker with year-over-year growth, margins, free cash flow 
 date, the latest balance sheet, and a flag for reports filed in the last FRESH_DAYS days.
 Inputs are the fundamentals views in sql/views.sql (collect_fundamentals.py writes the data).
 
-No consensus estimates are available for free, so there is no "surprise" here: growth is
-against the same fiscal quarter a year earlier, as reported to the SEC."""
+Growth here is against the same fiscal quarter a year earlier, as reported to the SEC; Yahoo's consensus EPS
+and the last surprise are a separate section (pipeline/estimate_sections.py, issue #17)."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from marketbrief.utils.markdown import cursor_markdown_table
 FRESH_DAYS = 5
 
 NOTE = (
-    "Growth is year over year (same fiscal quarter a year earlier); no consensus estimates, so no "
-    "surprise. `*` = derived from year-to-date totals (Q4 = FY - 9M; a derived EPS is approximate). "
+    "Growth is year over year (same fiscal quarter a year earlier); consensus EPS and the last surprise are "
+    "under Earnings estimates. `*` = derived from year-to-date totals (Q4 = FY - 9M; a derived EPS is approximate). "
     "Gross margin marked `c` = revenue minus cost of revenue (no gross profit tagged). "
     f"`new` = filed in the last {FRESH_DAYS} days."
 )

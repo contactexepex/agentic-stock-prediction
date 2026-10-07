@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import numpy as np
 import pandas as pd
 
@@ -30,7 +32,10 @@ def index_cue_series(cfg: dict, bars: dict, ranges_config: dict) -> pd.Series | 
     cue = bars.get(cue_config["symbol"])
     if cue is None:
         return None
-    nxt = pd.Series(bench.index[1:].tolist() + [pd.NaT], index=bench.index)
+    # the session after each as-of date; after the last stored bar the exchange calendar's (issue #27: the last
+    # as-of day of a cut-off data set keeps its cue when the cue's bar is stored)
+    after_last = pd.Timestamp(calendar.next_session(cfg, bench.index[-1].date(), include=False))
+    nxt = pd.Series(bench.index[1:].tolist() + [after_last], index=bench.index)
     asof_frame = pd.DataFrame({"asof": bench.index, "date": nxt.to_numpy()}).dropna()
     cue_returns = index_cue.log_returns(cue["close"]).dropna()
     cue_frame = pd.DataFrame({"date": cue_returns.index, "r": cue_returns.to_numpy()})
@@ -104,6 +109,10 @@ def input_columns(
     close, bar_index = frame["close"], frame.index
     length = len(bar_index)
     position_of_day = {timestamp.date(): position for position, timestamp in enumerate(bar_index)}
+    # the calendar's sessions after the last stored bar get the positions they will have (issue #27), so an
+    # earnings day or ex-date just after a cut-off data set still flags the last days before it
+    after_last = calendar.sessions_ahead(cfg, bar_index[-1].date() + timedelta(days=1), horizon) if length else []
+    position_of_day.update({day: length + offset for offset, day in enumerate(after_last)})
     input_frame = pd.DataFrame(index=bar_index)
     # earnings: each as-of date d uses the events as known at d (SEC 2.02 filings classified by
     # the 10-Q/10-K reports accepted by d; event_history.earnings_versions)
@@ -141,7 +150,7 @@ def input_columns(
         position = position_of_day.get(calendar.next_session(cfg, ex_day))
         if position is None or not amount:
             continue
-        for row_position in range(max(0, position - horizon), position):
+        for row_position in range(max(0, position - horizon), min(position, length)):
             shift[row_position] += range_math.ex_dividend_shift(float(close.iloc[row_position]), [amount])
     input_frame["div_shift"] = shift
     input_frame["has_div"] = shift != 0

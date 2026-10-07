@@ -276,13 +276,45 @@ def call(ticker="MSFT", h=5, conf=0.6, ev_ids=("0001-26-000001",), **kw) -> dict
     return r
 
 
-def record(prepared, rows: list, results: Path) -> subprocess.CompletedProcess:
+def record(prepared, rows: list, results: Path, root: Path | None = None) -> subprocess.CompletedProcess:
     f = results.parent / "calls.jsonl"
     f.write_text("".join((x if isinstance(x, str) else json.dumps(x)) + "\n" for x in rows))
     env = {**os.environ, "MB_ROOT": str(prepared["base"]["src"]), "MB_CONFIG": str(prepared["base"]["cfg"])}
+    root = root or prepared["base"]["root"]
     return subprocess.run([sys.executable, str(SCRIPTS / "ai_replay.py"), "record", "--market", MARKET, "--date",
-                           str(D), "--root", str(prepared["base"]["root"]), "--calls", str(f), "--results", str(results)],
+                           str(D), "--root", str(root), "--calls", str(f), "--results", str(results)],
                           cwd=SCRIPTS, env=env, capture_output=True, text=True, check=False)
+
+
+def test_record_applies_the_news_status_rules_as_of_the_cutoff(prepared, tmp_path):
+    """Issue #39: with status rows in the replay root by the cutoff, record applies the daily gate's
+    news-verification rules: a filing that confirms the ticker's event is main evidence, an announcement no
+    status row confirms is unverified (NEWS_STATUS_MAIN); a status row after the cutoff is not seen."""
+    root = tmp_path / "root"
+    shutil.copytree(prepared["base"]["root"], root)
+    base = {"cluster_row_id": "r", "claim_id": None, "level": "cluster", "ticker": "MSFT", "outlet_ids": [],
+            "mismatch_ids": [], "status_ids": [], "id_statuses": [], "independent_origins": 1,
+            "unread_vetted_origins": 0, "origins": [], "conflicts": [], "flags": [], "confirmed_at": None,
+            "state_hash": "h", "method_version": "nv-b1"}
+    rows = [{**base, "id": "MSFT-a|*@1", "as_of": "2026-08-17T10:00:00+00:00", "cluster_id": "MSFT-a",
+             "status": "confirmed_primary", "primary_ids": ["0001-26-000001"],
+             "first_reported_at": "2026-08-17T10:00:00+00:00", "inputs_until": "2026-08-17T10:00:00+00:00"},
+            {**base, "id": "MSFT-b|*@2", "as_of": "2026-08-17T13:00:00+00:00", "cluster_id": "MSFT-b",
+             "status": "confirmed_primary", "primary_ids": ["nse-ann-1"],             # after the cutoff
+             "first_reported_at": "2026-08-17T13:00:00+00:00", "inputs_until": "2026-08-17T13:00:00+00:00"}]
+    path = root / "data" / MARKET / "news_verified" / "2026" / "08" / "2026-08-17.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    results = tmp_path / "results"
+    p = record(prepared, [call(), call(h=1, ev_ids=("nse-ann-1",), direction="down", conf=0.55)], results, root)
+    assert p.returncode == 0, p.stderr
+    out = json.loads(p.stdout)
+    assert out["recorded"] == 1
+    [rejected] = out["rejected"]
+    assert rejected["line"] == 2 and rejected["reasons"][0].startswith("NEWS_STATUS_MAIN: main evidence nse-ann-1 is "
+                                                                       "unverified")
+    day = json.loads((results / MARKET / "days.jsonl").read_text())
+    assert day["news_status_rules"] is True and day["n_calls"] == 1
 
 
 def test_record_validation(prepared, tmp_path):
@@ -323,6 +355,7 @@ def test_record_validation(prepared, tmp_path):
     assert all(s["replay"] is True and s["prompt_version"] == "forecast-v7" and s["made_at"] == CUT for s in stored)
     day = json.loads((results / MARKET / "days.jsonl").read_text())
     assert day["eligible"] == ["MSFT"] and day["n_calls"] == 2 and day["n_rejected"] == 16
+    assert day["news_status_rules"] is False                     # no status rows in the root: rules not applied
     # nothing went to the real predictions, and a day is recorded once
     assert not (prepared["base"]["root"] / "data" / MARKET / "predictions" / "2026" / "08" / "2026-08-17.jsonl").exists()
     assert not list((prepared["base"]["src"] / "data" / MARKET / "predictions").glob("**/2026-10-*.jsonl"))

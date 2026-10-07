@@ -7,6 +7,7 @@ from datetime import timedelta
 
 import pandas as pd
 
+from marketbrief.analytics.call_basis import label as basis_label
 from marketbrief.analytics.scoring import percent
 from marketbrief.core import calendar
 from marketbrief.core.market_config import benchmark_key, vol_index_key
@@ -25,7 +26,6 @@ class ReportParts:
     blocked: object
     cal_rows: object
     call_rows: object
-    calls_hit: object
     cue_rows: object
     cur: object
     dir_rows: object
@@ -125,11 +125,10 @@ def yesterday_tables(cfg, cur, day, feats):
         else ""
     )
     scored_calls = day["calls_scored"]
-    calls_hit = int(scored_calls["hit"].sum()) if not scored_calls.empty else 0
     call_rows = [
         [
             item.ticker,
-            f"{item.horizon_days}d",
+            f"{item.horizon_days}d · {basis_label(item.label_basis)}",  # scoring basis (call_basis.py)
             item.direction,
             percent(item.confidence),
             pct(item.actual_return, 2),
@@ -138,7 +137,7 @@ def yesterday_tables(cfg, cur, day, feats):
         for item in scored_calls.itertuples()
     ]
 
-    return call_rows, calls_hit, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows
+    return call_rows, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows
 
 
 def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
@@ -279,10 +278,12 @@ def track_record_rows(day, feats):
         [f"{item.h}d", item.regime, item.n, share(item.c50), share(item.c80), share(item.nc80)]
         for item in day["by_regime"].itertuples()
     ]
-    dir_rows = [
-        [f"{item.h}d", item.win, item.n, share(item.hit), share(item.up)] for item in day["direction"].itertuples()
+    dir_rows = [  # per scoring basis, never pooled
+        [f"{item.h}d · {basis_label(item.label_basis)}", item.win, item.n, share(item.hit), share(item.up)]
+        for item in day["direction"].itertuples()
     ]
-    band_rows = [[item.band, item.n, share(item.conf), share(item.hit)] for item in day["conf_bands"].itertuples()]
+    band_rows = [[f"{item.band} · {basis_label(item.label_basis)}", item.n, share(item.conf), share(item.hit)]
+                 for item in day["conf_bands"].itertuples()]
     cal_rows = [
         [f"{item.horizon_days}d", item.source, item.n_history, item.n_live, f"{item.q10:.2f} / {item.q90:.2f}"]
         for item in day["calibration"].itertuples()
@@ -296,7 +297,7 @@ def track_record_rows(day, feats):
 def prepare_parts(cfg: dict, day: dict) -> ReportParts:
     """Compute the tables, lines and counts of one report from the gathered day data."""
     cur, feats, img, market, range_by_ticker_horizon, reg, regime_line, session, vol_name = report_basics(cfg, day)
-    (call_rows, calls_hit, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows) = (
+    (call_rows, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows) = (
         yesterday_tables(cfg, cur, day, feats)
     )
     n_late, today_rows = today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon)
@@ -309,7 +310,6 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
         blocked=blocked,
         cal_rows=cal_rows,
         call_rows=call_rows,
-        calls_hit=calls_hit,
         cue_rows=cue_rows,
         cur=cur,
         dir_rows=dir_rows,

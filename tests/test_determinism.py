@@ -133,14 +133,14 @@ def section(title: str):
 
 
 def test_score_predictions_queries(cons):
-    calls = stable(cons, rows(score_predictions.SQL))
+    calls = stable(cons, rows(score_predictions.SQL, [2, 5]))           # the open_to_close target offsets
     assert len(calls) > 100 and [r[0] for r in calls] == sorted(r[0] for r in calls)
     stable(cons, rows(score_predictions.RANGE_SQL))
 
 
 def test_scoring_summary(cons):
     s = stable(cons, lambda con: json.dumps(scoring.summary(con), sort_keys=True))
-    rel = [r for r in json.loads(s)["calls"]["all"]["reliability"] if r["n"]]
+    rel = [r for r in json.loads(s)["calls"]["close_to_close"]["all"]["reliability"] if r["n"]]
     assert rel and all(r["mean_conf"] is not None for r in rel)
 
 
@@ -152,9 +152,10 @@ def test_scoring_mean_is_order_independent():
 
 
 def test_view_data_bands_and_scored_calls(cons):
-    bands = stable(cons, rows(view_data.BANDS_SQL))
-    assert [b[0] for b in bands] == sorted(b[0] for b in bands) and sum(b[1] for b in bands) > 200
-    stable(cons, lambda con: con.execute(view_data.SCORED_CALLS_SQL).df().to_json())
+    bands = stable(cons, rows(view_data.BANDS_SQL.format(src="track_record")))
+    assert [b[0] for b in bands] == sorted(b[0] for b in bands) and sum(b[2] for b in bands) > 200
+    stable(cons, lambda con: con.execute(view_data.SCORED_CALLS_SQL.format(src="track_record"),
+                                         ["close_to_close"]).df().to_json())
 
 
 def test_context_sections(cons):

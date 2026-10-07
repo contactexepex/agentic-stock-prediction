@@ -143,6 +143,73 @@ def test_no_look_ahead():
     assert "2023-10-19" in v[D("2023-08-01")] and "2023-10-19" not in v[D("2023-11-01")]
 
 
+def test_live_filter_counts_a_report_only_from_its_acceptance_time():
+    """Issue #24: the live ranges count a 10-Q/10-K from its acceptance time, not from its date: a morning run on
+    the day of an after-close 10-Q does not see it (the date-only filter did)."""
+    rows, reps = sec_rows(ALL_PRE + ALL_RESULTS), reports(ALL_REPORTS)
+    evdf = evframe("ALL", rows, reps)
+    evdf["accepted_at"] = [pd.Timestamp(f"{d}T20:15:00Z") if t == "periodic_report" else pd.NaT
+                           for d, t in zip(evdf["date"], evdf["type"])]
+    day = D("2023-11-01")                                     # the 10-Q that rules out the 10-19 pre-announcement
+    morning, evening = pd.Timestamp("2023-11-01T13:00:00Z"), pd.Timestamp("2023-11-01T21:00:00Z")
+    dates = lambda **kw: [str(d) for d, _ in event_history.earnings_events(evdf, **kw)["ALL"]]  # noqa: E731
+    assert "2023-10-19" in dates(as_of=day, made_at=morning.to_pydatetime())
+    assert "2023-10-19" not in dates(as_of=day, made_at=evening.to_pydatetime())
+    assert "2023-10-19" not in dates(as_of=day)               # the date filter alone counted it in the morning
+    # a report stored without an acceptance time counts only from the next day
+    evdf["accepted_at"] = pd.NaT
+    assert "2023-10-19" in dates(as_of=day, made_at=evening.to_pydatetime())
+    assert "2023-10-19" not in dates(as_of=D("2023-11-02"), made_at=pd.Timestamp("2023-11-02T12:00:00Z"))
+
+
+def test_releases_up_to_near_days_before_are_the_same_report():
+    """Issue #24: 2.02s up to NEAR_DAYS (3) days before a quarter's release belong to it; one day more does not."""
+    reps = reports([("2024-02-21", "2023-12-31"), ("2024-05-01", "2024-03-31")])
+    rows = sec_rows(["2024-02-07", "2024-04-27", "2024-04-28", "2024-05-01"])
+    assert kept(rows, reps) == ["2024-02-07", "2024-04-28", "2024-05-01"]
+
+
+def test_backtest_version_applies_only_from_its_start():
+    """Issue #24: an events version (known from its 10-Q's acceptance) never marks days before its start."""
+    sessions = ev.exchange_calendar("XNYS").sessions_in_range("2026-03-02", "2026-04-30")
+    close = 100 * np.exp(np.cumsum(np.random.default_rng(5).normal(0, 0.01, len(sessions))))
+    df = pd.DataFrame({"open": close, "close": close}, index=sessions)
+    rc = {**ALL_ON, "ewma_lambda": 0.94, "warmup_bars": 10, "earnings_vol_multiple": 3.0}
+    start = D("2026-04-01")
+    versions = {"X": [(None, []), (start, [(D("2026-03-16"), "after_close")])]}   # learnt on 04-01 about 03-16
+    extra = {"earnings": versions, "dividends": {}, "bench": df, "index_cue": None}
+    cols = observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, "X", 1, extra)
+    assert not cols["earn"].any()                              # 03-13/03-16 are before the version's start
+
+
+def test_events_just_after_the_last_bar_still_flag_the_last_days():
+    """Issue #27: an earnings day or ex-date after the last stored bar flags the last days before it (their
+    positions come from the exchange calendar), as a live run on those days would."""
+    sessions = ev.exchange_calendar("XNYS").sessions_in_range("2026-08-03", "2026-09-30")
+    close = 100 * np.exp(np.cumsum(np.random.default_rng(7).normal(0, 0.01, len(sessions))))
+    df = pd.DataFrame({"open": close, "close": close}, index=sessions)
+    rc = {**ALL_ON, "ewma_lambda": 0.94, "warmup_bars": 10, "earnings_vol_multiple": 3.0}
+    extra = {"earnings": {"X": [(None, [(D("2026-10-02"), "before_open")])]},
+             "dividends": {"X": [(D("2026-10-01"), 1.0)]}, "bench": df, "index_cue": None}
+    cols = observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, "X", 5, extra)
+    assert cols["earn"].tail(4).all() and not cols["earn"].iloc[-5]     # 10-02 is the 2nd session after 09-30
+    assert cols["has_div"].tail(5).all() and not cols["has_div"].iloc[-6]
+
+
+def test_fitted_index_cue_on_the_last_as_of_day():
+    """Issue #27: with a fitted beta, the last as-of day of the data keeps its index cue: the session after it comes
+    from the exchange calendar, and the cue's return before that session is stored."""
+    days = ev.exchange_calendar("XBOM").sessions_in_range("2026-01-01", "2026-10-01")
+    rng = np.random.default_rng(3)
+    cue_days = ev.exchange_calendar("XNYS").sessions_in_range("2026-01-01", "2026-10-01")
+    bench = pd.DataFrame({"open": 100.0, "close": 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(days))))}, index=days)
+    cue = pd.DataFrame({"close": 50 * np.exp(np.cumsum(rng.normal(0, 0.01, len(cue_days))))}, index=cue_days)
+    cfg = {"market": "india", "calendar": "XBOM", "timezone": "Asia/Kolkata",
+           "index_cue": {"symbol": "SPX", "beta": "fit"}, "symbols": {"NIFTY50": {"role": "benchmark"}}}
+    series = observations.index_cue_series(cfg, {"NIFTY50": bench, "SPX": cue}, {"beta_split": {"fit_sessions": 60}})
+    assert series.index[-1] == days[-1] and not np.isnan(series.iloc[-1])   # SPX's 10-01 move, before India's 10-05
+
+
 def evframe(ticker: str, rows, reps) -> pd.DataFrame:
     t0 = pd.Timestamp("2026-10-05", tz="UTC")
     recs = [{"ticker": ticker, "type": "earnings", "date": d, "timing": tm, "amount": None, "source": src,
@@ -210,6 +277,7 @@ def test_collector_stores_periodic_reports_and_reader_uses_them(tmp_path, monkey
     rep = [r for r in rows if r["type"] == "periodic_report"]
     assert [(r["id"], r["date"], r["period_end"], r["source"]) for r in rep] == [
         ("AAPL-periodic_report-2026-04-22", "2026-04-22", "2026-03-31", "sec_history")]
+    assert rep[0]["accepted_at"] == "2026-04-23T01:43:00+00:00"           # issue #24: the time, for made_at
     assert all("period_end" not in r for r in rows if r["type"] != "periodic_report")
     # second run: nothing new (append-only, ids de-duplicated)
     s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))

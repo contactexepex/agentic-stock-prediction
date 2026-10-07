@@ -30,10 +30,10 @@ def holder_statement(rel: str, dates: tuple = (), datetimes: tuple = ()) -> str:
     """The statement that merges a holder and its relationship to a company."""
     return f"""UNWIND $rows AS row
 MERGE (h:Holder {{id: row.holder_id}})
-  ON CREATE SET h.name = row.holder_name, h.market = $market, h.source_kind = $kind, h.source_id = row.source_id,
+  ON CREATE SET h.market = $market, h.source_kind = $kind, h.source_id = row.source_id,
                 h.recorded_at = datetime(row.recorded_at)
 SET h.synced_at = datetime($synced_at), h.cik = coalesce(row.holder_cik, h.cik), h.kind = coalesce(h.kind, \
-row.holder_kind)
+row.holder_kind), h.name = coalesce(row.holder_name, h.name)
 FOREACH (_ IN CASE WHEN row.holder_person THEN [1] ELSE [] END | SET h:Person)
 WITH h, row
 {COMPANY}

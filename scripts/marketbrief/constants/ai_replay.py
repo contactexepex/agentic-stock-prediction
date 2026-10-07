@@ -44,6 +44,7 @@ PUBLIC_AT: dict[str, list[str]] = {
     "replays": ["computed_at"],
     "judgments": ["recorded_at"],
     "quotes": ["collected_at"],
+    "earnings_estimates": ["collected_at"],  # Yahoo consensus as we saw it (issue #17)
     "options": ["collected_at"],
     "graph": ["added_at"],
     "graph_runs": ["run_at"],

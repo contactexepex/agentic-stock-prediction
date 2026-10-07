@@ -33,6 +33,7 @@ from marketbrief.collectors import nse_session
 from marketbrief.collectors.event_timing import as_dates, between_quarters, merge_near
 from marketbrief.collectors.events_nse import nse_due, nse_earnings
 from marketbrief.collectors.events_sec import sec_earnings
+from marketbrief.collectors.earnings_estimates import new_estimate_rows, stored_estimates
 from marketbrief.collectors.events_yahoo import read_calendar, read_dividends, yf_earnings
 from marketbrief.constants.columns import (
     COL_DATE,
@@ -66,6 +67,7 @@ from marketbrief.constants.events import (
     HISTORY_SUFFIX,
     MSG_ESTIMATED_DIVIDEND,
     MSG_PERIODIC_REPORT,
+    MSG_YAHOO_DATE_DROPPED,
     NEAR_DAYS,
     PRIORITY_FILING,
     SOURCE_NSE_HISTORY,
@@ -76,7 +78,7 @@ from marketbrief.constants.events import (
     WHAT_EARNINGS_HISTORY,
 )
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
-from marketbrief.constants.kinds import KIND_EVENTS
+from marketbrief.constants.kinds import KIND_EARNINGS_ESTIMATES, KIND_EVENTS
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -154,6 +156,7 @@ class EventsCollector:
         self.new_history = {EVENT_EARNINGS: 0, EVENT_EX_DIVIDEND: 0}
         self.earnings_sources: dict[str, int] = {}
         self.report_count = 0
+        self.estimates, self.stored_estimates = [], stored_estimates(self.market)  # issue #17
 
     def add(self, key: str, event_type: str, day: date, source: str, details: EventDetails = NO_DETAILS) -> bool:
         """Add an event row unless its id (<ticker>-<type>-<date>) is stored; True when added."""
@@ -214,11 +217,11 @@ class EventsCollector:
         """SEC 10-Q/10-K acceptances with their period end: the range inputs' results_filter picks each
         quarter's results release among the 2.02 rows by them. Same window as the 2.02 rows."""
         for key, reports in self.sec_reports.items():
-            for day, when, form, period_end in sorted(reports, key=lambda report: report[0]):
+            for day, when, form, period_end, accepted_at in sorted(reports, key=lambda report: report[0]):
                 details = EventDetails(
                     when=when,
                     note=MSG_PERIODIC_REPORT.format(form=form, period=period_end),
-                    extra={"period_end": period_end.isoformat() if period_end else None},
+                    extra={"period_end": period_end.isoformat() if period_end else None, "accepted_at": accepted_at},
                 )
                 if self.since <= day < self.today and self.add(
                     key, EVENT_PERIODIC_REPORT, day, SOURCE_SEC_HISTORY, details
@@ -251,7 +254,8 @@ class EventsCollector:
 
     def add_earnings_history(self, key: str, ticker) -> None:
         """Past earnings days, timed where the source has a time: SEC or NSE filings first, then Yahoo."""
-        yahoo_dates, used, yahoo_errors = yf_earnings(self.cfg, ticker)
+        yahoo_dates, used, yahoo_errors, consensus = yf_earnings(self.cfg, ticker)
+        self.estimates += new_estimate_rows(self.stored_estimates, key, consensus, self.now)
         if used:
             self.earnings_sources[used] = self.earnings_sources.get(used, 0) + 1
         if yahoo_errors:
@@ -259,7 +263,13 @@ class EventsCollector:
         # a yfinance date between two NSE results dates a quarter apart is either the same report
         # or not a results release (no quarter is missing there)
         known_nse = self.history.nse_dates.get(key, []) + [known_day for known_day, _, _ in self.nse.get(key, [])]
-        yahoo_dates = [candidate for candidate in yahoo_dates if not between_quarters(candidate[0], known_nse)]
+        kept = [candidate for candidate in yahoo_dates if not between_quarters(candidate[0], known_nse)]
+        for day, _, _ in yahoo_dates:  # issue #16: a dropped date that is no NSE date's twin is logged
+            if day not in {candidate[0] for candidate in kept} and self.since <= day < self.today and all(
+                abs((day - nse_day).days) > NEAR_DAYS for nse_day in known_nse
+            ):
+                self.nse_info.setdefault("nse_notes", []).append(MSG_YAHOO_DATE_DROPPED.format(ticker=key, day=day))
+        yahoo_dates = kept
         primary = SOURCE_NSE_HISTORY if self.nse_info else SOURCE_SEC_HISTORY  # the filings source of this market
         for day, when, priority in merge_near(self.sec.get(key, []) + self.nse.get(key, []) + yahoo_dates):
             if not (self.since <= day < self.today):
@@ -310,7 +320,8 @@ class EventsCollector:
         for key, meta in self.cfg[CFG_TICKERS].items():
             self.collect_ticker(key, meta)
         written = append_jsonl(day_file(self.market, KIND_EVENTS, self.today), self.rows)
-        print(json.dumps(self.summary(written), indent=2))
+        estimates = append_jsonl(day_file(self.market, KIND_EARNINGS_ESTIMATES, self.today), self.estimates)
+        print(json.dumps({**self.summary(written), "new_estimates": estimates}, indent=2))
         # exit 1 only when Yahoo's calendar failed for every ticker (several `failed` entries per ticker)
         no_calendar = {failure[COL_TICKER] for failure in self.failed if failure["what"] == WHAT_CALENDAR}
         return 1 if no_calendar and len(no_calendar) == len(self.cfg[CFG_TICKERS]) else 0

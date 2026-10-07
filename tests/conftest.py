@@ -42,6 +42,7 @@ _saved_proxies = {k: os.environ[k] for k in PROXY_VARS if k in os.environ}
 SLOW = {
     "tests/test_aci_scoring.py": {
         "test_aci_off_reproduces_ranges_byte_for_byte",
+        "test_held_out_tuning_ignores_bars_after_the_cut_off",
         "test_replay_aci_has_no_lookahead",
         "test_replay_aci_off_rows_unchanged",
         "test_replay_held_out_selects_on_tuning_dates_and_reports_test_dates",
@@ -53,10 +54,15 @@ SLOW = {
         "test_prepare_no_look_ahead",
         "test_prepare_reads_source",
         "test_prepare_refuses_unsafe_roots_and_training_period",
+        "test_record_applies_the_news_status_rules_as_of_the_cutoff",
         "test_record_validation",
         "test_sample_dates_cli",
         "test_score_cli_on_recorded_calls",
         "test_training_cutoff_comes_from_config",
+    },
+    "tests/test_call_basis.py": {
+        "test_no_entry_open_no_score_and_old_rows_read_as_close_to_close",
+        "test_scoring_bases_match_the_model_labels",
     },
     "tests/test_determinism.py": {
         "test_score_predictions_queries",
@@ -68,6 +74,7 @@ SLOW = {
     "tests/test_guard.py": {
         "test_context_and_report_label_mid_session_ranges_late",
         "test_context_pack_labels_late_ranges",
+        "test_late_calls_left_out_of_slack_count_and_news_window",
         "test_market_status_cli_now",
         "test_ranges_cli_in_session_flag",
         "test_ranges_cli_late_flag",
@@ -76,6 +83,7 @@ SLOW = {
         "test_report_labels_late_ranges_and_links_the_review",
         "test_scoring_skips_every_horizon_made_after_the_open",
         "test_scoring_skips_records_made_after_the_first_session_closed",
+        "test_slack_ranges_line_says_late",
     },
     "tests/test_judge_fails.py": {
         "test_context_pack_prints_the_section",
@@ -125,6 +133,7 @@ SLOW = {
         "test_replay_ranges_equal_ranges_py",
     },
     "tests/test_review.py": {
+        "test_model_check_reruns_the_backtest_into_work",
         "test_review_end_to_end",
         "test_review_with_little_data_makes_no_live_proposal",
     },

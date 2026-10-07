@@ -152,7 +152,7 @@ def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
             "hit_rate": round_or_none(rate),
             "ci95": [round_or_none(lower), round_or_none(upper)],
             "ci95_iid": [round_or_none(wilson_lower), round_or_none(wilson_upper)],
-            "p_vs_50": None if not calls else float(f"{binom_p_two_sided(hit_count, calls):.3g}"),
+            "p_vs_50": None if not calls else binom_p_two_sided(hit_count, calls),  # rounded only for display
             "always_up_same_rows": round_or_none(always_up_hit[has_call].mean()) if calls else None,
             "diff_vs_always_up": round_or_none(diff.mean()) if calls else None,
             "diff_ci95": [round_or_none(diff_lower), round_or_none(diff_upper)],

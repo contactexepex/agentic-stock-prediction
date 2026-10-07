@@ -97,7 +97,9 @@ def held_out(
     """Out-of-sample check of the ACI settings: every ACI_GRID variant is replayed (ACI runs online over
     the whole window), the variant with the lowest mean relative 80% interval score on the TUNING rows
     (as-of date and target close on or before tune_end) is selected, and fixed bands vs that variant (and
-    vs the config's settings) are compared on the TEST rows only (as-of date after tune_end)."""
+    vs the run's settings) are compared on the TEST rows only (as-of date after tune_end). `config` and
+    `selected_is_config` describe the run's settings: config/ranges.yaml's unless --aci-gamma or --aci-by-regime
+    changed them (issue #33; the weekly review only reads replays whose settings equal the config's)."""
     bars, extra = load_inputs(cfg, ranges_config, con)
     fixed, _ = replay_rows(
         cfg,
@@ -163,18 +165,20 @@ def held_out_html(held_out_result: dict | None) -> str:
     if not held_out_result:
         return '<p class="note">No held-out check in this run (replay.py --aci --aci-tune-end DATE).</p>'
     selected = held_out_result["selected"]
+    same = " = this run's settings" if held_out_result["selected_is_config"] else " (not this run's settings)"
     return (
         f"<h3>Held-out check</h3><p>gamma and one-or-per-regime alpha picked from {len(held_out_result['grid'])} "
         f"variants on "
         f"as-of dates up to {escape_html(held_out_result['tune_end'])} only (lowest 80% interval score): gamma "
         f"{selected['gamma']}, "
         f"{'per regime' if selected['by_regime'] else 'one alpha'}"
-        f"{' = the config settings' if held_out_result['selected_is_config'] else ' (not the config settings)'}. "
+        f"{same}. "
         f"Fixed bands vs that choice on the later, unseen as-of dates:</p>{aci_table(held_out_result['test_selected'])}"
         + (
             ""
             if held_out_result["selected_is_config"]
-            else f"<p>Fixed bands vs the config settings on the same later "
+            else f"<p>Fixed bands vs this run's settings (config/ranges.yaml unless --aci-gamma or --aci-by-regime "
+            f"changed them) on the same later "
             f"dates:</p>{aci_table(held_out_result['test_config'])}"
         )
     )

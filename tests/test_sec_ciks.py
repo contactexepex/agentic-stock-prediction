@@ -237,3 +237,41 @@ def test_failed_predecessor_list_is_reported_like_any_failed_cik(tmp_path):
         assert [(f["ticker"], f["cik"]) for f in out["failed"]] == [("XOM", PRED)], script
     # the mapped CIK's filings are still collected
     assert {"0002115436-26-000020", "0002115436-26-000021"} <= {r["id"] for r in rows(root, "filings")}
+
+
+def drop_urls(tmp_path: Path, *urls: str) -> None:
+    path = tmp_path / "sec" / "urls.json"
+    served = json.loads(path.read_text())
+    for url in urls:
+        del served[url]
+    path.write_text(json.dumps(served))
+
+
+def test_failed_documents_name_their_cik(tmp_path):
+    """Issue #25: a failed Form 4 or Schedule 13 document is listed with the CIK whose folder holds it."""
+    root, cfg = setup(tmp_path)
+    drop_urls(tmp_path, f"{ARCH}/34088/000003408826000111/form4.xml",
+              f"{ARCH}/34088/000210011926000200/primary_doc.xml")
+    ins, stk = run("collect_insiders.py", root, cfg), run("collect_stakes.py", root, cfg)
+    assert [(f["ticker"], f["cik"], f["accession"]) for f in ins["failed"]] == [("XOM", PRED, "0000034088-26-000111")]
+    assert [(f["ticker"], f["cik"], f["accession"]) for f in stk["failed"]] == [("XOM", PRED, "0002100119-26-000200")]
+
+
+def run_filings(root: Path, cfg: Path) -> subprocess.CompletedProcess:
+    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET,
+           "MB_SEC_FIXTURES": str(root.parent / "sec"), "SEC_USER_AGENT": "market-brief tests test@example.com"}
+    return subprocess.run([sys.executable, str(SCRIPTS / "collect_filings.py")], cwd=SCRIPTS, env=env,
+                          capture_output=True, text=True, check=False)
+
+
+def test_collect_filings_exit_code_counts_unanswered_tickers(tmp_path):
+    """Issue #25: collect_filings exits 1 only when no watchlist ticker's submissions answered."""
+    sub = "https://data.sec.gov/submissions/CIK{:010d}.json"
+    root, cfg = setup(tmp_path / "some")
+    drop_urls(tmp_path / "some", sub.format(2115436), sub.format(PRED))          # XOM unanswered, AAPL answers
+    some = run_filings(root, cfg)
+    assert some.returncode == 0 and {f["cik"] for f in json.loads(some.stdout)["failed"]} == {2115436, PRED}
+    root, cfg = setup(tmp_path / "none")
+    drop_urls(tmp_path / "none", sub.format(320193), sub.format(2115436), sub.format(PRED))
+    none = run_filings(root, cfg)
+    assert none.returncode == 1 and json.loads(none.stdout)["new_filings"] == 0

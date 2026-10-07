@@ -46,6 +46,11 @@ MASKS = [re.compile(p, re.I) for p in (
     r"^\s*(?:\d+[.)]|#+)\s",                             # list numbering, headings
 )]
 IDS = re.compile(r"\b(?:[0-9a-f]{16}|nse-ann-\d+|\d{10}-\d{2}-\d{6})\b")
+# a falling move named just before a number ("fell 2.1%", "down 0.8%"; not a level: "fell to 95", "down from");
+# sign check only
+DOWN_WORD = re.compile(r"\b(?:fell|falls?|falling|dropped|drops?|declined?|declines|down|lost|loses|slid|slipped)\b"
+                       r"(?!\s+(?:to|from)\b)[^.;:,]*$", re.I)
+DOWN_REACH = 40   # characters before a number searched for a down word
 SENTENCE = re.compile(r"(?<=[.;!?])\s+(?=[A-Z(*•\-])")
 UNIT_MULT = {"cr": 1e7, "crore": 1e7, "lakh": 1e5, "mn": 1e6, "million": 1e6, "bn": 1e9, "billion": 1e9,
              "tn": 1e12, "trillion": 1e12, "k": 1e3}
@@ -81,8 +86,10 @@ def numbers(text: str, names: list[str], small_int: int | None = None) -> list[d
     """Numbers shown in text: value in base units, kind (pct | plain), rounding tolerance, token."""
     out = []
     for line in text.splitlines():
-        for m in NUM.finditer(mask(line, names)):
+        masked = mask(line, names)
+        for m in NUM.finditer(masked):
             sign, cur, digits, unit = m.group(1), m.group(2), m.group(3), (m.group(4) or "").strip().lower()
+            down = bool(DOWN_WORD.search(masked[max(0, m.start() - DOWN_REACH) : m.start()]))
             val = float(digits.replace(",", ""))
             dec = len(digits.split(".")[1]) if "." in digits else 0
             if small_int is not None and dec == 0 and not unit and not cur and not sign and val <= small_int:
@@ -95,7 +102,8 @@ def numbers(text: str, names: list[str], small_int: int | None = None) -> list[d
                 kind, val, tol = "pct", val / 100, tol / 100
             elif unit in UNIT_MULT:
                 val, tol = val * UNIT_MULT[unit], tol * UNIT_MULT[unit]
-            out.append({"value": val, "kind": kind, "tol": tol, "token": m.group(0).strip(), "line": line.strip()})
+            out.append({"value": val, "kind": kind, "tol": tol, "token": m.group(0).strip(), "line": line.strip(),
+                        "down": down, "negative": sign in ("-", "−") or down})
     return out
 
 
@@ -145,10 +153,12 @@ class Pool:
     def __init__(self, ents: Entities):
         self.ents = ents
         self._raw: dict = defaultdict(lambda: {"pct": set(), "plain": set()})
+        self._neg: dict = defaultdict(lambda: {"pct": set(), "plain": set()})   # values seen negative (sign check)
         self._sorted: dict | None = None
+        self._sorted_neg: dict | None = None
         self.notes: list[str] = []     # sources that could not be read (validate.py info.number_sources)
 
-    def add(self, scope, kind: str, value) -> None:
+    def add(self, scope, kind: str, value, negative: bool = False) -> None:
         try:
             v = float(value)
         except (TypeError, ValueError):
@@ -156,6 +166,9 @@ class Pool:
         if math.isfinite(v):
             self._raw[scope][kind].add(round(abs(v), 10))
             self._sorted = None
+            if v < 0 or negative:
+                self._neg[scope][kind].add(round(abs(v), 10))
+                self._sorted_neg = None
 
     def add_text(self, text: str, scope_by_line: bool = True, scope=None, pct_sections: bool = False) -> None:
         """Numbers in a source text. Each line is scoped to the entities it names (none: market level);
@@ -167,9 +180,9 @@ class Pool:
             scopes = [scope] if not scope_by_line else (sorted(self.ents.find(line)) or [None])
             for n in numbers(line, self.ents.mask_names):
                 for s in scopes:
-                    self.add(s, n["kind"], n["value"])
+                    self.add(s, n["kind"], n["value"], n["negative"])
                     if in_pct and n["kind"] == "plain":
-                        self.add(s, "pct", n["value"])
+                        self.add(s, "pct", n["value"], n["negative"])
 
     def add_rows(self, rows: list[dict], scope_col: str | None) -> None:
         """Stored rows: fraction columns as percentages (x100), other numbers as plain numbers."""
@@ -209,8 +222,14 @@ class Pool:
         ids = set(IDS.findall(sentence)) or set(IDS.findall(line))
         return [None, *sorted(ents)] + [("id", i) for i in sorted(ids)]
 
-    def has(self, n: dict, scopes) -> bool:
-        idx = self._index()
+    def has(self, n: dict, scopes, negative: bool = False) -> bool:
+        """A same-kind source number in scope rounds to n (with negative=True: one seen negative)."""
+        if negative:
+            if self._sorted_neg is None:
+                self._sorted_neg = {s: {k: sorted(v) for k, v in d.items()} for s, d in self._neg.items()}
+            idx = self._sorted_neg
+        else:
+            idx = self._index()
         x, t = n["value"], n["tol"]
         for s in scopes:
             vals = idx.get(s, {}).get(n["kind"], [])
@@ -231,6 +250,20 @@ def unmatched(lines: list[str], pool: Pool, small_int: int) -> list[dict]:
                     bad.append({**n, "line": line.strip(), "sentence": sentence.strip(),
                                 "entities": sorted(pool.ents.find(sentence) or pool.ents.find(line))})
     return bad
+
+
+def sign_alarms(lines: list[str], pool: Pool, small_int: int) -> list[dict]:
+    """Optional sign check (issue #32; validate.yaml narrative_sign_check): a number after a down word (fell,
+    dropped, down ...) whose source numbers in scope are all positive. Numbers without any source are
+    `unmatched`'s, not this check's."""
+    alarms = []
+    for line in lines:
+        for sentence in SENTENCE.split(line):
+            scopes = pool.scopes_for(sentence, line)
+            for n in numbers(sentence, pool.ents.mask_names, small_int):
+                if n["down"] and pool.has(n, scopes) and not pool.has(n, scopes, negative=True):
+                    alarms.append({**n, "sentence": sentence.strip()})
+    return alarms
 
 
 def collector_summaries(pool: Pool, paths) -> None:

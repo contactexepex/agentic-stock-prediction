@@ -19,11 +19,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   a split or bonus confirmed by a Yahoo `Stock Splits` row, or for India by NSE's bhavcopy, is recorded
   once in `data/<market>/adjustments/` (`marketbrief/analytics/price_adjustments.py`) and applied on read by the `ohlc`/`bars`
   views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-base is a `warnings` entry and holds
-  that symbol's new bars (`held`); a wrong record is cancelled by a later one with `supersedes`;
-  DESIGN.md section 3), `collect_quotes`, `collect_events` (also backfills past earnings
+  that symbol's new bars (`held`; 5+ sessions without a new bar: `held_too_long`, gate warning
+  `PRICE_HELD_TOO_LONG`); a wrong record is cancelled by a later one with `supersedes`
+  (`adjustment_records.py` lists the calls and ranges made while the wrong row was active);
+  DESIGN.md section 3; the market calendar counts `special_sessions` of the market config, e.g. India's
+  Muhurat days, as sessions), `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02, every 2.02 stored as filed and kept only when it is a
   quarter's results release when read (`event_history.results_filter`, anchored on stored 10-Q/10-K `periodic_report`
-  rows), and dividends), `collect_news`, `collect_filings`, `collect_options` (US option-chain
+  rows), and dividends; also Yahoo's consensus EPS point in time -> `earnings_estimates`, read with
+  `earnings_estimates_asof(ts)`, context only), `collect_news`, `collect_filings`, `collect_options` (US option-chain
   implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
@@ -56,7 +60,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `marketbrief/analytics/` (past earnings moves, ex-dividend shift, beta split, implied vol; each
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
-  `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them.
+  `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
+  reruns the signal-model backtest and says plainly whether the model shows skill (`model_skill`).
+  Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
+  open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`);
+  every summary shows the two bases apart, never pooled.
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
@@ -213,6 +221,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   GitHub issue labelled `cosmetic` to fix later, and the work can merge.
 - Build work: on FAIL (any blocker), send the blocker list back and judge again, repeating until PASS.
   A re-check covers only the listed blockers and the diff that fixed them, not the whole batch again.
+  Nothing is merged or pushed to main before its PASS.
 - Batches: plan work as a few batches (a feature, a refactor chunk, or a group of related fixes with
   the cosmetic issues that touch the same files), build the whole batch, then one review per batch;
   never a review cycle per small item. The reviewer lists every finding in one pass.
@@ -225,8 +234,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   live collection) at a time on the session's machine.
 - Scope of a review follows the change: an end-to-end run of the routine is needed only when
   executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
-  agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is
-  merged or pushed to main before its PASS.
+  agent-instruction changes get a judge review of the diff only, never an end-to-end run.
 - Merging: a batch is merged to main as soon as its review passes; the working branch is only where a
   batch is built. The end-to-end run of both markets is required before the routines are re-enabled,
   not before code reaches main.
@@ -245,7 +253,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's
   `data_quality`. The judge still checks the monthly graph-builder edges, and once a week
   (`scripts/spotcheck.py --if-due`) a deterministic sample of the past week's output (2 forecasts
-  with their evidence, 1 filled report) for what scripts cannot see.
+  with their evidence, 1 filled report, 1 lesson, 2 claims with their status) for what scripts cannot see.
 - Every verdict, PASS or FAIL, is appended as one line: build work to `judgments/log.jsonl`
   (subject, work, commit, round, verdict, summary, recorded_at as ISO UTC); daily-run verdicts
   (graph-builder, spot-check) to `data/<market>/judgments/` (schema `judgments` in

@@ -366,6 +366,25 @@ def test_replay_held_out_selects_on_tuning_dates_and_reports_test_dates(tmp_path
     assert any(ho["test_config"][h]["overall"]["before"] != ho["test_config"][h]["overall"]["after"] for h in ("1", "5"))
 
 
+def test_held_out_tuning_ignores_bars_after_the_cut_off(tmp_path):
+    """Issue #33: the tuning rows need their target close on or before tune_end (`bar_target <= tune_end`), so
+    changing every bar after tune_end leaves the tuning scores and the selected settings unchanged."""
+    from test_replay import py
+    days, series, events, _, _ = fixture(tmp_path)
+    tune_end = days[200]
+    shaken = {k: [x if i <= 200 else x * 1.37 for i, x in enumerate(v)] for k, v in series.items()}
+    outs = []
+    for name, data in (("base", series), ("pert", shaken)):
+        root, cfg = build(tmp_path, name, days, data, events)
+        r = py(HELD_OUT, root, cfg, str(tune_end))
+        assert r.returncode == 0, r.stderr
+        outs.append(json.loads(r.stdout)["ho"])
+    base, pert = outs
+    assert [v["tune_rel_score80"] for v in base["grid"]] == [v["tune_rel_score80"] for v in pert["grid"]]
+    assert base["selected"] == pert["selected"]
+    assert base["test_selected"] != pert["test_selected"]                      # the later rows did change
+
+
 def test_review_skips_aci_replays_with_other_settings_and_ids_name_settings():
     from marketbrief.replay.rule_replay import aci_compare
     from marketbrief.pipeline.review import aci_review

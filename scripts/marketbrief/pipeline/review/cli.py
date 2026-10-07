@@ -10,6 +10,10 @@ window and since start (all by target date, never past the week's end):
   changed (cue, AI drift, AI widening, earnings/event/regime widening, centre cap), and
   (b) walk-forward on stored prices (backtest.py) for the width parameters and the regime and
   event widening rebuilt from stored bars.
+- signal-model check (model_skill.py): the walk-forward backtest of scripts/model_backtest.py rerun
+  for the market, its headline numbers and a plain verdict on whether the model has shown skill
+  (--no-model-backtest skips it).
+Calls are summarised per scoring basis, never pooled (analytics/call_basis.py).
 Thresholds and variants live in config/review.yaml. Small samples are flagged and get no
 proposal. Proposed config/ranges.yaml changes are written to the report, never applied.
 Appends a record to data/<market>/reviews/ and writes reports/<market>/review-YYYY-Www.md."""
@@ -19,8 +23,16 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 
+from marketbrief.analytics import call_basis
 from marketbrief.analytics.features import load_bars
-from marketbrief.constants.review import DEFAULTS, MSG_HISTORY_ABLATION_SKIPPED
+from marketbrief.constants.review import (
+    DEFAULTS,
+    MSG_HISTORY_ABLATION_SKIPPED,
+    MSG_MODEL_CHECK_FAILED,
+    MSG_MODEL_CHECK_SKIPPED,
+    SKIP_HISTORY,
+    SKIP_MODEL,
+)
 from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -38,6 +50,7 @@ from marketbrief.pipeline.review.helpers import (
     previous_week,
     week_bounds,
 )
+from marketbrief.pipeline.review import model_skill
 from marketbrief.pipeline.review.history_ablation import history_ablation
 from marketbrief.pipeline.review.live_ablation import live_ablation
 from marketbrief.pipeline.review.markdown import markdown
@@ -48,6 +61,7 @@ from marketbrief.pipeline.review.summaries import (
     confidence_bands,
     load_calls,
     load_ranges,
+    per_basis,
     range_summary,
 )
 from marketbrief.pipeline.review.verdicts import (
@@ -58,10 +72,22 @@ from marketbrief.pipeline.review.verdicts import (
 )
 
 
+def model_check(market: str, review_config: dict, enabled: bool) -> dict:
+    """The signal-model check (model_skill.py), or why it was not run; a failure never stops the review."""
+    if not enabled:
+        return {"skipped": MSG_MODEL_CHECK_SKIPPED}
+    try:
+        result, path = model_skill.rerun(market)
+    except (Exception, SystemExit) as exc:  # e.g. no config/model.yaml or too little history for any fit
+        return {"error": MSG_MODEL_CHECK_FAILED.format(error=str(exc)[:200])}
+    return model_skill.headline(result, market, path, review_config)
+
+
 def build(
-    cfg: dict, ranges_config: dict, review_config: dict, con, week: str, history: bool = True
+    cfg: dict, ranges_config: dict, review_config: dict, con, week: str, skip: frozenset = frozenset()
 ) -> tuple[dict, dict]:
-    """Build the review record and its data for one ISO week."""
+    """Build the review record and its data for one ISO week; `skip` may hold SKIP_HISTORY (no walk-forward on
+    stored prices) and SKIP_MODEL (no signal-model backtest)."""
     start, end = week_bounds(week)
     roll_start = end - timedelta(days=review_config["rolling_days"] - 1)
     ranges, calls = load_ranges(con, cfg, end), load_calls(con, end)
@@ -76,8 +102,9 @@ def build(
         "ranges": {
             window: by_horizon(rows_since(ranges, start_date), range_summary) for window, start_date in windows.items()
         },
-        "calls": {
-            window: by_horizon(rows_since(calls, start_date), call_summary) for window, start_date in windows.items()
+        "calls": {  # per scoring basis, never pooled (call_basis.py)
+            window: per_basis(rows_since(calls, start_date), lambda frame: by_horizon(frame, call_summary))
+            for window, start_date in windows.items()
         },
         "breakdowns": {
             window: {
@@ -88,7 +115,9 @@ def build(
             for window, start_date in windows.items()
         },
         "bands": {
-            window: confidence_bands(rows_since(calls, start_date), review_config["confidence_bands"])
+            window: per_basis(
+                rows_since(calls, start_date), lambda frame: confidence_bands(frame, review_config["confidence_bands"])
+            )
             for window, start_date in windows.items()
         },
     }
@@ -104,12 +133,14 @@ def build(
     review_data["live_ablation"] = live_ablation(ranges, ranges_config, review_config)
     review_data["history_ablation"] = (
         history_ablation(cfg, ranges_config, review_config, load_bars(con), end)
-        if history
+        if SKIP_HISTORY not in skip
         else {"n": 0, "error": MSG_HISTORY_ABLATION_SKIPPED, "variants": []}
     )
     for ablation in (review_data["live_ablation"], review_data["history_ablation"]):
         judge(ablation, review_config)
-    review_data["proposals"] = proposals(ranges_config, review_data["live_ablation"], review_data["history_ablation"])
+    review_data["proposals"] = proposals(
+        ranges_config, review_data["live_ablation"], review_data["history_ablation"], cfg["market"]
+    )
     review_data["scores"] = {
         window: proper_scores(rows_since(ranges, start_date), rows_since(calls, start_date))
         for window, start_date in windows.items()
@@ -119,9 +150,13 @@ def build(
     proposal = aci_proposal(ranges_config, review_data["aci"]["replay"])
     if proposal:
         review_data["proposals"].append(proposal)
+    review_data["model"] = model_check(cfg["market"], review_config, SKIP_MODEL not in skip)
     review_data["advice"] = confidence_advice(review_data["bands"]["all"], review_data["calls"]["all"], review_config)
 
-    range_all, call_all = review_data["ranges"]["all"]["all"], review_data["calls"]["all"]["all"]
+    # the record's call columns are of the current basis (the newest scored call's), named in call_basis_all
+    basis = call_basis.current(calls)
+    range_all = review_data["ranges"]["all"]["all"]
+    call_all = review_data["calls"]["all"].get(f"all · {call_basis.label(basis)}", {}) if basis else {}
     rec = {
         "id": week,
         "week": week,
@@ -132,8 +167,9 @@ def build(
         "n_ranges_week": review_data["ranges"]["week"]["all"]["n"],
         "n_ranges_30d": review_data["ranges"]["rolling"]["all"]["n"],
         "n_ranges_all": range_all["n"],
-        "n_calls_week": review_data["calls"]["week"]["all"]["n"],
-        "n_calls_all": call_all["n"],
+        "n_calls_week": len(rows_since(calls, start)),
+        "n_calls_all": len(calls),
+        "call_basis_all": basis,
         "cover50_all": range_all.get("cover50"),
         "cover80_all": range_all.get("cover80"),
         "score80_all": range_all.get("score80_pct"),
@@ -141,11 +177,12 @@ def build(
         "call_hit_all": call_all.get("hit_rate"),
         "always_up_all": call_all.get("always_up"),
         "low_sample": range_all["n"] < review_config["min_n_recommend"],
+        "model_skill": review_data["model"].get("skill"),
         "n_proposals": len(review_data["proposals"]),
         "proposals": review_data["proposals"],
         "detail": {
             key: review_data[key]
-            for key in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice", "scores", "aci")
+            for key in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice", "scores", "aci", "model")
         }
         | {
             "live_ablation": review_data["live_ablation"],
@@ -162,6 +199,7 @@ def main() -> int:
     parser.add_argument("--week", help="ISO week to review, e.g. 2026-W40 (default: the previous ISO week)")
     parser.add_argument("--if-due", action="store_true", help="do nothing if this week's review is already stored")
     parser.add_argument("--no-history", action="store_true", help="skip the walk-forward on stored prices")
+    parser.add_argument("--no-model-backtest", action="store_true", help="skip rerunning the signal-model backtest")
     args = parser.parse_args()
     cfg = require_market(args)
     week = args.week or previous_week(utc_today())
@@ -183,7 +221,12 @@ def main() -> int:
         return 0
     review_config = load_review_config()
     rec, review_data = build(
-        cfg, load_ranges_config(cfg["market"]), review_config, con, week, history=not args.no_history
+        cfg,
+        load_ranges_config(cfg["market"]),
+        review_config,
+        con,
+        week,
+        frozenset({SKIP_HISTORY} if args.no_history else set()) | ({SKIP_MODEL} if args.no_model_backtest else set()),
     )
     path = paths.ROOT / rec["report"]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -203,6 +246,7 @@ def main() -> int:
                 "n_ranges_all": rec["n_ranges_all"],
                 "n_calls_all": rec["n_calls_all"],
                 "low_sample": rec["low_sample"],
+                "model_skill": rec["model_skill"],
                 "proposals": [
                     {**change, "source": proposal["source"], "n": proposal["n"], "rel_score": proposal["rel_score"]}
                     for proposal in rec["proposals"]

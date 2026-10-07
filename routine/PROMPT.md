@@ -67,7 +67,8 @@ Warnings never block: list them in `data_quality`.
    to Slack #market-brief with
    `python scripts/notify_slack.py --text "<market name>: market closed today, next session <session_date>"`
    (exit code 2 = no bot token and no webhook: use the Slack connector as in step 13) and stop. If `late_run` is
-   true (the run started after the close of `session_date`, at `session_close_utc`), carry on,
+   true (the run started after the close of `session_date`, at `session_close_utc`, while that
+   session's bar is still settling), carry on,
    but tell the forecaster it is a late run: it abstains on every ticker with reason "late run".
    `ranges.py` then skips ranges whose target session has closed, labels the others late (never
    scored) and ignores cues quoted after that session's open. Say so in the report's `data_quality` section. If `in_session` is true (a manual run
@@ -98,7 +99,8 @@ Warnings never block: list them in `data_quality`.
    List every `failed` entry of their summaries in `data_quality` (a session file missing for the
    latest session is only a note: it is published after the close).
    India: also list `collect_prices`' `filled_from_nse` bars (ticker, date) in `data_quality` as
-   "bar from the NSE bhavcopy (Yahoo had none)"; they are official exchange prices, not a failure.
+   "bar from the NSE bhavcopy (Yahoo had none)"; they are official exchange prices, not a failure
+   (`validate.py --stage collect` lists them under `info.collect.filled_from_nse`, ready to copy).
    Its `failed` entries with `missing_after_nse` (e.g. a price-basis mismatch after a split or
    bonus) or `sessions_behind` are real gaps: list them like any other failure.
    Both markets: list `collect_prices`' `adjustments` (a split or bonus recorded today; the bars
@@ -235,7 +237,10 @@ Warnings never block: list them in `data_quality`.
 10a. Weekly review (first trading day of each ISO week): `python scripts/review.py --if-due`.
     It reviews the previous ISO week once (it does nothing if that review is already stored, so
     a missed first day is caught up on the next run), writes `reports/<market>/review-<week>.md`
-    and appends a record to `data/<market>/reviews/`. Keep its JSON summary. Its proposed
+    and appends a record to `data/<market>/reviews/`. It also reruns the signal model's walk-forward
+    backtest for the market (about 20 seconds; JSON in `work/model_backtest/`) and states in the review
+    whether the model has shown skill (`model_skill` in its JSON summary; a failed backtest is reported
+    in the review and never stops it). Keep its JSON summary. Its proposed
     `config/ranges.yaml` changes are for a human to decide: never edit config in the routine.
     report.py links the review in the report and adds one Slack line on the day it is written.
 
@@ -274,7 +279,9 @@ Warnings never block: list them in `data_quality`.
     track record) and `reports/<market>/index.html` from the validated report plus the stored data,
     and lists the files for Slack in `work/slack_<market>_files.json`. It adds no narrative of its
     own (numbers come from the data, text is copied from the validated report), so it needs no
-    further check. If it fails, list the failure in the Slack failures line and post anyway.
+    further check. If it fails, add the failure to the Slack draft's failures line, then run
+    `python scripts/validate.py --stage report` again, so the draft that is posted is the one the gate
+    checked (one retry, as for the report), and post anyway.
 
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
@@ -305,9 +312,10 @@ Warnings never block: list them in `data_quality`.
 
 14a. Weekly spot-check (first trading day of each ISO week, after the brief so it never delays
     it): `python scripts/spotcheck.py --if-due`. If it prints `due: false`, skip this step. If
-    `empty` is true (no calls and no filled report in the previous ISO week), append its `record`
+    `empty` is true (nothing to sample in the previous ISO week), append its `record`
     as printed (verdict SKIP). Otherwise run the judge subagent on its sample (2 forecasts with
-    their evidence rows and outcome, 1 filled report of that week; the sample is seeded by market
+    their evidence rows and outcome, 1 filled report, 1 reflector lesson and 2 claim-checker claims
+    with their event's status, all of that week; the sample is seeded by market
     and week, so a rerun picks the same items) with the instructions "Weekly spot-check
     (.claude/agents/judge.md): check every item of `checklist`", the sample JSON as the claims,
     and the report path and `data/<market>/` as where the work lives. One round only (no

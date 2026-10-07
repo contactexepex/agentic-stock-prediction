@@ -44,7 +44,6 @@ from marketbrief.constants.prices import (
     MSG_NO_NEWEST_STORED,
     MSG_NO_PREV_CLOSE,
     MSG_NO_STORED_CLOSE,
-    MSG_NOT_FILLED,
     MSG_SPLIT_AFTER_PREVIOUS,
     NEWEST_LOOKBACK,
     NSE_ARCHIVES_FULL_URL,
@@ -217,10 +216,8 @@ class NseBarFiller:
     def fill_ticker(self, ticker: str, day: date, bar: dict | None, problem: str | None) -> None:
         """Write one missing bar, or record why it stays missing."""
         reason = self.reason_not_filled(ticker, day, bar, problem)
-        if reason:
+        if reason:  # listed once, in failed[].missing_after_nse (issue #35: no second copy in nse_notes)
             self.still_missing.setdefault(ticker, []).append({COL_DATE: day.isoformat(), "reason": reason})
-            if not problem:
-                self.notes.append(MSG_NOT_FILLED.format(day=day, ticker=ticker, reason=reason))
             return
         path = prices_file(self.run.cfg, day)
         if ticker in stored_bars(path):  # never a second bar for a (date, ticker)

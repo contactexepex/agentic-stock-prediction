@@ -26,6 +26,9 @@ FACT_FIELDS = (
     "target_close",
     "actual_return",
     "hit",
+    "label_basis",  # the call's scoring basis (analytics/call_basis.py); entry_* only for open_to_close
+    "entry_date",
+    "entry_open",
     "range_id",
     "range_target_date",
     "range_actual_close",
@@ -47,7 +50,8 @@ WITH o AS (SELECT DISTINCT ON (prediction_id) * FROM outcomes ORDER BY predictio
      p AS (SELECT DISTINCT ON (id) * FROM predictions ORDER BY id, made_at)
 SELECT p.id, p.ticker, p.horizon_days, p.as_of_date, p.made_at, p.direction, p.confidence, p.rationale,
        p.evidence_ids, p.prompt_version, o.base_date, o.base_close, o.target_date, o.target_close,
-       o.actual_return, o.hit, o.scored_at
+       o.actual_return, o.hit, o.scored_at, coalesce(o.label_basis, 'close_to_close') AS label_basis,
+       o.entry_date, o.entry_open
 FROM p JOIN o ON o.prediction_id = p.id
 """
 

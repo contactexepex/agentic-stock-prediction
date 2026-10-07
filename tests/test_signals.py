@@ -165,6 +165,26 @@ def test_index_rebalance_dates():
     assert ev.major_events_near(in_evs, date(2026, 3, 27)) == []
 
 
+def test_provisional_event_dates_are_flagged_and_named():
+    """Issue #15: unconfirmed dates carry provisional: true and say so in the name the report shows."""
+    india, us = load_market("india"), load_market("us")
+    reb = {e["date"]: e for e in ev.market_events(us, date(2026, 1, 1), date(2027, 12, 31))
+           if e["type"] == "index_rebalance"}
+    provisional = sorted(day for day, e in reb.items() if e["provisional"])
+    assert provisional == [date(2026, 6, 18), date(2027, 6, 17)]          # moved by Juneteenth
+    assert reb[date(2027, 6, 17)]["name"].endswith("(provisional date)")
+    assert "provisional" not in reb[date(2027, 3, 19)]["name"]
+    nifty = {e["date"]: e for e in ev.market_events(india, date(2026, 1, 1), date(2027, 12, 31))
+             if e["type"] == "index_rebalance"}
+    assert {day: e["provisional"] for day, e in nifty.items()} == {
+        date(2026, 3, 27): False, date(2026, 9, 29): False, date(2027, 3, 30): True, date(2027, 9, 29): True}
+    assert nifty[date(2027, 3, 30)]["name"].endswith("(provisional date)")
+    # a fixed date already named provisional is flagged without a second suffix
+    fomc = next(e for e in ev.market_events(us, date(2027, 1, 27), date(2027, 1, 27)) if e["type"] == "fomc")
+    assert fomc["provisional"] and fomc["name"] == "FOMC rate decision (provisional)"
+    assert not any(e["provisional"] for e in ev.market_events(us, date(2026, 10, 1), date(2026, 10, 31)))
+
+
 def test_month_end_rule_and_session_offset(tmp_path):
     assert ev.rule_dates({"rule": "month_end", "months": [3, 9]}, date(2026, 1, 1), date(2026, 12, 31)) == \
         [date(2026, 3, 31), date(2026, 9, 30)]

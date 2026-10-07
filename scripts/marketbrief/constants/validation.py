@@ -51,6 +51,8 @@ MSG_BIG_MOVE_WITHOUT_ACTION = (
 )
 MSG_COLLECTOR_ERROR = "{name}: {error}"
 MSG_COLLECTOR_FAILED = "{name}: {count} failed: {failures}"
+MSG_PRICE_HELD_TOO_LONG = ("prices: held with no new bar for {sessions_min} sessions or more, a human must record the "
+                           "split or bonus: {held}")
 MSG_PRICE_BASIS_WARNINGS = "prices: {count} price-basis warning(s): {warnings}"
 MSG_ZERO_ROWS_WITHOUT_REASON = "{name}: {key} is 0 and the summary gives no reason"
 MSG_COLLECTOR_FILE_PROBLEM = "{relative_path}: {problems}"
@@ -128,3 +130,5 @@ MSG_UNMATCHED_NUMBERS = (
     "(context pack, script-written report, cited news text, stored rows): {examples}"
 )
 MSG_UNMATCHED_NUMBER_EXAMPLE = '{token!r} in "{sentence}"'
+MSG_SIGN_ALARMS = ("{name}: {count} number(s) after a falling word (fell, dropped, down ...) whose sources are all "
+                   "positive (optional sign check, issue #32): {examples}")

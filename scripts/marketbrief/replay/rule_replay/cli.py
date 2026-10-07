@@ -43,7 +43,7 @@ from marketbrief.constants.replay import (
     MSG_NO_TRADING_DAYS_IN_THE_WINDOW,
 )
 from marketbrief.core import cli, database, paths, storage
-from marketbrief.core.clock import utc_now
+from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.market_config import benchmark_key, load_ranges_config
 from marketbrief.replay.rule_replay.aci_compare import (
     aci_comparison,
@@ -190,8 +190,9 @@ def main() -> int:
     json_file.write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")
     rel = str(page.relative_to(paths.ROOT))
     rec = record(summary, rel)
-    rec["id"] += suffix
-    storage.append_jsonl(storage.day_file(cfg["market"], "replays", date.fromisoformat(summary["end"])), [rec])
+    # issue #27: a re-run of the same window is a new id (run time appended); issue #28: the file is the UTC run date
+    rec["id"] += suffix + "@" + summary["computed_at"]
+    storage.append_jsonl(storage.day_file(cfg["market"], "replays", utc_today()), [rec])
     print(
         json.dumps(
             {

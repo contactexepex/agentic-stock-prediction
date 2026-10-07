@@ -15,7 +15,9 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 from marketbrief.core import calendar as ev
-from marketbrief.analytics import scoring
+from marketbrief.analytics import call_basis, scoring
+from marketbrief.constants.model import LABEL_CLOSE_TO_CLOSE
+from marketbrief.constants.scoring import MSG_SCORED_ON
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.constants.formatting import CURRENCY_SYMBOLS
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
@@ -82,18 +84,19 @@ def _list(v) -> list:
 
 # calls by stated-confidence band (exact decimal average: no dependence on row order) and the scored
 # calls in a fixed order for scoring.call_scores / reliability (docs/REFACTOR_PLAN.md, nondeterminism)
+# (per scoring basis, never pooled: analytics/call_basis.py; {src} = the track record as of the day's made_at)
 BANDS_SQL = """SELECT CASE WHEN confidence < 0.6 THEN '50-59%' WHEN confidence < 0.7 THEN '60-69%'
-                         WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band,
+                         WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band, label_basis,
                     count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
-             FROM track_record GROUP BY band ORDER BY band"""
-SCORED_CALLS_SQL = ("SELECT confidence, hit FROM track_record WHERE confidence IS NOT NULL AND hit IS NOT NULL "
-                    "ORDER BY id, scored_at")
+             FROM {src} GROUP BY band, label_basis ORDER BY band, label_basis"""
+SCORED_CALLS_SQL = ("SELECT confidence, hit FROM {src} WHERE confidence IS NOT NULL AND hit IS NOT NULL "
+                    "AND label_basis = ? ORDER BY id, scored_at")
 # the same for report.py: its confidence bands, and range_record with the averaged % columns as exact decimals
 CONF_BANDS_SQL = """SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59' WHEN confidence < 0.7 THEN '0.60-0.69'
-                              WHEN confidence < 0.8 THEN '0.70-0.79' ELSE '0.80-0.90' END AS band,
+                              WHEN confidence < 0.8 THEN '0.70-0.79' ELSE '0.80-0.90' END AS band, label_basis,
                          count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf,
                          avg(hit::INT) AS hit
-                  FROM track_record GROUP BY band ORDER BY band"""
+                  FROM track_record GROUP BY band, label_basis ORDER BY band, label_basis"""
 EXACT_COLUMNS = ("width80_pct", "naive_width80_pct", "is80_pct", "naive_is80_pct", "center_err_pct",
                  "naive_center_err_pct")
 RANGE_RECORD_EXACT = ("(SELECT * REPLACE ("
@@ -110,6 +113,16 @@ def record_text(n: int, hits: int, what: str) -> str:
     return f"Right {hits} of {n} times ({scoring.percent(hits / n)})."
 
 
+def asof_source(con, view: str, cutoff) -> str:
+    """A temp view of `view` with only the outcomes scored by `cutoff` (issue #26: rebuilding an old day's page
+    later shows the track record as it was that day); the view itself when there is no cutoff."""
+    if cutoff is None or pd.isna(cutoff):
+        return view
+    con.execute(f"CREATE OR REPLACE TEMP VIEW {view}_asof AS SELECT * FROM {view} "
+                f"WHERE scored_at <= TIMESTAMPTZ '{pd.Timestamp(cutoff).isoformat()}'")
+    return f"{view}_asof"
+
+
 def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     q = lambda sql, p=None: con.execute(sql, p or []).df()  # noqa: E731
     cur = cfg.get("currency", "")
@@ -119,6 +132,9 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     as_of = pd.Timestamp(ranges["as_of_date"].iloc[0]).date()
     session = pd.Timestamp(ranges["session_date"].iloc[0]).date()
     made_at = pd.to_datetime(ranges["made_at"], utc=True).max()
+    trs, rrs = asof_source(con, "track_record", made_at), asof_source(con, "range_record", made_at)
+    calls_seen = q(f"SELECT id, made_at, label_basis FROM {trs}")
+    basis = call_basis.current(calls_seen) or LABEL_CLOSE_TO_CLOSE  # per-company and proper scores: this basis
 
     regime = q("SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1")
     feats = q("SELECT * FROM features_latest WHERE as_of_date = ?", [as_of]).set_index("ticker")
@@ -127,8 +143,9 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                    SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS k
                    FROM bars WHERE date <= ?) WHERE k <= {HISTORY_DAYS} ORDER BY ticker, date""", [as_of])
     rr = q("""SELECT ticker, horizon_days AS h, count(*) AS n, sum(hit80::INT) AS h80, sum(hit50::INT) AS h50
-              FROM range_record GROUP BY ALL ORDER BY ticker, h""")
-    tr = q("SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM track_record GROUP BY ALL ORDER BY ticker")
+              FROM {rrs} GROUP BY ALL ORDER BY ticker, h""".format(rrs=rrs))
+    tr = q(f"SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM {trs} WHERE label_basis = ? "
+           "GROUP BY ALL ORDER BY ticker", [basis])
     preds = q("SELECT DISTINCT ON (id) * FROM predictions WHERE as_of_date = ? ORDER BY id, made_at", [as_of]) \
         if _has_rows(con, "predictions") else pd.DataFrame()
     news = q("""SELECT n.id, n.title, n.url, n.source, coalesce(n.published_at, n.first_seen_at) AS ts, n.tickers,
@@ -247,7 +264,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 "history": [{"d": iso(x.date), "c": json_safe_float(x.close, 4)} for x in h.itertuples()],
                 "ranges": rows, "calls": calls, "events": evs,
                 "news": items[:NEWS_PER_COMPANY],
-                "record": {"ranges": rec_r, "calls": {"n": nc, "hits": hc, "text": record_text(nc, hc, "up/down calls")}},
+                "record": {"ranges": rec_r, "calls": {"n": nc, "hits": hc, "text": record_text(
+                    nc, hc, f"up/down calls (scored {call_basis.label(basis)})")}},
             })
         sector_rows.append({"sector": sector, "tickers": members,
                             "move_1d": (sum(m for _, m in moves) / len(moves)) if moves else None,
@@ -268,20 +286,21 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
 
     # track record, market-wide: stated vs actual hit rate (ranges by band, calls by confidence)
     cal = q("""SELECT horizon_days AS h, count(*) AS n, avg(hit50::INT) AS c50, avg(hit80::INT) AS c80
-               FROM range_record GROUP BY ALL ORDER BY h""")
-    bands = q(BANDS_SQL)
+               FROM {rrs} GROUP BY ALL ORDER BY h""".format(rrs=rrs))
+    bands = q(BANDS_SQL.format(src=trs))
     points = []
     for x in cal.itertuples():
         for stated, actual in ((0.5, x.c50), (0.8, x.c80)):
             points.append({"kind": "range", "label": f"{int(stated * 100)}% ranges, {int(x.h)}-day",
                            "stated": stated, "actual": json_safe_float(actual), "n": int(x.n)})
     for x in bands.itertuples():
-        points.append({"kind": "call", "label": f"Calls at {x.band} confidence", "stated": json_safe_float(x.conf),
+        points.append({"kind": "call", "label": f"Calls at {x.band} confidence ({call_basis.label(x.label_basis)})",
+                       "stated": json_safe_float(x.conf),
                        "actual": json_safe_float(x.hit), "n": int(x.n)})
 
     # proper scores of the scored calls (scoring.py): Brier, log loss, reliability with Wilson 95%
-    sc_calls = q(SCORED_CALLS_SQL)
-    call_scores = scoring.call_scores(sc_calls)
+    sc_calls = q(SCORED_CALLS_SQL.format(src=trs), [basis])
+    call_scores = {**scoring.call_scores(sc_calls), "basis_note": MSG_SCORED_ON.format(basis=call_basis.label(basis))}
     reliability = [{**r, "mean_conf": json_safe_float(r["mean_conf"]), "hit_rate": json_safe_float(r["hit_rate"]),
                     "wilson_lo": json_safe_float(r["wilson_lo"]), "wilson_hi": json_safe_float(r["wilson_hi"])}
                    for r in scoring.reliability(sc_calls["confidence"], sc_calls["hit"])] if len(sc_calls) else []

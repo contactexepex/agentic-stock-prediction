@@ -225,6 +225,9 @@ def build_market(tmp: Path):
     rv.update({"min_n": 30, "min_n_recommend": 100, "min_n_calls": 20, "history_eval_sessions": 30,
                "history_variants": rv["history_variants"][:1] + [{"name": "EWMA lambda 0.97", "set": {"ewma_lambda": 0.97}}]})
     (cfg / "review.yaml").write_text(yaml.safe_dump(rv))
+    settings = yaml.safe_load((cfg / "settings.yaml").read_text())   # every call here on one basis (close_to_close)
+    settings.pop("call_scoring", None)
+    (cfg / "settings.yaml").write_text(yaml.safe_dump(settings))
 
     rng = np.random.default_rng(5)
     n = 300
@@ -298,8 +301,8 @@ def test_review_end_to_end(tmp_path):
     for key in ("regime", "sector", "note"):                                  # windows nest: week <= 30d <= all
         n = {w: sum(x["n"] for x in b[w][key].values()) for w in b}
         assert 0 < n["week"] < n["rolling"] < n["all"], (key, n)
-    assert 0 < d["bands"]["week"]["80%-90%"]["n"] < d["bands"]["rolling"]["80%-90%"]["n"] < 40
-    assert d["bands"]["all"]["80%-90%"]["n"] == 40
+    band_n = {w: d["bands"][w]["80%-90% · close→close"]["n"] for w in d["bands"]}  # one basis (before the switch)
+    assert 0 < band_n["week"] < band_n["rolling"] < band_n["all"] == 40
 
     # since-start coverage equals the scored outcomes on disk
     outs = [json.loads(x) for f in (root / "data" / tp.MARKET / "range_outcomes").glob("**/*.jsonl")
@@ -334,7 +337,8 @@ def test_review_end_to_end(tmp_path):
                    "### By confidence band", "## Calibration", "## Ablation: replay of live scored ranges",
                    "Round-trip consistency check against the current config",
                    "## Ablation: walk-forward on stored prices", "## Proposed changes to config/ranges.yaml",
-                   "`cue_weight`", "**Not applied.**", "drop overnight cue", "low n"):
+                   "`cue_weight`", "**Not applied.**", "drop overnight cue", "low n",
+                   "## Signal model: does it show skill?", "_Not checked: the backtest failed: "):
         assert needle in text, needle
     # every coverage row is flagged exactly when n < min_n (30), and both kinds occur
     section = text.split("## Ranges: coverage vs target")[1].split("###")[0]
@@ -395,7 +399,8 @@ def window_con(target_dates: list[date]):
         "naive_hit80": True, "is80_pct": 10.0, "naive_is80_pct": 6.0, "width80_pct": 10.0, "naive_width80_pct": 6.0}
         for i, d in enumerate(target_dates)])
     calls = pd.DataFrame([{"id": f"c{i}", "target_date": d, "horizon_days": 1,  # noqa: F841
-                           "confidence": 0.85, "hit": True, "actual_return": 0.01} for i, d in enumerate(target_dates)])
+                           "confidence": 0.85, "hit": True, "actual_return": 0.01, "label_basis": "close_to_close",
+                           "made_at": pd.Timestamp(d, tz="UTC")} for i, d in enumerate(target_dates)])
     con.execute("CREATE TABLE range_record AS SELECT * FROM ranges")
     con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
     return con
@@ -407,14 +412,16 @@ def test_window_boundaries_and_no_data_after_the_week():
              end - timedelta(days=29), end - timedelta(days=30)]
     rv = {**review.DEFAULTS, "rolling_days": 30}
     cfg = {"market": "testmkt", "tickers": {"A": {"sector": "Tech"}}}
-    rec, d = cli.build(cfg, RC, rv, window_con(dates), "2026-W40", history=False)
+    rec, d = cli.build(cfg, RC, rv, window_con(dates), "2026-W40", frozenset({cli.SKIP_HISTORY}))
     # week: start, end · 30 days: end-29 .. end · since start: all up to end (end+1 is after the week)
     assert (rec["n_ranges_week"], rec["n_ranges_30d"], rec["n_ranges_all"]) == (2, 4, 5)
-    assert {w: d["calls"][w]["all"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
-    assert {w: d["bands"][w]["80%-90%"]["n"] for w in d["bands"]} == {"week": 2, "rolling": 4, "all": 5}
+    assert {w: d["calls"][w]["all · close→close"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
+    assert {w: d["bands"][w]["80%-90% · close→close"]["n"] for w in d["bands"]} == {"week": 2, "rolling": 4,
+                                                                                    "all": 5}
     assert {w: d["breakdowns"][w]["sector"]["Tech · 1d"]["n"] for w in d["breakdowns"]} == \
         {"week": 2, "rolling": 4, "all": 5}
     assert rec["detail"]["live_ablation"]["n"] == 5 and rec["n_calls_all"] == 5
+    assert (rec["call_basis_all"], rec["n_calls_week"]) == ("close_to_close", 2)
 
 
 def test_confidence_bands_edges():
@@ -500,6 +507,38 @@ def test_proposals_prefer_live_evidence():
     assert verdicts.proposals(RC, ablation("x", {"cue_weight": 0.0}, "low n", -0.5), {"variants": []}) == []
 
 
+def test_review_tracks_5d_earnings_day_coverage():
+    """Issue #16: the review shows the 5-day earnings-in-horizon coverage per window, or _none_ before any."""
+    from marketbrief.pipeline.review.markdown_sections import range_lines
+
+    rv = {**review.DEFAULTS, "rolling_days": 30}
+    names = {"week": "week 2026-W40", "rolling": "last 30 days", "all": "since start"}
+    stats = {"n": 40, "cover50": 0.45, "cover80": 0.75}
+    empty = {"regime": {}, "sector": {}, "note": {}}
+    data = {"ranges": {w: {"all": {"n": 0}} for w in names},
+            "breakdowns": {"week": empty, "rolling": empty,
+                           "all": {**empty, "note": {"earnings · 5d": stats, "earnings · 1d": stats}}}}
+    text = "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage, 5-day ranges")[1]
+    rows = [line for line in text.split("Notes:")[0].splitlines() if line.startswith("| since")]
+    assert len(rows) == 1 and rows[0].startswith("| since start | earnings · 5d | 40 | 45% | 75% |")
+    data["breakdowns"]["all"] = empty
+    assert "_none_" in "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage")[1]
+
+
+def test_proposal_names_the_per_market_override_key():
+    """Issue #16: for India the earnings multiple comes from earnings_vol_multiple_by_market.india: name that key."""
+    from marketbrief.core.market_config import load_ranges_config
+
+    hist = ablation("earnings multiple 2.5", {"earnings_vol_multiple": 2.5}, "improves score", -0.05)
+    india, us = load_ranges_config("india"), load_ranges_config("us")
+    [p] = verdicts.proposals(india, {"variants": []}, hist, "india")
+    assert p["changes"] == [{"param": "earnings_vol_multiple_by_market.india",
+                             "current": india["earnings_vol_multiple_by_market"]["india"], "proposed": 2.5}]
+    [p] = verdicts.proposals(us, {"variants": []}, hist, "us")
+    assert p["changes"][0]["param"] == "earnings_vol_multiple"
+    assert p["changes"][0]["current"] == us["earnings_vol_multiple"]
+
+
 def test_major_event_counts_after_start_up_to_target():
     majors = [date(2026, 10, 2)]
     assert not major_event_between(majors, date(2026, 10, 2), date(2026, 10, 9))   # on the as-of day: known
@@ -540,3 +579,58 @@ def test_weekly_review_written_earlier_is_not_fresh():
                 "now() - INTERVAL 2 DAY)")
     rv = gather.weekly_review(con, date(2026, 10, 7))
     assert rv is not None and rv["fresh"] is False                          # linked in the report, no Slack line
+
+
+# ---------- change B: the signal-model check ----------
+
+def backtest_result(skill: bool, low: float) -> dict:
+    """A model_backtest.run() result with one scored horizon and a paper strategy at two thresholds."""
+    row = {"n": 900, "dates": 120, "brier": 0.24 if skill else 0.252, "brier_base_rate": 0.25,
+           "brier_skill": 0.04 if skill else -0.008, "auc": 0.56 if skill else 0.5, "auc95": [low, 0.6]}
+    diff = {"dates": 100, "positions": 100, "mean_pct": 0.2, "ci95_pct": [0.05, 0.4]}
+    paper = {"thresholds": {"0.55": {"long": {"positions": 300}, "vs": {"always_up": diff}},
+                            "0.65": {"long": {"positions": 0}, "vs": {"always_up": {"dates": 0}}}}}
+    return {"computed_at": "2026-10-05T12:00:00+00:00", "data": {"us": {"tickers": 3}},
+            "results": {"us": {"5d open_to_close": {**row, "paper": paper}, "1d close_to_close": {"skipped": "x"}}}}
+
+
+def test_model_check_says_plainly_whether_the_model_shows_skill():
+    from marketbrief.pipeline.review import model_skill
+    rv = {**review.DEFAULTS}
+    yes = model_skill.headline(backtest_result(True, 0.52), "us", "work/model_backtest/x.json", rv)
+    assert yes["skill"] and yes["verdict"].startswith("Yes: the signal model has shown skill out of sample on "
+                                                      "5d open_to_close.")
+    assert yes["strategy_beats"] and "5d open_to_close p>=0.55 vs always_up" in yes["verdict"]
+    assert [r["verdict"] for r in yes["strategy"]] == ["beats", "no positions"]
+    no = model_skill.headline(backtest_result(True, 0.49), "us", "x.json", rv)          # AUC interval reaches 0.5
+    assert not no["skill"] and no["verdict"].startswith("No: the signal model has not shown skill.")
+    stricter = model_skill.headline(backtest_result(True, 0.52), "us", "x.json",
+                                    {**rv, "model_skill": {"min_n": 1000, "min_brier_skill": 0.0, "min_auc_low": 0.5}})
+    assert not stricter["skill"]                                                         # thresholds from config
+    text = "\n".join(model_skill.markdown_lines(yes))
+    assert "| 5d open_to_close | 900 | 0.24 | 0.25 | 0.04 | 0.56 | 0.52 to 0.6 | yes |" in text
+    assert "| 1d close_to_close | – | – | – | – | – | – | x |" in text
+    assert "| 5d open_to_close | p>=0.65 | 0 | – | 0 | – | – to – | no positions |" in text
+    assert "_Not checked: skipped (--no-model-backtest)._" in "\n".join(
+        model_skill.markdown_lines({"skipped": "skipped (--no-model-backtest)"}))
+
+
+def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
+    """The review reruns the walk-forward backtest for its market, writes its JSON under work/ (never data/ or
+    reports/) and summarises it; a failing backtest is reported, never fatal."""
+    from marketbrief.core import paths
+    from marketbrief.model import backtest
+    from marketbrief.pipeline.review import model_skill
+    from test_signal_model import SETTINGS, synthetic_inputs, write_prices
+
+    write_prices(tmp_path, synthetic_inputs())
+    monkeypatch.setattr(paths, "ROOT", tmp_path)
+    monkeypatch.setattr(backtest, "load_model_config", lambda: SETTINGS)
+    out = cli.model_check("us", {**review.DEFAULTS}, True)
+    assert out["json"].startswith("work/model_backtest/model-backtest-us-") and (tmp_path / out["json"]).exists()
+    assert {row["key"] for row in out["scores"]} == {"1d close_to_close", "1d open_to_close", "5d close_to_close",
+                                                     "5d open_to_close"}
+    assert out["verdict"].startswith(("Yes:", "No:")) and not (tmp_path / "data" / "us" / "reviews").exists()
+    monkeypatch.setattr(model_skill, "run_backtest", lambda _markets: 1 / 0)
+    assert cli.model_check("us", {**review.DEFAULTS}, True) == {"error": "the backtest failed: division by zero"}
+    assert cli.model_check("us", {**review.DEFAULTS}, False) == {"skipped": "skipped (--no-model-backtest)"}

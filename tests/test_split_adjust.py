@@ -212,6 +212,39 @@ def test_isolated_mismatch_warns_but_keeps_collecting(us, monkeypatch, capsys):
         date(2026, 9, 17)
 
 
+def test_one_corrected_oldest_bar_is_not_held(us, monkeypatch, capsys):
+    """Issue #36: Yahoo corrects only the oldest stored bar of its frame by 5%, and our stored closes run on
+    without a step after it: a corrected bar, not a re-base, so a warning and the new bars are written."""
+    tr = traded(9)
+    write_stored(us.root, "us", "NVDA", dict(zip(US_DAYS[:9], tr)))
+    y = list(tr) + [190.0, 191.0, 192.0, 193.0]
+    y[0] = tr[0] * 0.95
+    FakeTicker.frames["NVDA"] = frame(US_DAYS, y, "America/New_York")
+    out = run(monkeypatch, capsys, "us")
+    assert out["adjustments"] == [] and "held" not in out and out["failed"] == []
+    assert out["warnings"] == ["NVDA: Yahoo's close differs from the stored close on 1 date(s) 2026-08-31..2026-08-31 "
+                               "(Yahoo/stored 0.9500-0.9500); one date only and our stored closes show no step by "
+                               "that ratio after it: a bar Yahoo corrected, not a re-base; not recorded, not held"]
+    assert connect("us").execute("SELECT max(date) FROM ohlc WHERE ticker = 'NVDA'").fetchone()[0] == \
+        date(2026, 9, 17)
+
+
+def test_one_date_rebase_with_a_stored_step_is_held(us, monkeypatch, capsys):
+    """Issue #36: the oldest stored bar of the frame is the last one before a 4:5 re-base our stored closes
+    already step by (the later ones were collected on the new basis): still a re-base, so the new bars are held."""
+    tr = traded(9)
+    stored = {d: (c if i == 0 else c * 0.8) for i, (d, c) in enumerate(zip(US_DAYS[:9], tr))}
+    write_stored(us.root, "us", "NVDA", stored)
+    FakeTicker.frames["NVDA"] = frame(US_DAYS, [c * 0.8 for c in tr] + [180.0, 181.0, 182.0, 183.0],
+                                      "America/New_York")
+    out = run(monkeypatch, capsys, "us")
+    assert out["adjustments"] == [] and out["held"] == ["NVDA"]
+    assert out["warnings"][0].startswith("NVDA: Yahoo's close differs from the stored close on 1 date(s) "
+                                         "2026-08-31..2026-08-31 (Yahoo/stored 0.8000-0.8000)")
+    assert out["warnings"][0].endswith("a re-base by 4/5 that no Yahoo split row or NSE bhavcopy confirms (yet): "
+                                       "not recorded, new bars held")
+
+
 def test_split_row_with_mixed_stored_basis_warns(us, monkeypatch, capsys):
     """A split row, but the stored closes before it are partly on the old basis and partly on the
     new one: no single factor fits, so nothing is recorded and the collector warns."""
@@ -495,9 +528,12 @@ def test_hold_persists_after_the_frame_moves_past_the_stored_bars(us, monkeypatc
         newest = con.execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0]
         if k < 2:     # held, also a month later when the 1-month frame no longer covers 08-14
             assert out["held"] == ["NVDA"] and out["adjustments"] == []
-            assert out["warnings"] == [f"NVDA: Yahoo's close differs from the stored close on 10 date(s) "
+            assert out["warnings"][:1] == [f"NVDA: Yahoo's close differs from the stored close on 10 date(s) "
                                        f"2026-08-03..2026-08-14 (Yahoo/stored 0.5000-0.5000); a re-base by 1/2 that "
                                        f"no Yahoo split row or NSE bhavcopy confirms (yet): not recorded, new bars held"]
+            assert out["warnings"][1:] == ([] if k == 0 else [   # issue #36: a month without a new bar escalates
+                "NVDA: held with no new bar for 30 sessions (newest stored bar 2026-08-14); no source has confirmed "
+                "the price basis, a human must record the split or bonus (DESIGN.md section 3)"])
             assert any(f["ticker"] == "NVDA" and "new bars held" in f["error"] for f in out["failed"])
             assert newest == date(2026, 8, 14)
         else:
@@ -526,7 +562,10 @@ def test_no_overlap_even_after_the_longer_fetch_holds(us, monkeypatch, capsys):
         assert out["held"] == ["NVDA"] and out["adjustments"] == []
         assert out["warnings"] == [f"NVDA: no stored bar in Yahoo's frame to check the price basis; its first close "
                                    f"(2026-08-24) is 0.5024x our newest stored close (2026-08-14): not verifiable, "
-                                   f"new bars held"]
+                                   f"new bars held",
+                                   "NVDA: held with no new bar for 23 sessions (newest stored bar 2026-08-14); no "
+                                   "source has confirmed the price basis, a human must record the split or bonus "
+                                   "(DESIGN.md section 3)"]
         assert connect("us").execute("SELECT max(date) FROM ohlc_raw WHERE ticker = 'NVDA'").fetchone()[0] \
             == date(2026, 8, 14)
 

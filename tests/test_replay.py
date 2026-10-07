@@ -224,6 +224,11 @@ def test_replay_cli_writes_report_json_and_record(tmp_path):
              "'SELECT count(*), max(cover80_1d), CAST(max(end_date) AS VARCHAR) FROM replays').fetchone())", root, cfg)
     assert rec.returncode == 0, rec.stderr
     assert rec.stdout.strip().startswith("(1, ") and end in rec.stdout
+    # issues #27/#28: the record's id carries its run time (a re-run is a new id), its file the UTC run date
+    [stored] = list((root / "data" / "testmkt" / "replays").glob("**/*.jsonl"))
+    row = json.loads(stored.read_text().splitlines()[0])
+    assert row["id"] == f"{row['start_date']}_{row['end_date']}@{row['computed_at']}"
+    assert stored.stem == row["computed_at"][:10]
 
 
 # ---------- statistics on synthetic series ----------
@@ -252,6 +257,20 @@ def test_baseline_hit_rates_on_synthetic_series():
 def test_tiny_p_values_print_as_less_than():
     assert html_parts.p_value_text(0.0) == "<0.001" and html_parts.p_value_text(4.2e-9) == "<0.001"
     assert html_parts.p_value_text(0.0123) == "0.0123" and html_parts.p_value_text(None) == ""
+
+
+def test_replay_page_details_issue_27():
+    """The stored p-value is unrounded (rounded only on the page), the calibration chart names its y axis, and a
+    hit-rate tile says whether its 95% interval excludes a coin flip."""
+    from marketbrief.replay.rule_replay import replay_statistics, rule_charts, rule_html
+
+    p = replay_statistics.binom_p_two_sided(61, 100)
+    assert p != float(f"{p:.3g}") and html_parts.p_value_text(p) == f"{p:.3g}"
+    svg = rule_charts.svg_calibration({"horizons": {}})
+    assert "actual coverage (how often it held)</text>" in svg and "rotate(-90" in svg
+    assert rule_html.coin_note([0.52, 0.58]).endswith("the 95% interval excludes 50%")
+    assert rule_html.coin_note([0.48, 0.55]).endswith("the 95% interval includes 50%")
+    assert rule_html.coin_note(None) == "a coin flip is 50%"
 
 
 def test_binomial_and_wilson():

@@ -8,6 +8,9 @@ import json
 import pandas as pd
 
 from marketbrief.constants.verification import (
+    MAIN_EVIDENCE_STATUSES,
+    MSG_MAIN_EVIDENCE_EVENTS,
+    MSG_NO_MAIN_EVIDENCE,
     NEVER_SUPPORT_STATUSES,
     STATUS_PRECEDENCE,
     STATUS_UNVERIFIED,
@@ -107,7 +110,20 @@ def context_section(con, window_hours: float = 72, per_ticker: int = 4) -> tuple
             f"{', '.join(_cite(event, status)) or '–'} | {_short_time(event['first_reported_at'])} | "
             f"{_short_time(event.get('confirmed_at'))} |"
         )
-    return TITLE, HEADER + "\n".join(lines) + "\n"
+    return TITLE, main_evidence_line(rows) + "\n\n" + HEADER + "\n".join(lines) + "\n"
+
+
+def main_evidence_line(rows: list[dict]) -> str:
+    """How many shown events may be a call's main evidence now (issue #39: on a market's first days with
+    status rows, e.g. India, often none, so a news-based call cannot pass the forecast gate)."""
+    eligible = sorted({row["ticker"] for row in rows if row.get("status") in MAIN_EVIDENCE_STATUSES})
+    count = sum(1 for row in rows if row.get("status") in MAIN_EVIDENCE_STATUSES)
+    return MSG_MAIN_EVIDENCE_EVENTS.format(
+        eligible=count,
+        shown=len(rows),
+        tickers=f" ({', '.join(eligible)})" if eligible else "",
+        consequence="" if count else MSG_NO_MAIN_EVIDENCE,
+    ).rstrip()
 
 
 def call_status_lines(con, as_of) -> list[str]:

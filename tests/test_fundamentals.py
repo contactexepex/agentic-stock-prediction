@@ -285,6 +285,20 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
                AND concept = 'revenue' AND period = 'quarter' AND period_end = '2025-06-30'"""
     assert con.execute(asof.format("2026-07-31 20:00:00+00")).fetchone() == (26463000000,)
     assert con.execute(asof.format("2026-07-31 21:00:00+00")).fetchone() == (27443000000,)
+    # exact edges (issue #2): known AT its acceptance time, not a second before
+    assert con.execute(asof.format("2026-07-31 20:29:59+00")).fetchone() == (26463000000,)
+    assert con.execute(asof.format("2026-07-31 20:30:00+00")).fetchone() == (27443000000,)
+    edge = """SELECT count(*) FROM fundamentals_{}_asof(TIMESTAMPTZ '{}') WHERE ticker = 'XOM'
+              AND accession = '0000034088-26-000067'"""
+    assert con.execute(edge.format("latest", "2026-05-04 23:59:59+00")).fetchone() == (0,)   # no acceptance time:
+    assert con.execute(edge.format("latest", "2026-05-05 00:00:00+00")).fetchone()[0] > 0    # known at day end
+    aapl_q3 = """SELECT count(*) FROM fundamentals_{}_asof(TIMESTAMPTZ '{}') WHERE ticker = 'AAPL'
+                 AND period_end = '2026-06-27'"""
+    accepted = con.execute(f"SELECT min(accepted_at) FROM fundamentals WHERE accession = '{NEW_ACC}'").fetchone()[0]
+    just_before = (accepted - timedelta(seconds=1)).isoformat()
+    for macro in ("quarterly", "metrics"):
+        assert con.execute(aapl_q3.format(macro, just_before)).fetchone() == (0,), macro
+        assert con.execute(aapl_q3.format(macro, accepted.isoformat())).fetchone()[0] > 0, macro
     before = con.execute("""SELECT max(period_end) FROM fundamentals_metrics_asof(TIMESTAMPTZ '2026-07-01 00:00:00+00')
                             WHERE ticker = 'AAPL'""").fetchone()
     assert before == (date(2026, 3, 28),)                       # the June quarter's 10-Q was not filed yet
@@ -305,7 +319,7 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
     text = ctx.stdout.split("## Fundamentals")[1]
-    assert f"Filed in the last 5 days: AAPL 10-Q FY2026 Q3 ({YESTERDAY})" in text and "no consensus" in text
+    assert f"Filed in the last 5 days: AAPL 10-Q FY2026 Q3 ({YESTERDAY})" in text and "under Earnings estimates" in text
     assert f"| AAPL | FY2026 Q3 | 2026-06-27 | 10-Q | {YESTERDAY} | new | 109.42 | 16.4 | 2.02 | 28.7 |" in text
     assert "| BAC | FY2026 Q2 | 2026-06-30 | 10-Q | 2026-07-31 |  | 31.56 |" in text
     assert "| AAPL | 2026-06-27 | 39.54 | 84.34 |" in text
@@ -328,6 +342,19 @@ def test_predecessor_cik_filing_triggers_a_reload(tmp_path):
     out = json.loads(run("collect_fundamentals.py", root, cfg).stdout)
     assert [(f["ticker"], f["cik"]) for f in out["failed"]] == [("XOM", 34088)]
     assert "XOM" not in out["loaded"] and out["up_to_date"] == 2
+
+
+def test_failed_company_facts_name_the_cik(tmp_path):
+    """Issue #25: a failed company-facts request is listed with its CIK; the ticker is skipped as a whole
+    (half its CIKs would store an incomplete history), the others load."""
+    root, cfg = setup(tmp_path)
+    path = tmp_path / "sec" / "urls.json"
+    served = json.loads(path.read_text())
+    del served[cf.facts_url(34088)]
+    path.write_text(json.dumps(served))
+    out = json.loads(run("collect_fundamentals.py", root, cfg).stdout)
+    assert [(f["ticker"], f["cik"]) for f in out["failed"]] == [("XOM", 34088)]
+    assert out["loaded"] == ["AAPL", "BAC"] and not any(x["ticker"] == "XOM" for x in rows(root))
 
 
 def test_skipped_without_sec(tmp_path):

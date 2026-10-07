@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from marketbrief.analytics.prediction_rules import RuleLabels, check_prediction
+from marketbrief.analytics.prediction_rules import RuleLabels, check_news_status, check_prediction
 from marketbrief.constants.ai_replay import (
     MARKER,
     MSG_DAY_ALREADY_RECORDED,
@@ -19,6 +19,7 @@ from marketbrief.constants.ai_replay import (
 from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl
+from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.evidence import evidence
 from marketbrief.replay.ai_replay.roots import data_root
@@ -59,6 +60,10 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
         feats = con.execute(
             "SELECT ticker, quality, days_to_earnings FROM features_latest WHERE as_of_date = ?", [as_of_day]
         ).df()
+        statuses = EvidenceStatuses(con)  # issue #39: the daily gate's news-status rules, as of the cutoff
+        status_rules = statuses.active(meta["cutoff_utc"])
+        if status_rules:
+            statuses.preload(meta["cutoff_utc"])
     evidence_frame, _ = evidence(cfg["market"], root, datetime.fromisoformat(meta["cutoff_utc"]))
     return {
         "meta": meta,
@@ -71,19 +76,28 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
         },
         "evidence": set(evidence_frame["id"]),
         "tickers": set(cfg["tickers"]),
+        "statuses": statuses if status_rules else None,
     }
 
 
 def validate(rec, ctx: dict, as_of_day: date, seen: set[str]) -> list[str]:
     """Reasons a forecaster record breaks the schema or the CLAUDE.md prediction rules (empty = valid):
-    the shared check in prediction_rules.py, with the replay date as every ticker's as_of_date."""
-    return check_prediction(
+    the shared check in prediction_rules.py, with the replay date as every ticker's as_of_date, then (when the
+    root holds status rows by the cutoff) the daily gate's news-verification rules, each cited id's status as
+    of the cutoff (the record's made_at once stored; issue #39)."""
+    errs = check_prediction(
         rec,
         ctx,
         seen,
         as_of=as_of_day,
         labels=RuleLabels("the replay date", "the replay root's news/filings/announcements"),
     )
+    statuses = ctx.get("statuses")
+    if errs or statuses is None:
+        return errs
+    cutoff = ctx["meta"]["cutoff_utc"]
+    found = [statuses.of(evidence_id, rec["ticker"], cutoff) for evidence_id in rec["evidence_ids"]]
+    return [f"{code}: {reason}" for code, reason in check_news_status(rec, found)]
 
 
 def record(cfg: dict, as_of_day: date, root: Path, calls_file: Path, results: Path) -> dict:
@@ -157,6 +171,7 @@ def record(cfg: dict, as_of_day: date, root: Path, calls_file: Path, results: Pa
         "prompt_versions": sorted({accepted["prompt_version"] for accepted in good}),
         "recorded_at": now,
         "citable_ids": ctx["meta"]["citable_evidence"]["total"],
+        "news_status_rules": ctx.get("statuses") is not None,
     }
     append_jsonl(store_directory / "days.jsonl", [day_record])
     return {

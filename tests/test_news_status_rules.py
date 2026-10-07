@@ -177,6 +177,19 @@ def test_primary_only_side_fact_never_confirms_the_event():
     assert "primary_only" not in res["flags"]
 
 
+def test_fact_outlets_only_deny_while_a_primary_affirms_is_primary_only():
+    """Issue #39 item 1: only affirming outlet statements count, so a fact the outlet items only deny while a
+    filing affirms it is flagged primary_only: confirmed on its own row, but it neither raises the event's
+    status nor lends it the filing (the outlet item keeps the cluster's base status)."""
+    res, facts = vs.cluster_status(cluster(), [
+        st("n1", fact="buyback", stance="denies"),
+        st("acc-1", "filing", fact="buyback", source_published_at="2026-10-05T04:00:00+00:00")])
+    assert facts["buyback"]["status"] == "confirmed_primary" and facts["buyback"]["flags"] == ["primary_only"]
+    assert facts["buyback"]["outlet_ids"] == ["n1"] and facts["buyback"]["primary_ids"] == ["acc-1"]
+    assert (res["status"], res["primary_ids"], res["confirmed_at"], res["ids"]["n1"]) == \
+        ("single_source", [], None, "single_source")
+
+
 def test_cluster_status_highest_of_facts_and_base():
     res, facts = vs.cluster_status(cluster(), [])
     assert res["status"] == "single_source" and facts == {}
@@ -310,3 +323,15 @@ def test_forecast_gate_report_lists_codes_json(root):
     out = forecast(root, [call()])
     assert json.loads(json.dumps(out))["ok"] is False
     assert {f["code"] for f in out["failures"]} == {"NEWS_STATUS_MAIN", "NEWS_STATUS_BLOCKED"}
+    # issue #39: the refused calls are also counted in one warning (one data_quality line) and in info
+    assert out["info"]["forecast"]["refused_news_status"] == 1
+    assert codes(out, "warnings")["NEWS_STATUS_REFUSED"]["detail"].startswith(
+        "1 of 1 call(s) refused by the news-verification rules")
+    assert "2026-10-05-AAPL-5d" in codes(out, "warnings")["NEWS_STATUS_REFUSED"]["detail"]
+
+
+def test_forecast_gate_counts_no_refusal_for_a_passing_call(root):
+    write_jsonl(root, "news_verified", date(2026, 10, 6), [status_row([GOOD_NEWS_ID], ["corroborated"])])
+    out = forecast(root, [call()])
+    assert out["ok"] and out["info"]["forecast"]["refused_news_status"] == 0
+    assert "NEWS_STATUS_REFUSED" not in codes(out, "warnings")

@@ -90,7 +90,8 @@ BASE_SCHEMAS: Schemas = {
         "as_of_date": "DATE", "made_at": "TIMESTAMPTZ", "direction": "VARCHAR", "confidence": "DOUBLE",
         "rationale": "VARCHAR", "evidence_ids": "VARCHAR[]", "call_prompt_version": "VARCHAR",
         "base_date": "DATE", "base_close": "DOUBLE", "target_date": "DATE", "target_close": "DOUBLE",
-        "actual_return": "DOUBLE", "hit": "BOOLEAN", "range_id": "VARCHAR", "range_target_date": "DATE",
+        "actual_return": "DOUBLE", "hit": "BOOLEAN", "label_basis": "VARCHAR", "entry_date": "DATE",
+        "entry_open": "DOUBLE", "range_id": "VARCHAR", "range_target_date": "DATE",
         "range_actual_close": "DOUBLE", "lo80": "DOUBLE", "lo50": "DOUBLE", "hi50": "DOUBLE", "hi80": "DOUBLE",
         "hit50": "BOOLEAN", "hit80": "BOOLEAN", "range_position": "VARCHAR",
         "settled_at": "TIMESTAMPTZ", "available_from": "TIMESTAMPTZ",
@@ -105,6 +106,9 @@ BASE_SCHEMAS: Schemas = {
         "prediction_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "base_date": "DATE",
         "base_close": "DOUBLE", "target_date": "DATE", "target_close": "DOUBLE",
         "actual_return": "DOUBLE", "hit": "BOOLEAN",
+        # the scoring basis (analytics/call_basis.py): close_to_close (also every row stored without it) or
+        # open_to_close, whose return starts at entry_open, the open of entry_date (the session after as-of)
+        "label_basis": "VARCHAR", "entry_date": "DATE", "entry_open": "DOUBLE",
     }),
     "prices": ("csv", {
         "date": "DATE", "ticker": "VARCHAR", "open": "DOUBLE", "high": "DOUBLE",
@@ -146,6 +150,16 @@ BASE_SCHEMAS: Schemas = {
         # periodic_report rows (SEC 10-Q/10-K acceptance, source sec_history): the fiscal period end.
         # They date each quarter's results release among the 2.02 filings (event_history.results_filter).
         "period_end": "DATE",
+        # periodic_report rows stored from issue #24 on: the acceptance time (UTC), so the live ranges count a
+        # report only once accepted by made_at (earnings_events(made_at=...)); older rows have none.
+        "accepted_at": "TIMESTAMPTZ",
+    }),
+    # Yahoo consensus EPS per report (collect_events.py, issue #17): a row per (ticker, report) when first seen or
+    # changed; collected_at is when we saw it, so a value is usable only from then (earnings_estimates_asof).
+    "earnings_estimates": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "report_date": "DATE", "report_at": "TIMESTAMPTZ",
+        "eps_estimate": "DOUBLE", "reported_eps": "DOUBLE", "surprise_pct": "DOUBLE", "source": "VARCHAR",
+        "collected_at": "TIMESTAMPTZ",
     }),
     # Near-the-money implied volatility per ticker and expiry (collect_options.py, US only).
     "options": ("jsonl", {
@@ -199,7 +213,9 @@ BASE_SCHEMAS: Schemas = {
         "n_calls_week": "INTEGER", "n_calls_all": "INTEGER",
         "cover50_all": "DOUBLE", "cover80_all": "DOUBLE", "score80_all": "DOUBLE",
         "naive_score80_all": "DOUBLE", "call_hit_all": "DOUBLE", "always_up_all": "DOUBLE",
+        "call_basis_all": "VARCHAR",  # the scoring basis of call_hit_all / always_up_all (call_basis.py)
         "low_sample": "BOOLEAN", "n_proposals": "INTEGER", "proposals": "JSON", "detail": "JSON",
+        "model_skill": "BOOLEAN",  # the signal-model check's verdict (review/model_skill.py); null when not run
     }),
     # Historical replay of the rule-based parts (replay.py): headline numbers as columns (scores are
     # the 80% interval score in % of price on rows with a naive range), the full results as JSON.

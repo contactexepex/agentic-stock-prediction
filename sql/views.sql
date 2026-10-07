@@ -95,8 +95,11 @@ CREATE OR REPLACE VIEW open_predictions AS
 SELECT p.* FROM predictions p
 WHERE p.id NOT IN (SELECT prediction_id FROM outcomes);
 
+-- Scored calls. label_basis: close_to_close (outcomes stored without it) or open_to_close (entry at the open of
+-- entry_date); the two are never pooled (analytics/call_basis.py).
 CREATE OR REPLACE VIEW track_record AS
-SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at
+SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at,
+       coalesce(o.label_basis, 'close_to_close') AS label_basis, o.entry_date, o.entry_open
 FROM predictions p JOIN outcomes o ON o.prediction_id = p.id;
 
 -- Where each stored bar came from: 'yahoo' unless data/<market>/price_sources/ names another
@@ -120,6 +123,15 @@ ORDER BY ticker, type, first_seen_at DESC, date;
 CREATE OR REPLACE VIEW event_history AS
 SELECT DISTINCT ON (id) * FROM events WHERE ticker IS NOT NULL ORDER BY id, first_seen_at;
 
+-- Yahoo consensus EPS per report as known at ts (issue #17; collect_events.py): the newest row per (ticker,
+-- report) collected by ts. `reported` = the report time has passed by ts (its reported EPS and surprise are
+-- outcomes); an estimate supports a decision at ts only for a report after ts. Never read past rows without it:
+-- a past report's estimate collected after the report is not what was known before it.
+CREATE OR REPLACE MACRO earnings_estimates_asof(ts) AS TABLE
+SELECT DISTINCT ON (ticker, report_at) *, report_at <= ts AS reported
+FROM earnings_estimates WHERE collected_at <= ts
+ORDER BY ticker, report_at, collected_at DESC;
+
 -- Latest quote per symbol per UTC day.
 CREATE OR REPLACE VIEW quotes_latest AS
 SELECT DISTINCT ON (symbol, CAST(collected_at AS DATE)) *, CAST(collected_at AS DATE) AS day
@@ -141,7 +153,7 @@ SELECT r.* FROM ranges_latest r WHERE r.id NOT IN (SELECT range_id FROM range_ou
 
 CREATE OR REPLACE VIEW range_record AS
 SELECT r.*, o.actual_close, o.z, o.hit50, o.hit80, o.naive_hit50, o.naive_hit80, o.is80_pct,
-       o.naive_is80_pct, o.width80_pct, o.naive_width80_pct, o.center_err_pct, o.naive_center_err_pct
+       o.naive_is80_pct, o.width80_pct, o.naive_width80_pct, o.center_err_pct, o.naive_center_err_pct, o.scored_at
 FROM ranges_latest r JOIN (SELECT DISTINCT ON (range_id) * FROM range_outcomes ORDER BY range_id, scored_at) o
   ON o.range_id = r.id;
 
@@ -284,18 +296,30 @@ FROM h WINDOW hw AS (PARTITION BY filer_cik, ticker ORDER BY period);
 -- 13F by ticker and quarter across the tracked filers. Holdings (filers_holding, shares,
 -- value) count every filing; change_shares, change_pct and the action counts use only filers
 -- whose filings for this and their previous period are both complete. filers_incomplete
--- counts the filers whose filing this quarter is incomplete (e.g. combination reports).
+-- counts every tracked filer whose filing this quarter (the latest original per period) is an
+-- incomplete holdings report (e.g. a combination or partial report), whether or not it lists
+-- the ticker (issue #3); a 13F notice (holdings reported by another manager) is not counted.
 CREATE OR REPLACE VIEW holdings_quarter AS
-SELECT ticker, period, count(*) AS filers_reporting,
-       count(*) FILTER (WHERE shares > 0) AS filers_holding,
-       count(*) FILTER (WHERE NOT complete) AS filers_incomplete,
-       sum(shares) AS shares, sum(value_usd) AS value_usd,
-       sum(change_shares) FILTER (WHERE action NOT IN ('first', 'incomplete')) AS change_shares,
-       round(sum(change_shares) FILTER (WHERE action NOT IN ('first', 'incomplete'))
-             / nullif(sum(prev_shares) FILTER (WHERE action NOT IN ('first', 'incomplete')), 0), 4) AS change_pct,
-       count(*) FILTER (WHERE action = 'new') AS n_new, count(*) FILTER (WHERE action = 'exit') AS n_exit,
-       count(*) FILTER (WHERE action = 'add') AS n_add, count(*) FILTER (WHERE action = 'trim') AS n_trim
-FROM holdings_change GROUP BY ticker, period;
+WITH f AS (
+    SELECT DISTINCT ON (filer_cik, period) filer_cik, period, report_type, coalesce(complete, true) AS complete
+    FROM holdings WHERE ticker IS NULL
+    ORDER BY filer_cik, period, filing_date DESC, first_seen_at
+), inc AS (
+    SELECT period, count(DISTINCT filer_cik) AS n FROM (
+        SELECT filer_cik, period FROM f WHERE NOT complete AND report_type IS DISTINCT FROM '13F NOTICE'
+        UNION SELECT filer_cik, period FROM holdings_change WHERE NOT complete)
+    GROUP BY period
+)
+SELECT c.ticker, c.period, count(*) AS filers_reporting,
+       count(*) FILTER (WHERE c.shares > 0) AS filers_holding,
+       coalesce(any_value(inc.n), 0) AS filers_incomplete,
+       sum(c.shares) AS shares, sum(c.value_usd) AS value_usd,
+       sum(c.change_shares) FILTER (WHERE c.action NOT IN ('first', 'incomplete')) AS change_shares,
+       round(sum(c.change_shares) FILTER (WHERE c.action NOT IN ('first', 'incomplete'))
+             / nullif(sum(c.prev_shares) FILTER (WHERE c.action NOT IN ('first', 'incomplete')), 0), 4) AS change_pct,
+       count(*) FILTER (WHERE c.action = 'new') AS n_new, count(*) FILTER (WHERE c.action = 'exit') AS n_exit,
+       count(*) FILTER (WHERE c.action = 'add') AS n_add, count(*) FILTER (WHERE c.action = 'trim') AS n_trim
+FROM holdings_change c LEFT JOIN inc ON inc.period = c.period GROUP BY c.ticker, c.period;
 
 -- Weekly reviews (review.py): latest record per ISO week; a rerun appends a newer record.
 CREATE OR REPLACE VIEW review_latest AS
@@ -489,10 +513,12 @@ FROM a LEFT JOIN lab USING (ticker, accession)
 ORDER BY a.ticker, a.filing_date DESC, a.period_end DESC NULLS LAST;
 
 -- ---------- Free market-wide sources (issue #9; collect_macro, collect_shorts, collect_flows_india) ----------
--- Per series and date the complete row first, then the newest (a revision is a newer row),
+-- Per series and date the complete row first (a row stored before `complete` existed counts as complete),
+-- then the newest (a revision is a newer row),
 -- plus two Treasury curve spreads from the same day's par yields (10y-2y, 10y-3m; source 'derived').
 CREATE OR REPLACE VIEW macro_series AS
-WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro ORDER BY series, date, complete DESC NULLS LAST, first_seen_at DESC),
+WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro
+           ORDER BY series, date, coalesce(complete, true) DESC, first_seen_at DESC),
 s AS (SELECT date, max(value) FILTER (WHERE series = 'UST_10Y') AS y10, max(value) FILTER (WHERE series = 'UST_2Y') AS y2,
              max(value) FILTER (WHERE series = 'UST_3M') AS m3, max(first_seen_at) AS first_seen_at
       FROM m WHERE source = 'treasury' GROUP BY date)
@@ -518,7 +544,7 @@ WHERE a.k = 1;
 -- the latest session per ticker with the 5-session average and the average of the up to 20
 -- sessions before it (n_prior = how many there were; short_pct in %).
 CREATE OR REPLACE VIEW shorts_daily AS
-SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, complete DESC NULLS LAST, first_seen_at DESC;
+SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, coalesce(complete, true) DESC, first_seen_at DESC;
 
 CREATE OR REPLACE VIEW shorts_latest AS
 WITH d AS (
@@ -546,7 +572,8 @@ SELECT * FROM fpi_daily WHERE reporting_date = (SELECT max(reporting_date) FROM 
 -- NSE index closes: per session and index the complete row first, then the newest; the latest
 -- session per index with the return versus 1 and 5 stored sessions earlier (in %).
 CREATE OR REPLACE VIEW indices_daily AS
-SELECT DISTINCT ON (date, index_name) * FROM indices ORDER BY date, index_name, complete DESC NULLS LAST, first_seen_at DESC;
+SELECT DISTINCT ON (date, index_name) * FROM indices
+ORDER BY date, index_name, coalesce(complete, true) DESC, first_seen_at DESC;
 
 CREATE OR REPLACE VIEW indices_latest AS
 WITH r AS (SELECT *, row_number() OVER (PARTITION BY index_name ORDER BY date DESC) AS k FROM indices_daily)

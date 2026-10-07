@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from marketbrief.constants.replay import CI_NOTE, MIN_MONTH_DAYS, RSI_HIGH, RSI_LOW, SCORE_NOTE
+from marketbrief.constants.replay import (
+    CI_NOTE,
+    COIN_FLIP,
+    MIN_MONTH_DAYS,
+    MSG_COIN_FLIP,
+    MSG_EXCLUDES_COIN,
+    MSG_INCLUDES_COIN,
+    RSI_HIGH,
+    RSI_LOW,
+    SCORE_NOTE,
+)
 from marketbrief.constants.replay_page import CSS, REPLAY_SCRIPT
 from marketbrief.replay.html_parts import escape_html, legend, p_value_text, scaled_text
 from marketbrief.replay.rule_replay.aci_compare import aci_table, held_out_html
@@ -50,6 +60,14 @@ def score_cell(stats: dict, field: str) -> str:
     return f"{stats[field]:.2f}" if stats.get("n") and stats.get(field) is not None else ""
 
 
+def coin_note(interval) -> str:
+    """A tile note on a hit rate: a coin flip is 50%, and whether the 95% interval excludes it (issue #27)."""
+    if not interval or interval[0] is None:
+        return MSG_COIN_FLIP
+    excludes = interval[0] > COIN_FLIP or interval[1] < COIN_FLIP
+    return MSG_COIN_FLIP + (MSG_EXCLUDES_COIN if excludes else MSG_INCLUDES_COIN)
+
+
 def html_report(cfg: dict, stats: dict) -> str:
     """The replay's self-contained HTML page."""
     by_horizon = stats["horizons"]
@@ -86,13 +104,13 @@ def html_report(cfg: dict, stats: dict) -> str:
                 "“Always up” right, 1 day ahead",
                 always_up["1"].get("hit_rate"),
                 always_up["1"].get("ci95"),
-                "a coin flip is 50%",
+                coin_note(always_up["1"].get("ci95")),
             ),
             tile(
                 "“Always up” right, 5 days ahead",
                 always_up["5"].get("hit_rate"),
                 always_up["5"].get("ci95"),
-                "a coin flip is 50%",
+                coin_note(always_up["5"].get("ci95")),
             ),
         ]
     )
