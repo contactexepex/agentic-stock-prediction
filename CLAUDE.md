@@ -156,6 +156,19 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   15 years of daily history into the long-history cache `work/model_history/`, news, filings or announcements; the
   candidate's collect gate) before its event is appended.
   `.github/workflows/onboard.yml` imports the MotherDuck inbox (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
+- AI traders, EOD analyst, research director (B3, docs/SPEC.md F4 and F6, notes `docs/ws/b3.md`; code
+  `marketbrief/traders/`, run as `PYTHONPATH=scripts python -m marketbrief.traders <command>`). Four traders
+  (`.claude/agents/trader-news-results.md`, `trader-pattern-mood.md`, `trader-combined.md`, and `forecaster.md` as
+  `ai.combined.opus.v1`) each read only `work/traders/<id>.md` (`prepare`) and predict N+1, N+3 and N+5 or abstain.
+  Each agent file's `yaml trader` block holds its prompt_version, kill switch (`enabled`) and budget. `add` is the gate
+  (shared with prediction_rules and the forecast-v11 anchor, which binds only the combined traders; made_at of a
+  clockless trader = its file's write time, capped at the gate's clock). It allows one retry, then
+  `strategy_abstentions` (gate_failed, timeout 15 minutes before the open, killed, blocked_quality, earnings_window,
+  abstained). Post-close (`routine/POSTCLOSE_PROMPT.md`): B2's `scripts/lab.py settle`, the `eod-analyst` agent and
+  its gate `eod-validate|add` -> `trade_reasons_ai`, `eod_analyses` (market-cost view), B6's close alerts. Weekly
+  (`routine/WEEKLY_PROMPT.md`, Saturday 10:00 local): the `research-director` agent and its gate
+  `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
+  `reports/<market>/research-<week>.md`.
 - Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
   `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines). The governed tool layer
   `web/lib/tools/` implements `mcp/tools.yaml`; `mcp/build_registry.py` generates `registry.generated.ts` from it and
@@ -278,11 +291,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   graph-builder (monthly connection map; every edge cites a public source),
   deviation-explainer (one note per flagged intraday deviation, citing only the check's candidates),
   results-analyst (at most 5 quoted bullets per results release or earnings-call text, never a forecast or
-  advice), and judge
+  advice), the AI traders trader-news-results, trader-pattern-mood and trader-combined (Sonnet; the forecaster is
+  also the Opus combined trader), eod-analyst (Sonnet: at most 60 words per settled head-to-head trade and per
+  biggest win or miss), research-director (Opus: weekly findings and config-diff proposals), and judge
   (independent verifier of code, config, agent-instruction and process changes, the monthly
   graph-builder edges and the weekly spot-check sample).
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, claim
-  checking, the reflector, the deviation explainer, the results-analyst and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
+  checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
+  the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one per market, every 4 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
@@ -369,7 +385,9 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   tests go in `SLOW` in `tests/conftest.py`.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
-  for the deviation-explainer's notes by `scripts/intraday_check.py validate`, not by the judge: one retry (the run is time-boxed), then the failed
+  for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by
+  `python -m marketbrief.traders add`, for the EOD analyst by `eod-validate`, for the research director by
+  `director-validate`, not by the judge: one retry (the run is time-boxed), then the failed
   output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's
   `data_quality`. The judge still checks the monthly graph-builder edges, and once a week
   (`scripts/spotcheck.py --if-due`) a deterministic sample of the past week's output (2 forecasts
