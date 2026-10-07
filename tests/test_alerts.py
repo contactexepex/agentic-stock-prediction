@@ -9,12 +9,13 @@ import shutil
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-from marketbrief.alerts import cli, text  # noqa: E402
+from marketbrief.alerts import cli, reads, text  # noqa: E402
 from marketbrief.alerts.close import build_close, listed_rows, tally, trade_line  # noqa: E402
 from marketbrief.alerts.client import SlackClient, SlackError  # noqa: E402
 from marketbrief.alerts.constants import (  # noqa: E402
@@ -33,6 +34,7 @@ from marketbrief.alerts.onboarding import onboarding_text, post_onboarding_confi
 from marketbrief.alerts.publish import Message, NotConfiguredError, Publisher, post_brief, publisher  # noqa: E402
 from marketbrief.alerts.weekly import build_weekly  # noqa: E402
 from marketbrief.core import paths  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
 
 CATALOGUE = REPO / "design" / "catalogue"
 TOKEN = "xoxb-test-0000-SECRET-never-printed"
@@ -156,29 +158,59 @@ def test_morning_empty_days():
     assert "Strongest other horizon: no other horizon has a buyer." in msg
 
 
-def test_intraday_alerts_from_trade_checks():
-    rows = of_market(examples("trade_check"), "us")
-    msg = build_alerts("us", rows, {"rule.model_news.v1": "Model + news"}, "USD")
-    flagged = [r for r in rows if r["flagged"]]
-    head = f"*US — intraday check at 16:27 UTC: {len(flagged)} flagged open paper trades*"
-    assert msg.splitlines()[0].startswith(head)
-    nvda = next(line for line in msg.splitlines() if "Model + news" in line and "NVDA" in line)
-    assert "$241.10, +5.16% since entry at $229.27; above its 80% range ($215.86–$240.88)" in nvda
-    assert "target $228.03 already passed (-5.42%)" in nvda and "outside its predicted range" in nvda
-    assert len(signal_lines(msg)) == len(flagged)
-    assert all(PAPER in line for line in signal_lines(msg))
-    assert "AAPL" not in msg   # AAPL's checks are not flagged
-    assert build_alerts("us", [r for r in rows if not r["flagged"]]) is None
+def feed_rows(checks: list[dict], computed_at: str | None = None) -> list[dict]:
+    """B9's trade alerts (docs/ws/b9.md "The alerts feed") built from W1's example trade checks: one
+    open_trade_flagged row per check and ticker with flagged trades."""
+    rows = {}
+    for c in (c for c in checks if c["flagged"]):
+        row = rows.setdefault((c["check_id"], c["ticker"]), {
+            "id": f"{c['check_id']}-{c['ticker']}-trades", "check_id": c["check_id"], "check_at": c["check_at"],
+            "session_date": c["session_date"], "market": c["market"], "ticker": c["ticker"],
+            "alert_type": "open_trade_flagged", "check_row_id": c["check_row_id"], "trade_ids": [], "trades": [],
+            "flags": [], "repeat": False, "method_version": "tc-v1", "computed_at": computed_at or c["computed_at"]})
+        row["trade_ids"].append(c["trade_id"])
+        row["trades"].append({k: c[k] for k in ("trade_id", "strategy_id", "view", "horizon_days", "flags", "band",
+                                                 "ret_since_entry_pct", "to_target_pct")} | {"target_reached": False})
+        row["flags"] = sorted(set(row["flags"]) | set(c["flags"]))
+    return list(rows.values())
 
 
-def test_intraday_news_alert_record():
-    news = {"id": "na-1", "kind": "news", "market": "us", "ticker": "NVDA", "check_at": "2026-10-07T16:27:00Z",
-            "news_id": "a41c9e07b2d35f18", "title": "Nvidia unveils new chip", "status": "corroborated",
-            "materiality": "high", "trade_ids": ["acc:rule.model_news.v1:2026-09-29-NVDA-5d"]}
-    msg = build_alerts("us", [news])
-    assert "0 flagged open paper trades, 1 news alert*" in msg
-    assert '• *NVDA* news (corroborated, materiality high): "Nvidia unveils new chip" [a41c9e07b2d35f18];' \
-           ' 1 open paper trade on it. [Paper]' in msg
+NEWS = {"id": "ic-us-202610071627-NVDA-news-a41c9e07b2d35f18", "check_id": "ic-us-202610071627",
+        "check_at": "2026-10-07T16:27:00Z", "session_date": "2026-10-07", "market": "us", "ticker": "NVDA",
+        "alert_type": "material_news_open_trade", "check_row_id": "ic-us-202610071627-NVDA",
+        "trade_ids": ["acc:rule.model_news.v1:2026-09-29-NVDA-5d"], "trades": None, "flags": [], "repeat": False,
+        "news_id": "a41c9e07b2d35f18", "news_title": "Nvidia unveils new chip", "news_source": "Reuters",
+        "news_status": "corroborated", "news_materiality": "high", "news_first_seen_at": "2026-10-07T15:00:00Z",
+        "method_version": "tc-v1", "computed_at": "2026-10-07T16:27:00Z"}
+
+
+def test_intraday_trade_alerts_from_b9_feed():
+    checks = of_market(examples("trade_check"), "us")
+    feed = feed_rows(checks)
+    msg = build_alerts("us", feed, {"rule.model_news.v1": "Model + news"})
+    head = f"*US — intraday check at 16:27 UTC: {len(feed)} companies with newly flagged open paper trades*"
+    assert msg.splitlines()[0].startswith(head) and msg.splitlines()[1] == "Paper only — no proven edge yet."
+    nvda = next(line for line in msg.splitlines() if "Model + news" in line)
+    assert nvda == ("   – N+5 Model + news (rule.model_news.v1), accuracy view: +5.16% since entry, above its 80%"
+                    " range, target already reached; flags: outside its predicted range [Paper]")
+    assert "• *NVDA*: 2 flagged open paper trades [Paper]" in msg.splitlines()
+    assert sum(len(r["trades"]) for r in feed) == sum(c["flagged"] for c in checks)
+    assert len([x for x in msg.splitlines() if x.startswith("   – ")]) == sum(c["flagged"] for c in checks)
+    assert all(PAPER in line for line in signal_lines(msg)) and "AAPL" not in msg   # AAPL is not flagged
+    assert build_alerts("us", [{**r, "repeat": True} for r in feed]) is None        # already posted this session
+
+
+def test_intraday_note_and_news_alert():
+    feed = feed_rows(of_market(examples("trade_check"), "us"))
+    noted = [{**r, "explanation": "NVDA rose with its sector.", "attribution": "sector", "cited_ids": ["XLK"]}
+             if r["ticker"] == "NVDA" else r for r in feed]
+    msg = build_alerts("us", noted + [NEWS])
+    assert "   Note (sector): NVDA rose with its sector. [XLK]" in msg
+    assert "1 news alert*" in msg.splitlines()[0]
+    assert ('• *NVDA* news (corroborated, materiality high): "Nvidia unveils new chip" (Reuters)'
+            ' [a41c9e07b2d35f18]; 1 open paper trade on it. [Paper]') in msg
+    only_news = build_alerts("us", [{**r, "repeat": True} for r in feed] + [NEWS])
+    assert "0 companies with newly flagged open paper trades, 1 news alert*" in only_news
 
 
 def test_close_results_from_examples():
@@ -190,7 +222,7 @@ def test_close_results_from_examples():
     assert rule["net_pnl"] == round(sum(r["net_pnl"] for r in rule_rows), 2)
     assert f"Rule {rule['trades']} trade" in msg
     assert "Analyst note (eod-us-2026-10-01): Two paper trades settled." in msg
-    line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
+    line = next(x for x in msg.splitlines() if "rule.model_news.v1, accuracy view" in x and "NVDA* N+1" in x)
     assert ("bought $229.27 on 2026-09-30, sold $230.86 on 2026-10-01; net +$4.60 (+0.46%) after $2.34 market"
             " costs") in line
     assert "target reached, closed inside its 80% range; main reason sector_lift" in line
@@ -309,7 +341,7 @@ def test_live_publisher_needs_token_and_channel():
 def store_us_examples(root: Path) -> None:
     store(root, "us", "strategy_predictions", of_market(examples("prediction"), "us"), "made_at")
     store(root, "us", "head_to_head_picks", of_market(examples("head_to_head_pick"), "us"), "made_at")
-    store(root, "us", "trade_checks", of_market(examples("trade_check"), "us"), "check_at")
+    store(root, "us", "intraday_alerts", feed_rows(of_market(examples("trade_check"), "us")), "check_at")
     store(root, "us", "paper_trades_settled", of_market(examples("paper_trade"), "us"), "settled_at")
     store(root, "us", "research_reviews", examples("research_review"), "written_at")
     store(root, "us", "command_log", of_market(examples("command_log"), "us"), "received_at")
@@ -393,18 +425,39 @@ def test_cli_without_token_posts_nothing(scratch, monkeypatch, capsys):
 
 # ---------- as of the clock (judge round 1) ----------
 
-def test_trade_checks_computed_after_the_clock_are_not_used(scratch, monkeypatch, capsys):
-    late = [{**r, "computed_at": "2026-10-07T16:40:00Z"} for r in of_market(examples("trade_check"), "us")]
-    store(scratch, "us", "trade_checks", late, "check_at")
+def test_alerts_computed_after_the_clock_are_not_used(scratch, monkeypatch, capsys):
+    late = feed_rows(of_market(examples("trade_check"), "us"), computed_at="2026-10-07T16:40:00Z")
+    store(scratch, "us", "intraday_alerts", late, "check_at")
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:30:00+00:00")   # after check_at 16:27, before computed_at 16:40
     assert run(["--market", "us", "--dry-run", "intraday"], capsys)[1]["reason"] == "nothing to post"
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:45:00+00:00")
     assert run(["--market", "us", "--dry-run", "intraday"], capsys)[1]["posted"]
 
 
+def test_explainer_note_written_after_the_clock_is_not_quoted(scratch, monkeypatch, capsys):
+    store(scratch, "us", "intraday_alerts", feed_rows(of_market(examples("trade_check"), "us")), "check_at")
+    store(scratch, "us", "intraday_explanations", [
+        {"id": "ix-ic-us-202610071627-NVDA", "check_row_id": "ic-us-202610071627-NVDA", "attribution": "sector",
+         "text": "NVDA rose with its sector.", "cited_ids": ["XLK"], "created_at": "2026-10-07T16:40:00Z"}],
+        "created_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:30:00+00:00")
+    run(["--market", "us", "--dry-run", "intraday"], capsys)
+    first = (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text()
+    assert "Note (" not in first
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:45:00+00:00")
+    run(["--market", "us", "--dry-run", "intraday", "--check-id", "ic-us-202610071627"], capsys)
+    assert "Note (" not in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text()   # posted once already
+    shutil.rmtree(scratch / "work")   # a fresh ledger: the run posts at 16:45 with the note, read through the view
+    run(["--market", "us", "--dry-run", "intraday"], capsys)
+    assert "   Note (sector): NVDA rose with its sector. [XLK]" in (scratch / "work/alerts_dryrun/us/messages.jsonl"
+                                                                    ).read_text()
+    rows = reads.latest_alerts(connect("us"), "2026-10-07", pd.Timestamp("2026-10-07T16:45:00Z"))
+    assert next(r for r in rows if r["ticker"] == "NVDA")["explanation"] == "NVDA rose with its sector."
+
+
 def test_feed_records_after_the_clock_are_dropped(scratch, monkeypatch, capsys, tmp_path):
     feed = tmp_path / "feed.jsonl"
-    rows = [{**r, "computed_at": "2026-10-07T16:27:00Z"} for r in of_market(examples("trade_check"), "us")]
+    rows = feed_rows(of_market(examples("trade_check"), "us"), computed_at="2026-10-07T16:27:00Z")
     feed.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:00:00+00:00")
     args = ["--market", "us", "--dry-run", "intraday", "--date", "2026-10-07", "--feed", str(feed)]
@@ -429,11 +482,9 @@ def test_onboarding_command_after_the_clock_is_not_found(scratch, monkeypatch, c
 
 def test_every_message_carries_the_paper_label_and_footer():
     command = examples("command_log")[0]
-    news = {"kind": "news", "ticker": "NVDA", "check_at": "2026-10-07T16:27:00Z", "news_id": "n1", "title": "t",
-            "trade_ids": ["x"]}
     messages = [
         build_morning("us", "2026-10-07", of_market(examples("prediction"), "us"), [], HORIZONS),
-        build_alerts("us", of_market(examples("trade_check"), "us")), build_alerts("us", [news]),
+        build_alerts("us", feed_rows(of_market(examples("trade_check"), "us"))), build_alerts("us", [NEWS]),
         build_close("us", "2026-10-01", []), build_weekly("us", examples("research_review")[0]),
         onboarding_text(command),
     ]
@@ -484,7 +535,7 @@ def test_correction_reply_in_the_day_thread_once(scratch, monkeypatch, capsys):
     assert code == 0 and out["posted"] == ["correction:us:acc:rule.model_news.v1:2026-09-29-NVDA-1d@resettled#1"]
     sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[-1])
     assert sent["thread_ts"] == close["thread_ts"]
-    assert sent["text"].startswith("Correction: *NVDA* N+1, Model + news (rule.model_news.v1) (accuracy) is now net"
+    assert sent["text"].startswith("Correction: *NVDA* N+1, Model + news (rule.model_news.v1), accuracy view is now net"
                                    " +$3.10 (+0.31%), was +$4.60 (+0.46%); re-settled 2026-10-02T03:00:00+00:00"
                                    " (flags: split_in_window, resettled). [Paper]")
     assert run(["--market", "us", "--dry-run", "corrections"], capsys)[1]["posted"] == []
@@ -560,7 +611,7 @@ def test_close_shows_your_cost_result_beside_market_cost():
     mine = [{**r, "your_costs": round(r["costs"] + 0.46, 2), "your_net_pnl": round(r["net_pnl"] - 0.46, 2),
              "your_return_pct": round((r["net_pnl"] - 0.46) / r["amount"] * 100, 2)} for r in rows]
     msg = build_close("us", "2026-10-01", mine, None, {}, "USD")
-    line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
+    line = next(x for x in msg.splitlines() if "rule.model_news.v1, accuracy view" in x and "NVDA* N+1" in x)
     assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in line
     rule = [r for r in mine if r["view"] == "accuracy" and r["family"] == "rule"]
     total = sum(r["your_net_pnl"] for r in rule)
@@ -580,7 +631,7 @@ def test_resettlement_on_a_later_day_is_only_a_correction(scratch, monkeypatch, 
     run(["--market", "us", "--dry-run", "close", "--date", "2026-10-02"], capsys)
     sent = [json.loads(x) for x in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()]
     second_day = next(m["text"] for m in sent if "close results for Fri 2 Oct 2026" in m["text"])
-    assert not [x for x in second_day.splitlines() if "NVDA* N+1" in x and "(rule.model_news.v1) (accuracy)" in x]
+    assert not [x for x in second_day.splitlines() if "NVDA* N+1" in x and "(rule.model_news.v1), accuracy view" in x]
     assert "+$3.10" not in second_day
     expected = tally([r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-02")
                       and r["view"] == "accuracy" and r["family"] == "rule"])
@@ -616,13 +667,21 @@ def test_webhook_fallback_posts_unthreaded_once(monkeypatch, scratch):
     res = pub.publish(Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
     assert res["mode"] == "webhook" and len(hook.calls) == res["parts"] > 1
     assert all(c["url"] == HOOK and set(c["json"]) == {"text"} for c in hook.calls)   # no thread field at all
-    assert publisher("us", dry_run=False, http=hook).publish(
-        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))["posted"] == []
+    rows = [r for r in Ledger(scratch / "data/us/slack_posts").rows() if r["post_key"] == "morning:us:2026-10-07"]
+    assert res["thread_ts"] is None and all(r["thread_ts"] is None for r in rows)    # nothing was threaded
+    assert len({r["ts"] for r in rows}) == len(rows) and all(r["ts"].startswith("webhook.") for r in rows)
+    again = publisher("us", dry_run=False, http=hook).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert again["posted"] == [] and again["thread_ts"] is None                 # a rerun gives no made-up thread
     # a later run with the token starts a real thread (a webhook post is never a thread)
     monkeypatch.setenv("SLACK_BOT_TOKEN", TOKEN)
     http = FakeSlack()
     publisher("us", dry_run=False, http=http).publish(Message("alerts", "alerts:us:ic-1", "a", "us:2026-10-07"))
     assert "thread_ts" not in http.calls[0]["form"]
+    # a token run of the post that went out by webhook posts nothing and names no webhook ts as a thread
+    token_rerun = publisher("us", dry_run=False, http=http).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert token_rerun["posted"] == [] and token_rerun["thread_ts"] is None
     written = "".join(p.read_text() for p in scratch.rglob("*") if p.is_file())
     assert HOOK not in written and "SECRET-hook" not in repr(pub.client)
 
@@ -649,7 +708,7 @@ def test_partly_posted_message_with_a_new_split_is_flagged_incomplete(scratch):
 def test_feed_time_without_offset_is_read_as_utc(monkeypatch, capsys, tmp_path):
     feed = tmp_path / "feed.jsonl"
     rows = [{**r, "check_at": "2026-10-07T16:27:00", "computed_at": None}
-            for r in of_market(examples("trade_check"), "us")]
+            for r in feed_rows(of_market(examples("trade_check"), "us"))]
     feed.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
     args = ["--market", "us", "--dry-run", "intraday", "--date", "2026-10-07", "--feed", str(feed)]
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:00:00+00:00")
@@ -662,3 +721,48 @@ def test_your_cost_total_only_when_every_row_has_it():
     rows = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
     one = [{**r, "your_net_pnl": 1.0} if i == 0 else r for i, r in enumerate(rows)]
     assert "after your costs +" not in build_close("us", "2026-10-01", one, None, {}, "USD").split("*Settled")[0]
+
+
+def test_no_pick_clears_with_some_picks_lacking_cost_numbers():
+    preds = of_market(examples("prediction"), "us") + of_market(examples("prediction"), "india")
+    costed = [{**p, "your_cost_pct": 0.30} if p["ticker"] == "NVDA" else p for p in preds]   # RELIANCE: no cost
+    msg = build_morning("us", "2026-10-07", costed, [], HORIZONS)
+    assert [r["ticker"] for r in picks(costed)] == ["NVDA", "RELIANCE"]
+    assert msg.splitlines()[2] == "No pick clears your costs today."
+    reliance = next(x for x in msg.splitlines() if "(RELIANCE)*" in x)
+    assert "your cost" not in reliance                                    # no numbers: no cost text
+
+
+# ---------- B2's cost_views joined on record_id (docs/ws/b2.md) ----------
+
+def cost_view(kind: str, record: dict, computed_at: str, **values) -> dict:
+    return {"id": f"cv:{kind}:{record['id']}", "record_kind": kind, "record_id": record["id"],
+            "market": record["market"], "ticker": record["ticker"], "computed_at": computed_at, **values}
+
+
+def test_cost_views_join_as_of_the_clock(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    preds = of_market(examples("prediction"), "us")
+    settled = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
+    views = [cost_view("prediction", p, "2026-10-07T11:46:00Z", your_cost_pct=0.30) for p in preds]
+    views += [cost_view("settlement", r, "2026-10-01T22:16:00Z", your_costs=round(r["costs"] + 0.46, 2),
+                        net_pnl_your=round(r["net_pnl"] - 0.46, 2),
+                        return_pct_your=round((r["net_pnl"] - 0.46) / r["amount"] * 100, 2)) for r in settled]
+    store(scratch, "us", "cost_views", views, "computed_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-07T12:00:00+00:00")
+    run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
+    sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
+    assert "after your cost 0.30% — not viable." in sent
+    shutil.rmtree(scratch / "work")
+    monkeypatch.setenv("MB_NOW", "2026-10-07T11:45:30+00:00")
+    run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
+    early = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
+    assert "your cost" not in early                                  # computed after the clock: not used
+    monkeypatch.setenv("MB_NOW", "2026-10-02T02:00:00+00:00")
+    shutil.rmtree(scratch / "work")
+    run(["--market", "us", "--dry-run", "close", "--date", "2026-10-01"], capsys)
+    close = "\n".join(json.loads(x)["text"] for x in
+                      (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines())
+    assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in close
+    rule = [r for r in settled if r["view"] == "accuracy" and r["family"] == "rule" and r["status"] == "settled"]
+    assert f"(after your costs {text.signed_money('USD', round(sum(r['net_pnl'] - 0.46 for r in rule), 2))})" in close

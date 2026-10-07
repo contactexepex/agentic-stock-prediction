@@ -273,9 +273,10 @@ requests), each its own data kind with a schema in `core/schema_*.py` (WS4 for p
 2. **Later: dashboard form -> `inbox.<kind>` in MotherDuck** (append-only, `inbox_id` = the client's
    Idempotency-Key, `submitted_at`, `submitted_by` injected from the Vercel Authentication identity,
    never from the body). The next run imports: same CLI validation, append to `data/`, and a
-   `data/<market>/inbox_imports/` row per inbox id (accepted or rejected with reason). The import
-   is idempotent because an inbox id already in `inbox_imports` is skipped; a rebuild never replays
-   the inbox.
+   `command_log` row per inbox id (result accepted, refused, duplicate or failed, with the reason); company
+   commands are read from `market_brief_inbox`, table `inbox.company_commands` (docs/ws/b1.md, "Contract"). The
+   import is idempotent because an inbox id with a settled `command_log` row (accepted, refused, duplicate) is
+   skipped and an all-`failed` one is retried; a rebuild never replays the inbox.
 3. Until imported, the app shows the entry as "pending (not yet in the record)", never as a fact.
 
 Why not alternatives: writing straight to git from Vercel needs a repo-write token in the web tier

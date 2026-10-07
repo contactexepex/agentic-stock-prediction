@@ -414,6 +414,24 @@ trade); (3) close results (each settled trade, rule vs AI today); plus (4) the w
 post, and onboarding confirmations as replies to the command that asked. Nothing is posted outside
 these runs and replies.
 
+Built by B6 (`scripts/alerts.py`, docs/ws/b6.md). Owner decisions of 2026-10-07 refine it:
+- **Viable at your costs.** Each morning pick and head-to-head trade with stored cost numbers says whether it is
+  viable. Viable means the
+  expected gain after your cost is above zero: P(up) × move − (1 − P(up)) × loss − your round-trip cost > 0, all
+  in % of the amount (the F1.7.3 formula with the owner's cost). "No pick clears your costs today" when none does.
+  Non-viable picks stay listed.
+- **Close results.** Every head-to-head trade, then the 10 biggest wins and the 10 biggest losses of the rest,
+  then the count of the others with a pointer to the dashboard. Each trade shows the net after market costs and,
+  beside it, after your costs; a family total shows the after-your-costs figure only when every trade in it has
+  one.
+- **Corrections.** A trade re-settled after its day's close post gets one correction reply in that day's thread.
+  This covers the last 30 days; the original post stays.
+- **Intraday alerts.** They come from B9's alerts feed (`intraday_alerts`): new flagged open trades, and every
+  material news item on a company with an open trade.
+- **One thread.** From Wave 5 the morning picks open the day's thread, and the existing daily brief, its charts and
+  report reply in it.
+- **No bot token.** Without the token the posts go out unthreaded through the incoming webhook to #market-brief.
+
 ### F10 Channels and governed tools
 
 One set of tools, defined once (`mcp/tools.yaml`), used by every channel:
