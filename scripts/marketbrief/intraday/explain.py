@@ -83,6 +83,7 @@ def check_alerts(con, check: str | None) -> list[dict]:
     out = []
     for row in records(frame):
         row["trades"] = json.loads(row["trades"]) if isinstance(row["trades"], str) else (row["trades"] or [])
+        row["session_date"] = str(row["session_date"])[:10]   # a DATE, not a timestamp (issue #72)
         out.append({key: (value.isoformat() if hasattr(value, "isoformat") else
                           list(value) if hasattr(value, "tolist") else value) for key, value in row.items()})
     return out
