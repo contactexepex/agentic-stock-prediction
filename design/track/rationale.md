@@ -5,11 +5,19 @@ Files: `template.html` + `build.py` (`--out DIR`, both markets in one page with 
 and design system as the other screens (`design/system/`).
 
 ## What it is for
-The owner's rule is that every signal stays Paper until proven. This screen is the proof gate: it says
-PROVEN or NOT PROVEN and shows exactly why, separating what is live from what is back-test.
+The owner's rule is that every signal stays Paper until proven. This screen is the proof gate: it says TRUSTED or
+NOT YET and shows exactly why, separating what is live from what is a rehearsal on past prices (back-test).
+
+## Plain language (second pass)
+The first version was written for a statistician and the owner could not read it. It was rewritten so that every
+block is a question with a one-sentence answer, and every number is "x out of 100" or money on 10,000: a reading
+guide at the top; the verdict "in plain words"; three tests in plain words (enough real calls; when it says 70%
+sure is it right 70% of the time; does it beat a coin); "promise vs reality" bars for the ranges; a "coin" chart for
+direction (dashed line = the coin); a money table for the paper strategy. Brier, AUC, Wilson intervals, reliability
+and the baseline tables moved to a folded "for the record" section at the bottom.
 
 ## Layout
-1. **Verdict header** (red NOT PROVEN today; dark green PROVEN when all three gates pass) with the reason in
+1. **Verdict header** (red NOT YET today; dark green TRUSTED when all three gates pass) with the reason in
    one sentence, then the three gates as tiles with a progress bar each: enough live calls scored (0 of the
    50 per band that config/review.yaml requires), confidence bands keep their promise (no band has enough
    calls), model skill in the weekly review (n ok, Brier skill must be above 0, AUC's 95% low end must be above

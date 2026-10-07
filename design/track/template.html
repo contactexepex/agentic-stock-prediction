@@ -59,7 +59,19 @@ table.t tr.tot td{font-weight:700;background:var(--md-sys-color-surface-containe
 footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
 code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
 @media (max-width: 1000px){ .grid2{grid-template-columns:1fr} .gates{grid-template-columns:1fr} .gate{border-left:0;border-top:var(--mb-card-border)} .gate:first-child{border-top:0} .kpis{grid-template-columns:repeat(2,1fr)} }
-@media (max-width: 760px){ .pad{padding:0 var(--mb-gutter)} .hhead{grid-template-columns:1fr} .verdict .mb-verdict{grid-template-columns:1fr;padding:14px} .mb-topbar .md-chip{display:none} }
+@media (max-width: 760px){ .pad{padding:0 var(--mb-gutter)} .prow{grid-template-columns:1fr} .prow .pv{text-align:left} .hhead{grid-template-columns:1fr} .verdict .mb-verdict{grid-template-columns:1fr;padding:14px} .mb-topbar .md-chip{display:none} }
+
+.guide{margin-top:14px;padding:12px 16px;border-radius:var(--mb-card-radius);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:13.5px;line-height:1.5}
+.qn{width:22px;height:22px;border-radius:6px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);font-size:11px;display:inline-grid;place-items:center;font-weight:700;flex:none}
+.card h2{text-transform:none;letter-spacing:0;font-size:14px}
+.ans{font-size:14.5px;line-height:1.5;margin:0 0 10px;font-weight:500}
+.prow{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high)}
+.prow .pl b{display:block;font-size:13px} .prow .pl small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant)}
+.ptrack{position:relative;height:14px;border-radius:7px;background:var(--md-sys-color-surface-container-highest);overflow:visible}
+.ptrack i{position:absolute;left:0;top:0;bottom:0;border-radius:7px} .ptrack i.good{background:var(--mb-color-up)} .ptrack i.off{background:var(--mb-color-warn)}
+.ptrack u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--md-sys-color-on-surface);transform:translateX(-1px)}
+.prow .pv b{font-size:18px} .prow .pv small{font-size:11px}
+table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
 </style>
 </head>
 <body>
@@ -84,6 +96,10 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
   <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
 </section>
 
+<div class="guide" id="guide">
+  <b>How to read this page.</b> It answers one question: <b>can the signals be trusted with money yet?</b> The big box says yes or no. Under it, three tests the system must pass. Then what it has done for real, and what a rehearsal on past prices (the <span class="mb-tag bt">back-test</span>) says. Every number is "x out of 100" or money on <span id="guide-stake"></span>. The statistics behind it all are at the bottom, folded away.
+</div>
+
 <section class="card verdict" id="verdict-card">
   <div class="mb-verdict" id="vhead">
     <div style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box" aria-hidden="true" id="v-ico"></div><div class="mb-verdict-word" id="v-word"></div></div>
@@ -94,60 +110,61 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
 
 <div class="grid2">
   <section class="card" id="live-card">
-    <h2>Live record <span class="mb-tag live">live</span><span class="sp" id="live-sub"></span></h2>
+    <h2><span class="qn">1</span>What has it done for real so far? <span class="mb-tag live">live</span></h2>
+    <p class="ans" id="live-ans"></p>
     <div class="kpis" id="live-kpis"></div>
-    <h3 class="micro" style="margin:12px 0 6px">Calls by confidence band</h3>
-    <div class="tblwrap" id="bands"></div>
+    <div class="tblwrap" id="bands" style="margin-top:10px"></div>
     <p class="note" id="live-note"></p>
   </section>
   <section class="card" id="review-card">
-    <h2>Weekly review <span class="mb-tag live">live</span><span class="sp" id="review-sub"></span></h2>
+    <h2><span class="qn">2</span>What did the weekly check-up say? <span class="mb-tag live">live</span><span class="sp" id="review-sub"></span></h2>
+    <p class="ans" id="review-ans"></p>
     <div id="review"></div>
   </section>
 </div>
 
 <div class="grid2">
   <section class="card" id="ranges-card">
-    <h2>Ranges in the back-test <span class="mb-tag bt">rule replay</span> <button class="md-help" id="ranges-help" aria-label="Explain">?</button><span class="sp" id="ranges-sub"></span></h2>
-    <div class="seg-in"><div class="md-segmented dense hz" role="group" aria-label="Horizon"><button type="button" data-h="1" aria-pressed="true">1-day</button><button type="button" data-h="5" aria-pressed="false">5-day</button></div><span class="muted" style="font-size:12px">80% ranges should hold 80% of the time, 50% ranges 50%</span></div>
-    <div class="kpis" id="range-kpis" style="grid-template-columns:repeat(3,1fr)"></div>
-    <h3 class="micro" style="margin:12px 0 6px">By regime</h3>
-    <div class="tblwrap" id="by-regime"></div>
-    <h3 class="micro" style="margin:12px 0 6px">By month, 80% ranges held</h3>
+    <h2><span class="qn">3</span>In the rehearsal, did the price ranges keep their promise? <span class="mb-tag bt">back-test</span> <button class="md-help" id="ranges-help" aria-label="Explain">?</button></h2>
+    <div class="seg-in"><div class="md-segmented dense hz" role="group" aria-label="Horizon"><button type="button" data-h="1" aria-pressed="true">Next day</button><button type="button" data-h="5" aria-pressed="false">Next 5 days</button></div><span class="muted" style="font-size:12px" id="ranges-sub"></span></div>
+    <p class="ans" id="ranges-ans"></p>
+    <div class="promise" id="promise"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Month by month: how often the 80% range held</h3>
     <div class="chart" id="by-month"></div>
     <p class="note" id="ranges-note"></p>
   </section>
   <section class="card" id="model-card">
-    <h2>Signal model in the back-test <span class="mb-tag bt">walk-forward</span> <button class="md-help" id="model-help" aria-label="Explain">?</button><span class="sp" id="model-sub"></span></h2>
-    <div class="tblwrap" id="model-table"></div>
-    <h3 class="micro" style="margin:12px 0 6px">Reliability, 5-day open-to-close: what the model said vs what happened</h3>
-    <div class="chart" id="reliability"></div>
+    <h2><span class="qn">4</span>In the rehearsal, did it pick the direction better than a coin? <span class="mb-tag bt">back-test</span> <button class="md-help" id="model-help" aria-label="Explain">?</button></h2>
+    <p class="ans" id="model-ans"></p>
+    <div class="chart" id="coin"></div>
     <p class="note" id="model-note"></p>
   </section>
 </div>
 
 <div class="grid2">
   <section class="card" id="paper-card">
-    <h2>Paper strategy after costs <span class="mb-tag bt">back-test</span> <button class="md-help" id="paper-help" aria-label="Explain">?</button><span class="sp" id="paper-sub"></span></h2>
-    <div class="chart" id="paper-chart"></div>
-    <div class="tblwrap" id="paper-table" style="margin-top:8px"></div>
+    <h2><span class="qn">5</span>Would following it have made money on paper? <span class="mb-tag bt">back-test</span> <button class="md-help" id="paper-help" aria-label="Explain">?</button></h2>
+    <p class="ans" id="paper-ans"></p>
+    <div class="tblwrap" id="money"></div>
     <p class="note" id="paper-note"></p>
   </section>
-  <section class="card" id="direction-card">
-    <h2>Direction baselines <span class="mb-tag bt">rule replay</span> <button class="md-help" data-tip="Simple rules replayed over the same window, scored close-to-close: always up, 1-day and 5-day momentum, RSI mean reversion. The model must beat these before a call means anything." aria-label="Explain">?</button></h2>
-    <div class="tblwrap" id="baselines"></div>
-    <h3 class="micro" style="margin:12px 0 6px">Call thresholds in the walk-forward (5-day open-to-close)</h3>
-    <div class="tblwrap" id="thresholds"></div>
+  <section class="card" id="ticker-card">
+    <h2><span class="qn">6</span>Which companies did the ranges fit best? <span class="mb-tag bt">back-test</span></h2>
+    <p class="ans" id="ticker-ans"></p>
+    <div class="tblwrap" id="by-ticker"></div>
   </section>
 </div>
 
-<section class="card" style="margin-top:16px" id="ticker-card">
-  <h2>By company <span class="mb-tag bt">rule replay</span><span class="sp" id="ticker-sub"></span></h2>
-  <div class="tblwrap" id="by-ticker"></div>
-</section>
-
 <div style="display:grid;gap:10px;margin-top:16px">
-  <details class="md-expansion"><summary>What the back-tests cannot see (their own limitations)</summary><div class="inner" id="limits"></div></details>
+  <details class="md-expansion"><summary>For the record: the statistics behind the answers (Brier, AUC, reliability, baselines, thresholds)</summary><div class="inner">
+    <h3 class="micro" style="margin:8px 0 6px">Signal model, walk-forward</h3><div class="tblwrap" id="model-table"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Reliability, 5-day open-to-close: what the model said vs what happened</h3><div class="chart" id="reliability"></div><p class="note" id="rel-note"></p>
+    <h3 class="micro" style="margin:12px 0 6px">Call thresholds, 5-day open-to-close</h3><div class="tblwrap" id="thresholds"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Direction baselines in the rule replay (close-to-close)</h3><div class="tblwrap" id="baselines"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Ranges by regime</h3><div class="tblwrap" id="by-regime"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Paper strategy after costs, mean return per trade with 95% intervals</h3><div class="chart" id="paper-chart"></div><div class="tblwrap" id="paper-table" style="margin-top:8px"></div>
+  </div></details>
+  <details class="md-expansion"><summary>What the rehearsal cannot see (its own limitations)</summary><div class="inner" id="limits"></div></details>
   <details class="md-expansion"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
 </div>
 <footer id="foot"></footer>
@@ -163,14 +180,18 @@ const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); 
 const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
 const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
 const pct = (x, dec=0) => x == null ? '—' : (Math.round(x*100*Math.pow(10,dec))/Math.pow(10,dec)).toFixed(dec) + '%';
+const of100 = x => x == null ? '—' : `${Math.round(x*100)} out of 100`;
 const sgn = (x, dec=2, unit='%') => x == null ? '—' : (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fmtD = iso => { const d = new Date(iso.slice(0,10)+'T00:00:00Z'); return d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
 const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
 const LABEL = {india: 'India', us: 'US'};
+const STAKE = 10000;
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let MKT = 'india', HZ = '1';
 const M = () => D.markets[MKT];
+const money = (x, dec=0) => { const c = M().currency; return (x < 0 ? '−' : '') + c.symbol + Math.abs(x).toLocaleString(c.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec}); };
+const onStake = p => money(STAKE * p / 100);
 
 /* ---------- shell ---------- */
 for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
@@ -194,150 +215,175 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned 
 document.querySelectorAll('.hz button').forEach(b => b.addEventListener('click', () => { HZ = b.dataset.h; document.querySelectorAll('.hz button').forEach(o => o.setAttribute('aria-pressed', o===b)); renderRanges(); }));
 
 /* ---------- helpers ---------- */
-const table = (heads, rows, opts={}) => { const t = el('table', {class:'t'}); const tr = el('tr'); heads.forEach(h => tr.append(el('th', {class: h.num ? 'num' : null}, h.label || h))); t.append(el('thead', {}, tr)); const tb = el('tbody'); rows.forEach(r => tb.append(r)); t.append(tb); return t; };
+const table = (heads, rows) => { const t = el('table', {class:'t'}); const tr = el('tr'); heads.forEach(h => tr.append(el('th', {class: h.num ? 'num' : null}, h.label || h))); t.append(el('thead', {}, tr)); const tb = el('tbody'); rows.forEach(r => tb.append(r)); t.append(tb); return t; };
 const td = (content, cls) => el('td', {class: cls}, content);
-const covBar = (v, target, n) => { if (v == null) return el('span', {class:'muted'}, '—'); const ok = Math.abs(v - target) <= 0.05; return el('span', {class:'bar', 'data-tip': `${pct(v,1)} held (target ${pct(target)})${n ? ', n ' + n : ''}`}, el('div', {class:'md-progress'}, el('i', {style:`width:${Math.min(100, v*100)}%;background:${ok ? 'var(--mb-color-up)' : v < target ? 'var(--mb-color-warn)' : 'var(--md-sys-color-primary)'}`})), el('b', {}, pct(v))); };
+const covBar = (v, target, n) => { if (v == null) return el('span', {class:'muted'}, '—'); const ok = Math.abs(v - target) <= 0.05; return el('span', {class:'bar', 'data-tip': `Held ${of100(v)} (promise: ${Math.round(target*100)})${n ? ', ' + n + ' ranges' : ''}`}, el('div', {class:'md-progress'}, el('i', {style:`width:${Math.min(100, v*100)}%;background:${ok ? 'var(--mb-color-up)' : v < target ? 'var(--mb-color-warn)' : 'var(--md-sys-color-primary)'}`})), el('b', {}, pct(v))); };
+/* "promise vs reality" row: two bars, the promise as a tick */
+function promiseRow(label, promise, actual, n, extra) {
+  const ok = Math.abs(actual - promise) <= 0.05;
+  const row = el('div', {class:'prow', 'data-tip': `${label}: promised to hold ${Math.round(promise*100)} times out of 100; in the rehearsal it held ${of100(actual)} over ${n} ranges.${extra ? ' ' + extra : ''}`});
+  row.append(el('div', {class:'pl'}, el('b', {}, label), el('small', {}, `promise: ${Math.round(promise*100)} of 100`)));
+  const track = el('div', {class:'ptrack'}); track.append(el('i', {class: ok ? 'good' : 'off', style:`width:${actual*100}%`}), el('u', {style:`left:${promise*100}%`, 'aria-hidden':'true'}));
+  row.append(track, el('div', {class:'pv ' + (ok ? 'ok' : 'warn')}, el('b', {}, `${Math.round(actual*100)}`), el('small', {}, ` of 100 · ${ok ? 'kept' : actual < promise ? 'too narrow' : 'too wide'}`)));
+  return row;
+}
 
 /* ---------- render ---------- */
 function render() {
-  const m = M(), L = m.live, G = m.gates, g5 = G.find(g => g.label.startsWith('5d')) || G[0];
+  const m = M(), L = m.live, G = m.gates, g5 = G.find(g => g.label.startsWith('5d')) || G[0], mod5 = m.model['5d open_to_close'];
+  $('#guide-stake').textContent = money(STAKE);
   $('#h-title').innerHTML = ''; $('#h-meta').innerHTML = ''; $('#h-right').innerHTML = '';
   $('#h-title').append(`${LABEL[MKT]} track record`, el('small', {}, `${m.market_name} · ${m.n_tickers} companies`));
-  $('#h-meta').append(el('span', {}, `live data as of ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {}, `back-test window ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}`));
+  $('#h-meta').append(el('span', {}, `real data up to ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {}, `rehearsal window ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}`));
   $('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
-  // verdict: proven only when all three gates pass
+  // gates in plain words
   const callsNeeded = R.min_n_calls, callsOk = L.calls_total >= callsNeeded;
   const bandsScored = L.calls_by_band.filter(b => b.n >= callsNeeded), bandsOk = bandsScored.length > 0 && bandsScored.every(b => b.hit_rate >= b.band - R.calibration_tolerance);
   const skillOk = !!(m.review && m.review.model_skill);
   const proven = callsOk && bandsOk && skillOk;
   const vh = $('#vhead'); vh.className = 'mb-verdict ' + (proven ? 'yes-strong' : 'no');
   $('#v-ico').innerHTML = ''; $('#v-ico').append(icon(proven ? 'ms-bolt' : 'ms-block'));
-  $('#v-word').innerHTML = ''; $('#v-word').append(proven ? 'PROVEN' : 'NOT PROVEN', el('small', {}, proven ? 'signals may leave Paper' : 'every signal stays Paper'));
-  $('#v-why').innerHTML = `<b>Why:</b> ${callsOk ? `${L.calls_total} live calls scored` : `only <b>${L.calls_total}</b> live call${L.calls_total===1?'':'s'} scored (${callsNeeded} needed per confidence band)`}; ${bandsOk ? 'the scored confidence bands hit at or above their stated confidence' : bandsScored.length ? 'a scored confidence band hits below its stated confidence' : 'no confidence band has enough scored calls yet'}; the weekly review ${skillOk ? 'finds' : 'does <b>not</b> find'} model skill in the back-test${g5 ? ` (5-day open-to-close: Brier skill ${g5.brier_skill}, AUC ${g5.auc} with a 95% interval from ${g5.auc95[0]} to ${g5.auc95[1]})` : ''}.`;
+  $('#v-word').innerHTML = ''; $('#v-word').append(proven ? 'TRUSTED' : 'NOT YET', el('small', {}, proven ? 'the signals passed all three tests' : 'every signal stays Paper'));
+  const t60 = mod5.thresholds['0.60'] ? mod5.thresholds['0.60'].long : null;
+  $('#v-why').innerHTML = `<b>In plain words:</b> ${callsOk ? `it has made ${L.calls_total} real calls` : `it has not yet made real calls that can be checked (<b>${L.calls_total}</b> checked, ${callsNeeded} needed)`}; ${bandsOk ? 'and when it said it was sure, it was right as often as it promised' : 'so nobody can yet say whether "70% sure" really means 70%'}; and in the rehearsal on past prices it picked the direction ${skillOk ? 'better than a coin' : `<b>no better than a coin</b>${t60 ? ` (when it was at least 60% sure of a rise, the stock rose ${of100(t60.hit_rate)} times; always betting on a rise: ${of100(mod5.up_share)})` : ''}`}.`;
   const gates = $('#gates'); gates.innerHTML = '';
   const gate = (ok, title, prog, text, tipText) => { const d = el('div', {class:'gate', 'data-tip': tipText}); d.append(el('div', {class:'t'}, el('span', {class:'mb-mark '+(ok?'ok':'no')}, icon(ok?'ms-check':'ms-close')), title)); if (prog != null) d.append(el('div', {class:'md-progress' + (ok ? '' : ' bad')}, el('i', {style:`width:${Math.max(2, Math.min(100, prog*100))}%`}))); d.append(el('small', {}, text)); return d; };
   gates.append(
-    gate(callsOk, 'Enough live calls scored', Math.min(1, L.calls_total / callsNeeded), `${L.calls_total} scored · ${callsNeeded} needed per band (config/review.yaml min_n_calls) · ${L.open_predictions} open`, 'A confidence band gets advice only from at least this many scored live calls; the whole record needs that many too.'),
-    gate(bandsOk, 'Confidence bands keep their promise', bandsScored.length ? Math.max(0, Math.min(1, bandsScored.reduce((a,b) => a + b.hit_rate, 0) / bandsScored.length)) : 0, bandsScored.length ? `${bandsScored.length} band${bandsScored.length>1?'s':''} with enough calls; tolerance ${pct(R.calibration_tolerance)}` : `no band has ${callsNeeded} scored calls yet`, 'Calls made at 70% confidence must hit at least 70% of the time (minus the tolerance). Otherwise the forecaster lowers confidence or abstains.'),
-    gate(skillOk, 'Model skill in the weekly review', g5 ? Math.max(0, Math.min(1, (g5.auc - 0.4) / 0.2)) : 0, g5 ? `n ${g5.n} (${g5.n_ok ? 'ok' : 'short'}) · Brier skill ${g5.brier_skill} (${g5.brier_ok ? 'ok' : 'must be above 0'}) · AUC low ${g5.auc95[0]} (${g5.auc_ok ? 'ok' : 'must be above 0.5'})` : 'no back-test', `Rule (config/review.yaml model_skill): at least ${R.model_skill.min_n} out-of-sample rows, Brier skill above ${R.model_skill.min_brier_skill} against the base rate, and an AUC 95% interval whose low end is above ${R.model_skill.min_auc_low}. The review reruns the walk-forward back-test every week.`));
-  // live record
+    gate(callsOk, 'Test 1 · Has it made enough real calls?', Math.min(1, L.calls_total / callsNeeded), `${L.calls_total} checked so far · needs ${callsNeeded}`, `A call is checked once its day passes and the price is known. ${callsNeeded} checked calls are needed per confidence level before anything is judged (config/review.yaml).`),
+    gate(bandsOk, 'Test 2 · When it says "70% sure", is it right 70% of the time?', bandsScored.length ? Math.max(0, Math.min(1, bandsScored.reduce((a,b) => a + b.hit_rate, 0) / bandsScored.length)) : 0, bandsScored.length ? `${bandsScored.length} confidence level${bandsScored.length>1?'s':''} checked` : 'no checked calls yet', `Calls made at 70% confidence must come true at least 70 times out of 100 (minus ${Math.round(R.calibration_tolerance*100)} of tolerance). If not, the forecaster must lower its confidence or abstain.`),
+    gate(skillOk, 'Test 3 · Does it beat a coin in the rehearsal?', g5 ? Math.max(0, Math.min(1, (g5.auc - 0.4) / 0.2)) : 0, g5 ? `${g5.n} rehearsal days · ranking score ${g5.auc.toFixed(2)} (0.50 = coin, 1.00 = perfect) · ${skillOk ? 'passes' : 'fails'}` : 'no rehearsal', `The weekly check-up replays the model on past prices it had not seen and asks two things: does it put the rising days above the falling ones better than chance (the ranking score must be clearly above 0.50, interval ${g5 ? g5.auc95.join(' to ') : '—'}), and are its probabilities closer to the truth than always saying the average? Both must pass.`));
+  // 1 live record
+  $('#live-ans').textContent = L.calls_total ? `${L.calls_total} real calls have been checked.` : `No real call has been checked yet. ${L.open_ranges ? `The system has published ${L.open_ranges} price ranges for the coming days (for ${fmtD(L.open_first_target)} to ${fmtD(L.open_last_target)}); each is checked once its day passes.` : ''} ${L.predictions ? `${L.predictions} direction calls are waiting.` : 'The forecaster has not yet made a direction call, which is allowed: abstaining is always an option.'}`;
   const lk = $('#live-kpis'); lk.innerHTML = '';
   for (const k of [
-    {v: String(L.calls_total), l: 'calls scored', t: 'Live direction calls that settled and were scored (outcomes joined to predictions).'},
-    {v: String(L.predictions), l: `calls made · ${L.open_predictions} open`, t: 'All live predictions stored, and those not yet settled.'},
-    {v: String(L.ranges_scored), l: 'ranges scored' + (L.ranges_cover80 != null ? ` · 80% held ${pct(L.ranges_cover80)}` : ''), t: 'Published ranges whose target date has passed and were scored (range_record).'},
-    {v: String(L.open_ranges), l: L.open_ranges ? `ranges waiting · targets ${fmtD(L.open_first_target)} – ${fmtD(L.open_last_target)}` : 'ranges waiting', t: 'Published ranges whose target date has not been scored yet (open_ranges).'},
+    {v: String(L.calls_total), l: 'real calls checked', t: 'Direction calls whose day has passed and that were scored against the real price.'},
+    {v: String(L.predictions), l: `direction calls made · ${L.open_predictions} waiting`, t: 'All live direction calls stored, and those whose day has not come yet.'},
+    {v: String(L.ranges_scored), l: 'price ranges checked' + (L.ranges_cover80 != null ? ` · 80% range held ${of100(L.ranges_cover80)}` : ''), t: 'Published ranges whose target day has passed and were checked.'},
+    {v: String(L.open_ranges), l: 'price ranges waiting for their day', t: 'Published ranges whose target day has not come yet.'},
   ]) lk.append(el('div', {class:'kpi', 'data-tip': k.t}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
   const bands = $('#bands'); bands.innerHTML = '';
-  if (L.calls_total) bands.append(table(['Band', {label:'Calls', num:true}, {label:'Hits', num:true}, {label:'Hit rate', num:true}, 'Promise kept?'], L.calls_by_band.map(b => { const tr = el('tr'); const okb = b.hit_rate == null ? null : b.hit_rate >= b.band - R.calibration_tolerance; tr.append(td(`${pct(b.band)} – ${pct(b.band+0.1)}`), td(String(b.n), 'num'), td(String(b.hits), 'num'), td(pct(b.hit_rate), 'num'), td(b.n < callsNeeded ? el('span', {class:'muted'}, `low n (< ${callsNeeded})`) : el('span', {class: okb ? 'ok' : 'bad'}, okb ? '✓ yes' : '✗ no'))); return tr; })));
-  else bands.append(el('div', {class:'empty'}, `No live call has settled yet. The live system started publishing on ${L.first_live_range_asof ? fmtD(L.first_live_range_asof) : '—'}; direction calls are scored ${R.call_scoring_from ? 'open-to-close from ' + fmtD(R.call_scoring_from) : 'open-to-close'} once their horizon passes. The bands ${R.confidence_bands.map(b => pct(b)).join(', ')} will fill here.`));
-  $('#live-sub').textContent = `${L.lessons} lesson${L.lessons===1?'':'s'} in the reflection log`;
-  $('#live-note').textContent = `Every live number above comes from stored rows (predictions, outcomes, ranges, range_record, open_ranges, lessons). Nothing is estimated.`;
-  // review
+  if (L.calls_total) bands.append(table(['When it said', {label:'Calls', num:true}, {label:'Came true', num:true}, 'Promise kept?'], L.calls_by_band.map(b => { const tr = el('tr'); const okb = b.hit_rate == null ? null : b.hit_rate >= b.band - R.calibration_tolerance; tr.append(td(`${Math.round(b.band*100)}–${Math.round(b.band*100+10)}% sure`), td(String(b.n), 'num'), td(b.hit_rate == null ? '—' : `${of100(b.hit_rate)}`, 'num'), td(b.n < callsNeeded ? el('span', {class:'muted'}, `too few to judge (< ${callsNeeded})`) : el('span', {class: okb ? 'ok' : 'bad'}, okb ? '✓ yes' : '✗ no'))); return tr; })));
+  $('#live-note').textContent = `Every number here comes from stored records (predictions, outcomes, ranges, open ranges, lessons: ${L.lessons}). Nothing is estimated.`;
+  // 2 review
   const rv = $('#review'); rv.innerHTML = ''; const rw = m.review;
-  if (rw) { $('#review-sub').textContent = `${rw.week} · computed ${String(rw.computed_at).slice(0,16).replace('T',' ')} UTC`;
+  if (rw) { $('#review-sub').textContent = `week ${rw.week}`;
+    $('#review-ans').textContent = `${rw.model_skill ? 'The check-up found the model knows something.' : 'The check-up found the model does not yet beat a coin.'} ${rw.n_ranges_all ? `${rw.n_ranges_all} ranges and ${rw.n_calls_all} calls have been checked since the start.` : 'Nothing real has been checked since the start, so it could not grade the live record.'} ${rw.n_proposals ? `It suggested ${rw.n_proposals} change${rw.n_proposals>1?'s':''} to the range settings for a human to decide: ${rw.proposals.map(p => p.variant).join('; ')}.` : 'It suggested no change to the settings.'}`;
     const kv = el('dl', {class:'md-kv'});
-    for (const [k, v] of [['Model skill', rw.model_skill ? 'shown' : 'not shown'], ['Ranges scored', `${rw.n_ranges_week} this week · ${rw.n_ranges_30d} in 30 days · ${rw.n_ranges_all} since start`], ['Calls scored', `${rw.n_calls_week} this week · ${rw.n_calls_all} since start`], ['80% held, since start', rw.cover80_all == null ? 'no scored ranges yet' : pct(rw.cover80_all)], ['Call hit rate, since start', rw.call_hit_all == null ? 'no scored calls yet' : pct(rw.call_hit_all) + (rw.always_up_all != null ? ` (always-up ${pct(rw.always_up_all)})` : '')], ['Sample', rw.low_sample ? 'low: no advice yet' : 'enough for advice'], ['Proposals', rw.n_proposals ? rw.proposals.map(p => `${p.variant} (${p.verdict}; ${p.source}, n ${p.n})`).join('; ') : 'none'], ['Report', rw.report]]) kv.append(el('dt', {}, k), el('dd', {}, v));
-    rv.append(kv, el('p', {class:'note'}, 'The review proposes changes to config/ranges.yaml; a human applies them. It reruns the signal-model back-test and says plainly whether the model shows skill.'));
-  } else { $('#review-sub').textContent = ''; rv.append(el('div', {class:'empty'}, 'No weekly review stored yet.')); }
-  renderRanges(); renderModel(); renderPaper(); renderBaselines(); renderTickers();
+    for (const [k, v] of [['Checked ranges', `${rw.n_ranges_week} this week · ${rw.n_ranges_30d} in 30 days · ${rw.n_ranges_all} since start`], ['Checked calls', `${rw.n_calls_week} this week · ${rw.n_calls_all} since start`], ['80% range held since start', rw.cover80_all == null ? 'nothing checked yet' : of100(rw.cover80_all)], ['Calls that came true', rw.call_hit_all == null ? 'nothing checked yet' : of100(rw.call_hit_all)], ['Enough data to advise?', rw.low_sample ? 'no, not yet' : 'yes'], ['Full report', rw.report]]) kv.append(el('dt', {}, k), el('dd', {}, v));
+    rv.append(kv);
+  } else { $('#review-sub').textContent = ''; $('#review-ans').textContent = 'No weekly check-up has run yet.'; }
+  renderRanges(); renderModel(); renderPaper(); renderTickers(); renderRecord();
   $('#limits').innerHTML = '<ul style="margin:0;padding-left:18px">' + m.replay.limitations.map(x => `<li>${x}</li>`).join('') + '</ul>';
   $('#sources').innerHTML = `<dl class="md-kv">
-<dt>Live</dt><dd>data/${MKT}/: predictions, outcomes, ranges, range_record, open_ranges, open_predictions, lessons, reviews (the latest weekly review and its proposals). Read through DuckDB views in sql/views.sql.</dd>
-<dt>Back-test, ranges</dt><dd><code>scripts/replay.py --market ${MKT} --start ${m.replay.window[0]} --end ${m.replay.window[1]}</code> run into a scratch root (computed ${String(m.replay.computed_at).slice(0,16).replace('T',' ')} UTC): coverage, widths and interval scores of the rule replay's ranges by horizon, regime, month, sector and ticker; direction baselines scored close-to-close.</dd>
-<dt>Back-test, model</dt><dd><code>${m.bt_path}</code> from <code>scripts/model_backtest.py</code> (computed ${String(m.bt_computed_at).slice(0,16).replace('T',' ')} UTC): walk-forward out-of-sample rows, Brier and log loss against the base rate, AUC with a bootstrap 95% interval, reliability bins with Wilson intervals, thresholds, the paper strategy after costs (config/costs.yaml) against baselines.</dd>
-<dt>Rules</dt><dd>config/review.yaml: confidence bands ${R.confidence_bands.join(', ')}, min_n_calls ${R.min_n_calls}, calibration tolerance ${R.calibration_tolerance}, model_skill min_n ${R.model_skill.min_n}, min_brier_skill ${R.model_skill.min_brier_skill}, min_auc_low ${R.model_skill.min_auc_low}.</dd>
-<dt>Derived</dt><dd>The PROVEN / NOT PROVEN verdict combines the three gates above; it is this page's reading of the rules, not a stored verdict. Nothing is invented: empty live tables say so.</dd>
+<dt>Live</dt><dd>data/${MKT}/: predictions, outcomes, ranges, range_record, open_ranges, open_predictions, lessons, reviews. Read through DuckDB views in sql/views.sql.</dd>
+<dt>Rehearsal of the ranges</dt><dd><code>scripts/replay.py --market ${MKT} --start ${m.replay.window[0]} --end ${m.replay.window[1]}</code> (computed ${String(m.replay.computed_at).slice(0,16).replace('T',' ')} UTC): each past day's range rebuilt from what was known that evening, then checked against the real close.</dd>
+<dt>Rehearsal of the model</dt><dd><code>${m.bt_path}</code> from <code>scripts/model_backtest.py</code> (computed ${String(m.bt_computed_at).slice(0,16).replace('T',' ')} UTC): the model refit each month on past data and tested on the days after each fit; the paper strategy uses the costs in config/costs.yaml.</dd>
+<dt>Rules</dt><dd>config/review.yaml: ${R.min_n_calls} checked calls per confidence level, tolerance ${R.calibration_tolerance}, model skill needs ${R.model_skill.min_n} rehearsal rows, a Brier skill above ${R.model_skill.min_brier_skill} and a ranking score (AUC) whose 95% interval sits above ${R.model_skill.min_auc_low}.</dd>
+<dt>Derived</dt><dd>The TRUSTED / NOT YET verdict is this page's reading of those rules, not a stored verdict. "Out of 100" figures are the stored rates rounded. Money figures are ${money(STAKE)} times the stored percentage.</dd>
 </dl>`;
   $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
 }
 
 function renderRanges() {
-  const m = M(), hb = m.replay.horizons[HZ], o = hb.overall;
-  $('#ranges-sub').textContent = `${o.n} ranges on ${o.days} days, ${m.n_tickers} companies`;
-  $('#ranges-help').dataset.tip = `scripts/replay.py rebuilt each day's ${HZ}-day range exactly as ranges.py would have, using only data known at that close, over ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}. "Held" = the later close landed inside the band. The interval score rewards narrow bands that hold (lower is better); the naive band is last close ± 20-day volatility.`;
-  const rk = $('#range-kpis'); rk.innerHTML = '';
-  for (const k of [
-    {v: pct(o.cover80), l: `80% ranges held (95% CI ${pct(o.cover80_ci[0])}–${pct(o.cover80_ci[1])})`, t: `Target 80%. Naive band: ${pct(o.naive_cover80)}.`, cls: Math.abs(o.cover80 - 0.8) <= 0.05 ? 'ok' : 'warn'},
-    {v: pct(o.cover50), l: '50% ranges held', t: `Target 50%. Naive band: ${pct(o.naive_cover50)}.`, cls: Math.abs(o.cover50 - 0.5) <= 0.05 ? 'ok' : 'warn'},
-    {v: `${o.score80} vs ${o.naive_score80}`, l: '80% interval score, ours vs naive (lower is better)', t: `Mean 80% band width ${o.width80_pct}% of price; mean absolute centre error ${o.abs_err_pct}%.`, cls: o.score80 <= o.naive_score80 ? 'ok' : 'warn'},
-  ]) rk.append(el('div', {class:'kpi', 'data-tip': k.t}, el('div', {class:'v ' + k.cls}, k.v), el('div', {class:'l'}, k.l)));
-  const br = $('#by-regime'); br.innerHTML = '';
-  br.append(table(['Regime', {label:'Days', num:true}, {label:'Ranges', num:true}, '80% held', '50% held', {label:'Width 80%', num:true}, {label:'Score vs naive', num:true}], Object.entries(hb.by_regime).map(([k, v]) => { const tr = el('tr'); tr.append(td(k), td(String(v.days), 'num'), td(String(v.n), 'num'), td(covBar(v.cover80, 0.8, v.n)), td(covBar(v.cover50, 0.5, v.n)), td(`${v.width80_pct}%`, 'num'), td(`${v.score80} vs ${v.naive_score80}`, 'num')); return tr; })));
-  // by month chart
+  const m = M(), hb = m.replay.horizons[HZ], o = hb.overall, hz = HZ === '1' ? 'next day' : 'next 5 days';
+  $('#ranges-sub').textContent = `${o.n} ranges over ${o.days} days, ${m.n_tickers} companies`;
+  $('#ranges-help').dataset.tip = `Every evening the system publishes a price range for each company: the "80% range" promises the close will land inside it 80 times out of 100, the "50% range" 50 times. The rehearsal rebuilt those ranges for each past day from what was known that evening and checked them against the real close. "Too narrow" = held less often than promised; "too wide" = more often (safe but useless).`;
+  const k80 = Math.abs(o.cover80 - 0.8) <= 0.05, k50 = Math.abs(o.cover50 - 0.5) <= 0.05;
+  $('#ranges-ans').textContent = `${k80 && k50 ? 'Yes, about right.' : k80 ? 'Mostly.' : 'Not quite.'} For the ${hz}, the 80% range held ${of100(o.cover80)} times (promise: 80) and the 50% range ${of100(o.cover50)} (promise: 50). ${o.score80 <= o.naive_score80 ? 'The ranges were also tighter than a plain "last close ± recent wobble" guess, so the formula adds something.' : 'A plain "last close ± recent wobble" guess would have scored better, so the formula adds nothing yet.'}`;
+  const pr = $('#promise'); pr.innerHTML = '';
+  pr.append(promiseRow('80% range', 0.8, o.cover80, o.n, `A plain guess held ${of100(o.naive_cover80)}.`), promiseRow('50% range', 0.5, o.cover50, o.n, `A plain guess held ${of100(o.naive_cover50)}.`));
   const bm = $('#by-month'); bm.innerHTML = '';
   const months = Object.entries(hb.by_month).sort((a, b) => a[0].localeCompare(b[0]));
   const W = Math.max(320, bm.clientWidth || 500), H = 150, ml = 36, mr = 10, mt = 14, mb = 28, bw = (W - ml - mr) / Math.max(1, months.length);
   const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'80% ranges held by month'});
   const y = v => mt + (1 - v) * (H - mt - mb);
-  for (const g of [0.5, 0.8, 1]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke: g === 0.8 ? cssVar('--mb-color-up') : cssVar('--mb-chart-grid'), 'stroke-dasharray': g === 0.8 ? '4 3' : null})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = pct(g); svg.append(t); }
-  months.forEach(([k, v], i) => { const x = ml + i * bw + bw * 0.2, w = bw * 0.6; const ok = Math.abs(v.cover80 - 0.8) <= 0.05; svg.append(svgEl('rect', {x, y: y(v.cover80), width: w, height: y(0) - y(v.cover80), rx: 3, fill: ok ? cssVar('--mb-color-up') : cssVar('--mb-color-warn'), opacity: .85})); const t = svgEl('text', {x: x + w/2, y: y(v.cover80) - 4, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--md-sys-color-on-surface')}); t.textContent = pct(v.cover80); svg.append(t); const t2 = svgEl('text', {x: x + w/2, y: H - 10, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--mb-chart-label')}); t2.textContent = `${MON[+k.slice(5,7)-1]} ${k.slice(2,4)} · n ${v.n}`; svg.append(t2); });
+  for (const g of [0.5, 0.8, 1]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke: g === 0.8 ? cssVar('--mb-color-up') : cssVar('--mb-chart-grid'), 'stroke-dasharray': g === 0.8 ? '4 3' : null})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = g === 0.8 ? 'promise' : pct(g); svg.append(t); }
+  months.forEach(([k, v], i) => { const x = ml + i * bw + bw * 0.2, w = bw * 0.6; const ok = Math.abs(v.cover80 - 0.8) <= 0.05; svg.append(svgEl('rect', {x, y: y(v.cover80), width: w, height: y(0) - y(v.cover80), rx: 3, fill: ok ? cssVar('--mb-color-up') : cssVar('--mb-color-warn'), opacity: .85})); const t = svgEl('text', {x: x + w/2, y: y(v.cover80) - 4, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--md-sys-color-on-surface')}); t.textContent = `${Math.round(v.cover80*100)} of 100`; svg.append(t); const t2 = svgEl('text', {x: x + w/2, y: H - 10, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--mb-chart-label')}); t2.textContent = `${MON[+k.slice(5,7)-1]} ${k.slice(0,4)} · ${v.n} ranges`; svg.append(t2); });
   bm.append(svg);
-  $('#ranges-note').textContent = m.replay.summary.filter(s => s.startsWith(`${HZ}-day`)).join(' ') || '';
+  const regs = Object.entries(hb.by_regime);
+  $('#ranges-note').textContent = regs.length ? `By market mood: ${regs.map(([k, v]) => `${k.toLowerCase().replace('_',' ')} days ${of100(v.cover80)} (${v.days} days)`).join('; ')}. Green = within 5 of the promise, amber = off.` : '';
 }
 
 function renderModel() {
-  const m = M(), keys = Object.keys(m.model);
-  $('#model-sub').textContent = `${m.model[keys[0]].first_date} – ${m.model[keys[0]].last_date}, ${m.n_tickers} companies`;
-  $('#model-help').dataset.tip = 'scripts/model_backtest.py: the signal model is refit each month on labels known by then and scored only on later dates (walk-forward, out of sample). Brier skill = improvement over always predicting the base rate (above 0 is skill). AUC 0.5 = no ability to rank up days above down days; the 95% interval must sit above 0.5. Open-to-close = buy at the next open, sell at the close of D+1 (1d) or D+4 (5d); close-to-close is the older label.';
-  const mt = $('#model-table'); mt.innerHTML = '';
-  mt.append(table(['Label', {label:'Rows', num:true}, {label:'Brier vs base', num:true}, {label:'Skill', num:true}, {label:'AUC [95% CI]', num:true}], keys.map(k => { const v = m.model[k]; const tr = el('tr'); tr.append(td(el('span', {'data-tip': `${v.label}. ${v.n} rows on ${v.dates} dates, up share ${pct(v.up_share,1)}, log loss ${v.log_loss} vs ${v.log_loss_base_rate}.`}, k.replace('open_to_close', 'open→close').replace('close_to_close', 'close→close'))), td(String(v.n), 'num'), td(`${v.brier} vs ${v.brier_base_rate}`, 'num'), td(el('span', {class: v.brier_skill > 0 ? 'ok' : 'bad'}, sgn(v.brier_skill, 4, '')), 'num'), td(el('span', {class: v.auc95[0] > 0.5 ? 'ok' : 'bad'}, `${v.auc} [${v.auc95[0]}, ${v.auc95[1]}]`), 'num')); return tr; })));
-  // reliability chart
-  const key = keys.find(k => k === '5d open_to_close') || keys[0], v = m.model[key], bins = (v.reliability || []).filter(b => b.n > 0);
-  const rc = $('#reliability'); rc.innerHTML = '';
-  const W = Math.max(320, rc.clientWidth || 500), H = 230, ml = 40, mr = 12, mt2 = 10, mb = 30;
-  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Reliability: predicted probability against the realised share of up outcomes'});
-  const x = p => ml + (p - 0.2) / 0.6 * (W - ml - mr), y = p => mt2 + (1 - (p - 0.2) / 0.6) * (H - mt2 - mb);
-  for (const g of [0.3, 0.4, 0.5, 0.6, 0.7]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke:cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = pct(g); svg.append(t); const t2 = svgEl('text', {x:x(g), y:H-12, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t2.textContent = pct(g); svg.append(t2); }
-  svg.append(svgEl('line', {x1:x(0.2), y1:y(0.2), x2:x(0.8), y2:y(0.8), stroke:cssVar('--md-sys-color-outline'), 'stroke-dasharray':'4 3'}));
-  const lab = svgEl('text', {x:x(0.78), y:y(0.8)-6, 'text-anchor':'end', 'font-size':10, fill:cssVar('--md-sys-color-on-surface-variant')}); lab.textContent = 'perfect calibration'; svg.append(lab);
-  const xl = svgEl('text', {x:(ml+W-mr)/2, y:H-1, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); xl.textContent = 'what the model said (mean P(up) in the bin)'; svg.append(xl);
-  const maxN = Math.max(...bins.map(b => b.n), 1);
-  for (const b of bins) { const px = x(Math.max(0.2, Math.min(0.8, b.mean_p))), py = y(Math.max(0.2, Math.min(0.8, b.up_share))); svg.append(svgEl('line', {x1:px, x2:px, y1:y(Math.max(0.2, Math.min(0.8, b.wilson95[0]))), y2:y(Math.max(0.2, Math.min(0.8, b.wilson95[1]))), stroke:cssVar('--mb-chart-1'), 'stroke-width':1.5}));
-    const c = svgEl('circle', {cx:px, cy:py, r: 4 + 6 * Math.sqrt(b.n / maxN), fill:cssVar('--mb-chart-1'), stroke:'#fff', 'stroke-width':1.5}); svg.append(c);
-    const t = svgEl('text', {x:px, y:py - 10 - 6 * Math.sqrt(b.n / maxN), 'text-anchor':'middle', 'font-size':9.5, fill:cssVar('--md-sys-color-on-surface-variant')}); t.textContent = `${b.bin} n ${b.n}`; svg.append(t); }
-  rc.append(svg);
-  $('#model-note').textContent = `${key}: ${v.n} out-of-sample rows on ${v.dates} dates. Dots are the model's probability bins (size = rows), the whiskers their Wilson 95% intervals for the realised share of up outcomes; a calibrated model sits on the dashed line. Latest fit: ${v.model ? `${v.model.fits} monthly fits, trained to ${v.model.last_cutoff} on ${v.model.last_train_rows} rows, base rate ${v.model.last_base_rate}, Platt ${JSON.stringify(v.model.last_platt)}` : '—'}.`;
+  const m = M(), v = m.model['5d open_to_close'], v1 = m.model['1d open_to_close'];
+  $('#model-help').dataset.tip = 'The rehearsal refits the model every month on prices before that month and tests it on the days after, so it never sees the answer. "Sure of a rise" = the probability it gave. A coin would be right about as often as the plain share of rising days.';
+  const t = v.thresholds, base = v.up_share;
+  const rows = Object.entries(t).map(([th, s]) => ({th: +th, n: s.long.n, hit: s.long.hit_rate, lo: s.long.wilson95[0], hi: s.long.wilson95[1]}));
+  const best = rows.reduce((a, b) => b.hit > a.hit ? b : a);
+  const beats = rows.filter(r => r.lo > base);
+  const skillOk = !!(m.review && m.review.model_skill);
+  $('#model-ans').textContent = `${skillOk ? 'Yes.' : beats.length ? 'Barely, and not enough to pass the test.' : 'No.'} Over ${v.n} rehearsal calls for the next 5 days, a rise happened ${of100(base)} times on average. ${rows.map(r => `When the model was at least ${Math.round(r.th*100)}% sure of a rise, it rose ${of100(r.hit)} (${r.n} calls)`).join('; ')}. ${beats.length ? `The ${beats.map(r => Math.round(r.th*100) + '%').join(' and ')} level${beats.length>1?'s':''} edge${beats.length>1?'':'s'} past the coin, but those are few calls${skillOk ? '' : ', and across all its calls the model ranks rising days no better than chance'}.` : 'None of these clears a coin flip with any confidence.'} Ranking score ${v.auc.toFixed(2)} (0.50 = coin, 1.00 = perfect).`;
+  const c = $('#coin'); c.innerHTML = '';
+  const W = Math.max(320, c.clientWidth || 500), phone = W < 480, H = 30 + (rows.length + 1) * 30, ml = phone ? 118 : 170, mr = phone ? 44 : 60;
+  const x = p => ml + (p - 0.3) / 0.4 * (W - ml - mr);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'How often the stock rose, by how sure the model was'});
+  for (const g of [0.4, 0.5, 0.6, 0.7]) { svg.append(svgEl('line', {x1:x(g), x2:x(g), y1:6, y2:H-22, stroke: cssVar('--mb-chart-grid')})); const tt = svgEl('text', {x:x(g), y:H-8, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); tt.textContent = `${Math.round(g*100)} of 100`; svg.append(tt); }
+  svg.append(svgEl('line', {x1:x(base), x2:x(base), y1:6, y2:H-22, stroke: cssVar('--md-sys-color-outline'), 'stroke-dasharray':'4 3', 'stroke-width':1.5}));
+  const all = [{label: phone ? 'Always "rise"' : 'Always betting on a rise', hit: base, lo: null, hi: null, n: v.n, base: true}, ...rows.map(r => ({label: phone ? `Model ≥ ${Math.round(r.th*100)}% sure` : `Model at least ${Math.round(r.th*100)}% sure`, hit: r.hit, lo: r.lo, hi: r.hi, n: r.n}))];
+  all.forEach((r, i) => { const cy = 20 + i * 30; const tl = svgEl('text', {x: ml - 8, y: cy + 4, 'text-anchor':'end', 'font-size':11, fill: cssVar('--md-sys-color-on-surface'), 'font-weight': r.base ? 400 : 700}); tl.textContent = r.label; svg.append(tl);
+    if (r.lo != null) svg.append(svgEl('line', {x1:x(Math.max(0.3, r.lo)), x2:x(Math.min(0.7, r.hi)), y1:cy, y2:cy, stroke: cssVar('--mb-chart-1'), 'stroke-width':2}));
+    svg.append(svgEl('circle', {cx:x(Math.max(0.3, Math.min(0.7, r.hit))), cy, r:5.5, fill: r.base ? cssVar('--md-sys-color-outline') : (r.lo > base ? cssVar('--mb-color-up') : cssVar('--mb-color-down')), stroke:'#fff', 'stroke-width':1.5}));
+    const tv = svgEl('text', {x: x(Math.min(0.7, r.hi == null ? r.hit : r.hi)) + 8, y: cy + 4, 'font-size':10.5, fill: cssVar('--md-sys-color-on-surface-variant')}); tv.textContent = phone ? `${Math.round(r.hit*100)}` : `${Math.round(r.hit*100)} of 100 · ${r.n} calls`; svg.append(tv); });
+  c.append(svg);
+  $('#model-note').textContent = `Dashed line = the coin (the plain share of rising days). A dot clears the coin only when its whole whisker (where the true rate most likely lies) sits to the right of the line. Next-day calls: ${v1 ? `a rise ${of100(v1.up_share)} on average; ranking score ${v1.auc.toFixed(2)}.` : ''}`;
 }
 
 function renderPaper() {
-  const m = M(), key = '5d open_to_close', v = m.model[key], P = v.paper;
-  $('#paper-sub').textContent = P ? `mean round-trip cost ${P.mean_cost_pct}%` : '';
-  $('#paper-help').dataset.tip = 'Paper, never traded: at each date buy every stock whose model P(up) is at or above the threshold at the next open and sell at the close of D+4 (5-day); return per trade after the costs in config/costs.yaml, averaged with a 95% interval (bootstrap over dates). Compared with always buying everything, 5-day momentum, RSI mean reversion and holding the benchmark.';
-  const pc = $('#paper-chart'); pc.innerHTML = ''; const pt = $('#paper-table'); pt.innerHTML = '';
-  if (!P) { pc.append(el('div', {class:'empty'}, 'No paper-strategy result in the back-test JSON.')); return; }
-  const rows = [...Object.entries(P.thresholds).map(([t, r]) => ({name: `long at ≥ ${pct(+t)}`, ...r.long, kind:'model'})), ...Object.entries(P.baselines).map(([k, r]) => ({name: {always_up:'always up', momentum_5d:'5-day momentum', rsi_mean_reversion:'RSI mean reversion', benchmark_long_per_date:'hold the benchmark'}[k] || k, ...r, kind:'base'}))];
-  const W = Math.max(320, pc.clientWidth || 500), H = 36 + rows.length * 26, ml = 150, mr = 50;
-  const lo = Math.min(-1, ...rows.map(r => r.ci95_pct[0])), hi = Math.max(0.5, ...rows.map(r => r.ci95_pct[1]));
-  const x = val => ml + (val - lo) / (hi - lo) * (W - ml - mr);
-  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Mean return per trade after costs with 95% intervals'});
-  for (const g of [-1.5, -1, -0.5, 0, 0.5]) { if (g < lo || g > hi) continue; svg.append(svgEl('line', {x1:x(g), x2:x(g), y1:8, y2:H-20, stroke: g === 0 ? cssVar('--md-sys-color-outline') : cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:x(g), y:H-6, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = sgn(g, 1); svg.append(t); }
-  rows.forEach((r, i) => { const cy = 20 + i * 26; const t = svgEl('text', {x: ml - 8, y: cy + 4, 'text-anchor':'end', 'font-size':11, fill: cssVar('--md-sys-color-on-surface'), 'font-weight': r.kind === 'model' ? 700 : 400}); t.textContent = r.name; svg.append(t);
-    svg.append(svgEl('line', {x1:x(r.ci95_pct[0]), x2:x(r.ci95_pct[1]), y1:cy, y2:cy, stroke: r.kind === 'model' ? cssVar('--mb-chart-1') : cssVar('--md-sys-color-outline'), 'stroke-width':2}));
-    svg.append(svgEl('circle', {cx:x(r.mean_pct), cy, r:5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), stroke:'#fff', 'stroke-width':1.5}));
-    const t2 = svgEl('text', {x: x(r.ci95_pct[1]) + 6, y: cy + 4, 'font-size':10.5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), 'font-weight':600}); t2.textContent = sgn(r.mean_pct, 2); svg.append(t2); });
-  pc.append(svg);
-  pt.append(table(['Strategy', {label:'Positions', num:true}, {label:'Dates', num:true}, {label:'Mean per trade', num:true}, {label:'95% interval', num:true}, 'vs always up'], rows.map(r => { const tr = el('tr'); const vs = r.kind === 'model' ? (P.thresholds[Object.keys(P.thresholds).find(t => `long at ≥ ${pct(+t)}` === r.name)] || {}).vs : null; const d = vs && vs.always_up; tr.append(td(r.name), td(String(r.positions), 'num'), td(String(r.dates), 'num'), td(el('span', {class: r.mean_pct >= 0 ? 'ok' : 'bad'}, sgn(r.mean_pct, 2)), 'num'), td(`${sgn(r.ci95_pct[0], 2)} to ${sgn(r.ci95_pct[1], 2)}`, 'num'), td(d ? el('span', {class: d.ci95_pct[0] > 0 ? 'ok' : 'muted'}, `${sgn(d.mean_pct, 2)} [${sgn(d.ci95_pct[0],2)}, ${sgn(d.ci95_pct[1],2)}]${d.ci95_pct[0] > 0 ? ' · beats it' : ' · not better'}`) : el('span', {class:'muted'}, '—'))); return tr; })));
-  $('#paper-note').textContent = `A strategy beats a baseline only when the 95% interval of the after-cost difference is above zero. Costs: ${P.mean_cost_pct}% mean round trip (config/costs.yaml, every rate marked "verify"; slippage not modelled).`;
-}
-
-function renderBaselines() {
-  const m = M(), b = $('#baselines'); b.innerHTML = '';
-  const rows = [];
-  for (const h of ['1', '5']) for (const [k, v] of Object.entries(m.replay.baselines[h])) rows.push({h, ...v});
-  b.append(table(['Rule', 'Horizon', {label:'Calls', num:true}, {label:'Hits', num:true}, {label:'Hit rate', num:true}, {label:'95% CI', num:true}], rows.map(r => { const tr = el('tr'); const ok = r.ci95 && r.ci95[0] > 0.5; tr.append(td(r.label), td(`${r.h}-day`), td(String(r.calls), 'num'), td(String(r.hits), 'num'), td(el('span', {class: ok ? 'ok' : r.hit_rate < 0.5 ? 'bad' : ''}, pct(r.hit_rate, 1)), 'num'), td(r.ci95 ? `${pct(r.ci95[0], 1)} – ${pct(r.ci95[1], 1)}` : '—', 'num')); return tr; })));
-  const th = $('#thresholds'); th.innerHTML = '';
-  const v = m.model['5d open_to_close'];
-  th.append(table(['Threshold', 'Side', {label:'Calls', num:true}, {label:'Coverage', num:true}, {label:'Hit rate', num:true}, {label:'Wilson 95%', num:true}, {label:'Hit after cost', num:true}], Object.entries(v.thresholds).flatMap(([t, s]) => ['long', 'short'].map(side => { const r = s[side]; const tr = el('tr'); tr.append(td(`P(up) ${side === 'long' ? '≥' : '≤ 1 −'} ${pct(+t)}`), td(side), td(String(r.n), 'num'), td(pct(r.coverage, 1), 'num'), td(el('span', {class: r.wilson95[0] > 0.5 ? 'ok' : ''}, pct(r.hit_rate, 1)), 'num'), td(`${pct(r.wilson95[0],1)} – ${pct(r.wilson95[1],1)}`, 'num'), td(r.hit_after_cost == null ? '—' : pct(r.hit_after_cost, 1), 'num')); return tr; }))));
+  const m = M(), v = m.model['5d open_to_close'], P = v.paper;
+  $('#paper-help').dataset.tip = `A pretend account: on each rehearsal day, buy every company the model was sure enough about at the next open and sell at the close four days later, paying the real trading costs (config/costs.yaml). Compared with simply buying everything, buying recent winners, buying recent losers, and holding the index. "Could be between" is the range where the true average most likely lies.`;
+  const mo = $('#money'); mo.innerHTML = '';
+  if (!P) { $('#paper-ans').textContent = 'No paper-trading result stored.'; return; }
+  const t60 = P.thresholds['0.60'] ? P.thresholds['0.60'].long : null, au = P.baselines.always_up;
+  $('#paper-ans').textContent = `${t60 && t60.mean_pct > 0 && t60.ci95_pct[0] > 0 ? 'Yes, a little.' : 'No.'} ${t60 ? `Following the model when it was at least 60% sure, each ${money(STAKE)} trade would have ${t60.mean_pct >= 0 ? 'made' : 'lost'} about ${money(Math.abs(STAKE*t60.mean_pct/100))} on average after costs (${t60.positions} trades); it could be between ${onStake(t60.ci95_pct[0])} and ${onStake(t60.ci95_pct[1])}.` : ''} ${au ? `Simply buying everything would have ${au.mean_pct >= 0 ? 'made' : 'lost'} about ${money(Math.abs(STAKE*au.mean_pct/100))} per trade.` : ''} Costs alone take about ${money(STAKE*P.mean_cost_pct/100, 2)} per trade.`;
+  const rows = [...Object.entries(P.thresholds).map(([t, r]) => ({name: `Follow the model when ≥ ${Math.round(+t*100)}% sure`, ...r.long, kind:'model'})), ...Object.entries(P.baselines).map(([k, r]) => ({name: {always_up:'Buy everything, every day', momentum_5d:'Buy last week\'s winners', rsi_mean_reversion:'Buy the oversold (RSI)', benchmark_long_per_date:'Hold the index'}[k] || k, ...r, kind:'base'}))];
+  mo.append(table(['What you do', {label:'Trades', num:true}, {label:`Per ${money(STAKE)} trade`, num:true}, 'Could be between'], rows.map(r => { const tr = el('tr', {class: r.kind}); tr.append(td(r.kind === 'model' ? el('b', {}, r.name) : r.name), td(String(r.positions), 'num'), td(el('span', {class: r.mean_pct >= 0 ? 'ok' : 'bad'}, onStake(r.mean_pct)), 'num'), td(`${onStake(r.ci95_pct[0])} and ${onStake(r.ci95_pct[1])}`)); return tr; })));
+  $('#paper-note').textContent = `Red = loses money on average, green = makes money. A way of trading is better than another only when its whole "could be between" range sits above the other's.`;
 }
 
 function renderTickers() {
   const m = M(), bt1 = m.replay.horizons['1'].by_ticker, bt5 = m.replay.horizons['5'].by_ticker, t = $('#by-ticker'); t.innerHTML = '';
-  $('#ticker-sub').textContent = `rule replay ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}; live columns fill as calls settle`;
-  t.append(table(['Company', {label:'1d ranges', num:true}, '1d 80% held', '1d 50% held', {label:'1d score vs naive', num:true}, '5d 80% held', '5d 50% held', {label:'5d score vs naive', num:true}, {label:'Live calls scored', num:true}], Object.keys(bt1).sort().map(k => { const a = bt1[k], b = bt5[k] || {}; const tr = el('tr'); tr.append(td(el('a', {href:`../decision/decision-${k}.html`, style:'color:inherit;font-weight:700;text-decoration:none'}, k)), td(String(a.n), 'num'), td(covBar(a.cover80, 0.8, a.n)), td(covBar(a.cover50, 0.5, a.n)), td(el('span', {class: a.score80 <= a.naive_score80 ? 'ok' : 'warn'}, `${a.score80} vs ${a.naive_score80}`), 'num'), td(covBar(b.cover80, 0.8, b.n)), td(covBar(b.cover50, 0.5, b.n)), td(b.score80 == null ? '—' : el('span', {class: b.score80 <= b.naive_score80 ? 'ok' : 'warn'}, `${b.score80} vs ${b.naive_score80}`), 'num'), td(el('span', {class:'muted'}, '0'), 'num')); return tr; })));
+  const arr = Object.entries(bt1).map(([k, a]) => ({k, c: a.cover80, n: a.n}));
+  const best = arr.reduce((a, b) => b.c > a.c ? b : a), worst = arr.reduce((a, b) => b.c < a.c ? b : a);
+  $('#ticker-ans').textContent = `Next-day 80% ranges held best for ${best.k} (${of100(best.c)}) and worst for ${worst.k} (${of100(worst.c)}); green means within 5 of the promise, amber means off. Click a company for its page.`;
+  t.append(table(['Company', 'Next-day 80% range held', 'Next-5-days 80% range held', {label:'Real calls checked', num:true}], Object.keys(bt1).sort().map(k => { const a = bt1[k], b = bt5[k] || {}; const tr = el('tr'); tr.append(td(el('a', {href:`../decision/decision-${k}.html`, style:'color:inherit;font-weight:700;text-decoration:none'}, k)), td(covBar(a.cover80, 0.8, a.n)), td(covBar(b.cover80, 0.8, b.n)), td(el('span', {class:'muted'}, '0'), 'num')); return tr; })));
+}
+
+/* ---------- for the record: the statistics ---------- */
+function renderRecord() {
+  const m = M(), keys = Object.keys(m.model);
+  const mt = $('#model-table'); mt.innerHTML = '';
+  mt.append(table(['Label', {label:'Rows', num:true}, {label:'Dates', num:true}, {label:'Brier vs base', num:true}, {label:'Skill', num:true}, {label:'AUC [95% CI]', num:true}], keys.map(k => { const v = m.model[k]; const tr = el('tr'); tr.append(td(el('span', {'data-tip': v.label}, k.replace('open_to_close', 'open→close').replace('close_to_close', 'close→close'))), td(String(v.n), 'num'), td(String(v.dates), 'num'), td(`${v.brier} vs ${v.brier_base_rate}`, 'num'), td(el('span', {class: v.brier_skill > 0 ? 'ok' : 'bad'}, sgn(v.brier_skill, 4, '')), 'num'), td(el('span', {class: v.auc95[0] > 0.5 ? 'ok' : 'bad'}, `${v.auc} [${v.auc95[0]}, ${v.auc95[1]}]`), 'num')); return tr; })));
+  const v = m.model['5d open_to_close'], bins = (v.reliability || []).filter(b => b.n > 0);
+  const rc = $('#reliability'); rc.innerHTML = '';
+  const W = Math.max(320, rc.clientWidth || 500), H = 230, ml = 40, mr = 12, mt2 = 10, mb = 30;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Reliability'});
+  const x = p => ml + (p - 0.2) / 0.6 * (W - ml - mr), y = p => mt2 + (1 - (p - 0.2) / 0.6) * (H - mt2 - mb);
+  for (const g of [0.3, 0.4, 0.5, 0.6, 0.7]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke:cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = pct(g); svg.append(t); const t2 = svgEl('text', {x:x(g), y:H-12, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t2.textContent = pct(g); svg.append(t2); }
+  svg.append(svgEl('line', {x1:x(0.2), y1:y(0.2), x2:x(0.8), y2:y(0.8), stroke:cssVar('--md-sys-color-outline'), 'stroke-dasharray':'4 3'}));
+  const maxN = Math.max(...bins.map(b => b.n), 1);
+  for (const b of bins) { const px = x(Math.max(0.2, Math.min(0.8, b.mean_p))), py = y(Math.max(0.2, Math.min(0.8, b.up_share))); svg.append(svgEl('line', {x1:px, x2:px, y1:y(Math.max(0.2, Math.min(0.8, b.wilson95[0]))), y2:y(Math.max(0.2, Math.min(0.8, b.wilson95[1]))), stroke:cssVar('--mb-chart-1'), 'stroke-width':1.5})); svg.append(svgEl('circle', {cx:px, cy:py, r: 4 + 6 * Math.sqrt(b.n / maxN), fill:cssVar('--mb-chart-1'), stroke:'#fff', 'stroke-width':1.5})); const t = svgEl('text', {x:px, y:py - 10 - 6 * Math.sqrt(b.n / maxN), 'text-anchor':'middle', 'font-size':9.5, fill:cssVar('--md-sys-color-on-surface-variant')}); t.textContent = `${b.bin} n ${b.n}`; svg.append(t); }
+  rc.append(svg);
+  $('#rel-note').textContent = `Dots = the model's probability bins (size = rows), whiskers = Wilson 95% intervals of the realised up share; a calibrated model sits on the dashed line. Latest fit: ${v.model ? `${v.model.fits} monthly fits, trained to ${v.model.last_cutoff} on ${v.model.last_train_rows} rows, base rate ${v.model.last_base_rate}, Platt ${JSON.stringify(v.model.last_platt)}` : '—'}.`;
+  const th = $('#thresholds'); th.innerHTML = '';
+  th.append(table(['Threshold', 'Side', {label:'Calls', num:true}, {label:'Coverage', num:true}, {label:'Hit rate', num:true}, {label:'Wilson 95%', num:true}, {label:'Hit after cost', num:true}], Object.entries(v.thresholds).flatMap(([t, s]) => ['long', 'short'].map(side => { const r = s[side]; const tr = el('tr'); tr.append(td(`P(up) ${side === 'long' ? '≥' : '≤ 1 −'} ${pct(+t)}`), td(side), td(String(r.n), 'num'), td(pct(r.coverage, 1), 'num'), td(pct(r.hit_rate, 1), 'num'), td(`${pct(r.wilson95[0],1)} – ${pct(r.wilson95[1],1)}`, 'num'), td(r.hit_after_cost == null ? '—' : pct(r.hit_after_cost, 1), 'num')); return tr; }))));
+  const b = $('#baselines'); b.innerHTML = '';
+  const rows = []; for (const h of ['1', '5']) for (const [k, vv] of Object.entries(m.replay.baselines[h])) rows.push({h, ...vv});
+  b.append(table(['Rule', 'Horizon', {label:'Calls', num:true}, {label:'Hits', num:true}, {label:'Hit rate', num:true}, {label:'95% CI', num:true}], rows.map(r => { const tr = el('tr'); tr.append(td(r.label), td(`${r.h}-day`), td(String(r.calls), 'num'), td(String(r.hits), 'num'), td(pct(r.hit_rate, 1), 'num'), td(r.ci95 ? `${pct(r.ci95[0], 1)} – ${pct(r.ci95[1], 1)}` : '—', 'num')); return tr; })));
+  const br = $('#by-regime'); br.innerHTML = ''; const hb = m.replay.horizons[HZ];
+  br.append(table(['Regime', {label:'Days', num:true}, {label:'Ranges', num:true}, '80% held', '50% held', {label:'Width 80%', num:true}, {label:'Score vs naive', num:true}], Object.entries(hb.by_regime).map(([k, vv]) => { const tr = el('tr'); tr.append(td(k), td(String(vv.days), 'num'), td(String(vv.n), 'num'), td(covBar(vv.cover80, 0.8, vv.n)), td(covBar(vv.cover50, 0.5, vv.n)), td(`${vv.width80_pct}%`, 'num'), td(`${vv.score80} vs ${vv.naive_score80}`, 'num')); return tr; })));
+  const P = v.paper, pc = $('#paper-chart'); pc.innerHTML = ''; const pt = $('#paper-table'); pt.innerHTML = '';
+  if (!P) return;
+  const prow = [...Object.entries(P.thresholds).map(([t, r]) => ({name: `long at ≥ ${pct(+t)}`, ...r.long, kind:'model', key: t})), ...Object.entries(P.baselines).map(([k, r]) => ({name: k.replace(/_/g, ' '), ...r, kind:'base'}))];
+  const W2 = Math.max(320, pc.clientWidth || 500), H2 = 36 + prow.length * 26, ml2 = 150, mr2 = 50;
+  const lo = Math.min(-1, ...prow.map(r => r.ci95_pct[0])), hi = Math.max(0.5, ...prow.map(r => r.ci95_pct[1])), xx = val => ml2 + (val - lo) / (hi - lo) * (W2 - ml2 - mr2);
+  const sv = svgEl('svg', {viewBox:`0 0 ${W2} ${H2}`, role:'img', 'aria-label':'Mean return per trade after costs with 95% intervals'});
+  for (const g of [-1.5, -1, -0.5, 0, 0.5]) { if (g < lo || g > hi) continue; sv.append(svgEl('line', {x1:xx(g), x2:xx(g), y1:8, y2:H2-20, stroke: g === 0 ? cssVar('--md-sys-color-outline') : cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:xx(g), y:H2-6, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = sgn(g, 1); sv.append(t); }
+  prow.forEach((r, i) => { const cy = 20 + i * 26; const t = svgEl('text', {x: ml2 - 8, y: cy + 4, 'text-anchor':'end', 'font-size':11, fill: cssVar('--md-sys-color-on-surface'), 'font-weight': r.kind === 'model' ? 700 : 400}); t.textContent = r.name; sv.append(t); sv.append(svgEl('line', {x1:xx(r.ci95_pct[0]), x2:xx(r.ci95_pct[1]), y1:cy, y2:cy, stroke: r.kind === 'model' ? cssVar('--mb-chart-1') : cssVar('--md-sys-color-outline'), 'stroke-width':2})); sv.append(svgEl('circle', {cx:xx(r.mean_pct), cy, r:5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), stroke:'#fff', 'stroke-width':1.5})); const t2 = svgEl('text', {x: xx(r.ci95_pct[1]) + 6, y: cy + 4, 'font-size':10.5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), 'font-weight':600}); t2.textContent = sgn(r.mean_pct, 2); sv.append(t2); });
+  pc.append(sv);
+  pt.append(table(['Strategy', {label:'Positions', num:true}, {label:'Dates', num:true}, {label:'Mean per trade', num:true}, {label:'95% interval', num:true}, 'vs always up'], prow.map(r => { const tr = el('tr'); const d = r.kind === 'model' ? (P.thresholds[r.key].vs || {}).always_up : null; tr.append(td(r.name), td(String(r.positions), 'num'), td(String(r.dates), 'num'), td(sgn(r.mean_pct, 2), 'num'), td(`${sgn(r.ci95_pct[0], 2)} to ${sgn(r.ci95_pct[1], 2)}`, 'num'), td(d ? `${sgn(d.mean_pct, 2)} [${sgn(d.ci95_pct[0],2)}, ${sgn(d.ci95_pct[1],2)}]${d.ci95_pct[0] > 0 ? ' · beats it' : ' · not better'}` : '—')); return tr; })));
 }
 render();
-new ResizeObserver(() => { renderRanges(); renderModel(); renderPaper(); }).observe($('#by-month'));
+new ResizeObserver(() => { renderRanges(); renderModel(); renderRecord(); }).observe($('#by-month'));
 </script>
 </body>
 </html>
