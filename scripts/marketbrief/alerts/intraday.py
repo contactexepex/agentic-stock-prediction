@@ -31,7 +31,7 @@ def trade_text(trade: dict, names: dict) -> str:
         target = f"{fmt.pct(to_target)} left to target"
     flags = ", ".join(FLAG_TEXT.get(f, f) for f in trade.get("flags") or []) or "none"
     band = BAND_TEXT.get(trade.get("band"), trade.get("band") or "band unknown")
-    return (f"{fmt.horizon(trade['horizon_days'])} {fmt.who(trade['strategy_id'], names)} ({trade.get('view')}):"
+    return (f"{fmt.horizon(trade['horizon_days'])} {fmt.who(trade['strategy_id'], names)}, {trade.get('view')} view:"
             f" {fmt.pct(trade.get('ret_since_entry_pct'))} since entry, {band}, {target}; flags: {flags}")
 
 
@@ -47,7 +47,7 @@ def note_line(row: dict) -> list[str]:
 def trade_alert_lines(row: dict, names: dict) -> list[str]:
     """A ticker's flagged open trades, one line each, then the explainer's note."""
     trades = sorted(row.get("trades") or [], key=lambda t: (t["horizon_days"], t["strategy_id"], str(t.get("view"))))
-    lines = [f"• *{row['ticker']}* {len(trades)} flagged open paper trade{'s' if len(trades) != 1 else ''}: {PAPER}"]
+    lines = [f"• *{row['ticker']}*: {len(trades)} flagged open paper trade{'s' if len(trades) != 1 else ''} {PAPER}"]
     lines += [f"   – {trade_text(t, names)} {PAPER}" for t in trades]
     return lines + note_line(row)
 

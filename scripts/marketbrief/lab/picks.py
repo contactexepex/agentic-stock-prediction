@@ -20,40 +20,14 @@ against a centre) made N+1 always win at a negative value; per session neither e
 and costs (paid once per trade) weigh more on short horizons. Ties: the shorter horizon."""
 from __future__ import annotations
 
-import math
-
 from marketbrief.contracts.protocol import MIN_TRADES_PER_COMPANY
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.constants import (BASIS_ALL, BASIS_PER_COMPANY, MONEY_DIGITS, PCT_DIGITS, PERCENT, PICK_GAIN,
-                                       PICK_PROBABILITY, STATUS_SETTLED, VIEW_ACCURACY, Z80)
+                                       PICK_PROBABILITY, STATUS_SETTLED, VIEW_ACCURACY)
 from marketbrief.lab.cost_views import viability
+from marketbrief.lab.gain import conditional_move_loss, expected_gain_pct
 from marketbrief.lab.scoreboard import latest_settlements
 from marketbrief.lab.sizing import quantity
-
-
-def normal_pdf(z: float) -> float:
-    """Standard normal density."""
-    return math.exp(-0.5 * z * z) / math.sqrt(2 * math.pi)
-
-
-def normal_cdf(z: float) -> float:
-    """Standard normal distribution function."""
-    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
-
-
-def conditional_move_loss(close: float, target: float, lo80: float, hi80: float) -> tuple[float, float]:
-    """(move, loss) in % of C: E[X/C - 1 | X > C] and E[1 - X/C | X < C] for X ~ N(target, sigma)."""
-    sigma = (float(hi80) - float(lo80)) / (2 * Z80)
-    if sigma <= 0:
-        gap = (float(target) / close - 1) * PERCENT
-        return max(gap, 0.0), max(-gap, 0.0)
-    z = (close - float(target)) / sigma
-    above, below = 1 - normal_cdf(z), normal_cdf(z)
-    upside = (float(target) - close) * above + sigma * normal_pdf(z)     # E[(X - C)+]
-    downside = (close - float(target)) * below + sigma * normal_pdf(z)   # E[(C - X)+]
-    move = upside / above / close * PERCENT if above > 0 else 0.0
-    loss = downside / below / close * PERCENT if below > 0 else 0.0
-    return move, loss
 
 
 def costs_pct(market: str, rate: dict, amount: float, close: float, eurusd: float | None) -> float:
@@ -74,7 +48,7 @@ def candidate(pred: dict, market: str, rate: dict, eurusd: float | None) -> dict
         return None
     move, loss = conditional_move_loss(close, pred["target_price"], pred["lo80"], pred["hi80"])
     cost = costs_pct(market, rate, float(pred["amount"]), close, eurusd)
-    gain = prob * move - (1 - prob) * loss - cost
+    gain = expected_gain_pct(prob, move, loss, cost)
     return {"horizon_days": int(pred["horizon_days"]), "prediction_id": pred["id"], "prob_up": prob,
             "move_pct": round(move, PCT_DIGITS), "loss_pct": round(loss, PCT_DIGITS),
             "costs_pct": round(cost, PCT_DIGITS), "expected_gain_pct": round(gain, PCT_DIGITS),
@@ -83,12 +57,12 @@ def candidate(pred: dict, market: str, rate: dict, eurusd: float | None) -> dict
 
 
 def cost_flags(pred: dict, rate: dict, eurusd: float | None) -> dict:
-    """expected_move_pct, your_cost_pct and cost_viable of decision 51 (lab/cost_views.py)."""
+    """expected_move_pct, your_cost_pct, expected_gain_your_pct and cost_viable (lab/cost_views.py: viable = the
+    expected gain after your cost > 0)."""
     found = viability(pred, rate, eurusd)
-    return {"expected_move_pct": None if found["expected_move_pct"] is None else round(found["expected_move_pct"],
-                                                                                       PCT_DIGITS),
-            "your_cost_pct": None if found["your_cost_pct"] is None else round(found["your_cost_pct"], PCT_DIGITS),
-            "cost_viable": found["cost_viable"]}
+    out = {key: None if found[key] is None else round(found[key], PCT_DIGITS)
+           for key in ("expected_move_pct", "your_cost_pct", "expected_gain_your_pct")}
+    return {**out, "cost_viable": found["cost_viable"]}
 
 
 def pick(candidates: list[dict], rule: str) -> dict | None:

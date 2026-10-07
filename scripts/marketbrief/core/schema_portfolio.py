@@ -15,6 +15,9 @@ PORTFOLIO_SCHEMAS: Schemas = {
         "id": "VARCHAR", "market": "VARCHAR", "ticker": "VARCHAR", "side": "VARCHAR", "quantity": "DOUBLE",
         "price": "DOUBLE", "price_basis": "VARCHAR", "trade_date": "DATE", "source": "VARCHAR",
         "idempotency_key": "VARCHAR", "entered_at": "TIMESTAMPTZ", "note": "VARCHAR", "supersedes": "VARCHAR",
+        # issue #112: the channel identity that asked (inbox `submitted_by`, e.g. slack:U07ABCD123; null from the
+        # CLI) and the web tier's command id of the inbox row (as watchlist_events.command_id)
+        "submitted_by": "VARCHAR", "command_id": "VARCHAR",
     }),
     # A request to add a company to the watchlist (status requested). Adding it to config/markets/<market>.yaml
     # stays a human or reviewed change; this row is only the request.

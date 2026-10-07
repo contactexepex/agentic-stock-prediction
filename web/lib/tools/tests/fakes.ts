@@ -142,6 +142,9 @@ export class FakeSlack implements SlackApi {
   opened: { triggerId: string; view: any }[] = [];
   updated: { viewId: string; view: any }[] = [];
   responses: { url: string; body: any }[] = [];
+  posts: { channel: string; text: string; ts: string }[] = [];
+  edits: { channel: string; ts: string; text: string }[] = [];
+  postFails = false;
   async viewsOpen(triggerId: string, view: unknown) {
     this.opened.push({ triggerId, view });
     return true;
@@ -152,6 +155,16 @@ export class FakeSlack implements SlackApi {
   }
   async respond(url: string, body: unknown) {
     this.responses.push({ url, body });
+    return true;
+  }
+  async postMessage(channel: string, text: string) {
+    if (this.postFails) return null;
+    const ts = `1791400000.${String(this.posts.length + 1).padStart(6, "0")}`;
+    this.posts.push({ channel, text, ts });
+    return ts;
+  }
+  async updateMessage(channel: string, ts: string, text: string) {
+    this.edits.push({ channel, ts, text });
     return true;
   }
 }

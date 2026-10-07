@@ -12,7 +12,7 @@ from marketbrief.alerts.ledger import Ledger
 
 
 def correction_text(row: dict, names: dict, currency: str) -> str:
-    """'Correction: NVDA N+1, Model + news (rule.model_news.v1) (accuracy) is now net +$3.10 (+0.31%), was +$4.60
+    """'Correction: NVDA N+1, Model + news (rule.model_news.v1), accuracy view is now net +$3.10 (+0.31%), was +$4.60
     (+0.46%); re-settled 2026-10-02T03:00:00+00:00 (flags: split_in_window, resettled). [Paper]'."""
     flags = f" (flags: {', '.join(row['flags'])})" if row.get("flags") else ""
     now_text = (f"net {fmt.signed_money(currency, row.get('net_pnl'))} ({fmt.pct(row.get('return_pct'))})"

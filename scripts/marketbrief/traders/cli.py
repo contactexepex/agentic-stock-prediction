@@ -10,8 +10,7 @@ Pre-open (F4; one call per trader, in parallel):
   add      --strategy ID FILE --attempt N   store what passed; attempt 1 with errors stores nothing (exit 1),
                                          attempt 2 stores the valid predictions and abstentions for the rest;
                                          kill switch off -> `killed`, past the deadline -> `timeout` for everyone
-Post-close (F6.1):
-  settle                                 settle every due paper trade through session B2's engine
+Post-close (F6.1; settle first with session B2's engine: `python scripts/lab.py --market <m> settle`):
   eod-prepare [--session D]              work/eod_facts.json: the day's results and the trades to explain
   eod-validate FILE [--session D]        gate the analyst's file
   eod-add FILE [--session D] [--valid-only]   store reasons and the day's analysis
@@ -35,7 +34,6 @@ from marketbrief.traders import director, director_facts, director_report, eod, 
 from marketbrief.traders.inputs import InputsUnavailableError, load_inputs
 from marketbrief.traders.registry import load_traders, trader, trader_problems
 from marketbrief.traders.run import file_stamp, gate_lines, read_lines, timed_out
-from marketbrief.traders.settle_step import EngineUnavailableError, settle_due
 
 WORK = Path("work")
 
@@ -45,7 +43,6 @@ def parser():
     root = market_arg(__doc__)
     sub = root.add_subparsers(dest="cmd", required=True)
     sub.add_parser("check")
-    sub.add_parser("settle")
     for name in ("prepare", "validate", "add"):
         one = sub.add_parser(name)
         one.add_argument("--strategy", required=True)
@@ -164,13 +161,6 @@ def main(argv: list[str] | None = None) -> int:
                                                                 "file": t.agent_file.name}
                                                             for k, t in traders.items()},
                      "problems": problems}, 1 if problems else 0)
-    if args.cmd == "settle":
-        now = clock()
-        try:
-            summary = settle_due(cfg, connect(cfg["market"]), last_complete_session(cfg, now), now)
-        except EngineUnavailableError as error:
-            return emit({"step": "traders.settle", "market": cfg["market"], "error": str(error)}, 2)
-        return emit({"step": "traders.settle", "market": cfg["market"], **summary})
     if args.cmd.startswith("eod-"):
         return eod_command(args, cfg)
     if args.cmd.startswith("director-"):

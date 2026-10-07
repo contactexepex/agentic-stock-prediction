@@ -32,8 +32,13 @@ and right after it is stored. Save every step's JSON summary under `work/steps/`
    writes `reports/<market>/research-<iso_week>.md` and appends the `research_reviews` row with every proposal as
    `proposed`. A week already stored is refused. Delete `work/research_review.json`.
 
-6. Save: `git add data reports && git commit -m "<market> weekly research <iso_week>"`, then
-   `git push origin HEAD:main`; if the push is rejected, `git pull --rebase origin main` and push again.
+6. Weekly post (session B6, docs/ws/b6.md): `python scripts/alerts.py weekly > work/steps/alerts_weekly.json` posts
+   the week's research report as its own #market-brief post. Exit 2 (no Slack token or webhook) or exit 1: note it
+   and go on; never retry by hand.
 
-7. Optional, never blocking (wired in Wave 5): the warehouse sync and session B6's weekly Slack post. Until then,
-   end with a short message: the leaders, the number of findings and proposals, and the report path.
+7. Save: `git add data reports && git commit -m "<market> weekly research <iso_week>"` (this includes
+   `data/<market>/slack_posts`), then `git push origin HEAD:main`; if the push is rejected,
+   `git pull --rebase origin main` and push again.
+
+8. Optional, never blocking (wired in Wave 5): the warehouse sync. End with a short message: the leaders, the number
+   of findings and proposals, the report path and the Slack result.

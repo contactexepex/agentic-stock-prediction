@@ -4,7 +4,12 @@ pick that would trade, as `cost_views` rows (core/schema_b2.py). Costs from lab/
 - prediction / pick (pre-open): the round trip of the company's amount bought and sold at the reference price
   C = base_close (India whole shares at C; none affordable: no cost, not viable), the US order fee at the EUR/USD
   close on or before D, the portfolio fee over the calendar days from D to the planned exit.
-  expected_move_pct = (target / C - 1) x 100; cost_viable = expected_move_pct > your_cost_pct.
+  expected_move_pct = (target / C - 1) x 100. Viable (owner decision of 2026-10-07, made in session B6 for every
+  session; it replaces decision 51's "move > cost"): the expected gain after your cost is above 0,
+      expected_gain_your_pct = p x move - (1 - p) x loss - your_cost_pct > 0,
+  with the prediction's prob_up and the same move and loss as the head-to-head picks (lab/gain.py: the conditional
+  rise and shortfall from its own 80% range). A prediction without a probability or a range (always-up, momentum)
+  has no expected gain: cost_viable null.
 - settlement (post-close): the settled trade's entry and exit values, both views; net and return per view."""
 from __future__ import annotations
 
@@ -14,6 +19,7 @@ from marketbrief.constants.kinds import KIND_COST_VIEWS
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.constants import ENGINE_VERSION, MONEY_DIGITS, PCT_DIGITS, PERCENT, STATUS_SETTLED
+from marketbrief.lab.gain import conditional_move_loss, expected_gain_pct
 from marketbrief.lab.market_data import MarketData
 from marketbrief.lab.settle import as_date
 from marketbrief.lab.sizing import quantity
@@ -40,23 +46,34 @@ def base_row(record_kind: str, record_id: str, pred: dict, computed_at: datetime
     return row
 
 
+def gain_after_your_cost(pred: dict, your_pct: float) -> float | None:
+    """p x move - (1 - p) x loss - your cost in % (lab/gain.py), or None without a probability or a range."""
+    if None in (pred.get("prob_up"), pred.get("target_price"), pred.get("lo80"), pred.get("hi80")):
+        return None
+    move, loss = conditional_move_loss(float(pred["base_close"]), pred["target_price"], pred["lo80"], pred["hi80"])
+    return expected_gain_pct(float(pred["prob_up"]), move, loss, your_pct)
+
+
 def viability(pred: dict, rate: dict, eurusd: float | None) -> dict:
-    """{expected_move_pct, market_cost_pct, your_cost_pct, cost_viable, views, holding_days} at C."""
+    """{expected_move_pct, market_cost_pct, your_cost_pct, expected_gain_your_pct, cost_viable, views,
+    holding_days} at C."""
     close, amount = float(pred["base_close"]), float(pred["amount"])
     target = pred.get("target_price")
     move = None if target is None else (float(target) / close - 1) * PERCENT
     days = holding_days(pred["session_date"], pred["exit_date"])
     shares = quantity(pred["market"], amount, close)
     if shares <= 0:
-        return {"expected_move_pct": move, "market_cost_pct": None, "your_cost_pct": None, "cost_viable": False,
-                "views": None, "holding_days": days}
+        return {"expected_move_pct": move, "market_cost_pct": None, "your_cost_pct": None,
+                "expected_gain_your_pct": None, "cost_viable": False, "views": None, "holding_days": days}
     value = shares * close
     views = lab_costs.cost_views(pred["market"], rate, (value, value), shares,
                                  {"eurusd": (eurusd, eurusd), "holding_days": days})
     market_pct = views["market"]["total"] / amount * PERCENT
     your_pct = views["your"]["total"] / amount * PERCENT
+    gain = gain_after_your_cost(pred, your_pct)
     return {"expected_move_pct": move, "market_cost_pct": market_pct, "your_cost_pct": your_pct,
-            "cost_viable": bool(move is not None and move > your_pct), "views": views, "holding_days": days}
+            "expected_gain_your_pct": gain, "cost_viable": None if gain is None else bool(gain > 0), "views": views,
+            "holding_days": days}
 
 
 def viability_row(record_kind: str, record_id: str, pred: dict, rate: dict, eurusd: float | None,
@@ -70,7 +87,7 @@ def viability_row(record_kind: str, record_id: str, pred: dict, rate: dict, euru
                market_costs=market.get("total"), market_cost_lines=market.get("lines"),
                your_costs=your.get("total"), your_cost_lines=your.get("lines"),
                **{key: None if found[key] is None else round(found[key], PCT_DIGITS)
-                  for key in ("expected_move_pct", "market_cost_pct", "your_cost_pct")})
+                  for key in ("expected_move_pct", "market_cost_pct", "your_cost_pct", "expected_gain_your_pct")})
     return row
 
 
