@@ -72,14 +72,16 @@ def trade_input(row: dict, args: dict) -> TradeInput:
 
 
 def not_yet(ctx: Context, entry: TradeInput) -> list[str]:
-    """Why a trade cannot be validated YET (its date is after the clock's date, or its session bar is not stored
-    by the clock); [] when it can. Such a request is logged `failed` and tried again by the next import."""
+    """Why a trade cannot be validated YET; [] when it can. Yet = its date is after the clock's date, or its
+    session's bar can still arrive: no bar of the ticker is stored by the clock for that session or any later one
+    (the collector stores sessions in order). Such a request is logged `failed` and tried again by the next import;
+    a past session with no bar while later bars exist (a data gap) is not retried: add_trade refuses it."""
     if entry.trade_date > ctx.clock.date():
         return [ERR_NOT_YET.format(day=entry.trade_date, today=ctx.clock.date())]
-    if is_session(ctx.cfg, entry.trade_date) and reads.bar_on(ctx.con, ctx.cfg, ctx.clock, entry.ticker,
-                                                             entry.trade_date) is None:
-        return [ERR_NO_BAR_YET.format(ticker=entry.ticker, day=entry.trade_date)]
-    return []
+    if not is_session(ctx.cfg, entry.trade_date):
+        return []
+    bars = reads.stored_bars(ctx.con, ctx.cfg, ctx.clock, [entry.ticker], entry.trade_date)
+    return [] if len(bars) else [ERR_NO_BAR_YET.format(ticker=entry.ticker, day=entry.trade_date)]
 
 
 def log_request(ctx: Context, row: dict, args: dict, outcome: dict) -> str:

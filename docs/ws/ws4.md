@@ -377,9 +377,13 @@ The web tier (B5) writes the owner's paper trades from Slack `/trade`, the Claud
   - a key already used by a stored trade: `duplicate`.
 - **Logging:** every imported row gets one `command_log` row (B1's format and helper): accepted, refused,
   duplicate or failed.
-- **Not decidable yet:** a request whose trade date is after the clock's date, or whose session bar is not stored
-  yet (e.g. a "today at the close" trade sent before the close), is logged `failed`. B1's design retries `failed`
-  rows, so the next import stores or refuses it.
+- **Not decidable yet:** some requests are logged `failed`, and B1's design retries `failed` rows, so the next
+  import stores or refuses them:
+  - a trade date after the clock's date;
+  - a session bar that can still arrive: no bar of the ticker is stored for that session or any later one, e.g. a
+    "today at the close" trade sent before the close.
+  - The retry is bounded: once a later bar is stored, a session still without a bar (a data gap, or a date before
+    the stored history) is refused (`validation_failed`, "no stored bar") and never retried.
 - **As of the clock:** only rows `submitted_at` by the run's clock (MB_NOW-aware) are read.
 - **Idempotent:** an `inbox_id` that a `command_log` row already settled is skipped, so a rerun imports nothing
   twice. A `failed` row is tried again. The inbox is never written.
@@ -388,6 +392,8 @@ The web tier (B5) writes the owner's paper trades from Slack `/trade`, the Claud
 - **Tests:** `tests/test_portfolio_inbox.py`, on an inbox built from `mcp/inbox.sql`. It covers accepted, refused,
   duplicate, other markets, the clock, the retry of a trade whose bar comes later, a sell larger than held, manual
   prices inside and outside the bar, and a non-number quantity.
+- **Judge round 2:** FAIL (f83bb42). The retry had no bound; a date with no bar ever coming was retried forever.
+  Fixed in round 3: retry only while the bar can still arrive.
 - **Judge round 1:** FAIL (994ae50). Two blockers: the inbox was read without the clock, and a same-day trade was
   refused for good. Both are fixed in round 2. The cosmetic findings not fixed are in GitHub issue #119
   (label `cosmetic`).

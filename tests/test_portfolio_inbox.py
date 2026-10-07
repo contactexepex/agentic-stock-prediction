@@ -94,10 +94,14 @@ def test_import_reads_as_of_the_clock_and_retries_trades_not_decidable_yet(root,
     late = request("inbox-late-0001", TRADE)
     late = (*late[:10], "2026-10-09T10:00:00Z", late[11])                        # submitted after the clock
     make_inbox(inbox, [late, request("inbox-today-0002", {**TRADE, "trade_date": "2026-10-07"}),
-                       request("inbox-future-0003", {**TRADE, "trade_date": "2026-10-08"})])
+                       request("inbox-future-0003", {**TRADE, "trade_date": "2026-10-08"}),
+                       request("inbox-old-0004", {**TRADE, "trade_date": "2026-09-01"})])   # before any stored bar
     code, first, _ = run_cli(["--market", "us", "import-inbox", "--inbox", str(inbox)])
     by_id = {row["inbox_id"]: row for row in first["results"]}
-    assert code == 0 and set(by_id) == {"inbox-today-0002", "inbox-future-0003"}      # not the later row
+    assert code == 0 and set(by_id) == {"inbox-today-0002", "inbox-future-0003", "inbox-old-0004"}   # not the late row
+    # an old session whose bar can never arrive (later bars are stored): refused at once, never retried
+    assert by_id["inbox-old-0004"]["refusal_code"] == "validation_failed"
+    assert "no stored bar" in by_id["inbox-old-0004"]["errors"][0]
     assert by_id["inbox-today-0002"]["result"] == "failed" and "tried again" in by_id["inbox-today-0002"]["errors"][0]
     assert by_id["inbox-future-0003"]["result"] == "failed"
     # the next run, after the 7 Oct bar is collected (clock 8 Oct 12:00Z): the same request is now stored
@@ -108,6 +112,7 @@ def test_import_reads_as_of_the_clock_and_retries_trades_not_decidable_yet(root,
     assert results["inbox-today-0002"]["result"] == "accepted"
     assert results["inbox-future-0003"]["result"] == "failed"                     # the 8 Oct bar is not stored yet
     assert "inbox-late-0001" not in results                                        # still after the clock
+    assert "inbox-old-0004" not in results                                         # settled: not tried again
 
 
 def test_import_applies_add_trade_checks(root):
