@@ -4,20 +4,22 @@ For each of the last paper_follow.lookback_sessions as-of dates with model score
 newest computed before the open of D (D = the first session after the as-of date), the candidates are picked as
 signals.candidates picks them (the farthest model_prob from 0.5, tiers.max_candidates, minus BLOCKED quality or
 earnings within earnings_block_days by the feature row of that as-of date computed before the open of D). Each is
-simulated open-to-close (model/labels.py offsets): entry at the open of D, exit at the close of D+1 (1d) or D+4
-(5d), prices on today's split basis, the round-trip cost of config/costs.yaml at the entry open. Up candidates are
-simulated long (net = return - cost); down candidates as "sell if held" (avoided = -return, net of a round trip),
+simulated open-to-close: entry at the open of D, exit at the close of the k-th session after D (N+k, decision
+37; a legacy 5-day score without horizon_label: D+4), prices on today's split basis, the round-trip cost of
+config/costs.yaml at the entry open. Up candidates are simulated long (net = return - cost); down candidates as
+"sell if held" (avoided = -return, net of a round trip),
 reported apart, never pooled. A candidate whose exit bar is not stored by the clock is pending, not scored."""
 from __future__ import annotations
 
 import pandas as pd
 
 from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
-from marketbrief.core.calendar import next_session, session_open_utc, sessions_ahead
-from marketbrief.model.labels import end_offset
+from marketbrief.core.calendar import next_session, session_open_utc
+from marketbrief.lab.timing import exit_session, sessions_after_d
 from marketbrief.model.settings import round_trip_cost
 from marketbrief.portfolio import reads
 from marketbrief.portfolio.constants import SIMULATED_LABEL
+from marketbrief.portfolio.horizons import label_sql
 from marketbrief.portfolio.signals import blocked_reason
 
 PERCENT = 100.0
@@ -26,7 +28,8 @@ PERCENT = 100.0
 def scores_before_open(con, cfg: dict, clock) -> tuple[pd.DataFrame, int]:
     """(per id, the newest score computed before the open of its D and by the clock; the number of ids whose
     every score came at or after that open, left out)."""
-    frame = con.execute("SELECT id, as_of_date, ticker, horizon_days, prob_up, computed_at FROM model_scores "
+    frame = con.execute(f"SELECT id, as_of_date, ticker, horizon_days, {label_sql(con, 'model_scores')}, prob_up, "
+                        "computed_at FROM model_scores "
                         "WHERE computed_at <= ? ORDER BY id, computed_at DESC, prob_up", [clock]).df()
     if frame.empty:
         return frame, 0
@@ -79,9 +82,12 @@ def simulate(con, cfg: dict, clock, market: str, settings: dict, costs: dict) ->
 
 
 def position(row: dict, cfg: dict, bar_index: dict, adjust, market: str, costs: dict) -> dict:
-    """One simulated position: entry open of D, exit close of D+1 or D+4 (None while pending)."""
-    days = sessions_ahead(cfg, next_session(cfg, row["as_of_date"], include=False),
-                          end_offset(LABEL_OPEN_TO_CLOSE, int(row["horizon_days"])))
+    """One simulated position: entry open of D, exit close of the k-th session after D for N+k (a legacy 5-day
+    score without horizon_label: D+4); None while pending."""
+    entry_day = next_session(cfg, row["as_of_date"], include=False)
+    label = row.get("horizon_label")
+    days = [entry_day, exit_session(cfg, entry_day, sessions_after_d(int(row["horizon_days"]),
+                                                                     None if pd.isna(label) else label))]
     entry, exit_ = bar_index.get((row["ticker"], days[0])), bar_index.get((row["ticker"], days[-1]))
     side = "up" if row["prob_up"] > 0.5 else "down"
     out = {"id": row["id"], "ticker": row["ticker"], "horizon_days": int(row["horizon_days"]), "direction": side,

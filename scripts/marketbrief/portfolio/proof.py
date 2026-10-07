@@ -13,8 +13,8 @@ import pandas as pd
 
 from marketbrief.analytics.scoring import wilson
 from marketbrief.portfolio.constants import PROOF_NOT_PROVEN, PROOF_PROVEN
+from marketbrief.portfolio.horizons import horizons, is_n_plus_k, label_sql
 
-HORIZONS = (1, 5)
 RULE_TEXT = ("proven = weekly review model_skill true{skill} and, per horizon and confidence band, >= {min_count} "
              "scored {basis} calls with Wilson 95% low >= {min_wilson_low}")
 
@@ -27,13 +27,19 @@ def latest_review(con, clock: datetime) -> dict | None:
 
 
 def scored_calls(con, clock: datetime, basis: str) -> pd.DataFrame:
-    """Calls made by the clock with their first outcome scored by the clock, on `basis` only."""
-    return con.execute(
-        "SELECT p.id, p.horizon_days, p.confidence, o.hit FROM "
+    """Calls made by the clock with their first outcome scored by the clock, on `basis` only, that measure N+k
+    (portfolio/horizons.py: the legacy 5-day calls are never pooled with N+5)."""
+    frame = con.execute(
+        f"SELECT p.id, p.horizon_days, {label_sql(con, 'predictions', 'p.')}, p.confidence, o.hit FROM "
         "(SELECT DISTINCT ON (id) * FROM predictions WHERE made_at <= ? ORDER BY id, made_at) p JOIN "
         "(SELECT DISTINCT ON (prediction_id) * FROM outcomes WHERE scored_at <= ? ORDER BY prediction_id, scored_at) o "
         "ON o.prediction_id = p.id WHERE coalesce(o.label_basis, 'close_to_close') = ? AND o.hit IS NOT NULL "
         "ORDER BY p.id", [clock, clock, basis]).df()
+    if frame.empty:
+        return frame
+    keep = [is_n_plus_k(h, None if pd.isna(label) else label)
+            for h, label in zip(frame["horizon_days"], frame["horizon_label"])]
+    return frame[keep].reset_index(drop=True)
 
 
 def band_of(confidence: float | None, edges: list[float]) -> str | None:
@@ -58,7 +64,7 @@ def proof_status(con, clock: datetime, settings: dict) -> dict:
         calls["band"] = [band_of(c, rules["bands"]) for c in calls["confidence"]]
     cells = []
     edges = rules["bands"]
-    for horizon in HORIZONS:
+    for horizon in horizons():
         for low, high in zip(edges[:-1], edges[1:]):
             band = f"{low:.1f}-{high:.1f}"
             rows = calls[(calls["horizon_days"] == horizon) & (calls["band"] == band)] if not calls.empty else calls
