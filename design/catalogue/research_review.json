@@ -50,6 +50,52 @@
       "report_path": "reports/us/research-2026-W41.md",
       "prompt_version": "director-v1",
       "written_at": "2026-10-10T14:20:00Z"
+    },
+    {
+      "id": "rr-india-2026-W41",
+      "market": "india",
+      "iso_week": "2026-W41",
+      "period_start": "2026-10-05",
+      "period_end": "2026-10-09",
+      "leaders": [
+        {
+          "scope": "rule",
+          "strategy_id": "rule.model_news.v1",
+          "net_pnl": -9309.36,
+          "trades": 6
+        },
+        {
+          "scope": "ai",
+          "strategy_id": "ai.combined.opus.v1",
+          "net_pnl": -4783.58,
+          "trades": 4
+        }
+      ],
+      "findings": [
+        {
+          "text": "Both India leaders lost after market costs (rule.model_news.v1 -9,309.36 INR on 6 trades, ai.combined.opus.v1 -4,783.58 INR on 4); at your cost the losses are -11,949.07 and -6,543.96 INR.",
+          "cited_ids": [
+            "rule.model_news.v1",
+            "ai.combined.opus.v1"
+          ]
+        }
+      ],
+      "proposals": [
+        {
+          "proposal_id": "p-india-2026-W41-1",
+          "kind": "new_strategy_version",
+          "file": "config/strategies.yaml",
+          "diff": "+  - id: rule.model_news_n5.v1\n+    horizons: [5]",
+          "rationale": "Costs are paid once per trade; holding to N+5 spreads them over more sessions.",
+          "cited_ids": [
+            "rule.model_news.v1"
+          ],
+          "status": "proposed"
+        }
+      ],
+      "report_path": "reports/india/research-2026-W41.md",
+      "prompt_version": "director-v1",
+      "written_at": "2026-10-10T04:50:00Z"
     }
   ]
 }

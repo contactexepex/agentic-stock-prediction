@@ -125,6 +125,9 @@ def comparison_problems(spec: dict, by_id: dict) -> list[str]:
         return [f"{sid}: compares to an unknown strategy"]
     params = spec["parameters"]
     diff = {key for key in params if params[key] != other["parameters"].get(key)}
+    # The threshold counts as a parameter only when both sides have one. A signal without a probability
+    # (always_up, momentum) has no threshold by construction (checked in parameter_problems), so its null
+    # threshold is part of its `signal` difference, not a second one.
     if spec["threshold"] is not None and other["threshold"] is not None and spec["threshold"] != other["threshold"]:
         diff.add("threshold")
     if diff != {spec["differs_in"]}:
