@@ -69,9 +69,15 @@ def setup(tmp: Path) -> tuple[Path, Path]:
 
 
 def weekdays(start: date, n: int) -> list[date]:
+    """n market sessions from `start`: weekdays that are no NYSE holiday (the test market's calendar), because the
+    price views leave out bars on days the exchange is closed (issue #40)."""
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    from marketbrief.core.calendar import is_session
+
     days, d = [], start
     while len(days) < n:
-        if d.weekday() < 5:
+        if is_session({"calendar": "XNYS"}, d):
             days.append(d)
         d += timedelta(days=1)
     return days
@@ -179,7 +185,12 @@ def test_features_regime_and_context(tmp_path):
     a = feats["AAPL"]
     assert a["bars"] == len(days) and a["quality"] == "OK"
     assert 0 <= a["rsi_14"] <= 100 and a["atr_pct"] > 0 and a["beta_1y"] is not None
-    assert a["days_to_earnings"] is not None and a["days_to_earnings"] <= 3
+    # features count from the next session of the exchange-local today (the test uses the UTC date for `soon`)
+    from zoneinfo import ZoneInfo
+
+    from marketbrief.core.calendar import next_session
+    local_today = datetime.now(ZoneInfo("America/New_York")).date()
+    assert a["days_to_earnings"] == (soon - next_session({"calendar": "XNYS"}, local_today)).days
     assert feats["MSFT"]["ret_1d"] == 0.0
     assert abs(feats["MSFT"]["rel_sector_5d"] + a["rel_sector_5d"]) < 1e-9   # mirror images
 

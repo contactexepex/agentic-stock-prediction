@@ -13,7 +13,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `scripts/` deterministic Python. Every script takes `--market india|us` (or `MB_MARKET`).
   Collectors: `collect_prices` (India: a watchlist bar Yahoo lacks for a recent session comes
   from NSE's bhavcopy when its price basis checks out, listed in `filled_from_nse` and recorded in
-  `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config; both markets:
+  `data/india/price_sources/`, view `bar_sources`; `price_fallback` in the market config; both markets: bars on days that are no
+  session of the market calendar and flat zero-volume stock bars are not stored (summary `dropped_non_session`), stored holiday rows are
+  left out on read by the `ohlc_raw` view (`own_closed_days`, built by `connect`); both markets:
   a split or bonus confirmed by a Yahoo `Stock Splits` row, or for India by NSE's bhavcopy, is recorded
   once in `data/<market>/adjustments/` (`marketbrief/analytics/price_adjustments.py`) and applied on read by the `ohlc`/`bars`
   views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-base is a `warnings` entry and holds
