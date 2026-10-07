@@ -354,3 +354,56 @@ Open:
    brief says.
 5. **Horizon on trades.** Default: not stored. Positions have no planned exit; the paper-follow simulation uses
    the D+1 / D+4 convention.
+
+## Issue #112: the paper-trade inbox import (2026-10-07, built in session B2 as the WS4 owner)
+The web tier (B5) writes the owner's paper trades from Slack `/trade`, the Claude app and the dashboard to
+`market_brief_inbox.inbox.requests` (`tool = add_paper_trade`; schema `mcp/inbox.sql`). The importer stores them.
+
+- **Command:** `python scripts/portfolio.py --market india|us import-inbox [--inbox FILE]`. Without `--inbox`, it
+  reads MotherDuck with `MOTHERDUCK_INBOX_TOKEN` only, through B1's `lifecycle/inbox.open_inbox`, read-only. The
+  code is in `marketbrief/portfolio/inbox_import.py`.
+- **Validation:** each pending row runs through `service.add_trade`, the same checks as `add-trade`:
+  - the ticker is an active watchlist company;
+  - the trade date is a session and not in the future;
+  - the price basis matches a stored bar, or a manual price lies inside the bar's low-high;
+  - the idempotency key is unused (the key is the row's `inbox_id`);
+  - the sell is no larger than the quantity held.
+- **Identity:** `source` is the row's `channel`; `config/portfolio.yaml` `trades.sources` gains `dashboard` and
+  `claude_app`. `submitted_by` is the row's identity and `command_id` is the web tier's command id; both are new
+  columns of `portfolio_trades`, null for CLI trades. Nothing is taken from the arguments.
+- **Refusals:**
+  - a channel other than dashboard, slack, claude_code or claude_app: `not_allowed_in_channel`;
+  - missing fields or a failed check: `validation_failed`;
+  - a key already used by a stored trade: `duplicate`.
+- **Logging:** every imported row gets one `command_log` row (B1's format and helper): accepted, refused,
+  duplicate or failed.
+- **Not decidable yet:** some requests are logged `failed`, and B1's design retries `failed` rows, so the next
+  import stores or refuses them:
+  - a trade date after the clock's date;
+  - a session bar that can still arrive: no bar of the ticker is stored for that session or any later one, e.g. a
+    "today at the close" trade sent before the close.
+  - The retry is bounded: once a later bar is stored, a session still without a bar (a data gap, or a date before
+    the stored history) is refused (`validation_failed`, "no stored bar") and never retried.
+- **As of the clock:** only rows `submitted_at` by the run's clock (MB_NOW-aware) are read.
+- **Idempotent:** an `inbox_id` that a `command_log` row already settled is skipped, so a rerun imports nothing
+  twice. A `failed` row is tried again. The inbox is never written.
+- **Numbers as sent:** quantity and price go to `add_trade` unconverted, so its number checks apply (e.g.
+  `quantity: true` is refused).
+- **Tests:** `tests/test_portfolio_inbox.py`, on an inbox built from `mcp/inbox.sql`. It covers accepted, refused,
+  duplicate, other markets, the clock, the retry of a trade whose bar comes later, a sell larger than held, manual
+  prices inside and outside the bar, and a non-number quantity.
+- **Judge round 2:** FAIL (f83bb42). The retry had no bound; a date with no bar ever coming was retried forever.
+  Fixed in round 3: retry only while the bar can still arrive.
+- **Judge round 1:** FAIL (994ae50). Two blockers: the inbox was read without the clock, and a same-day trade was
+  refused for good. Both are fixed in round 2. The cosmetic findings not fixed are in GitHub issue #119
+  (label `cosmetic`).
+
+Handed over to the owners (not built here):
+- **B1:** a step in `.github/workflows/onboard.yml` running
+  `python scripts/portfolio.py --market "$market" import-inbox`, beside `company.py import-inbox`.
+- **Orchestrator / Wave 5:** the same command in the routines (pre-open and post-close), after
+  `company.py import-inbox`.
+- **B5:**
+  - switch on the paper-trade dispatch in `web/lib/tools/executor.ts`;
+  - update the "NO IMPORTER YET" comment in `mcp/inbox.sql`;
+  - update the caller's "pending until the paper-trade import is built" text.
