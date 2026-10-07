@@ -67,6 +67,8 @@ def trade_pair(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None
     details.update(basis_factor=rounded(basis, 6), entry_adj=rounded(_times(entry_raw, entry_factor), 4),
                    target_adj=rounded(adj["target_price"], 4),
                    **{f"{key}_adj": rounded(adj[key], 4) for key in BAND_KEYS})
+    if trade.get("exit_delayed"):
+        details["notes"].append("exit_delayed")   # issue #93: past its exit date, no settlement row yet
     reached, high, low = _so_far(ctx, trade, quote if ok else None, adj["target_price"], details["notes"])
     details.update(target_reached=reached[0], target_reached_session=reached[1])
     if quality != QUALITY_OK:
@@ -75,7 +77,9 @@ def trade_pair(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None
     last = quote.last_price
     sessions_held = trade["session_number"] - 1 + elapsed
     min_left = ctx.settings["measures"]["min_elapsed_fraction"]
-    sessions_left = max(trade["exit_session_number"] - trade["session_number"] + 1 - elapsed, min_left)
+    # a delayed exit (#93) settles at the next stored close: the rest of today
+    exit_number = trade["session_number"] if trade.get("exit_delayed") else trade["exit_session_number"]
+    sessions_left = max(exit_number - trade["session_number"] + 1 - elapsed, min_left)
     ret = last / entry_adj - 1
     to_target = adj["target_price"] / last - 1 if adj["target_price"] else None
     band = band_position(last, {key: adj[key] for key in BAND_KEYS})
