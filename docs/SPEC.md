@@ -1,6 +1,6 @@
 # market-brief: product specification and parallel roadmap
 
-Status: approved by the owner (decisions 1-36, 2026-10-07). It records every decision the owner made in the
+Status: approved by the owner (decisions 1-48, 2026-10-07). It records every decision the owner made in the
 question rounds of 2026-10-07 and turns them into features, data, API, pages, integrations and a
 roadmap of waves that can be built in parallel cloud sessions. It builds on what is already merged
 (docs/DESIGN.md, docs/ARCHITECTURE.md, api/openapi.yaml, docs/ws/) and changes none of its rules unless
@@ -55,7 +55,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 29 | Intraday checks | Monitoring only (no trades). |
 | 30 | Home picks | Agreement ranking: companies ranked by how many strategies would buy them, then by average probability. Clicking a company opens a stock strategy page with the agreement ranking, the best strategy, and all strategies ranked by profit after costs. |
 | 31 | Pre-open run | Starts 30 minutes earlier: India 07:40 IST, US 07:45 New York time (schedules changed 2026-10-07). |
-| 32 | Frontend order | This spec is merged first; the owner's design sessions then design the pages (from W1's data catalogue, section 10); the frontend session builds from those designs. |
+| 32 | Frontend order | This spec is merged first; the owner's design sessions then update the page designs from it; the frontend stage builds from those designs. Refined by decision 48: the design track designs the pages from W1's data catalogue, and the API follows the approved mockups (section 10). |
 | 33 | Rule changes | Both approved: companies as validated data records (F8.1), and the prediction-rule changes for strategies (F2.6). |
 | 34 | Orchestrator defaults | Accepted: money-view budget ₹5,00,000 / $5,000 per strategy, at most 5 trades a day (this item superseded by decision 40); weekly research run Saturday 10:00 local; chat history kept 90 days; the Slack add form asks market, symbol and optional amount only. |
 | 35 | Help page | Kept as page 12. |
@@ -453,7 +453,8 @@ source refuses GitHub's runners (to be verified in session B1 for NSE, Yahoo and
 scheduled run imports the inbox. The inbox lives in its own MotherDuck database `market_brief_inbox`
 written by a separate service account (the Lite plan has 2), because MotherDuck tokens are not
 scoped per schema: a leaked inbox token cannot touch `market_brief`. This changes ARCHITECTURE.md
-sections 1, 2, 3, 8 and 9 (schema `inbox` inside `market_brief`); session B4 updates them. The importer
+sections 1, 2, 3, 8 and 9 (schema `inbox` inside `market_brief`); session B4 proposes the edits in
+`docs/ws/b4.md` and the orchestrator applies them. The importer
 (`onboard.yml` and the routine runs) reads the inbox with that account's token
 (`MOTHERDUCK_INBOX_TOKEN`, stored in the cloud environment and as a GitHub Actions secret). The UI shows the request as
 "pending" until the import is in `data/`.
@@ -516,7 +517,9 @@ Each is built by its feature's payload function and written by the warehouse syn
 Read and write endpoints under `/api/v1` (Next.js route handlers on Vercel). Existing contract
 (api/openapi.yaml 1.0): markets, status, overview, watchlist, stock, bars, track record, news, runs,
 portfolio, and the planned `company-requests`, `portfolio/paper-trades`, inbox and internal revalidate.
-Version 1.1 adds the rows below; its write endpoints replace the two planned 1.0 write endpoints
+Status of this section: intended endpoints, adjusted to the approved mockups in Wave 3 (session B4,
+section 10); the mockups' data files, not this list, are the final contract. Version 1.1 adds the
+rows below; its write endpoints replace the two planned 1.0 write endpoints
 (`company-requests`, `portfolio/paper-trades`), which were never built.
 
 | Method and path | Returns / does |
@@ -600,14 +603,15 @@ sessions; plus 1 weekly research run):
    works, else at the next run).
 4. The chat panel streams from `/api/assistant`; tool calls are shown as "looked at: ..." with links.
 5. Charts: the vendored Lightweight Charts with our bars, targets and ranges.
-6. Design: the Material 3 system and page designs from the owner's design sessions (on the design
-   branches; to be updated from this spec) are implemented as React components; the design builders'
-   JSON shapes are aligned to the read-model payloads.
+6. Design: the owner's design track designs the pages in `design/` from W1's data catalogue and
+   example data files (section 10); the API payloads (read models) are then built to match the approved
+   mockups' data files, and the frontend implements the mockups as React components on the Material 3
+   system.
 
 ## 9. Non-functional rules
 
 - All existing data, prediction, judging and safety rules hold, except the rule changes marked in
-  F2.6 and F8.1. Free sources only, HTTPS allowlist, nothing run from fetched content, secrets only in
+  F2.6, F8.1 and section 10 (the wave merge protocol). Free sources only, HTTPS allowlist, nothing run from fetched content, secrets only in
   environment variables, no email in requests.
 - Cost guards: MotherDuck Lite (10 CU hours a month, ARCHITECTURE.md section 5 kill switch), Claude
   subscription use (AI traders as subagents of the existing pre-open session; Sonnet except one Opus
@@ -627,23 +631,35 @@ list of W1), and works autonomously:
    collector or fetcher changed;
 2. runs the `judge` subagent on its own work and fixes blockers until PASS (CLAUDE.md "Judging every
    change");
-3. merges the latest `origin/main` into its branch, reruns the full suite, appends its verdicts to
-   `judgments/log.jsonl` (on a conflict in that file: keep every line from both sides, ordered by
-   `recorded_at`), and pushes to `main` itself (no pull request; on a push race: fetch, merge, retest,
-   push again);
+3. merges the latest `origin/main` into its branch and reruns the full suite; if the merge needed a
+   conflict resolution in anything but `judgments/log.jsonl`, the judge re-checks that resolution (its
+   diff only) before the push (CLAUDE.md: merge-conflict resolutions are judged); appends its verdicts
+   to `judgments/log.jsonl` (on a conflict in that file: keep main's lines exactly as they are and
+   append the branch's own lines after them, never re-sorting); and pushes to `main` itself (no pull
+   request; on a push race: fetch, merge, retest, and repeat this step);
 4. deletes its branch on GitHub after the push;
-5. writes the shared-doc edits it needs (CLAUDE.md, DESIGN.md, routine prompts) as proposals in
-   `docs/ws/<session>.md`; the orchestrator applies them in one judged batch per wave, so parallel
-   sessions never edit those files.
+5. writes the shared-doc edits it needs (CLAUDE.md, DESIGN.md, ARCHITECTURE.md, and existing routine
+   prompts it does not own) as proposals in `docs/ws/<session>.md`; the orchestrator applies them in one
+   judged batch per wave (the last batch in Wave 5), so parallel sessions never edit those files. A
+   routine prompt a session owns (e.g. B9's `routine/INTRADAY_PROMPT.md`, B3's new prompts) it edits
+   itself.
+
+**Rule change** (owner decision 48): until now the orchestrator merged build work to main and copied
+the sessions' `docs/ws/*-judgments.jsonl` lines into the log (docs/ws/README.md); from the waves on,
+each session appends its own verdicts and runs the post-merge full suite before pushing to main
+itself, as above. Everything else in CLAUDE.md "Judging every change" holds.
 
 The orchestrating session watches the waves on a timer (no owner attention needed), launches the next
-wave when its inputs have merged, resolves any merge clash, and reports only finished waves, blockers
+wave when its inputs have merged, resolves any merge clash a session cannot (with a judge re-check of
+the resolution before pushing), and reports only finished waves, blockers
 and decisions that are the owner's.
 
 The session ids below (B1-B10) are the ones used throughout this spec.
 
-**Wave 0 (running):** the news de-duplication fix (owner decisions 45-47 of 2026-10-07: same outlet
-under any label or host counts once; same link = one item plus headline history; once per market).
+**Wave 0:** the news de-duplication fix built in the orchestrating session (owner requirement of
+2026-10-07: never store the same news from the same source twice; decisions 45-47: same link = one
+item plus headline history, once per market, fix now). Recognising one outlet under several labels or
+hosts is the orchestrator's implementation of the owner's "same source" rule.
 
 **Wave 1: foundation (1 session; everything else starts from it).** "Catalogue and record formats":
 - the **data catalogue** (`docs/DATA_CATALOGUE.md`): every piece of information the system will hold,
@@ -684,11 +700,18 @@ track.**
 | B5 Tools and channels | the tool layer, the gateway mode (middleware), Slack commands, form and confirm step, `/mcp` with GitHub OAuth, inbox writes, workflow dispatch, injection suite | `web/lib/tools/`, `web/app/slack/`, `web/app/mcp/`, `web/middleware.ts`, `mcp/` except `tools.yaml`, the minimal `web/` project files (`package.json`, `tsconfig.json`, `next.config.*`) | W1 |
 | (owner) Design track | the owner with Fable designs the 12 pages in `design/` from the data catalogue and example files; a field the catalogue lacks is a "new data request" the owner approves and W1's catalogue then gains (by the orchestrator, judged) | `design/` except `design/catalogue/` | W1 |
 
+**`web/` project files.** B5 creates `web/package.json`, its lockfile, `tsconfig.json` and
+`next.config.*` in Wave 2. Later sessions (B4 in Wave 3; B7 and B8 in parallel in Wave 4) may only add
+dependency lines and their lockfile entries (additive, never changing or removing another session's);
+the lockfile is regenerated with the package manager, never edited by hand; a conflict in these files
+is resolved by keeping both sides' dependencies, regenerating the lockfile, and the judge re-check of
+step 3.
+
 Sessions that need another session's data (B2, B3, B6, B9) build and test against W1's example
 records; real data flows once all of Wave 2 has merged. B1 changes only the loader and the files W1
 assigns to it; every other reader of `cfg` tickers keeps working through the loader.
 `config/markets/<market>.yaml` `tickers:` and the ticker lists under `sectors:` stay until Wave 5
-removes them. Shared files keep the additive rules of waves 0-1 (one import + one spread line in
+removes them. Shared files keep the additive rules of the earlier WS waves 0-1 (docs/ws) (one import + one spread line in
 `core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks at the end). Optional, in parallel:
 a cleanup session for the older open GitHub issues and #59 (files not owned by another session).
 
@@ -705,7 +728,8 @@ a cleanup session for the older open GitHub issues and #59 (files not owned by a
 | B7 Frontend | the 12 pages from the approved mockups as the Next.js app on the live API (each mockup's example data file replaced by its endpoint) | `web/` except the paths owned by B4, B5 and B8 | B4 |
 | B8 Assistant | F11 chat panel and Slack `/ask` with the budget | `web/app/api/assistant/`, `web/lib/assistant/` | B4, B5 |
 
-**Wave 5: consolidation (1 session, last).** Apply the remaining proposed shared-doc edits, wire the
+**Wave 5: consolidation (1 session, last).** The orchestrator applies the remaining proposed
+shared-doc edits (judged); the session wires the
 new runs into the routine prompts, create the schedules (post-close, intraday, weekly research),
 update `CUTOFF_LOCAL` in `constants/ai_replay.py` to the new pre-open times, remove `tickers:` from the
 market configs, measure the pre-open run's duration, end-to-end run of both markets, then switch on
