@@ -53,8 +53,9 @@ class HorizonScore(TypedDict):
 
 class HorizonRange(TypedDict):
     """One `ranges` row per ticker x horizon x as-of date (id <as_of_date>-<ticker>-<k>d): the 50% and 80% bands
-    of the exit close (target_date = exit_date) around `center`, from base_close (the as-of close). A strategy's
-    target price defaults to `center`; its range may only be wider (range_widen 0-0.5)."""
+    of the exit close (target_date = exit_date) from base_close (the as-of close). `center` is a LOG SHIFT, not a
+    price: the band edges are base_close * exp(center + q * sigma_h), and the centre price, a strategy's default
+    target price, is base_close * exp(center). A strategy's range may only be wider (range_widen 0-0.5)."""
 
     id: str
     made_at: datetime
@@ -64,7 +65,7 @@ class HorizonRange(TypedDict):
     ticker: str
     horizon_days: int
     base_close: float
-    center: float
+    center: float             # log shift of the centre (price = base_close * exp(center))
     sigma_h: float
     lo50: float
     hi50: float
