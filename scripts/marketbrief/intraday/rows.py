@@ -64,6 +64,11 @@ class CheckContext:
     trade_checks: list = field(default_factory=list)  # B9: the trade_checks rows written by this check
     trade_details: list = field(default_factory=list)  # B9: their trade_check_details rows
     skipped_trades: list = field(default_factory=list)  # B9: trade ids skipped (India: a share above the amount)
+    unwatched: set = field(default_factory=set)       # B9: tickers with open trades but no ticker row (no check row)
+
+    def check_row(self, ticker: str) -> str | None:
+        """The ticker's intraday_checks row id, or None when no such row is written (not on the ticker list)."""
+        return None if ticker in self.unwatched else row_id(self.check_id, ticker)
 
     def range_horizons(self) -> set[int]:
         """Every horizon with a published range for this session (any ticker), or the configured ones when none
