@@ -5,7 +5,7 @@ traded."""
 from __future__ import annotations
 
 from marketbrief.alerts import text as fmt
-from marketbrief.alerts.constants import BAND_TEXT, FLAG_TEXT, MSG_FOOTER, PAPER
+from marketbrief.alerts.constants import BAND_TEXT, FLAG_TEXT, LABEL_PAPER_ONLY, MSG_FOOTER, PAPER
 
 NEWS_ALERT = "news"
 
@@ -54,7 +54,8 @@ def build_alerts(market: str, rows: list[dict], names: dict | None = None, curre
     currency = currency or fmt.MARKET_CURRENCY.get(market, "")
     lines = [f"*{fmt.market_label(market)} — intraday check at {check_time(flagged + news)}: "
              f"{len(flagged)} flagged open paper trade{'s' if len(flagged) != 1 else ''}"
-             f"{f', {len(news)} news alert' + ('s' if len(news) != 1 else '') if news else ''}* (monitoring only)"]
+             f"{f', {len(news)} news alert' + ('s' if len(news) != 1 else '') if news else ''}* (monitoring only)",
+             LABEL_PAPER_ONLY]
     for row in sorted(flagged, key=lambda r: (r["ticker"], r["horizon_days"], r["strategy_id"], r["view"])):
         lines.append(trade_alert_line(row, names, currency))
     for row in sorted(news, key=lambda r: (r["ticker"], str(r.get("news_id")))):

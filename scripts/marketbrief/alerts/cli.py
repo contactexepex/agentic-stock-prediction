@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sys
+from http.client import HTTPException
 from pathlib import Path
 
 import yaml
@@ -66,7 +67,7 @@ def display_names(cfg: dict) -> dict:
     names = {t: (v or {}).get("name", t) for t, v in (cfg.get("tickers") or {}).items()}
     registry = paths.CONFIG / STRATEGIES_FILE
     if registry.exists():
-        doc = yaml.safe_load(registry.read_text()) or {}
+        doc = yaml.safe_load(registry.read_text(encoding="utf-8")) or {}
         names.update({s["id"]: s.get("name", s["id"]) for s in doc.get("strategies") or []})
     return names
 
@@ -74,13 +75,13 @@ def display_names(cfg: dict) -> dict:
 def horizons() -> list[int]:
     """The horizon list of config/strategies.yaml (1-5 when it is missing)."""
     registry = paths.CONFIG / STRATEGIES_FILE
-    doc = yaml.safe_load(registry.read_text()) if registry.exists() else {}
+    doc = yaml.safe_load(registry.read_text(encoding="utf-8")) if registry.exists() else {}
     return [int(h) for h in (doc or {}).get("horizons") or [1, 2, 3, 4, 5]]
 
 
 def read_feed(path: str) -> list[dict]:
     """Alert records of a JSONL feed file."""
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def build(args, cfg: dict) -> Message | None:
@@ -104,7 +105,8 @@ def build(args, cfg: dict) -> Message | None:
         text = build_close(market, day, reads.settled_today(con, day, cfg["timezone"], now),
                            reads.eod_analysis(con, day, now), names, currency)
         return Message(POST_CLOSE, f"{POST_CLOSE}:{market}:{day}", text, thread)
-    rows = read_feed(args.feed) if args.feed else reads.latest_check(con, day, now, args.check_id)
+    rows = (reads.feed_asof(read_feed(args.feed), now) if args.feed
+            else reads.latest_check(con, day, now, args.check_id))
     text = build_alerts(market, rows, names, currency)
     if text is None:
         return None
@@ -119,7 +121,7 @@ def main(argv: list[str] | None = None, http=None) -> int:
     out: dict = {"step": "alerts", "post": args.post, "market": cfg["market"]}
     try:
         if args.post == "onboarding":
-            cmd = reads.command(connect(cfg["market"]), args.command_id)
+            cmd = reads.command(connect(cfg["market"]), args.command_id, clock())
             if cmd is None:
                 print(json.dumps({**out, "error": f"command {args.command_id} not found"}))
                 return 1
@@ -133,7 +135,7 @@ def main(argv: list[str] | None = None, http=None) -> int:
     except NotConfiguredError as exc:
         print(json.dumps({**out, "posted": [], "error": str(exc)}))
         return 2
-    except (SlackError, OSError) as exc:
+    except (SlackError, OSError, HTTPException) as exc:
         print(json.dumps({**out, "posted": [], "error": str(exc)[:300]}))
         return 1
     print(json.dumps({**out, **res}, ensure_ascii=False))

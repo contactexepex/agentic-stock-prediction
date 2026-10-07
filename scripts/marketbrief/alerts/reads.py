@@ -42,6 +42,14 @@ def records(con, kind: str, sql: str, params: list) -> list[dict]:
     return [{c: plain(v, c in json_cols) for c, v in row.items()} for row in frame.to_dict("records")]
 
 
+def feed_asof(rows: list[dict], now: datetime) -> list[dict]:
+    """Alert feed records checked (and computed, when stated) by `now`; a record without check_at is dropped."""
+    def by_now(value) -> bool:
+        return value is not None and pd.Timestamp(value).tz_convert("UTC") <= pd.Timestamp(now).tz_convert("UTC")
+    return [r for r in rows if by_now(r.get("check_at"))
+            and (r.get("computed_at") is None or by_now(r.get("computed_at")))]
+
+
 def session_predictions(con, session_date: str, now: datetime) -> list[dict]:
     """The session's strategy predictions made by `now` (one row per id, the first made)."""
     return records(con, KIND_STRATEGY_PREDICTIONS, f"""
@@ -60,14 +68,15 @@ def latest_check(con, session_date: str, now: datetime, check_id: str | None = N
     """The trade checks of one check run of the session (the newest by `now` unless `check_id` is given)."""
     if check_id is None:
         newest = con.execute(f"""SELECT check_id FROM {KIND_TRADE_CHECKS} WHERE session_date = ?::DATE
-            AND check_at <= ?::TIMESTAMPTZ ORDER BY check_at DESC, check_id DESC LIMIT 1""",
-                             [session_date, now]).fetchone()
+            AND check_at <= ?::TIMESTAMPTZ AND computed_at <= ?::TIMESTAMPTZ
+            ORDER BY check_at DESC, check_id DESC LIMIT 1""", [session_date, now, now]).fetchone()
         if newest is None:
             return []
         check_id = newest[0]
     return records(con, KIND_TRADE_CHECKS, f"""
         SELECT * FROM {KIND_TRADE_CHECKS} WHERE check_id = ? AND check_at <= ?::TIMESTAMPTZ
-        QUALIFY row_number() OVER (PARTITION BY id ORDER BY computed_at) = 1 ORDER BY id""", [check_id, now])
+        AND computed_at <= ?::TIMESTAMPTZ
+        QUALIFY row_number() OVER (PARTITION BY id ORDER BY computed_at) = 1 ORDER BY id""", [check_id, now, now])
 
 
 def settled_today(con, session_date: str, timezone: str, now: datetime) -> list[dict]:
@@ -97,9 +106,11 @@ def research_review(con, now: datetime, iso_week: str | None = None) -> dict | N
     return rows[0] if rows else None
 
 
-def command(con, command_id: str) -> dict | None:
-    """A command_log record (the newest row of that id)."""
+def command(con, command_id: str, now: datetime) -> dict | None:
+    """A command_log record as of `now`: the newest row of that id received (and, when completed, completed)
+    by then."""
     rows = records(con, KIND_COMMAND_LOG, f"""
-        SELECT * FROM {KIND_COMMAND_LOG} WHERE id = ? ORDER BY completed_at DESC NULLS LAST LIMIT 1""",
-                   [command_id])
+        SELECT * FROM {KIND_COMMAND_LOG} WHERE id = ? AND received_at <= ?::TIMESTAMPTZ
+        AND (completed_at IS NULL OR completed_at <= ?::TIMESTAMPTZ)
+        ORDER BY completed_at DESC NULLS LAST LIMIT 1""", [command_id, now, now])
     return rows[0] if rows else None

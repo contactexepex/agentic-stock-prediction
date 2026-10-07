@@ -385,3 +385,54 @@ def test_cli_without_token_posts_nothing(scratch, monkeypatch, capsys):
     monkeypatch.setenv("MB_NOW", "2026-10-07T12:00:00+00:00")
     code, out = run(["--market", "us", "morning"], capsys)
     assert code == 2 and "SLACK_BOT_TOKEN not set" in out["error"]
+
+
+# ---------- as of the clock (judge round 1) ----------
+
+def test_trade_checks_computed_after_the_clock_are_not_used(scratch, monkeypatch, capsys):
+    late = [{**r, "computed_at": "2026-10-07T16:40:00Z"} for r in of_market(examples("trade_check"), "us")]
+    store(scratch, "us", "trade_checks", late, "check_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:30:00+00:00")   # after check_at 16:27, before computed_at 16:40
+    assert run(["--market", "us", "--dry-run", "intraday"], capsys)[1]["reason"] == "nothing to post"
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:45:00+00:00")
+    assert run(["--market", "us", "--dry-run", "intraday"], capsys)[1]["posted"]
+
+
+def test_feed_records_after_the_clock_are_dropped(scratch, monkeypatch, capsys, tmp_path):
+    feed = tmp_path / "feed.jsonl"
+    rows = [{**r, "computed_at": "2026-10-07T16:27:00Z"} for r in of_market(examples("trade_check"), "us")]
+    feed.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:00:00+00:00")
+    args = ["--market", "us", "--dry-run", "intraday", "--date", "2026-10-07", "--feed", str(feed)]
+    assert run(args, capsys)[1]["reason"] == "nothing to post"
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:30:00+00:00")
+    assert run(args, capsys)[1]["posted"]
+    assert not (scratch / "data/us/slack_posts").exists()
+
+
+def test_onboarding_command_after_the_clock_is_not_found(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    args = ["--market", "us", "--dry-run", "onboarding", "--command-id", "cmd-20261005T135500Z-052b8228",
+            "--channel", "C9", "--thread-ts", "1.2"]
+    monkeypatch.setenv("MB_NOW", "2026-10-01T00:00:00+00:00")   # received 2026-10-05
+    code, out = run(args, capsys)
+    assert code == 1 and "not found" in out["error"]
+    monkeypatch.setenv("MB_NOW", "2026-10-05T14:01:00+00:00")   # received, not yet completed (14:02)
+    assert run(args, capsys)[0] == 1
+    monkeypatch.setenv("MB_NOW", "2026-10-05T15:00:00+00:00")
+    assert run(args, capsys)[1]["posted"]
+
+
+def test_every_message_carries_the_paper_label_and_footer():
+    command = examples("command_log")[0]
+    news = {"kind": "news", "ticker": "NVDA", "check_at": "2026-10-07T16:27:00Z", "news_id": "n1", "title": "t",
+            "trade_ids": ["x"]}
+    messages = [
+        build_morning("us", "2026-10-07", of_market(examples("prediction"), "us"), [], HORIZONS),
+        build_alerts("us", of_market(examples("trade_check"), "us")), build_alerts("us", [news]),
+        build_close("us", "2026-10-01", []), build_weekly("us", examples("research_review")[0]),
+        onboarding_text(command),
+    ]
+    for message in messages:
+        assert "Paper only — no proven edge yet." in message
+        assert "Research only, not investment advice. Paper trades are records, never orders." in message

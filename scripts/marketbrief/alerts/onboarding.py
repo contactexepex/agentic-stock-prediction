@@ -2,7 +2,7 @@
 `command_log` record. B5 (and B1's import) call `post_onboarding_confirmation`."""
 from __future__ import annotations
 
-from marketbrief.alerts.constants import ONBOARDING_RESULT_TEXT, POST_ONBOARDING
+from marketbrief.alerts.constants import LABEL_PAPER_ONLY, MSG_FOOTER, ONBOARDING_RESULT_TEXT, POST_ONBOARDING
 from marketbrief.alerts.publish import Message, publisher
 
 
@@ -16,6 +16,7 @@ def onboarding_text(command: dict) -> str:
     if command.get("record_ids"):
         lines.append("Records: " + ", ".join(command["record_ids"]))
     lines.append(f"Request {command['id']} ({command.get('tool')}).")
+    lines += [LABEL_PAPER_ONLY, MSG_FOOTER]
     return "\n".join(lines) + "\n"
 
 
