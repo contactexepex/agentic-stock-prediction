@@ -23,6 +23,7 @@ from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 from marketbrief.analytics.prediction_rules import check_news_status, check_prediction
 from marketbrief.model.forecast_rules import model_rules_pass
+from marketbrief.lifecycle.loader import active_tickers
 
 
 def evidence_times(con) -> dict:
@@ -48,7 +49,7 @@ def forecast_context(cfg: dict, con) -> tuple[dict, dict, set]:
         "FROM features_latest ORDER BY ticker, as_of_date DESC"
     ).df()
     ctx = {
-        "tickers": set(cfg["tickers"]),
+        "tickers": set(active_tickers(cfg)),
         "features": {
             feature_row.ticker: {
                 "quality": feature_row.quality,
