@@ -15,9 +15,11 @@ Top level: `as_of`, `cutoff`, `built_at`, `endpoint`, `read_model`, `sources`, `
 | `to_date` | Scoreboard row | `scope`, `market`, `view`, `family`, `pick_rule`, `horizon_days`, `trades`, `net_pnl`, `currency`, `mean_return_pct`, `win_rate`, `sample_badge`, `basis`, `as_of` | rows with `scope` = `pick_rule`, `horizon_days` = `all` (head-to-head view) |
 | `go_live` | Scoreboard row | `go_live.{proven, months_forward, trades_needed, beats_best_baseline}` | of the reference strategy's accuracy row, all horizons |
 | `strategies` | Strategy | `id`, `family`, `name`, `threshold`, `horizons`, `live`, `settled_trades` | all 15, keyed by id (names for picks, open trades and alerts) |
+| `news` | News item | `id`, `market`, `tickers`, `primary_tickers`, `title`, `source`, `source_domain`, `url`, `published_at`, `first_seen_at`, `enrichment.{event_type, materiality, sentiment, relevance, novelty, urgency, priced_in, analyzed_at}`, `status`, `status_as_of`, `cluster_id`, `independent_origins`, `primary_ids`, `headline_history_status` | the market's items with `first_seen_at` at or before `cutoff`, newest first |
 | `horizons`, `default_horizon` | (setting) | `config/strategies.yaml` horizons 1-5; N+1 opens (decision 39) | |
 
-Shown but computed by the page (presentation only): the unrealised total per company (sum of `unrealised_pnl`),
+Shown but computed by the page (presentation only): the stat strip's counts and sums (trades, flagged checks, runs
+ok, unrealised total), the unrealised total per company (sum of `unrealised_pnl`), the range bar's geometry,
 the expected gain in money (`expected_gain_pct` x `amount` / 100), local times from the UTC fields and the
 market's `session.local_time` offset, the "clears costs / below costs" reading (`expected_gain_pct` > 0, SPEC F9),
 the leader outline among the family tiles (highest `net_pnl` with trades).

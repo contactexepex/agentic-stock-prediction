@@ -70,6 +70,10 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
                      if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy"
                      and r["strategy_id"] == "rule.model_news.v1" and r["horizon_days"] == "all")
     strategies = {r["id"]: pick(r, STRATEGY_FIELDS) for r in files["strategy"]["records"]}
+    # the Home news card (owner, earlier design round: "add the news card to Home and drop the News screen"):
+    # this market's items first seen by the cut-off, newest first
+    news = sorted((r for r in files["news_item"]["records"] if r["market"] == market and r["first_seen_at"] <= cutoff),
+                  key=lambda r: r["published_at"], reverse=True)
     return {
         "market": market, "name": status["name"], "currency": status["currency"],
         "as_of": status["as_of"], "cutoff": cutoff, "built_at": status["freshness"]["built_at"],
@@ -84,12 +88,13 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
         "to_date": to_date,
         "go_live": reference["go_live"],
         "strategies": strategies,
+        "news": news,
     }
 
 
 def build() -> dict:
     names = ("market_status", "company", "agreement", "head_to_head_pick", "open_trade", "trade_check",
-             "eod_analysis", "scoreboard_row", "strategy")
+             "eod_analysis", "scoreboard_row", "strategy", "news_item")
     files = {name: catalogue(name) for name in names}
     cutoffs = {files[name]["as_of"] for name in names}
     assert len(cutoffs) == 1, cutoffs
@@ -126,7 +131,7 @@ def main() -> None:
         print(f"{market}: as of {p['as_of']}, session {p['status']['session']['session_date']}, "
               f"agreement N+1 {[(r['ticker'], r['buy'], r['of']) for r in p['agreement']['1']]}, "
               f"picks {len(p['head_to_head'])}, open trades {len(p['open_trades'])}, "
-              f"checks at cut-off {len(p['trade_checks'])}, to-date rows {len(p['to_date'])}")
+              f"checks at cut-off {len(p['trade_checks'])}, to-date rows {len(p['to_date'])}, news {len(p['news'])}")
     print(out, len(html), "bytes")
 
 
