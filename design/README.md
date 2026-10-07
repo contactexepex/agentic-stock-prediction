@@ -38,6 +38,7 @@ cloud session, then one consolidation session turns them into the production gen
 | `watchlist/` Watchlist (20 companies per market, sortable, sector-grouped) | built, awaiting the owner's approval |
 | `portfolio/` Paper portfolio: live book and rehearsal book, 10,000 per trade after costs | built, awaiting the owner's approval |
 | `track/` Track record: proof gate, live record, weekly review, back-tests | built, awaiting the owner's approval |
-| News, Help | to do |
+| `news/` News and events: stories with verification status, checked claims, all headlines, next eight weeks | built, awaiting the owner's approval |
+| Help | to do |
 
 `reference/` holds earlier rejected iterations (v2) for context only.

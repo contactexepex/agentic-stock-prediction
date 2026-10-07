@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>News and events</title>
+<meta name="description" content="The evidence behind the calls of the personal stock cockpit: every stored headline with its verification status, the stories per company with the claims checked, and the next eight weeks of events. Research only.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* News and events screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:14px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 .sp{margin-left:auto;font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.ans{font-size:14px;line-height:1.5;margin:0 0 10px}
+.hhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.guide{margin-top:14px;padding:12px 16px;border-radius:var(--mb-card-radius);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:13.5px;line-height:1.5}
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);border:var(--mb-card-border);border-radius:var(--mb-card-radius);background:var(--md-sys-color-surface);margin-top:14px;overflow:hidden}
+.tiles div{padding:10px 14px;border-left:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.tiles div:first-child{border-left:0}
+.tiles b{display:block;font-size:16px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.tiles small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;margin-top:16px;align-items:start}
+.col{display:grid;gap:16px;min-width:0}
+/* status legend */
+.legend{display:grid;grid-template-columns:1fr;gap:2px 14px;font-size:12.5px}
+.legend div{display:flex;gap:8px;align-items:flex-start;padding:4px 0;min-width:0}
+.legend div span:last-child{min-width:0;overflow-wrap:anywhere}
+.legend .md-badge{flex:none;margin-top:1px}
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
+.toolbar .md-chip{height:26px;padding:0 10px;font:var(--md-sys-typescale-label-medium)}
+.toolbar input[type=search],.toolbar select{height:30px;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-small);padding:0 10px;font:inherit;background:var(--md-sys-color-surface);color:inherit}
+.toolbar input[type=search]{width:220px}
+/* stories */
+.story{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface);margin-bottom:8px;min-width:0}
+.story .top{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.story .top .bx{width:26px;height:26px;border-radius:6px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);display:grid;place-items:center;font-weight:800;font-size:9px;flex:none}
+.story .top b.tk{color:var(--md-sys-color-on-surface);font-size:13px}
+.story .lead{font-size:14px;font-weight:600;margin:6px 0 4px;overflow-wrap:anywhere}
+.story .lead a{color:inherit;text-decoration:none} .story .lead a:hover{text-decoration:underline}
+.story .facts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.story .facts b{color:var(--md-sys-color-on-surface)}
+.story details{margin-top:6px} .story summary{cursor:pointer;font-size:12px;color:var(--md-sys-color-primary);list-style:none} .story summary::-webkit-details-marker{display:none}
+.story .items{list-style:none;margin:6px 0 0;padding:0;font-size:12.5px} .story .items li{padding:3px 0;border-top:1px solid var(--md-sys-color-surface-container-high);overflow-wrap:anywhere}
+.story .items a{color:inherit;text-decoration:none} .story .items a:hover{text-decoration:underline}
+.claim{border-left:3px solid var(--md-sys-color-primary);padding:4px 10px;margin:6px 0;font-size:12.5px;background:var(--md-sys-color-surface-container-low);border-radius:0 6px 6px 0}
+.claim q{color:var(--md-sys-color-on-surface-variant);font-style:italic}
+.mb-dir.s{width:18px;height:18px} .mb-dir.s .ms{width:13px;height:13px}
+/* events */
+.evl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.evl li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;padding:6px 8px;border:var(--mb-card-border);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface);font-size:12.5px}
+.evl li.today{background:var(--md-sys-color-primary-container);border-color:transparent}
+.evl li.major{box-shadow:inset 3px 0 0 var(--md-sys-color-primary)}
+.evl .when{text-align:center;line-height:1.05}
+.evl .when b{display:block;font-size:16px;color:var(--md-sys-color-primary)} .evl .when small{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.evl .what{min-width:0;overflow-wrap:anywhere} .evl .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.evl .what .ms{width:14px;height:14px;vertical-align:-2px;margin-right:3px}
+.evl .what a{color:inherit;text-decoration:none;font-weight:600}
+.wk{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);margin:10px 0 4px}
+/* headlines table */
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{font:500 10.5px/16px var(--md-ref-typeface-plain);letter-spacing:.05em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:6px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+table.t td{padding:6px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:top}
+table.t td.ttl{white-space:normal;min-width:260px;overflow-wrap:anywhere}
+table.t td.nw{white-space:nowrap}
+table.t a{color:inherit;text-decoration:none;font-weight:500} table.t a:hover{text-decoration:underline}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tk{display:inline-block;font:600 10px/1 var(--md-ref-typeface-plain);letter-spacing:.04em;padding:3px 5px;border-radius:4px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);margin-right:3px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+@media (max-width: 1000px){ .grid{grid-template-columns:1fr} .tiles{grid-template-columns:repeat(3,1fr)} .tiles div{border-top:1px solid var(--md-sys-color-outline-variant)} .tiles div:nth-child(-n+3){border-top:0} .tiles div:nth-child(4){border-left:0} .legend{grid-template-columns:1fr} }
+@media (max-width: 760px){ .pad{padding:0 var(--mb-gutter)} .hhead{grid-template-columns:1fr} .tiles{grid-template-columns:repeat(2,1fr)} .tiles div:nth-child(-n+3){border-top:1px solid var(--md-sys-color-outline-variant)} .tiles div:nth-child(-n+2){border-top:0} .tiles div:nth-child(odd){border-left:0} .tiles div:nth-child(4){border-left:1px solid var(--md-sys-color-outline-variant)} .toolbar input[type=search]{width:100%} .t .c-src,.t .c-mat{display:none} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">News and events · the evidence</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner"><div class="pad"><div class="wrap">
+
+<section class="hhead" aria-label="News and events">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+
+<div class="guide" id="guide"></div>
+<div class="tiles" id="tiles"></div>
+
+<div class="grid">
+<div class="col">
+  <section class="card" id="stories-card">
+    <h2>Stories by company <span class="mb-tag live">live</span> <button class="md-help" data-tip="A story groups the headlines about one event of one company (news_clusters). Its status comes from how many independent sources reported it and whether a primary document (an exchange filing) confirms it. Copies of one agency story count once." aria-label="Explain">?</button><span class="sp" id="stories-sub"></span></h2>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Filter by company or words" aria-label="Filter stories">
+      <select id="f-status" aria-label="Status"></select>
+      <select id="f-mat" aria-label="Materiality"><option value="">Any materiality</option><option value="high">High only</option><option value="medium">High and medium</option></select>
+      <select id="f-tk" aria-label="Company"></select>
+    </div>
+    <div id="stories"></div>
+    <button class="md-btn outlined" id="stories-more" type="button" style="margin-top:6px"></button>
+  </section>
+  <section class="card" id="headlines-card">
+    <h2>All headlines <span class="mb-tag live">live</span><span class="sp" id="headlines-sub"></span></h2>
+    <div class="toolbar">
+      <input type="search" id="hq" placeholder="Filter headlines" aria-label="Filter headlines">
+      <select id="hf-tk" aria-label="Company"></select>
+      <select id="hf-status" aria-label="Status"></select>
+      <select id="hf-sort" aria-label="Sort"><option value="new">Newest first</option><option value="mat">Most material first</option></select>
+    </div>
+    <div class="tblwrap" id="headlines"></div>
+    <button class="md-btn outlined" id="headlines-more" type="button" style="margin-top:10px"></button>
+    <p class="note" id="headlines-note"></p>
+  </section>
+</div>
+<div class="col">
+  <section class="card" id="legend-card">
+    <h2>What the status badges mean</h2>
+    <div class="legend" id="legend"></div>
+    <p class="note">Only <b>confirmed primary</b> and <b>corroborated</b> stories can be the main evidence of a call. Single-source or unverified evidence lowers the forecaster's confidence; rumours and promotional items never support a call; a contradicted story can only widen a range.</p>
+  </section>
+  <section class="card" id="events-card">
+    <h2>What's coming, next 8 weeks <span class="mb-tag live">calendar</span><span class="sp" id="events-sub"></span></h2>
+    <ul class="evl" id="events"></ul>
+    <p class="note">Results and ex-dividend dates from the stored events; market-wide events from config/events.yaml. No new call is made within one day of a company's results; a major market event widens every range.</p>
+  </section>
+  <section class="card" id="sources-card">
+    <h2>Where the headlines come from <span class="mb-tag live">live</span></h2>
+    <div class="tblwrap" id="sources-table"></div>
+    <p class="note" id="access-note"></p>
+  </section>
+</div>
+</div>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+  </div></div></div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=false) => { const d = dt(iso); return (dow ? DOW[d.getUTCDay()] + ' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const fmtT = iso => `${fmtD(iso)} ${iso.slice(11,16)} UTC`;
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const STATUS = {confirmed_primary: ['confirmed primary', 'a primary document (exchange filing, company release) confirms it', 'ms-verified_user'], corroborated: ['corroborated', 'two or more independent outlets reported it on their own', 'ms-check'], single_source: ['single source', 'one independent origin so far (one agency story copied by many counts once)', 'ms-warning'], unverified: ['unverified', 'no vetted outlet read yet, or only unread headlines', null], rumour: ['rumour', 'reported as a rumour or from unnamed sources', 'ms-close'], promotional: ['promotional', 'a paid or promotional item (press-release wire, law-firm notice)', 'ms-close'], contradicted: ['contradicted', 'a checked claim conflicts with a primary document', 'ms-close'], 'not assessed': ['not assessed', 'not part of a story yet', null]};
+const MATW = {high: 3, medium: 2, low: 1};
+const pageOf = t => `../decision/decision-${t}.html`;
+let MKT = 'india', storiesAll = false, headAll = false;
+let fs = {q: '', status: '', mat: '', tk: ''}, hf = {q: '', tk: '', status: '', sort: 'new'};
+const M = () => D.markets[MKT];
+
+/* ---------- shell ---------- */
+for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
+$('#market-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; MKT = b.dataset.m; $('#market-seg').querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); storiesAll = headAll = false; fs = {q:'', status:'', mat:'', tk:''}; hf = {q:'', tk:'', status:'', sort:'new'}; render(); });
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['newspaper','News', true], ['help','Help', false]];
+const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A') { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- helpers ---------- */
+const badge = st => { const s = STATUS[st] || STATUS['not assessed']; return el('span', {class:'md-badge ' + st.replace(' ', '_'), 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
+const sentIcon = v => { const s = v == null ? 'flat' : v > 0.05 ? 'up' : v < -0.05 ? 'dn' : 'flat'; return el('span', {class:'mb-dir s ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive)`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+const matBadge = (m, ev) => m ? el('span', {class:'md-badge', 'data-tip': 'Materiality: how much this could move the price (news-analyst). High items drive the model\'s news score most.'}, m + (ev ? ' · ' + ev.replace(/_/g, ' ') : '')) : null;
+const fillSelect = (sel, opts, first) => { sel.innerHTML = ''; sel.append(el('option', {value:''}, first)); for (const [v, l] of opts) sel.append(el('option', {value: v}, l)); };
+
+/* ---------- render ---------- */
+function render() {
+  const m = M();
+  $('#h-title').innerHTML = ''; $('#h-meta').innerHTML = ''; $('#h-right').innerHTML = '';
+  $('#h-title').append(`${LABEL[MKT]} news and events`, el('small', {}, `${m.market_name} · ${m.tickers.length} companies`));
+  $('#h-meta').append(el('span', {}, `headlines stored ${fmtT(m.span[0])} – ${fmtT(m.span[1])}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {}, `prices as of ${fmtD(m.as_of)}`));
+  $('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
+  $('#guide').innerHTML = `<b>What this page is.</b> The evidence behind every call. Each evening the pipeline collects the headlines about the ${m.tickers.length} companies, scores them (sentiment, how material), groups them into <b>stories</b> and checks each story: how many <b>independent</b> sources reported it, whether an exchange filing confirms it, and whether it is a rumour or a paid notice. A call may only lean on a story that is <b>confirmed</b> or <b>corroborated</b>. The calendar on the right lists what is scheduled for the next eight weeks.`;
+  const tl = $('#tiles'); tl.innerHTML = '';
+  const sc = m.status_counts, strong = (sc.confirmed_primary || 0) + (sc.corroborated || 0);
+  for (const t of [
+    {l:'Headlines stored', v: String(m.n_headlines), s: `${m.mat_counts.high || 0} high materiality`, t:'Every headline in the archive for this market (news), with the news-analyst\'s scores (enriched_latest).'},
+    {l:'Stories', v: String(m.n_stories), s: `${Object.keys(m.per_ticker).length} companies with news`, t:'Groups of headlines about one event of one company (news_clusters_latest).'},
+    {l:'Fit to support a call', v: String(strong), s: 'confirmed or corroborated', t:'Stories whose status allows them to be the main evidence of a call.', cls: strong ? 'ok' : ''},
+    {l:'Single source', v: String(sc.single_source || 0), s: 'one independent origin', t:'Reported by one independent origin (agency copies count once). Lowers confidence.'},
+    {l:'Rumour / promotional', v: String((sc.rumour || 0) + (sc.promotional || 0)), s: 'never support a call', t:'Rumours and paid or promotional items.'},
+    {l:'Claims checked', v: String(m.n_claims), s: 'quoted from stored texts', t:'Factual claims the claim-checker extracted from stored article extracts and filing texts (news_claims), each with its verbatim quote.'},
+  ]) tl.append(el('div', {'data-tip': t.t}, el('span', {class:'micro'}, t.l), el('b', {class: t.cls || ''}, t.v), el('small', {}, t.s)));
+  // legend
+  const lg = $('#legend'); lg.innerHTML = '';
+  for (const st of D.status_order) lg.append(el('div', {}, badge(st), el('span', {}, `${STATUS[st][1]} · ${sc[st] || 0} ${sc[st] === 1 ? 'story' : 'stories'}`)));
+  // filters
+  const tkOpts = m.tickers.map(t => [t, `${t} · ${m.names[t]}${m.per_ticker[t] ? ' (' + m.per_ticker[t] + ')' : ''}`]);
+  fillSelect($('#f-status'), D.status_order.filter(s => sc[s]).map(s => [s, `${STATUS[s][0]} (${sc[s]})`]), 'Any status');
+  fillSelect($('#f-tk'), tkOpts, 'All companies'); fillSelect($('#hf-tk'), tkOpts, 'All companies');
+  fillSelect($('#hf-status'), D.status_order.concat(['not assessed']).map(s => [s, STATUS[s][0]]), 'Any status');
+  $('#q').value = fs.q; $('#f-status').value = fs.status; $('#f-mat').value = fs.mat; $('#f-tk').value = fs.tk; $('#hq').value = hf.q; $('#hf-tk').value = hf.tk; $('#hf-status').value = hf.status; $('#hf-sort').value = hf.sort;
+  renderStories(); renderHeadlines(); renderEvents();
+  const st = $('#sources-table'); st.innerHTML = '';
+  const tbl = el('table', {class:'t'}); tbl.append(el('thead', {}, el('tr', {}, el('th', {}, 'Source'), el('th', {style:'text-align:right'}, 'Headlines'))));
+  const tb = el('tbody'); for (const s of m.sources) tb.append(el('tr', {}, el('td', {}, s.source), el('td', {style:'text-align:right'}, String(s.n)))); tbl.append(tb); st.append(tbl);
+  const ac = m.access; $('#access-note').textContent = `Article pages read behind the headlines (collect_articles, vetted outlets only): full ${ac.full || 0}, partial ${ac.partial || 0}, paywalled ${ac.paywalled || 0}, blocked ${ac.blocked || 0}, outlet not on the vetted list ${ac.skipped_unlisted || 0}. Full texts are never stored, only short extracts.`;
+  $('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live</dt><dd>data/${MKT}/: news (headlines, sources, company tags), news_enriched (sentiment, materiality, event type, priced-in, summary; latest per headline), news_clusters (stories per company and run), news_verified (status per story at the latest pass, with independent origins and primary ids), news_claims (checked claims with verbatim quotes), news_articles (what was read behind the headlines), events (results and ex-dividend dates) and config/events.yaml (market calendar). Read through DuckDB views in sql/views.sql.</dd>
+<dt>Shown</dt><dd>All ${m.n_stories} stories; the newest ${m.n_embedded} of ${m.n_headlines} headlines plus every high-materiality one (the full archive stays in data/). Status per headline = the best status of the stories it belongs to; "not assessed" = not part of a story.</dd>
+<dt>Derived</dt><dd>Nothing: every status, score and count is a stored value. The order of stories is materiality first, then status, then size.</dd>
+<dt>Mock / coming</dt><dd>Symbol search and the Help section are not built. Nothing on this page is invented.</dd>
+</dl>`;
+  $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
+}
+function storyCard(s) {
+  const c = el('div', {class:'story'});
+  c.append(el('div', {class:'top'}, el('span', {class:'bx', 'aria-hidden':'true'}, s.ticker.slice(0,4)), el('a', {href: pageOf(s.ticker), style:'text-decoration:none'}, el('b', {class:'tk'}, s.ticker)), el('span', {}, s.name), badge(s.status), matBadge(s.materiality, s.event_type), sentIcon(s.sentiment), el('span', {style:'margin-left:auto'}, `${fmtT(s.first)} → ${fmtT(s.last)}`)));
+  c.append(el('div', {class:'lead'}, el('a', {href: s.lead.url, rel:'noopener', target:'_blank'}, s.lead.title), el('span', {class:'muted', style:'font-weight:400;font-size:12px'}, ` · ${s.lead.source}`)));
+  const facts = el('div', {class:'facts'});
+  facts.append(el('span', {}, el('b', {}, String(s.n_items)), ` headline${s.n_items===1?'':'s'}${s.n_duplicates ? ` + ${s.n_duplicates} copies` : ''}`), el('span', {}, el('b', {}, String(s.outlets.length)), ` outlet${s.outlets.length===1?'':'s'}`), el('span', {'data-tip': s.origins.length ? 'Independent origins: ' + s.origins.join(', ') : 'No vetted outlet was read and no agency origin found.'}, el('b', {}, String(s.independent_origins)), ` independent origin${s.independent_origins===1?'':'s'}`, s.unread_vetted_origins ? ` (+${s.unread_vetted_origins} unread vetted)` : ''));
+  if (s.primary_ids.length) facts.append(el('span', {'data-tip': 'Primary documents attached to the story: ' + s.primary_ids.join(', ')}, icon('ms-description'), ` ${s.primary_ids.length} filing${s.primary_ids.length===1?'':'s'}`));
+  if (s.flags.length) facts.append(el('span', {class:'muted'}, `flags: ${s.flags.map(f => f.replace(/_/g, ' ')).join(', ')}`));
+  c.append(facts);
+  for (const cl of s.claims) c.append(el('div', {class:'claim'}, el('b', {}, `Claim (${cl.type.replace(/_/g,' ')}, ${cl.stance}): `), `${cl.subject} ${cl.predicate}${cl.value ? ' · ' + cl.value : ''}`, el('br'), el('q', {}, cl.quote), el('span', {class:'muted'}, ` — ${cl.source_kind} ${cl.quote_field}, ${cl.attribution.replace(/_/g,' ')}, ${fmtT(cl.at)}`)));
+  if (s.items.length > 1) { const d = el('details'); d.append(el('summary', {}, `Show the ${s.items.length} headlines in this story`)); const ul = el('ul', {class:'items'}); for (const it of s.items) ul.append(el('li', {}, el('a', {href: it.url, rel:'noopener', target:'_blank'}, it.title), el('span', {class:'muted'}, ` · ${it.source} · ${fmtT(it.at)}${it.materiality ? ' · ' + it.materiality : ''}`))); d.append(ul); c.append(d); }
+  return c;
+}
+function renderStories() {
+  const m = M(), box = $('#stories'); box.innerHTML = '';
+  let rows = m.stories.filter(s => (!fs.tk || s.ticker === fs.tk) && (!fs.status || s.status === fs.status) && (!fs.mat || (fs.mat === 'high' ? s.materiality === 'high' : ['high','medium'].includes(s.materiality))) && (!fs.q || (s.ticker + ' ' + s.name + ' ' + s.lead.title + ' ' + s.items.map(i => i.title).join(' ')).toLowerCase().includes(fs.q)));
+  const shown = storiesAll ? rows : rows.slice(0, 12);
+  shown.forEach(s => box.append(storyCard(s)));
+  if (!rows.length) box.append(el('div', {class:'muted', style:'padding:10px'}, 'No story matches.'));
+  $('#stories-sub').textContent = `${rows.length} of ${m.n_stories} stories`;
+  const b = $('#stories-more'); b.style.display = rows.length > 12 ? '' : 'none'; b.textContent = storiesAll ? 'Show the first 12' : `Show all ${rows.length}`;
+}
+function renderHeadlines() {
+  const m = M(), box = $('#headlines'); box.innerHTML = '';
+  let rows = m.headlines.filter(h => (!hf.tk || h.tickers.includes(hf.tk)) && (!hf.status || h.status === hf.status) && (!hf.q || (h.title + ' ' + h.source + ' ' + h.tickers.join(' ')).toLowerCase().includes(hf.q)));
+  if (hf.sort === 'mat') rows = rows.slice().sort((a, b) => (MATW[b.materiality] || 0) - (MATW[a.materiality] || 0) || b.at.localeCompare(a.at));
+  const shown = headAll ? rows : rows.slice(0, 25);
+  const t = el('table', {class:'t'}); t.append(el('thead', {}, el('tr', {}, el('th', {}, 'When'), el('th', {}, 'Headline'), el('th', {class:'c-src'}, 'Source'), el('th', {}, 'Company'), el('th', {}, 'Mood'), el('th', {class:'c-mat'}, 'Materiality'), el('th', {}, 'Status'))));
+  const tb = el('tbody');
+  for (const h of shown) tb.append(el('tr', {}, el('td', {class:'nw'}, fmtT(h.at)), el('td', {class:'ttl'}, el('a', {href: h.url, rel:'noopener', target:'_blank'}, h.title)), el('td', {class:'c-src nw'}, h.source), el('td', {class:'nw'}, ...h.tickers.map(k => el('a', {class:'tk', href: pageOf(k), style:'text-decoration:none'}, k))), el('td', {}, sentIcon(h.sentiment)), el('td', {class:'c-mat nw'}, matBadge(h.materiality, h.event_type) || el('span', {class:'muted'}, '—')), el('td', {class:'nw'}, badge(h.status))));
+  t.append(tb); box.append(t);
+  $('#headlines-sub').textContent = `${rows.length} of ${m.n_embedded} listed`;
+  const b = $('#headlines-more'); b.style.display = rows.length > 25 ? '' : 'none'; b.textContent = headAll ? 'Show the first 25' : `Show all ${rows.length}`;
+  $('#headlines-note').textContent = `${m.n_headlines} headlines are stored for this market; the newest ${m.n_embedded} and every high-materiality one are listed here. Mood = the news-analyst's sentiment (arrow up / down / flat); status = the best status of the story the headline belongs to.`;
+}
+function renderEvents() {
+  const m = M(), ul = $('#events'); ul.innerHTML = '';
+  const EV_ICO = {rbi_policy:'ms-account_balance', fomc:'ms-account_balance', earnings:'ms-receipt_long', ex_dividend:'ms-account_balance_wallet', fno_expiry:'ms-event', weekly_expiry:'ms-event', jobs_report:'ms-public', index_rebalance:'ms-layers', cpi:'ms-public'};
+  $('#events-sub').textContent = `${m.events.length} events to ${fmtD(m.events_until)}`;
+  let lastWeek = null;
+  for (const e of m.events) {
+    const d = dt(e.date); const monday = new Date(d); monday.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); const wk = monday.toISOString().slice(0,10);
+    if (wk !== lastWeek) { ul.append(el('div', {class:'wk'}, `week of ${fmtD(wk, true)}`)); lastWeek = wk; }
+    const li = el('li', {class: (e.date === m.today ? 'today ' : '') + (e.major ? 'major' : '')});
+    li.append(el('div', {class:'when'}, el('small', {}, DOW[d.getUTCDay()]), el('b', {}, d.getUTCDate())));
+    li.append(el('div', {class:'what'}, icon(EV_ICO[e.type] || 'ms-calendar_month'), e.ticker ? el('a', {href: pageOf(e.ticker)}, e.name) : e.name, el('small', {}, e.type === 'earnings' ? `Company results${e.timing ? ', ' + e.timing.replace('_',' ') : ''} · reaction session ${fmtD(e.reaction_session, true)} · no new call within 1 day` : e.type === 'ex_dividend' ? 'Goes ex-dividend: the range centre shifts by the dividend' : e.major ? 'Market-wide major event · ranges widen' : 'Market-wide, minor')));
+    ul.append(li);
+  }
+  if (!m.events.length) ul.append(el('li', {}, el('div'), el('div', {class:'what muted'}, 'No stored events in the next eight weeks.')));
+}
+$('#q').addEventListener('input', e => { fs.q = e.target.value.trim().toLowerCase(); storiesAll = false; renderStories(); });
+$('#f-status').addEventListener('change', e => { fs.status = e.target.value; renderStories(); });
+$('#f-mat').addEventListener('change', e => { fs.mat = e.target.value; renderStories(); });
+$('#f-tk').addEventListener('change', e => { fs.tk = e.target.value; renderStories(); });
+$('#stories-more').addEventListener('click', () => { storiesAll = !storiesAll; renderStories(); });
+$('#hq').addEventListener('input', e => { hf.q = e.target.value.trim().toLowerCase(); headAll = false; renderHeadlines(); });
+$('#hf-tk').addEventListener('change', e => { hf.tk = e.target.value; renderHeadlines(); });
+$('#hf-status').addEventListener('change', e => { hf.status = e.target.value; renderHeadlines(); });
+$('#hf-sort').addEventListener('change', e => { hf.sort = e.target.value; renderHeadlines(); });
+$('#headlines-more').addEventListener('click', () => { headAll = !headAll; renderHeadlines(); });
+render();
+</script>
+</body>
+</html>
