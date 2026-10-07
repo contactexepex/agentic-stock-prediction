@@ -59,7 +59,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
   range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
-  each past day's 1d/5d ranges as `ranges.py` builds them, the regime, and direction baselines
+  each past day's N+k ranges (every horizon of `config/strategies.yaml`) as `ranges.py` builds them, the regime, and direction baselines
   (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
   and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
   Adaptive Conformal Inference (`adaptive_conformal.py`: per horizon x band x regime miss rate alpha_t updated from
@@ -77,8 +77,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
   reruns the signal-model backtest and says plainly whether the model shows skill (`model_skill`).
   Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
-  open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`);
-  every summary shows the two bases apart, never pooled.
+  open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`); an open-to-close
+  call of horizon k sells at the close of D+k (N+k), a 5-day call made before `call_scoring.n_plus_k_from` at D+4
+  (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled.
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
@@ -236,9 +237,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `results_digests_latest`, `results_digest_ticker_latest`). The context pack does not show digests yet.
 - Signal model (DESIGN.md section 15; `scripts/marketbrief/model/`, settings `config/model.yaml`, costs
   `config/costs.yaml`): `model_scores` (routine step 5a, again after the news append) appends per ticker and
-  horizon P(up) of the open-to-close label (buy at the open of D, the first session after the as-of close; sell
-  at the close of D+1 for 1d, D+4 for 5d) with its explanation (points per feature group, top 3 drivers each
-  way) to `data/<market>/model_scores/` (view `model_scores_latest`); the month's model (L2 logistic, monthly
+  horizon P(up) of the open-to-close label (N+k, decision 37: buy at the open of D, the first session after the
+  as-of close; sell at the close of the k-th session after D, k in `config/strategies.yaml` `horizons`;
+  `core/horizons.py`) with its explanation (points per feature group, top 3 drivers each
+  way) to `data/<market>/model_scores/` (view `model_scores_latest`), plus a `cross_market` variant (every
+  cross-market group on, for strategies with `cross_market: true`) in `model_variant_scores|versions`; the month's model (L2 logistic, monthly
   expanding-window refit on labels resolved by the refit date, Platt calibration on past out-of-sample rows,
   JSON coefficients) to `data/<market>/model_versions/`. News enters as a fixed prior (not trainable yet; no
   news archive); `model_news_update` reports the re-estimation and the rows it needs. `model_backtest --out DIR`
@@ -252,6 +255,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   never data/). Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
   `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
   stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
+- Horizons N+1..N+5 (B10, docs/SPEC.md F2.7, decision 37; docs/ws/b10.md; `core/horizons.py`): horizon k means buy
+  at the open of D, sell at the close of the k-th market session after D (weekends and holidays skipped). The list is
+  `config/strategies.yaml` `horizons` (`config/ranges.yaml` follows it). Model labels, ranges (target = the exit
+  session, width over k + 1 sessions), calibration, call scoring and the prediction rules use it. New
+  `model_scores`, `ranges`, `outcomes`, `calibration` and `model_versions` rows carry `horizon_label` (`n_plus_k`),
+  ranges and scores also `entry_date` and `exit_date`; older rows are labelled on read (B10 block of
+  `sql/views.sql`): `legacy_cc` (old ranges, close-to-close calls), `legacy_5d_d4` (open-to-close 5-day rows sold at
+  D+4), open-to-close 1-day = N+1. Legacy rows are never pooled with N+k. `contracts/horizons.py` `scores_asof`
+  (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of a time (no look-ahead).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
@@ -424,7 +436,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 
 ## Prediction rules
 - One record per call: `id` = `<as_of_date>-<ticker>-<horizon>d`; skip if the id already exists.
-- `direction` is `up` or `down`; `horizon_days` is 1 or 5 (trading days); `confidence` 0.50-0.90.
+- `direction` is `up` or `down`; `horizon_days` is one of `config/strategies.yaml` `horizons` (1-5; N+k = sell at
+  the close of the k-th session after D); `confidence` 0.50-0.90.
 - `as_of_date` = the latest price date in the context pack for that ticker.
 - `evidence_ids` must reference news/filing ids. Abstaining is always allowed and often right.
 - News verification (DESIGN.md 3b): the first evidence id (the main evidence) must be
