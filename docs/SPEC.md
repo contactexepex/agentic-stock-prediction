@@ -60,7 +60,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 Proposals made by the orchestrator (not owner decisions; the owner may change any of them): every
 command logged with who sent it; one Slack thread per market per day plus a weekly post; design widths
 390 px and 1280 px; money-view budget ₹5,00,000 / $5,000; the post-close, weekly and intraday times of
-section 7; the Opus trader being the extended forecaster; chat logs kept 90 days; no bulk-storage move
+section 7 (the intraday times are WS5's existing schedules); the Opus trader being the extended forecaster; chat logs kept 90 days; no bulk-storage move
 within a year (git + MotherDuck handle 50 companies).
 
 ## 2. Words used in this document
@@ -166,6 +166,19 @@ place P&L is computed.
      lower the probability.
    - The `confidence` 0.50-0.90 band applies to AI traders; rule strategies output the calibrated
      probability as is (the threshold decides whether it trades).
+   - Regimes. AI traders lower their probability in `EVENT_HEAVY` and `UNSTABLE` regimes, as CLAUDE.md
+     says. **Rule change** for rule strategies and baselines: they do not lower the probability by
+     judgment; a strategy either has a regime filter (no trades in those regimes) or not, and the
+     scoreboard reports every strategy per regime, so the effect is measured instead of assumed.
+   - Model anchor. The combined traders (Sonnet and Opus) see the model score and are bound by the
+     forecast-v11 anchor: `model_prob` = the score, `agent_adjustment` within +-0.10 with a reason,
+     direction and probability from their sum. The blind traders (news, pattern) do not see the score
+     and are not anchored (**Rule change**: the anchor binds only predictions made with the score in
+     view).
+   - Track-record calibration. AI traders see their own per-confidence-band track record in their
+     input and must lower confidence or abstain where a band hits less often than stated, as
+     CLAUDE.md says. Rule strategies are calibrated by the model's Platt calibration; their thresholds
+     change only through new strategy versions approved by the owner (F6.2), never during a run.
 
 Done when: the registry validates; the pre-open run writes one prediction per strategy x company x
 horizon; back-test and forward results are stored separately; adding a strategy is a config change only.
@@ -196,7 +209,7 @@ planted effect is recovered.
 2. Each runs in the pre-open run (as subagents of the existing daily session, not separate sessions)
    and writes per active company and horizon: direction, probability, target price, range, up to 3
    evidence ids, and a reason of at most 60 words. Timing: with the pre-open run moved 30 minutes
-   earlier (decision 31) the run has about 90 minutes before the open; the traders run in parallel
+   earlier (decision 31) the run has about 95 minutes (India) and 105 minutes (US) before the open; the traders run in parallel
    and a trader that has not passed its gate 15 minutes before the open abstains for that day
    (recorded). Stage C measures the run's duration on both markets before go-live. A deterministic gate (shared with the existing
    prediction rules) checks: ids exist and are verified enough (DESIGN.md 3b), no call with earnings
@@ -265,8 +278,14 @@ states each strategy's position against the bar.
    `effective_from` = the start of stored history and `recorded_at` = the seeding time, so history
    stays continuous and the record is honest about when it was written.
 2. **States**: `active` (collected, predicted, traded), `inactive` (collected, not predicted or traded),
-   `deleted` (not collected, not shown, excluded on read everywhere; derived stores purge it). One
-   accessor (`watchlist(market, as_of, state)`) replaces every direct read of `tickers:`.
+   `deleted` (not collected, not shown, excluded on read everywhere; derived stores purge it).
+   **One place changes:** the market-config loader (`load_market` in `core/market_config.py`) fills
+   `cfg["tickers"]` from the watchlist events as of the run's clock (MB_NOW-aware) with every
+   collected company (active and inactive, never deleted), and adds `cfg["active_tickers"]`. The 37
+   existing readers of `cfg` tickers keep working unchanged and keep collecting inactive companies,
+   as decision 13 wants. Only code that predicts or trades reads `active_tickers` (the new strategy
+   and trader code, and the existing model-score, forecaster-context and intraday steps, each listed
+   in B1's ownership). The accessor `watchlist(market, as_of, state)` serves replays and new code.
 3. **Add** takes: market, exchange symbol, optional name, optional amount. The onboarding pipeline
    (deterministic, no AI needed): resolve and check identifiers (NSE symbol and Yahoo symbol; or
    NYSE/Nasdaq ticker, Yahoo symbol and SEC CIK), refuse ETFs, BSE-only and unknown symbols, set the
@@ -278,6 +297,8 @@ states each strategy's position against the bar.
 5. **Delete** (dashboard only, with a typed confirmation) appends a `delete` tombstone; reads exclude
    the company everywhere; the warehouse and Neo4j drop it at the next sync. Raw records stay in git
    history (decision 12).
+   Note: a deleted company's past predictions and trades stay in the strategies' records and keep
+   counting in their scoreboards (so results are never rewritten), shown under "deleted company".
 6. Every event records who asked, through which channel, and the idempotency key.
 7. **Confirmation in Slack**: `/company add` opens a form (market, symbol, optional amount); on submit
    the system resolves the identifiers and shows a summary (name, exchange, sector, Yahoo symbol, CIK,
@@ -320,8 +341,9 @@ pass before release.
 Authentication. Slack and the Claude app cannot sign in to it, so the same `web/` app is deployed as
 a second Vercel project, the gateway (`MB_GATEWAY=1`), without Vercel Authentication; in gateway mode
 its middleware serves only `/slack/*` (every request verified with Slack's
-signing secret and refused when older than 5 minutes) and `/mcp` (GitHub OAuth; only the owner's
-GitHub account is accepted). It exposes no pages and no `/api/v1` routes; it holds only what the tool
+signing secret and refused when older than 5 minutes), `/mcp` (GitHub OAuth; only the owner's
+GitHub account is accepted) and the OAuth routes the MCP sign-in needs (`/.well-known/oauth-*`,
+authorize, token and callback). It exposes no pages and no `/api/v1` routes; it holds only what the tool
 layer needs (the MotherDuck read token, the inbox token, the dispatch token, the Anthropic key for
 `/ask`). No bypass secret is ever put in a URL.
 
@@ -333,7 +355,10 @@ and retry so it never races a routine's push), and replies in Slack. If the disp
 source refuses GitHub's runners (to be verified in Stage B1 for NSE, Yahoo and SEC), the next
 scheduled run imports the inbox. The inbox lives in its own MotherDuck database `market_brief_inbox`
 written by a separate service account (the Lite plan has 2), because MotherDuck tokens are not
-scoped per schema: a leaked inbox token cannot touch `market_brief`. The UI shows the request as
+scoped per schema: a leaked inbox token cannot touch `market_brief`. This changes ARCHITECTURE.md
+sections 3, 8 and 9 (schema `inbox` inside `market_brief`); Stage A updates them. The importer
+(`onboard.yml` and the routine runs) reads the inbox with that account's token
+(`MOTHERDUCK_INBOX_TOKEN`, stored in the cloud environment and as a GitHub Actions secret). The UI shows the request as
 "pending" until the import is in `data/`.
 
 ### F11 Assistant chat (dashboard and Slack `/ask`)
@@ -379,7 +404,7 @@ every query parameter maps to a `page_key`, never to a filter at request time):
 | `rm.stock_strategies` | ticker | the stock strategy page (decision 30) |
 | `rm.strategies` | `_` (scoreboard) and `<strategy_id>` (detail) | Strategy lab |
 | `rm.compare` | `_` and ticker | Rule vs AI |
-| `rm.trades` | `_` and ticker (open and the last 60 sessions' settled trades; status filtering in the browser) | trades lists |
+| `rm.trades` | `_` (open trades and the last 5 sessions' settled trades) and ticker (open and the last 60 sessions) | trades lists |
 | `rm.lifecycle` | `<ticker>:<session_date>` for the last 30 sessions | one day's path: made, checks, settled, explained |
 | `rm.companies` | `_` | Companies |
 | `rm.portfolio` | `_` | owner's portfolio with EUR view; strategies' money-view portfolios |
@@ -446,7 +471,7 @@ trades to rank"), and keeps the best strategy overall beside the per-company bes
 |---|---|---|
 | Claude Code routines | all computation and agents (schedules below); builds in cloud sessions | none |
 | GitHub | source of truth (`data/`), CI, Actions workflow `onboard.yml` for writes from the web tier | a fine-grained token (Actions read and write, this repo only) for Vercel |
-| MotherDuck | `market_brief` (`base`, `rm`, `app`) and `market_brief_inbox` | a read-only token for the dashboard; a second service account with its token for the inbox |
+| MotherDuck | `market_brief` (`base`, `rm`, `meta`, `app`) and `market_brief_inbox` | a read-only token for the dashboard; a second service account with its token for the inbox |
 | Vercel | the `web/` app as two projects: the dashboard (Vercel Authentication) and the gateway (`MB_GATEWAY=1`, no Vercel Authentication, only `/slack/*` and `/mcp`); the existing `reports/` site until retired | create the two projects; add environment variables |
 | Slack | existing app gains `/company`, `/trade`, `/ask` and interactivity pointing at the gateway | add the commands and the request URL in the Slack app settings (exact steps provided) |
 | Claude app | custom connector to the gateway's `/mcp` with GitHub sign-in | add the connector once `/mcp` is live |
@@ -508,9 +533,9 @@ function signature. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/
 
 | Stage | Builds | Owns | Needs |
 |---|---|---|---|
-| B1 Lifecycle | F8: watchlist events, the accessor and its swap into every reader of `tickers:`, seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `scripts/company.py`, `.github/workflows/onboard.yml`, the reader call sites in `collectors/` and `pipeline/` | A |
+| B1 Lifecycle | F8: watchlist events, the loader change and accessor, the switch of the existing predicting steps to `active_tickers` (`model/` scoring entry point, the context pack, `intraday/` ticker selection), seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `core/market_config.py`, `scripts/company.py`, `.github/workflows/onboard.yml`, those three call sites only | A |
 | B2 Lab | F1 engine (incl. F1.10, the EUR view in `marketbrief/portfolio/`, and the `EURUSD=X` symbol in `config/markets/us.yaml`), F2 strategies and baselines, F3 news-impact study, F7 scoreboard and luck test | `marketbrief/lab/`, `scripts/lab.py`, `marketbrief/portfolio/`, `config/costs.yaml`, that line of `config/markets/us.yaml` | A |
-| B3 AI traders | F4 traders and gate, F6 EOD analyst and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | A (writes predictions; B2 settles them) |
+| B3 AI traders | F4 traders and gate, F6 EOD analyst and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `.claude/agents/forecaster.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | A (writes predictions; B2 settles them) |
 | B4 API | the read models of section 4 (payload functions from B1-B3 via A's interfaces, stubbed until merged) and every route file under `web/app/api/v1/` (write handlers are thin calls into B5's tool layer), caching, revalidate | `web/app/api/v1/`, `web/lib/data/`, `marketbrief/warehouse/rm_*` additions | A |
 | B5 Tools and channels | the tool layer, the gateway mode (middleware), Slack commands, form and confirm step, `/mcp` with GitHub OAuth, inbox writes, workflow dispatch, injection suite | `web/lib/tools/`, `web/app/slack/`, `web/app/mcp/`, `web/middleware.ts`, `mcp/` except `tools.yaml` | A |
 | B6 Notifications | F9 Slack threads (morning, alerts, close, weekly) | `marketbrief/alerts/`, `scripts/alerts.py` | A |
@@ -518,9 +543,11 @@ function signature. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/
 | B8 Assistant | F11 chat and Slack `/ask` with budget | `web/app/api/assistant/`, `web/lib/assistant/` | A |
 | B9 Monitoring | F5: intraday checks of every open paper trade, the extended explainer input, intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | A |
 
-B1 is the only stage that edits existing collectors and pipeline readers (the accessor swap); the
-others call the accessor through A's interface. `config/markets/<market>.yaml` `tickers:` stays in
-place until Stage C removes it. Shared files keep the additive rules of waves 0-1 (one import + one
+B1 changes only the loader and the three predicting call sites named above; every other reader of
+`cfg` tickers keeps working unchanged through the loader, and new code calls the accessor through A's
+interface. B9 builds on B1's `active_tickers` for open-trade checks without editing B1's line.
+`config/markets/<market>.yaml` `tickers:` stays in place until Stage C removes it (safe then, because
+the loader no longer reads it). Shared files keep the additive rules of waves 0-1 (one import + one
 spread line in `core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks at the end).
 B7 starts with the shell, design system and the Home, Company and Stock strategies pages as the
 updated designs land.

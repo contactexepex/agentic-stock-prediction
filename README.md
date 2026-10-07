@@ -129,8 +129,8 @@ the market-level symbols. Edit tickers, sectors, regime thresholds and news feed
      load everything once with `--full`; the routine then syncs incrementally.
    - Setup script: `bash setup.sh`
 3. **Routines** (claude.ai/code/routines → New routine), one per market, both on this repo and environment:
-   - **India**: prompt = `routine/PROMPT.md` with `MARKET=india`; schedule weekdays 08:10 Asia/Kolkata.
-   - **US**: prompt = `routine/PROMPT.md` with `MARKET=us`; schedule weekdays 08:15 America/New_York.
+   - **India**: prompt = `routine/PROMPT.md` with `MARKET=india`; schedule weekdays 07:40 Asia/Kolkata.
+   - **US**: prompt = `routine/PROMPT.md` with `MARKET=us`; schedule weekdays 07:45 America/New_York.
    - Connectors: keep only Slack. Remove everything else, especially anything that can trade.
 4. **First run**: backfill two years of prices once (needed for beta and the range backtest).
    In a Claude Code session on the repo:

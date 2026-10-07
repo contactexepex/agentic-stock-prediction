@@ -244,7 +244,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   least the config's `news.google_news.window` (1d) and the oldest item kept at least 3 days. Before the
   first `news_runs` row exists, the newest stored news `first_seen_at` stands in; with no stored news at
   all (a first run) the defaults apply; with runs stored but none `ok` in the newest 9 daily files, the
-  window is the 7-day cap. Examples: India's pre-open runs Friday 02:40 and Monday 02:40 UTC: `when:73h`;
+  window is the 7-day cap. Examples: India's pre-open runs Friday 02:10 and Monday 02:10 UTC: `when:73h`;
   Friday to Tuesday after a Monday holiday: `when:97h`; a light run 4 hours after the last: `when:1d`.
   The summary shows the `window` used and `ok`. De-duplication reads the newest 9 daily files (the cap
   plus 2 days).
@@ -816,7 +816,8 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   deals backfill. Rows keep their real publication/acceptance times (`first_seen_at` = the
   backfill time), which is what `prepare` filters on. Summary in `S/backfill-<M>.json`.
 - `prepare --market M --date D --root R [--source S]`: cutoff = the routine's start on the session
-  after D (08:15 ET, 08:10 IST; section 2). R gets copies of `config/`, `sql/`, `templates/` and
+  after D (08:15 ET, 08:10 IST: the start times until 2026-10-07; `CUTOFF_LOCAL` in
+  `constants/ai_replay.py` moves to the new times of section 2 in the app roadmap's Stage C, docs/SPEC.md). R gets copies of `config/`, `sql/`, `templates/` and
   `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
   (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
   time; events first seen by the cutoff plus backfilled past events dated <= D; predictions, ranges,
