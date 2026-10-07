@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>India (NSE) briefs</title><style>
+/* Layout: one reading column; summary, then one filter row scoping overview charts and company cards. */
+:root{
+  --page:#f4f4f1; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#6f6d68; --grid:#e1e0d9;
+  --axis:#c3c2b7; --border:rgba(11,11,11,.10); --accent:#2a78d6; --accent-ink:#1c5cab;
+  --band80:rgba(42,120,214,.16); --band50:rgba(42,120,214,.34); --late:rgba(137,135,129,.22);
+  --up:#2a78d6; --down:#e34948; --call2:#eb6834; --warn-bg:#fff4dc; --warn-ink:#7a5200;
+  --pill:#ecebe6; --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#a3a198; --grid:#2c2c2a;
+  --axis:#383835; --border:rgba(255,255,255,.10); --accent:#3987e5; --accent-ink:#86b6ef;
+  --band80:rgba(57,135,229,.20); --band50:rgba(57,135,229,.42); --late:rgba(137,135,129,.28);
+  --up:#3987e5; --down:#e66767; --call2:#d95926; --warn-bg:#3a2e12; --warn-ink:#f3cf83; --pill:#2a2a28;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#a3a198; --grid:#2c2c2a;
+  --axis:#383835; --border:rgba(255,255,255,.10); --accent:#3987e5; --accent-ink:#86b6ef;
+  --band80:rgba(57,135,229,.20); --band50:rgba(57,135,229,.42); --late:rgba(137,135,129,.28);
+  --up:#3987e5; --down:#e66767; --call2:#d95926; --warn-bg:#3a2e12; --warn-ink:#f3cf83; --pill:#2a2a28;
+  color-scheme:dark;}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 var(--font);overflow-wrap:anywhere}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
+a{color:var(--accent-ink)} a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
+h1{font-size:1.6rem;font-weight:650} h2{font-size:1.1rem;font-weight:650} h3{font-size:1.02rem;font-weight:650}
+p{margin:0}
+.eyebrow{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sub{color:var(--ink2);font-size:.9rem}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.regime{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--pill);font-size:.8rem;font-weight:600;white-space:nowrap}
+.pill.up{background:color-mix(in srgb,var(--up) 18%,transparent)} .pill.down{background:color-mix(in srgb,var(--down) 18%,transparent)}
+.pill.late{background:var(--late)}
+.headline p{font-size:1.05rem}
+.top3{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{border-top:1px solid var(--grid);padding-top:8px}
+.kpi .v{font-size:1.5rem;font-weight:650} .kpi .l{font-size:.8rem;color:var(--ink2)}
+details{border-top:1px solid var(--grid);padding-top:8px}
+details>summary{cursor:pointer;font-weight:600;color:var(--ink2);list-style-position:outside}
+details[open]>summary{margin-bottom:8px}
+.prose{display:flex;flex-direction:column;gap:8px;max-width:68ch}
+.prose ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.warn{background:var(--warn-bg);color:var(--warn-ink);border-radius:8px;padding:8px 12px;font-size:.9rem}
+dl.gloss{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0;font-size:.92rem}
+dl.gloss dt{font-weight:600} dl.gloss dd{margin:0;color:var(--ink2)}
+@media (max-width:560px){dl.gloss{grid-template-columns:1fr} dl.gloss dd{margin-bottom:6px}}
+.filters{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--page);padding-block:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;border-bottom:1px solid var(--grid)}
+.filters label{display:flex;flex-direction:column;gap:2px;font-size:.75rem;color:var(--muted);font-weight:600;letter-spacing:.03em;text-transform:uppercase;min-width:0}
+.filters select,.filters input{font:inherit;font-size:.95rem;padding:6px 8px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0;max-width:100%}
+.filters button{font:inherit;font-size:.9rem;padding:6px 12px;border-radius:8px;border:1px solid var(--axis);background:transparent;color:var(--ink2);cursor:pointer}
+.filters .count{font-size:.85rem;color:var(--ink2);margin-left:auto;padding-bottom:6px}
+@media (max-width:700px){.filters{position:static} .filters label{flex:1 1 140px} .filters select,.filters input{width:100%}}
+.charts{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:860px){.charts{grid-template-columns:1fr 1fr} .charts .wide{grid-column:1 / -1}}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+/* keep chart text near its design size: a lone card or chart never scales its labels up */
+.co svg{max-width:520px} .chart:not(.wide) svg{max-width:520px} .chart.wide svg{max-width:900px}
+.chart .cap{font-size:.85rem;color:var(--ink2)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:14px;height:10px;border-radius:2px}
+.cards{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:860px){.cards{grid-template-columns:1fr 1fr} .cards.one{grid-template-columns:1fr}}
+.co header{display:flex;flex-direction:column;gap:4px}
+.co .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.co .tk{color:var(--muted);font-weight:500;font-size:.85rem;margin-left:6px}
+.co .price{font-variant-numeric:tabular-nums;color:var(--ink2);font-size:.9rem}
+.chg.up{color:var(--up)} .chg.down{color:var(--down)}
+.rng{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--grid);padding-top:8px}
+.rng .when{font-size:.8rem;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+.rng .main{font-size:1rem} .rng .main b{font-variant-numeric:tabular-nums}
+.rng .second{font-size:.88rem;color:var(--ink2)}
+.rng.is-late .main{color:var(--ink2)}
+.tag-late{font-size:.82rem;background:var(--late);border-radius:6px;padding:2px 8px;align-self:flex-start}
+.record{font-size:.88rem;color:var(--ink2)}
+.why h4{margin:6px 0 2px;font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.why ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px;font-size:.92rem}
+.why .meta{color:var(--muted);font-size:.8rem}
+.ref{font-size:.85em;white-space:nowrap}
+.ref-missing{color:var(--muted);font-family:ui-monospace,monospace;font-size:.8em}
+strong.bull{color:var(--up)} strong.bear{color:var(--down)}
+.tbl{overflow-x:auto} table{border-collapse:collapse;font-size:.85rem;font-variant-numeric:tabular-nums;width:100%}
+th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:.82rem;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:20;max-width:260px}
+#tip b{font-variant-numeric:tabular-nums}
+.empty{color:var(--ink2);font-size:.92rem}
+footer{color:var(--muted);font-size:.82rem;display:flex;flex-direction:column;gap:4px}
+.idx{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.idx a{display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;text-decoration:none;color:var(--ink);font-weight:600}
+.idx .r,.idx .c{font-weight:500;color:var(--ink2);font-size:.9rem}
+.idx p{color:var(--ink2);font-size:.9rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body><div class="wrap">
+<header style="display:flex;flex-direction:column;gap:6px"><div class="eyebrow">Market brief · india</div>
+<h1>India (NSE): daily reports</h1><p class="sub">Newest first. Research log, not investment advice.</p></header>
+<section class="panel"><ul class="idx"><li><a href="2026-10-07.html"><span class="d">2026-10-07</span><span class="r">EVENT_HEAVY</span><span class="c">0 calls</span></a><p>The RBI raised the repo rate by 25 bp to 5.5% this morning, its first hike since 2023 (ETV Bharat, The Indian Express), and the Nifty 50 was -0.41% shortly after the open. This run started after the open, so it makes no calls today.</p></li></ul></section>
+</div></body></html>
