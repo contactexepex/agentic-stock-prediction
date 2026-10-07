@@ -596,7 +596,7 @@ def page_block(market, cfg, con, ticker, company, sector, peers, cur, D, today, 
                          "tip": f"Headline {n['id']} tagged to {cfg['tickers'][peer]['name']}: sentiment {n['sentiment']:+.2f}, materiality {n['materiality']}; verification {st.replace('_', ' ')}."})
 
     mkt = []
-    names = list(regime.get("major_event_names") or [])
+    names = [str(x) for x in (regime.get("major_event_names") if regime.get("major_event_names") is not None else [])]
     if names:
         mkt.append({"name": f"{', '.join(names)} today", "dir": "unk", "str": 3, "sub": f"regime {regime['regime']}; ranges ×{load_ranges_config()['major_event_factor']}", "k": "live",
                     "tip": f"config/events.yaml: a major market-wide event inside the horizon raises the regime to EVENT_HEAVY and widens every range "

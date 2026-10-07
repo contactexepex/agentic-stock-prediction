@@ -1,0 +1,1829 @@
+{
+ "market": "india",
+ "market_name": "India (NSE)",
+ "exchange": "NSE",
+ "currency": {
+  "code": "INR",
+  "symbol": "\u20b9",
+  "locale": "en-IN",
+  "unit": "cr"
+ },
+ "as_of": "2026-10-06",
+ "today": "2026-10-07",
+ "built_at": "2026-10-07",
+ "window": [
+  "2026-08-17",
+  "2026-10-06"
+ ],
+ "call_threshold": 0.6,
+ "header": {
+  "regime": "EVENT_HEAVY",
+  "major_event_names": [
+   "RBI policy decision"
+  ],
+  "vol_level": 13.7375,
+  "vol_name": "India VIX",
+  "vol_move": -7.92,
+  "vol_close": 13.61,
+  "bench_name": "Nifty 50",
+  "bench_close": 22776.0996,
+  "bench_move": 0.98,
+  "bench_move_5": -0.02,
+  "bench_live": {
+   "price": 22681.75,
+   "change_pct": -0.41,
+   "ts": "2026-10-07 04:55:00+00:00"
+  },
+  "flows": {
+   "date": "2026-10-06",
+   "fii": -2961.3,
+   "dii": 5088.92
+  },
+  "run_at": "2026-10-07 05:11:06+00:00",
+  "session": {
+   "market": "india",
+   "local_time": "2026-10-07T20:31+05:30",
+   "trading_day": true,
+   "session_date": "2026-10-08",
+   "previous_session": "2026-10-07",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-08T03:45:00+00:00",
+   "session_close_utc": "2026-10-08T10:00:00+00:00",
+   "in_session": false,
+   "late_run": false
+  },
+  "n": 20,
+  "yes": [],
+  "candidates": [],
+  "abstain": 20,
+  "blocked": [
+   "TCS"
+  ],
+  "scored_total": 0,
+  "model_skill": false,
+  "review_week": "2026-W40",
+  "up": 14,
+  "down": 6,
+  "news_total": 462,
+  "news_high": 70
+ },
+ "sectors": [
+  {
+   "name": "Banks",
+   "members": [
+    "HDFCBANK",
+    "ICICIBANK"
+   ],
+   "index": {
+    "symbol": "NIFTYBANK",
+    "name": "Nifty Bank",
+    "move": 0.76,
+    "move_5": 1.21
+   }
+  },
+  {
+   "name": "IT",
+   "members": [
+    "INFY",
+    "TCS"
+   ],
+   "index": {
+    "symbol": "NIFTYIT",
+    "name": "Nifty IT",
+    "move": -0.59,
+    "move_5": 0.18
+   }
+  },
+  {
+   "name": "Insurance",
+   "members": [
+    "SBILIFE",
+    "HDFCLIFE"
+   ],
+   "index": null
+  },
+  {
+   "name": "Transport",
+   "members": [
+    "ADANIPORTS",
+    "INDIGO"
+   ],
+   "index": null
+  },
+  {
+   "name": "Energy",
+   "members": [
+    "RELIANCE",
+    "ONGC"
+   ],
+   "index": null
+  },
+  {
+   "name": "Pharma",
+   "members": [
+    "SUNPHARMA",
+    "DRREDDY"
+   ],
+   "index": {
+    "symbol": "NIFTYPHARMA",
+    "name": "Nifty Pharma",
+    "move": 1.66,
+    "move_5": -0.79
+   }
+  },
+  {
+   "name": "Autos",
+   "members": [
+    "M&M",
+    "MARUTI"
+   ],
+   "index": null
+  },
+  {
+   "name": "Consumer goods",
+   "members": [
+    "HINDUNILVR",
+    "ITC"
+   ],
+   "index": null
+  },
+  {
+   "name": "Construction",
+   "members": [
+    "LT",
+    "ULTRACEMCO"
+   ],
+   "index": null
+  },
+  {
+   "name": "Metals",
+   "members": [
+    "TATASTEEL",
+    "HINDALCO"
+   ],
+   "index": null
+  }
+ ],
+ "rows": [
+  {
+   "ticker": "HDFCBANK",
+   "name": "HDFC Bank",
+   "sector": "Banks",
+   "close": 711.45,
+   "date": "2026-10-06",
+   "move": 0.94,
+   "move_5": -1.06,
+   "move_20": -0.09,
+   "spark": [
+    712.1,
+    710.5,
+    703.0,
+    687.1,
+    693.8,
+    708.25,
+    716.55,
+    721.5,
+    713.0,
+    731.0,
+    739.5,
+    738.6,
+    737.25,
+    728.9,
+    735.6,
+    719.05,
+    722.7,
+    708.7,
+    721.2,
+    704.8,
+    711.45
+   ],
+   "rsi": 46,
+   "rel_sector_5d": -4.19,
+   "quality": "OK",
+   "days_to_earnings": 10,
+   "p1": 0.4714,
+   "p5": 0.4708,
+   "news_score": 0.0135,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 679.23,
+    "hi80": 749.41,
+    "lo50": 696.3,
+    "hi50": 731.22,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 711.45
+   },
+   "range1": {
+    "lo80": 705.17,
+    "hi80": 728.65,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 76,
+   "cover_n": 34,
+   "cover80_5d": 87,
+   "next_earnings": {
+    "date": "2026-10-17",
+    "timing": null,
+    "days": 10
+   },
+   "news": {
+    "n": 123,
+    "high": 25,
+    "latest": "2026-10-07 04:47:23+00:00"
+   },
+   "best_status": "single_source",
+   "cue": {
+    "symbol": "HDFCBANK:ADR",
+    "change_pct": 1.4,
+    "ts": "2026-10-06 21:25:00+00:00",
+    "kind": "ADR"
+   },
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "ICICIBANK",
+   "name": "ICICI Bank",
+   "sector": "Banks",
+   "close": 1342.8,
+   "date": "2026-10-06",
+   "move": 0.81,
+   "move_5": 3.13,
+   "move_20": -5.65,
+   "spark": [
+    1423.2,
+    1427.5,
+    1399.4,
+    1389.1,
+    1384.5,
+    1379.3,
+    1350.4,
+    1358.8,
+    1347.6,
+    1338.9,
+    1345.0,
+    1339.6,
+    1340.0,
+    1334.5,
+    1326.8,
+    1302.0,
+    1292.2,
+    1321.7,
+    1310.6,
+    1332.0,
+    1342.8
+   ],
+   "rsi": 45,
+   "rel_sector_5d": 4.19,
+   "quality": "OK",
+   "days_to_earnings": 10,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1300.26,
+    "hi80": 1405.47,
+    "lo50": 1326.05,
+    "hi50": 1378.41,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1342.8
+   },
+   "range1": {
+    "lo80": 1300.05,
+    "hi80": 1334.75,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 79,
+   "cover_n": 34,
+   "cover80_5d": 80,
+   "next_earnings": {
+    "date": "2026-10-17",
+    "timing": null,
+    "days": 10
+   },
+   "news": {
+    "n": 21,
+    "high": 0,
+    "latest": "2026-10-07 04:47:23+00:00"
+   },
+   "best_status": "unverified",
+   "cue": {
+    "symbol": "ICICIBANK:ADR",
+    "change_pct": 2.02,
+    "ts": "2026-10-06 23:45:00+00:00",
+    "kind": "ADR"
+   },
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "INFY",
+   "name": "Infosys",
+   "sector": "IT",
+   "close": 1013.85,
+   "date": "2026-10-06",
+   "move": -0.65,
+   "move_5": 1.06,
+   "move_20": -10.28,
+   "spark": [
+    1130.0,
+    1087.5,
+    1082.0,
+    1035.0,
+    1036.5,
+    1037.7,
+    1077.0,
+    1060.0,
+    1058.6,
+    1051.4,
+    1038.5,
+    1029.4,
+    1020.5,
+    1014.5,
+    1000.2,
+    1003.2,
+    1015.4,
+    994.1,
+    1035.0,
+    1020.5,
+    1013.85
+   ],
+   "rsi": 40,
+   "rel_sector_5d": -0.35,
+   "quality": "OK",
+   "days_to_earnings": 16,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 937.27,
+    "hi80": 1067.58,
+    "lo50": 968.58,
+    "hi50": 1033.42,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1013.85
+   },
+   "range1": {
+    "lo80": 1000.97,
+    "hi80": 1048.88,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 82,
+   "cover_n": 34,
+   "cover80_5d": 90,
+   "next_earnings": {
+    "date": "2026-10-23",
+    "timing": null,
+    "days": 16
+   },
+   "news": {
+    "n": 28,
+    "high": 0,
+    "latest": "2026-10-07 02:48:16+00:00"
+   },
+   "best_status": "single_source",
+   "cue": {
+    "symbol": "INFY:ADR",
+    "change_pct": -1.58,
+    "ts": "2026-10-06 21:05:00+00:00",
+    "kind": "ADR"
+   },
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "TCS",
+   "name": "Tata Consultancy Services",
+   "sector": "IT",
+   "close": 2100.0,
+   "date": "2026-10-06",
+   "move": -0.68,
+   "move_5": 1.41,
+   "move_20": -8.85,
+   "spark": [
+    2304.0,
+    2270.0,
+    2255.5,
+    2208.0,
+    2204.1,
+    2200.8,
+    2251.0,
+    2188.8,
+    2190.0,
+    2105.0,
+    2128.7,
+    2105.0,
+    2089.6,
+    2087.0,
+    2082.0,
+    2070.7,
+    2032.4,
+    2050.6,
+    2075.0,
+    2114.4,
+    2100.0
+   ],
+   "rsi": 41,
+   "rel_sector_5d": 0.35,
+   "quality": "OK",
+   "days_to_earnings": 1,
+   "p1": 0.4719,
+   "p5": 0.4713,
+   "news_score": 0.0337,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1942.99,
+    "hi80": 2242.44,
+    "lo50": 2014.57,
+    "hi50": 2163.56,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 2100.0
+   },
+   "range1": {
+    "lo80": 2033.39,
+    "hi80": 2115.63,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 85,
+   "cover_n": 34,
+   "cover80_5d": 97,
+   "next_earnings": {
+    "date": "2026-10-08",
+    "timing": null,
+    "days": 1
+   },
+   "news": {
+    "n": 43,
+    "high": 0,
+    "latest": "2026-10-07 04:30:41+00:00"
+   },
+   "best_status": "single_source",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "SBILIFE",
+   "name": "SBI Life Insurance",
+   "sector": "Insurance",
+   "close": 1750.0,
+   "date": "2026-10-06",
+   "move": 2.37,
+   "move_5": 1.27,
+   "move_20": -1.41,
+   "spark": [
+    1775.0,
+    1732.0,
+    1696.6,
+    1684.0,
+    1700.6,
+    1684.7,
+    1654.1,
+    1697.9,
+    1766.9,
+    1731.0,
+    1756.0,
+    1756.3,
+    1760.0,
+    1755.0,
+    1742.0,
+    1728.1,
+    1735.0,
+    1696.4,
+    1721.6,
+    1709.5,
+    1750.0
+   ],
+   "rsi": 52,
+   "rel_sector_5d": -1.06,
+   "quality": "OK",
+   "days_to_earnings": 16,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1650.19,
+    "hi80": 1838.98,
+    "lo50": 1695.93,
+    "hi50": 1789.88,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1750.0
+   },
+   "range1": {
+    "lo80": 1689.55,
+    "hi80": 1752.84,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 71,
+   "cover_n": 34,
+   "cover80_5d": 80,
+   "next_earnings": {
+    "date": "2026-10-23",
+    "timing": null,
+    "days": 16
+   },
+   "news": {
+    "n": 5,
+    "high": 0,
+    "latest": "2026-10-07 04:21:07+00:00"
+   },
+   "best_status": null,
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "HDFCLIFE",
+   "name": "HDFC Life",
+   "sector": "Insurance",
+   "close": 543.95,
+   "date": "2026-10-06",
+   "move": 2.44,
+   "move_5": 2.32,
+   "move_20": -0.45,
+   "spark": [
+    546.4,
+    533.2,
+    533.8,
+    514.0,
+    526.15,
+    530.0,
+    516.1,
+    530.2,
+    557.0,
+    550.95,
+    559.4,
+    559.2,
+    561.5,
+    526.9,
+    531.0,
+    531.6,
+    523.55,
+    521.2,
+    534.2,
+    531.0,
+    543.95
+   ],
+   "rsi": 53,
+   "rel_sector_5d": 1.06,
+   "quality": "OK",
+   "days_to_earnings": 8,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 501.47,
+    "hi80": 582.62,
+    "lo50": 520.82,
+    "hi50": 561.19,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 543.95
+   },
+   "range1": {
+    "lo80": 519.9,
+    "hi80": 548.26,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 74,
+   "cover_n": 34,
+   "cover80_5d": 73,
+   "next_earnings": {
+    "date": "2026-10-15",
+    "timing": null,
+    "days": 8
+   },
+   "news": {
+    "n": 2,
+    "high": 1,
+    "latest": "2026-10-06 11:59:25+00:00"
+   },
+   "best_status": "unverified",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "ADANIPORTS",
+   "name": "Adani Ports",
+   "sector": "Transport",
+   "close": 1783.4,
+   "date": "2026-10-06",
+   "move": 0.53,
+   "move_5": 2.28,
+   "move_20": 4.46,
+   "spark": [
+    1707.3,
+    1694.3,
+    1710.0,
+    1775.0,
+    1768.0,
+    1764.6,
+    1713.8,
+    1723.8,
+    1738.3,
+    1824.0,
+    1787.1,
+    1795.0,
+    1807.3,
+    1785.3,
+    1788.0,
+    1743.7,
+    1822.0,
+    1798.3,
+    1737.8,
+    1774.0,
+    1783.4
+   ],
+   "rsi": 53,
+   "rel_sector_5d": -1.33,
+   "quality": "OK",
+   "days_to_earnings": 21,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1640.1,
+    "hi80": 1914.13,
+    "lo50": 1705.32,
+    "hi50": 1841.65,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1783.4
+   },
+   "range1": {
+    "lo80": 1689.33,
+    "hi80": 1785.5,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 76,
+   "cover_n": 34,
+   "cover80_5d": 97,
+   "next_earnings": {
+    "date": "2026-10-28",
+    "timing": null,
+    "days": 21
+   },
+   "news": {
+    "n": 12,
+    "high": 0,
+    "latest": "2026-10-07 04:47:05+00:00"
+   },
+   "best_status": null,
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "INDIGO",
+   "name": "InterGlobe Aviation",
+   "sector": "Transport",
+   "close": 5050.5,
+   "date": "2026-10-06",
+   "move": 2.34,
+   "move_5": 3.61,
+   "move_20": 1.48,
+   "spark": [
+    4977.0,
+    5001.0,
+    5000.0,
+    4975.0,
+    4945.0,
+    4973.0,
+    4776.0,
+    4733.5,
+    4845.0,
+    4920.0,
+    4941.0,
+    5030.0,
+    5028.5,
+    4890.0,
+    4940.0,
+    4874.5,
+    4872.0,
+    4984.0,
+    4929.9,
+    4935.0,
+    5050.5
+   ],
+   "rsi": 54,
+   "rel_sector_5d": 1.33,
+   "quality": "OK",
+   "days_to_earnings": 27,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 4751.67,
+    "hi80": 5317.45,
+    "lo50": 4888.53,
+    "hi50": 5170.08,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 5050.5
+   },
+   "range1": {
+    "lo80": 4833.32,
+    "hi80": 5024.14,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 82,
+   "cover_n": 34,
+   "cover80_5d": 87,
+   "next_earnings": {
+    "date": "2026-11-03",
+    "timing": null,
+    "days": 27
+   },
+   "news": {
+    "n": 27,
+    "high": 0,
+    "latest": "2026-10-06 17:04:13+00:00"
+   },
+   "best_status": "single_source",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "RELIANCE",
+   "name": "Reliance Industries",
+   "sector": "Energy",
+   "close": 1218.0,
+   "date": "2026-10-06",
+   "move": 2.66,
+   "move_5": 1.7,
+   "move_20": -7.87,
+   "spark": [
+    1322.0,
+    1309.5,
+    1294.9,
+    1279.0,
+    1274.0,
+    1257.5,
+    1235.3,
+    1240.0,
+    1243.9,
+    1226.4,
+    1247.4,
+    1240.4,
+    1248.0,
+    1219.2,
+    1226.0,
+    1197.6,
+    1182.0,
+    1187.0,
+    1167.7,
+    1186.4,
+    1218.0
+   ],
+   "rsi": 44,
+   "rel_sector_5d": 4.23,
+   "quality": "OK",
+   "days_to_earnings": 9,
+   "p1": 0.4742,
+   "p5": 0.4736,
+   "news_score": 0.1275,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1153.97,
+    "hi80": 1274.83,
+    "lo50": 1183.35,
+    "hi50": 1243.5,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1218.0
+   },
+   "range1": {
+    "lo80": 1149.23,
+    "hi80": 1185.65,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 76,
+   "cover_n": 34,
+   "cover80_5d": 73,
+   "next_earnings": {
+    "date": "2026-10-16",
+    "timing": null,
+    "days": 9
+   },
+   "news": {
+    "n": 48,
+    "high": 25,
+    "latest": "2026-10-07 04:50:05+00:00"
+   },
+   "best_status": "single_source",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "ONGC",
+   "name": "ONGC",
+   "sector": "Energy",
+   "close": 224.2,
+   "date": "2026-10-06",
+   "move": -0.31,
+   "move_5": -2.52,
+   "move_20": -4.45,
+   "spark": [
+    234.65,
+    233.7,
+    236.0,
+    234.02,
+    237.27,
+    232.5,
+    235.95,
+    236.8,
+    232.43,
+    232.8,
+    235.63,
+    236.13,
+    236.9,
+    239.0,
+    235.86,
+    230.0,
+    230.0,
+    225.8,
+    222.37,
+    224.9,
+    224.2
+   ],
+   "rsi": 35,
+   "rel_sector_5d": -4.23,
+   "quality": "OK",
+   "days_to_earnings": 30,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 214.35,
+    "hi80": 232.87,
+    "lo50": 218.88,
+    "hi50": 228.1,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 224.2
+   },
+   "range1": {
+    "lo80": 219.03,
+    "hi80": 225.62,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 76,
+   "cover_n": 34,
+   "cover80_5d": 90,
+   "next_earnings": {
+    "date": "2026-11-06",
+    "timing": null,
+    "days": 30
+   },
+   "news": {
+    "n": 6,
+    "high": 0,
+    "latest": "2026-10-06 08:59:23+00:00"
+   },
+   "best_status": "unverified",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "SUNPHARMA",
+   "name": "Sun Pharma",
+   "sector": "Pharma",
+   "close": 1804.1,
+   "date": "2026-10-06",
+   "move": 1.37,
+   "move_5": -1.84,
+   "move_20": -5.0,
+   "spark": [
+    1899.0,
+    1895.0,
+    1885.9,
+    1864.9,
+    1861.0,
+    1840.0,
+    1835.0,
+    1853.5,
+    1867.3,
+    1837.3,
+    1868.9,
+    1846.4,
+    1865.0,
+    1849.9,
+    1852.2,
+    1838.0,
+    1865.0,
+    1816.6,
+    1801.0,
+    1779.7,
+    1804.1
+   ],
+   "rsi": 40,
+   "rel_sector_5d": -0.78,
+   "quality": "OK",
+   "days_to_earnings": 29,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1720.73,
+    "hi80": 1877.64,
+    "lo50": 1759.06,
+    "hi50": 1837.15,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1804.1
+   },
+   "range1": {
+    "lo80": 1773.57,
+    "hi80": 1827.65,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 79,
+   "cover_n": 34,
+   "cover80_5d": 93,
+   "next_earnings": {
+    "date": "2026-11-05",
+    "timing": null,
+    "days": 29
+   },
+   "news": {
+    "n": 14,
+    "high": 1,
+    "latest": "2026-10-07 02:59:33+00:00"
+   },
+   "best_status": "unverified",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "DRREDDY",
+   "name": "Dr Reddy's",
+   "sector": "Pharma",
+   "close": 1208.0,
+   "date": "2026-10-06",
+   "move": 0.42,
+   "move_5": -1.06,
+   "move_20": 4.95,
+   "spark": [
+    1151.0,
+    1144.2,
+    1151.0,
+    1145.0,
+    1143.0,
+    1165.5,
+    1145.0,
+    1140.0,
+    1175.0,
+    1185.0,
+    1198.3,
+    1211.0,
+    1211.2,
+    1200.4,
+    1201.0,
+    1221.0,
+    1251.9,
+    1233.0,
+    1206.2,
+    1203.0,
+    1208.0
+   ],
+   "rsi": 54,
+   "rel_sector_5d": 0.78,
+   "quality": "OK",
+   "days_to_earnings": 16,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1155.63,
+    "hi80": 1270.02,
+    "lo50": 1183.5,
+    "hi50": 1240.42,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1208.0
+   },
+   "range1": {
+    "lo80": 1181.89,
+    "hi80": 1223.55,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 79,
+   "cover_n": 34,
+   "cover80_5d": 90,
+   "next_earnings": {
+    "date": "2026-10-23",
+    "timing": null,
+    "days": 16
+   },
+   "news": {
+    "n": 5,
+    "high": 0,
+    "latest": "2026-10-06 06:09:03+00:00"
+   },
+   "best_status": "unverified",
+   "cue": {
+    "symbol": "DRREDDY:ADR",
+    "change_pct": 1.38,
+    "ts": "2026-10-06 21:25:00+00:00",
+    "kind": "ADR"
+   },
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "M&M",
+   "name": "Mahindra & Mahindra",
+   "sector": "Autos",
+   "close": 2855.0,
+   "date": "2026-10-06",
+   "move": -0.09,
+   "move_5": -4.67,
+   "move_20": -9.94,
+   "spark": [
+    3170.0,
+    3160.0,
+    3160.0,
+    3150.0,
+    3123.8,
+    3107.0,
+    3029.5,
+    3070.0,
+    3076.5,
+    3052.0,
+    3055.3,
+    3044.5,
+    3035.0,
+    2982.7,
+    3035.0,
+    2995.0,
+    2947.8,
+    2950.0,
+    2860.0,
+    2857.6,
+    2855.0
+   ],
+   "rsi": 23,
+   "rel_sector_5d": -1.48,
+   "quality": "OK",
+   "days_to_earnings": 28,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 2715.35,
+    "hi80": 2978.51,
+    "lo50": 2779.5,
+    "hi50": 2910.47,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 2855.0
+   },
+   "range1": {
+    "lo80": 2810.68,
+    "hi80": 2908.01,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 82,
+   "cover_n": 34,
+   "cover80_5d": 77,
+   "next_earnings": {
+    "date": "2026-11-04",
+    "timing": null,
+    "days": 28
+   },
+   "news": {
+    "n": 13,
+    "high": 0,
+    "latest": "2026-10-07 04:22:09+00:00"
+   },
+   "best_status": null,
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "MARUTI",
+   "name": "Maruti Suzuki",
+   "sector": "Autos",
+   "close": 11625.0,
+   "date": "2026-10-06",
+   "move": 0.81,
+   "move_5": -3.19,
+   "move_20": -8.42,
+   "spark": [
+    12694.0,
+    12760.0,
+    12641.0,
+    12618.0,
+    12590.0,
+    12400.0,
+    12231.0,
+    12166.0,
+    12338.0,
+    12103.0,
+    12153.0,
+    12190.0,
+    12230.0,
+    11990.0,
+    12065.0,
+    12008.0,
+    11877.0,
+    11967.0,
+    11386.0,
+    11532.0,
+    11625.0
+   ],
+   "rsi": 31,
+   "rel_sector_5d": 1.48,
+   "quality": "OK",
+   "days_to_earnings": 22,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 10934.27,
+    "hi80": 12242.2,
+    "lo50": 11250.6,
+    "hi50": 11901.45,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 11625.0
+   },
+   "range1": {
+    "lo80": 11152.1,
+    "hi80": 11614.45,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 82,
+   "cover_n": 34,
+   "cover80_5d": 73,
+   "next_earnings": {
+    "date": "2026-10-29",
+    "timing": null,
+    "days": 22
+   },
+   "news": {
+    "n": 9,
+    "high": 0,
+    "latest": "2026-10-06 06:18:00+00:00"
+   },
+   "best_status": "unverified",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "HINDUNILVR",
+   "name": "Hindustan Unilever",
+   "sector": "Consumer goods",
+   "close": 1895.2,
+   "date": "2026-10-06",
+   "move": 3.09,
+   "move_5": -0.04,
+   "move_20": -3.96,
+   "spark": [
+    1973.4,
+    1960.0,
+    1980.0,
+    1945.0,
+    1942.3,
+    1927.0,
+    1938.1,
+    1962.0,
+    1942.2,
+    1932.0,
+    1947.0,
+    1933.8,
+    1950.0,
+    1933.5,
+    1942.9,
+    1896.0,
+    1863.8,
+    1879.1,
+    1836.0,
+    1838.4,
+    1895.2
+   ],
+   "rsi": 43,
+   "rel_sector_5d": -0.61,
+   "quality": "OK",
+   "days_to_earnings": 22,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 1794.08,
+    "hi80": 1985.02,
+    "lo50": 1840.47,
+    "hi50": 1935.49,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 1895.2
+   },
+   "range1": {
+    "lo80": 1806.41,
+    "hi80": 1864.78,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 85,
+   "cover_n": 34,
+   "cover80_5d": 93,
+   "next_earnings": {
+    "date": "2026-10-29",
+    "timing": null,
+    "days": 22
+   },
+   "news": {
+    "n": 9,
+    "high": 0,
+    "latest": "2026-10-07 02:46:13+00:00"
+   },
+   "best_status": null,
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "ITC",
+   "name": "ITC",
+   "sector": "Consumer goods",
+   "close": 266.7,
+   "date": "2026-10-06",
+   "move": -0.82,
+   "move_5": 0.57,
+   "move_20": 0.98,
+   "spark": [
+    264.1,
+    263.5,
+    263.5,
+    260.8,
+    259.3,
+    259.85,
+    258.0,
+    264.15,
+    266.2,
+    262.3,
+    267.0,
+    265.8,
+    270.15,
+    268.0,
+    269.0,
+    265.2,
+    265.1,
+    262.75,
+    255.9,
+    268.9,
+    266.7
+   ],
+   "rsi": 50,
+   "rel_sector_5d": 0.61,
+   "quality": "OK",
+   "days_to_earnings": 22,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 249.31,
+    "hi80": 282.33,
+    "lo50": 257.26,
+    "hi50": 273.69,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 266.7
+   },
+   "range1": {
+    "lo80": 251.52,
+    "hi80": 260.16,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 76,
+   "cover_n": 34,
+   "cover80_5d": 93,
+   "next_earnings": {
+    "date": "2026-10-29",
+    "timing": null,
+    "days": 22
+   },
+   "news": {
+    "n": 16,
+    "high": 0,
+    "latest": "2026-10-07 03:00:22+00:00"
+   },
+   "best_status": null,
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "LT",
+   "name": "Larsen & Toubro",
+   "sector": "Construction",
+   "close": 3770.0,
+   "date": "2026-10-06",
+   "move": 0.53,
+   "move_5": 0.1,
+   "move_20": -4.9,
+   "spark": [
+    3964.1,
+    3999.0,
+    3946.1,
+    3922.6,
+    3955.0,
+    3930.7,
+    3850.7,
+    3807.7,
+    3836.2,
+    3885.0,
+    3904.8,
+    3866.4,
+    3929.9,
+    3858.4,
+    3876.2,
+    3766.4,
+    3749.1,
+    3760.0,
+    3693.4,
+    3750.0,
+    3770.0
+   ],
+   "rsi": 40,
+   "rel_sector_5d": 2.59,
+   "quality": "OK",
+   "days_to_earnings": 21,
+   "p1": 0.508,
+   "p5": 0.5074,
+   "news_score": 1.479,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 3597.89,
+    "hi80": 3921.74,
+    "lo50": 3677.02,
+    "hi50": 3838.2,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 3770.0
+   },
+   "range1": {
+    "lo80": 3636.82,
+    "hi80": 3748.37,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 76,
+   "cover_n": 34,
+   "cover80_5d": 77,
+   "next_earnings": {
+    "date": "2026-10-28",
+    "timing": null,
+    "days": 21
+   },
+   "news": {
+    "n": 22,
+    "high": 18,
+    "latest": "2026-10-07 04:52:27+00:00"
+   },
+   "best_status": "confirmed_primary",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "ULTRACEMCO",
+   "name": "UltraTech Cement",
+   "sector": "Construction",
+   "close": 10750.0,
+   "date": "2026-10-06",
+   "move": -0.92,
+   "move_5": -2.49,
+   "move_20": -5.77,
+   "spark": [
+    11408.0,
+    11175.0,
+    11009.0,
+    10900.0,
+    10979.0,
+    11000.0,
+    10697.0,
+    10700.0,
+    10764.0,
+    11014.0,
+    11100.0,
+    11000.0,
+    11155.0,
+    11056.0,
+    11155.0,
+    11025.0,
+    10829.0,
+    10956.0,
+    10710.0,
+    10850.0,
+    10750.0
+   ],
+   "rsi": 40,
+   "rel_sector_5d": -2.59,
+   "quality": "OK",
+   "days_to_earnings": 12,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 10229.38,
+    "hi80": 11210.25,
+    "lo50": 10468.56,
+    "hi50": 10956.71,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 10750.0
+   },
+   "range1": {
+    "lo80": 10534.89,
+    "hi80": 10880.32,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 79,
+   "cover_n": 34,
+   "cover80_5d": 83,
+   "next_earnings": {
+    "date": "2026-10-19",
+    "timing": null,
+    "days": 12
+   },
+   "news": {
+    "n": 28,
+    "high": 0,
+    "latest": "2026-10-07 03:00:38+00:00"
+   },
+   "best_status": "unverified",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "TATASTEEL",
+   "name": "Tata Steel",
+   "sector": "Metals",
+   "close": 178.69,
+   "date": "2026-10-06",
+   "move": 0.31,
+   "move_5": -4.08,
+   "move_20": -5.35,
+   "spark": [
+    188.79,
+    185.61,
+    184.15,
+    188.75,
+    186.78,
+    183.0,
+    183.65,
+    183.0,
+    187.29,
+    185.54,
+    183.4,
+    184.97,
+    190.82,
+    188.02,
+    187.97,
+    186.3,
+    188.0,
+    184.3,
+    178.0,
+    178.14,
+    178.69
+   ],
+   "rsi": 39,
+   "rel_sector_5d": -2.47,
+   "quality": "OK",
+   "days_to_earnings": 35,
+   "p1": 0.4744,
+   "p5": 0.4737,
+   "news_score": 0.1332,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 168.75,
+    "hi80": 187.54,
+    "lo50": 173.31,
+    "hi50": 182.66,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 178.69
+   },
+   "range1": {
+    "lo80": 174.5,
+    "hi80": 181.41,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 74,
+   "cover_n": 34,
+   "cover80_5d": 90,
+   "next_earnings": {
+    "date": "2026-11-11",
+    "timing": null,
+    "days": 35
+   },
+   "news": {
+    "n": 27,
+    "high": 0,
+    "latest": "2026-10-07 02:45:56+00:00"
+   },
+   "best_status": "single_source",
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  },
+  {
+   "ticker": "HINDALCO",
+   "name": "Hindalco",
+   "sector": "Metals",
+   "close": 940.5,
+   "date": "2026-10-06",
+   "move": 0.22,
+   "move_5": -1.61,
+   "move_20": -6.97,
+   "spark": [
+    1011.0,
+    1006.0,
+    1009.0,
+    1026.9,
+    1014.0,
+    981.5,
+    958.7,
+    972.7,
+    980.5,
+    986.5,
+    981.2,
+    973.0,
+    1003.8,
+    982.0,
+    977.0,
+    955.9,
+    955.2,
+    941.8,
+    941.85,
+    938.4,
+    940.5
+   ],
+   "rsi": 36,
+   "rel_sector_5d": 2.47,
+   "quality": "OK",
+   "days_to_earnings": 30,
+   "p1": 0.4711,
+   "p5": 0.4704,
+   "news_score": 0.0,
+   "decision_1d": "abstain",
+   "decision_5d": "abstain",
+   "verdict": {
+    "word": "NO",
+    "strength": null,
+    "confidence": null,
+    "horizon": null
+   },
+   "range5": {
+    "lo80": 889.72,
+    "hi80": 985.64,
+    "lo50": 913.01,
+    "hi50": 960.74,
+    "target": "2026-10-13",
+    "as_of": "2026-10-06",
+    "base": 940.5
+   },
+   "range1": {
+    "lo80": 924.01,
+    "hi80": 959.24,
+    "target": "2026-10-05",
+    "as_of": "2026-10-01"
+   },
+   "cover80_1d": 74,
+   "cover_n": 34,
+   "cover80_5d": 90,
+   "next_earnings": {
+    "date": "2026-11-06",
+    "timing": null,
+    "days": 30
+   },
+   "news": {
+    "n": 4,
+    "high": 0,
+    "latest": "2026-10-07 03:10:05+00:00"
+   },
+   "best_status": null,
+   "cue": null,
+   "scored": {
+    "n": 0,
+    "hits": 0
+   }
+  }
+ ]
+}
