@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 
 from marketbrief.analytics import call_basis
-from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES
 from marketbrief.constants.indicators import TRADING_DAYS
 from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
 from marketbrief.core.calendar import next_session, sessions_ahead
@@ -69,18 +69,19 @@ def call_window(cfg: dict, as_of: date, horizon: int, basis: str,
 def open_calls(con, cfg: dict, session_date: date, check_at: datetime) -> dict[str, list[dict]]:
     """{ticker: calls}: predictions made and model scores computed by check_at whose scored window contains this
     session. Each model score id: its newest row by check_at (basis = its label_convention); a prediction's basis is
-    call_basis.basis_for(made_at). entry_kind: open (open_to_close: the open of entry_date) or close (close_to_close:
-    the as-of close)."""
+    call_basis.basis_for(made_at). Each call's window follows its horizon label (issue #94), stored per call as
+    `horizon_label`: a model score's stored label, a prediction's from its made_at. entry_kind: open (open_to_close:
+    the open of entry_date) or close (close_to_close: the as-of close)."""
     since = session_date - timedelta(days=call_lookback_days(configured_horizons()))
     predictions = con.execute(
-        "SELECT id, ticker, horizon_days, as_of_date, made_at, made_at AS made_when, direction, NULL AS prob_up, "
+        "SELECT id, ticker, horizon_days, as_of_date, made_at, NULL AS stored_label, direction, NULL AS prob_up, "
         "NULL AS label_convention FROM predictions WHERE made_at <= ? AND as_of_date >= ? AND as_of_date < ? "
         "ORDER BY id",
         [check_at, since, session_date],
     ).df()
     scores = con.execute(
-        "SELECT DISTINCT ON (id) id, ticker, horizon_days, as_of_date, NULL AS made_at, computed_at AS made_when, "
-        "NULL AS direction, prob_up, "
+        "SELECT DISTINCT ON (id) id, ticker, horizon_days, as_of_date, NULL AS made_at, "
+        f"{SQL_LABEL_MODEL_SCORES} AS stored_label, NULL AS direction, prob_up, "
         "label_convention FROM model_scores WHERE computed_at <= ? AND as_of_date >= ? AND as_of_date < ? "
         "ORDER BY id, computed_at DESC",
         [check_at, since, session_date],
@@ -95,12 +96,14 @@ def open_calls(con, cfg: dict, session_date: date, check_at: datetime) -> dict[s
             else:
                 basis = row["label_convention"] or LABEL_OPEN_TO_CLOSE
             horizon = int(row["horizon_days"])
-            label = call_basis.horizon_label(basis, horizon, row["made_when"], n_plus_k_since)   # issue #94
+            # issue #94: a model score's window is the label it is stored with (unlabelled rows: SQL_LABEL_MODEL_SCORES,
+            # as B10's readers); a prediction's follows its made_at (call_basis.horizon_label, as score_predictions)
+            label = row["stored_label"] or call_basis.horizon_label(basis, horizon, row["made_at"], n_plus_k_since)
             first, last = call_window(cfg, as_of, horizon, basis, label)
             if first <= session_date <= last:
                 by_open = basis == LABEL_OPEN_TO_CLOSE
                 out.setdefault(row["ticker"], []).append({
-                    "source": source, "id": row["id"], "horizon_days": int(row["horizon_days"]),
+                    "source": source, "id": row["id"], "horizon_days": horizon,
                     "direction": row["direction"], "prob_up": row["prob_up"], "basis": basis, "horizon_label": label,
                     "entry_kind": "open" if by_open else "close",
                     "entry_date": (first if by_open else as_of).isoformat(), "last_session": last.isoformat(),

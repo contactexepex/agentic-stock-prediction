@@ -545,3 +545,24 @@ def test_old_five_day_score_keeps_its_d4_window(market):
     assert "2026-09-29-NVDA-5d" not in found                     # ended at D+4 = 10-06
     assert found["2026-10-02-NVDA-5d"]["horizon_label"] == "legacy_5d_d4"
     assert found["2026-10-02-NVDA-5d"]["last_session"] == "2026-10-09"   # D = 10-05, D+4 = 10-09
+
+
+def test_score_window_follows_its_stored_label_not_its_time(market):
+    """Issue #94 (judge round 1): a model score's window is the label it is stored with, as B10's other readers do,
+    whatever its computed_at: a 5-day score stored n_plus_k ends at D+5 even when computed before
+    call_scoring.n_plus_k_from; an unlabelled 5-day score is legacy_5d_d4 (D+4) even when computed after it."""
+    from marketbrief.intraday.inputs import open_calls
+
+    root, cfg, _settings = market
+    jl(root, "model_scores", "2026-10-07", [
+        {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00",
+         "horizon_label": "n_plus_k"},
+        {"id": "2026-09-29-AAPL-5d", "as_of_date": "2026-09-29", "ticker": "AAPL", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-10-07T16:00:00+00:00"}])
+    late = datetime(2026, 10, 7, 23, 0, tzinfo=timezone.utc)          # after n_plus_k_from (2026-10-07T21:19Z)
+    calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), late)
+    nvda = {call["id"]: call for call in calls.get("NVDA", [])}
+    assert nvda["2026-09-29-NVDA-5d"]["horizon_label"] == "n_plus_k"
+    assert nvda["2026-09-29-NVDA-5d"]["last_session"] == "2026-10-07"   # D = 09-30, D+5 = 10-07
+    assert "2026-09-29-AAPL-5d" not in {call["id"] for call in calls.get("AAPL", [])}   # D+4 = 10-06: ended
