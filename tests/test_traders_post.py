@@ -132,9 +132,24 @@ def test_track_record_bands_from_settled_ai_trades():
     assert track_record.refusal(0.55, {"0.50-0.60": {"n": 20, "hits": 10, "hit_rate": 0.5, "low": 0.5}}) is None
 
 
-def test_per_horizon_inputs_wait_for_b10():
+def test_per_horizon_inputs_unavailable_while_the_contract_is_a_stub(monkeypatch):
+    """Without B10's per-horizon records (the W1 stub raises NotImplementedError) the traders stop with
+    InputsUnavailableError; with them, per_horizon keys every record by its id. Independent of whether B10 is merged."""
+    from traders_fixtures import published_range, score
+
+    from marketbrief.contracts import horizons
+
+    def stub(*_args, **_kwargs):
+        raise NotImplementedError("session B10")
+
+    monkeypatch.setattr(horizons, "ranges_asof", stub)
+    monkeypatch.setattr(horizons, "scores_asof", stub)
     with pytest.raises(InputsUnavailableError):
         per_horizon("us", NOW)
+    monkeypatch.setattr(horizons, "ranges_asof", lambda *_args, **_kwargs: [published_range(1), published_range(3)])
+    monkeypatch.setattr(horizons, "scores_asof", lambda *_args, **_kwargs: [score(1)])
+    ranges, scores = per_horizon("us", NOW)
+    assert set(ranges) == {"2026-10-06-NVDA-1d", "2026-10-06-NVDA-3d"} and set(scores) == {"2026-10-06-NVDA-1d"}
 
 
 def director_inputs() -> dict:

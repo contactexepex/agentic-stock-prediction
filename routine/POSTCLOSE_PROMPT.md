@@ -44,9 +44,15 @@ Every step prints a JSON summary: save it under `work/steps/`.
    reasons and the day's deterministic results (summary withheld when the summary failed); list each dropped line in
    your final message. Delete `work/eod_analysis.jsonl`.
 
-8. Save: `git add data && git commit -m "<market> post-close TODAY"` (TODAY = `date -u +%F`), then
-   `git push origin HEAD:main`; if the push is rejected, `git pull --rebase origin main` and push again.
+8. Optional, never blocking (wired in Wave 5): the warehouse sync (`python scripts/warehouse_sync.py`).
 
-9. Optional, never blocking (wired in Wave 5): the warehouse sync (`python scripts/warehouse_sync.py`) and the Slack
-   close results of session B6. Until then, end with a short message: settled trades per view, pending trades, the
-   EOD gate result and any dropped lines.
+9. Close results (session B6, docs/ws/b6.md): `python scripts/alerts.py close > work/steps/alerts_close.json`, then
+   `python scripts/alerts.py corrections > work/steps/alerts_corrections.json`. The first posts rule vs AI, every
+   head-to-head trade and the 10 biggest wins and losses settled today into today's #market-brief thread; the second
+   replies in an earlier day's thread for each trade re-settled since that day's close post (30-day window). Exit 2
+   (no Slack token or webhook) or exit 1: note it in your final message and go on; never retry by hand.
+
+10. Save: `git add data && git commit -m "<market> post-close TODAY"` (TODAY = `date -u +%F`; this includes
+    `data/<market>/slack_posts`), then `git push origin HEAD:main`; if the push is rejected,
+    `git pull --rebase origin main` and push again. End with a short message: settled trades per view, refused or
+    pending trades, the EOD gate result, any dropped lines and the Slack result.
