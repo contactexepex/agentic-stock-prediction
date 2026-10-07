@@ -1869,3 +1869,153 @@ Strong only in a proven (horizon, confidence band) cell: the latest weekly revie
 forecaster's open-to-close calls in that cell number >= `proof.min_count` with a Wilson 95% lower bound >=
 `proof.min_wilson_low` (`config/portfolio.yaml`); a row is labelled proven only when it carries a forecaster call in
 such a cell, and every other row is labelled "Paper only — no proven edge yet".
+
+## 17. Strategy lab and paper-trading engine (B2)
+The engine and lab of docs/SPEC.md F1-F3 and F7 (code `scripts/marketbrief/lab/`, entry `scripts/lab.py`, notes
+`docs/ws/b2.md`). Research only: a paper trade is a record, never an order; nothing connects to a broker. Every read
+is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars by `collected_at`, splits by
+`detected_at`.
+
+### 17.1 Engine rules as built
+- **Timing.** D = the first session whose open is after `made_at`. N+k exits at the close of the k-th session after
+  D. A trade is settled only once the planned exit bar is final (close + `BAR_SETTLE_MINUTES`). No open on D:
+  `no_entry`. No close on the exit session: settled on the next stored final close, flag `exit_delayed`.
+- **Locked (F1.8).** The prediction and, for the head-to-head view, its pick must be made before D's open. When the
+  data root is a git repository, the commit that first added each row must be before the open too; a row that no
+  commit added is refused; a row first seen in a shallow clone's boundary commit is undated, so only its `made_at` is
+  checked. Refused ids are listed in the settle summary (`refused_not_locked`) and never settled. `pick` refuses to
+  run at or after D's open.
+- **Amount.** `contracts.watchlist.trade_amount` (B1): the `set_amount` override in force (higher or lower,
+  decision 44), else the default (₹1,00,000 / $1,000), copied into each prediction at `made_at`.
+- **Quantity.** India `floor(amount / open)`; 0 gives `skipped_price_above_amount`. US `round(amount / open, 6)`.
+- **Splits.** Adjustments with D < ex-date <= the exit: `exit_quantity = quantity / factor`, flag
+  `split_in_window`; the target, range and price-reached measures use the window's bars on D's basis. When the set
+  of split records in the window changes later (a correction with `supersedes`), the next settle run writes a new
+  row with `supersedes` and flag `resettled`. Scoreboards and the strongest-strategy ranking use the newest
+  settlement of each trade.
+- **Costs** (`lab/costs.py`, owner decisions 49, 50 and 52; `config/costs.yaml` statutory rates plus its `broker:`
+  section, owner-provided and marked verify). Each line is rounded to cents; a view's total is the sum of its
+  rounded lines.
+  - **Market cost** (`paper_trades_settled.costs`, `net_pnl`, `return_pct`; strategies are ranked on it). India:
+    Axis brokerage 0.75% per side, at least ₹50 per order; STT 0.1% each side; exchange and SEBI fees; stamp duty
+    0.015% on the buy; GST 18% on brokerage + exchange + SEBI. US: BUX's €0.99 per order at the EUR/USD close on or
+    before each side's session; SEC fee; FINRA TAF.
+  - **Your cost** (`cost_views`; the go-live bar and the owner's money use it) = market cost plus, in India, the NRI
+    reporting charge ₹200 on the purchase date and ₹200 on the sale date and the DP charge (provisional: ₹30 or
+    0.04% of the sale value, the higher); in the US, BUX Basic's FX markup 0.75% of the value on the buy and on the
+    sale and the 0.20% a year portfolio fee on the entry value, pro-rated over the calendar days from D to the exit.
+  - A US trade whose fee cannot be converted yet (no EUR/USD stored at all) waits (`waiting_for_eurusd`).
+- **Cost-viable flag** (decision 51, `lab/cost_views.py`). At `pick` time, for every qualifying prediction of D (all
+  families) and every pick: the round trip of the company's amount bought and sold at C = base_close, in both
+  views, and `expected_move_pct = (target / C − 1) × 100`. Viable (owner decision of 2026-10-07, made in session B6;
+  it replaces the first wording "move > cost"): `expected_gain_your_pct = p × move − (1 − p) × loss −
+  your_cost_pct` and `cost_viable = expected_gain_your_pct > 0`, with move and loss those of the head-to-head picks
+  (`lab/gain.py`, 17.2), so the flag and the picks agree. Without a probability or a range (always-up, momentum)
+  `cost_viable` is null; when the amount buys no whole share at C it is false. Stored as a `cost_views` row
+  (`record_kind` prediction or pick) and on each head-to-head candidate (`expected_move_pct`, `your_cost_pct`,
+  `expected_gain_your_pct`, `cost_viable`). Predictions are made and scored either way, and a non-viable candidate
+  can still be picked; the flag is shown (owner decision, open question 9 of b2.md).
+- **Automatic reason** (F1.10, `reasons.py`): `market_pct` = beta (`beta_1y` as of the prediction, 1 when missing) ×
+  the benchmark's open-of-D-to-exit-close move; `sector_pct` = the sector index or ETF move minus the benchmark (no
+  index: the other same-sector watchlist stocks' mean move minus the benchmark; else 0); `news_pct` = the rest
+  (move − market − sector), credited only when verified news (confirmed_primary or corroborated as of settlement,
+  timed from D's open to the exit close) exists and its summed sentiment has the rest's sign, else 0; `company_pct`
+  = what is left. `reason_code` is the largest part by size; `reason_codes` add `target_reached` and
+  `range_missed`.
+
+**Record format: `cost_views`** (B2 kind, `core/schema_b2.py`): one row per lab record, in the day file of
+`computed_at`.
+
+| Column | Meaning |
+|---|---|
+| id | `cv:<record_kind>:<record_id>` |
+| record_kind, record_id | `prediction` (strategy_predictions id), `pick` (head_to_head_picks id) or `settlement` (paper_trades_settled id) |
+| trade_id, prediction_id, strategy_id, market, ticker, horizon_days, session_date, exit_date, amount, currency | the record's keys (exit_date: the planned exit, or the one used for a settlement) |
+| reference_price, target_price, expected_move_pct | C (base_close; for a settlement the entry price), the target, `(target / C − 1) × 100` |
+| market_cost_pct, your_cost_pct | the round trip in each view as % of the amount |
+| expected_gain_your_pct, cost_viable | `p × move − (1 − p) × loss − your_cost_pct` with the picks' move and loss; viable when above 0 (pre-open rows; null without a probability or range, and on settlements) |
+| market_costs, market_cost_lines, your_costs, your_cost_lines | totals and `{charge: amount}` per view |
+| net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | settlements only |
+| holding_days, eurusd_entry, eurusd_exit | calendar days from D to the exit; the EUR/USD closes used (US) |
+| computed_at, method_version | when; `engine-v1` |
+
+### 17.2 The two corrections to F1.7
+**Expected gain.** The first draft, `p × (target / C − 1) − (1 − p) × (1 − lo80 / C) − costs`, compared a centre
+with a tail and picked N+1 for every group of W1's example data, always at a negative value; ranking a per-trade
+gain instead (`loss` = the expected shortfall below C) grows like √k at equal p, so N+5 always wins. As built
+(`lab/gain.py`, `lab/picks.py`):
+- From C and the strategy's own 80% range for the horizon, the exit close X is read as normal with mean = target
+  and sigma = (hi80 − lo80) / (2 × 1.2816).
+- `move = E[X / C − 1 | X > C]` and `loss = E[1 − X / C | X < C]`, in % of C.
+- `expected_gain = p × move − (1 − p) × loss − costs` (`expected_gain_pct`; costs = the market-cost round trip of the
+  amount at C).
+- "Best expected gain" = the horizon with the highest expected gain per session held, `expected_gain / k`
+  (`gain_per_session_pct` in the candidates JSON; owner decision of 2026-10-07). Ties: the shorter horizon.
+- A prediction whose amount buys no whole share at C is no candidate.
+- The pick's `candidates` JSON lists the strongest strategy's expected gain at every horizon it predicted for the
+  company (the horizon list of config/strategies.yaml); `eligible` marks the qualifying ones, and only those can be
+  picked.
+
+`python scripts/lab.py pick-study` is the evidence (docs/ws/b2.md pastes it): the corrected rule picks several
+horizons on W1's example data and on back-test samples of both markets. With the owner-provided Axis costs (about
+2% per round trip in the market view) no India candidate in the study has a positive expected gain; when every gain
+is negative, dividing by k shrinks the long horizons' losses most, so India picks lean to N+5.
+
+**Strongest strategy** (decision 41). Strategies of the family with at least 20 settled accuracy trades on the
+company rank first, by profit after costs on it; the rest follow by profit after costs on all the market's
+companies; strategies with no settled trade rank last. Ties: more settled trades, then the lower id. A re-settled
+trade counts once (its newest row).
+
+### 17.3 F2 strategies as built
+- **Probability of the model signal:** `p = sigmoid(logit(prob_model) + news_weight × coefficient × clip(sum of item
+  weights, ±score_cap))`. The item weights are the signal model's (`model/news_score.py`), keeping only the
+  strategy's `news_statuses` and `news_materiality`; rumour, promotional, unverified and contradicted items always
+  weigh 0. News weight 0 is model-only.
+- **Evidence.** Rule strategies cite the model score id, then the feature snapshot id; baselines (always-up,
+  momentum) the feature snapshot id only. News ids are cited only when the first (after sorting confirmed,
+  corroborated, single-source) is verified (DESIGN.md 3b).
+- **Blocks.** BLOCKED quality or `days_to_earnings <= 1`: an abstention row per strategy (`blocked_quality`,
+  `earnings_window`).
+- **Regime filter.** Written with `qualifies: false` in UNSTABLE / EVENT_HEAVY.
+- **Cross-market strategy** (`rule.model_news_global.v1`) abstains ("no cross-market model score") until B10
+  supplies a cross-market model variant.
+- **Momentum** compares the as-of close with the previous close put on the same split basis.
+- **Target and range** come from the B10 range of the horizon (its bands, never narrowed). B10's `center` is a log
+  shift, so the centre price is `base_close × exp(center)`; `lab/strategies.py` copies `center` into
+  `target_price` unchanged today (its tests use price-valued fixtures), which must be converted before B10's ranges
+  are read.
+- **Live inputs.** `predict` reads `contracts.horizons.scores_asof` / `ranges_asof`; until B10 builds them it
+  refuses with a message and writes nothing.
+- **Back-test** (`backtest`, F2.3): always-up and momentum on adjusted bars stored by the clock (plus the history
+  cache with `--history`), basis `backtest`, written only to `--out`, never to data/. Both cost views come from
+  `lab/costs.py`. Model-only needs B10's per-horizon walk-forward probabilities and is not run yet. Without stored
+  EURUSD bars the US order fee needs `--eurusd` (an ASSUMED constant, labelled in the output). Limits: today's
+  watchlist (survivorship), split adjustment as of the fetch, no stored past ranges (no target or range measures),
+  and overlapping trades, so the bootstrap intervals are too narrow.
+
+### 17.4 Scoreboard (F7) as built
+- `scoreboard.py` rows per market × view × basis, with `scope` `strategy`, `strategy_company`, `pick_rule`
+  (head-to-head) and `strategy_regime` (F2.6), each for "all" and each horizon.
+- Each row (market-cost view, the ranking): trades, net_pnl, mean_return_pct, win_rate; target_reached_rate and
+  median_reached_session (over trades with a target); avg_target_error_pct, range_hit_rate, worst_losing_streak,
+  max_drawdown, sample_badge; the luck test. `your_cost` (decision 50) repeats net_pnl, mean_return_pct, win_rate,
+  worst_losing_streak, max_drawdown and the luck test on `return_pct_your` from the `cost_views` settlement rows.
+- **Luck test** (`luck.py`): percentile bootstrap (2000 resamples, seed from the slice key) of the mean net return %;
+  Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon;
+  `corrected` is true only when the corrected interval excludes zero.
+- **Go-live** (F7.2, on the your-cost view; `cost_view` names the view used, market only while a your-cost row is
+  missing): at least 2 months and 300 trades (accuracy view, forward); beats the best baseline's net profit with
+  `corrected` true; max drawdown within 10 × the default amount; net profit positive in both calm and volatile
+  (UNSTABLE / EVENT_HEAVY) regimes.
+- **Comparisons** (`compare.py`), each with pairs, net profit of each side, wins and the mean difference with a
+  bootstrap interval: rule vs AI on identical company-days per pick rule; gain-pick vs probability-pick per family;
+  each strategy vs its `compared_to` on identical predictions.
+- **Heatmaps** (`heatmaps.py`): win rate and net profit by strategy × horizon, × company and × reason code, per ISO
+  week and "all"; cumulative profit lines per strategy (accuracy) and per family:pick rule (head-to-head).
+
+### 17.5 News-impact study (F3) as built
+`news_impact.py` and `reports.write_news_impact`: events are enriched news on their primary tickers, first seen and
+enriched by the run time, with their status as of then; one event per company and same-event cluster. D is the
+first session whose open is after the item's time; only windows whose exit bar is final count. `abnormal = stock −
+beta × benchmark − (sector index − benchmark)` (sector part 0 without an index). Mean and a normal 95% interval;
+`enough` from 10 events, below that no mean is stored ("not enough events yet").

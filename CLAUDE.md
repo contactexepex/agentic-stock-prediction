@@ -178,7 +178,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   the `/trade` form (or a tool call) without a summary step. Writes are appended to the inbox
   (`mcp/inbox.sql`, database `market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`): company commands to
   `inbox.company_commands` (read by `company.py import-inbox`; dispatches `onboard.yml`), paper trades to
-  `inbox.requests` (no importer yet, issue #112); pending until imported. Every call is logged in `inbox.command_log`
+  `inbox.requests` (read by `portfolio.py import-inbox`, issue #112); pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
   Vercel project `market-brief-gateway`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
   `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
@@ -260,8 +260,31 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `data/<market>/watchlist_requests/` (config stays a human change); `positions` / `pnl` (FIFO, marked to the latest
   stored close, before and after `config/costs.yaml` costs, split basis of `adjustments`); `signals` (tiers Strong Buy
   .. Strong Sell; Strong only in a proven horizon x confidence band: review `model_skill` true and >= 50 open_to_close
-  calls with Wilson low >= 0.55; else "No proven strong signals today" + Paper candidates); `paper-follow` (SIMULATED).
+  calls with Wilson low >= 0.55; else "No proven strong signals today" + Paper candidates); `paper-follow` (SIMULATED);
+  `import-inbox [--inbox FILE]` (issue #112, `marketbrief/portfolio/inbox_import.py`, docs/ws/ws4.md) imports the
+  web tier's `add_paper_trade` requests from `market_brief_inbox.inbox.requests` (`MOTHERDUCK_INBOX_TOKEN`, read
+  only) through the same checks as `add-trade`; identity and channel come from the inbox row, the key is its
+  `inbox_id`, and each row gets one `command_log` row (a request not decidable yet is logged `failed` and tried again).
   Every read is as of the clock (MB_NOW-aware).
+- Strategy lab and paper-trading engine (B2; docs/SPEC.md F1-F3, F7; DESIGN.md section 17; notes `docs/ws/b2.md`;
+  code `marketbrief/lab/`, entry `scripts/lab.py`): `predict` (pre-open, rule strategies and baselines from B10's
+  per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`), `pick` (pre-open,
+  refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
+  and the cost-viable rows of decision 51 -> `cost_views`; "best expected gain" = the horizon with the highest
+  expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in
+  the market-cost view and its your-cost view -> `cost_views`; F1.9 measures, F1.10 automatic reason; a prediction
+  or pick made or first committed at or after D's open is refused; a split correction re-settles as a new row),
+  `news-impact` (weekly -> `news_impact`), `summary` (scoreboard ranked on market cost with the bootstrap luck test
+  and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up
+  and momentum on stored bars, basis backtest, never in data/), `pick-study`. Costs (`lab/costs.py`): the statutory
+  rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
+  owner-provided, marked verify; the owner confirms them with a contract note before Wave 5 switches paper trading
+  on); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
+  reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
+  pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
+  gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
+  conditional move and loss of `lab/gain.py`; null without a probability or 80% range); the flag never blocks a
+  prediction or pick. The owner's paper portfolio uses the your-cost charges and shows a EUR view of US positions.
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
@@ -414,6 +437,9 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 ## Prediction rules
 - One record per call: `id` = `<as_of_date>-<ticker>-<horizon>d`; skip if the id already exists.
 - `direction` is `up` or `down`; `horizon_days` is 1 or 5 (trading days); `confidence` 0.50-0.90.
+- Strategy predictions (`strategy_predictions`) follow docs/SPEC.md F2.6: horizons N+1..N+5 (the k-th session
+  after D); rule strategies cite their model score and feature snapshot ids, baselines their feature snapshot id; a
+  prediction made at or after D's open is refused by the settlement (F1.8).
 - `as_of_date` = the latest price date in the context pack for that ticker.
 - `evidence_ids` must reference news/filing ids. Abstaining is always allowed and often right.
 - News verification (DESIGN.md 3b): the first evidence id (the main evidence) must be
