@@ -25,7 +25,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | # | Topic | Decision |
 |---|---|---|
 | 1 | Trade timing | Buy at the OPEN of D (the first session after the prediction is made); sell at the CLOSE of the horizon's exit session (decision 37). Prediction locked before D's open. No intraday trading. |
-| 2 | Horizons | Superseded by decision 37: horizons N+1 to N+5, all first-class (no separate research horizon). |
+| 2 | 5-day horizon | Originally: kept as a research horizon (buy at the open of D, sell at the close of D+4). Superseded by decision 37: horizons N+1 to N+5, all first-class. |
 | 3 | Down signals | Buy-only in both markets: a "down" prediction creates no trade (it is still scored as a prediction). |
 | 4 | India share price above the amount | Skip the trade unless the company's amount is raised. Whole shares only in India. |
 | 5 | US shares | Fractional shares: exactly the amount is invested. |
@@ -57,22 +57,25 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 31 | Pre-open run | Starts 30 minutes earlier: India 07:40 IST, US 07:45 New York time (schedules changed 2026-10-07). |
 | 32 | Frontend order | This spec is merged first; the owner's design sessions then update the page designs from it; the frontend stage builds from those designs. |
 | 33 | Rule changes | Both approved: companies as validated data records (F8.1), and the prediction-rule changes for strategies (F2.6). |
-| 34 | Orchestrator defaults | Accepted: money-view budget ₹5,00,000 / $5,000 per strategy (at most 5 trades a day; later superseded by decision 40); weekly research run Saturday 10:00 local; chat history kept 90 days; the Slack add form asks market, symbol and optional amount only. |
+| 34 | Orchestrator defaults | Accepted: money-view budget ₹5,00,000 / $5,000 per strategy, at most 5 trades a day (this item superseded by decision 40); weekly research run Saturday 10:00 local; chat history kept 90 days; the Slack add form asks market, symbol and optional amount only. |
 | 35 | Help page | Kept as page 12. |
 | 36 | Old commit 85416b0 | Kept with a git tag (the owner creates it on GitHub; this session may push branches but not tags). |
 | 37 | Horizon N+k | Buy at the open of D on any weekday; N+k = sell at the close of the k-th market session after D, skipping weekends and the market's holidays (example: bought Friday, N+1 = Monday's close). Horizons N+1 to N+5 now; the horizon list is a setting so N+10 (two weeks) and about N+21 (a month) can be added later without redesign. The old "5-day" records (sold at D+4) keep their definition and label and are never pooled with N+5. |
 | 38 | Who forecasts which horizons | Rule strategies and baselines: N+1 to N+5. AI traders: N+1, N+3 and N+5. |
-| 39 | Horizon on screens | A horizon selector (N+1 to N+5) on Home and the stock strategy page, opening on N+1; Slack morning picks show N+1 plus each pick's strongest other horizon. |
-| 40 | Trade size and count | No budget per strategy. Each paper trade is at most ₹1,00,000 / $1,000 (the company's amount); one stock may have several open trades at once (one per strategy and horizon). The goal is statistics on prediction accuracy (reaching the predicted price within the predicted window) and profit. |
+| 39 | Horizon on screens | A horizon selector (N+1 to N+5) on Home and the stock strategy page, opening on N+1; Slack morning picks show N+1 plus each pick's strongest other horizon (the other horizon with the highest agreement count; ties: the shorter). |
+| 40 | Trade size and count | No budget per strategy. Each paper trade uses the company's amount: ₹1,00,000 / $1,000 unless overridden (decision 26); one stock may have several open trades at once (one per strategy and horizon). The goal is statistics on prediction accuracy (reaching the predicted price within the predicted window) and profit. |
 | 41 | Strongest strategy | For a stock on a day: in each family (rule-based, AI), the strategy with the highest profit after costs on that stock so far, once it has at least 20 settled trades on it; before that, the family's best by profit after costs across all stocks. |
 | 42 | Head-to-head picks | Both pick rules compete: "best expected gain" (the horizon with the highest probability-weighted profit after costs) and "highest probability" (the horizon the strategy is most sure of). Each day, per company, the strongest rule strategy and the strongest AI trader each get one ₹1,00,000 / $1,000 trade per pick rule (up to 4 head-to-head trades per company per day). Comparisons run across families (rule vs AI) and within each (rule vs rule, AI vs AI, gain-pick vs probability-pick), with heatmaps and charts over time. |
+| 37a | Ready before accurate | The horizon functionality is built and running from the start even though early predictions will be inaccurate; accuracy is expected to improve as data accumulates. |
 | 43 | Reasons for every trade | Every settled trade gets an automatic reason (computed, no AI: the move split into market, sector, news and company-specific parts; target and range hit or missed). AI writes plain-language reasons for the head-to-head trades and the day's biggest wins and misses. |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
 command logged with who sent it; one Slack thread per market per day plus a weekly post; design widths
 390 px and 1280 px; the post-close times of section 7 (the intraday times are WS5's existing
-schedules); the Opus trader being the extended forecaster; no bulk-storage move within a year (git +
+schedules); the Opus trader being the extended forecaster; the AI reasons for the day's 5 biggest wins
+and 5 biggest misses (F6); top 5 picks on Home and in Slack; baselines excluded from the head-to-head
+(F1.7); the drawdown proposal (F7.2); no bulk-storage move within a year (git +
 MotherDuck handle 50 companies).
 
 ## 2. Words used in this document
@@ -84,7 +87,7 @@ MotherDuck handle 50 companies).
   price (expected close), a price range, and the evidence. Made before the open of D.
 - **Paper trade**: what a prediction turns into under the protocol (F1): only "up" predictions above
   the strategy's threshold trade.
-- **Account**: one strategy's trades under one view (accuracy or money).
+- **Account**: one strategy's trades under one view (accuracy or head-to-head).
 - **Settlement**: the deterministic computation of a trade's outcome from stored bars after the exit
   close.
 - **Lifecycle of a prediction**: made (pre-open) -> monitored (intraday checks) -> settled (after the
@@ -106,7 +109,10 @@ part already does it, the feature says "exists" and what changes.
 2. **Buy-only.** Only `direction = up` with probability >= the strategy's threshold creates a trade.
    Down predictions are scored as predictions only.
 3. **Amount.** Per company: the override if one is active at `made_at`, else the market default
-   (₹1,00,000 India, $1,000 US). Overrides are watchlist events (F8).
+   (₹1,00,000 India, $1,000 US). Overrides are watchlist events (F8) and may be higher or lower than
+   the default (decisions 4 and 26: e.g. raised for a stock whose single share costs more than the
+   default). "At most ₹1,00,000 / $1,000 per trade" (decision 40) means: every trade uses exactly the
+   company's amount, which is the default unless the owner overrides it.
 4. **Quantity.** From D's raw (unadjusted, `ohlc_raw`) open, as an investor would buy: India
    `floor(amount / open)` whole shares; 0 shares (one share costs more than the amount) = trade
    skipped, recorded `skipped_price_above_amount`. US: `amount / open` fractional, 6 decimals. The
@@ -137,33 +143,50 @@ part already does it, the feature says "exists" and what changes.
    - **Accuracy view:** every qualifying prediction (each strategy, company and horizon) is its own
      trade of the company's amount (at most ₹1,00,000 / $1,000); no limit on the number of trades,
      and one stock can have several open trades at once.
-   - **Head-to-head view:** each day, per company, four trades: {strongest rule strategy, strongest AI
-     trader} x {best expected gain, highest probability}. "Strongest" follows decision 41 (ties: lower
-     strategy id). The "best expected gain" pick is the strategy's horizon with the highest
-     `probability x target move - (1 - probability) x expected loss - costs`, where the expected loss is
-     the distance from entry to the lower edge of the strategy's range; the "highest probability" pick
-     is its horizon with the highest probability (ties: the shorter horizon). Only horizons whose
-     prediction is "up" above the strategy's threshold qualify; a family with no qualifying prediction
-     for a company has no head-to-head trade that day (recorded as such). When two picks coincide
-     (same strategy, horizon), both trades are still recorded so each pick rule's results stay
-     complete.
+   - **Head-to-head view:** each day, per company, up to four trades: {strongest rule strategy,
+     strongest AI trader} x {best expected gain, highest probability}. Exact rules:
+     1. Candidates. Rule family = the rule strategies of F2 (baselines excluded: they are the
+        yardstick, not contenders; proposal). AI family = the four AI traders. A candidate horizon of a
+        strategy for the company is one where its prediction is "up" with probability at or above the
+        strategy's threshold.
+     2. "Strongest" (decision 41): rank the family by profit after costs on this company in the
+        accuracy view, all horizons pooled, counting only strategies with at least 20 settled trades on
+        it; strategies below 20 are ranked after them by profit after costs across all companies (ties:
+        more settled trades, then the lower strategy id). Take the highest-ranked strategy that has at
+        least one candidate horizon today. No such strategy: no head-to-head trade for that family and
+        company today, recorded as `no_candidate`.
+     3. Pick rules, applied to that strategy's candidate horizons, computed pre-open from the latest
+        stored close `C` (the entry open is not known yet), all in percent of the trade amount:
+        `move = target / C - 1`, `loss = 1 - range_low / C`, `costs` = the round-trip cost of the
+        company's amount at `C` (F1.6) as a percent of the amount;
+        "best expected gain" = the horizon with the highest `p x move - (1 - p) x loss - costs`
+        (ties: the shorter horizon); "highest probability" = the horizon with the highest `p` (ties: the
+        shorter horizon).
+     4. Both picks are recorded even when they name the same horizon, so each pick rule's results stay
+        complete; each pick stores the ranking it came from and its expected-gain number.
 8. **Locked before the open.** Predictions are appended to `data/` and pushed before D's open; the
    settlement refuses any prediction whose `made_at` is after the entry open or whose record was
    first committed after it (checked from git when available).
 9. **Settlement** is deterministic and re-runnable: same stored bars give the same result. Each trade
    records entry, exit, quantity, gross and net P&L (₹ or $), return %, costs, target error (exit close
-   vs predicted target, %), range hit (exit close inside the predicted range), and status.
+   vs predicted target, %), range hit (exit close inside the predicted range), and status, plus the
+   price-reached measures of decision 40:
+   - `target_reached`: true when any session's high from D to the exit session (inclusive) is at or
+     above the predicted target (adjusted bars, so a split inside the window does not distort it);
+   - `target_reached_session`: the first such session (1 = D, ..., k+1 = the exit session);
+   - `max_favourable_pct` and `max_adverse_pct`: the highest high and lowest low in the window
+     relative to the entry price.
 10. **Reasons** (decision 43): every settled trade stores an automatic reason: the entry-to-exit move
     split into market (benchmark), sector (sector index or peers), news (verified news on the company
     inside the window, with ids), and the company-specific rest; whether the target and the range were
-    hit; plus a reason code (e.g. `market_down`, `sector_drag`, `news_positive`, `target_hit`). These
+    hit; plus a reason code (e.g. `market_down`, `sector_drag`, `news_positive`, `target_reached`). These
     feed the heatmaps. AI-written reasons are F6.
 11. **Owner's own paper portfolio** (exists, WS4: `scripts/portfolio.py`) keeps manual trades; it gains
     the EUR view for US trades (rate change + FX fee) and reads amounts and costs from the same place.
 
 Done when: a fixture week of predictions settles to hand-checked numbers for both markets, both views,
-all five horizons (including a Friday buy with N+1 settling on Monday and a holiday inside a window), including skip, no-entry, delayed exit, split and holiday cases; the engine is the only
-place P&L is computed.
+all five horizons, including a Friday buy with N+1 settling on Monday and the skip, no-entry, delayed
+exit, split and holiday cases; the engine is the only place P&L is computed.
 
 ### F2 Strategy lab (rule-based strategies)
 
@@ -179,17 +202,6 @@ place P&L is computed.
 4. **Forward**: every rule strategy and baseline predicts daily for every active company and every
    horizon N+1 to N+5 in the pre-open run (decision 38); each prediction carries a target price and a
    range; the predictions go through F1.
-7. **Horizons as a setting.** The horizon list lives in config (`horizons: [1, 2, 3, 4, 5]`), shared by
-   the signal model, `ranges.py`, the strategies and the scoreboard; adding 10 or 21 later is a config
-   change plus a model refit, no code change. Today the signal model and `ranges.py` support only
-   horizons 1 and 5 (`HORIZONS = (1, 5)` in `constants/model.py`, `constants/prediction_rules.py`,
-   `constants/dashboard.py`; `horizons: [1, 5]` in `config/ranges.yaml`) and the existing "5d" label
-   sells at D+4. Stage B10 extends them to N+1..N+5 with the decision-37 definition (new labels, model
-   refit per horizon, ranges per horizon); the old `predictions`, `model_scores` and range records keep
-   their own definition and label (`legacy_5d_d4`) and are never pooled with N+5.
-8. **Visual statistics** (decision 42): heatmaps of win rate and profit after costs by strategy x
-   horizon, strategy x company and strategy x reason code, each over time (weekly), plus cumulative
-   profit lines per strategy and per pick rule; on the Strategy lab and Rule vs AI pages.
 5. Initial set: about 8 rule strategies + 3 baselines, chosen so each differs from the others in one
    parameter (so a difference in results points to that parameter).
 6. **Rule change (prediction rules for strategies).** CLAUDE.md's prediction rules were written for the
@@ -228,10 +240,33 @@ place P&L is computed.
 Done when: the registry validates; the pre-open run writes one prediction per strategy x company x
 horizon; back-test and forward results are stored separately; adding a strategy is a config change only.
 
+7. **Horizons as a setting.** The horizon list lives in `config/strategies.yaml` (`horizons: [1, 2, 3,
+   4, 5]`), read by the signal model, `ranges.py`, the strategies and the scoreboard (B10 moves
+   `config/ranges.yaml` `horizons:` to read it), shared by
+   the signal model, `ranges.py`, the strategies and the scoreboard; adding 10 or 21 later is a config
+   change plus a model refit, no code change. Today the signal model and `ranges.py` support only
+   horizons 1 and 5 (`HORIZONS = (1, 5)` in `constants/model.py`, `constants/prediction_rules.py`,
+   `constants/dashboard.py` and `portfolio/proof.py`; `horizons: [1, 5]` in `config/ranges.yaml`; a
+   hard-coded 5 in `intraday/rows.py`). The old windows differ from decision 37:
+   - published ranges, 1d: from the as-of close to D's close (`range_math.py` `close.shift(-horizon)`,
+     `range_context.py`); 5d: to D+4's close;
+   - direction calls scored close-to-close (before `call_scoring.from`, 2026-10-08): 1d ends at D's
+     close, 5d at D+4's close;
+   - open-to-close model labels and calls: 1d = open of D to close of D+1, which IS N+1; 5d = open of D
+     to close of D+4, which is not N+5.
+   Old records keep their definition and get a label: `legacy_cc` (close-to-close and the old ranges),
+   `legacy_5d_d4` (open-to-close 5d). They are never pooled with the new horizons, except open-to-close
+   1d, which equals N+1 and may be pooled with it. Stage B10 extends the model, ranges, scoring and
+   calibration to N+1..N+5 with the decision-37 definition (new labels, a refit per horizon, ranges
+   per horizon).
+8. **Visual statistics** (decision 42): heatmaps of win rate and profit after costs by strategy x
+   horizon, strategy x company and strategy x reason code, each over time (weekly), plus cumulative
+   profit lines per strategy and per pick rule; on the Strategy lab and Rule vs AI pages.
+
 ### F3 News-impact study
 
 For every news category (event type), verification status and materiality level: the average move of
-the stock over the next 1 and 5 sessions relative to its benchmark and sector (abnormal return), with
+the stock over each horizon N+1..N+5 relative to its benchmark and sector (abnormal return), with
 a confidence interval and the number of events. Refreshed weekly from stored data only, as of the
 review date (no look-ahead). It answers "which news moves prices, and how much" and is the evidence
 behind any change of news weights. Small samples are shown as "not enough events yet".
@@ -306,9 +341,11 @@ proposal as an approvable diff.
    company-days; rule vs rule and AI vs AI within each family; gain-pick vs probability-pick.
    Baselines on the same table.
 2. **Go-live bar** (owner-approved): at least 2 months of forward paper trading and about 300 trades
-   per strategy and horizon (accuracy view); beats the best baseline after costs with the corrected luck test
+   per strategy (accuracy view; proposal: counted per strategy and horizon once the owner agrees);
+   beats the best baseline after costs with the corrected luck test
    excluding zero; maximum drawdown within the owner's limit (to be set at the first review; proposal:
-   a loss of 10 times the per-trade amount, i.e. ₹10,00,000 / $10,000, on the head-to-head view); holds in calm and volatile regimes. First formal review 2 months after
+   a cumulative loss of 10 times the default per-trade amount, i.e. ₹10,00,000 / $10,000, on the
+   strategy's accuracy-view trades); holds in calm and volatile regimes. First formal review 2 months after
    F1 goes live; then monthly. A strategy that meets the bar is "proven"; only proven strategies may show
    Strong Buy (the existing WS4 rule generalised to strategies).
 
@@ -457,7 +494,7 @@ every query parameter maps to a `page_key`, never to a filter at request time):
 
 | Table | page_key | Serves |
 |---|---|---|
-| `rm.home` | `_` | Home: agreement ranking (top 5), rule vs AI today and to date, open trades, alerts, freshness |
+| `rm.home` | `_` | Home: agreement per horizon N+1..N+5 (top 5 each), today's head-to-head trades, rule vs AI today and to date, open trades, alerts, freshness |
 | `rm.stock_strategies` | ticker | the stock strategy page (decision 30) |
 | `rm.strategies` | `_` (scoreboard) and `<strategy_id>` (detail) | Strategy lab |
 | `rm.compare` | `_` and ticker | Rule vs AI |
@@ -584,9 +621,15 @@ proposed shared-doc edits into `docs/ws/<stage>.md` as in waves 0-1.
 kinds (section 4), `config/strategies.yaml` schema and the initial strategy set, `mcp/tools.yaml` (tool
 names, inputs, outputs, permissions per channel), and the interfaces later stages code against: the F1
 protocol (function signatures, record formats), the watchlist accessor, each read model's payload
-function signature, and the list of every existing reader of `cfg` tickers and sector lists, each
-classified collect, predict or display, with each predict or display call site assigned to one stage
-(F8.2). Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/schema_lifecycle.py`,
+function signature, the per-horizon model-score and range interfaces (record formats for N+1..N+5,
+so B2, B3 and B9 build against them with fixtures before B10's real data exists), and one **file
+assignment list**: every existing file that needs a change for the company lists (each reader of `cfg`
+tickers and sector lists, classified collect, predict or display, F8.2) or for horizons (every file that
+handles `HORIZONS`, `horizon_days` or a fixed horizon), each file assigned to exactly one stage, which
+then makes both kinds of change in it. Rule: files under a stage's own directories go to that stage
+(B2 `portfolio/` and `lab/`, B4 `warehouse/`, B9 `intraday/`); `model/`, `analytics/` range, scoring,
+calibration and prediction-rule modules, `pipeline/`, `presentation/` and `replay/` horizon changes go to
+B10; the remaining company-list changes go to B1. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/schema_lifecycle.py`,
 `config/strategies.yaml`, interface stubs in `marketbrief/contracts/`, `docs/ws/stageA.md`.
 
 **Stage B: parallel builds (after A merges; one session each). Ownership is disjoint:**
@@ -594,17 +637,17 @@ classified collect, predict or display, with each predict or display call site a
 | Stage | Builds | Owns | Needs |
 |---|---|---|---|
 | B1 Lifecycle | F8: watchlist events, the loader change and accessor, the switch of existing predict and display call sites to `active_tickers` (those Stage A assigns to B1), seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `core/market_config.py`, `scripts/company.py`, `.github/workflows/onboard.yml`, the predict and display call sites Stage A assigns to B1 | A |
-| B2 Lab | F1 engine (incl. F1.10, the EUR view in `marketbrief/portfolio/`, and the `EURUSD=X` symbol in `config/markets/us.yaml`), F2 strategies and baselines, F3 news-impact study, F7 scoreboard and luck test | `marketbrief/lab/`, `scripts/lab.py`, `marketbrief/portfolio/`, `config/costs.yaml`, that line of `config/markets/us.yaml` | A |
-| B3 AI traders | F4 traders and gate, F6 EOD analyst and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `.claude/agents/forecaster.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | A (writes predictions; B2 settles them) |
+| B2 Lab | F1 engine (incl. F1.9-F1.11, the EUR view in `marketbrief/portfolio/`, and the `EURUSD=X` symbol in `config/markets/us.yaml`), F2 strategies, baselines and the head-to-head picks, F2.8 heatmaps data, F3 news-impact study, F7 scoreboard and luck test | `marketbrief/lab/`, `scripts/lab.py`, `marketbrief/portfolio/` (incl. its `HORIZONS`), `config/costs.yaml`, that line of `config/markets/us.yaml`, its files on Stage A's list | A (B10's per-horizon scores for live data) |
+| B3 AI traders | F4 traders and gate, F6 EOD analyst and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `.claude/agents/forecaster.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | A (writes predictions; B2 settles them; B10's per-horizon ranges for live data) |
 | B4 API | the read models of section 4 (payload functions from B1-B3 via A's interfaces, stubbed until merged) and every route file under `web/app/api/v1/` (write handlers are thin calls into B5's tool layer), caching, revalidate | `web/app/api/v1/`, `web/lib/data/`, `marketbrief/warehouse/` (new `rm_*` modules and the call sites Stage A assigns to B4) | A |
 | B5 Tools and channels | the tool layer, the gateway mode (middleware), Slack commands, form and confirm step, `/mcp` with GitHub OAuth, inbox writes, workflow dispatch, injection suite | `web/lib/tools/`, `web/app/slack/`, `web/app/mcp/`, `web/middleware.ts`, `mcp/` except `tools.yaml` | A |
 | B6 Notifications | F9 Slack threads (morning, alerts, close, weekly) | `marketbrief/alerts/`, `scripts/alerts.py` | A |
 | B7 Frontend | the 12 pages from the owner's updated designs, against A's contract with fixture payloads | `web/` except the paths owned by B4, B5 and B8 | A + page designs |
 | B8 Assistant | F11 chat and Slack `/ask` with budget | `web/app/api/assistant/`, `web/lib/assistant/` | A |
-| B10 Horizons | F2.7: the signal model, its labels and backtest, `ranges.py`/`range_math`, scoring and calibration for N+1..N+5 with the decision-37 definition, horizon list in config, legacy labels for old records; refit and walk-forward test per horizon | `marketbrief/model/`, `marketbrief/analytics/range_math.py` and the range/score/calibration modules it names in its plan, `config/model.yaml`, `config/ranges.yaml`, the `HORIZONS` constants | A |
-| B9 Monitoring | F5: intraday checks of every open paper trade, the extended explainer input, intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | A |
+| B10 Horizons | F2.7: the signal model, its labels and backtest, `ranges.py`/`range_math`, scoring and calibration for N+1..N+5 with the decision-37 definition, horizon list in config, legacy labels for old records; refit and walk-forward test per horizon | `marketbrief/model/`, `config/model.yaml`, `config/ranges.yaml`, the `HORIZONS` constants in `constants/model.py`, `constants/prediction_rules.py`, `constants/dashboard.py`, and the files Stage A's list assigns to B10 | A |
+| B9 Monitoring | F5: intraday checks of every open paper trade at every horizon (incl. the fixed horizon in `intraday/rows.py`), the extended explainer input, intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | A |
 
-B1 changes only the loader and the call sites Stage A assigns to it; every other reader of
+B1 changes only the loader and the files Stage A assigns to it; every other reader of
 `cfg` tickers keeps working unchanged through the loader, and new code calls the accessor through A's
 interface. B9 builds on B1's `active_tickers` for open-trade checks without editing B1's line.
 `config/markets/<market>.yaml` `tickers:` and the ticker lists under `sectors:` stay in place until
@@ -612,6 +655,9 @@ Stage C removes them (safe then, because the loader no longer reads them). Share
 spread line in `core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks at the end).
 B7 starts with the shell, design system and the Home, Company and Stock strategies pages as the
 updated designs land.
+
+B10 merges before Stage C; B2, B3 and B9 switch from fixtures to B10's real per-horizon data in Stage
+C's end-to-end run.
 
 **Stage C: consolidation (one session, last).** Wire the new runs into the routine prompts, create the
 schedules (post-close, intraday, weekly research), update `CUTOFF_LOCAL` in
