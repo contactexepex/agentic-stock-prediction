@@ -203,7 +203,7 @@ const CAUSE = {market:{ico:'ms-public', name:'Market-wide'}, company:{ico:'ms-ap
 
 /* ---------- shell ---------- */
 for (const m of MK) $('#market-seg').append(el('a', {href: wlOf(m), 'aria-pressed':'false', 'data-tip': `Open the ${LABEL[m]} watchlist`}, LABEL[m]));
-const NAV = [['home','Home', true], ['format_list_bulleted','Watchlist', false, wlOf('india')], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false]];
+const NAV = [['home','Home', true], ['format_list_bulleted','Watchlist', false, wlOf('india')], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false, '../help/help.html']];
 const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
 $('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
 $('#navbar').append(...NAV.slice(0,5).map(navItem));
@@ -361,7 +361,7 @@ $('#sources').innerHTML = `<dl class="md-kv">
 <dt>Live</dt><dd>Per market, data/&lt;market&gt;/: prices (last stored bars), model_scores_latest, ranges, features_latest, agent_reasoning, predictions and outcomes, quotes_latest, regime, events (calendar rules in config/events.yaml plus stored results dates), news with enrichment (news-analyst summaries, sentiment, materiality), news_clusters_latest and news_verified (the news card), flows (India), lessons, reviews. Read through DuckDB views in sql/views.sql; the watchlist builder assembles the rows, this page adds movers, events and status.</dd>
 <dt>Back-test</dt><dd>Range coverage from <code>scripts/replay.py</code> over each market's 35-session window ending at its as-of date. Not live.</dd>
 <dt>Derived</dt><dd>The cause of a mover (market-wide / company news / unexplained), the grouping of market-wide headlines by the analyst's summary and the "can carry a call" split by verification status, Paper candidates (chance at or above the call line), blocked companies, "before/after the open" from the run time and the exchange calendar.</dd>
-<dt>Mock / coming</dt><dd>"Unexplained" causes (explainer agent not built); symbol search; the Help section.</dd>
+<dt>Mock / coming</dt><dd>"Unexplained" causes (explainer agent not built); symbol search.</dd>
 </dl>`;
 $('#foot').textContent = `Personal research project. Prices from Yahoo Finance and NSE bhavcopy; nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
 </script>

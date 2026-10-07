@@ -220,7 +220,7 @@ const onStake = p => money(STAKE * p / 100);
 /* ---------- shell ---------- */
 for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
 $('#market-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; MKT = b.dataset.m; $('#market-seg').querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
-const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', true], ['help','Help', false]];
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', true], ['help','Help', false, '../help/help.html']];
 const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
 $('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
 $('#navbar').append(...NAV.slice(0,5).map(navItem));

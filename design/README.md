@@ -38,6 +38,8 @@ cloud session, then one consolidation session turns them into the production gen
 | `watchlist/` Watchlist (20 companies per market, sortable, sector-grouped) | built, awaiting the owner's approval |
 | `portfolio/` Paper portfolio: live book and rehearsal book, 10,000 per trade after costs | built, awaiting the owner's approval |
 | `track/` Track record: proof gate, live record, weekly review, back-tests | built, awaiting the owner's approval |
-| Help | to do. A separate News screen was built and dropped on 7 Oct: the owner judged it an archive nobody reads; its key content moved into the Home news card and the company pages keep their full feeds |
+| `help/` Help: what the cockpit is, the five-minute morning, what each page answers, how a call is made and the rules, colours and badges, the four tests, glossary, sources, questions | built, awaiting the owner's approval |
+
+A separate News screen was built and dropped on 7 Oct: the owner judged it an archive nobody reads; its key content moved into the Home news card and the company pages keep their full feeds.
 
 `reference/` holds earlier rejected iterations (v2) for context only.
