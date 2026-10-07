@@ -222,7 +222,7 @@ def test_close_results_from_examples():
     assert rule["net_pnl"] == round(sum(r["net_pnl"] for r in rule_rows), 2)
     assert f"Rule {rule['trades']} trade" in msg
     assert "Analyst note (eod-us-2026-10-01): Two paper trades settled." in msg
-    line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
+    line = next(x for x in msg.splitlines() if "rule.model_news.v1, accuracy view" in x and "NVDA* N+1" in x)
     assert ("bought $229.27 on 2026-09-30, sold $230.86 on 2026-10-01; net +$4.60 (+0.46%) after $2.34 market"
             " costs") in line
     assert "target reached, closed inside its 80% range; main reason sector_lift" in line
@@ -535,7 +535,7 @@ def test_correction_reply_in_the_day_thread_once(scratch, monkeypatch, capsys):
     assert code == 0 and out["posted"] == ["correction:us:acc:rule.model_news.v1:2026-09-29-NVDA-1d@resettled#1"]
     sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[-1])
     assert sent["thread_ts"] == close["thread_ts"]
-    assert sent["text"].startswith("Correction: *NVDA* N+1, Model + news (rule.model_news.v1) (accuracy) is now net"
+    assert sent["text"].startswith("Correction: *NVDA* N+1, Model + news (rule.model_news.v1), accuracy view is now net"
                                    " +$3.10 (+0.31%), was +$4.60 (+0.46%); re-settled 2026-10-02T03:00:00+00:00"
                                    " (flags: split_in_window, resettled). [Paper]")
     assert run(["--market", "us", "--dry-run", "corrections"], capsys)[1]["posted"] == []
@@ -611,7 +611,7 @@ def test_close_shows_your_cost_result_beside_market_cost():
     mine = [{**r, "your_costs": round(r["costs"] + 0.46, 2), "your_net_pnl": round(r["net_pnl"] - 0.46, 2),
              "your_return_pct": round((r["net_pnl"] - 0.46) / r["amount"] * 100, 2)} for r in rows]
     msg = build_close("us", "2026-10-01", mine, None, {}, "USD")
-    line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
+    line = next(x for x in msg.splitlines() if "rule.model_news.v1, accuracy view" in x and "NVDA* N+1" in x)
     assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in line
     rule = [r for r in mine if r["view"] == "accuracy" and r["family"] == "rule"]
     total = sum(r["your_net_pnl"] for r in rule)
@@ -631,7 +631,7 @@ def test_resettlement_on_a_later_day_is_only_a_correction(scratch, monkeypatch, 
     run(["--market", "us", "--dry-run", "close", "--date", "2026-10-02"], capsys)
     sent = [json.loads(x) for x in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()]
     second_day = next(m["text"] for m in sent if "close results for Fri 2 Oct 2026" in m["text"])
-    assert not [x for x in second_day.splitlines() if "NVDA* N+1" in x and "(rule.model_news.v1) (accuracy)" in x]
+    assert not [x for x in second_day.splitlines() if "NVDA* N+1" in x and "(rule.model_news.v1), accuracy view" in x]
     assert "+$3.10" not in second_day
     expected = tally([r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-02")
                       and r["view"] == "accuracy" and r["family"] == "rule"])
