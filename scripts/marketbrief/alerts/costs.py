@@ -34,9 +34,10 @@ def first_cost(rows: list[dict]) -> float | None:
 
 
 def mean_gain(rows: list[dict]) -> float | None:
-    """The mean of the rows' stored expected gain after your cost (2 decimals); None when none has one."""
+    """The mean of the rows' stored expected gain after your cost, unrounded (the viability test uses the exact
+    value, as B2's cost_viable does; only the display rounds); None when none has one."""
     gains = [float(r[YOUR_GAIN_PCT]) for r in rows if not fmt.missing(r.get(YOUR_GAIN_PCT))]
-    return round(statistics.mean(gains), 2) if gains else None
+    return statistics.mean(gains) if gains else None
 
 
 def pick_gain(row: dict) -> float | None:
@@ -45,7 +46,8 @@ def pick_gain(row: dict) -> float | None:
 
 
 def verdict(gain: float | None, cost) -> str:
-    """'expected gain -0.71% after your cost 0.30% — not viable' (or '— viable'); '' without the numbers."""
+    """'expected gain -0.71% after your cost 0.30% — not viable' (or '— viable'); '' without the numbers. Viable is
+    tested on the unrounded gain; the text shows it to 2 decimals."""
     if gain is None or fmt.missing(cost):
         return ""
     return (f"expected gain {fmt.pct(gain)} after your cost {float(cost):.2f}% — "
@@ -61,7 +63,7 @@ def pick_cost_text(row: dict) -> str:
 def head_to_head_cost_text(pick: dict) -> str:
     """'; expected gain -1.44% after your cost 0.30% — not viable' from the pick's stored gain, else ''."""
     gain = pick.get(YOUR_GAIN_PCT)
-    text = verdict(None if fmt.missing(gain) else round(float(gain), 2), pick.get(YOUR_COST_PCT))
+    text = verdict(None if fmt.missing(gain) else float(gain), pick.get(YOUR_COST_PCT))
     return f"; {text}" if text else ""
 
 

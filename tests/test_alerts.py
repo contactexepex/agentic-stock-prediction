@@ -568,7 +568,7 @@ def test_daily_brief_joins_the_day_thread(monkeypatch):
     assert http.calls[-1]["form"]["thread_ts"] == first["thread_ts"]
 
 
-# ---------- the owner's own costs (decisions 50-51; field names assumed until B2's docs/ws/b2.md) ----------
+# ---------- the owner's own costs (decisions 50-51; B2's stored cost_views values, docs/ws/b2.md) ----------
 
 def with_your_cost(rows: list[dict], cost: float, gain=None) -> list[dict]:
     """Fixture rows carrying B2's stored cost_views values as the reader joins them: the owner's round-trip cost and
@@ -764,3 +764,18 @@ def test_cost_views_join_as_of_the_clock(scratch, monkeypatch, capsys):
     assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in close
     rule = [r for r in settled if r["view"] == "accuracy" and r["family"] == "rule" and r["status"] == "settled"]
     assert f"(after your costs {text.signed_money('USD', round(sum(r['net_pnl'] - 0.46 for r in rule), 2))})" in close
+
+
+def test_viability_uses_the_unrounded_stored_gain_and_skips_null_gains():
+    preds = of_market(examples("prediction"), "us")
+    h2h = with_your_cost(of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07"), 0.30,
+                         lambda _row: 0.003)                       # B2: cost_viable = 0.003 > 0 = True
+    tiny = with_your_cost(preds, 0.30, lambda _row: 0.004)
+    msg = build_morning("us", "2026-10-07", tiny, h2h, HORIZONS)
+    assert "Expected gain +0.00% after your cost 0.30% — viable." in msg       # shown rounded, tested exact
+    assert all("; expected gain +0.00% after your cost 0.30% — viable [Paper]" in x
+               for x in msg.splitlines() if x.startswith("   • "))
+    assert "No pick clears your costs today." not in msg
+    mixed = with_your_cost(preds, 0.30, lambda r: None if r["family"] == "rule" else 0.5)  # rule: none stored
+    assert "Expected gain +0.50% after your cost 0.30% — viable." in build_morning("us", "2026-10-07", mixed, [],
+                                                                                  HORIZONS)
