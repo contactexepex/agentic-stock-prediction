@@ -289,6 +289,7 @@ What is covered:
     earnings, and the label rule did not match the code.
   
   All were fixed in round 2's commit, each with a test.
+- Round 2, PASS, fed8f55: all six blockers verified fixed with tests; no new blockers.
 
 ## Proposed edits to shared docs
 
@@ -335,6 +336,8 @@ Open:
   the model's probability (no stored calls exist today).
 - `signals.py` `candidates`: a Paper candidate's `tier` can be of the opposite side when the forecaster's
   adjustment flips the side. Its `direction` is the model's side.
+- `signals.py` `unscored_rows` (round 2): when no score exists at all, the rows have `id` None, and
+  `api_shapes` keys a dict by id. Harmless today, because candidates exclude these rows.
 
 ## Open questions
 1. **Proof thresholds** (`min_count` 50, `min_wilson_low` 0.55, strong at confidence ≥ 0.65 with a forecaster call
