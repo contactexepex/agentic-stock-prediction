@@ -283,9 +283,10 @@ states each strategy's position against the bar.
    `cfg["tickers"]` from the watchlist events as of the run's clock (MB_NOW-aware) with every
    collected company (active and inactive, never deleted), and adds `cfg["active_tickers"]`. The 37
    existing readers of `cfg` tickers keep working unchanged and keep collecting inactive companies,
-   as decision 13 wants. Only code that predicts or trades reads `active_tickers` (the new strategy
-   and trader code, and the existing model-score, forecaster-context and intraday steps, each listed
-   in B1's ownership). The accessor `watchlist(market, as_of, state)` serves replays and new code.
+   as decision 13 wants. Only code that predicts, publishes ranges or picks, or trades reads `active_tickers`: the new
+   strategy and trader code, and those existing steps, which Stage A lists file by file from a search
+   of every `cfg` tickers reader (each classified collect or predict); B1 owns exactly the predict
+   call sites on that list. The accessor `watchlist(market, as_of, state)` serves replays and new code.
 3. **Add** takes: market, exchange symbol, optional name, optional amount. The onboarding pipeline
    (deterministic, no AI needed): resolve and check identifiers (NSE symbol and Yahoo symbol; or
    NYSE/Nasdaq ticker, Yahoo symbol and SEC CIK), refuse ETFs, BSE-only and unknown symbols, set the
@@ -533,7 +534,7 @@ function signature. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/
 
 | Stage | Builds | Owns | Needs |
 |---|---|---|---|
-| B1 Lifecycle | F8: watchlist events, the loader change and accessor, the switch of the existing predicting steps to `active_tickers` (`model/` scoring entry point, the context pack, `intraday/` ticker selection), seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `core/market_config.py`, `scripts/company.py`, `.github/workflows/onboard.yml`, those three call sites only | A |
+| B1 Lifecycle | F8: watchlist events, the loader change and accessor, the switch of the existing predicting steps to `active_tickers` (the predict call sites on Stage A's list), seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `core/market_config.py`, `scripts/company.py`, `.github/workflows/onboard.yml`, the predict call sites on Stage A's list only | A |
 | B2 Lab | F1 engine (incl. F1.10, the EUR view in `marketbrief/portfolio/`, and the `EURUSD=X` symbol in `config/markets/us.yaml`), F2 strategies and baselines, F3 news-impact study, F7 scoreboard and luck test | `marketbrief/lab/`, `scripts/lab.py`, `marketbrief/portfolio/`, `config/costs.yaml`, that line of `config/markets/us.yaml` | A |
 | B3 AI traders | F4 traders and gate, F6 EOD analyst and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `.claude/agents/forecaster.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | A (writes predictions; B2 settles them) |
 | B4 API | the read models of section 4 (payload functions from B1-B3 via A's interfaces, stubbed until merged) and every route file under `web/app/api/v1/` (write handlers are thin calls into B5's tool layer), caching, revalidate | `web/app/api/v1/`, `web/lib/data/`, `marketbrief/warehouse/rm_*` additions | A |
@@ -543,7 +544,7 @@ function signature. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/
 | B8 Assistant | F11 chat and Slack `/ask` with budget | `web/app/api/assistant/`, `web/lib/assistant/` | A |
 | B9 Monitoring | F5: intraday checks of every open paper trade, the extended explainer input, intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | A |
 
-B1 changes only the loader and the three predicting call sites named above; every other reader of
+B1 changes only the loader and the predict call sites on Stage A's list; every other reader of
 `cfg` tickers keeps working unchanged through the loader, and new code calls the accessor through A's
 interface. B9 builds on B1's `active_tickers` for open-trade checks without editing B1's line.
 `config/markets/<market>.yaml` `tickers:` stays in place until Stage C removes it (safe then, because
