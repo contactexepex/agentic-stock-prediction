@@ -1,18 +1,39 @@
 -- The inbox of the web tier (docs/SPEC.md F10; ARCHITECTURE.md section 9; session B5).
 -- Database market_brief_inbox in MotherDuck, written only with MOTHERDUCK_INBOX_TOKEN (its own service account, so a
 -- leaked inbox token cannot touch market_brief). The tool layer (web/lib/tools/) appends; the importer (session B1:
--- onboard.yml and the routine runs) reads, validates with the same Python validators as the CLIs, appends to data/
--- and records each inbox id in data/<market>/inbox_imports/. Rows are never updated or deleted by the web tier.
+-- `scripts/company.py import-inbox`, run by onboard.yml and the routines; scripts/marketbrief/lifecycle/inbox.py) reads
+-- inbox.company_commands, validates with the same Python validators as the CLI and appends to data/. Rows are never
+-- updated or deleted by the web tier. Idempotent: every statement is CREATE ... IF NOT EXISTS.
 -- The owner creates these tables once (docs/ws/b5.md, owner setup). tests/test_b5_tools.py checks the command_log
 -- columns against the schema and runs the tool layer's statements (web/lib/tools/sql.ts) on a local DuckDB.
 
 CREATE SCHEMA IF NOT EXISTS inbox;
 
--- One row per write request. inbox_id = the caller's idempotency key (unique: a repeated key returns the first
--- result). kind: the data kind the import appends to (watchlist_events | portfolio_trades). arguments: the
--- validated tool arguments. preview: the resolved identifiers the caller confirmed (add_company), else null.
--- submitted_by: the identity the channel's auth gave, never taken from arguments. args_sha256: sha256 of the
--- arguments as JSON with sorted keys, so a reused key with other arguments is refused.
+-- One row per company command (add, deactivate, reactivate, set amount, delete), read by B1's importer. The first
+-- eight columns are B1's (scripts/marketbrief/lifecycle/inbox.py INBOX_COLUMNS, an explicit SELECT): inbox_id = the
+-- caller's idempotency key (unique per table by the primary key, and across both tables by the tool layer's claim
+-- statement; a repeated key returns the first result);
+-- arguments = the validated tool arguments (secret values scrubbed); actor = the identity the channel's auth gave,
+-- never taken from arguments; command_id = the web tier's command id. B5's own columns follow (B1 ignores them):
+-- preview = the identifiers the caller confirmed (add_company), agent, args_sha256 = sha256 of the arguments as JSON
+-- with sorted keys (a reused key with other arguments is refused).
+CREATE TABLE IF NOT EXISTS inbox.company_commands (
+    inbox_id VARCHAR PRIMARY KEY,
+    market VARCHAR NOT NULL,
+    tool VARCHAR NOT NULL,
+    arguments JSON NOT NULL,
+    actor VARCHAR NOT NULL,
+    channel VARCHAR NOT NULL,
+    submitted_at TIMESTAMPTZ NOT NULL,
+    command_id VARCHAR,
+    preview JSON,
+    agent VARCHAR NOT NULL,
+    args_sha256 VARCHAR NOT NULL
+);
+
+-- One row per other write request: today only add_paper_trade (kind portfolio_trades). NO IMPORTER YET: these rows
+-- wait here until a portfolio importer (WS4, marketbrief/portfolio/) reads them; the caller sees "pending".
+-- Same meanings as above; submitted_by is the actor.
 CREATE TABLE IF NOT EXISTS inbox.requests (
     inbox_id VARCHAR PRIMARY KEY,
     kind VARCHAR NOT NULL,
@@ -29,7 +50,8 @@ CREATE TABLE IF NOT EXISTS inbox.requests (
 );
 
 -- One row per command from the web tier's channels, the columns of the command_log kind
--- (scripts/marketbrief/core/schema_lifecycle.py); the import copies them to data/<market>/command_log/.
+-- (scripts/marketbrief/core/schema_lifecycle.py). An OPERATIONAL log only (budgets, the owner's view of refusals):
+-- it is NOT imported. The canonical data/<market>/command_log/ is written by B1's importer and the CLIs.
 CREATE TABLE IF NOT EXISTS inbox.command_log (
     id VARCHAR NOT NULL,
     market VARCHAR,

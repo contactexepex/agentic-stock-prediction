@@ -616,13 +616,21 @@ def test_webhook_fallback_posts_unthreaded_once(monkeypatch, scratch):
     res = pub.publish(Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
     assert res["mode"] == "webhook" and len(hook.calls) == res["parts"] > 1
     assert all(c["url"] == HOOK and set(c["json"]) == {"text"} for c in hook.calls)   # no thread field at all
-    assert publisher("us", dry_run=False, http=hook).publish(
-        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))["posted"] == []
+    rows = [r for r in Ledger(scratch / "data/us/slack_posts").rows() if r["post_key"] == "morning:us:2026-10-07"]
+    assert res["thread_ts"] is None and all(r["thread_ts"] is None for r in rows)    # nothing was threaded
+    assert len({r["ts"] for r in rows}) == len(rows) and all(r["ts"].startswith("webhook.") for r in rows)
+    again = publisher("us", dry_run=False, http=hook).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert again["posted"] == [] and again["thread_ts"] is None                 # a rerun gives no made-up thread
     # a later run with the token starts a real thread (a webhook post is never a thread)
     monkeypatch.setenv("SLACK_BOT_TOKEN", TOKEN)
     http = FakeSlack()
     publisher("us", dry_run=False, http=http).publish(Message("alerts", "alerts:us:ic-1", "a", "us:2026-10-07"))
     assert "thread_ts" not in http.calls[0]["form"]
+    # a token run of the post that went out by webhook posts nothing and names no webhook ts as a thread
+    token_rerun = publisher("us", dry_run=False, http=http).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert token_rerun["posted"] == [] and token_rerun["thread_ts"] is None
     written = "".join(p.read_text() for p in scratch.rglob("*") if p.is_file())
     assert HOOK not in written and "SECRET-hook" not in repr(pub.client)
 
@@ -662,3 +670,13 @@ def test_your_cost_total_only_when_every_row_has_it():
     rows = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
     one = [{**r, "your_net_pnl": 1.0} if i == 0 else r for i, r in enumerate(rows)]
     assert "after your costs +" not in build_close("us", "2026-10-01", one, None, {}, "USD").split("*Settled")[0]
+
+
+def test_no_pick_clears_with_some_picks_lacking_cost_numbers():
+    preds = of_market(examples("prediction"), "us") + of_market(examples("prediction"), "india")
+    costed = [{**p, "your_cost_pct": 0.30} if p["ticker"] == "NVDA" else p for p in preds]   # RELIANCE: no cost
+    msg = build_morning("us", "2026-10-07", costed, [], HORIZONS)
+    assert [r["ticker"] for r in picks(costed)] == ["NVDA", "RELIANCE"]
+    assert msg.splitlines()[2] == "No pick clears your costs today."
+    reliance = next(x for x in msg.splitlines() if "(RELIANCE)*" in x)
+    assert "your cost" not in reliance                                    # no numbers: no cost text
