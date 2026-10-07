@@ -36,6 +36,8 @@ symbols:
   FTSE:    {yahoo: "^FTSE", role: cue, name: FTSE 100, close_time: "16:40 Europe/London"}
   USDJPY:  {yahoo: "JPY=X", role: factor, name: USD/JPY, close_time: "23:59 Europe/London"}
   USDCNY:  {yahoo: "CNY=X", role: factor, name: USD/CNY, close_time: "23:59 Europe/London"}
+  # B2 (docs/SPEC.md F1.6, F1.11): EUR/USD for the BUX order fee and the owner's EUR view; bars only, no model feature.
+  EURUSD:  {yahoo: "EURUSD=X", role: fx, name: EUR/USD, close_time: "23:59 Europe/London"}
   # Sector ETFs: `sectors` = the watchlist sectors (under `sectors:` below) each one stands for;
   # every watchlist sector has one (tests/test_signals.py). Eight SPDR sector ETFs plus JETS
   # (airlines; no SPDR fund) and IAK (iShares U.S. Insurance; XLF is mostly banks and payments).

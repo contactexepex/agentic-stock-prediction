@@ -21,6 +21,7 @@ from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.portfolio import ledger, reads
 from marketbrief.portfolio import constants as text
 from marketbrief.portfolio.constants import BASIS_MANUAL, SIDE_CANCEL, TRADE_ID_PREFIX, TRADE_SIDES
+from marketbrief.portfolio.horizons import active_tickers
 
 KEY_DIGITS = 16
 
@@ -56,7 +57,7 @@ def check_fields(cfg: dict, settings: dict, fields: dict, clock: datetime) -> li
     rules, errors = settings["trades"], []
     if fields["market"] != cfg["market"]:
         errors.append(text.ERR_MARKET.format(market=fields["market"], config=cfg["market"]))
-    if fields["ticker"] not in cfg["tickers"]:
+    if fields["ticker"] not in active_tickers(cfg):
         errors.append(text.ERR_TICKER.format(ticker=fields["ticker"], market=cfg["market"]))
     if fields["side"] not in TRADE_SIDES:
         errors.append(text.ERR_SIDE.format(allowed=", ".join(TRADE_SIDES)))
@@ -136,7 +137,7 @@ def check_no_short(ctx, trades: pd.DataFrame, row: dict | None, target: str | No
         after = pd.concat([after, new], ignore_index=True) if not after.empty else new
     if after.empty:
         return []
-    book = ledger.run_book(after, reads.adjustments(ctx.con, ctx.clock), ctx.market, ctx.costs)
+    book = ledger.run_book(after, reads.adjustments(ctx.con, ctx.clock), ctx.market, None)   # quantities only
     return [text.ERR_SHORT.format(quantity=v["quantity"], ticker=v["ticker"], day=v["trade_date"], left=v["left"])
             for v in book.violations]
 

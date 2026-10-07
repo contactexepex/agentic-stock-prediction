@@ -47,3 +47,6 @@ KIND_TRADE_CHECKS = "trade_checks"
 KIND_EOD_ANALYSES = "eod_analyses"
 KIND_RESEARCH_REVIEWS = "research_reviews"
 KIND_NEWS_IMPACT = "news_impact"
+
+# ---------- B2: strategy lab cost views (owner decisions 50-51; schema in core/schema_b2.py; docs/ws/b2.md) ----------
+KIND_COST_VIEWS = "cost_views"

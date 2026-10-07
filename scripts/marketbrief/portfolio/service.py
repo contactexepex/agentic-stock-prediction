@@ -12,6 +12,10 @@ from marketbrief.portfolio import constants as text
 from marketbrief.portfolio import ledger, reads, trades
 from marketbrief.portfolio.constants import REQUEST_ID_PREFIX, SIDE_CANCEL, STATUS_REQUESTED
 from marketbrief.portfolio.context import Context, TradeInput, context
+from marketbrief.portfolio.eur_view import eur_view
+from marketbrief.portfolio.fx import EurUsd
+
+KEY_EURUSD_SYMBOL, KEY_FX_FEE_RATE = "eurusd_symbol", "fx_fee_rate"   # config/costs.yaml broker.us
 
 __all__ = ["Context", "TradeInput", "add_trade", "cancel_trade", "context", "list_report", "pnl_report",
            "positions_report", "request_company"]
@@ -105,14 +109,30 @@ def marks(ctx: Context, tickers: list[str], adjust) -> dict[str, tuple[str, floa
     return out
 
 
+def eurusd(ctx: Context) -> EurUsd | None:
+    """The stored EUR/USD closes when the market's costs carry a euro order fee (US, BUX), else None."""
+    symbol = ctx.costs.get(KEY_EURUSD_SYMBOL)
+    return EurUsd(ctx.con, ctx.cfg, ctx.clock, symbol) if symbol else None
+
+
 def book_now(ctx: Context):
-    """(book with the open lots marked, marks, active trades) as of the clock."""
+    """(book with the open lots marked, marks) as of the clock."""
     active = reads.active_trades(reads.trade_rows(ctx.con, ctx.clock))
     adjust = reads.adjustments(ctx.con, ctx.clock)
-    book = ledger.run_book(active, adjust, ctx.market, ctx.costs)
+    fx = eurusd(ctx)
+    rate_of = fx.required if fx and not active.empty and ctx.costs.get("order_fee_eur") else None
+    book = ledger.run_book(active, adjust, ctx.market, ctx.costs, rate_of)
     prices = marks(ctx, sorted(book.lots), adjust)
-    ledger.mark_lots(book, prices, ctx.market, ctx.costs)
+    ledger.mark_lots(book, prices, ctx.market, ctx.costs, rate_of)
     return book, prices
+
+
+def eur_section(ctx: Context, book, prices) -> dict:
+    """{"eur_view": [...]} for a market whose costs name the EUR/USD symbol (US), else {}."""
+    fx = eurusd(ctx)
+    if fx is None:
+        return {}
+    return {"eur_view": eur_view(book, prices, fx, float(ctx.costs.get(KEY_FX_FEE_RATE, 0.0)))}
 
 
 def header(ctx: Context) -> dict:
@@ -124,7 +144,7 @@ def header(ctx: Context) -> dict:
 def positions_report(ctx: Context) -> dict:
     """Open positions per ticker, marked to the latest stored close."""
     book, prices = book_now(ctx)
-    return {**header(ctx), "positions": ledger.positions(book, prices)}
+    return {**header(ctx), "positions": ledger.positions(book, prices), **eur_section(ctx, book, prices)}
 
 
 def pnl_report(ctx: Context) -> dict:
@@ -132,7 +152,7 @@ def pnl_report(ctx: Context) -> dict:
     book, prices = book_now(ctx)
     rows = list(book.results.values())
     return {**header(ctx), "trades": [ledger.rounded(row) for row in rows], "totals": ledger.totals(rows),
-            "positions": ledger.positions(book, prices)}
+            "positions": ledger.positions(book, prices), **eur_section(ctx, book, prices)}
 
 
 def list_report(ctx: Context) -> dict:

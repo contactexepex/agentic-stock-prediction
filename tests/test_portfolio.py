@@ -28,6 +28,7 @@ SATURDAY = date(2026, 10, 3)
 BARS = {"AAPL": {D1: (200, 205, 198, 202), D2: (203, 208, 201, 206), D3: (207, 211, 204, 210),
                  D4: (209, 215, 207, 214)},
         "JPM": {D1: (300, 303, 297, 301), D2: (301, 304, 299, 302), D3: (302, 306, 300, 305), D4: (305, 309, 303, 308)}}
+EURUSD_BARS = {D1: (1.16, 1.17, 1.15, 1.165), D4: (1.17, 1.18, 1.16, 1.17)}   # B2: the BUX order fee (US)
 INDIA_BARS = {"HDFCBANK": {D1: (100, 104, 99, 101), D3: (110, 112, 108, 111), D4: (118, 121, 117, 120)}}
 US_COSTS = {"commission_each_side": 0.0, "sec_fee_sell": 0.0000206, "finra_taf_per_share_sell": 0.000195,
             "finra_taf_max_per_trade": 9.79, "notional_per_trade": 10000.0, "slippage_each_side": 0.0}
@@ -59,7 +60,7 @@ def make_root(tmp_path: Path, monkeypatch) -> Path:
     """A synthetic data root with US and India bars, the clock frozen at NOW (shared with test_portfolio_signals)."""
     monkeypatch.setattr(common, "ROOT", tmp_path)
     monkeypatch.setenv("MB_NOW", NOW)
-    write_bars(tmp_path, "us", BARS)
+    write_bars(tmp_path, "us", {**BARS, "EURUSD": EURUSD_BARS})
     write_bars(tmp_path, "india", INDIA_BARS)
     return tmp_path
 

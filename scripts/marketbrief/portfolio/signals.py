@@ -6,7 +6,8 @@ the direction is the side of 0.5 (the call's own direction when it exists) and c
 - Strong Buy / Strong Sell: only in a PROVEN (horizon, confidence band) cell (proof.py), with a forecaster call
   when tiers.strong_requires_call, and confidence >= tiers.strong_min_confidence.
 - Buy / Sell: confidence >= tiers.buy_min_confidence.
-- Hold/No call: otherwise, no model score (every watchlist ticker x horizon gets a row), indicator quality BLOCKED,
+- Hold/No call: otherwise, no model score (every active watchlist ticker x horizon of config/strategies.yaml gets
+  a row), indicator quality BLOCKED,
   or earnings within earnings_block_days calendar days (features.days_to_earnings).
 Every row carries paper_only (true unless it has a forecaster call in a proven cell) and then the label
 "Paper only — no proven edge yet".
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 from marketbrief.core.market_config import load_market
 from marketbrief.portfolio import proof as proofs
+from marketbrief.portfolio.horizons import active_tickers, horizons, is_n_plus_k
 from marketbrief.portfolio import signal_inputs as inputs
 from marketbrief.portfolio.constants import (
     LABEL_PAPER_ONLY,
@@ -94,7 +96,8 @@ def signal_row(score: dict, call: dict | None, band_range: dict | None, block: d
     final, adjustment = final_probability(model_prob, call)
     direction = (call or {}).get("direction") or ("up" if final > 0.5 else "down" if final < 0.5 else None)
     confidence = round(max(final, 1 - final), PROB_DIGITS)   # rounded first: 1 - 0.35 is 0.6499999999999999
-    cell = proofs.cell(proof, int(score["horizon_days"]), proofs.band_of(confidence, settings["proof"]["bands"]))
+    cell = proofs.cell(proof, int(score["horizon_days"]), proofs.band_of(confidence, settings["proof"]["bands"])) \
+        if is_n_plus_k(score["horizon_days"], score.get("horizon_label")) else None
     cell_proven = bool(cell and cell["proven"])
     proven = cell_proven and call is not None   # a model-only row stays paper only, even in a proven cell
     why_blocked = blocked_reason(block, settings)
@@ -134,8 +137,8 @@ def candidates(rows: list[dict], scores: dict[str, dict], settings: dict) -> lis
 def unscored_rows(cfg: dict, as_of, scored: set[tuple[str, int]]) -> list[dict]:
     """Hold/No call rows for every watchlist ticker x horizon with no model score on the as-of date."""
     out = []
-    for ticker in sorted(cfg["tickers"]):
-        for horizon in proofs.HORIZONS:
+    for ticker in active_tickers(cfg):
+        for horizon in horizons():
             if (ticker, horizon) in scored:
                 continue
             out.append({"id": f"{as_of}-{ticker}-{horizon}d" if as_of else None, "ticker": ticker,
