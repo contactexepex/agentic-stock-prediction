@@ -3,6 +3,7 @@ name: onboard
 # The inbox import (docs/SPEC.md F8 and F10, write path from the web tier): company commands written by the web tier
 # to the MotherDuck database market_brief_inbox are validated by scripts/company.py import-inbox (the same lifecycle
 # validator as the CLI), adds run the deterministic onboarding (identifiers, sector, backfill, collect gate), and the
+# web tier's paper trades (inbox.requests) are imported by scripts/portfolio.py import-inbox (B2); the
 # new records are committed to data/ with pull, rebase and retry so the run never races a routine's push.
 # Research only: a watchlist event is a record, never an order. Dispatched by the web tier (workflow_dispatch);
 # a command whose sources do not answer from GitHub's runners is logged `failed` and retried by the next import
@@ -56,6 +57,9 @@ jobs:
           for market in $markets; do
             python scripts/company.py --market "$market" import-inbox --slack-reply > "work/onboard-$market.json" || status=$?
             cat "work/onboard-$market.json"
+            # the web tier's add_paper_trade requests (inbox.requests; B2's importer, issue #112)
+            python scripts/portfolio.py --market "$market" import-inbox > "work/paper-trades-$market.json" || status=$?
+            cat "work/paper-trades-$market.json"
           done
           exit $status
       - name: Commit and push the new records
