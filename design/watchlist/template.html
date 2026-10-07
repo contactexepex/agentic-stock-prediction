@@ -174,7 +174,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
     <th class="num" data-k="move">Day</th>
     <th class="num c-5d" data-k="move_5">5d</th>
     <th class="c-spark">20 sessions</th>
-    <th class="num" data-k="p1">Chance up 1d <button class="md-help" data-tip="The signal model's live probability that the stock closes above its next open (1 day) or above the open four sessions later (5 days). 50% is a coin flip; a call needs 60% (config/model.yaml)." aria-label="Explain">?</button></th>
+    <th class="num" data-k="p1">Chance up 1d <button class="md-help" data-tip="The signal model's live probability that the stock closes above its next open (1 day) or above the open four sessions later (5 days). 50% is a coin flip. 60% is the cockpit's Paper-candidate line (a reading aid, not a pipeline rule); a YES is a live call the forecaster made." aria-label="Explain">?</button></th>
     <th class="num c-p5" data-k="p5">5d</th>
     <th data-k="verdict">Verdict <button class="md-help" data-tip="NO (red) when there is no live call for the latest date; YES (green) for a live up call, darker green when strong (confidence >= 0.75 or anchored probability >= 0.65), lighter when okay. Every signal is Paper until the live track record proves it." aria-label="Explain">?</button></th>
     <th class="c-range">5-day range <button class="md-help" data-tip="The latest published 5-day 80% range (ranges.py), drawn around the last close. Hover for the numbers." aria-label="Explain">?</button></th>
@@ -275,7 +275,7 @@ for (const t of tiles) $('#tiles').append(el('div', {'data-tip': t.t}, el('span'
 /* ---------- banner ---------- */
 const B = $('#banner');
 if (H.yes.length) { B.classList.add('yes'); B.append(el('div', {class:'ico'}, icon('ms-check')), el('div', {}, el('b', {class:'t'}, `${H.yes.length} YES call${H.yes.length>1?'s':''} today: ${H.yes.join(', ')}`), el('div', {class:'s'}, `Paper until the track record proves them (${H.scored_total} live calls scored so far). Open the company page for the plan.`))); }
-else { B.classList.add('none'); B.append(el('div', {class:'ico'}, icon('ms-block')), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'), el('div', {class:'s'}, (H.candidates.length ? `Paper candidates at or above ${pct(D.call_threshold)}%: ${H.candidates.join(', ')}. ` : `No company reaches the ${pct(D.call_threshold)}% call line; `) + `the forecaster abstained on ${H.abstain} of ${H.n}` + (H.model_skill ? '.' : ', and the model has not shown skill in the back-test, so every signal stays Paper.')))); }
+else { B.classList.add('none'); B.append(el('div', {class:'ico'}, icon('ms-block')), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'), el('div', {class:'s'}, (H.candidates.length ? `Paper candidates at or above ${pct(D.call_threshold)}%: ${H.candidates.join(', ')}. ` : `No company reaches the ${pct(D.call_threshold)}% Paper-candidate line; `) + `the forecaster abstained on ${H.abstain} of ${H.n}` + (H.model_skill ? '.' : ', and the model has not shown skill in the back-test, so every signal stays Paper.')))); }
 
 /* ---------- table ---------- */
 let sortKey = 'sector', sortDir = 1, sectorFilter = null, query = '';
@@ -360,7 +360,7 @@ render();
 $('#sources').innerHTML = `<dl class="md-kv">
 <dt>Live</dt><dd>data/${D.market}/: prices (last 21 stored bars per symbol: close, day, 5-day and 20-session sparkline), model_scores_latest (chance of a rise, latest date), ranges_latest (the latest published 5-day range), features_latest (RSI, results countdown, indicator quality), agent_reasoning (abstain / call), predictions and outcomes (verdicts and scored calls), quotes_latest (overnight cues, live benchmark), regime, events (next results date), news with enrichment and news_verified (72-hour counts and best status)${D.market==='india' ? ', flows (NSE FII/DII)' : ''}, reviews (model skill). Read through DuckDB views in sql/views.sql.</dd>
 <dt>Back-test</dt><dd>"80% held": <code>scripts/replay.py --market ${D.market} --start ${D.window[0]} --end ${D.window[1]}</code> run into a scratch root; per ticker coverage of the rule replay's 1-day and 5-day 80% ranges. Not live.</dd>
-<dt>Derived</dt><dd>Verdict colour and strength from the stored call (confidence >= 0.75 or anchored probability >= 0.65 = strong); Paper candidates = chance at or above the ${pct(D.call_threshold)}% call line; blocked = indicator quality BLOCKED or results within 1 day.</dd>
+<dt>Derived</dt><dd>Verdict colour and strength from the stored call (confidence >= 0.75 or anchored probability >= 0.65 = strong); Paper candidates = chance at or above the ${pct(D.call_threshold)}% Paper-candidate line; blocked = indicator quality BLOCKED or results within 1 day.</dd>
 <dt>Mock / coming</dt><dd>Symbol search across markets, the live market switch, and the rail's other sections are not built. Nothing on this page is invented: a missing value shows as a dash.</dd>
 </dl>`;
 $('#foot').textContent = `Personal research project. Prices from Yahoo Finance${D.market==='india' ? ' and NSE bhavcopy' : ''}; nothing here is investment advice and nothing trades. Built ${D.built_at} (UTC) from stored data as of ${D.as_of}.`;

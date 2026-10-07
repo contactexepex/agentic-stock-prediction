@@ -293,7 +293,7 @@ $('#legend').append(...LEG.map(([sw, text]) => el('div', {class:'row'}, el('div'
 /* ---------- when to trust ---------- */
 const TESTS = [
   ['Price ranges keep their promise', `${G.ranges_needed} real ranges checked, and the 80% range held between ${80 - pct(G.tolerance)} and ${80 + pct(G.tolerance)} times out of 100. ${M.india.n_tickers} ranges a day per market, each checked the next session, so this is a matter of weeks.`],
-  ['Direction calls come true as often as promised', `At a confidence level (${G.confidence_bands.map(b => pct(b) + '%').join(', ')}), at least ${G.calls_needed} real calls checked and they came true at least that often, minus ${pct(G.tolerance)} points. It only starts counting once the model is sure enough to call.`],
+  ['Direction calls come true as often as promised', `At a confidence level (${G.confidence_bands.map(b => pct(b) + '%').join(', ')}), at least ${G.calls_needed} real calls checked and they came true at least that often, minus ${pct(G.tolerance)} points. It only starts counting once the forecaster makes live calls.`],
   ['It beats a coin', `In the weekly check-up, on at least ${G.model_skill.min_n} rehearsal days: a ranking score whose likely range sits above ${G.model_skill.min_auc_low} (a coin scores exactly that) and probabilities better than always guessing the average.`],
   ['Following it makes money after costs', `In the rehearsal, buying when the model is at least ${pct(R.call_threshold)}% sure and selling at the close of the fifth session leaves a profit after costs whose likely range sits entirely above zero. Costs of one round trip on ${R.stake.toLocaleString('en')}: ${MK.map(m => `${LABEL[m]} ${money(m, M[m].round_trip_cost_per_stake)} (${M[m].round_trip_cost_pct}%)`).join(', ')}.`],
 ];

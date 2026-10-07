@@ -5130,9 +5130,9 @@
   "checks": [
    {
     "ok": false,
-    "text": "Model chance of a rise at or above 60%",
+    "text": "Model chance of a rise at or above the cockpit's 60% Paper-candidate line (a reading aid, not a pipeline rule)",
     "now": "47% / 47% now",
-    "tip": "config/model.yaml backtest thresholds are 55/60/65%. In the back-test the 5-day long at >=60% held 999 positions on 76 dates and lost 0.17% per trade after costs on average (95% interval -0.84 to 0.28)."
+    "tip": "The 60% line is the cockpit's Paper-candidate line, not a pipeline rule: a YES is a live call the forecaster made, at any confidence from 50%. The back-test reports the thresholds 55/60/65% (config/model.yaml). In the back-test the 5-day long at >=60% held 999 positions on 76 dates and lost 0.17% per trade after costs on average (95% interval -0.84 to 0.28)."
    },
    {
     "ok": false,
@@ -6065,7 +6065,7 @@
   },
   "session": {
    "market": "india",
-   "local_time": "2026-10-07T22:18+05:30",
+   "local_time": "2026-10-07T22:51+05:30",
    "trading_day": true,
    "session_date": "2026-10-08",
    "previous_session": "2026-10-07",

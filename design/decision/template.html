@@ -269,7 +269,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
 
   <!-- CHECKLIST -->
   <section class="card" id="checks-card">
-    <h2>What would turn this into a YES <button class="md-help" data-tip="The pipeline's own rules for a call (CLAUDE.md prediction rules, config/model.yaml thresholds, the weekly review's skill test). Each line shows today's value next to the rule." aria-label="Explain">?</button></h2>
+    <h2>What stands between this and a YES <button class="md-help" data-tip="A YES is a live call the forecaster made. This checklist is the cockpit's reading aid: the pipeline's own rules for a call (CLAUDE.md prediction rules: evidence status, the results block, the run time) next to the cockpit's own Paper-candidate line (60%) and the weekly review's skill test. Each line shows today's value next to the check." aria-label="Explain">?</button></h2>
     <ul class="checks" id="checks"></ul>
     <p class="note" id="paper-note"></p>
   </section>
@@ -400,7 +400,7 @@ why += W.abstained ? '; the forecaster abstained.' : (W.decision_1d ? `; the for
 why += `<span class="meta">${W.forecaster_quote ? `Forecaster, ${W.forecaster_time} UTC: “${W.forecaster_quote}” ` : ''}${W.earnings_sentence}</span>`;
 $('#dec-why').innerHTML = why;
 for (const [h, p, lv] of [[1, p1, live1], [5, p5, live5]]) {
-  $('#odds').append(el('div', {class:'row', 'data-tip': lv ? `Live model score, ${h}-day (model_scores ${hm(lv.computed_at)} UTC): P(up) ${p.toFixed(4)}, base rate ${lv.base_rate}. 50% = coin flip; a call needs 60%.` : 'No live model score stored.'}, el('span', {class:'micro', style:'color:inherit;opacity:.8'}, `${h}d chance up`), el('div', {class:'bar'}, el('i', {style:`width:${p==null?0:pct(p)}%`})), el('b', {}, p==null?'—':pct(p)+'%')));
+  $('#odds').append(el('div', {class:'row', 'data-tip': lv ? `Live model score, ${h}-day (model_scores ${hm(lv.computed_at)} UTC): P(up) ${p.toFixed(4)}, base rate ${lv.base_rate}. 50% = coin flip; 60% = the cockpit's Paper-candidate line (a reading aid, not a pipeline rule).` : 'No live model score stored.'}, el('span', {class:'micro', style:'color:inherit;opacity:.8'}, `${h}d chance up`), el('div', {class:'bar'}, el('i', {style:`width:${p==null?0:pct(p)}%`})), el('b', {}, p==null?'—':pct(p)+'%')));
 }
 $('#vfoot').append(el('span', {}, 'Confidence: ', el('b', {}, P.verdict.kind === 'call' ? P.verdict.small.split('confidence ')[1] : 'no call')), el('span', {}, 'Run: ', el('b', {}, P.run_hm ? `${P.run_hm} UTC` : '—'), P.run_before_open ? ' (before the open)' : ' (after the open)'), el('span', {}, 'Evidence: ', el('b', {}, P.best_status.replace('_',' '))), el('span', {}, 'Regime: ', el('b', {}, D.live.regime.regime)), el('span', {class:'mb-tag live'}, 'live'));
 for (const c of P.checks) {

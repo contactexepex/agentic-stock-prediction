@@ -449,9 +449,9 @@ def page_block(market, cfg, con, ticker, company, sector, peers, cur, D, today, 
     paper60 = (sk5.get("paper") or {}).get("0.60", {}).get("long")
     pct = lambda x, dec=0: round(x * 100, dec) if dec else round(x * 100)  # noqa: E731
     checks = [
-        {"ok": bool(p1 is not None and max(p1, p5 or 0) >= 0.60), "text": "Model chance of a rise at or above 60%",
+        {"ok": bool(p1 is not None and max(p1, p5 or 0) >= 0.60), "text": "Model chance of a rise at or above the cockpit's 60% Paper-candidate line (a reading aid, not a pipeline rule)",
          "now": f"{pct(p1)}% / {pct(p5)}% now" if p1 is not None and p5 is not None else "no live score",
-         "tip": f"config/model.yaml backtest thresholds are {'/'.join(str(int(t * 100)) for t in th)}%. "
+         "tip": f"The 60% line is the cockpit's Paper-candidate line, not a pipeline rule: a YES is a live call the forecaster made, at any confidence from 50%. The back-test reports the thresholds {'/'.join(str(int(t * 100)) for t in th)}% (config/model.yaml). "
                 + (f"In the back-test the 5-day long at >=60% held {paper60['positions']} positions on {paper60['dates']} dates and "
                    f"{'lost' if paper60['mean_pct'] < 0 else 'made'} {abs(paper60['mean_pct']):.2f}% per trade after costs on average "
                    f"(95% interval {paper60['ci95_pct'][0]} to {paper60['ci95_pct'][1]})." if paper60 else "")},
