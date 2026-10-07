@@ -109,7 +109,8 @@ def load_inputs(ctx: CheckContext) -> dict:
     keys = [(ticker, call["entry_date"], call["entry_kind"]) for ticker, calls in ctx.calls.items() for call in calls
             if call["entry_date"] != day.isoformat()]
     ctx.entry_prices = inputs.entry_prices(bars, keys)
-    ctx.trades, skipped = trades.open_trades(con, ctx.cfg, day, at)
+    max_past = (ctx.settings.get("trades") or {}).get("max_sessions_past_exit", 0)
+    ctx.trades, skipped = trades.open_trades(con, ctx.cfg, day, at, max_past)
     held = [trade for rows in ctx.trades.values() for trade in rows]
     tickers = sorted(ctx.trades)
     if held:
