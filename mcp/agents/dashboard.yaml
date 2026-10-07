@@ -1,0 +1,10 @@
+# The dashboard's buttons and forms (behind Vercel Authentication, the owner only; decision 16). The write routes of
+# /api/v1 (session B4) call the tool layer with this agent; it is refused in gateway mode (MB_GATEWAY=1).
+agent: dashboard
+channels: [dashboard]
+enabled: true
+tools: [get_overview, get_company, get_scoreboard, compare_rule_vs_ai, get_news, get_trades, explain,
+        add_company, deactivate_company, reactivate_company, set_paper_amount, delete_company, add_paper_trade]
+daily_write_budget: 50
+daily_read_budget: 2000
+fail_to: owner

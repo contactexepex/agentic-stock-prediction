@@ -1,0 +1,12 @@
+// The statements the tool layer sends to MotherDuck (DuckDB SQL over the Postgres endpoint, $n parameters). Plain
+// template literals without interpolation: tests/test_b5_tools.py runs each against a local DuckDB with mcp/inbox.sql.
+
+export const READ_MODEL_COLUMNS = `market, page_key, as_of, cutoff, built_at, schema_version, source_commit, payload_sha256, payload`;
+
+export const INBOX_SQL_STATEMENTS = {
+  usage: `SELECT (SELECT count(*) FROM inbox.requests WHERE agent = $1 AND submitted_at >= CAST($2 AS TIMESTAMPTZ)) AS writes, (SELECT count(*) FROM inbox.command_log WHERE agent = $1 AND kind IN ('read', 'read_ai') AND received_at >= CAST($2 AS TIMESTAMPTZ)) AS reads, (SELECT bool_and(enabled) FROM (SELECT agent, arg_max(enabled, updated_at) AS enabled FROM inbox.controls WHERE agent IN ($1, '*') GROUP BY agent)) AS enabled`,
+  claim: `INSERT INTO inbox.requests (inbox_id, kind, tool, market, arguments, preview, channel, submitted_by, agent, command_id, submitted_at, args_sha256) VALUES ($1, $2, $3, $4, CAST($5 AS JSON), CAST($6 AS JSON), $7, $8, $9, $10, CAST($11 AS TIMESTAMPTZ), $12) ON CONFLICT (inbox_id) DO NOTHING RETURNING inbox_id`,
+  existing: `SELECT inbox_id, kind, tool, market, CAST(arguments AS VARCHAR) AS arguments, CAST(preview AS VARCHAR) AS preview, channel, submitted_by, agent, command_id, submitted_at, args_sha256 FROM inbox.requests WHERE inbox_id = $1`,
+  append: `INSERT INTO inbox.command_log (id, market, received_at, channel, actor, agent, tool, kind, arguments, idempotency_key, result, refusal_code, message, record_ids, budget_left, completed_at) VALUES ($1, $2, CAST($3 AS TIMESTAMPTZ), $4, $5, $6, $7, $8, CAST($9 AS JSON), $10, $11, $12, $13, from_json(CAST($14 AS VARCHAR), '["VARCHAR"]'), CAST($15 AS INTEGER), CAST($16 AS TIMESTAMPTZ))`,
+  find: `SELECT id, market, received_at, channel, actor, agent, tool, kind, CAST(arguments AS VARCHAR) AS arguments, idempotency_key, result, refusal_code, message, CAST(to_json(record_ids) AS VARCHAR) AS record_ids, budget_left, completed_at FROM inbox.command_log WHERE id = $1 ORDER BY received_at LIMIT 1`,
+} as const;

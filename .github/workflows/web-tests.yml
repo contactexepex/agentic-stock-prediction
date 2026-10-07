@@ -1,0 +1,41 @@
+name: web-tests
+
+# The web tier (web/, session B5): typecheck, the offline node tests (mocked MotherDuck, GitHub and Slack; the
+# prompt-injection suite) and a production build. No secrets and no deploys: nothing here reaches Slack or Vercel.
+# Install scripts are off (web/.npmrc ignore-scripts=true); the lockfile pins every package.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"     # >= 22.18: the tests run TypeScript through Node's type stripping
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install (lockfile, no install scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests (offline)
+        run: npm test
+      - name: Build
+        run: npm run build
