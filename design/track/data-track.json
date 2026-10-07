@@ -1,5 +1,5 @@
 {
- "built_at": "2026-10-07T15:25+00:00",
+ "built_at": "2026-10-07T15:34+00:00",
  "markets": {
   "india": {
    "market": "india",
@@ -11,6 +11,16 @@
     "symbol": "\u20b9",
     "locale": "en-IN",
     "unit": "cr"
+   },
+   "expected": {
+    "ranges_needed": 200,
+    "ranges_checked": 0,
+    "ranges_per_day": 20,
+    "ranges_by": "2026-10-23",
+    "calls_needed": 50,
+    "calls_checked": 0,
+    "calls_made": 0,
+    "today": "2026-10-07"
    },
    "live": {
     "calls_total": 0,
@@ -2760,6 +2770,16 @@
     "symbol": "$",
     "locale": "en-US",
     "unit": "bn"
+   },
+   "expected": {
+    "ranges_needed": 200,
+    "ranges_checked": 0,
+    "ranges_per_day": 20,
+    "ranges_by": "2026-10-22",
+    "calls_needed": 50,
+    "calls_checked": 0,
+    "calls_made": 0,
+    "today": "2026-10-07"
    },
    "live": {
     "calls_total": 0,

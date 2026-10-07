@@ -95,7 +95,16 @@ def market_block(market: str, review_cfg: dict) -> dict:
         model[key] = {k: v.get(k) for k in ("label", "n", "dates", "first_date", "last_date", "up_share", "brier", "brier_base_rate", "brier_skill", "log_loss", "log_loss_base_rate", "auc", "auc95", "calibrated_share", "reliability", "thresholds")}
         model[key]["paper"] = v.get("paper")
         model[key]["model"] = {k: v["model"].get(k) for k in ("fits", "first_cutoff", "last_cutoff", "last_train_rows", "last_base_rate", "last_platt")} if v.get("model") else None
-    return {"market": market, "market_name": cfg["name"], "n_tickers": len(tickers), "as_of": str(end), "currency": decision_build.CURRENCY[cfg["currency"]],
+    # expected dates: 20 ranges a day -> when will min_n_recommend real ranges be checked (1-day ranges settle the next session)
+    from marketbrief.core.calendar import next_session, sessions_ahead
+    today = next_session(cfg, end + timedelta(days=1))
+    needed = max(0, review_cfg["min_n_recommend"] - int(rr["n"]))
+    days_needed = -(-needed // len(tickers))
+    ahead = sessions_ahead(cfg, today, days_needed + 2)
+    ranges_by = str(ahead[min(len(ahead) - 1, days_needed + 1)]) if needed else str(today)
+    expected = {"ranges_needed": review_cfg["min_n_recommend"], "ranges_checked": int(rr["n"]), "ranges_per_day": len(tickers), "ranges_by": ranges_by,
+                "calls_needed": review_cfg["min_n_calls"], "calls_checked": len(live_calls), "calls_made": n_pred, "today": str(today)}
+    return {"market": market, "market_name": cfg["name"], "n_tickers": len(tickers), "as_of": str(end), "currency": decision_build.CURRENCY[cfg["currency"]], "expected": expected,
             "live": {"calls_total": len(live_calls), "calls_by_band": by_band, "predictions": n_pred, "open_predictions": n_open_pred,
                      "ranges_scored": int(rr["n"]), "ranges_cover50": None if rr["c50"] is None or rr["c50"] != rr["c50"] else float(rr["c50"]), "ranges_cover80": None if rr["c80"] is None or rr["c80"] != rr["c80"] else float(rr["c80"]),
                      "open_ranges": int(open_r["n"]), "open_first_target": None if open_r["tfirst"] is None else str(open_r["tfirst"])[:10], "open_last_target": None if open_r["tlast"] is None else str(open_r["tlast"])[:10],

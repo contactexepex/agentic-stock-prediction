@@ -72,6 +72,13 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
 .ptrack u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--md-sys-color-on-surface);transform:translateX(-1px)}
 .prow .pv b{font-size:18px} .prow .pv small{font-size:11px}
 table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
+
+.score td.wrap{white-space:normal;font-size:12.5px;line-height:1.4;min-width:150px;vertical-align:top}
+.score td{vertical-align:top;padding:9px 8px}
+.light{width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;color:#fff}
+.light .ms{width:16px;height:16px}
+.light.green{background:var(--mb-color-up)} .light.red{background:var(--mb-color-down)} .light.amber{background:var(--mb-color-warn)}
+.then p{margin:0 0 8px;font-size:13.5px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -81,7 +88,7 @@ table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
 <div class="mb-app">
   <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
   <header class="mb-topbar" id="topbar">
-    <div class="mb-topbar-title">Track record</div>
+    <div class="mb-topbar-title">Track record · has it earned trust?</div>
     <div class="mb-topbar-actions">
       <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
     </div>
@@ -96,8 +103,8 @@ table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
   <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
 </section>
 
-<div class="guide" id="guide">
-  <b>How to read this page.</b> It answers one question: <b>can the signals be trusted with money yet?</b> The big box says yes or no. Under it, three tests the system must pass. Then what it has done for real, and what a rehearsal on past prices (the <span class="mb-tag bt">back-test</span>) says. Every number is "x out of 100" or money on <span id="guide-stake"></span>. The statistics behind it all are at the bottom, folded away.
+<div class="guide">
+  <b>What this page proves.</b> Every evening the system makes two kinds of promise for each company: a <b>price range</b> ("tomorrow the price stays between X and Y, 8 days out of 10") and, when it is at least 60% sure, a <b>direction call</b> ("70% sure it rises" = 7 times out of 10). Trust is earned by keeping those promises on <b>real</b> days, many times over, and by beating a coin and the costs. Four tests below say where it stands, what each means, what it takes to pass, and when that could happen. Until all four are green, every signal is <span class="mb-tag paper">paper</span>: look, don't act.
 </div>
 
 <section class="card verdict" id="verdict-card">
@@ -105,52 +112,69 @@ table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
     <div style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box" aria-hidden="true" id="v-ico"></div><div class="mb-verdict-word" id="v-word"></div></div>
     <p class="why" id="v-why"></p>
   </div>
-  <div class="gates" id="gates"></div>
+</section>
+
+<section class="card" style="margin-top:16px" id="score-card">
+  <h2>The four tests <span class="sp">green = passed · amber = waiting for real data · red = failing</span></h2>
+  <div class="tblwrap"><table class="t score" id="score"></table></div>
 </section>
 
 <div class="grid2">
-  <section class="card" id="live-card">
-    <h2><span class="qn">1</span>What has it done for real so far? <span class="mb-tag live">live</span></h2>
-    <p class="ans" id="live-ans"></p>
-    <div class="kpis" id="live-kpis"></div>
-    <div class="tblwrap" id="bands" style="margin-top:10px"></div>
-    <p class="note" id="live-note"></p>
+  <section class="card" id="then-card">
+    <h2>If all four turn green, what then?</h2>
+    <div class="then" id="then"></div>
   </section>
-  <section class="card" id="review-card">
-    <h2><span class="qn">2</span>What did the weekly check-up say? <span class="mb-tag live">live</span><span class="sp" id="review-sub"></span></h2>
-    <p class="ans" id="review-ans"></p>
-    <div id="review"></div>
+  <section class="card" id="gloss-card">
+    <h2>What the percentages mean</h2>
+    <dl class="md-kv" id="gloss"></dl>
   </section>
 </div>
 
 <div class="grid2">
-  <section class="card" id="ranges-card">
-    <h2><span class="qn">3</span>In the rehearsal, did the price ranges keep their promise? <span class="mb-tag bt">back-test</span> <button class="md-help" id="ranges-help" aria-label="Explain">?</button></h2>
-    <div class="seg-in"><div class="md-segmented dense hz" role="group" aria-label="Horizon"><button type="button" data-h="1" aria-pressed="true">Next day</button><button type="button" data-h="5" aria-pressed="false">Next 5 days</button></div><span class="muted" style="font-size:12px" id="ranges-sub"></span></div>
-    <p class="ans" id="ranges-ans"></p>
+  <section class="card" id="t1-card">
+    <h2><span class="qn">1</span>Price ranges: real days, then the rehearsal <button class="md-help" id="ranges-help" aria-label="Explain">?</button></h2>
+    <p class="ans" id="t1-ans"></p>
+    <div class="kpis" id="t1-kpis" style="grid-template-columns:repeat(2,1fr)"></div>
+    <div class="seg-in" style="margin-top:12px"><div class="md-segmented dense hz" role="group" aria-label="Which promise"><button type="button" data-h="1" aria-pressed="true">Range for tomorrow</button><button type="button" data-h="5" aria-pressed="false">Range for 5 days ahead</button></div><span class="muted" style="font-size:12px" id="ranges-sub"></span></div>
+    <p class="ans" id="ranges-ans" style="font-weight:400;font-size:13.5px"></p>
     <div class="promise" id="promise"></div>
-    <h3 class="micro" style="margin:12px 0 6px">Month by month: how often the 80% range held</h3>
+    <h3 class="micro" style="margin:12px 0 6px">Rehearsal, month by month: how often the 80% range held</h3>
     <div class="chart" id="by-month"></div>
     <p class="note" id="ranges-note"></p>
   </section>
-  <section class="card" id="model-card">
-    <h2><span class="qn">4</span>In the rehearsal, did it pick the direction better than a coin? <span class="mb-tag bt">back-test</span> <button class="md-help" id="model-help" aria-label="Explain">?</button></h2>
+  <section class="card" id="t2-card">
+    <h2><span class="qn">2</span>Direction calls: do they come true as often as promised?</h2>
+    <p class="ans" id="t2-ans"></p>
+    <div class="kpis" id="t2-kpis" style="grid-template-columns:repeat(2,1fr)"></div>
+    <div class="tblwrap" id="bands" style="margin-top:10px"></div>
+    <p class="note" id="t2-note"></p>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="t3-card">
+    <h2><span class="qn">3</span>Rehearsal: does it beat a coin? <button class="md-help" id="model-help" aria-label="Explain">?</button></h2>
     <p class="ans" id="model-ans"></p>
     <div class="chart" id="coin"></div>
     <p class="note" id="model-note"></p>
   </section>
-</div>
-
-<div class="grid2">
-  <section class="card" id="paper-card">
-    <h2><span class="qn">5</span>Would following it have made money on paper? <span class="mb-tag bt">back-test</span> <button class="md-help" id="paper-help" aria-label="Explain">?</button></h2>
+  <section class="card" id="t4-card">
+    <h2><span class="qn">4</span>Rehearsal: would following it have made money after costs? <button class="md-help" id="paper-help" aria-label="Explain">?</button></h2>
     <p class="ans" id="paper-ans"></p>
     <div class="tblwrap" id="money"></div>
     <p class="note" id="paper-note"></p>
   </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="review-card">
+    <h2>The weekly check-up <span class="mb-tag live">live</span><span class="sp" id="review-sub"></span></h2>
+    <p class="ans" id="review-ans"></p>
+    <div id="review"></div>
+  </section>
   <section class="card" id="ticker-card">
-    <h2><span class="qn">6</span>Which companies did the ranges fit best? <span class="mb-tag bt">back-test</span></h2>
-    <p class="ans" id="ticker-ans"></p>
+    <h2>Per company: how well the ranges fitted in the rehearsal <span class="mb-tag bt">back-test</span></h2>
+    <p class="ans" id="ticker-ans" style="font-weight:400;font-size:13.5px"></p>
     <div class="tblwrap" id="by-ticker"></div>
   </section>
 </div>
@@ -158,7 +182,7 @@ table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
 <div style="display:grid;gap:10px;margin-top:16px">
   <details class="md-expansion"><summary>For the record: the statistics behind the answers (Brier, AUC, reliability, baselines, thresholds)</summary><div class="inner">
     <h3 class="micro" style="margin:8px 0 6px">Signal model, walk-forward</h3><div class="tblwrap" id="model-table"></div>
-    <h3 class="micro" style="margin:12px 0 6px">Reliability, 5-day open-to-close: what the model said vs what happened</h3><div class="chart" id="reliability"></div><p class="note" id="rel-note"></p>
+    <h3 class="micro" style="margin:12px 0 6px">Reliability, 5-day open-to-close</h3><div class="chart" id="reliability"></div><p class="note" id="rel-note"></p>
     <h3 class="micro" style="margin:12px 0 6px">Call thresholds, 5-day open-to-close</h3><div class="tblwrap" id="thresholds"></div>
     <h3 class="micro" style="margin:12px 0 6px">Direction baselines in the rule replay (close-to-close)</h3><div class="tblwrap" id="baselines"></div>
     <h3 class="micro" style="margin:12px 0 6px">Ranges by regime</h3><div class="tblwrap" id="by-regime"></div>
@@ -228,46 +252,83 @@ function promiseRow(label, promise, actual, n, extra) {
   return row;
 }
 
+
+/* ---------- the four tests ---------- */
+function tests() {
+  const m = M(), L = m.live, E = m.expected, mod5 = m.model['5d open_to_close'], P = mod5.paper, g5 = m.gates.find(g => g.label.startsWith('5d')) || m.gates[0];
+  const callsNeeded = R.min_n_calls;
+  const bandsScored = L.calls_by_band.filter(b => b.n >= callsNeeded), bandsOk = bandsScored.length > 0 && bandsScored.every(b => b.hit_rate >= b.band - R.calibration_tolerance);
+  const rangesEnough = L.ranges_scored >= E.ranges_needed, rangesOk = rangesEnough && L.ranges_cover80 != null && Math.abs(L.ranges_cover80 - 0.8) <= R.calibration_tolerance;
+  const skillOk = !!(m.review && m.review.model_skill);
+  const t60 = P && P.thresholds['0.60'] ? P.thresholds['0.60'].long : null, au = P ? P.baselines.always_up : null;
+  const moneyOk = !!(t60 && t60.ci95_pct[0] > 0);
+  const rh = m.replay.horizons['1'].overall;
+  return [
+    {n: 1, name: 'Price ranges keep their promise', status: rangesOk ? 'green' : rangesEnough ? 'red' : 'amber',
+     means: 'The "8 days out of 10" range really holds about 8 days out of 10 on real days (not too often, not too rarely).',
+     today: `${L.ranges_scored} real ranges checked${L.ranges_cover80 != null ? `, the 80% range held ${of100(L.ranges_cover80)}` : ''} · ${L.open_ranges} waiting for their day · in the rehearsal it held ${of100(rh.cover80)} (${rh.n} ranges)`,
+     passes: `${E.ranges_needed} real ranges checked and the 80% range held between ${80 - Math.round(R.calibration_tolerance*100)} and ${80 + Math.round(R.calibration_tolerance*100)} times out of 100`,
+     when: rangesEnough ? 'now' : `about ${fmtD(E.ranges_by)}: ${E.ranges_per_day} ranges a day, checked the next day`},
+    {n: 2, name: 'Direction calls come true as often as promised', status: bandsOk ? 'green' : bandsScored.length ? 'red' : 'amber',
+     means: 'When it says "70% sure", about 70 calls out of 100 come true. Then "70%" is a number you can rely on.',
+     today: `${L.calls_total} real calls checked · ${E.calls_made} made · it has not been sure enough (60%) to call yet`,
+     passes: `${callsNeeded} checked calls at a confidence level, and they came true at least that often (minus ${Math.round(R.calibration_tolerance*100)})`,
+     when: L.calls_total >= callsNeeded ? 'now' : E.calls_made ? 'as soon as the calls settle' : 'no date: it only starts counting once the model is at least 60% sure of a rise'},
+    {n: 3, name: 'It beats a coin', status: skillOk ? 'green' : 'red',
+     means: 'Its "likely to rise" picks rise more often than a coin flip would get them, across thousands of rehearsal days.',
+     today: g5 ? `rehearsal on ${g5.n} days: ranking score ${g5.auc.toFixed(2)} (0.50 = coin) · when at least 60% sure, the stock rose ${t60 ? of100(mod5.thresholds['0.60'].long.hit_rate) : '—'}; always betting on a rise: ${of100(mod5.up_share)}` : 'no rehearsal',
+     passes: 'the weekly check-up finds a ranking score clearly above 0.50 and probabilities better than the average',
+     when: skillOk ? 'now' : 'checked every week; passes only if the model improves (it is refit monthly as more days come in)'},
+    {n: 4, name: 'Following it makes money after costs', status: moneyOk ? 'green' : 'red',
+     means: `On paper, buying when it is at least 60% sure and selling four days later leaves a profit after trading costs, not just on a lucky day.`,
+     today: t60 ? `rehearsal: about ${t60.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(STAKE*t60.mean_pct/100))} per ${money(STAKE)} trade (${t60.positions} trades); buying everything: ${au.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(STAKE*au.mean_pct/100))}` : 'no rehearsal',
+     passes: 'the likely range of the average profit per trade sits entirely above zero',
+     when: moneyOk ? 'now' : 'checked every week with test 3; needs the model to improve'},
+  ];
+}
+
 /* ---------- render ---------- */
 function render() {
-  const m = M(), L = m.live, G = m.gates, g5 = G.find(g => g.label.startsWith('5d')) || G[0], mod5 = m.model['5d open_to_close'];
-  $('#guide-stake').textContent = money(STAKE);
+  const m = M(), L = m.live, E = m.expected, T = tests(), passed = T.filter(t => t.status === 'green').length, proven = passed === 4;
   $('#h-title').innerHTML = ''; $('#h-meta').innerHTML = ''; $('#h-right').innerHTML = '';
-  $('#h-title').append(`${LABEL[MKT]} track record`, el('small', {}, `${m.market_name} · ${m.n_tickers} companies`));
-  $('#h-meta').append(el('span', {}, `real data up to ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {}, `rehearsal window ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}`));
+  $('#h-title').append(`${LABEL[MKT]}: has it earned trust?`, el('small', {}, `${m.market_name} · ${m.n_tickers} companies`));
+  $('#h-meta').append(el('span', {}, `real data up to ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test = rehearsal on past prices'), el('span', {class:'mb-tag paper'}, 'paper'));
   $('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
-  // gates in plain words
-  const callsNeeded = R.min_n_calls, callsOk = L.calls_total >= callsNeeded;
-  const bandsScored = L.calls_by_band.filter(b => b.n >= callsNeeded), bandsOk = bandsScored.length > 0 && bandsScored.every(b => b.hit_rate >= b.band - R.calibration_tolerance);
-  const skillOk = !!(m.review && m.review.model_skill);
-  const proven = callsOk && bandsOk && skillOk;
   const vh = $('#vhead'); vh.className = 'mb-verdict ' + (proven ? 'yes-strong' : 'no');
   $('#v-ico').innerHTML = ''; $('#v-ico').append(icon(proven ? 'ms-bolt' : 'ms-block'));
-  $('#v-word').innerHTML = ''; $('#v-word').append(proven ? 'TRUSTED' : 'NOT YET', el('small', {}, proven ? 'the signals passed all three tests' : 'every signal stays Paper'));
-  const t60 = mod5.thresholds['0.60'] ? mod5.thresholds['0.60'].long : null;
-  $('#v-why').innerHTML = `<b>In plain words:</b> ${callsOk ? `it has made ${L.calls_total} real calls` : `it has not yet made real calls that can be checked (<b>${L.calls_total}</b> checked, ${callsNeeded} needed)`}; ${bandsOk ? 'and when it said it was sure, it was right as often as it promised' : 'so nobody can yet say whether "70% sure" really means 70%'}; and in the rehearsal on past prices it picked the direction ${skillOk ? 'better than a coin' : `<b>no better than a coin</b>${t60 ? ` (when it was at least 60% sure of a rise, the stock rose ${of100(t60.hit_rate)} times; always betting on a rise: ${of100(mod5.up_share)})` : ''}`}.`;
-  const gates = $('#gates'); gates.innerHTML = '';
-  const gate = (ok, title, prog, text, tipText) => { const d = el('div', {class:'gate', 'data-tip': tipText}); d.append(el('div', {class:'t'}, el('span', {class:'mb-mark '+(ok?'ok':'no')}, icon(ok?'ms-check':'ms-close')), title)); if (prog != null) d.append(el('div', {class:'md-progress' + (ok ? '' : ' bad')}, el('i', {style:`width:${Math.max(2, Math.min(100, prog*100))}%`}))); d.append(el('small', {}, text)); return d; };
-  gates.append(
-    gate(callsOk, 'Test 1 · Has it made enough real calls?', Math.min(1, L.calls_total / callsNeeded), `${L.calls_total} checked so far · needs ${callsNeeded}`, `A call is checked once its day passes and the price is known. ${callsNeeded} checked calls are needed per confidence level before anything is judged (config/review.yaml).`),
-    gate(bandsOk, 'Test 2 · When it says "70% sure", is it right 70% of the time?', bandsScored.length ? Math.max(0, Math.min(1, bandsScored.reduce((a,b) => a + b.hit_rate, 0) / bandsScored.length)) : 0, bandsScored.length ? `${bandsScored.length} confidence level${bandsScored.length>1?'s':''} checked` : 'no checked calls yet', `Calls made at 70% confidence must come true at least 70 times out of 100 (minus ${Math.round(R.calibration_tolerance*100)} of tolerance). If not, the forecaster must lower its confidence or abstain.`),
-    gate(skillOk, 'Test 3 · Does it beat a coin in the rehearsal?', g5 ? Math.max(0, Math.min(1, (g5.auc - 0.4) / 0.2)) : 0, g5 ? `${g5.n} rehearsal days · ranking score ${g5.auc.toFixed(2)} (0.50 = coin, 1.00 = perfect) · ${skillOk ? 'passes' : 'fails'}` : 'no rehearsal', `The weekly check-up replays the model on past prices it had not seen and asks two things: does it put the rising days above the falling ones better than chance (the ranking score must be clearly above 0.50, interval ${g5 ? g5.auc95.join(' to ') : '—'}), and are its probabilities closer to the truth than always saying the average? Both must pass.`));
-  // 1 live record
-  $('#live-ans').textContent = L.calls_total ? `${L.calls_total} real calls have been checked.` : `No real call has been checked yet. ${L.open_ranges ? `The system has published ${L.open_ranges} price ranges for the coming days (for ${fmtD(L.open_first_target)} to ${fmtD(L.open_last_target)}); each is checked once its day passes.` : ''} ${L.predictions ? `${L.predictions} direction calls are waiting.` : 'The forecaster has not yet made a direction call, which is allowed: abstaining is always an option.'}`;
-  const lk = $('#live-kpis'); lk.innerHTML = '';
-  for (const k of [
-    {v: String(L.calls_total), l: 'real calls checked', t: 'Direction calls whose day has passed and that were scored against the real price.'},
-    {v: String(L.predictions), l: `direction calls made · ${L.open_predictions} waiting`, t: 'All live direction calls stored, and those whose day has not come yet.'},
-    {v: String(L.ranges_scored), l: 'price ranges checked' + (L.ranges_cover80 != null ? ` · 80% range held ${of100(L.ranges_cover80)}` : ''), t: 'Published ranges whose target day has passed and were checked.'},
-    {v: String(L.open_ranges), l: 'price ranges waiting for their day', t: 'Published ranges whose target day has not come yet.'},
-  ]) lk.append(el('div', {class:'kpi', 'data-tip': k.t}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
+  $('#v-word').innerHTML = ''; $('#v-word').append(proven ? 'TRUSTED' : 'NOT YET', el('small', {}, `${passed} of 4 tests passed`));
+  const waiting = T.filter(t => t.status === 'amber'), failing = T.filter(t => t.status === 'red');
+  $('#v-why').innerHTML = `<b>In plain words:</b> ${waiting.length ? `${waiting.length === 2 ? 'both real-world tests are' : 'a real-world test is'} still waiting for real days (${waiting.map(t => t.name.toLowerCase()).join('; ')})` : ''}${waiting.length && failing.length ? ', and ' : ''}${failing.length ? `the rehearsal ${failing.length > 1 ? 'tests fail' : 'test fails'}: ${failing.map(t => t.name.toLowerCase()).join('; ')}` : ''}${proven ? 'all four tests are green: the signals have earned the right to be followed with the plan on each company page.' : '.'} ${proven ? '' : `The first test can turn green around <b>${fmtD(E.ranges_by)}</b>; the second has no date until the model makes calls; the last two change only if the model improves.`}`;
+  // scorecard
+  const sc = $('#score'); sc.innerHTML = '';
+  const tr0 = el('tr'); ['', 'Test', 'What it means', 'Today', 'Passes when', 'Could turn green'].forEach(h => tr0.append(el('th', {}, h))); sc.append(el('thead', {}, tr0));
+  const tb = el('tbody');
+  for (const t of T) { const tr = el('tr'); tr.append(td(el('span', {class:'light '+t.status, 'aria-label': {green:'passed', amber:'waiting', red:'failing'}[t.status]}, icon(t.status === 'green' ? 'ms-check' : t.status === 'amber' ? 'ms-schedule' : 'ms-close'))), td(el('b', {}, `${t.n}. ${t.name}`)), td(t.means, 'wrap'), td(t.today, 'wrap'), td(t.passes, 'wrap'), td(t.when, 'wrap')); tb.append(tr); }
+  sc.append(tb);
+  // then + glossary
+  const th = $('#then'); th.innerHTML = '';
+  th.append(
+    el('p', {}, el('b', {}, 'The Paper label comes off.'), ` A call shown as YES on a company page (the model at least 60% sure, the forecaster agreeing) becomes a signal that has kept its promises on real days.`),
+    el('p', {}, el('b', {}, 'What you would do then.'), ` Only what the company page's plan says: buy at the open if the price is at or below the range centre, sell at the close of the planned day, exit early below the 80% range floor, with the amount the plan shows (it is written for ${money(STAKE)}). Below 60% the system itself says "no call", so there is nothing to act on.`),
+    el('p', {}, el('b', {}, 'What it never does.'), ' It never tells you when to invest or how much. It tells you whether the system has earned the right to be followed. The decision stays yours, and this remains a research project.'),
+    el('p', {class:'muted', style:'font-size:12px'}, `If a test turns red later (promises stop holding), the Paper label comes back until it passes again.`));
+  const gl = $('#gloss'); gl.innerHTML = '';
+  for (const [k, v] of [['"70% sure"', 'the direction call will come true about 7 times out of 10. Test 2 checks that this is honest.'], ['80% range', 'the price stays inside it 8 days out of 10; so about 2 days out of 10 it will be outside, and that is normal.'], ['50% range', 'the narrower band the price stays in half the days.'], ['60% (the call line)', 'below this the model stays silent; a YES on a company page needs at least this.'], ['a coin', 'right about half the time: the bar every call must beat. On these companies a rise happens about 47 days out of 100, so "always rise" is the coin here.'], ['rehearsal (back-test)', 'the system replayed on past prices it had not seen, day by day. It shows what it would have done; it is not real money and not real days.'], ['after costs', 'brokerage, taxes and fees taken off (config/costs.yaml); about ' + money(STAKE * (m.model['5d open_to_close'].paper ? m.model['5d open_to_close'].paper.mean_cost_pct : 0) / 100, 2) + ' per ' + money(STAKE) + ' trade.']]) gl.append(el('dt', {}, k), el('dd', {}, v));
+  // test 1 details
+  $('#t1-ans').textContent = `${L.ranges_scored} real ranges have been checked so far; ${L.open_ranges} are waiting for their day${L.open_ranges ? ` (${fmtD(L.open_first_target)} to ${fmtD(L.open_last_target)})` : ''}. With ${E.ranges_per_day} new ranges every evening, the ${E.ranges_needed} needed should be checked by about ${fmtD(E.ranges_by)}. Until then, the rehearsal below is the only evidence.`;
+  const k1 = $('#t1-kpis'); k1.innerHTML = '';
+  for (const k of [{v: String(L.ranges_scored), l: `real ranges checked · need ${E.ranges_needed}`}, {v: String(L.open_ranges), l: 'published, waiting for their day'}]) k1.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
+  // test 2 details
+  $('#t2-ans').textContent = L.calls_total ? `${L.calls_total} real calls have been checked.` : `No direction call has been made yet: the model has not been at least 60% sure of a rise on any company, and the forecaster abstained. That is allowed and often right. The table below fills in once calls are made and their day passes; each row says whether "x% sure" came true x times out of 100.`;
+  const k2 = $('#t2-kpis'); k2.innerHTML = '';
+  for (const k of [{v: String(L.calls_total), l: `real calls checked · need ${R.min_n_calls} per level`}, {v: String(L.predictions), l: `calls made · ${L.open_predictions} waiting`}]) k2.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
   const bands = $('#bands'); bands.innerHTML = '';
-  if (L.calls_total) bands.append(table(['When it said', {label:'Calls', num:true}, {label:'Came true', num:true}, 'Promise kept?'], L.calls_by_band.map(b => { const tr = el('tr'); const okb = b.hit_rate == null ? null : b.hit_rate >= b.band - R.calibration_tolerance; tr.append(td(`${Math.round(b.band*100)}–${Math.round(b.band*100+10)}% sure`), td(String(b.n), 'num'), td(b.hit_rate == null ? '—' : `${of100(b.hit_rate)}`, 'num'), td(b.n < callsNeeded ? el('span', {class:'muted'}, `too few to judge (< ${callsNeeded})`) : el('span', {class: okb ? 'ok' : 'bad'}, okb ? '✓ yes' : '✗ no'))); return tr; })));
-  $('#live-note').textContent = `Every number here comes from stored records (predictions, outcomes, ranges, open ranges, lessons: ${L.lessons}). Nothing is estimated.`;
-  // 2 review
+  bands.append(table(['When it said', {label:'Calls', num:true}, {label:'Came true', num:true}, 'Promise kept?'], L.calls_by_band.map(b => { const tr = el('tr'); const okb = b.hit_rate == null ? null : b.hit_rate >= b.band - R.calibration_tolerance; tr.append(td(`${Math.round(b.band*100)}–${Math.round(b.band*100+10)}% sure`), td(String(b.n), 'num'), td(b.hit_rate == null ? '—' : of100(b.hit_rate), 'num'), td(b.n < R.min_n_calls ? el('span', {class:'muted'}, b.n ? `too few to judge (< ${R.min_n_calls})` : 'no calls yet') : el('span', {class: okb ? 'ok' : 'bad'}, okb ? '✓ yes' : '✗ no'))); return tr; })));
+  $('#t2-note').textContent = `Every number here comes from stored records (predictions, outcomes, ranges, open ranges, lessons: ${L.lessons}). Nothing is estimated.`;
+  // review
   const rv = $('#review'); rv.innerHTML = ''; const rw = m.review;
   if (rw) { $('#review-sub').textContent = `week ${rw.week}`;
-    $('#review-ans').textContent = `${rw.model_skill ? 'The check-up found the model knows something.' : 'The check-up found the model does not yet beat a coin.'} ${rw.n_ranges_all ? `${rw.n_ranges_all} ranges and ${rw.n_calls_all} calls have been checked since the start.` : 'Nothing real has been checked since the start, so it could not grade the live record.'} ${rw.n_proposals ? `It suggested ${rw.n_proposals} change${rw.n_proposals>1?'s':''} to the range settings for a human to decide: ${rw.proposals.map(p => p.variant).join('; ')}.` : 'It suggested no change to the settings.'}`;
+    $('#review-ans').textContent = `Every week the system re-runs tests 3 and 4 and grades the real record. This week: ${rw.model_skill ? 'the model beats a coin.' : 'the model does not yet beat a coin.'} ${rw.n_ranges_all ? `${rw.n_ranges_all} ranges and ${rw.n_calls_all} calls checked since the start.` : 'Nothing real checked since the start yet.'} ${rw.n_proposals ? `It suggested ${rw.n_proposals} change${rw.n_proposals>1?'s':''} to the range settings for a human to decide: ${rw.proposals.map(p => p.variant).join('; ')}.` : 'It suggested no change to the settings.'}`;
     const kv = el('dl', {class:'md-kv'});
     for (const [k, v] of [['Checked ranges', `${rw.n_ranges_week} this week · ${rw.n_ranges_30d} in 30 days · ${rw.n_ranges_all} since start`], ['Checked calls', `${rw.n_calls_week} this week · ${rw.n_calls_all} since start`], ['80% range held since start', rw.cover80_all == null ? 'nothing checked yet' : of100(rw.cover80_all)], ['Calls that came true', rw.call_hit_all == null ? 'nothing checked yet' : of100(rw.call_hit_all)], ['Enough data to advise?', rw.low_sample ? 'no, not yet' : 'yes'], ['Full report', rw.report]]) kv.append(el('dt', {}, k), el('dd', {}, v));
     rv.append(kv);
@@ -277,19 +338,19 @@ function render() {
   $('#sources').innerHTML = `<dl class="md-kv">
 <dt>Live</dt><dd>data/${MKT}/: predictions, outcomes, ranges, range_record, open_ranges, open_predictions, lessons, reviews. Read through DuckDB views in sql/views.sql.</dd>
 <dt>Rehearsal of the ranges</dt><dd><code>scripts/replay.py --market ${MKT} --start ${m.replay.window[0]} --end ${m.replay.window[1]}</code> (computed ${String(m.replay.computed_at).slice(0,16).replace('T',' ')} UTC): each past day's range rebuilt from what was known that evening, then checked against the real close.</dd>
-<dt>Rehearsal of the model</dt><dd><code>${m.bt_path}</code> from <code>scripts/model_backtest.py</code> (computed ${String(m.bt_computed_at).slice(0,16).replace('T',' ')} UTC): the model refit each month on past data and tested on the days after each fit; the paper strategy uses the costs in config/costs.yaml.</dd>
-<dt>Rules</dt><dd>config/review.yaml: ${R.min_n_calls} checked calls per confidence level, tolerance ${R.calibration_tolerance}, model skill needs ${R.model_skill.min_n} rehearsal rows, a Brier skill above ${R.model_skill.min_brier_skill} and a ranking score (AUC) whose 95% interval sits above ${R.model_skill.min_auc_low}.</dd>
-<dt>Derived</dt><dd>The TRUSTED / NOT YET verdict is this page's reading of those rules, not a stored verdict. "Out of 100" figures are the stored rates rounded. Money figures are ${money(STAKE)} times the stored percentage.</dd>
+<dt>Rehearsal of the model</dt><dd><code>${m.bt_path}</code> from <code>scripts/model_backtest.py</code> (computed ${String(m.bt_computed_at).slice(0,16).replace('T',' ')} UTC): the model refit each month and tested on the days after each fit; the paper strategy uses the costs in config/costs.yaml.</dd>
+<dt>Rules</dt><dd>config/review.yaml: ${R.min_n_calls} checked calls per confidence level, ${E.ranges_needed} checked ranges before advice, tolerance ${R.calibration_tolerance}, model skill needs ${R.model_skill.min_n} rehearsal rows, a Brier skill above ${R.model_skill.min_brier_skill} and a ranking score (AUC) whose 95% interval sits above ${R.model_skill.min_auc_low}.</dd>
+<dt>Derived</dt><dd>The four tests, their colours and the TRUSTED / NOT YET verdict are this page's reading of those rules, not a stored verdict; "could turn green" dates count ${E.ranges_per_day} ranges per session on the exchange calendar. "Out of 100" figures are the stored rates rounded; money figures are ${money(STAKE)} times the stored percentage.</dd>
 </dl>`;
   $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
 }
 
 function renderRanges() {
-  const m = M(), hb = m.replay.horizons[HZ], o = hb.overall, hz = HZ === '1' ? 'next day' : 'next 5 days';
+  const m = M(), hb = m.replay.horizons[HZ], o = hb.overall, hz = HZ === '1' ? 'range for tomorrow' : 'range for 5 days ahead';
   $('#ranges-sub').textContent = `${o.n} ranges over ${o.days} days, ${m.n_tickers} companies`;
   $('#ranges-help').dataset.tip = `Every evening the system publishes a price range for each company: the "80% range" promises the close will land inside it 80 times out of 100, the "50% range" 50 times. The rehearsal rebuilt those ranges for each past day from what was known that evening and checked them against the real close. "Too narrow" = held less often than promised; "too wide" = more often (safe but useless).`;
   const k80 = Math.abs(o.cover80 - 0.8) <= 0.05, k50 = Math.abs(o.cover50 - 0.5) <= 0.05;
-  $('#ranges-ans').textContent = `${k80 && k50 ? 'Yes, about right.' : k80 ? 'Mostly.' : 'Not quite.'} For the ${hz}, the 80% range held ${of100(o.cover80)} times (promise: 80) and the 50% range ${of100(o.cover50)} (promise: 50). ${o.score80 <= o.naive_score80 ? 'The ranges were also tighter than a plain "last close ± recent wobble" guess, so the formula adds something.' : 'A plain "last close ± recent wobble" guess would have scored better, so the formula adds nothing yet.'}`;
+  $('#ranges-ans').textContent = `Rehearsal, ${hz}: ${k80 && k50 ? 'the promises were kept.' : k80 ? 'mostly kept.' : 'not quite kept.'} The 80% range held ${of100(o.cover80)} times (promise: 80) and the 50% range ${of100(o.cover50)} (promise: 50). ${o.score80 <= o.naive_score80 ? 'The ranges were also tighter than a plain "last close ± recent wobble" guess, so the formula adds something.' : 'A plain "last close ± recent wobble" guess would have scored better, so the formula adds nothing yet.'}`;
   const pr = $('#promise'); pr.innerHTML = '';
   pr.append(promiseRow('80% range', 0.8, o.cover80, o.n, `A plain guess held ${of100(o.naive_cover80)}.`), promiseRow('50% range', 0.5, o.cover50, o.n, `A plain guess held ${of100(o.naive_cover50)}.`));
   const bm = $('#by-month'); bm.innerHTML = '';
@@ -382,6 +443,7 @@ function renderRecord() {
   pc.append(sv);
   pt.append(table(['Strategy', {label:'Positions', num:true}, {label:'Dates', num:true}, {label:'Mean per trade', num:true}, {label:'95% interval', num:true}, 'vs always up'], prow.map(r => { const tr = el('tr'); const d = r.kind === 'model' ? (P.thresholds[r.key].vs || {}).always_up : null; tr.append(td(r.name), td(String(r.positions), 'num'), td(String(r.dates), 'num'), td(sgn(r.mean_pct, 2), 'num'), td(`${sgn(r.ci95_pct[0], 2)} to ${sgn(r.ci95_pct[1], 2)}`, 'num'), td(d ? `${sgn(d.mean_pct, 2)} [${sgn(d.ci95_pct[0],2)}, ${sgn(d.ci95_pct[1],2)}]${d.ci95_pct[0] > 0 ? ' · beats it' : ' · not better'}` : '—')); return tr; })));
 }
+
 render();
 new ResizeObserver(() => { renderRanges(); renderModel(); renderRecord(); }).observe($('#by-month'));
 </script>

@@ -16,6 +16,25 @@ sure is it right 70% of the time; does it beat a coin); "promise vs reality" bar
 direction (dashed line = the coin); a money table for the paper strategy. Brier, AUC, Wilson intervals, reliability
 and the baseline tables moved to a folded "for the record" section at the bottom.
 
+## Scorecard (third pass)
+The owner asked what the page proves, when it could be trusted and what to do then. The page is now a scorecard:
+1. **Guide**: the two promises the system makes every evening (a price range; a direction call when at least 60%
+   sure), how trust is earned (keeping those promises on real days, beating a coin and the costs), and that every
+   signal is Paper until all four tests are green.
+2. **Verdict** NOT YET / TRUSTED with "in plain words": which tests wait for real data, which fail, and when the
+   first could turn green (a date computed from 20 ranges a session on the exchange calendar).
+3. **The four tests** as a table: light (green passed, amber waiting for real data, red failing), what it means,
+   today's numbers, what passing takes, when it could turn green. Test 1: 200 real ranges checked and the 80%
+   range held 75–85 times out of 100 (about 23 Oct for India). Test 2: 50 checked calls at a confidence level
+   that came true at least that often (no date: no call made yet). Test 3: the weekly check-up finds it beats a
+   coin (rehearsal; fails). Test 4: paper money after costs clearly positive (rehearsal; fails).
+4. **If all four turn green, what then**: the Paper label comes off; what you would do (only the company page's
+   plan, for the amount it shows; below 60% there is no call); what the page never does (tell you when or how
+   much to invest). **What the percentages mean**: a glossary (70% sure, 80% range, 50% range, the 60% call
+   line, a coin, rehearsal, after costs).
+5. Details per test (real counts, promise-vs-reality bars, month chart, the calls-by-level table, the coin chart,
+   the money table), the weekly check-up, per-company fit, and the statistics folded away.
+
 ## Layout
 1. **Verdict header** (red NOT YET today; dark green TRUSTED when all three gates pass) with the reason in
    one sentence, then the three gates as tiles with a progress bar each: enough live calls scored (0 of the
