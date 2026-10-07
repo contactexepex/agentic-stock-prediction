@@ -6,6 +6,7 @@ import pandas as pd
 
 from marketbrief.analytics.call_basis import label
 from marketbrief.core.clock import clock
+from marketbrief.lifecycle.loader import active_tickers
 
 
 def context_section(cfg: dict, con, per_ticker: int = 3, market_wide: int = 3) -> tuple[str, str]:
@@ -42,7 +43,7 @@ def context_section(cfg: dict, con, per_ticker: int = 3, market_wide: int = 3) -
             )
         return "\n".join(out) + "\n"
 
-    tickers = [ticker for ticker in cfg["tickers"] if ticker in set(frame["ticker"])]
+    tickers = [ticker for ticker in active_tickers(cfg) if ticker in set(frame["ticker"])]
     by_t = (
         pd.concat([frame[frame["ticker"] == ticker].head(per_ticker) for ticker in tickers])
         if tickers

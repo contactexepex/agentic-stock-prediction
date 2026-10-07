@@ -5,6 +5,7 @@ reported quarter's consensus EPS, reported EPS and surprise, and the consensus f
 from __future__ import annotations
 
 from marketbrief.utils.markdown import cursor_markdown_table
+from marketbrief.lifecycle.loader import active_tickers
 
 TITLE = "Earnings estimates (Yahoo consensus EPS; not a range or forecast input)"
 NOTE = ("Yahoo's consensus (yfinance), stored when first seen or changed. `surprise_pct` = reported vs estimate. "
@@ -28,6 +29,6 @@ ORDER BY t.ticker"""
 
 def context_section(cfg: dict, con) -> tuple[str, str]:
     """(title, body) of the section; `_none_` before any estimate is stored."""
-    tickers = sorted(cfg["tickers"])
+    tickers = sorted(active_tickers(cfg))
     table = cursor_markdown_table(con.execute(SQL, [tickers, tickers]))
     return TITLE, (NOTE + table) if not table.startswith("_none_") else table

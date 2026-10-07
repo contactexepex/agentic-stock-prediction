@@ -106,6 +106,31 @@ test("the per-agent day budget stops writes and resets the next UTC day", async 
   assert.equal(tomorrow.result, "pending");
 });
 
+test("a key already stored answers duplicate even after the day budget is used (issue #79)", async () => {
+  const r = rig();
+  const first = await r.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "budget-key-first" }, { confirmedSummary: true });
+  for (let i = 1; i < 20; i += 1) {
+    await r.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: `budget-key-${String(i).padStart(3, "0")}` }, { confirmedSummary: true });
+  }
+  assert.equal(r.inbox.requests.length, 20);
+  const retry = await r.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "budget-key-first" }, { confirmedSummary: true });
+  assert.equal(retry.result, "duplicate");
+  assert.equal(retry.message, first.message);
+  const fresh = await r.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "budget-key-fresh" }, { confirmedSummary: true });
+  assert.equal(fresh.refusal_code, "budget_exceeded");
+  const preview = await r.layer.preview(app, "deactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "budget-key-prev" });
+  assert.equal(preview.outcome?.refusal_code, "budget_exceeded", "the summary step is refused over budget too");
+  assert.equal(r.inbox.requests.length, 20);
+});
+
+test("the newest controls row counts: switching an agent back on works", async () => {
+  const r = rig();
+  r.inbox.controls.push({ agent: "claude-app", enabled: false }, { agent: "claude-app", enabled: true });
+  assert.equal((await r.layer.execute(app, "get_overview", { market: "us" })).result, "accepted");
+  r.inbox.controls.push({ agent: "*", enabled: false });
+  assert.equal((await r.layer.execute(app, "get_overview", { market: "us" })).refusal_code, "kill_switch");
+});
+
 test("the kill switch stops every call before its arguments are checked: the agent's controls row, and '*' for all", async () => {
   const off = rig();
   off.inbox.controls.push({ agent: "claude-app", enabled: false });
@@ -145,6 +170,8 @@ test("summary-confirm tools need the confirmation, and an add needs the confirme
   assert.equal((await r.layer.execute(app, "add_company", add, { confirmedSummary: true })).refusal_code, "validation_failed");
   const mismatch = await r.layer.execute(app, "add_company", add, { confirmedSummary: true, preview: { ...MSFT, symbol: "AAPL" } });
   assert.equal(mismatch.refusal_code, "validation_failed");
+  const otherAmount = await r.layer.execute(app, "add_company", { ...add, amount: 2500 }, { confirmedSummary: true, preview: MSFT });
+  assert.equal(otherAmount.refusal_code, "validation_failed", "the confirmed amount must match too (issue #85)");
   const ok = await r.layer.execute(app, "add_company", add, { confirmedSummary: true, preview: MSFT });
   assert.equal(ok.result, "pending");
   assert.match(ok.message ?? "", /Microsoft Corporation \(NASDAQ, Technology, Yahoo MSFT, CIK 0000789019\), \$1,000 per trade \(default\)/);

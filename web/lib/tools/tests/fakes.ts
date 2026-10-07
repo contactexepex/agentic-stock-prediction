@@ -21,6 +21,7 @@ export const SECRET_VALUES = Object.values(SECRETS);
 export class FakeInbox implements InboxStore {
   requests: InboxRequest[] = [];
   commands: CommandLogRow[] = [];
+  /** Rows in insertion order = updated_at order; like the real SQL, the newest row per agent (and per '*') counts. */
   controls: { agent: string; enabled: boolean }[] = [];
   down = false;
   failAppend = false;
@@ -30,14 +31,17 @@ export class FakeInbox implements InboxStore {
     const writes = this.requests.filter((row) => row.agent === agent && row.submitted_at >= sinceIso).length;
     const reads = this.commands.filter((row) => row.agent === agent && (row.kind === "read" || row.kind === "read_ai") &&
       row.received_at >= sinceIso).length;
-    const relevant = this.controls.filter((row) => row.agent === agent || row.agent === "*");
-    return { writes, reads, enabled: relevant.length ? relevant.every((row) => row.enabled) : null };
+    const newest = new Map<string, boolean>();
+    for (const row of this.controls) if (row.agent === agent || row.agent === "*") newest.set(row.agent, row.enabled);
+    return { writes, reads, enabled: newest.size ? [...newest.values()].every(Boolean) : null };
   }
 
-  async claimRequest(row: InboxRequest) {
+  async claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }) {
     if (this.down) throw new Error("inbox down");
     const existing = this.requests.find((item) => item.inbox_id === row.inbox_id) ?? null;
     if (existing) return { claimed: false, existing };
+    const used = this.requests.filter((item) => item.agent === row.agent && item.submitted_at >= budget.sinceIso).length;
+    if (used >= budget.limit) return { claimed: false, existing: null };
     this.requests.push(structuredClone(row));
     return { claimed: true, existing: null };
   }
@@ -150,7 +154,6 @@ export class FakeSlack implements SlackApi {
   }
 }
 
-export const TEAM = "T0TEAM123";
 export const CHANNEL = "C0C6REB7QS2";
 export const USER = "U07ABCD123";
 
@@ -172,8 +175,8 @@ export function slackRig(settings: Partial<ToolSettings> = {}) {
 
 export function commandParams(command: string, text: string, overrides: Record<string, string> = {}) {
   return new URLSearchParams({
-    command, text, user_id: USER, team_id: TEAM, channel_id: CHANNEL, trigger_id: "trig.123",
-    response_url: "https://hooks.slack.com/commands/T0TEAM123/1/abc", ...overrides,
+    command, text, user_id: USER, channel_id: CHANNEL, trigger_id: "trig.123",
+    response_url: "https://hooks.slack.com/commands/T0/1/abc", ...overrides,
   });
 }
 
