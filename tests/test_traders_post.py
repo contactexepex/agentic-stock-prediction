@@ -156,7 +156,17 @@ def test_track_record_bands_from_settled_ai_trades():
     assert track_record.refusal(0.55, {"0.50-0.60": {"n": 20, "hits": 10, "hit_rate": 0.5, "low": 0.5}}) is None
 
 
-def test_per_horizon_inputs_wait_for_b10():
+@pytest.mark.usefixtures("root")
+def test_per_horizon_inputs_read_b10s_records(monkeypatch):
+    """B10 built contracts/horizons.py: per_horizon returns its N+k ranges and scores by id (no legacy row); a
+    contract that is not built yet still raises InputsUnavailableError."""
+    ranges, scores = per_horizon("us", NOW)
+    assert all(row["id"] == key and row["horizon_label"] == "n_plus_k" for key, row in {**ranges, **scores}.items())
+    from marketbrief.contracts import horizons
+
+    def not_built(*_args, **_kwargs):
+        raise NotImplementedError("session B10")
+    monkeypatch.setattr(horizons, "ranges_asof", not_built)
     with pytest.raises(InputsUnavailableError):
         per_horizon("us", NOW)
 
