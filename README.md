@@ -43,8 +43,18 @@ Research only. Nothing here is investment advice, and the routines never trade.
    from the vol index, benchmark trend and the event calendar (`config/events.yaml`).
 5. **Calibrate** (`calibrate.py`): range quantiles from two years of standardized returns plus
    live scored ranges, recency-weighted (self-calibration).
+5a. **Signal model** (`model_scores.py`; docs/DESIGN.md section 15): an explainable probability that each
+   stock rises from the next open to the close one or four sessions later: an L2-regularised logistic
+   regression on the indicators, regime, benchmark, vol index and overnight cue, refitted monthly on
+   labels resolved by then, Platt-calibrated on its own past out-of-sample scores, plus a small
+   fixed-prior news term. Each score lists its top drivers in probability points ("RSI 33.7, near
+   oversold: +0.4 pts"); the formula is stored as JSON in `data/<market>/model_versions/`.
+   `model_backtest.py --out DIR` tests it walk-forward against the base rate and simple baselines
+   after trading costs (`config/costs.yaml`).
 6. **Context pack** (`context.py`): everything above as compact tables for the agents.
-7. **Reason** (Claude subagents): news-analyst → bull-researcher + bear-researcher → forecaster.
+7. **Reason** (Claude subagents): news-analyst → bull-researcher + bear-researcher → forecaster. The
+   forecaster's probability starts from the model's and may move it by at most 0.10 with a written
+   reason; the debate (bull case, bear case, verdict) is stored per ticker (`agent_reasoning.py`).
 8. **Ranges** (`ranges.py`): 50% and 80% price ranges per ticker for 1 and 5 trading days,
    widened for earnings, major events and the regime, centre nudged by overnight cues and
    the AI call. Scored daily against a naive baseline; `backtest.py` checks the formula

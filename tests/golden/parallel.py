@@ -84,6 +84,11 @@ ACCESS: dict[str, Access] = {
     # news_clusters, news_claims, news_verified
     "news_status": access(but=(*NOT_FEATURE_KINDS, "lessons", "outcomes", "range_outcomes"),
                           data_writes=("news_verified",)),
+    "model_config": access(no_data=True, writes=("model_config",)),
+    # ohlc, event_history, flows/fpi or shorts/insider_trades, news, news_enriched, news_verified,
+    # model_versions_latest, model_scores_latest
+    "model_scores": access(but=(*NOT_REVIEWS, "lessons", "outcomes", "range_outcomes"), reads=("model_config",),
+                           data_writes=("model_scores", "model_versions")),
     # context.py and the section modules it imports: no reviews or replays
     "context": access(but=NOT_REVIEWS, writes=("context",)),
     "context_after_ranges": access(but=NOT_REVIEWS, writes=("context",)),

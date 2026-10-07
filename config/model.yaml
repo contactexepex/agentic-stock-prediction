@@ -1,0 +1,31 @@
+# Signal model: an explainable up/down probability per ticker and horizon (docs/DESIGN.md section 15;
+# scripts/model_scores.py daily, scripts/model_backtest.py for the walk-forward test). Every value here
+# was set before the backtest was run and is never tuned on its results (no test-period tuning).
+model_version: logit-v1
+# L2-regularised logistic regression on standardised features: minimise
+#   mean log loss + l2_alpha / 2 * sum(beta_j^2)   (the intercept is not penalised)
+l2_alpha: 0.05
+z_clip: 5.0                 # standardised values are clipped to +-z_clip (outlier days)
+warmup_bars: 60             # a stock-day enters the panel only after this many bars of its ticker
+min_train_sessions: 100     # distinct as-of sessions with resolved labels before the first fit
+min_feature_coverage: 0.8   # a feature enters a fit only when non-missing in this share of its training rows
+refit: monthly              # refit at the first as-of date of each calendar month (expanding window)
+platt_min_rows: 1000        # Platt calibration once this many past out-of-sample rows have resolved
+# News (live only; there is no historical news archive, so these are fixed priors, not estimates).
+# Per item: sentiment (-1..1) x relevance (0..1) x materiality weight x verification weight, summed per
+# ticker over the window, clipped to +-score_cap, times `coefficient` in logit units.
+news:
+  coefficient: 0.10         # prior mean of the global news coefficient (logit per unit of score), shrunk small
+  prior_sd: 0.10            # its prior standard deviation (Bayesian update, scripts/model_news_update.py)
+  target_se: 0.05           # re-estimate once the posterior standard error would be at most this
+  score_cap: 2.0
+  lookback_hours: 72
+  status_weights: {confirmed_primary: 1.0, corroborated: 0.7, single_source: 0.3, rumour: 0.0,
+                   promotional: 0.0, unverified: 0.0, contradicted: 0.0}
+  materiality_weights: {high: 1.0, medium: 0.5, low: 0.2}
+  event_type_weights: {}    # every event type 1.0 until live outcomes support a difference
+backtest:
+  thresholds: [0.55, 0.60, 0.65]
+  bootstrap_samples: 1000
+  bootstrap_seed: 20261006
+  reliability_edges: [0.0, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 1.0]

@@ -1217,6 +1217,7 @@ scheduled routine honours per-subagent `model:`/`effort:` is not documented; the
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
 (forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits, forecast-v9
 also covering the forecaster's lessons bullet; forecast-v10, news-v8 and claims-v3 with news verification phase B;
+forecast-v11 with the signal-model anchor and the debate record (section 15);
 reflect-v1 started with the Sonnet 5.5 / medium frontmatter; news-v9 and reflect-v2 only reword the schema path and
 the lessons gate), and a per-call `model` field on predictions is a planned follow-up.
 
@@ -1233,3 +1234,145 @@ the lessons gate), and a per-call `model` field on predictions is a planned foll
   2409.19839). Only forecasts on questions that resolve after the model's training cutoff are a
   fair test; here as-of dates on or before `model_training_cutoff` are labelled contaminated and
   scored separately.
+
+## 15. Signal model: an explainable up/down probability (built 2026-10-06)
+
+Why: the forecaster's confidence had no formula behind it. The owner asked what makes a probability,
+how it is checked, whether news moves it and how much each input counts. The signal model answers
+this with a stated formula, learned weights, a walk-forward test and a per-score explanation. The
+forecaster now starts from it. Research only: the model never trades and never connects to a broker.
+
+**Trade convention (owner's decision; the primary label).** D is the first session after the as-of
+close. 1-day: buy at the open of D, sell at the close of D+1 (two sessions held). 5-day: buy at the
+open of D, sell at the close of D+4 (five sessions). Up = return > 0. A cost-aware label (return >
+round-trip cost) is reported too. Secondary label: close-to-close, from the as-of close to the close
+of D (1-day) or D+4 (5-day), the convention `score_predictions.py` uses for calls. A label is missing
+when the ticker has no bar on a benchmark session it spans (`marketbrief/model/labels.py`).
+
+**Features at the as-of date (no look-ahead; `technical_panel.py`, `market_panel.py`, `panel.py`).**
+- Per ticker: 1/3/5/20-day returns, 10-day rate of change, EMA 9/21 ratio, close vs 20-day high,
+  RSI(14), ATR %, 10-day realized vol, EWMA vol, Bollinger width, 5-day OBV trend, volume vs 20-day
+  average, 1-year beta and 5-day return vs sector peers. Each is computed causally at every date and
+  equals `indicators.py` on the bars cut at that date (tested).
+- Market: benchmark 5-day return and 10-day vol, vol index level and its 1-day change, the regime
+  one-hot (`regime.classify` on closes and scheduled events) and the index cue's last daily return
+  (`index_cue`: US ES futures, India the S&P 500 session of the as-of date, which closes before D
+  opens). Training and live scoring both use closes, never a pre-open quote, so both see one definition.
+- Events: earnings or ex-dividend inside the holding window, from rows stored by the as-of date.
+- Flows where history exists: India NSE FII/DII provisional cash (date <= d) and NSDL FPI equity net
+  (reporting date < d: it is published the next day); US FINRA short-volume share and Form 4 net
+  open-market buying over 30 days (accepted by d). Before the first stored row of a kind the value is
+  missing, never 0.
+- A feature enters a fit only when it is present in at least 80% of the training rows and varies there.
+  On today's data the event and flow features have days of history, not months, so every fit leaves them
+  out (listed with the reason in each stored model).
+
+**The formula (`logistic.py`; settings in `config/model.yaml`, fixed before the backtest, never tuned
+on it).** z_j = clip((x_j - mean_j) / sd_j, -5, 5), 0 when missing (= the training mean); logit = b0 +
+sum_j b_j z_j; the weights minimise mean log loss + 0.05 / 2 * sum b_j^2 (b0 not penalised), solved by
+Newton's method (unique optimum; tested against the gradient condition). One model per market x
+horizon: the vol-index scales, cues, sessions and costs differ by market, so pooling with a market flag
+would mix definitions. Walk-forward (`walk_forward.py`): expanding window, refit at the first as-of
+date of each month on labels resolved by then (end date <= refit date), first fit once 100 sessions
+have resolved (after a 60-bar warm-up per ticker). Platt calibration p = sigmoid(a * logit + c) is fitted
+at each refit on the earlier months' out-of-sample scores resolved by then, once 1,000 exist; a is kept
+>= 0 (calibration may shrink the model to the base rate, never turn its ranking upside down: a negative
+slope would also reverse every explained driver). Final probability = sigmoid(calibrated logit + news
+term). The daily `model_scores.py` runs the same loop up to the as-of date, so a month's stored model is
+the one the backtest used; its formula is stored as JSON in `data/<market>/model_versions/` (features,
+training means and sds, coefficients, intercept, Platt slope and offset, excluded features).
+
+**Explanation (`explain.py`).** logit(p) = logit(base rate) + baseline + sum_j a b_j z_j + news, with
+baseline = a b0 + c - logit(base rate). The items are converted to percentage points by sharing
+p - base rate in proportion to their logit size, so they add up to 100 (p - base rate) (exactly before
+rounding, tested; the stored points are rounded to 2 decimals, so their sum can differ by a few hundredths).
+Each score stores the points per feature and per group (momentum, oscillator, volatility, volume,
+relative strength, market, regime, events, flows, news, baseline) and the top 3 drivers each way in
+plain words, e.g. from the US run on 2026-10-06 (as of 2026-10-05): "10-day realized vol 19.5%: +0.3 pts;
+ATR 2.1%: +0.2 pts" and "benchmark 10-day vol 8.3%: -0.3 pts" for AAPL 5d (P(up) 0.5314, base rate 0.5379).
+Global importance: the coefficient table and the sum of |coefficient| per group in each stored model
+and on the backtest page.
+
+**News (live only; `news_score.py`).** There is no historical news archive, so news weights cannot be
+trained yet. Fixed, documented priors: per item sentiment x relevance x materiality weight (high 1.0,
+medium 0.5, low 0.2) x verification weight by the item's status as of the scoring time (confirmed_primary
+1.0, corroborated 0.7, single_source 0.3, rumour, promotional, unverified and contradicted 0) x event-type
+weight (1.0 for every type until outcomes say otherwise), summed over the ticker's primary news of the last
+72 hours, clipped to +-2, times a small global coefficient 0.10 logit per unit (at most +-0.2 logit, about
++-5 points at p = 0.5). Re-estimation (`model_news_update.py`, prints only; a human edits the config):
+Bayesian logistic update of the coefficient with the model's own logit as offset and prior N(0.10, 0.10^2);
+MAP by Newton, standard error from the curvature. Rows needed for a standard error of 0.05:
+n = (1/0.05^2 - 1/0.10^2) / (0.25 E[score^2]); with no live data the plan assumes E[score^2] = 0.1 (most
+stock-days carry no verified news), which gives 12,000 scored stock-days per horizon (about 600 sessions
+for 20 tickers). The script recomputes n from the live E[score^2] as scores accumulate.
+
+**Forecaster anchor (forecast-v11; `forecast_rules.py`, `validate.py --stage forecast` code
+MODEL_ADJUSTMENT).** When a score exists for the call's id (the newest computed by made_at): `model_prob`
+= that score, |`agent_adjustment`| <= 0.10 with an `adjustment_reason` when not 0, direction = the side
+of 0.5 of model_prob + adjustment (0.5: abstain), confidence = max(final, 1 - final) within 0.005. Without
+a score the call is checked by the other rules and the gate warns MODEL_SCORE_MISSING. Note: calls are
+still scored close-to-close by `score_predictions.py` while the model's label is open-to-close; aligning
+the scorer is an open decision for the owner (it changes the meaning of the track record).
+
+**Debate record.** The forecaster writes per ticker the bull and bear cases (<= 80 words each), its
+verdict (<= 60 words), its decisions and the cited ids; `agent_reasoning.py validate|add` checks ids,
+publication times, word limits and that each decision matches a stored call, and appends to
+`data/<market>/agent_reasoning/` (routine step 9a).
+
+**Validation (`model_backtest.py --out DIR`; out-of-sample only; stored bars 2024-10-07 to 2026-10-05,
+20 tickers per market; with the warm-up and the first 100 resolved sessions the first scored as-of date
+is 2025-06-02 for 1-day and 2025-07-01 for 5-day).** Run on commit 67eeca0 (after the holiday-bar fix,
+which drops bars on closed days), computed 2026-10-07T00:38:34Z. Brier and log loss are compared with the
+base rate known at each refit (the training up share):
+
+| market | horizon / label | n | as-of dates | up share | Brier | Brier base rate | log loss | log loss base | AUC (95% block bootstrap) |
+|---|---|---|---|---|---|---|---|---|---|
+| india | 1d open_to_close | 6595 | 2025-06-02..2026-09-30 | 0.471 | 0.2513 | 0.2496 | 0.6959 | 0.6923 | 0.4859 [0.4548, 0.5172] |
+| india | 5d open_to_close | 6115 | 2025-07-01..2026-09-25 | 0.4698 | 0.2555 | 0.2509 | 0.7047 | 0.695 | 0.5019 [0.4516, 0.5455] |
+| us | 1d open_to_close | 6720 | 2025-06-02..2026-10-01 | 0.5228 | 0.2504 | 0.2498 | 0.6939 | 0.6927 | 0.4836 [0.4597, 0.5068] |
+| us | 5d open_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5332 | 0.2504 | 0.2492 | 0.6941 | 0.6916 | 0.4845 [0.4558, 0.5129] |
+| india | 1d close_to_close | 6615 | 2025-06-02..2026-10-01 | 0.4828 | 0.2511 | 0.25 | 0.6956 | 0.6931 | 0.5162 [0.486, 0.5467] |
+| india | 5d close_to_close | 6115 | 2025-07-01..2026-09-25 | 0.4728 | 0.2553 | 0.2512 | 0.7042 | 0.6956 | 0.4988 [0.4446, 0.5434] |
+| us | 1d close_to_close | 6740 | 2025-06-02..2026-10-02 | 0.5218 | 0.2501 | 0.2496 | 0.6933 | 0.6923 | 0.4934 [0.4721, 0.5158] |
+| us | 5d close_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5414 | 0.2499 | 0.2486 | 0.693 | 0.6904 | 0.481 [0.4492, 0.5089] |
+
+Hit rates and coverage of the long side (p >= t; hit = return > 0), open-to-close: India 1d t = 0.55:
+20 stock-days (coverage 0.003), hit 0.6 [0.3866, 0.7812]; none at 0.60 or 0.65. India 5d: 0.55 1581
+(0.2585) hit 0.4712 [0.4467, 0.4959]; 0.60 983 (0.1608) 0.5229 [0.4916, 0.554]; 0.65 391 (0.0639) 0.5678
+[0.5182, 0.616]. US 1d: 0.55 173 (0.0257) 0.5896 [0.5151, 0.6602]; 0.60 3; 0.65 none. US 5d: 0.55 1968
+(0.3144) 0.503 [0.481, 0.5251]; 0.60 1; 0.65 none. Short side (p <= 1 - t; hit = return < 0), India 5d:
+0.55 1144 (0.1871) 0.5297 [0.5007, 0.5585]; 0.60 772 (0.1262) 0.5699 [0.5348, 0.6044]; 0.65 304 (0.0497)
+0.6118 [0.556, 0.6649]. The full tables, reliability bins with Wilson intervals and the close-to-close rows
+are on the backtest page.
+
+Paper strategy after costs (open-to-close, mean holding-period return per date in %, 95% moving-block
+bootstrap; mean round trip 0.2225% India, 0.0021% US with the FINRA TAF at its in-force $0):
+India 1d always-up -0.2956 [-0.4, -0.18], benchmark_long_per_date (a benchmark long opened at every as-of
+date, a full round trip charged each time) -0.2806 [-0.4, -0.16], model p >= 0.55 -0.5398 [-1.63, 0.4] on
+10 dates (too few for a verdict: the page requires 20 common dates). India 5d always-up -0.4159 [-0.71,
+-0.07], model p >= 0.55 -0.5734 [-1.31, -0.05], p >= 0.60 -0.2808 [-1.1, 0.2], p >= 0.65 0.3749 [-0.64,
+1.03]. US 1d always-up 0.142 [0.03, 0.26], model p >= 0.55 0.2753 [-0.74, 1.06]. US 5d always-up 0.4717
+[0.23, 0.74], benchmark_long_per_date 0.2857 [-0.02, 0.58], model p >= 0.55 0.413 [-0.07, 0.9]. Every
+model-minus-baseline difference with at least 20 common dates has a 95% interval that contains 0.
+
+**Verdict (honest).** On this history the model does not beat the base rate: Brier skill is negative in
+all eight rows (-0.0021 to -0.0181), every AUC interval contains 0.5, and the gradient-boosted comparison
+(HistGradientBoostingClassifier, depth 3, 100 trees, used only here) is no better (AUC 0.485 to 0.5159,
+Brier 0.2535 to 0.275). After costs the model's long picks are not distinguishable from always-up,
+momentum, RSI mean reversion or the benchmark; some thresholds have too few positions for any verdict.
+Where the calibration sees no skill in the past months it sets the Platt slope to 0 (India's latest fits),
+so the issued probability is the past up share and no feature driver is listed (0 points): that is the
+calibration doing its job, not a fault. The value of the model today is the explanation and the
+discipline (a stated formula, a cap on the agent's adjustment), not an edge. Nothing was tuned on the test
+period. Disclosure: the first run of this backtest used an unconstrained Platt slope (it went negative in
+several months, which inverts rankings and explanations); the slope was then constrained to >= 0 as a
+correctness fix and the run repeated; the numbers above are from the constrained version (the first run,
+before the holiday-bar fix, also showed no skill: Brier skill -0.0027 to -0.0293).
+
+**Limits.** About 16 months of out-of-sample history, 20 tickers per market, overlapping 5-day labels
+(handled by the block bootstrap, still wide intervals). Fills are assumed at the official open and close;
+spread, slippage and India's flat DP charge are not modelled; the cost rates in force on 2026-10-07 (`config/costs.yaml`, each
+marked "verify" with its source) are applied to past dates. Event and flow features have too little
+history to enter any fit; news has none (fixed prior). The overnight cue is the cue's last daily return,
+not the live pre-open quote. Splits are applied on read by the `ohlc` view; returns are ratios, so the
+re-basing does not leak.

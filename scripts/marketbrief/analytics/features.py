@@ -20,7 +20,7 @@ from marketbrief.constants.config_keys import CFG_MARKET, CFG_SECTORS, CFG_TICKE
 from marketbrief.constants.features import (
     EX_DIVIDEND_WINDOW_DAYS,
     MSG_CALENDAR_NOT_COVERED,
-    MSG_NO_BENCHMARK,
+    MSG_NO_BENCHMARK_FOR_KEY,
     MSG_NO_PRICE_DATA,
     MSG_STALE_BAR,
     QUALITY_ORDER,
@@ -169,7 +169,7 @@ def run(cfg: dict, today_local: date | None = None, utc_day: date | None = None)
     bench_key, vol_key = benchmark_key(cfg), vol_index_key(cfg)
     bench = bars.get(bench_key)
     if bench is None or bench.empty:
-        raise SystemExit(MSG_NO_BENCHMARK.format(key=bench_key))
+        raise SystemExit(MSG_NO_BENCHMARK_FOR_KEY.format(key=bench_key))
     as_of = bench.index[-1].date()
     quotes = quotes_today(con, utc_day or utc_today())
     company = company_events(con, session)

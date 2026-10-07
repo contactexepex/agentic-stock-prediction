@@ -145,6 +145,18 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `news_verified`, read with `news_verified_asof(ts)` / `news_status_ids_asof(ts)` (no look-ahead). The
   context pack shows events with their status; the forecast gate checks each cited id's status as of
   `made_at` (`prediction_rules.check_news_status`).
+- Signal model (DESIGN.md section 15; `scripts/marketbrief/model/`, settings `config/model.yaml`, costs
+  `config/costs.yaml`): `model_scores` (routine step 5a, again after the news append) appends per ticker and
+  horizon P(up) of the open-to-close label (buy at the open of D, the first session after the as-of close; sell
+  at the close of D+1 for 1d, D+4 for 5d) with its explanation (points per feature group, top 3 drivers each
+  way) to `data/<market>/model_scores/` (view `model_scores_latest`); the month's model (L2 logistic, monthly
+  expanding-window refit on labels resolved by the refit date, Platt calibration on past out-of-sample rows,
+  JSON coefficients) to `data/<market>/model_versions/`. News enters as a fixed prior (not trainable yet; no
+  news archive); `model_news_update` reports the re-estimation and the rows it needs. `model_backtest --out DIR`
+  is the walk-forward test (both markets and horizons, open-to-close and close-to-close, baselines after costs;
+  writes only to DIR). The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
+  `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
+  stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
@@ -181,6 +193,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   allow-list in `tests/test_code_structure.py`. Queries whose row order or float sums reach an output
   have a full ORDER BY and order-independent sums (plan, "Known nondeterminism", fixed); the golden
   harness runs DuckDB with its default threads, and refactor steps keep those orderings
+
+## Code rules
+- Self-explanatory names (docs/REFACTOR_PLAN.md); the conventional short names `cfg`, `con`, `ctx`, `res`,
+  `rec`, `src`, `reg`, `feats`, `preds` and `cal` are allowed (user decision).
 
 ## Judging every change
 Every change to code, config, agent instructions or process is reviewed by the `judge` subagent
@@ -264,4 +280,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   widen a range (`range_widen` 0-0.5), never narrow it.
 - Calibrate against the track record: if a confidence band hits less often than its stated
   confidence, use lower confidence or abstain.
+- Signal model anchor (forecast-v11): when a model score exists for the call's id, `model_prob` = that
+  score, `agent_adjustment` within +-0.10 (with `adjustment_reason` when not 0), `direction` = the side of
+  0.5 of model_prob + adjustment, `confidence` = max(final, 1 - final).
 - `prompt_version` identifies the agent instructions used (bump it when agent files change).

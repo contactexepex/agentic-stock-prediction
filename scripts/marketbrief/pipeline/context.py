@@ -17,6 +17,7 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
 from marketbrief.graph import news_hits
+from marketbrief.model import context_section as model_context
 from marketbrief.pipeline import macro_sections, nse_sections
 from marketbrief.pipeline.lessons import context_section
 from marketbrief.pipeline.score_predictions import is_late
@@ -268,6 +269,8 @@ def main() -> None:
         if title.startswith("SEC") and cfg.get("filings") != "sec":
             continue
         print(f"## {title}\n\n{cursor_markdown_table(con.execute(sql, params))}")
+        if title.startswith("Indicators"):  # the signal model's P(up) and drivers (model_scores.py)
+            print("## {}\n\n{}".format(*model_context.context_section(con)))
         if title.startswith("News activity"):  # news verification: events with their status (news_status.py)
             print("## {}\n\n{}".format(*news_events.context_section(con)))
         if title.startswith("Sector ETFs") and sector_gaps(cfg):

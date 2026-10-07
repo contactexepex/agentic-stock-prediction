@@ -131,6 +131,9 @@ SLOW = {
     "tests/test_sec_times.py": {
         "test_stored_shifted_rows_are_corrected_on_read",
     },
+    "tests/test_signal_model.py": {
+        "test_daily_scores_end_to_end",
+    },
     "tests/test_split_adjust.py": {
         "test_hold_persists_after_the_frame_moves_past_the_stored_bars",
     },
