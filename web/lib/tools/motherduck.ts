@@ -95,13 +95,22 @@ export class MotherDuckInboxStore implements InboxStore {
 
   async claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: StoredRequest | null }> {
     const preview = row.preview === null ? null : JSON.stringify(row.preview);
-    const inserted = row.kind === COMPANY_KIND
-      ? await this.query(SQL.claimCompany,
+    const insert = () => row.kind === COMPANY_KIND
+      ? this.query(SQL.claimCompany,
         [row.inbox_id, row.market, row.tool, JSON.stringify(row.arguments), row.submitted_by, row.channel, row.submitted_at,
           row.command_id, preview, row.agent, row.args_sha256, budget.sinceIso, budget.limit])
-      : await this.query(SQL.claimRequest,
+      : this.query(SQL.claimRequest,
         [row.inbox_id, row.kind, row.tool, row.market, JSON.stringify(row.arguments), preview, row.channel, row.submitted_by,
           row.agent, row.command_id, row.submitted_at, row.args_sha256, budget.sinceIso, budget.limit]);
+    let inserted;
+    try {
+      inserted = await insert();
+    } catch (error) {
+      // Two concurrent claims of one key: the second fails on the primary key. Answer with the stored row.
+      const { rows } = await this.query(SQL.existing, [row.inbox_id]);
+      if (rows[0]) return { claimed: false, existing: storedFrom(rows[0]) };
+      throw error;
+    }
     if (inserted.rows.length) return { claimed: true, existing: null };
     const { rows } = await this.query(SQL.existing, [row.inbox_id]);
     return { claimed: false, existing: rows[0] ? storedFrom(rows[0]) : null };

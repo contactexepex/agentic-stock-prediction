@@ -157,3 +157,16 @@ test("an explain question with instructions is answered by the stub and writes n
   assertNoWrite(r);
   assertNoSecret(reply, r.inbox.commands);
 });
+
+test("a reused key whose text differs only in a secret value is refused, not answered as a duplicate (issue #109)", async () => {
+  const r = rig();
+  const base = { market: "us", ticker: "AAPL", side: "buy", quantity: 1, trade_date: "2026-10-06", price_basis: "open",
+    idempotency_key: "secret-note-key-01" };
+  const first = await r.layer.execute(app, "add_paper_trade", { ...base, note: `call ${SECRETS.SLACK_BOT_TOKEN}` });
+  assert.equal(first.result, "pending");
+  const other = await r.layer.execute(app, "add_paper_trade", { ...base, note: `call ${SECRETS.GITHUB_DISPATCH_TOKEN}` });
+  assert.equal(other.refusal_code, "duplicate_key");
+  const same = await r.layer.execute(app, "add_paper_trade", { ...base, note: `call ${SECRETS.SLACK_BOT_TOKEN}` });
+  assert.equal(same.result, "duplicate");
+  assertNoSecret(r.inbox.requests, r.inbox.commands, r.notifier.reports);
+});
