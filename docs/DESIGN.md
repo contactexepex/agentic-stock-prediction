@@ -145,7 +145,12 @@ recorded for the past. Design (adjust on read; data stays append-only):
   e's traded close / PREV_CLOSE steps by about the factor (0.8-1.25x of it and nearer to it than to
   1). For a factor of 0.9 or more (a 1:10 bonus is 10/11) an ordinary day's move can look like the
   step, so only the chain confirms, and an ex-date whose next session is not stored yet is held
-  until the next run. So a missed run (bars stored to E-2) is handled too.
+  until the next run. So a missed run (bars stored to E-2) is handled too. Why 0.9 (issue #36):
+  a step s passes for factor f when it is log-nearer to f than to 1, i.e. a fall of more than
+  1 - sqrt(f): 2.5% for f = 0.95, 5.1% for 0.9, 10.6% for 0.8. Above 0.9 an ordinary day of under
+  5% would pass; at 0.9 a fall of over 5.1% is still needed on the very session whose PREV_CLOSE
+  ties to our stored close, after the re-base itself was seen in Yahoo's history (the step only
+  places the ex-date). The cut is a judgement, not measured (`WEAK_FACTOR` in constants/prices.py).
 - Hold: a re-base or split row no source confirms (an unconfirmed re-base, also by a ratio that is
   no simple fraction; mixed ratios before a split row; a split row with no stored bar in the
   window; a split row whose stored closes match Yahoo's while Yahoo's own frame steps by about the
@@ -160,8 +165,15 @@ recorded for the past. Design (adjust on read; data stays append-only):
   its first close is compared with our newest stored close across the gap, and a step of more
   than 2% holds as well ("not verifiable"). The hold ends only when a split row or the NSE check
   confirms the action (a later run records it and writes the held bars through the basis
-  conversion below) or a human corrects the data. A mismatch above 2% that is no single re-base
-  (one corrected bar, mixed ratios with no split row) is a warning only. An overlap ratio alone is
+  conversion below) or a human corrects the data. A hold with no new bar for 5 sessions or more
+  (sessions after the symbol's newest stored bar, about one per daily run) adds a warning naming
+  the count and the summary key `held_too_long`, which validate.py reports as its own
+  `PRICE_HELD_TOO_LONG` warning (the report's `data_quality`): a human must record the action
+  (issue #36). A mismatch above 2% that is no single re-base (one corrected bar, mixed ratios with
+  no split row) is a warning only. A mismatch on one stored date only (the oldest of the frame)
+  counts as a re-base only when our own stored closes step by about that ratio right after it (the
+  older bar on the old basis, the next on the new); with no such step it is a bar Yahoo corrected:
+  a warning, no hold (issue #36). An overlap ratio alone is
   never a source. Dividends are never adjusted (ex-dividend handling is separate, in ranges).
 - A wrong record is corrected by appending a new one (own id, e.g. `<ticker>-<E>-fix1`,
   `supersedes` = the wrong id, `factor` 1.0 to cancel or the right factor, a `note`): the
@@ -170,8 +182,10 @@ recorded for the past. Design (adjust on read; data stays append-only):
   scored on the corrected basis: a call or range made between the wrong row's and the correction's
   `detected_at` was built on bars carrying the wrong factor, while scoring (record_basis) only knows
   the active rows, so its stored edges and closes do not match the corrected closes and its outcome
-  is off by that factor; outcomes already stored stay as written. List such records
-  (`made_at` between the two `detected_at`) in the correction's `note` and judge them by hand.
+  is off by that factor; outcomes already stored stay as written. `scripts/adjustment_records.py
+  --market M` lists such records per correction (the stock's predictions and ranges with `made_at`
+  from the wrong row's `detected_at` up to, not including, the correction's, each marked scored or
+  not; read-only); name them in the correction's `note` and judge them by hand.
 - After a recorded split, an older bar Yahoo serves on the new basis (a gap it fills late) is
   written on its date's stored basis (prices / factor, volume x factor; summary `rebased_bars`),
   and a recorded split no longer blocks the bhavcopy fallback (the as-traded bar fits the views).

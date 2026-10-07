@@ -30,6 +30,8 @@ from marketbrief.constants.review import (
     MSG_HISTORY_ABLATION_SKIPPED,
     MSG_MODEL_CHECK_FAILED,
     MSG_MODEL_CHECK_SKIPPED,
+    SKIP_HISTORY,
+    SKIP_MODEL,
 )
 from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
@@ -82,9 +84,10 @@ def model_check(market: str, review_config: dict, enabled: bool) -> dict:
 
 
 def build(
-    cfg: dict, ranges_config: dict, review_config: dict, con, week: str, history: bool = True, model: bool = True
+    cfg: dict, ranges_config: dict, review_config: dict, con, week: str, skip: frozenset = frozenset()
 ) -> tuple[dict, dict]:
-    """Build the review record and its data for one ISO week."""
+    """Build the review record and its data for one ISO week; `skip` may hold SKIP_HISTORY (no walk-forward on
+    stored prices) and SKIP_MODEL (no signal-model backtest)."""
     start, end = week_bounds(week)
     roll_start = end - timedelta(days=review_config["rolling_days"] - 1)
     ranges, calls = load_ranges(con, cfg, end), load_calls(con, end)
@@ -130,7 +133,7 @@ def build(
     review_data["live_ablation"] = live_ablation(ranges, ranges_config, review_config)
     review_data["history_ablation"] = (
         history_ablation(cfg, ranges_config, review_config, load_bars(con), end)
-        if history
+        if SKIP_HISTORY not in skip
         else {"n": 0, "error": MSG_HISTORY_ABLATION_SKIPPED, "variants": []}
     )
     for ablation in (review_data["live_ablation"], review_data["history_ablation"]):
@@ -147,7 +150,7 @@ def build(
     proposal = aci_proposal(ranges_config, review_data["aci"]["replay"])
     if proposal:
         review_data["proposals"].append(proposal)
-    review_data["model"] = model_check(cfg["market"], review_config, model)
+    review_data["model"] = model_check(cfg["market"], review_config, SKIP_MODEL not in skip)
     review_data["advice"] = confidence_advice(review_data["bands"]["all"], review_data["calls"]["all"], review_config)
 
     # the record's call columns are of the current basis (the newest scored call's), named in call_basis_all
@@ -218,8 +221,12 @@ def main() -> int:
         return 0
     review_config = load_review_config()
     rec, review_data = build(
-        cfg, load_ranges_config(cfg["market"]), review_config, con, week, history=not args.no_history,
-        model=not args.no_model_backtest,
+        cfg,
+        load_ranges_config(cfg["market"]),
+        review_config,
+        con,
+        week,
+        frozenset({SKIP_HISTORY} if args.no_history else set()) | ({SKIP_MODEL} if args.no_model_backtest else set()),
     )
     path = paths.ROOT / rec["report"]
     path.parent.mkdir(parents=True, exist_ok=True)

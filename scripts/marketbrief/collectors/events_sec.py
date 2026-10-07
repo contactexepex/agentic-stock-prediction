@@ -27,7 +27,8 @@ def sec_earnings(
 ) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
     """Item 2.02 filings from SEC EDGAR: 8-K/6-K filings with item 2.02 (results of operations),
     timed by acceptance. Given a dict, `reports` receives the 10-Q/10-K filings per ticker: (acceptance date,
-    timing, form, period end, acceptance time in UTC). Acceptance times are the checked/corrected ones of Edgar.recent; given a dict,
+    timing, form, period end, acceptance time in UTC). Acceptance times are the checked/corrected ones of
+    Edgar.recent; given a dict,
     `times` receives the summary of those checks (sec_acceptance.time_summary).
     Each ticker's filings are those of its mapped CIK plus the predecessor/related CIKs in
     `fundamentals.predecessor_ciks` (sec_filings.ticker_submissions), each filing once.

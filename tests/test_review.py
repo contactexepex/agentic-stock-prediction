@@ -301,9 +301,8 @@ def test_review_end_to_end(tmp_path):
     for key in ("regime", "sector", "note"):                                  # windows nest: week <= 30d <= all
         n = {w: sum(x["n"] for x in b[w][key].values()) for w in b}
         assert 0 < n["week"] < n["rolling"] < n["all"], (key, n)
-    band = "80%-90% · close→close"                                         # one scoring basis (before the switch)
-    assert 0 < d["bands"]["week"][band]["n"] < d["bands"]["rolling"][band]["n"] < 40
-    assert d["bands"]["all"][band]["n"] == 40
+    band_n = {w: d["bands"][w]["80%-90% · close→close"]["n"] for w in d["bands"]}  # one basis (before the switch)
+    assert 0 < band_n["week"] < band_n["rolling"] < band_n["all"] == 40
 
     # since-start coverage equals the scored outcomes on disk
     outs = [json.loads(x) for f in (root / "data" / tp.MARKET / "range_outcomes").glob("**/*.jsonl")
@@ -413,7 +412,7 @@ def test_window_boundaries_and_no_data_after_the_week():
              end - timedelta(days=29), end - timedelta(days=30)]
     rv = {**review.DEFAULTS, "rolling_days": 30}
     cfg = {"market": "testmkt", "tickers": {"A": {"sector": "Tech"}}}
-    rec, d = cli.build(cfg, RC, rv, window_con(dates), "2026-W40", history=False)
+    rec, d = cli.build(cfg, RC, rv, window_con(dates), "2026-W40", frozenset({cli.SKIP_HISTORY}))
     # week: start, end · 30 days: end-29 .. end · since start: all up to end (end+1 is after the week)
     assert (rec["n_ranges_week"], rec["n_ranges_30d"], rec["n_ranges_all"]) == (2, 4, 5)
     assert {w: d["calls"][w]["all · close→close"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
@@ -536,7 +535,8 @@ def test_proposal_names_the_per_market_override_key():
     assert p["changes"] == [{"param": "earnings_vol_multiple_by_market.india",
                              "current": india["earnings_vol_multiple_by_market"]["india"], "proposed": 2.5}]
     [p] = verdicts.proposals(us, {"variants": []}, hist, "us")
-    assert p["changes"][0]["param"] == "earnings_vol_multiple" and p["changes"][0]["current"] == us["earnings_vol_multiple"]
+    assert p["changes"][0]["param"] == "earnings_vol_multiple"
+    assert p["changes"][0]["current"] == us["earnings_vol_multiple"]
 
 
 def test_major_event_counts_after_start_up_to_target():
@@ -631,6 +631,6 @@ def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
     assert {row["key"] for row in out["scores"]} == {"1d close_to_close", "1d open_to_close", "5d close_to_close",
                                                      "5d open_to_close"}
     assert out["verdict"].startswith(("Yes:", "No:")) and not (tmp_path / "data" / "us" / "reviews").exists()
-    monkeypatch.setattr(model_skill, "run_backtest", lambda markets: 1 / 0)
+    monkeypatch.setattr(model_skill, "run_backtest", lambda _markets: 1 / 0)
     assert cli.model_check("us", {**review.DEFAULTS}, True) == {"error": "the backtest failed: division by zero"}
     assert cli.model_check("us", {**review.DEFAULTS}, False) == {"skipped": "skipped (--no-model-backtest)"}

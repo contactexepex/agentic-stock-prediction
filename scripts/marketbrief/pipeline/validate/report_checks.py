@@ -21,8 +21,8 @@ from marketbrief.constants.validation import (
     MSG_SOURCE_QUERY_SKIPPED,
     MSG_STILL_HAS_AGENT_MARKERS,
     MSG_STILL_HAS_NUMBERED_AGENT_MARKERS,
-    MSG_UNMATCHED_NUMBER_EXAMPLE,
     MSG_SIGN_ALARMS,
+    MSG_UNMATCHED_NUMBER_EXAMPLE,
     MSG_UNMATCHED_NUMBERS,
     MSG_WORK_CONTEXT_MD_MISSING_NARRATIVE_NUMBERS,
 )
@@ -220,6 +220,17 @@ def report_file(cfg: dict, con, status: dict) -> Path:
     return paths.ROOT / "reports" / cfg["market"] / f"{report_session(con, status)}.md"
 
 
+def check_signs(res, validate_config: dict, path: Path, lines: list[str], pool) -> None:
+    """A NARRATIVE_SIGN warning for numbers written after a down word that only a positive source matches
+    (optional: `narrative_sign_check` in config/validate.yaml, off by default; issue #32)."""
+    if not validate_config.get("narrative_sign_check"):
+        return
+    alarms = narrative_numbers.sign_alarms(lines, pool, validate_config["narrative_small_int"])
+    if alarms:
+        examples = "; ".join(f"{alarm['token']} in '{alarm['sentence'][:90]}'" for alarm in alarms[:6])
+        res.warn("NARRATIVE_SIGN", MSG_SIGN_ALARMS.format(name=path.name, count=len(alarms), examples=examples))
+
+
 def stage_report(  # noqa: PLR0913 (uniform stage signature)
     res, cfg, con, status, now, today, validate_config, report_path: Path | None = None, slack_path: Path | None = None
 ):
@@ -274,11 +285,7 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
         targets.append((summary, summary.read_text(encoding="utf-8").splitlines()))
     checked = {}
     for path, lines in targets:
-        if validate_config.get("narrative_sign_check"):  # optional, off by default (issue #32)
-            alarms = narrative_numbers.sign_alarms(lines, pool, small)
-            if alarms:
-                res.warn("NARRATIVE_SIGN", MSG_SIGN_ALARMS.format(name=path.name, count=len(alarms), examples="; ".join(
-                    f"{alarm['token']} in '{alarm['sentence'][:90]}'" for alarm in alarms[:6])))
+        check_signs(res, validate_config, path, lines, pool)
         bad = narrative_numbers.unmatched(lines, pool, small)
         checked[path.relative_to(paths.ROOT).as_posix() if path.is_relative_to(paths.ROOT) else str(path)] = {
             "agent_lines": len(lines),

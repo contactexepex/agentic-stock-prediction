@@ -103,8 +103,8 @@ def own_exchange_keys(cfg: dict) -> list[str]:
 def register_own_closed_days(con: duckdb.DuckDBPyConnection, market: str) -> None:
     """Create the `own_closed_days` table (ticker, date) the ohlc_raw view reads (issue #40): every stored price
     date that is no session of the market's own exchange, for each stock and own-exchange index of the config.
-    Built set-based from the distinct stored dates. No market config file (some tests): the table is empty and a warning goes to stderr;
-    any other config error raises."""
+    Built set-based from the distinct stored dates. No market config file (some tests): the table is empty and
+    a warning goes to stderr; any other config error raises."""
     con.execute("CREATE TABLE own_closed_days (ticker VARCHAR, date DATE)")
     if not (paths.CONFIG / DIR_CONFIG_MARKETS / f"{market}{YAML_SUFFIX}").exists():
         print(MSG_NO_MARKET_CONFIG_CLOSED_DAYS.format(market=market), file=sys.stderr)  # issue #41: never silent

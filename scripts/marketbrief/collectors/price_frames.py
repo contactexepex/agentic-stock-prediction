@@ -23,7 +23,7 @@ from marketbrief.constants.prices import (
     YAHOO_OHLC,
     YAHOO_SPLITS,
 )
-from marketbrief.core.calendar import prev_session
+from marketbrief.core.calendar import is_session, prev_session
 from marketbrief.core.paths import data_dir
 from marketbrief.core.storage import day_file
 
@@ -112,6 +112,16 @@ def newest_stored_before(cfg: dict, key: str, day: date) -> tuple[date, float] |
         if row and row.get(COL_CLOSE) not in (None, "") and float(row[COL_CLOSE]) > 0:
             return date.fromisoformat(path.stem), float(row[COL_CLOSE])
     return None
+
+
+def sessions_held(cfg: dict, key: str, through: date) -> tuple[date | None, int]:
+    """(newest stored bar of `key` on or before `through`, sessions after it up to `through`) for a held symbol:
+    each daily run adds about one, so the count says how many runs the hold has lasted (issue #36)."""
+    newest = newest_stored_before(cfg, key, through + timedelta(days=1))
+    if not newest:
+        return None, 0
+    days = (newest[0] + timedelta(days=offset) for offset in range(1, (through - newest[0]).days + 1))
+    return newest[0], sum(1 for day in days if is_session(cfg, day))
 
 
 def stored_overlap(cfg: dict, key: str, frame, today: date) -> int:

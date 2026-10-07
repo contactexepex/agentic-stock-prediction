@@ -51,8 +51,12 @@ def estimate_rows(cfg: dict, frame: pd.DataFrame) -> list[dict]:
         stamp = pd.Timestamp(stamp)
         if stamp.tzinfo is None:
             continue  # no time zone: the report time is unknown
-        found = {ours: (None if pd.isna(values[yahoo]) else round(float(values[yahoo]), 4)) for yahoo, ours in columns.items()}
-        rows.append({"report_at": stamp.tz_convert("UTC").isoformat(), "report_date": timing(cfg, stamp)[0].isoformat(), **found})
+        found = {
+            ours: (None if pd.isna(values[yahoo]) else round(float(values[yahoo]), 4))
+            for yahoo, ours in columns.items()
+        }
+        report_date = timing(cfg, stamp)[0].isoformat()
+        rows.append({"report_at": stamp.tz_convert("UTC").isoformat(), "report_date": report_date, **found})
     return rows
 
 

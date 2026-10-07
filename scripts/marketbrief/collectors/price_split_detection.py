@@ -41,6 +41,7 @@ from marketbrief.constants.prices import (
     MSG_NO_WINDOW_FOR_SPLIT,
     MSG_NOT_ONE_REBASE,
     MSG_NSE_CHECK_SUFFIX,
+    MSG_ONE_CORRECTED_BAR,
     MSG_REBASE_NOT_FRACTION,
     MSG_REBASE_UNCONFIRMED,
     MSG_SPLIT_NEITHER_ADJUSTED,
@@ -212,11 +213,21 @@ class AdjustmentDetector:
         if not is_rebase:
             state.warnings.append(detail + MSG_NOT_ONE_REBASE)
             return state.records, state.warnings, False
+        if len(mismatches) == 1 and not self.stored_step_matches(state, last, middle):
+            state.warnings.append(detail + MSG_ONE_CORRECTED_BAR)  # issue #36: a corrected bar, not a re-base
+            return state.records, state.warnings, False
         fraction = split_fraction(middle)
         if fraction is None:
             state.warnings.append(detail + MSG_REBASE_NOT_FRACTION)
             return state.records, state.warnings, True
         return self.confirm_rebase(state, detail, fraction, last)
+
+    @staticmethod
+    def stored_step_matches(state: Detection, last: date, ratio: float) -> bool:
+        """A one-date mismatch is a re-base only when our stored closes step by about the ratio right after it
+        (the older bar on the old basis, the next on the new); a bar Yahoo merely corrected shows no such step."""
+        later = [session_day for session_day in sorted(state.stored) if session_day > last]
+        return bool(later) and step_matches(state.stored_view(later[0]) / state.stored_view(last), ratio)
 
     def confirm_rebase(self, state: Detection, detail: str, fraction, last: date) -> tuple[list[dict], list[str], bool]:
         """Ask the NSE check to confirm a re-base by `fraction`; hold when nothing does."""

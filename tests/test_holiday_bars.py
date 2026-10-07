@@ -189,7 +189,8 @@ def test_special_session_bars_are_kept_on_read():
     for day, close in ((date(2024, 10, 31), 1000.0), (MUHURAT[0], 1010.0), (date(2024, 11, 4), 1020.0)):
         path = day_file("india", "prices", day, "csv")
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(header + f"{day},INFY,{close},{close + 5},{close - 5},{close},{close},500,{day}T13:00:00+00:00\n")
+        bar = f"{day},INFY,{close},{close + 5},{close - 5},{close},{close},500,{day}T13:00:00+00:00\n"
+        path.write_text(header + bar)
     con = connect("india")
     days = [row[0] for row in con.execute("SELECT date FROM bars WHERE ticker = 'INFY' ORDER BY date").fetchall()]
     assert days == [date(2024, 10, 31), MUHURAT[0], date(2024, 11, 4)]
@@ -202,9 +203,9 @@ def test_missing_exchange_calendars_fails_loudly(monkeypatch):
     calendar.exchange_calendar.cache_clear()
     monkeypatch.setitem(sys.modules, "exchange_calendars", None)  # import now raises ImportError
     try:
-        with pytest.raises(calendar.CalendarUnavailable, match="exchange_calendars cannot be imported"):
+        with pytest.raises(calendar.CalendarUnavailableError, match="exchange_calendars cannot be imported"):
             calendar.is_session({"calendar": "XNYS"}, date(2026, 10, 5))
-        with pytest.raises(calendar.CalendarUnavailable):
+        with pytest.raises(calendar.CalendarUnavailableError):
             calendar.session_open_utc({"calendar": "XNYS", "timezone": "America/New_York"}, date(2026, 10, 5))
     finally:
         calendar.exchange_calendar.cache_clear()

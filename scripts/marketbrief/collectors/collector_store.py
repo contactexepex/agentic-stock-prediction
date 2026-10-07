@@ -77,7 +77,9 @@ def refetch_since(cfg: dict, today: date) -> date:
     return day
 
 
-def complete_days(market: str, kind: str, key_col: str, required: set[str], final_before: date | None = None) -> set[str]:
+def complete_days(
+    market: str, kind: str, key_col: str, required: set[str], final_before: date | None = None
+) -> set[str]:
     """Dates whose stored rows (latest per id) cover every required key with `complete` true, plus (with
     `final_before`) every stored date before it: a key still absent then is taken as absent at the source, so the
     day is not fetched and reported again on every run (issue #27). Other dates (missing, partial, truncated) are

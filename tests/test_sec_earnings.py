@@ -189,8 +189,8 @@ def test_events_just_after_the_last_bar_still_flag_the_last_days():
     close = 100 * np.exp(np.cumsum(np.random.default_rng(7).normal(0, 0.01, len(sessions))))
     df = pd.DataFrame({"open": close, "close": close}, index=sessions)
     rc = {**ALL_ON, "ewma_lambda": 0.94, "warmup_bars": 10, "earnings_vol_multiple": 3.0}
-    extra = {"earnings": {"X": [(None, [(D("2026-10-02"), "before_open")])]}, "dividends": {"X": [(D("2026-10-01"), 1.0)]},
-             "bench": df, "index_cue": None}
+    extra = {"earnings": {"X": [(None, [(D("2026-10-02"), "before_open")])]},
+             "dividends": {"X": [(D("2026-10-01"), 1.0)]}, "bench": df, "index_cue": None}
     cols = observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, "X", 5, extra)
     assert cols["earn"].tail(4).all() and not cols["earn"].iloc[-5]     # 10-02 is the 2nd session after 09-30
     assert cols["has_div"].tail(5).all() and not cols["has_div"].iloc[-6]
@@ -204,8 +204,8 @@ def test_fitted_index_cue_on_the_last_as_of_day():
     cue_days = ev.exchange_calendar("XNYS").sessions_in_range("2026-01-01", "2026-10-01")
     bench = pd.DataFrame({"open": 100.0, "close": 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(days))))}, index=days)
     cue = pd.DataFrame({"close": 50 * np.exp(np.cumsum(rng.normal(0, 0.01, len(cue_days))))}, index=cue_days)
-    cfg = {"market": "india", "calendar": "XBOM", "timezone": "Asia/Kolkata", "index_cue": {"symbol": "SPX", "beta": "fit"},
-           "symbols": {"NIFTY50": {"role": "benchmark"}}}
+    cfg = {"market": "india", "calendar": "XBOM", "timezone": "Asia/Kolkata",
+           "index_cue": {"symbol": "SPX", "beta": "fit"}, "symbols": {"NIFTY50": {"role": "benchmark"}}}
     series = observations.index_cue_series(cfg, {"NIFTY50": bench, "SPX": cue}, {"beta_split": {"fit_sessions": 60}})
     assert series.index[-1] == days[-1] and not np.isnan(series.iloc[-1])   # SPX's 10-01 move, before India's 10-05
 

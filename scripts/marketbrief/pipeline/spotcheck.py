@@ -157,8 +157,8 @@ LESSONS_SQL = ("SELECT DISTINCT ON (id) id, prediction_id, ticker, direction, co
                "WHERE CAST(written_at AS DATE) BETWEEN ? AND ? ORDER BY id, written_at DESC")
 CLAIMS_SQL = ("SELECT c.*, v.status AS event_status FROM (SELECT DISTINCT ON (id) * FROM news_claims "
               "WHERE CAST(extracted_at AS DATE) BETWEEN ? AND ? ORDER BY id, extracted_at DESC) c "
-              "LEFT JOIN (SELECT DISTINCT ON (cluster_id) cluster_id, status FROM news_verified WHERE level = 'cluster' "
-              "ORDER BY cluster_id, as_of DESC) v USING (cluster_id) ORDER BY c.id")
+              "LEFT JOIN (SELECT DISTINCT ON (cluster_id) cluster_id, status FROM news_verified "
+              "WHERE level = 'cluster' ORDER BY cluster_id, as_of DESC) v USING (cluster_id) ORDER BY c.id")
 
 
 def week_rows(con, sql: str, start, end) -> list[dict]:

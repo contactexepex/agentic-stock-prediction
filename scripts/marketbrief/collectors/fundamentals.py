@@ -73,7 +73,7 @@ def pending_filings(periodic: list[dict], recheck: date, stored_accessions: set[
     ]
 
 
-class CompanyFactsFailed(Exception):
+class CompanyFactsError(Exception):
     """A company-facts request failed; `cik` names the CIK (issue #25: every `failed` entry names its CIK)."""
 
     def __init__(self, cik: int, error: Exception):
@@ -82,13 +82,13 @@ class CompanyFactsFailed(Exception):
 
 
 def company_facts(edgar: Edgar, ticker: str, cik: int, predecessors: dict[str, list[int]]) -> list[dict]:
-    """The facts of the ticker's mapped CIK and its predecessor CIKs (CompanyFactsFailed names a failing one)."""
+    """The facts of the ticker's mapped CIK and its predecessor CIKs (CompanyFactsError names a failing one)."""
     facts = []
     for company in [cik, *[predecessor for predecessor in predecessors.get(ticker.upper(), []) if predecessor != cik]]:
         try:
             facts += extract(edgar.json(facts_url(company)), company)
         except Exception as exc:
-            raise CompanyFactsFailed(company, exc) from exc
+            raise CompanyFactsError(company, exc) from exc
     return facts
 
 
@@ -128,7 +128,7 @@ def main() -> int:
             continue
         try:
             facts = company_facts(edgar, ticker, cik, predecessors)
-        except CompanyFactsFailed as exc:
+        except CompanyFactsError as exc:
             failed.append({COL_TICKER: ticker, "cik": exc.cik, "error": str(exc)[:ERROR_TEXT_LIMIT]})
             continue
         loaded.append(ticker)

@@ -534,7 +534,8 @@ def test_rows_stored_before_complete_count_as_complete(root):
     legacy = [{k: v for k, v in json.loads(line).items() if k != "complete"} for line in path.read_text().splitlines()]
     path.write_text("".join(json.dumps(r) + "\n" for r in legacy))                 # as stored before the field
     assert cm.collect(cfg, FakeClient(US_ROUTES[:1]), TODAY, NOW)["new"]["macro"] == 0
-    newer = {**legacy[0], "value": legacy[0]["value"] + 1, "complete": False, "first_seen_at": "2026-10-06T03:00:00+00:00"}
+    newer = {**legacy[0], "value": legacy[0]["value"] + 1, "complete": False,
+             "first_seen_at": "2026-10-06T03:00:00+00:00"}
     with path.open("a") as f:
         f.write(json.dumps(newer) + "\n")
     got = connect("us").execute("SELECT value FROM macro_series WHERE series = ? AND date = ?",
@@ -543,7 +544,8 @@ def test_rows_stored_before_complete_count_as_complete(root):
     assert collector_store.is_complete({}) and not collector_store.is_complete({"complete": False})
 
 
-def test_absent_ticker_is_not_refetched_after_the_refetch_window(root):
+@pytest.mark.usefixtures("root")
+def test_absent_ticker_is_not_refetched_after_the_refetch_window():
     """Issue #27: a day still missing a ticker after REFETCH_SESSIONS sessions is taken as absent at the source:
     not fetched and reported again on every run."""
     cfg = us_cfg()

@@ -52,3 +52,5 @@ EARNINGS_5D = "earnings · 5d"   # the note-tag breakdown row of 5-day ranges wi
 MSG_WEEK_MUST_LOOK_LIKE_2026_W40 = "--week must look like 2026-W40, got {week!r}"
 MSG_HISTORY_ABLATION_SKIPPED = "skipped (--no-history)"
 MSG_NOT_ENOUGH_BENCHMARK_BARS = "not enough benchmark bars"
+SKIP_HISTORY = "history"  # review.build: no walk-forward on stored prices (--no-history)
+SKIP_MODEL = "model"  # review.build: no signal-model backtest (--no-model-backtest)

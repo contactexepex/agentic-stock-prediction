@@ -215,9 +215,9 @@ def test_collector_summaries(root):
                                                          "failed": [{"feed": "x"}]}))
     assert "EMPTY_OUTPUT" not in codes(run("collect"), "warnings")
     assert "filled_from_nse" not in run("collect")["info"]["collect"]
+    filled = [{"ticker": "AAPL", "date": "2026-10-05", "close": 1.0}]
     (steps / "collect_prices.json").write_text(json.dumps({"collector": "prices", "market": "us", "new_bars": 5,
-                                                           "failed": [], "filled_from_nse": [
-                                                               {"ticker": "AAPL", "date": "2026-10-05", "close": 1.0}]}))
+                                                           "failed": [], "filled_from_nse": filled}))
     assert run("collect")["info"]["collect"]["filled_from_nse"] == ["AAPL 2026-10-05"]   # issue #35
 
 
@@ -247,6 +247,13 @@ def test_price_basis_warnings_surface(root):
                                                            "adjustments": [], "warnings": [msg], "failed": []}))
     w = codes(run("collect"), "warnings")["PRICE_BASIS"]
     assert w["tickers"] == ["AAPL"] and msg in w["detail"]
+    assert "PRICE_HELD_TOO_LONG" not in codes(run("collect"), "warnings")
+    (steps / "collect_prices.json").write_text(json.dumps({  # issue #36: a hold a week old is its own warning
+        "collector": "prices", "market": "us", "new_bars": 5, "adjustments": [], "warnings": [msg], "failed": [],
+        "held": ["AAPL"], "held_too_long": [{"ticker": "AAPL", "sessions": 7, "newest_stored": "2026-09-01"}]}))
+    w = codes(run("collect"), "warnings")["PRICE_HELD_TOO_LONG"]
+    assert w["tickers"] == ["AAPL"] and w["detail"] == ("prices: held with no new bar for 5 sessions or more, a human "
+                                                        "must record the split or bonus: AAPL (7 sessions)")
 
 
 # ---------- features / context ----------

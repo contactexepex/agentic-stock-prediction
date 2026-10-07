@@ -61,6 +61,7 @@ from marketbrief.collectors.price_frames import (
     frame_error,
     newest_stored_before,
     prices_file,
+    sessions_held,
     stored_bars,
     stored_overlap,
     to_stored_basis,
@@ -95,7 +96,9 @@ from marketbrief.constants.prices import (
     ERROR_TEXT_LIMIT,
     GAP_REFETCH_DAYS,
     MIN_OVERLAP,
+    HELD_ESCALATE_SESSIONS,
     MSG_HELD_NOTE,
+    MSG_HELD_TOO_LONG,
     MSG_LONGER_HISTORY_FAILED,
     MSG_SPLIT_CHECK_FAILED,
     OWN_EXCHANGE_ROLES,
@@ -104,6 +107,9 @@ from marketbrief.constants.prices import (
     SUMMARY_ADJUSTMENTS,
     SUMMARY_DROPPED_NON_SESSION,
     SUMMARY_HELD,
+    SUMMARY_HELD_TOO_LONG,
+    SUMMARY_NEWEST,
+    SUMMARY_SESSIONS,
     SUMMARY_NEW_BARS,
     SUMMARY_REBASED,
     SUMMARY_SYMBOLS,
@@ -154,6 +160,7 @@ class PriceCollector:
         self.warnings: list[str] = []
         self.rebased: list[dict] = []
         self.held: list[str] = []
+        self.held_too_long: list[dict] = []
         self.dropped: list[dict] = []
         nse_box: dict = {}
         nse_check = None
@@ -201,6 +208,10 @@ class PriceCollector:
     def hold_symbol(self, key: str, symbol: str) -> None:
         """Yahoo's frame is on a basis no source confirms: no new bar is written this run."""
         self.held.append(key)
+        newest, sessions = sessions_held(self.cfg, key, self.run.own_through or self.run.today - timedelta(days=1))
+        if sessions >= HELD_ESCALATE_SESSIONS:
+            self.warnings.append(MSG_HELD_TOO_LONG.format(key=key, sessions=sessions, newest=newest))
+            self.held_too_long.append({COL_TICKER: key, SUMMARY_SESSIONS: sessions, SUMMARY_NEWEST: str(newest)})
         entry = next((failure for failure in self.failed if failure[COL_TICKER] == key), None)
         if entry:
             entry[ENTRY_ERROR] += f"; {MSG_HELD_NOTE}"
@@ -297,6 +308,8 @@ class PriceCollector:
             summary[SUMMARY_REBASED] = self.rebased
         if self.held:
             summary[SUMMARY_HELD] = self.held
+        if self.held_too_long:
+            summary[SUMMARY_HELD_TOO_LONG] = self.held_too_long
         if self.dropped:
             summary[SUMMARY_DROPPED_NON_SESSION] = self.dropped
         if uses_nse_fallback(self.cfg):

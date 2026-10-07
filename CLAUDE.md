@@ -19,7 +19,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   a split or bonus confirmed by a Yahoo `Stock Splits` row, or for India by NSE's bhavcopy, is recorded
   once in `data/<market>/adjustments/` (`marketbrief/analytics/price_adjustments.py`) and applied on read by the `ohlc`/`bars`
   views, raw bars in `ohlc_raw`/`bars_raw`; an unconfirmed re-base is a `warnings` entry and holds
-  that symbol's new bars (`held`); a wrong record is cancelled by a later one with `supersedes`;
+  that symbol's new bars (`held`; 5+ sessions without a new bar: `held_too_long`, gate warning
+  `PRICE_HELD_TOO_LONG`); a wrong record is cancelled by a later one with `supersedes`
+  (`adjustment_records.py` lists the calls and ranges made while the wrong row was active);
   DESIGN.md section 3), `collect_quotes`, `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02, every 2.02 stored as filed and kept only when it is a
   quarter's results release when read (`event_history.results_filter`, anchored on stored 10-Q/10-K `periodic_report`

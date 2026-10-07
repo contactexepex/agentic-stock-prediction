@@ -5,7 +5,7 @@
   market config's `holidays` are always closed (exchange circulars the library lacks); dates under
   `special_sessions` always trade (NSE's Diwali Muhurat sessions on a holiday; their open and close
   are taken as the regular hours). Without the exchange_calendars package nothing falls back
-  silently: CalendarUnavailable is raised.
+  silently: CalendarUnavailableError is raised.
 - Market events come from config/events.yaml (rules + fixed dates) plus company earnings and
   ex-dividend dates collected into data/<market>/events/ by the events collector.
 """
@@ -58,7 +58,7 @@ from marketbrief.constants.config_keys import (
 from marketbrief.core import paths
 
 
-class CalendarUnavailable(RuntimeError):
+class CalendarUnavailableError(RuntimeError):
     """The exchange_calendars package cannot be imported (never a silent Monday-Friday fallback, issue #43)."""
 
 
@@ -68,7 +68,7 @@ def exchange_calendar(code: str):
     try:
         import exchange_calendars
     except ImportError as exc:
-        raise CalendarUnavailable(MSG_NO_EXCHANGE_CALENDARS.format(error=exc)) from exc
+        raise CalendarUnavailableError(MSG_NO_EXCHANGE_CALENDARS.format(error=exc)) from exc
 
     return exchange_calendars.get_calendar(code, start=CALENDAR_START)
 
@@ -93,7 +93,7 @@ def calendar_covers(cfg: dict, day: date) -> bool:
     try:
         calendar = exchange_calendar(cfg[CFG_CALENDAR])
         return calendar.first_session.date() <= day <= calendar.last_session.date()
-    except CalendarUnavailable:
+    except CalendarUnavailableError:
         raise
     except Exception:
         return False
@@ -136,7 +136,7 @@ def _session_edge_utc(cfg: dict, day: date, edge: str) -> datetime:
             return edge_time.to_pydatetime().astimezone(timezone.utc)
         zone = ZoneInfo(str(calendar.tz))
         local_time = (calendar.open_times if edge == EDGE_OPEN else calendar.close_times)[-1][1]
-    except CalendarUnavailable:
+    except CalendarUnavailableError:
         raise
     except Exception:
         zone, local_time = ZoneInfo(cfg[CFG_TIMEZONE]), DEFAULT_OPEN if edge == EDGE_OPEN else DEFAULT_CLOSE

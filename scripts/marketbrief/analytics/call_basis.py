@@ -13,7 +13,13 @@ from __future__ import annotations
 import pandas as pd
 
 from marketbrief.constants.model import LABEL_CLOSE_TO_CLOSE, LABEL_CONVENTIONS, LABEL_OPEN_TO_CLOSE
-from marketbrief.constants.scoring import BASIS_SHORT, MSG_UNKNOWN_BASIS, SETTING_BASIS, SETTING_CALL_SCORING, SETTING_FROM
+from marketbrief.constants.scoring import (
+    BASIS_SHORT,
+    MSG_UNKNOWN_BASIS,
+    SETTING_BASIS,
+    SETTING_CALL_SCORING,
+    SETTING_FROM,
+)
 from marketbrief.core.settings import load_settings
 from marketbrief.model.labels import end_offset
 

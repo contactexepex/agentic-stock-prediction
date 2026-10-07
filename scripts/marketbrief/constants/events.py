@@ -54,8 +54,10 @@ MSG_NO_DIVIDENDS = "no dividends returned ({why})"
 MSG_STORED_DIVIDENDS = "{count} stored"
 MSG_CALENDAR_LISTS_EX_DIVIDEND = "calendar lists ex-dividend {day}"
 MSG_ESTIMATED_DIVIDEND = " (est. {amount:g}, last dividend)"
-MSG_YAHOO_DATE_DROPPED = ("yfinance earnings date {ticker} {day} dropped: it falls between two NSE results dates a quarter "
-                          "apart (check NSE if a quarter looks misdated)")
+MSG_YAHOO_DATE_DROPPED = (
+    "yfinance earnings date {ticker} {day} dropped: it falls between two NSE results dates a quarter "
+    "apart (check NSE if a quarter looks misdated)"
+)
 MSG_PERIODIC_REPORT = " ({form}, period {period})"
 MSG_INTEGRATED_LIST_PARTIAL = "{symbol}: integrated filings list {rows} of {total} rows"
 MSG_LATE_QUARTERS = "{ticker}: {count} quarter(s) first filed after the SEBI deadline, not used"

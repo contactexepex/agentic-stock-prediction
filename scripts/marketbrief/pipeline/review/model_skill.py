@@ -100,8 +100,10 @@ def markdown_lines(model: dict) -> list[str]:
             lines.append(f"| {row['key']} | – | – | – | – | – | – | {row.get('skipped')} |")
             continue
         low, high = row.get("auc95") or [None, None]
-        lines.append(f"| {row['key']} | {row['n']} | {row['brier']} | {row['brier_base_rate']} | {row['brier_skill']} | "
-                     f"{row['auc']} | {low} to {high} | {'yes' if row['skill'] else 'no'} |")
+        lines.append(
+            f"| {row['key']} | {row['n']} | {row['brier']} | {row['brier_base_rate']} | {row['brier_skill']} | "
+            f"{row['auc']} | {low} to {high} | {'yes' if row['skill'] else 'no'} |"
+        )
     lines += ["", "Paper long strategy (open to close, after costs) minus each baseline, mean % per date with its "
               "95% interval:", "",
               "| Horizon | Threshold | Positions | Baseline | Dates | Mean % | 95% | Verdict |",

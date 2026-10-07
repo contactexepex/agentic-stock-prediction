@@ -250,7 +250,8 @@ def drop_urls(tmp_path: Path, *urls: str) -> None:
 def test_failed_documents_name_their_cik(tmp_path):
     """Issue #25: a failed Form 4 or Schedule 13 document is listed with the CIK whose folder holds it."""
     root, cfg = setup(tmp_path)
-    drop_urls(tmp_path, f"{ARCH}/34088/000003408826000111/form4.xml", f"{ARCH}/34088/000210011926000200/primary_doc.xml")
+    drop_urls(tmp_path, f"{ARCH}/34088/000003408826000111/form4.xml",
+              f"{ARCH}/34088/000210011926000200/primary_doc.xml")
     ins, stk = run("collect_insiders.py", root, cfg), run("collect_stakes.py", root, cfg)
     assert [(f["ticker"], f["cik"], f["accession"]) for f in ins["failed"]] == [("XOM", PRED, "0000034088-26-000111")]
     assert [(f["ticker"], f["cik"], f["accession"]) for f in stk["failed"]] == [("XOM", PRED, "0002100119-26-000200")]

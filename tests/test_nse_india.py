@@ -157,7 +157,8 @@ def test_nse_primary_sources_on_real_responses(tmp_path):
     results = ctx.stdout.split("## Latest quarterly results")[1].split("\n## ")[0]
     with_results = sorted({x["ticker"] for x in rows(root, "financials")})
     assert f"y/y growth is blank for {len(with_results)} ticker(s)" in results
-    pending = [t for t in yaml.safe_load((cfg / "markets" / "india.yaml").read_text())["tickers"] if t not in with_results]
+    tickers = yaml.safe_load((cfg / "markets" / "india.yaml").read_text())["tickers"]
+    pending = [t for t in tickers if t not in with_results]
     assert f"Quarterly results not stored yet for {len(pending)} of" in results and ", ".join(pending) in results
     assert "Shareholding (promoter, public, pledges) not stored yet for" in results
     assert "## Delivery % (latest session vs average of the 1 stored sessions before (up to 20" in ctx.stdout

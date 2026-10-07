@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from marketbrief.constants.prices import HELD_ESCALATE_SESSIONS, SUMMARY_HELD_TOO_LONG
 from marketbrief.constants.validation import (
     FETCH_COL,
     MSG_BAD_CLOSE_ON_RECENT_BAR,
@@ -27,6 +28,7 @@ from marketbrief.constants.validation import (
     MSG_NOT_FETCHED_NO_ROWS,
     MSG_NOT_FETCHED_STALE,
     MSG_PRICE_BASIS_WARNINGS,
+    MSG_PRICE_HELD_TOO_LONG,
     MSG_ZERO_ROWS_WITHOUT_REASON,
     TRADING_DATE_KINDS,
 )
@@ -225,8 +227,8 @@ def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, v
 
 def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict) -> dict:
     """Collector summaries saved by the routine (work/steps/<collector>.json); the prices summary's bars filled
-    from NSE's bhavcopy are returned as `filled_from_nse` (issue #35: for the report's data_quality); without them, today's
-    row counts per kind stand in."""
+    from NSE's bhavcopy are returned as `filled_from_nse` (issue #35: for the report's data_quality); without them,
+    today's row counts per kind stand in."""
     seen = {}
     steps = work_dir() / "steps"
     for summary_path in sorted(steps.glob("collect_*.json")) if steps.exists() else []:
@@ -269,6 +271,16 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
                 MSG_PRICE_BASIS_WARNINGS.format(count=len(warning_texts), warnings="; ".join(warning_texts[:5])[:600]),
                 [warning.split(":", 1)[0] for warning in warning_texts if warning.split(":", 1)[0] in cfg["tickers"]],
             )
+        if name == "prices" and collector_summary.get(SUMMARY_HELD_TOO_LONG):  # issue #36: escalate old holds
+            long_held = collector_summary[SUMMARY_HELD_TOO_LONG]
+            res.warn(
+                "PRICE_HELD_TOO_LONG",
+                MSG_PRICE_HELD_TOO_LONG.format(
+                    sessions_min=HELD_ESCALATE_SESSIONS,
+                    held=", ".join(f"{entry['ticker']} ({entry['sessions']} sessions)" for entry in long_held),
+                ),
+                [entry["ticker"] for entry in long_held],
+            )
         key = (validate_config.get("expect_output") or {}).get(name)
         explained = (
             collector_summary.get("failed")
@@ -282,5 +294,6 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
         for kind in validate_config.get("expect_output") or {}:
             if counts.get(kind, 0) == 0 and kind in counts:
                 res.warn("EMPTY_OUTPUT", MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR.format(kind=kind))
-    filled = [f"{bar.get('ticker')} {bar.get('date')}" for bar in (seen.get("prices") or {}).get("filled_from_nse") or []]
+    filled_bars = (seen.get("prices") or {}).get("filled_from_nse") or []
+    filled = [f"{bar.get('ticker')} {bar.get('date')}" for bar in filled_bars]
     return {"summaries": sorted(seen), "rows_today": counts, **({"filled_from_nse": filled} if filled else {})}

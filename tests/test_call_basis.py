@@ -57,7 +57,8 @@ def outcomes(root: Path) -> dict[str, dict]:
 
 
 def test_switch_reads_settings_and_defaults_to_close_to_close():
-    assert call_basis.switch({}) is None and call_basis.switch({"call_scoring": {"label_basis": "open_to_close"}}) is None
+    assert call_basis.switch({}) is None
+    assert call_basis.switch({"call_scoring": {"label_basis": "open_to_close"}}) is None
     rule = call_basis.switch({"call_scoring": {"label_basis": "open_to_close", "from": SWITCH}})
     assert rule == (LABEL_OPEN_TO_CLOSE, pd.Timestamp(SWITCH))
     assert call_basis.basis_for("2026-09-14T23:59:59+00:00", rule) == LABEL_CLOSE_TO_CLOSE
