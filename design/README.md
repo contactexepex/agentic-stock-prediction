@@ -32,7 +32,7 @@ cloud session, then one consolidation session turns them into the production gen
 ## Pages
 | Page | Status |
 |---|---|
-| `system/` Material 3 design system | done: tokens, components, icons, style guide (`design/system/README.md`) |
+| `system/` "terminal light" design system | done: tokens, components, icons, style guide (`design/system/README.md`) |
 | `decision/` Stock decision page | layout approved by the owner; recoloured to the design system; `build.py --market --ticker --out` regenerates it for any watchlist ticker (examples: HDFCBANK, ICICIBANK, AAPL) |
 | `home/` Home (Today): both markets, signals, movers with causes, the news card (last 24 hours: market-wide stories, company stories that can carry a call, what was set aside), week's events with eight weeks behind a click, run status | approved; news card added 7 Oct |
 | `watchlist/` Watchlist (20 companies per market, sortable, sector-grouped) | built, awaiting the owner's approval |
