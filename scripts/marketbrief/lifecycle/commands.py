@@ -18,7 +18,7 @@ from marketbrief.lifecycle.constants import (
 )
 from marketbrief.lifecycle.events import stored_events
 from marketbrief.lifecycle.loader import companies_as_of
-from marketbrief.lifecycle.store import command_row, iso, load_lifecycle_config, log_command, store_rows
+from marketbrief.lifecycle.store import command_row, iso, load_lifecycle_config, log_command_row, store_rows
 from marketbrief.lifecycle.validator import (
     effective_time,
     event_row,
@@ -46,7 +46,7 @@ def finish(request: dict, received, result: dict, outcome: str, refusal: str | N
     message = "; ".join(result.get("errors") or []) or None
     row = command_row(request["market"], received, logged, outcome, refusal_code=refusal, message=message,
                       record_ids=record_ids, completed=clock())
-    stored = log_command(request["market"], row)
+    stored = log_command_row(request["market"], row)
     return {**result, "command_id": stored["id"], "command_record": stored}
 
 

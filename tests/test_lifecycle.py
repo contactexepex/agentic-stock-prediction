@@ -681,3 +681,13 @@ def test_onboard_workflow_imports_company_commands_then_paper_trades():
     assert company < trades and "status=$?" in script[trades:]
     env = workflow["jobs"]["import"]["env"]
     assert {"MOTHERDUCK_INBOX_TOKEN", "SEC_USER_AGENT", "SLACK_BOT_TOKEN"} <= set(env)
+
+
+def test_log_command_keeps_returning_the_id():
+    """B2's paper-trade importer stores log_command's return value as its command_log_id (a string)."""
+    from marketbrief.lifecycle.store import command_row, log_command
+
+    received = datetime(2026, 10, 7, 12, tzinfo=timezone.utc)
+    row = command_row("us", received, {"idempotency_key": "trade-key-001", "channel": "slack"}, "accepted")
+    first, second = log_command("us", row), log_command("us", row)
+    assert isinstance(first, str) and second == first + "-2"
