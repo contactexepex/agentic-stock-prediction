@@ -106,3 +106,37 @@ def test_stored_holiday_rows_are_excluded_on_read():
     assert ret == pytest.approx(1020.0 / 1000.0 - 1)
     numbers = con.execute("SELECT rn FROM bars WHERE ticker = 'INFY' ORDER BY date").fetchall()
     assert [row[0] for row in numbers] == [1, 2]
+
+
+def bar_row(close: float, flat: bool = True, volume: int = 0) -> pd.Series:
+    """A yfinance row; flat = open = high = low = close."""
+    spread = 0.0 if flat else 1.0
+    values = {"Open": close, "High": close + spread, "Low": close - spread, "Close": close, "Adj Close": close}
+    return pd.Series({**values, "Volume": volume})
+
+
+def collector_for(market: str):
+    """A PriceCollector shell with the real config of `market` (drop_reason reads only the config)."""
+    from marketbrief.collectors.prices import PriceCollector
+    from marketbrief.core.market_config import load_market
+
+    shell = object.__new__(PriceCollector)
+    shell.cfg = load_market(market)
+    return shell
+
+
+def test_drop_reason_rules_for_the_us_and_for_sector_indices():
+    us, india = collector_for("us"), collector_for("india")
+    labor_day, memorial_day, session = date(2026, 9, 7), date(2026, 5, 25), date(2026, 9, 8)
+    not_a_session = "not a session of the market calendar"
+    assert us.drop_reason("SPY", labor_day, bar_row(500)) == not_a_session  # benchmark
+    assert us.drop_reason("AAPL", labor_day, bar_row(200)) == not_a_session  # stock
+    assert us.drop_reason("VIX", memorial_day, bar_row(15, flat=False)) == not_a_session  # vol index, not flat
+    assert us.drop_reason("ES", labor_day, bar_row(5000, flat=False, volume=10)) is None  # cue: futures trade
+    assert us.drop_reason("US10Y", labor_day, bar_row(4.1)) is None  # factor keeps its own calendar
+    assert us.drop_reason("AAPL", session, bar_row(200)) == "flat bar with zero volume"
+    assert us.drop_reason("AAPL", session, bar_row(200, flat=False, volume=5)) is None
+    assert us.drop_reason("SPY", session, bar_row(500)) is None  # an index with volume 0 on a session
+    assert india.drop_reason("NIFTYBANK", date(2026, 10, 2), bar_row(55000)) == not_a_session  # sector_etf
+    assert india.drop_reason("NIFTYBANK", date(2026, 10, 1), bar_row(55000)) is None
+    assert india.drop_reason("SPX", date(2026, 10, 2), bar_row(6000)) is None

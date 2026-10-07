@@ -15,8 +15,8 @@ ORDER BY id, detected_at;
 
 -- Daily bars as stored (one per ticker per date, latest collection wins), minus the bars Yahoo
 -- serves on days the market's own exchange is closed (a flat zero-volume bar on an exchange
--- holiday, issue #40). own_closed_days (ticker, date) is built by common.connect from the market
--- calendar for the market's stocks and its own-exchange indices (benchmark, vol index, sector
+-- holiday, issue #40). own_closed_days (ticker, date) is built by marketbrief.core.database.connect from
+-- the market calendar for the market's stocks and its own-exchange indices (benchmark, vol index, sector
 -- indices); cues and factors trade on other calendars and are never listed. Stored rows stay.
 CREATE OR REPLACE VIEW ohlc_raw AS
 SELECT ticker, date, open, high, low, close, adj_close, volume, collected_at

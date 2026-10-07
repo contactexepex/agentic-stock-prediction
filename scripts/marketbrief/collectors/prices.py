@@ -205,11 +205,12 @@ class PriceCollector:
             self.failed.append({COL_TICKER: key, ENTRY_YAHOO: symbol, ENTRY_ERROR: MSG_HELD_NOTE})
 
     def drop_reason(self, key: str, day: date, row) -> str | None:
-        """Why Yahoo's bar is no real session bar, or None. Yahoo serves a flat zero-volume bar (open = high = low =
-        close = the previous close) for an exchange holiday. A stock or an index of the market's own exchange
-        (benchmark, vol index, sector index) is dropped on a day that is not a session of the market calendar; a
-        stock is also dropped for a flat bar with zero volume (indices report volume 0 legitimately; cues and
-        factors trade on other exchanges' calendars)."""
+        """Why Yahoo's bar is no real session bar, or None. Yahoo serves a bar for an exchange holiday (stocks and
+        indices: a flat zero-volume bar, open = high = low = close = the previous close; the VIX: a bar that is not
+        flat). A stock or an index of the market's own exchange (benchmark, vol index, sector index) is dropped on a
+        day that is not a session of the market calendar, flat or not. A stock is also dropped for a flat bar with
+        zero volume on any day (indices report volume 0 legitimately; cues and factors trade on other exchanges'
+        calendars and are never dropped by the calendar)."""
         is_stock = key in self.cfg[CFG_TICKERS]
         own_exchange = is_stock or self.cfg[CFG_SYMBOLS].get(key, {}).get(META_ROLE) in OWN_EXCHANGE_ROLES
         if own_exchange and not is_session(self.cfg, day):

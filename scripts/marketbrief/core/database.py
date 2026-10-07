@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
@@ -93,32 +92,30 @@ def register_news_retag(con: duckdb.DuckDBPyConnection, market: str) -> None:
     )
 
 
-def own_closed_days(market: str, first: date, last: date) -> list[tuple[str, date]]:
-    """(ticker, date) for every day of first..last that is no session of the market's own exchange, for each
-    stock and own-exchange index of the config (cues and factors trade on other calendars). No config: none."""
-    try:
-        cfg = load_market(market)
-    except SystemExit:  # no market config (some tests): nothing is excluded
-        return []
-    keys = list(cfg[CFG_TICKERS]) + [
+def own_exchange_keys(cfg: dict) -> list[str]:
+    """The config's stocks and own-exchange indices (cues and factors trade on other calendars)."""
+    return list(cfg[CFG_TICKERS]) + [
         key for key, meta in cfg[CFG_SYMBOLS].items() if meta.get(META_ROLE) in OWN_EXCHANGE_ROLES
     ]
-    closed = [
-        first + timedelta(days=offset)
-        for offset in range((last - first).days + 1)
-        if not is_session(cfg, first + timedelta(days=offset))
-    ]
-    return [(key, day) for key in keys for day in closed]
 
 
 def register_own_closed_days(con: duckdb.DuckDBPyConnection, market: str) -> None:
-    """Create the `own_closed_days` table the ohlc_raw view reads (issue #40)."""
+    """Create the `own_closed_days` table (ticker, date) the ohlc_raw view reads (issue #40): every stored price
+    date that is no session of the market's own exchange, for each stock and own-exchange index of the config.
+    Built set-based from the distinct stored dates. No market config (some tests): the table is empty."""
     con.execute("CREATE TABLE own_closed_days (ticker VARCHAR, date DATE)")
-    first, last = con.execute("SELECT min(date), max(date) FROM prices").fetchone()
-    if first is not None:
-        rows = own_closed_days(market, first, last)
-        if rows:
-            con.executemany("INSERT INTO own_closed_days VALUES (?, ?)", rows)
+    try:
+        cfg = load_market(market)
+    except SystemExit:  # no market config (some tests): nothing is excluded
+        return
+    stored = [row[0] for row in con.execute("SELECT DISTINCT date FROM prices").fetchall()]
+    closed = [day for day in stored if not is_session(cfg, day)]
+    if closed:
+        con.execute(
+            "INSERT INTO own_closed_days SELECT k.ticker, d.day FROM (SELECT unnest(?) AS ticker) k "
+            "CROSS JOIN (SELECT unnest(?) AS day) d",
+            [own_exchange_keys(cfg), closed],
+        )
 
 
 def connect(market: str) -> duckdb.DuckDBPyConnection:

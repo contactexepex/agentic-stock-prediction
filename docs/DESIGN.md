@@ -93,6 +93,19 @@ price vs 20-day high, ATR(14), 10-day realized vol, Bollinger width, OBV trend, 
 **Regime:** Calm / Trending / Event-heavy / Unstable from VIX, index 5-day return and volatility,
 and the event calendar.
 
+**Closed-day bars (issue #40, added 2026-10-07).** Yahoo serves a bar for exchange holidays: a flat
+zero-volume bar for stocks and indices (all 24 India symbols on 2026-10-02, Gandhi Jayanti), a non-flat
+one for the VIX (US Memorial Day, Labor Day 2026). It would be a fake 0% day in returns, indicators and
+ranges. `collect_prices.py` therefore does not store a stock or own-exchange index bar (benchmark, vol
+index, sector index) on a day that is no session of the market calendar, and no flat zero-volume stock
+bar on any day; both are listed in the summary's `dropped_non_session`. Cues and factors follow other
+exchanges' calendars and are kept. Bars stored before stay (append-only) and are left out on read:
+`connect` builds a table `own_closed_days (ticker, date)` (each own-exchange ticker x each stored price
+date that is no session of the market calendar) and the `ohlc_raw` view, which `ohlc`, `bars` and
+`returns` read, excludes those rows. Known limits: India's Diwali Muhurat sessions are closed days in
+the calendar library, so their bars are dropped too, and stored flat zero-volume stock bars on real
+sessions are not removed on read.
+
 **Price basis: splits and bonus issues (issue #31, added 2026-10-06).** yfinance's `Close`
 (auto_adjust=False) is not dividend-adjusted but is split/bonus-adjusted as of the collection time,
 and a stored bar is written once. After a future split or bonus the bars stored before its ex-date
