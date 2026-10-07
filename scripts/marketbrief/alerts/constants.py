@@ -13,6 +13,8 @@ POST_CORRECTION = "correction"
 POST_BRIEF = "brief"   # notify_slack.py's daily brief, posted into the day's thread (owner, 2026-10-07)
 
 ENV_SLACK_BOT_TOKEN = "SLACK_BOT_TOKEN"
+ENV_SLACK_WEBHOOK_URL = "SLACK_WEBHOOK_URL"   # fallback without the token: unthreaded messages (owner, 2026-10-07)
+WEBHOOK_TS_PREFIX = "webhook"   # ledger ts of a webhook post (a webhook answers no ts; never a thread)
 SETTING_CHANNEL_ID = "slack_channel_id"
 SLACK_API = "https://slack.com/api/"
 
@@ -65,6 +67,7 @@ ONBOARDING_RESULT_TEXT = {
     "failed": "Failed",
 }
 
-MSG_NO_TOKEN = "SLACK_BOT_TOKEN not set: nothing posted (use --dry-run to write the messages to work/)"
+MSG_NO_TOKEN = ("SLACK_BOT_TOKEN and SLACK_WEBHOOK_URL not set: nothing posted (use --dry-run to write the messages "
+                "to work/)")
 MSG_NO_CHANNEL = "slack_channel_id missing in config/settings.yaml"
 MSG_NOTHING = "nothing to post"

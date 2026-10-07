@@ -1,14 +1,19 @@
-"""The owner's own costs in Slack (owner decisions 50-51, relayed by the orchestrator on 2026-10-07): each morning
-pick says whether its expected move clears the owner's round-trip cost, and close results show the net result
-after the owner's costs beside the market-cost result. B2 stores these fields. Until B2 documents them in
-docs/ws/b2.md, the names below are this session's assumption (docs/ws/b6.md): a row without them shows no
-cost text."""
+"""The owner's own costs in Slack (owner decisions 50-51, relayed by the orchestrator on 2026-10-07; the viability
+test chosen by the owner in this session on 2026-10-07): each morning pick says whether it is viable at the owner's
+costs, and close results show the net result after the owner's costs beside the market-cost result.
+
+Viable = expected gain after your cost > 0, with the head-to-head formula of F1.7.3 and the owner's round-trip
+cost in place of the market costs: p x move - (1 - p) x loss - your_cost (all % of the amount; move = target vs
+the last close, loss = the drop to the 80% range's low). Slack computes this itself from stored numbers; B2's
+`cost_viable` (move > cost) is not used.
+
+B2 stores the owner's costs. Until B2 documents its names in docs/ws/b2.md, the names below are this session's
+assumption (docs/ws/b6.md): a row without them shows no cost text."""
 from __future__ import annotations
 
 from marketbrief.alerts import text as fmt
 
 YOUR_COST_PCT = "your_cost_pct"      # predictions and picks: the owner's round-trip cost, % of the amount
-COST_VIABLE = "cost_viable"          # predictions and picks: the predicted move exceeds that cost
 YOUR_COSTS = "your_costs"            # settled trades: the owner's round-trip costs in the market currency
 YOUR_NET_PNL = "your_net_pnl"        # settled trades: net profit after the owner's costs
 YOUR_RETURN_PCT = "your_return_pct"  # settled trades: that net profit as % of the amount
@@ -19,38 +24,53 @@ def first_cost(rows: list[dict]) -> float | None:
     return next((float(r[YOUR_COST_PCT]) for r in rows if not fmt.missing(r.get(YOUR_COST_PCT))), None)
 
 
-def expected_move_pct(row: dict) -> float | None:
-    """The pick's expected move: the buyers' average target against the last close, in % (2 decimals)."""
-    if fmt.missing(row.get("avg_target")) or fmt.missing(row.get("base_close")) or not row["base_close"]:
+def gain_after_your_cost(prob_up, move_pct, loss_pct, cost_pct) -> float | None:
+    """p x move - (1 - p) x loss - your cost, in % (2 decimals); None when a number is missing."""
+    if any(fmt.missing(v) for v in (prob_up, move_pct, loss_pct, cost_pct)):
         return None
-    return round((row["avg_target"] / row["base_close"] - 1) * 100, 2)
+    return round(prob_up * move_pct - (1 - prob_up) * loss_pct - cost_pct, 2)
 
 
-def pick_viable(row: dict) -> bool | None:
-    """Whether the pick's expected move exceeds the owner's cost; None without both numbers."""
-    move = expected_move_pct(row)
-    return None if move is None or row.get(YOUR_COST_PCT) is None else move > row[YOUR_COST_PCT]
+def pick_parts(row: dict) -> tuple[float | None, float | None]:
+    """A pick's move and loss in %: the buyers' average target and average 80% low against the last close."""
+    base = row.get("base_close")
+    if fmt.missing(base) or not base:
+        return None, None
+    move = None if fmt.missing(row.get("avg_target")) else (row["avg_target"] / base - 1) * 100
+    loss = None if fmt.missing(row.get("avg_lo80")) else (1 - row["avg_lo80"] / base) * 100
+    return move, loss
+
+
+def pick_gain(row: dict) -> float | None:
+    """The pick's expected gain after your cost, from the buyers' average probability, target and 80% low."""
+    move, loss = pick_parts(row)
+    return gain_after_your_cost(row.get("avg_prob_up"), move, loss, row.get(YOUR_COST_PCT))
+
+
+def verdict(gain: float | None, cost) -> str:
+    """'expected gain -0.74% after your cost 0.30% — not viable' (or '— viable'); '' without the numbers."""
+    if gain is None:
+        return ""
+    return (f"expected gain {fmt.pct(gain)} after your cost {float(cost):.2f}% — "
+            f"{'viable' if gain > 0 else 'not viable'}")
 
 
 def pick_cost_text(row: dict) -> str:
-    """' Expected +3.10% vs your cost 2.70% — viable.' / '… — not viable at your costs.' / ''."""
-    viable = pick_viable(row)
-    if viable is None:
-        return ""
-    verdict = "viable" if viable else "not viable at your costs"
-    return f" Expected {fmt.pct(expected_move_pct(row))} vs your cost {row[YOUR_COST_PCT]:.2f}% — {verdict}."
+    """' Expected gain -0.74% after your cost 0.30% — not viable.' for a pick line, '' without the numbers."""
+    text = verdict(pick_gain(row), row.get(YOUR_COST_PCT))
+    return f" {text[0].upper()}{text[1:]}." if text else ""
 
 
 def head_to_head_cost_text(pick: dict) -> str:
-    """'; viable at your costs' / '; not viable at your costs' from the pick's stored flag, else ''."""
-    flag = pick.get(COST_VIABLE)
-    if flag is None:
-        return ""
-    return "; viable at your costs" if flag else "; not viable at your costs"
+    """'; expected gain -1.44% after your cost 0.30% — not viable' from the pick's stored parts, else ''."""
+    gain = gain_after_your_cost(pick.get("prob_up"), pick.get("move_pct"), pick.get("loss_pct"),
+                                pick.get(YOUR_COST_PCT))
+    text = verdict(gain, pick.get(YOUR_COST_PCT))
+    return f"; {text}" if text else ""
 
 
 def trade_cost_text(row: dict, currency: str) -> str:
-    """'; after your costs (2.80) net +$1.80 (+0.18%)' when the row has the owner's costs, else ''."""
+    """'; after your costs ($2.80) net +$4.14 (+0.41%)' when the row has the owner's costs, else ''."""
     if fmt.missing(row.get(YOUR_NET_PNL)):
         return ""
     return (f"; after your costs ({fmt.money(currency, row.get(YOUR_COSTS))}) net"
@@ -58,6 +78,9 @@ def trade_cost_text(row: dict, currency: str) -> str:
 
 
 def your_net_total(rows: list[dict]) -> float | None:
-    """Sum of the owner's net results of settled rows; None when no row has one."""
-    values = [r[YOUR_NET_PNL] for r in rows if r.get("status") == "settled" and not fmt.missing(r.get(YOUR_NET_PNL))]
-    return round(sum(values), 2) if values else None
+    """Sum of the owner's net results of the settled rows; None unless every settled row has one (a partial sum
+    would mislead)."""
+    done = [r for r in rows if r.get("status") == "settled"]
+    if not done or any(fmt.missing(r.get(YOUR_NET_PNL)) for r in done):
+        return None
+    return round(sum(r[YOUR_NET_PNL] for r in done), 2)
