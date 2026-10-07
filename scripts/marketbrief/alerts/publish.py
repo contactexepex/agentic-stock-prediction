@@ -20,6 +20,7 @@ from marketbrief.alerts.constants import (
     MSG_NO_CHANNEL,
     MSG_NO_TOKEN,
     SETTING_CHANNEL_ID,
+    WEBHOOK_TS_PREFIX,
     WORK_DIR,
 )
 from marketbrief.alerts.ledger import Ledger
@@ -48,7 +49,7 @@ class Publisher:
     """Posts messages through a client and records each part in the ledger."""
 
     def __init__(self, market: str, client, ledger: Ledger, channel: str):
-        """client: SlackClient or DryRunClient."""
+        """client: SlackClient, WebhookClient or DryRunClient."""
         self.market, self.client, self.ledger, self.channel = market, client, ledger, channel
 
     def publish(self, msg: Message) -> dict:
@@ -59,20 +60,23 @@ class Publisher:
                    "posted": [], "skipped": sorted(f"{msg.post_key}#{n}" for n in done)}
         expected = max((int(r["parts"]) for r in done.values()), default=0)
         if done and (len(done) >= expected or len(parts) != expected):
-            summary["thread_ts"] = done[min(done)].get("thread_ts") or done[min(done)]["ts"]
+            root = done[min(done)].get("thread_ts") or done[min(done)]["ts"]
+            summary["thread_ts"] = None if str(root).startswith(WEBHOOK_TS_PREFIX) else root   # never a thread
             missing = [n for n in range(1, expected + 1) if n not in done]
             if missing:   # partly posted, and the text now splits differently: left as is, but said so
                 summary.update({"incomplete": True, "missing_parts": missing})
             return summary   # posted before (a changed text is not posted again)
+        threaded = self.client.mode != WebhookClient.mode   # a webhook post is never a thread
         anchor = msg.reply_to or (self.ledger.thread_ts(msg.thread_key) if msg.thread_key else None)
+        anchor = anchor if threaded else None
         for number, part in enumerate(parts, 1):
             if number in done:
-                anchor = anchor or done[number]["ts"]
+                anchor = anchor or (done[number]["ts"] if threaded else None)
                 continue
             ts = self.client.post_message(self.channel, part, anchor)
             self.ledger.append(self.row(msg, number, len(parts), part, ts, anchor))
             summary["posted"].append(f"{msg.post_key}#{number}")
-            anchor = anchor or ts
+            anchor = anchor or (ts if threaded else None)
         summary["thread_ts"] = anchor
         return summary
 
