@@ -231,9 +231,9 @@ def stored(root: Path, kind: str) -> list[dict]:
 def trade_view(root: Path) -> dict[str, dict]:
     """{trade_id: trade_checks row merged with its details row}: a column from trade_checks when set, else from the
     details row, as the view trade_check_rows does (issue #78: trade_checks gained the details' columns)."""
-    details = {row["id"]: row for row in stored(root, "trade_check_details")}
-    return {row["trade_id"]: {**details[row["id"]], **{k: v for k, v in row.items() if v is not None
-                                                        or k not in details[row["id"]]}}
+    details = {row["id"]: row for row in stored(root, "trade_check_details")}   # only rows written before #78
+    return {row["trade_id"]: {**details.get(row["id"], {}), **{k: v for k, v in row.items() if v is not None
+                                                                or k not in details.get(row["id"], {})}}
             for row in stored(root, "trade_checks")}
 
 
@@ -359,7 +359,7 @@ def test_idempotent_rerun_and_alerts_once_per_session(market):
     root, cfg, settings = market
     first = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
     counts = {kind: len(stored(root, kind)) for kind in
-              ("trade_checks", "trade_check_details", "intraday_alerts", "intraday_checks", "intraday_runs")}
+              ("trade_checks", "intraday_alerts", "intraday_checks", "intraday_runs")}
     again = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK + timedelta(seconds=20))
     assert again["status"] == "duplicate" and again["written"] == 0
     assert counts == {kind: len(stored(root, kind)) for kind in counts}
@@ -424,9 +424,13 @@ def test_payload_rows_pass_the_schema_gate_and_india_price_skip(market, monkeypa
     run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
     monkeypatch.delenv("MB_NOW")
     now = pd.Timestamp(CHECK) + pd.Timedelta(minutes=5)
-    for kind in ("trade_checks", "trade_check_details", "intraday_alerts", "intraday_checks", "intraday_runs"):
+    for kind in ("trade_checks", "intraday_alerts", "intraday_checks", "intraday_runs"):
         rows = stored(root, kind)
         assert rows and schema_problems(kind, rows, False, now, timedelta(minutes=5)) == [], kind
+    # issue #78: one trade_checks row per open trade, its detail columns filled; no trade_check_details row any more
+    assert stored(root, "trade_check_details") == []
+    checks = stored(root, "trade_checks")
+    assert all(row["quality"] and row["entry_source"] and row["notes"] is not None for row in checks)
     from marketbrief.core.schemas import SCHEMAS
 
     assert all(list(row) == list(SCHEMAS["trade_checks"][1]) for row in stored(root, "trade_checks"))   # W1 format

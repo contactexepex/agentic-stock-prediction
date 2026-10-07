@@ -56,7 +56,8 @@ INTRADAY_SCHEMAS: Schemas = {
         "session_date": "DATE", "ticker": "VARCHAR", "flags": "VARCHAR[]", "attribution": "VARCHAR",
         "text": "VARCHAR", "cited_ids": "VARCHAR[]", "prompt_version": "VARCHAR", "created_at": "TIMESTAMPTZ",
     }),
-    # B9: the measures of a trade check that W1's trade_checks columns do not hold, one row per trade_checks row
+    # B9: written until issue #78 (since then trade_checks holds these columns itself and this kind gets no new rows;
+    # the view trade_check_rows still reads older rows). The measures of a trade check, one row per trade_checks row
     # (same id = <check_id>-<trade_id>). quality ok | stale_quote | no_quote | no_entry_price (no measures then).
     # entry_source intraday_open (D is today) | stored_open (D's stored raw open). basis_factor = the split/bonus
     # factor from the prediction's as-of date to today's basis (adjustments detected by check_at); the *_adj

@@ -371,7 +371,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   strategy, horizon N+1..N+5 and view; past exit_date while it has no `paper_trades_settled` row, at most
   `trades.max_sessions_past_exit` sessions, note `exit_delayed`) gets a `trade_checks` row per check (W1's format:
   price vs entry, target and its own range, band, target_z; flags outside_range | far_from_target |
-  against_prediction) and a `trade_check_details` row (quality, today's price basis, target reached so far);
+  against_prediction; with its detail columns: quality, today's price basis, target reached so far, issue #78;
+  rows written before #78 keep those in `trade_check_details`);
   views `trade_check_rows`, `trade_checks_latest`; a ticker with a flagged open trade is flagged
   `open_trade_flagged`, and the explainer's input carries its flagged trades. Band flags exist for every published
   horizon (`outside_<k>d_80`; `bands` JSON on each check row). The intraday alerts feed (`intraday_alerts`, view `intraday_alerts_feed`,

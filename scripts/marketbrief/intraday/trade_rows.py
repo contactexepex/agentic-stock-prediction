@@ -1,5 +1,5 @@
-"""One open paper trade's rows of a check (B9; docs/ws/b9.md): the trade_checks row (W1's columns: price vs entry,
-vs target and vs the trade's own range, band, target_z, flags) and its trade_check_details row (quality, today's
+"""One open paper trade's row of a check (B9; docs/ws/b9.md): the trade_checks row (price vs entry, vs target and vs
+the trade's own range, band, target_z, flags) with its detail columns (issue #78: quality, today's
 basis, whether the target has been reached so far, the z-scores). Monitoring only: nothing is ever traded.
 
 All measures are on today's price basis: the prediction's target and range are multiplied by the split/bonus
@@ -14,14 +14,12 @@ from datetime import date
 from marketbrief.constants.config_keys import CFG_MARKET
 from marketbrief.constants.kinds import KIND_TRADE_CHECKS
 from marketbrief.contracts.protocol import QUANTITY_DECIMALS
-from marketbrief.core.schema_intraday import INTRADAY_SCHEMAS
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.intraday.constants import (
     BAND_ABOVE80,
     BAND_BELOW80,
     ENTRY_INTRADAY_OPEN,
     ENTRY_STORED_OPEN,
-    KIND_TRADE_CHECK_DETAILS,
     QUALITY_NO_ENTRY,
     QUALITY_NO_QUOTE,
     QUALITY_OK,
@@ -46,9 +44,10 @@ def skipped_for_price(market: str, amount: float | None, entry_raw: float | None
     return math.floor(amount / entry_raw) == 0
 
 
-def trade_pair(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None,
-               elapsed: float | None) -> tuple[dict, dict] | None:
-    """(trade_checks row, trade_check_details row) of one open trade, or None when the trade was skipped because
+def trade_row(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None,
+              elapsed: float | None) -> dict | None:
+    """The trade_checks row of one open trade (with every detail column since issue #78), or None when the trade was
+    skipped because
     one share costs more than its amount (India)."""
     ticker = trade["ticker"]
     ok = quote is not None and not ctx.stale.get(ticker)
@@ -61,18 +60,18 @@ def trade_pair(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None
     adjustments = ctx.adjustments.get(ticker, [])
     basis = factor_after(adjustments, trade["as_of_date"])
     entry_factor = 1.0 if source == ENTRY_INTRADAY_OPEN else factor_after(adjustments, trade["entry_date"])
-    check, details = _base_rows(ctx, trade, quality, source)
+    check = _base_row(ctx, trade, quality, source)
     check["entry_price"] = rounded(entry_raw, 4)
     adj = {key: _times(trade.get(key), basis) for key in ("target_price", *BAND_KEYS)}
-    details.update(basis_factor=rounded(basis, 6), entry_adj=rounded(_times(entry_raw, entry_factor), 4),
+    check.update(basis_factor=rounded(basis, 6), entry_adj=rounded(_times(entry_raw, entry_factor), 4),
                    target_adj=rounded(adj["target_price"], 4),
                    **{f"{key}_adj": rounded(adj[key], 4) for key in BAND_KEYS})
     if trade.get("exit_delayed"):
-        details["notes"].append("exit_delayed")   # issue #93: past its exit date, no settlement row yet
-    reached, high, low = _so_far(ctx, trade, quote if ok else None, adj["target_price"], details["notes"])
-    details.update(target_reached=reached[0], target_reached_session=reached[1])
+        check["notes"].append("exit_delayed")   # issue #93: past its exit date, no settlement row yet
+    reached, high, low = _so_far(ctx, trade, quote if ok else None, adj["target_price"], check["notes"])
+    check.update(target_reached=reached[0], target_reached_session=reached[1])
     if quality != QUALITY_OK:
-        return check, details
+        return check
     entry_adj = entry_raw * entry_factor
     last = quote.last_price
     sessions_held = trade["session_number"] - 1 + elapsed
@@ -87,16 +86,16 @@ def trade_pair(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None
     check.update(last_price=rounded(last, 4), ret_since_entry_pct=rounded(100 * ret, 4),
                  to_target_pct=rounded(100 * to_target, 4) if to_target is not None else None, band=band,
                  target_z=rounded(target_z, 3))
-    details.update(last_time=quote.last_time.isoformat(), sigma_1d=rounded(sigma), elapsed_fraction=rounded(elapsed, 4),
+    check.update(last_time=quote.last_time.isoformat(), sigma_1d=rounded(sigma), elapsed_fraction=rounded(elapsed, 4),
                    sessions_held=rounded(sessions_held, 4), sessions_left=rounded(sessions_left, 4),
                    z_since_entry=rounded(z_since, 3),
                    high_since_entry_pct=rounded(100 * (high / entry_adj - 1), 4) if high else None,
                    low_since_entry_pct=rounded(100 * (low / entry_adj - 1), 4) if low else None)
     if sigma is None:
-        details["notes"].append("no_sigma")
+        check["notes"].append("no_sigma")
     check["flags"] = trade_flags(trade, band, z_since, check["target_z"], reached[0], ctx.settings)
     check["flagged"] = any(flag in ctx.settings["trade_flag_on"] for flag in check["flags"])
-    return check, details
+    return check
 
 
 def trade_flags(trade: dict, band: str | None, z_since: float | None, target_z: float | None,
@@ -156,8 +155,8 @@ def _so_far(ctx, trade: dict, quote: SessionQuote | None, target: float | None,
     return (False, None), high, low
 
 
-def _base_rows(ctx, trade: dict, quality: str, source: str) -> tuple[dict, dict]:
-    """Both rows with their identifying columns, every measure empty."""
+def _base_row(ctx, trade: dict, quality: str, source: str) -> dict:
+    """The row with its identifying columns, every measure empty."""
     ident = trade_check_id(ctx.check_id, trade["trade_id"])
     stamp = {"check_id": ctx.check_id, "check_at": ctx.check_at.isoformat(),
              "session_date": ctx.session_date.isoformat(), "ticker": trade["ticker"], "trade_id": trade["trade_id"],
@@ -171,12 +170,9 @@ def _base_rows(ctx, trade: dict, quality: str, source: str) -> tuple[dict, dict]
         "target_price": trade["target_price"], **{key: trade[key] for key in BAND_KEYS}, "flags": [],
         "flagged": False, "method_version": TRADE_METHOD_VERSION,
     }
-    details = {
-        **dict.fromkeys(INTRADAY_SCHEMAS[KIND_TRADE_CHECK_DETAILS][1]), **stamp, "id": ident,
-        "family": trade["family"], "pick_rule": trade["pick_rule"], "quality": quality, "entry_source": source,
-        "notes": [], "method_version": TRADE_METHOD_VERSION,
-    }
-    return check, details
+    check.update(family=trade["family"], pick_rule=trade["pick_rule"], quality=quality, entry_source=source,
+                 notes=[])   # issue #78: the detail columns live in trade_checks itself
+    return check
 
 
 def _times(value: float | None, factor: float) -> float | None:
