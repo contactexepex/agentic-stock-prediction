@@ -1,6 +1,8 @@
-"""Which news items the articles collector reads: news rows first seen in the last `lookback_hours`, published
-within `max_age_hours`, whose title names a watchlist company as its primary subject with `tag_confidence` at or
-above `min_tag_confidence` (marketbrief/analytics/news_tags.py), and whose title matches `material_terms` with
+"""Which news items the articles collector reads: news rows first seen in the last `lookback_hours`,
+published within `max_age_hours` (widened to the widest catch-up window of the news runs in that lookback,
+`window_hours` in data/<market>/news_runs/, so items a catch-up run brought in are not dropped as old),
+whose title names a watchlist company as its primary subject with `tag_confidence` at or above
+`min_tag_confidence` (marketbrief/analytics/news_tags.py), and whose title matches `material_terms` with
 weight >= `min_priority`; highest weight, then allowlist tier, then newest first. Ids already in
 data/<market>/news_articles/ are skipped, so a rerun writes nothing twice (one row per news id)."""
 
@@ -25,6 +27,7 @@ NEWS_IN_WINDOW_SQL = (
     "SELECT id, title, url, source, source_domain, feed, published_at, first_seen_at, primary_tickers, "
     "tag_confidence FROM news WHERE first_seen_at >= ? AND first_seen_at <= ? ORDER BY first_seen_at, id"
 )
+WIDEST_RUN_WINDOW_SQL = "SELECT max(window_hours) FROM news_runs WHERE ran_at >= ? AND ran_at <= ?"
 
 
 def lookback_start(src: Sources, now: pd.Timestamp) -> pd.Timestamp:
@@ -32,10 +35,18 @@ def lookback_start(src: Sources, now: pd.Timestamp) -> pd.Timestamp:
     return now - pd.Timedelta(hours=float(src.sel.get("lookback_hours", DEFAULT_LOOKBACK_HOURS)))
 
 
+def max_age_hours(con, src: Sources, now: pd.Timestamp) -> float:
+    """`max_age_hours`, or the widest news-run window of the lookback when that is wider."""
+    configured = float(src.sel.get("max_age_hours", DEFAULT_MAX_AGE_HOURS))
+    bounds = [lookback_start(src, now).to_pydatetime(), now.to_pydatetime()]
+    widest = con.execute(WIDEST_RUN_WINDOW_SQL, bounds).fetchone()[0]
+    return max(configured, float(widest)) if widest is not None else configured
+
+
 def candidates(con, cfg: dict, src: Sources, now: pd.Timestamp) -> list[dict]:
     """The items to read, best first (see the module docstring)."""
     selection = src.sel
-    oldest = now - pd.Timedelta(hours=float(selection.get("max_age_hours", DEFAULT_MAX_AGE_HOURS)))
+    oldest = now - pd.Timedelta(hours=max_age_hours(con, src, now))
     needed = CONFIDENCE_RANK.get(str(selection.get("min_tag_confidence", DEFAULT_MIN_CONFIDENCE)), 2)
     done = {row[0] for row in con.execute(DONE_SQL).fetchall()}
     rows = con.execute(NEWS_IN_WINDOW_SQL, [lookback_start(src, now).to_pydatetime(), now.to_pydatetime()]).fetchall()

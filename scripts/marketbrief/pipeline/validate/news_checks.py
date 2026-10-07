@@ -21,7 +21,7 @@ from marketbrief.constants.validation import (
     MSG_ENRICHED_FILE_PROBLEM,
     MSG_ENRICHMENT_RULE_PROBLEM,
     MSG_IDS_ALREADY_ENRICHED,
-    MSG_IDS_NOT_FIRST_SEEN_TODAY,
+    MSG_IDS_NOT_FIRST_SEEN_IN_WINDOW,
     MSG_IDS_WITHOUT_ENRICHMENT,
     MSG_NEWS_ROWS_FROM_UNCONFIGURED_SOURCES,
     MSG_NEWS_SOURCE_GOOGLE_DOMAIN,
@@ -30,6 +30,7 @@ from marketbrief.constants.validation import (
     MSG_NEWS_SOURCE_UNKNOWN_OUTLET,
     MSG_REPEATED_IDS,
 )
+from marketbrief.pipeline.news_pending import window_ids
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.pipeline.validate.row_checks import check_rows, read_rows, todays_files
 
@@ -124,18 +125,6 @@ def check_articles(res: Result, cfg: dict, today: date):
         res.warn("ARTICLE_ROWS", MSG_ARTICLE_ROWS_BREAK_RULES.format(count=len(bad), examples=bad[:3]))
 
 
-def todays_new_ids(con, today) -> set[str]:
-    """Ids of the news and announcements first seen today (the ones that need an enrichment)."""
-    new_ids = {
-        row[0] for row in con.execute("SELECT id FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
-    }
-    new_ids |= {
-        row[0]
-        for row in con.execute("SELECT id FROM announcements WHERE CAST(first_seen_at AS DATE) = ?", [today]).fetchall()
-    }
-    return new_ids
-
-
 def enrichment_rule_problems(row: dict) -> list[str]:
     """Rule problems of one news_enriched record: score ranges, enumerations, summary length, required fields."""
     why = []
@@ -158,9 +147,11 @@ def enrichment_rule_problems(row: dict) -> list[str]:
 
 
 def stage_news(  # noqa: PLR0913 (uniform stage signature)
-    res, _cfg, con, _status, now, today, validate_config, path: Path | None = None
+    res, _cfg, con, _status, now, _today, validate_config, path: Path | None = None
 ):
-    """News stage: the news analyst's enrichment file against the rules."""
+    """News stage: the news analyst's enrichment file against the rules. Its ids must be news or announcements
+    first seen since the last enrichment (marketbrief/pipeline/news_pending.py: the same window the analyst's
+    input work/news_pending.jsonl holds), not enriched yet."""
     path = path or work_dir() / "enriched.jsonl"
     if not path.exists():
         res.info["news"] = "no work/enriched.jsonl"
@@ -171,7 +162,7 @@ def stage_news(  # noqa: PLR0913 (uniform stage signature)
     bad = check_rows("news_enriched", rows, False, now, timedelta(minutes=validate_config["future_tolerance_minutes"]))
     if bad:
         res.block("SCHEMA", MSG_ENRICHED_FILE_PROBLEM.format(name=path.name, problems="; ".join(bad)))
-    new_ids = todays_new_ids(con, today)
+    since, new_ids = window_ids(con, now)
     done = {row[0] for row in con.execute("SELECT DISTINCT id FROM news_enriched").fetchall()}
     ids = [row.get("id") for row in rows]
     duplicates = sorted({index for index in ids if ids.count(index) > 1})
@@ -179,17 +170,23 @@ def stage_news(  # noqa: PLR0913 (uniform stage signature)
         res.block("DUPLICATE_ID", MSG_REPEATED_IDS.format(name=path.name, ids=duplicates[:5]))
     extra = sorted({index for index in ids if index not in new_ids})
     if extra:
-        res.block("ENRICH_UNKNOWN_ID", MSG_IDS_NOT_FIRST_SEEN_TODAY.format(count=len(extra), ids=extra[:5]))
+        res.block(
+            "ENRICH_UNKNOWN_ID",
+            MSG_IDS_NOT_FIRST_SEEN_IN_WINDOW.format(count=len(extra), since=since.isoformat(), ids=extra[:5]),
+        )
     again = sorted({index for index in ids if index in done})
     if again:
         res.block("ENRICH_ALREADY_STORED", MSG_IDS_ALREADY_ENRICHED.format(count=len(again), ids=again[:5]))
     missing = sorted(new_ids - done - set(ids))
     if missing:
-        res.warn("ENRICH_MISSING", MSG_IDS_WITHOUT_ENRICHMENT.format(count=len(missing), ids=missing[:5]))
+        res.warn(
+            "ENRICH_MISSING",
+            MSG_IDS_WITHOUT_ENRICHMENT.format(count=len(missing), since=since.isoformat(), ids=missing[:5]),
+        )
     for row in rows:
         why = enrichment_rule_problems(row)
         if why:
             res.block(
                 "ENRICH_RULE", MSG_ENRICHMENT_RULE_PROBLEM.format(record_id=row.get("id"), problems="; ".join(why))
             )
-    res.info["news"] = {"records": len(rows), "new_ids_today": len(new_ids)}
+    res.info["news"] = {"records": len(rows), "since": since.isoformat(), "ids_in_window": len(new_ids)}

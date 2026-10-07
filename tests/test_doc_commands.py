@@ -1,4 +1,5 @@
-"""The commands that CLAUDE.md, routine/PROMPT.md and the agent files tell the daily run to execute still work.
+"""The commands that CLAUDE.md, routine/PROMPT.md, routine/NEWS_PROMPT.md and the agent files tell the daily run
+to execute still work.
 
 Every `python -c "..."` snippet is run from scripts/ (a `'...'` placeholder SQL becomes `SELECT 1`), and every
 `python scripts/<name>.py` command must name an existing script whose `--help` exits 0. A moved or deleted
@@ -14,7 +15,8 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-DOC_FILES = [REPO / "CLAUDE.md", REPO / "routine" / "PROMPT.md", *sorted((REPO / ".claude" / "agents").glob("*.md"))]
+DOC_FILES = [REPO / "CLAUDE.md", REPO / "routine" / "PROMPT.md", REPO / "routine" / "NEWS_PROMPT.md",
+             *sorted((REPO / ".claude" / "agents").glob("*.md"))]
 INLINE_SNIPPET = re.compile(r'python3? -c "((?:[^"\\]|\\.)*)"')
 SCRIPT_COMMAND = re.compile(r"python3? (scripts/[A-Za-z_0-9]+\.py)")
 

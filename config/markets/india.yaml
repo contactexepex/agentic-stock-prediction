@@ -121,6 +121,14 @@ news:
     global: ["crude oil prices India", "rupee dollar exchange rate"]
     geopolitics: ["India trade tariffs", "India geopolitical tensions"]
     markets: ["Sensex Nifty site:moneycontrol.com"]   # Moneycontrol market reports via Google News
+    # Overseas and sector drivers (each query checked live 2026-10-07 with when:1d, en-IN: relevant results)
+    us_fed: ["FOMC Federal Reserve", "US Fed interest rates"]
+    us_markets: ["Wall Street stocks"]
+    it_services: ["Accenture earnings", "Cognizant earnings"]   # US IT services results (TCS, Infosys peers)
+    pharma_usfda: ["USFDA"]                                       # USFDA approvals, inspections, warning letters
+    monsoon: ["monsoon IMD", "monsoon kharif sowing"]
+    metals: ["steel prices India", "aluminium prices LME"]
+    premarket: ["GIFT Nifty"]                                     # GIFT Nifty (formerly SGX Nifty) pre-market reports
   outlets:   # verify each URL on the first run; drop any that fail repeatedly
     - {name: ET Markets, url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: general}
     # Moneycontrol's own RSS feeds (marketreports, latestnews, business, ...) stopped updating in

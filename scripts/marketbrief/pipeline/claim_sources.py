@@ -9,7 +9,10 @@ import json
 import pandas as pd
 
 from marketbrief.analytics.claim_rules import ClusterSources, SourceText
+from marketbrief.constants.news import WINDOW_MARGIN_HOURS
 from marketbrief.constants.verification import (
+    DEFAULT_CLAIMS_WINDOW_HOURS,
+    DEFAULT_CLUSTER_LOOKBACK_HOURS,
     FIELD_EXTRACT,
     FIELD_PRIMARY,
     FIELD_TITLE,
@@ -17,6 +20,7 @@ from marketbrief.constants.verification import (
     SOURCE_ARTICLE,
     SOURCE_FILING,
 )
+from marketbrief.pipeline.news_pending import enrichment_since
 from marketbrief.utils.timefmt import as_utc_timestamp
 
 READ_ACCESS = ("full", "partial", "paywalled")
@@ -66,6 +70,16 @@ def current_clusters(con, now: pd.Timestamp, window_hours: float) -> list[dict]:
     since = now - pd.Timedelta(hours=window_hours)
     cluster_rows = con.execute(CLUSTERS_SQL, [now.isoformat(), since.isoformat()]).df()
     return [clean_row(row) for row in cluster_rows.to_dict("records")]
+
+
+def claims_window_hours(con, now: pd.Timestamp, cluster_settings: dict) -> float:
+    """The clusters claims.py considers: those reported in the last `window_hours` (72), widened to reach back to
+    the last enrichment (marketbrief/pipeline/news_pending.py; + 1 h) so a long weekend or holiday is covered,
+    at most the clusters' `lookback_hours` (144)."""
+    base = float(cluster_settings.get("window_hours", DEFAULT_CLAIMS_WINDOW_HOURS))
+    cap = max(base, float(cluster_settings.get("lookback_hours", DEFAULT_CLUSTER_LOOKBACK_HOURS)))
+    span = (now - enrichment_since(con, now)).total_seconds() / 3600 + WINDOW_MARGIN_HOURS
+    return min(max(base, span), cap)
 
 
 def cluster_ids(cluster: dict) -> list[str]:

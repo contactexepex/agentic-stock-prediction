@@ -21,6 +21,16 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | India (NSE) | `CRON_TZ=Asia/Kolkata 10 8 * * 1-5` (08:10 IST) | ~08:40 IST, before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
 | US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 15 8 * * 1-5` (08:15 ET) | ~08:45 ET (~14:45 Amsterdam) | SPY, VIX (`^VIX`) |
 
+News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"), every 6 hours, every day
+including weekends and holidays, in UTC and at least about 2.5 hours away from the same market's
+pre-open run (which starts 02:40 UTC for India; 12:15 UTC in US summer time, 13:15 UTC in winter), so
+their pushes rarely meet on the same day file:
+
+| Light run | Cron (UTC) |
+|---|---|
+| India | `17 5,11,17,23 * * *` (05:17, 11:17, 17:17, 23:17 UTC) |
+| US | `47 3,9,15,21 * * *` (03:47, 09:47, 15:47, 21:47 UTC) |
+
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Session cut-off (issue #20): a session's bar counts as final 120 minutes after its close
   (`BAR_SETTLE_MINUTES`, `calendar.last_complete_session`). `collect_prices.py` stores the
@@ -209,6 +219,69 @@ recorded for the past. Design (adjust on read; data stays append-only):
 - As-of replay roots (`ai_replay.py prepare`): an adjustment is kept when its ex-date is on or
   before D, whatever its `detected_at`: a root before the ex-date shows the bars exactly as stored
   (as the live run saw them); after it, all bars on bar D's basis. Neo4j does not project the kind.
+
+**News timing** (built 2026-10-07). Before, `collect_news` asked Google News with a fixed `when:1d`,
+outlet feeds only list their latest items, and items older than 3 days were skipped, while the routine
+ran once per weekday before the open: Monday's run missed Friday daytime and Saturday news, the day
+after a holiday missed a day (the pre-open run stops at the holiday check before collecting), a failed
+run lost a day, and busy outlet feeds rolled weekend items off before Monday. Now:
+- Catch-up window (`marketbrief/collectors/news_window.py`). Each `collect_news` run appends one row to
+  `data/<market>/news_runs/` (kind `news_runs`: `ran_at` = the run's start, `since`, `window_hours`,
+  `google_when`, `max_age_hours`, `reason`, feeds and Google News queries asked and failed, per-day
+  re-asks, `new_items`, `ok`). A run is `ok` when not every feed failed and at most half of its Google
+  News queries failed. The next run's window is the time since the newest `ok` run (its `ran_at`, at or
+  before now) plus 1 hour, capped at 7 days, and never narrower than before: Google News `when:` at
+  least the config's `news.google_news.window` (1d) and the oldest item kept at least 3 days. Before the
+  first `news_runs` row exists, the newest stored news `first_seen_at` stands in; with no stored news at
+  all (a first run) the defaults apply; with runs stored but none `ok` in the newest 9 daily files, the
+  window is the 7-day cap. Examples: India's pre-open runs Friday 02:40 and Monday 02:40 UTC: `when:73h`;
+  Friday to Tuesday after a Monday holiday: `when:97h`; a light run 6 hours after the last: `when:1d`.
+  The summary shows the `window` used and `ok`. De-duplication reads the newest 9 daily files (the cap
+  plus 2 days).
+- Google News checks (live, 2026-10-07, query `"Microsoft" stock`): `when:` accepts hours and days
+  (`1h`, `6h`, `12h`, `30h`, `48h`, `72h`, `100h`, `170h`, `1d`, `2d`, `3d`, `5d`, `7d`, `8d` all
+  answered with items no older than the span), while `when:1w` and `when:1m` returned nothing; a span
+  above the floor is therefore asked in whole hours, rounded up. Google News answers at most 100 items
+  per query: `when:3d` returned 100 items, and asking the days one by one (`after:2026-10-04
+  before:2026-10-05` returned 25 items, of which 15 were in the `when:3d` answer; the next day 59, 40)
+  found more. So a query that fills the 100 over a window longer than a day is asked again per day,
+  `<query> after:D before:D+1` without `when:`, from the day before the window's start to today
+  (Google's days end at midnight Pacific time: the slice `after:2026-10-03 before:2026-10-04` held items
+  from 07:00 UTC to 07:00 UTC), at most 200 such re-asks per run (`sliced_queries`, `slices_skipped`);
+  items older than the window are dropped as usual and duplicates are stored once.
+- News-only light runs (`scripts/collect_news_only.py`, saved prompt `routine/NEWS_PROMPT.md`, one per
+  market, every 6 hours, every day including weekends and holidays): `collect_news`, for India
+  `collect_nse_india.py --only announcements` (one market-wide call), `collect_articles`, `news_clusters`
+  and the gate `validate.py --stage news_collect` (files, schemas, duplicate ids and news sources of the
+  news kinds `news`, `news_runs`, `news_articles`, `news_clusters`, `announcements` written today, this
+  run's `news_runs` row from today and `ok`, the collectors' summaries; no price or calendar check). No
+  agents, no Slack. The session commits and pushes only the news data folders the script lists
+  (`commit_paths`); a rejected push is retried after `git pull --rebase`; a rebase conflict (the pre-open
+  run appended to the same day file meanwhile) is never resolved by hand: the session resets to
+  `origin/main` and collects once more. On a gate failure nothing is committed and the next run reaches
+  back over it. The light runs are scheduled away from the pre-open runs (section 2).
+- The pre-open run covers everything stored since its last run (`marketbrief/pipeline/news_pending.py`).
+  `scripts/news_pending.py` writes the news analyst's input `work/news_pending.jsonl`: every news and
+  announcement id first seen in (since, now] without a `news_enriched` row, since = the earlier of the
+  start of today (UTC; today's items, the window used before) and the newest `first_seen_at` among the
+  items already enriched (items a light run stored after the last enriched one, even while the previous
+  pre-open run was working, stay pending), at most 7 days back. `validate.py --stage news` checks the
+  analyst's file against the same window (an id outside it blocks as `ENRICH_UNKNOWN_ID`; a pending id
+  left out is the warning `ENRICH_MISSING`). `claims.py` considers clusters reported in the last 72 h or
+  since that same `since` (+1 h) when longer, at most the clusters' 144 h lookback (`window_hours` in its
+  summary); `news_status.py` already reads 144 h. `collect_articles` keeps items up to the widest
+  `window_hours` of the news runs in its 24 h lookback when that is wider than `max_age_hours` (48), so
+  older items a catch-up run brought in are still read. Calls are still made only in the pre-open run,
+  and every input a call cites must be public before its `made_at` (unchanged).
+- Topics: `news.categories` gained, for India, the US Fed (`FOMC Federal Reserve`, `US Fed interest
+  rates`), Wall Street (`Wall Street stocks`), US IT services results (`Accenture earnings`, `Cognizant
+  earnings`, peers of TCS and Infosys), `USFDA`, the monsoon (`monsoon IMD`, `monsoon kharif sowing`),
+  metals (`steel prices India`, `aluminium prices LME`) and `GIFT Nifty` (formerly SGX Nifty) pre-market
+  reports; for the US, `China economy`, Europe (`European Central Bank`, `European stocks`), Japan (`Bank
+  of Japan`, `yen dollar`), the chip supply chain (`TSMC`, `Samsung semiconductor`) and `Asian stocks`.
+  Each query was checked live on 2026-10-07 for relevant headlines; weaker candidates were left out
+  (`USFDA Indian pharma` and `USFDA warning letter` returned nothing over a day, `PBOC China stimulus`
+  nothing, `IT services demand US clients` and `Gartner IT spending` mostly unrelated items).
 
 ### 3a. News verification, phase A (deterministic; built 2026-10-06)
 Headlines alone are not enough, so the routine reads the article behind material watchlist

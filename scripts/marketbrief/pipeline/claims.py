@@ -37,7 +37,7 @@ from marketbrief.core.clock import clock, utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.pipeline.claim_inputs import input_records, select_clusters
-from marketbrief.pipeline.claim_sources import current_clusters, sources_by_cluster
+from marketbrief.pipeline.claim_sources import claims_window_hours, current_clusters, sources_by_cluster
 from marketbrief.sources.primary_text import filing_text_rows
 from marketbrief.sources.sec_client import Edgar
 
@@ -89,8 +89,8 @@ def prepare(cfg: dict, out: Path, fetch: bool) -> dict:
     """Select clusters, store their primary texts and write the claim-checker's input file."""
     market, conf, src = cfg["market"], settings(), load_sources()
     now = now_floor()
-    window = float(src.clusters.get("window_hours", 72))
     con = connect(market)
+    window = claims_window_hours(con, now, src.clusters)
     clusters = current_clusters(con, now, window)
     selected, info = select_clusters(con, clusters, src, conf, now)
     fetched = {"skipped": "--no-fetch"} if not fetch else fetch_primary_texts(con, market, selected, conf, now)
@@ -107,6 +107,7 @@ def prepare(cfg: dict, out: Path, fetch: bool) -> dict:
         "market": market,
         "as_of": now.isoformat(),
         "inputs": str(out),
+        "window_hours": round(window, 2),
         **info,
         "selected": len(records),
         "primary_texts": fetched,
@@ -131,7 +132,7 @@ def check_file(cfg: dict, path: Path) -> tuple[list[dict], list[dict], int]:
     """(valid records to store, errors by line, number of records)."""
     now = now_floor()
     con = connect(cfg["market"])
-    window = float(load_sources().clusters.get("window_hours", 72))
+    window = claims_window_hours(con, now, load_sources().clusters)
     clusters = current_clusters(con, now, window)
     sources = sources_by_cluster(con, clusters, now)
     seen = {row[0] for row in con.execute("SELECT id FROM news_claims").fetchall()}
