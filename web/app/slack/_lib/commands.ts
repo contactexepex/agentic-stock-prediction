@@ -54,6 +54,13 @@ async function admitted(params: URLSearchParams, deps: SlackDeps, tool: string |
   return ctx;
 }
 
+/** Logs a command that only opened a form or showed help (no tool call yet); a form that failed to open is a failure. */
+async function logStep(ctx: CallContext, deps: SlackDeps, params: URLSearchParams, tool: string | null, done: boolean,
+  message: string): Promise<void> {
+  await deps.tools.record(ctx, { tool, kind: null, market: null, args: { text: params.get("text") ?? "" },
+    result: done ? "accepted" : "failed", code: null, message: done ? message : `${message}: Slack did not open it` });
+}
+
 async function confirmStep(ctx: CallContext, deps: SlackDeps, tool: string, args: Record<string, unknown>): Promise<SlackReply> {
   const preview = await deps.tools.preview(ctx, tool, args);
   if (!preview.ok) return ok(ephemeral(`Not done: ${preview.outcome?.message ?? "refused"}`));
@@ -71,6 +78,7 @@ async function company(ctx: CallContext, params: URLSearchParams, deps: SlackDep
       const rest = chosen ? words.slice(2) : words.slice(1);   // "/company add MSFT" works without a market
       const opened = await deps.slack.viewsOpen(params.get("trigger_id") ?? "",
         companyAddModal(key, { market: chosen, symbol: rest[0]?.toUpperCase() ?? null, amount: rest[1] ?? null }));
+      await logStep(ctx, deps, params, "add_company", opened, "add form opened");
       return opened ? ok() : ok(ephemeral("The add form could not be opened; please try again."));
     }
     case "deactivate": {
@@ -87,6 +95,7 @@ async function company(ctx: CallContext, params: URLSearchParams, deps: SlackDep
       return ok(ephemeral(`Not done: ${outcome.message ?? "refused"}. Delete is only on the dashboard, with a typed confirmation.`));
     }
     case "help":
+      await logStep(ctx, deps, params, null, true, "help shown");
       return ok(ephemeral(USAGE));
     default:
       await deps.tools.record(ctx, { tool: null, kind: null, market: null, args: { text: params.get("text") ?? "" },
@@ -105,6 +114,7 @@ export async function handleCommand(params: URLSearchParams, deps: SlackDeps): P
       return company(ctx, params, deps);
     case "/trade": {
       const opened = await deps.slack.viewsOpen(params.get("trigger_id") ?? "", tradeModal(deps.newKey()));
+      await logStep(ctx, deps, params, "add_paper_trade", opened, "trade form opened");
       return opened ? ok() : ok(ephemeral("The trade form could not be opened; please try again."));
     }
     case "/ask":
@@ -112,6 +122,8 @@ export async function handleCommand(params: URLSearchParams, deps: SlackDeps): P
         args: { question: (params.get("text") ?? "").slice(0, 500) }, result: "accepted", code: null, message: "coming soon" });
       return ok(ephemeral(COMING_SOON));
     default:
+      await deps.tools.record(ctx, { tool: null, kind: null, market: null, args: { command: (command ?? "").slice(0, 40) },
+        result: "refused", code: "validation_failed", message: "Unknown command" });
       return ok(ephemeral(USAGE));
   }
 }

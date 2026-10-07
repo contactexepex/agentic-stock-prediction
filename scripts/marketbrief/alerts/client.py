@@ -1,13 +1,14 @@
-"""Posting one Slack message: the live Web API client (bot token from SLACK_BOT_TOKEN, as notify_slack.py) and
-the dry-run client that writes the messages to a file under work/ instead. The token is only ever put in the
-Authorization header; no error, log line or file contains it."""
+"""Posting one Slack message: the live Web API client (bot token from SLACK_BOT_TOKEN, as notify_slack.py), the
+incoming-webhook fallback without the token (SLACK_WEBHOOK_URL: one unthreaded message per part, as notify_slack.py
+falls back), and the dry-run client that writes the messages to a file under work/ instead. The token goes only in
+the Authorization header and the webhook URL only into the request; no error, log line or file contains either."""
 from __future__ import annotations
 
 import json
 import urllib.parse
 from pathlib import Path
 
-from marketbrief.alerts.constants import DRY_RUN_TS_PREFIX, SLACK_API
+from marketbrief.alerts.constants import DRY_RUN_TS_PREFIX, SLACK_API, WEBHOOK_TS_PREFIX
 from marketbrief.constants.files import ENCODING_UTF8
 from marketbrief.core.storage import append_jsonl
 from marketbrief.sources.slack_client import SlackHttp
@@ -51,6 +52,32 @@ class SlackClient:
         if status != 200 or not out.get("ok") or not out.get("ts"):
             raise SlackError(f"chat.postMessage: {out.get('error') or f'HTTP {status}'}")
         return str(out["ts"])
+
+
+class WebhookClient:
+    """POSTs each part to the incoming webhook as its own message. A webhook answers no ts and cannot reply in a
+    thread, so thread_ts is ignored and the ledger records ts webhook.<n> (never used as a thread)."""
+
+    mode = "webhook"
+
+    def __init__(self, url: str, http=None):
+        """`url` = SLACK_WEBHOOK_URL (hooks.slack.com)."""
+        self._url = url
+        self.http = http or default_http
+        self.count = 0
+
+    def __repr__(self) -> str:
+        """Never shows the URL."""
+        return "WebhookClient(url=***)"
+
+    def post_message(self, _channel: str, text: str, _thread_ts: str | None = None) -> str:
+        """Post `text` as one webhook message (the webhook's own channel)."""
+        status, raw = self.http(self._url, json.dumps({"text": text}).encode(), {"Content-Type": "application/json"})
+        body = raw.decode(errors="replace")[:60]
+        if status != 200 or body != "ok":
+            raise SlackError(f"webhook: HTTP {status} {body}")
+        self.count += 1
+        return f"{WEBHOOK_TS_PREFIX}.{self.count:06d}"
 
 
 class DryRunClient:

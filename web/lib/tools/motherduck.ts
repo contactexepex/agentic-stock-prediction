@@ -92,11 +92,11 @@ export class MotherDuckInboxStore implements InboxStore {
     };
   }
 
-  async claimRequest(row: InboxRequest): Promise<{ claimed: boolean; existing: InboxRequest | null }> {
+  async claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: InboxRequest | null }> {
     const inserted = await this.query(SQL.claim,
       [row.inbox_id, row.kind, row.tool, row.market, JSON.stringify(row.arguments),
         row.preview === null ? null : JSON.stringify(row.preview), row.channel, row.submitted_by, row.agent,
-        row.command_id, row.submitted_at, row.args_sha256],
+        row.command_id, row.submitted_at, row.args_sha256, budget.sinceIso, budget.limit],
     );
     if (inserted.rows.length) return { claimed: true, existing: null };
     const { rows } = await this.query(SQL.existing, [row.inbox_id]);
