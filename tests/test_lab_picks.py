@@ -128,3 +128,16 @@ def test_pick_study_on_the_w1_examples():
     out = pick_study.example_spread(REPO / "design/catalogue/prediction.json", rates, 1.17)
     assert out["groups"] == 21 and out["draft"] == {1: 21} and out["draft_best_positive"] == 0
     assert len(out["corrected"]) > 1                                    # the corrected rule picks several horizons
+
+
+def test_pick_shows_every_horizon_but_picks_only_eligible_ones():
+    # owner decision 2026-10-07: the pick lists the strongest strategy's gain at every horizon it predicted; a
+    # non-qualifying horizon (N+5 at p 0.52 under the 0.55 bar) is shown, marked not eligible, and never picked
+    preds = [pred("rule.a.v1", "rule", 1, 0.60), pred("rule.a.v1", "rule", 3, 0.58),
+             pred("rule.a.v1", "rule", 5, 0.52, sigma=2 * math.sqrt(5), qualifies=False)]
+    rows = picks.pick_rows("AAPL", "rule", {**CONTEXT, "family_ids": ["rule.a.v1"]}, preds, [])
+    table = rows[0]["candidates"]
+    assert [(c["horizon_days"], c["eligible"]) for c in table] == [(1, True), (3, True), (5, False)]
+    assert all("gain_per_session_pct" in c and "cost_viable" in c for c in table)
+    assert {r["horizon_days"] for r in rows} <= {1, 3}
+    assert picks.pick([{**table[2], "eligible": False}], "highest_probability") is None

@@ -93,7 +93,9 @@ def cost_flags(pred: dict, rate: dict, eurusd: float | None) -> dict:
 
 def pick(candidates: list[dict], rule: str) -> dict | None:
     """best_expected_gain: the highest gain_per_session_pct; highest_probability: the highest prob_up; ties: the
-    shorter horizon. None without candidates."""
+    shorter horizon. Only eligible entries (qualifying predictions; `eligible` absent = eligible) are picked. None
+    without one."""
+    candidates = [c for c in candidates if c.get("eligible", True)]
     if not candidates:
         return None
     def value(c: dict) -> float:
@@ -138,15 +140,32 @@ def strongest(rank: list[dict], qualifying: list[dict]) -> dict | None:
     return next((entry for entry in rank if entry["strategy_id"] in have), None)
 
 
+def horizon_table(preds: list[dict], ticker: str, best: dict | None, context: dict) -> list[dict]:
+    """The strongest strategy's expected gain at EVERY horizon it predicted for the company (owner decision of
+    2026-10-07: show the gain for every horizon held), sorted by horizon; `eligible` = the prediction qualifies
+    (only eligible entries can be picked). A horizon without a probability, target or range, or whose amount buys
+    no whole share at C, is left out."""
+    if best is None:
+        return []
+    own = sorted((p for p in preds if p["ticker"] == ticker and p["strategy_id"] == best["strategy_id"]
+                  and p.get("prob_up") is not None and None not in (p.get("target_price"), p.get("lo80"),
+                                                                     p.get("hi80"))),
+                 key=lambda p: p["horizon_days"])
+    out = []
+    for pred in own:
+        found = candidate(pred, context["market"], context["rate"], context["eurusd"])
+        if found:
+            out.append({**found, "eligible": bool(pred.get("qualifies"))})
+    return out
+
+
 def pick_rows(ticker: str, family: str, context: dict, preds: list[dict], trades: list[dict]) -> list[dict]:
     """The head_to_head_picks rows (one per pick rule) of one company and family. context: market, rate, eurusd,
     family_ids, made_at, as_of_date, session_date, base_close, amount, currency, method_version."""
     mine = [p for p in preds if p["ticker"] == ticker and p["family"] == family and p.get("qualifies")]
     rank = ranking(context["family_ids"], ticker, trades)
     best = strongest(rank, mine)
-    chosen = sorted((p for p in mine if best and p["strategy_id"] == best["strategy_id"]),
-                    key=lambda p: p["horizon_days"])
-    candidates = [c for c in (candidate(p, context["market"], context["rate"], context["eurusd"]) for p in chosen) if c]
+    candidates = horizon_table(preds, ticker, best, context)
     rows = []
     for rule in (PICK_GAIN, PICK_PROBABILITY):
         chosen_one = pick(candidates, rule)
