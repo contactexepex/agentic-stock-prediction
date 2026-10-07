@@ -31,6 +31,7 @@ from marketbrief.pipeline.validate.collect_checks import (
 )
 from marketbrief.pipeline.validate.gate_result import work_dir
 from marketbrief.pipeline.validate.news_checks import check_articles, check_news_sources
+from marketbrief.lifecycle.loader import active_tickers
 
 
 def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)
@@ -87,7 +88,7 @@ def stage_features(res, cfg, con, status, now, today, validate_config):  # noqa:
         res.block("MISSING_FEATURES", MSG_NO_FEATURE_ROW, missing)
     if behind:
         res.block("STALE_FEATURES", MSG_FEATURE_ROW_OLDER_THAN_THE_TICKER, behind)
-    blocked = [ticker for ticker in cfg["tickers"] if ticker in feats and feats[ticker][1] == "BLOCKED"]
+    blocked = [ticker for ticker in active_tickers(cfg) if ticker in feats and feats[ticker][1] == "BLOCKED"]
     if blocked:
         res.warn("QUALITY_BLOCKED", MSG_INDICATOR_QUALITY_BLOCKED_NO_CALL_ALLOWED, blocked)
     need = date.fromisoformat(status["previous_session"])
@@ -115,7 +116,9 @@ def stage_context(  # noqa: PLR0913 (uniform stage signature)
         res.block("STALE_CONTEXT", MSG_FIRST_LINE_NOT_PACK_HEADER.format(first_line=first[:80]))
     if "Traceback (most recent call last)" in text:
         res.block("CONTEXT_ERROR", MSG_CONTEXT_PACK_HAS_TRACEBACK)
-    absent = [ticker for ticker in cfg["tickers"] if not re.search(rf"(?<![\w&]){re.escape(ticker)}(?![\w&])", text)]
+    absent = [
+        ticker for ticker in active_tickers(cfg) if not re.search(rf"(?<![\w&]){re.escape(ticker)}(?![\w&])", text)
+    ]
     if absent:
         res.block("CONTEXT_INCOMPLETE", MSG_WATCHLIST_NOT_IN_CONTEXT_PACK, absent)
     if "## Market regime" not in text:

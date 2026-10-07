@@ -262,7 +262,7 @@ def test_no_tool_mentions_orders_or_brokers():
 
 # ---------------- contracts ----------------
 
-@pytest.mark.parametrize("module", [protocol, watchlist, horizons])
+@pytest.mark.parametrize("module", [protocol, horizons])   # watchlist: built by B1 (tests/test_lifecycle.py)
 def test_contract_functions_are_stubs(module):
     functions = [f for name, f in inspect.getmembers(module, inspect.isfunction) if f.__module__ == module.__name__]
     assert functions

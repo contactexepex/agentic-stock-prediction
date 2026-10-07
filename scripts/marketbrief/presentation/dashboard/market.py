@@ -11,6 +11,7 @@ from marketbrief.constants.dashboard import CUE_ROLES
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.presentation.dashboard.stock import as_list, bar_rows, iso_time, last_session
 from marketbrief.utils.numbers import json_safe_float
+from marketbrief.lifecycle.loader import active_sectors, active_tickers
 from view_data import REGIME_PLAIN
 
 SPARK_BARS = 30
@@ -73,7 +74,7 @@ def sector_rows(cfg: dict, feats: pd.DataFrame) -> list[dict]:
     """Per sector: each stock's 1-day and 5-day return and the sector's mean of each."""
     indexed = feats.set_index("ticker") if len(feats) else feats
     out = []
-    for sector, members in (cfg.get("sectors") or {"": list(cfg["tickers"])}).items():
+    for sector, members in (active_sectors(cfg) if cfg.get("sectors") else {"": active_tickers(cfg)}).items():
         stocks = []
         for t in members:
             f = indexed.loc[t] if t in indexed.index else None

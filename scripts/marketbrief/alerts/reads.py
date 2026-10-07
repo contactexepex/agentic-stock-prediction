@@ -36,10 +36,14 @@ def plain(value, is_json: bool = False):
 
 
 def records(con, kind: str, sql: str, params: list) -> list[dict]:
-    """Rows of a query on one kind as dicts, its JSON columns parsed."""
-    json_cols = {c for c, t in SCHEMAS[kind][1].items() if t == "JSON"}
+    """Rows of a query on one kind as dicts, its JSON columns parsed and its DATE columns as 'YYYY-MM-DD'."""
+    types = SCHEMAS[kind][1]
     frame = con.execute(sql, params).df()
-    return [{c: plain(v, c in json_cols) for c, v in row.items()} for row in frame.to_dict("records")]
+    out = []
+    for row in frame.to_dict("records"):
+        rec = {c: plain(v, types.get(c) == "JSON") for c, v in row.items()}
+        out.append({c: v[:10] if types.get(c) == "DATE" and isinstance(v, str) else v for c, v in rec.items()})
+    return out
 
 
 def feed_asof(rows: list[dict], now: datetime) -> list[dict]:
@@ -80,13 +84,31 @@ def latest_check(con, session_date: str, now: datetime, check_id: str | None = N
 
 
 def settled_today(con, session_date: str, timezone: str, now: datetime) -> list[dict]:
-    """Settlement rows written on the session's local date by `now` (a later correction of the same trade
-    settled that day replaces the earlier row)."""
+    """The trades first settled on the session's local date, each as its newest row by `now`. A trade first settled
+    on an earlier day and re-settled on this one is not listed here: it is a correction of that day (corrections)."""
     return records(con, KIND_PAPER_TRADES_SETTLED, f"""
-        SELECT * FROM {KIND_PAPER_TRADES_SETTLED}
-        WHERE CAST(timezone(?, settled_at) AS DATE) = ?::DATE AND settled_at <= ?::TIMESTAMPTZ
-        QUALIFY row_number() OVER (PARTITION BY trade_id ORDER BY settled_at DESC, id DESC) = 1
-        ORDER BY trade_id""", [timezone, session_date, now])
+        WITH first AS (SELECT trade_id, min(settled_at) AS first_at FROM {KIND_PAPER_TRADES_SETTLED}
+                       WHERE settled_at <= ?::TIMESTAMPTZ GROUP BY trade_id)
+        SELECT t.* FROM {KIND_PAPER_TRADES_SETTLED} t JOIN first f ON f.trade_id = t.trade_id
+        WHERE CAST(timezone(?, f.first_at) AS DATE) = ?::DATE AND t.settled_at <= ?::TIMESTAMPTZ
+        QUALIFY row_number() OVER (PARTITION BY t.trade_id ORDER BY t.settled_at DESC, t.id DESC) = 1
+        ORDER BY t.trade_id""", [now, timezone, session_date, now])
+
+
+def corrections(con, session_date: str, timezone: str, after: str, now: datetime) -> list[dict]:
+    """Settlement rows that supersede another row (a re-settlement, F1.5) of a trade first settled on the session's
+    local date, written after `after` (the close post) and by `now`; each with the superseded row's net_pnl and
+    return_pct as was_net_pnl and was_return_pct."""
+    return records(con, KIND_PAPER_TRADES_SETTLED, f"""
+        WITH first AS (SELECT trade_id, min(settled_at) AS first_at FROM {KIND_PAPER_TRADES_SETTLED}
+                       GROUP BY trade_id)
+        SELECT r.*, o.net_pnl AS was_net_pnl, o.return_pct AS was_return_pct
+        FROM {KIND_PAPER_TRADES_SETTLED} r
+        JOIN {KIND_PAPER_TRADES_SETTLED} o ON o.id = r.supersedes
+        JOIN first f ON f.trade_id = r.trade_id
+        WHERE CAST(timezone(?, f.first_at) AS DATE) = ?::DATE
+          AND r.settled_at > ?::TIMESTAMPTZ AND r.settled_at <= ?::TIMESTAMPTZ
+        ORDER BY r.settled_at, r.id""", [timezone, session_date, after, now])
 
 
 def eod_analysis(con, session_date: str, now: datetime) -> dict | None:

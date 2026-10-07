@@ -4,7 +4,9 @@ The company list moves from config/markets/<market>.yaml `tickers:` into the app
 `watchlist_events` (schema in core/schema_lifecycle.py). A company's state as of a time is the newest event with
 effective_from <= as_of among those recorded by as_of (recorded_at <= as_of), so a replay with MB_NOW sees only
 what was known then. "Newest" orders by effective_from, then recorded_at, then id; the validator refuses an event whose
-effective_from is before the company's newest stored event, so a later request can never take effect earlier:
+effective_from is before the company's newest stored event, so a later request can never take effect earlier.
+One exception (B1): the seed's add events (channel `seed`) count from their effective_from even before their
+recorded_at, because they restate the config list every earlier run used (marketbrief/lifecycle/events.py):
 
 - add, reactivate -> active (collected, predicted, traded)
 - deactivate      -> inactive (collected, not predicted or traded; shown only in the Companies page's Inactive part)
@@ -55,15 +57,21 @@ def watchlist(market: str, as_of: datetime | None = None, state: CompanyState | 
     """The market's companies in `state` as of `as_of` (default: the run's clock, MB_NOW-aware), sorted by sector
     then ticker. state "collected" = active and inactive (what the collectors read); "deleted" is only for the
     purge of derived stores, never for display."""
-    raise NotImplementedError("session B1 (marketbrief/lifecycle/)")
+    from marketbrief.lifecycle import accessor  # imported here: lifecycle imports this module
+
+    return accessor.watchlist(market, as_of, state)
 
 
 def company(market: str, ticker: str, as_of: datetime | None = None) -> Company | None:
     """One company as of `as_of`, or None when it was never added (a deleted company is returned with state
     "deleted" so callers can refuse it explicitly)."""
-    raise NotImplementedError("session B1 (marketbrief/lifecycle/)")
+    from marketbrief.lifecycle import accessor  # imported here: lifecycle imports this module
+
+    return accessor.company(market, ticker, as_of)
 
 
 def trade_amount(market: str, ticker: str, as_of: datetime) -> float:
     """The paper amount of one trade made at `as_of` (F1.3): the override active at as_of, else DEFAULT_AMOUNT."""
-    raise NotImplementedError("session B1 (marketbrief/lifecycle/)")
+    from marketbrief.lifecycle import accessor  # imported here: lifecycle imports this module
+
+    return accessor.trade_amount(market, ticker, as_of)

@@ -9,8 +9,8 @@ POST_ALERTS = "alerts"
 POST_CLOSE = "close"
 POST_WEEKLY = "weekly"
 POST_ONBOARDING = "onboarding"
-POST_KINDS: tuple[str, ...] = (POST_MORNING, POST_ALERTS, POST_CLOSE, POST_WEEKLY, POST_ONBOARDING)
-THREAD_KINDS: tuple[str, ...] = (POST_MORNING, POST_ALERTS, POST_CLOSE)   # posted into the day's thread
+POST_CORRECTION = "correction"
+POST_BRIEF = "brief"   # notify_slack.py's daily brief, posted into the day's thread (owner, 2026-10-07)
 
 ENV_SLACK_BOT_TOKEN = "SLACK_BOT_TOKEN"
 SETTING_CHANNEL_ID = "slack_channel_id"
@@ -19,6 +19,9 @@ SLACK_API = "https://slack.com/api/"
 MAX_MESSAGE_CHARS = 3500   # one Slack message part; Slack truncates text above 40,000 and advises 4,000
 TOP_PICKS = 5              # morning picks per market (SPEC F9, decision 30)
 PICK_HORIZON = 1           # the picks are ranked at N+1 (decision 39)
+CLOSE_TOP_WINS = 10        # close results: every head-to-head trade, then the 10 biggest wins and
+CLOSE_TOP_LOSSES = 10      # 10 biggest losses of the other rows (owner, 2026-10-07)
+CORRECTION_DAYS = 30       # corrections: close posts of the last 30 days are checked for re-settled trades
 WORK_DIR = "work"
 DRY_RUN_DIR = "alerts_dryrun"   # under work/: the dry run's messages and its own ledger
 DRY_RUN_TS_PREFIX = "dry"
@@ -48,9 +51,11 @@ MSG_NO_STRONG = "No proven strong signals today."
 MSG_NO_PICKS = "No paper picks today: no strategy buys at N+1."
 MSG_NO_PREDICTIONS = "No paper picks today: no strategy predictions are stored for this session."
 MSG_NO_HEAD_TO_HEAD = "No head-to-head trades today."
+MSG_NONE_VIABLE = "No pick clears your costs today."
 MSG_NO_SETTLED = "No paper trades settled today."
 MSG_FOOTER = "Research only, not investment advice. Paper trades are records, never orders."
 MSG_CONTINUED = "(continued {part}/{parts})"
+MSG_MORE_ON_DASHBOARD = "…and {count} more row{s} settled today on the dashboard."
 
 ONBOARDING_RESULT_TEXT = {
     "accepted": "Done",

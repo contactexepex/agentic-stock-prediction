@@ -73,10 +73,10 @@ def test_inbox_command_log_has_the_schema_columns():
         (name, "TIMESTAMP WITH TIME ZONE" if kind == "TIMESTAMPTZ" else kind) for name, kind in columns.items()]
 
 
-def request_params(inbox_id: str, command_id: str) -> list:
+def request_params(inbox_id: str, command_id: str, limit: int = 20) -> list:
     arguments = json.dumps({"market": "us", "ticker": "AAPL"})
     return [inbox_id, "watchlist_events", "reactivate_company", "us", arguments, None, "slack", "slack:U07ABCD123",
-            "slack-gateway", command_id, "2026-10-07T10:00:00.000Z", "f" * 64]
+            "slack-gateway", command_id, "2026-10-07T10:00:00.000Z", "f" * 64, "2026-10-07T00:00:00Z", limit]
 
 
 def test_inbox_statements_run_on_duckdb():
@@ -127,3 +127,16 @@ def test_fixed_slack_channel_matches_settings():
     settings = yaml.safe_load((REPO / "config" / "settings.yaml").read_text(encoding="utf-8"))
     constants = (REPO / "web" / "lib" / "tools" / "constants.ts").read_text(encoding="utf-8")
     assert f'SLACK_CHANNEL_ID = "{settings["slack_channel_id"]}"' in constants
+
+
+def test_claim_enforces_the_day_budget_in_one_statement():
+    claim = statements()["claim"]
+    con = inbox()
+    assert con.execute(claim, request_params("key-000001", "cmd-1", limit=2)).fetchall() == [("key-000001",)]
+    assert con.execute(claim, request_params("key-000002", "cmd-2", limit=2)).fetchall() == [("key-000002",)]
+    assert con.execute(claim, request_params("key-000003", "cmd-3", limit=2)).fetchall() == [], "over budget"
+    assert con.execute(claim, request_params("key-000001", "cmd-4", limit=2)).fetchall() == [], "existing key"
+    assert con.execute("SELECT count(*) FROM inbox.requests").fetchone() == (2,)
+    tomorrow = request_params("key-000004", "cmd-5", limit=2)
+    tomorrow[10], tomorrow[12] = "2026-10-08T09:00:00.000Z", "2026-10-08T00:00:00Z"
+    assert con.execute(claim, tomorrow).fetchall() == [("key-000004",)], "the budget resets each UTC day"

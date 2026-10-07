@@ -15,7 +15,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
 from marketbrief.alerts import cli, text  # noqa: E402
-from marketbrief.alerts.close import build_close, tally  # noqa: E402
+from marketbrief.alerts.close import build_close, listed_rows, tally, trade_line  # noqa: E402
 from marketbrief.alerts.client import SlackClient, SlackError  # noqa: E402
 from marketbrief.alerts.constants import (  # noqa: E402
     MAX_MESSAGE_CHARS,
@@ -30,7 +30,7 @@ from marketbrief.alerts.intraday import build_alerts  # noqa: E402
 from marketbrief.alerts.ledger import Ledger  # noqa: E402
 from marketbrief.alerts.morning import agreement, build_morning, picks, strongest_other  # noqa: E402
 from marketbrief.alerts.onboarding import onboarding_text, post_onboarding_confirmation  # noqa: E402
-from marketbrief.alerts.publish import Message, NotConfiguredError, Publisher, publisher  # noqa: E402
+from marketbrief.alerts.publish import Message, NotConfiguredError, Publisher, post_brief, publisher  # noqa: E402
 from marketbrief.alerts.weekly import build_weekly  # noqa: E402
 from marketbrief.core import paths  # noqa: E402
 
@@ -190,7 +190,8 @@ def test_close_results_from_examples():
     assert f"Rule {rule['trades']} trade" in msg
     assert "Analyst note (eod-us-2026-10-01): Two paper trades settled." in msg
     line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
-    assert "bought $229.27 on 2026-09-30, sold $230.86 on 2026-10-01; net +$4.60 (+0.46%) after $2.34 costs" in line
+    assert ("bought $229.27 on 2026-09-30, sold $230.86 on 2026-10-01; net +$4.60 (+0.46%) after $2.34 market"
+            " costs") in line
     assert "target reached, closed inside its 80% range; main reason sector_lift" in line
     assert len(signal_lines(msg)) == len(rows)
     assert all(PAPER in line for line in signal_lines(msg))
@@ -200,7 +201,9 @@ def test_close_skipped_and_empty_days():
     skipped = [r for r in of_market(examples("paper_trade"), "india") if r["status"] == "skipped_price_above_amount"]
     assert skipped
     msg = build_close("india", "2026-10-06", skipped[:1])
-    assert "no trade: one share costs more than the amount. [Paper]" in msg
+    assert "no trade: one share costs more than the amount" not in msg   # not a win or loss: counted only
+    assert "…and 1 more row settled today on the dashboard." in msg
+    assert "no trade: one share costs more than the amount. [Paper]" in trade_line(skipped[0], {}, "INR")
     assert "Accuracy view: Rule 0 trades, 0 wins, net +₹0.00" in msg   # a skipped row is not a trade
     assert "Head-to-head: no head-to-head trades settled today." in msg
     empty = build_close("india", "2026-10-06", [])
@@ -436,3 +439,145 @@ def test_every_message_carries_the_paper_label_and_footer():
     for message in messages:
         assert "Paper only — no proven edge yet." in message
         assert "Research only, not investment advice. Paper trades are records, never orders." in message
+
+
+# ---------- owner decisions of 2026-10-07: close list, corrections, one thread ----------
+
+def settled_row(n: int, view: str, net: float, status: str = "settled") -> dict:
+    return {"id": f"r{n}", "trade_id": f"t{n}", "ticker": f"T{n:02d}", "horizon_days": 1, "strategy_id": "s",
+            "family": "rule", "view": view, "pick_rule": "highest_probability" if view == "head_to_head" else None,
+            "status": status, "net_pnl": net, "return_pct": net / 10}
+
+
+def test_close_lists_head_to_head_then_ten_wins_and_ten_losses():
+    rows = ([settled_row(i, "head_to_head", -1.0) for i in range(3)]
+            + [settled_row(10 + i, "accuracy", float(i + 1)) for i in range(15)]
+            + [settled_row(40 + i, "accuracy", -float(i + 1)) for i in range(12)]
+            + [settled_row(70 + i, "accuracy", 0.0, "no_entry") for i in range(2)])
+    shown = listed_rows(rows)
+    assert [r["id"] for r in shown[:3]] == ["r0", "r1", "r2"]
+    assert [r["net_pnl"] for r in shown[3:13]] == [15.0, 14.0, 13.0, 12.0, 11.0, 10.0, 9.0, 8.0, 7.0, 6.0]
+    assert [r["net_pnl"] for r in shown[13:]] == [-12.0, -11.0, -10.0, -9.0, -8.0, -7.0, -6.0, -5.0, -4.0, -3.0]
+    msg = build_close("us", "2026-10-01", rows, None, {}, "USD")
+    assert "*Settled today (32 rows)*" in msg and "…and 9 more rows settled today on the dashboard." in msg
+    assert "Accuracy view: Rule 27 trades, 15 wins, net +$42.00" in msg   # totals over every row
+    assert len(signal_lines(msg)) == 23
+
+
+def resettle(original: dict, settled_at: str, net: float) -> dict:
+    return {**original, "id": f"{original['trade_id']}@resettled", "supersedes": original["id"],
+            "settled_at": settled_at, "net_pnl": net, "return_pct": round(net / 10, 2),
+            "flags": ["split_in_window", "resettled"]}
+
+
+def test_correction_reply_in_the_day_thread_once(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    original = next(r for r in of_market(examples("paper_trade"), "us")
+                    if r["trade_id"] == "acc:rule.model_news.v1:2026-09-29-NVDA-1d")
+    store(scratch, "us", "paper_trades_settled", [resettle(original, "2026-10-02T03:00:00Z", 3.10)], "settled_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-02T02:00:00+00:00")
+    close = run(["--market", "us", "--dry-run", "close", "--date", "2026-10-01"], capsys)[1]
+    assert run(["--market", "us", "--dry-run", "corrections"], capsys)[1]["reason"] == "nothing to post"
+    monkeypatch.setenv("MB_NOW", "2026-10-02T04:00:00+00:00")   # the re-settlement is now stored
+    code, out = run(["--market", "us", "--dry-run", "corrections"], capsys)
+    assert code == 0 and out["posted"] == ["correction:us:acc:rule.model_news.v1:2026-09-29-NVDA-1d@resettled#1"]
+    sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[-1])
+    assert sent["thread_ts"] == close["thread_ts"]
+    assert sent["text"].startswith("Correction: *NVDA* N+1, Model + news (rule.model_news.v1) (accuracy) is now net"
+                                   " +$3.10 (+0.31%), was +$4.60 (+0.46%); re-settled 2026-10-02T03:00:00+00:00"
+                                   " (flags: split_in_window, resettled). [Paper]")
+    assert run(["--market", "us", "--dry-run", "corrections"], capsys)[1]["posted"] == []
+
+
+def test_resettlement_before_the_close_post_is_no_correction(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    original = next(r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01"))
+    store(scratch, "us", "paper_trades_settled", [resettle(original, "2026-10-01T23:00:00Z", 1.0)], "settled_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-02T02:00:00+00:00")
+    run(["--market", "us", "--dry-run", "close", "--date", "2026-10-01"], capsys)
+    sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
+    assert "net +$1.00" in sent   # the close post already shows the newest row of the trade
+    assert run(["--market", "us", "--dry-run", "corrections"], capsys)[1]["reason"] == "nothing to post"
+
+
+@pytest.mark.usefixtures("scratch")
+def test_daily_brief_joins_the_day_thread(monkeypatch):
+    monkeypatch.setenv("SLACK_BOT_TOKEN", TOKEN)
+    http = FakeSlack()
+    morning = publisher("us", dry_run=False, http=http).publish(
+        Message("morning", "morning:us:2026-10-07", "picks", "us:2026-10-07"))
+    brief = post_brief("us", "2026-10-07", "daily brief", http=http)
+    assert brief["thread_ts"] == morning["thread_ts"] and http.calls[-1]["form"]["thread_ts"] == morning["thread_ts"]
+    assert post_brief("us", "2026-10-07", "daily brief", http=http)["posted"] == []
+    # a brief posted first starts the thread, and the morning picks then reply to it
+    first = post_brief("us", "2026-10-08", "brief", http=http)
+    assert "thread_ts" not in http.calls[-1]["form"]
+    publisher("us", dry_run=False, http=http).publish(Message("morning", "morning:us:2026-10-08", "p", "us:2026-10-08"))
+    assert http.calls[-1]["form"]["thread_ts"] == first["thread_ts"]
+
+
+# ---------- the owner's own costs (decisions 50-51; field names assumed until B2's docs/ws/b2.md) ----------
+
+def with_your_cost(preds: list[dict], cost: float) -> list[dict]:
+    """Fixture values in B6's assumed naming: your_cost_pct on every call, cost_viable = move > cost."""
+    return [{**p, "your_cost_pct": cost,
+             "cost_viable": (p["target_price"] / p["base_close"] - 1) * 100 > cost} for p in preds]
+
+
+def test_morning_pick_says_whether_it_clears_your_cost():
+    preds = of_market(examples("prediction"), "us")
+    row = agreement(preds, 1)[0]
+    move = round((row["avg_target"] / row["base_close"] - 1) * 100, 2)   # the buyers' average target vs last close
+    viable = build_morning("us", "2026-10-07", with_your_cost(preds, move - 0.05), [], HORIZONS)
+    assert f"Expected {move:+.2f}% vs your cost {move - 0.05:.2f}% — viable." in viable
+    assert "No pick clears your costs today." not in viable
+    costly = build_morning("us", "2026-10-07", with_your_cost(preds, 2.7), [], HORIZONS)
+    assert f"Expected {move:+.2f}% vs your cost 2.70% — not viable at your costs." in costly
+    assert "No pick clears your costs today." in costly.splitlines()[2]
+    plain = build_morning("us", "2026-10-07", preds, [], HORIZONS)       # no cost fields stored: no cost text
+    assert "your cost" not in plain
+
+
+def test_head_to_head_line_shows_the_stored_flag():
+    preds = of_market(examples("prediction"), "us")
+    h2h = [{**p, "cost_viable": p["family"] == "rule"}
+           for p in of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07")]
+    lines = [x for x in build_morning("us", "2026-10-07", preds, h2h, HORIZONS).splitlines() if x.startswith("   • ")]
+    assert all("; viable at your costs [Paper]" in x for x in lines if x.startswith("   • Rule"))
+    assert all("; not viable at your costs [Paper]" in x for x in lines if x.startswith("   • AI"))
+
+
+def test_close_shows_your_cost_result_beside_market_cost():
+    rows = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
+    mine = [{**r, "your_costs": round(r["costs"] + 0.46, 2), "your_net_pnl": round(r["net_pnl"] - 0.46, 2),
+             "your_return_pct": round((r["net_pnl"] - 0.46) / r["amount"] * 100, 2)} for r in rows]
+    msg = build_close("us", "2026-10-01", mine, None, {}, "USD")
+    line = next(x for x in msg.splitlines() if "rule.model_news.v1 (accuracy)" in x and "NVDA* N+1" in x)
+    assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in line
+    rule = [r for r in mine if r["view"] == "accuracy" and r["family"] == "rule"]
+    total = sum(r["your_net_pnl"] for r in rule)
+    assert f"(after your costs {text.signed_money('USD', round(total, 2))})" in msg
+    assert "your costs" not in build_close("us", "2026-10-01", rows, None, {}, "USD")
+
+
+def test_resettlement_on_a_later_day_is_only_a_correction(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    original = next(r for r in of_market(examples("paper_trade"), "us")
+                    if r["trade_id"] == "acc:rule.model_news.v1:2026-09-29-NVDA-1d")
+    # re-settled at 15:00 UTC on 10-02 = 11:00 New York time on 10-02, a later local day than the first settlement
+    store(scratch, "us", "paper_trades_settled", [resettle(original, "2026-10-02T15:00:00Z", 3.10)], "settled_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-02T02:00:00+00:00")
+    run(["--market", "us", "--dry-run", "close", "--date", "2026-10-01"], capsys)
+    monkeypatch.setenv("MB_NOW", "2026-10-03T02:00:00+00:00")
+    run(["--market", "us", "--dry-run", "close", "--date", "2026-10-02"], capsys)
+    sent = [json.loads(x) for x in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()]
+    second_day = next(m["text"] for m in sent if "close results for Fri 2 Oct 2026" in m["text"])
+    assert not [x for x in second_day.splitlines() if "NVDA* N+1" in x and "(rule.model_news.v1) (accuracy)" in x]
+    assert "+$3.10" not in second_day
+    expected = tally([r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-02")
+                      and r["view"] == "accuracy" and r["family"] == "rule"])
+    assert f"Rule {expected['trades']} trade" in second_day
+    assert text.signed_money("USD", expected["net_pnl"]) in second_day
+    code, out = run(["--market", "us", "--dry-run", "corrections"], capsys)
+    assert out["posted"] == ["correction:us:acc:rule.model_news.v1:2026-09-29-NVDA-1d@resettled#1"]
+    assert "bought $229.27 on 2026-09-30," in sent[0]["text"]   # DATE columns print as dates
