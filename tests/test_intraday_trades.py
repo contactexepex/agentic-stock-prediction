@@ -517,6 +517,12 @@ def test_unwatched_ticker_rows_and_alerts_cli_dates(market, monkeypatch, capsys)
     assert cli.main() == 0
     alerts = json.loads(capsys.readouterr().out)["alerts"]
     assert alerts and {row["session_date"] for row in alerts} == {SESSION}
+    assert configured_horizons() == (1, 2, 3, 4, 5)                  # B10's contract (built)
+    from marketbrief.contracts import horizons as horizon_contract
+
+    def not_built():
+        raise NotImplementedError("session B10")
+    monkeypatch.setattr(horizon_contract, "horizons", not_built)    # the fallback: strategies.yaml, cached
     before = _horizons_in.cache_info().hits
     assert configured_horizons() == configured_horizons() == (1, 2, 3, 4, 5)
     assert _horizons_in.cache_info().hits >= before + 1
