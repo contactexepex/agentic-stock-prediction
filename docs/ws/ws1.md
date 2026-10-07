@@ -215,8 +215,8 @@ Full suite, `python -m pytest -n auto -q` (run once at the end):
 FAILED tests/test_judgments.py::test_every_logged_commit_exists - AssertionEr...
 1 failed, 904 passed, 3 skipped, 6453 warnings in 184.35s (0:03:04)
 ```
-`test_every_logged_commit_exists` also fails on the untouched tree in this clone: it lacks 27 logged build
-commits that were never pushed. CI excludes this test (CLAUDE.md).
+`test_every_logged_commit_exists` also fails on the untouched tree in this clone: 27 commits named in `judgments/log.jsonl`
+are not in this clone. CI excludes this test (CLAUDE.md).
 
 Fast tier, `python -m pytest -m "not slow" -n auto -q`, before the contract alignment:
 ```
