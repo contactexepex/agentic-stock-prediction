@@ -276,6 +276,9 @@ matplotlib, only where `pypdf` is installed, and is skipped otherwise.)
   judgments file claimed but missing, the PDF parse in the live check; all fixed in the next commit).
 - Round 2, PASS, commit 4db67b4d6d9238074de94dcc49869eed417f1e91 (all four blockers fixed; two new cosmetic findings,
   listed under Cosmetic follow-ups).
+- Merge review, PASS, commit b970acb93201700ae88ea2bcfb536c501d82971e (origin/main merged in; conflicts in
+  `core/schemas.py` and `sql/views.sql` resolved keeping both sides; full suite 986 passed, the one failure
+  pre-existing on main).
 
 ## Proposed edits to shared docs
 **CLAUDE.md**, `## Layout`, after the `- News verification, phase B ...` bullet:
@@ -353,6 +356,9 @@ file count; the ambiguous "local midnight" wording; a minimum quote length, now 
   gate checks the number exists for the release, not which metric the sentence names).
 - `scripts/marketbrief/results/numbers.py` (`US_FIRST_REPORT_SQL`): no `first_seen_at <= now` filter; matters only
   for MB_NOW backfills of filings collected later.
+
+- `tests/test_judgments.py::test_every_logged_commit_exists` fails locally on main too (logged commits missing
+  from this checkout); it hides real regressions locally (merge review).
 
 ## Open questions
 1. **PDF parsing (India).** NSE attachments (results press releases, transcripts) are PDFs. The safety rules allow
