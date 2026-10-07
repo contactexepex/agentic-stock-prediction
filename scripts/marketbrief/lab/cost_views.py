@@ -62,9 +62,9 @@ def viability(pred: dict, rate: dict, eurusd: float | None) -> dict:
     move = None if target is None else (float(target) / close - 1) * PERCENT
     days = holding_days(pred["session_date"], pred["exit_date"])
     shares = quantity(pred["market"], amount, close)
-    if shares <= 0:
+    if shares <= 0:   # one share costs more than the amount: no trade, no costs, no gain, so no verdict (null)
         return {"expected_move_pct": move, "market_cost_pct": None, "your_cost_pct": None,
-                "expected_gain_your_pct": None, "cost_viable": False, "views": None, "holding_days": days}
+                "expected_gain_your_pct": None, "cost_viable": None, "views": None, "holding_days": days}
     value = shares * close
     views = lab_costs.cost_views(pred["market"], rate, (value, value), shares,
                                  {"eurusd": (eurusd, eurusd), "holding_days": days})
