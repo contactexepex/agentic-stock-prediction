@@ -41,6 +41,16 @@ conflict: the nearest news run is 34 and 94 min after the India checks, and 20 m
 | India | `CRON_TZ=Asia/Kolkata 13 11 * * 1-5` and `CRON_TZ=Asia/Kolkata 13 14 * * 1-5` | 05:43 and 08:43 (session 03:45-10:00) |
 | US | `CRON_TZ=America/New_York 27 12 * * 1-5` and `CRON_TZ=America/New_York 57 14 * * 1-5` | 16:27 and 18:57 in EDT, 17:27 and 19:57 in EST (session 13:30-20:00 EDT, 14:30-21:00 EST) |
 
+**Open paper trades (B9, docs/ws/b9.md).** Each check also covers every open paper trade (F1) of every
+strategy and horizon, in both views: the price against the trade's entry, its target and its own range, on
+today's price basis (splits and bonus issues detected by the check applied to the stored prediction),
+whether the target has been reached so far (stored highs from D, then today's complete 5-minute bars), and
+three flags: outside_range (outside its 80% range), far_from_target (not reached and at least 2 sigma_1d
+scaled to the sessions left away) and against_prediction (the move since entry at least 1 sigma_1d scaled to
+the sessions held against the direction). A trade whose exit close is missing stays checked until it is settled
+(at most 5 sessions past its exit date). The checks feed the deviation explainer and an alerts feed
+(`intraday_alerts`) that the Slack alerts read. The schedules are unchanged.
+
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Session cut-off (issue #20): a session's bar counts as final 120 minutes after its close
   (`BAR_SETTLE_MINUTES`, `calendar.last_complete_session`). `collect_prices.py` stores the
