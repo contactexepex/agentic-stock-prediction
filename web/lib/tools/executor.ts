@@ -248,7 +248,8 @@ export class ToolLayer {
     if (!claim.claimed) return this.duplicate(ctx, now, gate, base, claim.existing, argsSha);
     const summary = writeSummary(tool.name, args, preview);
     // Both kinds have an importer: company commands `company.py import-inbox` (B1), paper trades
-    // `portfolio.py import-inbox` (B2, marketbrief/portfolio/inbox_import.py); onboard.yml and the routines run them.
+    // `portfolio.py import-inbox` (B2, marketbrief/portfolio/inbox_import.py). onboard.yml runs B1's import; the step
+    // for B2's import is B1's (onboard.yml) and the orchestrator's (routines, Wave 5). Until then a trade waits.
     let dispatched: { ok: boolean; reason: string | null };
     try {
       dispatched = await this.deps.dispatcher.dispatch();
@@ -256,7 +257,7 @@ export class ToolLayer {
       dispatched = { ok: false, reason: "dispatch error" };
     }
     const message = `Pending: ${summary}. It shows as pending until the import writes it to the record` +
-      (dispatched.ok ? "." : "; the onboarding workflow could not be started now, so the next scheduled run imports it.");
+      (dispatched.ok ? "." : "; the onboarding workflow could not be started now, so it waits in the inbox for the next import run.");
     const outcome = await this.finish(ctx, now, { ...base, result: "pending", code: null, message, inboxId: key,
       budgetLeft: this.budgetLeft(agent, usage, tool.kind, 1) }, id);
     if (!dispatched.ok) {
