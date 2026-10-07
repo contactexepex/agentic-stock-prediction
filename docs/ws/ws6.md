@@ -274,6 +274,8 @@ matplotlib, only where `pypdf` is installed, and is skipped otherwise.)
 ## Judge verdicts
 - Round 1, FAIL, commit 12bdf5f83c6ba6aeb3c36e1ced49c58a43d402d9 (4 blockers: gate number checks x2, the
   judgments file claimed but missing, the PDF parse in the live check; all fixed in the next commit).
+- Round 2, PASS, commit 4db67b4d6d9238074de94dcc49869eed417f1e91 (all four blockers fixed; two new cosmetic findings,
+  listed under Cosmetic follow-ups).
 
 ## Proposed edits to shared docs
 **CLAUDE.md**, `## Layout`, after the `- News verification, phase B ...` bullet:
@@ -337,8 +339,12 @@ Until then `ai_replay` lists the kind as "no known publication-time rule" and le
 ## Cosmetic follow-ups
 From round 1 (fixed in the round-1 fix commit: the `schema_results.py` comment naming `quote_field`; the pasted ruff
 file count; the ambiguous "local midnight" wording; a minimum quote length, now `quote_min_words: 3`). Open:
-- `scripts/marketbrief/results/sources.py` (state_key): leaves out the numbers basis and as-of time, so an India
-  digest made from a standalone-only filing is not redone when the consolidated one is filed later than 24 h.
+- `scripts/marketbrief/results/sources.py` (state_key): a run that falls between an India company's standalone
+  and consolidated filings (inside the 24 h grace) stores a standalone digest that is never redone, because the
+  state key leaves out the numbers basis and as-of time (round 2).
+- `scripts/marketbrief/results/gate.py` / `digest.py` (`number_values`): the gate's matchable release values include
+  counters (`sessions_done`, `sessions_total`, `prev_quarter_gap_days`), so e.g. "EPS of Rs 1" passes when
+  sessions_total = 1; leave counters out (round 2).
 - `scripts/marketbrief/results/surprise.py`: the reaction is frozen at `created_at`; a digest stored before the
   window's first session shows `move_pct: null` until the release is digested again.
 - `scripts/marketbrief/results/sources.py` (`is_concall_doc`): a press release naming "transcript" in its first 3000
