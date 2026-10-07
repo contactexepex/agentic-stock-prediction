@@ -62,7 +62,8 @@ def markdown(cfg: dict, summary: dict) -> str:
         f"# Range backtest: {cfg['name']}, data to {summary['as_of_date']}",
         "",
         "_Formula only (no AI, no regime adjustments). Walk-forward: each day uses only "
-        "outcomes known before it. Target coverage: 50% and 80%. Interval score: lower is better._",
+        "outcomes known before it. Horizon N+k: from the as-of close to the close of the k-th session after the "
+        "next one (D). Target coverage: 50% and 80%. Interval score: lower is better._",
         "",
         "| Horizon | Window | n | 50% cover | 80% cover | Naive 80% cover | 80% width % | Naive width % | Score | "
         "Naive score |",
@@ -75,7 +76,7 @@ def markdown(cfg: dict, summary: dict) -> str:
         ):
             if window_summary.get("n"):
                 lines.append(
-                    f"| {horizon}d | {name} | {window_summary['n']} | {window_summary['cover50']:.1%} | "
+                    f"| N+{horizon} | {name} | {window_summary['n']} | {window_summary['cover50']:.1%} | "
                     f"{window_summary['cover80']:.1%} | "
                     f"{window_summary['naive_cover80']:.1%} | {window_summary['width80_pct']} | "
                     f"{window_summary['naive_width80_pct']} | "
@@ -103,10 +104,10 @@ def markdown(cfg: dict, summary: dict) -> str:
                     continue
                 off_summary, on_summary = window_summary["off"], window_summary["on"]
                 if not off_summary.get("n"):
-                    lines.append(f"| {horizon}d | {name} | 0 | | | | | | | {window_summary['verdict']} |")
+                    lines.append(f"| N+{horizon} | {name} | 0 | | | | | | | {window_summary['verdict']} |")
                     continue
                 lines.append(
-                    f"| {horizon}d | {name} | {window_summary['applies']} | {off_summary['cover80']:.1%} | "
+                    f"| N+{horizon} | {name} | {window_summary['applies']} | {off_summary['cover80']:.1%} | "
                     f"{on_summary['cover80']:.1%} | "
                     f"{off_summary['width80_pct']} | {on_summary['width80_pct']} | {off_summary['score80']} | "
                     f"{on_summary['score80']} | {window_summary['verdict']} |"
@@ -114,7 +115,7 @@ def markdown(cfg: dict, summary: dict) -> str:
     for horizon, per in summary["by_ticker"].items():
         lines += [
             "",
-            f"## {horizon}-day, per ticker",
+            f"## N+{horizon}, per ticker",
             "",
             "| Ticker | n | 80% cover | Score | Naive score |",
             "|---|---|---|---|---|",

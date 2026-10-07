@@ -19,6 +19,7 @@ from marketbrief.analytics.range_switches import enabled
 from marketbrief.constants.range_inputs import INPUT_BETA_SPLIT, INPUT_EARNINGS_HISTORY, TYPE_EARNINGS
 from marketbrief.constants.range_publication import (
     CALIBRATION_ID,
+    CALIBRATION_SQL,
     CUE_TIME_SQL,
     INDEX_CUE_SQL,
     LATEST_REGIME_SQL,
@@ -30,6 +31,7 @@ from marketbrief.constants.range_publication import (
 )
 from marketbrief.core.calendar import market_events, session_close_utc, session_open_utc, sessions_ahead
 from marketbrief.core.clock import utc_now
+from marketbrief.core.horizons import window_sessions
 
 
 @dataclass
@@ -64,27 +66,32 @@ class RangeContext:
 
 @dataclass
 class HorizonContext:
-    """One horizon of a run: its target session, calibration quantiles and whether a major event falls in it."""
+    """One horizon N+k of a run: its target (exit) session, the sessions from the as-of close to it (k + 1),
+    calibration quantiles and whether a major event falls in it."""
 
     horizon: int
     target: date
     quantiles: dict
     cal_id: str
     major: bool
+    sessions: int = 0
+
+    def __post_init__(self):
+        self.sessions = self.sessions or window_sessions(self.horizon)
 
 
-def target_date(cfg: dict, as_of, horizon: int):
-    """The session `h` trading days after `as_of`."""
-    return sessions_ahead(cfg, as_of + timedelta(days=1), horizon)[-1]
+def target_date(cfg: dict, as_of, sessions: int):
+    """The session `sessions` trading days after `as_of` (1 = D; the exit of N+k is window_sessions(k))."""
+    return sessions_ahead(cfg, as_of + timedelta(days=1), sessions)[-1]
 
 
 def first_target_close(cfg: dict, as_of):
-    """The close (UTC) of the first target session."""
+    """The close (UTC) of D, the first session after the as-of close (every horizon's window covers it)."""
     return session_close_utc(cfg, target_date(cfg, as_of, 1))
 
 
 def first_target_open(cfg: dict, as_of):
-    """The open (UTC) of the first target session."""
+    """The open (UTC) of D, the first session after the as-of close."""
     return session_open_utc(cfg, target_date(cfg, as_of, 1))
 
 
@@ -139,7 +146,7 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
     reg = reg.iloc[0]
     as_of = pd.Timestamp(reg["as_of_date"]).date()
     feats = con.execute("SELECT * FROM features_latest WHERE as_of_date = ?", [as_of]).df().set_index("ticker")
-    cal = con.execute("SELECT * FROM calibration_latest").df().set_index("horizon_days")
+    cal = con.execute(CALIBRATION_SQL).df().set_index("horizon_days")
     preds = con.execute(PREDICTIONS_SQL, [as_of]).df()
     existing = set(con.execute("SELECT id FROM ranges").df()["id"])
     bars = load_bars(con)
@@ -205,12 +212,12 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
 
 
 def horizon_context(ctx: RangeContext, horizon: int) -> HorizonContext | None:
-    """The horizon's target and calibration, or None when its outcome is already public (late or mid-session run)."""
-    target_day = target_date(ctx.cfg, ctx.as_of, horizon)
+    """The horizon's target (the exit session of N+k) and calibration, or None when its outcome is already public
+    (late run). A mid-session run (D has opened) still publishes every horizon, noted late (range_row): no N+k
+    exits at D's close, the window of each only starts in it."""
+    target_day = target_date(ctx.cfg, ctx.as_of, window_sessions(horizon))
     if ctx.made >= session_close_utc(ctx.cfg, target_day):
         return None  # late run: the target session already closed, its outcome is public
-    if target_day == ctx.first and ctx.made >= ctx.first_open:
-        return None  # mid-session run: the 1-day target session has opened, its outcome is partly public
     major = any(event["major"] for event in market_events(ctx.cfg, ctx.as_of + timedelta(days=1), target_day))
     if horizon in ctx.cal.index:
         calibration = ctx.cal.loc[horizon]

@@ -10,7 +10,8 @@ Probability by signal:
 - always_up: direction up, no probability; momentum: up when the as-of close is above the previous close.
 Rules (F2.6): no prediction (an abstention row) with quality BLOCKED or days_to_earnings <= 1; regime_filter:
 written with qualifies false in UNSTABLE / EVENT_HEAVY; cross_market true: abstains until a cross-market model
-score exists (B10). target_price = the range centre, the range as ranges.py publishes it (never narrowed)."""
+score exists (B10). target_price = the range's base_close x exp(center) (center is a log shift, not a price);
+the range as ranges.py publishes it (never narrowed)."""
 from __future__ import annotations
 
 import math
@@ -20,7 +21,8 @@ from marketbrief.constants.kinds import KIND_STRATEGY_ABSTENTIONS, KIND_STRATEGY
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab.constants import (ABSTAIN_ABSTAINED, ABSTAIN_BLOCKED, ABSTAIN_EARNINGS, DOWN, EARNINGS_BLOCK_DAYS,
                                        FILTERED_REGIMES, LAB_VERSION, MSG_NO_CROSS_SCORE, PROB_DIGITS,
-                                       QUALITY_BLOCKED, SIGNAL_ALWAYS_UP, SIGNAL_MOMENTUM, UP, VERIFIED_STATUSES)
+                                       PRICE_DIGITS, QUALITY_BLOCKED, SIGNAL_ALWAYS_UP, SIGNAL_MOMENTUM, UP,
+                                       VERIFIED_STATUSES)
 from marketbrief.lab.registry import config_hash
 from marketbrief.lab.sizing import qualifies
 from marketbrief.model.news_score import item_weight
@@ -89,6 +91,13 @@ def model_probability(params: dict, score: dict, news: list[dict], news_cfg: dic
     return prob, [item["id"] for item, _ in ranked]
 
 
+def target_price(rng: dict, inputs: TickerInputs) -> float:
+    """The range's expected exit close: its base_close x exp(center); `center` is a log shift, not a price (B10's
+    ranges rows; the as-of close when the row has no base_close)."""
+    base = rng.get("base_close") or inputs.base_close
+    return round(float(base) * math.exp(float(rng["center"])), PRICE_DIGITS)
+
+
 def evidence(spec: dict, inputs: TickerInputs, horizon: int, news_ids: list[str], statuses: dict) -> list[str]:
     """The inputs used (F2.6: model score and feature snapshot ids), then the counted news ids when the first is
     confirmed_primary or corroborated (DESIGN.md 3b: otherwise no news id is cited)."""
@@ -119,7 +128,7 @@ def prediction(spec: dict, inputs: TickerInputs, horizon: int, news_cfg: dict) -
                as_of_date=inputs.as_of_date, session_date=inputs.session_date, exit_date=inputs.exit_dates[horizon],
                horizon_days=horizon, direction=direction, prob_up=prob,
                confidence=None if prob is None else round(max(prob, 1 - prob), PROB_DIGITS),
-               threshold=spec["threshold"], base_close=inputs.base_close, target_price=rng["center"],
+               threshold=spec["threshold"], base_close=inputs.base_close, target_price=target_price(rng, inputs),
                range_id=rng["id"], lo50=rng["lo50"], hi50=rng["hi50"], lo80=rng["lo80"], hi80=rng["hi80"],
                range_widen=0.0, model_score_id=score["id"] if score and prob is not None else None,
                model_prob=score["prob_model"] if score and prob is not None else None,

@@ -19,7 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from marketbrief.analytics import indicators  # noqa: E402
 from marketbrief.constants.model import (KIND_AGENT_REASONING, KIND_MODEL_SCORES, KIND_MODEL_VERSIONS,  # noqa: E402
                                          LABEL_CLOSE_TO_CLOSE, LABEL_OPEN_TO_CLOSE)
-from marketbrief.core import paths  # noqa: E402
+from marketbrief.core import calendar, paths  # noqa: E402
+from marketbrief.core.horizons import horizons  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.model import daily_scores  # noqa: E402
@@ -115,11 +116,25 @@ def test_label_convention_open_d_to_close_d_plus_1():
     o, c = bars["open"].to_numpy(), bars["close"].to_numpy()
     assert one[f"ret_{LABEL_OPEN_TO_CLOSE}_1d"].iloc[3] == pytest.approx(c[5] / o[4] - 1)     # D = 4, D+1 = 5
     assert one[f"end_{LABEL_OPEN_TO_CLOSE}_1d"].iloc[3] == bars.index[5]
-    assert five[f"ret_{LABEL_OPEN_TO_CLOSE}_5d"].iloc[3] == pytest.approx(c[8] / o[4] - 1)    # D+4 = 8
-    assert one[f"ret_{LABEL_CLOSE_TO_CLOSE}_1d"].iloc[3] == pytest.approx(c[4] / c[3] - 1)
-    assert five[f"ret_{LABEL_CLOSE_TO_CLOSE}_5d"].iloc[3] == pytest.approx(c[8] / c[3] - 1)
+    assert five[f"ret_{LABEL_OPEN_TO_CLOSE}_5d"].iloc[3] == pytest.approx(c[9] / o[4] - 1)    # N+5: D+5 = 9
+    assert five[f"end_{LABEL_OPEN_TO_CLOSE}_5d"].iloc[3] == bars.index[9]
+    # close_to_close shares the exit of N+k (decision 37): the as-of close to the close of D+k
+    assert one[f"ret_{LABEL_CLOSE_TO_CLOSE}_1d"].iloc[3] == pytest.approx(c[5] / c[3] - 1)
+    assert five[f"ret_{LABEL_CLOSE_TO_CLOSE}_5d"].iloc[3] == pytest.approx(c[9] / c[3] - 1)
     assert one["entry_open_1d"].iloc[3] == pytest.approx(o[4])
     assert pd.isna(one[f"ret_{LABEL_OPEN_TO_CLOSE}_1d"].iloc[10])                              # D+1 past the data
+    assert pd.isna(five[f"ret_{LABEL_OPEN_TO_CLOSE}_5d"].iloc[6])                              # D+5 = 12 past the data
+    assert pd.notna(five[f"ret_{LABEL_OPEN_TO_CLOSE}_5d"].iloc[5])                             # D+5 = 11, the last bar
+
+
+@pytest.mark.parametrize("horizon", [1, 2, 3, 4, 5])
+def test_every_horizon_sells_at_the_close_of_the_kth_session_after_d(horizon):
+    bars = frame(5).iloc[:12]
+    pos = pd.Series(np.arange(len(bars)), index=bars.index)
+    labels = forward_labels(bars, pos, horizon)
+    o, c = bars["open"].to_numpy(), bars["close"].to_numpy()
+    assert labels[f"ret_{LABEL_OPEN_TO_CLOSE}_{horizon}d"].iloc[2] == pytest.approx(c[3 + horizon] / o[3] - 1)
+    assert labels[f"end_{LABEL_OPEN_TO_CLOSE}_{horizon}d"].iloc[2] == bars.index[3 + horizon]
 
 
 def test_label_missing_when_a_session_is_skipped():
@@ -306,16 +321,28 @@ def test_daily_scores_end_to_end(tmp_path, monkeypatch, inputs):
     monkeypatch.setenv("MB_NOW", f"{DAYS[-1].date() + pd.Timedelta(days=1)}T12:00:00+00:00")
     monkeypatch.setattr(daily_scores, "load_model_config", lambda: SETTINGS)
     first = daily_scores.run(CFG)
-    assert first["scores"] == 2 * len(CFG["tickers"]) and len(first["new_model_versions"]) == 2
+    count = 2 * len(horizons())               # N+1..N+5 (config/strategies.yaml) x the base and cross_market models
+    assert first["scores"] == count * len(CFG["tickers"]) and len(first["new_model_versions"]) == count
     files = list((tmp_path / "data" / "us" / KIND_MODEL_SCORES).rglob("*.jsonl"))
     rows = [json.loads(x) for f in files for x in f.read_text().splitlines()]
     assert set(rows[0]) == set(SCHEMAS[KIND_MODEL_SCORES][1])
+    rows = sorted(rows, key=lambda r: r["id"])
     assert rows[0]["id"] == f"{DAYS[-1].date()}-{rows[0]['ticker']}-{rows[0]['horizon_days']}d"
     assert all(0 < r["prob_up"] < 1 and r["label_convention"] == LABEL_OPEN_TO_CLOSE for r in rows)
+    assert {r["horizon_days"] for r in rows} == set(horizons()) and {r["horizon_label"] for r in rows} == {"n_plus_k"}
+    assert not any("cross_market" in r["id"] or "model_variant" in r for r in rows)   # base model only
+    variant = [json.loads(x) for f in (tmp_path / "data" / "us" / "model_variant_scores").rglob("*.jsonl")
+               for x in f.read_text().splitlines()]
+    assert len(variant) == len(rows) and {r["model_variant"] for r in variant} == {"cross_market"}
+    assert all(r["id"].endswith("d-cross_market") and set(r) == set(SCHEMAS["model_variant_scores"][1])
+               for r in variant)
+    for r in rows:                                                        # D and the k-th session after D
+        days = calendar.sessions_ahead(CFG, DAYS[-1].date() + pd.Timedelta(days=1), r["horizon_days"] + 1)
+        assert (r["entry_date"], r["exit_date"]) == (str(days[0]), str(days[-1]))
     versions = [json.loads(x) for f in (tmp_path / "data" / "us" / KIND_MODEL_VERSIONS).rglob("*.jsonl")
                 for x in f.read_text().splitlines()]
     assert set(versions[0]) == set(SCHEMAS[KIND_MODEL_VERSIONS][1])
     assert not math.isnan(versions[0]["model"]["intercept"])
     second = daily_scores.run(CFG)                                        # same day again: stored model reused
-    assert second["scores"] == 0 and second["unchanged"] == 2 * len(CFG["tickers"])
+    assert second["scores"] == 0 and second["unchanged"] == count * len(CFG["tickers"])
     assert second["new_model_versions"] == []

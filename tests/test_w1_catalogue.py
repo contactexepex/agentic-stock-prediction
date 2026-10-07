@@ -262,14 +262,8 @@ def test_no_tool_mentions_orders_or_brokers():
 
 # ---------------- contracts ----------------
 
-@pytest.mark.parametrize("module", [horizons])   # watchlist (B1) and protocol (B2) are built: see below
-def test_contract_functions_are_stubs(module):
-    functions = [f for name, f in inspect.getmembers(module, inspect.isfunction) if f.__module__ == module.__name__]
-    assert functions
-    for function in functions:
-        assert function.__doc__, function.__name__
-        source = inspect.getsource(function)
-        assert "raise NotImplementedError" in source, function.__name__
+# All three contracts are built: watchlist by B1 (tests/test_lifecycle.py), horizons by B10 (tests/test_horizons.py),
+# protocol by B2 (delegation checked below), so no stub test remains.
 
 
 def test_protocol_contract_delegates_to_the_lab_with_the_same_signatures():

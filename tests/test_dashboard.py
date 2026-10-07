@@ -119,8 +119,82 @@ def scored_rows(root: Path) -> None:
                 "hit80": hit80,
             }
         )
+    # an N+1 range (decision 37, horizon_label n_plus_k) scored on the same date: never pooled with the old 1-day
+    ranges.append(
+        {
+            **ranges[0],
+            "id": "2026-09-30-JPM-1d",
+            "as_of_date": "2026-09-30",
+            "horizon_label": "n_plus_k",
+            "entry_date": "2026-10-01",
+            "exit_date": "2026-10-02",
+        }
+    )
+    routs.append({**routs[0], "range_id": "2026-09-30-JPM-1d", "hit80": False})
     append(root, "ranges", "2026-10-01", ranges)
     append(root, "range_outcomes", "2026-10-02", routs)
+    # an old open-to-close 5-day call (D+4 window, legacy_5d_d4): its own basis key, never pooled with N+k calls
+    append(root, "predictions", "2026-09-29", [{**preds[2], "id": "2026-09-22-JPM-5d", "horizon_days": 5}])
+    append(
+        root,
+        "outcomes",
+        "2026-10-01",
+        [{**outs[2], "prediction_id": "2026-09-22-JPM-5d", "horizon_label": "legacy_5d_d4"}],
+    )
+
+
+def n_plus_k_rows(root: Path) -> None:
+    """N+2 and N+3 ranges and model scores of the as-of date (B10 rows: horizon_label, entry and exit dates)."""
+    for h, exit_day in ((2, "2026-10-09"), (3, "2026-10-12")):
+        window = {"horizon_label": "n_plus_k", "entry_date": "2026-10-07", "exit_date": exit_day}
+        append(
+            root,
+            "ranges",
+            "2026-10-06",
+            [
+                {
+                    "id": f"2026-10-06-JPM-{h}d",
+                    "made_at": "2026-10-06T22:00:00+00:00",
+                    "as_of_date": "2026-10-06",
+                    "session_date": "2026-10-07",
+                    "ticker": "JPM",
+                    "horizon_days": h,
+                    "base_close": 300.0,
+                    "center": 0.0,
+                    "lo50": 295.0,
+                    "hi50": 305.0,
+                    "lo80": 290.0,
+                    "hi80": 310.0,
+                    "target_date": exit_day,
+                    "notes": [],
+                    "inputs": [],
+                    **window,
+                }
+            ],
+        )
+        append(
+            root,
+            "model_scores",
+            "2026-10-06",
+            [
+                {
+                    "id": f"2026-10-06-JPM-{h}d",
+                    "as_of_date": "2026-10-06",
+                    "ticker": "JPM",
+                    "horizon_days": h,
+                    "prob_up": 0.52,
+                    "prob_model": 0.52,
+                    "base_rate": 0.5,
+                    "calibrated": False,
+                    "label_convention": "open_to_close",
+                    "trained_until": "2026-09-30",
+                    "computed_at": "2026-10-06T22:00:00+00:00",
+                    "model_id": f"test-{h}d",
+                    "contributions": {"groups": {"baseline": 0.0}},
+                    **window,
+                }
+            ],
+        )
 
 
 def earlier_adjustment(root: Path) -> None:
@@ -233,6 +307,7 @@ def built(tmp_path_factory):
     scored_rows(root)
     earlier_adjustment(root)
     later_rows(root)
+    n_plus_k_rows(root)
     saved = common.ROOT
     common.ROOT = root
     try:
@@ -274,10 +349,28 @@ def test_numbers_equal_the_source_views(built):
             [m["id"], CUTOFF],
         ).fetchone()
         assert m["prob_up"] == prob and m["baseline_points"] == json.loads(groups)["baseline"]
-    assert {m["h"]: (m["entry"], m["exit"]) for m in jpm["model"]} == {
-        1: ("2026-10-07", "2026-10-08"),
-        5: ("2026-10-07", "2026-10-13"),
+    # N+k: the close of D+k (stored exit_date; N+1 stored before B10 is the same window); an old 5-day score keeps
+    # its D+4 exit (legacy_5d_d4)
+    assert {m["h"]: (m["entry"], m["exit"], m["horizon_label"], m["name"]) for m in jpm["model"]} == {
+        1: ("2026-10-07", "2026-10-08", "n_plus_k", "N+1: sell at the close of D+1"),
+        2: ("2026-10-07", "2026-10-09", "n_plus_k", "N+2: sell at the close of D+2"),
+        3: ("2026-10-07", "2026-10-12", "n_plus_k", "N+3: sell at the close of D+3"),
+        5: ("2026-10-07", "2026-10-13", "legacy_5d_d4", "Buy today, sell within 5 days"),
     }
+    assert data["plan"] == {
+        "entry": "2026-10-07",
+        "horizons": [1, 2, 3, 4, 5],
+        "exits": {"1": "2026-10-08", "2": "2026-10-09", "3": "2026-10-12", "4": "2026-10-13", "5": "2026-10-14"},
+        "exit_1d": "2026-10-08",
+        "exit_5d": "2026-10-14",
+        "sessions": ["2026-10-07", "2026-10-08", "2026-10-09", "2026-10-12", "2026-10-13", "2026-10-14"],
+    }
+    assert [(r["h"], r["horizon_label"], r["name"]) for r in jpm["ranges"]] == [
+        (1, "legacy_cc", "Next session"),
+        (2, "n_plus_k", "N+2"),
+        (3, "n_plus_k", "N+3"),
+        (5, "legacy_cc", "5 sessions"),
+    ]
     bull = con.execute(
         "SELECT bull_case FROM agent_reasoning WHERE ticker = 'JPM' AND written_at <= ? "
         "ORDER BY written_at DESC LIMIT 1",
@@ -314,7 +407,8 @@ def test_nothing_after_the_cut_off_or_the_as_of(built):
     assert all(n["ts"] <= CUTOFF.isoformat() for c in data["companies"] for n in c["news"])
     assert data["skill"]["state"] == "paper" and data["skill"]["review"]["id"] == "2026-W40"
     assert data["track"]["replay"] is None
-    assert [r["inside80"]["n"] for r in data["track"]["ranges"]] == [1, 1]  # the range scored later is left out
+    # the range scored later is left out; N+1 and the old 1-day window are two rows
+    assert [r["inside80"]["n"] for r in data["track"]["ranges"]] == [1, 1, 1]
 
 
 def test_bars_earnings_and_splits_as_of_the_cut_off(built):
@@ -356,16 +450,30 @@ def test_stored_text_cannot_break_the_page():
 
 def test_track_record_per_basis_never_pooled(built):
     track = built["data"]["track"]
-    by_basis = {b["basis"]: b["all"] for b in track["calls"]}
-    assert set(by_basis) == {"close_to_close", "open_to_close"}
+    by_basis = {b["key"]: b["all"] for b in track["calls"]}
+    assert set(by_basis) == {"close_to_close", "open_to_close", "open_to_close legacy_5d_d4"}
+    assert by_basis["open_to_close legacy_5d_d4"]["n"] == 1
+    horizons_of = {b["key"]: {k: v["name"] for k, v in b["by_horizon"].items()} for b in track["calls"]}
+    assert horizons_of == {
+        "close_to_close": {"1d legacy_cc": "1 day"},
+        "open_to_close": {"1d": "N+1"},
+        "open_to_close legacy_5d_d4": {"5d legacy_5d_d4": "5 days"},
+    }
     assert (by_basis["close_to_close"]["n"], by_basis["close_to_close"]["hits"]) == (2, 1)
     assert (by_basis["open_to_close"]["n"], by_basis["open_to_close"]["hits"]) == (3, 2)
     assert by_basis["open_to_close"]["always_up"] == pytest.approx(2 / 3, abs=1e-4)
     lo, hi = scoring.wilson(2, 3)
     assert (by_basis["open_to_close"]["wilson_lo"], by_basis["open_to_close"]["wilson_hi"]) == (lo, hi)
-    ranges = {r["h"]: r for r in track["ranges"]}
-    assert (ranges[1]["inside80"]["n"], ranges[1]["inside80"]["hits"], ranges[1]["inside50"]["hits"]) == (1, 1, 1)
-    assert (ranges[5]["inside80"]["hits"], ranges[5]["inside50"]["hits"]) == (1, 0)
+    ranges = {r["key"]: r for r in track["ranges"]}
+    assert [(r["key"], r["name"]) for r in track["ranges"]] == [
+        ("1d", "N+1"),
+        ("1d legacy_cc", "Next session"),
+        ("5d legacy_cc", "5 sessions"),
+    ]
+    old = ranges["1d legacy_cc"]
+    assert (old["inside80"]["n"], old["inside80"]["hits"], old["inside50"]["hits"]) == (1, 1, 1)
+    assert (ranges["1d"]["inside80"]["n"], ranges["1d"]["inside80"]["hits"]) == (1, 0)
+    assert (ranges["5d legacy_cc"]["inside80"]["hits"], ranges["5d legacy_cc"]["inside50"]["hits"]) == (1, 0)
 
 
 def test_empty_market_builds(tmp_path):
@@ -475,8 +583,13 @@ const { chromium } = require('playwright');
     await p.click('[data-span="1Y"]'); await p.waitForTimeout(200); const year = await range();
     await p.click('#st-next'); await p.waitForTimeout(300);
     const next = await p.evaluate(() => window.MB.state.ticker);
+    const texts = {};
+    for (const view of ['track', 'how', 'overview']) {
+      await p.evaluate(v => window.MB.go(v), view); await p.waitForTimeout(200);
+      texts[view] = await p.textContent('#view-' + view);
+    }
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-    out[w] = {errors, requests, rows, canvases, fan, week, year, next, overflow};
+    out[w] = {errors, requests, rows, canvases, fan, week, year, next, overflow, texts};
   }
   console.log(JSON.stringify(out)); await b.close();
 })();
@@ -509,3 +622,14 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
         assert o["errors"] == [] and o["requests"] == [] and o["overflow"] is False, o
         assert o["rows"] == len(built["cfg"]["tickers"]) and o["canvases"] > 0 and o["fan"] == 2
         assert o["week"] == "2026-09-29" and o["year"] < "2025-10-10" and o["next"] == banks[banks.index("JPM") + 1]
+    # every configured horizon N+k is on the page, the old windows keep their names (B10)
+    assert "N+2: sell at the close of D+2" in out["stock_text"] and "Buy today, sell within 5 days" in out["stock_text"]
+    assert "N+3" in out["stock_text"] and "5 sessions" in out["stock_text"]
+    texts = out["1280"]["texts"]
+    assert "N+5: sold at the close of D+5 (Wed 14 Oct)" in texts["how"]
+    assert (
+        "P(up) N+1" in texts["overview"]
+        and "P(up) N+5" in texts["overview"]
+        and "N+4: sell at the close of" in texts["overview"]
+    )
+    assert "N+1" in texts["track"] and "Next session" in texts["track"] and "open→close D+4 (legacy)" in texts["track"]

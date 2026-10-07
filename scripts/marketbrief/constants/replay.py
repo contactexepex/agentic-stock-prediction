@@ -29,8 +29,8 @@ LIMITATIONS = [
     "Relationship and smart-money widening are off in config/ranges.yaml and not replayed.",
     "Past earnings and ex-dividend dates are treated as known in advance (they are scheduled); a backfilled "
     "row does not say when its date was first announced.",
-    "Confidence intervals are clustered by date blocks (all stocks share a day; 5-day outcomes overlap), "
-    "so they are wider than a naive binomial interval.",
+    "Confidence intervals are clustered by date blocks as long as each horizon's window (all stocks share a "
+    "day; the outcomes of N+k span k + 1 sessions and overlap), so they are wider than a naive binomial interval.",
 ]
 
 SCORE_NOTE = (
@@ -51,6 +51,7 @@ ACI_GRID = tuple(
 MIN_EWMA_BARS = 31  # ranges.py needs an EWMA volatility of 31 bars
 
 # ---------- rule replay: cli ----------
+HEADLINE_HORIZONS = ("1", "5")  # the replays schema's headline columns (cover50_1d ... always_up_5d): N+1 and N+5
 MSG_ACI_OPTIONS_NEED_ACI = "--aci-gamma, --aci-by-regime and --aci-tune-end need --aci"
 MSG_NO_TRADING_DAYS_IN_THE_WINDOW = "no trading days in the window"
 

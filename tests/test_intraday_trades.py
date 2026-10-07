@@ -519,6 +519,12 @@ def test_unwatched_ticker_rows_and_alerts_cli_dates(market, monkeypatch, capsys)
     assert cli.main() == 0
     alerts = json.loads(capsys.readouterr().out)["alerts"]
     assert alerts and {row["session_date"] for row in alerts} == {SESSION}
+    assert configured_horizons() == (1, 2, 3, 4, 5)                  # B10's contract (built)
+    from marketbrief.contracts import horizons as horizon_contract
+
+    def not_built():
+        raise NotImplementedError("session B10")
+    monkeypatch.setattr(horizon_contract, "horizons", not_built)    # the fallback: strategies.yaml, cached
     before = _horizons_in.cache_info().hits
     assert configured_horizons() == configured_horizons() == (1, 2, 3, 4, 5)
     assert _horizons_in.cache_info().hits >= before + 1
@@ -565,6 +571,47 @@ def test_stored_bars_apply_a_correction_only_once_detected(market):
     before_split = datetime(2026, 10, 7, 4, 45, tzinfo=timezone.utc)                # bars known, split not yet
     assert aapl_close(before_split) == pytest.approx(333.63)
 
+
+
+def test_old_five_day_score_keeps_its_d4_window(market):
+    """Issue #94: a 5-day open-to-close score computed before call_scoring.n_plus_k_from (config/settings.yaml) is
+    legacy_5d_d4: bought at the open of D (09-30) and sold at the close of D+4 (10-06), so it is no longer open on
+    10-07. Under N+5 it would end at D+5 = 10-07."""
+    from marketbrief.intraday.inputs import open_calls
+
+    root, cfg, _settings = market
+    jl(root, "model_scores", "2026-09-30", [
+        {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00"},
+        {"id": "2026-10-02-NVDA-5d", "as_of_date": "2026-10-02", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-10-05T04:40:00+00:00"}])
+    calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), CHECK)
+    found = {call["id"]: call for call in calls.get("NVDA", [])}
+    assert "2026-09-29-NVDA-5d" not in found                     # ended at D+4 = 10-06
+    assert found["2026-10-02-NVDA-5d"]["horizon_label"] == "legacy_5d_d4"
+    assert found["2026-10-02-NVDA-5d"]["last_session"] == "2026-10-09"   # D = 10-05, D+4 = 10-09
+
+
+def test_score_window_follows_its_stored_label_not_its_time(market):
+    """Issue #94 (judge round 1): a model score's window is the label it is stored with, as B10's other readers do,
+    whatever its computed_at: a 5-day score stored n_plus_k ends at D+5 even when computed before
+    call_scoring.n_plus_k_from; an unlabelled 5-day score is legacy_5d_d4 (D+4) even when computed after it."""
+    from marketbrief.intraday.inputs import open_calls
+
+    root, cfg, _settings = market
+    jl(root, "model_scores", "2026-10-07", [
+        {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00",
+         "horizon_label": "n_plus_k"},
+        {"id": "2026-09-29-AAPL-5d", "as_of_date": "2026-09-29", "ticker": "AAPL", "horizon_days": 5,
+         "label_convention": "open_to_close", "prob_up": 0.6,
+         "computed_at": "2026-10-07T22:00:00+00:00"}])                 # after n_plus_k_from, before the check
+    late = datetime(2026, 10, 7, 23, 0, tzinfo=timezone.utc)          # after n_plus_k_from (2026-10-07T21:19Z)
+    calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), late)
+    nvda = {call["id"]: call for call in calls.get("NVDA", [])}
+    assert nvda["2026-09-29-NVDA-5d"]["horizon_label"] == "n_plus_k"
+    assert nvda["2026-09-29-NVDA-5d"]["last_session"] == "2026-10-07"   # D = 09-30, D+5 = 10-07
+    assert "2026-09-29-AAPL-5d" not in {call["id"] for call in calls.get("AAPL", [])}   # D+4 = 10-06: ended
 
 
 def test_delayed_exit_trade_is_watched_until_settled(market):

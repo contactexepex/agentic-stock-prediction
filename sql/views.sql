@@ -847,3 +847,26 @@ FROM (SELECT DISTINCT ON (id) * FROM intraday_alerts ORDER BY id, computed_at) a
 LEFT JOIN (SELECT DISTINCT ON (check_row_id) * FROM intraday_explanations ORDER BY check_row_id, created_at, id) x
   ON x.check_row_id = a.check_row_id
 ORDER BY a.check_at, a.ticker, a.id;
+
+-- B10 (docs/SPEC.md F2.7; core/horizons.py): horizon labels on read. Horizon k is N+k (buy at the open of D, sell at
+-- the close of the k-th session after D). Rows written before B10 carry no horizon_label and keep their window:
+-- ranges are legacy_cc (1-day: D's close, 5-day: D+4's close); open-to-close model scores and calls are N+1
+-- (1-day, the same window) or legacy_5d_d4 (5-day: D+4's close); close-to-close outcomes are legacy_cc. These
+-- three definitions replace the ones above with the same rows and a filled horizon_label (views that read them,
+-- open_ranges and range_record, pick it up); a legacy row is never pooled with an n_plus_k one.
+CREATE OR REPLACE VIEW ranges_latest AS
+SELECT DISTINCT ON (id) * REPLACE (coalesce(horizon_label, 'legacy_cc') AS horizon_label)
+FROM ranges ORDER BY id, made_at;
+
+CREATE OR REPLACE VIEW model_scores_latest AS
+SELECT DISTINCT ON (id) * REPLACE (coalesce(horizon_label, CASE WHEN horizon_days = 1 THEN 'n_plus_k'
+                                                           ELSE 'legacy_5d_d4' END) AS horizon_label)
+FROM model_scores ORDER BY id, computed_at DESC, prob_up, model_id;
+
+CREATE OR REPLACE VIEW track_record AS
+SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at,
+       coalesce(o.label_basis, 'close_to_close') AS label_basis, o.entry_date, o.entry_open,
+       coalesce(o.horizon_label,
+                CASE WHEN coalesce(o.label_basis, 'close_to_close') = 'close_to_close' THEN 'legacy_cc'
+                     WHEN p.horizon_days = 1 THEN 'n_plus_k' ELSE 'legacy_5d_d4' END) AS horizon_label
+FROM predictions p JOIN outcomes o ON o.prediction_id = p.id;

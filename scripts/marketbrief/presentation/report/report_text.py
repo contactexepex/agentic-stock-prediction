@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from marketbrief.constants.report import DISCLAIMER
+from marketbrief.core.horizons import horizons
 from marketbrief.presentation.report.formatting import data_stamp, md_link, review_line
 from marketbrief.presentation.report.report_parts import ReportParts
 from marketbrief.utils.markdown import markdown_table
@@ -27,6 +28,7 @@ def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
     n_late = parts.n_late
     nh80 = parts.nh80
     one_day_count = parts.one_day_count
+    first, last = horizons()[0], horizons()[-1]   # the Today table's columns (N+k, B10)
     partial = parts.partial
     reg = parts.reg
     regime_line = parts.regime_line
@@ -58,7 +60,7 @@ def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
         f"### Ranges scored (target date {day['last_target'] or '–'})",
         "",
         (
-            f"Next-day ranges: **80% hit {h80}/{one_day_count}** (naive {nh80}/{one_day_count}) · 50% hit "
+            f"{parts.one_day_name} ranges: **80% hit {h80}/{one_day_count}** (naive {nh80}/{one_day_count}) · 50% hit "
             f"{h50}/{one_day_count}"
             if one_day_count
             else "No ranges have matured yet."
@@ -77,7 +79,8 @@ def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
         *([release_line, ""] if release_line else []),
         *img("ranges.png", "Price ranges for every company"),
         markdown_table(
-            ["Ticker", "Sector", "Close", "Next day 80%", "Next day 50%", "5 days 80%", "Call", "Cue", "Notes"],
+            ["Ticker", "Sector", "Close", f"N+{first} 80%", f"N+{first} 50%", f"N+{last} 80%", "Call", "Cue",
+             "Notes"],
             today_rows,
         ),
         *(

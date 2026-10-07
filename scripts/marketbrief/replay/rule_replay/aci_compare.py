@@ -110,7 +110,7 @@ def held_out(
         end,
     )
 
-    def tune(group: pd.DataFrame) -> pd.Series:  # outcome known by tune_end too (5-day targets cross it)
+    def tune(group: pd.DataFrame) -> pd.Series:  # outcome known by tune_end too (N+k exits cross it)
         """The rows used to choose the settings (as-of date and outcome on or before the tune end)."""
         return (group["date"] <= tune_end) & group["bar_target"].map(
             lambda item: isinstance(item, date) and item <= tune_end
@@ -193,7 +193,7 @@ def aci_table(comparison: dict) -> str:
             if not before.get("n"):
                 continue
             rows.append(
-                f"<tr><td>{horizon}d</td><td>{escape_html(key)}</td><td>{before['n']:,}</td>"
+                f"<tr><td>N+{horizon}</td><td>{escape_html(key)}</td><td>{before['n']:,}</td>"
                 + "".join(
                     f"<td>{scaled_text(before.get(metric))} → {scaled_text(after.get(metric))}</td>"
                     for metric in ("cover50", "cover80")

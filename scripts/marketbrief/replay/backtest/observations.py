@@ -10,6 +10,7 @@ import pandas as pd
 from marketbrief.analytics import earnings_reaction, index_cue, range_math
 from marketbrief.constants.indicators import TRADING_DAYS
 from marketbrief.core import calendar, market_config
+from marketbrief.core.horizons import window_sessions
 
 
 def rolling_beta(close: pd.Series, bench: pd.Series, window: int = TRADING_DAYS, min_obs: int = 60) -> pd.Series:
@@ -54,11 +55,11 @@ def index_cue_series(cfg: dict, bars: dict, ranges_config: dict) -> pd.Series | 
     return (betas * cue_by_day).reindex(bench.index)
 
 
-def mark_window(length: int, positions: list[int], horizon: int) -> np.ndarray:
-    """Rows i whose horizon (i, i+h] contains one of the positions."""
+def mark_window(length: int, positions: list[int], sessions: int) -> np.ndarray:
+    """Rows i whose window (i, i+sessions] contains one of the positions (N+k: sessions = k + 1)."""
     out = np.zeros(length, dtype=bool)
     for position in positions:
-        out[max(0, position - horizon) : max(0, position)] = True
+        out[max(0, position - sessions) : max(0, position)] = True
     return out
 
 
@@ -71,15 +72,17 @@ def observations(  # noqa: PLR0913 (the walk-forward inputs; callers pass them b
     cfg: dict | None = None,
     extra: dict | None = None,
 ) -> pd.DataFrame:
-    """The walk-forward observations: standardised outcomes per ticker and day."""
+    """The walk-forward observations: standardised outcomes per ticker and day. The outcome of horizon N+k is the
+    close k + 1 sessions after the as-of close (core/horizons.window_sessions), as ranges.py targets it."""
     out = []
+    sessions = window_sessions(horizon)
     for ticker_symbol in tickers:
         frame = bars.get(ticker_symbol)
-        if frame is None or len(frame) < ranges_config["warmup_bars"] + horizon + 21:
+        if frame is None or len(frame) < ranges_config["warmup_bars"] + sessions + 21:
             continue
         close_series = frame["close"]
         standardized_returns = range_math.standardized(
-            close_series, horizon, ranges_config["ewma_lambda"], ranges_config["warmup_bars"]
+            close_series, sessions, ranges_config["ewma_lambda"], ranges_config["warmup_bars"]
         )
         logr = np.log(close_series / close_series.shift(1))
         s20 = logr.rolling(20).std(ddof=1)
@@ -105,13 +108,14 @@ def input_columns(
     cfg: dict, ranges_config: dict, frame: pd.DataFrame, ticker: str, horizon: int, extra: dict
 ) -> pd.DataFrame:
     """Per as-of date: earnings in horizon and the walk-forward multiple, ex-dividend log shift,
-    beta at d and the cue proxies."""
+    beta at d and the cue proxies. The window of horizon N+k is the k + 1 sessions after d up to the exit."""
     close, bar_index = frame["close"], frame.index
+    sessions = window_sessions(horizon)
     length = len(bar_index)
     position_of_day = {timestamp.date(): position for position, timestamp in enumerate(bar_index)}
     # the calendar's sessions after the last stored bar get the positions they will have (issue #27), so an
     # earnings day or ex-date just after a cut-off data set still flags the last days before it
-    after_last = calendar.sessions_ahead(cfg, bar_index[-1].date() + timedelta(days=1), horizon) if length else []
+    after_last = calendar.sessions_ahead(cfg, bar_index[-1].date() + timedelta(days=1), sessions) if length else []
     position_of_day.update({day: length + offset for offset, day in enumerate(after_last)})
     input_frame = pd.DataFrame(index=bar_index)
     # earnings: each as-of date d uses the events as known at d (SEC 2.02 filings classified by
@@ -135,7 +139,7 @@ def input_columns(
             for affected_session in earnings_reaction.affected_sessions(cfg, event_day, timing)
             if affected_session in position_of_day
         ]
-        window_rows = mark_window(length, event_positions, horizon) & live
+        window_rows = mark_window(length, event_positions, sessions) & live
         earn |= window_rows
         moves = earnings_reaction.past_moves(cfg, close, sigma, events, ranges_config["warmup_bars"])
         for row_position in np.flatnonzero(window_rows):
@@ -144,13 +148,13 @@ def input_columns(
             )[0]
     input_frame["earn"] = earn
     input_frame["m_hist"] = history_multiplier
-    # dividends: log shift for ex-dates inside (d, d+h]
+    # dividends: log shift for ex-dates inside (d, exit of N+k]
     shift = np.zeros(length)
     for ex_day, amount in extra["dividends"].get(ticker, []):
         position = position_of_day.get(calendar.next_session(cfg, ex_day))
         if position is None or not amount:
             continue
-        for row_position in range(max(0, position - horizon), min(position, length)):
+        for row_position in range(max(0, position - sessions), min(position, length)):
             shift[row_position] += range_math.ex_dividend_shift(float(close.iloc[row_position]), [amount])
     input_frame["div_shift"] = shift
     input_frame["has_div"] = shift != 0

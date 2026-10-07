@@ -20,6 +20,7 @@ from marketbrief.collectors import event_timing, events_nse, nse_session  # noqa
 from marketbrief.collectors import events as ce  # noqa: E402
 from marketbrief.collectors import options as co  # noqa: E402
 from marketbrief.core import calendar as ev  # noqa: E402
+from marketbrief.core.horizons import horizons  # noqa: E402
 from marketbrief.analytics import earnings_reaction, event_history, index_cue, range_switches  # noqa: E402
 from marketbrief.analytics import range_math as rl  # noqa: E402
 from test_pipeline import MARKET, fat_tailed_walk, run, setup, weekdays, write_bars  # noqa: E402
@@ -271,7 +272,8 @@ def test_ranges_apply_inputs(tmp_path):
     moves = [(math.log(c[i] / c[i - 1]), float(sig[i - 1]), 1) for i in earn_idx]
     m, k = rl.earnings_multiple(moves, 2.5, 2, 4, 8.0)
     assert k == len(earn_idx) and m > 3.5 and m != rl.earnings_multiple(moves, 3.0, 2, 4, 8.0)[0]
-    assert abs(a1["sigma_h"] - sd["AAPL"] * m) < 2e-6                 # h=1: variance sd^2 * m^2
+    # N+1 spans 2 sessions (as-of close -> D+1's close), one of them the earnings day: variance sd^2 * (1 + m^2)
+    assert abs(a1["sigma_h"] - sd["AAPL"] * math.sqrt(1 + m * m)) < 2e-6
     assert set(a1["inputs"]) == {"earnings_history", "beta_split"}
     assert any(f"x{round(m, 2)} day, {k} past moves" in x for x in a1["notes"])
     # centre = index weight x clipped beta x expected index move (AAPL has no own cue)
@@ -281,7 +283,7 @@ def test_ranges_apply_inputs(tmp_path):
     sessions = sum(ev.is_session(xnys, as_of + timedelta(days=d)) for d in range(1, (expiry - as_of).days + 1))
     iv_var = 0.6 ** 2 * (expiry - as_of).days / 365 / sessions
     s_msft = math.sqrt(0.5 * sd["MSFT"] ** 2 + 0.5 * iv_var)
-    assert abs(m1["sigma_h"] - s_msft) < 2e-6 and m1["sigma_h"] > 1.5 * sd["MSFT"]
+    assert abs(m1["sigma_h"] - s_msft * math.sqrt(2)) < 2e-6 and m1["sigma_h"] > 1.5 * sd["MSFT"]   # 2 sessions
     drift = min(0.5 * beta["MSFT"] * index_cue, 0.5 * m1["sigma_h"])
     assert abs(m1["center"] - (drift + math.log(1 - 3.0 / m1["base_close"]))) < 2e-6
     assert {"implied_vol", "ex_dividend"} <= set(m1["inputs"]) and m1["iv_sigma_h"] == m1["sigma_h"]
@@ -291,14 +293,14 @@ def test_ranges_apply_inputs(tmp_path):
     r = run("ranges.py", root_off, cfg_off, "--now", made_at)
     assert r.returncode == 0, r.stderr
     m1_off = ranges_rows(root_off)[f"{as_of}-MSFT-1d"]
-    assert abs(m1_off["sigma_h"] - sd["MSFT"]) < 2e-6
+    assert abs(m1_off["sigma_h"] - sd["MSFT"] * math.sqrt(2)) < 2e-6
     assert "implied_vol" not in m1_off["inputs"] and abs(m1_off["iv_sigma_h"] - m1["sigma_h"]) < 2e-6
 
 
 def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
-    """A run after the first target session's close: the 1d range is not published, and an index
-    cue or option snapshot taken after that close (so after its open) is not used (it would carry
-    that session)."""
+    """A run after the close of D (the first session after the as-of close): every N+k range is still published
+    (none exits at D's close), noted late, and an index cue or option snapshot taken after that close (so after
+    its open) is not used (it would carry that session)."""
     root, cfg = setup(tmp_path)
     mfile = cfg / "markets" / f"{MARKET}.yaml"
     mfile.write_text(mfile.read_text() + "\noptions: yfinance\nindex_cue: {symbol: BENCH, beta: 1.0}\n")
@@ -335,9 +337,10 @@ def test_late_run_guard_drops_late_index_cue_and_options(tmp_path):
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["late"] is True
     rows = ranges_rows(root)
-    assert not any(x["horizon_days"] == 1 for x in rows.values())      # target session closed
-    for t in ("AAPL", "MSFT"):
-        x = rows[f"{as_of}-{t}-5d"]
+    assert sorted({x["horizon_days"] for x in rows.values()}) == list(horizons())   # no target closed yet
+    for x in rows.values():
+        t = x["ticker"]
+        assert t in ("AAPL", "MSFT")
         assert f"index cue ignored: BENCH quoted after {first} open" in x["notes"]   # cut at the open
         assert "beta_split" not in x["inputs"] and x["center"] == 0
         assert "implied_vol" not in x["inputs"] and x["iv_sigma_h"] is None

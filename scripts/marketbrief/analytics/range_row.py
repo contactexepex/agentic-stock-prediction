@@ -14,6 +14,7 @@ from marketbrief.analytics.index_cue import clip_beta
 from marketbrief.analytics.range_context import HorizonContext, RangeContext
 from marketbrief.analytics.range_switches import enabled
 from marketbrief.analytics.scoring import percent
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.constants.indicators import QUALITY_BLOCKED, TRADING_DAYS
 from marketbrief.constants.range_inputs import (
     INPUT_BETA_SPLIT,
@@ -82,7 +83,7 @@ def horizon_width(
             names.append(INPUT_EARNINGS_HISTORY)
     sigma_h, horizon_notes = range_math.horizon_sigma(
         sigma,
-        horizon_context.horizon,
+        horizon_context.sessions,
         in_h,
         ctx.ranges_config,
         ctx.reg["regime"],
@@ -220,12 +221,12 @@ def range_row(ctx: RangeContext, horizon_context: HorizonContext, ticker: str) -
     close = ctx.bars[ticker]["close"] if ticker in ctx.bars else None
     s20 = range_math.realized_sigma(close[close.index <= pd.Timestamp(ctx.as_of)]) if close is not None else None
     n50 = (
-        tuple(round(price, ROUND_PRICE) for price in range_math.naive_range(base, s20, horizon_context.horizon, 0.5))
+        tuple(round(price, ROUND_PRICE) for price in range_math.naive_range(base, s20, horizon_context.sessions, 0.5))
         if s20
         else (None, None)
     )
     n80 = (
-        tuple(round(price, ROUND_PRICE) for price in range_math.naive_range(base, s20, horizon_context.horizon, 0.8))
+        tuple(round(price, ROUND_PRICE) for price in range_math.naive_range(base, s20, horizon_context.sessions, 0.8))
         if s20
         else (None, None)
     )
@@ -257,4 +258,7 @@ def range_row(ctx: RangeContext, horizon_context: HorizonContext, ticker: str) -
         "iv_sigma_h": round(parts.iv_formula * parts.sigma_h / parts.formula_sigma, ROUND_CENTER)
         if parts.iv_formula
         else None,
+        "horizon_label": LABEL_N_PLUS_K,
+        "entry_date": str(ctx.first),
+        "exit_date": str(horizon_context.target),
     }

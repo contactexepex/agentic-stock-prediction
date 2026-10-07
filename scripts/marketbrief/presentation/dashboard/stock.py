@@ -12,7 +12,11 @@ import re
 import pandas as pd
 
 from marketbrief.constants.dashboard import INDICATOR_COLUMNS, NEWS_PER_TICKER
+from marketbrief.constants.horizon_names import NAME_LEGACY_MODEL, NAME_LEGACY_RANGE, NAME_N_PLUS_K_MODEL
+from marketbrief.constants.horizons import LABEL_LEGACY_5D_D4
 from marketbrief.constants.model import GROUP_BASELINE
+from marketbrief.core.horizons import horizons, legacy_label
+from marketbrief.presentation.horizon_names import horizon_name
 from marketbrief.utils.numbers import json_safe_float
 
 PRICE_DIGITS = 4
@@ -37,6 +41,12 @@ def as_list(value) -> list:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return []
     return [x for x in list(value) if x is not None]
+
+
+def row_label(row, kind: str) -> str:
+    """A stored row's horizon label; a row written before B10 (no label) gets core.horizons.legacy_label."""
+    label = getattr(row, "horizon_label", None)
+    return label if isinstance(label, str) else legacy_label(kind, int(row.horizon_days))
 
 
 def ratio(numerator, denominator) -> float | None:
@@ -87,9 +97,12 @@ def range_rows(ticker_ranges: pd.DataFrame, late_of) -> list[dict]:
     for r in ticker_ranges.sort_values("horizon_days").itertuples():
         base = json_safe_float(r.base_close)
         up, down = ratio(r.hi80, base), ratio(r.lo80, base)
+        h, label = int(r.horizon_days), row_label(r, "ranges")
         out.append(
             {
-                "h": int(r.horizon_days),
+                "h": h,
+                "horizon_label": label,
+                "name": horizon_name(h, label, legacy=NAME_LEGACY_RANGE),
                 "target_date": iso_day(r.target_date),
                 "made_at": iso_time(r.made_at),
                 "base_close": base,
@@ -113,16 +126,32 @@ def group_points(groups: dict) -> list[dict]:
     return sorted(rows, key=lambda r: (-abs(r["points"] or 0.0), r["group"]))
 
 
-def model_row(score, exits: dict) -> dict:
-    """One horizon's model score with its explanation, as stored (model_scores contributions)."""
+def score_exit(score, label: str, plan: dict) -> str | None:
+    """The exit close of a score's trade: its stored exit_date; else, for an old open-to-close 5-day score
+    (legacy_5d_d4), the close of D+(h-1) (the old D+4 window); else the plan's N+k exit (D+k)."""
+    stored = iso_day(getattr(score, "exit_date", None))
+    if stored:
+        return stored
+    h = int(score.horizon_days)
+    if label == LABEL_LEGACY_5D_D4:
+        sessions = plan.get("sessions") or []
+        return sessions[h - 1] if 0 < h <= len(sessions) else None
+    return plan.get("exits", {}).get(h)
+
+
+def model_row(score, plan: dict) -> dict:
+    """One horizon's model score with its explanation, as stored (model_scores contributions), with its horizon
+    label, name and the entry open and exit close of its trade."""
     explanation = (
         json.loads(score.contributions) if isinstance(score.contributions, str) else (score.contributions or {})
     )
     groups = explanation.get("groups") or {}
     news = explanation.get("news") or {}
-    h = int(score.horizon_days)
+    h, horizon_label = int(score.horizon_days), row_label(score, "model_scores")
     return {
         "h": h,
+        "horizon_label": horizon_label,
+        "name": horizon_name(h, horizon_label, NAME_N_PLUS_K_MODEL, NAME_LEGACY_MODEL),
         "id": score.id,
         "prob_up": json_safe_float(score.prob_up),
         "prob_model": json_safe_float(score.prob_model),
@@ -139,8 +168,8 @@ def model_row(score, exits: dict) -> dict:
         "missing": explanation.get("missing") or [],
         "news_note": news.get("note"),
         "news_items": news.get("items"),
-        "entry": exits.get("entry"),
-        "exit": exits.get(h),
+        "entry": iso_day(getattr(score, "entry_date", None)) or plan.get("entry"),
+        "exit": score_exit(score, horizon_label, plan),
     }
 
 
@@ -193,7 +222,9 @@ def reasoning_ids(row, id_pattern) -> list[str]:
 
 
 def reasoning_view(row, cited: dict, id_pattern) -> dict | None:
-    """The forecaster's bull case, bear case, verdict and decisions, with the cited ids it names."""
+    """The forecaster's bull case, bear case, verdict and decisions (`decisions`: per configured horizon k, the
+    stored decision_<k>d, None when absent; decision_1d/decision_5d kept for the API contract), with the cited ids
+    it names."""
     if row is None:
         return None
     ids = reasoning_ids(row, id_pattern)
@@ -203,6 +234,7 @@ def reasoning_view(row, cited: dict, id_pattern) -> dict | None:
         "verdict": row.get("verdict"),
         "decision_1d": row.get("decision_1d"),
         "decision_5d": row.get("decision_5d"),
+        "decisions": {str(k): row.get(f"decision_{k}d") for k in horizons()},
         "made_at": iso_time(row.get("made_at")),
         "prompt_version": row.get("prompt_version"),
         "evidence": [{"id": i, **cited[i]} for i in ids if i in cited],

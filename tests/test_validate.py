@@ -16,6 +16,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.core.horizons import horizons  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
@@ -307,15 +308,16 @@ def forecast(root, rows) -> dict:
 
 def test_forecast_valid_and_absent(root):
     assert run("forecast")["ok"]                                   # no file: abstained
-    out = forecast(root, [call(), call(h=1, evidence_ids=["0000320193-26-000001"], direction="down")])
+    out = forecast(root, [call(), call(h=1, evidence_ids=["0000320193-26-000001"], direction="down"),
+                          call(h=3, id="2026-10-05-AAPL-3d")])                 # N+3: a configured horizon
     assert out["ok"], out["failures"]
-    assert out["info"]["forecast"] == {"records": 2, "valid": 2, "refused_news_status": 0}
+    assert out["info"]["forecast"] == {"records": 3, "valid": 3, "refused_news_status": 0}
 
 
 @pytest.mark.parametrize("rec,word", [
     (call(id="2026-10-05-AAPL-5"), "id must be"),
     (call(direction="flat"), "direction"),
-    (call(h=3, id="2026-10-05-AAPL-3d"), "horizon_days"),
+    (call(h=6, id="2026-10-05-AAPL-6d"), "horizon_days"),                  # not in config/strategies.yaml
     (call(confidence=0.95), "confidence"),
     (call(confidence=0.45), "confidence"),
     (call(range_widen=0.6), "range_widen"),
@@ -483,9 +485,9 @@ def test_planted_invented_percentages_are_caught(root):
 def test_report_stage_flags_planted_number(root):
     rng = []
     for t in TICKERS:
-        for h in (1, 5):
+        for h in horizons():
             rng.append({"id": f"2026-10-05-{t}-{h}d", "made_at": "2026-10-06T11:50:00+00:00", "as_of_date": "2026-10-05",
-                        "session_date": "2026-10-06", "target_date": "2026-10-06", "ticker": t, "horizon_days": h,
+                        "session_date": "2026-10-06", "target_date": "2026-10-07", "ticker": t, "horizon_days": h,
                         "base_close": 105.0, "lo80": 101.5, "hi80": 108.25})
     write_jsonl(root, "ranges", date(2026, 10, 5), rng)
     (root / "work" / "context.md").write_text(f"# Context pack: US, {TODAY} (UTC)\n\n| AAPL | 105.00 | +1.23% |\n")
@@ -510,11 +512,11 @@ def test_missing_range_blocks_unless_calendar_explains(root, monkeypatch):
     (root / "reports" / "us").mkdir(parents=True)
     f = codes(run("report"))
     assert "MISSING_RANGE" in f and set(f["MISSING_RANGE"]["tickers"]) <= set(TICKERS)
-    monkeypatch.setenv("MB_NOW", "2026-10-06T21:00:00+00:00")       # late run: the 1d target closed
+    monkeypatch.setenv("MB_NOW", "2026-10-07T21:00:00+00:00")       # late run: the N+1 target (D+1) closed
     out = run("report")
     d = codes(out)["MISSING_RANGE"]["detail"]
-    assert " 5d" in d and " 1d" not in d                             # only the 5-day ranges are unexplained
-    assert out["info"]["ranges_skipped"] == {"1d: target 2026-10-06 closed (late run)": len(TICKERS)}
+    assert " 2d" in d and " 1d" not in d                             # only N+2.. are unexplained
+    assert out["info"]["ranges_skipped"] == {"1d: target 2026-10-07 closed (late run)": len(TICKERS)}
 
 
 def test_cli_exit_code(root):

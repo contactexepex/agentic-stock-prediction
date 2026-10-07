@@ -100,7 +100,8 @@ def build(
     review_data = {
         "partial_week": end >= utc_today(),
         "ranges": {
-            window: by_horizon(rows_since(ranges, start_date), range_summary) for window, start_date in windows.items()
+            window: by_horizon(rows_since(ranges, start_date), range_summary, labels=True)
+            for window, start_date in windows.items()
         },
         "calls": {  # per scoring basis, never pooled (call_basis.py)
             window: per_basis(rows_since(calls, start_date), lambda frame: by_horizon(frame, call_summary))

@@ -21,6 +21,7 @@ from marketbrief.constants.dashboard import (
 )
 from marketbrief.constants.formatting import CURRENCY_SYMBOLS
 from marketbrief.core import calendar
+from marketbrief.core.horizons import entry_exit, exit_offset, horizons
 from marketbrief.core.market_config import market_names
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.pipeline.score_predictions import is_late
@@ -29,14 +30,30 @@ from view_data import NEWS_ID, safe_url
 
 
 def session_plan(cfg: dict, as_of) -> dict:
-    """D (the first session after the as-of date, the entry open) and the exit sessions: the close of D+1
-    for the 1-day horizon and of D+4 for the 5-day horizon (model/labels.py)."""
-    days = calendar.sessions_ahead(cfg, as_of + timedelta(days=1), 5)
+    """D (the first session after the as-of date, the entry open), the exit session of every configured horizon N+k
+    (the close of the k-th session after D, core/horizons.entry_exit; config/strategies.yaml) keyed by k, and the
+    sessions D .. the last exit (sessions[j] = D+j)."""
+    ks = horizons()
+    windows = {k: entry_exit(cfg, as_of, k) for k in ks}
+    days = calendar.sessions_ahead(cfg, as_of + timedelta(days=1), exit_offset(ks[-1]))
     return {
-        "entry": days[0].isoformat(),
-        1: days[1].isoformat(),
-        5: days[4].isoformat(),
+        "entry": windows[ks[0]][0].isoformat(),
+        "exits": {k: exit_day.isoformat() for k, (_, exit_day) in windows.items()},
         "sessions": [d.isoformat() for d in days],
+    }
+
+
+def plan_view(plan: dict) -> dict:
+    """The page's session plan: D, the horizons and each one's exit close (keys are the horizon as text); exit_1d
+    and exit_5d are the N+1 and N+5 exits (D+1, D+5) kept for the API contract (api/openapi.yaml SessionPlan)."""
+    exits = plan["exits"]
+    return {
+        "entry": plan["entry"],
+        "horizons": list(exits),
+        "exits": {str(k): day for k, day in exits.items()},
+        "exit_1d": exits.get(1),
+        "exit_5d": exits.get(5),
+        "sessions": plan["sessions"],
     }
 
 
@@ -155,7 +172,7 @@ def gather_dashboard(cfg: dict, con, cutoff_time) -> dict:
     return {
         **head,
         "as_of": as_of.isoformat(),
-        "plan": {"entry": plan["entry"], "exit_1d": plan[1], "exit_5d": plan[5], "sessions": plan["sessions"]},
+        "plan": plan_view(plan),
         "overview": market.overview(cfg, bars, reads.regime(con, as_of, cutoff), reads.quotes(con, cutoff), feats),
         "models": model_info.versions_used(reads.versions(con, cutoff), model_ids),
         "companies": companies,
