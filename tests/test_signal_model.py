@@ -271,10 +271,11 @@ def test_india_round_trip_cost():
 
 
 def test_us_round_trip_cost_and_taf_cap():
-    costs = load_costs("us")
-    at_100 = us_round_trip(costs, 100.0)
-    assert at_100 == pytest.approx(0.0000206 + 0.000195 * 100 / 10000)
-    tiny = us_round_trip(costs, 0.01)                                     # 1,000,000 shares: TAF capped
+    costs = load_costs("us")                                              # TAF paused at $0 (2026-10-01..12-31)
+    assert us_round_trip(costs, 100.0) == pytest.approx(0.0000206)
+    regular = {**costs, "finra_taf_per_share_sell": 0.000195, "finra_taf_max_per_trade": 9.79}   # from 2027-01-01
+    assert us_round_trip(regular, 100.0) == pytest.approx(0.0000206 + 0.000195 * 100 / 10000)
+    tiny = us_round_trip(regular, 0.01)                                   # 1,000,000 shares: TAF capped
     assert tiny == pytest.approx(0.0000206 + 9.79 / 10000)
 
 

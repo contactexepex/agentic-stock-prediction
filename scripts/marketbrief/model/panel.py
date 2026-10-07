@@ -90,7 +90,7 @@ def ticker_rows(key: str, bars: dict, bench: pd.DataFrame, session_pos: pd.Serie
 
 
 def bench_labels(bench: pd.DataFrame, session_pos: pd.Series) -> pd.DataFrame:
-    """The benchmark's own open-to-close returns per as-of date (the buy-and-hold baseline)."""
+    """The benchmark's own open-to-close returns per as-of date (the benchmark_long_per_date baseline)."""
     out = pd.DataFrame(index=bench.index)
     for horizon in HORIZONS:
         labels = forward_labels(bench, session_pos, horizon)

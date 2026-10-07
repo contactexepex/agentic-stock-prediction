@@ -1270,7 +1270,8 @@ training means and sds, coefficients, intercept, Platt slope and offset, exclude
 
 **Explanation (`explain.py`).** logit(p) = logit(base rate) + baseline + sum_j a b_j z_j + news, with
 baseline = a b0 + c - logit(base rate). The items are converted to percentage points by sharing
-p - base rate in proportion to their logit size, so they add up exactly to 100 (p - base rate) (tested).
+p - base rate in proportion to their logit size, so they add up to 100 (p - base rate) (exactly before
+rounding, tested; the stored points are rounded to 2 decimals, so their sum can differ by a few hundredths).
 Each score stores the points per feature and per group (momentum, oscillator, volatility, volume,
 relative strength, market, regime, events, flows, news, baseline) and the top 3 drivers each way in
 plain words, e.g. from the US run on 2026-10-06 (as of 2026-10-05): "10-day realized vol 19.5%: +0.3 pts;

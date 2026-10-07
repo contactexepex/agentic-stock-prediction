@@ -8,7 +8,7 @@ every feature at its training mean, relative to the base rate) and news the fixe
 The items are converted to percentage points by sharing p - base_rate in proportion to their logit
 size (pts_i = item_i * 100 * (p - base_rate) / sum of items; when the items cancel, item_i * 100 *
 base_rate * (1 - base_rate), the slope at the base rate), so the points add up exactly to
-100 * (p - base_rate)."""
+100 * (p - base_rate) before rounding (the stored points are rounded to 2 decimals)."""
 from __future__ import annotations
 
 import numpy as np

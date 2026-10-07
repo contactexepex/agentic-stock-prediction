@@ -7,7 +7,9 @@ chosen stock-days are equally weighted; the statistics are the mean holding-peri
 over dates (metrics.block_bootstrap). Strategies:
 - model long at threshold t: p >= t;
 - always-up: every stock-day; momentum: 5-day return > 0; RSI mean reversion: RSI(14) < 30;
-- buy-and-hold benchmark: the benchmark's own open-to-close return over the same window, less the cost;
+- benchmark_long_per_date: a new long position in the benchmark at every as-of date, its own open-to-close
+  return over the same window less a full round trip each time (not a single buy-and-hold: the cost is
+  charged per date, like every other strategy here);
 - "sell if held" (reported apart, not a short sale): p <= 1 - t, the return a holder avoids by selling
   at the open and buying back at the close (-return, gross and net of a round trip).
 Differences model minus baseline are taken per date on the dates the model holds positions."""
@@ -59,7 +61,7 @@ def baseline_series(frame: pd.DataFrame, market: str, costs: dict) -> dict[str, 
              "rsi_mean_reversion": frame["rsi_14"] < RSI_OVERSOLD}
     out = {name: (per_date(frame, chosen, "net"), int(chosen.sum())) for name, chosen in picks.items()}
     bench = frame.groupby("date")["bench_ret"].first().dropna() - round_trip_cost(market, costs)
-    out["buy_and_hold_benchmark"] = (bench, len(bench))
+    out["benchmark_long_per_date"] = (bench, len(bench))
     return out
 
 

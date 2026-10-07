@@ -1,27 +1,44 @@
 # Round-trip trading costs for the model's paper strategy (scripts/model_backtest.py; docs/DESIGN.md
 # section 15). Research only: no trade is ever placed. Rates are fractions of traded value. Every value
-# is marked "verify": check it against the official source before relying on it. The rates below were
-# looked up on 2026-10-06; the backtest applies today's rates to every past date (earlier dates had other
-# rates, e.g. the SEC fee was $0 per million until 2026-04-03 per the advisory below).
+# is marked "verify": check it against the official source before relying on it. Looked up on
+# 2026-10-06/07. Each line says what backs it:
+#   ASSUMPTION      a broker choice, not a published rate; no source.
+#   OFFICIAL, READ  read on the official page named (sec.gov).
+#   SEARCH ONLY     the official site (nseindia.com, sebi.gov.in, incometaxindia.gov.in, cbic.gov.in,
+#                   ccilindia.com, finra.org) refused this environment's traffic, so the value comes from
+#                   web-search results quoting it; the official URL given was NOT opened.
+# The backtest applies these rates to every past date (earlier dates had other rates, e.g. the SEC fee was
+# $0 per million until 2026-04-03 per the advisory below).
 # Not modelled: bid-ask spread and slippage (fills assumed at the official open and close prices; set
 # slippage_each_side to stress-test), and India's flat DP charge per scrip sold (a rupee amount per sale,
 # not a rate; it depends on position size).
 india:
   # Equity delivery (the holds span at least one night, so delivery rates apply, not intraday).
-  brokerage_each_side: 0.0          # verify: discount broker, Rs 0 on delivery
-  stt_each_side: 0.001              # verify: STT 0.1% on buy and sell (delivery); https://www.incometaxindia.gov.in
-  exchange_txn_each_side: 0.0000307 # verify: NSE cash 0.00307% from 2026-03-01 (0.00297% 2024-10-01..2026-02-28),
-                                    # NSE circular of 2026-02-27; https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
-  sebi_fee_each_side: 0.000001      # verify: SEBI turnover fee Rs 10 per crore = 0.0001%; https://www.sebi.gov.in
-  stamp_duty_buy: 0.00015           # verify: 0.015% on the buy side (delivery), Indian Stamp Act as amended 2020
-  gst_rate: 0.18                    # verify: GST 18% on brokerage + exchange transaction + SEBI fees
+  brokerage_each_side: 0.0          # verify. ASSUMPTION: a discount broker charging Rs 0 on delivery trades
+  stt_each_side: 0.001              # verify. SEARCH ONLY: STT 0.1% on delivery purchase and sale (Finance (No. 2)
+                                    # Act 2004, Chapter VII); official page not opened: https://incometaxindia.gov.in
+  exchange_txn_each_side: 0.0000307 # verify. SEARCH ONLY: NSE cash market 0.00307% from 2026-03-01 (0.00297%
+                                    # 2024-10-01..2026-02-28), NSE circular of 2026-02-27; nseindia.com was
+                                    # unreachable, so this rate comes from search results, the circular was not
+                                    # opened: https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+  sebi_fee_each_side: 0.000001      # verify. SEARCH ONLY: SEBI turnover fee Rs 10 per crore = 0.0001%; official
+                                    # document not opened: https://www.sebi.gov.in/sebi_data/meetingfiles/jul-2020/1594293677017_1.pdf
+  stamp_duty_buy: 0.00015           # verify. SEARCH ONLY: 0.015% on the buy side of a delivery transfer, Indian Stamp
+                                    # Act 1899 Schedule I Article 56A as amended by the Finance Act 2019, in force
+                                    # 2020-07-01; official page not opened: https://www.ccilindia.com/web/ccil/tr-stamp-duty
+  gst_rate: 0.18                    # verify. SEARCH ONLY: GST 18% on brokerage + exchange transaction + SEBI fees
+                                    # (SAC 997152); no official CBIC page was found or opened
   slippage_each_side: 0.0
 us:
-  commission_each_side: 0.0         # verify: commission-free broker
-  sec_fee_sell: 0.0000206           # verify: Section 31 fee $20.60 per million on sales from 2026-04-04;
-                                    # https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2
-  finra_taf_per_share_sell: 0.000195  # verify: FINRA TAF $0.000195 per share sold, max $9.79 per trade (2026);
-  finra_taf_max_per_trade: 9.79       # FINRA paused it at $0 for 2026-10-01..2026-12-31 (SR-FINRA-2026-021):
-                                      # https://www.finra.org/rules-guidance/rule-filings/sr-finra-2026-021
+  commission_each_side: 0.0         # verify. ASSUMPTION: a commission-free broker
+  sec_fee_sell: 0.0000206           # verify. OFFICIAL, READ: Section 31 fee $20.60 per million on sales from
+                                    # 2026-04-04 ($0.00 before): https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2
+  # FINRA TAF on sales of covered equity securities. OFFICIAL, READ (the SEC's copy of FINRA's filing; finra.org
+  # was unreachable): Release 34-106409, SR-FINRA-2026-021 (2026-09-18) sets it to $0.00 per share, max $0.00, for
+  # transactions 2026-10-01..2026-12-31; the rate it replaces, which resumes 2027-01-01, is $0.000195 per share,
+  # max $9.79 per trade (Exhibit 5): https://www.sec.gov/files/rules/sro/finra/2026/34-106409-ex5.pdf
+  # Below: the rate in force on 2026-10-07 ($0).
+  finra_taf_per_share_sell: 0.0     # verify (0.000195 from 2027-01-01)
+  finra_taf_max_per_trade: 0.0      # verify (9.79 from 2027-01-01)
   notional_per_trade: 10000.0       # USD per position, only for the per-share TAF and its cap
   slippage_each_side: 0.0
