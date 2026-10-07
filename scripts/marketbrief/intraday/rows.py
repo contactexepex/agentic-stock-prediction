@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from marketbrief.core.calendar import prev_session
 from marketbrief.constants.config_keys import META_SECTOR, META_SECTOR_ETF, META_YAHOO
 from marketbrief.core.schema_intraday import INTRADAY_SCHEMAS
 from marketbrief.intraday import attribution, inputs
@@ -47,8 +48,8 @@ class CheckContext:
     ranges: dict = field(default_factory=dict)
     calls: dict = field(default_factory=dict)
     features: dict = field(default_factory=dict)
-    prev_closes: dict = field(default_factory=dict)
-    entry_opens: dict = field(default_factory=dict)
+    prev_closes: dict = field(default_factory=dict)   # symbol -> (close, date) as stored by check_at
+    entry_prices: dict = field(default_factory=dict)  # (ticker, date, open|close) -> price
     market_moves: dict = field(default_factory=dict)  # benchmark key, cue snapshot
     news_since: datetime | None = None                # start of the news window (attribution.news_window)
 
@@ -122,7 +123,12 @@ def fill_measures(ctx: CheckContext, row: dict, ticker: str, meta: dict, quote: 
     elapsed = elapsed_fraction(bar_end, ctx.session_open, ctx.session_close,
                                settings["measures"]["min_elapsed_fraction"])
     ret = quote.last_price / quote.open_price - 1
-    prev = ctx.prev_closes.get(ticker)
+    prev, prev_date = ctx.prev_closes.get(ticker, (None, None))
+    expected_prev = prev_session(ctx.cfg, ctx.session_date, include=False).isoformat()
+    if prev is None:
+        notes.append("no_prev_close")
+    elif prev_date != expected_prev:
+        notes.append(f"prev_close_from_{prev_date}")
     beta, bench_ret = beta_for(ctx, ticker, notes), ctx.ret(ctx.market_moves.get("benchmark"))
     sector_key, sector_ret, sector_source = sector_move(ctx, ticker, meta)
     resid = residual(ret, beta, bench_ret)
@@ -156,11 +162,14 @@ def fill_measures(ctx: CheckContext, row: dict, ticker: str, meta: dict, quote: 
 
 
 def _judged(ctx: CheckContext, call: dict, ticker: str, quote: SessionQuote, sigma, elapsed: float) -> dict:
-    """A call with its entry open (today's open when it entered today) judged against the last price."""
-    entry_open = quote.open_price if call["entry_date"] == ctx.session_date.isoformat() else (
-        ctx.entry_opens.get((ticker, call["entry_date"])))
+    """A call with its entry price (open_to_close: the open of its entry session, today's intraday open when that
+    is today; close_to_close: the stored as-of close) judged against the last price."""
+    if call["entry_kind"] == "open" and call["entry_date"] == ctx.session_date.isoformat():
+        entry = quote.open_price
+    else:
+        entry = ctx.entry_prices.get((ticker, call["entry_date"], call["entry_kind"]))
     sessions = max(call["sessions_held"] - 1, 0) + elapsed
-    return judge_call({**call, "entry_open": rounded(entry_open, 4)}, quote.last_price, sigma, sessions, ctx.settings)
+    return judge_call({**call, "entry_price": rounded(entry, 4)}, quote.last_price, sigma, sessions, ctx.settings)
 
 
 def _bar(settings: dict) -> timedelta:

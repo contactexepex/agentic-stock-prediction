@@ -44,9 +44,12 @@ Shared files changed (additive only):
   above50 | above80; a price on an edge is inside), `bench_ret`, `beta` (features `beta_1y`, clipped; default
   1.0 noted), `residual` = ret - beta x bench_ret and `residual_z`, `sector_ret` (`sector_source` sector_etf, or
   peers = mean of the sector's other watchlist tickers) and `sector_residual`. `calls` JSON: open predictions
-  and model scores whose holding window (entry at the open of the session after as-of, to the close of its last
-  session) contains the session, each with `entry_open`, `ret`, `z` (sigma_1d x sqrt(sessions held)) and
-  `against`. `flags`: outside_1d_80, outside_1d_50, outside_5d_80, large_move, large_residual,
+  and model scores whose scored window contains the session (analytics/call_basis.py: open_to_close = the open
+  of D, the session after as-of, to the close of D+1 for 1d and D+4 for 5d; close_to_close = the as-of close to
+  the close of the h-th session; model scores use their `label_convention`, predictions
+  `call_basis.basis_for(made_at)`), each with `basis`, `entry_kind` (open | close), `entry_date`, `entry_price`
+  (today's intraday open, or the stored bar as of check_at), `last_session`, `sessions_held`, `ret`, `z`
+  (sigma_1d x sqrt(sessions held - 1 + elapsed)) and `against`. `flags`: outside_1d_80, outside_1d_50, outside_5d_80, large_move, large_residual,
   against_call, against_model; `flagged` = any flag in `flag_on` of the config. `candidates` JSON and
   `candidate_ids` only on flagged rows.
 - `intraday_runs`: one row per check time (id = check_id): status ok | market_closed | stale, counts,
@@ -55,7 +58,9 @@ Shared files changed (additive only):
   `ticker`, `flags` (copied from the stored row), `attribution`, `text`, `cited_ids`, `prompt_version`,
   `created_at`.
 
-**No look-ahead** (all as of check_at): ranges `made_at` <= check_at (first published per id, as
+**No look-ahead** (all as of check_at): stored daily bars (previous close, entry prices) per (ticker, date) the
+newest row collected by check_at, with split/bonus factors detected by check_at (a previous close older than the
+previous session is noted `prev_close_from_<date>`; none: `no_prev_close`); ranges `made_at` <= check_at (first published per id, as
 `ranges_latest`); predictions `made_at`, model scores `computed_at` (newest per id), features
 `computed_at`, news `first_seen_at` in [session open, check_at] and `published_at` <= check_at,
 news status `news_status_ids_asof(check_at)`, enrichment `analyzed_at` <= check_at, announcements and
@@ -104,7 +109,7 @@ Proposed minor bump (1.1.0), for WS2 to apply:
       summary: The session's intraday checks, deviations with notes, and the learning loop's outcomes
       parameters: [{$ref: '#/components/parameters/Market'}]
       responses:
-        '200': {content: {application/json: {schema: {$ref: '#/components/schemas/IntradayResponse'}}}}
+        '200': {content: {application/json: {schema: {$ref: '#/components/schemas/IntradayResponse'}  # allOf ReadModelMeta + payload: Intraday}}}
 # components/schemas:
     Intraday:
       type: object
@@ -122,38 +127,135 @@ Proposed minor bump (1.1.0), for WS2 to apply:
         history: {type: object}                           # n, outcomes, by_attribution, rows
 ```
 
+### Schedules (for the orchestrator's triggers)
+- India: `CRON_TZ=Asia/Kolkata 13 11 * * 1-5` (11:13 IST = 05:43 UTC) and `CRON_TZ=Asia/Kolkata 13 14 * * 1-5`
+  (14:13 IST = 08:43 UTC). NSE session 09:15-15:30 IST = 03:45-10:00 UTC. India news light runs are at 05:17
+  and 11:17 UTC, so the 05:43 check pushes 26 minutes after one; their folders differ (no same-file rebase).
+- US: `CRON_TZ=America/New_York 27 12 * * 1-5` (12:27 ET = 16:27 UTC in EDT, 17:27 UTC in EST) and
+  `CRON_TZ=America/New_York 57 14 * * 1-5` (14:57 ET = 18:57 / 19:57 UTC). Session 09:30-16:00 ET. The US news
+  light runs are at 15:47 and 21:47 UTC.
+- Holidays and early closes come from the market calendar (`core/calendar.py`): a check outside the session
+  (open + one bar to close + one bar) writes only its `market_closed` run row. Each trigger runs
+  `routine/INTRADAY_PROMPT.md` with `MARKET=<india|us>` in a fresh session.
+
 ## Tests
-All pasted from command output.
+All pasted from command output (round 2, after the judge's round-1 fixes).
 
-`python -m pytest tests/test_intraday.py tests/test_doc_commands.py tests/test_code_structure.py -q -n auto`:
+`python -m pytest tests/test_intraday.py tests/test_doc_commands.py tests/test_code_structure.py -q -n auto`
+(18 tests in tests/test_intraday.py):
 ```
-50 passed in 9.90s
+52 passed in 13.33s
 ```
 
-Full suite `python -m pytest -n auto -q` (before the last word-list edit, which the run above covers):
+Full suite `python -m pytest -n auto -q`:
 ```
 FAILED tests/test_judgments.py::test_every_logged_commit_exists - AssertionEr...
-1 failed, 901 passed, 2 skipped, 6453 warnings in 195.41s (0:03:15)
+1 failed, 903 passed, 2 skipped, 6453 warnings in 195.65s (0:03:15)
 ```
 The one failure is `test_every_logged_commit_exists`, which fails the same way on main in this shallow clone
 (`git rev-parse --is-shallow-repository` = true; CI excludes it). `ruff check` on every touched Python file:
 `All checks passed!`
 
-Live check, one real run per market (2026-10-07, `date -u` 15:12:48 UTC) with output under
-`work/intraday_live/` only (`--out`); `git status --short data` printed nothing afterwards:
+Live check, one real run per market (2026-10-07, `date -u` 15:24:42 UTC) with output under
+`work/intraday_live/` only (`--out`); `git status --short data | wc -l` printed 0 afterwards. US (live):
+```json
+{
+  "step": "intraday_check",
+  "market": "us",
+  "check_id": "ic-us-2026-10-07T15:24Z",
+  "check_at": "2026-10-07T15:24:00+00:00",
+  "session_date": "2026-10-07",
+  "to": "../work/intraday_live/us",
+  "status": "ok",
+  "tickers": 20,
+  "written": 20,
+  "flagged": 6,
+  "stale": [],
+  "failed": [],
+  "flagged_tickers": {
+    "JPM": [
+      "outside_1d_80",
+      "outside_1d_50"
+    ],
+    "BAC": [
+      "outside_1d_80",
+      "outside_1d_50"
+    ],
+    "UAL": [
+      "outside_1d_80",
+      "outside_1d_50"
+    ],
+    "LLY": [
+      "outside_1d_80",
+      "outside_1d_50",
+      "large_move",
+      "large_residual"
+    ],
+    "CAT": [
+      "outside_1d_80",
+      "outside_1d_50",
+      "outside_5d_80",
+      "large_move",
+      "large_residual"
+    ],
+    "DE": [
+      "outside_1d_80",
+      "outside_1d_50",
+      "large_move",
+      "large_residual",
+      "against_model"
+    ]
+  },
+  "benchmark_ret": -0.0011892008758938033,
+  "cue": {
+    "symbol": "ES",
+    "ret": -0.005652,
+    "ts": "2026-10-07T15:10:00+00:00"
+  }
+}
 ```
-{"market": "us", "check_id": "ic-us-2026-10-07T15:12Z", "check_at": "2026-10-07T15:12:00+00:00", "status": "ok", "tickers": 20, "written": 20, "flagged": 7, "stale": [], "failed": [], "flagged_tickers": {"JPM": ["outside_1d_80", "outside_1d_50"], "BAC": ["outside_1d_80", "outside_1d_50"], "UAL": ["outside_1d_80", "outside_1d_50"], "CVX": ["outside_1d_50", "large_move", "large_residual", "against_model"], "LLY": ["outside_1d_80", "outside_1d_50", "large_move", "large_residual"], "CAT": ["outside_1d_80", "outside_1d_50", "outside_5d_80", "large_move", "large_residual"], "DE": ["outside_1d_80", "outside_1d_50", "large_move", "large_residual", "against_model"]}, "benchmark_ret": -0.001753156673340528, "cue": {"symbol": "ES", "ret": -0.006953, "ts": "2026-10-07T15:00:00+00:00"}, "to": "../work/intraday_live/us"}
-{"market": "india", "check_id": "ic-india-2026-10-07T08:45Z", "check_at": "2026-10-07T08:45:00+00:00", "status": "ok", "tickers": 20, "written": 20, "flagged": 0, "stale": [], "failed": [], "flagged_tickers": {}, "benchmark_ret": -0.005777744112120398, "cue": null, "to": "../work/intraday_live/india"}
-{"market": "india", "check_id": "ic-india-2026-10-07T15:13Z", "check_at": "2026-10-07T15:13:00+00:00", "status": "market_closed", "written": 0, "note": "market closed at 2026-10-07T15:13:00+00:00 (session 2026-10-07)", "to": "../work/intraday_live/india"}
+India with `MB_NOW=2026-10-07T08:45:00+00:00` (India was closed at the time; Yahoo bars after that time are cut):
+```json
+{
+  "step": "intraday_check",
+  "market": "india",
+  "check_id": "ic-india-2026-10-07T08:45Z",
+  "check_at": "2026-10-07T08:45:00+00:00",
+  "session_date": "2026-10-07",
+  "to": "../work/intraday_live/india",
+  "status": "ok",
+  "tickers": 20,
+  "written": 20,
+  "flagged": 0,
+  "stale": [],
+  "failed": [],
+  "flagged_tickers": {},
+  "benchmark_ret": -0.005777744112120398,
+  "cue": null
+}
 ```
-The US run is live. India was closed at the time, so its second line used `MB_NOW=2026-10-07T08:45:00+00:00`
-(today's session; Yahoo bars after that time are cut). Its cue is null because the S&P 500 snapshot was
-quoted after 08:45 UTC (the look-ahead guard). India published no 1-day range on 2026-10-07 (its daily run was
-mid-session), so its rows note `no_range_1d` and scale moves with the 5-day sigma / sqrt 5. The third line is
-the same India command without MB_NOW: only a `market_closed` run row.
+India without MB_NOW (closed):
+```json
+{
+  "step": "intraday_check",
+  "market": "india",
+  "check_id": "ic-india-2026-10-07T15:25Z",
+  "check_at": "2026-10-07T15:25:00+00:00",
+  "session_date": "2026-10-07",
+  "to": "../work/intraday_live/india",
+  "status": "market_closed",
+  "note": "market closed at 2026-10-07T15:25:00+00:00 (session 2026-10-07)",
+  "written": 0
+}
+```
+India's cue is null because the S&P 500 snapshot was quoted after 08:45 UTC (the look-ahead guard). India
+published no 1-day range on 2026-10-07 (its daily run was mid-session), so its rows note `no_range_1d` and scale
+moves with the 5-day sigma / sqrt 5.
 
 ## Judge verdicts
-(see `docs/ws/ws5-judgments.jsonl`)
+Mirrors `docs/ws/ws5-judgments.jsonl`.
+- Round 1, FAIL, b591a89: blockers: 1-day calls dropped on D+1 (window not from call_basis); previous close and
+  entry opens read without a collected_at bound; ws5-judgments.jsonl claimed but missing.
 
 ## Proposed edits to shared docs
 
@@ -202,19 +304,19 @@ counts of held / reversed / faded per attribution.
 settled call's session (`intraday_deviations` where session_date in the call's window), so a lesson can say
 whether an intraday deviation foreshadowed the outcome.
 
-## Schedules (for the orchestrator's triggers)
-- India: `CRON_TZ=Asia/Kolkata 13 11 * * 1-5` (11:13 IST = 05:43 UTC) and `CRON_TZ=Asia/Kolkata 13 14 * * 1-5`
-  (14:13 IST = 08:43 UTC). NSE session 09:15-15:30 IST = 03:45-10:00 UTC. India news light runs are at 05:17
-  and 11:17 UTC, so the 05:43 check pushes 26 minutes after one; their folders differ (no same-file rebase).
-- US: `CRON_TZ=America/New_York 27 12 * * 1-5` (12:27 ET = 16:27 UTC in EDT, 17:27 UTC in EST) and
-  `CRON_TZ=America/New_York 57 14 * * 1-5` (14:57 ET = 18:57 / 19:57 UTC). Session 09:30-16:00 ET. The US news
-  light runs are at 15:47 and 21:47 UTC.
-- Holidays and early closes come from the market calendar (`core/calendar.py`): a check outside the session
-  (open + one bar to close + one bar) writes only its `market_closed` run row. Each trigger runs
-  `routine/INTRADAY_PROMPT.md` with `MARKET=<india|us>` in a fresh session.
-
 ## Cosmetic follow-ups
-(none yet; filled from judge verdicts)
+From judge round 1 (fixed in round 2: `could`/`might` added to the banned words; the wrong-sign message no longer
+adds "%" to z-scores; the OpenAPI snippet names its response wrapper; the schedules moved under Contract):
+- `scripts/marketbrief/intraday/explain_gate.py`: a number written without a sign is checked by size only
+  ("rose 4.3%" passes on a -4.29% move; same design as lessons.py); require signs or check up/down words.
+- `scripts/marketbrief/intraday/measures.py`: flags compare the stored (rounded) z, so 1.9996 counts as 2.0.
+- `scripts/marketbrief/intraday/inputs.py`: an earnings release after the previous close (dated D-1) is not a
+  candidate; only events dated the session are.
+- `scripts/marketbrief/intraday/attribution.py`: announcement candidates carry no status (exchange filings).
+- `scripts/marketbrief/intraday/check.py`: the rerun check reads only the run row, so a crash between the check
+  rows and the run row write would duplicate check rows on a rerun of the same minute.
+- `scripts/marketbrief/intraday/payload.py`: `latest_session` can pick a closed day's (empty) session.
+- `docs/ws/ws5.md` (round 1): the pasted live JSON lines were a field subset of the summaries; round 2 pastes them whole.
 
 ## Open questions
 1. News window for attribution: the spec says items first seen since the open (default `news_window: open`).

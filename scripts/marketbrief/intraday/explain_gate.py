@@ -75,8 +75,8 @@ def call_numbers(call: dict) -> list[tuple[float, str, bool, bool]]:
         out.append((100 * call["ret"], "call ret", True, True))
     if call.get("z") is not None:
         out.append((call["z"], "call z", False, True))
-    if call.get("entry_open") is not None:
-        out.append((call["entry_open"], "call entry_open", False, False))
+    if call.get("entry_price") is not None:
+        out.append((call["entry_price"], "call entry_price", False, False))
     if call.get("prob_up") is not None:
         out += [(call["prob_up"], "call prob_up", False, False), (100 * call["prob_up"], "call prob_up", True, False)]
     return out
@@ -121,7 +121,8 @@ def number_errors(text: str, row: dict, cited: list[str]) -> list[str]:
             negative = sign in "-−"
             signed = [item for item in matches if item[3]]
             if signed and not any(item[0] == 0 or (item[0] < 0) == negative for item in signed):
-                errs.append(MSG_WRONG_SIGN.format(sign=sign, num=num, what=signed[0][1], value=signed[0][0]))
+                errs.append(MSG_WRONG_SIGN.format(sign=sign, num=num, unit=pct.strip(), what=signed[0][1],
+                                                  value=signed[0][0]))
     return errs
 
 

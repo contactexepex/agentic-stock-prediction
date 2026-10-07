@@ -39,12 +39,12 @@ Rules (`python scripts/intraday_check.py validate work/intraday_notes.jsonl` che
 deterministically):
 - Every number in the text must be one of the line's stored values: returns, gap, residuals and
   the price's distance from a band edge in % (sign right if you write one), prices, band edges,
-  z-scores, beta, a call's return or z, the cue's change, "50%"/"80%" for the bands, or a number
+  z-scores, beta, a call's return, z or entry price, the cue's change (its `ret`), "50%"/"80%" for the bands, or a number
   in a candidate's title, subject or name. Round as you like (4.95% may be written 5%); compute
   nothing else. Times (HH:MM) and dates are not checked.
 - Describe only what has happened by `check_at`. No forecasts or advice: the gate rejects words such
-  as will, should, expect, likely to, going to, buy, sell, target, stop-loss, predict, forecast,
-  recommend.
+  as will, should, could, might, expect, likely to, going to, buy, sell, target, stop-loss, predict,
+  forecast, recommend.
 - One object per line; skip none. Do not copy the measure fields.
 
 Run `python scripts/intraday_check.py validate work/intraday_notes.jsonl` yourself and fix every

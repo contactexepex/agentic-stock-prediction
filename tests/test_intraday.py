@@ -99,8 +99,9 @@ def jl(root: Path, kind: str, day: str, rows: list[dict]) -> None:
             handle.write(json.dumps(row) + "\n")
 
 
-def bars_csv(root: Path, day: str, closes: dict[str, float], collected_at: str = "2026-10-07T00:00:00+00:00"):
-    path = root / "data" / MARKET / "prices" / day[:4] / day[5:7] / f"{day}.csv"
+def bars_csv(root: Path, day: str, closes: dict[str, float], collected_at: str = "2026-10-07T00:00:00+00:00",
+             name: str | None = None):
+    path = root / "data" / MARKET / "prices" / day[:4] / day[5:7] / f"{name or day}.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["date,ticker,open,high,low,close,adj_close,volume,collected_at"]
     lines += [f"{day},{t},{c},{c},{c},{c},{c},1000,{collected_at}" for t, c in closes.items()]
@@ -122,11 +123,15 @@ def market(tmp_path, monkeypatch):
     (config / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML)
     shutil.copy(REPO / "config" / "intraday.yaml", config / "intraday.yaml")
     shutil.copy(REPO / "config" / "events.yaml", config / "events.yaml")
+    shutil.copy(REPO / "config" / "settings.yaml", config / "settings.yaml")   # call_scoring switch: 2026-10-08
     monkeypatch.setattr(paths, "ROOT", root)
     monkeypatch.setattr(paths, "CONFIG", config)
     monkeypatch.delenv("MB_NOW", raising=False)
     bars_csv(root, "2026-10-05", dict.fromkeys(PATHS, 99.0))
-    bars_csv(root, "2026-10-06", dict.fromkeys(PATHS, 100.0))
+    bars_csv(root, "2026-10-06", {key: 100.0 for key in PATHS if key != "MSFT"})
+    # stored after the check time: MSFT's 10-06 bar and a corrected SPY bar must not be used at 16:30
+    bars_csv(root, "2026-10-06", {"MSFT": 100.0, "SPY": 50.0}, collected_at="2026-10-07T17:00:00+00:00",
+             name="2026-10-06-late")
     jl(root, "ranges", "2026-10-07", [
         rng("AAPL", 1, (96.0, 98.0, 102.0, 105.0)), rng("AAPL", 5, (90.0, 95.0, 105.0, 110.0)),
         rng("MSFT", 1, (97.0, 99.0, 100.2, 100.5)), rng("BAC", 1, (97.0, 99.0, 101.0, 103.0)),
@@ -139,7 +144,13 @@ def market(tmp_path, monkeypatch):
     ])
     jl(root, "model_scores", "2026-10-07", [
         {"id": "2026-10-06-BAC-1d", "as_of_date": "2026-10-06", "ticker": "BAC", "horizon_days": 1,
-         "prob_up": 0.60, "computed_at": "2026-10-07T04:40:00+00:00"},
+         "label_convention": "open_to_close", "prob_up": 0.60, "computed_at": "2026-10-07T04:40:00+00:00"},
+        # entered at the open of 10-06 (D), sold at the close of 10-07 (D+1): still open on 10-07
+        {"id": "2026-10-05-AAPL-1d", "as_of_date": "2026-10-05", "ticker": "AAPL", "horizon_days": 1,
+         "label_convention": "open_to_close", "prob_up": 0.45, "computed_at": "2026-10-06T04:40:00+00:00"},
+        # ended at the close of 10-06: not open on 10-07
+        {"id": "2026-10-02-AAPL-1d", "as_of_date": "2026-10-02", "ticker": "AAPL", "horizon_days": 1,
+         "label_convention": "open_to_close", "prob_up": 0.45, "computed_at": "2026-10-05T04:40:00+00:00"},
     ])
     jl(root, "features", "2026-10-06", [
         {"id": "2026-10-06-AAPL", "as_of_date": "2026-10-06", "ticker": "AAPL",
@@ -216,14 +227,41 @@ def test_flags_calls_and_no_bar_after_check(market):
     assert aapl["last_time"] == "2026-10-07T16:25:00+00:00"
     assert aapl["band_1d"] == "above80" and aapl["flagged"]
     assert {"outside_1d_80", "large_move", "against_call"} <= set(aapl["flags"])
-    call = next(c for c in aapl["calls"] if c["source"] == "prediction")
-    assert call["direction"] == "down" and call["against"] and call["entry_open"] == 101.0
+    call = next(c for c in aapl["calls"] if c["source"] == "prediction")   # made before 10-08: close_to_close
+    assert call["basis"] == "close_to_close" and call["entry_kind"] == "close" and call["entry_price"] == 100.0
+    assert call["direction"] == "down" and call["against"] and call["last_session"] == SESSION
+    model = {c["id"]: c for c in aapl["calls"] if c["source"] == "model"}
+    assert set(model) == {"2026-10-05-AAPL-1d"}                # D+1 of a 1-day call is still open
+    held = model["2026-10-05-AAPL-1d"]
+    assert held["entry_date"] == "2026-10-06" and held["last_session"] == SESSION and held["sessions_held"] == 2
+    assert held["entry_price"] == 100.0 and held["direction"] == "down" and held["against"]
     msft = rows["MSFT"]                                      # last 100.5 == hi80 100.5: on the edge, inside
     assert msft["band_1d"] == "above50" and "outside_1d_80" not in msft["flags"]
     assert not msft["flagged"]
     bac = rows["BAC"]                                        # model side up, price -1% (z < -1): info flag only
     assert bac["band_1d"] == "inside50" and "against_model" in bac["flags"] and not bac["flagged"]
     assert rows["JPM"]["range_id_1d"] is None                # its range was published after the check
+
+
+def test_call_windows_follow_the_scoring_basis():
+    from marketbrief.intraday.inputs import call_window
+
+    cfg = {"calendar": "XNYS", "timezone": "America/New_York"}
+    as_of = datetime(2026, 10, 6).date()
+    days = [d.isoformat() for d in call_window(cfg, as_of, 1, "open_to_close")]
+    assert days == ["2026-10-07", "2026-10-08"]              # buy the open of D, sell the close of D+1
+    assert [d.isoformat() for d in call_window(cfg, as_of, 5, "open_to_close")] == ["2026-10-07", "2026-10-13"]
+    assert [d.isoformat() for d in call_window(cfg, as_of, 1, "close_to_close")] == ["2026-10-07", "2026-10-07"]
+
+
+def test_stored_bars_as_of_the_check(market):
+    root, cfg, settings = market
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
+    rows = check_rows(root)
+    assert rows["AAPL"]["prev_close"] == 100.0 and rows["AAPL"]["gap"] == pytest.approx(0.01)
+    assert rows["MSFT"]["prev_close"] == 99.0                 # its 10-06 bar was stored after the check
+    assert "prev_close_from_2026-10-05" in rows["MSFT"]["notes"]
+    assert rows["AAPL"]["bench_ret"] == pytest.approx(0.01)   # intraday bars; the late SPY 50.0 bar is unused
 
 
 def test_no_news_after_check_at(market):

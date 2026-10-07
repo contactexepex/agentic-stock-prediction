@@ -69,7 +69,7 @@ OUTCOME_HELD, OUTCOME_REVERSED, OUTCOME_FADED, OUTCOME_PENDING = "held", "revers
 # words that would make a note a prediction or a trade instruction (checked case-insensitively)
 FORBIDDEN_WORDS_RE = (
     r"\b(buy|buying|sell(?!-off)|selling|will|should|expect\w*|recommend\w*|predict\w*|forecast\w*|"
-    r"target|likely to|going to|stop[- ]loss)\b"
+    r"target|likely to|going to|could|might|stop[- ]loss)\b"
 )
 NUM_RE = r"([+\-−]?)(\d[\d,]*(?:\.\d+)?)(\s?%)?"
 SKIP_RE = r"\b\d{4}-\d{2}-\d{2}(?:[T ][\d:.+Z\-]+)?\b|\b\d{1,2}:\d{2}(?::\d{2})?\b"
@@ -89,7 +89,7 @@ MSG_ID_NOT_CANDIDATE = "cited id {cited!r} is not an attribution candidate of th
 MSG_NEEDS_CITATION = "attribution {attribution} needs at least one cited id of that kind"
 MSG_BAD_ATTRIBUTION = "attribution {attribution!r} is not one of {allowed}"
 MSG_NUMBER_MATCHES_NOTHING = "number {sign}{num}{unit} matches no stored measure of this row"
-MSG_WRONG_SIGN = "signed number {sign}{num}% has the wrong sign (stored {what} {value:+.4f})"
+MSG_WRONG_SIGN = "signed number {sign}{num}{unit} has the wrong sign (stored {what} {value:+.4f})"
 MSG_FORBIDDEN_WORD = "text predicts or recommends ({word!r}); describe only what happened"
 MSG_PROMPT_VERSION = "prompt_version {found!r} is not the configured {expected!r}"
 MSG_PATH_DOES_NOT_EXIST = "{path} does not exist"

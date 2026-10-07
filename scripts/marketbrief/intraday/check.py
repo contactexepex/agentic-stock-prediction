@@ -98,10 +98,11 @@ def load_inputs(ctx: CheckContext) -> None:
     ctx.ranges = inputs.published_ranges(con, day, at)
     ctx.calls = inputs.open_calls(con, ctx.cfg, day, at)
     ctx.features = inputs.latest_features(con, day, at)
-    ctx.prev_closes = inputs.previous_closes(con, day)
-    keys = [(ticker, call["entry_date"]) for ticker, calls in ctx.calls.items() for call in calls
+    bars = inputs.stored_bars(con, day, at)
+    ctx.prev_closes = inputs.previous_closes(bars)
+    keys = [(ticker, call["entry_date"], call["entry_kind"]) for ticker, calls in ctx.calls.items() for call in calls
             if call["entry_date"] != day.isoformat()]
-    ctx.entry_opens = inputs.entry_opens(con, keys)
+    ctx.entry_prices = inputs.entry_prices(bars, keys)
 
 
 def run_row(ctx: CheckContext, status: str, counts: dict, note: str | None = None) -> dict:

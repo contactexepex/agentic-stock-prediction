@@ -9,7 +9,9 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
+from marketbrief.analytics import call_basis
 from marketbrief.constants.indicators import TRADING_DAYS
+from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
 from marketbrief.core.calendar import next_session, sessions_ahead
 from marketbrief.intraday.constants import CALL_MODEL, CALL_PREDICTION, EVENT_TYPES
 
@@ -42,37 +44,50 @@ def published_ranges(con, session_date: date, check_at: datetime) -> dict[str, d
     return out
 
 
-def call_window(cfg: dict, as_of: date, horizon: int) -> tuple[date, date]:
-    """(entry date, last session) of a call: entry at the open of the session after as-of."""
-    entry = next_session(cfg, as_of, include=False)
-    return entry, sessions_ahead(cfg, entry, horizon)[-1]
+def call_window(cfg: dict, as_of: date, horizon: int, basis: str) -> tuple[date, date]:
+    """(first session, last session) of a call's scored return (analytics/call_basis.py): open_to_close buys at the
+    open of D (the session after as-of) and sells at the close of D+1 (1d) or D+4 (5d); close_to_close runs from the
+    as-of close to the close of the h-th session after it."""
+    sessions = sessions_ahead(cfg, next_session(cfg, as_of, include=False), call_basis.target_offset(basis, horizon))
+    return sessions[0], sessions[-1]
 
 
 def open_calls(con, cfg: dict, session_date: date, check_at: datetime) -> dict[str, list[dict]]:
-    """{ticker: calls}: predictions made and model scores computed by check_at whose holding window (entry open
-    to the close of the last session) contains this session. Each model score id: its newest row by check_at."""
+    """{ticker: calls}: predictions made and model scores computed by check_at whose scored window contains this
+    session. Each model score id: its newest row by check_at (basis = its label_convention); a prediction's basis is
+    call_basis.basis_for(made_at). entry_kind: open (open_to_close: the open of entry_date) or close (close_to_close:
+    the as-of close)."""
     since = session_date - timedelta(days=CALL_LOOKBACK_DAYS)
     predictions = con.execute(
-        "SELECT id, ticker, horizon_days, as_of_date, direction, confidence, NULL AS prob_up FROM predictions "
-        "WHERE made_at <= ? AND as_of_date >= ? AND as_of_date < ? ORDER BY id",
+        "SELECT id, ticker, horizon_days, as_of_date, made_at, direction, NULL AS prob_up, "
+        "NULL AS label_convention FROM predictions WHERE made_at <= ? AND as_of_date >= ? AND as_of_date < ? "
+        "ORDER BY id",
         [check_at, since, session_date],
     ).df()
     scores = con.execute(
-        "SELECT DISTINCT ON (id) id, ticker, horizon_days, as_of_date, NULL AS direction, NULL AS confidence, "
-        "prob_up FROM model_scores WHERE computed_at <= ? AND as_of_date >= ? AND as_of_date < ? "
+        "SELECT DISTINCT ON (id) id, ticker, horizon_days, as_of_date, NULL AS made_at, NULL AS direction, prob_up, "
+        "label_convention FROM model_scores WHERE computed_at <= ? AND as_of_date >= ? AND as_of_date < ? "
         "ORDER BY id, computed_at DESC",
         [check_at, since, session_date],
     ).df()
+    rule = call_basis.switch()
     out: dict[str, list[dict]] = {}
     for source, frame in ((CALL_PREDICTION, predictions), (CALL_MODEL, scores)):
         for row in records(frame):
             as_of = pd.Timestamp(row["as_of_date"]).date()
-            entry, last = call_window(cfg, as_of, int(row["horizon_days"]))
-            if entry <= session_date <= last:
+            if source == CALL_PREDICTION:
+                basis = call_basis.basis_for(row["made_at"], rule)
+            else:
+                basis = row["label_convention"] or LABEL_OPEN_TO_CLOSE
+            first, last = call_window(cfg, as_of, int(row["horizon_days"]), basis)
+            if first <= session_date <= last:
+                by_open = basis == LABEL_OPEN_TO_CLOSE
                 out.setdefault(row["ticker"], []).append({
                     "source": source, "id": row["id"], "horizon_days": int(row["horizon_days"]),
-                    "direction": row["direction"], "prob_up": row["prob_up"], "entry_date": entry.isoformat(),
-                    "sessions_held": len(sessions_between(cfg, entry, session_date)),
+                    "direction": row["direction"], "prob_up": row["prob_up"], "basis": basis,
+                    "entry_kind": "open" if by_open else "close",
+                    "entry_date": (first if by_open else as_of).isoformat(), "last_session": last.isoformat(),
+                    "sessions_held": len(sessions_between(cfg, first, session_date)),
                 })
     return out
 
@@ -88,16 +103,41 @@ def sessions_between(cfg: dict, start: date, end: date) -> list[date]:
     return found
 
 
-def entry_opens(con, keys: list[tuple[str, str]]) -> dict[tuple[str, str], float]:
-    """{(ticker, entry date): open} from the stored bars (adjusted basis)."""
-    if not keys:
-        return {}
-    frame = con.execute(
-        "SELECT ticker, CAST(date AS VARCHAR) AS day, open FROM ohlc WHERE list_contains(?, ticker || '|' || "
-        "CAST(date AS VARCHAR))",
-        [[f"{ticker}|{day}" for ticker, day in keys]],
+def stored_bars(con, session_date: date, check_at: datetime) -> pd.DataFrame:
+    """Daily bars before the session as known at check_at: per (ticker, date) the newest stored row collected by
+    check_at, minus the exchange's closed days (as the ohlc_raw view), times the split/bonus factors detected by
+    check_at with an ex-date after the bar and up to the session (as the ohlc view, on today's basis)."""
+    return con.execute(
+        "WITH p AS (SELECT DISTINCT ON (ticker, date) ticker, date, open, close FROM prices "
+        "WHERE collected_at <= ? AND date < ? ORDER BY ticker, date, collected_at DESC), "
+        "q AS (SELECT * FROM p WHERE NOT EXISTS (SELECT 1 FROM own_closed_days c WHERE c.ticker = p.ticker "
+        "AND c.date = p.date)), "
+        "f AS (SELECT q.ticker, q.date, coalesce(list_product(list_sort(list(a.factor))), 1.0) AS factor FROM q "
+        "LEFT JOIN price_adjustments a ON a.ticker = q.ticker AND a.ex_date > q.date AND a.ex_date <= ? "
+        "AND a.detected_at <= ? GROUP BY q.ticker, q.date) "
+        "SELECT q.ticker, q.date, q.open * f.factor AS open, q.close * f.factor AS close FROM q JOIN f "
+        "USING (ticker, date) ORDER BY q.ticker, q.date",
+        [check_at, session_date, session_date, check_at],
     ).df()
-    return {(row["ticker"], row["day"]): float(row["open"]) for row in records(frame) if row["open"] is not None}
+
+
+def entry_prices(bars: pd.DataFrame, keys: list[tuple[str, str, str]]) -> dict[tuple[str, str, str], float]:
+    """{(ticker, date, open|close): price} of the stored bars (stored_bars) for the calls' entries before today."""
+    out = {}
+    for ticker, day, kind in keys:
+        match = bars[(bars["ticker"] == ticker) & (bars["date"].astype(str).str[:10] == day)]
+        if not match.empty and pd.notna(match.iloc[-1][kind]):
+            out[(ticker, day, kind)] = float(match.iloc[-1][kind])
+    return out
+
+
+def previous_closes(bars: pd.DataFrame) -> dict[str, tuple[float, str]]:
+    """{symbol: (close, date)} of each symbol's newest stored bar before the session (stored_bars)."""
+    out = {}
+    for row in records(bars):
+        if row["close"] is not None:
+            out[row["ticker"]] = (float(row["close"]), str(row["date"])[:10])
+    return out
 
 
 def latest_features(con, session_date: date, check_at: datetime) -> dict[str, dict]:
@@ -121,15 +161,6 @@ def daily_sigma(bands: dict[int, dict], features: dict | None) -> tuple[float | 
     if features and features.get("ewma_vol"):
         return float(features["ewma_vol"]) / math.sqrt(TRADING_DAYS), "sigma_from_ewma_vol"
     return None, "no_sigma"
-
-
-def previous_closes(con, session_date: date) -> dict[str, float]:
-    """{symbol: close} of each symbol's newest stored bar before this session."""
-    frame = con.execute(
-        "SELECT DISTINCT ON (ticker) ticker, close FROM ohlc WHERE date < ? ORDER BY ticker, date DESC",
-        [session_date],
-    ).df()
-    return {row["ticker"]: float(row["close"]) for row in records(frame) if row["close"] is not None}
 
 
 def news_since(con, ticker: str, since: datetime, check_at: datetime, limit: int) -> list[dict]:

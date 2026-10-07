@@ -72,7 +72,7 @@ def call_side(call: dict, min_edge: float) -> str | None:
 
 def judge_call(call: dict, last_price: float, sigma: float | None, sessions: float, settings: dict) -> dict:
     """The call with its return since entry, that return's z and whether it runs against the call."""
-    entry = call.get("entry_open")
+    entry = call.get("entry_price")
     ret = last_price / entry - 1 if entry else None
     z = scaled(ret, sigma, sessions)
     side = call_side(call, settings["thresholds"]["model_min_edge"])
