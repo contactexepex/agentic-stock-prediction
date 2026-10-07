@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from marketbrief.collectors.collector_store import (
     Problems,
     complete_days,
+    refetch_since,
     not_published,
     stale_cutoff,
     store_changed,
@@ -65,7 +66,7 @@ def collect_cboe(client, cfg: dict, today: date, settings: dict, now: str, probl
     complete; a missing file is a failure, except the latest session's (publishing lag, a note)."""
     market = cfg[CFG_MARKET]
     wanted = settings.get("ratios") or {}
-    have = complete_days(market, KIND_MACRO, "series", set(wanted.values()))
+    have = complete_days(market, KIND_MACRO, "series", set(wanted.values()), refetch_since(cfg, today))
     cutoff, rows, available = stale_cutoff(cfg, today), [], 0
     for day in sessions_in_window(cfg, today, int(settings.get("lookback_days", DEFAULT_CBOE_LOOKBACK_DAYS))):
         if str(day) in have:

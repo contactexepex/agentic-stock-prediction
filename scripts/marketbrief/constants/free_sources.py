@@ -87,3 +87,4 @@ MSG_FPI_NO_EQUITY = ", no equity sub-total"
 MSG_INDEX_FILE_DATES = "file for {day} holds {served}"
 MSG_INDEX_NOT_YET = "indices: no NSE index file for {day} yet (HTTP {status}); published after the close"
 MSG_INDEX_MISSING = "configured indices not in the file: {missing}"
+REFETCH_SESSIONS = 3   # an incomplete day is fetched again only while among the last 3 sessions (collector_store.py)

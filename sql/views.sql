@@ -513,10 +513,12 @@ FROM a LEFT JOIN lab USING (ticker, accession)
 ORDER BY a.ticker, a.filing_date DESC, a.period_end DESC NULLS LAST;
 
 -- ---------- Free market-wide sources (issue #9; collect_macro, collect_shorts, collect_flows_india) ----------
--- Per series and date the complete row first, then the newest (a revision is a newer row),
+-- Per series and date the complete row first (a row stored before `complete` existed counts as complete),
+-- then the newest (a revision is a newer row),
 -- plus two Treasury curve spreads from the same day's par yields (10y-2y, 10y-3m; source 'derived').
 CREATE OR REPLACE VIEW macro_series AS
-WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro ORDER BY series, date, complete DESC NULLS LAST, first_seen_at DESC),
+WITH m AS (SELECT DISTINCT ON (series, date) * FROM macro
+           ORDER BY series, date, coalesce(complete, true) DESC, first_seen_at DESC),
 s AS (SELECT date, max(value) FILTER (WHERE series = 'UST_10Y') AS y10, max(value) FILTER (WHERE series = 'UST_2Y') AS y2,
              max(value) FILTER (WHERE series = 'UST_3M') AS m3, max(first_seen_at) AS first_seen_at
       FROM m WHERE source = 'treasury' GROUP BY date)
@@ -542,7 +544,7 @@ WHERE a.k = 1;
 -- the latest session per ticker with the 5-session average and the average of the up to 20
 -- sessions before it (n_prior = how many there were; short_pct in %).
 CREATE OR REPLACE VIEW shorts_daily AS
-SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, complete DESC NULLS LAST, first_seen_at DESC;
+SELECT DISTINCT ON (date, ticker) * FROM shorts ORDER BY date, ticker, coalesce(complete, true) DESC, first_seen_at DESC;
 
 CREATE OR REPLACE VIEW shorts_latest AS
 WITH d AS (
@@ -570,7 +572,8 @@ SELECT * FROM fpi_daily WHERE reporting_date = (SELECT max(reporting_date) FROM 
 -- NSE index closes: per session and index the complete row first, then the newest; the latest
 -- session per index with the return versus 1 and 5 stored sessions earlier (in %).
 CREATE OR REPLACE VIEW indices_daily AS
-SELECT DISTINCT ON (date, index_name) * FROM indices ORDER BY date, index_name, complete DESC NULLS LAST, first_seen_at DESC;
+SELECT DISTINCT ON (date, index_name) * FROM indices
+ORDER BY date, index_name, coalesce(complete, true) DESC, first_seen_at DESC;
 
 CREATE OR REPLACE VIEW indices_latest AS
 WITH r AS (SELECT *, row_number() OVER (PARTITION BY index_name ORDER BY date DESC) AS k FROM indices_daily)

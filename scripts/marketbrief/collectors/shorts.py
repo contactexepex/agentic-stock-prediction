@@ -23,6 +23,7 @@ from datetime import date, timedelta
 from marketbrief.collectors.collector_store import (
     Problems,
     complete_days,
+    refetch_since,
     not_published,
     stale_cutoff,
     store_changed,
@@ -65,7 +66,7 @@ def daily_volume(client, cfg: dict, today: date, settings: dict, now: str, probl
     """(rows, sessions available) of the FINRA short-sale volume for the sessions in the lookback that are not
     stored complete; an incomplete day is stored but fetched again next run (complete_days)."""
     symbols = finra_symbols(cfg)
-    have = complete_days(cfg[CFG_MARKET], KIND_SHORTS, COL_TICKER, set(symbols.values()))
+    have = complete_days(cfg[CFG_MARKET], KIND_SHORTS, COL_TICKER, set(symbols.values()), refetch_since(cfg, today))
     cutoff, rows, available = stale_cutoff(cfg, today), [], 0
     for day in sessions_in_window(cfg, today, int(settings.get("lookback_days", DEFAULT_VOLUME_LOOKBACK_DAYS))):
         if str(day) in have:

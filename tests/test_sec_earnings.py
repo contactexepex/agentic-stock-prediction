@@ -182,6 +182,34 @@ def test_backtest_version_applies_only_from_its_start():
     assert not cols["earn"].any()                              # 03-13/03-16 are before the version's start
 
 
+def test_events_just_after_the_last_bar_still_flag_the_last_days():
+    """Issue #27: an earnings day or ex-date after the last stored bar flags the last days before it (their
+    positions come from the exchange calendar), as a live run on those days would."""
+    sessions = ev.exchange_calendar("XNYS").sessions_in_range("2026-08-03", "2026-09-30")
+    close = 100 * np.exp(np.cumsum(np.random.default_rng(7).normal(0, 0.01, len(sessions))))
+    df = pd.DataFrame({"open": close, "close": close}, index=sessions)
+    rc = {**ALL_ON, "ewma_lambda": 0.94, "warmup_bars": 10, "earnings_vol_multiple": 3.0}
+    extra = {"earnings": {"X": [(None, [(D("2026-10-02"), "before_open")])]}, "dividends": {"X": [(D("2026-10-01"), 1.0)]},
+             "bench": df, "index_cue": None}
+    cols = observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, "X", 5, extra)
+    assert cols["earn"].tail(4).all() and not cols["earn"].iloc[-5]     # 10-02 is the 2nd session after 09-30
+    assert cols["has_div"].tail(5).all() and not cols["has_div"].iloc[-6]
+
+
+def test_fitted_index_cue_on_the_last_as_of_day():
+    """Issue #27: with a fitted beta, the last as-of day of the data keeps its index cue: the session after it comes
+    from the exchange calendar, and the cue's return before that session is stored."""
+    days = ev.exchange_calendar("XBOM").sessions_in_range("2026-01-01", "2026-10-01")
+    rng = np.random.default_rng(3)
+    cue_days = ev.exchange_calendar("XNYS").sessions_in_range("2026-01-01", "2026-10-01")
+    bench = pd.DataFrame({"open": 100.0, "close": 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(days))))}, index=days)
+    cue = pd.DataFrame({"close": 50 * np.exp(np.cumsum(rng.normal(0, 0.01, len(cue_days))))}, index=cue_days)
+    cfg = {"market": "india", "calendar": "XBOM", "timezone": "Asia/Kolkata", "index_cue": {"symbol": "SPX", "beta": "fit"},
+           "symbols": {"NIFTY50": {"role": "benchmark"}}}
+    series = observations.index_cue_series(cfg, {"NIFTY50": bench, "SPX": cue}, {"beta_split": {"fit_sessions": 60}})
+    assert series.index[-1] == days[-1] and not np.isnan(series.iloc[-1])   # SPX's 10-01 move, before India's 10-05
+
+
 def evframe(ticker: str, rows, reps) -> pd.DataFrame:
     t0 = pd.Timestamp("2026-10-05", tz="UTC")
     recs = [{"ticker": ticker, "type": "earnings", "date": d, "timing": tm, "amount": None, "source": src,

@@ -421,6 +421,18 @@ WIRE_CASES = [
     ("Merck KGaA, Darmstadt, Germany, Opens New Facility", set()),
     ("The new app is available on iPhone and Android", set()),
     ("Acme Widgets wins award. Follow us on Facebook and Instagram", set()),
+    # issue #27: conference, underwriters, partner platforms and the inventor are no company news
+    ("Acme to Present at the 45th Annual J.P. Morgan Healthcare Conference", set()),
+    ("Acme Prices $500 Million Offering. J.P. Morgan, BofA Securities and Morgan Stanley are acting as joint "
+     "book-running managers for the offering.", set()),
+    ("Acme Announces Pricing. The underwriters for the offering are Goldman Sachs and J.P. Morgan.", set()),
+    ("Acme Launches Its Analytics Platform on Google Cloud", set()),
+    ("Acme Joins Google Cloud Partner Advantage Program", set()),
+    ("Nikola Tesla Museum Opens New Wing", set()),
+    ("Google Cloud Announces New AI Infrastructure Regions", {"GOOGL"}),
+    ("Tesla Releases Third Quarter 2026 Financial Results", {"TSLA"}),
+    ("Bank of America Reports Third-Quarter 2026 Financial Results", {"BAC"}),
+    ("J.P. Morgan Asset Management Launches New ETF", {"JPM"}),
 ]
 
 
@@ -510,3 +522,40 @@ def test_fpi_unreadable_numbers_and_missing_equity_are_failures(root):
     out = cfi.collect({**cfg, "india_flows": {"fpi": True}},
                       FakeClient([("fpi.nsdl.co.in", no_equity.encode())]), TODAY, NOW)
     assert "without an Equity sub-total" in out["failed"][0]["error"] and out["new"]["fpi"] > 0
+
+
+def test_rows_stored_before_complete_count_as_complete(root):
+    """Issue #27: a row stored before `complete` existed is complete: not appended again by an equal fetch, and the
+    views keep it over a newer incomplete row."""
+    cfg = us_cfg()
+    cfg["macro"] = {"treasury": True}
+    cm.collect(cfg, FakeClient(US_ROUTES[:1]), TODAY, NOW)
+    path = next((root / "data" / "us" / "macro").glob("**/*.jsonl"))
+    legacy = [{k: v for k, v in json.loads(line).items() if k != "complete"} for line in path.read_text().splitlines()]
+    path.write_text("".join(json.dumps(r) + "\n" for r in legacy))                 # as stored before the field
+    assert cm.collect(cfg, FakeClient(US_ROUTES[:1]), TODAY, NOW)["new"]["macro"] == 0
+    newer = {**legacy[0], "value": legacy[0]["value"] + 1, "complete": False, "first_seen_at": "2026-10-06T03:00:00+00:00"}
+    with path.open("a") as f:
+        f.write(json.dumps(newer) + "\n")
+    got = connect("us").execute("SELECT value FROM macro_series WHERE series = ? AND date = ?",
+                                [legacy[0]["series"], legacy[0]["date"]]).fetchone()
+    assert got == (legacy[0]["value"],)
+    assert collector_store.is_complete({}) and not collector_store.is_complete({"complete": False})
+
+
+def test_absent_ticker_is_not_refetched_after_the_refetch_window(root):
+    """Issue #27: a day still missing a ticker after REFETCH_SESSIONS sessions is taken as absent at the source:
+    not fetched and reported again on every run."""
+    cfg = us_cfg()
+    cfg["shorts"]["daily_volume"]["lookback_days"] = 8
+    lines = [ln for ln in (FIX / "CNMSshvol20261002.txt").read_text().splitlines() if "|NVDA|" not in ln]
+    cut = ("\n".join(lines[:-1] + [str(len(lines) - 2)]) + "\n").encode()
+    cs.collect(cfg, FakeClient([("CNMSshvol20261002", cut)]), TODAY, NOW)
+    assert collector_store.refetch_since(cfg, date(2026, 10, 7)) == date(2026, 10, 2)
+    soon = FakeClient([])
+    cs.collect(cfg, soon, date(2026, 10, 7), NOW)                                 # 10-02 still in the window
+    assert any("CNMSshvol20261002" in u for u in soon.calls)
+    later = FakeClient([])
+    out = cs.collect(cfg, later, date(2026, 10, 8), NOW)                          # 10-02 is past it
+    assert not any("CNMSshvol20261002" in u for u in later.calls)
+    assert not any(f.get("date") == "2026-10-02" for f in out["failed"])

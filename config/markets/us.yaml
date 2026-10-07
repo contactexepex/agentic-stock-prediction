@@ -126,6 +126,15 @@ news:
     - 'Progressive Supranuclear Palsy'
     - '(?:available|follow us|find us|download(?:able)?) on (?:the )?(?:iPhone|Facebook|Instagram|Google Play)'
     - 'Google Play'
+    # issue #27: J.P. Morgan's January healthcare conference, banks named as underwriters or advisers of
+    # another company's deal, Google Cloud as a partner's platform, and Nikola Tesla
+    - 'J\.P\. Morgan Healthcare Conference'
+    - '\b(?:J\.P\. Morgan|JPMorgan|BofA Securities|BofA|Morgan Stanley|Goldman Sachs|Citigroup|Wells Fargo Securities)\b[^.]{0,300}?\b(?:is|are) (?:acting|serving) as\b[^.]*'
+    - '\b(?:underwriters?|book-?running managers?|bookrunners?|placement agents?|financial advisors?) (?:for the offering )?(?:is|are|include)\b[^.]*'
+    - 'BofA Securities'
+    - '\b(?:on|with|via|through|using|in|to|for|across|from|by|and) Google Cloud\b'
+    - '\bGoogle Cloud (?:Marketplace|Partner(?: Advantage)?|Next|customers?)\b'
+    - 'Nikola Tesla'
 
 filings: sec
 filing_forms: ["8-K", "10-Q", "10-K", "6-K", "20-F", "4", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G"]  # new-format 13D/13G since Dec 2024

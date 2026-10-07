@@ -29,6 +29,10 @@ def svg_calibration(summary: dict) -> str:
         f'<text x="{left + plot_width / 2}" y="{height - 4}" text-anchor="middle">stated coverage (what the range '
         f"promises)</text>"
     )
+    out.append(  # issue #27: the y axis is named too
+        f'<text x="12" y="{top + plot_height / 2:.1f}" text-anchor="middle" '
+        f'transform="rotate(-90 12 {top + plot_height / 2:.1f})">actual coverage (how often it held)</text>'
+    )
     out.append(
         f'<line x1="{scale_x(0)}" y1="{scale_y(0)}" x2="{scale_x(1)}" y2="{scale_y(1)}" stroke="var(--muted)" '
         f'stroke-dasharray="4 4"/>'

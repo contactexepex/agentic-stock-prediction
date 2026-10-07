@@ -12,6 +12,7 @@ from datetime import date
 
 from marketbrief.constants.columns import COL_COMPLETE, COL_DATE, COL_ID
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
+from marketbrief.constants.free_sources import REFETCH_SESSIONS
 from marketbrief.constants.statuses import (
     SUMMARY_ALLOWLIST,
     SUMMARY_ALLOWLIST_NEEDED,
@@ -29,6 +30,7 @@ from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.sources.errors import FetchError
 
 NOT_PUBLISHED_STATUSES = (403, 404)
+
 
 
 @dataclass
@@ -62,14 +64,32 @@ def stored_rows(market: str, kind: str, files: int = 400) -> dict[str, dict]:
     return latest
 
 
-def complete_days(market: str, kind: str, key_col: str, required: set[str]) -> set[str]:
-    """Dates whose stored rows (latest per id) cover every required key with `complete` true.
-    Any other date (missing, partial, truncated) is fetched again while it is in the lookback."""
+def is_complete(row: dict) -> bool:
+    """A stored row's `complete`; rows stored before the field existed count as complete (issue #27)."""
+    return row.get(COL_COMPLETE, True) is not False
+
+
+def refetch_since(cfg: dict, today: date) -> date:
+    """The oldest session still fetched again when stored incomplete (REFETCH_SESSIONS sessions back)."""
+    day = today
+    for _ in range(REFETCH_SESSIONS):
+        day = prev_session(cfg, day, include=False)
+    return day
+
+
+def complete_days(market: str, kind: str, key_col: str, required: set[str], final_before: date | None = None) -> set[str]:
+    """Dates whose stored rows (latest per id) cover every required key with `complete` true, plus (with
+    `final_before`) every stored date before it: a key still absent then is taken as absent at the source, so the
+    day is not fetched and reported again on every run (issue #27). Other dates (missing, partial, truncated) are
+    fetched again while they are in the lookback."""
     have: dict[str, set[str]] = {}
+    stored_days: set[str] = set()
     for row in stored_rows(market, kind).values():
-        if row.get(COL_COMPLETE) and row.get(key_col) in required:
+        stored_days.add(str(row[COL_DATE]))
+        if is_complete(row) and row.get(key_col) in required:
             have.setdefault(row[COL_DATE], set()).add(row[key_col])
-    return {day for day, keys in have.items() if keys >= required}
+    done = {day for day, keys in have.items() if keys >= required}
+    return done | ({day for day in stored_days if day < str(final_before)} if final_before else set())
 
 
 def store_changed(market: str, kind: str, rows: list[dict], today: date, value_cols: list[str]) -> int:
@@ -79,7 +99,10 @@ def store_changed(market: str, kind: str, rows: list[dict], today: date, value_c
     fresh: dict[str, dict] = {}
     for row in rows:
         old = stored.get(row[COL_ID])
-        if old is None or any(old.get(column) != row.get(column) for column in value_cols):
+        if old is None or any(
+            (is_complete(old) != is_complete(row)) if column == COL_COMPLETE else old.get(column) != row.get(column)
+            for column in value_cols
+        ):
             fresh[row[COL_ID]] = row
     return append_jsonl(day_file(market, kind, today), fresh.values()) if fresh else 0
 

@@ -259,6 +259,20 @@ def test_tiny_p_values_print_as_less_than():
     assert html_parts.p_value_text(0.0123) == "0.0123" and html_parts.p_value_text(None) == ""
 
 
+def test_replay_page_details_issue_27():
+    """The stored p-value is unrounded (rounded only on the page), the calibration chart names its y axis, and a
+    hit-rate tile says whether its 95% interval excludes a coin flip."""
+    from marketbrief.replay.rule_replay import replay_statistics, rule_charts, rule_html
+
+    p = replay_statistics.binom_p_two_sided(61, 100)
+    assert p != float(f"{p:.3g}") and html_parts.p_value_text(p) == f"{p:.3g}"
+    svg = rule_charts.svg_calibration({"horizons": {}})
+    assert "actual coverage (how often it held)</text>" in svg and "rotate(-90" in svg
+    assert rule_html.coin_note([0.52, 0.58]).endswith("the 95% interval excludes 50%")
+    assert rule_html.coin_note([0.48, 0.55]).endswith("the 95% interval includes 50%")
+    assert rule_html.coin_note(None) == "a coin flip is 50%"
+
+
 def test_binomial_and_wilson():
     assert replay_statistics.binom_p_two_sided(50, 100) == pytest.approx(1.0)
     assert replay_statistics.binom_p_two_sided(60, 100) == pytest.approx(0.056887, abs=1e-5)

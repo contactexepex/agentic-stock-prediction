@@ -28,6 +28,7 @@ from marketbrief.collectors.flows_parsing import parse_fpi, parse_indices
 from marketbrief.collectors.collector_store import (
     Problems,
     complete_days,
+    refetch_since,
     not_published,
     stale_cutoff,
     store_changed,
@@ -88,7 +89,7 @@ def collect_indices(client, cfg: dict, today: date, settings: dict, now: str, pr
     """(rows, sessions available) of NSE's index close files for the sessions in the lookback that are not stored
     complete; an incomplete day is stored but fetched again next run (complete_days)."""
     names = settings.get("names") or {}
-    have = complete_days(cfg[CFG_MARKET], KIND_INDICES, "index_name", set(names))
+    have = complete_days(cfg[CFG_MARKET], KIND_INDICES, "index_name", set(names), refetch_since(cfg, today))
     cutoff, rows, available = stale_cutoff(cfg, today), [], 0
     for day in sessions_in_window(cfg, today, int(settings.get("lookback_days", DEFAULT_INDEX_LOOKBACK_DAYS))):
         if str(day) in have:

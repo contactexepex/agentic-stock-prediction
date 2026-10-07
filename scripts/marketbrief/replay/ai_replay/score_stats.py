@@ -79,7 +79,7 @@ def hit_rate_stats(hits: int, count: int) -> dict:
         "hits": hits,
         "hit_rate": round_or_none(hits / count) if count else None,
         "ci95": [round_or_none(lower), round_or_none(upper)],
-        "p_vs_50": None if not count else float(f"{replay_statistics.binom_p_two_sided(hits, count):.3g}"),
+        "p_vs_50": None if not count else replay_statistics.binom_p_two_sided(hits, count),  # rounded for display
     }
 
 
