@@ -161,13 +161,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `web/lib/tools/` implements `mcp/tools.yaml`; `mcp/build_registry.py` generates `registry.generated.ts` from it and
   `mcp/agents/*.yaml` (allowed tools, day budgets, kill switch per agent; `assistant` has read tools only), checked by
   `tests/test_b5_tools.py`. Identity comes only from the channel's auth, never from arguments. Every write needs an
-  idempotency key and a confirmation (summary; typed for delete, dashboard only) and is appended to the inbox
+  idempotency key; company commands are confirmed (summary; typed for delete, dashboard only), paper trades come from
+  the `/trade` form (or a tool call) without a summary step. Writes are appended to the inbox
   (`mcp/inbox.sql`, database `market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`): company commands to
   `inbox.company_commands` (read by `company.py import-inbox`; dispatches `onboard.yml`), paper trades to
   `inbox.requests` (no importer yet, issue #112); pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
   Vercel project `market-brief-gateway`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
-  `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*`. Slack:
+  `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
+  `/slack/commands` and `/slack/interactions`). Slack:
   `/company`, `/trade`, `/ask` (stub until B8), in #market-brief only; Confirm posts a visible request message whose
   `slack_channel`/`slack_ts` go into the inbox row for B6's onboarding reply. Web tests: `npm test` in `web/` (node test
   runner, offline, with the prompt-injection suite), CI `.github/workflows/web-tests.yml`.

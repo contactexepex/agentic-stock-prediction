@@ -308,7 +308,7 @@ import) is bounded to entries since the last run and visible as pending.
 
   Built in Wave 2 by session B5 (docs/ws/b5.md): the agent files `mcp/agents/*.yaml`, the policy enforcement point
   `web/lib/tools/executor.ts`, the injection suite `web/lib/tools/tests/injection.test.ts` (CI `web-tests.yml`).
-  The remote MCP endpoint is `/mcp` on the gateway deployment with GitHub OAuth (decision 22).
+  The remote MCP endpoint is `/mcp` on the gateway deployment with GitHub OAuth (SPEC decision 22).
 - No tool can place, route or simulate a broker order; paper trades are records only.
 
 ## 11. Failure modes
