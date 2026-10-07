@@ -12,7 +12,7 @@ protocol" at the end); the rules below up to it are for your calls in `work/pred
 
 ```yaml trader
 strategy_id: ai.combined.opus.v1
-prompt_version: forecast-v13
+prompt_version: forecast-v14
 enabled: true            # kill switch: false = the trader part is skipped and every active company gets `killed`
 budget:
   max_minutes: 60        # the trader file must pass its gate before the deadline in its input (D's open - 15 min)
@@ -33,7 +33,9 @@ first session every call covers has already opened and part of its outcome is pu
 on every ticker and horizon with reason "mid-session run", write no prediction records (leave
 `work/predictions.jsonl` absent), and return the abstention table.
 
-For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and optionally 1.
+For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and optionally 1. A horizon k is N+k
+(decision 37): buy at the open of D (the first session after the as-of date) and sell at the close of the k-th
+session after D, so N+1 sells at the close of D+1 and N+5 at the close of D+5.
 - Signal model anchor (docs/DESIGN.md section 15): the context pack's "Signal model" section gives each
   ticker's model probability P(up) per horizon (id `<as_of_date>-<ticker>-<h>d`, from
   `scripts/model_scores.py`: a logistic regression on indicators, regime, market and cue, plus a small
@@ -49,8 +51,9 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   The gate (`validate.py --stage forecast`, code MODEL_ADJUSTMENT) checks model_prob against the stored
   score, |adjustment| <= 0.10, the reason, the direction and the confidence. A ticker without a model
   row: decide as below and leave the three fields out (the gate warns MODEL_SCORE_MISSING). Note: the
-  model's label is open-to-close (buy at the open of the first session after the as-of close, sell at the
-  close of the next session for 1 day, of the fifth for 5 days), and from `call_scoring.from` in
+  model's label is open-to-close on the same N+k window (buy at the open of D, sell at the close of D+1 for
+  horizon 1 and of D+5 for horizon 5; 5-day calls made before `call_scoring.n_plus_k_from` in
+  `config/settings.yaml` keep the old close of D+4), and from `call_scoring.from` in
   `config/settings.yaml` on `score_predictions.py` scores your calls the same way: `up` means that close is
   above that open. Older calls stay scored close-to-close; the track record shows the two bases apart.
 - Start from the base rate: roughly half of daily moves are up; a call needs specific evidence.
@@ -92,7 +95,7 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   your call adds a small capped drift to that range's centre.
 - `made_at`: current UTC time (ISO 8601, e.g. `date -u +%FT%T+00:00`); every cited id must have been
   published before it.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v13".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v14".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs
@@ -105,7 +108,7 @@ Debate record: also write `work/reasoning.jsonl`, one line per watchlist ticker 
 their cited ids), `verdict` (your reason, at most 60 words), `decision_1d` and `decision_5d` (`up`,
 `down` or `abstain`, as in your calls), `evidence_ids` (every news, filing or announcement id cited in the
 three texts) and `prediction_ids` (the ids of your calls for this ticker), and `prompt_version`
-"forecast-v13". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
+"forecast-v14". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
 the dashboard can show why each call was made or not.
 
 Return a table of calls and abstentions with 1-line reasons.
@@ -121,9 +124,9 @@ prediction or one abstention line:
 - prediction: `{"strategy_id": "ai.combined.opus.v1", "ticker", "horizon_days" (1, 3 or 5), "direction", "prob_up"
   (4 decimals: P(exit close of N+k > D's open)), "model_prob", "agent_adjustment", "adjustment_reason",
   "target_price" (expected exit close), "range_widen", "evidence_ids" (1-3 ids), "reason" (at most 60 words),
-  "made_at", "prompt_version": "forecast-v13"}`;
+  "made_at", "prompt_version": "forecast-v14"}`;
 - abstention: `{"strategy_id": "ai.combined.opus.v1", "ticker", "abstain": true, "horizons": [...], "reason" (at most
-  60 words), "made_at", "prompt_version": "forecast-v13"}`.
+  60 words), "made_at", "prompt_version": "forecast-v14"}`.
 The rules are the ones above, per horizon: the model anchor on the horizon's score from the trader input
 (`model_prob` exactly, |adjustment| <= 0.10 with a reason, prob_up = model_prob + adjustment; a non-zero adjustment
 cites a news, filing or announcement id); confidence = max(prob_up, 1 - prob_up) within 0.50-0.90, at most 0.65 in
