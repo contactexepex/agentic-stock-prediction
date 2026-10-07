@@ -256,6 +256,7 @@ moves with the 5-day sigma / sqrt 5.
 Mirrors `docs/ws/ws5-judgments.jsonl`.
 - Round 1, FAIL, b591a89: blockers: 1-day calls dropped on D+1 (window not from call_basis); previous close and
   entry opens read without a collected_at bound; ws5-judgments.jsonl claimed but missing.
+- Round 2, PASS, 13433f8: the three blockers fixed; 3 new cosmetic findings (below).
 
 ## Proposed edits to shared docs
 
@@ -317,6 +318,13 @@ adds "%" to z-scores; the OpenAPI snippet names its response wrapper; the schedu
   rows and the run row write would duplicate check rows on a rerun of the same minute.
 - `scripts/marketbrief/intraday/payload.py`: `latest_session` can pick a closed day's (empty) session.
 - `docs/ws/ws5.md` (round 1): the pasted live JSON lines were a field subset of the summaries; round 2 pastes them whole.
+
+From judge round 2:
+- `scripts/marketbrief/intraday/inputs.py`: `price_adjustments` drops superseded records even when the cancelling
+  record came after check_at, so an MB_NOW replay uses the later correction (edge case).
+- `tests/test_intraday.py` `test_stored_bars_as_of_the_check`: SPY's stored previous close is never asserted (only
+  `bench_ret`, which comes from the intraday bars).
+- `scripts/marketbrief/intraday/constants.py`: "may" is not a banned word.
 
 ## Open questions
 1. News window for attribution: the spec says items first seen since the open (default `news_window: open`).
