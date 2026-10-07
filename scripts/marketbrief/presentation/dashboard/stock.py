@@ -11,19 +11,12 @@ import re
 
 import pandas as pd
 
-from marketbrief.constants.dashboard import (
-    INDICATOR_COLUMNS,
-    NAME_LEGACY_MODEL,
-    NAME_LEGACY_MODEL_OTHER,
-    NAME_LEGACY_RANGE,
-    NAME_LEGACY_RANGE_OTHER,
-    NAME_N_PLUS_K,
-    NAME_N_PLUS_K_MODEL,
-    NEWS_PER_TICKER,
-)
-from marketbrief.constants.horizons import LABEL_LEGACY_5D_D4, LABEL_N_PLUS_K
+from marketbrief.constants.dashboard import INDICATOR_COLUMNS, NEWS_PER_TICKER
+from marketbrief.constants.horizon_names import NAME_LEGACY_MODEL, NAME_LEGACY_RANGE, NAME_N_PLUS_K_MODEL
+from marketbrief.constants.horizons import LABEL_LEGACY_5D_D4
 from marketbrief.constants.model import GROUP_BASELINE
 from marketbrief.core.horizons import horizons, legacy_label
+from marketbrief.presentation.horizon_names import horizon_name
 from marketbrief.utils.numbers import json_safe_float
 
 PRICE_DIGITS = 4
@@ -54,14 +47,6 @@ def row_label(row, kind: str) -> str:
     """A stored row's horizon label; a row written before B10 (no label) gets core.horizons.legacy_label."""
     label = getattr(row, "horizon_label", None)
     return label if isinstance(label, str) else legacy_label(kind, int(row.horizon_days))
-
-
-def horizon_name(h: int, label: str, n_plus_k: str, legacy_first: dict, legacy_other: str) -> str:
-    """The page's name of a horizon: `n_plus_k` for an N+k row; the wording used before B10 for a row of an old
-    window (legacy_first[h], else legacy_other), so an old row is never shown under an N+k name."""
-    if label == LABEL_N_PLUS_K:
-        return n_plus_k.format(h=h)
-    return legacy_first.get(h, legacy_other.format(h=h))
 
 
 def ratio(numerator, denominator) -> float | None:
@@ -117,7 +102,7 @@ def range_rows(ticker_ranges: pd.DataFrame, late_of) -> list[dict]:
             {
                 "h": h,
                 "horizon_label": label,
-                "name": horizon_name(h, label, NAME_N_PLUS_K, NAME_LEGACY_RANGE, NAME_LEGACY_RANGE_OTHER),
+                "name": horizon_name(h, label, legacy=NAME_LEGACY_RANGE),
                 "target_date": iso_day(r.target_date),
                 "made_at": iso_time(r.made_at),
                 "base_close": base,
@@ -166,7 +151,7 @@ def model_row(score, plan: dict) -> dict:
     return {
         "h": h,
         "horizon_label": horizon_label,
-        "name": horizon_name(h, horizon_label, NAME_N_PLUS_K_MODEL, NAME_LEGACY_MODEL, NAME_LEGACY_MODEL_OTHER),
+        "name": horizon_name(h, horizon_label, NAME_N_PLUS_K_MODEL, NAME_LEGACY_MODEL),
         "id": score.id,
         "prob_up": json_safe_float(score.prob_up),
         "prob_model": json_safe_float(score.prob_model),

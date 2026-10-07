@@ -10,18 +10,10 @@ from __future__ import annotations
 import pandas as pd
 
 from marketbrief.analytics import call_basis, scoring
-from marketbrief.constants.dashboard import (
-    NAME_LEGACY_CALLS,
-    NAME_LEGACY_CALLS_OTHER,
-    NAME_LEGACY_RANGE,
-    NAME_LEGACY_RANGE_OTHER,
-    NAME_LEGACY_REPLAY,
-    NAME_N_PLUS_K,
-)
-from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.constants.horizon_names import NAME_LEGACY_CALLS, NAME_LEGACY_RANGE, NAME_REPLAY
 from marketbrief.core.horizons import horizon_key, horizons
 from marketbrief.pipeline.review.summaries import call_summary
-from marketbrief.presentation.dashboard.stock import horizon_name
+from marketbrief.presentation.horizon_names import by_horizon, horizon_name
 from marketbrief.utils.numbers import json_safe_float
 from view_data import MIN_SAMPLE, asof_source
 
@@ -62,11 +54,6 @@ def call_block(calls: pd.DataFrame) -> dict:
     }
 
 
-def horizon_order(h: int, label: str) -> tuple:
-    """Sort key: by horizon, the N+k row before an old window's."""
-    return (int(h), label != LABEL_N_PLUS_K, label)
-
-
 def calls_by_basis(con, cutoff) -> list[dict]:
     """Per scoring basis key (scoring.basis_key; the old D+4 open-to-close calls apart): all horizons, then each
     horizon and label (keys core.horizons.horizon_key, e.g. "1d" for N+1, "1d legacy_cc"), shortest first."""
@@ -78,18 +65,17 @@ def calls_by_basis(con, cutoff) -> list[dict]:
             for basis, label in zip(calls["label_basis"], calls["horizon_label"], strict=True)
         ]
     for key, group in calls.groupby("basis_key", sort=True) if len(calls) else []:
-        by_horizon = {}
-        groups = sorted(group.groupby(["horizon_days", "horizon_label"]), key=lambda item: horizon_order(*item[0]))
-        for (h, label), rows in groups:
-            name = horizon_name(int(h), label, NAME_N_PLUS_K, NAME_LEGACY_CALLS, NAME_LEGACY_CALLS_OTHER)
-            by_horizon[horizon_key(h, label)] = {**call_block(rows), "h": int(h), "horizon_label": label, "name": name}
+        per_horizon = {}
+        for (h, label), rows in by_horizon(group):
+            name = horizon_name(h, label, legacy=NAME_LEGACY_CALLS)
+            per_horizon[horizon_key(h, label)] = {**call_block(rows), "h": h, "horizon_label": label, "name": name}
         out.append(
             {
                 "basis": group["label_basis"].iloc[0],
                 "key": key,
                 "label": call_basis.label(key),
                 "all": call_block(group),
-                "by_horizon": by_horizon,
+                "by_horizon": per_horizon,
             }
         )
     return out
@@ -100,19 +86,14 @@ def ranges_by_horizon(con, cutoff) -> list[dict]:
     50% and 80% ranges, with Wilson intervals, plus the interval scores of scoring.range_scores."""
     rng = con.execute(RANGES_SQL.format(src=asof_source(con, "range_record", cutoff))).df()
     out = []
-    groups = (
-        sorted(rng.groupby(["horizon_days", "horizon_label"]), key=lambda item: horizon_order(*item[0]))
-        if len(rng)
-        else []
-    )
-    for (h, label), group in groups:
+    for (h, label), group in by_horizon(rng):
         n = len(group)
         out.append(
             {
                 "h": int(h),
                 "key": horizon_key(h, label),
                 "horizon_label": label,
-                "name": horizon_name(int(h), label, NAME_N_PLUS_K, NAME_LEGACY_RANGE, NAME_LEGACY_RANGE_OTHER),
+                "name": horizon_name(h, label, legacy=NAME_LEGACY_RANGE),
                 "inside50": share_with_interval(int(group["hit50"].astype(bool).sum()), n),
                 "inside80": share_with_interval(int(group["hit80"].astype(bool).sum()), n),
                 "scores": scoring.range_scores(group),
@@ -128,7 +109,7 @@ def replay_view(record: dict | None) -> dict | None:
         return None
     replayed = [h for h in horizons() if any(record.get(f"{m}_{h}d") is not None for m in REPLAY_HORIZON_METRICS)]
     fields = REPLAY_FIELDS + tuple(f"{m}_{h}d" for h in replayed for m in REPLAY_HORIZON_METRICS)
-    out = {"horizons": replayed, "names": {str(h): NAME_LEGACY_REPLAY.format(h=h) for h in replayed}}
+    out = {"horizons": replayed, "names": {str(h): NAME_REPLAY.format(h=h) for h in replayed}}
     for field in fields:
         value = record.get(field)
         if field in ("start_date", "end_date", "computed_at"):

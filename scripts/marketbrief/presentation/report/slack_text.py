@@ -6,9 +6,10 @@ import pandas as pd
 
 from marketbrief.analytics.call_basis import label as basis_label
 from marketbrief.analytics.scoring import basis_key
-from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.constants.horizon_names import NAME_LEGACY_SLACK_CALL
 from marketbrief.constants.report import MSG_RANGES_LATE
 from marketbrief.pipeline.score_predictions import is_late
+from marketbrief.presentation.horizon_names import horizon_name
 from marketbrief.presentation.report.formatting import review_line
 from marketbrief.presentation.report.gather import report_url
 from marketbrief.presentation.report.report_parts import ReportParts
@@ -27,9 +28,7 @@ def calls_by_basis(scored_calls: pd.DataFrame) -> str:
 
 def call_horizon(item) -> str:
     """A call's horizon in the Slack line: 'N+k' for an N+k range, the old 'next day' / '<h> days' otherwise."""
-    if getattr(item, "horizon_label", None) == LABEL_N_PLUS_K:
-        return f"N+{item.horizon_days}"
-    return "next day" if item.horizon_days == 1 else f"{item.horizon_days} days"
+    return horizon_name(item.horizon_days, getattr(item, "horizon_label", None), legacy=NAME_LEGACY_SLACK_CALL)
 
 
 def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tuple[str, str]:

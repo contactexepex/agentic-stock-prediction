@@ -16,8 +16,7 @@ import pandas as pd
 
 from marketbrief.core import calendar as ev
 from marketbrief.analytics import call_basis, scoring
-from marketbrief.constants.horizon_names import NAME_LEGACY_RECORD
-from marketbrief.constants.horizons import LABEL_LEGACY_5D_D4, LABEL_N_PLUS_K
+from marketbrief.constants.horizon_names import BASIS_KEY_SQL, LABEL_ORDER_SQL, NAME_LEGACY_RECORD
 from marketbrief.constants.model import LABEL_CLOSE_TO_CLOSE
 from marketbrief.constants.scoring import MSG_SCORED_ON
 from marketbrief.core.horizons import horizon_key
@@ -44,10 +43,48 @@ REGIME_PLAIN = {
     "UNSTABLE": "Unstable: fear is high and prices swing a lot; ranges are wider and calls rarer.",
 }
 NEWS_ID = re.compile(r"\b(?:[0-9a-f]{16}|nse-ann-\d+|\d{10}-\d{2}-\d{6})\b")
-# the scoring basis of a track-record row as a summary key (scoring.basis_key): open-to-close 5-day calls of the old
-# D+4 window (horizon_label legacy_5d_d4) are their own key, never pooled with the N+k calls of their basis
-BASIS_KEY_SQL = (f"CASE WHEN horizon_label = '{LABEL_LEGACY_5D_D4}' THEN label_basis || ' {LABEL_LEGACY_5D_D4}' "
-                 "ELSE label_basis END")
+
+
+SAFE_URL = re.compile(r"^https?://\S+$", re.I)
+
+
+def safe_url(url) -> str | None:
+    """The URL if it is plain http(s), else None. Feed links are stored unchecked, and a
+    javascript: or data: link must never become a clickable href in the report."""
+    if not isinstance(url, str):
+        return None
+    u = url.strip()
+    return u if SAFE_URL.match(u) else None
+
+
+def safe(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "_", name)
+
+
+def fmt_call(direction, confidence) -> str:
+    if direction not in ("up", "down") or confidence is None or pd.isna(confidence):
+        return "no call"
+    return f"{'▲ up' if direction == 'up' else '▼ down'} {scoring.percent(confidence)}"
+
+
+def day_label(d) -> str:
+    """'Mon 12 Oct' for a calendar date."""
+    d = pd.Timestamp(d).date()
+    return f"{d:%a} {d.day} {d:%b}"
+
+
+def iso(v) -> str | None:
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return None
+    return pd.Timestamp(v).date().isoformat()
+
+
+def _list(v) -> list:
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return []
+    return [x for x in list(v) if x is not None]
+
+
 # calls by stated-confidence band (exact decimal average: no dependence on row order) and the scored
 # calls in a fixed order for scoring.call_scores / reliability (docs/REFACTOR_PLAN.md, nondeterminism)
 # (per scoring basis key, never pooled: analytics/call_basis.py; {src} = the track record as of the day's made_at)
@@ -108,9 +145,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     hist = q(f"""SELECT ticker, date, close FROM (
                    SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS k
                    FROM bars WHERE date <= ?) WHERE k <= {HISTORY_DAYS} ORDER BY ticker, date""", [as_of])
-    rr = q("""SELECT ticker, horizon_days AS h, horizon_label AS label, count(*) AS n, sum(hit80::INT) AS h80,
-                     sum(hit50::INT) AS h50
-              FROM {rrs} GROUP BY ticker, h, label ORDER BY ticker, h, label <> '{nk}', label""".format(rrs=rrs, nk=LABEL_N_PLUS_K))
+    rr = q(f"""SELECT ticker, horizon_days AS h, horizon_label AS label, count(*) AS n, sum(hit80::INT) AS h80,
+               sum(hit50::INT) AS h50 FROM {rrs} GROUP BY ticker, h, label ORDER BY ticker, h, {LABEL_ORDER_SQL}""")
     tr = q(f"SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM {trs} WHERE {BASIS_KEY_SQL} = ? "
            "GROUP BY ALL ORDER BY ticker", [basis])
     preds = q("SELECT DISTINCT ON (id) * FROM predictions WHERE as_of_date = ? ORDER BY id, made_at", [as_of]) \
@@ -252,9 +288,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         }
 
     # track record, market-wide: stated vs actual hit rate (ranges by band, calls by confidence)
-    cal = q("""SELECT horizon_days AS h, horizon_label AS label, count(*) AS n, avg(hit50::INT) AS c50,
-                      avg(hit80::INT) AS c80
-               FROM {rrs} GROUP BY h, label ORDER BY h, label <> '{nk}', label""".format(rrs=rrs, nk=LABEL_N_PLUS_K))
+    cal = q(f"""SELECT horizon_days AS h, horizon_label AS label, count(*) AS n, avg(hit50::INT) AS c50,
+                avg(hit80::INT) AS c80 FROM {rrs} GROUP BY h, label ORDER BY h, {LABEL_ORDER_SQL}""")
     bands = q(BANDS_SQL.format(src=trs))
     points = []
     for x in cal.itertuples():

@@ -448,9 +448,7 @@ const gl = el('details'); gl.append(el('summary', null, 'How to read this'));
 const dl = el('dl', {class: 'gloss'});
 [['Price range', 'Where the closing price is likely to be on the target date. The 80% range should contain the real price about 8 times in 10; the narrower 50% range about half the time.'],
  ['Time period', 'Counted in trading days (days the exchange is open). "By Fri 9 Oct" is the close on that date.'],
- ['N+k', 'The horizon of a range or call: bought at the open of the next trading day (D) and sold at the ' +
-  'close of the k-th trading day after D. N+1 ends at the close of D+1, two trading days after the last close; ' +
-  'N+5 at the close of D+5.'],
+ ['N+k', 'The horizon of a range or call: bought at the open of the next trading day (D), sold at the close of the k-th trading day after D. N+1 ends at the close of D+1, two trading days after the last close.'],
  ['Call', 'An up or down view with a confidence between 50% and 90%. Most days most stocks get no call; that is on purpose.'],
  ['Track record', 'How often past ranges and calls were right once the real price was known. Below ' + D.min_sample + ' checked cases we say there is not enough history yet.'],
  ['Late', 'A range made after its session had already opened. It is shown for the record and is never scored or treated as a forecast.'],

@@ -9,11 +9,13 @@ import pandas as pd
 
 from marketbrief.analytics.call_basis import label as basis_label
 from marketbrief.analytics.scoring import percent
+from marketbrief.constants.horizon_names import NAME_LEGACY_SCORED_FIRST
 from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.core import calendar
 from marketbrief.core.horizons import horizon_key, horizons
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.pipeline.score_predictions import is_late
+from marketbrief.presentation.horizon_names import by_horizon, horizon_name
 from marketbrief.presentation.report.formatting import mark, pct
 from marketbrief.utils.money import format_money
 from view_data import fmt_call
@@ -105,12 +107,12 @@ def yesterday_tables(cfg, cur, day, feats):
     scored = day["scored"]
     # the headline group: the shortest configured horizon (its N+k ranges, else its old window); every other group
     # (other horizons, the other window) gets a sentence in line5, never pooled with it
-    groups = scored_groups(scored)
+    groups = by_horizon(scored)
     first = next((item for item in groups if item[0][0] == horizons()[0]), None)
     others = [item for item in groups if item is not first]
     (one_day_h, one_day_label), scored_one_day = first or ((horizons()[0], LABEL_N_PLUS_K), scored.iloc[0:0])
     one_day_count = len(scored_one_day)
-    one_day_name = short_horizon_name(one_day_h, one_day_label)
+    one_day_name = horizon_name(one_day_h, one_day_label, legacy=NAME_LEGACY_SCORED_FIRST)
     h80, h50 = (int(scored_one_day["hit80"].sum()), int(scored_one_day["hit50"].sum())) if one_day_count else (0, 0)
     nh80 = int(scored_one_day["naive_hit80"].fillna(False).sum()) if one_day_count else 0
     scored_rows = [
@@ -126,7 +128,7 @@ def yesterday_tables(cfg, cur, day, feats):
         for item in scored_one_day.itertuples()
     ]
     line5 = " ".join(  # every other horizon (and old window) that matured on the same date, one sentence each
-        f"{range_group_name(h, label)} ranges that matured on the same date: 80% hit "
+        f"{horizon_name(h, label)} ranges that matured on the same date: 80% hit "
         f"{int(group['hit80'].sum())}/{len(group)}, 50% hit {int(group['hit50'].sum())}/{len(group)}."
         for (h, label), group in others
     )
@@ -144,33 +146,6 @@ def yesterday_tables(cfg, cur, day, feats):
     ]
 
     return call_rows, h50, h80, line5, market_line, nh80, one_day_count, one_day_name, scored_calls, scored_rows
-
-
-def scored_groups(scored: pd.DataFrame) -> list:
-    """The ranges scored on one target date per horizon and horizon label (never pooled), shortest horizon first
-    and, within a horizon, N+k before an old window: [((h, label), rows), ...]."""
-    if scored.empty:
-        return []
-    groups = scored.groupby(["horizon_days", "horizon_label"], sort=False)
-    return sorted((((int(h), label), rows) for (h, label), rows in groups), key=lambda item: horizon_sort(*item[0]))
-
-
-def horizon_sort(h: int, label: str) -> tuple:
-    """Sort key of a horizon and label: by horizon, N+k before an old window."""
-    return (int(h), label != LABEL_N_PLUS_K, label)
-
-
-def short_horizon_name(h: int, label: str) -> str:
-    """The Slack and report name of the first group of scored ranges: 'N+k' (N+k), else the old 'next-day' /
-    '<h>-day' wording of an old window."""
-    if label == LABEL_N_PLUS_K:
-        return f"N+{h}"
-    return "next-day" if h == 1 else f"{h}-day"
-
-
-def range_group_name(h: int, label: str) -> str:
-    """A sentence-start name of a group of scored ranges: 'N+k' (N+k), else the old '<h>-day' wording."""
-    return f"N+{h}" if label == LABEL_N_PLUS_K else f"{h}-day"
 
 
 def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):

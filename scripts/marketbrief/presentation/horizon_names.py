@@ -2,6 +2,7 @@
 decision 37): their names, the trading days to a range's target close, the horizon an overview shows, and rows grouped
 by horizon and horizon label. An N+k row and a row of an old window (legacy_cc, legacy_5d_d4) never share a name and
 are never pooled."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -37,9 +38,12 @@ def horizon_name(h: int, label: str | None, n_plus_k: str = NAME_N_PLUS_K, legac
 def range_texts(h: int, label: str | None) -> dict:
     """A range's name, its trading days to the target close (`ahead`), the card text (`when`) and the chart title
     phrase (`phrase`)."""
-    return {"name": horizon_name(h, label), "ahead": days_to_target(h, label),
-            "when": horizon_name(h, label, WHEN_N_PLUS_K, WHEN_LEGACY),
-            "phrase": horizon_name(h, label, PHRASE_N_PLUS_K, PHRASE_LEGACY)}
+    return {
+        "name": horizon_name(h, label),
+        "ahead": days_to_target(h, label),
+        "when": horizon_name(h, label, WHEN_N_PLUS_K, WHEN_LEGACY),
+        "phrase": horizon_name(h, label, PHRASE_N_PLUS_K, PHRASE_LEGACY),
+    }
 
 
 def horizon_order(h: int, label: str | None) -> tuple:
