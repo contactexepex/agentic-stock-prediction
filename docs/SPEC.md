@@ -321,8 +321,9 @@ Authentication. Slack and the Claude app cannot sign in to it, so the same `web/
 a second Vercel project, the gateway (`MB_GATEWAY=1`), without Vercel Authentication; in gateway mode
 its middleware serves only `/slack/*` (every request verified with Slack's
 signing secret and refused when older than 5 minutes) and `/mcp` (GitHub OAuth; only the owner's
-GitHub account is accepted). It exposes nothing else, holds no read token for pages and calls the
-same tool layer. No bypass secret is ever put in a URL.
+GitHub account is accepted). It exposes no pages and no `/api/v1` routes; it holds only what the tool
+layer needs (the MotherDuck read token, the inbox token, the dispatch token, the Anthropic key for
+`/ask`). No bypass secret is ever put in a URL.
 
 **Write path from the web tier.** The API appends the request to an inbox (ARCHITECTURE.md section 9)
 and then dispatches the GitHub Actions workflow `onboard.yml`
