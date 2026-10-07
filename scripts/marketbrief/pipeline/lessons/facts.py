@@ -119,20 +119,21 @@ def stored_ids(con) -> set[str]:
     return set(con.execute("SELECT DISTINCT id FROM lessons").df()["id"])
 
 
-def evidence(con, ids: list[str]) -> list[dict]:
-    """What each cited id said (title/description), for the reflector to read; not stored."""
+def evidence(con, ids: list[str], made_at) -> list[dict]:
+    """What each cited id said (title/description) at the call's made_at, for the reflector to read; not stored. A
+    news item shows the headline it had then (news de-duplication: later headline updates are left out)."""
     if not ids:
         return []
     rows = con.execute(
         """
-        SELECT * FROM (SELECT id, 'news' AS kind, title AS text, published_at AS at FROM news_lookup
-            WHERE list_contains(?, id)
+        SELECT * FROM (SELECT id, 'news' AS kind, title AS text, published_at AS at
+            FROM news_lookup_asof(?::TIMESTAMPTZ) WHERE list_contains(?, id)
         UNION ALL SELECT id, 'filing', form || ': ' || coalesce(description, ''), accepted_at FROM filings
             WHERE list_contains(?, id)
         UNION ALL SELECT id, 'announcement', coalesce(category, '') || ': ' || coalesce(subject, ''), published_at
             FROM announcements WHERE list_contains(?, id)
         ) ORDER BY id, kind = 'announcement', kind = 'filing', "at", text""",
-        [ids, ids, ids],
+        [str(made_at), ids, ids, ids],
     ).df()
     first: dict[str, dict] = {}  # per id the news row, else the filing, else the announcement (ORDER BY)
     for row in rows.itertuples(index=False):

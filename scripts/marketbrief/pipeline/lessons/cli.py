@@ -65,7 +65,8 @@ def main() -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(
             "".join(
-                json.dumps({**fact, "evidence": evidence(con, fact["evidence_ids"])}, default=str) + "\n"
+                json.dumps({**fact, "evidence": evidence(con, fact["evidence_ids"], fact["made_at"])}, default=str)
+                + "\n"
                 for fact in todo
             ),
             encoding="utf-8",

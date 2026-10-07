@@ -58,27 +58,29 @@ def done(con, week: str) -> bool:
     )
 
 
-def evidence_rows(con, ids: list[str]) -> list[dict]:
-    """The stored rows of the evidence ids a sampled call cites."""
+def evidence_rows(con, ids: list[str], made_at) -> list[dict]:
+    """The stored rows of the evidence ids a sampled call cites, as of the call's made_at: a news item with the
+    headline and enrichment it had then (news de-duplication: a later headline update is never shown)."""
     out = []
     for kind, sql in (
         (
             "news",
-            "SELECT id, title AS text, url, coalesce(published_at, first_seen_at) AS public_at FROM news_lookup "
-            "WHERE id IN ?",
+            "SELECT id, title AS text, url, coalesce(published_at, first_seen_at) AS public_at "
+            "FROM news_lookup_asof($made_at::TIMESTAMPTZ) WHERE id IN $ids",
         ),
         (
             "filings",
             "SELECT id, form || ' ' || coalesce(description, '') AS text, url, "
-            "coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ)) AS public_at FROM filings WHERE id IN ?",
+            "coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ)) AS public_at FROM filings WHERE id IN $ids",
         ),
         (
             "announcements",
             "SELECT id, coalesce(category, '') || ': ' || coalesce(subject, '') AS text, url, "
-            "coalesce(published_at, first_seen_at) AS public_at FROM announcements WHERE id IN ?",
+            "coalesce(published_at, first_seen_at) AS public_at FROM announcements WHERE id IN $ids",
         ),
     ):
-        for row in con.execute(f"SELECT DISTINCT ON (id) * FROM ({sql}) ORDER BY ALL", [ids]).df().to_dict("records"):
+        params = {"ids": ids, "made_at": str(made_at)} if kind == "news" else {"ids": ids}
+        for row in con.execute(f"SELECT DISTINCT ON (id) * FROM ({sql}) ORDER BY ALL", params).df().to_dict("records"):
             out.append(
                 {
                     "kind": kind,
@@ -93,7 +95,10 @@ def evidence_rows(con, ids: list[str]) -> list[dict]:
                 }
             )
     enr = (
-        con.execute("SELECT id, summary, sentiment, materiality FROM enriched_latest WHERE id IN ?", [ids]).df()
+        con.execute(
+            "SELECT id, summary, sentiment, materiality FROM news_enriched_asof(?::TIMESTAMPTZ) WHERE id IN ?",
+            [str(made_at), ids],
+        ).df()
         if ids
         else pd.DataFrame()
     )
@@ -136,7 +141,7 @@ def sample(cfg: dict, week: str) -> dict:
                 "direction": call["direction"],
                 "confidence": float(call["confidence"]),
                 "rationale": call["rationale"],
-                "evidence": evidence_rows(con, ids),
+                "evidence": evidence_rows(con, ids, call["made_at"]),
                 "outcome": {key: str(value) for key, value in outcome[0].items()} if outcome else None,
             }
         )

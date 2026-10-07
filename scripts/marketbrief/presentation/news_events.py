@@ -31,7 +31,10 @@ SELECT c.ticker, c.cluster_id, c.news_ids, c.first_reported_at, c.last_reported_
        c.unread_vetted_origins, c.primary_ids AS candidates, v.status, v.primary_ids, v.conflicts, v.confirmed_at,
        v.status_ids, v.id_statuses, v.flags AS status_flags
 FROM c LEFT JOIN v USING (cluster_id) ORDER BY c.ticker, c.last_reported_at DESC, c.cluster_id"""
-TITLES_SQL = "SELECT DISTINCT ON (id) id, title FROM news_lookup WHERE list_contains(?, id) ORDER BY id, first_seen_at"
+TITLES_SQL = (   # the headline as of the context pack's clock
+    "SELECT DISTINCT ON (id) id, title FROM news_lookup_asof(?::TIMESTAMPTZ) WHERE list_contains(?, id) "
+    "ORDER BY id, first_seen_at"
+)
 CALLS_SQL = """
 SELECT DISTINCT ON (id) id, ticker, horizon_days, direction, evidence_ids, made_at FROM predictions
 WHERE as_of_date = ? ORDER BY id, made_at"""
@@ -92,11 +95,12 @@ def event_rows(con, now, window_hours: float, per_ticker: int) -> list[dict]:
 
 def context_section(con, window_hours: float = 72, per_ticker: int = 4) -> tuple[str, str]:
     """(title, markdown) of the context pack's news events section."""
-    rows = event_rows(con, clock(), window_hours, per_ticker)
+    now = clock()
+    rows = event_rows(con, now, window_hours, per_ticker)
     if not rows:
         return TITLE, "_none_\n"
     first_ids = [event["news_ids"][0] for event in rows if event.get("news_ids")]
-    titles = dict(con.execute(TITLES_SQL, [first_ids]).fetchall())
+    titles = dict(con.execute(TITLES_SQL, [now.isoformat(), first_ids]).fetchall())
     lines = []
     for event in rows:
         status = event.get("status") or STATUS_UNVERIFIED

@@ -125,10 +125,13 @@ SELECT n.* REPLACE (m.id AS id), m.canonical_id
 FROM news_asof(ts) n JOIN news_id_map m ON m.canonical_id = n.id
 WHERE m.first_seen_at <= ts;
 
--- Latest enrichment per article (re-analysis appends a newer row, it never edits). An item without its own
--- enrichment takes the latest one of a stored duplicate (news_aliases), under its own id.
+-- Latest enrichment per article analyzed by now (re-analysis appends a newer row, it never edits; the clock is the
+-- `news` view's, so a headline and its enrichment are read as of the same time: an item whose headline changed
+-- is scored again by the news analyst, news_pending.py). An item without its own enrichment takes the latest one
+-- of a stored duplicate (news_aliases), under its own id.
 CREATE OR REPLACE VIEW enriched_latest AS
-WITH own AS (SELECT DISTINCT ON (id) * FROM news_enriched ORDER BY id, analyzed_at DESC)
+WITH own AS (SELECT DISTINCT ON (id) * FROM news_enriched WHERE coalesce(analyzed_at <= now(), true)
+             ORDER BY id, analyzed_at DESC)
 SELECT * FROM own
 UNION ALL
 SELECT * FROM (
@@ -149,7 +152,8 @@ SELECT * FROM (
     ORDER BY a.canonical_id, o.analyzed_at DESC, o.id);
 
 -- One row per (ticker, article), dated by publish time (fallback: first seen). role: 'primary'
--- (the item is about the ticker) or 'mentioned'; tag_confidence 'low' marks tags to read with care.
+-- (the item is about the ticker) or 'mentioned'; tag_confidence 'low' marks tags to read with care. The headline
+-- (latest seen by now) and the enrichment (latest analyzed by now) are read at the same clock.
 CREATE OR REPLACE VIEW news_ticker_day AS
 WITH x AS (
     SELECT unnest(tickers) AS ticker, id, title, source, primary_tickers, tag_confidence,

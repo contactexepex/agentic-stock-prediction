@@ -536,7 +536,7 @@ def test_routine_step_7_uses_the_window_since_the_last_enrichment():
     assert "python scripts/news_pending.py" in step7 and "work/news_pending.jsonl" in step7
     assert "today's `data/<market>/news/` file" not in step7
     analyst = (REPO / ".claude" / "agents" / "news-analyst.md").read_text()
-    assert "work/news_pending.jsonl" in analyst and '"news-v10"' in analyst
+    assert "work/news_pending.jsonl" in analyst and '"news-v11"' in analyst
 
 
 def test_news_prompt_runs_no_agent_and_commits_data_only():

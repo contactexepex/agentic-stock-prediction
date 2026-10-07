@@ -274,7 +274,8 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   announcement id first seen in (since, now] without a `news_enriched` row, since = the earlier of the
   start of today (UTC; today's items, the window used before) and the newest `first_seen_at` among the
   items already enriched (items a light run stored after the last enriched one, even while the previous
-  pre-open run was working, stay pending), at most 7 days back. `validate.py --stage news` checks the
+  pre-open run was working, stay pending), at most 7 days back, plus items whose headline changed in the
+  window after their enrichment ("News de-duplication" below). `validate.py --stage news` checks the
   analyst's file against the same window (an id outside it blocks as `ENRICH_UNKNOWN_ID`; a pending id
   left out is the warning `ENRICH_MISSING`). `claims.py` considers clusters reported in the last 72 h or
   since that same `since` (+1 h) when longer, at most the clusters' 144 h lookback (`window_hours` in its
@@ -344,6 +345,17 @@ same story from different outlets is kept apart, because independent outlets fee
   check stored rows (`news_stored`) for duplicate ids and freshness, and today's updates for their sources.
   Neo4j keeps nodes of duplicates synced before this change until a `--full` rebuild; an item's node is
   re-synced when its headline changes.
+- Enrichment follows the headline: `news_pending.py` also queues every item whose headline changed (a
+  `news_updates` row seen in its window) after the item's latest enrichment, with `headline_updated_at`; the
+  analyst scores the new headline and appends a newer `news_enriched` row, which `validate.py --stage news`
+  accepts for such an item only (`news_pending.rescore_ids`). Readers pair a headline with the latest enrichment
+  as of the same time: `news` with `enriched_latest` (both as of the run's clock, so `news_ticker_day`,
+  `view_data`, `news_hits` and Neo4j agree), `news_asof(ts)` with `news_enriched_asof(ts)` (dashboard, warehouse,
+  intraday), and the spot-check and reflector evidence of a past call read `news_lookup_asof(made_at)` and
+  `news_enriched_asof(made_at)`. Between an update and the next pre-open enrichment, the new headline shows with
+  the earlier enrichment. `news_lookup` (current state) is left only where no past time is involved: the
+  forecast gate's public times (published or first-seen time, not the headline) and the news-source gate's
+  tickers of today's updates.
 
 ### 3a. News verification, phase A (deterministic; built 2026-10-06)
 Headlines alone are not enough, so the routine reads the article behind material watchlist

@@ -308,3 +308,91 @@ def test_light_run_commits_the_updates_folder():
     from marketbrief.constants.validation import NEWS_COLLECT_KINDS
 
     assert "news_updates" in NEWS_COLLECT_KINDS and "news_updates" in SCHEMAS
+
+
+# ---------- headline updates: as of a time, and scored again ----------
+
+SEEN, UPDATED, MADE = "2026-10-05T02:00:00+00:00", "2026-10-06T16:00:00+00:00", "2026-10-06T10:00:00+00:00"
+
+
+def enrichment(news_id: str, analyzed_at: str, summary: str) -> dict:
+    return {"id": news_id, "analyzed_at": analyzed_at, "relevance": 0.6, "sentiment": 0.2, "novelty": 0.5,
+            "materiality": "high", "event_type": "other", "urgency": "low", "geopolitical": False,
+            "priced_in": False, "summary": summary, "prompt_version": "news-v10"}
+
+
+def write_updated_item(root: Path) -> None:
+    """Item a1 seen Monday 02:00 ("Old headline"), enriched 03:00; its headline changed Tuesday 16:00."""
+    write_rows(root, "news", date(2026, 10, 5), [news_row("a1", "Old headline", SEEN, source="Mint",
+                                                          domain="livemint.com", url=GN + "a1")])
+    write_rows(root, "news_updates", date(2026, 10, 6), [{
+        "id": "u1", "news_id": "a1", "title": "New headline", "seen_at": UPDATED, "url": GN + "a1", "source": "Mint",
+        "source_domain": "livemint.com", "published_at": SEEN, "feed": "gnews:test"}])
+    write_rows(root, "news_enriched", date(2026, 10, 5), [enrichment("a1", "2026-10-05T03:00:00+00:00", "old")])
+
+
+def test_past_evidence_shows_the_headline_at_made_at(root):
+    """Spot-check and reflector evidence read a cited item as of the call's made_at, never a later headline."""
+    from marketbrief.pipeline import spotcheck
+    from marketbrief.pipeline.lessons import facts
+
+    write_updated_item(root)
+    con = connect(MARKETS[0])
+    rows = spotcheck.evidence_rows(con, ["a1"], MADE)
+    assert [(row["id"], row["text"], row.get("enriched_summary")) for row in rows] == [("a1", "Old headline", "old")]
+    assert spotcheck.evidence_rows(con, ["a1"], "2026-10-06T17:00:00+00:00")[0]["text"] == "New headline"
+    assert [row["text"] for row in facts.evidence(con, ["a1"], MADE)] == ["Old headline"]
+
+
+def test_a_changed_headline_is_scored_again(root, monkeypatch):
+    """news_pending queues an item whose headline changed in the window after its enrichment; the news gate accepts
+    the new enrichment; once stored, the item is no longer pending and readers pair the new headline with it."""
+    import pandas as pd
+
+    from marketbrief.core.settings import load_validate_config
+    from marketbrief.pipeline import news_pending
+    from marketbrief.pipeline.validate import gate_result
+    from marketbrief.pipeline.validate.news_checks import stage_news
+
+    write_updated_item(root)
+    now = pd.Timestamp("2026-10-06T18:00:00+00:00")
+    monkeypatch.setenv("MB_NOW", now.isoformat())
+    con = connect(MARKETS[0])
+    since, rows = news_pending.pending_rows(con, now)
+    # the window starts at the newest enriched item (a1, Monday): a1 itself is in it only through its update
+    assert since == pd.Timestamp(SEEN)
+    assert [(row["id"], row["title"], row["headline_updated_at"]) for row in rows] == [("a1", "New headline", UPDATED)]
+    # until it is scored again, readers show the headline and the latest enrichment as of the same clock
+    assert con.execute("SELECT title, summary FROM news JOIN enriched_latest USING (id)").fetchall() == [
+        ("New headline", "old")]
+    # the analyst's file with a newer enrichment of a1 passes the gate (no ENRICH_ALREADY_STORED / UNKNOWN_ID)
+    path = root / "enriched.jsonl"
+    path.write_text(json.dumps(enrichment("a1", "2026-10-06T18:00:00+00:00", "new")) + "\n")
+    res = gate_result.Result()
+    stage_news(res, None, con, None, now, now.date(), load_validate_config(), path)
+    assert res.failures == [] and res.warnings == []
+    write_rows(root, "news_enriched", date(2026, 10, 6), [enrichment("a1", "2026-10-06T18:00:00+00:00", "new")])
+    con = connect(MARKETS[0])
+    assert news_pending.pending_rows(con, now)[1] == []
+    assert con.execute("SELECT title, summary FROM news JOIN enriched_latest USING (id)").fetchall() == [
+        ("New headline", "new")]
+    assert con.execute("SELECT title, sentiment FROM news_ticker_day").fetchall() == [("New headline", 0.2)]
+    # as of a time before the update: the old headline with the old enrichment
+    assert con.execute("SELECT n.title, e.summary FROM news_asof(TIMESTAMPTZ '2026-10-06 12:00:00+00') n "
+                       "JOIN news_enriched_asof(TIMESTAMPTZ '2026-10-06 12:00:00+00') e USING (id)").fetchall() == [
+        ("Old headline", "old")]
+    # an item enriched after its last update is not scored again
+    res = gate_result.Result()
+    stage_news(res, None, con, None, now, now.date(), load_validate_config(), path)
+    assert [failure["code"] for failure in res.failures] == ["ENRICH_ALREADY_STORED"]
+
+
+def test_recent_rows_ignore_files_after_the_clock(root, monkeypatch):
+    from marketbrief.collectors.news_window import recent_rows
+
+    write_rows(root, "news", date(2026, 10, 6), [{"id": "x1"}])
+    write_rows(root, "news", date(2026, 10, 8), [{"id": "x2"}])
+    monkeypatch.setenv("MB_NOW", "2026-10-07T06:00:00+00:00")
+    assert [row["id"] for row in recent_rows(MARKETS[0], "news")] == ["x1"]
+    monkeypatch.setenv("MB_NOW", "2026-10-08T06:00:00+00:00")
+    assert [row["id"] for row in recent_rows(MARKETS[0], "news")] == ["x1", "x2"]
