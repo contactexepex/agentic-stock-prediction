@@ -280,7 +280,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (independent verifier of code, config, agent-instruction and process changes, the monthly
   graph-builder edges and the weekly spot-check sample).
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, claim
-  checking, the reflector, the deviation explainer, the results-analyst and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
+  checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
+  the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one per market, every 4 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
