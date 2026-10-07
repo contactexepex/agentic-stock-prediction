@@ -13,18 +13,22 @@ Created:
   No secret: the token is only ever the environment variable `MOTHERDUCK_TOKEN`.
 - `scripts/warehouse_sync.py`: thin entry point.
 - `scripts/marketbrief/warehouse/`:
-  - `connection.py`: target selection, `connect_warehouse(read_only=...)`, `WarehouseError`, `redact`.
+  - `connection.py`: target selection, `connect_warehouse(read_only=...)`.
+  - `errors.py`: the token from the environment, `redact`, `WarehouseError`.
+  - `extension.py`: the MotherDuck extension installed over HTTPS only (follow-up below).
   - `postgres.py`: `PostgresEndpoint` (URL with the token URL-encoded, libpq params; repr/str redacted).
   - `tables.py`: the mirrored tables and their cut-off-aware queries, Parquet staging.
   - `read_models.py`: the page payloads, sliced from `gather_dashboard`, plus the required-key check.
   - `rm_writer.py`: hash-based upsert of `rm.*` and the `rm.builds` row.
-  - `sync.py`: one market's sync (stage, one transaction, `meta.sync_runs`, summary, kill switch).
+  - `sql_statements.py`: shared SQL text (quoted literals, column definitions, one-row inserts).
+  - `sync.py`: one market's sync (`SyncRun`: stage, connect, kill switch, one transaction, record).
+  - `sync_records.py`: the run's `meta.sync_runs` and `rm.builds` rows, page facts, summary file.
   - `cli.py`: `--market india|us [--full] [--dry-run] [--local] [--kind daily|news]`.
 - `scripts/marketbrief/constants/warehouse.py`: names, required payload keys and messages. This is a new
   module in the shared `constants/` folder; no existing constants module was changed apart from
   `environment.py`, below.
-- `tests/test_warehouse_connection.py` (offline, no MotherDuck) and `tests/test_warehouse_sync.py`
-  (offline, local fallback DuckDB file on a copy of the US data).
+- `tests/test_warehouse_connection.py` and `tests/test_warehouse_extension.py` (offline, no MotherDuck), and
+  `tests/test_warehouse_sync.py` (offline, local fallback DuckDB file on a copy of the US data).
 - `docs/ws/ws1.md`, `docs/ws/ws1-judgments.jsonl`.
 
 Shared files changed (additive only):
@@ -36,8 +40,14 @@ Shared files changed (additive only):
 - `tests/conftest.py`: a `# WS1: ...` block in `SLOW` lists the 11 tests of `tests/test_warehouse_sync.py`.
   They share one module fixture that runs several local syncs (about 30 s together).
 
-Not changed: `core/schemas.py`, `sql/views.sql` and `requirements.txt`. No dependency was added: pyarrow is
-absent, so staging goes through DuckDB's own Parquet writer. No data kind was added and nothing under `data/`
+- `requirements.txt` (follow-up): `duckdb>=1.1` became `duckdb==1.5.6`, because the MotherDuck extension
+  is built per DuckDB version and `config/warehouse.yaml` pins the matching build.
+- `scripts/marketbrief/presentation/dashboard/reads.py` (follow-up): the company-events rule inside
+  `EARNINGS_SQL` became its own constant, `COMPANY_EVENTS_ASOF_SQL`, which the warehouse's `company_events`
+  table and the stock page's events now reuse. The golden harness shows the dashboard's outputs unchanged.
+
+Not changed: `core/schemas.py` and `sql/views.sql`. No dependency was added: pyarrow is absent, so staging
+goes through DuckDB's own Parquet writer. No data kind was added and nothing under `data/`
 was written.
 
 ## Contract
@@ -47,9 +57,10 @@ was written.
   the local file `work/warehouse/market_brief.duckdb`. `--local` forces the local file.
 - Without the token and without `--local`, the sync fails with a message that names the variable and
   `--local`. It never echoes a value.
-- The extension is installed with DuckDB's own `INSTALL motherduck` from the official signed repository;
-  `allow_unsigned_extensions` is never touched (it stays `false`). The extension reads `MOTHERDUCK_TOKEN`
-  from the environment itself, so the token is never put into SQL, a connection string or a config dict.
+- The extension is installed by `extension.py` over HTTPS only (see the follow-up section below). DuckDB
+  checks both files' signatures; `allow_unsigned_extensions` is never touched (it stays `false`). The
+  extension reads `MOTHERDUCK_TOKEN` from the environment itself, so the token is never put into SQL, a
+  connection string or a config dict.
 - Every error raised from the package goes through `redact()`, which hides the token both as is and
   URL-encoded. `PostgresEndpoint` keeps the password out of `repr`/`str`. Only `url()` and `params()`
   return it, for handing straight to a client.
@@ -250,6 +261,102 @@ untouched tree.
   false doc statements: `ws1-judgments.jsonl` listed as created but missing, and wrong statement counts.
 - Round 2: PASS, commit 5bf0ae3f4799f7d00e9b22b18e03386156bb7e35 (re-check of the two blockers and the fix
   diff; no new findings).
+- Follow-up (HTTPS extension install, clean-code pass), round 1: FAIL, commit b23f94f (the run's start time
+  moved after the local connect; summary key order and failure keys changed).
+- Follow-up, round 2: PASS, commit da70e29.
+
+## Follow-up 2026-10-07: HTTPS-only extension install and clean-code pass
+Owner decisions (this session): fix the extension install only (no new tokens, no inbox database), tidy the
+code to the clean-code rules, leave the shared docs to the owner's final documentation session.
+
+**Cause of the broken sync.** In the routine environment `LOAD motherduck` failed with "MotherDuck extension
+is not available for this DuckDB version". Both downloads behind it are plain HTTP:
+- DuckDB's `INSTALL motherduck` first fetches `httpfs` from `http://extensions.duckdb.org` (seen in the
+  installed file's `.info`).
+- On LOAD, the loader fetches its implementation from
+  `http://ext.motherduck.com/${REVISION}/${PLATFORM}/${NAME}.duckdb_extension.gz` (from the loader's
+  strings). Pointed at a local logging server, the request it makes is
+  `GET /v1.5.6/linux_amd64/motherduck_impl.v1.5.6-2026-10-3.duckdb_extension.gz`. A failed fetch
+  (blocked or 403) gives exactly that error message.
+
+This container also allows direct plain HTTP, so it never failed here.
+
+**Fix (`extension.py`).**
+- Both signed files are downloaded over HTTPS with the repo's `HttpClient`, which takes HTTPS_PROXY and
+  the CA bundle from the environment:
+  - the loader from `https://extensions.duckdb.org/...`;
+  - the implementation from `https://ext.motherduck.com/...` (200, 24,762,380 bytes).
+- Only HTTPS on those two hosts is accepted. A generic User-Agent is sent, because extensions.duckdb.org
+  answers Python's default one with 403.
+- The loader is installed with `INSTALL '<local file>'`.
+- The implementation is written where the loader looks for it, and `MOTHERDUCK_EXT_VERSION` is set, so
+  the loader downloads nothing.
+- Versions are pinned:
+  - `duckdb==1.5.6` in requirements.txt;
+  - `extension:` in `config/warehouse.yaml`. `https://api.motherduck.com/extension_version` answered
+    `{"extensionVersion": "v1.5.6-2026-10-3", "duckdbVersion": "v1.5.6", ...}`.
+
+**Safety checks.**
+- Tampered files are refused:
+  - a flipped byte in the loader gives "Attempting to install an extension file that doesn't have a valid
+    signature";
+  - a flipped byte in the implementation gives "... could not be loaded because its signature is either
+    missing or invalid and unsigned extensions are disabled by configuration (allow_unsigned_extensions)".
+- Under `strace`, the real sync of each market with an empty extension folder connected only to the
+  local proxy port:
+  ```
+  india exit 0 process wall 29.065075242s
+    connect ports:       4 sin_port=htons(41179)
+  us exit 0 process wall 25.490259345s
+    connect ports:       2 sin_port=htons(41179)
+  ```
+- Live sync summaries from that run:
+  ```
+  india {'mode': 'replace', 'target': 'md:market_brief', 'ok': True, 'build_ok': True, 'error': None, 'rows': 20558, 'read_models': 43, 'pages_written': 9, 'pages_unchanged': 34, 'pages_deleted': 0, 'stage_s': 2.95, 'connect_s': 5.48, 'write_s': 10.59, 'elapsed_s': 27.31}
+  us {'mode': 'replace', 'target': 'md:market_brief', 'ok': True, 'build_ok': True, 'error': None, 'rows': 24788, 'read_models': 43, 'pages_written': 0, 'pages_unchanged': 43, 'pages_deleted': 0, 'stage_s': 3.22, 'connect_s': 2.5, 'write_s': 9.95, 'elapsed_s': 23.86}
+  ```
+
+**Clean-code pass.**
+- Defined once now:
+  - the scored-calls and scored-ranges subqueries in `tables.py`;
+  - the company-events rule, `reads.COMPANY_EVENTS_ASOF_SQL`, used by the dashboard, the
+    `company_events` table and the stock page;
+  - the SQL helpers in `sql_statements.py` (with `core.database.column_spec` for read_json columns).
+- `SyncRun` (with `PhaseTimer`) replaces the `state` dict and the four-job function. The run records
+  moved to `sync_records.py`.
+- Short names are replaced by descriptive ones (`warehouse`, `warehouse_cfg`, ...).
+- A failed ROLLBACK no longer hides the original error (tested).
+
+**Judge round 1 of this follow-up (FAIL) and its fix.** The first version took the run's start time after
+the ~3 s local `database.connect`, not before it as main does. That shifted `started_at`, the run id and
+`built_at`, and shortened the run time recorded in `meta.sync_runs`, which the kill switch adds up. The
+summary file also changed: `write_s` came before the page counts, and a failed run listed phases that had
+not completed. Fixed: `sync_market` takes the start time before the connect and passes it into `SyncRun`,
+`PhaseTimer` records only completed phases, and the summary keeps main's key order. The same `us` local
+sync, with main's code (7dbac3b) and with this code, plus a forced write failure:
+```
+success summary keys identical (order): True
+failure summary keys identical (order): True
+recorded run time  base: 4.39 new: 4.64
+sync_market wall   base: 4.62 new: 4.87
+```
+
+**No output change in the stored tables.**
+- Both markets synced locally with `--full` and `MB_NOW=2026-10-07T05:00:00+00:00`, once with main's code
+  (7dbac3b) and once with this code. Every table was compared, `built_at` (wall clock) excluded:
+  ```
+  tables base/new: 43 43 same names: True
+  differing tables: []
+  rows compared: 40779
+  ```
+- Golden harness, `tests/golden/golden.py compare` (recorded from main 7dbac3b):
+  ```
+   "identical": true,
+   "compared_files": 2850,
+   "differing": [],
+   "deleted_mismatch": [],
+   "network_clean": true,
+  ```
 
 ## Proposed edits to shared docs
 
@@ -289,6 +396,10 @@ built from:
   key `(market, page_key)`, payload sliced from `gather_dashboard`, upserted by `payload_sha256`) and
   `rm.builds` / `meta.sync_runs`. Code in `marketbrief/warehouse/`; kill switch `enabled` and
   `monthly_hours_ceiling` in `config/warehouse.yaml`. Optional and non-blocking; rebuildable with `--full`.
+  The MotherDuck extension is installed by `marketbrief/warehouse/extension.py` over HTTPS only (both signed
+  files downloaded through the proxy, DuckDB checks the signatures; never `INSTALL motherduck`, whose
+  downloads are plain HTTP); `duckdb` is pinned in requirements.txt and the matching extension build under
+  `extension:` in `config/warehouse.yaml`.
 ```
 
 **docs/DESIGN.md**, in wave 0's proposed section 16, after its first paragraph:
@@ -302,17 +413,23 @@ and `reports/<market>/dashboard.html` can never disagree.
 
 ## Cosmetic follow-ups
 From judge round 1. The stale test docstring and the `config/warehouse.yaml` skip comment were fixed in the
-round 2 diff.
+round 2 diff. The duplicated company-events rule, the f-string paths in `tables.py` and the ROLLBACK that
+could hide the original error were fixed in the follow-up below.
 - `read_models.py` (`missing_keys`): contract 4.1 asks for required keys and types; only keys are checked.
   Today's payloads pass a full jsonschema check against wave 0's spec (judge).
-- `read_models.py` `EVENTS_SQL` repeats the inner `company_events` rule of `reads.EARNINGS_SQL`; a
-  shared helper in `presentation/dashboard/reads.py` would avoid the copy.
-- `tables.py` (`stage_tables`, `count_tables`) puts paths into SQL with an f-string; use `rm_writer.sql_text`
-  as elsewhere.
 - CLI flag naming: contract 4.4 calls the rebuild `--rebuild-rm`; WS1's `--full` covers it.
-- `sync.py` `write_market`: if ROLLBACK itself raises, it hides the original error.
 - `tests/test_warehouse_sync.py`: the look-ahead test covers features, news, reviews and bars, not ranges,
   predictions or lessons.
+- `extension.py`: an implementation file already in the extension folder that fails its signature check is
+  not downloaded again; it has to be deleted by hand (DuckDB refuses to load it, so this is safe).
+- `extension.py`: `MOTHERDUCK_EXT_VERSION` is set in the process environment, because that is where the
+  loader reads it; the variable stays set for the rest of the process.
+- Fixed in the follow-up's round 2: a redirect is followed only to HTTPS on the two official hosts; a
+  failed decompression leaves no partial file; `cli.py` and `postgres.py` import from `errors.py`; the
+  test environment no longer leaks `MOTHERDUCK_EXT_VERSION`; the `SLOW` comment in conftest.
+- From the follow-up's round 2: no committed test fixes the summary's key order (checked by a one-off
+  script against main's code); no test checks that the downloader's opener uses `AllowedRedirects` (checked
+  by hand); `tests/conftest.py` has 2 ruff ARG001 findings and needs a reformat, both from before WS1.
 - A changed page (delete and re-insert of the same key in one transaction) is not exercised live on
   MotherDuck; locally it is covered by the `--full` and invalid-page paths.
 
@@ -328,8 +445,8 @@ round 2 diff.
 3. **News-run sync.** The default taken is that it does the same full work as the daily sync
    (`--kind news` is only a label), because measured cost is dominated by statement count. Should it be
    narrowed to the news tables and pages now, or only if week 1 shows per-statement billing?
-4. **Routine environment.** The routines need `MOTHERDUCK_TOKEN` and network access to
-   `extensions.duckdb.org` (the signed extension download) and `*.motherduck.com`. The default taken is
+4. **Routine environment.** The routines need `MOTHERDUCK_TOKEN` and HTTPS access (through the proxy) to
+   `extensions.duckdb.org`, `ext.motherduck.com` (the two signed extension downloads) and `*.motherduck.com`. The default taken is
    that the owner adds them to the routine environment before consolidation wires the step.
 5. **Postgres endpoint.** It is unverified from this container (port 5432 is not reachable). WS2 should
    check it from Vercel; the URL builder (`warehouse.postgres.endpoint()`) is ready for that.
