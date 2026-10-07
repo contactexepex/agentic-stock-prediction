@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Home</title>
+<meta name="description" content="Home of the personal stock cockpit, per market: companies ranked by how many strategies would buy them at the chosen horizon, today's head-to-head paper trades, rule vs AI, open paper trades, alerts and the last runs. Research only, every signal Paper.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Home mockup (design track, SPEC section 6 page 1). Layout only; every colour is a design-system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.mb-content-inner{max-width:1180px}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.card h2 .go{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;display:inline-flex;align-items:center;gap:2px;text-decoration:none}
+.card h2 .go .ms{width:16px;height:16px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+a.plain{color:inherit;text-decoration:none} a.plain:hover{text-decoration:underline}
+.tk{font-weight:800;color:var(--md-sys-color-primary);text-decoration:none}
+.tk:hover{text-decoration:underline}
+.quiet{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);padding:8px 10px;border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius)}
+.h-lab{font-weight:700;color:var(--md-sys-color-on-primary-container);background:var(--md-sys-color-primary-container);border-radius:4px;padding:0 5px;font-size:11.5px;white-space:nowrap}
+
+/* header */
+.hhead{display:grid;grid-template-columns:1fr auto;gap:10px 24px;align-items:start;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.hhead .meta b{color:var(--md-sys-color-on-surface);font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mb-color-down);display:inline-block;margin-right:4px}
+.dot.open{background:var(--mb-color-up)}
+.fresh{display:inline-flex;align-items:center;gap:4px}
+.fresh .ms{width:14px;height:14px}
+.fresh.fresh-ok{color:var(--mb-color-up)} .fresh.fresh-stale{color:var(--mb-color-on-warn-container)}
+
+/* banner */
+.banner{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 18px;border-radius:var(--mb-card-radius);margin-top:14px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-lowest)}
+.banner .ico{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant)}
+.banner .ico .ms{width:26px;height:26px}
+.banner b.t{font-size:16px;display:block}
+.banner .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+
+/* horizon selector */
+.hsel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}
+.hsel .lab{font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+.hsel .md-segmented > button{min-width:52px;justify-content:center}
+
+/* layout */
+.grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:16px;margin-top:16px;align-items:start}
+.col{display:grid;gap:16px;min-width:0}
+
+/* agreement */
+.agl{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.agl li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px 12px;align-items:center;padding:10px 12px;border:var(--mb-card-border);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface);min-width:0}
+.agl li.top{border-color:var(--md-sys-color-primary);box-shadow:inset 3px 0 0 var(--md-sys-color-primary)}
+.agl .rk{font-size:18px;font-weight:800;color:var(--md-sys-color-primary);text-align:center}
+.agl .who{min-width:0}
+.agl .who .nm{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.agl .who .nm small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.agl .who .sent{font-size:12.5px;margin-top:2px}
+.agl .who .sent b{font-weight:700}
+.agl .bar{height:6px;border-radius:3px;background:var(--md-sys-color-surface-container-highest);margin-top:6px;overflow:hidden;max-width:360px}
+.agl .bar i{display:block;height:100%;background:var(--md-sys-color-primary)}
+.agl .fam{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.agl .fam b{color:var(--md-sys-color-on-surface);font-weight:600}
+.agl .right{text-align:right;min-width:0}
+.agl .right .p{font-size:20px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.agl .right .l{font-size:10.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.agl .hz{grid-column:2 / span 2;display:flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--md-sys-color-on-surface-variant)}
+.agl .hz span{border:1px solid var(--md-sys-color-outline-variant);border-radius:4px;padding:1px 6px;background:var(--md-sys-color-surface-container-lowest)}
+.agl .hz span.on{background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);border-color:transparent;font-weight:600}
+.agl .hz span.none{color:var(--md-sys-color-outline)}
+
+/* head-to-head */
+.h2h{display:grid;gap:10px}
+.cmp{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface);padding:10px 12px;min-width:0}
+.cmp .ch{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:13px}
+.cmp .ch .nm{font-weight:700;font-size:14px}
+.cmp .ch .amt{margin-left:auto;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.fams{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.fam-box{border:1px solid var(--md-sys-color-surface-container-highest);border-radius:6px;padding:8px 10px;background:var(--md-sys-color-surface-container-lowest);min-width:0}
+.fam-box .fh{display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:6px}
+.fam-box .fh .ms{width:15px;height:15px;color:var(--md-sys-color-primary)}
+.fam-box .fh b{font-weight:700;font-size:12px}
+.fam-box .fh small{color:var(--md-sys-color-on-surface-variant);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pk{display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center;padding:6px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px}
+.pk .rule{font-size:11px;color:var(--md-sys-color-on-surface-variant);grid-column:1 / span 3}
+.pk .chance{font-weight:600;min-width:0}
+.pk .det{grid-column:1 / span 3;font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.pk .gain{font-weight:600;text-align:right;white-space:nowrap;grid-column:3;grid-row:2 / span 2}
+.pk .viab{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600}
+.pk .viab .ms{width:13px;height:13px}
+.pk .viab.yes{color:var(--mb-color-up)} .pk .viab.no{color:var(--mb-color-down)}
+.cand{margin-top:6px;font-size:12px}
+.cand summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12px}
+.cand table{margin-top:6px}
+.cand td,.cand th{padding:4px 6px;font-size:12px}
+.sumline{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:8px 10px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container);margin-bottom:10px}
+.sumline .ms{width:16px;height:16px;flex:none}
+
+/* rule vs AI */
+.rva{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:8px 10px;background:var(--md-sys-color-surface);min-width:0}
+.tile .l{font-size:10.5px;color:var(--md-sys-color-on-surface-variant);letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+.tile .v{font-size:17px;font-weight:700;line-height:1.15;margin-top:2px;overflow-wrap:anywhere}
+.tile .s{font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.tile.lead{border-color:var(--md-sys-color-primary)}
+.h3{margin:12px 0 6px;display:flex;align-items:center;gap:8px}
+.h3:first-child{margin-top:0}
+.grid22{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px;font-size:12.5px;align-items:stretch}
+.grid22 .hd{font-size:10.5px;color:var(--md-sys-color-on-surface-variant);letter-spacing:.06em;text-transform:uppercase;font-weight:500;padding:4px 6px;align-self:end}
+.grid22 .rh{font-weight:600;padding:8px 6px;display:flex;align-items:center;gap:6px}
+.grid22 .rh .ms{width:15px;height:15px;color:var(--md-sys-color-primary)}
+.grid22 .cell{border:var(--mb-card-border);border-radius:6px;padding:6px 8px;background:var(--md-sys-color-surface);min-width:0}
+.grid22 .cell .v{font-weight:700;font-size:14px}
+.grid22 .cell .s{font-size:11px;color:var(--md-sys-color-on-surface-variant)}
+.grid22 .cell.none{border-style:dashed;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.badge-few{font:500 10.5px/14px var(--md-ref-typeface-plain);border:1px solid var(--md-sys-color-outline-variant);border-radius:4px;padding:0 4px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap}
+
+/* open trades */
+.ot{width:100%;border-collapse:collapse;font-size:12.5px}
+.ot th{font:500 10.5px/14px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:6px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+.ot td{padding:6px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle}
+.ot td:first-child{white-space:nowrap}
+.ot td.num,.ot th.num{text-align:right;white-space:nowrap}
+.ot tr.grp td{background:var(--md-sys-color-surface-container);font-weight:700;padding:5px 6px;font-size:12px}
+.ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.ot .st{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.ot .st .ms{width:14px;height:14px}
+.ot .st.flag{color:var(--mb-color-on-warn-container);font-weight:600}
+.ot .st.ok{color:var(--mb-color-up)}
+.ot .v2{display:none}
+.vtag{font:600 9.5px/1 var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--md-sys-color-outline-variant);border-radius:4px;padding:2px 4px;color:var(--md-sys-color-on-surface-variant);margin-left:4px;vertical-align:middle}
+
+/* alerts */
+.al{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.al li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:8px 10px;border:1px solid var(--mb-color-warn);border-radius:var(--mb-panel-radius);background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:12.5px;min-width:0}
+.al li .ms{width:18px;height:18px;margin-top:1px}
+.al li b{color:var(--md-sys-color-on-surface)}
+.al li .d{color:var(--md-sys-color-on-surface);margin-top:2px}
+.al li small{display:block;margin-top:2px;font-size:11.5px}
+
+/* runs */
+.runs{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.runs li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border:var(--mb-card-border);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface);font-size:12.5px}
+.runs li .mb-mark{width:18px;height:18px} .runs li .mb-mark .ms{width:12px;height:12px}
+.runs li small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant)}
+.runs li .t{text-align:right;font-weight:600;white-space:nowrap}
+.runs li .t small{font-weight:500}
+
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+footer code{font-family:var(--md-ref-typeface-mono)}
+
+/* phone "more" sheet */
+.more{position:fixed;left:0;right:0;bottom:var(--mb-navbar-height);z-index:19;background:var(--md-sys-color-surface);border-top:var(--mb-card-border);padding:8px 16px 12px;display:none;grid-template-columns:1fr 1fr;gap:6px}
+.more.on{display:grid}
+.more a{display:flex;align-items:center;gap:8px;padding:8px 10px;border:var(--mb-card-border);border-radius:var(--mb-panel-radius);color:inherit;text-decoration:none;font-size:13px}
+.more a .ms{width:18px;height:18px;color:var(--md-sys-color-primary)}
+
+@media (max-width: 1000px){ .grid{grid-template-columns:1fr} }
+@media (max-width: 760px){
+  .hhead{grid-template-columns:1fr}
+  .hhead .right{text-align:left}
+  .banner{grid-template-columns:auto 1fr}
+  .banner .act{grid-column:1 / span 2}
+  .fams{grid-template-columns:1fr}
+  .rva{grid-template-columns:repeat(3,1fr)}
+  .ot th.v1,.ot td.v1{display:none} .ot small.v1{display:none} .ot .v2{display:table-cell}
+  .agl li{grid-template-columns:24px minmax(0,1fr) auto}
+  .agl .right .p{font-size:17px}
+  .mb-topbar .ask span{display:none}
+}
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Pages" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Home</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn outlined ask" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span>Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <div class="more" id="more" hidden></div>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null || v === false) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? '' : v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls, 'aria-hidden': 'true'}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const help = tip => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain', type:'button'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const ZONE = {india: 'IST', us: 'ET'};                      /* presentation only: the market's local clock label */
+const LOCALE = {INR: 'en-IN', USD: 'en-US'}, SYMBOL = {INR: '₹', USD: '$'};
+const FAMILY = {rule: ['Rule strategies', 'ms-settings'], ai: ['AI traders', 'ms-bolt'], baseline: ['Baselines', 'ms-trending_flat']};
+const PICK = {best_expected_gain: 'Best expected gain', highest_probability: 'Highest probability'};
+const BAND = {below80: ['below the 80% range', 'flag'], below50: ['below the 50% range', ''], inside50: ['inside the 50% range', 'ok'], above50: ['above the 50% range', ''], above80: ['above the 80% range', 'flag']};
+const FLAG = {outside_range: 'outside its range', far_from_target: 'far from its target', against_prediction: 'against the prediction'};
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const offsetMin = local => { const m = /([+-])(\d\d):(\d\d)$/.exec(local); return m ? (m[1]==='-'?-1:1) * (60*+m[2] + +m[3]) : 0; };
+const fmtLocal = (iso, m, withDate=false) => { if (!iso) return '—'; const t = new Date(new Date(iso).getTime() + offsetMin(P(m).status.session.local_time)*60000); const hm = `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`; return (withDate ? `${t.getUTCDate()} ${MON[t.getUTCMonth()]} ` : '') + `${hm} ${ZONE[m]}`; };
+const sgn = (x, dec=2, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = (x, dec=0) => x == null ? '—' : (x*100).toFixed(dec) + '%';
+const money = (cur, x, dec=0, sign=false) => { if (x == null) return '—'; const s = Math.abs(x).toLocaleString(LOCALE[cur], {minimumFractionDigits: dec, maximumFractionDigits: dec}); return (sign ? (x>0?'+':x<0?'−':'') : (x<0?'−':'')) + SYMBOL[cur] + s; };
+const price = (cur, x) => x == null ? '—' : x.toLocaleString(LOCALE[cur], {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const moneyDelta = (cur, x, dec=0) => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, money(cur, x, dec, true));
+const P = m => D.markets[m];
+const companyOf = (m, t) => P(m).companies.find(c => c.ticker === t) || {ticker: t, name: t};
+const stratOf = (m, id) => P(m).strategies[id] || {id, name: id, family: '—'};
+const companyPage = t => `../03-company/page.html#${t}`, strategiesPage = t => `../04-stock-strategies/page.html#${t}`;
+
+/* ---------- state: market from the hash, horizon opens on N+1 (decision 39) ---------- */
+let market = (location.hash.slice(1) in D.markets) ? location.hash.slice(1) : 'india';
+let horizon = null;
+
+/* ---------- shell ---------- */
+const NAV = [['home','Home','#'], ['format_list_bulleted','Watchlist','../02-watchlist/page.html'], ['science','Strategy lab','../05-strategy-lab/page.html'], ['layers','Rule vs AI','../06-rule-vs-ai/page.html'], ['account_balance_wallet','Portfolios','../07-paper-portfolios/page.html'], ['query_stats','Track record','../08-track-record/page.html'], ['newspaper','News','../09-news/page.html'], ['apartment','Companies','../10-companies/page.html'], ['bolt','Assistant','../11-assistant/page.html'], ['help','Help','../12-help/page.html']];
+const navItem = ([ico, label, href]) => el('a', {class:'mb-nav-item', href, 'aria-current': href === '#' ? 'page' : null}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+const more = $('#more');
+$('#navbar').append(...NAV.slice(0,4).map(navItem), el('button', {class:'mb-nav-item', type:'button', 'aria-expanded':'false', 'aria-controls':'more', onclick: e => { const on = more.classList.toggle('on'); more.hidden = !on; e.currentTarget.setAttribute('aria-expanded', String(on)); }}, el('span', {class:'mb-nav-ind'}, icon('ms-menu')), 'More'));
+more.append(...NAV.slice(4).map(([ico, label, href]) => el('a', {href}, icon('ms-'+ico), label)));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+function marketSeg() { const seg = $('#market-seg'); seg.innerHTML = ''; for (const m of Object.keys(D.markets)) seg.append(el('button', {type:'button', 'aria-pressed': String(m === market), 'data-tip': `Switch to the ${LABEL[m]} home (${P(m).name})`, onclick: () => { market = m; horizon = null; history.replaceState(null, '', '#'+m); render(); }}, LABEL[m])); }
+
+/* ---------- tooltip (hover, focus, tap; Escape closes) ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A' && !t.classList.contains('md-btn') && t.closest('.md-segmented') == null) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- sections ---------- */
+function header(m) {
+  const p = P(m), s = p.status.session, open = !!s.in_session, fr = p.status.freshness;
+  const sec = el('section', {class:'hhead', 'aria-label':'Session and freshness'});
+  const left = el('div', {style:'min-width:0'});
+  left.append(el('h1', {}, `${DOWL[dt(s.session_date).getUTCDay()]} ${fmtD(s.session_date, false)} ${s.session_date.slice(0,4)}`, el('small', {}, `${p.name} · session being predicted`)));
+  const meta = el('div', {class:'meta'});
+  meta.append(el('span', {}, el('span', {class:'dot'+(open?' open':'')}), s.trading_day ? (open ? el('b', {}, 'open now') : (s.late_run ? 'closed for today' : 'opens ' + fmtLocal(s.session_open_utc, m))) : 'no session today', ` · ${fmtLocal(s.session_open_utc, m)}–${fmtLocal(s.session_close_utc, m)}`));
+  meta.append(el('span', {}, 'data as of ', el('b', {}, fmtD(p.as_of, false) + ' close')));
+  meta.append(el('span', {'data-tip':'Market mood stored by the daily run: CALM / TRENDING / EVENT_HEAVY / UNSTABLE. AI traders lower their probability in EVENT_HEAVY and UNSTABLE; rule strategies either filter those days or not.'}, 'regime ', el('b', {}, p.status.regime)));
+  meta.append(el('span', {class:'fresh fresh-' + (fr.state === 'fresh' ? 'ok' : 'stale'), 'data-tip': `Page data built ${fmtLocal(fr.built_at, m, true)} (${fr.age_minutes} min before the cut-off ${fmtLocal(p.cutoff, m, true)}). Nothing stored after the cut-off is used.`}, icon(fr.state === 'fresh' ? 'ms-check' : 'ms-warning'), `${fr.state} · built ${fmtLocal(fr.built_at, m)}`));
+  meta.append(el('span', {class:'mb-tag paper', 'data-tip': p.status.paper_label}, 'paper'));
+  left.append(meta);
+  sec.append(left, el('div', {class:'muted right', style:'font-size:12px;text-align:right'}, 'Research only · nothing here trades', el('br'), el('a', {href:'../12-help/page.html', style:'font-size:12px'}, 'How to read this page')));
+  return sec;
+}
+
+function banner(m) {
+  const p = P(m), g = p.go_live, n = Object.keys(p.strategies).length;
+  const b = el('section', {class:'banner', 'aria-label':'Signals'});
+  b.append(el('div', {class:'ico'}, icon('ms-block')), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'),
+    el('div', {class:'s'}, `${p.status.paper_label}. None of the ${n} strategies has met the go-live bar (${g.trades_needed} settled trades, ${g.months_forward} of 2 months forward so far, beating the best baseline after costs). The ranking below is a Paper reading of who agrees, not advice.`)),
+    el('a', {class:'md-btn text act', href:'../08-track-record/page.html'}, 'Track record', icon('ms-chevron_right')));
+  return b;
+}
+
+function horizonSelector(m) {
+  const p = P(m);
+  const wrap = el('div', {class:'hsel'});
+  wrap.append(el('span', {class:'lab'}, 'Horizon', help('N+k: buy at the open of the session being predicted, sell at the close of the k-th market session after it (weekends and holidays skipped). The selector ranks the companies for that horizon; it opens on N+1.')));
+  const seg = el('div', {class:'md-segmented', role:'group', 'aria-label':'Horizon'});
+  for (const k of p.horizons) seg.append(el('button', {type:'button', 'aria-pressed': String(k === horizon), onclick: () => { horizon = k; render(); }}, `N+${k}`));
+  wrap.append(seg, el('span', {class:'lab'}, horizon === 1 ? 'next session’s close' : `close of the ${['','1st','2nd','3rd','4th','5th'][horizon]} session after the open`));
+  return wrap;
+}
+
+function agreement(m) {
+  const p = P(m), rows = p.agreement[String(horizon)] || [], cur = p.currency;
+  const card = el('section', {class:'card', 'aria-label':'Top companies by agreement'});
+  card.append(el('h2', {}, `Top ${rows.length} by agreement at `, el('span', {class:'h-lab'}, `N+${horizon}`), help('Decision 30: companies ranked by how many strategies would buy them at this horizon (a call counts when it is "up" and at or above the strategy’s own bar), then by the average probability of those buyers. Rule, baseline and AI strategies count alike; a click opens the company’s strategy page.'), el('span', {class:'sp'}, `${p.companies.filter(c => c.state === 'active').length} active companies ranked`)));
+  if (!rows.some(r => r.buy > 0)) { card.append(el('div', {class:'quiet'}, `No strategy buys any company at N+${horizon} today.`)); return card; }
+  const ul = el('ul', {class:'agl'});
+  rows.forEach((r, i) => {
+    const c = companyOf(m, r.ticker);
+    const li = el('li', {class: i === 0 ? 'top' : ''});
+    li.append(el('div', {class:'rk', 'aria-label': `rank ${r.rank}`}, r.rank));
+    const who = el('div', {class:'who'});
+    who.append(el('div', {class:'nm'}, el('a', {class:'tk', href: strategiesPage(r.ticker), 'data-tip': `${c.name}: open its stock strategies page (every strategy ranked on this company).`}, r.ticker), c.name, el('small', {}, `${price(cur, c.last_close)} `, delta(c.change_pct))));
+    who.append(el('div', {class:'sent'}, el('b', {}, `${r.buy} of ${r.of}`), ` strategies buy at N+${r.horizon_days}`));
+    who.append(el('div', {class:'bar', role:'img', 'aria-label': `${r.buy} of ${r.of}`}, el('i', {style:`width:${(100*r.buy/r.of).toFixed(1)}%`})));
+    const fam = el('div', {class:'fam'});
+    for (const f of ['rule','baseline','ai']) { const x = r.by_family[f]; fam.append(el('span', {'data-tip': `${FAMILY[f][0]}: ${x.buy} of the ${x.of} that predict ${c.name} at N+${r.horizon_days} would buy.`}, `${FAMILY[f][0].split(' ')[0]} `, el('b', {}, x.of ? `${x.buy}/${x.of}` : '—'))); }
+    who.append(fam);
+    li.append(who);
+    li.append(el('div', {class:'right'}, el('div', {class:'p'}, pct(r.avg_prob_up)), el('div', {class:'l', 'data-tip': r.avg_prob_up == null ? 'Only always-buy and follow-yesterday buy it; neither gives a probability.' : 'Average probability of a rise given by the buyers that give one.'}, r.avg_prob_up == null ? 'no probability' : 'avg. chance of a rise')));
+    const hz = el('div', {class:'hz'}, el('span', {style:'border:0;padding:0'}, 'buyers by horizon:'));
+    for (const k of p.horizons) { const a = (p.agreement[String(k)] || []).find(x => x.ticker === r.ticker); hz.append(el('span', {class: (k === horizon ? 'on' : '') + (a && a.buy ? '' : ' none'), 'data-tip': a ? `N+${k}: ${a.buy} of ${a.of} buy` : `N+${k}: no prediction`}, `N+${k} `, el('b', {}, a ? a.buy : '—'))); }
+    li.append(hz);
+    ul.append(li);
+  });
+  card.append(ul);
+  card.append(el('p', {class:'note'}, `Paper ranking from today’s predictions (made before the open, as of the ${fmtD(p.as_of, false)} close). Strongest other horizon = the other horizon with the most buyers; ties go to the shorter one.`));
+  return card;
+}
+
+function headToHead(m) {
+  const p = P(m), cur = p.currency, picks = p.head_to_head;
+  const card = el('section', {class:'card', 'aria-label':'Today’s head-to-head paper trades'});
+  card.append(el('h2', {}, 'Today’s head-to-head trades', el('span', {class:'mb-tag paper'}, 'paper'), help('Decisions 41-42: for each company, the strongest rule strategy and the strongest AI trader each choose one horizon under two pick rules: best expected gain (the horizon with the highest p × move − (1 − p) × loss − costs) and highest probability. Up to four paper trades of the company’s amount per company per day. A pick clears costs when its expected gain after costs is above zero.'), el('a', {class:'go', href:'../06-rule-vs-ai/page.html'}, 'Rule vs AI', icon('ms-chevron_right'))));
+  const byTicker = {};
+  for (const k of picks) (byTicker[k.ticker] = byTicker[k.ticker] || []).push(k);
+  const picked = picks.filter(k => k.status === 'picked');
+  const viable = picked.filter(k => k.expected_gain_pct > 0);
+  if (!picks.length) { card.append(el('div', {class:'quiet'}, 'No head-to-head picks stored for today’s session yet.')); return card; }
+  card.append(el('div', {class:'sumline'}, icon(viable.length ? 'ms-check' : 'ms-info'), el('span', {}, `${picked.length} paper trades today across ${Object.keys(byTicker).length} companies · `, el('b', {}, viable.length ? `${viable.length} clear costs` : 'No pick clears costs today'), ' (expected gain after costs above zero)')));
+  const list = el('div', {class:'h2h'});
+  for (const [t, ks] of Object.entries(byTicker)) {
+    const c = companyOf(m, t), box = el('div', {class:'cmp'});
+    box.append(el('div', {class:'ch'}, el('a', {class:'tk', href: strategiesPage(t)}, t), el('span', {class:'nm'}, c.name), el('span', {class:'muted', style:'font-size:12px'}, `close ${price(cur, ks[0].base_close)}`), el('span', {class:'amt', 'data-tip': c.amount_overridden ? 'This company’s amount is overridden (decision 44).' : 'The market’s default amount per paper trade (decision 26).'}, `${money(cur, ks[0].amount)} per trade${c.amount_overridden ? ' (override)' : ''}`)));
+    if (ks.every(k => k.status !== 'picked')) { box.append(el('div', {class:'quiet', style:'margin-top:8px'}, `No candidate: no rule strategy and no AI trader buys ${c.name} at any horizon today, so no head-to-head trade.`)); list.append(box); continue; }
+    const fams = el('div', {class:'fams'});
+    for (const f of ['rule','ai']) {
+      const fk = ks.filter(k => k.family === f), fb = el('div', {class:'fam-box'});
+      const any = fk.find(k => k.status === 'picked');
+      const st = any ? stratOf(m, any.strategy_id) : null;
+      fb.append(el('div', {class:'fh'}, icon(FAMILY[f][1]), el('b', {}, FAMILY[f][0].replace(' strategies','').replace(' traders','')), st ? el('small', {'data-tip': `${st.name} (${any.strategy_id}): the family’s strongest strategy with a buyable horizon today, ranked on ${any.strongest_basis === 'per_company' ? 'this company (20+ settled trades on it)' : 'all companies (fewer than 20 settled trades on this one)'}.`}, `· ${st.name}`) : el('small', {}, '· no candidate')));
+      for (const k of fk) {
+        const row = el('div', {class:'pk'});
+        row.append(el('span', {class:'rule'}, PICK[k.pick_rule]));
+        if (k.status !== 'picked') { row.append(el('span', {class:'muted'}, '—'), el('span', {class:'muted'}, 'no candidate'), el('span')); fb.append(row); continue; }
+        row.append(el('span', {class:'h-lab'}, `N+${k.horizon_days}`), el('span', {class:'chance'}, `${pct(k.prob_up)} chance of a rise`),
+          el('span', {class:'gain'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, cur === 'INR' ? 0 : 2), el('br'), el('span', {class:'viab ' + (k.expected_gain_pct > 0 ? 'yes' : 'no'), 'data-tip': `Expected gain after costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up,1)} × ${sgn(k.move_pct)} − ${pct(1-k.prob_up,1)} × ${k.loss_pct}% − ${k.costs_pct}%.`}, icon(k.expected_gain_pct > 0 ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${k.expected_gain_pct > 0 ? 'clears costs' : 'below costs'}`)));
+        row.append(el('span', {class:'det'}, `to target ${sgn(k.move_pct)} · downside ${sgn(-k.loss_pct)} · costs ${k.costs_pct}%`));
+        fb.append(row);
+      }
+      if (any && any.candidates) {
+        const det = el('details', {class:'cand'}, el('summary', {}, `Why these horizons: ${any.candidates.length} buyable horizons`));
+        const tb = el('table', {class:'md-table'}, el('thead', {}, el('tr', {}, el('th', {}, 'Horizon'), el('th', {class:'num'}, 'Chance'), el('th', {class:'num'}, 'To target'), el('th', {class:'num'}, 'Downside'), el('th', {class:'num'}, 'Costs'), el('th', {class:'num'}, 'Expected'))));
+        const tbody = el('tbody');
+        for (const cd of any.candidates) tbody.append(el('tr', {}, el('td', {}, `N+${cd.horizon_days}`), el('td', {class:'num'}, pct(cd.prob_up, 1)), el('td', {class:'num'}, sgn(cd.move_pct)), el('td', {class:'num'}, sgn(-cd.loss_pct)), el('td', {class:'num'}, `${cd.costs_pct}%`), el('td', {class:'num'}, delta(cd.expected_gain_pct))));
+        tb.append(tbody); det.append(el('div', {class:'md-table-wrap'}, tb)); fb.append(det);
+      }
+      fams.append(fb);
+    }
+    box.append(fams);
+    list.append(box);
+  }
+  card.append(list);
+  card.append(el('p', {class:'note'}, 'Expected gain is in percent of the trade amount, from the latest close (the entry open is not known before the open). Every trade is Paper: a record, never an order.'));
+  return card;
+}
+
+function ruleVsAi(m) {
+  const p = P(m), cur = p.currency, e = p.eod, pc = p.status.runs.post_close;
+  const card = el('section', {class:'card', 'aria-label':'Rule vs AI'});
+  card.append(el('h2', {}, 'Rule vs AI', help('Who is better: profit after costs on the same companies and amounts (decision 8). Last close: the post-close run’s end-of-day analysis per family and per pick rule. To date: the head-to-head scoreboard, family × pick rule, every horizon pooled.'), el('a', {class:'go', href:'../06-rule-vs-ai/page.html'}, 'Compare', icon('ms-chevron_right'))));
+  card.append(el('div', {class:'h3'}, el('span', {class:'micro'}, e ? `Last close · ${fmtD(e.session_date)} · ${e.settled_trades} trades settled` : 'Last close'), pc && pc.at == null ? el('span', {class:'muted', style:'font-size:11.5px;margin-left:auto'}, `today’s post-close run at ${fmtLocal(pc.next_at, m)}`) : null));
+  if (!e) card.append(el('div', {class:'quiet'}, 'No end-of-day analysis stored yet.'));
+  else {
+    const t = el('div', {class:'rva'});
+    const fams = ['rule','ai','baseline'].map(f => [f, e.results[f]]);
+    const best = Math.max(...fams.filter(([,x]) => x.trades > 0).map(([,x]) => x.net_pnl));
+    for (const [f, x] of fams) t.append(el('div', {class:'tile' + (x.trades > 0 && x.net_pnl === best ? ' lead' : ''), 'data-tip': `${FAMILY[f][0]}, accuracy view: ${x.trades} trades settled on ${fmtD(e.session_date)}, ${x.wins} with a profit after costs.`}, el('div', {class:'l'}, FAMILY[f][0]), el('div', {class:'v'}, x.trades ? moneyDelta(cur, x.net_pnl) : el('span', {class:'muted'}, 'no trades')), el('div', {class:'s'}, x.trades ? `${x.wins} of ${x.trades} won` : 'none settled')));
+    card.append(t);
+    const pr = el('div', {class:'rva', style:'margin-top:8px;grid-template-columns:1fr 1fr'});
+    for (const r of ['best_expected_gain','highest_probability']) { const x = e.results[r]; pr.append(el('div', {class:'tile'}, el('div', {class:'l'}, PICK[r] + ' picks'), el('div', {class:'v'}, x.trades ? moneyDelta(cur, x.net_pnl) : el('span', {class:'muted'}, 'no trades')), el('div', {class:'s'}, `${x.trades} head-to-head trade${x.trades === 1 ? '' : 's'}`))); }
+    card.append(pr);
+    card.append(el('p', {class:'note', style:'margin-top:8px'}, el('span', {class:'micro'}, 'EOD analyst · '), e.summary, ' ', el('a', {href:'../06-rule-vs-ai/page.html', 'data-tip': `Cites ${e.cited_ids.length} trade ids and ${e.reason_ids.length} AI reasons; gated.`}, 'reasons')));
+  }
+  card.append(el('div', {class:'h3'}, el('span', {class:'micro'}, 'To date · head-to-head · all horizons'), help('Head-to-head view: one trade per company, family and pick rule each day. Profit after costs, settled trades and win rate. Fewer than 20 trades: too few to rank (SPEC section 6).')));
+  const g = el('div', {class:'grid22'});
+  g.append(el('div'), ...['best_expected_gain','highest_probability'].map(r => el('div', {class:'hd'}, PICK[r])));
+  for (const f of ['rule','ai']) {
+    g.append(el('div', {class:'rh'}, icon(FAMILY[f][1]), FAMILY[f][0].replace(' strategies','').replace(' traders','')));
+    for (const r of ['best_expected_gain','highest_probability']) {
+      const row = p.to_date.find(x => x.family === f && x.pick_rule === r);
+      if (!row) { g.append(el('div', {class:'cell none'}, 'no settled trade yet')); continue; }
+      g.append(el('div', {class:'cell'}, el('div', {class:'v'}, moneyDelta(cur, row.net_pnl)), el('div', {class:'s'}, `${row.trades} trade${row.trades === 1 ? '' : 's'} · ${pct(row.win_rate)} won · ${sgn(row.mean_return_pct)}/trade `, row.sample_badge === 'too_few_to_rank' ? el('span', {class:'badge-few', 'data-tip':'Fewer than 20 settled trades: too few to rank; the number is shown but proves nothing yet.'}, 'too few to rank') : null)));
+    }
+  }
+  card.append(g);
+  return card;
+}
+
+function openTrades(m) {
+  const p = P(m), cur = p.currency, rows = p.open_trades;
+  const card = el('section', {class:'card', 'aria-label':'Open paper trades'});
+  const h2h = rows.filter(r => r.view === 'head_to_head').length;
+  card.append(el('h2', {}, 'Open paper trades', el('span', {class:'mb-tag paper'}, 'paper'), help('Every paper trade that has entered (bought at the open of its entry session) and not yet exited, all strategies and horizons: the accuracy view (one trade per qualifying prediction) and the head-to-head view (H2H). Unrealised = the latest stored close against the entry, before costs. Status = the latest intraday check of the day, where one exists.'), el('span', {class:'sp'}, `${rows.length} open · ${rows.length - h2h} accuracy, ${h2h} head-to-head`), el('a', {class:'go', href:'../07-paper-portfolios/page.html'}, 'All trades', icon('ms-chevron_right'))));
+  if (!rows.length) { card.append(el('div', {class:'quiet'}, 'No open paper trade.')); return card; }
+  const checks = {}; for (const c of p.trade_checks) checks[c.trade_id] = c;
+  const tb = el('table', {class:'ot'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Strategy'), el('th', {}, 'Horizon'), el('th', {class:'num v1'}, 'Entry'), el('th', {class:'num'}, 'Last'), el('th', {class:'num'}, 'Unrealised'), el('th', {class:'num v1'}, 'To target'), el('th', {}, 'Today’s check'))));
+  const tbody = el('tbody');
+  const byT = {}; for (const r of rows) (byT[r.ticker] = byT[r.ticker] || []).push(r);
+  for (const [t, trs] of Object.entries(byT)) {
+    const c = companyOf(m, t);
+    const sum = trs.reduce((a, r) => a + r.unrealised_pnl, 0);
+    tbody.append(el('tr', {class:'grp'}, el('td', {colspan: 7}, el('a', {class:'tk', href: companyPage(t), 'data-tip': `${c.name}: open its company page (chart with targets and ranges, today’s path, settled results).`}, t), ` ${c.name}`, el('small', {}, `${trs.length} open · last ${price(cur, trs[0].last_price)} (${fmtD(trs[0].last_price_date, false)}) · unrealised `), moneyDelta(cur, sum, cur === 'INR' ? 0 : 2))));
+    for (const r of trs.slice().sort((a, b) => a.horizon_days - b.horizon_days || a.strategy_id.localeCompare(b.strategy_id))) {
+      const st = stratOf(m, r.strategy_id), ck = checks[r.trade_id];
+      let status;
+      if (!ck) status = el('span', {class:'st muted', 'data-tip':'No intraday check stored for this trade by the cut-off.'}, '—');
+      else { const b = BAND[ck.band] || [ck.band, '']; const fl = ck.flags.map(f => FLAG[f] || f); status = el('span', {class:'st ' + (ck.flagged ? 'flag' : b[1]), 'data-tip': `${fmtLocal(ck.check_at, m)}: ${price(cur, ck.last_price)}, ${sgn(ck.ret_since_entry_pct)} since entry, ${b[0]}${fl.length ? '; ' + fl.join(', ') : ''}. Session ${ck.session_number} of the holding window.`}, icon(ck.flagged ? 'ms-warning' : 'ms-check'), ck.flagged ? fl.join(', ') : b[0]); }
+      tbody.append(el('tr', {}, el('td', {}, st.name, r.view === 'head_to_head' ? el('span', {class:'vtag', 'data-tip':'Head-to-head view: one of the up to four daily picks for this company.'}, 'h2h') : null), el('td', {}, el('span', {class:'h-lab'}, `N+${r.horizon_days}`), el('small', {class:'muted v1', style:'white-space:nowrap'}, ` ${fmtD(r.entry_date)} → ${fmtD(r.exit_date)}`)), el('td', {class:'num v1'}, price(cur, r.entry_price)), el('td', {class:'num'}, price(cur, r.last_price)), el('td', {class:'num'}, moneyDelta(cur, r.unrealised_pnl, cur === 'INR' ? 0 : 2), ' ', delta(r.unrealised_pct)), el('td', {class:'num v1'}, el('span', {'data-tip': r.to_target_pct < 0 ? `Already past the target ${price(cur, r.target_price)}.` : `${sgn(r.to_target_pct)} to the target ${price(cur, r.target_price)}; 80% range ${price(cur, r.lo80)}–${price(cur, r.hi80)}.`}, r.to_target_pct < 0 ? 'past target' : sgn(r.to_target_pct))), el('td', {}, status)));
+    }
+  }
+  tb.append(tbody);
+  card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+function alerts(m) {
+  const p = P(m), cur = p.currency, flagged = p.trade_checks.filter(c => c.flagged);
+  const card = el('section', {class:'card', 'aria-label':'Alerts'});
+  card.append(el('h2', {}, 'Alerts', help('Flagged intraday trade checks of the latest check today: an open paper trade outside its range, far from its target, or moving against the prediction. Monitoring only; nothing is traded on an alert.'), el('span', {class:'sp'}, p.trade_checks.length ? `check at ${fmtLocal(p.trade_checks[0].check_at, m)}` : 'no check yet')));
+  if (!p.trade_checks.length) { card.append(el('div', {class:'quiet'}, 'No intraday check stored yet today. Checks run twice per session; the first one fills this card.')); return card; }
+  if (!flagged.length) { card.append(el('div', {class:'quiet'}, `No open trade is flagged at the ${fmtLocal(p.trade_checks[0].check_at, m)} check.`)); return card; }
+  const ul = el('ul', {class:'al'});
+  const byT = {}; for (const c of flagged) (byT[c.ticker] = byT[c.ticker] || []).push(c);
+  for (const [t, cks] of Object.entries(byT)) {
+    const c = companyOf(m, t), flags = [...new Set(cks.flatMap(x => x.flags))].map(f => FLAG[f] || f);
+    const li = el('li');
+    li.append(icon('ms-warning'));
+    li.append(el('div', {}, el('b', {}, el('a', {class:'tk', href: companyPage(t)}, t), ` ${c.name}: ${cks.length} open trade${cks.length === 1 ? '' : 's'} ${flags.join(' and ')}`),
+      el('div', {class:'d'}, `${price(cur, cks[0].last_price)} at ${fmtLocal(cks[0].check_at, m)} · ${sgn(cks[0].ret_since_entry_pct)} since entry ${price(cur, cks[0].entry_price)}`),
+      el('small', {}, cks.map(x => `${stratOf(m, x.strategy_id).name} N+${x.horizon_days} (${(BAND[x.band] || [x.band])[0]}, session ${x.session_number})`).join(' · '))));
+    ul.append(li);
+  }
+  card.append(ul);
+  return card;
+}
+
+function runs(m) {
+  const p = P(m), r = p.status.runs, news = r.news;
+  const card = el('section', {class:'card', 'aria-label':'Last runs'});
+  card.append(el('h2', {}, 'Last runs', help('The routines of this market: pre-open (collect, model, strategies, AI traders, picks), two intraday checks, post-close (settlement, end-of-day analysis) and the news run every four hours. A tick means the run finished and its gates passed.')));
+  const ul = el('ul', {class:'runs'});
+  const mark = ok => el('span', {class:'mb-mark ' + (ok == null ? 'na' : ok ? 'ok' : 'no'), 'aria-label': ok == null ? 'not run yet' : ok ? 'ok' : 'failed'}, icon(ok == null ? 'ms-schedule' : ok ? 'ms-check' : 'ms-close'));
+  const item = (ok, what, sub, when) => el('li', {}, mark(ok), el('span', {}, what, el('small', {}, sub)), el('span', {class:'t'}, when));
+  ul.append(item(r.pre_open.ok, 'Pre-open', 'collect · model · strategies · AI traders · picks', fmtLocal(r.pre_open.at, m)));
+  if (r.intraday.length) r.intraday.forEach((x, i) => ul.append(item(x.ok, `Intraday check ${i + 1}`, 'open trades vs range and target', fmtLocal(x.at, m))));
+  else ul.append(item(null, 'Intraday checks', 'twice per session · none yet today', '—'));
+  ul.append(item(r.post_close.ok, 'Post-close', r.post_close.at ? 'settlement · end-of-day analysis' : 'settlement · end-of-day analysis · not yet', r.post_close.at ? fmtLocal(r.post_close.at, m) : el('span', {}, el('small', {}, 'next '), fmtLocal(r.post_close.next_at, m))));
+  ul.append(item(news.ok, 'News', `every 4 hours · ${news.new_items} new items`, fmtLocal(news.at, m)));
+  card.append(ul);
+  card.append(el('p', {class:'note'}, `Cut-off ${fmtLocal(p.cutoff, m, true)}: every number on this page was stored by then.`));
+  return card;
+}
+
+/* ---------- page ---------- */
+function render() {
+  const p = P(market);
+  if (horizon == null) horizon = p.default_horizon;
+  document.title = `Market brief · Home · ${LABEL[market]}`;
+  marketSeg();
+  const page = $('#page'); page.innerHTML = '';
+  page.append(header(market), banner(market), horizonSelector(market));
+  const grid = el('div', {class:'grid'});
+  grid.append(el('div', {class:'col'}, agreement(market), headToHead(market)), el('div', {class:'col'}, alerts(market), ruleVsAi(market), runs(market)));
+  page.append(grid, el('div', {style:'margin-top:16px'}, openTrades(market)));
+  page.append(el('footer', {}, `Personal research project. Example data from the data catalogue; nothing here is investment advice and nothing trades. as_of ${p.as_of} · cutoff ${p.cutoff} · built_at ${p.built_at} · `, el('code', {}, D.endpoint.replace('{market}', market))));
+}
+render();
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h in D.markets && h !== market) { market = h; horizon = null; render(); } });
+</script>
+</body>
+</html>
