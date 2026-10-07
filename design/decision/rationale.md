@@ -2,11 +2,36 @@
 
 Files: `template.html` + `build.py` (generator, any market and ticker), `decision-HDFCBANK.html`,
 `decision-ICICIBANK.html`, `decision-AAPL.html` (self-contained, no network), `data-HDFCBANK.json` (everything the
-HDFC Bank page shows), screenshots `shot-*.png`, `notes.md` (queries/commands). The layout below is the one the owner
-approved; on 2026-10-07 the page was recoloured onto the Material 3 design system (`design/system/`) and the builder
-made generic. What changed in that pass is listed at the end.
+HDFC Bank page shows), screenshots `shot-*.png`, `notes.md` (queries/commands).
 
-## How a novice reads it in 30 seconds
+## Layout (terminal, 2026-10-07, third layout)
+
+The owner released the first approved layout and pointed at trading terminals (Meridian Terminal, TradingView
+symbol pages, Tickr, SignalAIX). The page is now laid out like one, with the same information as before:
+
+1. **Shell**: icon rail (Watchlist current, the rest "soon"), top bar with the symbol, a Search chip (coming) and
+   the India/US switch, then a **ticker tape** of the market's 20 watchlist stocks (last stored close and day move,
+   the current one highlighted).
+2. **Quote hero**: symbol and name, exchange session status (open/closed from the calendar), sector, LIVE DATA and
+   PAPER tags, as-of date; the big last price with the day change in money and percent and the 52-week position.
+   Under it a **stat strip**: open, high, low, previous close, volume (and multiple of the 20-day average), 52-week
+   high and low, all from the stored bars.
+3. **Main column**: the **verdict card** (NO red / YES green, darker when strong, lighter when okay; the
+   plain-language why; 1-day and 5-day chance-up bars; a footer with confidence, run time vs the open, evidence
+   status and regime), the **candlestick chart** (stored daily bars with the rule replay's 50%/80% bands behind
+   each bar, hit/miss dots, cause icons, volume bars, the forward fan with the published 1-day and 5-day ranges;
+   Candles/Line and 1-day/5-day toggles), the **forecast log** table, and the **news feed** with verification
+   badges.
+4. **Side column**: the mechanical **plan if YES** (gap rule, exit, stop, outcome on 10,000 after costs, per
+   horizon with its source tag), the five-line **checklist** of what would turn the page into a YES, four
+   **track-record** tiles, **what's moving it** (Company / Sector / Market rows with direction and strength), and
+   **what's coming** (dated events with the typical results-day move where stored).
+5. **Collapsed**: the maths and the data sources.
+
+Phone (390 px): single column in the same order; the stat strip wraps to three per row; the log hides the 5-day
+and close columns.
+
+## How a novice reads it in 30 seconds (unchanged intent)
 
 1. **Top-left: a big "NO" with a no-entry icon and "No edge today".** One sentence says why: the model gives
    a rise 47% (a coin flip), it has shown no skill in the back-test, and the forecaster abstained. The forecaster's

@@ -676,6 +676,26 @@ def page_block(market, cfg, con, ticker, company, sector, peers, cur, D, today, 
     kinds = {"india": "prices (Yahoo, NSE bhavcopy), quotes, model_scores and ranges, agent_reasoning, features, regime, news with enrichment and verification status (news_verified), events, earnings_estimates (Yahoo), flows (NSE FII/DII), fpi (NSDL), indices (NSE), delivery (NSE)",
              "us": "prices (Yahoo), pre-market quotes, model_scores and ranges, agent_reasoning, features, regime, news with enrichment and verification status (news_verified), events (incl. SEC 8-K results days), earnings_estimates (Yahoo), FINRA short interest and short volume"}[market]
 
+    # ---- terminal-style extras: ticker tape, OHLCV history, stat strip, session status
+    tape = q("""select ticker, date, close, lag(close) over (partition by ticker order by date) prev from ohlc
+                 qualify date = max(date) over (partition by ticker)""")
+    tape = tape[tape["ticker"].isin(list(cfg["tickers"]))].sort_values("ticker")
+    tape_rows = [{"ticker": r.ticker, "name": cfg["tickers"][r.ticker]["name"], "close": round(float(r.close), 2),
+                  "move": None if r.prev is None or pd.isna(r.prev) else round((float(r.close) / float(r.prev) - 1) * 100, 2)}
+                 for r in tape.itertuples()]
+    ohlcv = q(f"select date, open, high, low, close, volume from ohlc where ticker='{ticker}' order by date desc limit 70").iloc[::-1]
+    ohlcv_rows = [{"date": str(r.date)[:10], "o": round(float(r.open), 2), "h": round(float(r.high), 2), "l": round(float(r.low), 2),
+                   "c": round(float(r.close), 2), "v": None if pd.isna(r.volume) else int(r.volume)} for r in ohlcv.itertuples()]
+    vols = [r["v"] for r in ohlcv_rows[-21:-1] if r["v"] is not None]
+    stats = {"open": ohlcv_rows[-1]["o"], "high": ohlcv_rows[-1]["h"], "low": ohlcv_rows[-1]["l"], "close": ohlcv_rows[-1]["c"],
+             "volume": ohlcv_rows[-1]["v"], "avg_volume_20": round(sum(vols) / len(vols)) if vols else None,
+             "prev_close": ohlcv_rows[-2]["c"] if len(ohlcv_rows) > 1 else None, "hi52": round(hi52, 2), "lo52": round(lo52, 2)}
+    from marketbrief.pipeline.market_status import status as market_session
+    try:
+        sess = market_session(cfg, datetime.now(timezone.utc))
+    except Exception:
+        sess = {}
+    extras = {"tape": tape_rows, "ohlcv": ohlcv_rows, "stats": stats, "session": {str(k): (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in sess.items()}}
     return {
         "market": market, "market_name": cfg["name"], "exchange": EXCHANGE[market], "company": company, "sector": sector, "logo": ticker[:4],
         "currency": cur, "stake": STAKE, "n_tickers": len(cfg["tickers"]), "timezone": cfg["timezone"],
@@ -692,6 +712,7 @@ def page_block(market, cfg, con, ticker, company, sector, peers, cur, D, today, 
         "regime_factor": load_ranges_config()["regime_factor"], "live_kinds": kinds,
         "bench_name": symbols[bench]["name"], "sector_index_name": symbols[sector_sym]["name"] if sector_sym else None, "sector_index": sector_sym,
         "replay_cmd": f"scripts/replay.py --market {market} --start {D['replay']['window'][0]} --end {D['replay']['window'][1]}",
+        **extras,
     }
 
 

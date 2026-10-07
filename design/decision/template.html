@@ -7,162 +7,160 @@
 <meta name="description" content="__DESC__">
 <!--@@SYSTEM_CSS@@-->
 <style>
-/* Page-local layout on top of the design system (design/system/): structure approved by the owner;
-   every colour below is a system token. */
-:root{ --radius: var(--md-sys-shape-corner-medium); --gutter: var(--mb-gutter); }
-body{font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
-.wrap{max-width:var(--mb-content-max);margin:0 auto}
-header.top{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);margin-top:var(--mb-space-3)}
-header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:14px 22px}
-.brand{display:flex;align-items:center;gap:12px;min-width:0}
-.logo{width:44px;height:44px;border-radius:var(--md-sys-shape-corner-small);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);display:grid;place-items:center;font-weight:700;letter-spacing:.5px;font-size:12px}
-.brand h1{font-size:20px;margin:0;line-height:1.2;font-weight:700;letter-spacing:-.2px}
-.brand .sub{color:var(--md-sys-color-on-surface-variant);font-size:13px}
-.price{margin-left:auto;text-align:right}
-.price .big{font-size:32px;font-weight:700;line-height:1.1;letter-spacing:-.8px}
-.price .chg{font-size:13px;color:var(--md-sys-color-on-surface-variant)} .price .chg .mb-delta{font-size:14px}
-.chips{display:flex;gap:6px;flex-wrap:wrap;width:100%;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
-.chips .md-chip{height:26px;padding:0 10px;font:var(--md-sys-typescale-label-medium);letter-spacing:0;gap:6px}
-.chips .md-chip .ms{width:14px;height:14px;margin-left:-2px}
-.tag{ /* provenance tag = design-system .mb-tag */ }
+/* Company decision page, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
 
-main{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:18px}
-main>*,.dbody>div,.plan .col,.kpi,.dcol,.drv .t,.ev .what,.newsl li>div{min-width:0}
-.why,.lede,.note{overflow-wrap:anywhere}
-.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:18px 22px}
-.card h2{font-size:16px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;letter-spacing:-.1px}
-.card h2 .n{width:22px;height:22px;border-radius:6px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);font-size:11px;display:grid;place-items:center;font-weight:700}
-.lede{color:var(--md-sys-color-on-surface-variant);font-size:13px;margin:0 0 14px}
-.q{ /* help button = design-system .md-help */ }
-.icon{width:1em;height:1em;vertical-align:-0.15em;fill:currentColor}
+/* ticker tape */
+.tape{overflow:hidden;background:var(--md-sys-color-surface);border-bottom:var(--mb-card-border);height:40px;position:relative}
+.tape .track{display:flex;white-space:nowrap;width:max-content;animation:tape 90s linear infinite}
+.tape:hover .track{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tape .it{display:inline-flex;align-items:center;gap:8px;padding:0 18px;border-right:1px solid var(--md-sys-color-outline-variant);font-size:12.5px;height:40px}
+.tape .it b{font-weight:700}
+.tape .it.cur{background:var(--md-sys-color-primary-container)}
+@media (prefers-reduced-motion: reduce){.tape .track{animation:none}.tape{overflow-x:auto}}
 
-/* decision */
-.decision{padding:0;overflow:hidden}
-.dhead{ /* = design-system .mb-verdict (no | yes-ok | yes-strong) */ }
-.verdict{display:flex;align-items:center;gap:14px}
-.why{font-size:16px;line-height:1.45;margin:0}
-.why b{font-weight:700}
-.why .meta{display:block;font-size:13px;opacity:.85;margin-top:6px}
-.dbody{display:grid;grid-template-columns:1fr 1.25fr;gap:0}
-.dbody>div{padding:18px 22px}
-.dbody>div+div{border-left:1px solid var(--md-sys-color-surface-container-high)}
-.dbody h3{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;margin:0 0 10px;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase;display:flex;align-items:center;gap:8px}
-.checks{list-style:none;margin:0;padding:0;display:grid;gap:9px}
-.checks li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:start;font-size:14px}
-.checks .now{color:var(--md-sys-color-on-surface-variant);font-size:13px;white-space:nowrap}
-.plan{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.plan .col{border-radius:var(--mb-panel-radius);padding:14px 16px;background:var(--md-sys-color-surface-container-low);border:var(--mb-card-border)}
-.plan .col h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap}
-.plan dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;font-size:13.5px}
-.plan dt{color:var(--md-sys-color-on-surface-variant)}
-.plan dd{margin:0;font-weight:600;text-align:right}
-.plan dd .r{color:var(--mb-color-down)} .plan dd .g{color:var(--mb-color-up)}
-.plan .hero{font-size:22px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
-.plan dt.wide{grid-column:1/-1;margin-top:4px} .plan dd.wide{grid-column:1/-1;text-align:left;margin-bottom:4px}
-.plan .hero small{font-size:12px;font-weight:500;color:var(--md-sys-color-on-surface-variant);display:block}
-.tr{margin-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.tr .kpi{border-radius:var(--mb-panel-radius);padding:12px 14px;background:var(--md-sys-color-surface);border:var(--mb-card-border)}
-.tr .kpi .v{font-size:24px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
-.tr .kpi .l{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
-.note{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0}
+/* hero */
+.hero{display:grid;grid-template-columns:1fr auto;gap:16px 24px;align-items:center;margin-top:16px}
+.hero .id{display:flex;align-items:center;gap:14px;min-width:0}
+.hero .sym{width:52px;height:52px;border-radius:10px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.3px;flex:none}
+.hero h1{font-size:22px;margin:0;line-height:1.15;font-weight:800;letter-spacing:-.3px}
+.hero h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hero .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.hero .meta .dot{width:7px;height:7px;border-radius:50%;background:var(--mb-color-down);display:inline-block;margin-right:4px}
+.hero .meta .dot.open{background:var(--mb-color-up)}
+.hero .quote{text-align:right}
+.hero .quote .px{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+.hero .quote .px small{font-size:14px;font-weight:600;color:var(--md-sys-color-on-surface-variant);letter-spacing:0;margin-left:6px}
+.hero .quote .chg{font-size:14px;margin-top:4px;color:var(--md-sys-color-on-surface-variant)}
+.stats{display:grid;grid-template-columns:repeat(7,1fr);border:var(--mb-card-border);border-radius:var(--mb-card-radius);background:var(--md-sys-color-surface);margin-top:14px;overflow:hidden}
+.stats div{padding:10px 14px;border-left:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.stats div:first-child{border-left:0}
+.stats b{display:block;font-size:15px;font-weight:700;margin-top:2px;white-space:nowrap}
+
+/* grid */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;margin-top:16px;align-items:start}
+.col{display:grid;gap:16px;min-width:0}
+
+/* verdict card */
+.vcard{padding:0;overflow:hidden}
+.vcard .mb-verdict{padding:18px 20px;grid-template-columns:auto 1fr auto}
+.vcard .mb-verdict .mb-verdict-word{font-size:46px}
+.vcard .why{font-size:15px;line-height:1.45;margin:0;overflow-wrap:anywhere}
+.vcard .why .meta{display:block;font-size:12.5px;opacity:.85;margin-top:6px}
+.odds{display:grid;gap:6px;min-width:150px}
+.odds .row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px}
+.odds .row b{font-size:15px;min-width:42px;text-align:right}
+.odds .bar{height:6px;border-radius:3px;background:rgba(0,0,0,.08);position:relative;overflow:hidden}
+.odds .bar i{position:absolute;left:0;top:0;bottom:0;background:currentColor;opacity:.55;border-radius:3px}
+.odds .bar::after{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:rgba(0,0,0,.35)}
+.vfoot{display:flex;flex-wrap:wrap;gap:8px 16px;padding:10px 20px;border-top:var(--mb-card-border);font-size:12px;color:var(--md-sys-color-on-surface-variant);align-items:center}
 
 /* chart */
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.seg{ /* = design-system .md-segmented */ }
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-left:auto}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{display:inline-block;width:14px;height:10px;border-radius:2px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-left:auto}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{display:inline-block;width:12px;height:9px;border-radius:2px}
 .chart-wrap{position:relative}
 .chart-wrap svg{display:block;width:100%;height:auto;overflow:visible}
 .chart-wrap text{font-family:inherit}
-.crosshair{stroke:var(--md-sys-color-outline);stroke-width:1}
-.axis text{fill:var(--mb-chart-label);font-size:11px}
-.grid line{stroke:var(--mb-chart-grid);stroke-width:1}
-.cause-ico{cursor:help}
+.crosshair{stroke:var(--md-sys-color-outline);stroke-width:1;stroke-dasharray:3 3}
+.grid-l line{stroke:var(--mb-chart-grid);stroke-width:1}
 .srtable{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
-/* strip */
-.strip{width:100%;border-collapse:collapse;font-size:13px}
-.strip th{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:8px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+/* plan + checks */
+.plan dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 10px;font-size:13px}
+.plan dt{color:var(--md-sys-color-on-surface-variant)}
+.plan dd{margin:0;font-weight:600;text-align:right}
+.plan dd .r{color:var(--mb-color-down)} .plan dd .g{color:var(--mb-color-up)}
+.plan .hero-out{font-size:21px;font-weight:800;letter-spacing:-.4px;white-space:nowrap}
+.plan .hero-out small{font-size:11.5px;font-weight:500;color:var(--md-sys-color-on-surface-variant);display:block;letter-spacing:0;white-space:normal}
+.plan dt.wide{grid-column:1/-1;margin-top:4px} .plan dd.wide{grid-column:1/-1;text-align:left;margin-bottom:4px}
+.plan .h{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin:12px 0 6px;white-space:nowrap}
+.plan > div:first-child .h{margin-top:0}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.checks li{display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:start;font-size:13px}
+.checks .now{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface);min-width:0}
+.kpi .v{font-size:22px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.kpi .l{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);margin-top:3px}
+
+/* log table */
+.strip{width:100%;border-collapse:collapse;font-size:12.5px}
+.strip th{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:7px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
 .strip td{padding:5px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
 .strip tr.fut td{color:var(--md-sys-color-on-surface-variant)}
 .strip .d{font-weight:600}
 .strip .d small{display:block;font-weight:400;color:var(--md-sys-color-on-surface-variant);font-size:11px}
-.meter{ /* = design-system .mb-odds */ }
-.mini svg{width:120px;height:16px;display:block}
+.mini svg{width:96px;height:16px;display:block}
+.strip .mb-odds svg{width:52px}
+.strip .ctext{max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom}
 .res{display:inline-flex;align-items:center;gap:4px;font-weight:600}
 .res.ok{color:var(--mb-color-hit)} .res.miss{color:var(--mb-color-miss)}
 .res .ms{width:14px;height:14px}
-.more{margin-top:10px}
 .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
 /* drivers */
-.drivers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.dcol{border-radius:var(--mb-panel-radius);padding:14px 16px;background:var(--md-sys-color-surface-container-low);border:var(--mb-card-border)}
-.dcol h3{margin:0 0 8px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.04em}
-.dcol h3 .net{margin-left:auto;font-size:12px;color:var(--md-sys-color-on-surface-variant);font-weight:500}
-.drv{display:grid;grid-template-columns:20px 1fr 64px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-highest);font-size:13px}
-.drv:first-of-type{border-top:0}
-.drv .t{min-width:0}
-.drv .t small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dgrp{margin-top:8px}
+.dgrp h3{margin:0 0 4px;font-size:11px;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.06em;color:var(--md-sys-color-on-surface-variant)}
+.dgrp h3 .net{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0}
+.drv{display:grid;grid-template-columns:20px 1fr 56px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px}
+.drv .t{min-width:0;overflow:hidden}
+.drv .t .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drv .t small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* coming */
-.events{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.ev{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;border-radius:var(--mb-panel-radius);padding:12px 14px;background:var(--md-sys-color-surface);border:var(--mb-card-border)}
-.ev.major{box-shadow:inset 4px 0 0 var(--md-sys-color-primary)}
-.ev .when b{color:var(--md-sys-color-primary)}
-.ev .when{text-align:center;line-height:1.1}
-.ev .when b{display:block;font-size:20px}
-.ev .when small{font-size:10px;letter-spacing:.06em;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase}
-.ev .what{font-size:14px}
-.ev .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px}
-.ev .typ{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);text-align:right;min-width:150px}
-.ev .typ b{font-size:16px;display:block;color:var(--md-sys-color-on-surface)}
-.earnbars svg{width:100%;max-width:360px;height:80px;display:block;margin-top:6px}
+/* events */
+.events{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ev{display:grid;grid-template-columns:46px minmax(0,1fr);gap:10px;align-items:center;border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:8px 10px;background:var(--md-sys-color-surface);min-width:0}
+.ev.major{box-shadow:inset 3px 0 0 var(--md-sys-color-primary)}
+.ev .when{text-align:center;line-height:1.05}
+.ev .when b{display:block;font-size:18px;color:var(--md-sys-color-primary)}
+.ev .when small{font-size:9.5px;letter-spacing:.06em;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase}
+.ev .what{font-size:12.5px;min-width:0;overflow-wrap:anywhere}
+.ev .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.ev .typ{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);margin-top:3px}
+.ev .typ b{color:var(--md-sys-color-on-surface)}
+.earnbars svg{width:100%;max-width:300px;height:64px;display:block;margin-top:4px}
 
-details{ /* = design-system details.md-expansion */ }
-details .inner{font-size:13.5px}
+/* news */
 .newsl{list-style:none;margin:0;padding:0}
-.newsl li{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);align-items:start}
-.newsl .s{width:22px;height:22px}
-.newsl .meta{color:var(--md-sys-color-on-surface-variant);font-size:12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:2px}
-.badge{ /* = design-system .md-badge */ }
-pre{ /* = .md-pre */ }
-.kv{ /* = .md-kv */ }
-footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+.newsl li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);align-items:start}
+.newsl .meta{color:var(--md-sys-color-on-surface-variant);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-top:2px}
+.newsl a{color:var(--md-sys-color-on-surface);text-decoration:none;font-weight:500;overflow-wrap:anywhere}
+.newsl a:hover{text-decoration:underline}
 
+details .inner{font-size:13px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+
+@media (max-width: 1000px){ .grid{grid-template-columns:1fr} .stats{grid-template-columns:repeat(4,1fr)} .stats div:nth-child(5){border-left:0} .stats div{border-top:1px solid var(--md-sys-color-outline-variant)} .stats div:nth-child(-n+4){border-top:0} }
 @media (max-width: 760px){
-  body{font-size:14px}
-  header .wrap{padding:14px}
-  .card{padding:16px 14px}
-  .mb-verdict{grid-template-columns:1fr;gap:12px}
-  .mb-verdict .mb-verdict-word{font-size:44px}
-  .mb-verdict{padding:16px 14px}
-  .why{font-size:15.5px}
-  .dbody{grid-template-columns:1fr}
-  .dbody>div{padding:14px}
-  .dbody>div+div{border-left:0;border-top:1px solid var(--md-sys-color-outline-variant)}
-  .plan{grid-template-columns:1fr}
-  .tr{grid-template-columns:1fr 1fr}
+  .pad{padding:0 var(--mb-gutter)}
+  .hero{grid-template-columns:1fr;gap:10px}
+  .hero .quote{text-align:left}
+  .hero .quote .px{font-size:34px}
+  .stats{grid-template-columns:repeat(3,1fr)} .stats div{border-top:1px solid var(--md-sys-color-outline-variant)} .stats div:nth-child(-n+3){border-top:0} .stats div:nth-child(4),.stats div:nth-child(7){border-left:0} .stats div:nth-child(5){border-left:1px solid var(--md-sys-color-outline-variant)}
+  .vcard .mb-verdict{grid-template-columns:1fr;padding:14px}
+  .vcard .mb-verdict .mb-verdict-word{font-size:40px}
+  .odds{min-width:0}
   .legend{margin-left:0}
-  .drivers{grid-template-columns:1fr}
-  .ev{grid-template-columns:52px 1fr}
-  .ev .typ{grid-column:2;text-align:left;min-width:0}
-  .ev .typ b{display:inline;margin-right:6px}
-  .price{text-align:left;margin-left:0;width:100%;display:flex;align-items:baseline;gap:10px}
-  details.md-expansion{padding:0 14px}
   .strip th:nth-child(5),.strip td:nth-child(5),.strip th:nth-child(3),.strip td:nth-child(3),.strip .ctext{display:none}
-  .mb-odds svg{width:36px}
-  .strip td,.strip th{padding:5px 3px}
-  .strip th{white-space:normal;font-size:10px}
-  .strip .d small{display:none}
-  .strip .mb-tag{display:none}
-  .strip .d{font-size:12px}
-  .mb-odds b{min-width:0}
-  .checks li{grid-template-columns:22px 1fr}
-  .checks .now{grid-column:2;white-space:normal}
-  .md-chip .long{display:none}
-  .mini svg{width:96px}
+  .mb-odds svg{width:36px} .mb-odds b{min-width:0}
+  .strip td,.strip th{padding:5px 3px} .strip th{white-space:normal;font-size:10px} .strip .d small{display:none} .strip .mb-tag{display:none}
+  .mini svg{width:72px}
+  details.md-expansion{padding:0 14px}
+  .tape .it{padding:0 12px}
+  .mb-topbar .md-chip{display:none}
 }
 </style>
 </head>
@@ -175,66 +173,54 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
   <header class="mb-topbar" id="topbar">
     <div class="mb-topbar-title" id="topbar-title"></div>
     <div class="mb-topbar-actions">
+      <span class="md-chip small" data-tip="Coming: symbol search. This page is built per market and ticker." aria-disabled="true"><svg class="ms"><use href="#ms-search"/></svg>Search symbols</span>
       <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
     </div>
   </header>
   <main class="mb-content"><div class="mb-content-inner">
+    <div class="tape" id="tape" aria-label="Watchlist, last close and day move"><div class="track" id="tape-track"></div></div>
+    <div class="pad"><div class="wrap">
 
-<header class="top">
-  <div class="wrap">
-    <div class="brand">
-      <div class="logo" aria-hidden="true" id="hdr-logo"></div>
-      <div><h1 id="hdr-name"></h1><div class="sub"><span id="hdr-sub"></span> · <span id="hdr-date"></span></div></div>
-    </div>
-    <div class="price"><div class="big" id="hdr-price"></div><div class="chg" id="hdr-chg"></div></div>
-    <div class="chips" id="chips">
-      <span class="md-chip live" data-tip="Live: stored by the pipeline this week (prices, quotes, model scores, ranges, news with its verification status, events, flows)."><span class="sw"></span>Live<span class="long"> = stored by the pipeline this week</span></span>
-      <span class="md-chip bt" data-tip="Back-test: the rule replay (scripts/replay.py) and the walk-forward model (scripts/model_backtest.py) rebuilt what the system would have said on past days. Not live predictions."><span class="sw"></span>Back-test<span class="long"> = rule replay &amp; walk-forward model, not live</span></span>
-      <span class="md-chip mock" data-tip="Mock: a placeholder for an agent that is not built yet (the explainer of unexplained moves)."><span class="sw"></span>Mock<span class="long"> = explainer agent coming</span></span>
-      <span class="md-chip"><svg class="ms"><use href="#ms-verified_user"/></svg>Research only · nothing here trades</span>
+<!-- HERO -->
+<section class="hero" aria-label="Quote">
+  <div class="id">
+    <div class="sym" aria-hidden="true" id="hdr-logo"></div>
+    <div style="min-width:0">
+      <h1 id="hdr-name"></h1>
+      <div class="meta" id="hdr-meta"></div>
     </div>
   </div>
-</header>
+  <div class="quote"><div class="px" id="hdr-price"></div><div class="chg" id="hdr-chg"></div></div>
+</section>
+<div class="stats" id="stats"></div>
 
-<main class="wrap">
-  <!-- 1 DECISION -->
-  <section class="card decision" id="decision" aria-labelledby="dec-h">
+<div class="grid">
+<div class="col">
+  <!-- VERDICT -->
+  <section class="card vcard" id="decision" aria-label="Decision">
     <div class="mb-verdict" id="dhead">
-      <div class="verdict">
-        <div class="mb-verdict-box" aria-hidden="true" id="dec-ico"></div>
-        <div class="mb-verdict-word" id="dec-word"></div>
-      </div>
+      <div style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box" aria-hidden="true" id="dec-ico"></div><div class="mb-verdict-word" id="dec-word"></div></div>
       <p class="why" id="dec-why"></p>
+      <div class="odds" id="odds"></div>
     </div>
-    <div class="dbody">
-      <div>
-        <h3>What would turn this into a YES <button class="md-help" data-tip="The pipeline's own rules for a call (CLAUDE.md prediction rules, config/model.yaml thresholds, the weekly review's skill test). Each line shows today's value next to the rule." aria-label="Explain">?</button></h3>
-        <ul class="checks" id="checks"></ul>
-        <p class="note" id="paper-note"></p>
-      </div>
-      <div>
-        <h3>If it were a YES, the plan would read <button class="md-help" id="plan-help" aria-label="Explain">?</button></h3>
-        <div class="plan" id="plan"></div>
-        <div class="tr" id="track"></div>
-        <p class="note" id="plan-note"></p>
-      </div>
-    </div>
+    <div class="vfoot" id="vfoot"></div>
   </section>
 
-  <!-- 2 FORECAST VS REALITY -->
+  <!-- CHART -->
   <section class="card" id="timeline" aria-labelledby="tl-h">
-    <h2 id="tl-h"><span class="n">2</span>Forecast vs reality <span class="mb-tag bt" id="tl-tag-bt"></span> <span class="mb-tag live">live fan</span></h2>
-    <p class="lede">Each bar is the price range predicted the evening before (<b>dark</b> = 50% band, <b>light</b> = 80% band); the dark line is what actually happened. Then the fan for the next 1 and 5 sessions.
-      <button class="md-help" id="tl-help" aria-label="Explain">?</button></p>
+    <h2 id="tl-h">Forecast vs reality <span class="mb-tag bt" id="tl-tag-bt"></span> <span class="mb-tag live">live fan</span> <button class="md-help" id="tl-help" aria-label="Explain">?</button><span class="sp" id="tl-sub"></span></h2>
     <div class="toolbar">
-      <div class="md-segmented seg" role="group" aria-label="Horizon">
+      <div class="md-segmented dense seg" role="group" aria-label="Horizon">
         <button type="button" data-h="1" aria-pressed="true">1-day bands</button>
         <button type="button" data-h="5" aria-pressed="false">5-day bands</button>
+      </div>
+      <div class="md-segmented dense mode" role="group" aria-label="Price style">
+        <button type="button" data-m="candles" aria-pressed="true">Candles</button>
+        <button type="button" data-m="line" aria-pressed="false">Line</button>
       </div>
       <div class="legend">
         <span><i style="background:var(--mb-chart-band-50)"></i>50% band</span>
         <span><i style="background:var(--mb-chart-band-80)"></i>80% band</span>
-        <span><i style="background:var(--mb-chart-ink);height:2px"></i>Actual close</span>
         <span><svg class="ms" style="color:var(--mb-color-hit)"><use href="#ms-check"/></svg>inside 80%</span>
         <span><svg class="ms" style="color:var(--mb-color-miss)"><use href="#ms-close"/></svg>outside</span>
       </div>
@@ -244,51 +230,77 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
     <table class="srtable" id="chart-table" aria-label="Forecast vs reality, table view"></table>
   </section>
 
-  <!-- 3 HOW THE PREDICTION CHANGED -->
+  <!-- LOG -->
   <section class="card" id="changes">
-    <h2><span class="n">3</span>How the prediction changed, day by day <span class="mb-tag bt">back-test</span></h2>
-    <p class="lede">One row per session: the chance of a rise the model gave the evening before, the predicted 1-day range against the real close, and the cause when it missed.
-      <button class="md-help" data-tip="Chance of a rise = the signal model's out-of-sample probability from the walk-forward back-test (scripts/model_backtest.py; refit monthly, scored only on dates after each fit). Range = the rule replay's 1-day 80% band. Tick = the close landed inside the 80% band." aria-label="Explain">?</button></p>
+    <h2>Forecast log, day by day <span class="mb-tag bt">back-test</span> <button class="md-help" data-tip="Chance of a rise = the signal model's out-of-sample probability from the walk-forward back-test (scripts/model_backtest.py; refit monthly, scored only on dates after each fit). Range = the rule replay's 1-day 80% band. Tick = the close landed inside the 80% band." aria-label="Explain">?</button></h2>
     <div class="tblwrap">
     <table class="strip" id="strip">
       <thead><tr>
         <th>For</th>
-        <th>Chance up, 1d <button class="md-help" data-tip="Model probability that the stock closes higher than it opens over the next session (open-to-close). 50 = coin flip. The dot sits on a 30-70 track." aria-label="Explain">?</button></th>
-        <th>5d <button class="md-help" data-tip="Same, for the five-session hold (buy at the next open, sell at the close four sessions later)." aria-label="Explain">?</button></th>
+        <th>Chance up 1d <button class="md-help" data-tip="Model probability that the stock closes higher than it opens over the next session (open-to-close). 50 = coin flip. The dot sits on a 30-70 track." aria-label="Explain">?</button></th>
+        <th>5d</th>
         <th>1-day range vs close <button class="md-help" data-tip="Light bar = 80% band, dark = 50% band, dot = actual close. Hover a row for the numbers." aria-label="Explain">?</button></th>
         <th>Close</th>
-        <th>80% <button class="md-help" data-tip="Did the close land inside the 80% band? Over many days about 8 in 10 should." aria-label="Explain">?</button></th>
+        <th>80%</th>
         <th>Cause <button class="md-help" data-tip="Why the stock moved that day. Market-wide and company-news causes are derived from stored index moves and stored headlines; stock-specific days with no stored news are marked unexplained (mock: an explainer agent is planned)." aria-label="Explain">?</button></th>
       </tr></thead>
       <tbody id="strip-body"></tbody>
     </table>
     </div>
-    <button class="md-btn outlined more" id="strip-more" type="button"></button>
+    <button class="md-btn outlined" id="strip-more" type="button" style="margin-top:10px"></button>
     <p class="note" id="strip-note"></p>
   </section>
 
-  <!-- 4 WHAT'S MOVING IT -->
+  <!-- NEWS -->
+  <section class="card" id="news-card">
+    <h2>News feed <span class="mb-tag live">live</span><span class="sp" id="news-count"></span></h2>
+    <ul class="newsl" id="newsl"></ul>
+    <button class="md-btn outlined" id="news-more" type="button" style="margin-top:10px"></button>
+  </section>
+</div>
+
+<div class="col">
+  <!-- PLAN -->
+  <section class="card plan" id="plan-card">
+    <h2>If it were a YES, the plan <button class="md-help" id="plan-help" aria-label="Explain">?</button></h2>
+    <div id="plan"></div>
+    <p class="note" id="plan-note"></p>
+  </section>
+
+  <!-- CHECKLIST -->
+  <section class="card" id="checks-card">
+    <h2>What would turn this into a YES <button class="md-help" data-tip="The pipeline's own rules for a call (CLAUDE.md prediction rules, config/model.yaml thresholds, the weekly review's skill test). Each line shows today's value next to the rule." aria-label="Explain">?</button></h2>
+    <ul class="checks" id="checks"></ul>
+    <p class="note" id="paper-note"></p>
+  </section>
+
+  <!-- TRACK RECORD -->
+  <section class="card" id="track-card">
+    <h2>Track record</h2>
+    <div class="kpis" id="track"></div>
+  </section>
+
+  <!-- DRIVERS -->
   <section class="card" id="drivers-card">
-    <h2><span class="n">4</span>What's moving it <span class="mb-tag live">live</span></h2>
-    <p class="lede"><span id="drivers-lede"></span> Strength: weak / medium / strong by fixed rules.
-      <button class="md-help" id="drivers-help" aria-label="Explain">?</button></p>
-    <div class="drivers" id="drivers"></div>
+    <h2>What's moving it <span class="mb-tag live">live</span> <button class="md-help" id="drivers-help" aria-label="Explain">?</button></h2>
+    <div id="drivers"></div>
     <p class="note" id="drivers-note"></p>
   </section>
 
-  <!-- 5 WHAT'S COMING -->
+  <!-- COMING -->
   <section class="card" id="coming">
-    <h2><span class="n">5</span>What's coming <span class="mb-tag live">live calendar</span></h2>
-    <p class="lede">Scheduled events that widen the ranges or move the stock, with the typical move where stored history allows.</p>
+    <h2>What's coming <span class="mb-tag live">calendar</span></h2>
     <ul class="events" id="events"></ul>
   </section>
+</div>
+</div>
 
-  <details class="md-expansion" id="d-news"><summary><span id="news-head"></span> (<span id="news-count"></span>)</summary><div class="inner"><ul class="newsl" id="newsl"></ul></div></details>
+<div style="display:grid;gap:10px;margin-top:16px">
   <details class="md-expansion" id="d-math"><summary>The maths: range inputs, model drivers, costs</summary><div class="inner" id="math"></div></details>
   <details class="md-expansion" id="d-src"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
-</main>
-<footer class="wrap" id="foot"></footer>
-
+</div>
+<footer id="foot"></footer>
+    </div></div>
   </div></main>
   <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
 </div>
@@ -302,6 +314,7 @@ const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://ww
 const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
 const CUR = P.currency;
 const money = (x, dec=0) => CUR.symbol + Math.abs(x).toLocaleString(CUR.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const num = (x, dec=2) => x.toLocaleString(CUR.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
 const sgn = (x, dec=1, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
 const pct = (x, dec=0) => Math.round(x*100*Math.pow(10,dec))/Math.pow(10,dec);
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -310,25 +323,25 @@ const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDa
 const dowName = iso => DOWL[dt(iso).getUTCDay()];
 const tag = (kind, text) => el('span', {class: 'mb-tag '+kind}, text || {live:'live', bt:'back-test', mock:'mock', derived:'derived'}[kind]);
 const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const delta = (x, dec=2, unit='%') => el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
 const hm = iso => iso ? iso.slice(11,16) : '';
 const MARKET_LABEL = {india: 'India', us: 'US'};
+const bigNum = v => v == null ? '—' : v >= 1e9 ? (v/1e9).toFixed(2)+'B' : v >= 1e6 ? (v/1e6).toFixed(2)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : String(v);
 
 /* ---------- app shell ---------- */
 document.title = `${P.company} decision`;
-$('#topbar-title').textContent = `Decision · ${P.company}`;
+$('#topbar-title').textContent = `${D.ticker} · ${P.company}`;
 for (const [m, label] of Object.entries(MARKET_LABEL)) {
   const b = el('button', {type:'button', 'aria-pressed': String(m === P.market)}, label);
-  if (m !== P.market) { b.setAttribute('aria-disabled', 'true'); b.dataset.tip = `Coming: the market switch lives on the Home and Watchlist pages. This page is built per market and ticker.`; }
+  if (m !== P.market) { b.setAttribute('aria-disabled', 'true'); b.dataset.tip = 'Coming: the market switch lives on the Home and Watchlist pages. This page is built per market and ticker.'; }
   $('#market-seg').append(b);
 }
 const NAV = [['home','Home', false], ['format_list_bulleted','Watchlist', true], ['account_balance_wallet','Portfolio', false], ['query_stats','Record', false], ['newspaper','News', false], ['help','Help', false]];
-function navItem([ico, label, current], short) {
-  const a = el('a', {class: 'mb-nav-item' + (current ? '' : ' coming'), href: '#', 'aria-current': current ? 'page' : null,
-    'data-tip': current ? 'Coming: the watchlist page. This decision page is one of its company pages.' : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), short ? label.split(' ')[0] : label);
-  return a;
+function navItem([ico, label, current]) {
+  return el('a', {class: 'mb-nav-item' + (current ? '' : ' coming'), href: '#', 'aria-current': current ? 'page' : null, 'data-tip': current ? 'Coming: the watchlist page. This decision page is one of its company pages.' : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
 }
-$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(n => navItem(n, false)));
-$('#navbar').append(...NAV.slice(0,5).map(n => navItem(n, true)));
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
 window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
 
 /* ---------- tooltip ---------- */
@@ -351,20 +364,29 @@ document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]'))
 document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
 
-/* ---------- header ---------- */
-const last = D.prices[D.prices.length-1];
+/* ---------- ticker tape (watchlist, last close) ---------- */
+const track = $('#tape-track');
+const tapeItems = () => P.tape.map(t => el('span', {class:'it'+(t.ticker===D.ticker?' cur':''), 'data-tip': `${t.name}: last close ${money(t.close,2)}` + (t.move==null?'':` (${sgn(t.move,2)} on the day)`)}, el('b', {}, t.ticker), el('span', {}, num(t.close)), t.move==null ? el('span', {}, '—') : delta(t.move)));
+track.append(...tapeItems(), ...tapeItems());
+
+/* ---------- hero + stats ---------- */
+const last = D.prices[D.prices.length-1], S = P.stats, sess = P.session || {};
 $('#hdr-logo').textContent = P.logo;
-$('#hdr-name').textContent = P.company;
-$('#hdr-sub').textContent = `${P.exchange}: ${D.ticker} · ${P.sector}`;
-$('#hdr-date').textContent = 'close of ' + fmtD(last.date) + ' ' + last.date.slice(0,4);
-$('#hdr-price').textContent = money(last.close, 2);
-$('#hdr-chg').append(el('span', {class:'mb-delta '+(last.move>0?'up':last.move<0?'down':'flat')}, sgn(last.move, 2)), ' on the day · ' + P.position_52w);
+$('#hdr-name').append(D.ticker, el('small', {}, P.company));
+const closed = !sess.in_session;
+$('#hdr-meta').append(
+  el('span', {}, el('span', {class:'dot'+(closed?'':' open')}), closed ? `${P.exchange} closed` : `${P.exchange} open`, ` · ${P.sector}`),
+  el('span', {class:'mb-tag live'}, 'live data'), el('span', {class:'mb-tag paper'}, 'paper'),
+  el('span', {}, `as of close ${fmtD(last.date)} ${last.date.slice(0,4)}`));
+$('#hdr-price').append(num(last.close), el('small', {}, CUR.code));
+$('#hdr-chg').append(delta(last.close - (S.prev_close ?? last.close), 2, ''), ' ', delta(last.move), ` · ${P.position_52w}`);
+const statItems = [['Open', money(S.open,2)], ['High', money(S.high,2)], ['Low', money(S.low,2)], ['Prev close', S.prev_close==null?'—':money(S.prev_close,2)], ['Volume', bigNum(S.volume) + (S.avg_volume_20 && S.volume ? ` (${(S.volume/S.avg_volume_20).toFixed(1)}× avg)` : '')], ['52w high', money(S.hi52,2)], ['52w low', money(S.lo52,2)]];
+for (const [l, v] of statItems) $('#stats').append(el('div', {}, el('span', {class:'micro'}, l), el('b', {}, v)));
 $('#foot').innerHTML = `Personal research project. Prices from Yahoo Finance${P.market==='india' ? ' and NSE bhavcopy' : ''}; nothing here is investment advice and nothing trades. Built ${D.built_at} (UTC) from stored data as of ${D.as_of}.`;
 
 /* ---------- decision ---------- */
 const live1 = D.live.latest.find(r => r.horizon_days === 1), live5 = D.live.latest.find(r => r.horizon_days === 5);
 const plan1 = P.plan['1'], plan5 = P.plan['5'];
-const reasoning = D.live.reasoning[D.live.reasoning.length-1];
 const sk5 = D.skill['5d open_to_close'], sk1 = D.skill['1d open_to_close'];
 const p1 = live1 ? live1.prob_up : null, p5 = live5 ? live5.prob_up : null;
 const W = P.why;
@@ -375,82 +397,77 @@ let why = '';
 if (p1 != null && p5 != null) why += `<b>Why:</b> the model gives a rise ${W.coin_flip ? 'only ' : ''}<b>${pct(p1)}%</b> (1 day) and <b>${pct(p5)}%</b> (5 days)${W.coin_flip ? ' — a coin flip —' : ''} and in the back-test it has shown <b>${W.skill ? 'skill' : 'no skill'}</b>`;
 else why += `<b>Why:</b> no live model score is stored for ${P.company}`;
 why += W.abstained ? '; the forecaster abstained.' : (W.decision_1d ? `; the forecaster's decisions: ${W.decision_1d} (1d), ${W.decision_5d} (5d).` : '.');
-why += `<span class="meta">${W.forecaster_quote ? `Forecaster, ${W.forecaster_time} UTC: “${W.forecaster_quote}” ` : ''}${W.earnings_sentence} <span class="mb-tag live">live</span></span>`;
+why += `<span class="meta">${W.forecaster_quote ? `Forecaster, ${W.forecaster_time} UTC: “${W.forecaster_quote}” ` : ''}${W.earnings_sentence}</span>`;
 $('#dec-why').innerHTML = why;
+for (const [h, p, lv] of [[1, p1, live1], [5, p5, live5]]) {
+  $('#odds').append(el('div', {class:'row', 'data-tip': lv ? `Live model score, ${h}-day (model_scores ${hm(lv.computed_at)} UTC): P(up) ${p.toFixed(4)}, base rate ${lv.base_rate}. 50% = coin flip; a call needs 60%.` : 'No live model score stored.'}, el('span', {class:'micro', style:'color:inherit;opacity:.8'}, `${h}d chance up`), el('div', {class:'bar'}, el('i', {style:`width:${p==null?0:pct(p)}%`})), el('b', {}, p==null?'—':pct(p)+'%')));
+}
+$('#vfoot').append(el('span', {}, 'Confidence: ', el('b', {}, P.verdict.kind === 'call' ? P.verdict.small.split('confidence ')[1] : 'no call')), el('span', {}, 'Run: ', el('b', {}, P.run_hm ? `${P.run_hm} UTC` : '—'), P.run_before_open ? ' (before the open)' : ' (after the open)'), el('span', {}, 'Evidence: ', el('b', {}, P.best_status.replace('_',' '))), el('span', {}, 'Regime: ', el('b', {}, D.live.regime.regime)), el('span', {class:'mb-tag live'}, 'live'));
 for (const c of P.checks) {
-  const st = el('span', {class:'mb-mark '+(c.ok?'ok':'no'), 'aria-label': c.ok?'met':'not met'}, icon(c.ok?'ms-check':'ms-close'));
-  $('#checks').append(el('li', {}, st, el('span', {}, c.text, ' ', help(c.tip)), el('span', {class:'now'}, c.now)));
+  $('#checks').append(el('li', {}, el('span', {class:'mb-mark '+(c.ok?'ok':'no'), 'aria-label': c.ok?'met':'not met'}, icon(c.ok?'ms-check':'ms-close')), el('span', {}, c.text, ' ', help(c.tip), el('span', {class:'now'}, c.now))));
 }
 $('#paper-note').append('Signals stay ', el('span', {class:'mb-tag paper'}, 'Paper'), ` until the live track record proves them: ${P.outcomes_n} call${P.outcomes_n===1?'':'s'} scored so far.`);
 
 /* plan */
 const rt = D.costs.round_trip, stake = P.stake, costR = stake*rt;
 const asofDow = dowName(D.as_of);
-$('#plan-help').dataset.tip = `A fixed, mechanical plan so a YES is never vague: entry gap rule, exit day, stop at the lower edge of the 80% range, and the outcome on ${money(stake)} from the published range after the costs in config/costs.yaml. Shown greyed because today is a ${P.verdict.word}.`;
-function planCol(title, h, rng) {
-  const base = rng.base, lo50 = rng.lo50, hi50 = rng.hi50, lo80 = rng.lo80, hi80 = rng.hi80;
-  const center = base*Math.exp(rng.center);
-  const out = x => stake*(x/base-1) - costR;
-  const dl = el('dl');
-  const add = (k, v, t) => { const dtEl = el('dt', {}, k); if (t) dtEl.append(help(t)); dl.append(dtEl, el('dd', {}, v)); };
-  const exitText = h===1 ? `close of ${fmtD(D.next_sessions[1])} (D+1)` : `by close of ${fmtD(D.next_sessions[4])} (D+4)`;
-  add('Buy', `at the open, only if ≤ ${money(center,0)}`, `Gap rule of this page: buy at the next open only if it opens at or below the range centre (${money(center,2)} = ${asofDow}'s close ${money(base,2)} shifted by the published centre ${sgn(rng.center*100,2)}). A gap above the centre has already spent the expected move. Not a pipeline rule.`);
-  add('Sell', exitText, h===1 ? 'The 1-day plan: hold one session, sell at the close of the day after entry (D+1). This is the label the model is trained on.' : `The 5-day plan: sell at the close of D+4, four sessions after the entry day — here ${fmtD(D.next_sessions[4], false)}, the target date of the 5-day range.`);
-  const stop = el('dd', {}, el('span', {class:'r'}, `below ${money(lo80,0)}`));
-  const dts = el('dt', {}, 'Exit early'); dts.append(help(`Stop = lower edge of the 80% range (${money(lo80,2)}, ${sgn((lo80/base-1)*100,1)} from ${asofDow}'s close). Only 1 in 10 normal days should close below it, so a close below means the forecast is broken, not unlucky.`));
-  dl.append(dts, stop);
-  const likely = el('dd', {class:'wide'}, el('span', {class:'hero'}, el('span', {class:'r'}, '−'+money(-out(lo50),0)), ' to ', el('span', {class:'g'}, '+'+money(out(hi50),0)), el('small', {}, `8 in 10 days: −${money(-out(lo80),0)} to +${money(out(hi80),0)}`)));
-  const dtl = el('dt', {class:'wide'}, `On ${money(stake)}`); dtl.append(help(`From the published range after costs: 50% band ${money(lo50,2)}–${money(hi50,2)} (${sgn((lo50/base-1)*100,1)} to ${sgn((hi50/base-1)*100,1)}), 80% band ${money(lo80,2)}–${money(hi80,2)}, both relative to ${asofDow}'s close ${money(base,2)}. Round-trip costs ${money(costR,2)} (${(rt*100).toFixed(4)}% of traded value; config/costs.yaml, ${P.market} section, every rate marked "verify"; brokerage assumed ${money(0)}, slippage not modelled).`));
-  dl.append(dtl, likely);
-  const pr = h===1 ? p1 : p5, lv = h===1 ? live1 : live5;
-  add('Chance of a rise', pr == null ? '— no score' : `${pct(pr)}%`, lv ? `The live model score for ${h}-day (model_scores, ${hm(lv.computed_at)} UTC): P(up) ${pr.toFixed(4)}; base rate ${lv.base_rate}. The forecaster may adjust by at most ±0.10 with a reason.` : 'No live model score stored.');
-  add('Confidence', P.verdict.kind === 'call' ? P.verdict.small.split('confidence ')[1] : '— no call', 'Confidence is the forecaster\'s stated 0.50–0.90 for a call. ' + (P.verdict.kind === 'call' ? '' : 'Abstained today, so none.'));
-  const col = el('div', {class:'col', style: P.verdict.kind === 'call' ? '' : 'opacity:.75'}, el('h4', {}, title, ' ', (() => { const t = tag(rng.kind, rng.kind==='live'?'live range':'rule replay'); t.dataset.tip = rng.kind==='live' ? 'Live range stored by the pipeline for this date.' : 'Rule replay: the range ranges.py would have published for this date; no live range was stored.'; return t; })()), dl);
-  return col;
-}
-if (plan1) $('#plan').append(planCol('1-day plan', 1, plan1));
-if (plan5) $('#plan').append(planCol('5-day plan', 5, plan5));
+$('#plan-help').dataset.tip = `A fixed, mechanical plan so a YES is never vague: entry gap rule, exit day, stop at the lower edge of the 80% range, and the outcome on ${money(stake)} from the published range after the costs in config/costs.yaml. Greyed because today is a ${P.verdict.word}.`;
 const planSrc = (h, r) => !r ? `No ${h}-day range (live or replay) for ${D.as_of}.` : r.kind === 'live'
   ? `${h}-day numbers are the live range published ${hm(r.made_at)} UTC for ${fmtD(r.target, false)}${r.notes.length ? ' (' + r.notes.join('; ') + ')' : ''}.`
   : `${h}-day numbers use the rule replay's range for ${fmtD(r.target, false)} because no live ${h}-day range was published for ${D.as_of}${P.run_before_open ? '' : ' (run after the open)'}.`;
-$('#plan-note').innerHTML = `${planSrc(1, plan1)} ${planSrc(5, plan5)} Costs ${money(costR,2)} per ${money(stake)} round trip.`;
+function planBlock(title, h, rng) {
+  const base = rng.base, lo50 = rng.lo50, hi50 = rng.hi50, lo80 = rng.lo80, hi80 = rng.hi80;
+  const center = base*Math.exp(rng.center);
+  const out = x => stake*(x/base-1) - costR;
+  const wrap = el('div', {style: P.verdict.kind === 'call' ? '' : 'opacity:.8'});
+  const t = tag(rng.kind, rng.kind==='live'?'live range':'rule replay'); t.dataset.tip = rng.kind==='live' ? 'Live range stored by the pipeline for this date.' : 'Rule replay: the range ranges.py would have published for this date; no live range was stored.';
+  wrap.append(el('div', {class:'h'}, title, t));
+  const dl = el('dl');
+  const add = (k, v, tipText, cls) => { const dtEl = el('dt', {class: cls}, k); if (tipText) dtEl.append(help(tipText)); dl.append(dtEl, el('dd', {class: cls}, v)); };
+  add('Buy', `at the open, only if ≤ ${money(center,0)}`, `Gap rule of this page: buy at the next open only if it opens at or below the range centre (${money(center,2)} = ${asofDow}'s close ${money(base,2)} shifted by the published centre ${sgn(rng.center*100,2)}). A gap above the centre has already spent the expected move. Not a pipeline rule.`);
+  add('Sell', h===1 ? `close of ${fmtD(D.next_sessions[1])} (D+1)` : `by close of ${fmtD(D.next_sessions[4])} (D+4)`, h===1 ? 'Hold one session, sell at the close of the day after entry (D+1): the label the model is trained on.' : `Sell at the close of D+4, four sessions after the entry day: ${fmtD(D.next_sessions[4], false)}, the target date of the 5-day range.`);
+  add('Exit early', el('span', {class:'r'}, `below ${money(lo80,0)}`), `Stop = lower edge of the 80% range (${money(lo80,2)}, ${sgn((lo80/base-1)*100,1)} from ${asofDow}'s close). Only 1 in 10 normal days should close below it.`);
+  add(`On ${money(stake)}`, el('span', {class:'hero-out'}, el('span', {class:'r'}, '−'+money(-out(lo50),0)), ' to ', el('span', {class:'g'}, '+'+money(out(hi50),0)), el('small', {}, `8 in 10 days: −${money(-out(lo80),0)} to +${money(out(hi80),0)} · after ${money(costR,2)} costs`)),
+      `From the published range after costs: 50% band ${money(lo50,2)}–${money(hi50,2)} (${sgn((lo50/base-1)*100,1)} to ${sgn((hi50/base-1)*100,1)}), 80% band ${money(lo80,2)}–${money(hi80,2)}, relative to ${asofDow}'s close ${money(base,2)}. Round trip ${money(costR,2)} (${(rt*100).toFixed(4)}%; config/costs.yaml, ${P.market} section, every rate marked "verify").`, 'wide');
+  wrap.append(dl);
+  return wrap;
+}
+if (plan1) $('#plan').append(planBlock('1-day plan', 1, plan1));
+if (plan5) $('#plan').append(planBlock('5-day plan', 5, plan5));
+$('#plan-note').textContent = `${planSrc(1, plan1)} ${planSrc(5, plan5)}`;
 
-/* track record KPIs */
+/* track record */
 const bs1 = D.band_summary['1'], bs5 = D.band_summary['5'];
 const paper = sk5 && sk5.paper && sk5.paper['0.60'];
 const windowLabel = `${fmtD(D.replay.window[0], false)}–${fmtD(D.replay.window[1], false)}`;
 const kpis = [
   {v: String(P.outcomes_n), l:'live calls scored', t:`Live direction calls for ${P.company} that have settled and been scored (outcomes). Everything else here is back-test.`, k:'live'},
-  {v:`${bs1.hit80}/${bs1.n}`, l:`1-day 80% ranges held, this stock, ${windowLabel}`, t:`Rule replay for ${D.ticker}: the 80% band contained the next close ${bs1.hit80} of ${bs1.n} sessions (${pct(bs1.hit80/bs1.n)}%, target 80%); the 50% band ${bs1.hit50} of ${bs1.n} (${pct(bs1.hit50/bs1.n)}%, target 50%). 5-day: 80% held ${bs5.hit80}/${bs5.n}, 50% held ${bs5.hit50}/${bs5.n}.`, k:'bt'},
+  {v:`${bs1.hit80}/${bs1.n}`, l:`1-day 80% ranges held, ${windowLabel}`, t:`Rule replay for ${D.ticker}: the 80% band contained the next close ${bs1.hit80} of ${bs1.n} sessions (${pct(bs1.hit80/bs1.n)}%, target 80%); the 50% band ${bs1.hit50} of ${bs1.n} (${pct(bs1.hit50/bs1.n)}%, target 50%). 5-day: 80% held ${bs5.hit80}/${bs5.n}, 50% held ${bs5.hit50}/${bs5.n}.`, k:'bt'},
   {v:`${bs1.lean_hit}/${bs1.lean_n}`, l:'1-day leans right, this stock', t:`Model lean = side of 50% of the out-of-sample probability. Right on ${bs1.lean_hit} of ${bs1.lean_n} resolved sessions for 1 day (probability range ${pct(bs1.p_min,1)}–${pct(bs1.p_max,1)}%), ${bs5.lean_hit} of ${bs5.lean_n} for 5 days.`, k:'bt'},
-  paper ? {v:`${paper.long.mean_pct>0?'+':'−'}${Math.abs(paper.long.mean_pct).toFixed(2)}%`, l:`per 5-day trade after costs, all ${P.n_tickers} stocks, long at ≥60%`, t:`Walk-forward back-test, ${sk5.dates} dates: ${paper.long.positions} positions on ${paper.long.dates} dates, mean ${paper.long.mean_pct}% per trade after costs (95% interval ${paper.long.ci95_pct[0]} to ${paper.long.ci95_pct[1]}). Always-long baseline: ${sk5.always_up ? sk5.always_up.mean_pct : '?'}%.`, k:'bt'}
-        : {v:'—', l:'paper strategy', t:'No paper-strategy result in the back-test JSON.', k:'bt'},
+  paper ? {v:`${paper.long.mean_pct>0?'+':'−'}${Math.abs(paper.long.mean_pct).toFixed(2)}%`, l:`per 5-day trade after costs, all ${P.n_tickers} stocks, long at ≥60%`, t:`Walk-forward back-test, ${sk5.dates} dates: ${paper.long.positions} positions on ${paper.long.dates} dates, mean ${paper.long.mean_pct}% per trade after costs (95% interval ${paper.long.ci95_pct[0]} to ${paper.long.ci95_pct[1]}). Always-long baseline: ${sk5.always_up ? sk5.always_up.mean_pct : '?'}%.`, k:'bt'} : {v:'—', l:'paper strategy', t:'No paper-strategy result in the back-test JSON.', k:'bt'},
 ];
 for (const k of kpis) $('#track').append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l, ' ', tag(k.k), ' ', help(k.t))));
 
 /* ---------- chart ---------- */
 const CAUSE = {market:{ico:'ms-public', name:'Market-wide'}, company:{ico:'ms-apartment', name:'Company news'}, results:{ico:'ms-receipt_long', name:'Results'}, unexplained:{ico:'ms-pending', name:'Unexplained'}};
-let H = '1';
+let H = '1', MODE = 'candles';
 $('#tl-tag-bt').textContent = `back-test to ${fmtD(D.as_of, false)}`;
-$('#tl-help').dataset.tip = `Past bands come from the rule replay: scripts/replay.py rebuilt each day's range exactly as ranges.py would have, using only data known at that close. They are not the live ranges. The forward fan: ${planSrc(1, plan1)} ${planSrc(5, plan5)}`;
+$('#tl-sub').textContent = `${fmtD(D.replay.window[0], false)} – ${fmtD(D.as_of, false)} + next 5 sessions`;
+$('#tl-help').dataset.tip = `Candles are the stored daily bars; each bar's shaded range is what the rule replay would have predicted the evening before (dark = 50% band, light = 80% band), the dot says whether the close landed inside the 80% band. Past bands come from scripts/replay.py (not the live ranges). The fan: ${planSrc(1, plan1)} ${planSrc(5, plan5)}`;
 function fanRows() {
-  const b1 = plan1, b5 = plan5;
-  const rows = [];
-  if (!b1 || !b5) return rows;
+  const b1 = plan1, b5 = plan5; const rows = []; if (!b1 || !b5) return rows;
   const lg = (a, b, k) => Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * (Math.sqrt(k) - 1) / (Math.sqrt(5) - 1));
-  D.next_sessions.slice(0,5).forEach((s, i) => {
-    const k = i+1;
-    rows.push({target:s, k, lo80: lg(b1.lo80, b5.lo80, k), hi80: lg(b1.hi80, b5.hi80, k), lo50: lg(b1.lo50, b5.lo50, k), hi50: lg(b1.hi50, b5.hi50, k), published: k===1||k===5});
-  });
+  D.next_sessions.slice(0,5).forEach((s, i) => { const k = i+1; rows.push({target:s, k, lo80: lg(b1.lo80, b5.lo80, k), hi80: lg(b1.hi80, b5.hi80, k), lo50: lg(b1.lo50, b5.lo50, k), hi50: lg(b1.hi50, b5.hi50, k), published: k===1||k===5}); });
   return rows;
 }
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function drawChart() {
   const wrap = $('#chart'); wrap.innerHTML = '';
-  const Wd = Math.max(320, wrap.clientWidth), phone = Wd < 600, Hh = phone ? 300 : 360;
-  const m = {l: phone? 40 : 48, r: 12, t: 26, b: 56};
+  const Wd = Math.max(320, wrap.clientWidth), phone = Wd < 600, volH = phone ? 44 : 60, Hh = (phone ? 300 : 380) + volH;
+  const m = {l: phone? 42 : 50, r: 12, t: 22, b: 56 + volH};
   const bands = D.bands[H];
-  const past = D.prices.map(p => ({date: p.date, close: p.close, open: p.open, move: p.move}));
+  const past = P.ohlcv.filter(r => r.date >= D.replay.window[0]).map(r => ({...r, close: r.c}));
+  const movesByDate = Object.fromEntries(D.prices.map(p => [p.date, p.move]));
   const fan = fanRows();
   const slots = [...past.map(p => p.date), ...fan.map(f => f.target)];
   const n = slots.length, x = i => m.l + (i + 0.5) * (Wd - m.l - m.r) / n, slotW = (Wd - m.l - m.r) / n;
@@ -458,88 +475,81 @@ function drawChart() {
   let lo = Infinity, hi = -Infinity;
   for (const b of bands) { lo = Math.min(lo, b.lo80, b.actual ?? Infinity); hi = Math.max(hi, b.hi80, b.actual ?? -Infinity); }
   for (const f of fan) { lo = Math.min(lo, f.lo80); hi = Math.max(hi, f.hi80); }
-  for (const p of past) { lo = Math.min(lo, p.close); hi = Math.max(hi, p.close); }
-  const rawStep = Math.max((hi - lo) / 10, 1e-6), pow10 = Math.pow(10, Math.floor(Math.log10(rawStep))); const step = [1, 2, 5, 10].map(mlt => mlt * pow10).find(s => s >= rawStep);
-  lo = Math.floor((lo - step*0.4)/step)*step; hi = Math.ceil((hi + step*0.4)/step)*step;
-  const y = v => m.t + (hi - v) / (hi - lo) * (Hh - m.t - m.b);
-  const LABEL = cssVar('--mb-chart-label'), INK2 = cssVar('--md-sys-color-on-surface-variant'), OUTL = cssVar('--md-sys-color-outline'), FUT = cssVar('--mb-chart-future'), S1 = cssVar('--mb-chart-1'), PRIM = cssVar('--md-sys-color-primary');
-  const svg = svgEl('svg', {viewBox:`0 0 ${Wd} ${Hh}`, width: Wd, height: Hh, role:'img', 'aria-label':`Predicted ranges against actual closes, ${fmtD(D.replay.window[0], false)} to ${fmtD(D.as_of, false)}, and the fan for the next five sessions`});
-  const g = svgEl('g', {class:'grid'});
-  const dec = step < 1 ? 2 : 0;
-  for (let v = lo; v <= hi + 1e-9; v += step) { g.append(svgEl('line', {x1:m.l, x2:Wd-m.r, y1:y(v), y2:y(v)})); const t = svgEl('text', {x:m.l-6, y:y(v)+4, 'text-anchor':'end', class:'axis', fill:LABEL, 'font-size':11}); t.textContent = v.toFixed(dec); svg.append(t); }
+  for (const p of past) { lo = Math.min(lo, MODE==='candles' ? p.l : p.c); hi = Math.max(hi, MODE==='candles' ? p.h : p.c); }
+  const rawStep = Math.max((hi - lo) / 8, 1e-6), pow10 = Math.pow(10, Math.floor(Math.log10(rawStep))); const step = [1, 2, 5, 10].map(mlt => mlt * pow10).find(s => s >= rawStep);
+  lo = Math.floor((lo - step*0.3)/step)*step; hi = Math.ceil((hi + step*0.3)/step)*step;
+  const plotB = Hh - m.b, y = v => m.t + (hi - v) / (hi - lo) * (plotB - m.t);
+  const LABEL = cssVar('--mb-chart-label'), INK2 = cssVar('--md-sys-color-on-surface-variant'), OUTL = cssVar('--md-sys-color-outline'), FUT = cssVar('--mb-chart-future'), S1 = cssVar('--mb-chart-1'), UP = cssVar('--mb-color-up'), DN = cssVar('--mb-color-down'), INK = cssVar('--mb-chart-ink');
+  const svg = svgEl('svg', {viewBox:`0 0 ${Wd} ${Hh}`, width: Wd, height: Hh, role:'img', 'aria-label':`Daily bars with the predicted ranges and the actual close, ${fmtD(D.replay.window[0], false)} to ${fmtD(D.as_of, false)}, and the fan for the next five sessions`});
+  const g = svgEl('g', {class:'grid-l'}); const dec = step < 1 ? 2 : 0;
+  for (let v = lo; v <= hi + 1e-9; v += step) { g.append(svgEl('line', {x1:m.l, x2:Wd-m.r, y1:y(v), y2:y(v)})); const t = svgEl('text', {x:m.l-6, y:y(v)+4, 'text-anchor':'end', fill:LABEL, 'font-size':11}); t.textContent = v.toFixed(dec); svg.append(t); }
   svg.append(g);
-  const iNow = past.length - 1;
-  const xNow = x(iNow) + slotW/2;
-  svg.append(svgEl('rect', {x: xNow, y: m.t-8, width: Wd-m.r-xNow, height: Hh-m.t-m.b+8, fill:FUT}));
-  svg.append(svgEl('line', {x1:xNow, x2:xNow, y1:m.t-10, y2:Hh-m.b, stroke:OUTL, 'stroke-width':1}));
-  const nowT = svgEl('text', {x: phone ? Wd-m.r : xNow+5, y:m.t-12, 'font-size':11, fill:INK2, 'font-weight':700, 'text-anchor': phone ? 'end' : 'start'}); nowT.textContent = phone ? 'Next 5 →' : 'Next 5 sessions →'; svg.append(nowT);
-  const btT = svgEl('text', {x:xNow-5, y:m.t-12, 'font-size':11, fill:INK2, 'text-anchor':'end', 'font-weight':700}); btT.textContent = 'Back-test (rule replay) ←'; if (!phone) svg.append(btT);
+  const vy0 = plotB + volH + 4, vh = v => v / Math.max(...past.map(p => p.v || 0), 1) * volH;
+  const iNow = past.length - 1, xNow = x(iNow) + slotW/2;
+  svg.append(svgEl('rect', {x: xNow, y: m.t-8, width: Wd-m.r-xNow, height: vy0-m.t+8, fill:FUT}));
+  svg.append(svgEl('line', {x1:xNow, x2:xNow, y1:m.t-10, y2:vy0, stroke:OUTL, 'stroke-width':1}));
+  const nowT = svgEl('text', {x: phone ? Wd-m.r : xNow+5, y:m.t-12, 'font-size':10.5, fill:INK2, 'font-weight':700, 'text-anchor': phone ? 'end' : 'start'}); nowT.textContent = phone ? 'NEXT 5 →' : 'NEXT 5 SESSIONS →'; svg.append(nowT);
+  const btT = svgEl('text', {x:xNow-5, y:m.t-12, 'font-size':10.5, fill:INK2, 'text-anchor':'end', 'font-weight':700}); btT.textContent = 'BACK-TEST (RULE REPLAY) ←'; if (!phone) svg.append(btT);
   const bw = Math.max(3, slotW*0.62);
-  past.forEach((p, i) => {
-    const b = byTarget[p.date]; if (!b) return;
-    svg.append(svgEl('rect', {x:x(i)-bw/2, y:y(b.hi80), width:bw, height:Math.max(1,y(b.lo80)-y(b.hi80)), fill:'var(--mb-chart-band-80)', rx:2}));
-    svg.append(svgEl('rect', {x:x(i)-bw/2, y:y(b.hi50), width:bw, height:Math.max(1,y(b.lo50)-y(b.hi50)), fill:'var(--mb-chart-band-50)', rx:2}));
-  });
+  past.forEach((p, i) => { const b = byTarget[p.date]; if (!b) return;
+    svg.append(svgEl('rect', {x:x(i)-bw/2-1.5, y:y(b.hi80), width:bw+3, height:Math.max(1,y(b.lo80)-y(b.hi80)), fill:'var(--mb-chart-band-80)', rx:2}));
+    svg.append(svgEl('rect', {x:x(i)-bw/2-1.5, y:y(b.hi50), width:bw+3, height:Math.max(1,y(b.lo50)-y(b.hi50)), fill:'var(--mb-chart-band-50)', rx:2})); });
   const fx = i => x(past.length + i);
   const poly = (loK, hiK, fill) => { const pts = [[xNow, y(last.close)], ...fan.map((f,i) => [fx(i), y(f[hiK])]), ...fan.slice().reverse().map((f,i) => [fx(fan.length-1-i), y(f[loK])]), [xNow, y(last.close)]]; svg.append(svgEl('polygon', {points: pts.map(p => p.join(',')).join(' '), fill})); };
   if (fan.length) { poly('lo80','hi80','var(--mb-chart-band-80)'); poly('lo50','hi50','var(--mb-chart-band-50)'); }
   const labDec = last.close < 50 ? 1 : 0;
   fan.forEach((f, i) => { if (!f.published) return; svg.append(svgEl('rect', {x:fx(i)-bw/2, y:y(f.hi80), width:bw, height:y(f.lo80)-y(f.hi80), fill:'none', stroke:S1, 'stroke-width':1.5, rx:2}));
-    const lab = (v, dy) => { const right = fx(i)+bw/2+4+34 <= Wd; const t = svgEl('text', {x: right ? fx(i)+bw/2+4 : fx(i)-bw/2-4, y:y(v)+dy, 'font-size':11, fill:PRIM, 'font-weight':600, 'text-anchor': right ? 'start' : 'end'}); t.textContent = money(v,labDec); svg.append(t); };
-    if (!phone || i===4) { lab(f.hi80, 4); lab(f.lo80, 4); }
-  });
-  const path = past.map((p,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + y(p.close).toFixed(1)).join(' ');
-  svg.append(svgEl('path', {d: path, fill:'none', stroke:'var(--mb-chart-ink)', 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
-  past.forEach((p, i) => {
-    const b = byTarget[p.date];
-    if (!b) { svg.append(svgEl('circle', {cx:x(i), cy:y(p.close), r:3.5, fill:'var(--mb-chart-ink)', stroke:'#fff', 'stroke-width':2})); return; }
-    const ok = b.hit80;
-    const grp = svgEl('g');
-    grp.append(svgEl('circle', {cx:x(i), cy:y(p.close), r: phone?4.5:6, fill: ok?'var(--mb-color-hit)':'var(--mb-color-miss)', stroke:'#fff', 'stroke-width':2}));
-    const u = svgEl('use'); u.setAttribute('href', ok?'#ms-check':'#ms-close'); u.setAttribute('x', x(i)-(phone?3:4)); u.setAttribute('y', y(p.close)-(phone?3:4)); u.setAttribute('width', phone?6:8); u.setAttribute('height', phone?6:8); u.setAttribute('fill', '#fff'); grp.append(u);
-    svg.append(grp);
-    if (!ok && b.cause) { const c = CAUSE[b.cause.kind]; const cu = svgEl('use'); cu.setAttribute('href', '#'+c.ico); const s = phone?12:14; cu.setAttribute('x', x(i)-s/2); cu.setAttribute('y', Hh-m.b+22); cu.setAttribute('width', s); cu.setAttribute('height', s); cu.setAttribute('fill', b.cause.source==='mock'?OUTL:INK2); cu.setAttribute('class','cause-ico'); svg.append(cu); }
-  });
-  const causeLab = svgEl('text', {x:m.l-4, y:Hh-m.b+33, 'font-size':10.5, fill:LABEL, 'text-anchor':'end'}); causeLab.textContent = phone ? 'cause' : 'cause of miss:'; svg.append(causeLab);
-  slots.forEach((s, i) => { const d = dt(s); let mondays = 0; const isLab = dd => phone ? (dd.getUTCDay()===1 && (mondays++ % 2 === 0)) : (dd.getUTCDay()===1 || dd.getUTCDay()===3); const prevLab = i>0 && isLab(dt(slots[i-1])); const show = isLab(d) || (i===n-1 && !prevLab); if (!show) return; const t = svgEl('text', {x:x(i), y:Hh-m.b+14, 'text-anchor':'middle', 'font-size':11, fill:LABEL}); t.textContent = d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; svg.append(t); });
-  const cross = svgEl('line', {class:'crosshair', y1:m.t, y2:Hh-m.b, x1:-10, x2:-10}); svg.append(cross);
+    const lab = (v, dy) => { const right = fx(i)+bw/2+4+34 <= Wd; const t = svgEl('text', {x: right ? fx(i)+bw/2+4 : fx(i)-bw/2-4, y:y(v)+dy, 'font-size':11, fill:S1, 'font-weight':700, 'text-anchor': right ? 'start' : 'end'}); t.textContent = money(v,labDec); svg.append(t); };
+    if (!phone || i===4) { lab(f.hi80, 4); lab(f.lo80, 4); } });
+  if (MODE === 'candles') {
+    const cw = Math.max(2, slotW*0.5);
+    past.forEach((p, i) => { const up = p.c >= p.o; const col = up ? UP : DN;
+      svg.append(svgEl('line', {x1:x(i), x2:x(i), y1:y(p.h), y2:y(p.l), stroke:col, 'stroke-width':1}));
+      svg.append(svgEl('rect', {x:x(i)-cw/2, y:y(Math.max(p.o,p.c)), width:cw, height:Math.max(1, Math.abs(y(p.o)-y(p.c))), fill:col, stroke:col, 'stroke-width':1, rx:1})); });
+  } else {
+    const path = past.map((p,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + y(p.c).toFixed(1)).join(' ');
+    svg.append(svgEl('path', {d: path, fill:'none', stroke:INK, 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+  }
+  past.forEach((p, i) => { const b = byTarget[p.date]; if (!b) return; const ok = b.hit80; const my = MODE==='candles' ? y(p.h) - 9 : y(p.c);
+    const grp = svgEl('g'); grp.append(svgEl('circle', {cx:x(i), cy:my, r: phone?4:5.5, fill: ok?'var(--mb-color-hit)':'var(--mb-color-miss)', stroke:'#fff', 'stroke-width':1.5}));
+    const u = svgEl('use'); u.setAttribute('href', ok?'#ms-check':'#ms-close'); u.setAttribute('x', x(i)-(phone?2.5:3.5)); u.setAttribute('y', my-(phone?2.5:3.5)); u.setAttribute('width', phone?5:7); u.setAttribute('height', phone?5:7); u.setAttribute('fill', '#fff'); grp.append(u); svg.append(grp);
+    if (!ok && b.cause) { const c = CAUSE[b.cause.kind]; const cu = svgEl('use'); cu.setAttribute('href', '#'+c.ico); const s = phone?12:14; cu.setAttribute('x', x(i)-s/2); cu.setAttribute('y', vy0+24); cu.setAttribute('width', s); cu.setAttribute('height', s); cu.setAttribute('fill', b.cause.source==='mock'?OUTL:INK2); svg.append(cu); } });
+  const causeLab = svgEl('text', {x:m.l-4, y:vy0+35, 'font-size':10, fill:LABEL, 'text-anchor':'end'}); causeLab.textContent = phone ? 'cause' : 'cause of miss:'; svg.append(causeLab);
+  past.forEach((p, i) => { if (!p.v) return; svg.append(svgEl('rect', {x:x(i)-bw/2, y:vy0 - vh(p.v), width:bw, height:vh(p.v), fill: p.c >= p.o ? UP : DN, opacity:.35, rx:1})); });
+  const vl = svgEl('text', {x:m.l-6, y:vy0-2, 'font-size':10, fill:LABEL, 'text-anchor':'end'}); vl.textContent = 'vol'; svg.append(vl);
+  slots.forEach((s, i) => { const d = dt(s); let mondays = 0; const isLab = dd => phone ? (dd.getUTCDay()===1 && (mondays++ % 2 === 0)) : slotW < 34 ? dd.getUTCDay()===1 : (dd.getUTCDay()===1 || dd.getUTCDay()===3); const prevLab = i>0 && isLab(dt(slots[i-1])); const show = isLab(d) || (i===n-1 && !prevLab); if (!show) return; const t = svgEl('text', {x:x(i), y:vy0+12, 'text-anchor':'middle', 'font-size':11, fill:LABEL}); t.textContent = d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; svg.append(t); });
+  const cross = svgEl('line', {class:'crosshair', y1:m.t, y2:vy0, x1:-10, x2:-10}); svg.append(cross);
   const hit = svgEl('rect', {x:m.l, y:0, width:Wd-m.l-m.r, height:Hh, fill:'transparent'}); svg.append(hit);
   const fanNote = f => f.k===1 ? (plan1.kind==='live' ? `live 1-day range published ${hm(plan1.made_at)} UTC` : 'rule replay 1-day range (no live 1-day range for this date)') : f.k===5 ? (plan5.kind==='live' ? `live 5-day range published ${hm(plan5.made_at)} UTC` : 'rule replay 5-day range (no live 5-day range for this date)') : 'interpolated shading between the 1- and 5-day ranges (not a published number)';
-  const onMove = e => {
-    const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * Wd / r.width; const i = Math.max(0, Math.min(n-1, Math.floor((px - m.l) / slotW)));
-    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i));
-    let html;
-    if (i < past.length) { const p = past[i], b = byTarget[p.date];
-      html = `<b>${fmtD(p.date)}</b> · close ${money(p.close,2)} (${sgn(p.move,2)})`;
+  const onMove = e => { const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * Wd / r.width; const i = Math.max(0, Math.min(n-1, Math.floor((px - m.l) / slotW)));
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); let html;
+    if (i < past.length) { const p = past[i], b = byTarget[p.date]; const mv = movesByDate[p.date];
+      html = `<b>${fmtD(p.date)}</b> · O ${num(p.o)} H ${num(p.h)} L ${num(p.l)} C ${num(p.c)}${mv==null?'':' ('+sgn(mv,2)+')'} · vol ${bigNum(p.v)}`;
       if (b) html += `<div class="row"><span>${H}-day 50% band</span><span>${money(b.lo50,labDec)}–${money(b.hi50,labDec)}</span></div><div class="row"><span>80% band</span><span>${money(b.lo80,labDec)}–${money(b.hi80,labDec)}</span></div><div class="row"><span>Result</span><span>${b.hit80?'inside 80% ✓':'outside 80% ✗'}${b.hit50?' · inside 50%':''}</span></div><div class="row"><span>Chance up (${H}d)</span><span>${b.p==null?'—':pct(b.p,1)+'%'}</span></div>` + (b.cause? `<div class="row"><span>Cause</span><span>${b.cause.label}${b.cause.source==='mock'?' (mock)':''}</span></div>`:'') + `<div class="dim">back-test, not live · predicted at the ${fmtD(b.as_of)} close</div>`;
       else html += `<div class="dim">no band: first day of the window</div>`;
-    } else { const f = fan[i - past.length];
-      html = `<b>${fmtD(f.target)}</b> · ${f.k} session${f.k>1?'s':''} ahead<div class="row"><span>50% band</span><span>${money(f.lo50,labDec)}–${money(f.hi50,labDec)}</span></div><div class="row"><span>80% band</span><span>${money(f.lo80,labDec)}–${money(f.hi80,labDec)}</span></div><div class="dim">${fanNote(f)}</div>`; }
+    } else { const f = fan[i - past.length]; html = `<b>${fmtD(f.target)}</b> · ${f.k} session${f.k>1?'s':''} ahead<div class="row"><span>50% band</span><span>${money(f.lo50,labDec)}–${money(f.hi50,labDec)}</span></div><div class="row"><span>80% band</span><span>${money(f.lo80,labDec)}–${money(f.hi80,labDec)}</span></div><div class="dim">${fanNote(f)}</div>`; }
     showTip(null, html, e.clientX, r.top + y(lo) * r.height / Hh - 8);
-    tip.style.top = Math.max(8, Math.min(window.innerHeight - tip.offsetHeight - 8, e.clientY - tip.offsetHeight - 16)) + 'px';
-  };
+    tip.style.top = Math.max(8, Math.min(window.innerHeight - tip.offsetHeight - 8, e.clientY - tip.offsetHeight - 16)) + 'px'; };
   hit.addEventListener('pointermove', onMove);
   hit.addEventListener('pointerleave', () => { cross.setAttribute('x1', -10); cross.setAttribute('x2', -10); hideTip(); });
   wrap.append(svg);
   const tb = $('#chart-table'); tb.innerHTML = '<tr><th>Target date</th><th>80% band</th><th>50% band</th><th>Actual close</th><th>Inside 80%</th></tr>';
   for (const b of bands) tb.append(el('tr', {}, el('td', {}, b.target), el('td', {}, `${b.lo80}–${b.hi80}`), el('td', {}, `${b.lo50}–${b.hi50}`), el('td', {}, b.actual ?? 'pending'), el('td', {}, b.hit80==null?'pending':b.hit80?'yes':'no')));
-  const bs = D.band_summary[H];
-  const ov = D.replay.overall[H];
-  $('#chart-note').innerHTML = `${H}-day bands: the 80% band held on <b>${bs.hit80} of ${bs.n}</b> sessions (${pct(bs.hit80/bs.n)}%; target 80%), the 50% band on <b>${bs.hit50} of ${bs.n}</b> (${pct(bs.hit50/bs.n)}%; target 50%). Across all ${P.n_tickers} ${MARKET_LABEL[P.market]} stocks the replay holds ${pct(ov.cover80)}% (80%) and ${pct(ov.cover50)}% (50%). Misses are explained one by one in the table below and in the chart's cause row.`;
+  const bs = D.band_summary[H], ov = D.replay.overall[H];
+  $('#chart-note').innerHTML = `${H}-day bands: the 80% band held on <b>${bs.hit80} of ${bs.n}</b> sessions (${pct(bs.hit80/bs.n)}%; target 80%), the 50% band on <b>${bs.hit50} of ${bs.n}</b> (${pct(bs.hit50/bs.n)}%; target 50%). Across all ${P.n_tickers} ${MARKET_LABEL[P.market]} stocks the replay holds ${pct(ov.cover80)}% (80%) and ${pct(ov.cover50)}% (50%). Misses are explained one by one in the log and in the cause row.`;
 }
 document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => { H = b.dataset.h; document.querySelectorAll('.seg button').forEach(o => o.setAttribute('aria-pressed', o===b)); drawChart(); }));
+document.querySelectorAll('.mode button').forEach(b => b.addEventListener('click', () => { MODE = b.dataset.m; document.querySelectorAll('.mode button').forEach(o => o.setAttribute('aria-pressed', o===b)); drawChart(); }));
 new ResizeObserver(() => drawChart()).observe($('#chart'));
 
-/* ---------- strip ---------- */
+/* ---------- log ---------- */
 const stripRows = D.bands['1'].slice().reverse();
 let stripAll = false;
 function meter(p, raw) {
   const s = svgEl('svg', {viewBox:'0 0 64 14'});
-  s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2}));
-  s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13}));
+  s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13}));
   if (p != null) { const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5})); }
-  const b = el('b', {}, p==null?'—':pct(p)+'%');
-  return el('span', {class:'mb-odds meter', 'data-tip': p==null? 'No out-of-sample score for this date' : `Calibrated P(up) ${(p*100).toFixed(1)}% (raw model score before calibration ${(raw*100).toFixed(1)}%). Calibration (Platt, latest fit ${JSON.stringify(sk1 ? sk1.last_platt : null)}) maps the raw score to a probability on past out-of-sample rows.`}, s, b);
+  return el('span', {class:'mb-odds', 'data-tip': p==null? 'No out-of-sample score for this date' : `Calibrated P(up) ${(p*100).toFixed(1)}% (raw model score before calibration ${(raw*100).toFixed(1)}%). Calibration (Platt, latest fit ${JSON.stringify(sk1 ? sk1.last_platt : null)}) maps the raw score to a probability on past out-of-sample rows.`}, s, el('b', {}, p==null?'—':pct(p)+'%'));
 }
 function miniBand(b) {
   const s = svgEl('svg', {viewBox:'0 0 120 16'});
@@ -552,23 +562,18 @@ function miniBand(b) {
 }
 function drawStrip() {
   const tb = $('#strip-body'); tb.innerHTML = '';
-  const rows = stripAll ? stripRows : stripRows.slice(0, 13);
-  for (const b of rows) {
-    const b5 = D.bands['5'].find(r => r.as_of === b.as_of);
-    const fut = b.actual == null;
+  for (const b of (stripAll ? stripRows : stripRows.slice(0, 10))) {
+    const b5 = D.bands['5'].find(r => r.as_of === b.as_of); const fut = b.actual == null;
     const tr = el('tr', {class: fut?'fut':''});
     tr.append(el('td', {class:'d'}, fmtD(b.target), el('small', {}, fut? 'pending' : 'made ' + fmtD(b.as_of, false))));
-    tr.append(el('td', {}, meter(b.p, b.p_raw)), el('td', {}, meter(b5 && b5.p, b5 && b5.p_raw)));
-    tr.append(el('td', {}, miniBand(b)));
-    tr.append(el('td', {}, fut? '—' : money(b.actual, 2) + ' ', fut? null : el('span', {class:'mb-delta '+(b.actual>b.base?'up':b.actual<b.base?'down':'flat'), style:'font-size:11px'}, sgn((b.actual/b.base-1)*100, 1))));
-    const res = fut ? el('span', {class:'res', style:'color:var(--md-sys-color-on-surface-variant)'}, 'open') : el('span', {class:'res '+(b.hit80?'ok':'miss')}, icon(b.hit80?'ms-check':'ms-close'), b.hit80?'in':'out');
-    tr.append(el('td', {}, res));
+    tr.append(el('td', {}, meter(b.p, b.p_raw)), el('td', {}, meter(b5 && b5.p, b5 && b5.p_raw)), el('td', {}, miniBand(b)));
+    tr.append(el('td', {}, fut? '—' : money(b.actual, 2) + ' ', fut? null : delta((b.actual/b.base-1)*100, 1)));
+    tr.append(el('td', {}, fut ? el('span', {class:'res', style:'color:var(--md-sys-color-on-surface-variant)'}, 'open') : el('span', {class:'res '+(b.hit80?'ok':'miss')}, icon(b.hit80?'ms-check':'ms-close'), b.hit80?'in':'out')));
     let cz = '—';
     if (b.cause && (!b.hit80 || b.cause.kind==='company' || b.cause.kind==='market' && Math.abs(b.actual/b.base-1) > 0.015)) { const c = CAUSE[b.cause.kind]; cz = el('span', {class:'res', style:'font-weight:500;color:'+(b.cause.source==='mock'?'var(--md-sys-color-outline)':'var(--md-sys-color-on-surface-variant)'), 'data-tip': b.cause.label + (b.cause.source==='mock' ? ' — mock: explainer agent coming' : b.cause.source==='derived' ? ' — derived from stored index moves' : ' — from stored headlines')}, icon(c.ico), el('span', {class:'ctext'}, c.name), b.cause.source==='mock'? tag('mock') : null); }
-    tr.append(el('td', {}, cz));
-    tb.append(tr);
+    tr.append(el('td', {}, cz)); tb.append(tr);
   }
-  $('#strip-more').textContent = stripAll ? 'Show the last 13 sessions' : `Show all ${stripRows.length} sessions since ${fmtD(D.replay.window[0], false)}`;
+  $('#strip-more').textContent = stripAll ? 'Show the last 10 sessions' : `Show all ${stripRows.length} sessions since ${fmtD(D.replay.window[0], false)}`;
 }
 $('#strip-more').addEventListener('click', () => { stripAll = !stripAll; drawStrip(); });
 drawStrip();
@@ -576,21 +581,20 @@ const liveRangeIds = D.live.ranges.map(r => r.id);
 $('#strip-note').innerHTML = (bs1.p_min != null ? `The chance ${bs1.p_max - bs1.p_min < 0.05 ? 'barely moves' : 'ranges'} (${pct(bs1.p_min,1)}–${pct(bs1.p_max,1)}% for 1 day)${bs1.p_max < 0.5 ? ': every lean in the window was "down"' : bs1.p_min > 0.5 ? ': every lean in the window was "up"' : ''}; the lean was right ${bs1.lean_hit} of ${bs1.lean_n} times. ` : '') + (p1 != null ? `Live scores for ${fmtD(D.as_of, false)}: ${pct(p1,1)}% (1d) / ${pct(p5,1)}% (5d). ` : '') + (liveRangeIds.length ? `Live ranges stored for this stock: ${liveRangeIds.join(', ')}; ${P.outcomes_n ? P.outcomes_n + ' scored' : 'none scored yet'}.` : 'No live range stored for this stock yet.');
 
 /* ---------- drivers ---------- */
-$('#drivers-lede').textContent = `Direction and strength of each driver for ${P.company}.`;
-$('#drivers-help').dataset.tip = `News strength = |sentiment| x materiality weight (high 1, medium 0.5, low 0.2): >=0.4 strong, >=0.15 medium, else weak. Market and sector strength = size of the move: >=1% strong, >=0.5% medium, else weak${P.market==='india' ? '; flows: >=₹3,000 cr strong, >=₹1,000 cr medium' : ''}. Direction for market drivers is the conventional reading for a ${P.sector.toLowerCase()} stock in ${MARKET_LABEL[P.market]}, not a model output.`;
+$('#drivers-help').dataset.tip = `Direction and strength of each driver for ${P.company}. News strength = |sentiment| x materiality weight (high 1, medium 0.5, low 0.2): >=0.4 strong, >=0.15 medium, else weak. Market and sector strength = size of the move: >=1% strong, >=0.5% medium, else weak${P.market==='india' ? '; flows: >=₹3,000 cr strong, >=₹1,000 cr medium' : ''}. Direction for market drivers is the conventional reading for a ${P.sector.toLowerCase()} stock in ${MARKET_LABEL[P.market]}, not a model output.`;
 function driverRow(d) {
   const dirIco = {up:'ms-arrow_upward', dn:'ms-arrow_downward', flat:'ms-remove', unk:'ms-help'}[d.dir];
-  const bar = el('div', {class:'mb-bar', 'aria-label': `strength ${d.str} of 3`}); const i = el('i', {class:d.dir==='unk'?'unk':d.dir==='dn'?'dn':'up', style:`width:${d.dir==='unk'?20:d.dir==='flat'?0:d.str*16.5}%`}); bar.append(i);
-  return el('div', {class:'drv', 'data-tip': d.tip}, el('span', {class:'mb-dir '+d.dir, 'aria-label': {up:'pushes up', dn:'pushes down', flat:'neutral', unk:'direction unclear'}[d.dir]}, icon(dirIco)), el('div', {class:'t'}, d.name, ' ', d.k? tag(d.k) : null, el('small', {}, d.sub)), bar);
+  const bar = el('div', {class:'mb-bar', 'aria-label': `strength ${d.str} of 3`}); bar.append(el('i', {class:d.dir==='unk'?'unk':d.dir==='dn'?'dn':'up', style:`width:${d.dir==='unk'?20:d.dir==='flat'?0:d.str*16.5}%`}));
+  return el('div', {class:'drv', 'data-tip': d.tip}, el('span', {class:'mb-dir '+d.dir, 'aria-label': {up:'pushes up', dn:'pushes down', flat:'neutral', unk:'direction unclear'}[d.dir]}, icon(dirIco)), el('div', {class:'t'}, el('div', {class:'nm'}, d.name), el('small', {}, d.sub)), bar);
 }
-function dcol(title, ico, rows, net) {
-  const c = el('div', {class:'dcol'}, el('h3', {}, icon(ico), title, el('span', {class:'net'}, net)));
+function dgrp(title, ico, rows, net) {
+  const c = el('div', {class:'dgrp'}, el('h3', {}, icon(ico), title, el('span', {class:'net'}, net)));
   for (const r of rows) c.append(driverRow(r));
   if (!rows.length) c.append(el('div', {class:'drv', style:'grid-template-columns:1fr'}, el('small', {}, 'nothing stored')));
   return c;
 }
-$('#drivers').append(dcol('Company', 'ms-apartment', P.drivers.company, P.nets.company), dcol('Sector', 'ms-layers', P.drivers.sector, P.nets.sector), dcol('Market', 'ms-public', P.drivers.market, P.nets.market));
-$('#drivers-note').innerHTML = P.drivers_note ? `${P.drivers_note} <span class="mb-tag live">live</span>` : '';
+$('#drivers').append(dgrp('Company', 'ms-apartment', P.drivers.company, P.nets.company), dgrp('Sector', 'ms-layers', P.drivers.sector, P.nets.sector), dgrp('Market', 'ms-public', P.drivers.market, P.nets.market));
+$('#drivers-note').textContent = P.drivers_note || '';
 
 /* ---------- coming ---------- */
 const em = D.earn_moves.slice(-8);
@@ -602,71 +606,68 @@ const MAJOR = P.major_event_factor, est0 = D.live.estimates[0], est1 = D.live.es
 const regimeEvents = (D.live.regime.major_event_names || []);
 const horizonEnd = new Date(dt(P.today).getTime() + 54*86400000).toISOString().slice(0,10);
 for (const e of D.upcoming.filter(e => e.date <= horizonEnd)) {
-  const d = dt(e.date);
-  const li = el('li', {class:'ev'+(e.major?' major':'')});
+  const d = dt(e.date); const li = el('li', {class:'ev'+(e.major?' major':'')});
   li.append(el('div', {class:'when'}, el('small', {}, DOW[d.getUTCDay()]), el('b', {}, d.getUTCDate()), el('small', {}, MON[d.getUTCMonth()])));
   let typ;
   if (e.type==='earnings') {
     if (em.length >= 2) {
       const worst = em.reduce((a, b) => Math.abs(b.move) > Math.abs(a.move) ? b : a);
-      typ = el('div', {class:'typ'}, el('b', {}, `±${median.toFixed(1)}% typical`), `last ${em.length} results days: ${upCount} up, ${em.length-upCount} down; largest ${sgn(worst.move,1)} (${MON[+worst.session.slice(5,7)-1]} ${worst.session.slice(0,4)})`, ' ', tag('live', 'stored history'), help(`Close-to-close move of ${P.company} on the reaction session of each stored results date (events + ohlc): ` + em.map(x => `${x.session} ${sgn(x.move,1)}`).join(', ') + `. Median absolute move ${median.toFixed(2)}%.` + (est0 && est0.eps_estimate != null ? ` Yahoo consensus EPS for ${est0.report_date.slice(0,10)}: ${CUR.symbol}${est0.eps_estimate} (context only` + (est1 && est1.reported_eps != null ? `; last quarter ${CUR.symbol}${est1.reported_eps} vs ${CUR.symbol}${est1.eps_estimate}, ${est1.surprise_pct}%` : '') + ').' : '')));
-      const sv = svgEl('svg', {viewBox:'0 0 360 80', role:'img', 'aria-label':'Past results-day moves'}); const bw = 360/em.length;
-      const scale = Math.max(5, Math.min(30, 30 / Math.max(...em.map(x => Math.abs(x.move)), 1)));
-      const yy = v => 40 - v*scale;
-      sv.append(svgEl('line', {x1:0, x2:360, y1:40, y2:40, stroke:'var(--mb-chart-axis)'}));
-      em.forEach((x, i) => { const h = Math.abs(yy(x.move)-40); sv.append(svgEl('rect', {x:i*bw+6, y:x.move>0?yy(x.move):40, width:bw-12, height:Math.max(1,h), rx:3, fill:x.move>0?'var(--mb-color-up)':'var(--mb-color-down)'})); const t = svgEl('text', {x:i*bw+bw/2, y:x.move>0?yy(x.move)-4:Math.min(yy(x.move)+12, 68), 'text-anchor':'middle', 'font-size':10, fill:'var(--md-sys-color-on-surface-variant)'}); t.textContent = sgn(x.move,1); sv.append(t); const t2 = svgEl('text', {x:i*bw+bw/2, y:76, 'text-anchor':'middle', 'font-size':9.5, fill:'var(--mb-chart-label)'}); t2.textContent = MON[+x.session.slice(5,7)-1] + ' ' + x.session.slice(2,4); sv.append(t2); });
+      typ = el('div', {class:'typ'}, el('b', {}, `±${median.toFixed(1)}% typical`), ` · last ${em.length}: ${upCount} up, ${em.length-upCount} down; largest ${sgn(worst.move,1)} (${MON[+worst.session.slice(5,7)-1]} ${worst.session.slice(0,4)}) `, tag('live', 'stored history'), ' ', help(`Close-to-close move of ${P.company} on the reaction session of each stored results date (events + ohlc): ` + em.map(x => `${x.session} ${sgn(x.move,1)}`).join(', ') + `. Median absolute move ${median.toFixed(2)}%.` + (est0 && est0.eps_estimate != null ? ` Yahoo consensus EPS for ${est0.report_date.slice(0,10)}: ${CUR.symbol}${est0.eps_estimate} (context only` + (est1 && est1.reported_eps != null ? `; last quarter ${CUR.symbol}${est1.reported_eps} vs ${CUR.symbol}${est1.eps_estimate}, ${est1.surprise_pct}%` : '') + ').' : '')));
+      const sv = svgEl('svg', {viewBox:'0 0 300 64', role:'img', 'aria-label':'Past results-day moves'}); const bw = 300/em.length;
+      const scale = Math.max(4, Math.min(24, 24 / Math.max(...em.map(x => Math.abs(x.move)), 1))); const yy = v => 32 - v*scale;
+      sv.append(svgEl('line', {x1:0, x2:300, y1:32, y2:32, stroke:'var(--mb-chart-axis)'}));
+      em.forEach((x, i) => { const h = Math.abs(yy(x.move)-32); sv.append(svgEl('rect', {x:i*bw+5, y:x.move>0?yy(x.move):32, width:bw-10, height:Math.max(1,h), rx:2, fill:x.move>0?'var(--mb-color-up)':'var(--mb-color-down)'})); const t = svgEl('text', {x:i*bw+bw/2, y:x.move>0?yy(x.move)-3:Math.min(yy(x.move)+10, 54), 'text-anchor':'middle', 'font-size':9, fill:'var(--md-sys-color-on-surface-variant)'}); t.textContent = sgn(x.move,1); sv.append(t); const t2 = svgEl('text', {x:i*bw+bw/2, y:62, 'text-anchor':'middle', 'font-size':8.5, fill:'var(--mb-chart-label)'}); t2.textContent = MON[+x.session.slice(5,7)-1] + ' ' + x.session.slice(2,4); sv.append(t2); });
       typ.append(el('div', {class:'earnbars'}, sv));
-    } else typ = el('div', {class:'typ'}, el('b', {}, 'no stored history'), 'fewer than two stored results days with bars');
-  } else if (e.type==='weekly_expiry') typ = el('div', {class:'typ'}, el('b', {}, e.date===D.next_sessions[4] ? 'end of the 5-day plan' : 'minor'), 'no range widening');
-  else if (e.major) typ = el('div', {class:'typ'}, el('b', {}, 'no stored history'), `major event: ranges ×${MAJOR}`, ' ', help(`A major market-wide event inside the horizon widens every range ×${MAJOR} (config/ranges.yaml) and raises the regime to EVENT_HEAVY. The typical move of ${P.company} on these days is not computed: the stored event calendar (config/events.yaml) does not cover enough past dates.`));
-  else typ = el('div', {class:'typ'}, el('b', {}, 'minor'), 'no range widening');
+    } else typ = el('div', {class:'typ'}, el('b', {}, 'no stored history'), ' · fewer than two stored results days with bars');
+  } else if (e.type==='weekly_expiry') typ = el('div', {class:'typ'}, el('b', {}, e.date===D.next_sessions[4] ? 'end of the 5-day plan' : 'minor'), ' · no range widening');
+  else if (e.major) typ = el('div', {class:'typ'}, el('b', {}, 'no stored history'), ` · major event: ranges ×${MAJOR} `, help(`A major market-wide event inside the horizon widens every range ×${MAJOR} (config/ranges.yaml) and raises the regime to EVENT_HEAVY. The typical move of ${P.company} on these days is not computed: the stored event calendar (config/events.yaml) does not cover enough past dates.`));
+  else typ = el('div', {class:'typ'}, el('b', {}, 'minor'), ' · no range widening');
   let small;
-  if (e.type==='earnings') { const ne = P.next_earnings; small = `Company event · reaction session ${fmtD(e.reaction_session || e.date)}` + (ne && ne.date===e.date ? ` · results in ${ne.days} days ${ne.days <= 1 ? 'block any new call (rule: within 1 day)' : '(a call is blocked within 1 day)'}` : ''); }
+  if (e.type==='earnings') { const ne = P.next_earnings; small = `Company event · reaction session ${fmtD(e.reaction_session || e.date)}` + (ne && ne.date===e.date ? ` · in ${ne.days} days ${ne.days <= 1 ? '(blocks any new call: rule within 1 day)' : '(a call is blocked within 1 day)'}` : ''); }
   else if (e.date===P.today && regimeEvents.some(n => e.name.includes(n) || n.includes(e.name))) small = `Today · the reason today's regime is ${D.live.regime.regime}`;
   else small = e.major ? 'Market-wide major event' : 'Market-wide, minor';
-  li.append(el('div', {class:'what'}, icon(EV_ICO[e.type]||'ms-calendar_month'), ' ', e.name, el('small', {}, small)), typ);
-  $('#events').append(li);
+  const what = el('div', {class:'what'}, icon(EV_ICO[e.type]||'ms-calendar_month'), ' ', e.name, el('small', {}, small)); what.append(typ);
+  li.append(what); $('#events').append(li);
 }
-if (!D.upcoming.length) $('#events').append(el('li', {class:'ev'}, el('div', {class:'what'}, 'No scheduled events stored for the next ten weeks.')));
+if (!$('#events').children.length) $('#events').append(el('li', {class:'ev'}, el('div', {class:'what'}, 'No scheduled events stored for the next eight weeks.')));
 
-/* ---------- news list ---------- */
-const news = D.news;
-$('#news-head').textContent = `All stored headlines for ${P.company}, with verification status`;
-$('#news-count').textContent = `${news.length} items, ${P.news_span}`;
-const nl = $('#newsl');
-for (const n of news) {
-  const s = n.sentiment == null ? 'flat' : n.sentiment > 0.05 ? 'up' : n.sentiment < -0.05 ? 'dn' : 'flat';
-  const li = el('li');
-  li.append(el('span', {class:'mb-dir s '+s, 'aria-label': 'sentiment '+ (n.sentiment ?? 'n/a')}, icon(s==='up'?'ms-arrow_upward':s==='dn'?'ms-arrow_downward':'ms-remove')));
-  const body = el('div');
-  body.append(el('div', {}, el('a', {href: n.url, rel:'noopener', target:'_blank'}, n.title)));
-  const meta = el('div', {class:'meta'}, el('span', {}, n.source), el('span', {}, n.published_at.slice(0,16).replace('T',' ') + ' UTC'), el('span', {class:'md-badge '+n.status.replace(' ','_')}, n.status.replace('_',' ')), n.materiality ? el('span', {class:'md-badge'}, n.materiality + ' · ' + (n.event_type||'')) : null, n.sentiment != null ? el('span', {}, 'sentiment ' + (n.sentiment>0?'+':'') + n.sentiment) : null, n.priced_in ? el('span', {}, 'priced in') : null);
-  body.append(meta);
-  if (n.summary) body.append(el('div', {style:'color:var(--md-sys-color-on-surface-variant);font-size:12.5px;margin-top:2px'}, n.summary));
-  li.append(body); nl.append(li);
+/* ---------- news feed ---------- */
+const news = D.news; let newsAll = false;
+$('#news-count').textContent = `${news.length} stored headlines, ${P.news_span}, with verification status`;
+function drawNews() {
+  const nl = $('#newsl'); nl.innerHTML = '';
+  for (const n of (newsAll ? news : news.slice(0, 8))) {
+    const s = n.sentiment == null ? 'flat' : n.sentiment > 0.05 ? 'up' : n.sentiment < -0.05 ? 'dn' : 'flat';
+    const li = el('li');
+    li.append(el('span', {class:'mb-dir '+s, 'aria-label': 'sentiment '+ (n.sentiment ?? 'n/a')}, icon(s==='up'?'ms-arrow_upward':s==='dn'?'ms-arrow_downward':'ms-remove')));
+    const body = el('div');
+    body.append(el('div', {}, el('a', {href: n.url, rel:'noopener', target:'_blank'}, n.title)));
+    body.append(el('div', {class:'meta'}, el('span', {}, n.source), el('span', {}, n.published_at.slice(0,16).replace('T',' ') + ' UTC'), el('span', {class:'md-badge '+n.status.replace(' ','_')}, n.status.replace('_',' ')), n.materiality ? el('span', {class:'md-badge'}, n.materiality + (n.event_type ? ' · ' + n.event_type : '')) : null, n.sentiment != null ? el('span', {}, 'sentiment ' + (n.sentiment>0?'+':'') + n.sentiment) : null, n.priced_in ? el('span', {}, 'priced in') : null));
+    if (n.summary) body.append(el('div', {style:'color:var(--md-sys-color-on-surface-variant);font-size:12px;margin-top:2px'}, n.summary));
+    li.append(body); nl.append(li);
+  }
+  if (!news.length) nl.append(el('li', {}, el('span'), el('div', {}, 'No stored headlines for this ticker.')));
+  $('#news-more').textContent = newsAll ? 'Show the latest 8' : `Show all ${news.length}`;
+  $('#news-more').style.display = news.length > 8 ? '' : 'none';
 }
-if (!news.length) nl.append(el('li', {}, el('span'), el('div', {}, 'No stored headlines for this ticker.')));
+$('#news-more').addEventListener('click', () => { newsAll = !newsAll; drawNews(); });
+drawNews();
 
 /* ---------- maths ---------- */
 const kv = pairs => el('dl', {class:'md-kv'}, ...pairs.flatMap(([k,v]) => [el('dt', {}, k), el('dd', {}, String(v))]));
 const M = $('#math');
 for (const h of ['1','5']) {
   const r = P.plan[h]; if (!r) continue;
-  if (r.kind === 'live') {
-    const row = D.live.ranges.find(x => x.id === r.id);
+  if (r.kind === 'live') { const row = D.live.ranges.find(x => x.id === r.id);
     M.append(el('h4', {}, `Live ${h}-day range for ${fmtD(r.target, false)} (ranges.py, made ${fmtD(row.made_at, false)} ${hm(row.made_at)} UTC) `, tag('live')),
       kv([['base close', money(row.base_close,2)], ['centre (log return)', sgn(row.center*100,2)], ['sigma over horizon', (row.sigma_h*100).toFixed(2)+'%'], ['50% band', `${money(row.lo50,2)} – ${money(row.hi50,2)}`], ['80% band', `${money(row.lo80,2)} – ${money(row.hi80,2)}`], ['naive 80% band', `${money(row.naive_lo80,2)} – ${money(row.naive_hi80,2)}`], ['regime', row.regime], ['notes', (row.notes||[]).join('; ') || '—'], ['calibration', row.calibration_id]]));
-  } else {
-    M.append(el('h4', {}, `Rule-replay ${h}-day range for ${fmtD(r.target, false)} `, tag('bt')),
-      kv([['base close', money(r.base,2)], ['centre', sgn(r.center*100,2)], ['50% band', `${money(r.lo50,2)} – ${money(r.hi50,2)}`], ['80% band', `${money(r.lo80,2)} – ${money(r.hi80,2)}`], ['regime', r.regime + (r.notes.length ? ' · ' + r.notes.join('; ') : '')]]));
-  }
+  } else { M.append(el('h4', {}, `Rule-replay ${h}-day range for ${fmtD(r.target, false)} `, tag('bt')),
+      kv([['base close', money(r.base,2)], ['centre', sgn(r.center*100,2)], ['50% band', `${money(r.lo50,2)} – ${money(r.hi50,2)}`], ['80% band', `${money(r.lo80,2)} – ${money(r.hi80,2)}`], ['regime', r.regime + (r.notes.length ? ' · ' + r.notes.join('; ') : '')]])); }
 }
 const sc1 = D.live.scores.filter(s => s.horizon_days===1), sc1b = sc1[sc1.length-1];
-if (sc1b) {
-  const contrib = typeof sc1b.contributions === 'string' ? JSON.parse(sc1b.contributions) : sc1b.contributions;
+if (sc1b) { const contrib = typeof sc1b.contributions === 'string' ? JSON.parse(sc1b.contributions) : sc1b.contributions;
   M.append(el('h4', {}, `Signal model, 1-day score for ${fmtD(sc1b.as_of_date, false)} (${sc1.length > 1 ? 'latest of ' + sc1.length + ' runs, ' : ''}${hm(sc1b.computed_at)} UTC) `, tag('live')),
-    kv([['P(up)', sc1b.prob_up], ['model probability before news', sc1b.prob_model], ['base rate', sc1b.base_rate], ['news score / logit', `${sc1b.news_score} / ${sc1b.news_logit}`], ['points by group', Object.entries(contrib.groups||{}).map(([k,v]) => `${k} ${v}`).join(', ')], ['news items', ((contrib.news||{}).ids||[]).join(', ') || '—'], ['model id', sc1b.model_id]]));
-}
+    kv([['P(up)', sc1b.prob_up], ['model probability before news', sc1b.prob_model], ['base rate', sc1b.base_rate], ['news score / logit', `${sc1b.news_score} / ${sc1b.news_logit}`], ['points by group', Object.entries(contrib.groups||{}).map(([k,v]) => `${k} ${v}`).join(', ')], ['news items', ((contrib.news||{}).ids||[]).join(', ') || '—'], ['model id', sc1b.model_id]])); }
 M.append(el('h4', {}, `Walk-forward back-test, all ${P.n_tickers} ${MARKET_LABEL[P.market]} stocks (scripts/model_backtest.py, run ${P.bt_run}) `, tag('bt')),
   kv(Object.entries(D.skill).map(([k,v]) => [k, `n ${v.n}, Brier ${v.brier} vs base ${v.brier_base} (skill ${v.skill}), AUC ${v.auc} [${v.auc95.join(', ')}], Platt ${JSON.stringify(v.last_platt)}`])));
 const yamlLines = D.costs.yaml.split('\n'); const i0 = yamlLines.findIndex(l => l.startsWith(P.market + ':'));
@@ -676,10 +677,10 @@ M.append(el('h4', {}, 'Costs (config/costs.yaml)'), el('pre', {class:'md-pre'}, 
 /* ---------- sources ---------- */
 $('#sources').innerHTML = `
 <dl class="md-kv">
-<dt>Live</dt><dd>data/${P.market}/: ${P.live_kinds}. Read through DuckDB views in sql/views.sql.</dd>
+<dt>Live</dt><dd>data/${P.market}/: ${P.live_kinds}. Read through DuckDB views in sql/views.sql. The ticker tape is each watchlist stock's last stored close; the stat strip and candles are the stored daily bars.</dd>
 <dt>Back-test</dt><dd>Past bands: <code>${P.replay_cmd}</code> run into a scratch root (MB_ROOT), per-row output from <code>rule_replay.range_rows.replay_rows</code>. Chance of a rise: <code>model.walk_forward.walk_forward</code> out-of-sample rows (same code as <code>scripts/model_backtest.py</code>, whose JSON gives the skill table). Neither is a live prediction.</dd>
-<dt>Derived</dt><dd>Causes "market-wide" (${P.bench_name}${P.sector_index_name ? ' or ' + P.sector_index_name : ''} moved ≥0.75% the same way) and "company news" (stored high-materiality headlines that day) are computed from stored data by this page. Typical results-day move: stored earnings dates × stored closes. Driver strengths and the conventional direction of market drivers.</dd>
-<dt>Mock</dt><dd>"Unexplained" causes (stock-specific days with no stored news); the explainer agent that will write them is not built. The gap rule and the ${money(stake)} outcome are this page's presentation of the published range, not pipeline outputs.</dd>
+<dt>Derived</dt><dd>Causes "market-wide" (${P.bench_name}${P.sector_index_name ? ' or ' + P.sector_index_name : ''} moved ≥0.75% the same way) and "company news" (stored high-materiality headlines that day) are computed from stored data by this page. Typical results-day move: stored earnings dates × stored closes. Driver strengths and the conventional direction of market drivers. 52-week high/low and the volume average from stored bars.</dd>
+<dt>Mock</dt><dd>"Unexplained" causes (stock-specific days with no stored news); the explainer agent that will write them is not built. The gap rule and the ${money(stake)} outcome are this page's presentation of the published range, not pipeline outputs. Symbol search and the other sections of the rail are not built.</dd>
 <dt>Not shown</dt><dd>${P.outcomes_n ? '' : 'No live direction call, outcome or range outcome exists yet for this stock; '}no lessons; no intraday data.</dd>
 </dl>`;
 </script>

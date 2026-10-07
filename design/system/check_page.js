@@ -19,7 +19,7 @@ const [,, file, outDir, prefix, hoverSel] = process.argv;
     await page.waitForTimeout(600);
     const sw = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
     if (sw > w) errs.push(`${tag} horizontal overflow: ${sw} > ${w}`);
-    const wide = await page.evaluate(vw => Array.from(document.querySelectorAll('body *')).filter(el => { const r = el.getBoundingClientRect(); return r.right > vw + 1 && r.width > 0 && getComputedStyle(el).position !== 'fixed' && !el.closest('.md-table-wrap, .tblwrap, .md-pre, pre') && el.id !== 'tip'; }).slice(0, 6).map(el => el.tagName + '.' + el.className + ' ' + Math.round(el.getBoundingClientRect().right)), w);
+    const wide = await page.evaluate(vw => Array.from(document.querySelectorAll('body *')).filter(el => { const r = el.getBoundingClientRect(); return r.right > vw + 1 && r.width > 0 && getComputedStyle(el).position !== 'fixed' && !el.closest('.md-table-wrap, .tblwrap, .md-pre, pre, .tape') && el.id !== 'tip'; }).slice(0, 6).map(el => el.tagName + '.' + el.className + ' ' + Math.round(el.getBoundingClientRect().right)), w);
     if (wide.length) errs.push(`${tag} elements past the edge: ${wide.join(' | ')}`);
     await page.screenshot({ path: path.join(outDir, `${prefix}-${tag}-full.png`), fullPage: true });
     if (mobile) await page.screenshot({ path: path.join(outDir, `${prefix}-${tag}-viewport.png`), fullPage: false });

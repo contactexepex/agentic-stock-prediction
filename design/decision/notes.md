@@ -27,6 +27,13 @@ everything written lives in this folder and under `work/design/` (gitignored scr
   Mon 19 Oct)" instead of the hand-written "HDFC Bank Q2 FY27 results (...)", and `live.indices` is now ordered by
   index name (the old query had no ORDER BY). Every number is identical.
 
+## Added for the terminal layout
+
+- Ticker tape: every watchlist ticker's last stored close and day move (`ohlc`, last two bars per ticker).
+- Stat strip and candles: `ohlc` open/high/low/close/volume, the last 70 sessions (the chart shows the back-test
+  window); 20-day average volume from the 20 bars before the last; 52-week high/low over 365 days.
+- Session status: `marketbrief.pipeline.market_status.status(cfg, now)` at build time (open/closed dot).
+
 ## Window and generic rules
 
 - Back-test window = the 35 sessions up to the as-of date (the ticker's latest stored bar): India 17 Aug–6 Oct,
