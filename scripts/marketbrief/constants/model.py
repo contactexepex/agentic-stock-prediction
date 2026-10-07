@@ -75,7 +75,7 @@ HISTORY_OVERLAP_DATES = 20            # stored dates compared with the cache to 
 HISTORY_BASIS = ("Yahoo daily history via yfinance, auto_adjust=False: OHLC split-adjusted as of fetched_at, not "
                  "dividend-adjusted (the basis of collect_prices.py)")
 MSG_NO_HISTORY = "no long-history cache for {market}: run scripts/model_history.py --market {market} first ({path})"
-MSG_NO_CLOSE_TIME ="symbol {key} has no close_time in the market config (needed by the cross-market features)"
+MSG_NO_CLOSE_TIME = "symbol {key} has no close_time in the market config (needed by the cross-market features)"
 GROUP_MOMENTUM, GROUP_OSCILLATOR, GROUP_VOLATILITY = "momentum", "oscillator", "volatility"
 GROUP_VOLUME, GROUP_RELATIVE, GROUP_MARKET = "volume", "relative strength", "market"
 GROUP_REGIME, GROUP_EVENTS, GROUP_FLOWS, GROUP_NEWS = "regime", "events", "flows", "news"

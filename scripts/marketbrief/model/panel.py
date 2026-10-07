@@ -15,10 +15,10 @@ import pandas as pd
 from marketbrief.constants.config_keys import CFG_TICKERS
 from marketbrief.constants.model import (FLOW_FEATURES, HORIZONS, LABEL_OPEN_TO_CLOSE, MARKET_FEATURES,
                                          REGIME_FEATURES, TECHNICAL_FEATURES)
-from marketbrief.model.cross_market import add_cross_features, enabled_features
 from marketbrief.constants.features import MSG_NO_BENCHMARK_FOR_KEY
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.model import market_panel
+from marketbrief.model.cross_market import add_cross_features, enabled_features
 from marketbrief.model.labels import end_offset, forward_labels
 from marketbrief.model.technical_panel import ticker_indicators
 
