@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from marketbrief.traders.constants import BIGGEST_COUNT, KIND_HEAD_TO_HEAD, KIND_MISS, KIND_WIN
-from marketbrief.traders.settle_step import records
+from marketbrief.traders.rows import records
 
 SETTLED_SQL = """
 SELECT * FROM paper_trades_settled t

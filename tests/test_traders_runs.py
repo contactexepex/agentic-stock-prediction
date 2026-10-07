@@ -147,7 +147,7 @@ def test_input_file_keeps_blind_traders_blind():
 
 def test_cli_commands_show_help():
     env = {**os.environ, "PYTHONPATH": str(REPO / "scripts")}
-    for command in ("check", "prepare", "validate", "add", "settle", "eod-prepare", "eod-validate", "eod-add",
+    for command in ("check", "prepare", "validate", "add", "eod-prepare", "eod-validate", "eod-add",
                     "director-prepare", "director-validate", "director-add"):
         result = subprocess.run([sys.executable, "-m", "marketbrief.traders", command, "--help"], cwd=REPO, env=env,
                                 capture_output=True, text=True, check=False)
