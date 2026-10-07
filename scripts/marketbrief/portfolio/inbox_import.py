@@ -8,7 +8,10 @@ data/<market>/portfolio_trades/. Research only: a paper trade is a record, never
   idempotency key is the row's `inbox_id`. A channel other than dashboard, slack, claude_code or claude_app is
   refused (`not_allowed_in_channel`).
 - Every imported row gets one command_log row (B1's format and helper, lifecycle/store.py): accepted, refused
-  (validation_failed, not_allowed_in_channel) or duplicate (its key is already a stored trade's).
+  (validation_failed, not_allowed_in_channel), duplicate (its key is already a stored trade's or request's) or
+  failed: not decidable yet (its trade date is after the clock's date, or its session's bar is not stored yet,
+  e.g. a "today at the close" trade sent before the close); a failed row is tried again by the next import.
+- As of the clock: only rows submitted by the run's clock (MB_NOW-aware) are read.
 - Idempotent: an inbox_id with a command_log row that settled it (any result but failed) is skipped, so a rerun
   imports nothing twice; the inbox is read only, never changed. Token: MOTHERDUCK_INBOX_TOKEN only (B1's
   open_inbox); offline tests pass a local DuckDB file."""
@@ -23,8 +26,10 @@ from marketbrief.lifecycle.constants import (REFUSE_VALIDATION, RESULT_ACCEPTED,
                                              RESULT_REFUSED)
 from marketbrief.lifecycle.inbox import INBOX_CHANNELS, open_inbox
 from marketbrief.lifecycle.store import command_row, log_command, stored_rows
-from marketbrief.portfolio import trades
+from marketbrief.core.calendar import is_session
+from marketbrief.portfolio import reads, trades
 from marketbrief.portfolio.context import Context, TradeInput
+from marketbrief.portfolio.horizons import active_tickers
 
 TOOL = "add_paper_trade"
 REQUESTS_TABLE = "inbox.requests"
@@ -33,15 +38,19 @@ REQUEST_COLUMNS = ("inbox_id", "kind", "tool", "market", "arguments", "channel",
 REFUSE_CHANNEL = "not_allowed_in_channel"
 ERR_CHANNEL = "channel {channel!r} may not record paper trades through the inbox (allowed: {allowed})"
 ERR_FIELDS = "the request needs {missing}"
+ERR_NOT_YET = "trade_date {day} is after today ({today}); tried again by the next import"
+ERR_NO_BAR_YET = "no stored bar for {ticker} on {day} yet; tried again by the next import once it is collected"
 NEEDED = ("ticker", "side", "quantity", "trade_date", "price_basis")
 
 
-def pending_requests(con, market: str) -> list[dict]:
-    """The market's add_paper_trade rows, oldest first, minus those a command_log row already settled."""
+def pending_requests(con, market: str, clock) -> list[dict]:
+    """The market's add_paper_trade rows submitted by the run's clock, oldest first, minus those a command_log row
+    already settled (a `failed` row is tried again)."""
     done = {row.get("idempotency_key") for row in stored_rows(market, KIND_COMMAND_LOG)
             if row.get("tool") == TOOL and row.get("result") != RESULT_FAILED}
     rows = con.execute(f"SELECT {', '.join(REQUEST_COLUMNS)} FROM {REQUESTS_TABLE} WHERE market = ? AND tool = ? "
-                       "ORDER BY submitted_at, inbox_id", [market, TOOL]).fetchall()
+                       "AND submitted_at <= ?::TIMESTAMPTZ ORDER BY submitted_at, inbox_id",
+                       [market, TOOL, clock.isoformat()]).fetchall()
     return [dict(zip(REQUEST_COLUMNS, row)) for row in rows if row[0] not in done]
 
 
@@ -55,11 +64,22 @@ def trade_input(row: dict, args: dict) -> TradeInput:
     """The TradeInput of one inbox row (identity, channel and key from the row)."""
     when = args["trade_date"]
     return TradeInput(ticker=str(args["ticker"]).strip().upper(), side=str(args["side"]).strip().lower(),
-                      quantity=float(args["quantity"]),
+                      quantity=args["quantity"],          # as sent: add_trade's own number check applies
                       trade_date=when if isinstance(when, date) else date.fromisoformat(str(when)[:10]),
                       price_basis=str(args["price_basis"]).strip().lower(), source=row["channel"],
-                      price=None if args.get("price") is None else float(args["price"]), note=args.get("note"),
+                      price=args.get("price"), note=args.get("note"),
                       idempotency_key=row["inbox_id"], submitted_by=row["submitted_by"])
+
+
+def not_yet(ctx: Context, entry: TradeInput) -> list[str]:
+    """Why a trade cannot be validated YET (its date is after the clock's date, or its session bar is not stored
+    by the clock); [] when it can. Such a request is logged `failed` and tried again by the next import."""
+    if entry.trade_date > ctx.clock.date():
+        return [ERR_NOT_YET.format(day=entry.trade_date, today=ctx.clock.date())]
+    if is_session(ctx.cfg, entry.trade_date) and reads.bar_on(ctx.con, ctx.cfg, ctx.clock, entry.ticker,
+                                                             entry.trade_date) is None:
+        return [ERR_NO_BAR_YET.format(ticker=entry.ticker, day=entry.trade_date)]
+    return []
 
 
 def log_request(ctx: Context, row: dict, args: dict, outcome: dict) -> str:
@@ -97,11 +117,15 @@ def import_one(ctx: Context, row: dict, add_trade) -> dict:
         except (TypeError, ValueError) as error:
             outcome = {"result": RESULT_REFUSED, "refusal_code": REFUSE_VALIDATION, "errors": [str(error)]}
         else:
+            waiting = not_yet(ctx, entry) if entry.ticker in active_tickers(ctx.cfg) else []
+            if waiting:
+                outcome = {"result": RESULT_FAILED, "errors": waiting}
+        if outcome is None:
             stored = add_trade(ctx, replace(entry, command_id=row.get("command_id")))
             outcome = ({"result": RESULT_ACCEPTED, "record_ids": [stored["trade"]["id"]]} if stored.get("ok") else
                        {"result": RESULT_REFUSED, "refusal_code": REFUSE_VALIDATION, "errors": stored["errors"]})
     command = log_request(ctx, row, args, outcome)
-    return {"inbox_id": row["inbox_id"], "ok": outcome["result"] != RESULT_REFUSED,
+    return {"inbox_id": row["inbox_id"], "ok": outcome["result"] not in (RESULT_REFUSED, RESULT_FAILED),
             "result": outcome["result"], "refusal_code": outcome.get("refusal_code"),
             "errors": outcome.get("errors"), "trade_ids": outcome.get("record_ids") or [], "command_log_id": command}
 
@@ -110,7 +134,7 @@ def import_inbox(ctx: Context, path: str | None, add_trade) -> dict:
     """Import every pending paper-trade request of ctx.market. add_trade: service.add_trade."""
     con = open_inbox(path)
     try:
-        pending = pending_requests(con, ctx.market)
+        pending = pending_requests(con, ctx.market, ctx.clock)
     finally:
         con.close()
     results = [import_one(ctx, row, add_trade) for row in pending]

@@ -375,11 +375,22 @@ The web tier (B5) writes the owner's paper trades from Slack `/trade`, the Claud
   - a channel other than dashboard, slack, claude_code or claude_app: `not_allowed_in_channel`;
   - missing fields or a failed check: `validation_failed`;
   - a key already used by a stored trade: `duplicate`.
-- **Logging:** every imported row gets one `command_log` row (B1's format and helper): accepted, refused or
-  duplicate.
+- **Logging:** every imported row gets one `command_log` row (B1's format and helper): accepted, refused,
+  duplicate or failed.
+- **Not decidable yet:** a request whose trade date is after the clock's date, or whose session bar is not stored
+  yet (e.g. a "today at the close" trade sent before the close), is logged `failed`. B1's design retries `failed`
+  rows, so the next import stores or refuses it.
+- **As of the clock:** only rows `submitted_at` by the run's clock (MB_NOW-aware) are read.
 - **Idempotent:** an `inbox_id` that a `command_log` row already settled is skipped, so a rerun imports nothing
-  twice. The inbox is never written.
-- **Tests:** `tests/test_portfolio_inbox.py`, on an inbox built from `mcp/inbox.sql`.
+  twice. A `failed` row is tried again. The inbox is never written.
+- **Numbers as sent:** quantity and price go to `add_trade` unconverted, so its number checks apply (e.g.
+  `quantity: true` is refused).
+- **Tests:** `tests/test_portfolio_inbox.py`, on an inbox built from `mcp/inbox.sql`. It covers accepted, refused,
+  duplicate, other markets, the clock, the retry of a trade whose bar comes later, a sell larger than held, manual
+  prices inside and outside the bar, and a non-number quantity.
+- **Judge round 1:** FAIL (994ae50). Two blockers: the inbox was read without the clock, and a same-day trade was
+  refused for good. Both are fixed in round 2. The cosmetic findings not fixed are in GitHub issue #119
+  (label `cosmetic`).
 
 Handed over to the owners (not built here):
 - **B1:** a step in `.github/workflows/onboard.yml` running
