@@ -131,7 +131,7 @@ def build_pool(cfg: dict, con, validate_config: dict, today: date, texts: list[s
     narrative_numbers.collector_summaries(pool, sorted(steps.glob("collect_*.json")) if steps.exists() else [])
     since = today - timedelta(days=validate_config["narrative_news_days"])
     for sql in (
-        "SELECT id, title FROM news WHERE first_seen_at >= ?",
+        "SELECT id, title FROM news_headlines WHERE seen_at >= ?",  # every stored headline
         "SELECT id, summary FROM news_enriched WHERE analyzed_at >= ?",
         "SELECT id, description FROM filings WHERE first_seen_at >= ?",
         "SELECT id, subject FROM announcements WHERE first_seen_at >= ?",

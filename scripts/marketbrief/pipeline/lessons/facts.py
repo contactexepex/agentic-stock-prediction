@@ -125,7 +125,8 @@ def evidence(con, ids: list[str]) -> list[dict]:
         return []
     rows = con.execute(
         """
-        SELECT * FROM (SELECT id, 'news' AS kind, title AS text, published_at AS at FROM news WHERE list_contains(?, id)
+        SELECT * FROM (SELECT id, 'news' AS kind, title AS text, published_at AS at FROM news_lookup
+            WHERE list_contains(?, id)
         UNION ALL SELECT id, 'filing', form || ': ' || coalesce(description, ''), accepted_at FROM filings
             WHERE list_contains(?, id)
         UNION ALL SELECT id, 'announcement', coalesce(category, '') || ': ' || coalesce(subject, ''), published_at

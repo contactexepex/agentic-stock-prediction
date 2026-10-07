@@ -161,12 +161,17 @@ def test_google_news_urls_carry_the_window():
 
 # ---------- the collector with the window ----------
 
+def slug(title: str) -> str:
+    """One article link per headline (a link shared by two headlines is one article with an edited headline)."""
+    return "-".join(title.lower().split())
+
+
 def feed_xml(items: list[tuple[str, datetime]]) -> str:
     body = "".join(
-        f"<item><title>{title} - Mint</title><link>https://news.google.com/rss/articles/{index}</link>"
+        f"<item><title>{title} - Mint</title><link>https://news.google.com/rss/articles/{slug(title)}</link>"
         f"<pubDate>{stamp.strftime('%a, %d %b %Y %H:%M:%S GMT')}</pubDate>"
         f'<source url="https://www.livemint.com">Mint</source></item>'
-        for index, (title, stamp) in enumerate(items)
+        for title, stamp in items
     )
     return f'<?xml version="1.0"?><rss version="2.0"><channel><title>T</title>{body}</channel></rss>'
 
@@ -265,7 +270,7 @@ def test_articles_keep_items_a_catch_up_run_brought_in(root):
 # ---------- the analyst's window: since the last enrichment ----------
 
 def news_row(news_id: str, first_seen: str, **extra) -> dict:
-    return {"id": news_id, "title": f"HDFC Bank {news_id}", "url": "https://news.google.com/rss/articles/x",
+    return {"id": news_id, "title": f"HDFC Bank {news_id}", "url": f"https://news.google.com/rss/articles/{news_id}",
             "source": "Mint", "published_at": first_seen, "first_seen_at": first_seen,
             "feed": 'gnews:"HDFC Bank" share', "category": "company", "tickers": ["HDFCBANK"], **extra}
 
@@ -452,9 +457,9 @@ def test_light_run_end_to_end_appends_only(tmp_path):
 
     def write_feed(titles):
         items = "".join(
-            f"<item><title>{title}</title><link>https://www.example.com/{index}</link>"
+            f"<item><title>{title}</title><link>https://www.example.com/{slug(title)}</link>"
             f"<pubDate>{now.strftime('%a, %d %b %Y %H:%M:%S GMT')}</pubDate></item>"
-            for index, title in enumerate(titles))
+            for title in titles)
         feed.write_text(f'<?xml version="1.0"?><rss version="2.0"><channel><title>T</title>{items}</channel></rss>')
 
     (cfg / "markets" / f"{market}.yaml").write_text(

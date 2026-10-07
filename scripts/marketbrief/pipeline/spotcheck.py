@@ -64,7 +64,8 @@ def evidence_rows(con, ids: list[str]) -> list[dict]:
     for kind, sql in (
         (
             "news",
-            "SELECT id, title AS text, url, coalesce(published_at, first_seen_at) AS public_at FROM news WHERE id IN ?",
+            "SELECT id, title AS text, url, coalesce(published_at, first_seen_at) AS public_at FROM news_lookup "
+            "WHERE id IN ?",
         ),
         (
             "filings",

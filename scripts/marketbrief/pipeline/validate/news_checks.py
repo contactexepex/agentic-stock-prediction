@@ -58,10 +58,13 @@ def allowed_news_sources(cfg: dict) -> tuple[set[str], dict[str, set[str]]]:
 
 
 def check_news_sources(res: Result, cfg: dict, con, today: date):
-    """Today's news rows come from allow-listed sources."""
+    """Today's stored news rows and headline updates come from allow-listed sources."""
     google_domains, outlets = allowed_news_sources(cfg)
     rows = con.execute(
-        "SELECT id, url, feed, tickers FROM news WHERE CAST(first_seen_at AS DATE) = ?", [today]
+        "SELECT id, url, feed, tickers FROM news_tagged WHERE CAST(first_seen_at AS DATE) = ? "
+        "UNION ALL SELECT u.id, u.url, u.feed, n.tickers FROM news_updates u "
+        "LEFT JOIN news_lookup n ON n.id = u.news_id WHERE CAST(u.seen_at AS DATE) = ? ORDER BY 1",
+        [today, today],
     ).fetchall()
     bad = []
     for nid, url, feed, tickers in rows:

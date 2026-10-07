@@ -40,7 +40,7 @@ from marketbrief.core.database import connect
 LAST_ENRICHED_ITEM_SQL = """
 WITH done AS (SELECT DISTINCT id FROM news_enriched WHERE analyzed_at <= ?::TIMESTAMPTZ)
 SELECT max(first_seen_at) FROM (
-    SELECT first_seen_at FROM news WHERE id IN (SELECT id FROM done)
+    SELECT first_seen_at FROM news_stored WHERE id IN (SELECT id FROM done)
     UNION ALL SELECT first_seen_at FROM announcements WHERE id IN (SELECT id FROM done)
 ) WHERE first_seen_at <= ?::TIMESTAMPTZ"""
 ENRICHED_SQL = "SELECT DISTINCT id FROM news_enriched"

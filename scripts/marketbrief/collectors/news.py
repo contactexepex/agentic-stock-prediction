@@ -1,6 +1,6 @@
 """Collect RSS headlines (Google News queries + outlet feeds from the market config's `news`
-section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only; de-duplicates against the
-last 9 daily files. Prints a JSON summary; outlet feeds that answer but carry nothing from the last
+section) into data/<market>/news/YYYY/MM/<today>.jsonl. Append-only. Prints a JSON summary; outlet feeds that
+answer but carry nothing from the last
 3 days are listed as `stale`. Tags come from marketbrief/analytics/news_tags.py, headline first: companies
 named in the title (a ticker's `news_names`, default name and aliases, whole words,
 case-insensitive, minus its `news_exclude` phrases); only when the title names none, the
@@ -9,7 +9,15 @@ plain-text summary (no HTML, URLs or outlet name). Each row stores `tickers`, `p
 summary-only) and `tag_confidence` (high: exactly one title company, primary; else low). A
 Google News company query does not tag by itself. Rows carry `tag_version`; older rows are
 re-tagged on read by the `news` view. An item's id is its normalized title + source domain
-(Google News <source url>), so one article under two source labels is stored once.
+(Google News <source url>).
+De-duplication (marketbrief/analytics/news_dedup.py, owner decisions Q45-Q47): one article is stored once per
+market. Against the newest 10 daily files of news and news_updates (collectors/news_history.py) and this run's
+items, an entry is skipped when its canonical article link was stored from the same outlet (a different
+headline there is appended to data/<market>/news_updates/ instead: one item plus its headline history), when
+its normalised title was stored from the same outlet (outlet key: host without www./m./amp./mobile., the
+allowlisted domain and its `same_as` in config/news_sources.yaml, or a configured outlet name), or when its id
+was stored; matches count within 9 days. The same story from another outlet is kept. The summary shows
+`duplicates_skipped` (same_link, same_title, same_id, within_run) and `headline_updates`.
 An outlet with `watchlist_only: true` (press-release wires) keeps only items whose title or
 summary names a watchlist company: case-insensitive whole-word matching on each ticker's
 `wire_names` (full company names; default its name and aliases) after removing the
@@ -27,14 +35,17 @@ from __future__ import annotations
 import json
 import socket
 import time
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
+from marketbrief.analytics.news_dedup import Sighting, load_outlet_keys
 from marketbrief.analytics.news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
-from marketbrief.collectors.news_window import run_ok, slice_days, window_for
+from marketbrief.collectors.news_history import stored_index, update_record
+from marketbrief.collectors.news_window import parse_utc, run_ok, slice_days, window_for
 from marketbrief.constants.columns import COL_ID, COL_TITLE
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_NEWS
-from marketbrief.constants.kinds import KIND_NEWS, KIND_NEWS_RUNS
+from marketbrief.constants.kinds import KIND_NEWS, KIND_NEWS_RUNS, KIND_NEWS_UPDATES
 from marketbrief.constants.news import (
     COLLECTOR_NEWS,
     DEFAULT_CATEGORY,
@@ -44,17 +55,17 @@ from marketbrief.constants.news import (
     FETCH_ATTEMPTS,
     GOOGLE_NEWS_ITEM_CAP,
     MAX_AGE_DAYS,
+    MATCH_LINK,
     MAX_SLICE_QUERIES_PER_RUN,
     PERMANENT_STATUSES,
     RETRY_PAUSE_SECONDS,
-    SEEN_LOOKBACK_DAYS,
     SOCKET_TIMEOUT_SECONDS,
     TITLE_SEPARATOR,
 )
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
-from marketbrief.core.storage import append_jsonl, day_file, recent_ids
+from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.sources.rss import fetch_feed
 
 STALE_AGE = timedelta(days=MAX_AGE_DAYS)  # an outlet feed with nothing newer is `stale`
@@ -148,8 +159,11 @@ class NewsCollector:
         self.feeds = watchlist.get(CFG_NEWS, {})
         self.google = self.feeds.get("google_news") or {}
         self.tagger = Tagger(watchlist)
-        self.seen = recent_ids(self.market, KIND_NEWS, days=SEEN_LOOKBACK_DAYS)
         self.now, self.now_dt = utc_now(), now_utc()
+        self.seen_at = parse_utc(self.now)
+        self.dedup, self.seen = stored_index(self.market, self.seen_at, load_outlet_keys())
+        self.updates: list[dict] = []
+        self.duplicates: Counter = Counter()
         self.window = window_for(self.market, self.now_dt, self.google.get("window", DEFAULT_WINDOW))
         self.slice_days = slice_days(self.window, self.now_dt)
         self.items: dict[str, dict] = {}
@@ -169,6 +183,24 @@ class NewsCollector:
             {"feed": job["feed"], "entries": len(times), "newest": newest.isoformat() if newest else None}
         )
 
+    def is_duplicate(self, job: dict, row: Sighting, published) -> bool:
+        """True when the item is already stored or collected this run (analytics/news_dedup.py): the same article
+        link from the same outlet (a new headline there is appended to news_updates instead), the same title
+        from the same outlet, or the same id (also ids stored before domains)."""
+        found = self.dedup.match(row)
+        if (found and found.news_id in self.items) or row.news_id in self.items:
+            self.duplicates["within_run"] += 1  # the same article from several feeds: keep the first
+        elif found and found.rule == MATCH_LINK and self.dedup.is_new_headline(found.news_id, row.title):
+            self.updates.append(update_record(found.news_id, row, self.now, published, job["feed"]))
+            self.dedup.note_headline(found.news_id, row.title, self.seen_at)
+        elif found:
+            self.duplicates[f"same_{found.rule}"] += 1
+        elif row.news_id in self.seen or article_id(row.title, row.source) in self.seen:
+            self.duplicates["same_id"] += 1
+        else:
+            return False
+        return True
+
     def add_entry(self, job: dict, entry) -> None:
         """Turn one feed entry into a news row unless it is empty, old, seen, or off the watchlist."""
         title = (entry.get(COL_TITLE) or "").strip()
@@ -183,19 +215,19 @@ class NewsCollector:
             return
         domain = source_domain(source_info.get("href"))
         news_id = item_id(title, source, domain)
-        if news_id in self.seen or article_id(title, source) in self.seen:  # also ids stored before domains
+        row = Sighting(news_id, title, source, domain, entry.get("link"), self.seen_at)
+        if self.is_duplicate(job, row, published):
             return
         # headline first; the plain-text summary only when the title names no company
         tags = self.tagger.classify_item(title, entry.get("summary"), source, wire=job.get("watchlist_only", False))
         if job.get("watchlist_only") and not tags["tickers"]:
             self.skipped_off_watchlist += 1  # wire feeds: keep only releases naming a watchlist company
             return
-        if news_id in self.items:  # same article from several feeds: tags come from its text, keep the first
-            return
+        self.dedup.add(row)
         self.items[news_id] = {
             COL_ID: news_id,
             COL_TITLE: title,
-            "url": entry.get("link"),
+            "url": row.url,
             "source": source,
             "published_at": published.isoformat() if published else None,
             "first_seen_at": self.now,
@@ -254,6 +286,8 @@ class NewsCollector:
         for job in jobs:
             self.run_job(job)
         written = append_jsonl(day_file(self.market, KIND_NEWS, utc_today()), self.items.values())
+        if self.updates:
+            append_jsonl(day_file(self.market, KIND_NEWS_UPDATES, utc_today()), self.updates)
         record = self.run_record(len(jobs), written)
         append_jsonl(day_file(self.market, KIND_NEWS_RUNS, utc_today()), [record])
         print(
@@ -265,6 +299,8 @@ class NewsCollector:
                     SUMMARY_FAILED: self.failed,
                     "stale": self.stale,
                     "new_items": written,
+                    "headline_updates": len(self.updates),
+                    "duplicates_skipped": dict(sorted(self.duplicates.items())),
                     "skipped_off_watchlist": self.skipped_off_watchlist,
                     "window": self.window.summary(),
                     "ok": record["ok"],

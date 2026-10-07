@@ -365,19 +365,20 @@ def test_collect_articles(env, capsys, src):
     assert access == {
         "n01": "full", "n02": "full", "n03": "skipped_unlisted", "n04": "skipped_unlisted", "n05": "blocked",
         "n06": "full", "n07": "skipped_unlisted", "n08": "skipped_unlisted", "n09": "skipped_unlisted",
-        "n10": "undecoded", "n12": "full", "n13": "full", "n14": "full"}
+        "n10": "undecoded", "n13": "full", "n14": "full"}
     assert "n11" not in rows and "n15" not in rows               # low tag confidence: not selected
+    # n12 is a stored duplicate of n01 (same title, same outlet under a label): hidden by the news view
+    assert "n12" not in rows
     # only allowlisted, fetchable https pages were requested; unlisted / reuters / http never
     assert sorted(env.session.calls) == sorted([URLS["bnn"], URLS["aol"], URLS["yahoo"], "https://www.livemint.com/r",
                                                 URLS["bs_jio"], URLS["mint_jio"]])
     assert gn(3) not in env.decoded_links and gn(5) not in env.decoded_links and gn(12) not in env.decoded_links
-    assert rows["n12"]["note"].startswith("same article as n01") and rows["n12"]["minhash"] == rows["n01"]["minhash"]
     assert rows["n09"]["final_url"] == "https://unlisted.example.org/x" and rows["n09"]["http_status"] is None
     assert rows["n05"]["http_status"] is None and "not requested" in rows["n05"]["note"]
     assert rows["n01"]["origin_wire"] == "Reuters" and rows["n02"]["origin_evidence"] == "provider"
     assert rows["n06"]["promotional"] == "provider TIKR"
     assert rows["n14"]["origin_evidence"] == "attribution" and rows["n14"]["sources_say"] is True
-    assert s["by_access"]["full"] == 6 and s["requests"]["fetch"] == 6 and s["copied_same_article"] == 1
+    assert s["by_access"]["full"] == 5 and s["requests"]["fetch"] == 6 and s["copied_same_article"] == 0
     # no article text stored: at most 3 sentences of <= 40 words; the schema and gate accept the rows
     for r in rows.values():
         assert len(r["extract"] or []) <= 3 and all(len(x.split()) <= 40 for x in r["extract"] or [])
@@ -425,6 +426,17 @@ def clusters_by_ticker(rows: list[dict]) -> dict:
     return {r["ticker"]: r for r in rows}
 
 
+def test_cluster_duplicate_step_still_merges_one_publisher_url():
+    """Items the news view keeps apart (other Google News links, other titles) that decode to one publisher page are
+    still one article inside a cluster (`duplicate_ids`)."""
+    page = "https://bnnbloomberg.ca/chevron-cfo"
+    items = [{"canon": page, "title": "Chevron names CFO", "outlet_key": "bnnbloomberg.ca"},
+             {"canon": page, "title": "Chevron CFO named", "outlet_key": "bnnbloomberg.ca"},
+             {"canon": "https://aol.com/x", "title": "Chevron names CFO", "outlet_key": "aol.com"}]
+    dup = news_clusters.duplicate_sets(items)
+    assert dup.find(1) == 0 and dup.find(2) == 2
+
+
 def test_clusters_origins_duplicates_primaries(env, capsys):
     env.run(collect_articles, capsys)
     env.write("news", [news_row(20, "Chevron elevates CFO to head oil and gas operations By Reuters", "CVX",
@@ -439,7 +451,9 @@ def test_clusters_origins_duplicates_primaries(env, capsys):
     rows = env.rows("news_clusters")
     cvx = [r for r in rows if r["ticker"] == "CVX" and "n01" in r["news_ids"]][0]
     # AOL (provider Reuters), BNN (byline Reuters Staff), Investing ("By Reuters"), Reuters itself: one origin
-    assert set(cvx["news_ids"]) >= {"n01", "n02", "n05", "n20", "n21", "n22"} and "n12" in cvx["duplicate_ids"]
+    assert set(cvx["news_ids"]) >= {"n01", "n02", "n05", "n20", "n21", "n22"}
+    # n12 (n01's article stored again under a label) is hidden on read, so it is no cluster item at all
+    assert "n12" not in cvx["news_ids"] + cvx["duplicate_ids"]
     groups = {g["origin"]: g for g in cvx["origin_groups"]}
     assert set(groups["wire:Reuters"]["news_ids"]) >= {"n01", "n02", "n05", "n20"} and groups["wire:Reuters"]["vetted"]
     assert set(groups["outlet:thecsruniverse.com"]["news_ids"]) == {"n21", "n22"}
@@ -448,11 +462,12 @@ def test_clusters_origins_duplicates_primaries(env, capsys):
     # n03 (suaragarut.id, unvetted) joins through the CSR Universe headlines; all three are informational
     assert cvx["unvetted_ids"] == ["n03", "n21", "n22"] and s["unvetted_domains"]["thecsruniverse.com"] == 2
     assert cvx["primary_ids"] == ["0000093410-26-000188"]        # not the Form 4, not the 8-K after as_of
-    assert "duplicates_removed" in cvx["flags"]
+    assert "duplicates_removed" not in cvx["flags"]
     jio = [r for r in rows if r["ticker"] == "RELIANCE"][0]
-    assert set(jio["news_ids"]) == {"n13", "n14", "n15"} and jio["duplicate_ids"] == ["n16"]
+    # n16 ("businesstoday.in") repeats n15 ("Business Today"): one outlet, hidden by the news view before clustering
+    assert set(jio["news_ids"]) == {"n13", "n14", "n15"} and jio["duplicate_ids"] == []
     assert jio["origins"] == ["wire:Reuters"] and jio["independent_origins"] == 1 and jio["unvetted_ids"] == []
-    assert {"single_source", "sources_say", "duplicates_removed"} <= set(jio["flags"])
+    assert {"single_source", "sources_say"} <= set(jio["flags"])
     tsla = [r for r in rows if r["ticker"] == "TSLA" and "n06" in r["news_ids"]][0]
     assert "promotional_provider" in tsla["flags"] and tsla["independent_origins"] == 0
     assert all(r["as_of"] == NOW and r["inputs_until"] <= NOW for r in rows)

@@ -31,7 +31,7 @@ SELECT c.ticker, c.cluster_id, c.news_ids, c.first_reported_at, c.last_reported_
        c.unread_vetted_origins, c.primary_ids AS candidates, v.status, v.primary_ids, v.conflicts, v.confirmed_at,
        v.status_ids, v.id_statuses, v.flags AS status_flags
 FROM c LEFT JOIN v USING (cluster_id) ORDER BY c.ticker, c.last_reported_at DESC, c.cluster_id"""
-TITLES_SQL = "SELECT DISTINCT ON (id) id, title FROM news WHERE list_contains(?, id) ORDER BY id, first_seen_at"
+TITLES_SQL = "SELECT DISTINCT ON (id) id, title FROM news_lookup WHERE list_contains(?, id) ORDER BY id, first_seen_at"
 CALLS_SQL = """
 SELECT DISTINCT ON (id) id, ticker, horizon_days, direction, evidence_ids, made_at FROM predictions
 WHERE as_of_date = ? ORDER BY id, made_at"""
