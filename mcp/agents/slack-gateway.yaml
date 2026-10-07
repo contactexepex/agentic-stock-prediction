@@ -1,0 +1,11 @@
+# The Slack commands /company, /trade and /ask (web/app/slack/, docs/SPEC.md F10; ARCHITECTURE.md section 10).
+# Any member of #market-brief may give commands (decision 15); delete is never available in Slack.
+# enabled: false stops every call of this agent (kill switch; a row in the inbox `controls` table stops it without a
+# deploy, mcp/inbox.sql). Budgets count the agent's calls per UTC day across all its users.
+agent: slack-gateway
+channels: [slack]
+enabled: true
+tools: [explain, add_company, deactivate_company, reactivate_company, set_paper_amount, add_paper_trade]
+daily_write_budget: 20
+daily_read_budget: 200
+fail_to: owner   # refusals and anything ambiguous: a report posted to #market-brief (owner decision 13, docs/ws/b5.md)

@@ -30,6 +30,7 @@ from marketbrief.constants.messages import (
 from marketbrief.constants.horizons import KEY_HORIZONS
 from marketbrief.core import paths
 from marketbrief.core.horizons import horizons
+from marketbrief.lifecycle.loader import apply_watchlist
 
 
 def load_ranges_config(market: str | None = None) -> dict:
@@ -52,13 +53,16 @@ def market_names() -> list[str]:
 
 
 def load_market(name: str) -> dict:
-    """A market's config with defaults filled in: Yahoo symbol, sector and sector ETF per ticker."""
+    """A market's config with defaults filled in: Yahoo symbol, sector and sector ETF per ticker. The company lists
+    (tickers, sector membership, active_tickers) come from the watchlist events as of the run's clock
+    (marketbrief/lifecycle/loader.py, docs/SPEC.md F8.2)."""
     path = paths.CONFIG / DIR_CONFIG_MARKETS / f"{name}{YAML_SUFFIX}"
     if not path.exists():
         raise SystemExit(MSG_UNKNOWN_MARKET.format(name=name, available=market_names()))
     cfg = yaml.safe_load(path.read_text())
     cfg.setdefault(CFG_MARKET, name)
     cfg.setdefault(CFG_SYMBOLS, {})
+    apply_watchlist(cfg, name)
     for key, meta in cfg[CFG_TICKERS].items():
         meta.setdefault(META_YAHOO, key)
     for key, meta in cfg[CFG_SYMBOLS].items():

@@ -7,6 +7,7 @@ from marketbrief.core.horizons import horizons
 from marketbrief.presentation.report.formatting import data_stamp, md_link, review_line
 from marketbrief.presentation.report.report_parts import ReportParts
 from marketbrief.utils.markdown import markdown_table
+from marketbrief.lifecycle.loader import active_sectors
 
 
 def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
@@ -119,7 +120,7 @@ def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
         "",
         *img("sectors.png", "Sector moves"),
     ]
-    for sector in cfg.get("sectors") or {}:
+    for sector in active_sectors(cfg):
         report_lines += [f"### {sector}", "", f"<!-- AGENT:sector:{sector} -->", ""]
     report_lines += [
         "## Track record",
