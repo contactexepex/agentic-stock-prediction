@@ -39,18 +39,18 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 - Priority: India (where capital is) first, US as a small trial. Paper only for weeks 1-6.
 
 ## 3. Inputs (all free)
-**Per company:** daily OHLCV (yfinance), news (RSS), earnings and ex-dividend dates.
-**US filings:** SEC EDGAR (already built). India filings: from news at first.
-A ticker's SEC filings are read from the CIK in SEC's ticker map plus any earlier or related
-registrant still filing for it (`fundamentals.predecessor_ciks`; XOM maps to ExxonMobil Holdings
-2115436 since 2026-07-01, while Exxon Mobil Corp 34088 still lists filings: an 8-K on 2026-07-01, the
-Q2 10-Q jointly, Form 4s, a 13G, and the item 2.02 results releases up to May 2026), merged and
-de-duplicated by accession number in `sec_filings.ticker_submissions` (issue #23). A CIK whose
-submission list fails is one `failed` entry with its `cik`; the other CIKs are still merged, except in
-`collect_fundamentals.py`, which skips the whole ticker that run when any of its submission lists or
-company-facts requests fails (half a ticker's CIKs would store an incomplete history and hide filings
-from the reload check), so its `failed` entries also name the `cik` (issue #25). Side effect of #23 noted
-by its review: reading the predecessor CIK's filings gave earlier XOM fundamentals rows their
+**Per company:** daily OHLCV (yfinance), news (RSS), earnings and ex-dividend dates. **US filings:**
+SEC EDGAR (already built). India filings: from news at first. A ticker's SEC filings are read from
+the CIK in SEC's ticker map plus any earlier or related registrant still filing for it
+(`fundamentals.predecessor_ciks`; XOM maps to ExxonMobil Holdings 2115436 since 2026-07-01, while
+Exxon Mobil Corp 34088 still lists filings: an 8-K on 2026-07-01, the Q2 10-Q jointly, Form 4s, a
+13G, and the item 2.02 results releases up to May 2026), merged and de-duplicated by accession
+number in `sec_filings.ticker_submissions` (issue #23). A CIK whose submission list fails is one
+`failed` entry with its `cik`; the other CIKs are still merged, except in `collect_fundamentals.py`,
+which skips the whole ticker that run when any of its submission lists or company-facts requests
+fails (half a ticker's CIKs would store an incomplete history and hide filings from the reload
+check), so its `failed` entries also name the `cik` (issue #25). Side effect of #23 noted by its
+review: reading the predecessor CIK's filings gave earlier XOM fundamentals rows their
 `accepted_at`; their values did not change and nothing became visible earlier.
 
 | Signal | US | India |
@@ -63,38 +63,36 @@ by its review: reading the predecessor CIK's filings gave earlier XOM fundamenta
 | Sectors | One ETF per watchlist sector (10): eight SPDR sector ETFs, JETS (airlines), IAK (insurance) | Nifty Bank, IT and Pharma indices (none for the other seven sectors; see `config/markets/india.yaml`) |
 | News sources | Google News (US), CNBC, BBC; PR Newswire, Business Wire earnings and GlobeNewswire releases (watchlist names only) | Google News (IN), Economic Times, Moneycontrol, Livemint, Business Standard, BusinessLine |
 
-**News ticker tags** (`marketbrief/analytics/news_tags.py`, issues #28/#29): headline first. A ticker is
-tagged when one of its `news_names` (default `name` + `aliases`; full names or unambiguous
+**News ticker tags** (`marketbrief/analytics/news_tags.py`, issues #28/#29): headline first. A
+ticker is tagged when one of its `news_names` (default `name` + `aliases`; full names or unambiguous
 aliases such as "M&M", "L&T", "NVDA") occurs as a whole word, case-insensitively, in the TITLE,
 after the ticker's `news_exclude` phrases are removed ("Kotak Mahindra", "Tech Mahindra" for M&M;
-"ITC Hotels"; "Chevron deference"). Only when the title names no watchlist company is the
-plain-text summary used (HTML, URLs/domains and the outlet name removed: every Google News
-summary is a `news.google.com` link, which used to tag nearly everything GOOGL). Roles:
-`primary_tickers` = companies named in the title (all of them when several), except in a
-comparison ("X vs Y") or a list ("TCS, Infosys and Wipro ...", "Stocks to watch: A, B, C";
-commas or slashes, not ";"), where they are `mentioned_tickers`, as is a company found only in
-the summary, and a company acting on or holding another one (`Tagger.is_actor`): analyst
-actions ("JPMorgan cuts target for Aon", "target raised by JPMorgan", "Bank of America upgrades
-DraftKings"), holdings ("shares of X bought by Bank of America Corp", "takes stake in"), venues
-("present at Bank of America 2026 conference", "Bank of America Plaza"); tickers with
-`broker: true` (JPM, BAC) also as research arms, commentators ("JPMorgan sees", "says
-JPMorgan") and in their own picks or views ("JPMorgan's October stock picks"). Names also match
-as `(TICKER)`, `(TICKER:EXCH)` or `(EXCH: TICKER)`, case-sensitive.
-`tag_confidence` is high only for a title naming exactly one company as primary, low for every
-other tagged item: the hook for a later LLM aboutness check by the news-analyst (not built);
+"ITC Hotels"; "Chevron deference"). Only when the title names no watchlist company is the plain-text
+summary used (HTML, URLs/domains and the outlet name removed: every Google News summary is a
+`news.google.com` link, which used to tag nearly everything GOOGL). Roles: `primary_tickers` =
+companies named in the title (all of them when several), except in a comparison ("X vs Y") or a list
+("TCS, Infosys and Wipro ...", "Stocks to watch: A, B, C"; commas or slashes, not ";"), where they
+are `mentioned_tickers`, as is a company found only in the summary, and a company acting on or
+holding another one (`Tagger.is_actor`): analyst actions ("JPMorgan cuts target for Aon", "target
+raised by JPMorgan", "Bank of America upgrades DraftKings"), holdings ("shares of X bought by Bank
+of America Corp", "takes stake in"), venues ("present at Bank of America 2026 conference", "Bank of
+America Plaza"); tickers with `broker: true` (JPM, BAC) also as research arms, commentators
+("JPMorgan sees", "says JPMorgan") and in their own picks or views ("JPMorgan's October stock
+picks"). Names also match as `(TICKER)`, `(TICKER:EXCH)` or `(EXCH: TICKER)`, case-sensitive.
+`tag_confidence` is high only for a title naming exactly one company as primary, low for every other
+tagged item: the hook for a later LLM aboutness check by the news-analyst (not built);
 `news_ticker_day` carries `role` and `tag_confidence`, and the context pack's news table counts
-`primary_7d` and `low_conf_7d`. A Google News query for a company only finds candidates: its
-results include market wraps and politics that never name the company, so the hit alone does
-not tag. Press-release wires match `wire_names` the same way. Identity: normalized title +
-the RSS `<source url>` domain, so "Business Today" and "businesstoday.in" copies of one article
-are one item (ids stored before that are still recognised as seen). Rows carry `tag_version`;
-because `tickers` is derived and `data/` is append-only, older rows are re-tagged on read: the
-stored rows are the DuckDB view `news_stored`, and `news` (used by `news_ticker_day`, the context
-pack, graph hits, view_data and the Neo4j copy) applies `news_retag` (registered in
-`core.database.connect`): stored title with the current rules (old wire rows whose title names no
-company keep their stored tags as mentioned, low). Old outlet rows lose tags found only in their
-summary (not stored). The Neo4j copy needs `neo4j_sync.py --full` once
-to drop mention edges synced before the fix.
+`primary_7d` and `low_conf_7d`. A Google News query for a company only finds candidates: its results
+include market wraps and politics that never name the company, so the hit alone does not tag.
+Press-release wires match `wire_names` the same way. Identity: normalized title + the RSS `<source
+url>` domain, so "Business Today" and "businesstoday.in" copies of one article are one item (ids
+stored before that are still recognised as seen). Rows carry `tag_version`; because `tickers` is
+derived and `data/` is append-only, older rows are re-tagged on read: the stored rows are the DuckDB
+view `news_stored`, and `news` (used by `news_ticker_day`, the context pack, graph hits, view_data
+and the Neo4j copy) applies `news_retag` (registered in `core.database.connect`): stored title with
+the current rules (old wire rows whose title names no company keep their stored tags as mentioned,
+low). Old outlet rows lose tags found only in their summary (not stored). The Neo4j copy needs
+`neo4j_sync.py --full` once to drop mention edges synced before the fix.
 
 **Event calendar:** earnings, ex-dividend, F&O expiry, Fed/FOMC, RBI policy, CPI/jobs releases,
 index rebalances (S&P 500 quarterly, Nifty 50 semi-annual; listed, not major).
@@ -105,18 +103,18 @@ price vs 20-day high, ATR(14), 10-day realized vol, Bollinger width, OBV trend, 
 and the event calendar.
 
 **Closed-day bars (issue #40, added 2026-10-07).** Yahoo serves a bar for exchange holidays: a flat
-zero-volume bar for stocks (15 India stocks on 2026-10-02, Gandhi Jayanti; the other 9 stored bars that day are
-cues and factors that traded), a non-flat
-one for the VIX (US Memorial Day, Labor Day 2026). It would be a fake 0% day in returns, indicators and
-ranges. `collect_prices.py` therefore does not store a stock or own-exchange index bar (benchmark, vol
-index, sector index) on a day that is no session of the market calendar, and no flat zero-volume stock
-bar on any day; both are listed in the summary's `dropped_non_session`. Cues and factors follow other
-exchanges' calendars and are kept. Bars stored before stay (append-only) and are left out on read:
-`connect` builds a table `own_closed_days (ticker, date)` (each own-exchange ticker x each stored price
-date that is no session of the market calendar) and the `ohlc_raw` view, which `ohlc`, `bars` and
-`returns` read, excludes those rows. Known limits: India's Diwali Muhurat sessions are closed days in
-the calendar library, so their bars are dropped too, and stored flat zero-volume stock bars on real
-sessions are not removed on read.
+zero-volume bar for stocks (15 India stocks on 2026-10-02, Gandhi Jayanti; the other 9 stored bars
+that day are cues and factors that traded), a non-flat one for the VIX (US Memorial Day, Labor Day
+2026). It would be a fake 0% day in returns, indicators and ranges. `collect_prices.py` therefore
+does not store a stock or own-exchange index bar (benchmark, vol index, sector index) on a day that
+is no session of the market calendar, and no flat zero-volume stock bar on any day; both are listed
+in the summary's `dropped_non_session`. Cues and factors follow other exchanges' calendars and are
+kept. Bars stored before stay (append-only) and are left out on read: `connect` builds a table
+`own_closed_days (ticker, date)` (each own-exchange ticker x each stored price date that is no
+session of the market calendar) and the `ohlc_raw` view, which `ohlc`, `bars` and `returns` read,
+excludes those rows. Known limits: India's Diwali Muhurat sessions are closed days in the calendar
+library, so their bars are dropped too, and stored flat zero-volume stock bars on real sessions are
+not removed on read.
 
 **Price basis: splits and bonus issues (issue #31, added 2026-10-06).** yfinance's `Close`
 (auto_adjust=False) is not dividend-adjusted but is split/bonus-adjusted as of the collection time,
@@ -127,27 +125,27 @@ bonus). History stored so far is consistent: it was downloaded in one go (HDFCBA
 either market moved more than 35% in a day except the vol indices (INDIAVIX 2025-04-07 +65.6%, VIX
 2024-12-18 +74.0% and four days in 2025-04 and 2026-06, real volatility spikes), so no adjustment is
 recorded for the past. Design (adjust on read; data stays append-only):
-- Detection (`collect_prices.py`, both markets, `marketbrief/analytics/price_adjustments.py`): before a symbol's new bars
-  are written, Yahoo's frame (today's basis) is compared with our stored closes of the same dates.
-  A `Stock Splits` row (ex-date E, ratio r) is recorded once as `data/<market>/adjustments/YYYY/MM/<E>.jsonl`
-  (id `<ticker>-<E>`, `factor` = 1/r = price multiplier for every bar before E, `volume_factor` =
-  r, `source` `yahoo_splits`, the compared date and closes as evidence, `detected_at`) when every
-  stored close in the frame before E (after any earlier split row) is Yahoo's x 1/factor within
-  1% (whether or not the session before E is stored) and Yahoo's own frame has no step of about
-  the factor at E. Stored closes already equal to Yahoo's (collected after the split) or no stored
-  bar before E: nothing to record. A re-base (every stored close up to the newest mismatch off by
-  one ratio within 0.1% of a simple fraction p/q, p, q <= 20) with no split row is recorded for
-  India (`nse_prev_close`) when NSE's bhavcopies confirm it: the frame's sessions after our newest
-  re-based bar are walked in order (up to 5); each one's PREV_CLOSE (as traded, not adjusted on an
-  ex-date: HDFCBANK 26-Aug-2025 1964.10) must equal the as-traded close of its previous session
-  within 0.5% (our stored close for the first one, Yahoo's re-based close / factor after that).
-  A session e is the ex-date when the next session's PREV_CLOSE (e's traded close) equals Yahoo's
-  close of e within 0.1% (an exact chain: e is on the new basis; equal to Yahoo's close / factor
-  means e is still before it), or, for a factor below 0.9 only, when e's traded close / PREV_CLOSE
-  steps by about the factor (0.8-1.25x of it and nearer to it than to 1). For a factor of 0.9 or
-  more (a 1:10 bonus is 10/11) an ordinary day's move can look like the step, so only the chain
-  confirms, and an ex-date whose next session is not stored yet is held until the next run. So a
-  missed run (bars stored to E-2) is handled too.
+- Detection (`collect_prices.py`, both markets, `marketbrief/analytics/price_adjustments.py`):
+  before a symbol's new bars are written, Yahoo's frame (today's basis) is compared with our stored
+  closes of the same dates. A `Stock Splits` row (ex-date E, ratio r) is recorded once as
+  `data/<market>/adjustments/YYYY/MM/<E>.jsonl` (id `<ticker>-<E>`, `factor` = 1/r = price
+  multiplier for every bar before E, `volume_factor` = r, `source` `yahoo_splits`, the compared date
+  and closes as evidence, `detected_at`) when every stored close in the frame before E (after any
+  earlier split row) is Yahoo's x 1/factor within 1% (whether or not the session before E is stored)
+  and Yahoo's own frame has no step of about the factor at E. Stored closes already equal to Yahoo's
+  (collected after the split) or no stored bar before E: nothing to record. A re-base (every stored
+  close up to the newest mismatch off by one ratio within 0.1% of a simple fraction p/q, p, q <= 20)
+  with no split row is recorded for India (`nse_prev_close`) when NSE's bhavcopies confirm it: the
+  frame's sessions after our newest re-based bar are walked in order (up to 5); each one's
+  PREV_CLOSE (as traded, not adjusted on an ex-date: HDFCBANK 26-Aug-2025 1964.10) must equal the
+  as-traded close of its previous session within 0.5% (our stored close for the first one, Yahoo's
+  re-based close / factor after that). A session e is the ex-date when the next session's PREV_CLOSE
+  (e's traded close) equals Yahoo's close of e within 0.1% (an exact chain: e is on the new basis;
+  equal to Yahoo's close / factor means e is still before it), or, for a factor below 0.9 only, when
+  e's traded close / PREV_CLOSE steps by about the factor (0.8-1.25x of it and nearer to it than to
+  1). For a factor of 0.9 or more (a 1:10 bonus is 10/11) an ordinary day's move can look like the
+  step, so only the chain confirms, and an ex-date whose next session is not stored yet is held
+  until the next run. So a missed run (bars stored to E-2) is handled too.
 - Hold: a re-base or split row no source confirms (an unconfirmed re-base, also by a ratio that is
   no simple fraction; mixed ratios before a split row; a split row with no stored bar in the
   window; a split row whose stored closes match Yahoo's while Yahoo's own frame steps by about the
@@ -210,11 +208,11 @@ text, and getting around bot protection. Each domain has:
   and major outlets) or `tier2` (established outlets, and aggregators that syndicate them);
 - the Google News source labels it appears under;
 - an optional extractor order;
-- `fetch: false` for outlets that refuse cloud traffic. These were tested 2026-10-06: Reuters,
-  AP, CNBC, MarketWatch, Barron's, Investing.com, Benzinga, Morningstar, NDTV Profit, Zee Business.
+- `fetch: false` for outlets that refuse cloud traffic. These were tested 2026-10-06: Reuters, AP,
+  CNBC, MarketWatch, Barron's, Investing.com, Benzinga, Morningstar, NDTV Profit, Zee Business.
   Their items are recorded as blocked and never requested (no attempt to evade), but they stay
-  vetted: their headline counts as an unread vetted origin (see Origins below), and their stories are read through legitimate
-  republications (AOL, Yahoo, BNN Bloomberg).
+  vetted: their headline counts as an unread vetted origin (see Origins below), and their stories
+  are read through legitimate republications (AOL, Yahoo, BNN Bloomberg).
 
 Rules for what is requested:
 - Only HTTPS URLs on an allowlisted domain are ever requested, with TLS verification on.
@@ -273,10 +271,11 @@ The full text is never stored. Article text is untrusted data: it is measured, n
 
 *Items and duplicates.* The items are news rows of the last 144 h whose title names a watchlist
 ticker as primary. An item's outlet is its domain. A row without one (older Google News rows) is
-mapped from its source label: a configured name, a label that is itself a host, or the domain
-other rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under two ids is kept once and the other ids are listed in
-`duplicate_ids`. Two ids are the same article when they share the canonical publisher URL, or the
-same title from the same outlet, as with the labels "Business Today" and "businesstoday.in".
+mapped from its source label: a configured name, a label that is itself a host, or the domain other
+rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under
+two ids is kept once and the other ids are listed in `duplicate_ids`. Two ids are the same article
+when they share the canonical publisher URL, or the same title from the same outlet, as with the
+labels "Business Today" and "businesstoday.in".
 
 *Linking items into events.* Items of one ticker at most 72 h apart are linked (single linkage)
 when any of these holds:
@@ -384,12 +383,12 @@ extracts quoted statements; every check and every status is deterministic.
 
 **Primary text** (`claims.py prepare`, kind `primary_texts`). For the run's selected clusters, the
 main document and EX-99 exhibits (press releases) of their SEC 8-K/6-K candidates
-(`claims.primary_text_forms`) are read through the Edgar client (SEC_USER_AGENT; one throttle), turned
-into plain text (scripts, styles and hidden XBRL headers dropped, one line per block element) and
-stored once per document, cut at `primary_max_chars` (`truncated`). `available_at` is the filing's
-acceptance time. SEC filings are public-domain government records, so their text is stored (unlike
-articles). NSE announcements are quoted from their stored subject; their PDF attachments are not
-collected (not done).
+(`claims.primary_text_forms`) are read through the Edgar client (SEC_USER_AGENT; one throttle),
+turned into plain text (scripts, styles and hidden XBRL headers dropped, one line per block element)
+and stored once per document, cut at `primary_max_chars` (`truncated`). `available_at` is the
+filing's acceptance time. SEC filings are public-domain government records, so their text is stored
+(unlike articles). NSE announcements are quoted from their stored subject; their PDF attachments are
+not collected (not done).
 
 **Selection.** Clusters current as of the run (`news_clusters_asof`, an item in the last
 `window_hours`) whose best item title weighs at least `claims.min_priority` in `material_terms`;
@@ -397,56 +396,56 @@ a cluster row that already has claims is skipped; highest weight, then newest, a
 `max_clusters_per_run` (15). The input file lists each item (title, outlet, access, stored extract)
 and each primary source's stored text.
 
-**Claims** (`.claude/agents/claim-checker.md`, Sonnet 5.5, effort high; kind `news_claims`). One record
-per statement of one fact by one source: `fact_key` groups the statements of a fact; `claim_type`
-(earnings_guidance, deal_ma, regulatory_legal, mgmt_change, rating_target, macro, rumour, opinion,
-promotional), `attribution` (on_record, company_statement, outlet_reporting = an outlet's own
-unattributed reporting, a factual statement; sources_say = a rumour; analyst; opinion = never
-counted), `stance`
-(affirms, denies), `subject`, `predicate`, `value_num` + `unit` (usd, inr, eur, gbp, pct, bps,
-count), `period`, `effective_date`, `quote` (<= 40 words) and `quote_source_id`. Text is untrusted
-data. The gate `claims.py validate` checks: the cluster is current; the quoted source is one of its
-items or stored primary sources; the quote is verbatim (quotes and dashes unified, whitespace
-collapsed) in that source's stored extract, title or primary text; `value_num` with its unit is a
-number literal of the quote (scale applied: `480K`, `$3.8 billion`); every number in subject and
-predicate is in the quote; enums; no id twice. `add` stores the computed fields (`id` =
-`<cluster_id>|<fact_key>|<quote_source_id>`, `source_kind`, `quote_field`, `value_text` = the
+**Claims** (`.claude/agents/claim-checker.md`, Sonnet 5.5, effort high; kind `news_claims`). One
+record per statement of one fact by one source: `fact_key` groups the statements of a fact;
+`claim_type` (earnings_guidance, deal_ma, regulatory_legal, mgmt_change, rating_target, macro,
+rumour, opinion, promotional), `attribution` (on_record, company_statement, outlet_reporting = an
+outlet's own unattributed reporting, a factual statement; sources_say = a rumour; analyst; opinion =
+never counted), `stance` (affirms, denies), `subject`, `predicate`, `value_num` + `unit` (usd, inr,
+eur, gbp, pct, bps, count), `period`, `effective_date`, `quote` (<= 40 words) and `quote_source_id`.
+Text is untrusted data. The gate `claims.py validate` checks: the cluster is current; the quoted
+source is one of its items or stored primary sources; the quote is verbatim (quotes and dashes
+unified, whitespace collapsed) in that source's stored extract, title or primary text; `value_num`
+with its unit is a number literal of the quote (scale applied: `480K`, `$3.8 billion`); every number
+in subject and predicate is in the quote; enums; no id twice. `add` stores the computed fields (`id`
+= `<cluster_id>|<fact_key>|<quote_source_id>`, `source_kind`, `quote_field`, `value_text` = the
 literal, `source_available_at` = when the quoted text was available to us, `extracted_at`), all or
 nothing (`--valid-only` after the one retry).
 
-**Status** (`news_status.py`, kind `news_verified`, rules in `marketbrief/analytics/verification_status.py`).
-Per fact, precedence contradicted > confirmed_primary > corroborated > rumour > promotional >
-single_source > unverified:
+**Status** (`news_status.py`, kind `news_verified`, rules in
+`marketbrief/analytics/verification_status.py`). Per fact, precedence contradicted >
+confirmed_primary > corroborated > rumour > promotional > single_source > unverified:
 - contradicted: primary sources disagree (values or stance), a primary source denies what an outlet
   affirms, or, without primary confirmation, outlets state disagreeing values or opposite stances;
 - confirmed_primary: a primary source affirms it; when outlets state a value, a primary source must
-  state one and the values match within 1% of the larger or either literal's stated rounding
-  (`480K` states +-5,000, `$3.8 billion` +-0.05 bn); an outlet value or period that does not match is
+  state one and the values match within 1% of the larger or either literal's stated rounding (`480K`
+  states +-5,000, `$3.8 billion` +-0.05 bn); an outlet value or period that does not match is
   flagged `mismatch_primary` and that news id's own status is contradicted (the filing wins);
 - corroborated: the outlet statements come from >= 2 verified independent origins (phase A's
   origin groups); opinion and promotional statements never count;
 - rumour: a statement attributed to unnamed sources or typed rumour; promotional: typed promotional;
-- single_source: one verified origin; unverified: none.
-A value quoted from a headline (`quote_field` title) is never compared (headlines are cut and drop
-hedges): it neither needs a primary value nor contradicts one or another outlet.
-A fact stated only by a primary source (no outlet item affirms it) keeps its own row, flagged
-`primary_only`, but never raises the event: a cluster's status is the highest of its base status and
-the statuses of the facts its outlet items state, and only those facts give its confirming primary ids
-and `confirmed_at`. Base status (from the cluster row alone:
->= 2 verified origins corroborated; `sources_say` rumour; promotional items and no verified origin
+- single_source: one verified origin; unverified: none. A value quoted from a headline
+  (`quote_field` title) is never compared (headlines are cut and drop hedges): it neither needs a
+  primary value nor contradicts one or another outlet. A fact stated only by a primary source (no
+  outlet item affirms it) keeps its own row, flagged `primary_only`, but never raises the event: a
+  cluster's status is the highest of its base status and the statuses of the facts its outlet items
+  state, and only those facts give its confirming primary ids and `confirmed_at`. Base status (from
+  the cluster row alone: >=
+  2 verified origins corroborated; `sources_say` rumour; promotional items and no verified origin
 promotional; one verified origin single_source; else unverified). Each news id has its own status:
 the cluster's, except contradicted (disagrees with a filing), promotional (vendor origin group) and
 unverified (unvetted outlet or opinion), but never weaker than a blocking cluster status: in a
 rumour, promotional or contradicted event an unvetted or opinion copy keeps that status.
 `confirmed_at` is when the confirming primary source was public (`source_published_at`: SEC
 acceptance, NSE dissemination); its text may have been stored later (`source_available_at`, the
-look-ahead time). Rows are appended per cluster (level cluster) and fact (level claim) when new or changed.
+look-ahead time). Rows are appended per cluster (level cluster) and fact (level claim) when new or
+changed.
 
 **No look-ahead.** A run at T reads clusters as of T, claims with `extracted_at` <= T and
 `source_available_at` <= T (article fetched, filing accepted and its text stored, announcement
-disseminated); every row's inputs are <= `inputs_until` <= `as_of` = T. `news_verified_asof(ts)` takes
-the newest row per cluster and fact with `as_of` <= ts; `news_status_ids_asof(ts)` each news id's
-status per ticker. Days before the feature have no rows: their ids are unverified, never
+disseminated); every row's inputs are <= `inputs_until` <= `as_of` = T. `news_verified_asof(ts)`
+takes the newest row per cluster and fact with `as_of` <= ts; `news_status_ids_asof(ts)` each news
+id's status per ticker. Days before the feature have no rows: their ids are unverified, never
 back-filled. `ai_replay prepare` keeps `primary_texts` by `fetched_at`, `news_claims` by
 `extracted_at` and `news_verified` by `as_of`; Neo4j does not project the three kinds.
 
@@ -475,22 +474,22 @@ evidence-status line per call; view_data passes each cited and listed id's statu
    dividend going ex, plus a small capped drift from the signal score and the AI's direction.
 4. **Events:** on earnings days use the options-implied move (US) or the stock's past earnings-day
    moves; widen on F&O expiry and central-bank days.
-5. **Self-calibration:** track live coverage over the last ~60 scored ranges per market and band.
-   If the 80% band hits less than 80%, widen it; if it hits clearly more, narrow it.
-   Implemented two ways: `calibrate.py` re-estimates the pool quantiles daily (live scored ranges
-   added to the pool), and, switched off by default, **Adaptive Conformal Inference** (`adaptive_conformal.py`,
+5. **Self-calibration:** track live coverage over the last ~60 scored ranges per market and band. If
+   the 80% band hits less than 80%, widen it; if it hits clearly more, narrow it. Implemented two
+   ways: `calibrate.py` re-estimates the pool quantiles daily (live scored ranges added to the
+   pool), and, switched off by default, **Adaptive Conformal Inference** (`adaptive_conformal.py`,
    Gibbs & Candès 2021; `aci:` in `config/ranges.yaml`). ACI keeps per market x horizon x band an
-   effective miss rate alpha_t, updated after each scored target date by
-   alpha_{t+1} = alpha_t + gamma (alpha_target - err_t), err_t = share of that date's ranges whose
-   close fell outside the band (0.5 target for the 50% band, 0.2 for the 80%). Only outcomes
-   scored at or before the calibration's time enter (`scored_at <= now`; no look-ahead).
-   `calibrate.py` then takes the pool quantiles at alpha_t/2 and 1 - alpha_t/2 (the 80% band never
-   narrower than the 50%), records `aci_alpha50|80` and `aci_steps`, and `ranges.py` uses them
-   unchanged. Settings: `gamma` (per scored date), `max_shift` (alpha stays within this of the
-   target), `min_history` (scored dates before alpha is used), `by_regime` (one alpha per regime
-   label). With ACI off the calibration rows and ranges are byte-for-byte as before
-   (`tests/test_aci_scoring.py`). Replay evidence (`replay.py --aci`) is in section 7; a human
-   switches it on (CLAUDE.md: ranges.yaml changes are proposed by `review.py`, applied by hand).
+   effective miss rate alpha_t, updated after each scored target date by alpha_{t+1} = alpha_t +
+   gamma (alpha_target - err_t), err_t = share of that date's ranges whose close fell outside the
+   band (0.5 target for the 50% band, 0.2 for the 80%). Only outcomes scored at or before the
+   calibration's time enter (`scored_at <= now`; no look-ahead). `calibrate.py` then takes the pool
+   quantiles at alpha_t/2 and 1 - alpha_t/2 (the 80% band never narrower than the 50%), records
+   `aci_alpha50|80` and `aci_steps`, and `ranges.py` uses them unchanged. Settings: `gamma` (per
+   scored date), `max_shift` (alpha stays within this of the target), `min_history` (scored dates
+   before alpha is used), `by_regime` (one alpha per regime label). With ACI off the calibration
+   rows and ranges are byte-for-byte as before (`tests/test_aci_scoring.py`). Replay evidence
+   (`replay.py --aci`) is in section 7; a human switches it on (CLAUDE.md: ranges.yaml changes are
+   proposed by `review.py`, applied by hand).
 
 ## 5. Role of the AI agents
 - **news-analyst:** classifies news with the PASDS scheme: sentiment, relevance, novelty, event
@@ -515,21 +514,21 @@ the same ticker's recent lessons plus recent ones from other tickers, point-in-t
 - Only the paragraph is written by an agent: the reflector, at most 60 words, citing only the stored
   call and outcome: what happened, what the evidence did or did not predict, one takeaway.
 - Gate (deterministic, `lessons.py validate`): each record cites an existing settled prediction id,
-  no stored lesson is repeated, 1-60 words, every copied fact equals the stored one, and every number
-  in the text matches the call or its outcome (return %, with the right sign if signed; confidence;
-  closes; band edges; the close's % distance from a band edge; the horizon; 50/80 for the bands; a
-  number already in the rationale; dates and ids are skipped). This gate replaces a per-run judge, like the other daily-run gates
-  (`scripts/validate.py`). `lessons.py add`
-  validates again and appends the facts recomputed from `data/` (never the agent's copy) plus the
-  text to `data/<market>/lessons/` (schema `lessons`), all or nothing.
+  no stored lesson is repeated, 1-60 words, every copied fact equals the stored one, and every
+  number in the text matches the call or its outcome (return %, with the right sign if signed;
+  confidence; closes; band edges; the close's % distance from a band edge; the horizon; 50/80 for
+  the bands; a number already in the rationale; dates and ids are skipped). This gate replaces a
+  per-run judge, like the other daily-run gates (`scripts/validate.py`). `lessons.py add` validates
+  again and appends the facts recomputed from `data/` (never the agent's copy) plus the text to
+  `data/<market>/lessons/` (schema `lessons`), all or nothing.
 - Availability: `settled_at` = the outcome's `scored_at`; `available_from` = the latest `scored_at`
   of the facts cited (outcome and range outcome). `context.py` adds "Lessons from past calls": the 3
   most recent lessons market-wide and each ticker's last 3, only with `available_from` <= the run's
   clock (`core.clock.clock()`, so an `MB_NOW` replay sees exactly what was settled by then; a newer
   version of the same lesson id replaces the older one). `ai_replay.py prepare` keeps lessons by
   `available_from` and `target_date` <= D. Tests (`tests/test_lessons.py`): no lesson visible before
-  its `available_from`; perturbing outcomes and lessons that became known after a past made_at leaves
-  that made_at's section byte-identical; validation catches a wrong number, a wrong sign, a
+  its `available_from`; perturbing outcomes and lessons that became known after a past made_at
+  leaves that made_at's section byte-identical; validation catches a wrong number, a wrong sign, a
   nonexistent or unsettled id, a wrong copied fact; the section's per-ticker and market-wide picks.
 - The forecaster (`forecast-v8`) weighs lessons as single anecdotes: they can make it more cautious
   or confirm a setup the track record supports, never override the prediction rules, never raise
@@ -544,7 +543,8 @@ the same ticker's recent lessons plus recent ones from other tickers, point-in-t
 
 Reported per market, per horizon, per regime, and over rolling 30-day and since-start windows.
 
-**Proper scores** (`marketbrief/analytics/scoring.py`, hand-written, tested on synthetic data with exact values):
+**Proper scores** (`marketbrief/analytics/scoring.py`, hand-written, tested on synthetic data with
+exact values):
 - Calls: Brier score mean((p - y)^2) with p = stated confidence and y = hit (a coin flip scores
   0.250), log loss -mean(y ln p + (1 - y) ln(1 - p)) (coin flip 0.693), Brier skill 1 - Brier/0.25,
   and a reliability table: confidence bins [0.5, 0.6), [0.6, 0.7), [0.7, 0.8), [0.8, 0.9] with
@@ -567,12 +567,13 @@ Reported per market, per horizon, per regime, and over rolling 30-day and since-
 everything rule-based is replayed walk-forward over all stored bars, one as-of day d at a time,
 with only what `ranges.py` would know pre-open the next session (bars up to d's close; earnings
 versions by the 10-Q/10-K reports accepted by that session date; dividends; major events).
-- Ranges: 1d and 5d 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles
-  at d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches
-  on, centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and `backtest` helpers.
-  Scored on the close h bars later: coverage overall and by regime, sector, ticker, month, year,
-  earnings and major event in horizon; interval score and width vs the naive range; calibration
-  (stated vs actual coverage, the two published bands plus other levels of the same pool).
+- Ranges: 1d and 5d 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles at
+  d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches on,
+  centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and
+  `backtest` helpers. Scored on the close h bars later: coverage overall and by regime, sector,
+  ticker, month, year, earnings and major event in horizon; interval score and width vs the naive
+  range; calibration (stated vs actual coverage, the two published bands plus other levels of the
+  same pool).
 - Regime per day (`regime.classify` on the vol index and benchmark closes, as `features.py`).
 - Direction baselines, labelled as such (the forecaster must beat them live): always-up, 1d and
   5d momentum sign, RSI(14) mean reversion (below 30 up, above 70 down; `indicators.py` has no
@@ -584,13 +585,13 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   previous close x fitted beta) is replayed. Past event dates count as known in advance.
 - Output: a self-contained, novice-first HTML page (three plain sentences answering "do the ranges
   keep their promise?", "where are they too wide or too narrow?" and "do simple up/down rules
-  work?", four big numbers, three captioned charts; every table, the full findings and the method
-  in collapsed sections) and the full results as JSON in `reports/<market>/replay-<end>.*`, plus
-  one append-only row in `data/<market>/replays/` (schema `replays`; the file is the UTC run date, the
+  work?", four big numbers, three captioned charts; every table, the full findings and the method in
+  collapsed sections) and the full results as JSON in `reports/<market>/replay-<end>.*`, plus one
+  append-only row in `data/<market>/replays/` (schema `replays`; the file is the UTC run date, the
   id `<start>_<end>@<computed_at>`, so a re-run of the same window is a new id). Tests
-  (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's
-  fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
-  synthetic series. About 22 s per market for five years of bars.
+  (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's fitted
+  index-cue beta split), unchanged when data after d is perturbed, baseline statistics on synthetic
+  series. About 22 s per market for five years of bars.
 - ACI mode (`--aci`, optional `--aci-gamma`, `--aci-by-regime on|off`, `--aci-tune-end DATE`): the
   same replay with ACI on (each day's alpha from the misses of ranges whose target close is on or
   before d), and a before/after table on the same rows (coverage at 50%/80%, width, interval
@@ -628,9 +629,9 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   wide, so alpha is kept per regime. UNSTABLE days are few, so their alpha moves slowly and the
   bands there stay wider than promised.
 
-  Held-out check (`--aci-tune-end 2024-12-31`; tuning on as-of dates to 2024-12-31, test on
-  the as-of dates after it, to 2026-10-05). In both markets the tuning dates select gamma 0.02 with one alpha,
-  not the config's settings, so the review's proposal stays PROVISIONAL. Fixed bands -> that
+  Held-out check (`--aci-tune-end 2024-12-31`; tuning on as-of dates to 2024-12-31, test on the
+  as-of dates after it, to 2026-10-05). In both markets the tuning dates select gamma 0.02 with one
+  alpha, not the config's settings, so the review's proposal stays PROVISIONAL. Fixed bands -> that
   selection on the unseen test dates:
 
   | Market, horizon | n | 50% held | 80% held | 50% score | 80% score | CALM 80% held |
@@ -652,8 +653,8 @@ because the model may have seen past outcomes. Days after its training data (as-
 script is deterministic and never runs an LLM; the orchestrating session runs the agents.
 - Leakage rule, from ForecastBench (forecastingresearch/forecastbench, MIT; Karger et al., arXiv
   2409.19839: questions must resolve after the model's training cutoff, else the model may already
-  know the answer): the cutoff is `model_training_cutoff` in `config/settings.yaml` (2026-06-30).
-  An as-of date after it is `fair`; on or before it, `contaminated`. `prepare` refuses a contaminated
+  know the answer): the cutoff is `model_training_cutoff` in `config/settings.yaml` (2026-06-30). An
+  as-of date after it is `fair`; on or before it, `contaminated`. `prepare` refuses a contaminated
   date unless `--allow-training-period` and labels its summary (`test`, `model_training_cutoff`);
   `record` labels every stored call and day; `score` relabels from the current config, scores the
   `fair` and `contaminated` groups separately (each its own hit rates, bands, baselines, abstention;
@@ -674,22 +675,23 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   week at a time, polls every ticker's results filings broadcast since then, and sets the per-ticker
   deals backfill. Rows keep their real publication/acceptance times (`first_seen_at` = the
   backfill time), which is what `prepare` filters on. Summary in `S/backfill-<M>.json`.
-- `prepare --market M --date D --root R [--source S]`: cutoff = the routine's start on the session after D
-  (08:15 ET, 08:10 IST; section 2). R gets copies of `config/`, `sql/`, `templates/` and
+- `prepare --market M --date D --root R [--source S]`: cutoff = the routine's start on the session
+  after D (08:15 ET, 08:10 IST; section 2). R gets copies of `config/`, `sql/`, `templates/` and
   `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
   (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
-  time; events first seen by the cutoff plus backfilled past events dated <= D; predictions,
-  ranges, outcomes and snapshots by their own made/scored/computed time, lessons by `available_from`; bulk/block deals by trade
-  date <= D (assumed: NSE publishes them after the close; listed under `assumptions`); kinds with
-  only an observation date (macro, shorts, FPI, indices, flows, delivery) only if first seen by the
-  cutoff. Upcoming earnings: only rows first seen by the cutoff count. `--assume-earnings-known DAYS`
-  (off by default) adds the actual earnings dates within DAYS after D as events labelled "ASSUMED
-  known in advance", as `replay.py` treats past event dates; stored rows never say when a date was
-  announced. News is dropped (stored news starts with live collection), and so are `summaries/` and
-  `reports/`. Then `features`, `calibrate`, `context` (`R/work/context.md`, plus a list of the
-  citable filing/announcement ids) and `ranges` run with `MB_ROOT=R` and `MB_NOW` = the cutoff:
-  `core.clock.clock()` freezes every "now"/"today" and `connect()` rewrites DuckDB's `current_date`.
-  A JSON summary lists every kind kept or dropped and the context pack's size.
+  time; events first seen by the cutoff plus backfilled past events dated <= D; predictions, ranges,
+  outcomes and snapshots by their own made/scored/computed time, lessons by `available_from`;
+  bulk/block deals by trade date <= D (assumed: NSE publishes them after the close; listed under
+  `assumptions`); kinds with only an observation date (macro, shorts, FPI, indices, flows, delivery)
+  only if first seen by the cutoff. Upcoming earnings: only rows first seen by the cutoff count.
+  `--assume-earnings-known DAYS` (off by default) adds the actual earnings dates within DAYS after D
+  as events labelled "ASSUMED known in advance", as `replay.py` treats past event dates; stored rows
+  never say when a date was announced. News is dropped (stored news starts with live collection),
+  and so are `summaries/` and `reports/`. Then `features`, `calibrate`, `context`
+  (`R/work/context.md`, plus a list of the citable filing/announcement ids) and `ranges` run with
+  `MB_ROOT=R` and `MB_NOW` = the cutoff: `core.clock.clock()` freezes every "now"/"today" and
+  `connect()` rewrites DuckDB's `current_date`. A JSON summary lists every kind kept or dropped and
+  the context pack's size.
 - `record`: validates forecaster records (schema `predictions`, id format, as_of_date = D,
   horizon 1/5, confidence 0.50-0.90, `range_widen` <= 0.5, rationale <= 40 words, evidence ids
   present in R's news/filings/announcements, no BLOCKED ticker, no `days_to_earnings` <= 1 in R)
@@ -707,8 +709,8 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   backfill) and their unchanged default (one call over the configured lookback).
 - Evidence: the repo's own data has zero citable ids on every sample day (stored SEC filings start
   2026-09-28, news 2026-10-02/04, no NSE announcements), so replays read a `backfill` source. With
-  `--since 2026-06-01` (run 2026-10-05) every sample day has 36-94 citable SEC filing ids (US, mostly
-  Form 4) and 89-186 NSE announcement ids (India) public in the 14 days before the cutoff.
+  `--since 2026-06-01` (run 2026-10-05) every sample day has 36-94 citable SEC filing ids (US,
+  mostly Form 4) and 89-186 NSE announcement ids (India) public in the 14 days before the cutoff.
 - Upcoming earnings, honestly as of D: none of the stored sources says when a date was announced.
   yfinance (upcoming and past dates), SEC 8-K item 2.02 and NSE results filings give the actual
   release dates, known only once they happen; NSE board-meeting intimations are a separate NSE feed
@@ -757,7 +759,8 @@ always show the same numbers.
 
 ## 10. Build phases
 1. Markets config, extra inputs, PASDS indicators, regime, event calendar. **(built)**
-2. Range engine, self-calibration, scoring against baselines; backtest of range formulas. **(built)**
+2. Range engine, self-calibration, scoring against baselines; backtest of range formulas.
+   **(built)**
 3. Charts, new report layout, Slack message, two routines. **(built; routines to be created once the
    environment's network access is set)**
 4. Weekly review: what improved coverage, what to drop. **(built: `scripts/review.py`, run by the
@@ -812,28 +815,30 @@ always show the same numbers.
    in `fundamentals_metrics`, 10-12 per ticker):
    - Banks and insurers (ALL, BAC, JPM, PGR) tag no gross or operating profit: both margins blank.
    - Operating margin is also blank for CVX, LLY, MRK and XOM (no `OperatingIncomeLoss`) and for DE
-     (no quarterly `OperatingIncomeLoss`: SEC companyconcept, read 2026-10-07, has DE quarters only up
-     to the 10-Q for the quarter ended 2023-07-30, and fiscal-year totals up to FY2024).
+     (no quarterly `OperatingIncomeLoss`: SEC companyconcept, read 2026-10-07, has DE quarters only
+     up to the 10-Q for the quarter ended 2023-07-30, and fiscal-year totals up to FY2024).
    - Gross margin is also blank for DAL, DE, GM, UAL and XOM (no gross profit and no cost of revenue
      among the collected tags).
    - FCF is blank for BAC and JPM (no capex tagged). DAL tags capex only in parts in its Q2 2026
      10-Q, so its latest quarter has no capex or FCF (9 of 10 quarters have them). ALL, NVDA and WMT
-     lack capex only in their first quarter in the window (no earlier year-to-date total to subtract).
+     lack capex only in their first quarter in the window (no earlier year-to-date total to
+     subtract).
    - Total debt on the latest balance sheet is blank for CAT, DE and GM (debt tagged only in parts
      or custom tags).
    - META has no company-total shares-outstanding fact in company facts (likely because it reports
      class A and B shares separately), so its `shares_out` is blank.
-   - Where no gross profit is tagged but a cost of revenue is (CAT, COST, CVX, GOOGL, LLY, META, MRK,
-     WMT), gross margin is computed as (revenue - cost of revenue) / revenue and marked `c`: a
+   - Where no gross profit is tagged but a cost of revenue is (CAT, COST, CVX, GOOGL, LLY, META,
+     MRK, WMT), gross margin is computed as (revenue - cost of revenue) / revenue and marked `c`: a
      uniform formula, not the company's own measure. It misleads for some: CVX's "cost" is purchased
      crude and products (47.8% for Q2 2026, not an oil major's margin), CAT's revenue includes
      financial-services revenue, and WMT's and COST's includes membership fees.
 
-   **Not point in time:** the plain views (`fundamentals_latest`, `_quarterly`, `_metrics`) use every
-   stored filing, so a restated or split-adjusted value replaces the original. A backtest or any
-   as-of question must use the macros `fundamentals_latest_asof(ts)`, `fundamentals_quarterly_asof(ts)`
-   and `fundamentals_metrics_asof(ts)`, which see only filings known by `ts` (`known_at` =
-   acceptance time, or the end of the filing date in UTC when SEC's list no longer holds it).
+   **Not point in time:** the plain views (`fundamentals_latest`, `_quarterly`, `_metrics`) use
+   every stored filing, so a restated or split-adjusted value replaces the original. A backtest or
+   any as-of question must use the macros `fundamentals_latest_asof(ts)`,
+   `fundamentals_quarterly_asof(ts)` and `fundamentals_metrics_asof(ts)`, which see only filings
+   known by `ts` (`known_at` = acceptance time, or the end of the filing date in UTC when SEC's list
+   no longer holds it).
 
 Later (parked): options for India and US, paper first, only once stock ranges are proven calibrated.
 
@@ -867,46 +872,45 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
 - India price fallback, added 2026-10-06: Yahoo had no 2026-10-05 bar for SBILIFE, HDFCLIFE,
   DRREDDY, MARUTI and ULTRACEMCO (it jumped from 10-01 to 10-06 although NSE traded on 10-05).
   `collect_prices.py` now fills a watchlist stock's missing bar for any of the last
-  `price_fallback.sessions` (5) completed sessions of the exchange calendar from NSE's
-  security-wise bhavcopy (`sec_bhavdata_full_DDMMYYYY.csv` on nsearchives.nseindia.com, the file
-  `collect_nse_india.py` reads for delivery %; series EQ, used only when its DATE1 is that
-  session). Yahoo is asked first and a (date, ticker) is written once, so the fallback never
-  replaces a bar. Price basis: the bhavcopy is as traded. yfinance's `Close` with
-  `auto_adjust=False` is not dividend-adjusted but is split/bonus-adjusted as of the collection
-  time, so stored bars collected after a split or bonus sit on the post-event basis: HDFCBANK
-  2025-08-22 (stored on 2026-10-05, after the 1:1 bonus with ex-date 2025-08-26) has close 982.3
-  and volume 19,833,502, while NSE's bhavcopy has 1964.60 and 9,916,751. The bhavcopy's
-  PREV_CLOSE is not adjusted either (26-Aug-2025: 1964.10). So a bhavcopy bar is written only
-  when its PREV_CLOSE is within 0.5% of our stored close of the previous session and the Yahoo
-  frame shows no split or bonus after that session; otherwise the stock stays in `failed` with
-  the reason (`missing_after_nse`). A bar on a split's ex-date is refused when the Yahoo frame
-  shows the split, or when our stored previous close was collected after the split (adjusted)
-  while PREV_CLOSE is not. (If Yahoo returned no frame and the stored previous close is itself
-  the unadjusted pre-split close, the check passes and the post-split bar is written next to
-  it: the same step a Yahoo collection made on that day leaves in the append-only store.) Where no split or bonus intervened the two
-  sources agree: for the 20 watchlist stocks on six sessions (2026-09-24 to 10-01, 120
-  stock-days) the stored Yahoo bars matched the bhavcopy's open, high, low and close to within
-  0.0002 (Yahoo's float rounding, e.g. 3858.3999 for 3858.40) and its volume exactly. `adj_close`
-  is set to the close on filled rows (as Yahoo gives for a new bar). The prices CSV has a fixed
-  column list (`read_csv` with `columns=`), so no source column was added; instead each filled
-  bar gets a row in `data/<market>/price_sources/` (id, date, ticker, source `nse_bhavcopy`, url,
-  filled_at; files dated by the bar's trading date) and the view `bar_sources` gives every
-  stored bar's source (`yahoo` unless a price_sources row names another). The collector summary
-  lists each fallback bar in `filled_from_nse`, moves a Yahoo failure to `resolved_by_nse` only
-  when every checked session is stored afterwards and its newest bar before the fallback was at
-  most `sessions` sessions behind, and otherwise keeps it in `failed` (`missing_after_nse` with
-  date and reason, or `newest_stored_bar` and `sessions_behind` for a gap older than the checked
-  sessions). For India, collect_prices therefore reads NSE and must not run alongside an NSE
-  collector.
+  `price_fallback.sessions` (5) completed sessions of the exchange calendar from NSE's security-wise
+  bhavcopy (`sec_bhavdata_full_DDMMYYYY.csv` on nsearchives.nseindia.com, the file
+  `collect_nse_india.py` reads for delivery %; series EQ, used only when its DATE1 is that session).
+  Yahoo is asked first and a (date, ticker) is written once, so the fallback never replaces a bar.
+  Price basis: the bhavcopy is as traded. yfinance's `Close` with `auto_adjust=False` is not
+  dividend-adjusted but is split/bonus-adjusted as of the collection time, so stored bars collected
+  after a split or bonus sit on the post-event basis: HDFCBANK 2025-08-22 (stored on 2026-10-05,
+  after the 1:1 bonus with ex-date 2025-08-26) has close 982.3 and volume 19,833,502, while NSE's
+  bhavcopy has 1964.60 and 9,916,751. The bhavcopy's PREV_CLOSE is not adjusted either (26-Aug-2025:
+  1964.10). So a bhavcopy bar is written only when its PREV_CLOSE is within 0.5% of our stored close
+  of the previous session and the Yahoo frame shows no split or bonus after that session; otherwise
+  the stock stays in `failed` with the reason (`missing_after_nse`). A bar on a split's ex-date is
+  refused when the Yahoo frame shows the split, or when our stored previous close was collected
+  after the split (adjusted) while PREV_CLOSE is not. (If Yahoo returned no frame and the stored
+  previous close is itself the unadjusted pre-split close, the check passes and the post-split bar
+  is written next to it: the same step a Yahoo collection made on that day leaves in the append-only
+  store.) Where no split or bonus intervened the two sources agree: for the 20 watchlist stocks on
+  six sessions (2026-09-24 to 10-01, 120 stock-days) the stored Yahoo bars matched the bhavcopy's
+  open, high, low and close to within 0.0002 (Yahoo's float rounding, e.g. 3858.3999 for 3858.40)
+  and its volume exactly. `adj_close` is set to the close on filled rows (as Yahoo gives for a new
+  bar). The prices CSV has a fixed column list (`read_csv` with `columns=`), so no source column was
+  added; instead each filled bar gets a row in `data/<market>/price_sources/` (id, date, ticker,
+  source `nse_bhavcopy`, url, filled_at; files dated by the bar's trading date) and the view
+  `bar_sources` gives every stored bar's source (`yahoo` unless a price_sources row names another).
+  The collector summary lists each fallback bar in `filled_from_nse`, moves a Yahoo failure to
+  `resolved_by_nse` only when every checked session is stored afterwards and its newest bar before
+  the fallback was at most `sessions` sessions behind, and otherwise keeps it in `failed`
+  (`missing_after_nse` with date and reason, or `newest_stored_bar` and `sessions_behind` for a gap
+  older than the checked sessions). For India, collect_prices therefore reads NSE and must not run
+  alongside an NSE collector.
 - Issue #9, done 2026-10-05 (no new network access needed):
-  - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the
-    close of the third Friday of March, June, September and December (the triple-witching day),
-    and the Nifty 50 semi-annual rebalance at the close of the session before the last trading
-    session of March and September (new rule `month_end` with `session_offset: -1`). Both are
-    listed with `major: false`: they are announced weeks ahead and their volume sits in the
-    closing auction of the changed names, so they do not raise EVENT_HEAVY or widen ranges on
-    their own (the S&P day is EVENT_HEAVY anyway through triple witching). The sources are cited
-    in the file; the S&P date when the third Friday is a holiday (Juneteenth 2026 and 2027) is provisional.
+  - Index rebalances are rules in `config/events.yaml`: the S&P 500 quarterly rebalance at the close
+    of the third Friday of March, June, September and December (the triple-witching day), and the
+    Nifty 50 semi-annual rebalance at the close of the session before the last trading session of
+    March and September (new rule `month_end` with `session_offset: -1`). Both are listed with
+    `major: false`: they are announced weeks ahead and their volume sits in the closing auction of
+    the changed names, so they do not raise EVENT_HEAVY or widen ranges on their own (the S&P day is
+    EVENT_HEAVY anyway through triple witching). The sources are cited in the file; the S&P date
+    when the third Friday is a holiday (Juneteenth 2026 and 2027) is provisional.
   - US sector ETFs: one per watchlist sector (10): the eight SPDR funds plus JETS (Airlines) and
     IAK (Insurance). Each sector ETF lists the watchlist sectors it stands for (`sectors:` in
     `config/markets/<market>.yaml`); the context pack shows the mapping in the sector ETF table
@@ -914,16 +918,17 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     seven of ten; only Nifty Bank, IT and Pharma are configured, see `config/markets/india.yaml`).
     JETS and IAK returned two years of daily bars through yfinance on 2026-10-05.
 - Issue #9, remaining free sources: **built 2026-10-05** after the hosts were allowlisted (checked
-  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in `marketbrief/sources/free_source_client.py`:
-  identifying User-Agent, 0.5-1 s between requests, up to 3 attempts on a dropped connection, none
-  on an HTTP error; every unread source or session file is listed in `failed`):
-  - `collect_macro.py` (US): Treasury par yield curve CSV (`home.treasury.gov`, HTTP 200);
-    FRED `fredgraph.csv` (no key) for `BAMLH0A0HYM2`, `BAMLC0A0CM`, `T10YIE`. FRED answered
-    HTTP 200 to Python's urllib (the live collector runs), but curl got an empty reply or an
-    HTTP/2 stream reset on every try, and one single-attempt urllib request was dropped without
-    an answer between successful ones: hence the retries. DGS2/DGS10/T10Y2Y are not fetched (Treasury's own par yields are the same H.15
-    data; the view `macro_series` derives 10y-2y and 10y-3m), nor VIXCLS and DTWEXBGS (Yahoo
-    `^VIX`, `DX-Y.NYB` already). Cboe daily options statistics JSON
+  ~21:45-22:15 UTC through the session's egress proxy). Collectors (HTTP client in
+  `marketbrief/sources/free_source_client.py`: identifying User-Agent, 0.5-1 s between requests, up
+  to 3 attempts on a dropped connection, none on an HTTP error; every unread source or session file
+  is listed in `failed`):
+  - `collect_macro.py` (US): Treasury par yield curve CSV (`home.treasury.gov`, HTTP 200); FRED
+    `fredgraph.csv` (no key) for `BAMLH0A0HYM2`, `BAMLC0A0CM`, `T10YIE`. FRED answered HTTP 200 to
+    Python's urllib (the live collector runs), but curl got an empty reply or an HTTP/2 stream reset
+    on every try, and one single-attempt urllib request was dropped without an answer between
+    successful ones: hence the retries. DGS2/DGS10/T10Y2Y are not fetched (Treasury's own par yields
+    are the same H.15 data; the view `macro_series` derives 10y-2y and 10y-3m), nor VIXCLS and
+    DTWEXBGS (Yahoo `^VIX`, `DX-Y.NYB` already). Cboe daily options statistics JSON
     (`cdn.cboe.com/data/us/options/market_statistics/daily/<date>_daily_options`, HTTP 200; a day
     without a file answers 403) gives the put/call ratios. Cboe's VIX/VIX3M/VIX9D history CSVs
     (`cdn.cboe.com/api/global/us_indices/daily_prices/*_History.csv`) redirect (307) to
@@ -939,12 +944,12 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     (`fpi.nsdl.co.in/web/Reports/Latest.aspx`, HTTP 200; `www.fpi.nsdl.co.in` is refused by the
     proxy) and NSE's daily index close file (`nsearchives.nseindia.com/content/indices/
     ind_close_all_<DDMMYYYY>.csv`, HTTP 200; 404 on a holiday) for 14 configured indices, one per
-    watchlist sector, so the seven sectors without a Yahoo index get level, 1- and 5-session
-    change and valuation in the context pack (not in the indicators: the stored history starts
-    with the first run's 10-day lookback). `www.niftyindices.com` answers HTTP 200, but its data endpoints
-    (`Backpage.aspx/getHistoricaldatatabletoString`, `.../getpepbHistoricaldataDBtoString`)
-    return the home page and `Daily_Snapshot/ind_close_all_*.csv` its 404 page, so NSE's
-    archive is used instead.
+    watchlist sector, so the seven sectors without a Yahoo index get level, 1- and 5-session change
+    and valuation in the context pack (not in the indicators: the stored history starts with the
+    first run's 10-day lookback). `www.niftyindices.com` answers HTTP 200, but its data endpoints
+    (`Backpage.aspx/getHistoricaldatatabletoString`, `.../getpepbHistoricaldataDBtoString`) return
+    the home page and `Daily_Snapshot/ind_close_all_*.csv` its 404 page, so NSE's archive is used
+    instead.
   - Not built: AMFI (`portal.amfiindia.com/spages/NAVAll.txt` answers HTTP 200, but scheme NAVs
     say nothing about 1- or 5-day stock moves, and AMFI's monthly net-flow figures come as monthly
     PDF/Excel reports about ten days after month end); BSE announcements: `www.bseindia.com`
@@ -973,7 +978,8 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   - Treasury yields: `home.treasury.gov`; FRED: `fred.stlouisfed.org`, `api.stlouisfed.org`
   - FINRA short volume: `www.finra.org`, `cdn.finra.org`, `api.finra.org`
   - CBOE put/call ratios: `www.cboe.com`, `cdn.cboe.com`
-  - AMFI mutual-fund flows: `www.amfiindia.com`, `portal.amfiindia.com`; NSDL FPI flows: `www.fpi.nsdl.co.in`
+  - AMFI mutual-fund flows: `www.amfiindia.com`, `portal.amfiindia.com`; NSDL FPI flows:
+    `www.fpi.nsdl.co.in`
   - Yahoo web pages: `finance.yahoo.com`. yfinance worked without it on 2026-10-05 (daily bars,
     fund holdings and an option chain were fetched); its API hosts query1.finance.yahoo.com and
     query2.finance.yahoo.com, and consent.yahoo.com and fc.yahoo.com, all accepted a connection,
@@ -990,21 +996,20 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   used daily and per-ticker backfill on demand. Earlier note, kept for history:
 - On the first India run with NSE allowed, check `collect_relations_india.py` field mappings
   against live responses (NSE changes field names; built from public scrapers, not yet seen live).
-- Section 4 range inputs: **built** (`marketbrief/analytics/range_switches.py` and its neighbours, switches in
-  `config/ranges.yaml`):
-  past earnings-day moves (dates and before-open/after-close timing from yfinance and, US, SEC
-  8-K item 2.02, India, NSE results filings; backfilled by `collect_events.py`), ex-dividend
-  shift (dividend amounts now collected), index-then-stock beta split of the overnight cue (US: `ES`; India: previous `SPX`
-  session with a fitted beta), and US option-implied vol (`collect_options.py`) in the width
-  blend and as the implied earnings move. The range notes and the `inputs` column say which
-  applied, so the weekly review can score each one live.
-  US earnings dates from SEC (2026-10-05): item 2.02 is not only the results release. Tesla files
-  its quarterly deliveries under it (about the 2nd of Jan/Apr/Jul/Oct), Allstate its catastrophe-loss
-  pre-announcements (to April 2024); Chevron an impairment (2024-01-02) and quarter guidance
-  (2026-04-09), Lilly a guidance update (2025-01-14), United a debt redemption (2025-07-09),
-  Caterpillar a director appointment (2024-10-11). A fresh backfill held 23 pairs of US earnings
-  dates under 45 days apart among 283. `collect_events.py` now also stores each 10-Q/10-K
-  acceptance (`periodic_report` rows with `period_end`), and
+- Section 4 range inputs: **built** (`marketbrief/analytics/range_switches.py` and its neighbours,
+  switches in `config/ranges.yaml`): past earnings-day moves (dates and before-open/after-close
+  timing from yfinance and, US, SEC 8-K item 2.02, India, NSE results filings; backfilled by
+  `collect_events.py`), ex-dividend shift (dividend amounts now collected), index-then-stock beta
+  split of the overnight cue (US: `ES`; India: previous `SPX` session with a fitted beta), and US
+  option-implied vol (`collect_options.py`) in the width blend and as the implied earnings move. The
+  range notes and the `inputs` column say which applied, so the weekly review can score each one
+  live. US earnings dates from SEC (2026-10-05): item 2.02 is not only the results release. Tesla
+  files its quarterly deliveries under it (about the 2nd of Jan/Apr/Jul/Oct), Allstate its
+  catastrophe-loss pre-announcements (to April 2024); Chevron an impairment (2024-01-02) and quarter
+  guidance (2026-04-09), Lilly a guidance update (2025-01-14), United a debt redemption
+  (2025-07-09), Caterpillar a director appointment (2024-10-11). A fresh backfill held 23 pairs of
+  US earnings dates under 45 days apart among 283. `collect_events.py` now also stores each
+  10-Q/10-K acceptance (`periodic_report` rows with `period_end`), and
   `event_history.results_filter` keeps, per report, the latest 2.02 after its period end and up to a
   day after its acceptance; other 2.02s are not earnings. A 2.02 whose 10-Q is not filed yet still
   counts, unless a year of releases is confirmed and it comes before the next period end or sooner
@@ -1013,13 +1018,13 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   those accepted by made_at's date, `backtest.py` the ones accepted by each day d
   (`earnings_versions`). Stored rows are never removed; the filter applies when the dates are read.
   Where yfinance and SEC disagree, SEC wins: of the 210 past yfinance report dates between each
-  ticker's first and last confirmed SEC release, 208 are within 3 days of one; the two others are PGR 2023-10-31 (the 10-Q day;
-  +1.9% that day vs +8.1% on the 2023-10-13 release) and COST 2024-06-06 (the day after the 10-Q;
-  the press release is dated 2024-05-30), so a past yfinance date within 45 days of a confirmed
-  release is dropped. Result: 260 dates, no pair under 45 days. Backtest to 2026-10-02 (250
-  sessions), past moves vs the fixed x3: 1d 20.73 -> 20.20 (n 85) before, 20.90 -> 20.53 (n 80)
-  after, still improves (on); 5d 23.85 -> 24.03 (n 424) before, 23.90 -> 24.17 (n 400) after,
-  still worse (off).
+  ticker's first and last confirmed SEC release, 208 are within 3 days of one; the two others are
+  PGR 2023-10-31 (the 10-Q day; +1.9% that day vs +8.1% on the 2023-10-13 release) and COST
+  2024-06-06 (the day after the 10-Q; the press release is dated 2024-05-30), so a past yfinance
+  date within 45 days of a confirmed release is dropped. Result: 260 dates, no pair under 45 days.
+  Backtest to 2026-10-02 (250 sessions), past moves vs the fixed x3: 1d 20.73 -> 20.20 (n 85)
+  before, 20.90 -> 20.53 (n 80) after, still improves (on); 5d 23.85 -> 24.03 (n 424) before, 23.90
+  -> 24.17 (n 400) after, still worse (off).
 - Backtest of the inputs. **Rule** (section 7, one window): an input is on for a market and
   horizon only if `backtest.py` over the stated 250 sessions (to 2026-10-02 US, 2026-10-01
   India) lowers the 80% interval score (in % of price, scored only where the input applies) by
@@ -1042,32 +1047,31 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   announcement up to 36 hours earlier, timed in IST; quarters first filed after the SEBI deadline
   are dropped): 228 reports from 2023-10-11 to 2026-08-07, 12 per ticker except the insurers
   HDFCLIFE and SBILIFE (6 each from April 2025; NSE's older list gave no rows for them in the
-  window, so yfinance supplies their 6 earlier ones), timed 29 before the open, 74 during, 125
-  after the close. With
-  these dates the fixed x3 was too wide (1d earnings ranges covered 91.0% of 78, 5d 85.4% of 391).
-  Past moves at x3 passed the rule (1d 11.54 -> 10.57, 5d 15.445 -> 15.10), but a lower fixed
-  multiple beat both: the fixed arm scored 1d 10.48 / 9.74 / 9.73 and 5d 15.01 / 14.97 / 15.36 at
-  x2.5 / x2 / x1.5 (x3: 11.54, 15.445). x2 is the only value best or within noise of best at both
-  horizons, so India uses `earnings_vol_multiple_by_market: {india: 2.0}`, and against x2 past
-  moves are worse at both horizons (off). The value was picked from these four on the same window;
-  the 440-session check agrees (fixed 1d x3 11.42, x2.5 10.45, x2 9.95, x1.5 10.09; 5d 15.61,
-  15.11, 15.04, 15.37; past moves vs x2 1d 9.95 -> 10.07, 5d 15.04 -> 15.12, worse). At x2 the 5d
-  earnings ranges cover 73.4% (1d 83.3%): the interval score is lower, but the weekly review
-  should watch 5d earnings coverage. Before the NSE dates the India backtest had no earnings
-  rows at 250 sessions and 38 at 440 (1d covered 97.4%). In the US every stock has its own pre-market cue, so with equal weights the beta
-  split equals the direct cue; US cue history is a proxy (next open gap, which flatters cues in
-  absolute terms). Implied vol cannot be backtested: it is off, `collect_options.py` keeps
-  collecting, and each range row stores the sigma the IV blend would have given (`iv_sigma_h`,
-  same centre) so the weekly review can score it against `sigma_h` before switching it on.
-  With every input off, `ranges.py` output equals the code before these inputs except the new
-  `inputs` and `iv_sigma_h` fields (checked on the stored data of both markets).
+  window, so yfinance supplies their 6 earlier ones), timed 29 before the open, 74 during, 125 after
+  the close. With these dates the fixed x3 was too wide (1d earnings ranges covered 91.0% of 78, 5d
+  85.4% of 391). Past moves at x3 passed the rule (1d 11.54 -> 10.57, 5d 15.445 -> 15.10), but a
+  lower fixed multiple beat both: the fixed arm scored 1d 10.48 / 9.74 / 9.73 and 5d 15.01 / 14.97 /
+  15.36 at x2.5 / x2 / x1.5 (x3: 11.54, 15.445). x2 is the only value best or within noise of best
+  at both horizons, so India uses `earnings_vol_multiple_by_market: {india: 2.0}`, and against x2
+  past moves are worse at both horizons (off). The value was picked from these four on the same
+  window; the 440-session check agrees (fixed 1d x3 11.42, x2.5 10.45, x2 9.95, x1.5 10.09; 5d
+  15.61, 15.11, 15.04, 15.37; past moves vs x2 1d 9.95 -> 10.07, 5d 15.04 -> 15.12, worse). At x2
+  the 5d earnings ranges cover 73.4% (1d 83.3%): the interval score is lower, but the weekly review
+  should watch 5d earnings coverage. Before the NSE dates the India backtest had no earnings rows at
+  250 sessions and 38 at 440 (1d covered 97.4%). In the US every stock has its own pre-market cue,
+  so with equal weights the beta split equals the direct cue; US cue history is a proxy (next open
+  gap, which flatters cues in absolute terms). Implied vol cannot be backtested: it is off,
+  `collect_options.py` keeps collecting, and each range row stores the sigma the IV blend would have
+  given (`iv_sigma_h`, same centre) so the weekly review can score it against `sigma_h` before
+  switching it on. With every input off, `ranges.py` output equals the code before these inputs
+  except the new `inputs` and `iv_sigma_h` fields (checked on the stored data of both markets).
 
 ## 12. Neo4j projection (graph copy for analysis)
 All data and results are also loaded into a Neo4j database for graph questions (who is connected to
 whom, who traded before what, which evidence led to good calls). **The repo stays the source of
 truth**: `data/` is append-only and `scripts/neo4j_sync.py` only reads it (through the DuckDB views
-of `core.database.connect`). Neo4j is a derived copy; `--full` deletes one market's nodes and rebuilds them
-from the repo, so emptying or losing the database loses nothing.
+of `core.database.connect`). Neo4j is a derived copy; `--full` deletes one market's nodes and
+rebuilds them from the repo, so emptying or losing the database loses nothing.
 
 **Connection.** Environment variables `NEO4J_URI` (`neo4j+s://<id>.databases.neo4j.io`; only the
 host is used), `NEO4J_USER`, `NEO4J_PASSWORD`, optional `NEO4J_DATABASE`. Bolt is not reachable
@@ -1216,7 +1220,8 @@ against the user's Aura instance returned `[[1]]`. No live sync has been run yet
 ## 13. Model selection (decided 2026-10-06)
 
 Each subagent's model and effort are set in its `.claude/agents/<name>.md` frontmatter (`model:`,
-`effort:`). Volume work runs on cheaper models; the scored decision and all verification stay on Opus.
+`effort:`). Volume work runs on cheaper models; the scored decision and all verification stay on
+Opus.
 
 | Job | Model | Effort |
 |---|---|---|
@@ -1230,29 +1235,32 @@ Each subagent's model and effort are set in its `.claude/agents/<name>.md` front
 | claim-checker (claim extraction from article extracts and filing texts; section 3b) | Claude Sonnet 5.5 | high |
 | orchestrator (the routine session itself, incl. report narrative) | the routine sessions' configured model: `claude-opus-5-5` (India and US routine sessions, checked 2026-10-06) | session default |
 
-Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the user chooses it manually for complex planning. Whether a
-scheduled routine honours per-subagent `model:`/`effort:` is not documented; the first routine run
-must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
-(forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits, forecast-v9
-also covering the forecaster's lessons bullet; forecast-v10, news-v8 and claims-v3 with news verification phase B;
-forecast-v11 with the signal-model anchor and the debate record (section 15); forecast-v12 when calls
-are scored open-to-close from the `call_scoring` switch (section 6);
-reflect-v1 started with the Sonnet 5.5 / medium frontmatter; news-v9 and reflect-v2 only reword the schema path and
-the lessons gate), and a per-call `model` field on predictions is a planned follow-up.
+Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the
+user chooses it manually for complex planning. Whether a scheduled routine honours per-subagent
+`model:`/`effort:` is not documented; the first routine run must confirm it from the transcript
+(model per subagent call). The intent is to compare the track record before and after this change:
+prompt versions were bumped with it (forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4
+after the validation-gate edits, forecast-v9 also covering the forecaster's lessons bullet;
+forecast-v10, news-v8 and claims-v3 with news verification phase B; forecast-v11 with the
+signal-model anchor and the debate record (section 15); forecast-v12 when calls are scored
+open-to-close from the `call_scoring` switch (section 6); reflect-v1 started with the Sonnet 5.5 /
+medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate), and a
+per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
-- **Reflection log** (section 5): TauricResearch/TradingAgents (https://github.com/TauricResearch/TradingAgents,
-  Apache-2.0). Its memory log settles each past decision against the realised return, has a model
-  write a short reflection (`tradingagents/memory/reflection.py`, `settlement.py`), and gives later
-  runs the same ticker's recent decisions plus recent lessons from other tickers, filtered to those
-  resolved by the trade date in historical runs. Only the idea is reused, no code: here the facts
-  are computed by `scripts/lessons.py`, the lesson is checked number by number, and visibility is
-  keyed on the scoring time.
-- **Leakage rule for the AI replay** (section 7): ForecastBench (https://github.com/forecastingresearch/forecastbench,
-  MIT; Karger et al., "ForecastBench: A Dynamic Benchmark of AI Forecasting Capabilities", arXiv
-  2409.19839). Only forecasts on questions that resolve after the model's training cutoff are a
-  fair test; here as-of dates on or before `model_training_cutoff` are labelled contaminated and
-  scored separately.
+- **Reflection log** (section 5): TauricResearch/TradingAgents
+  (https://github.com/TauricResearch/TradingAgents, Apache-2.0). Its memory log settles each past
+  decision against the realised return, has a model write a short reflection
+  (`tradingagents/memory/reflection.py`, `settlement.py`), and gives later runs the same ticker's
+  recent decisions plus recent lessons from other tickers, filtered to those resolved by the trade
+  date in historical runs. Only the idea is reused, no code: here the facts are computed by
+  `scripts/lessons.py`, the lesson is checked number by number, and visibility is keyed on the
+  scoring time.
+- **Leakage rule for the AI replay** (section 7): ForecastBench
+  (https://github.com/forecastingresearch/forecastbench, MIT; Karger et al., "ForecastBench: A
+  Dynamic Benchmark of AI Forecasting Capabilities", arXiv 2409.19839). Only forecasts on questions
+  that resolve after the model's training cutoff are a fair test; here as-of dates on or before
+  `model_training_cutoff` are labelled contaminated and scored separately.
 
 ## 15. Signal model: an explainable up/down probability (built 2026-10-06)
 
@@ -1265,8 +1273,8 @@ forecaster now starts from it. Research only: the model never trades and never c
 close. 1-day: buy at the open of D, sell at the close of D+1 (two sessions held). 5-day: buy at the
 open of D, sell at the close of D+4 (five sessions). Up = return > 0. A cost-aware label (return >
 round-trip cost) is reported too. Secondary label: close-to-close, from the as-of close to the close
-of D (1-day) or D+4 (5-day), the convention `score_predictions.py` uses for calls. A label is missing
-when the ticker has no bar on a benchmark session it spans (`marketbrief/model/labels.py`).
+of D (1-day) or D+4 (5-day), the convention `score_predictions.py` uses for calls. A label is
+missing when the ticker has no bar on a benchmark session it spans (`marketbrief/model/labels.py`).
 
 **Features at the as-of date (no look-ahead; `technical_panel.py`, `market_panel.py`, `panel.py`).**
 - Per ticker: 1/3/5/20-day returns, 10-day rate of change, EMA 9/21 ratio, close vs 20-day high,
@@ -1276,73 +1284,78 @@ when the ticker has no bar on a benchmark session it spans (`marketbrief/model/l
 - Market: benchmark 5-day return and 10-day vol, vol index level and its 1-day change, the regime
   one-hot (`regime.classify` on closes and scheduled events) and the index cue's last daily return
   (`index_cue`: US ES futures, India the S&P 500 session of the as-of date, which closes before D
-  opens). Training and live scoring both use closes, never a pre-open quote, so both see one definition.
+  opens). Training and live scoring both use closes, never a pre-open quote, so both see one
+  definition.
 - Events: earnings or ex-dividend inside the holding window, from rows stored by the as-of date.
 - Flows where history exists: India NSE FII/DII provisional cash (date <= d) and NSDL FPI equity net
   (reporting date < d: it is published the next day); US FINRA short-volume share and Form 4 net
-  open-market buying over 30 days (accepted by d). Before the first stored row of a kind the value is
-  missing, never 0.
-- A feature enters a fit only when it is present in at least 80% of the training rows and varies there.
-  On today's data the event and flow features have days of history, not months, so every fit leaves them
-  out (listed with the reason in each stored model).
+  open-market buying over 30 days (accepted by d). Before the first stored row of a kind the value
+  is missing, never 0.
+- A feature enters a fit only when it is present in at least 80% of the training rows and varies
+  there. On today's data the event and flow features have days of history, not months, so every fit
+  leaves them out (listed with the reason in each stored model).
 
-**The formula (`logistic.py`; settings in `config/model.yaml`, fixed before the backtest, never tuned
-on it).** z_j = clip((x_j - mean_j) / sd_j, -5, 5), 0 when missing (= the training mean); logit = b0 +
-sum_j b_j z_j; the weights minimise mean log loss + 0.05 / 2 * sum b_j^2 (b0 not penalised), solved by
-Newton's method (unique optimum; tested against the gradient condition). One model per market x
-horizon: the vol-index scales, cues, sessions and costs differ by market, so pooling with a market flag
-would mix definitions. Walk-forward (`walk_forward.py`): expanding window, refit at the first as-of
-date of each month on labels resolved by then (end date <= refit date), first fit once 100 sessions
-have resolved (after a 60-bar warm-up per ticker). Platt calibration p = sigmoid(a * logit + c) is fitted
-at each refit on the earlier months' out-of-sample scores resolved by then, once 1,000 exist; a is kept
->= 0 (calibration may shrink the model to the base rate, never turn its ranking upside down: a negative
-slope would also reverse every explained driver). Final probability = sigmoid(calibrated logit + news
-term). The daily `model_scores.py` runs the same loop up to the as-of date, so a month's stored model is
-the one the backtest used; its formula is stored as JSON in `data/<market>/model_versions/` (features,
-training means and sds, coefficients, intercept, Platt slope and offset, excluded features).
+**The formula (`logistic.py`; settings in `config/model.yaml`, fixed before the backtest, never
+tuned on it).** z_j = clip((x_j - mean_j) / sd_j, -5, 5), 0 when missing (= the training mean);
+logit = b0 + sum_j b_j z_j; the weights minimise mean log loss + 0.05 / 2 * sum b_j^2 (b0 not
+penalised), solved by Newton's method (unique optimum; tested against the gradient condition). One
+model per market x horizon: the vol-index scales, cues, sessions and costs differ by market, so
+pooling with a market flag would mix definitions. Walk-forward (`walk_forward.py`): expanding
+window, refit at the first as-of date of each month on labels resolved by then (end date <= refit
+date), first fit once 100 sessions have resolved (after a 60-bar warm-up per ticker). Platt
+calibration p = sigmoid(a * logit + c) is fitted at each refit on the earlier months' out-of-sample
+scores resolved by then, once 1,000 exist; a is kept >=
+0 (calibration may shrink the model to the base rate, never turn its ranking upside down: a negative
+slope would also reverse every explained driver). Final probability = sigmoid(calibrated logit +
+news term). The daily `model_scores.py` runs the same loop up to the as-of date, so a month's stored
+model is the one the backtest used; its formula is stored as JSON in `data/<market>/model_versions/`
+(features, training means and sds, coefficients, intercept, Platt slope and offset, excluded
+features).
 
-**Explanation (`explain.py`).** logit(p) = logit(base rate) + baseline + sum_j a b_j z_j + news, with
-baseline = a b0 + c - logit(base rate). The items are converted to percentage points by sharing
-p - base rate in proportion to their logit size, so they add up to 100 (p - base rate) (exactly before
-rounding, tested; the stored points are rounded to 2 decimals, so their sum can differ by a few hundredths).
-Each score stores the points per feature and per group (momentum, oscillator, volatility, volume,
-relative strength, market, regime, events, flows, news, baseline) and the top 3 drivers each way in
-plain words, e.g. from the US run on 2026-10-06 (as of 2026-10-05): "10-day realized vol 19.5%: +0.3 pts;
-ATR 2.1%: +0.2 pts" and "benchmark 10-day vol 8.3%: -0.3 pts" for AAPL 5d (P(up) 0.5314, base rate 0.5379).
-Global importance: the coefficient table and the sum of |coefficient| per group in each stored model
-and on the backtest page.
+**Explanation (`explain.py`).** logit(p) = logit(base rate) + baseline + sum_j a b_j z_j + news,
+with baseline = a b0 + c - logit(base rate). The items are converted to percentage points by sharing
+p - base rate in proportion to their logit size, so they add up to 100 (p - base rate) (exactly
+before rounding, tested; the stored points are rounded to 2 decimals, so their sum can differ by a
+few hundredths). Each score stores the points per feature and per group (momentum, oscillator,
+volatility, volume, relative strength, market, regime, events, flows, news, baseline) and the top 3
+drivers each way in plain words, e.g. from the US run on 2026-10-06 (as of 2026-10-05): "10-day
+realized vol 19.5%: +0.3 pts; ATR 2.1%: +0.2 pts" and "benchmark 10-day vol 8.3%: -0.3 pts" for AAPL
+5d (P(up) 0.5314, base rate 0.5379). Global importance: the coefficient table and the sum of
+|coefficient| per group in each stored model and on the backtest page.
 
-**News (live only; `news_score.py`).** There is no historical news archive, so news weights cannot be
-trained yet. Fixed, documented priors: per item sentiment x relevance x materiality weight (high 1.0,
-medium 0.5, low 0.2) x verification weight by the item's status as of the scoring time (confirmed_primary
-1.0, corroborated 0.7, single_source 0.3, rumour, promotional, unverified and contradicted 0) x event-type
-weight (1.0 for every type until outcomes say otherwise), summed over the ticker's primary news of the last
-72 hours, clipped to +-2, times a small global coefficient 0.10 logit per unit (at most +-0.2 logit, about
-+-5 points at p = 0.5). Re-estimation (`model_news_update.py`, prints only; a human edits the config):
-Bayesian logistic update of the coefficient with the model's own logit as offset and prior N(0.10, 0.10^2);
-MAP by Newton, standard error from the curvature. Rows needed for a standard error of 0.05:
-n = (1/0.05^2 - 1/0.10^2) / (0.25 E[score^2]); with no live data the plan assumes E[score^2] = 0.1 (most
-stock-days carry no verified news), which gives 12,000 scored stock-days per horizon (about 600 sessions
-for 20 tickers). The script recomputes n from the live E[score^2] as scores accumulate.
+**News (live only; `news_score.py`).** There is no historical news archive, so news weights cannot
+be trained yet. Fixed, documented priors: per item sentiment x relevance x materiality weight (high
+1.0, medium 0.5, low 0.2) x verification weight by the item's status as of the scoring time
+(confirmed_primary 1.0, corroborated 0.7, single_source 0.3, rumour, promotional, unverified and
+contradicted 0) x event-type weight (1.0 for every type until outcomes say otherwise), summed over
+the ticker's primary news of the last 72 hours, clipped to +-2, times a small global coefficient
+0.10 logit per unit (at most +-0.2 logit, about +-5 points at p = 0.5). Re-estimation
+(`model_news_update.py`, prints only; a human edits the config): Bayesian logistic update of the
+coefficient with the model's own logit as offset and prior N(0.10, 0.10^2); MAP by Newton, standard
+error from the curvature. Rows needed for a standard error of 0.05: n = (1/0.05^2 - 1/0.10^2) /
+(0.25 E[score^2]); with no live data the plan assumes E[score^2] = 0.1 (most stock-days carry no
+verified news), which gives 12,000 scored stock-days per horizon (about 600 sessions for 20
+tickers). The script recomputes n from the live E[score^2] as scores accumulate.
 
 **Forecaster anchor (forecast-v11; `forecast_rules.py`, `validate.py --stage forecast` code
-MODEL_ADJUSTMENT).** When a score exists for the call's id (the newest computed by made_at): `model_prob`
-= that score, |`agent_adjustment`| <= 0.10 with an `adjustment_reason` when not 0, direction = the side
-of 0.5 of model_prob + adjustment (0.5: abstain), confidence = max(final, 1 - final) within 0.005. Without
-a score the call is checked by the other rules and the gate warns MODEL_SCORE_MISSING. Note: calls are
-still scored close-to-close by `score_predictions.py` while the model's label is open-to-close; aligning
-the scorer is an open decision for the owner (it changes the meaning of the track record).
+MODEL_ADJUSTMENT).** When a score exists for the call's id (the newest computed by made_at):
+`model_prob` = that score, |`agent_adjustment`| <= 0.10 with an `adjustment_reason` when not 0,
+direction = the side of 0.5 of model_prob + adjustment (0.5: abstain), confidence = max(final, 1 -
+final) within 0.005. Without a score the call is checked by the other rules and the gate warns
+MODEL_SCORE_MISSING. Note: calls are still scored close-to-close by `score_predictions.py` while the
+model's label is open-to-close; aligning the scorer is an open decision for the owner (it changes
+the meaning of the track record).
 
 **Debate record.** The forecaster writes per ticker the bull and bear cases (<= 80 words each), its
-verdict (<= 60 words), its decisions and the cited ids; `agent_reasoning.py validate|add` checks ids,
-publication times, word limits and that each decision matches a stored call, and appends to
+verdict (<= 60 words), its decisions and the cited ids; `agent_reasoning.py validate|add` checks
+ids, publication times, word limits and that each decision matches a stored call, and appends to
 `data/<market>/agent_reasoning/` (routine step 9a).
 
-**Validation (`model_backtest.py --out DIR`; out-of-sample only; stored bars 2024-10-07 to 2026-10-05,
-20 tickers per market; with the warm-up and the first 100 resolved sessions the first scored as-of date
-is 2025-06-02 for 1-day and 2025-07-01 for 5-day).** Run on commit 67eeca0 (after the holiday-bar fix,
-which drops bars on closed days), computed 2026-10-07T00:38:34Z. Brier and log loss are compared with the
-base rate known at each refit (the training up share):
+**Validation (`model_backtest.py --out DIR`; out-of-sample only; stored bars 2024-10-07 to
+2026-10-05, 20 tickers per market; with the warm-up and the first 100 resolved sessions the first
+scored as-of date is 2025-06-02 for 1-day and 2025-07-01 for 5-day).** Run on commit 67eeca0 (after
+the holiday-bar fix, which drops bars on closed days), computed 2026-10-07T00:38:34Z. Brier and log
+loss are compared with the base rate known at each refit (the training up share):
 
 | market | horizon / label | n | as-of dates | up share | Brier | Brier base rate | log loss | log loss base | AUC (95% block bootstrap) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -1355,43 +1368,45 @@ base rate known at each refit (the training up share):
 | us | 1d close_to_close | 6740 | 2025-06-02..2026-10-02 | 0.5218 | 0.2501 | 0.2496 | 0.6933 | 0.6923 | 0.4934 [0.4721, 0.5158] |
 | us | 5d close_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5414 | 0.2499 | 0.2486 | 0.693 | 0.6904 | 0.481 [0.4492, 0.5089] |
 
-Hit rates and coverage of the long side (p >= t; hit = return > 0), open-to-close: India 1d t = 0.55:
-20 stock-days (coverage 0.003), hit 0.6 [0.3866, 0.7812]; none at 0.60 or 0.65. India 5d: 0.55 1581
-(0.2585) hit 0.4712 [0.4467, 0.4959]; 0.60 983 (0.1608) 0.5229 [0.4916, 0.554]; 0.65 391 (0.0639) 0.5678
-[0.5182, 0.616]. US 1d: 0.55 173 (0.0257) 0.5896 [0.5151, 0.6602]; 0.60 3; 0.65 none. US 5d: 0.55 1968
-(0.3144) 0.503 [0.481, 0.5251]; 0.60 1; 0.65 none. Short side (p <= 1 - t; hit = return < 0), India 5d:
-0.55 1144 (0.1871) 0.5297 [0.5007, 0.5585]; 0.60 772 (0.1262) 0.5699 [0.5348, 0.6044]; 0.65 304 (0.0497)
-0.6118 [0.556, 0.6649]. The full tables, reliability bins with Wilson intervals and the close-to-close rows
-are on the backtest page.
+Hit rates and coverage of the long side (p >= t; hit = return > 0), open-to-close: India 1d t =
+0.55: 20 stock-days (coverage 0.003), hit 0.6 [0.3866, 0.7812]; none at 0.60 or 0.65. India 5d: 0.55
+1581 (0.2585) hit 0.4712 [0.4467, 0.4959]; 0.60 983 (0.1608) 0.5229 [0.4916, 0.554]; 0.65 391
+(0.0639) 0.5678 [0.5182, 0.616]. US 1d: 0.55 173 (0.0257) 0.5896 [0.5151, 0.6602]; 0.60 3; 0.65
+none. US 5d: 0.55 1968 (0.3144) 0.503 [0.481, 0.5251]; 0.60 1; 0.65 none. Short side (p <= 1 - t;
+hit = return < 0), India 5d: 0.55 1144 (0.1871) 0.5297 [0.5007, 0.5585]; 0.60 772 (0.1262) 0.5699
+[0.5348, 0.6044]; 0.65 304 (0.0497) 0.6118 [0.556, 0.6649]. The full tables, reliability bins with
+Wilson intervals and the close-to-close rows are on the backtest page.
 
-Paper strategy after costs (open-to-close, mean holding-period return per date in %, 95% moving-block
-bootstrap; mean round trip 0.2225% India, 0.0021% US with the FINRA TAF at its in-force $0):
-India 1d always-up -0.2956 [-0.4, -0.18], benchmark_long_per_date (a benchmark long opened at every as-of
-date, a full round trip charged each time) -0.2806 [-0.4, -0.16], model p >= 0.55 -0.5398 [-1.63, 0.4] on
-10 dates (too few for a verdict: the page requires 20 common dates). India 5d always-up -0.4159 [-0.71,
--0.07], model p >= 0.55 -0.5734 [-1.31, -0.05], p >= 0.60 -0.2808 [-1.1, 0.2], p >= 0.65 0.3749 [-0.64,
-1.03]. US 1d always-up 0.142 [0.03, 0.26], model p >= 0.55 0.2753 [-0.74, 1.06]. US 5d always-up 0.4717
-[0.23, 0.74], benchmark_long_per_date 0.2857 [-0.02, 0.58], model p >= 0.55 0.413 [-0.07, 0.9]. Every
-model-minus-baseline difference with at least 20 common dates has a 95% interval that contains 0.
+Paper strategy after costs (open-to-close, mean holding-period return per date in %, 95%
+moving-block bootstrap; mean round trip 0.2225% India, 0.0021% US with the FINRA TAF at its in-force
+$0): India 1d always-up -0.2956 [-0.4, -0.18], benchmark_long_per_date (a benchmark long opened at
+every as-of date, a full round trip charged each time) -0.2806 [-0.4, -0.16], model p >= 0.55
+-0.5398 [-1.63, 0.4] on 10 dates (too few for a verdict: the page requires 20 common dates). India
+5d always-up -0.4159 [-0.71, -0.07], model p >= 0.55 -0.5734 [-1.31, -0.05], p >= 0.60 -0.2808
+[-1.1, 0.2], p >= 0.65 0.3749 [-0.64, 1.03]. US 1d always-up 0.142 [0.03, 0.26], model p >= 0.55
+0.2753 [-0.74, 1.06]. US 5d always-up 0.4717 [0.23, 0.74], benchmark_long_per_date 0.2857 [-0.02,
+0.58], model p >= 0.55 0.413 [-0.07, 0.9]. Every model-minus-baseline difference with at least 20
+common dates has a 95% interval that contains 0.
 
-**Verdict (honest).** On this history the model does not beat the base rate: Brier skill is negative in
-all eight rows (-0.0021 to -0.0181), every AUC interval contains 0.5, and the gradient-boosted comparison
-(HistGradientBoostingClassifier, depth 3, 100 trees, used only here) is no better (AUC 0.485 to 0.5159,
-Brier 0.2535 to 0.275). After costs the model's long picks are not distinguishable from always-up,
-momentum, RSI mean reversion or the benchmark; some thresholds have too few positions for any verdict.
-Where the calibration sees no skill in the past months it sets the Platt slope to 0 (India's latest fits),
-so the issued probability is the past up share and no feature driver is listed (0 points): that is the
-calibration doing its job, not a fault. The value of the model today is the explanation and the
-discipline (a stated formula, a cap on the agent's adjustment), not an edge. Nothing was tuned on the test
-period. Disclosure: the first run of this backtest used an unconstrained Platt slope (it went negative in
-several months, which inverts rankings and explanations); the slope was then constrained to >= 0 as a
-correctness fix and the run repeated; the numbers above are from the constrained version (the first run,
-before the holiday-bar fix, also showed no skill: Brier skill -0.0027 to -0.0293).
+**Verdict (honest).** On this history the model does not beat the base rate: Brier skill is negative
+in all eight rows (-0.0021 to -0.0181), every AUC interval contains 0.5, and the gradient-boosted
+comparison (HistGradientBoostingClassifier, depth 3, 100 trees, used only here) is no better (AUC
+0.485 to 0.5159, Brier 0.2535 to 0.275). After costs the model's long picks are not distinguishable
+from always-up, momentum, RSI mean reversion or the benchmark; some thresholds have too few
+positions for any verdict. Where the calibration sees no skill in the past months it sets the Platt
+slope to 0 (India's latest fits), so the issued probability is the past up share and no feature
+driver is listed (0 points): that is the calibration doing its job, not a fault. The value of the
+model today is the explanation and the discipline (a stated formula, a cap on the agent's
+adjustment), not an edge. Nothing was tuned on the test period. Disclosure: the first run of this
+backtest used an unconstrained Platt slope (it went negative in several months, which inverts
+rankings and explanations); the slope was then constrained to >= 0 as a correctness fix and the run
+repeated; the numbers above are from the constrained version (the first run, before the holiday-bar
+fix, also showed no skill: Brier skill -0.0027 to -0.0293).
 
-**Limits.** About 16 months of out-of-sample history, 20 tickers per market, overlapping 5-day labels
-(handled by the block bootstrap, still wide intervals). Fills are assumed at the official open and close;
-spread, slippage and India's flat DP charge are not modelled; the cost rates in force on 2026-10-07 (`config/costs.yaml`, each
-marked "verify" with its source) are applied to past dates. Event and flow features have too little
-history to enter any fit; news has none (fixed prior). The overnight cue is the cue's last daily return,
-not the live pre-open quote. Splits are applied on read by the `ohlc` view; returns are ratios, so the
-re-basing does not leak.
+**Limits.** About 16 months of out-of-sample history, 20 tickers per market, overlapping 5-day
+labels (handled by the block bootstrap, still wide intervals). Fills are assumed at the official
+open and close; spread, slippage and India's flat DP charge are not modelled; the cost rates in
+force on 2026-10-07 (`config/costs.yaml`, each marked "verify" with its source) are applied to past
+dates. Event and flow features have too little history to enter any fit; news has none (fixed
+prior). The overnight cue is the cue's last daily return, not the live pre-open quote. Splits are
+applied on read by the `ohlc` view; returns are ratios, so the re-basing does not leak.

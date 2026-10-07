@@ -42,6 +42,7 @@ _saved_proxies = {k: os.environ[k] for k in PROXY_VARS if k in os.environ}
 SLOW = {
     "tests/test_aci_scoring.py": {
         "test_aci_off_reproduces_ranges_byte_for_byte",
+        "test_held_out_tuning_ignores_bars_after_the_cut_off",
         "test_replay_aci_has_no_lookahead",
         "test_replay_aci_off_rows_unchanged",
         "test_replay_held_out_selects_on_tuning_dates_and_reports_test_dates",

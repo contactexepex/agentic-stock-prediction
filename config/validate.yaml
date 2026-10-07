@@ -44,6 +44,12 @@ expect_output:
 # Numbers in narrative (stage report): a bare integer from 0 to this value (no %, currency,
 # sign or decimals) is a count or label and is not looked up.
 narrative_small_int: 10
+# Optional sign check (issue #32): a number right after a falling word (fell, dropped, down, declined, lost,
+# slid; not "fell to 95") must have a negative source value in scope, else a NARRATIVE_SIGN warning. Off until
+# its false alarms are known: measured 2026-10-07 on the only stored filled report (reports/india/2026-10-05.md,
+# every line, against the stored data rows), 3 numbers after a falling word, 0 alarms. Too small a sample to
+# switch on; measure again once a few weeks of filled reports exist.
+narrative_sign_check: false
 # Headlines and summaries of news, filings and announcements first seen in the last N days are
 # sources too (the agents quote numbers from them).
 narrative_news_days: 7

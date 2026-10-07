@@ -5,7 +5,8 @@
 Daily runs are gated by validate.py; once a week the judge reviews a small sample of the
 previous ISO week's daily output for what scripts cannot see (reasons that do not match their
 evidence, wrong claims). The sample is deterministic, seeded by market and ISO week:
-SAMPLE_CALLS forecasts (with their evidence rows and outcome) and SAMPLE_REPORTS filled report.
+SAMPLE_CALLS forecasts (with their evidence rows and outcome), SAMPLE_REPORTS filled report, SAMPLE_LESSONS
+reflector lesson and SAMPLE_CLAIMS claim-checker claims (with their event's latest status).
 Prints JSON with the sample, the review checklist and the judgments record to append
 (`agent` "spotcheck", id `<today>-spotcheck-<week>-<round>-<HHMMSS>`).
 With --if-due it prints `due: false` and nothing else when a spot-check verdict for that week is
@@ -27,7 +28,7 @@ from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.pipeline.review.helpers import previous_week, week_bounds
 
-SAMPLE_CALLS, SAMPLE_REPORTS = 2, 1
+SAMPLE_CALLS, SAMPLE_REPORTS, SAMPLE_LESSONS, SAMPLE_CLAIMS = 2, 1, 1, 2
 CHECKLIST = [
     "Each call's rationale matches what its cited evidence ids actually say (headline/summary), "
     "and every cited id exists and was public before the call's made_at (no look-ahead).",
@@ -36,6 +37,10 @@ CHECKLIST = [
     "Every factual claim in the report narrative is true and supported by the id it cites; no "
     "background from memory, no cause the cited headline does not state.",
     "Nothing in the sampled output uses information published after it was written.",
+    "Each sampled lesson states what its settled call and outcome show (lessons.py validate checks only ids and "
+    "numbers): no cause the call's evidence does not support.",
+    "Each sampled claim's quote says what its fields (predicate, value, stance) record, from the cited source; the "
+    "event's verification status follows from its claims and sources.",
 ]
 
 
@@ -140,7 +145,32 @@ def sample(cfg: dict, week: str) -> dict:
         if report_path.exists() and "<!-- AGENT:" not in report_path.read_text(encoding="utf-8"):
             reports.append(report_path.relative_to(paths.ROOT).as_posix())
     rep = sorted(rng.sample(reports, min(SAMPLE_REPORTS, len(reports)))) if reports else []
-    return {"calls": out_calls, "reports": rep, "n_calls_in_week": int(len(calls)), "n_reports_in_week": len(reports)}
+    lessons = week_rows(con, LESSONS_SQL, start, end)   # issues #34 and #39: lessons and claims are sampled too
+    claims = week_rows(con, CLAIMS_SQL, start, end)
+    return {"calls": out_calls, "reports": rep, "n_calls_in_week": int(len(calls)), "n_reports_in_week": len(reports),
+            "lessons": picks(rng, lessons, SAMPLE_LESSONS), "n_lessons_in_week": len(lessons),
+            "claims": picks(rng, claims, SAMPLE_CLAIMS), "n_claims_in_week": len(claims)}
+
+
+LESSONS_SQL = ("SELECT DISTINCT ON (id) id, prediction_id, ticker, direction, confidence, hit, actual_return, "
+               "label_basis, rationale, lesson, written_at FROM lessons "
+               "WHERE CAST(written_at AS DATE) BETWEEN ? AND ? ORDER BY id, written_at DESC")
+CLAIMS_SQL = ("SELECT c.*, v.status AS event_status FROM (SELECT DISTINCT ON (id) * FROM news_claims "
+              "WHERE CAST(extracted_at AS DATE) BETWEEN ? AND ? ORDER BY id, extracted_at DESC) c "
+              "LEFT JOIN (SELECT DISTINCT ON (cluster_id) cluster_id, status FROM news_verified WHERE level = 'cluster' "
+              "ORDER BY cluster_id, as_of DESC) v USING (cluster_id) ORDER BY c.id")
+
+
+def week_rows(con, sql: str, start, end) -> list[dict]:
+    """The rows of a query over the week, as plain strings."""
+    frame = con.execute(sql, [start, end]).df()
+    return [{key: None if value is None or (isinstance(value, float) and pd.isna(value)) else str(value)
+             for key, value in row.items()} for row in frame.to_dict("records")]
+
+
+def picks(rng: random.Random, rows: list[dict], count: int) -> list[dict]:
+    """A deterministic sample of rows, in their order."""
+    return [rows[index] for index in sorted(rng.sample(range(len(rows)), min(count, len(rows))))] if rows else []
 
 
 def main() -> int:
@@ -159,7 +189,7 @@ def main() -> int:
         return 0
     sampled = sample(cfg, week)
     today, now = utc_today(), utc_now()
-    empty = not sampled["calls"] and not sampled["reports"]
+    empty = not any(sampled[key] for key in ("calls", "reports", "lessons", "claims"))
     print(
         json.dumps(
             {

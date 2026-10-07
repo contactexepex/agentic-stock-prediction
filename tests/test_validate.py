@@ -359,6 +359,22 @@ def pool_of(**scoped) -> nn.Pool:
     return pool
 
 
+def test_optional_sign_check_needs_a_negative_source():
+    """Issue #32: a number after a falling word must have a negative source value in scope (stored negative, or
+    a source text with a minus or a falling word); a level after "fell to" is no change; unmatched numbers are
+    left to `unmatched`."""
+    pool = pool_of(AAPL=[("pct", -2.1), ("pct", 3.4), ("plain", 95.0)])
+    pool.add_text("MSFT fell 1.5% on the news")
+    alarms = lambda text: [a["token"] for a in nn.sign_alarms([text], pool, 10)]  # noqa: E731
+    assert alarms("AAPL fell 2.1% on Monday.") == []
+    assert alarms("AAPL fell 3.4% on Monday.") == ["3.4%"]                 # the source move was a rise
+    assert alarms("AAPL is down 3.4% this week.") == ["3.4%"]
+    assert alarms("AAPL rose 3.4% on Monday.") == []
+    assert alarms("AAPL fell to 95 on Monday.") == []                      # a level, not a change
+    assert alarms("MSFT dropped 1.5% after the call.") == []               # the source text says it fell
+    assert alarms("AAPL fell 7.7% on Monday.") == []                       # no source at all: unmatched's case
+
+
 def passes(pool: nn.Pool, sentence: str) -> bool:
     return not nn.unmatched([sentence], pool, 10)
 
@@ -509,6 +525,29 @@ def test_spotcheck_sample_is_deterministic_and_in_week(root):
     picks = {tuple(c["id"] for c in spotcheck.sample(CFG, w)["calls"]) for w in ("2026-W40",)}
     assert len(picks) == 1
     assert spotcheck.seed("us", "2026-W40") != spotcheck.seed("us", "2026-W41")
+    assert (a["lessons"], a["claims"]) == ([], [])
+
+
+def test_spotcheck_samples_lessons_and_claims(root):
+    """Issues #34 and #39: the weekly sample holds a lesson written in the week and claims extracted in it, each
+    claim with its event's latest verification status."""
+    write_jsonl(root, "lessons", date(2026, 9, 30), [
+        {"id": f"lesson-{i}", "prediction_id": f"p{i}", "ticker": "AAPL", "direction": "up", "confidence": 0.6,
+         "hit": True, "actual_return": 0.01, "rationale": "r", "lesson": f"lesson {i}",
+         "written_at": f"2026-09-{29 + i}T12:00:00+00:00"} for i in range(2)] + [
+        {"id": "lesson-old", "prediction_id": "p9", "ticker": "AAPL", "lesson": "old",
+         "written_at": "2026-09-20T12:00:00+00:00"}])
+    write_jsonl(root, "news_claims", date(2026, 9, 30), [
+        {"id": f"claim-{i}", "cluster_id": "cl1", "ticker": "AAPL", "quote": f"q{i}", "quote_source_id": "s",
+         "extracted_at": "2026-09-30T12:00:00+00:00"} for i in range(3)])
+    write_jsonl(root, "news_verified", date(2026, 9, 30), [
+        {"id": "v1", "as_of": "2026-09-30T13:00:00+00:00", "cluster_id": "cl1", "level": "cluster", "ticker": "AAPL",
+         "status": "corroborated"}])
+    a = spotcheck.sample(CFG, "2026-W40")
+    assert a == spotcheck.sample(CFG, "2026-W40")
+    assert a["n_lessons_in_week"] == 2 and len(a["lessons"]) == 1 and a["lessons"][0]["id"] in ("lesson-0", "lesson-1")
+    assert a["n_claims_in_week"] == 3 and len(a["claims"]) == 2
+    assert all(c["event_status"] == "corroborated" for c in a["claims"])
 
 
 def test_spotcheck_if_due(root):

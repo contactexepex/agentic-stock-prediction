@@ -128,3 +128,5 @@ MSG_UNMATCHED_NUMBERS = (
     "(context pack, script-written report, cited news text, stored rows): {examples}"
 )
 MSG_UNMATCHED_NUMBER_EXAMPLE = '{token!r} in "{sentence}"'
+MSG_SIGN_ALARMS = ("{name}: {count} number(s) after a falling word (fell, dropped, down ...) whose sources are all "
+                   "positive (optional sign check, issue #32): {examples}")
