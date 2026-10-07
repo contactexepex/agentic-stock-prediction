@@ -14,7 +14,8 @@ from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.cost_views import settlement_row, viability, viability_row
 from marketbrief.lab.settle import settle
 from marketbrief.lab.sizing import qualifies, quantity
-from marketbrief.lab.timing import entry_session, exit_session, is_locked, sessions_after_d
+from marketbrief.lab.timing import entry_session, exit_session, is_locked
+from marketbrief.portfolio.horizons import resolved_label, sessions_after_d
 
 H2H = {"id": "h2h:2026-10-01-AAPL-rule-highest_probability", "pick_rule": "highest_probability"}
 
@@ -30,7 +31,13 @@ def test_timing_friday_holiday_and_lock():
     assert is_locked(pred, us, None) and is_locked(pred, us, datetime(2026, 10, 2, 13, 0, tzinfo=timezone.utc))
     assert not is_locked(pred, us, datetime(2026, 10, 2, 13, 31, tzinfo=timezone.utc))   # committed after the open
     assert not is_locked({**pred, "made_at": "2026-10-02T13:30:00+00:00"}, us, None)
-    assert sessions_after_d(5, "n_plus_k") == 5 and sessions_after_d(5, None) == 4 and sessions_after_d(1, None) == 1
+    # issue #94 (B10's call_basis): N+k closes k sessions after D; an unlabelled 5-day row made before
+    # call_scoring.n_plus_k_from (2026-10-07T21:19Z) is legacy_5d_d4 and closes at D+4
+    assert [sessions_after_d(k, "n_plus_k") for k in (1, 5)] == [1, 5] and sessions_after_d(5, "legacy_5d_d4") == 4
+    assert resolved_label(5, None, "2026-10-07T11:45:00+00:00") == "legacy_5d_d4"
+    assert resolved_label(5, None, "2026-10-08T11:45:00+00:00") == "n_plus_k"
+    assert resolved_label(1, None, "2026-10-07T11:45:00+00:00") == "n_plus_k"
+    assert resolved_label(5, "n_plus_k", "2026-10-07T11:45:00+00:00") == "n_plus_k"
 
 
 def test_qualifies_and_quantity():

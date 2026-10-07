@@ -217,13 +217,41 @@ def test_portfolio_positions_have_the_eur_view():
     assert view["pnl_eur"] == -13.8 and view["fx_effect_eur"] == round(206 / 1.2 - 206 / 1.1, 2)
 
 
-@pytest.mark.usefixtures("root")
-def test_cli_summary_and_predict_without_b10(capsys):
-    assert cli.main(["--market", "us", "summary"]) == 0
-    summary = json.loads(capsys.readouterr().out)
-    assert summary["scoreboard"] == [] and summary["basis"] == "forward"
-    assert cli.main(["--market", "us", "predict"]) == 2                          # B10's scores not built yet
-    assert "B10" in json.loads(capsys.readouterr().out)["message"]
+def horizon_rows(k: int, exit_day: str) -> tuple[dict, dict]:
+    """B10's N+k model score and range of AAPL as of 2 Oct, made pre-open on Monday 5 Oct."""
+    rid = f"2026-10-02-AAPL-{k}d"
+    score = {"id": rid, "as_of_date": "2026-10-02", "ticker": "AAPL", "horizon_days": k,
+             "label_convention": "open_to_close", "prob_up": 0.6, "prob_model": 0.6, "calibrated": True,
+             "base_rate": 0.52, "news_score": 0.0, "news_logit": 0.0, "contributions": {}, "model_version": "test",
+             "model_id": f"us-{k}d-test", "trained_until": "2026-09-30", "computed_at": "2026-10-05T10:00:00+00:00",
+             "horizon_label": "n_plus_k", "entry_date": "2026-10-05", "exit_date": exit_day}
+    band = {"id": rid, "made_at": "2026-10-05T10:00:00+00:00", "as_of_date": "2026-10-02", "session_date": "2026-10-05",
+            "target_date": exit_day, "ticker": "AAPL", "horizon_days": k, "base_close": 101.0, "center": 102.0 + k,
+            "sigma_h": 0.02, "lo50": 100.0, "hi50": 104.0 + k, "lo80": 98.0, "hi80": 106.0 + k, "naive_lo50": 100.0,
+            "naive_hi50": 104.0, "naive_lo80": 98.0, "naive_hi80": 106.0, "direction": None, "confidence": None,
+            "regime": "TRENDING", "calibration_id": None, "notes": [], "inputs": [], "iv_sigma_h": None,
+            "horizon_label": "n_plus_k", "entry_date": "2026-10-05", "exit_date": exit_day}
+    return score, band
+
+
+def test_predict_with_b10_scores_and_ranges(root, capsys, monkeypatch):
+    # Monday 5 Oct before the open: as of Friday's close; N+1..N+5 exit 6..12 Oct (US sessions)
+    exits = ["2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-12"]
+    rows = [horizon_rows(k, day) for k, day in zip(range(1, 6), exits)]
+    write_jsonl(root, "us", "model_scores", "2026-10-05", [score for score, _ in rows])
+    write_jsonl(root, "us", "ranges", "2026-10-05", [band for _, band in rows])
+    monkeypatch.setenv("MB_NOW", "2026-10-05T11:45:00+00:00")
+    assert cli.main(["--market", "us", "predict"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out == {"ok": True, "predictions": 50, "abstentions": 1}      # 10 strategies x 5; global abstains
+    preds = {p["id"]: p for p in connect("us").execute("SELECT * FROM strategy_predictions").df().to_dict("records")}
+    ref = preds["rule.model_news.v1:2026-10-02-AAPL-3d"]
+    assert (ref["prob_up"], ref["target_price"], ref["lo80"], ref["hi80"], str(ref["exit_date"])[:10]) == (
+        0.6, 105.0, 98.0, 109.0, "2026-10-08")
+    assert str(ref["session_date"])[:10] == "2026-10-05" and ref["qualifies"] and ref["amount"] == 1000.0
+    assert preds["rule.model_news_strict.v1:2026-10-02-AAPL-1d"]["qualifies"] is True   # 0.60 >= 0.60
+    assert cli.main(["--market", "us", "predict"]) == 0                                 # ids already stored
+    assert json.loads(capsys.readouterr().out) == {"ok": True, "predictions": 0, "abstentions": 0}
 
 
 @pytest.mark.usefixtures("root")

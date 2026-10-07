@@ -6,11 +6,9 @@ import subprocess
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from marketbrief.contracts.horizons import HORIZON_LABEL_N_PLUS_K
 from marketbrief.core.calendar import next_session, session_open_utc
 from marketbrief.utils.timefmt import as_utc_timestamp
 
-LEGACY_5D_SESSIONS_AFTER_D = 4   # legacy_5d_d4: exit at the close of D+4, 4 sessions after D
 
 
 def entry_session(cfg: dict, made_at: datetime) -> date:
@@ -28,14 +26,6 @@ def exit_session(cfg: dict, entry_date: date, horizon_days: int) -> date:
     for _ in range(int(horizon_days)):
         day = next_session(cfg, day, include=False)
     return day
-
-
-def sessions_after_d(horizon_days: int, horizon_label: str | None) -> int:
-    """How many sessions after D a stored horizon exits: N+k exits k after D; the legacy open-to-close 5d
-    (legacy_5d_d4, rows without a label) exits at D+4; the legacy 1d (= N+1) one after D."""
-    if horizon_label == HORIZON_LABEL_N_PLUS_K or int(horizon_days) not in (1, 5):
-        return int(horizon_days)
-    return 1 if int(horizon_days) == 1 else LEGACY_5D_SESSIONS_AFTER_D
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess | None:

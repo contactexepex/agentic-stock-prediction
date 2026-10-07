@@ -8,17 +8,18 @@ from datetime import date
 import pandas as pd
 
 from marketbrief.core.calendar import next_session
-from marketbrief.lab.timing import exit_session, sessions_after_d
+from marketbrief.lab.timing import exit_session
 from marketbrief.portfolio import service
 from marketbrief.portfolio.constants import TIER_STRONG_BUY, TIER_STRONG_SELL
+from marketbrief.portfolio.horizons import resolved_label, sessions_after_d
 
 API_TIERS = {TIER_STRONG_BUY: "strong_buy", TIER_STRONG_SELL: "strong_sell"}
 PAPER_TIERS = {"up": "paper_up", "down": "paper_down"}
 
 
-def entry_exit(cfg: dict, as_of: str | None, horizon: int, label: str | None = None) -> tuple[str | None, str | None]:
+def entry_exit(cfg: dict, as_of: str | None, horizon: int, label: str) -> tuple[str | None, str | None]:
     """(D, the exit session): the open of D and the close of the k-th session after D for N+k (decision 37); a
-    legacy open-to-close 5-day score (no horizon_label) exits at D+4 (lab/timing.py sessions_after_d)."""
+    legacy_5d_d4 score exits at D+4 (issue #94; portfolio/horizons.sessions_after_d)."""
     if as_of is None:
         return None, None
     first = next_session(cfg, date.fromisoformat(as_of), include=False)
@@ -27,7 +28,8 @@ def entry_exit(cfg: dict, as_of: str | None, horizon: int, label: str | None = N
 
 def candidate(cfg: dict, as_of: str | None, row: dict, tier: str) -> dict:
     """One SignalCandidate."""
-    entry, exit_ = entry_exit(cfg, as_of, row["horizon_days"], row.get("horizon_label"))
+    label = resolved_label(row["horizon_days"], row.get("horizon_label"), None)
+    entry, exit_ = entry_exit(cfg, as_of, row["horizon_days"], label)
     meta = cfg["tickers"].get(row["ticker"]) or {}
     return {"ticker": row["ticker"], "name": meta.get("name"), "h": row["horizon_days"], "tier": tier,
             "model_prob": row["model_prob"], "prediction_id": row["id"] if row.get("has_call") else None,
