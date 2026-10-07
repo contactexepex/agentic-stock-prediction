@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
 
 import yaml
 
@@ -48,7 +50,14 @@ def configured_horizons() -> tuple[int, ...]:
     path = paths.CONFIG / STRATEGIES_FILE
     if not path.exists():
         return ()
-    return tuple(int(k) for k in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("horizons") or [])
+    return _horizons_in(str(path), path.stat().st_mtime_ns)
+
+
+@lru_cache(maxsize=8)
+def _horizons_in(path: str, _mtime_ns: int) -> tuple[int, ...]:
+    """`horizons` of a strategies file, read once per file version (issue #75: the gate asks once per row)."""
+    text = Path(path).read_text(encoding="utf-8")
+    return tuple(int(k) for k in (yaml.safe_load(text) or {}).get("horizons") or [])
 
 
 def trade_check_id(check: str, trade_id: str) -> str:
