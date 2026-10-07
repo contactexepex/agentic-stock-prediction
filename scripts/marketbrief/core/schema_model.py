@@ -1,7 +1,8 @@
 """Column types of the signal model's kinds and of the persisted agent reasoning (docs/DESIGN.md section 15)."""
 from __future__ import annotations
 
-from marketbrief.constants.model import KIND_AGENT_REASONING, KIND_MODEL_SCORES, KIND_MODEL_VERSIONS
+from marketbrief.constants.model import (KIND_AGENT_REASONING, KIND_MODEL_SCORES, KIND_MODEL_VARIANT_SCORES,
+                                         KIND_MODEL_VARIANT_VERSIONS, KIND_MODEL_VERSIONS)
 from marketbrief.core.schema_base import Schemas
 
 MODEL_SCHEMAS: Schemas = {
@@ -42,3 +43,10 @@ MODEL_SCHEMAS: Schemas = {
         "prompt_version": "VARCHAR", "written_at": "TIMESTAMPTZ",
     }),
 }
+# B10: the other model variants (constants/model.py MODEL_VARIANTS; today cross_market = every cross-market group on,
+# for strategies with `cross_market: true`), kept apart from model_scores / model_versions so their readers never see
+# them: the same columns plus model_variant; ids end in -<variant>. Read with contracts/horizons.scores_asof(variant=).
+MODEL_SCHEMAS[KIND_MODEL_VARIANT_SCORES] = ("jsonl", {**MODEL_SCHEMAS[KIND_MODEL_SCORES][1],
+                                                     "model_variant": "VARCHAR"})
+MODEL_SCHEMAS[KIND_MODEL_VARIANT_VERSIONS] = ("jsonl", {**MODEL_SCHEMAS[KIND_MODEL_VERSIONS][1],
+                                                       "model_variant": "VARCHAR"})

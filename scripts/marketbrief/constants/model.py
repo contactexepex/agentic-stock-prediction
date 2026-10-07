@@ -19,6 +19,17 @@ LABEL_DESCRIPTIONS = {
     LABEL_CLOSE_TO_CLOSE: "as-of close to the exit close of N+k (the (k+1)-th session after the as-of session)",
 }
 
+# ---------- model variants (B10; strategies.yaml parameter `cross_market`, docs/SPEC.md F2.1) ----------
+# base: the cross-market groups config/model.yaml switches on, stored in model_scores / model_versions (the
+# forecaster's anchor; ids <as_of>-<ticker>-<k>d). cross_market: every cross-market group of the market on, for
+# strategies with `cross_market: true`, stored apart in model_variant_scores / model_variant_versions (ids end in
+# -cross_market), so no reader of model_scores ever sees it.
+VARIANT_BASE, VARIANT_CROSS = "base", "cross_market"
+MODEL_VARIANTS = (VARIANT_BASE, VARIANT_CROSS)
+KIND_MODEL_VARIANT_SCORES = "model_variant_scores"
+KIND_MODEL_VARIANT_VERSIONS = "model_variant_versions"
+MSG_UNKNOWN_VARIANT = "unknown model variant {variant!r}; known: {known}"
+
 # ---------- feature names and groups ----------
 TECHNICAL_FEATURES = ("ret_1d", "ret_3d", "ret_5d", "ret_20d", "roc_10", "ema_ratio", "price_vs_20d_high",
                       "rsi_14", "atr_pct", "realized_vol_10d", "ewma_vol", "bb_width", "obv_trend",

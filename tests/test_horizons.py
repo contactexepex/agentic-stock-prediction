@@ -183,3 +183,21 @@ def test_ranges_asof_first_published_n_plus_k_of_the_newest_as_of_date(market):
     assert all(str(r["target_date"]) == str(r["exit_date"]) for r in rows)
     assert contract.ranges_asof(MARKET, "2026-10-07T11:00:00+00:00") == []      # made after the time asked
 
+
+
+def test_scores_asof_reads_one_model_variant(market):
+    """The cross_market variant (every cross-market group on; stored in model_variant_scores, ids end in
+    -cross_market) is read only on request; model_scores and its view never hold it; an unknown variant exits."""
+    root = market
+    jsonl(root, "model_variant_scores", "2026-10-07", [
+        {**score("2026-10-06", 1, 0.7, "2026-10-07T11:00:00+00:00", horizon_label="n_plus_k",
+                 model_variant="cross_market", entry_date="2026-10-07", exit_date="2026-10-08"),
+         "id": "2026-10-06-AAPL-1d-cross_market"}])
+    base = {r["horizon_days"]: r for r in contract.scores_asof(MARKET, "2026-10-07T12:00:00+00:00")}
+    cross = contract.scores_asof(MARKET, "2026-10-07T12:00:00+00:00", variant="cross_market")
+    assert base[1]["prob_up"] == 0.51 and base[1]["id"] == "2026-10-06-AAPL-1d"
+    assert [(r["id"], r["prob_up"]) for r in cross] == [("2026-10-06-AAPL-1d-cross_market", 0.7)]
+    ids = {r[0] for r in connect(MARKET).execute("SELECT id FROM model_scores_latest").fetchall()}
+    assert "2026-10-06-AAPL-1d-cross_market" not in ids
+    with pytest.raises(SystemExit):
+        contract.scores_asof(MARKET, "2026-10-07T12:00:00+00:00", variant="nope")
