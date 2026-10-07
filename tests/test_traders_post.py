@@ -127,6 +127,11 @@ def test_settlement_goes_through_the_engine_interface(root, monkeypatch):
     pred = {k: v for k, v in catalogue("prediction")[0].items() if not k.startswith("_")}
     put(root, "us", "strategy_predictions", pred["made_at"][:10], [pred])
     con = connect("us")
+
+    def unbuilt_engine(*_args):   # the contract raised this until B2's engine was wired in (W1 delegation)
+        raise NotImplementedError("session B2")
+
+    monkeypatch.setattr(protocol, "settle", unbuilt_engine)
     with pytest.raises(EngineUnavailableError):
         settle_due({"market": "us"}, con, date(2026, 10, 8), datetime(2026, 10, 8, 22, 15, tzinfo=timezone.utc))
     calls = []

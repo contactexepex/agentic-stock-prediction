@@ -262,7 +262,7 @@ def test_no_tool_mentions_orders_or_brokers():
 
 # ---------------- contracts ----------------
 
-@pytest.mark.parametrize("module", [protocol, horizons])   # watchlist: built by B1 (tests/test_lifecycle.py)
+@pytest.mark.parametrize("module", [horizons])   # watchlist (B1) and protocol (B2) are built: see below
 def test_contract_functions_are_stubs(module):
     functions = [f for name, f in inspect.getmembers(module, inspect.isfunction) if f.__module__ == module.__name__]
     assert functions
@@ -270,6 +270,20 @@ def test_contract_functions_are_stubs(module):
         assert function.__doc__, function.__name__
         source = inspect.getsource(function)
         assert "raise NotImplementedError" in source, function.__name__
+
+
+def test_protocol_contract_delegates_to_the_lab_with_the_same_signatures():
+    """B2 built the F1 engine: each contract function forwards to marketbrief/lab/protocol.py unchanged."""
+    from marketbrief.lab import protocol as lab_protocol
+
+    functions = [f for _, f in inspect.getmembers(protocol, inspect.isfunction) if f.__module__ == protocol.__name__]
+    assert len(functions) == 9
+    for function in functions:
+        assert function.__doc__, function.__name__
+        source = inspect.getsource(function)
+        assert "NotImplementedError" not in source and f"lab_protocol.{function.__name__}(" in source
+        target = getattr(lab_protocol, function.__name__)
+        assert list(inspect.signature(function).parameters) == list(inspect.signature(target).parameters)
 
 
 def test_horizon_records_extend_todays_kinds():
@@ -408,3 +422,47 @@ def test_catalogue_scoreboard_has_every_slice():
             continue
         assert r["trades"] == len(mine)
         assert r["net_pnl"] == pytest.approx(sum(t["net_pnl"] for t in mine), abs=0.011)
+
+
+def test_catalogue_cost_views_agree_with_the_trades():
+    """cost_view.json (B2's kind): settlement rows repeat the trade's market costs; your cost = market + own lines."""
+    trades = {t["id"]: t for t in load("paper_trade.json")}
+    rows = load("cost_view.json")
+    assert {r["record_kind"] for r in rows} == {"prediction", "pick", "settlement"}
+    for r in rows:
+        assert r["your_costs"] == pytest.approx(sum(r["your_cost_lines"].values()), abs=0.011)
+        assert set(r["market_cost_lines"].items()) <= set(r["your_cost_lines"].items())
+        if r["record_kind"] == "settlement":
+            trade = trades[r["record_id"]]
+            assert r["market_costs"] == trade["costs"] and r["market_cost_lines"] == trade["cost_lines"]
+            assert r["net_pnl_market"] == pytest.approx(trade["net_pnl"], abs=0.011)
+            assert r["cost_viable"] is None
+        else:
+            assert r["cost_viable"] == (r["expected_move_pct"] > r["your_cost_pct"])
+
+
+def test_catalogue_trade_checks_use_the_real_check_ids_and_carry_the_b9_columns():
+    for r in load("trade_check.json"):
+        assert re.fullmatch(r"ic-(india|us)-\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z", r["check_id"])
+        assert r["id"] == f"{r['check_id']}-{r['trade_id']}" and r["check_row_id"] == f"{r['check_id']}-{r['ticker']}"
+        assert r["quality"] == "ok" and r["entry_adj"] == r["entry_price"] * r["basis_factor"]
+        assert r["sessions_held"] == pytest.approx(r["session_number"] - 1 + r["elapsed_fraction"], abs=0.0002)
+
+
+def test_trade_check_rows_view_reads_old_split_rows_and_new_single_rows():
+    """Issue #78: the B9 view takes each moved column from trade_checks when set, else from trade_check_details."""
+    views = (REPO / "sql" / "views.sql").read_text(encoding="utf-8")
+    statement = views[views.index("CREATE OR REPLACE VIEW trade_check_rows"):]
+    statement = statement[:statement.index(";") + 1]
+    con = duckdb.connect()
+    for kind in (kinds.KIND_TRADE_CHECKS, "trade_check_details"):
+        con.execute(f"CREATE TABLE {kind} ({', '.join(f'{c} {t}' for c, t in SCHEMAS[kind][1].items())})")
+    con.execute("INSERT INTO trade_checks (id, computed_at, quality, target_reached) VALUES "
+                "('new', '2026-10-08T00:00:00Z', 'ok', true), ('old', '2026-10-07T00:00:00Z', NULL, NULL)")
+    con.execute("INSERT INTO trade_check_details (id, computed_at, quality, target_reached) VALUES "
+                "('old', '2026-10-07T00:00:00Z', 'stale_quote', false)")
+    con.execute(statement)
+    got = con.execute("SELECT id, quality, target_reached FROM trade_check_rows ORDER BY id").fetchall()
+    assert got == [("new", "ok", True), ("old", "stale_quote", False)]
+    columns = [row[0] for row in con.execute("DESCRIBE trade_check_rows").fetchall()]
+    assert len(columns) == len(set(columns)) and set(columns) == set(SCHEMAS[kinds.KIND_TRADE_CHECKS][1])

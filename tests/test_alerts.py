@@ -124,8 +124,9 @@ def test_morning_picks_from_examples():
     assert lines[3] == "   Strongest other horizon: N+3 (14 of 15, average P(up) 0.581)."
     trades = [line for line in lines if line.startswith("   • ")]
     assert len(trades) == 4
-    assert trades[0].startswith("   • Rule, best expected gain: Model + news (rule.model_news.v1) at N+1, P(up) 0.566")
-    assert "target $239.54" in trades[0] and "expected gain -1.16%" in trades[0]
+    # W1 follow-up: the example picks come from B2's engine (gain per session held), so the gain pick is N+5
+    assert trades[0].startswith("   • Rule, best expected gain: Model + news (rule.model_news.v1) at N+5, P(up) 0.585")
+    assert "target $240.11" in trades[0] and "expected gain +0.48%" in trades[0]
     assert trades[3].startswith("   • AI, highest probability: ai.combined.opus.v1 at N+5, P(up) 0.615")
     assert all(PAPER in line for line in signal_lines(msg))
     assert not ADVICE.search(msg)
@@ -339,7 +340,7 @@ def test_cli_dry_run_writes_work_file_and_reruns_post_nothing(scratch, monkeypat
     assert run(["--market", "us", "--dry-run", "intraday"], capsys)[1]["reason"] == "nothing to post"
     monkeypatch.setenv("MB_NOW", "2026-10-07T17:00:00+00:00")
     code, out = run(["--market", "us", "--dry-run", "intraday"], capsys)
-    assert code == 0 and out["post_key"] == "alerts:us:ic-us-202610071627" and out["thread_ts"] == sent[0]["ts"]
+    assert code == 0 and out["post_key"] == "alerts:us:ic-us-2026-10-07T16:27Z" and out["thread_ts"] == sent[0]["ts"]
 
 
 def test_cli_reads_as_of_the_clock(scratch, monkeypatch, capsys):
@@ -551,7 +552,8 @@ def test_head_to_head_line_shows_expected_gain_after_your_cost():
     lines = [x for x in build_morning("us", "2026-10-07", preds, h2h, HORIZONS).splitlines() if x.startswith("   • ")]
     first = next(p for p in h2h if p["family"] == "rule" and p["pick_rule"] == "best_expected_gain")
     gain = round(first["prob_up"] * first["move_pct"] - (1 - first["prob_up"]) * first["loss_pct"] - 0.30, 2)
-    assert f"; expected gain {gain:+.2f}% after your cost 0.30% — not viable [Paper]" in lines[0]
+    verdict = "viable" if gain > 0 else "not viable"
+    assert f"; expected gain {gain:+.2f}% after your cost 0.30% — {verdict} [Paper]" in lines[0]
     assert all("after your cost 0.30%" in x for x in lines)
 
 

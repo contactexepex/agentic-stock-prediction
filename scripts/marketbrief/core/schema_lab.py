@@ -108,13 +108,26 @@ LAB_SCHEMAS: Schemas = {
         "text": "VARCHAR", "cited_ids": "VARCHAR[]", "reason_codes": "VARCHAR[]", "prompt_version": "VARCHAR",
         "created_at": "TIMESTAMPTZ",
     }),
-    # One row per open paper trade x intraday check (F5; extends WS5 intraday_checks): id = <check_id>-<trade_id>,
-    # check_id as in intraday_checks (ic-<market>-<check_at to the minute>); check_row_id = that ticker's
-    # intraday_checks row (market, sector, news candidates live there). session_number: which session of the
-    # holding window today is (1 = D). ret_since_entry_pct vs entry_price; to_target_pct = (target / last - 1)
-    # x 100; band below80 | below50 | inside50 | above50 | above80 against the trade's own range; target_z = the
-    # distance to target in 1-day sigma units scaled to the sessions left. flags outside_range | far_from_target
-    # | against_prediction.
+    # One row per open paper trade x intraday check (F5; extends WS5 intraday_checks; written by B9): id =
+    # <check_id>-<trade_id>, check_id as in intraday_checks (ic-<market>-<check_at to the minute as
+    # YYYY-MM-DDTHH:MMZ>, e.g. ic-us-2026-10-07T16:27Z); check_row_id = that ticker's intraday_checks row (market,
+    # sector, news candidates live there), null for a ticker not on the watchlist (no such row). session_number:
+    # which session of the holding window today is (1 = D). entry_price, target_price and lo80..hi80 are stored as
+    # predicted (raw); every measure is on today's price basis: ret_since_entry_pct = (last / entry_adj - 1) x 100;
+    # to_target_pct = (target_adj / last - 1) x 100; band below80 | below50 | inside50 | above50 | above80 against
+    # the adjusted range; target_z = (target_adj / last - 1) / (sigma_1d x sqrt(sessions_left)). flags outside_range
+    # | far_from_target | against_prediction.
+    # Added for B9 (issue #78, additive; rows written before it hold them in B9's trade_check_details, joined by the
+    # view trade_check_rows): family, pick_rule (head-to-head trades); quality ok | stale_quote | no_quote |
+    # no_entry_price (no measures and no flags unless ok); entry_source intraday_open (D is today) | stored_open;
+    # basis_factor = the split/bonus factor from the prediction's as-of date to today's basis (adjustments detected
+    # by check_at), entry_adj, target_adj, lo80_adj..hi80_adj the trade's prices on that basis; last_time = the
+    # 5-minute bar of last_price; sigma_1d, elapsed_fraction (share of today's session elapsed), sessions_held =
+    # session_number - 1 + elapsed_fraction, sessions_left = sessions to the exit close (the rest of today
+    # included), z_since_entry = return since entry / (sigma_1d x sqrt(sessions_held)); target_reached /
+    # target_reached_session (F1.9 so far: a session high from D up to the check at or above target_adj; 1 = D; null
+    # = unknown); high_since_entry_pct / low_since_entry_pct vs entry_adj; notes no_bar_<date> | no_sigma |
+    # not_on_watchlist.
     KIND_TRADE_CHECKS: ("jsonl", {
         "id": "VARCHAR", "check_id": "VARCHAR", "check_row_id": "VARCHAR", "check_at": "TIMESTAMPTZ",
         "session_date": "DATE", "market": "VARCHAR", "ticker": "VARCHAR", "trade_id": "VARCHAR",
@@ -124,6 +137,12 @@ LAB_SCHEMAS: Schemas = {
         "lo80": "DOUBLE", "lo50": "DOUBLE", "hi50": "DOUBLE", "hi80": "DOUBLE", "band": "VARCHAR",
         "target_z": "DOUBLE", "flags": "VARCHAR[]", "flagged": "BOOLEAN", "method_version": "VARCHAR",
         "computed_at": "TIMESTAMPTZ",
+        "family": "VARCHAR", "pick_rule": "VARCHAR", "quality": "VARCHAR", "entry_source": "VARCHAR",
+        "basis_factor": "DOUBLE", "entry_adj": "DOUBLE", "target_adj": "DOUBLE", "lo80_adj": "DOUBLE",
+        "lo50_adj": "DOUBLE", "hi50_adj": "DOUBLE", "hi80_adj": "DOUBLE", "last_time": "TIMESTAMPTZ",
+        "sigma_1d": "DOUBLE", "elapsed_fraction": "DOUBLE", "sessions_held": "DOUBLE", "sessions_left": "DOUBLE",
+        "z_since_entry": "DOUBLE", "target_reached": "BOOLEAN", "target_reached_session": "INTEGER",
+        "high_since_entry_pct": "DOUBLE", "low_since_entry_pct": "DOUBLE", "notes": "VARCHAR[]",
     }),
     # The EOD analyst's day summary per market (F6.1), gated: id = eod-<market>-<session_date>. results: JSON of
     # the day's deterministic numbers it was given ({family: {trades, wins, net_pnl, return_pct}}, per pick rule);

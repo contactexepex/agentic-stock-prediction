@@ -9,7 +9,9 @@ advice. Every signal stays "Paper" until it is proven (SPEC F7).
 marked `"_example": true`). Prices, index moves and range widths in them are real stored bars and ranges of
 29 Sep - 6 Oct 2026. Predictions, trades, reasons, news, commands and the portfolio are invented, but they are
 computed from one set of inputs, so the files agree with each other: quantities, costs, profit, agreement counts and
-scoreboard sums. `design/catalogue/make_examples.py` rebuilds them. The examples use the six companies NVDA, AAPL and JPM
+scoreboard sums. Costs, head-to-head picks and cost views are computed with session B2's engine code
+(`marketbrief/lab/`) and the rates in `config/costs.yaml`, at an example EUR/USD of 1.17.
+`design/catalogue/make_examples.py` rebuilds them. The examples use the six companies NVDA, AAPL and JPM
 (US, in $) and RELIANCE, HDFCBANK and MARUTI (India, in ₹), plus INDIGO and DAL as inactive companies.
 
 **Status of each entity.**
@@ -46,7 +48,7 @@ Contents:
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
-  [automatic reason](#automatic-reason)), [Open trade](#open-trade), [Intraday trade check](#trade-check)
+  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Research review](#research-review)
 - News and results: [News item](#news-item), [News-impact row](#news-impact-row),
@@ -81,7 +83,7 @@ through the watchlist accessor (`marketbrief/contracts/watchlist.py`). The price
 | last_close, last_close_date | Latest stored close | `ohlc_raw` (exists) | ₹ / $, date | `239.24` on `2026-10-06` |
 | change_pct | Last session's move | `ohlc_raw` | % | `2.66` |
 | agreement_n1 | How many strategies buy it at N+1 today | [Agreement](#agreement) | count of count | `12 of 15` |
-| open_trades | Its open paper trades, all strategies and horizons | [Open trade](#open-trade) | count | `8` |
+| open_trades | Its open paper trades, all strategies, horizons and both views | [Open trade](#open-trade) | count | `10` |
 
 <a id="lifecycle-event"></a>
 ## Lifecycle event
@@ -251,8 +253,9 @@ count; on a tie, the shorter one wins.
 
 Each day and for each company, the strongest rule strategy and the strongest AI trader each choose one horizon,
 under two pick rules: "best expected gain" and "highest probability". That makes up to four head-to-head trades
-(F1.7, decisions 41-42). Status: kind `head_to_head_picks`; session **B2** writes it. Example file:
-`head_to_head_pick.json` (RELIANCE, NVDA, and HDFCBANK with no candidate).
+(F1.7, decisions 41-42, with B2's two corrections: see docs/ws/b2.md). Status: kind `head_to_head_picks`; session
+**B2** writes it. Example file: `head_to_head_pick.json` (RELIANCE, NVDA, and HDFCBANK with no candidate), built by
+B2's own pick code.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -260,13 +263,13 @@ under two pick rules: "best expected gain" and "highest probability". That makes
 | pick_rule | How the horizon was chosen | F1.7.3 | `best_expected_gain` / `highest_probability` | `highest_probability` |
 | status | Whether a pick was possible | engine | `picked` / `no_candidate` | `no_candidate` (HDFCBANK: nobody buys) |
 | strategy_id | The family's strongest strategy with at least one buyable horizon | ranking | id | `ai.combined.opus.v1` |
-| strongest_basis | Ranked on this company (from 20 settled trades on it) or on all companies | decision 41 | `per_company` / `all_companies` | `all_companies` |
+| strongest_basis | Ranked on this company (from 20 settled trades on it) or on all companies of the market; a strategy with no settled trade ranks last | decision 41 (corrected) | `per_company` / `all_companies` | `all_companies` |
 | ranking | The full ranking it came from, within the market: rank, settled trades and profit after costs | settled trades | list | 1. `rule.model_news.v1`, 10 trades, $99.00 |
 | horizon_days, prediction_id | The chosen horizon and the prediction behind it | engine | k, id | `5` |
 | prob_up | That prediction's probability | prediction | 0-1 | `0.615` |
-| move_pct, loss_pct, costs_pct | Expected rise to target, drop to the 80 % range's low, and round-trip costs, all as a % of the amount, from the latest close | F1.7.3 | % | `0.49`, `5.57`, `0.23` |
-| expected_gain_pct | `p × move − (1 − p) × loss − costs` | F1.7.3 | % | `-2.08` (NVDA, AI, N+5) |
-| candidates | The same numbers for every buyable horizon, so a page can show why | engine | list | N+1, N+3, N+5 |
+| move_pct, loss_pct, costs_pct | Expected rise when the stock ends above the latest close C; expected shortfall when it ends below C (both from the strategy's own 80 % range); round-trip costs of the amount at C. All as a % of the amount | F1.7.3 (corrected) | % | `3.961`, `3.6023`, `0.234` |
+| expected_gain_pct | `p × move − (1 − p) × loss − costs`, per trade | F1.7.3 | % | `0.8151` (NVDA, AI, N+5) |
+| candidates | Every horizon the strongest strategy predicted, each with the numbers above plus: `gain_per_session_pct` (expected gain ÷ k, what "best expected gain" ranks, owner decision); `eligible` (the prediction qualifies; only eligible horizons can be picked); `expected_move_pct`, `your_cost_pct`, `cost_viable` (see [Cost view](#cost-view)) | engine | list | N+5: gain per session `0.163`, `eligible: true`, expected move `0.4932` vs your cost `1.738`, `cost_viable: false` |
 | amount, currency | Money per head-to-head trade | company | ₹ / $ | `1000`, `USD` |
 
 <a id="paper-trade"></a>
@@ -279,7 +282,7 @@ same predictions:
 
 Settlement is deterministic: the same stored bars always give the same numbers. A corrected split or bonus gives a
 new settlement row, not an edit. Status: kind `paper_trades_settled`; session **B2** (the engine) writes it. Example
-file: `paper_trade.json` (77 rows from the predictions of 29 Sep, settled on 1-6 Oct, including skipped MARUTI
+file: `paper_trade.json` (75 rows from the predictions of 29 Sep, settled on 1-6 Oct, including 10 skipped MARUTI
 trades).
 
 | Field | Meaning | Source | Unit | Example |
@@ -296,7 +299,7 @@ trades).
 | exit_quantity, adjustment_ids | Shares after a split or bonus in the window, and that adjustment | `adjustments` (exists) | shares, ids | `4.36167`, empty |
 | entry_value, exit_value | Quantity × price | engine | ₹ / $ | `1000.00` -> `1042.00` |
 | gross_pnl | Profit before costs | engine | ₹ / $ | `42.00` |
-| costs, cost_lines | Round-trip charges with their parts (provisional rates, F1.6). India: brokerage, STT, exchange, SEBI, stamp duty, DP charge, GST. US: BUX order fee converted to $, SEC fee | `config/costs.yaml` (B2) | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
+| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`, marked verify). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
 | net_pnl | Profit after costs (the headline number) | engine | ₹ / $ | `39.66` |
 | return_pct | Net profit as % of the amount (compares across amounts, decision 44) | engine | % | `3.97` |
 | prob_up, target_price, lo80, hi80 | What was predicted | prediction | 0-1, ₹ / $ | `0.583`, `227.84`, `218.36`-`237.72` |
@@ -325,6 +328,50 @@ move. These parts feed the reason-code heatmaps.
 
 The exact split method is session B2's; the fields above are fixed.
 
+<a id="cost-view"></a>
+## Cost view
+
+The two cost views of one record (owner decisions 50-51):
+- **market cost**: the costs strategies are ranked on, the same as the [paper trade](#paper-trade)'s `costs`;
+- **your cost**: market cost plus the owner's own charges. India: the NRI reporting charge ₹200 on the buy date and
+  ₹200 on the sell date, and the DP charge. US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
+  pro-rated.
+
+It also holds the **cost-viable** flag: whether the expected move beats your cost. A prediction is made, traded
+and scored either way; the flag is shown, and a non-viable head-to-head candidate can still be picked.
+
+Status: kind `cost_views`. Session **B2** writes it (`core/schema_b2.py`, `marketbrief/lab/cost_views.py`) and owns
+it; it is joined to the other records on `record_id`. W1 keeps it as B2's kind rather than folding it into
+`paper_trades_settled`, because the your-cost view is an owner-specific layer on top of the market view the
+strategies compete on.
+
+**Pending the owner:** which definition of "viable" is canonical. As built, it is "expected move > your cost"
+(`expected_move_pct > your_cost_pct`). The alternative is "expected gain after your cost > 0". The field may change
+meaning when the owner decides.
+
+Example file: `cost_view.json` (199 rows, built with B2's own row functions):
+- 118 prediction rows: every qualifying prediction of NVDA and RELIANCE on 7 Oct;
+- 16 pick rows;
+- 65 settlement rows.
+
+None of the example predictions is cost-viable: their expected moves are below 0.6 %, while a round trip at your
+cost is about 1.7 % (US) and 2.4 % (India).
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| id, record_kind, record_id | `cv:<kind>:<record id>`; which record it describes: a prediction or pick before the open, a settled trade after the close | B2 | text | `cv:settlement:acc:rule.model_news.v1:2026-09-29-NVDA-3d@20261005T221500Z` |
+| trade_id, prediction_id, strategy_id, ticker, horizon_days, session_date, exit_date, amount, currency | The record's keys | the record | text, date, ₹ / $ | `NVDA`, `3`, `1000`, `USD` |
+| reference_price, target_price | C (the latest close; for a settlement, the entry price) and the target | prediction | ₹ / $ | `229.27`, `227.84` |
+| expected_move_pct | `(target / C − 1) × 100` (predictions and picks only) | B2 | % | RELIANCE N+3: `0.225` |
+| market_cost_pct, your_cost_pct | The round trip in each view as a % of the amount | B2 | % | `1.99`, `2.4299` |
+| cost_viable | Expected move beats your cost (predictions and picks only; definition pending the owner) | B2, decision 51 | yes/no | `false` |
+| market_costs, market_cost_lines | The market view, total and per charge | B2 | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
+| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` `200` each and `dp_charge` |
+| net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | Profit after costs in each view (settlements only) | B2 | ₹ / $, % | `39.66` / `3.966`; `24.32` / `2.432` |
+| holding_days | Calendar days from D to the exit (the US portfolio fee) | calendar | days | `5` |
+| eurusd_entry, eurusd_exit | The EUR/USD closes used for the US order fee and FX markup | `EURUSD=X` (B2) | rate | `1.17` (example rate) |
+| computed_at, method_version | When it was computed; engine version | B2 | time, text | `engine-v1` |
+
 <a id="open-trade"></a>
 ## Open trade
 
@@ -344,8 +391,11 @@ qualifying [predictions](#prediction), the entry bar and the latest close. Examp
 ## Intraday trade check
 
 Twice per session, every open paper trade is compared with its prediction (F5; monitoring only, never a trade).
-Status: kind `trade_checks`. Session **B9** builds it on top of the existing per-company `intraday_checks`, which
-**exist** (WS5) and hold the market, sector and news candidates. Example file: `trade_check.json`.
+Status: kind `trade_checks`. Session **B9** writes it, on top of the existing per-company `intraday_checks`, which
+**exist** (WS5) and hold the market, sector and news candidates. The prices of the prediction are stored as
+predicted; every measure is on today's price basis (after a split or bonus in the window). Rows written before issue
+#78 keep the measures from `quality` on in B9's `trade_check_details`; the view `trade_check_rows` joins both.
+Example file: `trade_check.json` (the RELIANCE N+4 trade checked at 11:13 IST is the example below).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -356,7 +406,19 @@ Status: kind `trade_checks`. Session **B9** builds it on top of the existing per
 | target_price, to_target_pct | Target and the distance left (negative: already past it) | prediction | ₹ / $, % | `1184.81`, `-3.25` |
 | band | Where the price sits in the trade's own range | derived | `below80`, `below50`, `inside50`, `above50`, `above80` | `above50` (NVDA: `above80`) |
 | flags, flagged | Warnings | F5 | `outside_range`, `far_from_target`, `against_prediction` | NVDA `["outside_range"]` |
-| check_row_id | The company's intraday check row (market, sector and news causes; the explainer's note) | `intraday_checks`, `intraday_explanations` (exist) | id | `ic-us-202610071627-NVDA` |
+| check_id, check_row_id | The check (`ic-<market>-<time to the minute>`), and the company's intraday check row (market, sector and news causes; the explainer's note); empty for a company not on the watchlist | `intraday_checks`, `intraday_explanations` (exist) | id | `ic-india-2026-10-07T05:43Z`, `ic-us-2026-10-07T16:27Z-NVDA` |
+| target_z | Distance to the target in 1-day volatility units, scaled to the sessions left | B9 | number | `-2.182` (past the target) |
+| family, pick_rule | The trade's family; the pick rule for a head-to-head trade | trade | text | `rule`, empty |
+| quality | Whether the price could be measured; anything but `ok` means no measures and no flags | B9 | `ok`, `stale_quote`, `no_quote`, `no_entry_price` | `ok` |
+| entry_source | Where the entry price came from | B9 | `intraday_open` (D is today), `stored_open` | `stored_open` |
+| basis_factor, entry_adj, target_adj, lo80_adj..hi80_adj | The split/bonus factor since the prediction, and the trade's prices on today's basis | `adjustments` (exists) | factor, ₹ / $ | `1.0`, `1182.0`, `1184.81`, 80 %: `1131.42`-`1240.71` |
+| last_time | Start of the 5-minute bar the last price is from | Yahoo 5-min bars | time | `2026-10-07T05:35:00Z` |
+| sigma_1d, elapsed_fraction | 1-day volatility; share of today's session already past | features, calendar | fraction | `0.017987`, `0.3147` |
+| sessions_held, sessions_left | Sessions held so far (today's part included) and sessions to the exit close | calendar | sessions | `4.3147`, `0.6853` |
+| z_since_entry | Move since entry in volatility units (`against_prediction` at -1 or below) | B9 | number | `0.9646` |
+| target_reached, target_reached_session | Whether a high since D reached the target so far, and the first such session (1 = D); empty when unknown | bars | yes/no, number | `true`, `1` |
+| high_since_entry_pct, low_since_entry_pct | Best high and worst low since entry | bars | % | `3.6`, `-1.79` |
+| notes | Data notes | B9 | `no_bar_<date>`, `no_sigma`, `not_on_watchlist` | empty |
 
 A day's path for one prediction (made -> checks -> settled -> explained) combines a [prediction](#prediction),
 its trade checks, its [settled trade](#paper-trade) and any [AI reason](#ai-reason) (read model `rm.lifecycle`,
@@ -388,7 +450,7 @@ Status: kind `eod_analyses`; session **B3** writes it. Example file: `eod_analys
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
 | session_date, settled_trades | The day, and the trades settled that day | settlement | date, count | `2026-10-06`, `11` (India) |
-| results | Per family (accuracy view): trades, wins, net profit; per pick rule: trades, net profit | deterministic | JSON | `{"rule": {"trades": 2, "wins": 1, "net_pnl": 1293.67}}` |
+| results | Per family (accuracy view): trades, wins, net profit; per pick rule: trades, net profit | deterministic | JSON | `{"rule": {"trades": 2, "wins": 1, "net_pnl": -975.83}}` |
 | summary | The analyst's text, citing ids | EOD analyst (gated) | ≤ 150 words | "11 paper trades settled today..." |
 | reason_ids | The [AI reasons](#ai-reason) written with it | analyst | ids | `tra:...` |
 
@@ -415,7 +477,7 @@ example trades, so every count matches `paper_trade.json`).
 | range_hit_rate | Share of exit closes inside the 80 % range | F1.9 | 0-1 | `0.9` |
 | worst_losing_streak | Most losses in a row | sequence | count | `2` |
 | max_drawdown | Deepest fall of cumulative profit from its peak | sequence | ₹ / $ | `-11.24` |
-| luck_test | 95 % bootstrap interval of the mean return, with a correction across all strategies. Only "excludes zero" after correction counts as an edge | F7.1 | %, yes/no | `0.00` to `2.12` (low end just above 0), excludes zero `true` but `corrected: false` (no edge claimed) |
+| luck_test | 95 % bootstrap interval of the mean return, with a correction across all strategies. Only "excludes zero" after correction counts as an edge | F7.1 | %, yes/no | `0.02` to `2.16`, excludes zero `true` but `corrected: false` (no edge claimed) |
 | sample_badge | Fewer than 20 trades: "too few trades to rank" (greyed out, SPEC section 6) | rule | `ok` / `too_few_to_rank` | `too_few_to_rank` |
 | go_live | Position against the go-live bar: proven, months forward, trades needed, beats the best baseline | F7.2 | mixed | `proven: false`, 300 trades needed |
 | basis | Forward or back-test; the two are never pooled (F2.3) | label | `forward` / `backtest` | `forward` |

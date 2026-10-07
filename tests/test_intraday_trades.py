@@ -229,9 +229,12 @@ def stored(root: Path, kind: str) -> list[dict]:
 
 
 def trade_view(root: Path) -> dict[str, dict]:
-    """{trade_id: trade_checks row merged with its details row}."""
+    """{trade_id: trade_checks row merged with its details row}: a column from trade_checks when set, else from the
+    details row, as the view trade_check_rows does (issue #78: trade_checks gained the details' columns)."""
     details = {row["id"]: row for row in stored(root, "trade_check_details")}
-    return {row["trade_id"]: {**details[row["id"]], **row} for row in stored(root, "trade_checks")}
+    return {row["trade_id"]: {**details[row["id"]], **{k: v for k, v in row.items() if v is not None
+                                                        or k not in details[row["id"]]}}
+            for row in stored(root, "trade_checks")}
 
 
 def test_w1_example_trade_matches_its_record_and_every_open_trade_is_checked(market):

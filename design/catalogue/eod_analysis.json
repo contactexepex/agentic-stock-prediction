@@ -15,17 +15,17 @@
         "rule": {
           "trades": 2,
           "wins": 1,
-          "net_pnl": 1293.67
+          "net_pnl": -975.83
         },
         "baseline": {
           "trades": 3,
           "wins": 2,
-          "net_pnl": 3450.63
+          "net_pnl": 39.98
         },
         "ai": {
           "trades": 4,
           "wins": 2,
-          "net_pnl": 2587.34
+          "net_pnl": -1951.66
         },
         "best_expected_gain": {
           "trades": 0,
@@ -33,10 +33,10 @@
         },
         "highest_probability": {
           "trades": 2,
-          "net_pnl": 4313.92
+          "net_pnl": 2031.62
         }
       },
-      "summary": "11 paper trades settled today. Rule strategies: net +1293.67; AI traders: net +2587.34 (INR). The broad market set the direction; see each trade's reason.",
+      "summary": "11 paper trades settled today. Rule strategies: net -975.83; AI traders: net -1951.66 (INR). The broad market set the direction; see each trade's reason.",
       "cited_ids": [
         "acc:rule.model_news.v1:2026-09-29-RELIANCE-3d",
         "acc:base.always_up.v1:2026-09-29-RELIANCE-3d",
@@ -64,7 +64,7 @@
       "id": "eod-us-2026-10-06",
       "market": "us",
       "session_date": "2026-10-06",
-      "settled_trades": 7,
+      "settled_trades": 8,
       "results": {
         "rule": {
           "trades": 2,
@@ -82,15 +82,15 @@
           "net_pnl": 0
         },
         "best_expected_gain": {
-          "trades": 0,
-          "net_pnl": 0
+          "trades": 1,
+          "net_pnl": 41.15
         },
         "highest_probability": {
           "trades": 1,
           "net_pnl": 41.15
         }
       },
-      "summary": "7 paper trades settled today. Rule strategies: net +47.37; AI traders: net +0.00 (USD). The broad market set the direction; see each trade's reason.",
+      "summary": "8 paper trades settled today. Rule strategies: net +47.37; AI traders: net +0.00 (USD). The broad market set the direction; see each trade's reason.",
       "cited_ids": [
         "acc:rule.model_news.v1:2026-09-29-NVDA-4d",
         "acc:base.always_up.v1:2026-09-29-NVDA-4d",
@@ -99,12 +99,13 @@
         "acc:base.always_up.v1:2026-09-29-AAPL-4d"
       ],
       "reason_ids": [
+        "tra:h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-4d",
         "tra:h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d",
         "tra:acc:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
         "tra:acc:base.always_up.v1:2026-09-29-NVDA-4d:biggest_win",
         "tra:acc:base.model_only.v1:2026-09-29-NVDA-4d:biggest_win",
+        "tra:h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
         "tra:h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
-        "tra:acc:rule.model_news.v1:2026-09-29-AAPL-4d:biggest_win",
         "tra:acc:base.always_up.v1:2026-09-29-JPM-4d:biggest_miss"
       ],
       "prompt_version": "eod-v1",
