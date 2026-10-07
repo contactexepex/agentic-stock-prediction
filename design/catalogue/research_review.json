@@ -1,0 +1,55 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "research_review",
+  "kind": "research_reviews",
+  "catalogue": "docs/DATA_CATALOGUE.md#research-review",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "rr-us-2026-W41",
+      "market": "us",
+      "iso_week": "2026-W41",
+      "period_start": "2026-10-05",
+      "period_end": "2026-10-09",
+      "leaders": [
+        {
+          "scope": "rule",
+          "strategy_id": "rule.model_news.v1",
+          "net_pnl": 61.4,
+          "trades": 38
+        },
+        {
+          "scope": "ai",
+          "strategy_id": "ai.combined.opus.v1",
+          "net_pnl": 48.9,
+          "trades": 21
+        }
+      ],
+      "findings": [
+        {
+          "text": "Corroborated product news added about 0.6 points over 3 sessions (21 events, interval includes zero).",
+          "cited_ids": [
+            "ni-us-2026-W41-product-corroborated-high-3"
+          ]
+        }
+      ],
+      "proposals": [
+        {
+          "proposal_id": "p-2026-W41-1",
+          "kind": "threshold",
+          "file": "config/strategies.yaml",
+          "diff": "+  - id: rule.model_news_p57.v1\n+    threshold: 0.57",
+          "rationale": "Trades between 0.55 and 0.57 lost after costs in 3 of 3 weeks.",
+          "cited_ids": [
+            "rule.model_news.v1"
+          ],
+          "status": "proposed"
+        }
+      ],
+      "report_path": "reports/us/research-2026-W41.md",
+      "prompt_version": "director-v1",
+      "written_at": "2026-10-10T14:20:00Z"
+    }
+  ]
+}

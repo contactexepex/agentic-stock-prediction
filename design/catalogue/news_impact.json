@@ -1,0 +1,77 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "news_impact_row",
+  "kind": "news_impact",
+  "catalogue": "docs/DATA_CATALOGUE.md#news-impact-row",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "ni-us-2026-W41-earnings-confirmed_primary-high-1",
+      "market": "us",
+      "iso_week": "2026-W41",
+      "as_of": "2026-10-10T14:00:00Z",
+      "event_type": "earnings",
+      "status": "confirmed_primary",
+      "materiality": "high",
+      "horizon_days": 1,
+      "n_events": 34,
+      "mean_abnormal_pct": 1.12,
+      "ci_low_pct": 0.21,
+      "ci_high_pct": 2.03,
+      "mean_benchmark_pct": 0.08,
+      "mean_sector_pct": 0.15,
+      "enough": true,
+      "news_ids": [
+        "e1f0a2b3c4d5e6f7",
+        "0a1b2c3d4e5f6a7b"
+      ],
+      "method_version": "ni-v1",
+      "computed_at": "2026-10-10T14:00:00Z"
+    },
+    {
+      "id": "ni-us-2026-W41-product-corroborated-high-3",
+      "market": "us",
+      "iso_week": "2026-W41",
+      "as_of": "2026-10-10T14:00:00Z",
+      "event_type": "product",
+      "status": "corroborated",
+      "materiality": "high",
+      "horizon_days": 3,
+      "n_events": 21,
+      "mean_abnormal_pct": 0.64,
+      "ci_low_pct": -0.42,
+      "ci_high_pct": 1.7,
+      "mean_benchmark_pct": 0.22,
+      "mean_sector_pct": 0.31,
+      "enough": true,
+      "news_ids": [
+        "a41c9e07b2d35f18"
+      ],
+      "method_version": "ni-v1",
+      "computed_at": "2026-10-10T14:00:00Z"
+    },
+    {
+      "id": "ni-us-2026-W41-ma-rumour-medium-1",
+      "market": "us",
+      "iso_week": "2026-W41",
+      "as_of": "2026-10-10T14:00:00Z",
+      "event_type": "ma",
+      "status": "rumour",
+      "materiality": "medium",
+      "horizon_days": 1,
+      "n_events": 4,
+      "mean_abnormal_pct": null,
+      "ci_low_pct": null,
+      "ci_high_pct": null,
+      "mean_benchmark_pct": null,
+      "mean_sector_pct": null,
+      "enough": false,
+      "news_ids": [
+        "c0d2e4f6a8b1c3d5"
+      ],
+      "method_version": "ni-v1",
+      "computed_at": "2026-10-10T14:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,179 @@
+# Governed tools, defined once and used by every channel (docs/SPEC.md F10; ARCHITECTURE.md section 10; W1).
+# Session B5 builds the tool layer (web/lib/tools/), the Slack commands and /mcp from this file; it owns the rest
+# of mcp/. Research only: no tool places, routes or simulates a broker order; paper trades are records.
+#
+# Outputs are named by the entities of docs/DATA_CATALOGUE.md (and the read models of SPEC section 4 they come
+# from). Their exact shapes follow the owner's approved mockups (Wave 3, session B4); this file fixes names,
+# inputs, permissions and the write rules, not payload shapes.
+#
+# Rules for every tool (F10):
+# - identity comes from the channel's auth (Vercel Authentication on the dashboard, the Slack user id of a signed
+#   request, GitHub OAuth on /mcp, the session on Claude Code), never from arguments or prompt text;
+# - every write needs an idempotency key; a repeated key returns the first result (command_log result duplicate);
+# - every write is validated by the same Python validators as the CLIs and lands in data/ only through the inbox
+#   import (web tier) or the CLI (Claude Code); the caller sees "pending" until then;
+# - each agent has a per-day action budget and a kill switch (mcp/agents/<agent>.yaml, B5);
+# - refusals and anything ambiguous are reported to the owner in Slack; nothing is retried by an agent;
+# - every call is logged in command_log (core/schema_lifecycle.py).
+#
+# Channel values: true | false | a short note on how (e.g. the Slack command; a note means allowed, in that way).
+# Booleans are written true/false, never yes/no, so YAML 1.1 and 1.2 parsers read them alike. Slack: any member of
+# #market-brief (decision 15); the dashboard: the owner only (decision 16); the Claude app: the owner's GitHub
+# account only (decision 22).
+
+version: 1
+
+channels: [dashboard, slack, claude_code, claude_app]
+
+common_inputs:
+  market: {type: string, enum: [india, us], required: true, description: "The market (India in ₹, US in $)."}
+  ticker: {type: string, pattern: '^[A-Z0-9.&-]{1,20}$', description: "Exchange symbol as on the watchlist (e.g. HDFCBANK, M&M, AAPL)."}
+  idempotency_key: {type: string, pattern: '^[A-Za-z0-9_-]{8,64}$', description: "Client-chosen key; the same key twice returns the first result."}
+
+tools:
+  # ---------------- read ----------------
+  - name: get_overview
+    kind: read
+    description: The market today - top picks by agreement per horizon, head-to-head trades, rule vs AI, open trades, alerts and freshness.
+    inputs:
+      market: {$ref: common_inputs.market}
+      horizon_days: {type: integer, enum: [1, 2, 3, 4, 5], required: false, default: 1, description: "Horizon N+k shown first (decision 39)."}
+    output: {entities: [market_status, agreement, head_to_head_pick, paper_trade, intraday_check], read_model: rm.home}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
+  - name: get_company
+    kind: read
+    description: One company - its decision card, predictions per strategy and horizon with targets and ranges, today's path, settled results, news with status, results digest, events.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: true}
+    output: {entities: [company, prediction, paper_trade, intraday_check, news_item, results_digest, lifecycle_event], read_model: [rm.stock, rm.stock_strategies, rm.lifecycle]}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
+  - name: get_scoreboard
+    kind: read
+    description: Every strategy and baseline with profit after costs, win rate, target error, range hits, streaks, drawdown and the luck test, per horizon and view.
+    inputs:
+      market: {$ref: common_inputs.market}
+      view: {type: string, enum: [accuracy, head_to_head], required: false, default: accuracy}
+      horizon_days: {type: integer, enum: [1, 2, 3, 4, 5], required: false, description: "Omit for all horizons pooled."}
+      strategy_id: {type: string, required: false, description: "One strategy's detail (an id of config/strategies.yaml)."}
+    output: {entities: [strategy, scoreboard_row], read_model: rm.strategies}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
+  - name: compare_rule_vs_ai
+    kind: read
+    description: Rule strategies against AI traders on identical company-days, overall or for one company, with the EOD and weekly explanations.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: false}
+    output: {entities: [scoreboard_row, eod_analysis, research_review], read_model: [rm.compare, rm.review]}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
+  - name: get_news
+    kind: read
+    description: News with verification status, impact category and headline history, for the market or one company; plus the news-impact table.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: false}
+      since: {type: string, format: date-time, required: false, description: "Only items first seen after this time."}
+    output: {entities: [news_item, news_impact_row], read_model: [rm.news, rm.review]}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
+  - name: get_trades
+    kind: read
+    description: Open paper trades and recently settled ones with their automatic and AI reasons.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: false}
+      strategy_id: {type: string, required: false}
+      status: {type: string, enum: [open, settled, all], required: false, default: all}
+    output: {entities: [paper_trade, automatic_reason, ai_reason], read_model: rm.trades}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
+  - name: explain
+    kind: read_ai
+    description: A plain-language answer to "why did X deviate" or "why did strategy Y win", from stored data only, citing ids and as-of times; never advice.
+    inputs:
+      market: {$ref: common_inputs.market}
+      question: {type: string, max_length: 500, required: true}
+      ticker: {$ref: common_inputs.ticker, required: false}
+      strategy_id: {type: string, required: false}
+    output: {entities: [answer], fields: [text, cited_ids, as_of, not_in_data]}
+    uses_tools: [get_overview, get_company, get_scoreboard, compare_rule_vs_ai, get_news, get_trades]
+    budget: {model: sonnet, monthly_usd_cap: 20, daily_usd: 0.65}
+    channels: {dashboard: chat panel, slack: /ask, claude_code: true, claude_app: true}
+
+  # ---------------- write (append-only records; pending until imported) ----------------
+  - name: add_company
+    kind: write
+    description: Ask to add a common stock (NSE, or NYSE/Nasdaq) to the watchlist. The system resolves the identifiers and shows a summary to confirm; only Confirm starts the onboarding (backfill, checks, add event).
+    inputs:
+      market: {$ref: common_inputs.market}
+      symbol: {type: string, pattern: '^[A-Z0-9.&-]{1,20}$', required: true, description: "Exchange symbol (NSE or NYSE/Nasdaq)."}
+      amount: {type: number, minimum: 1, required: false, description: "Per-trade paper amount in the market currency; omit for the default (₹1,00,000 / $1,000)."}
+      idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
+    confirm: summary   # name, exchange, sector, Yahoo symbol, CIK, amount; Confirm / Cancel
+    writes: [watchlist_events, command_log]
+    validator: F8 add validator (session B1, marketbrief/lifecycle/)
+    refuses: [etf, bse_only, unknown_symbol, already_active, deleted_needs_new_add]
+    channels: {dashboard: true, slack: /company add (form), claude_code: true, claude_app: true}
+  - name: deactivate_company
+    kind: write
+    description: Stop predicting and trading a company from the next pre-open run; collection continues, open trades still settle.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: true}
+      reason: {type: string, max_length: 200, required: false}
+      idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
+    confirm: summary
+    writes: [watchlist_events, command_log]
+    validator: F8 lifecycle validator (session B1)
+    channels: {dashboard: true, slack: /company deactivate, claude_code: true, claude_app: true}
+  - name: reactivate_company
+    kind: write
+    description: Bring an inactive company back into predictions and trades from the next pre-open run.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: true}
+      idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
+    confirm: summary
+    writes: [watchlist_events, command_log]
+    validator: F8 lifecycle validator (session B1)
+    channels: {dashboard: true, slack: /company reactivate, claude_code: true, claude_app: true}
+  - name: set_paper_amount
+    kind: write
+    description: Change a company's per-trade paper amount (higher or lower than the default) from the next pre-open run; null returns to the default.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: true}
+      amount: {type: ['number', 'null'], minimum: 1, required: true, description: "Amount in the market currency, or null for the default."}
+      idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
+    confirm: summary
+    writes: [watchlist_events, command_log]
+    validator: F8 lifecycle validator (session B1)
+    channels: {dashboard: true, slack: /company amount, claude_code: true, claude_app: true}
+  - name: delete_company
+    kind: write
+    description: Hide a company everywhere (tombstone). Raw records stay in git history; scoreboards are recomputed without it.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: true}
+      confirm: {type: string, required: true, description: "Must equal the ticker, typed by the owner."}
+      idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
+    confirm: typed   # decision 20: dashboard only, typed confirmation
+    writes: [watchlist_events, command_log]
+    validator: F8 lifecycle validator (session B1)
+    channels: {dashboard: typed confirmation, slack: false, claude_code: false, claude_app: false}
+  - name: add_paper_trade
+    kind: write
+    description: Record one of the owner's own paper trades (buy or sell) at a stored bar's open or close, or a manual price inside that day's range.
+    inputs:
+      market: {$ref: common_inputs.market}
+      ticker: {$ref: common_inputs.ticker, required: true}
+      side: {type: string, enum: [buy, sell], required: true}
+      quantity: {type: number, exclusive_minimum: 0, required: true, description: "Whole shares in India; fractional allowed in the US."}
+      trade_date: {type: string, format: date, required: true}
+      price_basis: {type: string, enum: [open, close, manual], required: true}
+      price: {type: number, required: false, description: "Only with price_basis manual."}
+      note: {type: string, max_length: 200, required: false}
+      idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
+    writes: [portfolio_trades, command_log]
+    validator: scripts/portfolio.py add-trade (WS4, marketbrief/portfolio/)
+    channels: {dashboard: true, slack: /trade, claude_code: true, claude_app: true}
+
+refusal_codes: [not_allowed_in_channel, unknown_actor, budget_exceeded, kill_switch, validation_failed, duplicate_key, ambiguous]

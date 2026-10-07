@@ -1,8 +1,8 @@
 # market-brief: product specification and parallel roadmap
 
-Status: approved by the owner (decisions 1-36, 2026-10-07). It records every decision the owner made in the
+Status: approved by the owner (decisions 1-48, 2026-10-07). It records every decision the owner made in the
 question rounds of 2026-10-07 and turns them into features, data, API, pages, integrations and a
-roadmap of stages that can be built in parallel cloud sessions. It builds on what is already merged
+roadmap of waves that can be built in parallel cloud sessions. It builds on what is already merged
 (docs/DESIGN.md, docs/ARCHITECTURE.md, api/openapi.yaml, docs/ws/) and changes none of its rules unless
 a section says so explicitly ("Rule change").
 
@@ -55,7 +55,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 29 | Intraday checks | Monitoring only (no trades). |
 | 30 | Home picks | Agreement ranking: companies ranked by how many strategies would buy them, then by average probability. Clicking a company opens a stock strategy page with the agreement ranking, the best strategy, and all strategies ranked by profit after costs. |
 | 31 | Pre-open run | Starts 30 minutes earlier: India 07:40 IST, US 07:45 New York time (schedules changed 2026-10-07). |
-| 32 | Frontend order | This spec is merged first; the owner's design sessions then update the page designs from it; the frontend stage builds from those designs. |
+| 32 | Frontend order | This spec is merged first; the owner's design sessions then update the page designs from it; the frontend stage builds from those designs. Refined by decision 48: the design track designs the pages from W1's data catalogue, and the API follows the approved mockups (section 10). |
 | 33 | Rule changes | Both approved: companies as validated data records (F8.1), and the prediction-rule changes for strategies (F2.6). |
 | 34 | Orchestrator defaults | Accepted: money-view budget ₹5,00,000 / $5,000 per strategy, at most 5 trades a day (this item superseded by decision 40); weekly research run Saturday 10:00 local; chat history kept 90 days; the Slack add form asks market, symbol and optional amount only. |
 | 35 | Help page | Kept as page 12. |
@@ -69,6 +69,10 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 43 | Reasons for every trade | Every settled trade gets an automatic reason (computed, no AI: the move split into market, sector, news and company-specific parts; target and range hit or missed). AI writes plain-language reasons for the head-to-head trades and the day's biggest wins and misses. |
 | 37a | Ready before accurate | The horizon functionality is built and running from the start even though early predictions will be inaccurate; accuracy is expected to improve as data accumulates. |
 | 44 | Amount cap vs overrides | ₹1,00,000 / $1,000 is the default amount of every trade; a per-company override may raise or lower it (e.g. a stock whose single share costs more than ₹1,00,000). Comparisons therefore report % returns beside money. |
+| 45 | News: edited headline | The same article at the same link is one item; a later headline change is kept as a headline-update note on it (latest headline as of a time is shown). |
+| 46 | News: two markets | An article may be stored once per market (India, US), never twice within a market. |
+| 47 | News de-duplication timing | Fixed now as a small batch, before the waves (Wave 0). |
+| 48 | Waves | The wave plan of section 10: each session in its own cloud session, built, judged and merged to main in parallel; sessions merge to main themselves after a PASS (no pull requests); the orchestrator watches and resolves clashes. More automation and autonomy, less owner attention. |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
@@ -137,7 +141,7 @@ part already does it, the feature says "exists" and what changes.
    real charges from a contract note (India) and the BUX fee page (US); until then strategies are still
    comparable because every account pays the same costs. The USD comparison (decision 11) applies the
    order fee converted at the day's EUR/USD rate and leaves the FX conversion to the owner's EUR view.
-   No EUR/USD rate is stored today: Stage B2 adds `EURUSD=X` (Yahoo daily close) as a US cross-market
+   No EUR/USD rate is stored today: Session B2 adds `EURUSD=X` (Yahoo daily close) as a US cross-market
    symbol of role `fx` (collected as bars only, not a model feature).
 7. **Two views** (decisions 40-42), both from the same predictions:
    - **Accuracy view:** every qualifying prediction (each strategy, company and horizon) is its own
@@ -252,7 +256,7 @@ exit, split and holiday cases; the engine is the only place P&L is computed.
      to close of D+4, which is not N+5.
    Old records keep their definition and get a label: `legacy_cc` (close-to-close and the old ranges),
    `legacy_5d_d4` (open-to-close 5d). They are never pooled with the new horizons, except open-to-close
-   1d, which equals N+1 and may be pooled with it. Stage B10 extends the model, ranges, scoring and
+   1d, which equals N+1 and may be pooled with it. Session B10 extends the model, ranges, scoring and
    calibration to N+1..N+5 with the decision-37 definition (new labels, a refit per horizon, ranges
    per horizon).
 8. **Visual statistics** (decision 42): heatmaps of win rate and profit after costs by strategy x
@@ -290,7 +294,7 @@ planted effect is recovered.
    evidence ids, and a reason of at most 60 words. Timing: with the pre-open run moved 30 minutes
    earlier (decision 31) the run has about 95 minutes (India) and 105 minutes (US) before the open; the traders run in parallel
    and a trader that has not passed its gate 15 minutes before the open abstains for that day
-   (recorded). Stage C measures the run's duration on both markets before go-live. A deterministic gate (shared with the existing
+   (recorded). Wave 5 measures the run's duration on both markets before go-live. A deterministic gate (shared with the existing
    prediction rules) checks: ids exist and are verified enough (DESIGN.md 3b), no call with earnings
    within 1 day, `BLOCKED` quality refused, ranges no narrower than `ranges.py`'s, numbers match stored
    data. One retry, then the trader abstains for that run (recorded).
@@ -373,9 +377,9 @@ states each strategy's position against the bar.
    reading `cfg["tickers"]` unchanged. Existing code that predicts, publishes ranges or picks, trades,
    or displays the watchlist (reports, dashboard, warehouse read models, Slack digest) must show active
    companies only (decision 13; inactive ones appear only in the Companies page's Inactive section), so
-   those call sites switch to `active_tickers` and active sector membership. Stage A lists every
+   those call sites switch to `active_tickers` and active sector membership. W1 lists every
    existing reader of `cfg` tickers and sector lists, classifies each as collect, predict or display,
-   and assigns each predict or display call site to exactly one stage: the stage that owns the file
+   and assigns each predict or display call site to exactly one session: the session that owns the file
    (B2 `portfolio/`, B4 `warehouse/`, B9 `intraday/`), else B1. The accessor
    `watchlist(market, as_of, state)` serves replays and new code.
 3. **Add** takes: market, exchange symbol, optional name, optional amount. The onboarding pipeline
@@ -445,11 +449,12 @@ and then dispatches the GitHub Actions workflow `onboard.yml`
 (`workflow_dispatch`, fine-grained token limited to Actions on this repo). The workflow imports the
 inbox (same validators), runs the deterministic onboarding for adds, commits to `data/` (pull, rebase
 and retry so it never races a routine's push), and replies in Slack. If the dispatch fails, or if a
-source refuses GitHub's runners (to be verified in Stage B1 for NSE, Yahoo and SEC), the next
+source refuses GitHub's runners (to be verified in session B1 for NSE, Yahoo and SEC), the next
 scheduled run imports the inbox. The inbox lives in its own MotherDuck database `market_brief_inbox`
 written by a separate service account (the Lite plan has 2), because MotherDuck tokens are not
 scoped per schema: a leaked inbox token cannot touch `market_brief`. This changes ARCHITECTURE.md
-sections 1, 2, 3, 8 and 9 (schema `inbox` inside `market_brief`); Stage A updates them. The importer
+sections 1, 2, 3, 8 and 9 (schema `inbox` inside `market_brief`); session B4 proposes the edits in
+`docs/ws/b4.md` and the orchestrator applies them. The importer
 (`onboard.yml` and the routine runs) reads the inbox with that account's token
 (`MOTHERDUCK_INBOX_TOKEN`, stored in the cloud environment and as a GitHub Actions secret). The UI shows the request as
 "pending" until the import is in `data/`.
@@ -512,7 +517,9 @@ Each is built by its feature's payload function and written by the warehouse syn
 Read and write endpoints under `/api/v1` (Next.js route handlers on Vercel). Existing contract
 (api/openapi.yaml 1.0): markets, status, overview, watchlist, stock, bars, track record, news, runs,
 portfolio, and the planned `company-requests`, `portfolio/paper-trades`, inbox and internal revalidate.
-Version 1.1 adds the rows below; its write endpoints replace the two planned 1.0 write endpoints
+Status of this section: intended endpoints, adjusted to the approved mockups in Wave 3 (session B4,
+section 10); the mockups' data files, not this list, are the final contract. Version 1.1 adds the
+rows below; its write endpoints replace the two planned 1.0 write endpoints
 (`company-requests`, `portfolio/paper-trades`), which were never built.
 
 | Method and path | Returns / does |
@@ -596,14 +603,15 @@ sessions; plus 1 weekly research run):
    works, else at the next run).
 4. The chat panel streams from `/api/assistant`; tool calls are shown as "looked at: ..." with links.
 5. Charts: the vendored Lightweight Charts with our bars, targets and ranges.
-6. Design: the Material 3 system and page designs from the owner's design sessions (on the design
-   branches; to be updated from this spec) are implemented as React components; the design builders'
-   JSON shapes are aligned to the read-model payloads.
+6. Design: the owner's design track designs the pages in `design/` from W1's data catalogue and
+   example data files (section 10); the API payloads (read models) are then built to match the approved
+   mockups' data files, and the frontend implements the mockups as React components on the Material 3
+   system.
 
 ## 9. Non-functional rules
 
 - All existing data, prediction, judging and safety rules hold, except the rule changes marked in
-  F2.6 and F8.1. Free sources only, HTTPS allowlist, nothing run from fetched content, secrets only in
+  F2.6, F8.1 and section 10 (the wave merge protocol). Free sources only, HTTPS allowlist, nothing run from fetched content, secrets only in
   environment variables, no email in requests.
 - Cost guards: MotherDuck Lite (10 CU hours a month, ARCHITECTURE.md section 5 kill switch), Claude
   subscription use (AI traders as subagents of the existing pre-open session; Sonnet except one Opus
@@ -611,73 +619,134 @@ sessions; plus 1 weekly research run):
 - Every number shown comes from stored data or deterministic computation; AI text cites ids and is
   gated.
 
-## 10. Roadmap: stages for parallel cloud sessions
+## 10. Roadmap: waves of parallel cloud sessions (owner-approved 2026-10-07)
 
-Principle: contracts first, then independent builds that each own their files, then consolidation.
-Each stage runs in its own cloud session on its own branch, is judged before merge, and writes its
-proposed shared-doc edits into `docs/ws/<stage>.md` as in waves 0-1.
+Two tracks meet at the end: a **backend and AI track** that does not depend on what the pages look
+like, and a **UI track** where the owner designs the pages first and the API is then built to match
+the approved mockups (the mockups decide the API contract, not the other way round). Every session
+below runs in **its own cloud session** on its own branch, owns its own files (the file assignment
+list of W1), and works autonomously:
 
-**Stage A: contracts (one session, first; short).**
-`api/openapi.yaml` 1.1 (section 5 endpoints and the payload schemas of section 4), schemas of the new
-kinds (section 4), `config/strategies.yaml` schema and the initial strategy set, `mcp/tools.yaml` (tool
-names, inputs, outputs, permissions per channel), and the interfaces later stages code against: the F1
-protocol (function signatures, record formats), the watchlist accessor, each read model's payload
-function signature, the per-horizon model-score and range interfaces (record formats for N+1..N+5,
-so B2, B3 and B9 build against them with fixtures before B10's real data exists), and one **file
-assignment list**: every existing file that needs a change for the company lists (each reader of `cfg`
-tickers and sector lists, classified collect, predict or display, F8.2) or for horizons (every file that
-handles `HORIZONS`, `horizon_days` or a fixed horizon), each file assigned to exactly one stage, which
-then makes both kinds of change in it. Rule: files under a stage's own directories go to that stage
-(B2 `portfolio/` and `lab/`, B4 `warehouse/`, B9 `intraday/`); `model/`, `analytics/` range, scoring,
-calibration and prediction-rule modules, `pipeline/`, `presentation/` and `replay/` horizon changes go to
-B10; the remaining company-list changes go to B1. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/schema_lifecycle.py`,
-`config/strategies.yaml`, interface stubs in `marketbrief/contracts/`, `docs/ws/stageA.md`.
+1. builds and tests (fast tier while iterating, full suite at the end), live checks only where a
+   collector or fetcher changed;
+2. runs the `judge` subagent on its own work and fixes blockers until PASS (CLAUDE.md "Judging every
+   change");
+3. merges the latest `origin/main` into its branch and reruns the full suite; if the merge needed a
+   conflict resolution in anything but `judgments/log.jsonl`, the judge re-checks that resolution (its
+   diff only) before the push (CLAUDE.md: merge-conflict resolutions are judged); appends its verdicts
+   to `judgments/log.jsonl` (on a conflict in that file: keep main's lines exactly as they are and
+   append the branch's own lines after them, never re-sorting); and pushes to `main` itself (no pull
+   request; on a push race: fetch, merge, retest, and repeat this step);
+4. deletes its branch on GitHub after the push;
+5. writes the shared-doc edits it needs (CLAUDE.md, DESIGN.md, ARCHITECTURE.md, and existing routine
+   prompts it does not own) as proposals in `docs/ws/<session>.md`; the orchestrator applies them in one
+   judged batch per wave (the last batch in Wave 5), so parallel sessions never edit those files. A
+   routine prompt a session owns (e.g. B9's `routine/INTRADAY_PROMPT.md`, B3's new prompts) it edits
+   itself.
 
-**Stage B: parallel builds (after A merges; one session each). Ownership is disjoint:**
+**Rule change** (owner decision 48): until now the orchestrator merged build work to main and copied
+the sessions' `docs/ws/*-judgments.jsonl` lines into the log (docs/ws/README.md); from the waves on,
+each session appends its own verdicts and runs the post-merge full suite before pushing to main
+itself, as above. Everything else in CLAUDE.md "Judging every change" holds.
 
-| Stage | Builds | Owns | Needs |
+The orchestrating session watches the waves on a timer (no owner attention needed), launches the next
+wave when its inputs have merged, resolves any merge clash a session cannot (with a judge re-check of
+the resolution before pushing), and reports only finished waves, blockers
+and decisions that are the owner's.
+
+The session ids below (B1-B10) are the ones used throughout this spec.
+
+**Wave 0:** the news de-duplication fix built in the orchestrating session (owner requirement of
+2026-10-07: never store the same news from the same source twice; decisions 45-47: same link = one
+item plus headline history, once per market, fix now). Recognising one outlet under several labels or
+hosts is the orchestrator's implementation of the owner's "same source" rule.
+
+**Wave 1: foundation (1 session; everything else starts from it).** "Catalogue and record formats":
+- the **data catalogue** (`docs/DATA_CATALOGUE.md`): every piece of information the system will hold,
+  per entity (company, prediction, paper trade, head-to-head pick, strategy, scoreboard row, automatic
+  and AI reason, news item with status and headline history, results digest, intraday check,
+  lifecycle event, market status), each field with a plain-language description, its source (stored
+  kind or computation in this spec) and realistic example values; plus example data files per entity
+  (`design/catalogue/*.json`, realistic and internally consistent, clearly marked as examples) for
+  the owner's design sessions;
+- the storage formats of the new kinds (section 4) in `core/schema_lab.py` and
+  `core/schema_lifecycle.py`, `config/strategies.yaml` (schema, horizon list and the initial strategy
+  set), `mcp/tools.yaml` (tools, inputs, outputs, permissions per channel), and the interfaces later
+  sessions code against: the F1 protocol (function signatures, record formats), the watchlist
+  accessor, the per-horizon model-score and range record formats (so B2, B3 and B9 build against them
+  with fixtures before B10's real data exists);
+- one **file assignment list**: every existing file that needs a change for the company lists (each
+  reader of `cfg` tickers and sector lists, classified collect, predict or display, F8.2) or for
+  horizons (every file that handles `HORIZONS`, `horizon_days` or a fixed horizon), each assigned to
+  exactly one session, which then makes both kinds of change in it. Rule: files under a session's own
+  directories go to that session (B2 `portfolio/` and `lab/`, B9 `intraday/`, B4 `warehouse/`);
+  `model/`, the `analytics/` range, scoring, calibration and prediction-rule modules, `pipeline/`,
+  `presentation/` and `replay/` horizon changes go to B10; the remaining company-list changes go to B1.
+Owns: `docs/DATA_CATALOGUE.md`, `design/catalogue/`, `mcp/tools.yaml`, `core/schema_lab.py`,
+`core/schema_lifecycle.py`, `config/strategies.yaml`, interface stubs in `marketbrief/contracts/`,
+`docs/ws/w1.md`. No API contract and no page shapes (those come from the approved mockups, Wave 3).
+
+**Wave 2: parallel builds (7 sessions, launched together when W1 has merged) + the owner's design
+track.**
+
+| Session | Builds | Owns | Needs |
 |---|---|---|---|
-| B1 Lifecycle | F8: watchlist events, the loader change and accessor, the switch of existing predict and display call sites to `active_tickers` (those Stage A assigns to B1), seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `core/market_config.py`, `scripts/company.py`, `.github/workflows/onboard.yml`, the predict and display call sites Stage A assigns to B1 | A |
-| B2 Lab | F1 engine (incl. F1.9-F1.11, the EUR view in `marketbrief/portfolio/`, and the `EURUSD=X` symbol in `config/markets/us.yaml`), F2 strategies, baselines and the head-to-head picks, F2.8 heatmaps data, F3 news-impact study, F7 scoreboard and luck test | `marketbrief/lab/`, `scripts/lab.py`, `marketbrief/portfolio/` (incl. its `HORIZONS`), `config/costs.yaml`, that line of `config/markets/us.yaml`, its files on Stage A's list | A (B10's per-horizon scores for live data) |
-| B3 AI traders | F4 traders and gate, F6 EOD analyst and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `.claude/agents/forecaster.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | A (writes predictions; B2 settles them; B10's per-horizon ranges for live data) |
-| B4 API | the read models of section 4 (payload functions from B1-B3 via A's interfaces, stubbed until merged) and every route file under `web/app/api/v1/` (write handlers are thin calls into B5's tool layer), caching, revalidate | `web/app/api/v1/`, `web/lib/data/`, `marketbrief/warehouse/` (new `rm_*` modules and the call sites Stage A assigns to B4) | A |
-| B5 Tools and channels | the tool layer, the gateway mode (middleware), Slack commands, form and confirm step, `/mcp` with GitHub OAuth, inbox writes, workflow dispatch, injection suite | `web/lib/tools/`, `web/app/slack/`, `web/app/mcp/`, `web/middleware.ts`, `mcp/` except `tools.yaml` | A |
-| B6 Notifications | F9 Slack threads (morning, alerts, close, weekly) | `marketbrief/alerts/`, `scripts/alerts.py` | A |
-| B7 Frontend | the 12 pages from the owner's updated designs, against A's contract with fixture payloads | `web/` except the paths owned by B4, B5 and B8 | A + page designs |
-| B8 Assistant | F11 chat and Slack `/ask` with budget | `web/app/api/assistant/`, `web/lib/assistant/` | A |
-| B10 Horizons | F2.7: the signal model, its labels and backtest, `ranges.py`/`range_math`, scoring and calibration for N+1..N+5 with the decision-37 definition, horizon list in config, legacy labels for old records; refit and walk-forward test per horizon | `marketbrief/model/`, `config/model.yaml`, `config/ranges.yaml`, the `HORIZONS` constants in `constants/model.py`, `constants/prediction_rules.py`, `constants/dashboard.py`, and the files Stage A's list assigns to B10 | A |
-| B9 Monitoring | F5: intraday checks of every open paper trade at every horizon (incl. the fixed horizon in `intraday/rows.py`), the extended explainer input, intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | A |
+| B10 Horizons | F2.7: the signal model, its labels and backtest, `ranges.py`/`range_math`, scoring and calibration for N+1..N+5 with the decision-37 definition, the horizon list read from `config/strategies.yaml`, legacy labels for old records; refit and walk-forward test per horizon | `marketbrief/model/`, `config/model.yaml`, `config/ranges.yaml`, the `HORIZONS` constants in `constants/model.py`, `constants/prediction_rules.py`, `constants/dashboard.py`, and the files W1's list assigns to B10 | W1 |
+| B2 Engine and lab | F1 engine (incl. F1.9-F1.11, the EUR view in `marketbrief/portfolio/`, and the `EURUSD=X` symbol in `config/markets/us.yaml`), F2 strategies, baselines and the head-to-head picks, F2.8 heatmap data, F3 news-impact study, F7 scoreboard and luck test | `marketbrief/lab/`, `scripts/lab.py`, `marketbrief/portfolio/` (incl. its `HORIZONS`), `config/costs.yaml`, that line of `config/markets/us.yaml`, its files on W1's list | W1 (B10's per-horizon scores for live data) |
+| B3 AI traders | F4 traders and gate, F6 EOD analyst, AI reasons and research director, post-close and weekly routine prompts | `.claude/agents/trader-*.md`, `.claude/agents/forecaster.md`, `eod-analyst.md`, `research-director.md`, `marketbrief/traders/`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md` | W1 (B2 settles; B10's ranges for live data) |
+| B1 Lifecycle | F8: watchlist events, the loader change and accessor, the switch of the predict and display call sites W1 assigns to B1, seed, onboarding pipeline, lifecycle CLI, inbox import, `onboard.yml` | `marketbrief/lifecycle/`, `core/market_config.py`, `scripts/company.py`, `.github/workflows/onboard.yml`, the files W1 assigns to B1 | W1 |
+| B9 Monitoring | F5: intraday checks of every open paper trade at every horizon (incl. the fixed horizon in `intraday/rows.py`), the extended explainer input, the intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | W1 |
+| B6 Notifications | F9 Slack threads (morning, alerts, close, weekly) | `marketbrief/alerts/`, `scripts/alerts.py` | W1 |
+| B5 Tools and channels | the tool layer, the gateway mode (middleware), Slack commands, form and confirm step, `/mcp` with GitHub OAuth, inbox writes, workflow dispatch, injection suite | `web/lib/tools/`, `web/app/slack/`, `web/app/mcp/`, `web/middleware.ts`, `mcp/` except `tools.yaml`, the minimal `web/` project files (`package.json`, `tsconfig.json`, `next.config.*`) | W1 |
+| (owner) Design track | the owner with Fable designs the 12 pages in `design/` from the data catalogue and example files; a field the catalogue lacks is a "new data request" the owner approves and W1's catalogue then gains (by the orchestrator, judged) | `design/` except `design/catalogue/` | W1 |
 
-B1 changes only the loader and the files Stage A assigns to it; every other reader of
-`cfg` tickers keeps working unchanged through the loader, and new code calls the accessor through A's
-interface. B9 builds on B1's `active_tickers` for open-trade checks without editing B1's line.
-`config/markets/<market>.yaml` `tickers:` and the ticker lists under `sectors:` stay in place until
-Stage C removes them (safe then, because the loader no longer reads them). Shared files keep the additive rules of waves 0-1 (one import + one
-spread line in `core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks at the end).
-B7 starts with the shell, design system and the Home, Company and Stock strategies pages as the
-updated designs land.
+**`web/` project files.** B5 creates `web/package.json`, its lockfile, `tsconfig.json` and
+`next.config.*` in Wave 2. Later sessions (B4 in Wave 3; B7 and B8 in parallel in Wave 4) may only add
+dependency lines and their lockfile entries (additive, never changing or removing another session's);
+the lockfile is regenerated with the package manager, never edited by hand; a conflict in these files
+is resolved by keeping both sides' dependencies, regenerating the lockfile, and the judge re-check of
+step 3.
 
-B10 merges before Stage C; B2, B3 and B9 switch from fixtures to B10's real per-horizon data in Stage
-C's end-to-end run.
+Sessions that need another session's data (B2, B3, B6, B9) build and test against W1's example
+records; real data flows once all of Wave 2 has merged. B1 changes only the loader and the files W1
+assigns to it; every other reader of `cfg` tickers keeps working through the loader.
+`config/markets/<market>.yaml` `tickers:` and the ticker lists under `sectors:` stay until Wave 5
+removes them. Shared files keep the additive rules of the earlier WS waves 0-1 (docs/ws) (one import + one spread line in
+`core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks at the end). Optional, in parallel:
+a cleanup session for the older open GitHub issues and #59 (files not owned by another session).
 
-**Stage C: consolidation (one session, last).** Wire the new runs into the routine prompts, create the
-schedules (post-close, intraday, weekly research), update `CUTOFF_LOCAL` in
-`constants/ai_replay.py` to the new pre-open times, remove `tickers:` from the market configs, apply all
-proposed shared-doc edits, measure the pre-open run's duration, end-to-end run of both markets, then
-switch on the new paper trading. The 2-month review clock starts that day.
+**Wave 3: API layer (after the owner approves the mockups).**
 
-**Stage D: after go-live of the app.** Retire the static pages after 2 weeks (decision 25); first
-formal review at 2 months (decision 23).
+| Session | Builds | Owns | Needs |
+|---|---|---|---|
+| B4 Contract and API | `api/openapi.yaml` 1.1 taken from the approved mockups' data files (each page's data file is the payload of its endpoint; section 5 lists the intended endpoints, adjusted to the mockups), the read models of section 4 in MotherDuck, every route under `web/app/api/v1/` (write handlers are thin calls into B5's tool layer), caching, revalidate; a contract test that every live response validates against the schema and matches its mockup's data file in shape | `api/`, `web/app/api/v1/`, `web/lib/data/`, `marketbrief/warehouse/` (new `rm_*` modules and the files W1 assigns to B4) | approved mockups, Wave 2 merged |
 
-## 11. Owner actions (when each stage needs them)
+**Wave 4: app (2 sessions, after B4 merges).**
+
+| Session | Builds | Owns | Needs |
+|---|---|---|---|
+| B7 Frontend | the 12 pages from the approved mockups as the Next.js app on the live API (each mockup's example data file replaced by its endpoint) | `web/` except the paths owned by B4, B5 and B8 | B4 |
+| B8 Assistant | F11 chat panel and Slack `/ask` with the budget | `web/app/api/assistant/`, `web/lib/assistant/` | B4, B5 |
+
+**Wave 5: consolidation (1 session, last).** The orchestrator applies the remaining proposed
+shared-doc edits (judged); the session wires the
+new runs into the routine prompts, create the schedules (post-close, intraday, weekly research),
+update `CUTOFF_LOCAL` in `constants/ai_replay.py` to the new pre-open times, remove `tickers:` from the
+market configs, measure the pre-open run's duration, end-to-end run of both markets, then switch on
+the new paper trading. The 2-month review clock starts that day.
+
+**After launch.** Retire the static pages 2 weeks after the new app is live (decision 25); first formal
+review at 2 months (decision 23).
+
+## 11. Owner actions (when each wave needs them)
 
 | When | Action |
 |---|---|
-| Before B2 merges | Confirm broker charges: Axis Direct plan (brokerage % per side, DP charge per sale) from a contract note; BUX order fee and FX fee from the BUX app or site |
-| Before B4/B5 go live | Create the two Vercel projects; MotherDuck read token and inbox service account; GitHub fine-grained token |
+| Before B2 merges (Wave 2) | Confirm broker charges: Axis Direct plan (brokerage % per side, DP charge per sale) from a contract note; BUX order fee and FX fee from the BUX app or site |
+| Before B4/B5 go live (Waves 2-3) | Create the two Vercel projects; MotherDuck read token and inbox service account; GitHub fine-grained token |
 | Before B5 Slack | Add `/company`, `/trade`, `/ask` and the interactivity URL to the Slack app |
 | Before B8 | Anthropic workspace with a $20 monthly limit and a key in it |
 | After B5 | Add the Claude app connector |
-| After this spec merges | Ask the design sessions to update the page designs from it (decision 32) |
+| After W1 merges | Design the 12 pages with Fable from the data catalogue and example files (design track) |
 | Now (decision 36) | Create the tag `archive-dashboard-r1` on commit 85416b0 on GitHub (this session pushes a temporary branch with it if asked) |
 | At the first review | Set the maximum drawdown limit |

@@ -1,0 +1,850 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "agreement",
+  "kind": null,
+  "catalogue": "docs/DATA_CATALOGUE.md#agreement",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "RELIANCE",
+      "name": "Reliance Industries",
+      "horizon_days": 1,
+      "buy": 12,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5661,
+      "label": "Reliance Industries: 12 of 15 strategies buy at N+1",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "MARUTI",
+      "name": "Maruti Suzuki",
+      "horizon_days": 1,
+      "buy": 8,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 3,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 3,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5652,
+      "label": "Maruti Suzuki: 8 of 15 strategies buy at N+1",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "HDFCBANK",
+      "name": "HDFC Bank",
+      "horizon_days": 1,
+      "buy": 2,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 4
+        }
+      },
+      "avg_prob_up": null,
+      "label": "HDFC Bank: 2 of 15 strategies buy at N+1",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "RELIANCE",
+      "name": "Reliance Industries",
+      "horizon_days": 2,
+      "buy": 9,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5654,
+      "label": "Reliance Industries: 9 of 11 strategies buy at N+2",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "MARUTI",
+      "name": "Maruti Suzuki",
+      "horizon_days": 2,
+      "buy": 4,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 2,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5575,
+      "label": "Maruti Suzuki: 4 of 11 strategies buy at N+2",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "HDFCBANK",
+      "name": "HDFC Bank",
+      "horizon_days": 2,
+      "buy": 2,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": null,
+      "label": "HDFC Bank: 2 of 11 strategies buy at N+2",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "RELIANCE",
+      "name": "Reliance Industries",
+      "horizon_days": 3,
+      "buy": 13,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5755,
+      "label": "Reliance Industries: 13 of 15 strategies buy at N+3",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "MARUTI",
+      "name": "Maruti Suzuki",
+      "horizon_days": 3,
+      "buy": 9,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 4,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 3,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5657,
+      "label": "Maruti Suzuki: 9 of 15 strategies buy at N+3",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "HDFCBANK",
+      "name": "HDFC Bank",
+      "horizon_days": 3,
+      "buy": 2,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 4
+        }
+      },
+      "avg_prob_up": null,
+      "label": "HDFC Bank: 2 of 15 strategies buy at N+3",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "RELIANCE",
+      "name": "Reliance Industries",
+      "horizon_days": 4,
+      "buy": 9,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5684,
+      "label": "Reliance Industries: 9 of 11 strategies buy at N+4",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "MARUTI",
+      "name": "Maruti Suzuki",
+      "horizon_days": 4,
+      "buy": 8,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5582,
+      "label": "Maruti Suzuki: 8 of 11 strategies buy at N+4",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "HDFCBANK",
+      "name": "HDFC Bank",
+      "horizon_days": 4,
+      "buy": 2,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": null,
+      "label": "HDFC Bank: 2 of 11 strategies buy at N+4",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "RELIANCE",
+      "name": "Reliance Industries",
+      "horizon_days": 5,
+      "buy": 13,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5785,
+      "label": "Reliance Industries: 13 of 15 strategies buy at N+5",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "MARUTI",
+      "name": "Maruti Suzuki",
+      "horizon_days": 5,
+      "buy": 12,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5661,
+      "label": "Maruti Suzuki: 12 of 15 strategies buy at N+5",
+      "paper": true
+    },
+    {
+      "market": "india",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "HDFCBANK",
+      "name": "HDFC Bank",
+      "horizon_days": 5,
+      "buy": 2,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 4
+        }
+      },
+      "avg_prob_up": null,
+      "label": "HDFC Bank: 2 of 15 strategies buy at N+5",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "NVDA",
+      "name": "Nvidia",
+      "horizon_days": 1,
+      "buy": 14,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 7,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5693,
+      "label": "Nvidia: 14 of 15 strategies buy at N+1",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "JPM",
+      "name": "JPMorgan",
+      "horizon_days": 1,
+      "buy": 8,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 4,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 1,
+          "of": 3
+        },
+        "ai": {
+          "buy": 3,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5623,
+      "label": "JPMorgan: 8 of 15 strategies buy at N+1",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "AAPL",
+      "name": "Apple",
+      "horizon_days": 1,
+      "buy": 3,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 1,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.552,
+      "label": "Apple: 3 of 15 strategies buy at N+1",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "NVDA",
+      "name": "Nvidia",
+      "horizon_days": 2,
+      "buy": 10,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 7,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5696,
+      "label": "Nvidia: 10 of 11 strategies buy at N+2",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "JPM",
+      "name": "JPMorgan",
+      "horizon_days": 2,
+      "buy": 7,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 6,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 1,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5575,
+      "label": "JPMorgan: 7 of 11 strategies buy at N+2",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "AAPL",
+      "name": "Apple",
+      "horizon_days": 2,
+      "buy": 2,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": null,
+      "label": "Apple: 2 of 11 strategies buy at N+2",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "NVDA",
+      "name": "Nvidia",
+      "horizon_days": 3,
+      "buy": 14,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 7,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5812,
+      "label": "Nvidia: 14 of 15 strategies buy at N+3",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "JPM",
+      "name": "JPMorgan",
+      "horizon_days": 3,
+      "buy": 6,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 2,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 1,
+          "of": 3
+        },
+        "ai": {
+          "buy": 3,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5638,
+      "label": "JPMorgan: 6 of 15 strategies buy at N+3",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "AAPL",
+      "name": "Apple",
+      "horizon_days": 3,
+      "buy": 4,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 2,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.556,
+      "label": "Apple: 4 of 15 strategies buy at N+3",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "NVDA",
+      "name": "Nvidia",
+      "horizon_days": 4,
+      "buy": 10,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 7,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5806,
+      "label": "Nvidia: 10 of 11 strategies buy at N+4",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "JPM",
+      "name": "JPMorgan",
+      "horizon_days": 4,
+      "buy": 5,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 4,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 1,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": 0.5568,
+      "label": "JPMorgan: 5 of 11 strategies buy at N+4",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "AAPL",
+      "name": "Apple",
+      "horizon_days": 4,
+      "buy": 2,
+      "of": 11,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 0,
+          "of": 0
+        }
+      },
+      "avg_prob_up": null,
+      "label": "Apple: 2 of 11 strategies buy at N+4",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 1,
+      "ticker": "NVDA",
+      "name": "Nvidia",
+      "horizon_days": 5,
+      "buy": 14,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 7,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 3,
+          "of": 3
+        },
+        "ai": {
+          "buy": 4,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5882,
+      "label": "Nvidia: 14 of 15 strategies buy at N+5",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 2,
+      "ticker": "JPM",
+      "name": "JPMorgan",
+      "horizon_days": 5,
+      "buy": 11,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 7,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 1,
+          "of": 3
+        },
+        "ai": {
+          "buy": 3,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.5651,
+      "label": "JPMorgan: 11 of 15 strategies buy at N+5",
+      "paper": true
+    },
+    {
+      "market": "us",
+      "as_of_date": "2026-10-06",
+      "session_date": "2026-10-07",
+      "rank": 3,
+      "ticker": "AAPL",
+      "name": "Apple",
+      "horizon_days": 5,
+      "buy": 4,
+      "of": 15,
+      "by_family": {
+        "rule": {
+          "buy": 0,
+          "of": 8
+        },
+        "baseline": {
+          "buy": 2,
+          "of": 3
+        },
+        "ai": {
+          "buy": 2,
+          "of": 4
+        }
+      },
+      "avg_prob_up": 0.559,
+      "label": "Apple: 4 of 15 strategies buy at N+5",
+      "paper": true
+    }
+  ]
+}

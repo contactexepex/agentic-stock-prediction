@@ -1,0 +1,101 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "market_status",
+  "kind": null,
+  "catalogue": "docs/DATA_CATALOGUE.md#market-status",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "market": "india",
+      "name": "India (NSE)",
+      "as_of": "2026-10-06",
+      "currency": "INR",
+      "session": {
+        "local_time": "2026-10-07T17:30+05:30",
+        "trading_day": true,
+        "session_date": "2026-10-07",
+        "previous_session": "2026-10-06",
+        "calendar_covered": true,
+        "session_open_utc": "2026-10-07T03:45:00+00:00",
+        "session_close_utc": "2026-10-07T10:00:00+00:00",
+        "in_session": false,
+        "late_run": true
+      },
+      "regime": "EVENT_HEAVY",
+      "runs": {
+        "pre_open": {
+          "at": "2026-10-07T02:10:00Z",
+          "ok": true
+        },
+        "intraday": [
+          {
+            "at": "2026-10-07T05:43:00Z",
+            "ok": true
+          },
+          {
+            "at": "2026-10-07T08:43:00Z",
+            "ok": true
+          }
+        ],
+        "post_close": {
+          "at": null,
+          "ok": null,
+          "next_at": "2026-10-07T12:15:00Z"
+        },
+        "news": {
+          "at": "2026-10-07T10:17:00Z",
+          "ok": true,
+          "new_items": 37
+        }
+      },
+      "freshness": {
+        "state": "fresh",
+        "built_at": "2026-10-07T10:31:00Z",
+        "age_minutes": 29
+      },
+      "paper_label": "Paper only - no proven edge yet"
+    },
+    {
+      "market": "us",
+      "name": "US (NYSE/Nasdaq)",
+      "as_of": "2026-10-06",
+      "currency": "USD",
+      "session": {
+        "local_time": "2026-10-07T08:00-04:00",
+        "trading_day": true,
+        "session_date": "2026-10-07",
+        "previous_session": "2026-10-06",
+        "calendar_covered": true,
+        "session_open_utc": "2026-10-07T13:30:00+00:00",
+        "session_close_utc": "2026-10-07T20:00:00+00:00",
+        "in_session": false,
+        "late_run": false
+      },
+      "regime": "TRENDING",
+      "runs": {
+        "pre_open": {
+          "at": "2026-10-07T11:45:00Z",
+          "ok": true
+        },
+        "intraday": [],
+        "post_close": {
+          "at": null,
+          "ok": null,
+          "next_at": "2026-10-07T22:15:00Z"
+        },
+        "news": {
+          "at": "2026-10-07T08:47:00Z",
+          "ok": true,
+          "new_items": 52
+        }
+      },
+      "freshness": {
+        "state": "fresh",
+        "built_at": "2026-10-07T11:58:00Z",
+        "age_minutes": 2
+      },
+      "paper_label": "Paper only - no proven edge yet"
+    }
+  ]
+}

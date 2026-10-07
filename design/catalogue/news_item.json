@@ -1,0 +1,153 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "news_item",
+  "kind": null,
+  "catalogue": "docs/DATA_CATALOGUE.md#news-item",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "a41c9e07b2d35f18",
+      "market": "us",
+      "tickers": [
+        "NVDA"
+      ],
+      "primary_tickers": [
+        "NVDA"
+      ],
+      "title": "Nvidia wins multi-year data-centre order from cloud provider, sources say",
+      "source": "Reuters",
+      "source_domain": "reuters.com",
+      "url": "https://www.reuters.com/technology/example-nvda",
+      "published_at": "2026-09-29T21:10:00Z",
+      "first_seen_at": "2026-09-29T22:47:05Z",
+      "enrichment": {
+        "event_type": "product",
+        "materiality": "high",
+        "sentiment": 0.6,
+        "relevance": 0.9,
+        "novelty": 0.8,
+        "urgency": "high",
+        "priced_in": false,
+        "analyzed_at": "2026-09-30T11:20:00Z"
+      },
+      "status": "corroborated",
+      "status_as_of": "2026-09-30T11:15:00Z",
+      "cluster_id": "nvda-20260929-order",
+      "independent_origins": 2,
+      "primary_ids": [],
+      "headline_history": [
+        {
+          "title": "Nvidia said to win data-centre order",
+          "seen_at": "2026-09-29T22:47:05Z"
+        },
+        {
+          "title": "Nvidia wins multi-year data-centre order from cloud provider, sources say",
+          "seen_at": "2026-09-30T02:47:11Z"
+        }
+      ],
+      "headline_history_status": "planned (Wave 0 news de-duplication, kind news_updates)"
+    },
+    {
+      "id": "nse-ann-7781203",
+      "market": "india",
+      "tickers": [
+        "RELIANCE"
+      ],
+      "primary_tickers": [
+        "RELIANCE"
+      ],
+      "title": "Reliance Industries: board approves capital raise for retail subsidiary (exchange filing)",
+      "source": "NSE announcement",
+      "source_domain": "nseindia.com",
+      "url": "https://nsearchives.nseindia.com/example.pdf",
+      "published_at": "2026-09-29T13:05:00Z",
+      "first_seen_at": "2026-09-29T13:20:40Z",
+      "enrichment": {
+        "event_type": "ma",
+        "materiality": "high",
+        "sentiment": 0.4,
+        "relevance": 0.95,
+        "novelty": 0.9,
+        "urgency": "medium",
+        "priced_in": false,
+        "analyzed_at": "2026-09-30T02:00:00Z"
+      },
+      "status": "confirmed_primary",
+      "status_as_of": "2026-09-30T01:55:00Z",
+      "cluster_id": "reliance-20260929-raise",
+      "independent_origins": 1,
+      "primary_ids": [
+        "nse-ann-7781203"
+      ],
+      "headline_history": [],
+      "headline_history_status": "planned (Wave 0)"
+    },
+    {
+      "id": "c0d2e4f6a8b1c3d5",
+      "market": "us",
+      "tickers": [
+        "JPM"
+      ],
+      "primary_tickers": [
+        "JPM"
+      ],
+      "title": "JPMorgan said to weigh sale of payments unit stake",
+      "source": "Example Business Wire Blog",
+      "source_domain": "example-blog.com",
+      "url": "https://example-blog.com/jpm",
+      "published_at": "2026-10-06T15:00:00Z",
+      "first_seen_at": "2026-10-06T16:47:00Z",
+      "enrichment": {
+        "event_type": "ma",
+        "materiality": "medium",
+        "sentiment": 0.2,
+        "relevance": 0.7,
+        "novelty": 0.7,
+        "urgency": "low",
+        "priced_in": false,
+        "analyzed_at": "2026-10-07T11:20:00Z"
+      },
+      "status": "rumour",
+      "status_as_of": "2026-10-07T11:15:00Z",
+      "cluster_id": "jpm-20261006-stake",
+      "independent_origins": 0,
+      "primary_ids": [],
+      "headline_history": [],
+      "headline_history_status": "planned (Wave 0)"
+    },
+    {
+      "id": "3a5bd4c4813eb044",
+      "market": "us",
+      "tickers": [
+        "NVDA"
+      ],
+      "primary_tickers": [
+        "NVDA"
+      ],
+      "title": "Should You Buy Nvidia Stock in October?",
+      "source": "Yahoo Finance",
+      "source_domain": "finance.yahoo.com",
+      "url": "https://finance.yahoo.com/example",
+      "published_at": "2026-10-07T11:22:00Z",
+      "first_seen_at": "2026-10-07T12:28:07Z",
+      "enrichment": {
+        "event_type": "other",
+        "materiality": "low",
+        "sentiment": 0.0,
+        "relevance": 0.3,
+        "novelty": 0.1,
+        "urgency": "low",
+        "priced_in": true,
+        "analyzed_at": "2026-10-07T13:00:00Z"
+      },
+      "status": "promotional",
+      "status_as_of": "2026-10-07T12:40:00Z",
+      "cluster_id": "nvda-20261007-opinion",
+      "independent_origins": 0,
+      "primary_ids": [],
+      "headline_history": [],
+      "headline_history_status": "planned (Wave 0)"
+    }
+  ]
+}
