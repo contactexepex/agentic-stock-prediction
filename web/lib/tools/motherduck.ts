@@ -106,9 +106,10 @@ export class MotherDuckInboxStore implements InboxStore {
     try {
       inserted = await insert();
     } catch (error) {
-      // Two concurrent claims of one key: the second fails on the primary key. Answer with the stored row.
-      const { rows } = await this.query(SQL.existing, [row.inbox_id]);
-      if (rows[0]) return { claimed: false, existing: storedFrom(rows[0]) };
+      // Two concurrent claims of one key: the second fails on the primary key. Answer with the stored row; any other
+      // failure (or a failed lookup) rethrows the INSERT's own error.
+      const stored = await this.query(SQL.existing, [row.inbox_id]).then(({ rows }) => rows[0] ?? null, () => null);
+      if (stored) return { claimed: false, existing: storedFrom(stored) };
       throw error;
     }
     if (inserted.rows.length) return { claimed: true, existing: null };
