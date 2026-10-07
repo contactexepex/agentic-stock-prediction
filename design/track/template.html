@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Track record</title>
+<meta name="description" content="The proof gate of the personal stock cockpit: live calls and ranges scored, the weekly review's model-skill verdict, and the back-tests (rule replay coverage, walk-forward model, paper strategy after costs). Research only.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Track record screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.hhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+
+/* verdict + gates */
+.verdict{padding:0;overflow:hidden;margin-top:14px}
+.verdict .mb-verdict{padding:18px 20px;grid-template-columns:auto 1fr}
+.verdict .mb-verdict .mb-verdict-word{font-size:40px}
+.verdict .why{font-size:15px;margin:0}
+.gates{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:var(--mb-card-border)}
+.gate{padding:12px 16px;border-left:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.gate:first-child{border-left:0}
+.gate .t{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-bottom:6px}
+.gate .md-progress{margin:6px 0}
+.gate small{display:block;font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.gate .md-progress > i{background:var(--mb-color-up)} .gate .md-progress.bad > i{background:var(--mb-color-down)}
+
+/* grids */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;align-items:start}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpi{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface);min-width:0}
+.kpi .v{font-size:20px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.kpi .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:3px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{font:500 10.5px/16px var(--md-ref-typeface-plain);letter-spacing:.05em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:6px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+table.t td{padding:5px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
+table.t th.num,table.t td.num{text-align:right}
+table.t tr.tot td{font-weight:700;background:var(--md-sys-color-surface-container-low)}
+.bar{display:inline-flex;align-items:center;gap:6px}
+.bar .md-progress{width:60px}
+.ok{color:var(--mb-color-up)} .bad{color:var(--mb-color-down)} .warn{color:var(--mb-color-on-warn-container)}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:inherit}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.empty{border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);padding:12px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);background:var(--md-sys-color-surface)}
+.seg-in{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+@media (max-width: 1000px){ .grid2{grid-template-columns:1fr} .gates{grid-template-columns:1fr} .gate{border-left:0;border-top:var(--mb-card-border)} .gate:first-child{border-top:0} .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 760px){ .pad{padding:0 var(--mb-gutter)} .prow{grid-template-columns:1fr} .prow .pv{text-align:left} .hhead{grid-template-columns:1fr} .verdict .mb-verdict{grid-template-columns:1fr;padding:14px} .mb-topbar .md-chip{display:none} }
+
+.guide{margin-top:14px;padding:12px 16px;border-radius:var(--mb-card-radius);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:13.5px;line-height:1.5}
+.qn{width:22px;height:22px;border-radius:6px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);font-size:11px;display:inline-grid;place-items:center;font-weight:700;flex:none}
+.card h2{text-transform:none;letter-spacing:0;font-size:14px}
+.ans{font-size:14.5px;line-height:1.5;margin:0 0 10px;font-weight:500}
+.prow{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high)}
+.prow .pl b{display:block;font-size:13px} .prow .pl small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant)}
+.ptrack{position:relative;height:14px;border-radius:7px;background:var(--md-sys-color-surface-container-highest);overflow:visible}
+.ptrack i{position:absolute;left:0;top:0;bottom:0;border-radius:7px} .ptrack i.good{background:var(--mb-color-up)} .ptrack i.off{background:var(--mb-color-warn)}
+.ptrack u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--md-sys-color-on-surface);transform:translateX(-1px)}
+.prow .pv b{font-size:18px} .prow .pv small{font-size:11px}
+table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
+
+.score td.wrap{white-space:normal;font-size:12.5px;line-height:1.4;min-width:150px;vertical-align:top}
+.score td{vertical-align:top;padding:9px 8px}
+.light{width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;color:#fff}
+.light .ms{width:16px;height:16px}
+.light.green{background:var(--mb-color-up)} .light.red{background:var(--mb-color-down)} .light.amber{background:var(--mb-color-warn)}
+.then p{margin:0 0 8px;font-size:13.5px;line-height:1.5}
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Track record · has it earned trust?</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner"><div class="pad"><div class="wrap">
+
+<section class="hhead" aria-label="Track record">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+
+<div class="guide">
+  <b>What this page proves.</b> Before every session the system makes two kinds of promise for each company: a <b>price range</b> ("tomorrow the price stays between X and Y, 8 days out of 10") and, when the forecaster finds enough evidence, a <b>direction call</b> ("70% sure it rises" = 7 times out of 10). Trust is earned by keeping those promises on <b>real</b> days, many times over, and by beating a coin and the costs. Four tests below say where it stands, what each means, what it takes to pass, and when that could happen. Until all four are green, every signal is <span class="mb-tag paper">paper</span>: look, don't act.
+</div>
+
+<section class="card verdict" id="verdict-card">
+  <div class="mb-verdict" id="vhead">
+    <div style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box" aria-hidden="true" id="v-ico"></div><div class="mb-verdict-word" id="v-word"></div></div>
+    <p class="why" id="v-why"></p>
+  </div>
+</section>
+
+<section class="card" style="margin-top:16px" id="score-card">
+  <h2>The four tests <span class="sp">green = passed · amber = waiting for real data · red = failing</span></h2>
+  <div class="tblwrap"><table class="t score" id="score"></table></div>
+</section>
+
+<div class="grid2">
+  <section class="card" id="then-card">
+    <h2>If all four turn green, what then?</h2>
+    <div class="then" id="then"></div>
+  </section>
+  <section class="card" id="gloss-card">
+    <h2>What the percentages mean</h2>
+    <dl class="md-kv" id="gloss"></dl>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="t1-card">
+    <h2><span class="qn">1</span>Price ranges: real days, then the rehearsal <button class="md-help" id="ranges-help" aria-label="Explain">?</button></h2>
+    <p class="ans" id="t1-ans"></p>
+    <div class="kpis" id="t1-kpis" style="grid-template-columns:repeat(2,1fr)"></div>
+    <div class="seg-in" style="margin-top:12px"><div class="md-segmented dense hz" role="group" aria-label="Which promise"><button type="button" data-h="1" aria-pressed="true">Range for tomorrow</button><button type="button" data-h="5" aria-pressed="false">Range for 5 days ahead</button></div><span class="muted" style="font-size:12px" id="ranges-sub"></span></div>
+    <p class="ans" id="ranges-ans" style="font-weight:400;font-size:13.5px"></p>
+    <div class="promise" id="promise"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Rehearsal, month by month: how often the 80% range held</h3>
+    <div class="chart" id="by-month"></div>
+    <p class="note" id="ranges-note"></p>
+  </section>
+  <section class="card" id="t2-card">
+    <h2><span class="qn">2</span>Direction calls: do they come true as often as promised?</h2>
+    <p class="ans" id="t2-ans"></p>
+    <div class="kpis" id="t2-kpis" style="grid-template-columns:repeat(2,1fr)"></div>
+    <div class="tblwrap" id="bands" style="margin-top:10px"></div>
+    <p class="note" id="t2-note"></p>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="t3-card">
+    <h2><span class="qn">3</span>Rehearsal: does it beat a coin? <button class="md-help" id="model-help" aria-label="Explain">?</button></h2>
+    <p class="ans" id="model-ans"></p>
+    <div class="chart" id="coin"></div>
+    <p class="note" id="model-note"></p>
+  </section>
+  <section class="card" id="t4-card">
+    <h2><span class="qn">4</span>Rehearsal: would following it have made money after costs? <button class="md-help" id="paper-help" aria-label="Explain">?</button></h2>
+    <p class="ans" id="paper-ans"></p>
+    <div class="tblwrap" id="money"></div>
+    <p class="note" id="paper-note"></p>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="review-card">
+    <h2>The weekly check-up <span class="mb-tag live">live</span><span class="sp" id="review-sub"></span></h2>
+    <p class="ans" id="review-ans"></p>
+    <div id="review"></div>
+  </section>
+  <section class="card" id="ticker-card">
+    <h2>Per company: how well the ranges fitted in the rehearsal <span class="mb-tag bt">back-test</span></h2>
+    <p class="ans" id="ticker-ans" style="font-weight:400;font-size:13.5px"></p>
+    <div class="tblwrap" id="by-ticker"></div>
+  </section>
+</div>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion"><summary>For the record: the statistics behind the answers (Brier, AUC, reliability, baselines, thresholds)</summary><div class="inner">
+    <h3 class="micro" style="margin:8px 0 6px">Signal model, walk-forward</h3><div class="tblwrap" id="model-table"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Reliability, 5-day open-to-close</h3><div class="chart" id="reliability"></div><p class="note" id="rel-note"></p>
+    <h3 class="micro" style="margin:12px 0 6px">Call thresholds, 5-day open-to-close</h3><div class="tblwrap" id="thresholds"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Direction baselines in the rule replay (close-to-close)</h3><div class="tblwrap" id="baselines"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Ranges by regime</h3><div class="tblwrap" id="by-regime"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Paper strategy after costs, mean return per trade with 95% intervals</h3><div class="chart" id="paper-chart"></div><div class="tblwrap" id="paper-table" style="margin-top:8px"></div>
+  </div></details>
+  <details class="md-expansion"><summary>What the rehearsal cannot see (its own limitations)</summary><div class="inner" id="limits"></div></details>
+  <details class="md-expansion"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+  </div></div></div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const R = D.rules;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const pct = (x, dec=0) => x == null ? '—' : (Math.round(x*100*Math.pow(10,dec))/Math.pow(10,dec)).toFixed(dec) + '%';
+const of100 = x => x == null ? '—' : `${Math.round(x*100)} out of 100`;
+const sgn = (x, dec=2, unit='%') => x == null ? '—' : (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtD = iso => { const d = new Date(iso.slice(0,10)+'T00:00:00Z'); return d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const STAKE = 10000;
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let MKT = 'india', HZ = '1';
+const M = () => D.markets[MKT];
+const money = (x, dec=0) => { const c = M().currency; return (x < 0 ? '−' : '') + c.symbol + Math.abs(x).toLocaleString(c.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec}); };
+const onStake = p => money(STAKE * p / 100);
+
+/* ---------- shell ---------- */
+for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
+$('#market-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; MKT = b.dataset.m; $('#market-seg').querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', true], ['help','Help', false, '../help/help.html']];
+const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A') { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+document.querySelectorAll('.hz button').forEach(b => b.addEventListener('click', () => { HZ = b.dataset.h; document.querySelectorAll('.hz button').forEach(o => o.setAttribute('aria-pressed', o===b)); renderRanges(); }));
+
+/* ---------- helpers ---------- */
+const table = (heads, rows) => { const t = el('table', {class:'t'}); const tr = el('tr'); heads.forEach(h => tr.append(el('th', {class: h.num ? 'num' : null}, h.label || h))); t.append(el('thead', {}, tr)); const tb = el('tbody'); rows.forEach(r => tb.append(r)); t.append(tb); return t; };
+const td = (content, cls) => el('td', {class: cls}, content);
+const covBar = (v, target, n) => { if (v == null) return el('span', {class:'muted'}, '—'); const ok = Math.abs(v - target) <= 0.05; return el('span', {class:'bar', 'data-tip': `Held ${of100(v)} (promise: ${Math.round(target*100)})${n ? ', ' + n + ' ranges' : ''}`}, el('div', {class:'md-progress'}, el('i', {style:`width:${Math.min(100, v*100)}%;background:${ok ? 'var(--mb-color-up)' : v < target ? 'var(--mb-color-warn)' : 'var(--md-sys-color-primary)'}`})), el('b', {}, pct(v))); };
+/* "promise vs reality" row: two bars, the promise as a tick */
+function promiseRow(label, promise, actual, n, extra) {
+  const ok = Math.abs(actual - promise) <= 0.05;
+  const row = el('div', {class:'prow', 'data-tip': `${label}: promised to hold ${Math.round(promise*100)} times out of 100; in the rehearsal it held ${of100(actual)} over ${n} ranges.${extra ? ' ' + extra : ''}`});
+  row.append(el('div', {class:'pl'}, el('b', {}, label), el('small', {}, `promise: ${Math.round(promise*100)} of 100`)));
+  const track = el('div', {class:'ptrack'}); track.append(el('i', {class: ok ? 'good' : 'off', style:`width:${actual*100}%`}), el('u', {style:`left:${promise*100}%`, 'aria-hidden':'true'}));
+  row.append(track, el('div', {class:'pv ' + (ok ? 'ok' : 'warn')}, el('b', {}, `${Math.round(actual*100)}`), el('small', {}, ` of 100 · ${ok ? 'kept' : actual < promise ? 'too narrow' : 'too wide'}`)));
+  return row;
+}
+
+
+/* ---------- the four tests ---------- */
+function tests() {
+  const m = M(), L = m.live, E = m.expected, mod5 = m.model['5d open_to_close'], P = mod5.paper, g5 = m.gates.find(g => g.label.startsWith('5d')) || m.gates[0];
+  const callsNeeded = R.min_n_calls;
+  const bandsScored = L.calls_by_band.filter(b => b.n >= callsNeeded), bandsOk = bandsScored.length > 0 && bandsScored.every(b => b.hit_rate >= b.band - R.calibration_tolerance);
+  const rangesEnough = L.ranges_scored >= E.ranges_needed, rangesOk = rangesEnough && L.ranges_cover80 != null && Math.abs(L.ranges_cover80 - 0.8) <= R.calibration_tolerance;
+  const skillOk = !!(m.review && m.review.model_skill);
+  const t60 = P && P.thresholds['0.60'] ? P.thresholds['0.60'].long : null, au = P ? P.baselines.always_up : null;
+  const moneyOk = !!(t60 && t60.ci95_pct[0] > 0);
+  const rh = m.replay.horizons['1'].overall;
+  return [
+    {n: 1, name: 'Price ranges keep their promise', status: rangesOk ? 'green' : rangesEnough ? 'red' : 'amber',
+     means: 'The "8 days out of 10" range really holds about 8 days out of 10 on real days (not too often, not too rarely).',
+     today: `${L.ranges_scored} real ranges checked${L.ranges_cover80 != null ? `, the 80% range held ${of100(L.ranges_cover80)}` : ''} · ${L.open_ranges} waiting for their day · in the rehearsal it held ${of100(rh.cover80)} (${rh.n} ranges)`,
+     passes: `${E.ranges_needed} real ranges checked and the 80% range held between ${80 - Math.round(R.calibration_tolerance*100)} and ${80 + Math.round(R.calibration_tolerance*100)} times out of 100`,
+     when: rangesEnough ? 'now' : `about ${fmtD(E.ranges_by)}: ${E.ranges_per_day} ranges a day, checked the next day`},
+    {n: 2, name: 'Direction calls come true as often as promised', status: bandsOk ? 'green' : bandsScored.length ? 'red' : 'amber',
+     means: 'When it says "70% sure", about 70 calls out of 100 come true. Then "70%" is a number you can rely on.',
+     today: `${L.calls_total} real calls checked · ${E.calls_made} made · the forecaster has abstained on every company so far`,
+     passes: `${callsNeeded} checked calls at a confidence level, and they came true at least that often (minus ${Math.round(R.calibration_tolerance*100)})`,
+     when: L.calls_total >= callsNeeded ? 'now' : E.calls_made ? 'as soon as the calls settle' : 'no date: it only starts counting once the forecaster makes live calls'},
+    {n: 3, name: 'It beats a coin', status: skillOk ? 'green' : 'red',
+     means: 'Its "likely to rise" picks rise more often than a coin flip would get them, across thousands of rehearsal days.',
+     today: g5 ? `rehearsal on ${g5.n} days: ranking score ${g5.auc.toFixed(2)} (0.50 = coin) · when at least 60% sure, the stock rose ${t60 ? of100(mod5.thresholds['0.60'].long.hit_rate) : '—'}; always betting on a rise: ${of100(mod5.up_share)}` : 'no rehearsal',
+     passes: 'the weekly check-up finds a ranking score clearly above 0.50 and probabilities better than the average',
+     when: skillOk ? 'now' : 'checked every week; passes only if the model improves (it is refit monthly as more days come in)'},
+    {n: 4, name: 'Following it makes money after costs', status: moneyOk ? 'green' : 'red',
+     means: `On paper, buying when the model is at least 60% sure (the cockpit's Paper-candidate line) and selling four days later leaves a profit after trading costs, not just on a lucky day.`,
+     today: t60 ? `rehearsal: about ${t60.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(STAKE*t60.mean_pct/100))} per ${money(STAKE)} trade (${t60.positions} trades); buying everything: ${au.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(STAKE*au.mean_pct/100))}` : 'no rehearsal',
+     passes: 'the likely range of the average profit per trade sits entirely above zero',
+     when: moneyOk ? 'now' : 'checked every week with test 3; needs the model to improve'},
+  ];
+}
+
+/* ---------- render ---------- */
+function render() {
+  const m = M(), L = m.live, E = m.expected, T = tests(), passed = T.filter(t => t.status === 'green').length, proven = passed === 4;
+  $('#h-title').innerHTML = ''; $('#h-meta').innerHTML = ''; $('#h-right').innerHTML = '';
+  $('#h-title').append(`${LABEL[MKT]}: has it earned trust?`, el('small', {}, `${m.market_name} · ${m.n_tickers} companies`));
+  $('#h-meta').append(el('span', {}, `real data up to ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test = rehearsal on past prices'), el('span', {class:'mb-tag paper'}, 'paper'));
+  $('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
+  const vh = $('#vhead'); vh.className = 'mb-verdict ' + (proven ? 'yes-strong' : 'no');
+  $('#v-ico').innerHTML = ''; $('#v-ico').append(icon(proven ? 'ms-bolt' : 'ms-block'));
+  $('#v-word').innerHTML = ''; $('#v-word').append(proven ? 'TRUSTED' : 'NOT YET', el('small', {}, `${passed} of 4 tests passed`));
+  const waiting = T.filter(t => t.status === 'amber'), failing = T.filter(t => t.status === 'red');
+  $('#v-why').innerHTML = `<b>In plain words:</b> ${waiting.length ? `${waiting.length === 2 ? 'both real-world tests are' : 'a real-world test is'} still waiting for real days (${waiting.map(t => t.name.toLowerCase()).join('; ')})` : ''}${waiting.length && failing.length ? ', and ' : ''}${failing.length ? `the rehearsal ${failing.length > 1 ? 'tests fail' : 'test fails'}: ${failing.map(t => t.name.toLowerCase()).join('; ')}` : ''}${proven ? 'all four tests are green: the signals have earned the right to be followed with the plan on each company page.' : '.'} ${proven ? '' : `The first test can turn green around <b>${fmtD(E.ranges_by)}</b>; the second has no date until the model makes calls; the last two change only if the model improves.`}`;
+  // scorecard
+  const sc = $('#score'); sc.innerHTML = '';
+  const tr0 = el('tr'); ['', 'Test', 'What it means', 'Today', 'Passes when', 'Could turn green'].forEach(h => tr0.append(el('th', {}, h))); sc.append(el('thead', {}, tr0));
+  const tb = el('tbody');
+  for (const t of T) { const tr = el('tr'); tr.append(td(el('span', {class:'light '+t.status, 'aria-label': {green:'passed', amber:'waiting', red:'failing'}[t.status]}, icon(t.status === 'green' ? 'ms-check' : t.status === 'amber' ? 'ms-schedule' : 'ms-close'))), td(el('b', {}, `${t.n}. ${t.name}`)), td(t.means, 'wrap'), td(t.today, 'wrap'), td(t.passes, 'wrap'), td(t.when, 'wrap')); tb.append(tr); }
+  sc.append(tb);
+  // then + glossary
+  const th = $('#then'); th.innerHTML = '';
+  th.append(
+    el('p', {}, el('b', {}, 'The Paper label comes off.'), ` A call shown as YES on a company page (a live call the forecaster made) becomes a signal that has kept its promises on real days.`),
+    el('p', {}, el('b', {}, 'What you would do then.'), ` Only what the company page's plan says: buy at the open if the price is at or below the range centre, sell at the close of the planned day, exit early below the 80% range floor, with the amount the plan shows (it is written for ${money(STAKE)}). When there is no call, the page says NO and there is nothing to act on.`),
+    el('p', {}, el('b', {}, 'What it never does.'), ' It never tells you when to invest or how much. It tells you whether the system has earned the right to be followed. The decision stays yours, and this remains a research project.'),
+    el('p', {class:'muted', style:'font-size:12px'}, `If a test turns red later (promises stop holding), the Paper label comes back until it passes again.`));
+  const gl = $('#gloss'); gl.innerHTML = '';
+  for (const [k, v] of [['"70% sure"', 'the direction call will come true about 7 times out of 10. Test 2 checks that this is honest.'], ['80% range', 'the price stays inside it 8 days out of 10; so about 2 days out of 10 it will be outside, and that is normal.'], ['50% range', 'the narrower band the price stays in half the days.'], ['60% (the Paper-candidate line)', 'the cockpit\'s reading aid: a company at or above it is a Paper candidate, and the rehearsal follows the model from this line. Not a pipeline rule; a YES on a company page is a live call the forecaster made.'], ['a coin', 'right about half the time: the bar every call must beat. On these companies a rise happens about 47 days out of 100, so "always rise" is the coin here.'], ['rehearsal (back-test)', 'the system replayed on past prices it had not seen, day by day. It shows what it would have done; it is not real money and not real days.'], ['after costs', 'brokerage, taxes and fees taken off (config/costs.yaml); about ' + money(STAKE * (m.model['5d open_to_close'].paper ? m.model['5d open_to_close'].paper.mean_cost_pct : 0) / 100, 2) + ' per ' + money(STAKE) + ' trade.']]) gl.append(el('dt', {}, k), el('dd', {}, v));
+  // test 1 details
+  $('#t1-ans').textContent = `${L.ranges_scored} real ranges have been checked so far; ${L.open_ranges} are waiting for their day${L.open_ranges ? ` (${fmtD(L.open_first_target)} to ${fmtD(L.open_last_target)})` : ''}. With ${E.ranges_per_day} new ranges before every session, the ${E.ranges_needed} needed should be checked by about ${fmtD(E.ranges_by)}. Until then, the rehearsal below is the only evidence.`;
+  const k1 = $('#t1-kpis'); k1.innerHTML = '';
+  for (const k of [{v: String(L.ranges_scored), l: `real ranges checked · need ${E.ranges_needed}`}, {v: String(L.open_ranges), l: 'published, waiting for their day'}]) k1.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
+  // test 2 details
+  $('#t2-ans').textContent = L.calls_total ? `${L.calls_total} real calls have been checked.` : `No direction call has been made yet: the forecaster abstained on every company. That is allowed and often right. The table below fills in once calls are made and their day passes; each row says whether "x% sure" came true x times out of 100.`;
+  const k2 = $('#t2-kpis'); k2.innerHTML = '';
+  for (const k of [{v: String(L.calls_total), l: `real calls checked · need ${R.min_n_calls} per level`}, {v: String(L.predictions), l: `calls made · ${L.open_predictions} waiting`}]) k2.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
+  const bands = $('#bands'); bands.innerHTML = '';
+  bands.append(table(['When it said', {label:'Calls', num:true}, {label:'Came true', num:true}, 'Promise kept?'], L.calls_by_band.map(b => { const tr = el('tr'); const okb = b.hit_rate == null ? null : b.hit_rate >= b.band - R.calibration_tolerance; tr.append(td(`${Math.round(b.band*100)}–${Math.round(b.band*100+10)}% sure`), td(String(b.n), 'num'), td(b.hit_rate == null ? '—' : of100(b.hit_rate), 'num'), td(b.n < R.min_n_calls ? el('span', {class:'muted'}, b.n ? `too few to judge (< ${R.min_n_calls})` : 'no calls yet') : el('span', {class: okb ? 'ok' : 'bad'}, okb ? '✓ yes' : '✗ no'))); return tr; })));
+  $('#t2-note').textContent = `Every number here comes from stored records (predictions, outcomes, ranges, open ranges, lessons: ${L.lessons}). Nothing is estimated.`;
+  // review
+  const rv = $('#review'); rv.innerHTML = ''; const rw = m.review;
+  if (rw) { $('#review-sub').textContent = `week ${rw.week}`;
+    $('#review-ans').textContent = `Every week the system re-runs tests 3 and 4 and grades the real record. This week: ${rw.model_skill ? 'the model beats a coin.' : 'the model does not yet beat a coin.'} ${rw.n_ranges_all ? `${rw.n_ranges_all} ranges and ${rw.n_calls_all} calls checked since the start.` : 'Nothing real checked since the start yet.'} ${rw.n_proposals ? `It suggested ${rw.n_proposals} change${rw.n_proposals>1?'s':''} to the range settings for a human to decide: ${rw.proposals.map(p => p.variant).join('; ')}.` : 'It suggested no change to the settings.'}`;
+    const kv = el('dl', {class:'md-kv'});
+    for (const [k, v] of [['Checked ranges', `${rw.n_ranges_week} this week · ${rw.n_ranges_30d} in 30 days · ${rw.n_ranges_all} since start`], ['Checked calls', `${rw.n_calls_week} this week · ${rw.n_calls_all} since start`], ['80% range held since start', rw.cover80_all == null ? 'nothing checked yet' : of100(rw.cover80_all)], ['Calls that came true', rw.call_hit_all == null ? 'nothing checked yet' : of100(rw.call_hit_all)], ['Enough data to advise?', rw.low_sample ? 'no, not yet' : 'yes'], ['Full report', rw.report]]) kv.append(el('dt', {}, k), el('dd', {}, v));
+    rv.append(kv);
+  } else { $('#review-sub').textContent = ''; $('#review-ans').textContent = 'No weekly check-up has run yet.'; }
+  renderRanges(); renderModel(); renderPaper(); renderTickers(); renderRecord();
+  $('#limits').innerHTML = '<ul style="margin:0;padding-left:18px">' + m.replay.limitations.map(x => `<li>${x}</li>`).join('') + '</ul>';
+  $('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live</dt><dd>data/${MKT}/: predictions, outcomes, ranges, range_record, open_ranges, open_predictions, lessons, reviews. Read through DuckDB views in sql/views.sql.</dd>
+<dt>Rehearsal of the ranges</dt><dd><code>scripts/replay.py --market ${MKT} --start ${m.replay.window[0]} --end ${m.replay.window[1]}</code> (computed ${String(m.replay.computed_at).slice(0,16).replace('T',' ')} UTC): each past day's range rebuilt from what was known that evening, then checked against the real close.</dd>
+<dt>Rehearsal of the model</dt><dd><code>${m.bt_path}</code> from <code>scripts/model_backtest.py</code> (computed ${String(m.bt_computed_at).slice(0,16).replace('T',' ')} UTC): the model refit each month and tested on the days after each fit; the paper strategy uses the costs in config/costs.yaml.</dd>
+<dt>Rules</dt><dd>config/review.yaml: ${R.min_n_calls} checked calls per confidence level, ${E.ranges_needed} checked ranges before advice, tolerance ${R.calibration_tolerance}, model skill needs ${R.model_skill.min_n} rehearsal rows, a Brier skill above ${R.model_skill.min_brier_skill} and a ranking score (AUC) whose 95% interval sits above ${R.model_skill.min_auc_low}.</dd>
+<dt>Derived</dt><dd>The four tests, their colours and the TRUSTED / NOT YET verdict are this page's reading of those rules, not a stored verdict; "could turn green" dates count ${E.ranges_per_day} ranges per session on the exchange calendar. "Out of 100" figures are the stored rates rounded; money figures are ${money(STAKE)} times the stored percentage.</dd>
+</dl>`;
+  $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
+}
+
+function renderRanges() {
+  const m = M(), hb = m.replay.horizons[HZ], o = hb.overall, hz = HZ === '1' ? 'range for tomorrow' : 'range for 5 days ahead';
+  $('#ranges-sub').textContent = `${o.n} ranges over ${o.days} days, ${m.n_tickers} companies`;
+  $('#ranges-help').dataset.tip = `Before every session the system publishes a price range for each company: the "80% range" promises the close will land inside it 80 times out of 100, the "50% range" 50 times. The rehearsal rebuilt those ranges for each past day from what was known that evening and checked them against the real close. "Too narrow" = held less often than promised; "too wide" = more often (safe but useless).`;
+  const k80 = Math.abs(o.cover80 - 0.8) <= 0.05, k50 = Math.abs(o.cover50 - 0.5) <= 0.05;
+  $('#ranges-ans').textContent = `Rehearsal, ${hz}: ${k80 && k50 ? 'the promises were kept.' : k80 ? 'mostly kept.' : 'not quite kept.'} The 80% range held ${of100(o.cover80)} times (promise: 80) and the 50% range ${of100(o.cover50)} (promise: 50). ${o.score80 <= o.naive_score80 ? 'The ranges were also tighter than a plain "last close ± recent wobble" guess, so the formula adds something.' : 'A plain "last close ± recent wobble" guess would have scored better, so the formula adds nothing yet.'}`;
+  const pr = $('#promise'); pr.innerHTML = '';
+  pr.append(promiseRow('80% range', 0.8, o.cover80, o.n, `A plain guess held ${of100(o.naive_cover80)}.`), promiseRow('50% range', 0.5, o.cover50, o.n, `A plain guess held ${of100(o.naive_cover50)}.`));
+  const bm = $('#by-month'); bm.innerHTML = '';
+  const months = Object.entries(hb.by_month).sort((a, b) => a[0].localeCompare(b[0]));
+  const W = Math.max(320, bm.clientWidth || 500), H = 150, ml = 36, mr = 10, mt = 14, mb = 28, bw = (W - ml - mr) / Math.max(1, months.length);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'80% ranges held by month'});
+  const y = v => mt + (1 - v) * (H - mt - mb);
+  for (const g of [0.5, 0.8, 1]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke: g === 0.8 ? cssVar('--mb-color-up') : cssVar('--mb-chart-grid'), 'stroke-dasharray': g === 0.8 ? '4 3' : null})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = g === 0.8 ? 'promise' : pct(g); svg.append(t); }
+  months.forEach(([k, v], i) => { const x = ml + i * bw + bw * 0.2, w = bw * 0.6; const ok = Math.abs(v.cover80 - 0.8) <= 0.05; svg.append(svgEl('rect', {x, y: y(v.cover80), width: w, height: y(0) - y(v.cover80), rx: 3, fill: ok ? cssVar('--mb-color-up') : cssVar('--mb-color-warn'), opacity: .85})); const t = svgEl('text', {x: x + w/2, y: y(v.cover80) - 4, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--md-sys-color-on-surface')}); t.textContent = `${Math.round(v.cover80*100)} of 100`; svg.append(t); const t2 = svgEl('text', {x: x + w/2, y: H - 10, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--mb-chart-label')}); t2.textContent = `${MON[+k.slice(5,7)-1]} ${k.slice(0,4)} · ${v.n} ranges`; svg.append(t2); });
+  bm.append(svg);
+  const regs = Object.entries(hb.by_regime);
+  $('#ranges-note').textContent = regs.length ? `By market mood: ${regs.map(([k, v]) => `${k.toLowerCase().replace('_',' ')} days ${of100(v.cover80)} (${v.days} days)`).join('; ')}. Green = within 5 of the promise, amber = off.` : '';
+}
+
+function renderModel() {
+  const m = M(), v = m.model['5d open_to_close'], v1 = m.model['1d open_to_close'];
+  $('#model-help').dataset.tip = 'The rehearsal refits the model every month on prices before that month and tests it on the days after, so it never sees the answer. "Sure of a rise" = the probability it gave. A coin would be right about as often as the plain share of rising days.';
+  const t = v.thresholds, base = v.up_share;
+  const rows = Object.entries(t).map(([th, s]) => ({th: +th, n: s.long.n, hit: s.long.hit_rate, lo: s.long.wilson95[0], hi: s.long.wilson95[1]}));
+  const best = rows.reduce((a, b) => b.hit > a.hit ? b : a);
+  const beats = rows.filter(r => r.lo > base);
+  const skillOk = !!(m.review && m.review.model_skill);
+  $('#model-ans').textContent = `${skillOk ? 'Yes.' : beats.length ? 'Barely, and not enough to pass the test.' : 'No.'} Over ${v.n} rehearsal calls for the next 5 days, a rise happened ${of100(base)} times on average. ${rows.map(r => `When the model was at least ${Math.round(r.th*100)}% sure of a rise, it rose ${of100(r.hit)} (${r.n} calls)`).join('; ')}. ${beats.length ? `The ${beats.map(r => Math.round(r.th*100) + '%').join(' and ')} level${beats.length>1?'s':''} edge${beats.length>1?'':'s'} past the coin, but those are few calls${skillOk ? '' : ', and across all its calls the model ranks rising days no better than chance'}.` : 'None of these clears a coin flip with any confidence.'} Ranking score ${v.auc.toFixed(2)} (0.50 = coin, 1.00 = perfect).`;
+  const c = $('#coin'); c.innerHTML = '';
+  const W = Math.max(320, c.clientWidth || 500), phone = W < 480, H = 30 + (rows.length + 1) * 30, ml = phone ? 118 : 170, mr = phone ? 44 : 60;
+  const x = p => ml + (p - 0.3) / 0.4 * (W - ml - mr);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'How often the stock rose, by how sure the model was'});
+  for (const g of [0.4, 0.5, 0.6, 0.7]) { svg.append(svgEl('line', {x1:x(g), x2:x(g), y1:6, y2:H-22, stroke: cssVar('--mb-chart-grid')})); const tt = svgEl('text', {x:x(g), y:H-8, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); tt.textContent = `${Math.round(g*100)} of 100`; svg.append(tt); }
+  svg.append(svgEl('line', {x1:x(base), x2:x(base), y1:6, y2:H-22, stroke: cssVar('--md-sys-color-outline'), 'stroke-dasharray':'4 3', 'stroke-width':1.5}));
+  const all = [{label: phone ? 'Always "rise"' : 'Always betting on a rise', hit: base, lo: null, hi: null, n: v.n, base: true}, ...rows.map(r => ({label: phone ? `Model ≥ ${Math.round(r.th*100)}% sure` : `Model at least ${Math.round(r.th*100)}% sure`, hit: r.hit, lo: r.lo, hi: r.hi, n: r.n}))];
+  all.forEach((r, i) => { const cy = 20 + i * 30; const tl = svgEl('text', {x: ml - 8, y: cy + 4, 'text-anchor':'end', 'font-size':11, fill: cssVar('--md-sys-color-on-surface'), 'font-weight': r.base ? 400 : 700}); tl.textContent = r.label; svg.append(tl);
+    if (r.lo != null) svg.append(svgEl('line', {x1:x(Math.max(0.3, r.lo)), x2:x(Math.min(0.7, r.hi)), y1:cy, y2:cy, stroke: cssVar('--mb-chart-1'), 'stroke-width':2}));
+    svg.append(svgEl('circle', {cx:x(Math.max(0.3, Math.min(0.7, r.hit))), cy, r:5.5, fill: r.base ? cssVar('--md-sys-color-outline') : (r.lo > base ? cssVar('--mb-color-up') : cssVar('--mb-color-down')), stroke:'#fff', 'stroke-width':1.5}));
+    const tv = svgEl('text', {x: x(Math.min(0.7, r.hi == null ? r.hit : r.hi)) + 8, y: cy + 4, 'font-size':10.5, fill: cssVar('--md-sys-color-on-surface-variant')}); tv.textContent = phone ? `${Math.round(r.hit*100)}` : `${Math.round(r.hit*100)} of 100 · ${r.n} calls`; svg.append(tv); });
+  c.append(svg);
+  $('#model-note').textContent = `Dashed line = the coin (the plain share of rising days). A dot clears the coin only when its whole whisker (where the true rate most likely lies) sits to the right of the line. Next-day calls: ${v1 ? `a rise ${of100(v1.up_share)} on average; ranking score ${v1.auc.toFixed(2)}.` : ''}`;
+}
+
+function renderPaper() {
+  const m = M(), v = m.model['5d open_to_close'], P = v.paper;
+  $('#paper-help').dataset.tip = `A pretend account: on each rehearsal day, buy every company the model was sure enough about at the next open and sell at the close four days later, paying the real trading costs (config/costs.yaml). Compared with simply buying everything, buying recent winners, buying recent losers, and holding the index. "Could be between" is the range where the true average most likely lies.`;
+  const mo = $('#money'); mo.innerHTML = '';
+  if (!P) { $('#paper-ans').textContent = 'No paper-trading result stored.'; return; }
+  const t60 = P.thresholds['0.60'] ? P.thresholds['0.60'].long : null, au = P.baselines.always_up;
+  $('#paper-ans').textContent = `${t60 && t60.mean_pct > 0 && t60.ci95_pct[0] > 0 ? 'Yes, a little.' : 'No.'} ${t60 ? `Following the model when it was at least 60% sure, each ${money(STAKE)} trade would have ${t60.mean_pct >= 0 ? 'made' : 'lost'} about ${money(Math.abs(STAKE*t60.mean_pct/100))} on average after costs (${t60.positions} trades); it could be between ${onStake(t60.ci95_pct[0])} and ${onStake(t60.ci95_pct[1])}.` : ''} ${au ? `Simply buying everything would have ${au.mean_pct >= 0 ? 'made' : 'lost'} about ${money(Math.abs(STAKE*au.mean_pct/100))} per trade.` : ''} Costs alone take about ${money(STAKE*P.mean_cost_pct/100, 2)} per trade.`;
+  const rows = [...Object.entries(P.thresholds).map(([t, r]) => ({name: `Follow the model when ≥ ${Math.round(+t*100)}% sure`, ...r.long, kind:'model'})), ...Object.entries(P.baselines).map(([k, r]) => ({name: {always_up:'Buy everything, every day', momentum_5d:'Buy last week\'s winners', rsi_mean_reversion:'Buy the oversold (RSI)', benchmark_long_per_date:'Hold the index'}[k] || k, ...r, kind:'base'}))];
+  mo.append(table(['What you do', {label:'Trades', num:true}, {label:`Per ${money(STAKE)} trade`, num:true}, 'Could be between'], rows.map(r => { const tr = el('tr', {class: r.kind}); tr.append(td(r.kind === 'model' ? el('b', {}, r.name) : r.name), td(String(r.positions), 'num'), td(el('span', {class: r.mean_pct >= 0 ? 'ok' : 'bad'}, onStake(r.mean_pct)), 'num'), td(`${onStake(r.ci95_pct[0])} and ${onStake(r.ci95_pct[1])}`)); return tr; })));
+  $('#paper-note').textContent = `Red = loses money on average, green = makes money. A way of trading is better than another only when its whole "could be between" range sits above the other's.`;
+}
+
+function renderTickers() {
+  const m = M(), bt1 = m.replay.horizons['1'].by_ticker, bt5 = m.replay.horizons['5'].by_ticker, t = $('#by-ticker'); t.innerHTML = '';
+  const arr = Object.entries(bt1).map(([k, a]) => ({k, c: a.cover80, n: a.n}));
+  const best = arr.reduce((a, b) => b.c > a.c ? b : a), worst = arr.reduce((a, b) => b.c < a.c ? b : a);
+  $('#ticker-ans').textContent = `Next-day 80% ranges held best for ${best.k} (${of100(best.c)}) and worst for ${worst.k} (${of100(worst.c)}); green means within 5 of the promise, amber means off. Click a company for its page.`;
+  t.append(table(['Company', 'Next-day 80% range held', 'Next-5-days 80% range held', {label:'Real calls checked', num:true}], Object.keys(bt1).sort().map(k => { const a = bt1[k], b = bt5[k] || {}; const tr = el('tr'); tr.append(td(el('a', {href:`../decision/decision-${k}.html`, style:'color:inherit;font-weight:700;text-decoration:none'}, k)), td(covBar(a.cover80, 0.8, a.n)), td(covBar(b.cover80, 0.8, b.n)), td(el('span', {class:'muted'}, '0'), 'num')); return tr; })));
+}
+
+/* ---------- for the record: the statistics ---------- */
+function renderRecord() {
+  const m = M(), keys = Object.keys(m.model);
+  const mt = $('#model-table'); mt.innerHTML = '';
+  mt.append(table(['Label', {label:'Rows', num:true}, {label:'Dates', num:true}, {label:'Brier vs base', num:true}, {label:'Skill', num:true}, {label:'AUC [95% CI]', num:true}], keys.map(k => { const v = m.model[k]; const tr = el('tr'); tr.append(td(el('span', {'data-tip': v.label}, k.replace('open_to_close', 'open→close').replace('close_to_close', 'close→close'))), td(String(v.n), 'num'), td(String(v.dates), 'num'), td(`${v.brier} vs ${v.brier_base_rate}`, 'num'), td(el('span', {class: v.brier_skill > 0 ? 'ok' : 'bad'}, sgn(v.brier_skill, 4, '')), 'num'), td(el('span', {class: v.auc95[0] > 0.5 ? 'ok' : 'bad'}, `${v.auc} [${v.auc95[0]}, ${v.auc95[1]}]`), 'num')); return tr; })));
+  const v = m.model['5d open_to_close'], bins = (v.reliability || []).filter(b => b.n > 0);
+  const rc = $('#reliability'); rc.innerHTML = '';
+  const W = Math.max(320, rc.clientWidth || 500), H = 230, ml = 40, mr = 12, mt2 = 10, mb = 30;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Reliability'});
+  const x = p => ml + (p - 0.2) / 0.6 * (W - ml - mr), y = p => mt2 + (1 - (p - 0.2) / 0.6) * (H - mt2 - mb);
+  for (const g of [0.3, 0.4, 0.5, 0.6, 0.7]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke:cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = pct(g); svg.append(t); const t2 = svgEl('text', {x:x(g), y:H-12, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t2.textContent = pct(g); svg.append(t2); }
+  svg.append(svgEl('line', {x1:x(0.2), y1:y(0.2), x2:x(0.8), y2:y(0.8), stroke:cssVar('--md-sys-color-outline'), 'stroke-dasharray':'4 3'}));
+  const maxN = Math.max(...bins.map(b => b.n), 1);
+  for (const b of bins) { const px = x(Math.max(0.2, Math.min(0.8, b.mean_p))), py = y(Math.max(0.2, Math.min(0.8, b.up_share))); svg.append(svgEl('line', {x1:px, x2:px, y1:y(Math.max(0.2, Math.min(0.8, b.wilson95[0]))), y2:y(Math.max(0.2, Math.min(0.8, b.wilson95[1]))), stroke:cssVar('--mb-chart-1'), 'stroke-width':1.5})); svg.append(svgEl('circle', {cx:px, cy:py, r: 4 + 6 * Math.sqrt(b.n / maxN), fill:cssVar('--mb-chart-1'), stroke:'#fff', 'stroke-width':1.5})); const t = svgEl('text', {x:px, y:py - 10 - 6 * Math.sqrt(b.n / maxN), 'text-anchor':'middle', 'font-size':9.5, fill:cssVar('--md-sys-color-on-surface-variant')}); t.textContent = `${b.bin} n ${b.n}`; svg.append(t); }
+  rc.append(svg);
+  $('#rel-note').textContent = `Dots = the model's probability bins (size = rows), whiskers = Wilson 95% intervals of the realised up share; a calibrated model sits on the dashed line. Latest fit: ${v.model ? `${v.model.fits} monthly fits, trained to ${v.model.last_cutoff} on ${v.model.last_train_rows} rows, base rate ${v.model.last_base_rate}, Platt ${JSON.stringify(v.model.last_platt)}` : '—'}.`;
+  const th = $('#thresholds'); th.innerHTML = '';
+  th.append(table(['Threshold', 'Side', {label:'Calls', num:true}, {label:'Coverage', num:true}, {label:'Hit rate', num:true}, {label:'Wilson 95%', num:true}, {label:'Hit after cost', num:true}], Object.entries(v.thresholds).flatMap(([t, s]) => ['long', 'short'].map(side => { const r = s[side]; const tr = el('tr'); tr.append(td(`P(up) ${side === 'long' ? '≥' : '≤ 1 −'} ${pct(+t)}`), td(side), td(String(r.n), 'num'), td(pct(r.coverage, 1), 'num'), td(pct(r.hit_rate, 1), 'num'), td(`${pct(r.wilson95[0],1)} – ${pct(r.wilson95[1],1)}`, 'num'), td(r.hit_after_cost == null ? '—' : pct(r.hit_after_cost, 1), 'num')); return tr; }))));
+  const b = $('#baselines'); b.innerHTML = '';
+  const rows = []; for (const h of ['1', '5']) for (const [k, vv] of Object.entries(m.replay.baselines[h])) rows.push({h, ...vv});
+  b.append(table(['Rule', 'Horizon', {label:'Calls', num:true}, {label:'Hits', num:true}, {label:'Hit rate', num:true}, {label:'95% CI', num:true}], rows.map(r => { const tr = el('tr'); tr.append(td(r.label), td(`${r.h}-day`), td(String(r.calls), 'num'), td(String(r.hits), 'num'), td(pct(r.hit_rate, 1), 'num'), td(r.ci95 ? `${pct(r.ci95[0], 1)} – ${pct(r.ci95[1], 1)}` : '—', 'num')); return tr; })));
+  const br = $('#by-regime'); br.innerHTML = ''; const hb = m.replay.horizons[HZ];
+  br.append(table(['Regime', {label:'Days', num:true}, {label:'Ranges', num:true}, '80% held', '50% held', {label:'Width 80%', num:true}, {label:'Score vs naive', num:true}], Object.entries(hb.by_regime).map(([k, vv]) => { const tr = el('tr'); tr.append(td(k), td(String(vv.days), 'num'), td(String(vv.n), 'num'), td(covBar(vv.cover80, 0.8, vv.n)), td(covBar(vv.cover50, 0.5, vv.n)), td(`${vv.width80_pct}%`, 'num'), td(`${vv.score80} vs ${vv.naive_score80}`, 'num')); return tr; })));
+  const P = v.paper, pc = $('#paper-chart'); pc.innerHTML = ''; const pt = $('#paper-table'); pt.innerHTML = '';
+  if (!P) return;
+  const prow = [...Object.entries(P.thresholds).map(([t, r]) => ({name: `long at ≥ ${pct(+t)}`, ...r.long, kind:'model', key: t})), ...Object.entries(P.baselines).map(([k, r]) => ({name: k.replace(/_/g, ' '), ...r, kind:'base'}))];
+  const W2 = Math.max(320, pc.clientWidth || 500), H2 = 36 + prow.length * 26, ml2 = 150, mr2 = 50;
+  const lo = Math.min(-1, ...prow.map(r => r.ci95_pct[0])), hi = Math.max(0.5, ...prow.map(r => r.ci95_pct[1])), xx = val => ml2 + (val - lo) / (hi - lo) * (W2 - ml2 - mr2);
+  const sv = svgEl('svg', {viewBox:`0 0 ${W2} ${H2}`, role:'img', 'aria-label':'Mean return per trade after costs with 95% intervals'});
+  for (const g of [-1.5, -1, -0.5, 0, 0.5]) { if (g < lo || g > hi) continue; sv.append(svgEl('line', {x1:xx(g), x2:xx(g), y1:8, y2:H2-20, stroke: g === 0 ? cssVar('--md-sys-color-outline') : cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:xx(g), y:H2-6, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = sgn(g, 1); sv.append(t); }
+  prow.forEach((r, i) => { const cy = 20 + i * 26; const t = svgEl('text', {x: ml2 - 8, y: cy + 4, 'text-anchor':'end', 'font-size':11, fill: cssVar('--md-sys-color-on-surface'), 'font-weight': r.kind === 'model' ? 700 : 400}); t.textContent = r.name; sv.append(t); sv.append(svgEl('line', {x1:xx(r.ci95_pct[0]), x2:xx(r.ci95_pct[1]), y1:cy, y2:cy, stroke: r.kind === 'model' ? cssVar('--mb-chart-1') : cssVar('--md-sys-color-outline'), 'stroke-width':2})); sv.append(svgEl('circle', {cx:xx(r.mean_pct), cy, r:5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), stroke:'#fff', 'stroke-width':1.5})); const t2 = svgEl('text', {x: xx(r.ci95_pct[1]) + 6, y: cy + 4, 'font-size':10.5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), 'font-weight':600}); t2.textContent = sgn(r.mean_pct, 2); sv.append(t2); });
+  pc.append(sv);
+  pt.append(table(['Strategy', {label:'Positions', num:true}, {label:'Dates', num:true}, {label:'Mean per trade', num:true}, {label:'95% interval', num:true}, 'vs always up'], prow.map(r => { const tr = el('tr'); const d = r.kind === 'model' ? (P.thresholds[r.key].vs || {}).always_up : null; tr.append(td(r.name), td(String(r.positions), 'num'), td(String(r.dates), 'num'), td(sgn(r.mean_pct, 2), 'num'), td(`${sgn(r.ci95_pct[0], 2)} to ${sgn(r.ci95_pct[1], 2)}`, 'num'), td(d ? `${sgn(d.mean_pct, 2)} [${sgn(d.ci95_pct[0],2)}, ${sgn(d.ci95_pct[1],2)}]${d.ci95_pct[0] > 0 ? ' · beats it' : ' · not better'}` : '—')); return tr; })));
+}
+
+render();
+new ResizeObserver(() => { renderRanges(); renderModel(); renderRecord(); }).observe($('#by-month'));
+</script>
+</body>
+</html>

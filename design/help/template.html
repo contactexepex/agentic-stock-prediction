@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Help</title>
+<meta name="description" content="How to read the personal stock cockpit: what it is, the five-minute morning, what each page answers, how a call is made and the rules it never breaks, the colours and badges, when it can be trusted with money, a glossary, where the numbers come from. Research only.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Help screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:16px 18px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.note{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+a{color:var(--md-sys-color-primary)}
+p{margin:0 0 8px} p:last-child{margin-bottom:0}
+b.n{font-variant-numeric:tabular-nums}
+
+/* header */
+.hhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.guide{margin-top:14px;padding:14px 18px;border-radius:var(--mb-card-radius);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:14px;line-height:1.55}
+.guide b{color:inherit}
+
+/* contents */
+.toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.toc a{font-size:12.5px;text-decoration:none;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-full);padding:4px 11px;background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+.toc a:hover{border-color:var(--md-sys-color-primary);color:var(--md-sys-color-primary)}
+section.card{margin-top:16px;scroll-margin-top:72px}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.step{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:12px;background:var(--md-sys-color-surface);min-width:0;display:grid;grid-template-rows:auto auto 1fr;gap:6px}
+.step .no{width:26px;height:26px;border-radius:50%;background:var(--md-sys-color-primary);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+.step b{font-size:13.5px} .step p{font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+.step a{font-size:12.5px;text-decoration:none;font-weight:600;align-self:end}
+
+/* pages */
+.pages{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pg{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:12px 14px;background:var(--md-sys-color-surface);min-width:0;text-decoration:none;color:inherit;display:grid;gap:4px;align-content:start}
+.pg:hover{border-color:var(--md-sys-color-primary)}
+.pg .t{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px} .pg .t .ms{width:18px;height:18px;color:var(--md-sys-color-primary)}
+.pg .q{font-weight:600;font-size:13px;color:var(--md-sys-color-primary)} .pg .w{font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+
+/* flow */
+.flow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:stretch}
+.fl{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px;background:var(--md-sys-color-surface);min-width:0;font-size:12.5px;position:relative}
+.fl b{display:block;font-size:12.5px;margin-bottom:3px} .fl span{color:var(--md-sys-color-on-surface-variant)}
+.fl .k{position:absolute;top:-8px;left:10px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font:700 10px/14px var(--md-ref-typeface-plain);padding:0 6px;border-radius:7px}
+
+/* rules table */
+table.rules{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+.rules th{text-align:left;font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:6px 8px;border-bottom:var(--mb-card-border)}
+.rules td{padding:8px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:top}
+.rules td:first-child{font-weight:600;width:34%}
+.rules td.w{color:var(--md-sys-color-on-surface-variant)}
+
+/* legend */
+.leg{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px}
+.leg .row{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:start;padding:7px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.leg .row:first-child{border-top:0}
+.leg .sw{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.leg .row > div:last-child{color:var(--md-sys-color-on-surface-variant);font-size:12.5px}
+.mb-verdict.mini{padding:4px 10px;font-size:12px;font-weight:800;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.mb-verdict.mini .ms{width:14px;height:14px}
+
+/* four tests */
+.tests{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tst{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:12px 14px;background:var(--md-sys-color-surface);min-width:0;font-size:13px}
+.tst b{display:block;font-size:13.5px;margin-bottom:4px} .tst .p{color:var(--md-sys-color-on-surface-variant);font-size:12.5px;margin-top:4px}
+.tst .no{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-weight:800;font-size:11px;margin-right:6px;vertical-align:-4px}
+
+/* glossary */
+.gl{columns:2;column-gap:28px;font-size:13px}
+.gl div{break-inside:avoid;padding:6px 0;border-top:1px solid var(--md-sys-color-surface-container-high)}
+.gl dt{font-weight:700} .gl dd{margin:2px 0 0;color:var(--md-sys-color-on-surface-variant);font-size:12.5px}
+
+/* sources */
+.src{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.src h3{font-size:14px;font-weight:800;margin:0 0 6px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;font-size:12.5px}
+.kv dt{color:var(--md-sys-color-on-surface-variant)} .kv dd{margin:0;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chips a,.chips span{font-size:11.5px;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-extra-small);padding:1px 6px;text-decoration:none;color:inherit;background:var(--md-sys-color-surface-container-lowest)}
+.chips a:hover{border-color:var(--md-sys-color-primary);color:var(--md-sys-color-primary)}
+
+/* faq */
+.faq details{border-top:1px solid var(--md-sys-color-surface-container-high);padding:8px 0}
+.faq details:first-child{border-top:0}
+.faq summary{cursor:pointer;font-weight:600;font-size:13.5px}
+.faq details p{font-size:13px;margin:8px 0 0;color:var(--md-sys-color-on-surface-variant)}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+
+@media (max-width: 1000px){ .steps{grid-template-columns:repeat(3,1fr)} .pages{grid-template-columns:repeat(2,1fr)} .flow{grid-template-columns:repeat(4,1fr)} .leg,.tests,.src{grid-template-columns:1fr} .gl{columns:1} }
+@media (max-width: 760px){
+  .pad{padding:0 var(--mb-gutter)}
+  .hhead{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr} .pages{grid-template-columns:1fr} .flow{grid-template-columns:1fr 1fr}
+  .leg .row{grid-template-columns:1fr} .kv{grid-template-columns:1fr} .kv dt{margin-top:4px}
+  .rules td:first-child{width:40%}
+  .mb-topbar .md-chip{display:none}
+}
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Help · how to read the cockpit</div>
+    <div class="mb-topbar-actions">
+      <span class="md-chip small" data-tip="Coming: symbol search across both markets." aria-disabled="true"><svg class="ms"><use href="#ms-search"/></svg>Search symbols</span>
+      <a class="md-btn outlined" href="../home/home.html" style="height:32px"><svg class="ms"><use href="#ms-home"/></svg>Home</a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner">
+    <div class="pad"><div class="wrap">
+
+<section class="hhead" aria-label="Help">
+  <div style="min-width:0">
+    <h1>How to read this cockpit<small>plain words, no jargon without a definition</small></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+
+<div class="guide" id="guide">
+  <b>What this is.</b> A personal research tool that watches <b class="n" data-k="n_companies"></b> companies, <b class="n" data-k="n_per_market"></b> in India and <b class="n" data-k="n_per_market"></b> in the US. It collects news several times a day, captures prices before each market opens and after it closes, and runs its analysis at both points, so it knows what changed overnight and what changed during the session. For each company it works out the chance of a rise over the next day and the next five days, says <b>YES</b> or <b>NO</b>, and writes the result down so it can be checked later. A paper-trading book and further agents are being added to sharpen the forecasts; the Record page decides when any of it may be trusted. It never trades, and nothing here is advice. Until it has passed the four tests on the Record page, every signal is <b>paper</b>: something to watch, not to act on.
+</div>
+
+<nav class="toc" aria-label="Contents" id="toc"></nav>
+
+<section class="card" id="morning">
+  <h2>Your five-minute morning <span class="sp">the order to read the pages in</span></h2>
+  <div class="steps" id="steps"></div>
+  <p class="note" id="morning-note"></p>
+</section>
+
+<section class="card" id="pages">
+  <h2>The pages <span class="sp">one question each</span></h2>
+  <div class="pages" id="pages-grid"></div>
+</section>
+
+<section class="card" id="call">
+  <h2>How a call is made <span class="sp">before the open and after the close; news several times a day</span></h2>
+  <div class="flow" id="flow"></div>
+  <table class="rules" aria-label="Rules the system never breaks">
+    <thead><tr><th>The rule</th><th>What it means for you</th><th>Where it is checked</th></tr></thead>
+    <tbody id="rules"></tbody>
+  </table>
+</section>
+
+<section class="card" id="colours">
+  <h2>Colours, words and badges</h2>
+  <div class="leg" id="legend"></div>
+</section>
+
+<section class="card" id="trust">
+  <h2>When can it be trusted with money? <span class="sp">the four tests of the Record page</span></h2>
+  <p style="font-size:13px">Not yet. The system has to pass all four tests below on real days, not only in the rehearsal on past prices. The <a href="../track/track.html">Record page</a> shows each test with today's number and the date it could turn green. Until then the signals are paper: follow them in your head, or in the pretend <a href="../portfolio/portfolio.html">Portfolio</a>, never with money.</p>
+  <div class="tests" id="tests" style="margin-top:10px"></div>
+  <p class="note" id="trust-note"></p>
+</section>
+
+<section class="card" id="glossary">
+  <h2>Glossary <span class="sp">the words the pages use</span></h2>
+  <dl class="gl" id="gl"></dl>
+</section>
+
+<section class="card" id="sources">
+  <h2>Where the numbers come from</h2>
+  <div class="src" id="src"></div>
+  <p class="note" id="src-note"></p>
+</section>
+
+<section class="card faq" id="faq">
+  <h2>Questions people ask</h2>
+  <div id="faq-list"></div>
+</section>
+
+<footer id="foot"></footer>
+    </div></div>
+  </div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const R = D.rules, G = D.gate, M = D.markets, MK = ['india', 'us'];
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const pct = x => Math.round(x*100);
+const LABEL = {india: 'India', us: 'US'};
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtD = iso => { const d = new Date(iso.slice(0,10)+'T00:00:00Z'); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const money = (m, x) => M[m].currency.symbol + x.toLocaleString(M[m].currency.locale, {maximumFractionDigits: 2});
+const nCompanies = MK.reduce((a, m) => a + M[m].n_tickers, 0);
+
+/* ---------- shell ---------- */
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', true]];
+const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A') { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- header, guide numbers, contents ---------- */
+$('#h-meta').append(...MK.map(m => el('span', {}, `${LABEL[m]}: ${M[m].n_tickers} companies, data to ${fmtD(M[m].as_of)}`)), el('span', {class:'mb-tag paper'}, 'paper until proven'));
+$('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
+const NUM = {n_companies: nCompanies, n_per_market: M.india.n_tickers};
+for (const b of document.querySelectorAll('b.n[data-k]')) b.textContent = NUM[b.dataset.k];
+const TOC = [['morning', 'Five-minute morning'], ['pages', 'The pages'], ['call', 'How a call is made'], ['colours', 'Colours and badges'], ['trust', 'When to trust it'], ['glossary', 'Glossary'], ['sources', 'Where the numbers come from'], ['faq', 'Questions']];
+$('#toc').append(...TOC.map(([id, t]) => el('a', {href: '#' + id}, t)));
+
+/* ---------- five-minute morning ---------- */
+const STEPS = [
+  ['Open Home', `The banner at the top says whether anything is worth doing. Most days it says "No proven strong signals", and that is the system being honest, not broken.`, '../home/home.html', 'Home'],
+  ['Read the news card', `Below the two market panels: what moved the whole market in the last 24 hours, which company stories are solid enough to carry a call, and what was set aside as rumour or single-source.`, '../home/home.html#news', 'News card'],
+  ['Open a company that shows YES', `Its page has the plan in one line (buy at the next open, sell at the close of the fifth session), the price range on the chart and the evidence. A NO page tells you why not.`, '../decision/decision-HDFCBANK.html', 'Example: HDFC Bank'],
+  ['Check the Record page', `Is it TRUSTED or NOT YET? Until all four tests are green, a YES is paper: note it, do not fund it.`, '../track/track.html', 'Record'],
+  ['Look at the Portfolio', `The pretend account shows what following every YES would have done after costs, live and in the rehearsal on past prices. If that line is not above zero, the signals are not paying.`, '../portfolio/portfolio.html', 'Portfolio'],
+];
+$('#steps').append(...STEPS.map(([t, p, href, l], i) => el('div', {class:'step'}, el('div', {class:'no'}, i + 1), el('div', {}, el('b', {}, t), el('p', {}, p)), el('a', {href}, l + ' →'))));
+$('#morning-note').textContent = `Timing: each market is analysed after its close and again before its next open, with the news collected in between (${MK.map(m => `${LABEL[m]} opens ${M[m].open_local} local, ${M[m].open_utc} UTC`).join('; ')}). The data on every page is "as of" the last stored close; the Home status tiles say when the latest run happened and whether it finished before the open.`;
+
+/* ---------- pages ---------- */
+$('#pages-grid').append(...D.pages.map(p => el('a', {class:'pg', href: p.href}, el('div', {class:'t'}, icon('ms-' + p.icon), p.name), el('div', {class:'q'}, p.question), el('div', {class:'w'}, p.what))));
+
+/* ---------- how a call is made ---------- */
+const FLOW = [
+  ['1', 'Collect', `News headlines several times a day; prices and overnight cues before the open and after the close; exchange and SEC filings, results dates. Stored once, never edited.`],
+  ['2', 'Score the news', `On each pass an analyst agent gives the new headlines a mood, how material they are and what kind of event they are; stories are grouped and each story gets a verification status.`],
+  ['3', 'Model', `A small statistical model (${R.model_version}, refit ${R.model_refit}) turns the indicators and the news into a chance of a rise for 1 day and for 5 days, after the close and again before the open with the latest news.`],
+  ['4', 'Debate', `A bull agent and a bear agent each build the strongest honest case from the stored evidence.`],
+  ['5', 'Forecaster', `Weighs both cases against the track record and the lessons, and may move the model's number by at most ±${pct(R.agent_adjustment_max)} points. Abstaining is always allowed.`],
+  ['6', 'Ranges', `A formula, not the agents, computes the ${R.bands.map(b => pct(b) + '%').join(' and ')} price ranges. The forecaster may widen one, never narrow it.`],
+  ['7', 'Score it', `The next sessions settle every call and range: hit or miss, written down for good. A reflector agent writes one short lesson per settled call.`],
+];
+$('#flow').append(...FLOW.map(([k, t, s]) => el('div', {class:'fl'}, el('span', {class:'k'}, k), el('b', {}, t), el('span', {}, s))));
+const RULES = [
+  [`A YES is a live call by the forecaster, and nothing else`, `The company page says YES only when the forecaster made a call for a rise today; otherwise NO ("no edge today"). The ${pct(R.call_threshold)}% line you see on Home and the Watchlist is the cockpit's own reading aid, not a pipeline rule: a company at or above it is a "Paper candidate", and the rehearsal books follow the model from that line. The pipeline itself allows a call from ${pct(R.confidence_min)}% confidence.`, 'design/watchlist/build.py (the line); CLAUDE.md (confidence range)'],
+  [`No call within ${R.earnings_block_days} session of a company's results`, `Results days move prices in ways the model has not learned. The company page shows "blocked" and the calendar says "no new call within 1 day".`, 'scripts/validate.py (forecast stage)'],
+  ['No call when the indicators are BLOCKED', `Too few clean bars, a held price (a split not yet confirmed) or a data gap: the page says so and waits.`, 'scripts/features.py quality flags'],
+  ['The main evidence must be confirmed or corroborated', `A call may lean only on a story confirmed by a filing or reported by independent outlets. Rumours and promotional items never support a call; a single-source or unverified story costs at least ${pct(R.unverified_penalty)} points of confidence (and caps it at ${pct(R.unverified_cap)}%).`, 'DESIGN.md 3b; prediction_rules.check_news_status'],
+  [`The agents may move the model's number by at most ±${pct(R.agent_adjustment_max)} points`, `The model anchors; the agents adjust and must give a reason. The company page shows the model's number, the adjustment and the reason side by side.`, 'validate.py MODEL_ADJUSTMENT'],
+  [`Confidence stays between ${pct(R.confidence_min)}% and ${pct(R.confidence_max)}%`, `Nothing is ever "certain". If a confidence level has come true less often than it promised, the forecaster must use a lower one or abstain.`, 'CLAUDE.md prediction rules'],
+  [`Ranges come from the formula; agents can only widen them, by at most ${pct(R.max_ai_widen)}%`, `A range is never made to look tighter than the data supports. A major market event widens every range ×${R.major_event_factor}; an unstable regime ×${R.regime_factor.UNSTABLE}.`, 'config/ranges.yaml'],
+  [`A call is scored open-to-close from ${fmtD(R.label_basis_from)}`, `The way you would trade it: buy at the open of the next session, sell at the close of the first (1-day) or fifth (5-day) session. Earlier calls were scored close-to-close and are shown apart, never mixed.`, 'config/settings.yaml call_scoring'],
+  ['Nothing published after a call counts for it', `Every record carries the time it was made; no page and no score may use information that appeared later. The rehearsal replays past days with the same rule.`, 'MB_NOW-aware views; ai_replay leakage rule'],
+  ['Nothing trades', `The system has no brokerage connection and never will. It writes research records and a Slack digest, nothing else.`, 'CLAUDE.md, first paragraph'],
+];
+$('#rules').append(...RULES.map(([r, w, c]) => el('tr', {}, el('td', {}, r), el('td', {class:'w'}, w), el('td', {class:'w'}, el('code', {}, c)))));
+
+/* ---------- colours ---------- */
+const verdict = (cls, word, ico) => el('span', {class: 'mb-verdict mini ' + cls}, icon(ico), word);
+const LEG = [
+  [[verdict('no', 'NO', 'ms-block'), verdict('yes-ok', 'YES', 'ms-check'), verdict('yes-strong', 'YES', 'ms-bolt')], `The verdict on a company page. NO is red: no edge today, or a rule blocks a call. YES is green: lighter when the signal is okay, darker when it is strong (the forecaster at least ${pct(R.strong_confidence)}% confident, or the anchored chance at least ${pct(R.strong_prob)}%).`],
+  [[el('span', {class:'mb-delta up'}, '+1.8%'), el('span', {class:'mb-delta down'}, '−0.4%'), el('span', {class:'mb-delta flat'}, '0.0%')], 'Price moves: green up, red down, always with the sign. Green never means "buy"; only the verdict does.'],
+  [[el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {class:'mb-tag derived'}, 'derived'), el('span', {class:'mb-tag mock'}, 'mock')], 'Where a number comes from. Live: stored by the daily run. Back-test (rehearsal): computed on past prices, never a real day. Paper: an unproven signal. Derived: arithmetic on stored numbers, done by the page. Mock: a part not built yet, shown so the layout is honest.'],
+  [[el('span', {class:'md-badge confirmed_primary'}, icon('ms-verified_user'), 'confirmed'), el('span', {class:'md-badge corroborated'}, icon('ms-check'), 'corroborated')], 'A story a call may lean on: confirmed by a filing or company release, or reported by two or more independent outlets.'],
+  [[el('span', {class:'md-badge single_source'}, icon('ms-warning'), 'single source'), el('span', {class:'md-badge unverified'}, 'unverified')], 'One origin so far, or no vetted outlet read yet. Lowers the forecaster\'s confidence; cannot be the main evidence.'],
+  [[el('span', {class:'md-badge rumour'}, icon('ms-close'), 'rumour'), el('span', {class:'md-badge promotional'}, icon('ms-close'), 'promotional'), el('span', {class:'md-badge contradicted'}, icon('ms-close'), 'contradicted')], 'Never support a call. Rumour: unnamed sources. Promotional: a paid wire or law-firm notice. Contradicted: a checked claim conflicts with a filing (can only widen a range).'],
+  [[el('span', {class:'md-badge'}, 'high'), el('span', {class:'md-badge'}, 'medium'), el('span', {class:'md-badge'}, 'low')], `Materiality: how much a story could move the price, scored by the news analyst. In the model, high counts ${R.news_materiality_weights.high}, medium ${R.news_materiality_weights.medium}, low ${R.news_materiality_weights.low}.`],
+  [[el('span', {class:'md-badge neutral'}, 'CALM'), el('span', {class:'md-badge neutral'}, 'TRENDING'), el('span', {class:'md-badge warn'}, 'EVENT_HEAVY'), el('span', {class:'md-badge down'}, 'UNSTABLE')], `The market regime, from the volatility index, the benchmark and the calendar. ${MK.map(m => `${LABEL[m]}: calm below ${M[m].regime.calm_vol}, event-heavy from ${M[m].regime.event_vol}, unstable from ${M[m].regime.unstable_vol} on ${M[m].symbols.vol_index[0].name}`).join('; ')}. Event-heavy and unstable regimes lower confidence and widen ranges.`],
+  [[el('span', {class:'md-badge'}, '50% range'), el('span', {class:'md-badge'}, '80% range')], 'The price bands on a chart: the next close should land inside the 50% range about half the time and inside the 80% range about 8 days out of 10. A good range is one that keeps that promise, not a narrow one.'],
+];
+$('#legend').append(...LEG.map(([sw, text]) => el('div', {class:'row'}, el('div', {class:'sw'}, ...sw), el('div', {}, text))));
+
+/* ---------- when to trust ---------- */
+const TESTS = [
+  ['Price ranges keep their promise', `${G.ranges_needed} real ranges checked, and the 80% range held between ${80 - pct(G.tolerance)} and ${80 + pct(G.tolerance)} times out of 100. ${M.india.n_tickers} ranges a day per market, each checked the next session, so this is a matter of weeks.`],
+  ['Direction calls come true as often as promised', `At a confidence level (${G.confidence_bands.map(b => pct(b) + '%').join(', ')}), at least ${G.calls_needed} real calls checked and they came true at least that often, minus ${pct(G.tolerance)} points. It only starts counting once the forecaster makes live calls.`],
+  ['It beats a coin', `In the weekly check-up, on at least ${G.model_skill.min_n} rehearsal days: a ranking score whose likely range sits above ${G.model_skill.min_auc_low} (a coin scores exactly that) and probabilities better than always guessing the average.`],
+  ['Following it makes money after costs', `In the rehearsal, buying when the model is at least ${pct(R.call_threshold)}% sure and selling at the close of the fifth session leaves a profit after costs whose likely range sits entirely above zero. Costs of one round trip on ${R.stake.toLocaleString('en')}: ${MK.map(m => `${LABEL[m]} ${money(m, M[m].round_trip_cost_per_stake)} (${M[m].round_trip_cost_pct}%)`).join(', ')}.`],
+];
+$('#tests').append(...TESTS.map(([t, p], i) => el('div', {class:'tst'}, el('b', {}, el('span', {class:'no'}, i + 1), t), el('div', {class:'p'}, p))));
+$('#trust-note').textContent = `Even when all four are green, "trusted" means the signals have earned the right to be followed with the plan on each company page, with small, equal stakes. It never means a sure thing: a ${pct(R.call_threshold)}% call is expected to be wrong 4 times out of 10. The weekly review can also take the trust away.`;
+
+/* ---------- glossary ---------- */
+const GL = [
+  ['As-of date', 'The last stored close a page is built from. Everything on the page is what was known at that close.'],
+  ['Session', 'One trading day of the exchange. Weekends and exchange holidays are not sessions; India\'s Muhurat trading days are.'],
+  ['1-day and 5-day', 'The two horizons. 1-day: the next session. 5-day: the fifth session from now. Each company gets a chance of a rise and a price range for both.'],
+  ['Chance of a rise (P(up))', 'The model\'s probability, 0 to 100%, that the stock closes higher than it opens over the horizon. 50% is a coin. Shown on the Watchlist and the company page with the points each input added or took away.'],
+  ['Open-to-close', 'How a call is scored: buy at the open of the next session, sell at the close of the last session of the horizon. The move you could actually have captured.'],
+  ['Confidence', `How sure the forecaster says it is, ${pct(R.confidence_min)}% to ${pct(R.confidence_max)}%. It is checked: a level that comes true less often than it says is flagged on the Record page.`],
+  ['Call line (Paper-candidate line)', `${pct(R.call_threshold)}%: the cockpit's reading aid, not a pipeline rule. A company whose chance of a rise is at or above it is a Paper candidate on Home and the Watchlist, and the pretend portfolio follows the model from this line (the back-test also reports 55% and 65%). A YES on a company page is something else: a live call the forecaster actually made.`],
+  ['Range (50% / 80%)', 'The price band the next close should land in half the time, or 8 times out of 10. Computed by a formula from the stock\'s own recent swings, widened for results days, major events and unstable regimes.'],
+  ['Regime', 'The market\'s mood on the day: CALM, TRENDING, EVENT_HEAVY or UNSTABLE, from the volatility index, the benchmark\'s recent move and the event calendar.'],
+  ['Materiality', 'How much a piece of news could move the price: high, medium or low, scored by the news analyst agent.'],
+  ['Sentiment (mood)', 'The news analyst\'s reading of a headline from −1 (very negative) to +1 (very positive). Shown as an arrow next to a story.'],
+  ['Story (cluster)', 'All the headlines about one event for one company, grouped. Copies of one agency text count once. Each story carries a verification status.'],
+  ['Verification status', 'What the pipeline could establish about a story without any AI: confirmed by a primary document, corroborated by independent outlets, single source, unverified, rumour, promotional or contradicted.'],
+  ['Paper', 'A signal or a book that is tracked but not funded. Everything here is paper until the four tests are green.'],
+  ['Back-test / rehearsal / walk-forward', 'Running the same rules on past prices, day by day, using only what was known at each day, then scoring the results. Useful, but no real day was ever lived, so it is tagged and kept apart from live results.'],
+  ['Brier score', 'How far the probabilities were from what happened, squared and averaged: 0 is perfect, 0.25 is a coin. Lower is better.'],
+  ['Ranking score (AUC)', 'How often a day that rose was given a higher chance than a day that fell. 0.50 is a coin, 1.00 is perfect.'],
+  ['Hit rate', 'The share of calls (or ranges) that came true. Compared with the promised confidence (or band) to see whether the promise held.'],
+  ['Drawdown', 'The largest fall of the pretend account from a peak before it recovered. The worst stretch you would have sat through.'],
+  ['Round-trip cost', `Every fee of one buy and one sell, as a share of the trade: ${MK.map(m => `${LABEL[m]} ${M[m].round_trip_cost_pct}%`).join(', ')}. Spread and slippage are not included.`],
+  ['Ex-dividend date', 'The day a stock trades without its coming dividend; the price drops by about that amount, so the range shifts down with it.'],
+  ['Reaction session', 'The session in which a results announcement first moves the price: the same day for a morning release, the next session for one after the close.'],
+  ['Lesson', 'One short note the reflector agent writes after a call settles: what the evidence said, what happened, what to weigh differently. The forecaster reads them.'],
+  ['Weekly review', 'A scripted check-up every week: coverage of the ranges, hit rates by confidence, which inputs helped, and whether the model shows skill. It proposes changes; a human applies them.'],
+];
+$('#gl').append(...GL.map(([t, d]) => el('div', {}, el('dt', {}, t), el('dd', {}, d))));
+
+/* ---------- sources ---------- */
+function srcBlock(m) {
+  const b = M[m], c = el('div');
+  c.append(el('h3', {}, b.market_name));
+  const kv = el('dl', {class:'kv'});
+  const row = (k, v) => kv.append(el('dt', {}, k), el('dd', {}, v));
+  row('Session', `${b.open_local}–${b.close_local} ${b.timezone} (${b.open_utc}–${b.close_utc} UTC) · next session ${fmtD(b.next_session)}`);
+  row('Prices', m === 'india' ? `Yahoo Finance daily bars; a missing recent bar comes from NSE's bhavcopy when its price basis checks out. Stored since ${fmtD(b.first_bar)}.` : `Yahoo Finance daily bars and pre-market quotes. Stored since ${fmtD(b.first_bar)}.`);
+  row('Benchmark, volatility', `${b.symbols.benchmark.map(s => s.name).join(', ')} · ${b.symbols.vol_index.map(s => s.name).join(', ')}`);
+  row('Overnight cues', b.symbols.cue.map(s => s.name).join(', '));
+  row('Global factors', b.symbols.factor.map(s => s.name).join(', '));
+  row('News', `${b.news_feeds.google_news} Google News searches, ${b.news_feeds.outlets} outlet feeds, ${b.news_feeds.categories} categories; article pages read only from vetted outlets, full texts never stored. ${b.counts.news.toLocaleString('en')} headlines stored so far.`);
+  row('Filings, flows', m === 'india' ? 'NSE: exchange announcements, results filings, FII/DII flows, delivery %, insider and promoter trades, bulk and block deals, shareholding and pledges; NSDL FPI flows; NSE index closes.' : 'SEC EDGAR: 8-K/10-Q/10-K, Form 4 insider trades, 13D/13G stakes, 13F holdings, XBRL fundamentals; US Treasury yields, FRED series, Cboe put/call, FINRA short-sale data; option-chain implied volatility.');
+  row('Stored so far', `${b.data_kinds.length} kinds of records · ${b.counts.ranges} published ranges · ${b.counts.predictions} live calls · ${b.counts.lessons} lessons`);
+  c.append(kv);
+  c.append(el('div', {class:'micro', style:'margin:10px 0 4px'}, `The ${b.n_tickers} companies by sector`));
+  for (const s of b.sectors) { const ch = el('div', {class:'chips', style:'margin-bottom:4px'}); ch.append(el('span', {style:'border:0;padding-left:0;color:var(--md-sys-color-on-surface-variant)'}, s.name)); for (const t of s.companies) ch.append(t.page ? el('a', {href: `../decision/decision-${t.ticker}.html`, 'data-tip': t.name}, t.ticker) : el('span', {'data-tip': t.name + ' (page not built yet in this design set)'}, t.ticker)); c.append(ch); }
+  return c;
+}
+$('#src').append(...MK.map(srcBlock));
+$('#src-note').textContent = `Storage rules: records are append-only (a correction is a new record, never an edit), every timestamp is UTC, and no page or score may use anything published after the moment it describes. The repository holds everything, data and code alike.`;
+
+/* ---------- faq ---------- */
+const FAQ = [
+  ['Why does it say NO for almost everything?', `Because the forecaster makes a live call only when the evidence and the rules allow it, which is rare: calls are blocked near results and on thin evidence, and abstaining is always allowed. A NO is the normal answer. The Watchlist shows how far each company's chance of a rise is from the ${pct(R.call_threshold)}% Paper-candidate line, and the company page lists the five checks and which one failed.`],
+  ['The news about a company is big today. Why is the page still NO?', 'Big is not the same as verified. Until a story is confirmed by a filing or corroborated by independent outlets it cannot carry a call, however many copies of it exist. The news card on Home shows where each story stands and why.'],
+  ['Tomorrow the company page turns green. What do I do?', `Nothing with money, until the Record page says TRUSTED. In your head or in the pretend Portfolio: buy at the next open, sell at the close of the fifth session (or the first, for a 1-day call), equal small stakes, no averaging down. Then watch the call settle and the score land on the Record page.`],
+  ['What does "70% confident" mean?', 'That out of 100 such calls, about 70 should come true. Not 100. The Record page checks exactly this: if the 70% calls come true only 60 times out of 100, the number is not to be relied on, and the forecaster must lower it.'],
+  ['Why 1 day and 5 days, and not a month?', 'Because that is what the model is built and checked for: short holds from the open of the next session. It says nothing about a month or a year, and no page pretends otherwise.'],
+  ['What changes between the after-close run and the before-open run?', 'The after-close run has the day\'s final prices and scores every company. The before-open run adds the news collected overnight and the overnight cues (other markets, futures, pre-market quotes where they exist) and scores again, so the call you see in the morning uses everything known at that point. The Home status tiles show which run the page is built from.'],
+  ['How often does it look at the news?', `Several times a day; each pass scores only the new headlines. The model's news input looks back ${R.news_lookback_hours} hours; the Home news card shows the last 24. Everything older stays stored and appears in the company page's day-by-day history, but it no longer feeds a new call.`],
+  ['Who checks that the system is honest?', 'Scripted gates check every stage of the daily run (schemas, timestamps, no look-ahead, the prediction rules). An independent judge agent reviews every change to the code and instructions before it is merged, and once a week spot-checks a sample of the output. The weekly review reruns the back-test and says plainly whether the model shows skill.'],
+  ['Is this advice? Does it trade?', 'No and no. It is a personal research project. It has no brokerage connection, places no orders, and nothing on any page is a recommendation.'],
+  ['What is "back-test" and why is it kept apart?', `A back-test (the pages say "rehearsal") replays the rules on past prices. It is useful for finding out whether an idea has any merit, but the model may have been shaped by that very past, and no real day was lived. Live results are the only proof, which is why every back-test number is tagged and the four tests count real days only. AI replays are also split at the model's training cutoff (${fmtD(R.training_cutoff)}): earlier dates are marked contaminated and never pooled.`],
+];
+$('#faq-list').append(...FAQ.map(([q, a]) => el('details', {}, el('summary', {}, q), el('p', {}, a))));
+$('#foot').textContent = `Personal research project. Prices from Yahoo Finance and NSE bhavcopy; nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from the repository's configuration and stored data.`;
+</script>
+</body>
+</html>

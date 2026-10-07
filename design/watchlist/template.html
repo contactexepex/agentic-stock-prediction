@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<meta name="description" content="__DESC__">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Watchlist screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+
+/* ticker tape */
+.tape{overflow:hidden;background:var(--md-sys-color-surface);border-bottom:var(--mb-card-border);height:40px;position:relative}
+.tape .track{display:flex;white-space:nowrap;width:max-content;animation:tape 90s linear infinite}
+.tape:hover .track{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tape .it{display:inline-flex;align-items:center;gap:8px;padding:0 18px;border-right:1px solid var(--md-sys-color-outline-variant);font-size:12.5px;height:40px;color:inherit;text-decoration:none}
+.tape .it b{font-weight:700}
+@media (prefers-reduced-motion: reduce){.tape .track{animation:none}.tape{overflow-x:auto}}
+
+/* market header */
+.mhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.mhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.mhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.mhead .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.mhead .meta .dot{width:7px;height:7px;border-radius:50%;background:var(--mb-color-down);display:inline-block;margin-right:4px}
+.mhead .meta .dot.open{background:var(--mb-color-up)}
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);border:var(--mb-card-border);border-radius:var(--mb-card-radius);background:var(--md-sys-color-surface);margin-top:14px;overflow:hidden}
+.tiles div{padding:10px 14px;border-left:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.tiles div:first-child{border-left:0}
+.tiles b{display:block;font-size:16px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.tiles small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* signals banner */
+.banner{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:14px 18px;border-radius:var(--mb-card-radius);margin-top:14px;border:1px solid transparent}
+.banner.none{background:var(--md-sys-color-surface-container-lowest);border-color:var(--md-sys-color-outline-variant)}
+.banner.yes{background:var(--mb-verdict-ok-bg);color:var(--mb-verdict-ok-ink)}
+.banner .ico{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant)}
+.banner.yes .ico{background:var(--mb-verdict-ok-box);color:#fff}
+.banner .ico .ms{width:26px;height:26px}
+.banner b.t{font-size:16px;display:block}
+.banner .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.banner.yes .s{color:inherit;opacity:.85}
+
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px}
+.toolbar .chips{display:flex;flex-wrap:wrap;gap:6px}
+.toolbar .md-chip{height:28px;padding:0 10px;font:var(--md-sys-typescale-label-medium)}
+.toolbar input[type=search]{height:30px;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-small);padding:0 10px 0 30px;font:inherit;background:var(--md-sys-color-surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%236b7280'><path d='M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z'/></svg>") 8px center/16px no-repeat;width:200px;color:inherit}
+.toolbar .right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolbar select{height:30px;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-small);padding:0 8px;font:inherit;background:var(--md-sys-color-surface);color:inherit}
+
+/* table */
+.wl{width:100%;border-collapse:collapse;font-size:12.5px}
+.wl th{font:500 10.5px/16px var(--md-ref-typeface-plain);letter-spacing:.05em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:8px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap;cursor:pointer;user-select:none;background:var(--md-sys-color-surface-container-lowest)}
+.wl th.num,.wl td.num{text-align:right}
+.wl th[aria-sort=ascending]::after{content:" ↑"} .wl th[aria-sort=descending]::after{content:" ↓"}
+.wl td{padding:6px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
+.wl tr.sec td{background:var(--md-sys-color-surface-container-low);font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:6px 8px}
+.wl tr.sec td b{color:var(--md-sys-color-on-surface);letter-spacing:0;text-transform:none;font-size:12px}
+.wl tr.row{cursor:pointer}
+.wl tr.row:hover td{background:color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent)}
+.wl tr.row:focus-visible{outline:none} .wl tr.row:focus-visible td{box-shadow:inset 0 0 0 2px var(--md-sys-color-primary)}
+.wl .sym{display:flex;align-items:center;gap:10px;min-width:0}
+.wl .sym .bx{width:30px;height:30px;border-radius:7px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);display:grid;place-items:center;font-weight:800;font-size:10px;letter-spacing:.2px;flex:none}
+.wl .sym b{display:block;font-size:13px}
+.wl .sym small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
+.wl .px{font-weight:700;font-size:13px}
+.wl .px small{display:block;color:var(--md-sys-color-on-surface-variant);font-weight:400;font-size:10.5px}
+.spark{width:64px;height:24px;display:block}
+.vd{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px}
+.vd .ms{width:14px;height:14px}
+.vd.no{background:var(--mb-verdict-no-bg);color:var(--mb-verdict-no-ink)}
+.vd.yes-ok{background:var(--mb-verdict-ok-bg);color:var(--mb-verdict-ok-ink)}
+.vd.yes-strong{background:var(--mb-verdict-strong-bg);color:var(--mb-verdict-strong-ink)}
+.rng{display:inline-flex;align-items:center;gap:6px}
+.rng svg{width:64px;height:16px;display:block}
+.wl .mb-odds svg{width:44px}
+.wl .mb-odds b{min-width:0}
+.rng small{color:var(--md-sys-color-on-surface-variant);font-size:10.5px}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.held{display:inline-flex;align-items:center;gap:6px}
+.held .md-progress{width:34px}
+.wl .evt b{display:block} .wl .evt small{color:var(--md-sys-color-on-surface-variant);font-size:10.5px}
+.wl .nw{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
+.wl .nw .md-badge{font-size:10px;padding:0 5px;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+.count{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:8px}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+
+@media (max-width: 1440px){ .wl .c-p5,.wl .c-cue{display:none} }
+@media (max-width: 1000px){ .tiles{grid-template-columns:repeat(3,1fr)} .tiles div{border-top:1px solid var(--md-sys-color-outline-variant)} .tiles div:nth-child(-n+3){border-top:0} .tiles div:nth-child(4){border-left:0} .wl .c-spark,.wl .c-cue,.wl .c-held{display:none} }
+@media (max-width: 760px){
+  .pad{padding:0 var(--mb-gutter)}
+  .mhead{grid-template-columns:1fr}
+  .tiles{grid-template-columns:repeat(2,1fr)} .tiles div:nth-child(-n+3){border-top:1px solid var(--md-sys-color-outline-variant)} .tiles div:nth-child(-n+2){border-top:0} .tiles div:nth-child(odd){border-left:0} .tiles div:nth-child(4){border-left:1px solid var(--md-sys-color-outline-variant)}
+  .banner{grid-template-columns:1fr}
+  .toolbar input[type=search]{width:100%}
+  .toolbar .right{margin-left:0;width:100%}
+  .wl .c-5d,.wl .c-p5,.wl .c-news,.wl .c-range{display:none}
+  .wl td,.wl th{padding:6px 5px}
+  .wl .sym small{max-width:110px}
+  .tape .it{padding:0 12px}
+  .mb-topbar .md-chip{display:none}
+}
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title" id="topbar-title"></div>
+    <div class="mb-topbar-actions">
+      <span class="md-chip small" data-tip="Coming: symbol search across both markets. Use the filter box below for this list." aria-disabled="true"><svg class="ms"><use href="#ms-search"/></svg>Search symbols</span>
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner">
+    <div class="tape" id="tape" aria-label="Watchlist, last close and day move"><div class="track" id="tape-track"></div></div>
+    <div class="pad"><div class="wrap">
+
+<section class="mhead" aria-label="Market">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+<div class="tiles" id="tiles"></div>
+
+<div class="banner" id="banner"></div>
+
+<div class="toolbar">
+  <input type="search" id="q" placeholder="Filter by symbol or name" aria-label="Filter rows">
+  <div class="chips" id="sector-chips"></div>
+  <div class="right">
+    <label class="micro" for="sort">Sort</label>
+    <select id="sort">
+      <option value="sector">Sector (grouped)</option>
+      <option value="move">Day move</option>
+      <option value="move_5">5-day move</option>
+      <option value="p5">Chance up, 5d</option>
+      <option value="p1">Chance up, 1d</option>
+      <option value="cover80_1d">80% ranges held</option>
+      <option value="days_to_earnings">Next results</option>
+      <option value="news">News items</option>
+      <option value="ticker">Symbol</option>
+    </select>
+  </div>
+</div>
+
+<section class="card" style="padding:0 0 10px">
+<div class="tblwrap">
+<table class="wl" id="wl">
+  <thead><tr>
+    <th data-k="ticker">Company</th>
+    <th class="num" data-k="close">Last</th>
+    <th class="num" data-k="move">Day</th>
+    <th class="num c-5d" data-k="move_5">5d</th>
+    <th class="c-spark">20 sessions</th>
+    <th class="num" data-k="p1">Chance up 1d <button class="md-help" data-tip="The signal model's live probability that the stock closes above its next open (1 day) or above the open four sessions later (5 days). 50% is a coin flip. 60% is the cockpit's Paper-candidate line (a reading aid, not a pipeline rule); a YES is a live call the forecaster made." aria-label="Explain">?</button></th>
+    <th class="num c-p5" data-k="p5">5d</th>
+    <th data-k="verdict">Verdict <button class="md-help" data-tip="NO (red) when there is no live call for the latest date; YES (green) for a live up call, darker green when strong (confidence >= 0.75 or anchored probability >= 0.65), lighter when okay. Every signal is Paper until the live track record proves it." aria-label="Explain">?</button></th>
+    <th class="c-range">5-day range <button class="md-help" data-tip="The latest published 5-day 80% range (ranges.py), drawn around the last close. Hover for the numbers." aria-label="Explain">?</button></th>
+    <th class="c-held" data-k="cover80_1d">80% held <button class="md-help" data-tip="Back-test: how often the rule replay's 1-day 80% range contained the next close over the window (target 80%). scripts/replay.py, not live." aria-label="Explain">?</button></th>
+    <th data-k="days_to_earnings">Next results</th>
+    <th class="c-news" data-k="news">News 72h <button class="md-help" data-tip="Stored headlines tagged to the company in the last 72 hours of the archive, the number of high-materiality ones, and the best verification status of its news clusters." aria-label="Explain">?</button></th>
+    <th class="num c-cue" data-k="cue">Cue <button class="md-help" data-tip="Overnight cue: the ADR's move at the US close (India) or the pre-market gap (US). Half of it goes into the range centre." aria-label="Explain">?</button></th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+</div>
+<div class="count" id="count" style="padding:0 16px"></div>
+<div class="legend" style="padding:0 16px">
+  <span><span class="vd no"><svg class="ms"><use href="#ms-block"/></svg>NO</span> no edge</span>
+  <span><span class="vd yes-ok"><svg class="ms"><use href="#ms-check"/></svg>YES</span> okay signal</span>
+  <span><span class="vd yes-strong"><svg class="ms"><use href="#ms-bolt"/></svg>YES</span> strong signal</span>
+  <span><span class="mb-tag paper">paper</span> every signal until proven</span>
+  <span><span class="mb-tag live">live</span> stored by the pipeline</span>
+  <span><span class="mb-tag bt">back-test</span> rule replay / walk-forward</span>
+  <span>Click a row for the company's decision page.</span>
+</div>
+</section>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion" id="d-src"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+    </div></div>
+  </div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const H = D.header;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const CUR = D.currency;
+const money = (x, dec=2) => CUR.symbol + Math.abs(x).toLocaleString(CUR.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const num = (x, dec=2) => x.toLocaleString(CUR.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const sgn = (x, dec=1, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = x => Math.round(x*100);
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const MARKET_LABEL = {india: 'India', us: 'US'};
+const pageOf = t => `../decision/decision-${t}.html`;
+
+/* ---------- shell ---------- */
+document.title = `Watchlist · ${MARKET_LABEL[D.market]}`;
+$('#topbar-title').textContent = `Watchlist · ${D.market_name}`;
+for (const [m, label] of Object.entries(MARKET_LABEL)) {
+  const b = el('button', {type:'button', 'aria-pressed': String(m === D.market)}, label);
+  if (m !== D.market) { b.setAttribute('aria-disabled', 'true'); b.dataset.tip = `Built per market: open watchlist-${m}.html for ${label}. The live switch comes with the consolidated app.`; }
+  $('#market-seg').append(b);
+}
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', true], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false, '../help/help.html']];
+const navItem = ([ico, label, current]) => el('a', {class: 'mb-nav-item' + (current ? '' : ' coming'), href: '#', 'aria-current': current ? 'page' : null, 'data-tip': current ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && !t.closest('tr.row')) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- tape ---------- */
+const track = $('#tape-track');
+const tapeItems = () => D.rows.map(t => el('a', {class:'it', href: pageOf(t.ticker)}, el('b', {}, t.ticker), el('span', {}, t.close==null?'—':num(t.close)), delta(t.move)));
+track.append(...tapeItems(), ...tapeItems());
+
+/* ---------- header ---------- */
+const sess = H.session || {}; const closed = !sess.in_session;
+$('#h-title').append(`${MARKET_LABEL[D.market]} watchlist`, el('small', {}, `${H.n} companies · ${D.exchange}`));
+$('#h-meta').append(el('span', {}, el('span', {class:'dot'+(closed?'':' open')}), closed ? `${D.exchange} closed` : `${D.exchange} open`), el('span', {class:'mb-tag live'}, 'live data'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {}, `as of close ${fmtD(D.as_of)} ${D.as_of.slice(0,4)}`), el('span', {}, H.run_at ? `· last model run ${H.run_at.slice(11,16)} UTC` : ''));
+$('#h-right').append(`${H.up} up · ${H.down} down on the day`, el('br'), `${H.news_total} headlines in 72h, ${H.news_high} high materiality`);
+const tiles = [
+  {l: 'Regime', v: H.regime, s: H.major_event_names.length ? H.major_event_names.join(', ') : 'no major event', t: 'regime (stored by the daily run): CALM / TRENDING / EVENT_HEAVY / UNSTABLE from the vol index, the benchmark and the event calendar. EVENT_HEAVY widens every range.'},
+  {l: H.bench_name, v: H.bench_close == null ? '—' : num(H.bench_close), d: H.bench_move, s: H.bench_move_5 == null ? '' : `5d ${sgn(H.bench_move_5,2)}` + (H.bench_live ? ` · live ${sgn(H.bench_live.change_pct,2)} at ${H.bench_live.ts.slice(11,16)} UTC` : ''), t: 'Benchmark index: last stored close and day move; 5-day move; the live quote at the run if stored.'},
+  {l: H.vol_name, v: H.vol_close == null ? '—' : num(H.vol_close), d: H.vol_move, s: `regime vol level ${H.vol_level}`, t: 'Volatility index: last stored close and day move. The regime thresholds are in config/markets/<market>.yaml.'},
+  H.flows ? {l: 'FII / DII, cr', v: `${sgn(H.flows.fii, 0, '')} / ${sgn(H.flows.dii, 0, '')}`, s: `NSE provisional, ${fmtD(H.flows.date)}`, t: 'Foreign and domestic institutional net flows (NSE provisional, Rs crore). Foreign selling is the conventional negative.'} : {l: 'Live calls scored', v: String(H.scored_total), s: 'across the watchlist', t: 'Live direction calls that have settled and been scored.'},
+  {l: 'Calls today', v: `${H.yes.length} YES`, s: `${H.abstain} of ${H.n} abstained · ${H.blocked.length} blocked`, t: 'Live calls for the latest date (predictions); abstentions from the forecaster (agent_reasoning); blocked = indicator quality BLOCKED or results within 1 day (prediction rules).'},
+  {l: 'Model skill', v: H.model_skill ? 'shown' : 'not shown', s: H.review_week ? `weekly review ${H.review_week}` : 'no review yet', t: 'The weekly review\'s verdict on the signal model (model_skill). Until it is true, the cockpit says "no proven edge" and every signal stays Paper.'},
+];
+for (const t of tiles) $('#tiles').append(el('div', {'data-tip': t.t}, el('span', {class:'micro'}, t.l), el('b', {}, t.v, ' ', t.d == null ? null : delta(t.d, 2, t.l === 'FII / DII' ? '' : '%')), el('small', {}, t.s)));
+
+/* ---------- banner ---------- */
+const B = $('#banner');
+if (H.yes.length) { B.classList.add('yes'); B.append(el('div', {class:'ico'}, icon('ms-check')), el('div', {}, el('b', {class:'t'}, `${H.yes.length} YES call${H.yes.length>1?'s':''} today: ${H.yes.join(', ')}`), el('div', {class:'s'}, `Paper until the track record proves them (${H.scored_total} live calls scored so far). Open the company page for the plan.`))); }
+else { B.classList.add('none'); B.append(el('div', {class:'ico'}, icon('ms-block')), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'), el('div', {class:'s'}, (H.candidates.length ? `Paper candidates at or above ${pct(D.call_threshold)}%: ${H.candidates.join(', ')}. ` : `No company reaches the ${pct(D.call_threshold)}% Paper-candidate line; `) + `the forecaster abstained on ${H.abstain} of ${H.n}` + (H.model_skill ? '.' : ', and the model has not shown skill in the back-test, so every signal stays Paper.')))); }
+
+/* ---------- table ---------- */
+let sortKey = 'sector', sortDir = 1, sectorFilter = null, query = '';
+const chips = $('#sector-chips');
+const allChip = el('button', {class:'md-chip filter', type:'button', 'aria-pressed':'true'}, 'All sectors');
+chips.append(allChip, ...D.sectors.map(s => el('button', {class:'md-chip filter', type:'button', 'aria-pressed':'false', 'data-s': s.name}, s.name, s.index && s.index.move != null ? delta(s.index.move, 1) : null)));
+chips.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sectorFilter = b.dataset.s || null; chips.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
+$('#q').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); render(); });
+$('#sort').addEventListener('change', e => { sortKey = e.target.value; sortDir = ['ticker','sector','days_to_earnings'].includes(sortKey) ? 1 : -1; render(); });
+document.querySelectorAll('.wl th[data-k]').forEach(th => th.addEventListener('click', () => { const k = th.dataset.k; if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = ['ticker','sector','days_to_earnings','verdict'].includes(k) ? 1 : -1; } $('#sort').value = ['verdict','close','cue'].includes(k) ? $('#sort').value : k; render(); }));
+const val = (r, k) => k === 'news' ? (r.news ? r.news.n : -1) : k === 'cue' ? (r.cue ? r.cue.change_pct : -999) : k === 'verdict' ? (r.verdict.word === 'YES' ? (r.verdict.strength === 'strong' ? 0 : 1) : 2) : k === 'days_to_earnings' ? (r.next_earnings ? r.next_earnings.days : 999) : (r[k] == null ? -1e9 : r[k]);
+function spark(r) {
+  const s = svgEl('svg', {class:'spark', viewBox:'0 0 64 24'}); const v = r.spark; if (v.length < 2) return s;
+  const lo = Math.min(...v), hi = Math.max(...v), X = i => 2 + i * 60 / (v.length - 1), Y = x => hi === lo ? 12 : 21 - (x - lo) / (hi - lo) * 18;
+  const col = v[v.length-1] >= v[0] ? 'var(--mb-color-up)' : 'var(--mb-color-down)';
+  s.append(svgEl('path', {d: v.map((x, i) => (i?'L':'M') + X(i).toFixed(1) + ',' + Y(x).toFixed(1)).join(' ') + ` L${X(v.length-1).toFixed(1)},23 L2,23 Z`, fill: col, opacity: .12}));
+  s.append(svgEl('path', {d: v.map((x, i) => (i?'L':'M') + X(i).toFixed(1) + ',' + Y(x).toFixed(1)).join(' '), fill:'none', stroke: col, 'stroke-width': 1.5, 'stroke-linejoin':'round'}));
+  s.append(svgEl('circle', {cx: X(v.length-1), cy: Y(v[v.length-1]), r: 2.2, fill: col}));
+  return s;
+}
+function rangeBar(r) {
+  const rg = r.range5; if (!rg || r.close == null) return el('span', {class:'muted'}, '—');
+  const s = svgEl('svg', {viewBox:'0 0 64 16'});
+  const lo = Math.min(rg.lo80, r.close) * 0.995, hi = Math.max(rg.hi80, r.close) * 1.005, X = v => (v - lo) / (hi - lo) * 60 + 2;
+  s.append(svgEl('rect', {x: X(rg.lo80), y: 4, width: X(rg.hi80) - X(rg.lo80), height: 8, rx: 2, fill: 'var(--mb-chart-band-80)'}));
+  s.append(svgEl('rect', {x: X(rg.lo50), y: 4, width: X(rg.hi50) - X(rg.lo50), height: 8, rx: 2, fill: 'var(--mb-chart-band-50)'}));
+  s.append(svgEl('line', {x1: X(r.close), x2: X(r.close), y1: 1, y2: 15, stroke: 'var(--md-sys-color-on-surface)', 'stroke-width': 2}));
+  return el('span', {class:'rng', 'data-tip': `5-day range published for ${fmtD(rg.target)} (as of ${rg.as_of}): 50% ${money(rg.lo50,0)}–${money(rg.hi50,0)}, 80% ${money(rg.lo80,0)}–${money(rg.hi80,0)}; last close ${money(r.close)} (${sgn((r.close/rg.base-1)*100,1)} from the range's base ${money(rg.base)}).`}, s, el('small', {}, `${money(rg.lo80,0)}–${money(rg.hi80,0)}`));
+}
+function odds(p, h, r) {
+  if (p == null) return el('span', {class:'muted'}, '—');
+  const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13}));
+  const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5}));
+  return el('span', {class:'mb-odds', 'data-tip': `${h}-day P(up) ${(p*100).toFixed(1)}% (model_scores_latest)` + (r.decision_1d ? `; forecaster: ${h===1?r.decision_1d:r.decision_5d}` : '') + (r.news_score != null && h === 1 ? `; news score ${r.news_score}` : '')}, s, el('b', {}, pct(p)+'%'));
+}
+function verdictCell(r) {
+  const v = r.verdict; const cls = v.word === 'YES' ? (v.strength === 'strong' ? 'yes-strong' : 'yes-ok') : 'no';
+  const t = v.word === 'YES' ? `Live ${v.horizon}-day up call, confidence ${v.confidence} (${v.strength} signal). Paper until proven.` : v.confidence != null ? `Live ${v.horizon}-day down call, confidence ${v.confidence}: not a buy.` : `No live call for ${D.as_of}: ${r.decision_1d ? 'the forecaster ' + r.decision_1d + 'ed (1d) and ' + r.decision_5d + 'ed (5d)' : 'no forecaster record'}.`;
+  return el('span', {class:'vd '+cls, 'data-tip': t}, icon(v.word === 'YES' ? (v.strength === 'strong' ? 'ms-bolt' : 'ms-check') : 'ms-block'), v.word, v.word === 'YES' ? el('span', {class:'mb-tag paper', style:'margin-left:2px'}, 'paper') : null);
+}
+function row(r) {
+  const tr = el('tr', {class:'row', tabindex:'0', 'data-t': r.ticker, 'aria-label': `${r.name}: open the decision page`});
+  const open = () => { window.location.href = pageOf(r.ticker); };
+  tr.addEventListener('click', e => { if (!e.target.closest('.md-help, a')) open(); });
+  tr.addEventListener('keydown', e => { if (e.key === 'Enter') open(); });
+  tr.append(el('td', {}, el('div', {class:'sym'}, el('span', {class:'bx', 'aria-hidden':'true'}, r.ticker.slice(0,4)), el('div', {style:'min-width:0'}, el('b', {}, r.ticker), el('small', {}, `${r.name} · ${r.sector}`)))));
+  tr.append(el('td', {class:'num'}, el('span', {class:'px'}, r.close == null ? '—' : num(r.close), null)));
+  tr.append(el('td', {class:'num'}, delta(r.move)));
+  tr.append(el('td', {class:'num c-5d'}, delta(r.move_5)));
+  tr.append(el('td', {class:'c-spark'}, spark(r)));
+  tr.append(el('td', {class:'num'}, odds(r.p1, 1, r)));
+  tr.append(el('td', {class:'num c-p5'}, odds(r.p5, 5, r)));
+  tr.append(el('td', {}, verdictCell(r)));
+  tr.append(el('td', {class:'c-range'}, rangeBar(r)));
+  const held = r.cover80_1d == null ? el('span', {class:'muted'}, '—') : el('span', {class:'held', 'data-tip': `Rule replay ${fmtD(D.window[0], false)}–${fmtD(D.window[1], false)}: the 1-day 80% range held ${r.cover80_1d}% of ${r.cover_n} sessions (target 80%); 5-day ${r.cover80_5d == null ? '—' : r.cover80_5d + '%'}. Back-test, not live.`}, el('div', {class:'md-progress'}, el('i', {style:`width:${r.cover80_1d}%;background:${r.cover80_1d >= 75 ? 'var(--mb-color-up)' : 'var(--mb-color-warn)'}`})), el('b', {}, r.cover80_1d + '%'), null);
+  tr.append(el('td', {class:'c-held'}, held));
+  const ne = r.next_earnings;
+  tr.append(el('td', {class:'evt'}, ne ? el('span', {'data-tip': `Results ${fmtD(ne.date)} ${ne.date.slice(0,4)}${ne.timing ? ', ' + ne.timing.replace('_',' ') : ''} (events). ${ne.days <= 1 ? 'Within 1 day: no new call allowed.' : 'A call is blocked within 1 day of results.'}`}, el('b', {style: ne.days <= 1 ? 'color:var(--mb-color-down)' : ''}, `${ne.days} d`), el('small', {}, fmtD(ne.date, false))) : el('span', {class:'muted'}, 'none stored')));
+  const nw = r.news;
+  tr.append(el('td', {class:'c-news'}, nw ? el('div', {class:'nw', 'data-tip': `${nw.n} stored headlines in the last 72 hours of the archive, ${nw.high} high materiality; latest ${nw.latest.slice(0,16).replace('T',' ')} UTC. Best cluster status: ${r.best_status ? r.best_status.replace('_',' ') : 'not assessed'}.`}, el('span', {}, el('b', {}, nw.n), nw.high ? ` · ${nw.high} high` : ''), el('span', {class:'md-badge ' + (r.best_status || 'unverified')}, (r.best_status || 'not assessed').replace('_',' '))) : el('span', {class:'muted'}, '0')));
+  tr.append(el('td', {class:'num c-cue'}, r.cue ? el('span', {'data-tip': `${r.cue.kind} ${r.cue.symbol}: ${sgn(r.cue.change_pct, 2)} at ${r.cue.ts.slice(11,16)} UTC (quotes_latest).`}, delta(r.cue.change_pct), el('small', {class:'muted', style:'display:block;font-size:10px'}, r.cue.kind)) : el('span', {class:'muted'}, '—')));
+  return tr;
+}
+function render() {
+  const tb = $('#rows'); tb.innerHTML = '';
+  let rows = D.rows.filter(r => (!sectorFilter || r.sector === sectorFilter) && (!query || r.ticker.toLowerCase().includes(query) || r.name.toLowerCase().includes(query)));
+  if (sortKey === 'sector') {
+    for (const s of D.sectors) {
+      const members = rows.filter(r => r.sector === s.name); if (!members.length) continue;
+      const head = el('tr', {class:'sec'}); const td = el('td', {colspan: 13}, el('b', {}, s.name), ' · ', `${members.length} compan${members.length>1?'ies':'y'}`);
+      if (s.index) td.append(' · ', `${s.index.name} `, s.index.move == null ? '' : delta(s.index.move, 2), s.index.move_5 == null ? '' : el('span', {class:'muted'}, ` · 5d ${sgn(s.index.move_5, 2)}`)); else td.append(' · ', el('span', {class:'muted'}, 'no sector index stored'));
+      head.append(td); tb.append(head); members.forEach(r => tb.append(row(r)));
+    }
+  } else { rows.sort((a, b) => { const x = val(a, sortKey), y = val(b, sortKey); return (x < y ? -1 : x > y ? 1 : a.ticker.localeCompare(b.ticker)) * sortDir; }); rows.forEach(r => tb.append(row(r))); }
+  document.querySelectorAll('.wl th[data-k]').forEach(th => th.removeAttribute('aria-sort'));
+  const th = document.querySelector(`.wl th[data-k="${sortKey}"]`); if (th) th.setAttribute('aria-sort', sortDir > 0 ? 'ascending' : 'descending');
+  $('#count').textContent = `${rows.length} of ${D.rows.length} companies` + (sectorFilter ? ` · ${sectorFilter}` : '') + (query ? ` · "${query}"` : '') + ` · chances and ranges as of ${fmtD(D.as_of, false)}; 80% held over ${fmtD(D.window[0], false)}–${fmtD(D.window[1], false)} (back-test).`;
+}
+render();
+
+/* ---------- sources + footer ---------- */
+$('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live</dt><dd>data/${D.market}/: prices (last 21 stored bars per symbol: close, day, 5-day and 20-session sparkline), model_scores_latest (chance of a rise, latest date), ranges_latest (the latest published 5-day range), features_latest (RSI, results countdown, indicator quality), agent_reasoning (abstain / call), predictions and outcomes (verdicts and scored calls), quotes_latest (overnight cues, live benchmark), regime, events (next results date), news with enrichment and news_verified (72-hour counts and best status)${D.market==='india' ? ', flows (NSE FII/DII)' : ''}, reviews (model skill). Read through DuckDB views in sql/views.sql.</dd>
+<dt>Back-test</dt><dd>"80% held": <code>scripts/replay.py --market ${D.market} --start ${D.window[0]} --end ${D.window[1]}</code> run into a scratch root; per ticker coverage of the rule replay's 1-day and 5-day 80% ranges. Not live.</dd>
+<dt>Derived</dt><dd>Verdict colour and strength from the stored call (confidence >= 0.75 or anchored probability >= 0.65 = strong); Paper candidates = chance at or above the ${pct(D.call_threshold)}% Paper-candidate line; blocked = indicator quality BLOCKED or results within 1 day.</dd>
+<dt>Mock / coming</dt><dd>Symbol search across markets, the live market switch, and the rail's other sections are not built. Nothing on this page is invented: a missing value shows as a dash.</dd>
+</dl>`;
+$('#foot').textContent = `Personal research project. Prices from Yahoo Finance${D.market==='india' ? ' and NSE bhavcopy' : ''}; nothing here is investment advice and nothing trades. Built ${D.built_at} (UTC) from stored data as of ${D.as_of}.`;
+</script>
+</body>
+</html>

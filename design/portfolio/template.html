@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper portfolio</title>
+<meta name="description" content="The pretend account of the personal stock cockpit: what following the plan would have done, live (no trade yet) and in the rehearsal on past prices, 10,000 per trade after costs. Research only, nothing trades.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Paper portfolio screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:14px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 .sp{margin-left:auto;font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.ans{font-size:14.5px;line-height:1.5;margin:0 0 10px;font-weight:500}
+.hhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.guide{margin-top:14px;padding:12px 16px;border-radius:var(--mb-card-radius);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:13.5px;line-height:1.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;align-items:start}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpis.six{grid-template-columns:repeat(6,1fr)}
+.kpi .v{overflow-wrap:anywhere}
+.kpi{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface);min-width:0}
+.kpi .v{font-size:20px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.kpi .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:3px}
+.ok{color:var(--mb-color-up)} .bad{color:var(--mb-color-down)}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{font:500 10.5px/16px var(--md-ref-typeface-plain);letter-spacing:.05em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:6px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+table.t td{padding:5px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
+table.t th.num,table.t td.num{text-align:right}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:inherit}
+.empty{border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);padding:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant);background:var(--md-sys-color-surface)}
+.seg-in{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.rules p{margin:0 0 6px;font-size:13.5px;line-height:1.5}
+.bar{display:inline-flex;align-items:center;gap:6px} .bar .md-progress{width:50px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+@media (max-width: 1000px){ .grid2{grid-template-columns:1fr} .kpis,.kpis.six{grid-template-columns:repeat(3,1fr)} }
+@media (max-width: 600px){ .kpis,.kpis.six{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 760px){ .pad{padding:0 var(--mb-gutter)} .hhead{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Paper portfolio · the pretend account</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner"><div class="pad"><div class="wrap">
+
+<section class="hhead" aria-label="Paper portfolio">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+
+<div class="guide" id="guide"></div>
+
+<section class="card" style="margin-top:16px" id="live-card">
+  <h2>The live book <span class="mb-tag live">live</span><span class="sp" id="live-sub"></span></h2>
+  <p class="ans" id="live-ans"></p>
+  <div class="kpis" id="live-kpis"></div>
+  <div class="tblwrap" id="live-ledger" style="margin-top:10px"></div>
+</section>
+
+<section class="card" style="margin-top:16px" id="reh-card">
+  <h2>The rehearsal book <span class="mb-tag bt">back-test</span> <button class="md-help" id="reh-help" aria-label="Explain">?</button><span class="sp" id="reh-sub"></span></h2>
+  <div class="seg-in"><span class="micro">Follow the model when it is at least</span><div class="md-segmented dense th" role="group" aria-label="Threshold" id="th-seg"></div><span class="micro">sure of a rise</span></div>
+  <p class="ans" id="reh-ans"></p>
+  <div class="kpis six" id="reh-kpis"></div>
+  <h3 class="micro" style="margin:14px 0 6px">Running total of the book, one trade per company per day, <span id="stake-label"></span> each</h3>
+  <div class="chart" id="curve"></div>
+  <p class="note" id="curve-note"></p>
+</section>
+
+<div class="grid2">
+  <section class="card" id="month-card">
+    <h2>Month by month <span class="mb-tag bt">back-test</span></h2>
+    <div class="tblwrap" id="by-month"></div>
+  </section>
+  <section class="card" id="ticker-card">
+    <h2>Company by company <span class="mb-tag bt">back-test</span></h2>
+    <div class="tblwrap" id="by-ticker"></div>
+  </section>
+</div>
+
+<section class="card" style="margin-top:16px" id="ledger-card">
+  <h2>The trades, newest first <span class="mb-tag bt">back-test</span><span class="sp" id="ledger-sub"></span></h2>
+  <div class="tblwrap" id="ledger"></div>
+  <button class="md-btn outlined" id="ledger-more" type="button" style="margin-top:10px"></button>
+</section>
+
+<div class="grid2">
+  <section class="card rules" id="rules-card">
+    <h2>The rules of the book</h2>
+    <div id="rules"></div>
+  </section>
+  <section class="card" id="check-card">
+    <h2>Does this match the back-test? <span class="mb-tag bt">check</span></h2>
+    <div class="tblwrap" id="check"></div>
+    <p class="note">The same rows and the same costs as scripts/model_backtest.py: the mean per day and the number of trades must be identical to its JSON, or something is wrong with this page.</p>
+  </section>
+</div>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+  </div></div></div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const pct = (x, dec=0) => x == null ? '—' : (Math.round(x*100*Math.pow(10,dec))/Math.pow(10,dec)).toFixed(dec) + '%';
+const of100 = x => x == null ? '—' : `${Math.round(x*100)} out of 100`;
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtD = iso => { const d = new Date(iso.slice(0,10)+'T00:00:00Z'); return d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let MKT = 'india', TH = '0.60', ledgerAll = false;
+const M = () => D.markets[MKT];
+const money = (x, dec=0) => { const c = M().currency; return (x < 0 ? '−' : '') + c.symbol + Math.abs(x).toLocaleString(c.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec}); };
+const moneyCell = (x, dec=0) => x == null ? el('span', {class:'muted'}, '—') : el('span', {class: x > 0 ? 'ok' : x < 0 ? 'bad' : 'muted'}, (x > 0 ? '+' : '') + money(x, dec));
+const table = (heads, rows) => { const t = el('table', {class:'t'}); const tr = el('tr'); heads.forEach(h => tr.append(el('th', {class: h.num ? 'num' : null}, h.label || h))); t.append(el('thead', {}, tr)); const tb = el('tbody'); rows.forEach(r => tb.append(r)); t.append(tb); return t; };
+const td = (content, cls) => el('td', {class: cls}, content);
+
+/* ---------- shell ---------- */
+for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
+$('#market-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; MKT = b.dataset.m; $('#market-seg').querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', true], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false, '../help/help.html']];
+const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A') { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- render ---------- */
+function render() {
+  const m = M(), L = m.live;
+  $('#h-title').innerHTML = ''; $('#h-meta').innerHTML = ''; $('#h-right').innerHTML = '';
+  $('#h-title').append(`${LABEL[MKT]} paper portfolio`, el('small', {}, `${m.market_name} · ${m.n_tickers} companies · ${money(D.stake)} per trade`));
+  $('#h-meta').append(el('span', {}, `real data up to ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test = rehearsal on past prices'), el('span', {class:'mb-tag paper'}, 'paper'));
+  $('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
+  $('#guide').innerHTML = `<b>What this page is.</b> A pretend account that follows the cockpit's plan to the letter: whenever a company page shows <b>YES</b> (the model at least ${pct(D.call_line)} sure of a rise), it books a ${money(D.stake)} trade: buy at the next open, sell at the close four trading days later, pay the real trading costs (about ${money(D.stake * m.cost_pct / 100, 2)} per trade here). No real money ever moves. The <b>live book</b> is what has happened since the system went live${m.first_live ? ` on ${fmtD(m.first_live)}` : ''}; the <b>rehearsal book</b> is what the same rule would have done on past prices. Green is profit, red is loss, always after costs.`;
+  // live book
+  $('#live-sub').textContent = m.first_live ? `since ${fmtD(m.first_live)}` : '';
+  $('#live-ans').textContent = L.rows.length ? `${L.closed} trade${L.closed===1?'':'s'} closed and ${L.open} open; the closed ones ${L.pnl >= 0 ? 'made' : 'lost'} ${money(Math.abs(L.pnl), 2)} after costs.` : `Nothing yet. No company page has shown YES since the live start${m.first_live ? ` on ${fmtD(m.first_live)}` : ''}: the model has not been at least ${pct(D.call_line)} sure of a rise, and the forecaster abstained every day. The first trade appears here the morning after the first YES; it is closed, and graded, four trading days later.`;
+  const lk = $('#live-kpis'); lk.innerHTML = '';
+  for (const k of [{v: String(L.open), l: 'open trades'}, {v: String(L.closed), l: 'closed trades'}, {v: L.closed ? money(L.pnl, 2) : '—', l: 'profit or loss after costs', cls: L.pnl > 0 ? 'ok' : L.pnl < 0 ? 'bad' : ''}, {v: L.closed ? of100(L.wins / L.closed) : '—', l: 'trades that made money'}]) lk.append(el('div', {class:'kpi'}, el('div', {class:'v ' + (k.cls || '')}, k.v), el('div', {class:'l'}, k.l)));
+  const ll = $('#live-ledger'); ll.innerHTML = '';
+  if (L.rows.length) ll.append(table(['Called on', 'Company', 'Call', 'Bought', 'Sold', {label:'After costs', num:true}, 'Status'], L.rows.slice().reverse().map(r => { const tr = el('tr'); tr.append(td(fmtD(r.as_of)), td(el('b', {}, r.ticker)), td(`${r.direction} · ${Math.round(r.confidence*100)}% sure · ${r.horizon}d`), td(r.entry_open == null ? '—' : `${money(r.entry_open, 2)} on ${fmtD(r.entry_date)}`), td(r.exit_close == null ? '—' : `${money(r.exit_close, 2)} on ${fmtD(r.exit_date)}`), td(moneyCell(r.pnl, 2), 'num'), td(r.status === 'closed' ? (r.hit ? el('span', {class:'ok'}, '✓ came true') : el('span', {class:'bad'}, '✗ did not')) : el('span', {class:'muted'}, 'open'))); return tr; })));
+  // rehearsal
+  const seg = $('#th-seg'); seg.innerHTML = '';
+  for (const t of m.thresholds) seg.append(el('button', {type:'button', 'aria-pressed': String(t === TH), 'data-t': t}, pct(+t)));
+  seg.onclick = e => { const b = e.target.closest('button'); if (!b) return; TH = b.dataset.t; seg.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); ledgerAll = false; renderBook(); };
+  $('#reh-help').dataset.tip = `scripts/model_backtest.py refits the model every month on prices before that month and scores the days after, so it never sees the answer. This book applies the plan to those days: one ${money(D.stake)} trade per company per day when the model was at least this sure, costs from config/costs.yaml. The running total adds up the average trade of each day (equal weight per day, as the back-test does).`;
+  $('#stake-label').textContent = money(D.stake);
+  renderBook();
+  // rules
+  const ru = $('#rules'); ru.innerHTML = '';
+  for (const [b, t] of [['One trade per company per day.', `When the model is at least the chosen sureness (the cockpit's Paper-candidate line is ${pct(D.call_line)}%; a reading aid, not a pipeline rule), ${money(D.stake)} buys the stock at the next open.`], ['Sell four trading days later.', 'At the close of that fourth day (D+4), whatever happened. The live plan also exits early below the 80% range floor; the rehearsal cannot do that (it has no intraday prices), so it is slightly harsher.'], ['Costs are real.', `Brokerage, taxes and fees from config/costs.yaml, about ${money(D.stake * m.cost_pct / 100, 2)} per round trip here; slippage is not modelled.`], ['Equal weight per day.', 'A day with five trades counts the average of the five, so one busy day does not dominate the book. The trade table shows each trade on its own.'], ['Nothing is real.', 'No account exists, no order is placed. The book exists to see whether the plan would have paid, before any real money is considered.']]) ru.append(el('p', {}, el('b', {}, b + ' '), t));
+  // check
+  const ck = $('#check'); ck.innerHTML = '';
+  ck.append(table(['At least … sure', {label:'Trades here', num:true}, {label:'Trades in JSON', num:true}, {label:'Mean per day here', num:true}, {label:'Mean per day in JSON', num:true}, 'Match'], Object.entries(m.check).map(([k, v]) => { const ok = v.here_positions === v.json_positions && (v.here_mean_pct == null ? v.json_mean_pct == null : Math.abs(v.here_mean_pct - v.json_mean_pct) < 1e-6); const tr = el('tr'); tr.append(td(pct(+k)), td(String(v.here_positions), 'num'), td(String(v.json_positions), 'num'), td(v.here_mean_pct == null ? '—' : v.here_mean_pct.toFixed(4) + '%', 'num'), td(v.json_mean_pct == null ? '—' : v.json_mean_pct.toFixed(4) + '%', 'num'), td(el('span', {class: ok ? 'ok' : 'bad'}, ok ? '✓ identical' : '✗ differs'))); return tr; })));
+  $('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live book</dt><dd>data/${MKT}/: predictions (every live call) joined to outcomes (entry open, target close, return, hit once scored); costs at the entry open from config/costs.yaml. 0 calls on ${fmtD(m.as_of)}.</dd>
+<dt>Rehearsal book</dt><dd>The walk-forward out-of-sample rows of the signal model (model.walk_forward, ${m.fits} monthly fits, 5-day open-to-close label) with the entry open and the return, exactly the rows scripts/model_backtest.py scores for its paper strategy (<code>${m.bt_path}</code>); this page re-derives them and checks the totals against that JSON above. The trade table shows the newest 400 trades of a book.</dd>
+<dt>Derived</dt><dd>Running total = cumulative sum of each day's average net return × ${money(D.stake)}; win rate = trades with a net return above zero; largest drop = deepest fall of the running total from its previous high.</dd>
+<dt>Mock / coming</dt><dd>Nothing on this page is invented. Symbol search is not built.</dd>
+</dl>`;
+  $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
+}
+
+function renderBook() {
+  const m = M(), B = m.books[TH], A = m.always_up;
+  $('#reh-sub').textContent = `${fmtD(m.window[0])} – ${fmtD(m.window[1])}, ${m.n_tickers} companies`;
+  const rk = $('#reh-kpis'); rk.innerHTML = '';
+  if (!B.positions) { $('#reh-ans').textContent = `The model was never at least ${pct(+TH)} sure of a rise in the rehearsal, so this book has no trades. Pick a lower level.`; $('#curve').innerHTML = ''; $('#curve-note').textContent = ''; $('#by-month').innerHTML = ''; $('#by-ticker').innerHTML = ''; $('#ledger').innerHTML = ''; $('#ledger-sub').textContent = ''; $('#ledger-more').style.display = 'none'; return; }
+  const total = B.pnl_total, au = A.pnl_total;
+  $('#reh-ans').textContent = `${total > 0 ? 'It would have made money' : 'It would have lost money'}: ${B.positions} trades on ${B.dates} days ${total >= 0 ? 'added' : 'took'} ${money(Math.abs(total))} ${total >= 0 ? 'to' : 'from'} the book, about ${B.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(D.stake * B.mean_pct / 100))} per ${money(D.stake)} trade after costs (the back-test's measure: the average trade of each day); ${of100(B.win_rate)} trades made money. Simply buying every company every day (${A.positions} trades) would have ${au >= 0 ? 'added' : 'taken'} ${money(Math.abs(au))} over the same period, about ${A.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(D.stake * A.mean_pct / 100))} per trade.`;
+  for (const k of [
+    {v: String(B.positions), l: `trades on ${B.dates} days`},
+    {v: money(total), l: 'book total after costs', cls: total > 0 ? 'ok' : 'bad'},
+    {v: (B.mean_pct >= 0 ? '+' : '−') + money(Math.abs(D.stake * B.mean_pct / 100)), l: `average per ${money(D.stake)} trade (per day)`, cls: B.mean_pct > 0 ? 'ok' : 'bad', t: 'The back-test\'s measure: each day\'s trades averaged first, then the days averaged. Matches the Track record page.'},
+    {v: of100(B.win_rate), l: 'trades that made money'},
+    {v: money(B.max_drawdown), l: 'largest drop from a high', cls: 'bad', t: 'The deepest fall of the running total from its previous high: how bad a losing streak got.'},
+    {v: el('span', {style:'font-size:15px'}, el('span', {class:'ok'}, `+${money(Math.abs(B.best.pnl))}`), ' / ', el('span', {class:'bad'}, money(B.worst.pnl))), l: `best (${B.best.ticker}, ${fmtD(B.best.date)}) / worst (${B.worst.ticker}, ${fmtD(B.worst.date)})`},
+  ]) rk.append(el('div', {class:'kpi', 'data-tip': k.t}, el('div', {class:'v ' + (k.cls || '')}, k.v), el('div', {class:'l'}, k.l)));
+  // curve
+  const c = $('#curve'); c.innerHTML = '';
+  const W = Math.max(320, c.clientWidth || 600), H = 220, ml = 56, mr = 12, mt = 12, mb = 28;
+  const series = [{name: `model ≥ ${pct(+TH)}`, pts: B.curve, col: cssVar('--mb-chart-1'), w: 2}, {name: 'buy everything', pts: A.curve, col: cssVar('--md-sys-color-outline'), w: 1.5}];
+  const dates = A.curve.map(p => p.date), xOf = d => ml + (dates.indexOf(d) / Math.max(1, dates.length - 1)) * (W - ml - mr);
+  const vals = series.flatMap(s => s.pts.map(p => p.equity)).concat([0]); let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.08 || 100; lo -= pad; hi += pad;
+  const y = v => mt + (hi - v) / (hi - lo) * (H - mt - mb);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Running total of the paper book'});
+  const step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000].find(s => (hi - lo) / s <= 8) || 50000;
+  for (let g = Math.ceil(lo / step) * step; g <= hi; g += step) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke: g === 0 ? cssVar('--md-sys-color-outline') : cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = money(g); svg.append(t); }
+  const months = []; dates.forEach((d, i) => { if (i === 0 || d.slice(0,7) !== dates[i-1].slice(0,7)) months.push(d); });
+  months.forEach((d, i) => { if (months.length > 10 && i % 2) return; const t = svgEl('text', {x: xOf(d), y: H-10, 'text-anchor':'start', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = `${MON[+d.slice(5,7)-1]} ${d.slice(2,4)}`; svg.append(t); });
+  for (const s of series) { if (!s.pts.length) continue; const pts = [[xOf(dates[0]), y(0)], ...s.pts.map(p => [xOf(p.date), y(p.equity)])]; svg.append(svgEl('path', {d: pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '), fill:'none', stroke: s.col, 'stroke-width': s.w, 'stroke-linejoin':'round'})); const last = s.pts[s.pts.length-1]; const t = svgEl('text', {x: xOf(last.date) - 4, y: y(last.equity) - 6, 'text-anchor':'end', 'font-size':10.5, fill: s.col, 'font-weight':700}); t.textContent = `${s.name}: ${money(last.equity)}`; svg.append(t); }
+  c.append(svg);
+  $('#curve-note').textContent = `The blue line is this book; the grey line is buying every company every day with the same rule and costs. A line going up is money made; the zero line is break-even. The book of a day is the average of its trades, so the running total reads as "one ${money(D.stake)} trade per day".`;
+  // month, ticker
+  const bm = $('#by-month'); bm.innerHTML = '';
+  bm.append(table(['Month', {label:'Trades', num:true}, {label:'Made money', num:true}, {label:'Book that month', num:true}], B.by_month.map(r => { const tr = el('tr'); tr.append(td(`${MON[+r.month.slice(5,7)-1]} ${r.month.slice(0,4)}`), td(String(r.positions), 'num'), td(of100(r.win_rate), 'num'), td(moneyCell(r.pnl), 'num')); return tr; })));
+  const bt = $('#by-ticker'); bt.innerHTML = '';
+  bt.append(table(['Company', {label:'Trades', num:true}, {label:'Made money', num:true}, {label:`Per ${money(D.stake)} trade`, num:true}, {label:'Total', num:true}], B.by_ticker.map(r => { const tr = el('tr'); tr.append(td(el('a', {href:`../decision/decision-${r.ticker}.html`, style:'color:inherit;font-weight:700;text-decoration:none'}, r.ticker)), td(String(r.positions), 'num'), td(el('span', {class:'bar'}, el('div', {class:'md-progress'}, el('i', {style:`width:${r.win_rate*100}%;background:${r.win_rate >= 0.5 ? 'var(--mb-color-up)' : 'var(--mb-color-warn)'}`})), of100(r.win_rate)), 'num'), td(moneyCell(D.stake * r.mean_pct / 100), 'num'), td(moneyCell(r.pnl), 'num')); return tr; })));
+  renderLedger();
+}
+function renderLedger() {
+  const m = M(), B = m.books[TH], rows = B.ledger.slice().reverse(), shown = ledgerAll ? rows : rows.slice(0, 15);
+  $('#ledger-sub').textContent = `${B.ledger_is_tail ? `the newest ${B.ledger.length} of ${B.positions}` : `all ${B.positions}`} trades`;
+  const lg = $('#ledger'); lg.innerHTML = '';
+  lg.append(table(['Called on', 'Company', {label:'How sure', num:true}, 'Bought (next open)', 'Sold (close of D+4)', {label:'Move', num:true}, {label:'Costs', num:true}, {label:'After costs', num:true}], shown.map(r => { const tr = el('tr'); tr.append(td(fmtD(r.as_of)), td(el('a', {href:`../decision/decision-${r.ticker}.html`, style:'color:inherit;font-weight:700;text-decoration:none'}, r.ticker)), td(pct(r.prob), 'num'), td(money(r.entry_open, 2)), td(`${money(r.exit_close, 2)} on ${fmtD(r.exit_date)}`), td(el('span', {class: r.ret_pct > 0 ? 'ok' : r.ret_pct < 0 ? 'bad' : ''}, (r.ret_pct > 0 ? '+' : '') + r.ret_pct.toFixed(2) + '%'), 'num'), td(money(D.stake * r.cost_pct / 100, 2), 'num'), td(moneyCell(r.pnl, 2), 'num')); return tr; })));
+  const btn = $('#ledger-more'); btn.style.display = rows.length > 15 ? '' : 'none'; btn.textContent = ledgerAll ? 'Show the newest 15' : `Show all ${rows.length} listed`; btn.onclick = () => { ledgerAll = !ledgerAll; renderLedger(); };
+}
+render();
+new ResizeObserver(() => renderBook()).observe($('#curve'));
+</script>
+</body>
+</html>
