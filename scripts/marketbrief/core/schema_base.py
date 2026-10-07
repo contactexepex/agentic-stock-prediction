@@ -147,6 +147,13 @@ BASE_SCHEMAS: Schemas = {
         # They date each quarter's results release among the 2.02 filings (event_history.results_filter).
         "period_end": "DATE",
     }),
+    # Yahoo consensus EPS per report (collect_events.py, issue #17): a row per (ticker, report) when first seen or
+    # changed; collected_at is when we saw it, so a value is usable only from then (earnings_estimates_asof).
+    "earnings_estimates": ("jsonl", {
+        "id": "VARCHAR", "ticker": "VARCHAR", "report_date": "DATE", "report_at": "TIMESTAMPTZ",
+        "eps_estimate": "DOUBLE", "reported_eps": "DOUBLE", "surprise_pct": "DOUBLE", "source": "VARCHAR",
+        "collected_at": "TIMESTAMPTZ",
+    }),
     # Near-the-money implied volatility per ticker and expiry (collect_options.py, US only).
     "options": ("jsonl", {
         "id": "VARCHAR", "ticker": "VARCHAR", "collected_at": "TIMESTAMPTZ", "expiry": "DATE",

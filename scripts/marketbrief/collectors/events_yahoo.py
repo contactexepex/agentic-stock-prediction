@@ -30,20 +30,41 @@ from marketbrief.constants.events import (
     WHAT_DIVIDENDS,
     YAHOO_CALL,
     YAHOO_EARNINGS,
+    YAHOO_ESTIMATE_COLUMNS,
     YAHOO_EVENT_TYPE_COLUMN,
 )
 
 DIVIDEND_DECIMALS = 6
 
 
+def estimate_rows(cfg: dict, frame: pd.DataFrame) -> list[dict]:
+    """Yahoo's consensus EPS, reported EPS and surprise per earnings report of the frame (issue #17): report_at
+    (UTC), report_date (exchange-local) and the values present; reports without any value are left out."""
+    columns = {yahoo: ours for yahoo, ours in YAHOO_ESTIMATE_COLUMNS.items() if yahoo in frame.columns}
+    if not columns:
+        return []
+    kinds = frame[YAHOO_EVENT_TYPE_COLUMN] if YAHOO_EVENT_TYPE_COLUMN in frame.columns else None
+    rows = []
+    for position, (stamp, values) in enumerate(frame[list(columns)].iterrows()):
+        if (kinds is not None and kinds.iloc[position] != YAHOO_EARNINGS) or values.isna().all():
+            continue
+        stamp = pd.Timestamp(stamp)
+        if stamp.tzinfo is None:
+            continue  # no time zone: the report time is unknown
+        found = {ours: (None if pd.isna(values[yahoo]) else round(float(values[yahoo]), 4)) for yahoo, ours in columns.items()}
+        rows.append({"report_at": stamp.tz_convert("UTC").isoformat(), "report_date": timing(cfg, stamp)[0].isoformat(), **found})
+    return rows
+
+
 def yf_earnings(
     cfg: dict, ticker, limit: int = EARNINGS_DATES_LIMIT
-) -> tuple[list[tuple[date, str | None, int]], str | None, list[str]]:
+) -> tuple[list[tuple[date, str | None, int]], str | None, list[str], list[dict]]:
     """Past earnings (date, timing, priority) from yfinance: the earnings-calendar page
     (finance.yahoo.com), else the screener endpoint (query1). Report rows beat earnings-call rows
     (a call only times the release if it is before the open). The third value lists each
     method's error ("<method>: <error>") when every method tried raised, so nothing was learnt;
-    a method that answers with no rows is a real "no earnings dates", not an error."""
+    a method that answers with no rows is a real "no earnings dates", not an error. The fourth value holds
+    the frame's consensus rows (estimate_rows)."""
     frame, used, errors, answered = None, None, [], False
     for method_name in EARNINGS_DATES_METHODS:
         method = getattr(ticker, method_name, None)
@@ -59,7 +80,7 @@ def yf_earnings(
             used = method_name.strip("_")
             break
     if frame is None or frame.empty:
-        return [], None, ([] if answered else errors)
+        return [], None, ([] if answered else errors), []
     kinds = (
         frame[YAHOO_EVENT_TYPE_COLUMN]
         if YAHOO_EVENT_TYPE_COLUMN in frame.columns
@@ -74,7 +95,7 @@ def yf_earnings(
             found.append((day, when if when == TIMING_BEFORE_OPEN else None, PRIORITY_CALL))
         else:
             found.append((day, when, PRIORITY_REPORT))
-    return found, used, []
+    return found, used, [], estimate_rows(cfg, frame)
 
 
 def dividends_expected(calendar: dict | None, stored_count: int, since: date) -> str | None:

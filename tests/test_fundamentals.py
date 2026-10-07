@@ -319,7 +319,7 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
     text = ctx.stdout.split("## Fundamentals")[1]
-    assert f"Filed in the last 5 days: AAPL 10-Q FY2026 Q3 ({YESTERDAY})" in text and "no consensus" in text
+    assert f"Filed in the last 5 days: AAPL 10-Q FY2026 Q3 ({YESTERDAY})" in text and "under Earnings estimates" in text
     assert f"| AAPL | FY2026 Q3 | 2026-06-27 | 10-Q | {YESTERDAY} | new | 109.42 | 16.4 | 2.02 | 28.7 |" in text
     assert "| BAC | FY2026 Q2 | 2026-06-30 | 10-Q | 2026-07-31 |  | 31.56 |" in text
     assert "| AAPL | 2026-06-27 | 39.54 | 84.34 |" in text

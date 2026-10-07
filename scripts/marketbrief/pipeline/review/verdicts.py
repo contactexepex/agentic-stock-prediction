@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.analytics import scoring
+from marketbrief.constants.config_keys import BY_MARKET_SUFFIX
 from marketbrief.constants.review import BASELINE, TARGETS
 from marketbrief.pipeline.review.summaries import by_horizon
 
@@ -65,9 +66,18 @@ def judge(ablation: dict, review_config: dict) -> None:
         variant["verdict"] = verdict(variant["vs_current"], variant["n"], review_config)
 
 
-def proposals(ranges_config: dict, live: dict, hist: dict) -> list[dict]:
+def config_key(ranges_config: dict, param: str, market: str | None) -> str:
+    """The config/ranges.yaml key a human edits for `param`: `<param>_by_market.<market>` when that per-market
+    override sets it for this market (issue #16), else `param`."""
+    if market and market in (ranges_config.get(f"{param}{BY_MARKET_SUFFIX}") or {}):
+        return f"{param}{BY_MARKET_SUFFIX}.{market}"
+    return param
+
+
+def proposals(ranges_config: dict, live: dict, hist: dict, market: str | None = None) -> list[dict]:
     """Best qualifying variant per parameter set; live evidence wins over price history, and
-    price history is not proposed against live evidence (n >= min) that the change is worse."""
+    price history is not proposed against live evidence (n >= min) that the change is worse.
+    Each change names the key to edit (config_key: a per-market override where one applies)."""
     best: dict[tuple, dict] = {}
     live_worse = {
         tuple(sorted(variant["set"]))
@@ -96,7 +106,8 @@ def proposals(ranges_config: dict, live: dict, hist: dict) -> list[dict]:
                     "n": variant["n"],
                     "verdict": variant["verdict"],
                     "changes": [
-                        {"param": param, "current": ranges_config.get(param), "proposed": value}
+                        {"param": config_key(ranges_config, param, market), "current": ranges_config.get(param),
+                         "proposed": value}
                         for param, value in variant["set"].items()
                     ],
                     "drop": variant["name"].lower().startswith("drop"),

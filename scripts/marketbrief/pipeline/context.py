@@ -18,7 +18,7 @@ from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
 from marketbrief.graph import news_hits
 from marketbrief.model import context_section as model_context
-from marketbrief.pipeline import macro_sections, nse_sections
+from marketbrief.pipeline import estimate_sections, macro_sections, nse_sections
 from marketbrief.pipeline.lessons import context_section
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation import news_events
@@ -285,13 +285,14 @@ def main() -> None:
         news_hits.context_section(cfg, con),
         *nse_sections.context_sections(cfg, con),
         *macro_sections.context_sections(cfg, con),
+        estimate_sections.context_section(cfg, con),
     ]:
         print(f"## {title}\n\n{body}")
     # Reflection log: lessons settled before now (MB_NOW-aware), this ticker's last 3 and the latest 3 overall.
     title, body = context_section.context_section(cfg, con)
     print(f"## {title}\n\n{body}")
     print(smart_money.markdown(cfg, con))
-    print(fundamentals.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (no consensus, no "surprise")
+    print(fundamentals.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (consensus: estimate_sections)
     print(
         "## Judge FAILs from the previous run not yet in a report (copy each into data_quality)\n\n"
         f"{judge_fails(con, utc_today())}"

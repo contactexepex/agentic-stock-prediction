@@ -109,7 +109,9 @@ def build(
     )
     for ablation in (review_data["live_ablation"], review_data["history_ablation"]):
         judge(ablation, review_config)
-    review_data["proposals"] = proposals(ranges_config, review_data["live_ablation"], review_data["history_ablation"])
+    review_data["proposals"] = proposals(
+        ranges_config, review_data["live_ablation"], review_data["history_ablation"], cfg["market"]
+    )
     review_data["scores"] = {
         window: proper_scores(rows_since(ranges, start_date), rows_since(calls, start_date))
         for window, start_date in windows.items()

@@ -37,6 +37,9 @@ REPORT_FORMS = ("10-Q", "10-K")  # periodic reports (not amendments) that date e
 RESULT_8K_FORMS = ("8-K", "6-K")
 ITEM_RESULTS = "2.02"
 EARNINGS_DATES_METHODS = ("get_earnings_dates", "_get_earnings_dates_using_screener")
+# Yahoo's consensus columns of get_earnings_dates (issue #17) -> our earnings_estimates columns
+YAHOO_ESTIMATE_COLUMNS = {"EPS Estimate": "eps_estimate", "Reported EPS": "reported_eps", "Surprise(%)": "surprise_pct"}
+SOURCE_YAHOO_CONSENSUS = "yfinance"
 YAHOO_EVENT_TYPE_COLUMN = "Event Type"
 YAHOO_EARNINGS, YAHOO_CALL = "Earnings", "Call"
 
@@ -51,6 +54,8 @@ MSG_NO_DIVIDENDS = "no dividends returned ({why})"
 MSG_STORED_DIVIDENDS = "{count} stored"
 MSG_CALENDAR_LISTS_EX_DIVIDEND = "calendar lists ex-dividend {day}"
 MSG_ESTIMATED_DIVIDEND = " (est. {amount:g}, last dividend)"
+MSG_YAHOO_DATE_DROPPED = ("yfinance earnings date {ticker} {day} dropped: it falls between two NSE results dates a quarter "
+                          "apart (check NSE if a quarter looks misdated)")
 MSG_PERIODIC_REPORT = " ({form}, period {period})"
 MSG_INTEGRATED_LIST_PARTIAL = "{symbol}: integrated filings list {rows} of {total} rows"
 MSG_LATE_QUARTERS = "{ticker}: {count} quarter(s) first filed after the SEBI deadline, not used"

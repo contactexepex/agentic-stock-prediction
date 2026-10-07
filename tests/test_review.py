@@ -500,6 +500,37 @@ def test_proposals_prefer_live_evidence():
     assert verdicts.proposals(RC, ablation("x", {"cue_weight": 0.0}, "low n", -0.5), {"variants": []}) == []
 
 
+def test_review_tracks_5d_earnings_day_coverage():
+    """Issue #16: the review shows the 5-day earnings-in-horizon coverage per window, or _none_ before any."""
+    from marketbrief.pipeline.review.markdown_sections import range_lines
+
+    rv = {**review.DEFAULTS, "rolling_days": 30}
+    names = {"week": "week 2026-W40", "rolling": "last 30 days", "all": "since start"}
+    stats = {"n": 40, "cover50": 0.45, "cover80": 0.75}
+    empty = {"regime": {}, "sector": {}, "note": {}}
+    data = {"ranges": {w: {"all": {"n": 0}} for w in names},
+            "breakdowns": {"week": empty, "rolling": empty,
+                           "all": {**empty, "note": {"earnings · 5d": stats, "earnings · 1d": stats}}}}
+    text = "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage, 5-day ranges")[1]
+    rows = [line for line in text.split("Notes:")[0].splitlines() if line.startswith("| since")]
+    assert len(rows) == 1 and rows[0].startswith("| since start | earnings · 5d | 40 | 45% | 75% |")
+    data["breakdowns"]["all"] = empty
+    assert "_none_" in "\n".join(range_lines(rv, data, names)).split("### Earnings-day coverage")[1]
+
+
+def test_proposal_names_the_per_market_override_key():
+    """Issue #16: for India the earnings multiple comes from earnings_vol_multiple_by_market.india: name that key."""
+    from marketbrief.core.market_config import load_ranges_config
+
+    hist = ablation("earnings multiple 2.5", {"earnings_vol_multiple": 2.5}, "improves score", -0.05)
+    india, us = load_ranges_config("india"), load_ranges_config("us")
+    [p] = verdicts.proposals(india, {"variants": []}, hist, "india")
+    assert p["changes"] == [{"param": "earnings_vol_multiple_by_market.india",
+                             "current": india["earnings_vol_multiple_by_market"]["india"], "proposed": 2.5}]
+    [p] = verdicts.proposals(us, {"variants": []}, hist, "us")
+    assert p["changes"][0]["param"] == "earnings_vol_multiple" and p["changes"][0]["current"] == us["earnings_vol_multiple"]
+
+
 def test_major_event_counts_after_start_up_to_target():
     majors = [date(2026, 10, 2)]
     assert not major_event_between(majors, date(2026, 10, 2), date(2026, 10, 9))   # on the as-of day: known

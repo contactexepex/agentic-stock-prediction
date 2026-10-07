@@ -545,6 +545,11 @@ class FakeTicker:
         return pd.Series(dtype=float)
 
     def get_earnings_dates(self, limit=40):
+        if "consensus" in self.data:  # yfinance 1.7's shape: EPS Estimate, Reported EPS, Surprise(%) by report time
+            rows = self.data["consensus"]
+            idx = pd.DatetimeIndex([pd.Timestamp(t).tz_convert("America/New_York") for t, *_ in rows])
+            return pd.DataFrame([r[1:] for r in rows], index=idx,
+                                columns=["EPS Estimate", "Reported EPS", "Surprise(%)"])
         idx = pd.DatetimeIndex([pd.Timestamp(t, tz=IST_TZ) for t in self.data.get("earnings", [])])
         return pd.DataFrame({"Event Type": ["Earnings"] * len(idx)}, index=idx)
 
@@ -589,6 +594,10 @@ def test_collect_events_nse_backfill_is_append_only_and_idempotent(tmp_path, mon
     assert (s["nse_polled"], s["nse_backfill"], s["nse_tickers"]) == (3, 2, 2)
     assert [f["source"] for f in s["nse_failed"]] == ["nse_earnings:HDFCBANK"]
     assert s["new_history"]["earnings"] == 12 + 6 + 2 and s["new_events"] == 1
+    # issue #16: the dropped yfinance date is logged; the NSE report's own twin (2025-07-24) is not
+    dropped = [n for n in s["nse_notes"] if n.startswith("yfinance earnings date")]
+    assert dropped == ["yfinance earnings date INFY 2024-08-30 dropped: it falls between two NSE results dates a "
+                       "quarter apart (check NSE if a quarter looks misdated)"]
     new = base / "2026" / "10" / "2026-10-05.jsonl"
     rows = [json.loads(x) for x in new.read_text().splitlines()]
     hist = {(r["ticker"], r["date"], r["timing"], r["source"]) for r in rows if r["source"].endswith("_history")}
@@ -601,6 +610,44 @@ def test_collect_events_nse_backfill_is_append_only_and_idempotent(tmp_path, mon
     s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, today)
     assert (s["nse_polled"], s["nse_backfill"], s["new_history"]["earnings"], s["new_events"]) == (1, 1, 0, 0)
     assert len(new.read_text().splitlines()) == len(rows)
+
+
+def test_collect_events_stores_yahoo_consensus_point_in_time(tmp_path, monkeypatch, capsys):
+    """Issue #17: Yahoo's consensus EPS is stored per report when first seen or changed, with collected_at, and read
+    back only as known at a time (earnings_estimates_asof): no estimate is visible before we collected it."""
+    from marketbrief.core.database import connect
+
+    cfg = {"market": "testyf", "name": "Test", "calendar": "XNYS", "timezone": "America/New_York",
+           "tickers": {"AAPL": {"yahoo": "AAPL", "name": "Apple"}}}
+    past, nxt = "2026-07-30T20:00:00+00:00", "2026-10-29T20:00:00+00:00"   # AAPL, values as Yahoo showed them
+    yf_data = {"AAPL": {"calendar": {"Earnings Date": [date(2026, 10, 29)]},
+                        "consensus": [(nxt, 1.98, np.nan, np.nan), (past, 1.89, 2.02, 6.74)]}}
+    monkeypatch.setattr(ce, "utc_now", lambda: "2026-10-05T12:00:00+00:00")
+    s = run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))
+    assert s["new_estimates"] == 2
+    assert run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 5))["new_estimates"] == 0
+    yf_data["AAPL"]["consensus"][0] = (nxt, 2.01, np.nan, np.nan)                    # the consensus moved
+    monkeypatch.setattr(ce, "utc_now", lambda: "2026-10-06T12:00:00+00:00")
+    assert run_events_main(monkeypatch, capsys, tmp_path, cfg, yf_data, date(2026, 10, 6))["new_estimates"] == 1
+    rows = [json.loads(x) for f in sorted((tmp_path / "data" / "testyf" / "earnings_estimates").glob("**/*.jsonl"))
+            for x in f.read_text().splitlines()]
+    assert rows[1] == {"id": "AAPL-2026-07-30", "ticker": "AAPL", "report_at": past, "report_date": "2026-07-30",
+                       "eps_estimate": 1.89, "reported_eps": 2.02, "surprise_pct": 6.74, "source": "yfinance",
+                       "collected_at": "2026-10-05T12:00:00+00:00"}
+    con = connect("testyf")
+    asof = "SELECT eps_estimate, reported FROM earnings_estimates_asof(TIMESTAMPTZ '{}') WHERE report_at = '{}'"
+    assert con.execute(asof.format("2026-10-05 11:59:59+00", nxt)).fetchall() == []          # not collected yet
+    assert con.execute(asof.format("2026-10-05 12:00:00+00", nxt)).fetchall() == [(1.98, False)]
+    assert con.execute(asof.format("2026-10-06 12:00:00+00", nxt)).fetchall() == [(2.01, False)]
+    assert con.execute(asof.format("2026-10-06 12:00:00+00", past)).fetchall() == [(1.89, True)]
+    # the context pack's section, as known now (MB_NOW)
+    from marketbrief.pipeline import estimate_sections
+    monkeypatch.setenv("MB_NOW", "2026-10-05T13:00:00+00:00")
+    title, body = estimate_sections.context_section(cfg, connect("testyf"))
+    assert title.startswith("Earnings estimates (Yahoo consensus EPS")
+    assert "| AAPL | 2026-07-30 | 1.89 | 2.02 | 6.74 | 2026-10-29 | 1.98 | 2026-10-05 |" in body
+    monkeypatch.setenv("MB_NOW", "2026-10-05T11:00:00+00:00")                       # before the first collection
+    assert estimate_sections.context_section(cfg, connect("testyf"))[1].startswith("_none_")
 
 
 def test_collect_events_summary_lists_sec_failures(tmp_path, monkeypatch, capsys):

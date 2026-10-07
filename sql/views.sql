@@ -120,6 +120,15 @@ ORDER BY ticker, type, first_seen_at DESC, date;
 CREATE OR REPLACE VIEW event_history AS
 SELECT DISTINCT ON (id) * FROM events WHERE ticker IS NOT NULL ORDER BY id, first_seen_at;
 
+-- Yahoo consensus EPS per report as known at ts (issue #17; collect_events.py): the newest row per (ticker,
+-- report) collected by ts. `reported` = the report time has passed by ts (its reported EPS and surprise are
+-- outcomes); an estimate supports a decision at ts only for a report after ts. Never read past rows without it:
+-- a past report's estimate collected after the report is not what was known before it.
+CREATE OR REPLACE MACRO earnings_estimates_asof(ts) AS TABLE
+SELECT DISTINCT ON (ticker, report_at) *, report_at <= ts AS reported
+FROM earnings_estimates WHERE collected_at <= ts
+ORDER BY ticker, report_at, collected_at DESC;
+
 -- Latest quote per symbol per UTC day.
 CREATE OR REPLACE VIEW quotes_latest AS
 SELECT DISTINCT ON (symbol, CAST(collected_at AS DATE)) *, CAST(collected_at AS DATE) AS day
