@@ -82,9 +82,10 @@ SIGMA_1D = {"NVDA": 0.019129, "AAPL": 0.013523, "JPM": 0.011005,   # stored 1d r
             "RELIANCE": 0.040221 / math.sqrt(5), "HDFCBANK": 0.039704 / math.sqrt(5), "MARUTI": 0.045624 / math.sqrt(5)}
 NEWS_STATUS = {"a41c9e07b2d35f18": "corroborated", "nse-ann-7781203": "confirmed_primary",   # news_item.json
                "d93b1f5e7c2a4b60": "corroborated", "nse-ann-7790412": "confirmed_primary"}
-# Verified news first seen inside the example trades' windows (id, first_seen_at, sentiment): news_item.json.
-WINDOW_NEWS = {"NVDA": [("d93b1f5e7c2a4b60", "2026-10-02T14:10:00Z", 0.5)],
-               "RELIANCE": [("nse-ann-7790412", "2026-10-05T09:20:00Z", 0.4)]}
+# Verified news inside the example trades' windows (id, published_at, sentiment): news_item.json. Timed by
+# published_at, else first_seen_at, as B2's lab/reads.py does.
+WINDOW_NEWS = {"NVDA": [("d93b1f5e7c2a4b60", "2026-10-02T13:40:00Z", 0.5)],
+               "RELIANCE": [("nse-ann-7790412", "2026-10-05T09:05:00Z", 0.4)]}
 REGIME = {"india": "EVENT_HEAVY", "us": "TRENDING"}   # stored regime, as_of 2026-10-06
 # Invented reference probabilities P(up) per horizon N+1..N+5 (today: as_of 2026-10-06; past: as_of 2026-09-29).
 P_TODAY = {"NVDA": [0.566, 0.571, 0.578, 0.582, 0.585], "AAPL": [0.522, 0.528, 0.531, 0.533, 0.534],
@@ -280,8 +281,9 @@ def settle(pred: dict, view: str, pick_rule: str | None, pick_id: str | None) ->
 
 def window_news(market: str, ticker: str, entry_date: str, exit_date: str, rest: float) -> tuple[list[str], float]:
     """B2's rule (lab/reasons.py): the rest of the move (after market and sector) goes to news only when verified
-    news (confirmed_primary or corroborated) was first seen from D's open to the exit close and its summed sentiment
-    has the rest's sign; else 0. The same for every strategy holding that company over that window."""
+    news (confirmed_primary or corroborated) was published (else first seen) from D's open to the exit close and
+    its summed sentiment has the rest's sign; else 0. The same for every strategy holding that company over that
+    window."""
     cfg = load_market(market)
     start = calendar.session_open_utc(cfg, date.fromisoformat(entry_date)).isoformat().replace("+00:00", "Z")
     end = calendar.session_close_utc(cfg, date.fromisoformat(exit_date)).isoformat().replace("+00:00", "Z")

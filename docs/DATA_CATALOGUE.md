@@ -320,10 +320,10 @@ move. These parts feed the reason-code heatmaps.
 | move_pct | Exit vs entry | % | `4.20` |
 | market_pct | The part the market explains (beta × benchmark move) | % | `2.05` (SPY +1.09 %, beta 1.874) |
 | sector_pct | The sector's move beyond the market (sector index, ETF or peer) | % | `1.70` (XLK) |
-| news_pct | The rest of the move after market and sector, credited to news only when verified news (confirmed_primary or corroborated) was first seen from D's open to the exit close and its summed sentiment has the same sign; else 0 (B2's `lab/reasons.py`) | % | `0.45` |
+| news_pct | The rest of the move after market and sector, credited to news only when verified news (confirmed_primary or corroborated) was published (else first seen) from D's open to the exit close and its summed sentiment has the same sign; else 0 (B2's `lab/reasons.py`) | % | `0.45` |
 | company_pct | What is left: company-specific | % | `0.0` |
 | reason_code, reason_codes | The main cause, and all codes that apply | `market_up`, `market_down`, `sector_lift`, `sector_drag`, `news_positive`, `news_negative`, `company_specific`, `target_reached`, `range_missed` | `market_up`; `[market_up, target_reached, range_missed]` |
-| news_ids | Verified news first seen inside the window | ids | `["d93b1f5e7c2a4b60"]` (first seen 2 Oct) |
+| news_ids | Verified news published (else first seen) inside the window | ids | `["d93b1f5e7c2a4b60"]` (published 2 Oct) |
 | reason_detail | Benchmark, beta, sector source, news statuses | JSON | `{"benchmark": "SPY", "beta": 1.874, "sector_source": "XLK"}` |
 
 The examples follow B2's split (`marketbrief/lab/reasons.py`).
