@@ -28,3 +28,7 @@ KIND_ANNOUNCEMENTS = "announcements"
 KIND_FINANCIALS = "financials"
 KIND_FLOWS = "flows"
 KIND_DELIVERY = "delivery"
+
+# ---------- WS4: paper portfolio (scripts/portfolio.py; marketbrief/portfolio/) ----------
+KIND_PORTFOLIO_TRADES = "portfolio_trades"
+KIND_WATCHLIST_REQUESTS = "watchlist_requests"
