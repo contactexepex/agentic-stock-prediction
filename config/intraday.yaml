@@ -42,6 +42,12 @@ flag_on: ["outside_{k}d_80", large_move, against_call, open_trade_flagged]
 # B9: flags that mark an open paper trade's check flagged (trade_checks.flagged; all of them by default).
 trade_flag_on: [outside_range, far_from_target, against_prediction]
 
+# B9 (issue #93): a trade past its exit date that has no paper_trades_settled row yet (exit_delayed: its exit close
+# is missing) is still checked, for at most this many sessions after the exit date; later ones are only listed in the
+# run summary (skipped_trades.delayed_too_long). The check rows carry the note exit_delayed.
+trades:
+  max_sessions_past_exit: 5
+
 # B9: the intraday alerts feed (intraday_alerts) read by the Slack alerts (session B6). A news item on a ticker
 # with an open paper trade is alerted once per session when its enrichment (as of the check) has one of these
 # materiality levels; every item first seen since the previous session's close is read (no count limit).

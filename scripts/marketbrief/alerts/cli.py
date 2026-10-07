@@ -7,10 +7,12 @@
   alerts.py --market us weekly       [--week 2026-W41]          the weekly research report (its own post)
   alerts.py --market us onboarding   --command-id ID --channel C --thread-ts TS   reply to a command
 
-Live: SLACK_BOT_TOKEN (scope chat:write) and slack_channel_id in config/settings.yaml; each posted part is
+Live: SLACK_BOT_TOKEN (scope chat:write) and slack_channel_id in config/settings.yaml (without the token,
+unthreaded messages through SLACK_WEBHOOK_URL); each posted part is
 recorded in data/<market>/slack_posts/, so a rerun posts nothing twice. --dry-run posts nothing: it writes the
 messages to work/alerts_dryrun/<market>/messages.jsonl (with its own ledger there). Every read is as of the
-run's clock (MB_NOW-aware). Exit codes: 0 posted, dry run or nothing to post; 2 no token or channel; 1 error."""
+run's clock (MB_NOW-aware). Exit codes: 0 posted, dry run or nothing to post; 2 neither token nor webhook, or a
+token without a channel; 1 error."""
 from __future__ import annotations
 
 import json
