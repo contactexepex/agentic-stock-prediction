@@ -54,7 +54,7 @@ jobs:
           mkdir -p work
           status=0
           for market in $markets; do
-            python scripts/company.py --market "$market" import-inbox > "work/onboard-$market.json" || status=$?
+            python scripts/company.py --market "$market" import-inbox --slack-reply > "work/onboard-$market.json" || status=$?
             cat "work/onboard-$market.json"
           done
           exit $status

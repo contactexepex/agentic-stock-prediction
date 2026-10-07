@@ -579,3 +579,13 @@ def test_inbox_reply_through_b6_onboarding_confirmation_dry_run():
     assert first["posted"] and first["thread_ts"] == "1728295200.000100"
     command_id = stored_rows("us", "command_log")[0]["id"]
     assert first["post_key"].endswith(f"{command_id}:accepted")
+
+
+def test_without_slack_reply_the_cli_posts_nothing(monkeypatch):
+    import marketbrief.lifecycle.inbox as inbox_module
+
+    monkeypatch.setattr(inbox_module, "default_reply", lambda *_args: pytest.fail("posted without --slack-reply"))
+    inbox = common.ROOT / "slack_inbox.duckdb"
+    make_slack_inbox(inbox, SLACK_ROWS[:1])
+    code, result = cli("--market", "us", "import-inbox", "--inbox", str(inbox))
+    assert code == 0 and result["results"][0]["slack_reply"] is None and len(stored_events("us")) == 1

@@ -5,7 +5,8 @@ Inbox table read (written by session B5's tool layer): `inbox.company_commands` 
 idempotency key), market, tool (add_company | deactivate_company | reactivate_company | set_paper_amount |
 delete_company), arguments (JSON: symbol or ticker, amount, reason, confirm), actor (the channel's sign-in identity,
 never from the arguments), channel, submitted_at, command_id (optional), and optionally slack_channel and slack_ts
-(the channel and ts of the Slack message the command produced, written by B5): when both are set, the import replies
+(the channel and ts of the Slack message the command produced, written by B5): with --slack-reply (onboard.yml) and
+both set, the import replies
 in that thread with the command's result through B6's `alerts.onboarding.post_onboarding_confirmation` (once per
 command and result; a Slack failure is reported in the import's result and never stops the import).
 The import never deletes inbox rows: an inbox_id with a command_log row that settled it (accepted, refused or
@@ -94,8 +95,9 @@ def request_of(row: dict) -> dict:
 
 
 def slack_reply(market: str, command_id: str | None, row: dict, reply) -> dict | None:
-    """Reply to the command's Slack message with its command_log record (None when the row names no message)."""
-    if not (command_id and row.get("slack_channel") and row.get("slack_ts")):
+    """Reply to the command's Slack message with its command_log record (None when replies are off or the row names
+    no message)."""
+    if reply is None or not (command_id and row.get("slack_channel") and row.get("slack_ts")):
         return None
     record = next((stored for stored in stored_rows(market, KIND_COMMAND_LOG) if stored["id"] == command_id), None)
     if record is None:
@@ -113,9 +115,10 @@ def default_reply(record: dict, channel: str, thread_ts: str) -> dict:
     return post_onboarding_confirmation(record, channel, thread_ts)
 
 
-def import_inbox(market: str, path: str | None, sources, skip_backfill: bool = False, reply=default_reply) -> dict:
-    """Import every pending company command of the market; returns one result per inbox row (with the Slack reply's
-    summary when the row names a Slack message)."""
+def import_inbox(market: str, path: str | None, sources, skip_backfill: bool = False, reply=None) -> dict:
+    """Import every pending company command of the market; returns one result per inbox row. With `reply` (the CLI's
+    --slack-reply passes default_reply, B6's confirmation) each row naming a Slack message gets a threaded reply and
+    its summary in `slack_reply`; without it nothing is posted (tests, local runs)."""
     con = open_inbox(path)
     try:
         pending = pending_rows(con, market)

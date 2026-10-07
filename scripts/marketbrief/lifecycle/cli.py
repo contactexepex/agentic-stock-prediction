@@ -7,7 +7,8 @@
   company.py --market us delete --ticker MSFT --confirm MSFT --key K       (typed confirmation; never from Slack)
   company.py --market us list
   company.py --market us seed                         (one time: the config's tickers as add events)
-  company.py --market us import-inbox [--inbox FILE]  (MotherDuck market_brief_inbox, or a local DuckDB file)
+  company.py --market us import-inbox [--inbox FILE] [--slack-reply]  (MotherDuck market_brief_inbox, or a local
+                                                      DuckDB file; --slack-reply: B6's reply in each Slack thread)
 
 Writes take --channel (cli | claude_code; default cli) and record requested_by = <channel>:session; the inbox
 import takes channel and actor from each inbox row. stdout is one JSON object; exit 2 when a write is refused."""
@@ -56,6 +57,8 @@ def parser() -> argparse.ArgumentParser:
     inbox = sub.add_parser("import-inbox")
     inbox.add_argument("--inbox", help="a local DuckDB inbox file (default: MotherDuck with MOTHERDUCK_INBOX_TOKEN)")
     inbox.add_argument("--skip-backfill", action="store_true")
+    inbox.add_argument("--slack-reply", action="store_true",
+                       help="reply in each command's Slack thread (B6 onboarding confirmation; needs SLACK_BOT_TOKEN)")
     return root
 
 
@@ -90,9 +93,10 @@ def run(args, cfg: dict) -> dict:
 
         return seed(market, sources_for(cfg))
     if args.command == "import-inbox":
-        from marketbrief.lifecycle.inbox import import_inbox
+        from marketbrief.lifecycle.inbox import default_reply, import_inbox
 
-        return import_inbox(market, args.inbox, sources_for(cfg), skip_backfill=args.skip_backfill)
+        return import_inbox(market, args.inbox, sources_for(cfg), skip_backfill=args.skip_backfill,
+                            reply=default_reply if args.slack_reply else None)
     if args.command == "add":
         return commands.add_company(request_of(args, market, "add"), sources_for(cfg), args.skip_backfill)
     return commands.submit(request_of(args, market, EVENT_OF_COMMAND[args.command]))
