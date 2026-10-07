@@ -104,29 +104,39 @@ test("MotherDuck stores send one parameterised statement per read and never take
   await assert.rejects(() => store.readModel("home; DROP TABLE x", "us", "_"), /unknown read model/);
 });
 
-test("the inbox store claims a key once with ON CONFLICT DO NOTHING and reads the existing row otherwise", async () => {
-  const statements: string[] = [];
-  let inserted = false;
-  const query = async (text: string) => {
-    statements.push(text);
-    if (text.startsWith("INSERT INTO inbox.requests")) {
-      const rows = inserted ? [] : [{ inbox_id: "k" }];
-      inserted = true;
-      return { rows };
+test("company commands go to B1's inbox.company_commands, paper trades to inbox.requests; a key is claimed once", async () => {
+  const calls: { text: string; values: unknown[] }[] = [];
+  const claimed = new Set<string>();
+  const query = async (text: string, values: unknown[]) => {
+    calls.push({ text, values });
+    if (text.startsWith("INSERT INTO")) {
+      const key = String(values[0]);
+      if (claimed.has(key)) return { rows: [] };
+      claimed.add(key);
+      return { rows: [{ inbox_id: key }] };
     }
-    return { rows: [{ inbox_id: "key-000001", kind: "watchlist_events", tool: "reactivate_company", market: "us", arguments: "{}",
-      preview: null, channel: "slack", submitted_by: "slack:U1", agent: "slack-gateway", command_id: "cmd-1",
-      submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64) }] };
+    return { rows: [{ inbox_id: "key-000001", tool: "reactivate_company", submitted_by: "slack:U1", command_id: "cmd-1",
+      args_sha256: "f".repeat(64) }] };
   };
   const inbox = new MotherDuckInboxStore(query);
-  const row = { inbox_id: "key-000001", kind: "watchlist_events", tool: "reactivate_company", market: "us", arguments: {}, preview: null,
-    channel: "slack" as const, submitted_by: "slack:U1", agent: "slack-gateway", command_id: "cmd-1", submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64) };
+  const company = { inbox_id: "key-000001", kind: "watchlist_events", tool: "reactivate_company", market: "us", arguments: { ticker: "AAPL" },
+    preview: null, channel: "slack" as const, submitted_by: "slack:U1", agent: "slack-gateway", command_id: "cmd-1",
+    submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64) };
   const budget = { sinceIso: "2026-10-07T00:00:00Z", limit: 20 };
-  assert.deepEqual(await inbox.claimRequest(row, budget), { claimed: true, existing: null });
-  const again = await inbox.claimRequest(row, budget);
+  assert.deepEqual(await inbox.claimRequest(company, budget), { claimed: true, existing: null });
+  assert.match(calls[0].text, /^INSERT INTO inbox\.company_commands \(inbox_id, market, tool, arguments, actor, channel, submitted_at, command_id,/);
+  assert.deepEqual(calls[0].values.slice(0, 8), ["key-000001", "us", "reactivate_company", "{\"ticker\":\"AAPL\"}", "slack:U1", "slack",
+    "2026-10-07T10:00:00Z", "cmd-1"], "B1's eight columns, actor = submitted_by");
+  const again = await inbox.claimRequest(company, budget);
   assert.equal(again.claimed, false);
   assert.equal(again.existing?.command_id, "cmd-1");
-  assert.match(statements[0], /WHERE \(SELECT count\(\*\) FROM inbox\.requests WHERE agent = \$9 AND submitted_at >= CAST\(\$13 AS TIMESTAMPTZ\)\) < CAST\(\$14 AS INTEGER\) ON CONFLICT \(inbox_id\) DO NOTHING RETURNING inbox_id$/);
+  const trade = { ...company, inbox_id: "key-000002", kind: "portfolio_trades", tool: "add_paper_trade" };
+  assert.deepEqual(await inbox.claimRequest(trade, budget), { claimed: true, existing: null });
+  assert.match(calls.at(-1)!.text, /^INSERT INTO inbox\.requests /);
+  for (const call of calls.filter((item) => item.text.startsWith("INSERT INTO"))) {
+    assert.match(call.text, /NOT EXISTS \(SELECT 1 FROM inbox\.(requests|company_commands) WHERE inbox_id = \$1\)/);
+    assert.match(call.text, /UNION ALL SELECT agent, submitted_at FROM inbox\.requests\) WHERE agent = \$\d+ AND submitted_at >= CAST\(\$\d+ AS TIMESTAMPTZ\)\) < CAST\(\$\d+ AS INTEGER\) ON CONFLICT \(inbox_id\) DO NOTHING RETURNING inbox_id$/);
+  }
 });
 
 test("redaction removes configured secrets and common token shapes", () => {

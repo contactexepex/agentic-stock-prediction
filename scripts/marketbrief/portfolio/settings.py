@@ -1,7 +1,9 @@
-"""config/portfolio.yaml and the market's costs (config/costs.yaml, the signal model's rates)."""
+"""config/portfolio.yaml and the market's costs (config/costs.yaml: the statutory rates plus the broker charges,
+the same as the paper-trading engine's, marketbrief/lab/costs.py)."""
 from __future__ import annotations
 
-from marketbrief.model.settings import load_costs, read_config
+from marketbrief.lab.costs import rates
+from marketbrief.model.settings import read_config
 from marketbrief.portfolio.constants import FILE_PORTFOLIO_CONFIG
 
 
@@ -11,5 +13,5 @@ def load_portfolio_config() -> dict:
 
 
 def market_costs(market: str) -> dict:
-    """The market's section of config/costs.yaml."""
-    return load_costs(market)
+    """The market's statutory rates merged with its broker charges (config/costs.yaml)."""
+    return rates(market)

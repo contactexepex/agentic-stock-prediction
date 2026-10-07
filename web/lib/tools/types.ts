@@ -114,6 +114,17 @@ export interface CommandLogRow {
   completed_at: string;
 }
 
+/** What the tool layer compares when a key is already stored (either inbox table). */
+export interface StoredRequest {
+  inbox_id: string;
+  tool: string;
+  submitted_by: string;
+  command_id: string;
+  args_sha256: string;
+}
+
+/** One write request. kind watchlist_events -> inbox.company_commands (B1's importer; submitted_by is its actor
+ * column); kind portfolio_trades -> inbox.requests (no importer yet). */
 export interface InboxRequest {
   inbox_id: string;
   kind: string;
@@ -156,7 +167,7 @@ export interface InboxStore {
   usage(agent: string, sinceIso: string): Promise<AgentUsage>;
   /** Inserts the request in one statement unless its inbox_id exists or the agent already has `limit` requests since
    * `sinceIso`. Not claimed: `existing` is the stored row of that key, or null when the day budget was the reason. */
-  claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: InboxRequest | null }>;
+  claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: StoredRequest | null }>;
   appendCommand(row: CommandLogRow): Promise<void>;
   findCommand(id: string): Promise<CommandLogRow | null>;
 }

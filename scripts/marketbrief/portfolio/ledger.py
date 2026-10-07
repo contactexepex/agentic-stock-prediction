@@ -12,6 +12,7 @@ A sell larger than the quantity held is listed in `short_violations` (add-trade 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 import pandas as pd
 
@@ -84,12 +85,15 @@ def apply_sell(book: Book, trade, quantity: float, price: float, cost: float) ->
     return {"realised_gross": gross, "realised_net": gross - buy_costs - cost}
 
 
-def run_book(trades: pd.DataFrame, adjust: pd.DataFrame, market: str, costs: dict) -> Book:
-    """Replay the active trades in ledger order."""
+def run_book(trades: pd.DataFrame, adjust: pd.DataFrame, market: str, costs: dict | None, rate_of=None) -> Book:
+    """Replay the active trades in ledger order. rate_of: date -> EUR/USD (the BUX order fee), or None.
+    costs None: quantities only (every cost 0; the no-short check)."""
     book = Book()
     for _, trade in ordered(trades).iterrows():
         quantity, price = on_today_basis(trade, adjust)
-        cost = trade_cost(market, costs, trade["side"], float(trade["quantity"]), float(trade["price"]))
+        cost = 0.0 if costs is None else trade_cost(market, costs, trade["side"], float(trade["quantity"]),
+                                                    float(trade["price"]), rate_of(trade["trade_date"]) if rate_of
+                                                    else None)
         row = {"id": trade["id"], "ticker": trade["ticker"], "side": trade["side"],
                "trade_date": str(trade["trade_date"]), "quantity": round(quantity, QTY_DIGITS),
                "price": round(price, PRICE_DIGITS), "price_basis": trade["price_basis"], "cost": cost}
@@ -101,7 +105,7 @@ def run_book(trades: pd.DataFrame, adjust: pd.DataFrame, market: str, costs: dic
     return book
 
 
-def mark_lots(book: Book, marks: dict[str, tuple[str, float]], market: str, costs: dict) -> None:
+def mark_lots(book: Book, marks: dict[str, tuple[str, float]], market: str, costs: dict, rate_of=None) -> None:
     """Add each open lot's unrealised P&L at the ticker's mark (date, close on today's basis) to its buy row."""
     for ticker, lots in book.lots.items():
         mark = marks.get(ticker)
@@ -112,7 +116,8 @@ def mark_lots(book: Book, marks: dict[str, tuple[str, float]], market: str, cost
                 row.update(unrealised_gross=None, unrealised_net=None, est_exit_cost=None, mark=None)
                 continue
             gross = (mark[1] - lot.price) * lot.quantity
-            exit_cost = trade_cost(market, costs, SIDE_SELL, lot.quantity, mark[1])
+            exit_cost = trade_cost(market, costs, SIDE_SELL, lot.quantity, mark[1],
+                                   rate_of(date.fromisoformat(mark[0])) if rate_of else None)
             row.update(mark=round(mark[1], PRICE_DIGITS), mark_date=mark[0], unrealised_gross=gross,
                        est_exit_cost=exit_cost, unrealised_net=gross - lot.cost_per_unit * lot.quantity - exit_cost)
 
