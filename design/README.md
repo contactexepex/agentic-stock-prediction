@@ -37,7 +37,7 @@ cloud session, then one consolidation session turns them into the production gen
 | `home/` Home (Today): both markets, signals, movers with causes, week's events, run status | built, awaiting the owner's approval |
 | `watchlist/` Watchlist (20 companies per market, sortable, sector-grouped) | built, awaiting the owner's approval |
 | Portfolio (paper) | to do |
-| Track record | to do |
+| `track/` Track record: proof gate, live record, weekly review, back-tests | built, awaiting the owner's approval |
 | News, Help | to do |
 
 `reference/` holds earlier rejected iterations (v2) for context only.

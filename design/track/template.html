@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Track record</title>
+<meta name="description" content="The proof gate of the personal stock cockpit: live calls and ranges scored, the weekly review's model-skill verdict, and the back-tests (rule replay coverage, walk-forward model, paper strategy after costs). Research only.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Track record screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.hhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+
+/* verdict + gates */
+.verdict{padding:0;overflow:hidden;margin-top:14px}
+.verdict .mb-verdict{padding:18px 20px;grid-template-columns:auto 1fr}
+.verdict .mb-verdict .mb-verdict-word{font-size:40px}
+.verdict .why{font-size:15px;margin:0}
+.gates{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:var(--mb-card-border)}
+.gate{padding:12px 16px;border-left:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.gate:first-child{border-left:0}
+.gate .t{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-bottom:6px}
+.gate .md-progress{margin:6px 0}
+.gate small{display:block;font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.gate .md-progress > i{background:var(--mb-color-up)} .gate .md-progress.bad > i{background:var(--mb-color-down)}
+
+/* grids */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;align-items:start}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpi{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface);min-width:0}
+.kpi .v{font-size:20px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.kpi .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:3px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{font:500 10.5px/16px var(--md-ref-typeface-plain);letter-spacing:.05em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:6px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap}
+table.t td{padding:5px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
+table.t th.num,table.t td.num{text-align:right}
+table.t tr.tot td{font-weight:700;background:var(--md-sys-color-surface-container-low)}
+.bar{display:inline-flex;align-items:center;gap:6px}
+.bar .md-progress{width:60px}
+.ok{color:var(--mb-color-up)} .bad{color:var(--mb-color-down)} .warn{color:var(--mb-color-on-warn-container)}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:inherit}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.empty{border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);padding:12px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);background:var(--md-sys-color-surface)}
+.seg-in{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+@media (max-width: 1000px){ .grid2{grid-template-columns:1fr} .gates{grid-template-columns:1fr} .gate{border-left:0;border-top:var(--mb-card-border)} .gate:first-child{border-top:0} .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 760px){ .pad{padding:0 var(--mb-gutter)} .hhead{grid-template-columns:1fr} .verdict .mb-verdict{grid-template-columns:1fr;padding:14px} .mb-topbar .md-chip{display:none} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Track record</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner"><div class="pad"><div class="wrap">
+
+<section class="hhead" aria-label="Track record">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+
+<section class="card verdict" id="verdict-card">
+  <div class="mb-verdict" id="vhead">
+    <div style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box" aria-hidden="true" id="v-ico"></div><div class="mb-verdict-word" id="v-word"></div></div>
+    <p class="why" id="v-why"></p>
+  </div>
+  <div class="gates" id="gates"></div>
+</section>
+
+<div class="grid2">
+  <section class="card" id="live-card">
+    <h2>Live record <span class="mb-tag live">live</span><span class="sp" id="live-sub"></span></h2>
+    <div class="kpis" id="live-kpis"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Calls by confidence band</h3>
+    <div class="tblwrap" id="bands"></div>
+    <p class="note" id="live-note"></p>
+  </section>
+  <section class="card" id="review-card">
+    <h2>Weekly review <span class="mb-tag live">live</span><span class="sp" id="review-sub"></span></h2>
+    <div id="review"></div>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="ranges-card">
+    <h2>Ranges in the back-test <span class="mb-tag bt">rule replay</span> <button class="md-help" id="ranges-help" aria-label="Explain">?</button><span class="sp" id="ranges-sub"></span></h2>
+    <div class="seg-in"><div class="md-segmented dense hz" role="group" aria-label="Horizon"><button type="button" data-h="1" aria-pressed="true">1-day</button><button type="button" data-h="5" aria-pressed="false">5-day</button></div><span class="muted" style="font-size:12px">80% ranges should hold 80% of the time, 50% ranges 50%</span></div>
+    <div class="kpis" id="range-kpis" style="grid-template-columns:repeat(3,1fr)"></div>
+    <h3 class="micro" style="margin:12px 0 6px">By regime</h3>
+    <div class="tblwrap" id="by-regime"></div>
+    <h3 class="micro" style="margin:12px 0 6px">By month, 80% ranges held</h3>
+    <div class="chart" id="by-month"></div>
+    <p class="note" id="ranges-note"></p>
+  </section>
+  <section class="card" id="model-card">
+    <h2>Signal model in the back-test <span class="mb-tag bt">walk-forward</span> <button class="md-help" id="model-help" aria-label="Explain">?</button><span class="sp" id="model-sub"></span></h2>
+    <div class="tblwrap" id="model-table"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Reliability, 5-day open-to-close: what the model said vs what happened</h3>
+    <div class="chart" id="reliability"></div>
+    <p class="note" id="model-note"></p>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card" id="paper-card">
+    <h2>Paper strategy after costs <span class="mb-tag bt">back-test</span> <button class="md-help" id="paper-help" aria-label="Explain">?</button><span class="sp" id="paper-sub"></span></h2>
+    <div class="chart" id="paper-chart"></div>
+    <div class="tblwrap" id="paper-table" style="margin-top:8px"></div>
+    <p class="note" id="paper-note"></p>
+  </section>
+  <section class="card" id="direction-card">
+    <h2>Direction baselines <span class="mb-tag bt">rule replay</span> <button class="md-help" data-tip="Simple rules replayed over the same window, scored close-to-close: always up, 1-day and 5-day momentum, RSI mean reversion. The model must beat these before a call means anything." aria-label="Explain">?</button></h2>
+    <div class="tblwrap" id="baselines"></div>
+    <h3 class="micro" style="margin:12px 0 6px">Call thresholds in the walk-forward (5-day open-to-close)</h3>
+    <div class="tblwrap" id="thresholds"></div>
+  </section>
+</div>
+
+<section class="card" style="margin-top:16px" id="ticker-card">
+  <h2>By company <span class="mb-tag bt">rule replay</span><span class="sp" id="ticker-sub"></span></h2>
+  <div class="tblwrap" id="by-ticker"></div>
+</section>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion"><summary>What the back-tests cannot see (their own limitations)</summary><div class="inner" id="limits"></div></details>
+  <details class="md-expansion"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+  </div></div></div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const R = D.rules;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const pct = (x, dec=0) => x == null ? '—' : (Math.round(x*100*Math.pow(10,dec))/Math.pow(10,dec)).toFixed(dec) + '%';
+const sgn = (x, dec=2, unit='%') => x == null ? '—' : (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtD = iso => { const d = new Date(iso.slice(0,10)+'T00:00:00Z'); return d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let MKT = 'india', HZ = '1';
+const M = () => D.markets[MKT];
+
+/* ---------- shell ---------- */
+for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
+$('#market-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; MKT = b.dataset.m; $('#market-seg').querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', false], ['query_stats','Record', true], ['newspaper','News', false], ['help','Help', false]];
+const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A') { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+document.querySelectorAll('.hz button').forEach(b => b.addEventListener('click', () => { HZ = b.dataset.h; document.querySelectorAll('.hz button').forEach(o => o.setAttribute('aria-pressed', o===b)); renderRanges(); }));
+
+/* ---------- helpers ---------- */
+const table = (heads, rows, opts={}) => { const t = el('table', {class:'t'}); const tr = el('tr'); heads.forEach(h => tr.append(el('th', {class: h.num ? 'num' : null}, h.label || h))); t.append(el('thead', {}, tr)); const tb = el('tbody'); rows.forEach(r => tb.append(r)); t.append(tb); return t; };
+const td = (content, cls) => el('td', {class: cls}, content);
+const covBar = (v, target, n) => { if (v == null) return el('span', {class:'muted'}, '—'); const ok = Math.abs(v - target) <= 0.05; return el('span', {class:'bar', 'data-tip': `${pct(v,1)} held (target ${pct(target)})${n ? ', n ' + n : ''}`}, el('div', {class:'md-progress'}, el('i', {style:`width:${Math.min(100, v*100)}%;background:${ok ? 'var(--mb-color-up)' : v < target ? 'var(--mb-color-warn)' : 'var(--md-sys-color-primary)'}`})), el('b', {}, pct(v))); };
+
+/* ---------- render ---------- */
+function render() {
+  const m = M(), L = m.live, G = m.gates, g5 = G.find(g => g.label.startsWith('5d')) || G[0];
+  $('#h-title').innerHTML = ''; $('#h-meta').innerHTML = ''; $('#h-right').innerHTML = '';
+  $('#h-title').append(`${LABEL[MKT]} track record`, el('small', {}, `${m.market_name} · ${m.n_tickers} companies`));
+  $('#h-meta').append(el('span', {}, `live data as of ${fmtD(m.as_of)}`), el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'mb-tag bt'}, 'back-test'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {}, `back-test window ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}`));
+  $('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
+  // verdict: proven only when all three gates pass
+  const callsNeeded = R.min_n_calls, callsOk = L.calls_total >= callsNeeded;
+  const bandsScored = L.calls_by_band.filter(b => b.n >= callsNeeded), bandsOk = bandsScored.length > 0 && bandsScored.every(b => b.hit_rate >= b.band - R.calibration_tolerance);
+  const skillOk = !!(m.review && m.review.model_skill);
+  const proven = callsOk && bandsOk && skillOk;
+  const vh = $('#vhead'); vh.className = 'mb-verdict ' + (proven ? 'yes-strong' : 'no');
+  $('#v-ico').innerHTML = ''; $('#v-ico').append(icon(proven ? 'ms-bolt' : 'ms-block'));
+  $('#v-word').innerHTML = ''; $('#v-word').append(proven ? 'PROVEN' : 'NOT PROVEN', el('small', {}, proven ? 'signals may leave Paper' : 'every signal stays Paper'));
+  $('#v-why').innerHTML = `<b>Why:</b> ${callsOk ? `${L.calls_total} live calls scored` : `only <b>${L.calls_total}</b> live call${L.calls_total===1?'':'s'} scored (${callsNeeded} needed per confidence band)`}; ${bandsOk ? 'the scored confidence bands hit at or above their stated confidence' : bandsScored.length ? 'a scored confidence band hits below its stated confidence' : 'no confidence band has enough scored calls yet'}; the weekly review ${skillOk ? 'finds' : 'does <b>not</b> find'} model skill in the back-test${g5 ? ` (5-day open-to-close: Brier skill ${g5.brier_skill}, AUC ${g5.auc} with a 95% interval from ${g5.auc95[0]} to ${g5.auc95[1]})` : ''}.`;
+  const gates = $('#gates'); gates.innerHTML = '';
+  const gate = (ok, title, prog, text, tipText) => { const d = el('div', {class:'gate', 'data-tip': tipText}); d.append(el('div', {class:'t'}, el('span', {class:'mb-mark '+(ok?'ok':'no')}, icon(ok?'ms-check':'ms-close')), title)); if (prog != null) d.append(el('div', {class:'md-progress' + (ok ? '' : ' bad')}, el('i', {style:`width:${Math.max(2, Math.min(100, prog*100))}%`}))); d.append(el('small', {}, text)); return d; };
+  gates.append(
+    gate(callsOk, 'Enough live calls scored', Math.min(1, L.calls_total / callsNeeded), `${L.calls_total} scored · ${callsNeeded} needed per band (config/review.yaml min_n_calls) · ${L.open_predictions} open`, 'A confidence band gets advice only from at least this many scored live calls; the whole record needs that many too.'),
+    gate(bandsOk, 'Confidence bands keep their promise', bandsScored.length ? Math.max(0, Math.min(1, bandsScored.reduce((a,b) => a + b.hit_rate, 0) / bandsScored.length)) : 0, bandsScored.length ? `${bandsScored.length} band${bandsScored.length>1?'s':''} with enough calls; tolerance ${pct(R.calibration_tolerance)}` : `no band has ${callsNeeded} scored calls yet`, 'Calls made at 70% confidence must hit at least 70% of the time (minus the tolerance). Otherwise the forecaster lowers confidence or abstains.'),
+    gate(skillOk, 'Model skill in the weekly review', g5 ? Math.max(0, Math.min(1, (g5.auc - 0.4) / 0.2)) : 0, g5 ? `n ${g5.n} (${g5.n_ok ? 'ok' : 'short'}) · Brier skill ${g5.brier_skill} (${g5.brier_ok ? 'ok' : 'must be above 0'}) · AUC low ${g5.auc95[0]} (${g5.auc_ok ? 'ok' : 'must be above 0.5'})` : 'no back-test', `Rule (config/review.yaml model_skill): at least ${R.model_skill.min_n} out-of-sample rows, Brier skill above ${R.model_skill.min_brier_skill} against the base rate, and an AUC 95% interval whose low end is above ${R.model_skill.min_auc_low}. The review reruns the walk-forward back-test every week.`));
+  // live record
+  const lk = $('#live-kpis'); lk.innerHTML = '';
+  for (const k of [
+    {v: String(L.calls_total), l: 'calls scored', t: 'Live direction calls that settled and were scored (outcomes joined to predictions).'},
+    {v: String(L.predictions), l: `calls made · ${L.open_predictions} open`, t: 'All live predictions stored, and those not yet settled.'},
+    {v: String(L.ranges_scored), l: 'ranges scored' + (L.ranges_cover80 != null ? ` · 80% held ${pct(L.ranges_cover80)}` : ''), t: 'Published ranges whose target date has passed and were scored (range_record).'},
+    {v: String(L.open_ranges), l: L.open_ranges ? `ranges waiting · targets ${fmtD(L.open_first_target)} – ${fmtD(L.open_last_target)}` : 'ranges waiting', t: 'Published ranges whose target date has not been scored yet (open_ranges).'},
+  ]) lk.append(el('div', {class:'kpi', 'data-tip': k.t}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
+  const bands = $('#bands'); bands.innerHTML = '';
+  if (L.calls_total) bands.append(table(['Band', {label:'Calls', num:true}, {label:'Hits', num:true}, {label:'Hit rate', num:true}, 'Promise kept?'], L.calls_by_band.map(b => { const tr = el('tr'); const okb = b.hit_rate == null ? null : b.hit_rate >= b.band - R.calibration_tolerance; tr.append(td(`${pct(b.band)} – ${pct(b.band+0.1)}`), td(String(b.n), 'num'), td(String(b.hits), 'num'), td(pct(b.hit_rate), 'num'), td(b.n < callsNeeded ? el('span', {class:'muted'}, `low n (< ${callsNeeded})`) : el('span', {class: okb ? 'ok' : 'bad'}, okb ? '✓ yes' : '✗ no'))); return tr; })));
+  else bands.append(el('div', {class:'empty'}, `No live call has settled yet. The live system started publishing on ${L.first_live_range_asof ? fmtD(L.first_live_range_asof) : '—'}; direction calls are scored ${R.call_scoring_from ? 'open-to-close from ' + fmtD(R.call_scoring_from) : 'open-to-close'} once their horizon passes. The bands ${R.confidence_bands.map(b => pct(b)).join(', ')} will fill here.`));
+  $('#live-sub').textContent = `${L.lessons} lesson${L.lessons===1?'':'s'} in the reflection log`;
+  $('#live-note').textContent = `Every live number above comes from stored rows (predictions, outcomes, ranges, range_record, open_ranges, lessons). Nothing is estimated.`;
+  // review
+  const rv = $('#review'); rv.innerHTML = ''; const rw = m.review;
+  if (rw) { $('#review-sub').textContent = `${rw.week} · computed ${String(rw.computed_at).slice(0,16).replace('T',' ')} UTC`;
+    const kv = el('dl', {class:'md-kv'});
+    for (const [k, v] of [['Model skill', rw.model_skill ? 'shown' : 'not shown'], ['Ranges scored', `${rw.n_ranges_week} this week · ${rw.n_ranges_30d} in 30 days · ${rw.n_ranges_all} since start`], ['Calls scored', `${rw.n_calls_week} this week · ${rw.n_calls_all} since start`], ['80% held, since start', rw.cover80_all == null ? 'no scored ranges yet' : pct(rw.cover80_all)], ['Call hit rate, since start', rw.call_hit_all == null ? 'no scored calls yet' : pct(rw.call_hit_all) + (rw.always_up_all != null ? ` (always-up ${pct(rw.always_up_all)})` : '')], ['Sample', rw.low_sample ? 'low: no advice yet' : 'enough for advice'], ['Proposals', rw.n_proposals ? rw.proposals.map(p => `${p.variant} (${p.verdict}; ${p.source}, n ${p.n})`).join('; ') : 'none'], ['Report', rw.report]]) kv.append(el('dt', {}, k), el('dd', {}, v));
+    rv.append(kv, el('p', {class:'note'}, 'The review proposes changes to config/ranges.yaml; a human applies them. It reruns the signal-model back-test and says plainly whether the model shows skill.'));
+  } else { $('#review-sub').textContent = ''; rv.append(el('div', {class:'empty'}, 'No weekly review stored yet.')); }
+  renderRanges(); renderModel(); renderPaper(); renderBaselines(); renderTickers();
+  $('#limits').innerHTML = '<ul style="margin:0;padding-left:18px">' + m.replay.limitations.map(x => `<li>${x}</li>`).join('') + '</ul>';
+  $('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live</dt><dd>data/${MKT}/: predictions, outcomes, ranges, range_record, open_ranges, open_predictions, lessons, reviews (the latest weekly review and its proposals). Read through DuckDB views in sql/views.sql.</dd>
+<dt>Back-test, ranges</dt><dd><code>scripts/replay.py --market ${MKT} --start ${m.replay.window[0]} --end ${m.replay.window[1]}</code> run into a scratch root (computed ${String(m.replay.computed_at).slice(0,16).replace('T',' ')} UTC): coverage, widths and interval scores of the rule replay's ranges by horizon, regime, month, sector and ticker; direction baselines scored close-to-close.</dd>
+<dt>Back-test, model</dt><dd><code>${m.bt_path}</code> from <code>scripts/model_backtest.py</code> (computed ${String(m.bt_computed_at).slice(0,16).replace('T',' ')} UTC): walk-forward out-of-sample rows, Brier and log loss against the base rate, AUC with a bootstrap 95% interval, reliability bins with Wilson intervals, thresholds, the paper strategy after costs (config/costs.yaml) against baselines.</dd>
+<dt>Rules</dt><dd>config/review.yaml: confidence bands ${R.confidence_bands.join(', ')}, min_n_calls ${R.min_n_calls}, calibration tolerance ${R.calibration_tolerance}, model_skill min_n ${R.model_skill.min_n}, min_brier_skill ${R.model_skill.min_brier_skill}, min_auc_low ${R.model_skill.min_auc_low}.</dd>
+<dt>Derived</dt><dd>The PROVEN / NOT PROVEN verdict combines the three gates above; it is this page's reading of the rules, not a stored verdict. Nothing is invented: empty live tables say so.</dd>
+</dl>`;
+  $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
+}
+
+function renderRanges() {
+  const m = M(), hb = m.replay.horizons[HZ], o = hb.overall;
+  $('#ranges-sub').textContent = `${o.n} ranges on ${o.days} days, ${m.n_tickers} companies`;
+  $('#ranges-help').dataset.tip = `scripts/replay.py rebuilt each day's ${HZ}-day range exactly as ranges.py would have, using only data known at that close, over ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}. "Held" = the later close landed inside the band. The interval score rewards narrow bands that hold (lower is better); the naive band is last close ± 20-day volatility.`;
+  const rk = $('#range-kpis'); rk.innerHTML = '';
+  for (const k of [
+    {v: pct(o.cover80), l: `80% ranges held (95% CI ${pct(o.cover80_ci[0])}–${pct(o.cover80_ci[1])})`, t: `Target 80%. Naive band: ${pct(o.naive_cover80)}.`, cls: Math.abs(o.cover80 - 0.8) <= 0.05 ? 'ok' : 'warn'},
+    {v: pct(o.cover50), l: '50% ranges held', t: `Target 50%. Naive band: ${pct(o.naive_cover50)}.`, cls: Math.abs(o.cover50 - 0.5) <= 0.05 ? 'ok' : 'warn'},
+    {v: `${o.score80} vs ${o.naive_score80}`, l: '80% interval score, ours vs naive (lower is better)', t: `Mean 80% band width ${o.width80_pct}% of price; mean absolute centre error ${o.abs_err_pct}%.`, cls: o.score80 <= o.naive_score80 ? 'ok' : 'warn'},
+  ]) rk.append(el('div', {class:'kpi', 'data-tip': k.t}, el('div', {class:'v ' + k.cls}, k.v), el('div', {class:'l'}, k.l)));
+  const br = $('#by-regime'); br.innerHTML = '';
+  br.append(table(['Regime', {label:'Days', num:true}, {label:'Ranges', num:true}, '80% held', '50% held', {label:'Width 80%', num:true}, {label:'Score vs naive', num:true}], Object.entries(hb.by_regime).map(([k, v]) => { const tr = el('tr'); tr.append(td(k), td(String(v.days), 'num'), td(String(v.n), 'num'), td(covBar(v.cover80, 0.8, v.n)), td(covBar(v.cover50, 0.5, v.n)), td(`${v.width80_pct}%`, 'num'), td(`${v.score80} vs ${v.naive_score80}`, 'num')); return tr; })));
+  // by month chart
+  const bm = $('#by-month'); bm.innerHTML = '';
+  const months = Object.entries(hb.by_month).sort((a, b) => a[0].localeCompare(b[0]));
+  const W = Math.max(320, bm.clientWidth || 500), H = 150, ml = 36, mr = 10, mt = 14, mb = 28, bw = (W - ml - mr) / Math.max(1, months.length);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'80% ranges held by month'});
+  const y = v => mt + (1 - v) * (H - mt - mb);
+  for (const g of [0.5, 0.8, 1]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke: g === 0.8 ? cssVar('--mb-color-up') : cssVar('--mb-chart-grid'), 'stroke-dasharray': g === 0.8 ? '4 3' : null})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = pct(g); svg.append(t); }
+  months.forEach(([k, v], i) => { const x = ml + i * bw + bw * 0.2, w = bw * 0.6; const ok = Math.abs(v.cover80 - 0.8) <= 0.05; svg.append(svgEl('rect', {x, y: y(v.cover80), width: w, height: y(0) - y(v.cover80), rx: 3, fill: ok ? cssVar('--mb-color-up') : cssVar('--mb-color-warn'), opacity: .85})); const t = svgEl('text', {x: x + w/2, y: y(v.cover80) - 4, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--md-sys-color-on-surface')}); t.textContent = pct(v.cover80); svg.append(t); const t2 = svgEl('text', {x: x + w/2, y: H - 10, 'text-anchor':'middle', 'font-size':10, fill: cssVar('--mb-chart-label')}); t2.textContent = `${MON[+k.slice(5,7)-1]} ${k.slice(2,4)} · n ${v.n}`; svg.append(t2); });
+  bm.append(svg);
+  $('#ranges-note').textContent = m.replay.summary.filter(s => s.startsWith(`${HZ}-day`)).join(' ') || '';
+}
+
+function renderModel() {
+  const m = M(), keys = Object.keys(m.model);
+  $('#model-sub').textContent = `${m.model[keys[0]].first_date} – ${m.model[keys[0]].last_date}, ${m.n_tickers} companies`;
+  $('#model-help').dataset.tip = 'scripts/model_backtest.py: the signal model is refit each month on labels known by then and scored only on later dates (walk-forward, out of sample). Brier skill = improvement over always predicting the base rate (above 0 is skill). AUC 0.5 = no ability to rank up days above down days; the 95% interval must sit above 0.5. Open-to-close = buy at the next open, sell at the close of D+1 (1d) or D+4 (5d); close-to-close is the older label.';
+  const mt = $('#model-table'); mt.innerHTML = '';
+  mt.append(table(['Label', {label:'Rows', num:true}, {label:'Brier vs base', num:true}, {label:'Skill', num:true}, {label:'AUC [95% CI]', num:true}], keys.map(k => { const v = m.model[k]; const tr = el('tr'); tr.append(td(el('span', {'data-tip': `${v.label}. ${v.n} rows on ${v.dates} dates, up share ${pct(v.up_share,1)}, log loss ${v.log_loss} vs ${v.log_loss_base_rate}.`}, k.replace('open_to_close', 'open→close').replace('close_to_close', 'close→close'))), td(String(v.n), 'num'), td(`${v.brier} vs ${v.brier_base_rate}`, 'num'), td(el('span', {class: v.brier_skill > 0 ? 'ok' : 'bad'}, sgn(v.brier_skill, 4, '')), 'num'), td(el('span', {class: v.auc95[0] > 0.5 ? 'ok' : 'bad'}, `${v.auc} [${v.auc95[0]}, ${v.auc95[1]}]`), 'num')); return tr; })));
+  // reliability chart
+  const key = keys.find(k => k === '5d open_to_close') || keys[0], v = m.model[key], bins = (v.reliability || []).filter(b => b.n > 0);
+  const rc = $('#reliability'); rc.innerHTML = '';
+  const W = Math.max(320, rc.clientWidth || 500), H = 230, ml = 40, mr = 12, mt2 = 10, mb = 30;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Reliability: predicted probability against the realised share of up outcomes'});
+  const x = p => ml + (p - 0.2) / 0.6 * (W - ml - mr), y = p => mt2 + (1 - (p - 0.2) / 0.6) * (H - mt2 - mb);
+  for (const g of [0.3, 0.4, 0.5, 0.6, 0.7]) { svg.append(svgEl('line', {x1:ml, x2:W-mr, y1:y(g), y2:y(g), stroke:cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:ml-6, y:y(g)+4, 'text-anchor':'end', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = pct(g); svg.append(t); const t2 = svgEl('text', {x:x(g), y:H-12, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t2.textContent = pct(g); svg.append(t2); }
+  svg.append(svgEl('line', {x1:x(0.2), y1:y(0.2), x2:x(0.8), y2:y(0.8), stroke:cssVar('--md-sys-color-outline'), 'stroke-dasharray':'4 3'}));
+  const lab = svgEl('text', {x:x(0.78), y:y(0.8)-6, 'text-anchor':'end', 'font-size':10, fill:cssVar('--md-sys-color-on-surface-variant')}); lab.textContent = 'perfect calibration'; svg.append(lab);
+  const xl = svgEl('text', {x:(ml+W-mr)/2, y:H-1, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); xl.textContent = 'what the model said (mean P(up) in the bin)'; svg.append(xl);
+  const maxN = Math.max(...bins.map(b => b.n), 1);
+  for (const b of bins) { const px = x(Math.max(0.2, Math.min(0.8, b.mean_p))), py = y(Math.max(0.2, Math.min(0.8, b.up_share))); svg.append(svgEl('line', {x1:px, x2:px, y1:y(Math.max(0.2, Math.min(0.8, b.wilson95[0]))), y2:y(Math.max(0.2, Math.min(0.8, b.wilson95[1]))), stroke:cssVar('--mb-chart-1'), 'stroke-width':1.5}));
+    const c = svgEl('circle', {cx:px, cy:py, r: 4 + 6 * Math.sqrt(b.n / maxN), fill:cssVar('--mb-chart-1'), stroke:'#fff', 'stroke-width':1.5}); svg.append(c);
+    const t = svgEl('text', {x:px, y:py - 10 - 6 * Math.sqrt(b.n / maxN), 'text-anchor':'middle', 'font-size':9.5, fill:cssVar('--md-sys-color-on-surface-variant')}); t.textContent = `${b.bin} n ${b.n}`; svg.append(t); }
+  rc.append(svg);
+  $('#model-note').textContent = `${key}: ${v.n} out-of-sample rows on ${v.dates} dates. Dots are the model's probability bins (size = rows), the whiskers their Wilson 95% intervals for the realised share of up outcomes; a calibrated model sits on the dashed line. Latest fit: ${v.model ? `${v.model.fits} monthly fits, trained to ${v.model.last_cutoff} on ${v.model.last_train_rows} rows, base rate ${v.model.last_base_rate}, Platt ${JSON.stringify(v.model.last_platt)}` : '—'}.`;
+}
+
+function renderPaper() {
+  const m = M(), key = '5d open_to_close', v = m.model[key], P = v.paper;
+  $('#paper-sub').textContent = P ? `mean round-trip cost ${P.mean_cost_pct}%` : '';
+  $('#paper-help').dataset.tip = 'Paper, never traded: at each date buy every stock whose model P(up) is at or above the threshold at the next open and sell at the close of D+4 (5-day); return per trade after the costs in config/costs.yaml, averaged with a 95% interval (bootstrap over dates). Compared with always buying everything, 5-day momentum, RSI mean reversion and holding the benchmark.';
+  const pc = $('#paper-chart'); pc.innerHTML = ''; const pt = $('#paper-table'); pt.innerHTML = '';
+  if (!P) { pc.append(el('div', {class:'empty'}, 'No paper-strategy result in the back-test JSON.')); return; }
+  const rows = [...Object.entries(P.thresholds).map(([t, r]) => ({name: `long at ≥ ${pct(+t)}`, ...r.long, kind:'model'})), ...Object.entries(P.baselines).map(([k, r]) => ({name: {always_up:'always up', momentum_5d:'5-day momentum', rsi_mean_reversion:'RSI mean reversion', benchmark_long_per_date:'hold the benchmark'}[k] || k, ...r, kind:'base'}))];
+  const W = Math.max(320, pc.clientWidth || 500), H = 36 + rows.length * 26, ml = 150, mr = 50;
+  const lo = Math.min(-1, ...rows.map(r => r.ci95_pct[0])), hi = Math.max(0.5, ...rows.map(r => r.ci95_pct[1]));
+  const x = val => ml + (val - lo) / (hi - lo) * (W - ml - mr);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Mean return per trade after costs with 95% intervals'});
+  for (const g of [-1.5, -1, -0.5, 0, 0.5]) { if (g < lo || g > hi) continue; svg.append(svgEl('line', {x1:x(g), x2:x(g), y1:8, y2:H-20, stroke: g === 0 ? cssVar('--md-sys-color-outline') : cssVar('--mb-chart-grid')})); const t = svgEl('text', {x:x(g), y:H-6, 'text-anchor':'middle', 'font-size':10, fill:cssVar('--mb-chart-label')}); t.textContent = sgn(g, 1); svg.append(t); }
+  rows.forEach((r, i) => { const cy = 20 + i * 26; const t = svgEl('text', {x: ml - 8, y: cy + 4, 'text-anchor':'end', 'font-size':11, fill: cssVar('--md-sys-color-on-surface'), 'font-weight': r.kind === 'model' ? 700 : 400}); t.textContent = r.name; svg.append(t);
+    svg.append(svgEl('line', {x1:x(r.ci95_pct[0]), x2:x(r.ci95_pct[1]), y1:cy, y2:cy, stroke: r.kind === 'model' ? cssVar('--mb-chart-1') : cssVar('--md-sys-color-outline'), 'stroke-width':2}));
+    svg.append(svgEl('circle', {cx:x(r.mean_pct), cy, r:5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), stroke:'#fff', 'stroke-width':1.5}));
+    const t2 = svgEl('text', {x: x(r.ci95_pct[1]) + 6, y: cy + 4, 'font-size':10.5, fill: r.mean_pct >= 0 ? cssVar('--mb-color-up') : cssVar('--mb-color-down'), 'font-weight':600}); t2.textContent = sgn(r.mean_pct, 2); svg.append(t2); });
+  pc.append(svg);
+  pt.append(table(['Strategy', {label:'Positions', num:true}, {label:'Dates', num:true}, {label:'Mean per trade', num:true}, {label:'95% interval', num:true}, 'vs always up'], rows.map(r => { const tr = el('tr'); const vs = r.kind === 'model' ? (P.thresholds[Object.keys(P.thresholds).find(t => `long at ≥ ${pct(+t)}` === r.name)] || {}).vs : null; const d = vs && vs.always_up; tr.append(td(r.name), td(String(r.positions), 'num'), td(String(r.dates), 'num'), td(el('span', {class: r.mean_pct >= 0 ? 'ok' : 'bad'}, sgn(r.mean_pct, 2)), 'num'), td(`${sgn(r.ci95_pct[0], 2)} to ${sgn(r.ci95_pct[1], 2)}`, 'num'), td(d ? el('span', {class: d.ci95_pct[0] > 0 ? 'ok' : 'muted'}, `${sgn(d.mean_pct, 2)} [${sgn(d.ci95_pct[0],2)}, ${sgn(d.ci95_pct[1],2)}]${d.ci95_pct[0] > 0 ? ' · beats it' : ' · not better'}`) : el('span', {class:'muted'}, '—'))); return tr; })));
+  $('#paper-note').textContent = `A strategy beats a baseline only when the 95% interval of the after-cost difference is above zero. Costs: ${P.mean_cost_pct}% mean round trip (config/costs.yaml, every rate marked "verify"; slippage not modelled).`;
+}
+
+function renderBaselines() {
+  const m = M(), b = $('#baselines'); b.innerHTML = '';
+  const rows = [];
+  for (const h of ['1', '5']) for (const [k, v] of Object.entries(m.replay.baselines[h])) rows.push({h, ...v});
+  b.append(table(['Rule', 'Horizon', {label:'Calls', num:true}, {label:'Hits', num:true}, {label:'Hit rate', num:true}, {label:'95% CI', num:true}], rows.map(r => { const tr = el('tr'); const ok = r.ci95 && r.ci95[0] > 0.5; tr.append(td(r.label), td(`${r.h}-day`), td(String(r.calls), 'num'), td(String(r.hits), 'num'), td(el('span', {class: ok ? 'ok' : r.hit_rate < 0.5 ? 'bad' : ''}, pct(r.hit_rate, 1)), 'num'), td(r.ci95 ? `${pct(r.ci95[0], 1)} – ${pct(r.ci95[1], 1)}` : '—', 'num')); return tr; })));
+  const th = $('#thresholds'); th.innerHTML = '';
+  const v = m.model['5d open_to_close'];
+  th.append(table(['Threshold', 'Side', {label:'Calls', num:true}, {label:'Coverage', num:true}, {label:'Hit rate', num:true}, {label:'Wilson 95%', num:true}, {label:'Hit after cost', num:true}], Object.entries(v.thresholds).flatMap(([t, s]) => ['long', 'short'].map(side => { const r = s[side]; const tr = el('tr'); tr.append(td(`P(up) ${side === 'long' ? '≥' : '≤ 1 −'} ${pct(+t)}`), td(side), td(String(r.n), 'num'), td(pct(r.coverage, 1), 'num'), td(el('span', {class: r.wilson95[0] > 0.5 ? 'ok' : ''}, pct(r.hit_rate, 1)), 'num'), td(`${pct(r.wilson95[0],1)} – ${pct(r.wilson95[1],1)}`, 'num'), td(r.hit_after_cost == null ? '—' : pct(r.hit_after_cost, 1), 'num')); return tr; }))));
+}
+
+function renderTickers() {
+  const m = M(), bt1 = m.replay.horizons['1'].by_ticker, bt5 = m.replay.horizons['5'].by_ticker, t = $('#by-ticker'); t.innerHTML = '';
+  $('#ticker-sub').textContent = `rule replay ${fmtD(m.replay.window[0])} – ${fmtD(m.replay.window[1])}; live columns fill as calls settle`;
+  t.append(table(['Company', {label:'1d ranges', num:true}, '1d 80% held', '1d 50% held', {label:'1d score vs naive', num:true}, '5d 80% held', '5d 50% held', {label:'5d score vs naive', num:true}, {label:'Live calls scored', num:true}], Object.keys(bt1).sort().map(k => { const a = bt1[k], b = bt5[k] || {}; const tr = el('tr'); tr.append(td(el('a', {href:`../decision/decision-${k}.html`, style:'color:inherit;font-weight:700;text-decoration:none'}, k)), td(String(a.n), 'num'), td(covBar(a.cover80, 0.8, a.n)), td(covBar(a.cover50, 0.5, a.n)), td(el('span', {class: a.score80 <= a.naive_score80 ? 'ok' : 'warn'}, `${a.score80} vs ${a.naive_score80}`), 'num'), td(covBar(b.cover80, 0.8, b.n)), td(covBar(b.cover50, 0.5, b.n)), td(b.score80 == null ? '—' : el('span', {class: b.score80 <= b.naive_score80 ? 'ok' : 'warn'}, `${b.score80} vs ${b.naive_score80}`), 'num'), td(el('span', {class:'muted'}, '0'), 'num')); return tr; })));
+}
+render();
+new ResizeObserver(() => { renderRanges(); renderModel(); renderPaper(); }).observe($('#by-month'));
+</script>
+</body>
+</html>
