@@ -41,17 +41,29 @@ At merge the orchestrator appends these lines to `judgments/log.jsonl` (the comm
 
 ## Wave 0 notes
 
+Wave 0 has no `wave0.md` (its file list is this README), so its sections sit here one heading level down,
+in the order above.
+
 ### Scope
 Contracts for waves 1-3 on branch `build/wave0`: `docs/ARCHITECTURE.md`, `api/openapi.yaml`,
 `tests/test_openapi.py`, this README. Docs and spec only, no runtime code.
 
 ### Files
-Created: `docs/ARCHITECTURE.md`, `api/openapi.yaml`, `tests/test_openapi.py`, `docs/ws/README.md`,
-`docs/ws/wave0-judgments.jsonl`. No shared file changed; no dependency added (pyyaml was present).
+Created: `docs/ARCHITECTURE.md`, `api/openapi.yaml`, `tests/test_openapi.py`, `docs/ws/README.md`;
+`docs/ws/wave0-judgments.jsonl` is added with the first recorded verdict. No shared file changed; no dependency added (pyyaml was present).
 
 ### Contract
 `api/openapi.yaml` version 1.0.0. Read-model tables `rm.markets|status|overview|watchlist|stock|bars|
 track_record|news|runs`, planned `rm.portfolio`, bookkeeping `rm.builds` (ARCHITECTURE.md 4.1).
+
+### Tests
+- `python -m pytest tests/test_openapi.py -q` -> `9 passed in 0.25s`
+- `python -m ruff check tests/test_openapi.py` -> `All checks passed!`
+- Full suite `python -m pytest -n auto -q` (round 1 commit) -> `1 failed, 892 passed, 2 skipped`; the failure is
+  `test_every_logged_commit_exists`, which needs full git history (this clone is shallow; CI excludes it).
+
+### Judge verdicts
+- Round 1, FAIL, 17eb531: README listed the judgments file as created; the units note was wrong for `atr_pct`.
 
 ### Proposed edits to shared docs
 
@@ -84,7 +96,9 @@ only through validated CLIs, from Slack or Claude Code now and from an append-on
 non-blocking, like step 10b `neo4j_sync`).
 
 ### Cosmetic follow-ups
-(none yet; filled from judge verdicts)
+Round 1's cosmetic findings were all fixed in round 2's commit: the x-source check now fails on a missing
+module, a new test checks that operations returning planned schemas are planned, the `rm` size and
+budget-total wording were corrected, and these wave 0 notes gained Tests and Judge verdicts sections.
 
 ### Open questions
 1. News-run cadence: `routine/NEWS_PROMPT.md` says every 6 hours; the wave plan says 4-hourly. The

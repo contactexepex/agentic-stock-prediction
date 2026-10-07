@@ -18,8 +18,9 @@ info:
     - `x-status: planned` marks an operation, schema or field whose data is not built yet. Planned operations
       answer 501 until built; planned fields are omitted from payloads until built.
     - `x-read-model` on a read operation names its `rm` table.
-    - Numbers are as stored or as the existing dashboard code computes them; fractions, not percentages,
-      unless a field name ends in `_pct`.
+    - Numbers are as stored or as the existing dashboard code computes them. Returns, changes, shares and
+      probabilities are fractions (0.018 = 1.8%). The scoring fields ending in `_pct` (is50_pct, is80_pct,
+      qs_pct, width50_pct, width80_pct) are percent of price (x100); `atr_pct` is a fraction (ATR / close).
     - Missing values are `null`, never invented.
   license:
     name: Private research project
@@ -1087,7 +1088,7 @@ components:
         ret_1d: {$ref: '#/components/schemas/NullableNumber'}
         ret_5d: {$ref: '#/components/schemas/NullableNumber'}
         ret_20d: {$ref: '#/components/schemas/NullableNumber'}
-        atr_pct: {$ref: '#/components/schemas/NullableNumber'}
+        atr_pct: {type: ['number', 'null'], description: 'A fraction, not a percent: ATR(14) / close (indicators.py)'}
         volume_ratio_20d: {$ref: '#/components/schemas/NullableNumber'}
         ema_ratio: {$ref: '#/components/schemas/NullableNumber'}
         price_vs_20d_high: {$ref: '#/components/schemas/NullableNumber'}

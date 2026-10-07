@@ -97,7 +97,7 @@ Schema `rm`, one table per page type, identical columns in every table:
 | `payload` | JSON | The page body; its schema is the matching component in `api/openapi.yaml` |
 
 Primary key `(market, page_key)`. One current row per key. Each `rm` table is small (at most
-2 markets x 20 tickers rows), so a keyed lookup is a scan of a few dozen rows.
+2 markets x 21 keys: `rm.news` has `_` plus 20 tickers), so a keyed lookup is a scan of a few dozen rows.
 
 | Table | page_key | Payload schema (`api/openapi.yaml`) | Serves | Built from (existing code) |
 |---|---|---|---|---|
@@ -197,7 +197,7 @@ Budget against the Lite cap of 10 compute-hours per month. Assumptions (A) and u
 | News syncs | 360 | 15 s | 1.50 | 1.50 + 6.00 |
 | Read misses | 900 | 1 s | 0.25 | up to 15.0 if each miss wakes the instance |
 | Full rebuilds | 2 | 10 min | 0.33 | 0.33 |
-| **Total** | | | **~2.8** | **~9-24 (over the cap)** |
+| **Total** | | | **~2.8** | **~9.3 (reads warmed by the sync) to ~24 (every miss wakes it): at or over the cap** |
 
 So the design holds under per-second billing and fails under a long per-wake cool-down. Guards:
 

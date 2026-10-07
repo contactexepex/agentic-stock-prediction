@@ -103,6 +103,13 @@ def test_planned_operations_carry_x_status(spec):
             assert op.get("x-status") == PLANNED, f"{method} {path}: writes are planned (governed, later)"
 
 
+def test_operations_returning_planned_schemas_are_planned(spec):
+    for path, method, op in operations(spec):
+        ok = op.get("responses", {}).get("200", {}).get("content", {}).get("application/json", {})
+        if deref(spec, ok.get("schema") or {}).get("x-status") == PLANNED:
+            assert op.get("x-status") == PLANNED, f"{method} {path}: returns a planned schema but is not planned"
+
+
 def test_writes_take_an_idempotency_key(spec):
     for path, method, op in operations(spec):
         if method not in WRITE_METHODS or "/internal/" in path:
@@ -138,8 +145,9 @@ def test_x_source_functions_exist(spec):
             continue
         for module, name in SOURCE_CALL.findall(source):
             path = PACKAGE / f"{module}.py"
-            if not path.is_file():
+            if "/" not in module:  # a table or view name such as rm.status, not a module path
                 continue
+            assert path.is_file(), f"x-source module {module} not found"
             text = path.read_text(encoding="utf-8")
             assert re.search(rf"^(def|class) {name}\b|^{name}\s*(:[^=\n]*)?=", text, re.M), f"{module}.{name} not found"
             checked += 1
