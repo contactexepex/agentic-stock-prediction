@@ -404,24 +404,24 @@ def test_catalogue_lifecycle_events_match_their_market():
 
 
 def test_catalogue_scoreboard_has_every_slice():
+    """scoreboard_row.json is built by B2's lab/scoreboard.py; each slice's counts and profit match paper_trade.json."""
     rows = load("scoreboard_row.json")
-    assert {r["scope"] for r in rows} == {"strategy", "strategy_company", "pick_rule"}
+    assert {r["scope"] for r in rows} == {"strategy", "strategy_company", "pick_rule", "strategy_regime"}
     for r in rows:
         assert (r["ticker"] is not None) == (r["scope"] == "strategy_company")
         assert (r["pick_rule"] is not None) == (r["scope"] == "pick_rule")
         assert (r["strategy_id"] is None) == (r["scope"] == "pick_rule")
+        assert (r["regime"] is not None) == (r["scope"] == "strategy_regime")
     trades = [t for t in load("paper_trade.json") if t["status"] == "settled"]
     for r in rows:
-        if r["scope"] == "strategy_company":
-            mine = [t for t in trades if t["view"] == "accuracy" and t["strategy_id"] == r["strategy_id"]
-                    and t["ticker"] == r["ticker"]]
-        elif r["scope"] == "pick_rule":
-            mine = [t for t in trades if t["view"] == "head_to_head" and t["family"] == r["family"]
-                    and t["pick_rule"] == r["pick_rule"] and t["market"] == r["market"]]
-        else:
-            continue
-        assert r["trades"] == len(mine)
+        mine = [t for t in trades if t["market"] == r["market"] and t["view"] == r["view"]
+                and r["horizon_days"] in ("all", t["horizon_days"])
+                and r["strategy_id"] in (None, t["strategy_id"]) and r["family"] == t["family"]
+                and r["ticker"] in (None, t["ticker"]) and r["pick_rule"] in (None, t["pick_rule"])
+                and r["regime"] in (None, t["regime"])]
+        assert r["trades"] == len(mine), r
         assert r["net_pnl"] == pytest.approx(sum(t["net_pnl"] for t in mine), abs=0.011)
+        assert r["luck_test"]["n"] == len(mine)
 
 
 def test_catalogue_cost_views_agree_with_the_trades():
@@ -438,7 +438,8 @@ def test_catalogue_cost_views_agree_with_the_trades():
             assert r["net_pnl_market"] == pytest.approx(trade["net_pnl"], abs=0.011)
             assert r["cost_viable"] is None
         else:
-            assert r["cost_viable"] == (r["expected_move_pct"] > r["your_cost_pct"])
+            gain = r["expected_gain_your_pct"]   # owner decision 2026-10-07 (B2): viable = gain after your cost > 0
+            assert r["cost_viable"] == (None if gain is None else gain > 0)   # no probability (baselines): null
 
 
 def test_catalogue_trade_checks_use_the_real_check_ids_and_carry_the_b9_columns():

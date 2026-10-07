@@ -25,6 +25,7 @@
       "expected_move_pct": 0.1254,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.4875,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -67,6 +68,7 @@
       "expected_move_pct": 0.1923,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.3576,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -109,6 +111,7 @@
       "expected_move_pct": 0.2592,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.229,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -151,6 +154,7 @@
       "expected_move_pct": 0.3135,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1203,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -193,6 +197,7 @@
       "expected_move_pct": 0.3637,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0226,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -235,6 +240,7 @@
       "expected_move_pct": 0.1129,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.5104,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -277,6 +283,7 @@
       "expected_move_pct": 0.1756,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.3897,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -319,6 +326,7 @@
       "expected_move_pct": 0.2383,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.2685,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -361,6 +369,7 @@
       "expected_move_pct": 0.2926,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1649,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -403,6 +412,7 @@
       "expected_move_pct": 0.3386,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.073,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -445,6 +455,7 @@
       "expected_move_pct": 0.1505,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.4416,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -487,6 +498,7 @@
       "expected_move_pct": 0.2257,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.2934,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -529,6 +541,7 @@
       "expected_move_pct": 0.2968,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1513,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -571,6 +584,7 @@
       "expected_move_pct": 0.3595,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.0293,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -613,6 +627,7 @@
       "expected_move_pct": 0.4138,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.9216,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -655,6 +670,7 @@
       "expected_move_pct": 0.117,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.5028,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -697,6 +713,7 @@
       "expected_move_pct": 0.1797,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.3797,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -739,6 +756,7 @@
       "expected_move_pct": 0.2466,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.2548,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -781,6 +799,7 @@
       "expected_move_pct": 0.2968,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1509,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -823,6 +842,7 @@
       "expected_move_pct": 0.3469,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0562,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -865,6 +885,7 @@
       "expected_move_pct": 0.1129,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.5167,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -907,6 +928,7 @@
       "expected_move_pct": 0.1714,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.4001,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -949,6 +971,7 @@
       "expected_move_pct": 0.2341,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.2806,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -991,6 +1014,7 @@
       "expected_move_pct": 0.2842,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1802,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1033,6 +1057,7 @@
       "expected_move_pct": 0.3302,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0901,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1075,6 +1100,7 @@
       "expected_move_pct": 0.1379,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.4615,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1117,6 +1143,7 @@
       "expected_move_pct": 0.2132,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.3199,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1159,6 +1186,7 @@
       "expected_move_pct": 0.2801,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1839,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1201,6 +1229,7 @@
       "expected_move_pct": 0.3428,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.0664,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1243,6 +1272,7 @@
       "expected_move_pct": 0.3929,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.9636,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1285,6 +1315,7 @@
       "expected_move_pct": 0.1254,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.4875,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1327,6 +1358,7 @@
       "expected_move_pct": 0.1923,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.3576,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1369,6 +1401,7 @@
       "expected_move_pct": 0.2592,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.229,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1411,6 +1444,7 @@
       "expected_move_pct": 0.3135,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1203,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1453,6 +1487,7 @@
       "expected_move_pct": 0.3637,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0226,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1495,7 +1530,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1537,7 +1573,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1579,7 +1616,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1621,7 +1659,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1663,7 +1702,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1705,7 +1745,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1747,7 +1788,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1789,7 +1831,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1831,7 +1874,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1873,7 +1917,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
         "order_fee": 2.32,
@@ -1915,6 +1960,7 @@
       "expected_move_pct": 0.1045,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.532,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1957,6 +2003,7 @@
       "expected_move_pct": 0.1588,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.422,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -1999,6 +2046,7 @@
       "expected_move_pct": 0.2174,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.3081,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2041,6 +2089,7 @@
       "expected_move_pct": 0.2675,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.2107,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2083,6 +2132,7 @@
       "expected_move_pct": 0.3135,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.1237,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2125,6 +2175,7 @@
       "expected_move_pct": 0.1463,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.4261,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2167,6 +2218,7 @@
       "expected_move_pct": 0.2926,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.1168,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2209,6 +2261,7 @@
       "expected_move_pct": 0.4055,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.8734,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2251,6 +2304,7 @@
       "expected_move_pct": 0.1087,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.5071,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2293,6 +2347,7 @@
       "expected_move_pct": 0.2257,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.2584,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2335,6 +2390,7 @@
       "expected_move_pct": 0.3219,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0554,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2377,6 +2433,7 @@
       "expected_move_pct": 0.163,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.3864,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2419,6 +2476,7 @@
       "expected_move_pct": 0.326,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.0461,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2461,6 +2519,7 @@
       "expected_move_pct": 0.4514,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.7805,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2503,6 +2562,7 @@
       "expected_move_pct": 0.1839,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.735,
+      "expected_gain_your_pct": -1.345,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2545,6 +2605,7 @@
       "expected_move_pct": 0.3595,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -0.9753,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2587,6 +2648,7 @@
       "expected_move_pct": 0.4932,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.6889,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -2629,6 +2691,7 @@
       "expected_move_pct": 0.11,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.2146,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2680,6 +2743,7 @@
       "expected_move_pct": 0.1708,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0952,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2731,6 +2795,7 @@
       "expected_move_pct": 0.225,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9891,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2782,6 +2847,7 @@
       "expected_move_pct": 0.2521,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.935,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2833,6 +2899,7 @@
       "expected_move_pct": 0.3021,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8367,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2884,6 +2951,7 @@
       "expected_move_pct": 0.0993,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.2357,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2935,6 +3003,7 @@
       "expected_move_pct": 0.1552,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1254,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -2986,6 +3055,7 @@
       "expected_move_pct": 0.2061,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0259,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3037,6 +3107,7 @@
       "expected_move_pct": 0.2307,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9775,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3088,6 +3159,7 @@
       "expected_move_pct": 0.2775,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8845,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3139,6 +3211,7 @@
       "expected_move_pct": 0.1314,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1722,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3190,6 +3263,7 @@
       "expected_move_pct": 0.2011,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0352,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3241,6 +3315,7 @@
       "expected_move_pct": 0.2619,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9155,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3292,6 +3367,7 @@
       "expected_move_pct": 0.2956,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8497,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3343,6 +3419,7 @@
       "expected_move_pct": 0.3506,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.7413,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3394,6 +3471,7 @@
       "expected_move_pct": 0.1026,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.2288,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3445,6 +3523,7 @@
       "expected_move_pct": 0.1601,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1154,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3496,6 +3575,7 @@
       "expected_move_pct": 0.2118,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0139,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3547,6 +3627,7 @@
       "expected_move_pct": 0.2381,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9632,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3598,6 +3679,7 @@
       "expected_move_pct": 0.2857,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8685,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3649,6 +3731,7 @@
       "expected_move_pct": 0.0952,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.243,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3700,6 +3783,7 @@
       "expected_move_pct": 0.1502,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1353,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3751,6 +3835,7 @@
       "expected_move_pct": 0.1995,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0383,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3802,6 +3887,7 @@
       "expected_move_pct": 0.2233,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9917,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3853,6 +3939,7 @@
       "expected_move_pct": 0.2701,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9001,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3904,6 +3991,7 @@
       "expected_move_pct": 0.1223,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1899,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -3955,6 +4043,7 @@
       "expected_move_pct": 0.188,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0604,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4006,6 +4095,7 @@
       "expected_move_pct": 0.2463,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.9462,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4057,6 +4147,7 @@
       "expected_move_pct": 0.2775,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8853,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4108,6 +4199,7 @@
       "expected_move_pct": 0.33,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.7812,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4159,7 +4251,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4210,7 +4303,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4261,7 +4355,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4312,7 +4407,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4363,7 +4459,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4414,7 +4511,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4465,7 +4563,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4516,7 +4615,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4567,7 +4667,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4618,7 +4719,8 @@
       "expected_move_pct": 0.0,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
-      "cost_viable": false,
+      "expected_gain_your_pct": null,
+      "cost_viable": null,
       "market_costs": 1990.0,
       "market_cost_lines": {
         "brokerage": 1498.14,
@@ -4669,6 +4771,7 @@
       "expected_move_pct": 0.1404,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1552,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4720,6 +4823,7 @@
       "expected_move_pct": 0.1872,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0628,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4771,6 +4875,7 @@
       "expected_move_pct": 0.2085,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0202,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4822,6 +4927,7 @@
       "expected_move_pct": 0.2537,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.932,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4873,6 +4979,7 @@
       "expected_move_pct": 0.1281,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1588,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4924,6 +5031,7 @@
       "expected_move_pct": 0.2562,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8867,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -4975,6 +5083,7 @@
       "expected_move_pct": 0.3424,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.7026,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5026,6 +5135,7 @@
       "expected_move_pct": 0.092,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.2353,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5077,6 +5187,7 @@
       "expected_move_pct": 0.1929,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0199,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5128,6 +5239,7 @@
       "expected_move_pct": 0.2619,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8742,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5179,6 +5291,7 @@
       "expected_move_pct": 0.1461,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.1205,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5230,6 +5343,7 @@
       "expected_move_pct": 0.2874,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8202,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5281,6 +5395,7 @@
       "expected_move_pct": 0.3826,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.6166,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5332,6 +5447,7 @@
       "expected_move_pct": 0.1642,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -2.0822,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5383,6 +5499,7 @@
       "expected_move_pct": 0.3186,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.7537,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5434,6 +5551,7 @@
       "expected_move_pct": 0.4228,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.5305,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -5485,6 +5603,7 @@
       "expected_move_pct": 0.3301,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.0896,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5527,6 +5646,7 @@
       "expected_move_pct": 0.3301,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -1.0896,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5569,6 +5689,7 @@
       "expected_move_pct": 0.3741,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -0.9405,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5611,6 +5732,7 @@
       "expected_move_pct": 0.4885,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.6982,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5653,6 +5775,7 @@
       "expected_move_pct": 0.2614,
       "market_cost_pct": 1.9783,
       "your_cost_pct": 2.418,
+      "expected_gain_your_pct": -1.9043,
       "cost_viable": false,
       "market_costs": 1978.3,
       "market_cost_lines": {
@@ -5704,6 +5827,7 @@
       "expected_move_pct": 0.2149,
       "market_cost_pct": 1.9783,
       "your_cost_pct": 2.418,
+      "expected_gain_your_pct": -1.9958,
       "cost_viable": false,
       "market_costs": 1978.3,
       "market_cost_lines": {
@@ -5755,6 +5879,7 @@
       "expected_move_pct": 0.3832,
       "market_cost_pct": 1.9783,
       "your_cost_pct": 2.418,
+      "expected_gain_your_pct": -1.6044,
       "cost_viable": false,
       "market_costs": 1978.3,
       "market_cost_lines": {
@@ -5806,6 +5931,7 @@
       "expected_move_pct": 0.3088,
       "market_cost_pct": 1.9783,
       "your_cost_pct": 2.418,
+      "expected_gain_your_pct": -1.7619,
       "cost_viable": false,
       "market_costs": 1978.3,
       "market_cost_lines": {
@@ -5857,6 +5983,7 @@
       "expected_move_pct": 0.3637,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0226,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5899,6 +6026,7 @@
       "expected_move_pct": 0.3637,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -1.0226,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5941,6 +6069,7 @@
       "expected_move_pct": 0.3595,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.737,
+      "expected_gain_your_pct": -0.9753,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -5983,6 +6112,7 @@
       "expected_move_pct": 0.4932,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.738,
+      "expected_gain_your_pct": -0.6889,
       "cost_viable": false,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6025,6 +6155,7 @@
       "expected_move_pct": 0.3021,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8367,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -6076,6 +6207,7 @@
       "expected_move_pct": 0.3021,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.8367,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -6127,6 +6259,7 @@
       "expected_move_pct": 0.4228,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.5305,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -6178,6 +6311,7 @@
       "expected_move_pct": 0.4228,
       "market_cost_pct": 1.99,
       "your_cost_pct": 2.4299,
+      "expected_gain_your_pct": -1.5305,
       "cost_viable": false,
       "market_costs": 1990.0,
       "market_cost_lines": {
@@ -6229,6 +6363,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.74,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6271,6 +6406,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.75,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6313,6 +6449,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.768,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6355,6 +6492,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.77,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6397,6 +6535,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.74,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6439,6 +6578,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.75,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6481,6 +6621,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.768,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6523,6 +6664,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.77,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6565,6 +6707,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.74,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6607,6 +6750,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.75,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6649,6 +6793,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.768,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6691,6 +6836,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.77,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6733,6 +6879,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.74,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6775,6 +6922,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.768,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6817,6 +6965,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.74,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6859,6 +7008,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.768,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6901,6 +7051,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.734,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6943,6 +7094,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -6985,6 +7137,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7027,6 +7180,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.743,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7069,6 +7223,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.734,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7111,6 +7266,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7153,6 +7309,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7195,6 +7352,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.743,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7237,6 +7395,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7279,6 +7438,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.734,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7321,6 +7481,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7363,6 +7524,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.734,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7405,6 +7567,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.742,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7447,6 +7610,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7489,6 +7653,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.729,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7531,6 +7696,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7573,6 +7739,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.729,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7615,6 +7782,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7657,6 +7825,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.729,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7699,6 +7868,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7741,6 +7911,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7783,6 +7954,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7825,6 +7997,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.731,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -7867,6 +8040,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9664,
       "your_cost_pct": 2.4056,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1966.41,
       "market_cost_lines": {
@@ -7918,6 +8092,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.982,
       "your_cost_pct": 2.4218,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1981.95,
       "market_cost_lines": {
@@ -7969,6 +8144,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {
@@ -8020,6 +8196,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9664,
       "your_cost_pct": 2.4056,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1966.41,
       "market_cost_lines": {
@@ -8071,6 +8248,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.982,
       "your_cost_pct": 2.4218,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1981.95,
       "market_cost_lines": {
@@ -8122,6 +8300,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {
@@ -8173,6 +8352,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {
@@ -8224,6 +8404,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9664,
       "your_cost_pct": 2.4056,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1966.41,
       "market_cost_lines": {
@@ -8275,6 +8456,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {
@@ -8326,6 +8508,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9664,
       "your_cost_pct": 2.4056,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1966.41,
       "market_cost_lines": {
@@ -8377,6 +8560,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {
@@ -8428,6 +8612,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9981,
       "your_cost_pct": 2.4385,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1998.14,
       "market_cost_lines": {
@@ -8479,6 +8664,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9754,
       "your_cost_pct": 2.4149,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1975.43,
       "market_cost_lines": {
@@ -8530,6 +8716,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9846,
       "your_cost_pct": 2.4245,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1984.64,
       "market_cost_lines": {
@@ -8581,6 +8768,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9981,
       "your_cost_pct": 2.4385,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1998.14,
       "market_cost_lines": {
@@ -8632,6 +8820,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9754,
       "your_cost_pct": 2.4149,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1975.43,
       "market_cost_lines": {
@@ -8683,6 +8872,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9846,
       "your_cost_pct": 2.4245,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1984.64,
       "market_cost_lines": {
@@ -8734,6 +8924,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9981,
       "your_cost_pct": 2.4385,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1998.14,
       "market_cost_lines": {
@@ -8785,6 +8976,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9846,
       "your_cost_pct": 2.4245,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1984.64,
       "market_cost_lines": {
@@ -8836,6 +9028,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9981,
       "your_cost_pct": 2.4385,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1998.14,
       "market_cost_lines": {
@@ -8887,6 +9080,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 1.9846,
       "your_cost_pct": 2.4245,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 1984.64,
       "market_cost_lines": {
@@ -8938,6 +9132,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.77,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -8980,6 +9175,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.77,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -9022,6 +9218,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 0.234,
       "your_cost_pct": 1.768,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2.34,
       "market_cost_lines": {
@@ -9064,6 +9261,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {
@@ -9115,6 +9313,7 @@
       "expected_move_pct": null,
       "market_cost_pct": 2.0082,
       "your_cost_pct": 2.4491,
+      "expected_gain_your_pct": null,
       "cost_viable": null,
       "market_costs": 2008.19,
       "market_cost_lines": {

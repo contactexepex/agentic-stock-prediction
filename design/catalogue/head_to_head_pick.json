@@ -96,6 +96,7 @@
           "gain_per_session_pct": 0.0329,
           "expected_move_pct": 0.1364,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.4681,
           "cost_viable": false,
           "eligible": true
         },
@@ -110,6 +111,7 @@
           "gain_per_session_pct": 0.08,
           "expected_move_pct": 0.2025,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.341,
           "cost_viable": false,
           "eligible": true
         },
@@ -124,6 +126,7 @@
           "gain_per_session_pct": 0.1025,
           "expected_move_pct": 0.2773,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.1955,
           "cost_viable": false,
           "eligible": true
         },
@@ -138,6 +141,7 @@
           "gain_per_session_pct": 0.1034,
           "expected_move_pct": 0.3301,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.0896,
           "cost_viable": false,
           "eligible": true
         },
@@ -152,6 +156,7 @@
           "gain_per_session_pct": 0.0947,
           "expected_move_pct": 0.3609,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -1.0304,
           "cost_viable": false,
           "eligible": true
         }
@@ -250,6 +255,7 @@
           "gain_per_session_pct": 0.0329,
           "expected_move_pct": 0.1364,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.4681,
           "cost_viable": false,
           "eligible": true
         },
@@ -264,6 +270,7 @@
           "gain_per_session_pct": 0.08,
           "expected_move_pct": 0.2025,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.341,
           "cost_viable": false,
           "eligible": true
         },
@@ -278,6 +285,7 @@
           "gain_per_session_pct": 0.1025,
           "expected_move_pct": 0.2773,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.1955,
           "cost_viable": false,
           "eligible": true
         },
@@ -292,6 +300,7 @@
           "gain_per_session_pct": 0.1034,
           "expected_move_pct": 0.3301,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.0896,
           "cost_viable": false,
           "eligible": true
         },
@@ -306,6 +315,7 @@
           "gain_per_session_pct": 0.0947,
           "expected_move_pct": 0.3609,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -1.0304,
           "cost_viable": false,
           "eligible": true
         }
@@ -376,6 +386,7 @@
           "gain_per_session_pct": 0.1766,
           "expected_move_pct": 0.1937,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.3244,
           "cost_viable": false,
           "eligible": true
         },
@@ -390,6 +401,7 @@
           "gain_per_session_pct": 0.1875,
           "expected_move_pct": 0.3741,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -0.9405,
           "cost_viable": false,
           "eligible": true
         },
@@ -404,6 +416,7 @@
           "gain_per_session_pct": 0.1612,
           "expected_move_pct": 0.4885,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -0.6982,
           "cost_viable": false,
           "eligible": true
         }
@@ -474,6 +487,7 @@
           "gain_per_session_pct": 0.1766,
           "expected_move_pct": 0.1937,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.3244,
           "cost_viable": false,
           "eligible": true
         },
@@ -488,6 +502,7 @@
           "gain_per_session_pct": 0.1875,
           "expected_move_pct": 0.3741,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -0.9405,
           "cost_viable": false,
           "eligible": true
         },
@@ -502,6 +517,7 @@
           "gain_per_session_pct": 0.1612,
           "expected_move_pct": 0.4885,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -0.6982,
           "cost_viable": false,
           "eligible": true
         }
@@ -600,6 +616,7 @@
           "gain_per_session_pct": -1.7737,
           "expected_move_pct": 0.1041,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -2.2134,
           "cost_viable": false,
           "eligible": true
         },
@@ -614,6 +631,7 @@
           "gain_per_session_pct": -0.8368,
           "expected_move_pct": 0.1557,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -2.1132,
           "cost_viable": false,
           "eligible": true
         },
@@ -628,6 +646,7 @@
           "gain_per_session_pct": -0.5187,
           "expected_move_pct": 0.2149,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.9958,
           "cost_viable": false,
           "eligible": true
         },
@@ -642,6 +661,7 @@
           "gain_per_session_pct": -0.3779,
           "expected_move_pct": 0.2377,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.9515,
           "cost_viable": false,
           "eligible": true
         },
@@ -656,6 +676,7 @@
           "gain_per_session_pct": -0.2929,
           "expected_move_pct": 0.2614,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.9043,
           "cost_viable": false,
           "eligible": true
         }
@@ -754,6 +775,7 @@
           "gain_per_session_pct": -1.7737,
           "expected_move_pct": 0.1041,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -2.2134,
           "cost_viable": false,
           "eligible": true
         },
@@ -768,6 +790,7 @@
           "gain_per_session_pct": -0.8368,
           "expected_move_pct": 0.1557,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -2.1132,
           "cost_viable": false,
           "eligible": true
         },
@@ -782,6 +805,7 @@
           "gain_per_session_pct": -0.5187,
           "expected_move_pct": 0.2149,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.9958,
           "cost_viable": false,
           "eligible": true
         },
@@ -796,6 +820,7 @@
           "gain_per_session_pct": -0.3779,
           "expected_move_pct": 0.2377,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.9515,
           "cost_viable": false,
           "eligible": true
         },
@@ -810,6 +835,7 @@
           "gain_per_session_pct": -0.2929,
           "expected_move_pct": 0.2614,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.9043,
           "cost_viable": false,
           "eligible": true
         }
@@ -880,6 +906,7 @@
           "gain_per_session_pct": -1.6423,
           "expected_move_pct": 0.1582,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -2.082,
           "cost_viable": false,
           "eligible": true
         },
@@ -894,6 +921,7 @@
           "gain_per_session_pct": -0.4407,
           "expected_move_pct": 0.3088,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.7619,
           "cost_viable": false,
           "eligible": true
         },
@@ -908,6 +936,7 @@
           "gain_per_session_pct": -0.2329,
           "expected_move_pct": 0.3832,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.6044,
           "cost_viable": false,
           "eligible": true
         }
@@ -978,6 +1007,7 @@
           "gain_per_session_pct": -1.6423,
           "expected_move_pct": 0.1582,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -2.082,
           "cost_viable": false,
           "eligible": true
         },
@@ -992,6 +1022,7 @@
           "gain_per_session_pct": -0.4407,
           "expected_move_pct": 0.3088,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.7619,
           "cost_viable": false,
           "eligible": true
         },
@@ -1006,6 +1037,7 @@
           "gain_per_session_pct": -0.2329,
           "expected_move_pct": 0.3832,
           "your_cost_pct": 2.418,
+          "expected_gain_your_pct": -1.6044,
           "cost_viable": false,
           "eligible": true
         }
@@ -1104,6 +1136,7 @@
           "gain_per_session_pct": 0.0135,
           "expected_move_pct": 0.1254,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.4875,
           "cost_viable": false,
           "eligible": true
         },
@@ -1118,6 +1151,7 @@
           "gain_per_session_pct": 0.0717,
           "expected_move_pct": 0.1923,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.3576,
           "cost_viable": false,
           "eligible": true
         },
@@ -1132,6 +1166,7 @@
           "gain_per_session_pct": 0.0913,
           "expected_move_pct": 0.2592,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.229,
           "cost_viable": false,
           "eligible": true
         },
@@ -1146,6 +1181,7 @@
           "gain_per_session_pct": 0.0957,
           "expected_move_pct": 0.3135,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.1203,
           "cost_viable": false,
           "eligible": true
         },
@@ -1160,6 +1196,7 @@
           "gain_per_session_pct": 0.0963,
           "expected_move_pct": 0.3637,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -1.0226,
           "cost_viable": false,
           "eligible": true
         }
@@ -1258,6 +1295,7 @@
           "gain_per_session_pct": 0.0135,
           "expected_move_pct": 0.1254,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.4875,
           "cost_viable": false,
           "eligible": true
         },
@@ -1272,6 +1310,7 @@
           "gain_per_session_pct": 0.0717,
           "expected_move_pct": 0.1923,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.3576,
           "cost_viable": false,
           "eligible": true
         },
@@ -1286,6 +1325,7 @@
           "gain_per_session_pct": 0.0913,
           "expected_move_pct": 0.2592,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.229,
           "cost_viable": false,
           "eligible": true
         },
@@ -1300,6 +1340,7 @@
           "gain_per_session_pct": 0.0957,
           "expected_move_pct": 0.3135,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -1.1203,
           "cost_viable": false,
           "eligible": true
         },
@@ -1314,6 +1355,7 @@
           "gain_per_session_pct": 0.0963,
           "expected_move_pct": 0.3637,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -1.0226,
           "cost_viable": false,
           "eligible": true
         }
@@ -1384,6 +1426,7 @@
           "gain_per_session_pct": 0.156,
           "expected_move_pct": 0.1839,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.345,
           "cost_viable": false,
           "eligible": true
         },
@@ -1398,6 +1441,7 @@
           "gain_per_session_pct": 0.1759,
           "expected_move_pct": 0.3595,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -0.9753,
           "cost_viable": false,
           "eligible": true
         },
@@ -1412,6 +1456,7 @@
           "gain_per_session_pct": 0.163,
           "expected_move_pct": 0.4932,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -0.6889,
           "cost_viable": false,
           "eligible": true
         }
@@ -1482,6 +1527,7 @@
           "gain_per_session_pct": 0.156,
           "expected_move_pct": 0.1839,
           "your_cost_pct": 1.735,
+          "expected_gain_your_pct": -1.345,
           "cost_viable": false,
           "eligible": true
         },
@@ -1496,6 +1542,7 @@
           "gain_per_session_pct": 0.1759,
           "expected_move_pct": 0.3595,
           "your_cost_pct": 1.737,
+          "expected_gain_your_pct": -0.9753,
           "cost_viable": false,
           "eligible": true
         },
@@ -1510,6 +1557,7 @@
           "gain_per_session_pct": 0.163,
           "expected_move_pct": 0.4932,
           "your_cost_pct": 1.738,
+          "expected_gain_your_pct": -0.6889,
           "cost_viable": false,
           "eligible": true
         }
@@ -1608,6 +1656,7 @@
           "gain_per_session_pct": -1.7746,
           "expected_move_pct": 0.11,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -2.2146,
           "cost_viable": false,
           "eligible": true
         },
@@ -1622,6 +1671,7 @@
           "gain_per_session_pct": -0.8276,
           "expected_move_pct": 0.1708,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -2.0952,
           "cost_viable": false,
           "eligible": true
         },
@@ -1636,6 +1686,7 @@
           "gain_per_session_pct": -0.5164,
           "expected_move_pct": 0.225,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.9891,
           "cost_viable": false,
           "eligible": true
         },
@@ -1650,6 +1701,7 @@
           "gain_per_session_pct": -0.3738,
           "expected_move_pct": 0.2521,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.935,
           "cost_viable": false,
           "eligible": true
         },
@@ -1664,6 +1716,7 @@
           "gain_per_session_pct": -0.2793,
           "expected_move_pct": 0.3021,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.8367,
           "cost_viable": false,
           "eligible": true
         }
@@ -1762,6 +1815,7 @@
           "gain_per_session_pct": -1.7746,
           "expected_move_pct": 0.11,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -2.2146,
           "cost_viable": false,
           "eligible": true
         },
@@ -1776,6 +1830,7 @@
           "gain_per_session_pct": -0.8276,
           "expected_move_pct": 0.1708,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -2.0952,
           "cost_viable": false,
           "eligible": true
         },
@@ -1790,6 +1845,7 @@
           "gain_per_session_pct": -0.5164,
           "expected_move_pct": 0.225,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.9891,
           "cost_viable": false,
           "eligible": true
         },
@@ -1804,6 +1860,7 @@
           "gain_per_session_pct": -0.3738,
           "expected_move_pct": 0.2521,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.935,
           "cost_viable": false,
           "eligible": true
         },
@@ -1818,6 +1875,7 @@
           "gain_per_session_pct": -0.2793,
           "expected_move_pct": 0.3021,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.8367,
           "cost_viable": false,
           "eligible": true
         }
@@ -1888,6 +1946,7 @@
           "gain_per_session_pct": -1.6422,
           "expected_move_pct": 0.1642,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -2.0822,
           "cost_viable": false,
           "eligible": true
         },
@@ -1902,6 +1961,7 @@
           "gain_per_session_pct": -0.4379,
           "expected_move_pct": 0.3186,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.7537,
           "cost_viable": false,
           "eligible": true
         },
@@ -1916,6 +1976,7 @@
           "gain_per_session_pct": -0.2181,
           "expected_move_pct": 0.4228,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.5305,
           "cost_viable": false,
           "eligible": true
         }
@@ -1986,6 +2047,7 @@
           "gain_per_session_pct": -1.6422,
           "expected_move_pct": 0.1642,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -2.0822,
           "cost_viable": false,
           "eligible": true
         },
@@ -2000,6 +2062,7 @@
           "gain_per_session_pct": -0.4379,
           "expected_move_pct": 0.3186,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.7537,
           "cost_viable": false,
           "eligible": true
         },
@@ -2014,6 +2077,7 @@
           "gain_per_session_pct": -0.2181,
           "expected_move_pct": 0.4228,
           "your_cost_pct": 2.4299,
+          "expected_gain_your_pct": -1.5305,
           "cost_viable": false,
           "eligible": true
         }

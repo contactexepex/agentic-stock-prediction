@@ -142,13 +142,17 @@ def research_review(row) -> list[dict]:
 
 def portfolio(eurusd: float, r2, default_amount) -> dict:
     """The owner's own paper portfolio (WS4 portfolio_trades + positions) with the EUR view of US trades (F1.11)."""
+    from marketbrief.lab import costs as lab_costs
+    from marketbrief.portfolio.eur_view import lot_view
+
     eur_at_buy = 1.1650   # example EUR/USD on the buy date
     qty, buy, last = 3.0, 330.80, 333.63
-    fx_fee_rate = 0.0025   # BUX provisional, EUR -> USD at the buy
     cost_usd = qty * buy
     value_usd = qty * last
-    cost_eur = cost_usd / eur_at_buy * (1 + fx_fee_rate)
-    value_eur = value_usd / eurusd
+    rate = lab_costs.rates("us")
+    fx_fee_rate = rate["fx_fee_rate"]   # BUX FX markup (config/costs.yaml broker.us, verify)
+    buy_cost = lab_costs.side_cost("us", rate, "buy", qty, buy, {"eurusd": eur_at_buy})
+    eur = lot_view({"price": buy, "cost": buy_cost, "quantity": qty}, qty, last, (eur_at_buy, eurusd), fx_fee_rate)
     return {
         "owner_trades": [
             {"id": "pt-us-20260930-AAPL-1", "market": "us", "ticker": "AAPL", "side": "buy", "quantity": qty,
@@ -163,10 +167,12 @@ def portfolio(eurusd: float, r2, default_amount) -> dict:
             {"market": "us", "ticker": "AAPL", "quantity": qty, "avg_price": buy, "last_close": last,
              "last_close_date": "2026-10-06", "currency": "USD", "cost": r2(cost_usd), "value": r2(value_usd),
              "pnl": r2(value_usd - cost_usd), "pnl_pct": r2((value_usd / cost_usd - 1) * 100),
-             "eur_view": {"eurusd_at_buy": eur_at_buy, "eurusd_now": eurusd, "fx_fee_rate": fx_fee_rate,
-                          "cost_eur": r2(cost_eur), "value_eur": r2(value_eur), "pnl_eur": r2(value_eur - cost_eur),
-                          "fx_effect_eur": r2(value_usd / eurusd - value_usd / eur_at_buy),
-                          "note": "rate change and BUX FX fee included; fee provisional"}},
+             "eur_view": {"ticker": "AAPL", "quantity": qty, "mark_date": "2026-10-06", "eurusd_at_buy": eur_at_buy,
+                          "eurusd_now": eurusd, "fx_fee_rate": fx_fee_rate,
+                          **{key: r2(eur[key]) for key in ("cost_usd", "value_usd", "cost_eur", "value_eur",
+                                                           "fx_effect_eur")},
+                          "pnl_eur": r2(eur["value_eur"] - eur["cost_eur"]),
+                          "note": "BUX FX fee provisional (config/costs.yaml broker.us, verify)"}},
             {"market": "india", "ticker": "RELIANCE", "quantity": 50.0, "avg_price": 1182.0, "last_close": 1218.0,
              "last_close_date": "2026-10-06", "currency": "INR", "cost": 59100.0, "value": 60900.0, "pnl": 1800.0,
              "pnl_pct": r2((1218.0 / 1182.0 - 1) * 100), "eur_view": None}],

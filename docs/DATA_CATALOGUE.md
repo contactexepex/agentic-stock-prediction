@@ -269,7 +269,7 @@ B2's own pick code.
 | prob_up | That prediction's probability | prediction | 0-1 | `0.615` |
 | move_pct, loss_pct, costs_pct | Expected rise when the stock ends above the latest close C; expected shortfall when it ends below C (both from the strategy's own 80 % range); round-trip costs of the amount at C. All as a % of the amount | F1.7.3 (corrected) | % | `3.961`, `3.6023`, `0.234` |
 | expected_gain_pct | `p × move − (1 − p) × loss − costs`, per trade | F1.7.3 | % | `0.8151` (NVDA, AI, N+5) |
-| candidates | Every horizon the strongest strategy predicted, each with the numbers above plus: `gain_per_session_pct` (expected gain ÷ k, what "best expected gain" ranks, owner decision); `eligible` (the prediction qualifies; only eligible horizons can be picked); `expected_move_pct`, `your_cost_pct`, `cost_viable` (see [Cost view](#cost-view)) | engine | list | N+5: gain per session `0.163`, `eligible: true`, expected move `0.4932` vs your cost `1.738`, `cost_viable: false` |
+| candidates | Every horizon the strongest strategy predicted, each with the numbers above plus: `gain_per_session_pct` (expected gain ÷ k, what "best expected gain" ranks, owner decision); `eligible` (the prediction qualifies; only eligible horizons can be picked); `expected_move_pct`, `your_cost_pct`, `expected_gain_your_pct`, `cost_viable` (see [Cost view](#cost-view)) | engine | list | N+5: gain per session `0.163`, `eligible: true`, expected move `0.4932`, your cost `1.738`, gain after your cost `-0.6889`, `cost_viable: false` |
 | amount, currency | Money per head-to-head trade | company | ₹ / $ | `1000`, `USD` |
 
 <a id="paper-trade"></a>
@@ -337,26 +337,26 @@ The two cost views of one record (owner decisions 50-51):
   ₹200 on the sell date, and the DP charge. US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
   pro-rated.
 
-It also holds the **cost-viable** flag: whether the expected move beats your cost. A prediction is made, traded
-and scored either way; the flag is shown, and a non-viable head-to-head candidate can still be picked.
+It also holds the **cost-viable** flag: whether the expected gain after your cost is above zero (owner decision of
+2026-10-07, built by B2). That is `expected_gain_your_pct = p × move − (1 − p) × loss − your_cost_pct > 0`, with
+the same conditional move and loss as the [head-to-head pick](#head-to-head-pick) (`marketbrief/lab/gain.py`). The
+Slack morning picks (session B6) use the same rule. A prediction is made, traded and scored either way; the flag is
+shown, and a non-viable head-to-head candidate can still be picked. A prediction without a probability (the
+always-up and momentum baselines) has no expected gain, so its flag is empty.
 
 Status: kind `cost_views`. Session **B2** writes it (`core/schema_b2.py`, `marketbrief/lab/cost_views.py`) and owns
 it; it is joined to the other records on `record_id`. W1 keeps it as B2's kind rather than folding it into
 `paper_trades_settled`, because the your-cost view is an owner-specific layer on top of the market view the
 strategies compete on.
 
-**Pending the owner:** which definition of "viable" is canonical. As built, it is "expected move > your cost"
-(`expected_move_pct > your_cost_pct`). The alternative is "expected gain after your cost > 0". The Slack morning
-picks (session B6) already use that alternative in their "viable / not viable" words. So the same example NVDA pick
-reads "viable" in the alert while its `cost_viable` is false. The field may change meaning when the owner decides.
-
 Example file: `cost_view.json` (199 rows, built with B2's own row functions):
-- 118 prediction rows: every qualifying prediction of NVDA and RELIANCE on 7 Oct;
+- 118 prediction rows: every qualifying prediction of NVDA and RELIANCE on 7 Oct (20 of them baselines without a
+  probability, so with an empty flag);
 - 16 pick rows;
 - 65 settlement rows.
 
-None of the example predictions is cost-viable: their expected moves are below 0.6 %, while a round trip at your
-cost is about 1.7 % (US) and 2.4 % (India).
+None of the example predictions or picks is cost-viable: a round trip at your cost is about 1.7 % (US) and 2.4 %
+(India), and every example's expected gain after your cost is below zero (at best -0.69 %).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -365,7 +365,8 @@ cost is about 1.7 % (US) and 2.4 % (India).
 | reference_price, target_price | C (the latest close; for a settlement, the entry price) and the target | prediction | ₹ / $ | `229.27`, `227.84` |
 | expected_move_pct | `(target / C − 1) × 100` (predictions and picks only) | B2 | % | RELIANCE N+3: `0.225` |
 | market_cost_pct, your_cost_pct | The round trip in each view as a % of the amount | B2 | % | `1.99`, `2.4299` |
-| cost_viable | Expected move beats your cost (predictions and picks only; definition pending the owner) | B2, decision 51 | yes/no | `false` |
+| expected_gain_your_pct | `p × move − (1 − p) × loss − your_cost_pct` (predictions and picks only) | B2, `lab/gain.py` | % | `-1.9891` |
+| cost_viable | Expected gain after your cost is above zero (predictions and picks only; empty without a probability) | B2, decision 51, owner decision of 2026-10-07 | yes/no | `false` |
 | market_costs, market_cost_lines | The market view, total and per charge | B2 | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
 | your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` `200` each and `dp_charge` |
 | net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | Profit after costs in each view (settlements only) | B2 | ₹ / $, % | `39.66` / `3.966`; `24.32` / `2.432` |
@@ -458,30 +459,41 @@ Status: kind `eod_analyses`; session **B3** writes it. Example file: `eod_analys
 <a id="scoreboard-row"></a>
 ## Scoreboard row
 
-How a strategy is doing (F7). There is one row per market × view × strategy × horizon, plus a row with every
-horizon pooled. Rows per company and per pick rule are cut the same way. Status: **derived for pages** (B2
-computes, B4 serves `rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (73 rows computed from the
-example trades, so every count matches `paper_trade.json`).
+How a strategy is doing (F7). Status: **derived for pages**. B2 computes the rows (`marketbrief/lab/scoreboard.py`)
+and B4 serves them (`rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (152 rows, built with B2's
+own scoreboard code from the example trades and their your-cost numbers, so every count matches `paper_trade.json`).
+
+There is one row per market × view × basis × slice:
+- per strategy, with every horizon pooled ("all") and for each horizon;
+- per strategy and company (the stock strategies page), all horizons and each horizon;
+- per family and pick rule (head-to-head portfolios), all horizons and each horizon;
+- per strategy and regime at prediction time, all horizons (F2.6: the effect of regimes is measured).
+
+Money and returns are in the market-cost view (strategies are ranked on it). The `your_cost` block repeats them in
+the your-cost view, which the go-live bar uses.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
-| scope | Which cut: per strategy (all horizons and each horizon), per strategy and company (the stock strategies page), or per family and pick rule (head-to-head portfolios) | F7.1 | `strategy`, `strategy_company`, `pick_rule` | `strategy` |
-| view, strategy_id, family, horizon_days | Which slice (examples below: US, accuracy, `rule.model_news.v1`, all horizons) | settled trades | text; `all` or k | `accuracy`, `rule.model_news.v1`, `all` |
+| scope | Which cut | F7.1 | `strategy`, `strategy_company`, `pick_rule`, `strategy_regime` | `strategy` |
+| view, basis, strategy_id, family, horizon_days | Which slice (examples below: US, accuracy, forward, `rule.model_news.v1`, all horizons) | settled trades | text; `all` or k | `accuracy`, `forward`, `rule.model_news.v1`, `all` |
 | ticker | The company, for `strategy_company` rows (else empty) | settled trades | text | `NVDA`: 4 trades, $103.48 |
 | pick_rule | The pick rule, for `pick_rule` rows (head-to-head view; strategy_id empty, family set) | settled trades | text | rule family, `highest_probability`: 1 trade, $41.15 |
+| regime | The regime at prediction time, for `strategy_regime` rows | `regime` | text | `EVENT_HEAVY` (India) |
 | trades | Settled trades in the slice | count | count | `10` |
+| first_entry, last_exit | First entry and last exit of the slice's trades | trades | date | `2026-09-30`, `2026-10-06` |
 | net_pnl | Profit after costs: the headline | sum | ₹ / $ | `99.00` ($) |
-| mean_return_pct | Average return per trade | mean | % | `0.99` |
+| mean_return_pct | Average return per trade | mean | % | `0.992` |
 | win_rate | Share of trades with a profit after costs | count | 0-1 | `0.7` |
 | target_reached_rate, median_reached_session | Share that touched the target, and the typical session it happened | F1.9 | 0-1, number | `1.0`, `1` |
-| avg_target_error_pct | Average miss of the target | F1.9 | % | `1.6` |
+| avg_target_error_pct | Average miss of the target | F1.9 | % | `1.604` |
 | range_hit_rate | Share of exit closes inside the 80 % range | F1.9 | 0-1 | `0.9` |
 | worst_losing_streak | Most losses in a row | sequence | count | `2` |
 | max_drawdown | Deepest fall of cumulative profit from its peak | sequence | ₹ / $ | `-11.24` |
-| luck_test | 95 % bootstrap interval of the mean return, with a correction across all strategies. Only "excludes zero" after correction counts as an edge | F7.1 | %, yes/no | `0.02` to `2.16`, excludes zero `true` but `corrected: false` (no edge claimed) |
+| luck_test | Bootstrap interval of the mean return per trade (`n` trades), and the same interval corrected for the `m` rows compared with it (Bonferroni). Only `corrected: true` counts as an edge; fewer than 2 trades give no interval | F7.1, `lab/luck.py` | %, yes/no | n `10`, m `5`: `0.006` to `2.076` (excludes zero), corrected `-0.1701` to `2.467`, `corrected: false` |
+| your_cost | The same row in the your-cost view: net_pnl, mean_return_pct, win_rate, worst_losing_streak, max_drawdown, luck_test | B2 | mixed | net `-52.09`, win rate `0.3` |
 | sample_badge | Fewer than 20 trades: "too few trades to rank" (greyed out, SPEC section 6) | rule | `ok` / `too_few_to_rank` | `too_few_to_rank` |
-| go_live | Position against the go-live bar: proven, months forward, trades needed, beats the best baseline | F7.2 | mixed | `proven: false`, 300 trades needed |
-| basis | Forward or back-test; the two are never pooled (F2.3) | label | `forward` / `backtest` | `forward` |
+| go_live | Strategy rows: position against the go-live bar on the your-cost view: `proven`, `months_forward`, `trades_needed`, `beats_best_baseline`, `best_baseline_net_pnl`, `drawdown_limit`, `drawdown_within_limit`, `holds_in_calm_and_volatile`, `cost_view` | F7.2 | mixed | not proven; `0.2` months; `290` trades needed; best baseline `33.88` not beaten; limit `10000.0` |
+| as_of | The newest close the rows are computed to | settlement | date | `2026-10-06` |
 
 Heatmaps (F2.8) use the same numbers by strategy × horizon, × company and × reason code, each week.
 
@@ -581,9 +593,13 @@ and positions **exist**; the € view is **B2**. Example file: `portfolio.json`.
 | owner_trades | Each recorded trade: side, quantity, price and its basis (open, close or manual), date, channel | `portfolio_trades` (exists) | rows | buy 3 AAPL at the open of 30 Sep, `330.80` |
 | positions.quantity, avg_price, last_close | Holding and its marks | FIFO (exists) | shares, ₹ / $ | `3`, `330.80`, `333.63` |
 | positions.cost, value, pnl, pnl_pct | In the trade currency | exists | ₹ / $, % | `992.40`, `1000.89`, `8.49`, `0.86` |
-| eur_view.eurusd_at_buy, eurusd_now | EUR/USD then and now (`EURUSD=X`, added by B2) | Yahoo | rate | `1.1650`, `1.1700` |
-| eur_view.cost_eur, value_eur, pnl_eur | The same position in €, including the FX fee (provisional 0.25 %) | B2 | € | `853.98`, `855.46`, `1.49` |
-| eur_view.fx_effect_eur | How much of the € result is the rate change | B2 | € | `-3.67` |
+| eur_view.eurusd_at_buy, eurusd_now, mark_date | EUR/USD on the buy date and now (`EURUSD=X`, added by B2); the date of the mark | Yahoo | rate, date | `1.165`, `1.17`, `2026-10-06` |
+| eur_view.fx_fee_rate | BUX's FX markup on each EUR/USD conversion (`config/costs.yaml`, verify) | config | fraction | `0.0075` |
+| eur_view.cost_usd, value_usd | Dollars paid, including the buy order's cost, and dollars held now | B2 | $ | `993.55`, `1000.89` |
+| eur_view.cost_eur | Euros needed to buy those dollars: `cost_usd / eurusd_at_buy × (1 + fx_fee_rate)` | B2 (`portfolio/eur_view.py`) | € | `859.23` |
+| eur_view.value_eur | Euros back if converted now: `value_usd / eurusd_now × (1 − fx_fee_rate)` | B2 | € | `849.05` |
+| eur_view.pnl_eur | `value_eur − cost_eur` | B2 | € | `-10.19` |
+| eur_view.fx_effect_eur | The part due to the rate change alone: `value_usd / eurusd_now − value_usd / eurusd_at_buy` | B2 | € | `-3.67` |
 
 The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
 

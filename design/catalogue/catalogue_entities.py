@@ -1,12 +1,11 @@
 """The entity files of design/catalogue/ built from make_examples.py's predictions and settlement (EXAMPLES only)."""
 from __future__ import annotations
 
-import random
 import statistics
-from collections import defaultdict
 
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab import picks as lab_picks
+from marketbrief.lab import scoreboard as lab_scoreboard
 from marketbrief.lab.constants import LAB_VERSION
 
 from make_examples import (
@@ -72,57 +71,14 @@ def agreement(preds: list[dict]) -> list[dict]:
     return out
 
 
-def score_row(key: dict, trades: list[dict], rng: random.Random) -> dict:
-    """One F7.1 row for a slice of settled trades."""
-    trades = sorted(trades, key=lambda t: (t["exit_date"], t["id"]))
-    rets = [t["return_pct"] for t in trades]
-    streak = worst = 0
-    cum = peak = drawdown = 0.0
-    for t in trades:
-        streak = streak + 1 if t["net_pnl"] < 0 else 0
-        worst = max(worst, streak)
-        cum += t["net_pnl"]
-        peak = max(peak, cum)
-        drawdown = min(drawdown, cum - peak)
-    means = sorted(statistics.mean(rng.choices(rets, k=len(rets))) for _ in range(1000))
-    reached = [t["target_reached_session"] for t in trades if t["target_reached"]]
-    return {
-        **key, "trades": len(trades), "net_pnl": r2(sum(t["net_pnl"] for t in trades)),
-        "currency": CURRENCY[key["market"]], "mean_return_pct": r2(statistics.mean(rets)),
-        "win_rate": r4(sum(t["net_pnl"] > 0 for t in trades) / len(trades)),
-        "target_reached_rate": r4(len(reached) / len(trades)),
-        "median_reached_session": statistics.median(reached) if reached else None,
-        "avg_target_error_pct": r2(statistics.mean(t["target_error_pct"] for t in trades)),
-        "range_hit_rate": r4(sum(t["range_hit"] for t in trades) / len(trades)),
-        "worst_losing_streak": worst, "max_drawdown": r2(drawdown),
-        "luck_test": {"method": "bootstrap 95% interval of the mean net return (%), 1000 resamples",
-                      "low_pct": r2(means[25]), "high_pct": r2(means[974]), "excludes_zero": means[25] > 0,
-                      "corrected": False},
-        "sample_badge": "too_few_to_rank" if len(trades) < 20 else "ok",
-        "go_live": {"proven": False, "months_forward": 0.0, "trades_needed": 300, "beats_best_baseline": None},
-        "basis": "forward", "as_of": "2026-10-06"}
-
-
-def scoreboard(settled: list[dict]) -> list[dict]:
-    """F7.1 slices: scope strategy (per strategy, all horizons and each horizon), strategy_company (per strategy and
-    company, all horizons; the stock strategies page) and pick_rule (head-to-head per family and pick rule: the
-    head-to-head portfolios)."""
-    rng = random.Random(20261007)
-    groups = defaultdict(list)
-    for t in settled:
-        if t["status"] != "settled":
-            continue
-        base = {"market": t["market"], "view": t["view"]}
-        strategy = {"strategy_id": t["strategy_id"], "family": t["family"], "pick_rule": None}
-        groups[("strategy", *base.values(), *strategy.values(), None, "all")].append(t)
-        groups[("strategy", *base.values(), *strategy.values(), None, t["horizon_days"])].append(t)
-        if t["view"] == "accuracy":
-            groups[("strategy_company", *base.values(), *strategy.values(), t["ticker"], "all")].append(t)
-        else:
-            groups[("pick_rule", *base.values(), None, t["family"], t["pick_rule"], None, "all")].append(t)
-    names = ("scope", "market", "view", "strategy_id", "family", "pick_rule", "ticker", "horizon_days")
-    return [score_row(dict(zip(names, key)), trades, rng)
-            for key, trades in sorted(groups.items(), key=lambda kv: str(kv[0]))]
+def scoreboard(settled: list[dict], costs: list[dict]) -> list[dict]:
+    """F7 rows built by B2's engine (marketbrief/lab/scoreboard.py: scopes strategy, strategy_company, pick_rule and
+    strategy_regime; the luck test with its correction; the your-cost block and the go-live bar), from the example
+    trades joined to their your-cost numbers in cost_view.json."""
+    your = {r["record_id"]: r for r in costs if r["record_kind"] == "settlement"}
+    trades = [{**t, "net_pnl_your": your[t["id"]]["net_pnl_your"], "return_pct_your": your[t["id"]]["return_pct_your"]}
+              if t["id"] in your else t for t in settled]
+    return lab_scoreboard.scoreboard(trades, "forward", SETTLED_UNTIL)
 
 
 def company_rows(agree: list[dict], open_trades: list[dict]) -> list[dict]:
@@ -199,13 +155,14 @@ def build_all(write, settle, today: list[dict], past: list[dict], specs: list[di
     agree = agreement(today)
     opens = open_trade_rows(past, picks_past)
     shown = [p for p in today if p["ticker"] in ("NVDA", "RELIANCE")]
-    write("cost_view.json", "cost_view", "cost_views", cost_rows(shown, picks_past + picks_today, settled, past))
+    costs = cost_rows(shown, picks_past + picks_today, settled, past)
+    write("cost_view.json", "cost_view", "cost_views", costs)
     write("prediction.json", "prediction", "strategy_predictions", shown)
     write("agreement.json", "agreement", None, agree)
     write("head_to_head_pick.json", "head_to_head_pick", "head_to_head_picks", picks_past + picks_today)
     write("paper_trade.json", "paper_trade", "paper_trades_settled", settled)
     write("open_trade.json", "open_trade", None, opens)
-    write("scoreboard_row.json", "scoreboard_row", None, scoreboard(settled))
+    write("scoreboard_row.json", "scoreboard_row", None, scoreboard(settled, costs))
     write("company.json", "company", None, company_rows(agree, opens))
     write("strategy.json", "strategy", None, [
         {**s, "live": s["live_from"] is not None,
