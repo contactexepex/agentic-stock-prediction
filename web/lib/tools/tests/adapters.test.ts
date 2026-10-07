@@ -121,11 +121,12 @@ test("the inbox store claims a key once with ON CONFLICT DO NOTHING and reads th
   const inbox = new MotherDuckInboxStore(query);
   const row = { inbox_id: "key-000001", kind: "watchlist_events", tool: "reactivate_company", market: "us", arguments: {}, preview: null,
     channel: "slack" as const, submitted_by: "slack:U1", agent: "slack-gateway", command_id: "cmd-1", submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64) };
-  assert.deepEqual(await inbox.claimRequest(row), { claimed: true, existing: null });
-  const again = await inbox.claimRequest(row);
+  const budget = { sinceIso: "2026-10-07T00:00:00Z", limit: 20 };
+  assert.deepEqual(await inbox.claimRequest(row, budget), { claimed: true, existing: null });
+  const again = await inbox.claimRequest(row, budget);
   assert.equal(again.claimed, false);
   assert.equal(again.existing?.command_id, "cmd-1");
-  assert.match(statements[0], /ON CONFLICT \(inbox_id\) DO NOTHING RETURNING inbox_id$/);
+  assert.match(statements[0], /WHERE \(SELECT count\(\*\) FROM inbox\.requests WHERE agent = \$9 AND submitted_at >= CAST\(\$13 AS TIMESTAMPTZ\)\) < CAST\(\$14 AS INTEGER\) ON CONFLICT \(inbox_id\) DO NOTHING RETURNING inbox_id$/);
 });
 
 test("redaction removes configured secrets and common token shapes", () => {

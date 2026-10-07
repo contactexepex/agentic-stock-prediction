@@ -154,8 +154,9 @@ export interface ReadStore {
 
 export interface InboxStore {
   usage(agent: string, sinceIso: string): Promise<AgentUsage>;
-  /** Inserts the request unless its inbox_id exists; returns the stored row when it does. */
-  claimRequest(row: InboxRequest): Promise<{ claimed: boolean; existing: InboxRequest | null }>;
+  /** Inserts the request in one statement unless its inbox_id exists or the agent already has `limit` requests since
+   * `sinceIso`. Not claimed: `existing` is the stored row of that key, or null when the day budget was the reason. */
+  claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: InboxRequest | null }>;
   appendCommand(row: CommandLogRow): Promise<void>;
   findCommand(id: string): Promise<CommandLogRow | null>;
 }

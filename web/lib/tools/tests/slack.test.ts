@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHANNEL, MSFT, SECRETS, TEAM, USER, commandParams, slackRig } from "./fakes.ts";
+import { CHANNEL, MSFT, SECRETS, USER, commandParams, slackRig } from "./fakes.ts";
 import { hmacHex } from "../crypto.ts";
 import { SLACK_CHANNEL_ID } from "../constants.ts";
 import { MAX_AGE_SECONDS, verifiedBody, verifySlackRequest } from "../../../app/slack/_lib/verify.ts";
@@ -52,13 +52,30 @@ test("/company add opens the form (market, symbol, optional amount) and writes n
   assert.equal(view.blocks[1].element.initial_value, "MSFT");
   assert.equal(view.blocks[2].optional, true);
   assert.equal(JSON.parse(view.private_metadata).key, "slk-testkey0001");
-  assert.equal(s.inbox.requests.length + s.inbox.commands.length, 0);
+  assert.equal(s.inbox.requests.length, 0);
+  assert.equal(s.inbox.commands.length, 1, "opening the form is logged (issue #82)");
+  assert.equal(s.inbox.commands[0].tool, "add_company");
+  assert.equal(s.inbox.commands[0].result, "accepted");
+  assert.equal(s.inbox.commands[0].message, "add form opened");
+});
+
+test("help and a form Slack fails to open are logged too (issue #82)", async () => {
+  const s = slackRig();
+  await handleCommand(commandParams("/company", "help"), s.deps);
+  assert.equal(s.inbox.commands.at(-1)?.message, "help shown");
+  s.slack.viewsOpen = async () => false;
+  const reply = await handleCommand(commandParams("/trade", ""), s.deps);
+  assert.match(JSON.stringify(reply.body), /could not be opened/);
+  assert.equal(s.inbox.commands.at(-1)?.result, "failed");
+  assert.equal(s.inbox.commands.at(-1)?.tool, "add_paper_trade");
+  assert.equal(s.notifier.reports.at(-1)?.result, "failed");
+  assert.equal(s.inbox.requests.length, 0);
 });
 
 function submission(callback: string, values: Record<string, unknown>, metadata: unknown) {
   const state: Record<string, Record<string, unknown>> = {};
   for (const [block, value] of Object.entries(values)) state[block] = { value };
-  return { type: "view_submission", user: { id: USER, team_id: TEAM }, team: { id: TEAM },
+  return { type: "view_submission", user: { id: USER },
     view: { id: "V0VIEW1", callback_id: callback, private_metadata: JSON.stringify(metadata), state: { values: state } } };
 }
 
@@ -111,7 +128,7 @@ test("deactivate, reactivate and amount show a confirm step; Confirm writes, Can
   const confirm = body.blocks[1].elements?.find((element) => element.action_id === "mb_confirm");
   assert.ok(confirm);
   assert.equal(s.inbox.requests.length, 0);
-  const click = (actionId: string, value: string, channel = CHANNEL) => ({ type: "block_actions", user: { id: USER, team_id: TEAM }, team: { id: TEAM },
+  const click = (actionId: string, value: string, channel = CHANNEL) => ({ type: "block_actions", user: { id: USER },
     channel: { id: channel }, response_url: "https://hooks.slack.com/actions/T/1/x", actions: [{ action_id: actionId, value }] });
   await handleInteraction(click("mb_cancel", "cancel") as never, s.deps);
   await s.settle();

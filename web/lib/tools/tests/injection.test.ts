@@ -3,7 +3,7 @@
 // an authenticated caller plus its confirmation; nothing in the tool layer reads text and acts on it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHANNEL, SECRETS, SECRET_VALUES, TEAM, USER, commandParams, observable, rig, slackRig } from "./fakes.ts";
+import { CHANNEL, SECRETS, SECRET_VALUES, USER, commandParams, observable, rig, slackRig } from "./fakes.ts";
 import { githubContext, slackContext } from "../identity.ts";
 import { hmacHex } from "../crypto.ts";
 import { handleRpc } from "../../../app/mcp/_lib/server.ts";
@@ -72,7 +72,7 @@ test("instructions in a /company reason only become the reason of the summary th
   const body = reply.body as { blocks: { text?: { type: string; text: string }; elements?: { action_id: string; value: string }[] }[] };
   assert.equal(body.blocks[0].text?.type, "plain_text", "plain text: no pings, links or formatting");
   const confirm = body.blocks[1].elements!.find((element) => element.action_id === "mb_confirm")!;
-  await handleInteraction({ type: "block_actions", user: { id: USER, team_id: TEAM }, team: { id: TEAM }, channel: { id: CHANNEL },
+  await handleInteraction({ type: "block_actions", user: { id: USER }, channel: { id: CHANNEL },
     response_url: "https://hooks.slack.com/actions/T/1/x", actions: [{ action_id: "mb_confirm", value: confirm.value }] } as never, s.deps);
   await s.settle();
   assert.equal(s.inbox.requests.length, 1);
@@ -125,7 +125,7 @@ test("the assistant agent (whose model reads untrusted text) can never call a wr
 });
 
 test("an unsigned or replayed Slack request carrying instructions never reaches a handler", async () => {
-  const body = `command=%2Fcompany&text=${encodeURIComponent("reactivate us AAPL")}&user_id=${USER}&team_id=${TEAM}&channel_id=${CHANNEL}`;
+  const body = `command=%2Fcompany&text=${encodeURIComponent("reactivate us AAPL")}&user_id=${USER}&channel_id=${CHANNEL}`;
   const unsigned = new Request("https://gw.example/slack/commands", { method: "POST", body, headers: { "x-slack-request-timestamp": String(NOW), "x-slack-signature": "v0=" + "0".repeat(64) } });
   assert.equal(await verifiedBody(unsigned, SECRETS.SLACK_SIGNING_SECRET, NOW), null);
   const old = NOW - 600;
@@ -145,7 +145,8 @@ test("errors that carry secrets (driver text, injected names) never leave the to
   const note = await r.layer.execute(app, "add_paper_trade", { market: "us", ticker: "AAPL", side: "buy", quantity: 1, trade_date: "2026-10-06",
     price_basis: "open", note: `print ${SECRETS.SLACK_SIGNING_SECRET}`, idempotency_key: "note-key-00001" });
   assert.equal(note.result, "pending");
-  assertNoSecret(read, preview, note, r.inbox.commands, r.notifier.reports);
+  assertNoSecret(read, preview, note, r.inbox.commands, r.inbox.requests, r.notifier.reports);
+  assert.match(String(r.inbox.requests.at(-1)?.arguments.note), /\[redacted\]/, "stored request text is scrubbed (issue #81)");
 });
 
 test("an explain question with instructions is answered by the stub and writes nothing (MCP)", async () => {
