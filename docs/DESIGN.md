@@ -657,6 +657,21 @@ numbers (value, scale, direction), the topic enum and that no buy/sell/recommend
 attachments are not parsed until `texts.pdf_parser` is set (needs `pypdf`), so India digests hold numbers only
 until then. The context pack does not show digests yet.
 
+### 3d. Company lifecycle (F8, B1; built 2026-10-07)
+
+The watchlist is the append-only kind `watchlist_events` (add, deactivate, reactivate, delete, set_amount), validated
+by `marketbrief/lifecycle/validator.py` and appended by `scripts/company.py` or the inbox import. The loader
+(`core/market_config.load_market`) folds the events as of the run's clock: active companies are collected,
+predicted and traded; inactive ones are collected only; deleted ones are neither collected nor shown. add and delete
+count from the moment they are recorded, deactivate, reactivate and set_amount from the next pre-open run
+(`config/lifecycle.yaml`), never before the company's newest event. A new company is onboarded before its add event:
+identifiers checked (India: NSE equity list and Yahoo `.NS`; US: SEC ticker/exchange file, NYSE or Nasdaq, and Yahoo),
+ETFs, BSE-only and unknown symbols refused, the sector set from `sector_rules` (NSE industry info or SEC SIC
+description, and Yahoo's profile) or by the owner, prices backfilled from the market's first stored day through the
+price collector's own code, 15 years of daily history merged into the long-history cache (work/model_history/), the
+company's news query, its SEC filings or NSE announcements, and the candidate's collect gate. Rows an onboarding
+stored before a refusal stay (append-only) and are reused when the add is retried.
+
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
    where available, implied vol. Range = quantiles of recent standardized returns scaled by that
@@ -978,7 +993,14 @@ always show the same numbers.
 - **Slack:** one thread per market per day: a short summary (mood, top 3, number of calls,
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
-  bot token the summary is posted alone through the webhook. Nothing else is posted.
+  bot token the summary is posted alone through the webhook. `notify_slack.py` posts nothing else.
+- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** `alerts.py` keeps its own
+  thread per market and day (its first post of the day starts it) with the morning paper picks, the intraday
+  alerts of each check run (B9's feed), the close results and correction replies. From Wave 5 the morning picks
+  open that thread and the brief above replies in it (`post_brief`), so each market has one thread a day. The
+  weekly research report is its own post and onboarding confirmations reply to the command that asked. Every signal is
+  labelled Paper and every number comes from stored data as of the run's clock. The ledger
+  `data/<market>/slack_posts/` makes every post idempotent.
 
 ## 9. Repo changes needed
 - `config/markets.yaml` (exchange, timezone, benchmark, regime index, holidays) and per-market
