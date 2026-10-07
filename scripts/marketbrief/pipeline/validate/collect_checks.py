@@ -224,7 +224,8 @@ def check_fetches(res: Result, cfg: dict, con, now: pd.Timestamp, today: date, v
 
 
 def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict) -> dict:
-    """Collector summaries saved by the routine (work/steps/<collector>.json); without them, today's
+    """Collector summaries saved by the routine (work/steps/<collector>.json); the prices summary's bars filled
+    from NSE's bhavcopy are returned as `filled_from_nse` (issue #35: for the report's data_quality); without them, today's
     row counts per kind stand in."""
     seen = {}
     steps = work_dir() / "steps"
@@ -281,4 +282,5 @@ def check_summaries(res: Result, cfg: dict, counts: dict, validate_config: dict)
         for kind in validate_config.get("expect_output") or {}:
             if counts.get(kind, 0) == 0 and kind in counts:
                 res.warn("EMPTY_OUTPUT", MSG_NO_ROWS_WRITTEN_TODAY_NO_COLLECTOR.format(kind=kind))
-    return {"summaries": sorted(seen), "rows_today": counts}
+    filled = [f"{bar.get('ticker')} {bar.get('date')}" for bar in (seen.get("prices") or {}).get("filled_from_nse") or []]
+    return {"summaries": sorted(seen), "rows_today": counts, **({"filled_from_nse": filled} if filled else {})}

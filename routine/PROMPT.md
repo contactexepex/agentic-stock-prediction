@@ -99,7 +99,8 @@ Warnings never block: list them in `data_quality`.
    List every `failed` entry of their summaries in `data_quality` (a session file missing for the
    latest session is only a note: it is published after the close).
    India: also list `collect_prices`' `filled_from_nse` bars (ticker, date) in `data_quality` as
-   "bar from the NSE bhavcopy (Yahoo had none)"; they are official exchange prices, not a failure.
+   "bar from the NSE bhavcopy (Yahoo had none)"; they are official exchange prices, not a failure
+   (`validate.py --stage collect` lists them under `info.collect.filled_from_nse`, ready to copy).
    Its `failed` entries with `missing_after_nse` (e.g. a price-basis mismatch after a split or
    bonus) or `sessions_behind` are real gaps: list them like any other failure.
    Both markets: list `collect_prices`' `adjustments` (a split or bonus recorded today; the bars

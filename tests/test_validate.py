@@ -214,6 +214,11 @@ def test_collector_summaries(root):
     (steps / "collect_news.json").write_text(json.dumps({"collector": "news", "market": "us", "new_items": 0,
                                                          "failed": [{"feed": "x"}]}))
     assert "EMPTY_OUTPUT" not in codes(run("collect"), "warnings")
+    assert "filled_from_nse" not in run("collect")["info"]["collect"]
+    (steps / "collect_prices.json").write_text(json.dumps({"collector": "prices", "market": "us", "new_bars": 5,
+                                                           "failed": [], "filled_from_nse": [
+                                                               {"ticker": "AAPL", "date": "2026-10-05", "close": 1.0}]}))
+    assert run("collect")["info"]["collect"]["filled_from_nse"] == ["AAPL 2026-10-05"]   # issue #35
 
 
 def test_adjustments_files_are_checked_whatever_their_ex_date(root):
