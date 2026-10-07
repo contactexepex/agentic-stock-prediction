@@ -5,10 +5,13 @@ plus the owner portfolio's EUR view and the lab CLI."""
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import subprocess
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import yaml
 from lab_fixtures import INDIA_RATES, US_RATES, prediction
@@ -16,7 +19,7 @@ from lab_fixtures import INDIA_RATES, US_RATES, prediction
 import common
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
-from marketbrief.lab import cli, registry, run
+from marketbrief.lab import cli, registry, reports, run, settle_run, sizing, timing
 from marketbrief.portfolio import service
 from marketbrief.portfolio.eur_view import lot_view
 
@@ -75,22 +78,34 @@ def test_settle_due_end_to_end(root):
     late = prediction("us", "AAPL", 2, made_at="2026-10-02T13:31:00+00:00")       # after the open: refused
     down = prediction("us", "AAPL", 3, direction="down", qualifies=False)          # never a trade
     write_jsonl(root, "us", "strategy_predictions", "2026-10-02", [good, late, down])
-    out = run.settle_due(connect("us"), cfg, NOW, betas={}, commits={})
+    out = settle_run.settle_due(connect("us"), cfg, NOW, betas={})
     assert out["written"] == 1 and out["refused_not_locked"] == [late["id"]]
     row = stored_trades()[0]
     # qty 10; EUR 0.99 x (1.10 + 1.20) = 2.277 -> 2.28, SEC 0.02 -> costs 2.30, net 17.70 (as test_lab_engine)
     assert (row["trade_id"], row["status"], row["net_pnl"], row["costs"]) == (f"acc:{good['id']}", "settled", 17.7,
                                                                             2.3)
-    assert run.settle_due(connect("us"), cfg, NOW, betas={}, commits={})["written"] == 0     # idempotent
+    # its your-cost view: + FX .0075 x 2020 = 15.15 + portfolio fee .002 x 1000 x 3 / 365 = 0.02 -> 17.47
+    view = connect("us").execute("SELECT record_kind, record_id, your_costs, net_pnl_your FROM cost_views").fetchall()
+    assert view == [("settlement", row["id"], 17.47, 2.53)]
+    assert settle_run.settle_due(connect("us"), cfg, NOW, betas={})["written"] == 0     # idempotent
     # a 2:1 split recorded later inside the window: the trade is re-settled as a new row
-    write_jsonl(root, "us", "adjustments", "2026-10-06", [{"id": "adj-AAPL-2026-10-05", "ticker": "AAPL",
-                                                           "ex_date": "2026-10-05", "factor": 0.5,
-                                                           "detected_at": "2026-10-06T22:00:00+00:00"}])
-    out = run.settle_due(connect("us"), cfg, NOW + timedelta(days=1), betas={}, commits={})
+    split = {"id": "adj-AAPL-2026-10-05", "ticker": "AAPL", "ex_date": "2026-10-05", "factor": 0.5,
+             "detected_at": "2026-10-06T22:00:00+00:00"}
+    write_jsonl(root, "us", "adjustments", "2026-10-06", [split])
+    out = settle_run.settle_due(connect("us"), cfg, NOW + timedelta(days=1), betas={})
     rows = stored_trades()
     assert out["written"] == 1 and len(rows) == 2
     assert rows[1]["supersedes"] == rows[0]["id"] and list(rows[1]["flags"]) == ["split_in_window", "resettled"]
     assert rows[1]["exit_quantity"] == 20.0
+    # the split was wrong: a correcting record (supersedes, factor 1) re-settles the trade again
+    write_jsonl(root, "us", "adjustments", "2026-10-07", [{"id": "adj-AAPL-2026-10-05-fix", "ticker": "AAPL",
+                                                           "ex_date": "2026-10-05", "factor": 1.0,
+                                                           "supersedes": split["id"],
+                                                           "detected_at": "2026-10-07T22:00:00+00:00"}])
+    out = settle_run.settle_due(connect("us"), cfg, NOW + timedelta(days=2), betas={})
+    rows = stored_trades()
+    assert out["written"] == 1 and rows[2]["supersedes"] == rows[1]["id"] and rows[2]["exit_quantity"] == 10.0
+    assert list(rows[2]["adjustment_ids"]) == ["adj-AAPL-2026-10-05-fix"] and rows[2]["net_pnl"] == 17.7
 
 
 def test_pick_day_end_to_end(root):
@@ -109,7 +124,63 @@ def test_pick_day_end_to_end(root):
                      ("rule", "best_expected_gain", "rule.model_news.v1", 1),
                      ("rule", "highest_probability", "rule.model_news.v1", 1)]
     again = run.pick_day(connect("us"), cfg, when, registry.strategies(), "2026-10-02")
-    assert again["written"] == 0
+    assert again["written"] == 0 and again["cost_views"] == 0
+    kinds = connect("us").execute("SELECT record_kind, count(*) FROM cost_views GROUP BY 1 ORDER BY 1").fetchall()
+    assert kinds == [("pick", 4), ("prediction", 2)] and out["cost_views"] == 6
+    # F1.8: no pick at or after D's open (13:30Z on 2 Oct)
+    late = run.pick_day(connect("us"), cfg, datetime(2026, 10, 2, 13, 30, tzinfo=timezone.utc), registry.strategies(),
+                        "2026-10-02")
+    assert late["ok"] is False and "before its open" in late["message"]
+
+
+def test_settlement_refuses_a_pick_made_after_the_open(root):
+    cfg = load_market("us")
+    pred = prediction("us", "AAPL", 1, target_price=101.0, lo80=98.0, hi80=104.0, base_close=100.0)
+    pick = {"id": "h2h:2026-10-01-AAPL-rule-highest_probability", "market": "us", "ticker": "AAPL",
+            "made_at": "2026-10-02T14:00:00+00:00", "session_date": "2026-10-02", "family": "rule",
+            "pick_rule": "highest_probability", "status": "picked", "strategy_id": pred["strategy_id"],
+            "prediction_id": pred["id"], "horizon_days": 1}
+    write_jsonl(root, "us", "strategy_predictions", "2026-10-02", [pred])
+    write_jsonl(root, "us", "head_to_head_picks", "2026-10-02", [pick])
+    out = settle_run.settle_due(connect("us"), cfg, NOW, betas={})
+    assert out["refused_not_locked"] == [pick["id"]] and out["written"] == 1           # the accuracy trade only
+    assert stored_trades()[0]["view"] == "accuracy"
+
+
+def test_shallow_clone_boundary_lines_are_undated(tmp_path):
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    def git(repo, *args):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
+                       env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+                            "GIT_COMMITTER_DATE": "2026-10-01T10:00:00+00:00"})
+    git(origin, "init", "-q")
+    data = origin / "d.jsonl"
+    data.write_text('{"id": "a"}\n')
+    git(origin, "add", "d.jsonl")
+    git(origin, "commit", "-q", "-m", "one")
+    data.write_text('{"id": "a"}\n{"id": "b"}\n')
+    git(origin, "commit", "-q", "-am", "two")
+    full = timing.first_commit_times(origin, data)
+    assert set(full) == {'{"id": "a"}', '{"id": "b"}'} and None not in full.values()
+    shallow = tmp_path / "shallow"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{origin}", str(shallow)], check=True,
+                   capture_output=True)
+    cut = timing.first_commit_times(shallow, shallow / "d.jsonl")
+    assert cut == {'{"id": "a"}': None, '{"id": "b"}': None}                        # both in the boundary commit
+    assert timing.in_git_repo(shallow) and not timing.in_git_repo(tmp_path)
+
+
+@pytest.mark.usefixtures("root")
+def test_amount_override_raises_or_lowers_the_amount():
+    cfg = load_market("india")
+    when = datetime(2026, 10, 2, tzinfo=timezone.utc)
+    assert sizing.trade_amount("india", "MARUTI", when, cfg) == 100000.0                 # the default
+    cfg["tickers"]["MARUTI"]["amount"] = 200000.0                                        # raised (decision 44)
+    assert sizing.trade_amount("india", "MARUTI", when, cfg) == 200000.0
+    cfg["tickers"]["MARUTI"]["amount"] = 10000.0                                         # lowered
+    assert sizing.trade_amount("india", "MARUTI", when, cfg) == 10000.0
 
 
 def test_eur_view_hand_checked():
@@ -131,11 +202,11 @@ def test_portfolio_positions_have_the_eur_view():
     assert added["ok"] is True
     out = service.positions_report(service.context("us"))
     view = out["eur_view"][0]
-    # 2 shares at the 2 Oct open 100; buy fee 0.99 x 1.10 = 1.089; cost (200 + 1.089) / 1.10 x 1.0025 = 183.2652;
-    # value 2 x 103 (the 6 Oct close) = 206 / 1.20 x 0.9975 = 171.2375; pnl -12.0277
+    # 2 shares at the 2 Oct open 100; buy fee 0.99 x 1.10 = 1.089; BUX Basic FX 0.75%: cost (200 + 1.089) / 1.10 x
+    # 1.0075 = 184.1792; value 2 x 103 (the 6 Oct close) = 206 / 1.20 x 0.9925 = 170.3792; pnl -13.8000
     assert (view["eurusd_at_buy"], view["eurusd_now"], view["cost_eur"], view["value_eur"]) == (
-        1.1, 1.2, 183.27, 171.24)
-    assert view["pnl_eur"] == -12.03 and view["fx_effect_eur"] == round(206 / 1.2 - 206 / 1.1, 2)
+        1.1, 1.2, 184.18, 170.38)
+    assert view["pnl_eur"] == -13.8 and view["fx_effect_eur"] == round(206 / 1.2 - 206 / 1.1, 2)
 
 
 @pytest.mark.usefixtures("root")
@@ -145,3 +216,20 @@ def test_cli_summary_and_predict_without_b10(capsys):
     assert summary["scoreboard"] == [] and summary["basis"] == "forward"
     assert cli.main(["--market", "us", "predict"]) == 2                          # B10's scores not built yet
     assert "B10" in json.loads(capsys.readouterr().out)["message"]
+
+
+@pytest.mark.usefixtures("root")
+def test_backtest_reads_as_of_the_clock_and_adds_the_history_cache(monkeypatch):
+    cfg = load_market("us")
+    out = reports.run_backtest(connect("us"), cfg, NOW, history=False)
+    assert out["eurusd"] == "stored EURUSD closes" and out["first_date"] == "2026-10-02"
+    early = reports.run_backtest(connect("us"), cfg, datetime(2026, 10, 3, tzinfo=timezone.utc), history=False)
+    assert early["last_date"] == "2026-10-02"                    # bars collected after the clock are not read
+    days = pd.DatetimeIndex(["2026-09-29", "2026-09-30", "2026-10-01"])
+    cached = {"AAPL": pd.DataFrame({"open": [98.0, 99.0, 99.5], "high": [99.0] * 3, "low": [97.0] * 3,
+                                    "close": [98.5, 99.2, 100.0], "volume": [1.0] * 3}, index=days)}
+    monkeypatch.setattr(reports, "load_cache", lambda _market: (cached, {}))
+    out = reports.run_backtest(connect("us"), cfg, NOW, history=True)
+    assert out["first_date"] == "2026-09-29" and out["splice"]["AAPL"]["cache_rows"] == 3
+    always = next(r for r in out["rows"] if (r["strategy_id"], r["horizon_days"]) == ("base.always_up.v1", 1))
+    assert always["trades"] == 4                                 # 6 sessions -> 4 N+1 trades (29 Sep .. 2 Oct)

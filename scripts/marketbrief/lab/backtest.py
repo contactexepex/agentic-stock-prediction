@@ -4,8 +4,10 @@ cache's earlier dates with --history (model/history_cache.py). Labelled basis "b
 forward results; written only to the output folder, never to data/.
 
 Each as-of row t of a ticker (its own stored sessions): entry at the open of the next row (D), exit at the close of
-the k-th row after D (N+k), the market's default amount, the quantity rule of F1.4, the costs of lab/costs.py (US
-order fee at the EUR/USD close on or before each side, from the stored or cached EURUSD bars). Limits: today's
+the k-th row after D (N+k), the market's default amount, the quantity rule of F1.4, both cost views of
+lab/costs.py (the engine's own cost code; US order fee at the EUR/USD close on or before each side, from the
+stored or cached EURUSD bars; portfolio fee
+over the calendar days held). Net profit and return are in the market view; `your_cost` repeats them. Limits: today's
 watchlist (survivorship bias), split adjustment as of the fetch, no target or range (no stored ranges in the past)."""
 from __future__ import annotations
 
@@ -13,28 +15,23 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.contracts.watchlist import DEFAULT_AMOUNT
+from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.constants import (MIN_RANKED_TRADES, MONEY_DIGITS, PCT_DIGITS, PERCENT, PROB_DIGITS,
                                        SIGNAL_ALWAYS_UP, SIGNAL_MODEL, SIGNAL_MOMENTUM)
 from marketbrief.lab.luck import luck_test
 
 
-def frame_costs(market: str, rate: dict, values: tuple[np.ndarray, np.ndarray], shares: np.ndarray,
-                eurusd: tuple[np.ndarray, np.ndarray]) -> np.ndarray:
-    """lab/costs.round_trip_costs for arrays (each line rounded to cents, then summed)."""
-    entry, exit_ = values
-    both = entry + exit_
-    if market == "india":
-        brokerage, exchange = rate.get("brokerage_each_side", 0.0) * both, rate["exchange_txn_each_side"] * both
-        sebi = rate["sebi_fee_each_side"] * both
-        dp = np.maximum(rate.get("dp_charge_min", 0.0), rate.get("dp_charge_rate", 0.0) * exit_)
-        lines = [brokerage, rate["stt_each_side"] * both, exchange, sebi, rate["stamp_duty_buy"] * entry, dp,
-                 rate["gst_rate"] * (brokerage + exchange + sebi + dp), rate.get("slippage_each_side", 0.0) * both]
-    else:
-        fee = rate.get("order_fee_eur", 0.0)
-        lines = [fee * eurusd[0] + fee * eurusd[1], rate["sec_fee_sell"] * exit_,
-                 np.minimum(rate["finra_taf_per_share_sell"] * shares, rate["finra_taf_max_per_trade"]),
-                 rate.get("commission_each_side", 0.0) * both, rate.get("slippage_each_side", 0.0) * both]
-    return np.sum([np.round(line, MONEY_DIGITS) for line in lines], axis=0)
+def trade_costs(market: str, rate: dict, values: tuple[np.ndarray, np.ndarray], shares: np.ndarray,
+                extra: dict) -> tuple[np.ndarray, np.ndarray]:
+    """(market-view, your-view) round-trip costs per trade, each from lab/costs.cost_views (the engine's own
+    cost code). extra: eurusd = (entry rates, exit rates), holding_days per trade."""
+    market_view, your_view = np.zeros(len(shares)), np.zeros(len(shares))
+    for n in range(len(shares)):
+        views = lab_costs.cost_views(market, rate, (float(values[0][n]), float(values[1][n])), float(shares[n]),
+                                     {"eurusd": (extra["eurusd"][0][n], extra["eurusd"][1][n]),
+                                      "holding_days": int(extra["holding_days"][n])})
+        market_view[n], your_view[n] = views["market"]["total"], views["your"]["total"]
+    return market_view, your_view
 
 
 def rate_series(eurusd: pd.Series | None, dates: pd.Series) -> np.ndarray:
@@ -59,15 +56,22 @@ def ticker_trades(market: str, bars: pd.DataFrame, horizon: int, context: dict) 
     entry_price, exit_price = opens[1:n + 1], closes[1 + horizon:n + 1 + horizon]
     shares = np.floor(amount / entry_price) if market == "india" else np.round(amount / entry_price, 6)
     entry_value, exit_value = shares * entry_price, shares * exit_price
-    fx = (rate_series(context.get("eurusd"), dates[1:n + 1]), rate_series(context.get("eurusd"),
-                                                                          dates[1 + horizon:n + 1 + horizon]))
-    cost = frame_costs(market, context["rate"], (entry_value, exit_value), shares, fx)
-    net = exit_value - entry_value - cost
+    entries, exits = dates[1:n + 1].to_numpy(), dates[1 + horizon:n + 1 + horizon].to_numpy()
+    keep = shares > 0
+    fx = (rate_series(context.get("eurusd"), pd.Series(entries)), rate_series(context.get("eurusd"), pd.Series(exits)))
+    fx = tuple(np.where(np.isnan(side), None, side) for side in fx)
+    days = (pd.DatetimeIndex(exits) - pd.DatetimeIndex(entries)).days.to_numpy()
+    market_cost, your_cost = np.zeros(n), np.zeros(n)
+    if keep.any():
+        market_cost[keep], your_cost[keep] = trade_costs(
+            market, context["rate"], (entry_value[keep], exit_value[keep]), shares[keep],
+            {"eurusd": (fx[0][keep], fx[1][keep]), "holding_days": days[keep]})
+    net, net_your = exit_value - entry_value - market_cost, exit_value - entry_value - your_cost
     previous = np.concatenate([[np.nan], closes[:-1]])
-    out = pd.DataFrame({"as_of": dates[:n].to_numpy(), "entry_date": dates[1:n + 1].to_numpy(),
-                        "exit_date": dates[1 + horizon:n + 1 + horizon].to_numpy(), "shares": shares,
-                        "net_pnl": net, "return_pct": net / amount * PERCENT, "up_last": closes[:n] > previous[:n]})
-    return out[out["shares"] > 0]
+    out = pd.DataFrame({"as_of": dates[:n].to_numpy(), "entry_date": entries, "exit_date": exits, "shares": shares,
+                        "net_pnl": net, "return_pct": net / amount * PERCENT, "net_pnl_your": net_your,
+                        "return_pct_your": net_your / amount * PERCENT, "up_last": closes[:n] > previous[:n]})
+    return out[keep]
 
 
 def signal_mask(trades: pd.DataFrame, spec: dict, probs: pd.Series | None) -> np.ndarray:
@@ -99,6 +103,9 @@ def summary(trades: pd.DataFrame, key: str, m: int) -> dict:
             "win_rate": round(float((net > 0).mean()), PROB_DIGITS) if len(net) else None,
             "worst_losing_streak": worst,
             "max_drawdown": round(min(drawdown, 0.0), MONEY_DIGITS),
+            "your_cost": {"net_pnl": round(float(trades["net_pnl_your"].sum()), MONEY_DIGITS),
+                          "mean_return_pct": round(float(trades["return_pct_your"].mean()), PCT_DIGITS)
+                          if len(net) else None},
             "target_reached_rate": None, "median_reached_session": None, "avg_target_error_pct": None,
             "range_hit_rate": None, "luck_test": luck_test(returns.tolist(), key, m),
             "sample_badge": "too_few_to_rank" if len(net) < MIN_RANKED_TRADES else "ok",

@@ -26,6 +26,8 @@ from marketbrief.contracts.protocol import MIN_TRADES_PER_COMPANY
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.constants import (BASIS_ALL, BASIS_PER_COMPANY, MONEY_DIGITS, PCT_DIGITS, PERCENT, PICK_GAIN,
                                        PICK_PROBABILITY, STATUS_SETTLED, VIEW_ACCURACY, Z80)
+from marketbrief.lab.cost_views import viability
+from marketbrief.lab.scoreboard import latest_settlements
 from marketbrief.lab.sizing import quantity
 
 
@@ -64,16 +66,29 @@ def costs_pct(market: str, rate: dict, amount: float, close: float, eurusd: floa
     return total / amount * PERCENT
 
 
-def candidate(pred: dict, market: str, rate: dict, eurusd: float | None) -> dict:
-    """One Candidate (contracts/protocol.py) of a qualifying prediction."""
+def candidate(pred: dict, market: str, rate: dict, eurusd: float | None) -> dict | None:
+    """One Candidate (contracts/protocol.py) of a qualifying prediction, with its cost-viable flag (decision 51);
+    None when one share at C costs more than the amount (the trade would be skipped)."""
     close, prob = float(pred["base_close"]), float(pred["prob_up"])
+    if quantity(market, float(pred["amount"]), close) <= 0:
+        return None
     move, loss = conditional_move_loss(close, pred["target_price"], pred["lo80"], pred["hi80"])
     cost = costs_pct(market, rate, float(pred["amount"]), close, eurusd)
     gain = prob * move - (1 - prob) * loss - cost
     return {"horizon_days": int(pred["horizon_days"]), "prediction_id": pred["id"], "prob_up": prob,
             "move_pct": round(move, PCT_DIGITS), "loss_pct": round(loss, PCT_DIGITS),
             "costs_pct": round(cost, PCT_DIGITS), "expected_gain_pct": round(gain, PCT_DIGITS),
-            "gain_per_session_pct": round(gain / int(pred["horizon_days"]), PCT_DIGITS)}
+            "gain_per_session_pct": round(gain / int(pred["horizon_days"]), PCT_DIGITS), **cost_flags(pred, rate,
+                                                                                                    eurusd)}
+
+
+def cost_flags(pred: dict, rate: dict, eurusd: float | None) -> dict:
+    """expected_move_pct, your_cost_pct and cost_viable of decision 51 (lab/cost_views.py)."""
+    found = viability(pred, rate, eurusd)
+    return {"expected_move_pct": None if found["expected_move_pct"] is None else round(found["expected_move_pct"],
+                                                                                       PCT_DIGITS),
+            "your_cost_pct": None if found["your_cost_pct"] is None else round(found["your_cost_pct"], PCT_DIGITS),
+            "cost_viable": found["cost_viable"]}
 
 
 def pick(candidates: list[dict], rule: str) -> dict | None:
@@ -93,7 +108,7 @@ def ranking(family_ids: list[str], ticker: str, trades: list[dict]) -> list[dict
     """Decision 41 ranking (corrected) from settled accuracy-view trades of the market: [{strategy_id, rank,
     basis, settled_trades, net_pnl}] (net_pnl and trades on the company for per_company, else on all companies)."""
     stats = {sid: {"own": [0, 0.0], "all": [0, 0.0]} for sid in family_ids}
-    for trade in trades:
+    for trade in latest_settlements(trades):           # a re-settled trade counts once, at its newest row
         sid = trade["strategy_id"]
         if sid not in stats or trade["view"] != VIEW_ACCURACY or trade["status"] != STATUS_SETTLED:
             continue
@@ -131,7 +146,7 @@ def pick_rows(ticker: str, family: str, context: dict, preds: list[dict], trades
     best = strongest(rank, mine)
     chosen = sorted((p for p in mine if best and p["strategy_id"] == best["strategy_id"]),
                     key=lambda p: p["horizon_days"])
-    candidates = [candidate(p, context["market"], context["rate"], context["eurusd"]) for p in chosen]
+    candidates = [c for c in (candidate(p, context["market"], context["rate"], context["eurusd"]) for p in chosen) if c]
     rows = []
     for rule in (PICK_GAIN, PICK_PROBABILITY):
         chosen_one = pick(candidates, rule)

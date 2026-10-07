@@ -9,7 +9,8 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from marketbrief.constants.kinds import KIND_HEAD_TO_HEAD_PICKS, KIND_PAPER_TRADES_SETTLED, KIND_STRATEGY_PREDICTIONS
+from marketbrief.constants.kinds import (KIND_COST_VIEWS, KIND_HEAD_TO_HEAD_PICKS, KIND_PAPER_TRADES_SETTLED,
+                                         KIND_STRATEGY_PREDICTIONS)
 from marketbrief.core.market_config import benchmark_key
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab import costs as lab_costs
@@ -88,8 +89,15 @@ def picks(con, now: datetime) -> list[dict]:
 
 
 def settlements(con, now: datetime) -> list[dict]:
-    """paper_trades_settled rows settled by `now`."""
-    return stored(con, KIND_PAPER_TRADES_SETTLED, "settled_at", now)
+    """paper_trades_settled rows settled by `now`, each with its "your cost" view (owner decision 50) from the
+    cost_views settlement row stored by `now`: net_pnl_your, return_pct_your, your_costs (None when absent)."""
+    rows = stored(con, KIND_PAPER_TRADES_SETTLED, "settled_at", now)
+    views = {v["record_id"]: v for v in stored(con, KIND_COST_VIEWS, "computed_at", now)
+             if v["record_kind"] == "settlement"}
+    for row in rows:
+        view = views.get(row["id"]) or {}
+        row.update({key: view.get(key) for key in ("net_pnl_your", "return_pct_your", "your_costs")})
+    return rows
 
 
 def bars_by_symbol(con, cfg: dict, now: datetime, symbols: list[str], start: date | None) -> dict:

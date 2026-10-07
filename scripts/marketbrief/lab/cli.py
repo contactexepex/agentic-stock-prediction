@@ -24,7 +24,7 @@ from marketbrief.core.clock import clock
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
 from marketbrief.lab import costs as lab_costs
-from marketbrief.lab import pick_study, predict_inputs, registry, reports, run
+from marketbrief.lab import pick_study, predict_inputs, registry, reports, run, settle_run
 from marketbrief.lab.constants import MSG_NO_HORIZON_SCORES
 from marketbrief.lab.strategies import company_rows
 from marketbrief.model.settings import load_model_config
@@ -76,8 +76,8 @@ def pick_study_result() -> dict:
         cfg = load_market(market)
         con = connect(market)
         settings = {**STUDY, "amount": DEFAULT_AMOUNT[market], "eurusd": STUDY["eurusd_fallback"]}
-        out[market] = pick_study.history_spread(market, reports.study_inputs(con, cfg), registry.horizons(), rates,
-                                                settings)
+        bars = reports.study_inputs(con, cfg, clock())
+        out[market] = pick_study.history_spread(market, bars, registry.horizons(), rates, settings)
     return out
 
 
@@ -92,10 +92,10 @@ def dispatch(args) -> dict:
     commands = {
         "pick": lambda: run.pick_day(con, cfg, now, registry.strategies(),
                                      str(args.session or run.session_of(cfg, now))),
-        "settle": lambda: run.settle_due(con, cfg, now),
+        "settle": lambda: settle_run.settle_due(con, cfg, now),
         "news-impact": lambda: reports.write_news_impact(con, cfg, now),
         "summary": lambda: reports.lab_summary(con, now),
-        "backtest": lambda: reports.run_backtest(con, cfg, args.history, args.eurusd),
+        "backtest": lambda: reports.run_backtest(con, cfg, now, args.history, args.eurusd),
     }
     return commands[args.command]()
 

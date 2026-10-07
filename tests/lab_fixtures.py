@@ -3,8 +3,9 @@
 US (XNYS): predictions made Friday 2026-10-02 11:45Z, so D = Friday 2 Oct; N+1 = Monday 5 Oct ... N+5 = Friday 9 Oct.
 India (XNSE): made Wednesday 2026-09-30 02:10Z, so D = Wednesday 30 Sep; N+1 = Thursday 1 Oct; 2 Oct is a holiday,
 so N+2 = Monday 5 Oct ... N+5 = Thursday 8 Oct.
-Bars are (open, high, low, close). Rates are the provisional ones of docs/SPEC.md F1.6 (fixed here, so a config
-change does not move the hand-checked numbers)."""
+Bars are (open, high, low, close). Rates are the owner-provided ones of decisions 49-52 (Axis Direct NRI Normal
+tier, BUX Basic; the DP charge stays the provisional SPEC F1.6 value), fixed here so a config change does not move
+the hand-checked numbers."""
 from __future__ import annotations
 
 import sys
@@ -16,11 +17,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.lab.market_data import MarketData  # noqa: E402
 
-INDIA_RATES = {"brokerage_each_side": 0.0025, "stt_each_side": 0.001, "exchange_txn_each_side": 0.0000307,
-               "sebi_fee_each_side": 0.000001, "stamp_duty_buy": 0.00015, "gst_rate": 0.18, "slippage_each_side": 0.0,
+INDIA_RATES = {"brokerage_each_side": 0.0075, "brokerage_min_per_order": 50.0, "stt_each_side": 0.001,
+               "exchange_txn_each_side": 0.0000307, "sebi_fee_each_side": 0.000001, "stamp_duty_buy": 0.00015,
+               "gst_rate": 0.18, "slippage_each_side": 0.0, "nri_reporting_per_trade_date": 200.0,
                "dp_charge_min": 30.0, "dp_charge_rate": 0.0004}
 US_RATES = {"commission_each_side": 0.0, "sec_fee_sell": 0.0000206, "finra_taf_per_share_sell": 0.0,
-            "finra_taf_max_per_trade": 0.0, "slippage_each_side": 0.0, "order_fee_eur": 0.99}
+            "finra_taf_max_per_trade": 0.0, "slippage_each_side": 0.0, "order_fee_eur": 0.99, "fx_fee_rate": 0.0075,
+            "portfolio_fee_per_year": 0.002}
 NOW = datetime(2026, 10, 12, 0, 0, tzinfo=timezone.utc)
 US_MADE, INDIA_MADE = "2026-10-02T11:45:00+00:00", "2026-09-30T02:10:00+00:00"
 US_EXITS = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]
@@ -53,6 +56,7 @@ INDIA_BARS = {
                       "2026-10-07": (2050, 2070, 2045, 2060), "2026-10-08": (2060, 2080, 2050, 2070)}),
     "HDFCBANK": days({"2026-09-30": (1000, 1010, 995, 1005), "2026-10-01": (1005, 1020, 1000, 1015),
                       "2026-10-05": (510, 518, 505, 515), "2026-10-06": (515, 525, 512, 520)}),   # 2:1 split 5 Oct
+    "ITC": days({"2026-09-30": (1000, 1010, 995, 1005), "2026-10-01": (1005, 1025, 1000, 1020)}),   # min brokerage
     "MARUTI": days({"2026-09-30": (150000, 151000, 149000, 150500), "2026-10-01": (150500, 151000, 150000, 150800)}),
     "NIFTY50": days({"2026-09-30": (25000, 25100, 24900, 25050), "2026-10-01": (25050, 25300, 25000, 25250)}),
 }

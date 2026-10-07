@@ -10,8 +10,9 @@
 # The backtest applies these rates to every past date (earlier dates had other rates, e.g. the SEC fee was
 # $0 per million until 2026-04-03 per the advisory below).
 # Not modelled: bid-ask spread and slippage (fills assumed at the official open and close prices; set
-# slippage_each_side to stress-test), and India's flat DP charge per scrip sold (a rupee amount per sale,
-# not a rate; it depends on position size).
+# slippage_each_side to stress-test). The signal model's backtest also leaves out India's flat DP charge per
+# scrip sold (a rupee amount per sale, not a rate); the paper-trading engine models it in the "your cost" view
+# (`broker:` below).
 india:
   # Equity delivery (the holds span at least one night, so delivery rates apply, not intraday).
   brokerage_each_side: 0.0          # verify. ASSUMPTION: a discount broker charging Rs 0 on delivery trades
@@ -46,30 +47,35 @@ us:
 # Broker charges of the paper-trading engine (B2: marketbrief/lab/costs.py, docs/SPEC.md F1.6) and of the owner's
 # paper portfolio (scripts/portfolio.py, F1.11), on top of the statutory rates above (india: STT, exchange, SEBI,
 # stamp duty, GST; us: SEC fee, FINRA TAF). The model's backtest keeps the sections above unchanged.
-# PROVISIONAL: the owner's actual plans are not confirmed (SPEC section 11, owner action). Every value is marked
-# "verify" and backed only by SECONDARY SOURCES (search results, 2026-10-07); the official broker pages were NOT
-# opened from this environment. Wave 5 switches on live paper trading only after the owner confirms them.
+# Owner decisions 49-52 (2026-10-07): the values marked "owner-provided" come from the brokers' published
+# schedules as the owner researched them (Axis Direct NRI, Normal tier, Non-PIS account; BUX Basic, investor in the
+# Netherlands with a EUR account); they are NOT yet checked against a contract note. Two cost views (decision 50):
+#   market: brokerage, statutory taxes, exchange and regulatory fees (what any investor pays; strategies are
+#           ranked on it);
+#   your:   market + the owner-specific items marked `your_view` below (the go-live bar and the owner's money
+#           decisions use it).
+# Wave 5 switches on live paper trading only after the owner confirms them.
 broker:
   india:
-    name: Axis Direct
-    # verify. SECONDARY SOURCE: 0.25% delivery brokerage per side after the plan's free turnover ("Now or Never",
-    # https://comparesharebrokers.com/faq/what-is-axis-direct-brokerage-charges/515 and
-    # https://stest.finology.in/broker/axis-direct/plans); the same search showed Axis Bank's own demat page
-    # quoting 0.20% for that plan (https://www.axis.bank.in/investment/demat-account, not opened) and 0.50% for
-    # "Investment Plus" (SPEC F1.6). The owner confirms the plan from a contract note.
-    brokerage_each_side: 0.0025
-    # verify. SECONDARY SOURCE: DP charge per scrip sold, Rs 30 or 0.04% of the sale value, the higher (SPEC
-    # F1.6: a source quoted it for NRI accounts; no page found for a resident account). GST applies to it.
+    name: Axis Direct (NRI, Normal tier, Non-PIS)
+    brokerage_each_side: 0.0075        # verify. owner-provided; verify with a contract note: 0.75% of trade value per side
+    brokerage_min_per_order: 50.0      # verify. owner-provided; verify with a contract note: minimum Rs 50 per order
+    # GST 18% applies to brokerage + exchange transaction charge + SEBI fee (`gst_rate` above, owner-provided).
+    # STT 0.1% each side and stamp duty 0.015% on the buy side: as above (owner-provided figures agree).
+    nri_reporting_per_trade_date: 200.0   # your_view. verify. owner-provided; verify with a contract note: NRO
+                                          # Non-PIS reporting charge Rs 200 per trade date, on the purchase date and
+                                          # again on the sale date
+    # your_view. verify. SECONDARY SOURCE (unchanged provisional value): DP charge per scrip sold, Rs 30 or 0.04% of
+    # the sale value, the higher (docs/SPEC.md F1.6: a source quoted it for NRI accounts).
     dp_charge_min: 30.0
     dp_charge_rate: 0.0004
+    demat_amc_per_year: 885.0          # owner-provided, about Rs 885 a year; not per trade, so in no trade's cost
   us:
-    name: BUX
-    # verify. SECONDARY SOURCE: EUR 0.99 per US-share order (https://curvo.eu/article/bux-review,
-    # https://investingintheweb.com/broker-reviews/bux-review/; getbux.com pricing quoted in search results, not
-    # opened). Applied per side, converted to USD at the EUR/USD close (symbol below) of that side's session.
-    order_fee_eur: 0.99
-    # verify. SECONDARY SOURCE: FX markup 0.25% on EUR->USD (getbux.com pricing as quoted in search results; a 2026
-    # directory, https://www.findmymoat.com/tools/bux, lists Basic 0.75%, Plus 0.25%, Prime 0.20%). USD->EUR not
-    # found; the same rate is assumed. Used only by the owner's EUR view; strategies are compared in USD.
-    fx_fee_rate: 0.0025
-    eurusd_symbol: EURUSD     # config/markets/us.yaml symbols key (Yahoo EURUSD=X, role fx)
+    name: BUX Basic
+    order_fee_eur: 0.99                # verify. owner-provided; verify with a contract note: EUR 0.99 per order,
+                                       # converted to USD at the EUR/USD close (symbol below) of that side's session
+    fx_fee_rate: 0.0075                # your_view. verify. owner-provided (BUX Basic): FX markup 0.75% of the
+                                       # transaction value on each EUR<->USD conversion, on the buy and again on the sale
+    portfolio_fee_per_year: 0.002      # your_view. verify. owner-provided: 0.20% a year, pro-rated over the holding
+                                       # days (calendar days from D to the exit session) on the entry value
+    eurusd_symbol: EURUSD              # config/markets/us.yaml symbols key (Yahoo EURUSD=X, role fx)

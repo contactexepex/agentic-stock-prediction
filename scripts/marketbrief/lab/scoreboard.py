@@ -5,8 +5,11 @@ x basis and, as `scope`:
   pick_rule         head-to-head per family and pick rule, all horizons and each horizon (head-to-head portfolios);
   strategy_regime   per strategy and the regime at prediction time, all horizons (F2.6: the effect of regimes is
                     measured, not assumed).
-Each row: trades, net_pnl (headline), mean_return_pct, win_rate, target_reached_rate and median_reached_session
-(F1.9, over trades with a target), avg_target_error_pct, range_hit_rate, worst_losing_streak, max_drawdown, the
+Every money and return number is in the "market cost" view (owner decision 50: strategies are ranked on it);
+`your_cost` repeats net profit, return, win rate, streak, drawdown and the luck test in the "your cost" view,
+which the go-live bar uses. Each row: trades, net_pnl (headline), mean_return_pct, win_rate, target_reached_rate
+and median_reached_session (F1.9, over trades with a target), avg_target_error_pct, range_hit_rate,
+worst_losing_streak, max_drawdown, the
 luck test (lab/luck.py; m = the rows compared in the same scope, market, view, basis, company, regime and
 horizon), sample_badge and, for strategy rows, the go-live bar (F7.2, the spec's proposals until the owner
 sets them)."""
@@ -35,14 +38,14 @@ def latest_settlements(rows: list[dict]) -> list[dict]:
     return [newest[key] for key in sorted(newest)]
 
 
-def sequence_stats(trades: list[dict]) -> tuple[int, float]:
-    """(worst losing streak, max drawdown of cumulative net profit) in exit order."""
+def sequence_stats(trades: list[dict], net: str = "net_pnl") -> tuple[int, float]:
+    """(worst losing streak, max drawdown of cumulative net profit) in exit order, on the `net` column."""
     streak = worst = 0
     total = peak = drawdown = 0.0
     for trade in trades:
-        streak = streak + 1 if trade["net_pnl"] < 0 else 0
+        streak = streak + 1 if trade[net] < 0 else 0
         worst = max(worst, streak)
-        total += trade["net_pnl"]
+        total += trade[net]
         peak = max(peak, total)
         drawdown = min(drawdown, total - peak)
     return worst, drawdown
@@ -91,29 +94,48 @@ def slice_keys(trade: dict, basis: str) -> list[tuple]:
     return keys
 
 
-def regime_holds(trades: list[dict]) -> bool | None:
+def your_view(trades: list[dict], key: str, m: int) -> dict | None:
+    """The slice in the "your cost" view (owner decision 50: market cost plus the owner-specific items), or None
+    when a trade has no your-cost row: net_pnl, mean_return_pct, win_rate, worst_losing_streak, max_drawdown and
+    the luck test on return_pct_your."""
+    if any(t.get("net_pnl_your") is None for t in trades):
+        return None
+    trades = sorted(trades, key=lambda t: (str(t["exit_date_actual"]), t["trade_id"]))
+    worst, drawdown = sequence_stats(trades, "net_pnl_your")
+    returns = [t["return_pct_your"] for t in trades]
+    return {"net_pnl": round(sum(t["net_pnl_your"] for t in trades), MONEY_DIGITS),
+            "mean_return_pct": round(statistics.fmean(returns), PCT_DIGITS),
+            "win_rate": round(sum(t["net_pnl_your"] > 0 for t in trades) / len(trades), PROB_DIGITS),
+            "worst_losing_streak": worst, "max_drawdown": round(drawdown, MONEY_DIGITS),
+            "luck_test": luck_test(returns, f"your|{key}", m)}
+
+
+def regime_holds(trades: list[dict], net: str = "net_pnl") -> bool | None:
     """True when net profit is positive both in calm and in volatile (UNSTABLE / EVENT_HEAVY) regimes; None while
     one of them has no trade."""
-    calm = [t["net_pnl"] for t in trades if t.get("regime") not in FILTERED_REGIMES]
-    rough = [t["net_pnl"] for t in trades if t.get("regime") in FILTERED_REGIMES]
+    calm = [t[net] for t in trades if t.get("regime") not in FILTERED_REGIMES]
+    rough = [t[net] for t in trades if t.get("regime") in FILTERED_REGIMES]
     if not calm or not rough:
         return None
     return sum(calm) > 0 and sum(rough) > 0
 
 
 def go_live(row: dict, trades: list[dict], best_baseline: float | None) -> dict:
-    """F7.2 position against the go-live bar (accuracy view, forward basis)."""
+    """F7.2 position against the go-live bar (accuracy view, forward basis), on the "your cost" view (owner
+    decision 50; the market view only while a trade lacks its your-cost row, named in `cost_view`)."""
     months = (date.fromisoformat(row["last_exit"]) - date.fromisoformat(row["first_entry"])).days / DAYS_PER_MONTH
     limit = DRAWDOWN_LIMIT_AMOUNTS * DEFAULT_AMOUNT[row["market"]]
-    beats = None if best_baseline is None else bool(row["net_pnl"] > best_baseline and row["luck_test"]["corrected"])
-    holds = regime_holds(trades)
-    drawdown_ok = -row["max_drawdown"] <= limit
+    view = row.get("your_cost") or row
+    beats = None if best_baseline is None else bool(view["net_pnl"] > best_baseline and view["luck_test"]["corrected"])
+    holds = regime_holds(trades, "net_pnl_your" if row.get("your_cost") else "net_pnl")
+    drawdown_ok = -view["max_drawdown"] <= limit
     proven = bool(row["view"] == VIEW_ACCURACY and row["basis"] == "forward" and months >= GO_LIVE_MONTHS
                   and row["trades"] >= GO_LIVE_TRADES and beats and drawdown_ok and holds)
     return {"proven": proven, "months_forward": round(months, 2), "trades_needed": max(GO_LIVE_TRADES - row["trades"],
                                                                                          0),
             "beats_best_baseline": beats, "best_baseline_net_pnl": best_baseline, "drawdown_limit": limit,
-            "drawdown_within_limit": drawdown_ok, "holds_in_calm_and_volatile": holds}
+            "drawdown_within_limit": drawdown_ok, "holds_in_calm_and_volatile": holds,
+            "cost_view": "your" if row.get("your_cost") else "market"}
 
 
 def peer_key(key: tuple) -> tuple:
@@ -138,12 +160,14 @@ def scoreboard(settled: list[dict], basis: str = "forward", as_of: str | None = 
         row.update(metrics(trades))
         m = peers[peer_key(key)]
         row["luck_test"] = luck_test([t["return_pct"] for t in trades], "|".join(map(str, key)), m)
+        row["your_cost"] = your_view(trades, "|".join(map(str, key)), m)
         row["as_of"] = as_of
         rows[key] = (row, trades)
     out = []
     for key, (row, trades) in rows.items():
         if row["scope"] == "strategy":
-            baselines = [r["net_pnl"] for k, (r, _) in rows.items() if k[0] == "strategy" and k[1:4] == key[1:4]
+            baselines = [(r.get("your_cost") or r)["net_pnl"] for k, (r, _) in rows.items()
+                         if k[0] == "strategy" and k[1:4] == key[1:4]
                          and k[9] == key[9] and r["family"] == FAMILY_BASELINE
                          and r["strategy_id"] != row["strategy_id"]]
             row["go_live"] = go_live(row, trades, max(baselines) if baselines else None)

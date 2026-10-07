@@ -38,22 +38,46 @@ def sessions_after_d(horizon_days: int, horizon_label: str | None) -> int:
     return 1 if int(horizon_days) == 1 else LEGACY_5D_SESSIONS_AFTER_D
 
 
-def first_commit_times(repo: Path, file: Path) -> dict[str, datetime]:
-    """{line text: committer time of the first commit that added it} for one data file, from `git log -p`
-    (empty when git or the history is not available)."""
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess | None:
+    """A git command in `repo`, or None when git cannot run."""
     try:
-        out = subprocess.run(["git", "-C", str(repo), "log", "--reverse", "--format=@@commit %cI", "-p", "--",
-                              str(file)], capture_output=True, text=True, check=False, timeout=60)
+        return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=False,
+                              timeout=60)
     except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def in_git_repo(repo: Path) -> bool:
+    """True when `repo` is (inside) a git work tree."""
+    out = git(repo, "rev-parse", "--is-inside-work-tree")
+    return out is not None and out.returncode == 0 and out.stdout.strip() == "true"
+
+
+def shallow_boundaries(repo: Path) -> set[str]:
+    """The commit hashes at a shallow clone's history cut (.git/shallow), empty for a full clone."""
+    out = git(repo, "rev-parse", "--git-path", "shallow")
+    if out is None or out.returncode != 0:
+        return set()
+    path = Path(out.stdout.strip())
+    path = path if path.is_absolute() else repo / path
+    return set(path.read_text().split()) if path.exists() else set()
+
+
+def first_commit_times(repo: Path, file: Path) -> dict[str, datetime | None]:
+    """{line text: committer time of the first commit that added it} for one data file, from `git log -p`; None
+    for a line first seen in a shallow clone's boundary commit (its real first commit is cut off). Empty when git
+    or the history is not available."""
+    out = git(repo, "log", "--reverse", "--format=@@commit %H %cI", "-p", "--", str(file))
+    if out is None or out.returncode != 0:
         return {}
-    if out.returncode != 0:
-        return {}
-    found: dict[str, datetime] = {}
-    when = None
+    boundaries = shallow_boundaries(repo)
+    found: dict[str, datetime | None] = {}
+    when, seen = None, False
     for line in out.stdout.splitlines():
         if line.startswith("@@commit "):
-            when = datetime.fromisoformat(line.split(" ", 1)[1])
-        elif when is not None and line.startswith("+") and not line.startswith("+++"):
+            _, sha, stamp = line.split(" ", 2)
+            when, seen = (None if sha in boundaries else datetime.fromisoformat(stamp)), True
+        elif seen and line.startswith("+") and not line.startswith("+++"):
             found.setdefault(line[1:], when)
     return found
 

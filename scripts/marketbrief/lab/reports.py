@@ -12,6 +12,7 @@ from marketbrief.lab import backtest, compare, heatmaps, news_impact, reads, reg
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.run import append_new
 from marketbrief.model.history_cache import load_cache, merged_bars
+from marketbrief.portfolio import reads as portfolio_reads
 
 NEWS_IMPACT_LOOKBACK_DAYS = 400
 MSG_BACKTEST_NO_EURUSD = ("no stored EURUSD bars to convert the BUX order fee; collect EURUSD=X first or pass "
@@ -50,25 +51,31 @@ def write_news_impact(con, cfg: dict, now: datetime) -> dict:
             "enough": sum(bool(r["enough"]) for r in rows), "events": len(news_impact.first_per_event(events))}
 
 
-def adjusted_bars(con, tickers: list[str], symbols: list[str]) -> dict[str, pd.DataFrame]:
-    """{symbol: adjusted daily bars indexed by date} from data/ (the ohlc view)."""
-    frame = con.execute("SELECT ticker, date, open, high, low, close FROM ohlc WHERE ticker IN (SELECT unnest(?)) "
-                        "ORDER BY ticker, date", [sorted(set(tickers) | set(symbols))]).df()
-    return {key: group.set_index(pd.DatetimeIndex(group["date"]))[["open", "high", "low", "close"]]
-            for key, group in frame.groupby("ticker")}
+def adjusted_bars(con, cfg: dict, now: datetime, symbols: list[str]) -> dict[str, pd.DataFrame]:
+    """{symbol: daily bars indexed by date} as stored by `now` (portfolio/reads.stored_bars: latest collection by
+    `now`, sessions only), put on the newest split basis of the adjustments detected by `now`."""
+    frame = portfolio_reads.stored_bars(con, cfg, now, sorted(set(symbols)))
+    adjust = portfolio_reads.adjustments(con, now)
+    out = {}
+    for key, group in frame.groupby("ticker"):
+        factors = [portfolio_reads.factor_after(adjust, key, day) for day in group["date"]]
+        bars = group[["open", "high", "low", "close"]].astype(float).mul(factors, axis=0)
+        out[key] = bars.set_index(pd.DatetimeIndex(pd.to_datetime(group["date"])))
+    return out
 
 
-def run_backtest(con, cfg: dict, history: bool, assumed_eurusd: float | None = None) -> dict:
+def run_backtest(con, cfg: dict, now: datetime, history: bool, assumed_eurusd: float | None = None) -> dict:
     """F2.3 back-test rows of the no-news strategies on stored bars (plus the history cache with `history`). US:
     the BUX order fee is converted at the stored (or cached) EURUSD closes; without any, only at an explicitly
     given `assumed_eurusd` (labelled in the result), else the back-test refuses."""
     rate = lab_costs.rates(cfg["market"])
     fx_key = rate.get("eurusd_symbol")
-    bars = adjusted_bars(con, list(cfg["tickers"]), [fx_key] if fx_key else [])
+    bars = adjusted_bars(con, cfg, now, [*cfg["tickers"], *([fx_key] if fx_key else [])])
     splice = None
     if history:
         cached, _ = load_cache(cfg["market"])
-        bars, splice = merged_bars(bars, {k: v for k, v in cached.items() if k in bars or k in cfg["tickers"]})
+        keep = set(cfg["tickers"]) | {fx_key}
+        bars, splice = merged_bars(bars, {k: v for k, v in cached.items() if k in keep})
     eurusd = bars.pop(fx_key)["close"] if fx_key and fx_key in bars else None
     fx_source = "stored EURUSD closes" if eurusd is not None else None
     if cfg["market"] == "us" and eurusd is None:
@@ -85,7 +92,7 @@ def run_backtest(con, cfg: dict, history: bool, assumed_eurusd: float | None = N
             "last_date": max((str(v.index.max().date()) for v in stocks.values()), default=None), "rows": rows}
 
 
-def study_inputs(con, cfg: dict) -> dict[str, pd.DataFrame]:
-    """Adjusted bars of the watchlist for the pick study."""
-    return {k: v for k, v in adjusted_bars(con, list(cfg["tickers"]), []).items() if k in cfg["tickers"]}
+def study_inputs(con, cfg: dict, now: datetime) -> dict[str, pd.DataFrame]:
+    """Adjusted bars of the watchlist stored by `now`, for the pick study."""
+    return adjusted_bars(con, cfg, now, list(cfg["tickers"]))
 

@@ -42,3 +42,4 @@ MSG_NO_CROSS_SCORE = "no cross-market model score for this horizon (needs a cros
 MSG_NOT_LOCKED = "made_at or first commit not before the open of D (F1.8): refused"
 MSG_NO_EURUSD = "no stored EUR/USD close by {when}: the BUX order fee cannot be converted"
 REASON_NOTE_SKIPPED = "one share at {price} costs more than the amount {amount}"
+MSG_PICK_TOO_LATE = "picks for D = {session} must be made before its open; refused at {now} (F1.8)"

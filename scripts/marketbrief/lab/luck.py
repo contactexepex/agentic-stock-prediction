@@ -1,7 +1,7 @@
 """The luck test of the scoreboard (F7.1): a percentile bootstrap interval of the mean net return per trade (%),
-and the same interval corrected for multiple testing across every strategy compared in the same table
-(Bonferroni: level 1 - alpha / m). Only a corrected interval that excludes zero counts as an edge.
-Deterministic: the resampling seed is derived from the slice key."""
+and the same interval corrected for multiple testing across the m rows compared with one another (same scope,
+market, view, basis, company, regime and horizon; Bonferroni: level 1 - alpha / m). Only a corrected interval
+that excludes zero counts as an edge. Deterministic: the resampling seed is derived from the slice key."""
 from __future__ import annotations
 
 import hashlib
@@ -11,7 +11,8 @@ import numpy as np
 from marketbrief.lab.constants import BOOTSTRAP_ALPHA, BOOTSTRAP_SAMPLES, PCT_DIGITS
 
 METHOD = ("percentile bootstrap of the mean net return per trade (%), {n} resamples; corrected: Bonferroni over "
-          "the m strategies compared in the same market, view, basis and horizon")
+          "the m rows compared in the same scope, market, view, basis, company, regime and horizon "
+          "(scoreboard.peer_key)")
 
 
 def seed_of(key: str) -> int:

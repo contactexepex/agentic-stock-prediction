@@ -48,6 +48,16 @@ def regime_now(con, now: datetime) -> str | None:
     return rows[0][0] if rows else None
 
 
+def previous_close(own, adjust, ticker: str) -> float | None:
+    """The close before the as-of close, on the as-of close's split basis (momentum compares the two)."""
+    if len(own) < 2:
+        return None
+    prev_day, last_day = own["date"].iloc[-2], own["date"].iloc[-1]
+    ratio = portfolio_reads.factor_after(adjust, ticker, prev_day) / portfolio_reads.factor_after(adjust, ticker,
+                                                                                                    last_day)
+    return float(own["close"].iloc[-2]) * ratio
+
+
 def same_day(row: dict, ticker: str, as_of: str) -> bool:
     """A score or range row of this ticker and as-of date."""
     return row["ticker"] == ticker and str(row["as_of_date"])[:10] == as_of
@@ -60,6 +70,7 @@ def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list
     entry = entry_session(cfg, now)
     bars = portfolio_reads.stored_bars(con, cfg, now, tickers, entry - timedelta(days=BARS_BACK_DAYS))
     features, regime = feature_rows(con, now), regime_now(con, now)
+    adjust = portfolio_reads.adjustments(con, now)
     out = []
     for ticker in tickers:
         own = bars[bars["ticker"] == ticker].sort_values("date")
@@ -77,7 +88,7 @@ def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list
             market=market, ticker=ticker, as_of_date=as_of, session_date=str(entry),
             exit_dates={k: str(exit_session(cfg, entry, k)) for k in my_ranges}, made_at=now.isoformat(),
             base_close=float(own["close"].iloc[-1]),
-            prev_close=float(own["close"].iloc[-2]) if len(own) > 1 else None, regime=regime,
+            prev_close=previous_close(own, adjust, ticker), regime=regime,
             quality=feature.get("quality"), days_to_earnings=feature.get("days_to_earnings"),
             amount=trade_amount(market, ticker, now, cfg), currency=CURRENCY[market], scores=my_scores,
             ranges=my_ranges, news=news))
