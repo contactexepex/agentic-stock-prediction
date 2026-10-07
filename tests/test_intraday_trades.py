@@ -559,7 +559,8 @@ def test_score_window_follows_its_stored_label_not_its_time(market):
          "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00",
          "horizon_label": "n_plus_k"},
         {"id": "2026-09-29-AAPL-5d", "as_of_date": "2026-09-29", "ticker": "AAPL", "horizon_days": 5,
-         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-10-07T16:00:00+00:00"}])
+         "label_convention": "open_to_close", "prob_up": 0.6,
+         "computed_at": "2026-10-07T22:00:00+00:00"}])                 # after n_plus_k_from, before the check
     late = datetime(2026, 10, 7, 23, 0, tzinfo=timezone.utc)          # after n_plus_k_from (2026-10-07T21:19Z)
     calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), late)
     nvda = {call["id"]: call for call in calls.get("NVDA", [])}
