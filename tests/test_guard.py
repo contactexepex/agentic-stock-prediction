@@ -187,6 +187,22 @@ def test_ranges_cli_late_flag(market):
     assert run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00").returncode != 0   # needs an offset
 
 
+def test_ranges_filter_earnings_by_made_at(market, monkeypatch):
+    """Issue #24: ranges.py reads the earnings events as known at made_at (time and local date), not all of them."""
+    from marketbrief.analytics import event_history, range_context
+
+    root, _, cfg, rc = market
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    seen = []
+
+    def spy(events, as_of=None, made_at=None):
+        seen.append((as_of, made_at))
+        return event_history.earnings_events(events, as_of=as_of, made_at=made_at)
+    monkeypatch.setattr(range_context, "earnings_events", spy)
+    build(cfg, rc, "2026-10-05T11:30:00+00:00")
+    assert seen == [(date(2026, 10, 5), at("2026-10-05T11:30:00+00:00"))]
+
+
 @pytest.mark.parametrize("now, late", [("2026-10-05T11:30:00+00:00", False), ("2026-10-05T20:40:00+00:00", True)])
 def test_slack_ranges_line_says_late(market, now, late):
     """Issue #21: with no calls, the Slack line about the ranges says when they are late."""

@@ -151,10 +151,10 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
     made = datetime.fromisoformat(now)
     first_open, first_close = first_target_open(cfg, as_of), first_target_close(cfg, as_of)
     # SEC 2.02 filings that are not results releases are dropped using the 10-Q/10-K reports
-    # accepted by made_at's local date (a replay with --now never uses a later one)
+    # accepted by made_at (a replay with --now never uses a later one; issue #24: by time, not date)
     events = load_events(con)
     known_by = pd.Timestamp(made).tz_convert(cfg["timezone"]).date()
-    earn_ev = earnings_events(events, as_of=known_by)
+    earn_ev = earnings_events(events, as_of=known_by, made_at=made)
     sigma = {
         ticker: range_math.ewma_sigma(bars[ticker]["close"], ranges_config["ewma_lambda"])
         for ticker in cfg["tickers"]

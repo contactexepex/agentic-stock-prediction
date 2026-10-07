@@ -146,6 +146,9 @@ BASE_SCHEMAS: Schemas = {
         # periodic_report rows (SEC 10-Q/10-K acceptance, source sec_history): the fiscal period end.
         # They date each quarter's results release among the 2.02 filings (event_history.results_filter).
         "period_end": "DATE",
+        # periodic_report rows stored from issue #24 on: the acceptance time (UTC), so the live ranges count a
+        # report only once accepted by made_at (earnings_events(made_at=...)); older rows have none.
+        "accepted_at": "TIMESTAMPTZ",
     }),
     # Yahoo consensus EPS per report (collect_events.py, issue #17): a row per (ticker, report) when first seen or
     # changed; collected_at is when we saw it, so a value is usable only from then (earnings_estimates_asof).

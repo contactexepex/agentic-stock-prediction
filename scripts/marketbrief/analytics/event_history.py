@@ -7,7 +7,7 @@ Shared by the live ranges and the walk-forward backtest, so both use the same ru
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
@@ -180,13 +180,29 @@ def results_filter(
     return kept
 
 
-def earnings_events(events: pd.DataFrame, as_of: date | None = None) -> dict[str, list[tuple[date, str | None]]]:
+def known_at(events: pd.DataFrame, made_at: datetime, as_of: date) -> pd.DataFrame:
+    """The events without the 10-Q/10-K rows not yet accepted at `made_at` (issue #24: by timestamp, not date): a
+    report counts when its stored acceptance time is <= made_at, or, stored without one, when it was accepted on a
+    day before `as_of` (made_at's local date; a same-day report of unknown time is left out)."""
+    if events.empty or "accepted_at" not in events.columns:
+        return events
+    accepted = pd.to_datetime(events["accepted_at"], utc=True)
+    known = accepted.le(pd.Timestamp(made_at)) | (accepted.isna() & events[COL_DATE].map(lambda day: day < as_of))
+    return events[(events[COL_TYPE] != TYPE_PERIODIC_REPORT) | known]
+
+
+def earnings_events(
+    events: pd.DataFrame, as_of: date | None = None, made_at: datetime | None = None
+) -> dict[str, list[tuple[date, str | None]]]:
     """Per ticker: (date, timing) of every known earnings report, one row per report (a timed row
     beats an untimed one for the same report). SEC 2.02 filings that are not results releases are
-    dropped using the 10-Q/10-K reports accepted by `as_of` (all if None; see results_filter)."""
+    dropped using the 10-Q/10-K reports accepted by `as_of` (all if None; see results_filter), and with
+    `made_at` (live ranges) only those accepted by that time (known_at)."""
     found: dict[str, list] = {}
     if events.empty:
         return found
+    if made_at is not None and as_of is not None:
+        events = known_at(events, made_at, as_of)
     reports = periodic_reports(events)
     earnings = events[events[COL_TYPE] == TYPE_EARNINGS]
     for ticker, group in earnings.groupby(COL_TICKER):

@@ -217,11 +217,11 @@ class EventsCollector:
         """SEC 10-Q/10-K acceptances with their period end: the range inputs' results_filter picks each
         quarter's results release among the 2.02 rows by them. Same window as the 2.02 rows."""
         for key, reports in self.sec_reports.items():
-            for day, when, form, period_end in sorted(reports, key=lambda report: report[0]):
+            for day, when, form, period_end, accepted_at in sorted(reports, key=lambda report: report[0]):
                 details = EventDetails(
                     when=when,
                     note=MSG_PERIODIC_REPORT.format(form=form, period=period_end),
-                    extra={"period_end": period_end.isoformat() if period_end else None},
+                    extra={"period_end": period_end.isoformat() if period_end else None, "accepted_at": accepted_at},
                 )
                 if self.since <= day < self.today and self.add(
                     key, EVENT_PERIODIC_REPORT, day, SOURCE_SEC_HISTORY, details

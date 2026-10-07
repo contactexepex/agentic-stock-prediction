@@ -27,7 +27,7 @@ def sec_earnings(
 ) -> tuple[dict[str, list[tuple[date, str | None, int]]], list[dict]]:
     """Item 2.02 filings from SEC EDGAR: 8-K/6-K filings with item 2.02 (results of operations),
     timed by acceptance. Given a dict, `reports` receives the 10-Q/10-K filings per ticker: (acceptance date,
-    timing, form, period end). Acceptance times are the checked/corrected ones of Edgar.recent; given a dict,
+    timing, form, period end, acceptance time in UTC). Acceptance times are the checked/corrected ones of Edgar.recent; given a dict,
     `times` receives the summary of those checks (sec_acceptance.time_summary).
     Each ticker's filings are those of its mapped CIK plus the predecessor/related CIKs in
     `fundamentals.predecessor_ciks` (sec_filings.ticker_submissions), each filing once.
@@ -64,6 +64,8 @@ def add_filings(cfg: dict, key: str, recent: dict, found: dict, reports: dict | 
             day, when = timing(cfg, pd.Timestamp(accepted))
             found.setdefault(key, []).append((day, when, PRIORITY_FILING))
         elif form in REPORT_FORMS and reports is not None:
-            day, when = timing(cfg, pd.Timestamp(accepted))
+            stamp = pd.Timestamp(accepted)
+            day, when = timing(cfg, stamp)
             period_end = date.fromisoformat(period[index][:ISO_DATE_LENGTH]) if period[index] else None
-            reports.setdefault(key, []).append((day, when, form, period_end))
+            accepted_at = stamp.tz_convert("UTC").isoformat() if stamp.tzinfo is not None else None
+            reports.setdefault(key, []).append((day, when, form, period_end, accepted_at))
