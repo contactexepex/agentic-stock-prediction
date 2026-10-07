@@ -2029,8 +2029,9 @@ trade counts once (its newest row).
 - **Blocks.** BLOCKED quality or `days_to_earnings <= 1`: an abstention row per strategy (`blocked_quality`,
   `earnings_window`).
 - **Regime filter.** Written with `qualifies: false` in UNSTABLE / EVENT_HEAVY.
-- **Cross-market strategy** (`rule.model_news_global.v1`) abstains ("no cross-market model score") until B10
-  supplies a cross-market model variant.
+- **Cross-market strategy** (`rule.model_news_global.v1`) reads B10's cross_market model variant (`scores_asof(..., variant="cross_market")`, rows in
+  `model_variant_scores`, ids ending `-cross_market`) instead of the base scores; a horizon without a variant score
+  is an abstention (`abstained`, "no cross-market model score").
 - **Momentum** compares the as-of close with the previous close put on the same split basis.
 - **Target and range** come from the B10 range of the horizon (its bands, never narrowed). B10's `center` is a log
   shift, so the target price is `base_close × exp(center)` (`lab/strategies.py` `target_price`; the row's
