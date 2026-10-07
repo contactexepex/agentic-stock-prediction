@@ -41,6 +41,7 @@ from marketbrief.constants.news import (
     WINDOW_REASON_SINCE_RUN,
 )
 from marketbrief.core import paths
+from marketbrief.core.clock import utc_today
 
 WHEN_PATTERN = re.compile(r"^(\d+)([hd])$")
 
@@ -111,8 +112,11 @@ def parse_utc(value) -> datetime | None:
 
 
 def recent_rows(market: str, kind: str, files: int = SEEN_LOOKBACK_DAYS):
-    """Rows of the newest `files` day files of a kind (newest file last)."""
-    for path in sorted((paths.data_dir(market) / kind).glob(JSONL_GLOB))[-files:]:
+    """Rows of the newest `files` day files of a kind (newest file last), leaving out files dated after the run's
+    clock (MB_NOW in a test or replay: a later day's file is not known yet)."""
+    today = utc_today().isoformat()
+    stored = [path for path in sorted((paths.data_dir(market) / kind).glob(JSONL_GLOB)) if path.stem <= today]
+    for path in stored[-files:]:
         for line in path.read_text(encoding=ENCODING_UTF8).splitlines():
             if line.strip():
                 yield json.loads(line)

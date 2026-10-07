@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
 from marketbrief.constants.columns import COL_ACCEPTED_AT, COL_ACCESSION, COL_CHECKED_AT
 from marketbrief.constants.config_keys import CFG_SYMBOLS, CFG_TICKERS, META_ROLE
@@ -18,6 +19,7 @@ from marketbrief.constants.kinds import (
     KIND_SEC_TIMES,
     NEWS_STORED_VIEW,
 )
+from marketbrief.constants.news import NEWS_ID_MAP_TABLE
 from marketbrief.constants.prices import MSG_NO_MARKET_CONFIG_CLOSED_DAYS, OWN_EXCHANGE_ROLES
 from marketbrief.core import paths
 from marketbrief.core.calendar import is_session
@@ -93,6 +95,33 @@ def register_news_retag(con: duckdb.DuckDBPyConnection, market: str) -> None:
     )
 
 
+def register_news_id_map(con: duckdb.DuckDBPyConnection) -> None:
+    """Create the `news_id_map` table (id, canonical_id, match, first_seen_at) the `news` view and the news alias
+    views read: every stored news id with the item it belongs to (itself, or the earlier stored item it duplicates;
+    match = link | title | null) and when the id was first seen, assigned in (first_seen_at, id) order by
+    analytics/news_dedup.py, so no row stored later changes an earlier assignment."""
+    from marketbrief.analytics.news_dedup import assign, load_outlet_keys
+
+    rows = con.execute(
+        f"SELECT id, title, source, source_domain, url, first_seen_at FROM {NEWS_STORED_VIEW} "
+        "ORDER BY first_seen_at, id"
+    ).fetchall()
+    con.execute(
+        f"CREATE TABLE {NEWS_ID_MAP_TABLE} (id VARCHAR, canonical_id VARCHAR, match VARCHAR, first_seen_at TIMESTAMPTZ)"
+    )
+    pairs = assign(rows, load_outlet_keys()) if rows else []
+    if pairs:
+        first_seen: dict = {}
+        for row in rows:  # (first_seen_at, id) order: the first row of an id is its earliest
+            first_seen.setdefault(row[0], row[5])
+        frame = pd.DataFrame(
+            [(*pair, first_seen[pair[0]]) for pair in pairs], columns=["id", "canonical_id", "match", "first_seen_at"]
+        )
+        con.register("news_id_map_rows", frame)
+        con.execute(f"INSERT INTO {NEWS_ID_MAP_TABLE} SELECT * FROM news_id_map_rows")
+        con.unregister("news_id_map_rows")
+
+
 def own_exchange_keys(cfg: dict) -> list[str]:
     """The config's stocks and own-exchange indices (cues and factors trade on other calendars)."""
     return list(cfg[CFG_TICKERS]) + [
@@ -124,7 +153,8 @@ def connect(market: str) -> duckdb.DuckDBPyConnection:
     """In-memory DuckDB with one view per data kind plus the derived views in sql/views.sql.
     With MB_NOW set, the connection's SQL sees that time as now (FrozenClockConnection).
     News is the exception: the stored rows are `news_stored`, and the `news` view (views.sql)
-    re-tags rows from before the current tagger with `news_retag` (marketbrief/analytics/news_tags.py)."""
+    re-tags rows from before the current tagger with `news_retag` (marketbrief/analytics/news_tags.py), leaves
+    out stored duplicates (`news_id_map`, analytics/news_dedup.py) and shows each item's latest headline."""
     con = duckdb.connect()
     register_news_retag(con, market)
     if os.environ.get(ENV_NOW):
@@ -143,5 +173,6 @@ def connect(market: str) -> duckdb.DuckDBPyConnection:
             column_sql = ", ".join(f"{column_name} {column_type}" for column_name, column_type in columns.items())
             con.execute(f"CREATE TABLE {name} ({column_sql})")
     register_own_closed_days(con, market)
+    register_news_id_map(con)
     con.execute((paths.CODE / DIR_SQL / FILE_VIEWS_SQL).read_text())
     return con
