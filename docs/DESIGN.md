@@ -1321,55 +1321,57 @@ publication times, word limits and that each decision matches a stored call, and
 
 **Validation (`model_backtest.py --out DIR`; out-of-sample only; stored bars 2024-10-07 to 2026-10-05,
 20 tickers per market; with the warm-up and the first 100 resolved sessions the first scored as-of date
-is 2025-06-02 for 1-day and 2025-07-01 for 5-day).** Run on commit 778763b, computed 2026-10-06T23:25:50Z.
-Brier and log loss are compared with the base rate known at each refit (the training up share):
+is 2025-06-02 for 1-day and 2025-07-01 for 5-day).** Run on commit 67eeca0 (after the holiday-bar fix,
+which drops bars on closed days), computed 2026-10-07T00:38:34Z. Brier and log loss are compared with the
+base rate known at each refit (the training up share):
 
 | market | horizon / label | n | as-of dates | up share | Brier | Brier base rate | log loss | log loss base | AUC (95% block bootstrap) |
 |---|---|---|---|---|---|---|---|---|---|
-| india | 1d open_to_close | 6402 | 2025-06-02..2026-09-29 | 0.4758 | 0.2516 | 0.2498 | 0.6966 | 0.6927 | 0.485 [0.4541, 0.5165] |
-| india | 5d open_to_close | 5625 | 2025-07-01..2026-09-24 | 0.4786 | 0.2581 | 0.2511 | 0.7103 | 0.6953 | 0.5005 [0.452, 0.5439] |
-| us | 1d open_to_close | 6720 | 2025-06-02..2026-10-01 | 0.5228 | 0.2503 | 0.2498 | 0.6939 | 0.6927 | 0.4836 [0.4597, 0.5067] |
-| us | 5d open_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5332 | 0.2504 | 0.2492 | 0.6941 | 0.6916 | 0.4846 [0.4558, 0.5131] |
-| india | 1d close_to_close | 6521 | 2025-06-02..2026-09-30 | 0.4834 | 0.2513 | 0.25 | 0.6958 | 0.6932 | 0.5157 [0.4867, 0.5438] |
-| india | 5d close_to_close | 5625 | 2025-07-01..2026-09-24 | 0.4816 | 0.2575 | 0.2513 | 0.7091 | 0.6958 | 0.4942 [0.4403, 0.5363] |
+| india | 1d open_to_close | 6595 | 2025-06-02..2026-09-30 | 0.471 | 0.2513 | 0.2496 | 0.6959 | 0.6923 | 0.4859 [0.4548, 0.5172] |
+| india | 5d open_to_close | 6115 | 2025-07-01..2026-09-25 | 0.4698 | 0.2555 | 0.2509 | 0.7047 | 0.695 | 0.5019 [0.4516, 0.5455] |
+| us | 1d open_to_close | 6720 | 2025-06-02..2026-10-01 | 0.5228 | 0.2504 | 0.2498 | 0.6939 | 0.6927 | 0.4836 [0.4597, 0.5068] |
+| us | 5d open_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5332 | 0.2504 | 0.2492 | 0.6941 | 0.6916 | 0.4845 [0.4558, 0.5129] |
+| india | 1d close_to_close | 6615 | 2025-06-02..2026-10-01 | 0.4828 | 0.2511 | 0.25 | 0.6956 | 0.6931 | 0.5162 [0.486, 0.5467] |
+| india | 5d close_to_close | 6115 | 2025-07-01..2026-09-25 | 0.4728 | 0.2553 | 0.2512 | 0.7042 | 0.6956 | 0.4988 [0.4446, 0.5434] |
 | us | 1d close_to_close | 6740 | 2025-06-02..2026-10-02 | 0.5218 | 0.2501 | 0.2496 | 0.6933 | 0.6923 | 0.4934 [0.4721, 0.5158] |
-| us | 5d close_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5414 | 0.2499 | 0.2486 | 0.693 | 0.6904 | 0.4809 [0.449, 0.5089] |
+| us | 5d close_to_close | 6260 | 2025-07-01..2026-09-28 | 0.5414 | 0.2499 | 0.2486 | 0.693 | 0.6904 | 0.481 [0.4492, 0.5089] |
 
 Hit rates and coverage of the long side (p >= t; hit = return > 0), open-to-close: India 1d t = 0.55:
-44 stock-days (coverage 0.0069), hit 0.7273 [0.5815, 0.8365]; none at 0.60 or 0.65. India 5d: 0.55
-1704 (0.3029) hit 0.4765 [0.4529, 0.5003]; 0.60 1117 (0.1986) 0.4825 [0.4533, 0.5119]; 0.65 534 (0.0949)
-0.5206 [0.4782, 0.5627]. US 1d: 0.55 173 (0.0257) 0.5896 [0.5151, 0.6602]; 0.60 3; 0.65 none. US 5d: 0.55
-1968 (0.3144) 0.503 [0.481, 0.5251]; 0.60 1; 0.65 none. Short side (p <= 1 - t; hit = return < 0), India
-5d: 0.55 1151 (0.2046) 0.5308 [0.502, 0.5595]; 0.60 782 (0.139) 0.5703 [0.5354, 0.6046]; 0.65 330 (0.0587)
-0.6212 [0.5678, 0.6719]. The full tables, reliability bins with Wilson intervals and the close-to-close
-rows are on the backtest page.
+20 stock-days (coverage 0.003), hit 0.6 [0.3866, 0.7812]; none at 0.60 or 0.65. India 5d: 0.55 1581
+(0.2585) hit 0.4712 [0.4467, 0.4959]; 0.60 983 (0.1608) 0.5229 [0.4916, 0.554]; 0.65 391 (0.0639) 0.5678
+[0.5182, 0.616]. US 1d: 0.55 173 (0.0257) 0.5896 [0.5151, 0.6602]; 0.60 3; 0.65 none. US 5d: 0.55 1968
+(0.3144) 0.503 [0.481, 0.5251]; 0.60 1; 0.65 none. Short side (p <= 1 - t; hit = return < 0), India 5d:
+0.55 1144 (0.1871) 0.5297 [0.5007, 0.5585]; 0.60 772 (0.1262) 0.5699 [0.5348, 0.6044]; 0.65 304 (0.0497)
+0.6118 [0.556, 0.6649]. The full tables, reliability bins with Wilson intervals and the close-to-close rows
+are on the backtest page.
 
 Paper strategy after costs (open-to-close, mean holding-period return per date in %, 95% moving-block
-bootstrap; mean round trip 0.2225% India, 0.0022% US): India 1d always-up -0.2788 [-0.39, -0.17],
-benchmark -0.2591 [-0.37, -0.14], model p >= 0.55 0.044 [-0.95, 0.91] on 14 dates (too few for a verdict:
-the page requires 20 common dates). India 5d always-up -0.361 [-0.66, -0.03], model p >= 0.55 -0.573
-[-1.24, -0.13], p >= 0.60 -0.7387 [-1.59, -0.11], p >= 0.65 0.0931 [-0.89, 0.77]. US 1d always-up 0.1419
-[0.03, 0.26], model p >= 0.55 0.2752 [-0.74, 1.06]. US 5d always-up 0.4716 [0.23, 0.74], buy-and-hold
-benchmark 0.2855 [-0.02, 0.58], model p >= 0.55 0.4129 [-0.07, 0.9]. Every model-minus-baseline
-difference with at least 20 common dates has a 95% interval that contains 0.
+bootstrap; mean round trip 0.2225% India, 0.0021% US with the FINRA TAF at its in-force $0):
+India 1d always-up -0.2956 [-0.4, -0.18], benchmark_long_per_date (a benchmark long opened at every as-of
+date, a full round trip charged each time) -0.2806 [-0.4, -0.16], model p >= 0.55 -0.5398 [-1.63, 0.4] on
+10 dates (too few for a verdict: the page requires 20 common dates). India 5d always-up -0.4159 [-0.71,
+-0.07], model p >= 0.55 -0.5734 [-1.31, -0.05], p >= 0.60 -0.2808 [-1.1, 0.2], p >= 0.65 0.3749 [-0.64,
+1.03]. US 1d always-up 0.142 [0.03, 0.26], model p >= 0.55 0.2753 [-0.74, 1.06]. US 5d always-up 0.4717
+[0.23, 0.74], benchmark_long_per_date 0.2857 [-0.02, 0.58], model p >= 0.55 0.413 [-0.07, 0.9]. Every
+model-minus-baseline difference with at least 20 common dates has a 95% interval that contains 0.
 
 **Verdict (honest).** On this history the model does not beat the base rate: Brier skill is negative in
-all eight rows (-0.0021 to -0.0279), every AUC interval contains 0.5, and the gradient-boosted comparison
-(HistGradientBoostingClassifier, depth 3, 100 trees, used only here) is no better (AUC 0.485 to 0.5184,
-Brier 0.2535 to 0.2761). After costs the model's long picks are not distinguishable from always-up,
+all eight rows (-0.0021 to -0.0181), every AUC interval contains 0.5, and the gradient-boosted comparison
+(HistGradientBoostingClassifier, depth 3, 100 trees, used only here) is no better (AUC 0.485 to 0.5159,
+Brier 0.2535 to 0.275). After costs the model's long picks are not distinguishable from always-up,
 momentum, RSI mean reversion or the benchmark; some thresholds have too few positions for any verdict.
 Where the calibration sees no skill in the past months it sets the Platt slope to 0 (India's latest fits),
-so the issued probability is the past up share and no feature driver is listed (0 points): that is the calibration doing
-its job, not a fault. The value of the model today is the explanation and the discipline (a stated
-formula, a cap on the agent's adjustment), not an edge. Nothing was tuned on the test period. Disclosure:
-the first run of this backtest used an unconstrained Platt slope (it went negative in several months,
-which inverts rankings and explanations); the slope was then constrained to >= 0 as a correctness fix and
-the run repeated; the numbers above are from the constrained version (the first run also showed no skill,
-Brier skill -0.0027 to -0.0293).
+so the issued probability is the past up share and no feature driver is listed (0 points): that is the
+calibration doing its job, not a fault. The value of the model today is the explanation and the
+discipline (a stated formula, a cap on the agent's adjustment), not an edge. Nothing was tuned on the test
+period. Disclosure: the first run of this backtest used an unconstrained Platt slope (it went negative in
+several months, which inverts rankings and explanations); the slope was then constrained to >= 0 as a
+correctness fix and the run repeated; the numbers above are from the constrained version (the first run,
+before the holiday-bar fix, also showed no skill: Brier skill -0.0027 to -0.0293).
 
 **Limits.** About 16 months of out-of-sample history, 20 tickers per market, overlapping 5-day labels
 (handled by the block bootstrap, still wide intervals). Fills are assumed at the official open and close;
-spread, slippage and India's flat DP charge are not modelled; today's cost rates (`config/costs.yaml`, each
+spread, slippage and India's flat DP charge are not modelled; the cost rates in force on 2026-10-07 (`config/costs.yaml`, each
 marked "verify" with its source) are applied to past dates. Event and flow features have too little
 history to enter any fit; news has none (fixed prior). The overnight cue is the cue's last daily return,
 not the live pre-open quote. Splits are applied on read by the `ohlc` view; returns are ratios, so the
