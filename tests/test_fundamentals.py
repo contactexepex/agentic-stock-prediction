@@ -344,6 +344,19 @@ def test_predecessor_cik_filing_triggers_a_reload(tmp_path):
     assert "XOM" not in out["loaded"] and out["up_to_date"] == 2
 
 
+def test_failed_company_facts_name_the_cik(tmp_path):
+    """Issue #25: a failed company-facts request is listed with its CIK; the ticker is skipped as a whole
+    (half its CIKs would store an incomplete history), the others load."""
+    root, cfg = setup(tmp_path)
+    path = tmp_path / "sec" / "urls.json"
+    served = json.loads(path.read_text())
+    del served[cf.facts_url(34088)]
+    path.write_text(json.dumps(served))
+    out = json.loads(run("collect_fundamentals.py", root, cfg).stdout)
+    assert [(f["ticker"], f["cik"]) for f in out["failed"]] == [("XOM", 34088)]
+    assert out["loaded"] == ["AAPL", "BAC"] and not any(x["ticker"] == "XOM" for x in rows(root))
+
+
 def test_skipped_without_sec(tmp_path):
     root, cfg = setup(tmp_path)
     r = run("collect_fundamentals.py", root, cfg, market="nosec")

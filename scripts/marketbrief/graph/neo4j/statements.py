@@ -74,9 +74,11 @@ EVENT_STATEMENTS = [
 
 # Market-wide events (no ticker) are always current; a company event is current when it is the
 # latest known date for its (ticker, type) (view company_events), so a moved date flags the old one.
+# Only events whose flag changes are written (issue #25: no rewrite of every Event each run).
 EVENTS_CURRENT = (
     "UNWIND $rows AS row\nMATCH (e:Event) WHERE e.market = $market\n"
-    "SET e.current = e.ticker IS NULL OR e.record_id IN row.ids"
+    "WITH e, (e.ticker IS NULL OR e.record_id IN row.ids) AS cur\n"
+    "WHERE e.current IS NULL OR e.current <> cur\nSET e.current = cur"
 )
 
 INSIDERS_SQL = """
@@ -142,10 +144,9 @@ row.target_name,
         + COMPANY
         + """
 WITH c, row
-MERGE (t:Holder {id: row.target_id}) ON CREATE SET t.market = $market, t.name = row.target_name, t.kind = \
-'graph_target',
+MERGE (t:Holder {id: row.target_id}) ON CREATE SET t.market = $market, t.kind = 'graph_target',
       t.source_kind = $kind, t.source_id = row.source_id, t.recorded_at = datetime(row.recorded_at)
-SET t.synced_at = datetime($synced_at)
+SET t.synced_at = datetime($synced_at), t.name = coalesce(row.target_name, t.name)
 FOREACH (_ IN CASE WHEN row.target_person THEN [1] ELSE [] END | SET t:Person)
 """
         + GRAPH_REL,

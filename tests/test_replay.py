@@ -224,6 +224,11 @@ def test_replay_cli_writes_report_json_and_record(tmp_path):
              "'SELECT count(*), max(cover80_1d), CAST(max(end_date) AS VARCHAR) FROM replays').fetchone())", root, cfg)
     assert rec.returncode == 0, rec.stderr
     assert rec.stdout.strip().startswith("(1, ") and end in rec.stdout
+    # issues #27/#28: the record's id carries its run time (a re-run is a new id), its file the UTC run date
+    [stored] = list((root / "data" / "testmkt" / "replays").glob("**/*.jsonl"))
+    row = json.loads(stored.read_text().splitlines()[0])
+    assert row["id"] == f"{row['start_date']}_{row['end_date']}@{row['computed_at']}"
+    assert stored.stem == row["computed_at"][:10]
 
 
 # ---------- statistics on synthetic series ----------

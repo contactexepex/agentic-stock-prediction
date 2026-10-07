@@ -351,6 +351,27 @@ def test_sync_sends_authenticated_batches_and_handles_corrections(tmp_path, fake
     assert fake.rows("shareholding")[0]["holder_id"] == f"{MARKET}:promoters:CCC"
     assert PASSWORD not in res.stdout + res.stderr
     assert tree_hash(root / "data") == before
+    # HAS_RANGE: the range row carries its call's id; the statement links it only when that Prediction exists
+    rng = fake.rows("ranges")[0]
+    assert rng["prediction_id"] == f"{MARKET}:2026-10-01-AAA-1d"
+    stmt = next(r["statement"] for r in fake.writes() if r["parameters"]["kind"] == "ranges")
+    assert "OPTIONAL MATCH (p:Prediction {id: row.prediction_id})" in stmt and "MERGE (p)-[h:HAS_RANGE]->(n)" in stmt
+
+
+def test_holder_names_follow_corrections_and_current_flag_writes_only_changes():
+    """Issue #25: a Holder's name is set on every write (a corrected name is projected), and the events `current`
+    flag is written only where it changes. Cypher semantics themselves run only in the opt-in real-engine test."""
+    sys.path.insert(0, str(SCRIPTS))
+    from marketbrief.graph.neo4j import cypher, statements
+
+    holder = cypher.holder_statement("TRADED")
+    on_create, rest = holder.split("SET h.synced_at", 1)
+    assert "h.name" not in on_create and "h.name = coalesce(row.holder_name, h.name)" in rest
+    graph = next(text for text, _ in statements.GRAPH_STATEMENTS if "MERGE (t:Holder" in text)
+    assert "t.name = coalesce(row.target_name, t.name)" in graph.split("ON CREATE SET", 1)[1].split("\nSET ", 1)[1]
+    assert statements.EVENTS_CURRENT.endswith(
+        "WITH e, (e.ticker IS NULL OR e.record_id IN row.ids) AS cur\nWHERE e.current IS NULL OR e.current <> cur\n"
+        "SET e.current = cur")
 
 
 def test_rerun_is_idempotent_and_incremental(tmp_path, fake):

@@ -45,7 +45,13 @@ A ticker's SEC filings are read from the CIK in SEC's ticker map plus any earlie
 registrant still filing for it (`fundamentals.predecessor_ciks`; XOM maps to ExxonMobil Holdings
 2115436 since 2026-07-01, while Exxon Mobil Corp 34088 still lists filings: an 8-K on 2026-07-01, the
 Q2 10-Q jointly, Form 4s, a 13G, and the item 2.02 results releases up to May 2026), merged and
-de-duplicated by accession number in `sec_filings.ticker_submissions` (issue #23).
+de-duplicated by accession number in `sec_filings.ticker_submissions` (issue #23). A CIK whose
+submission list fails is one `failed` entry with its `cik`; the other CIKs are still merged, except in
+`collect_fundamentals.py`, which skips the whole ticker that run when any of its submission lists or
+company-facts requests fails (half a ticker's CIKs would store an incomplete history and hide filings
+from the reload check), so its `failed` entries also name the `cik` (issue #25). Side effect of #23 noted
+by its review: reading the predecessor CIK's filings gave earlier XOM fundamentals rows their
+`accepted_at`; their values did not change and nothing became visible earlier.
 
 | Signal | US | India |
 |---|---|---|
@@ -580,7 +586,8 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   keep their promise?", "where are they too wide or too narrow?" and "do simple up/down rules
   work?", four big numbers, three captioned charts; every table, the full findings and the method
   in collapsed sections) and the full results as JSON in `reports/<market>/replay-<end>.*`, plus
-  one append-only row in `data/<market>/replays/` (schema `replays`). Tests
+  one append-only row in `data/<market>/replays/` (schema `replays`; the file is the UTC run date, the
+  id `<start>_<end>@<computed_at>`, so a re-run of the same window is a new id). Tests
   (`tests/test_replay.py`): equal to `ranges.py` on a sample day (with and without India's
   fitted index-cue beta split), unchanged when data after d is perturbed, baseline statistics on
   synthetic series. About 22 s per market for five years of bars.
@@ -588,7 +595,7 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   same replay with ACI on (each day's alpha from the misses of ranges whose target close is on or
   before d), and a before/after table on the same rows (coverage at 50%/80%, width, interval
   scores, quantile score; overall, by regime and by major event) in `replay-<end><tag>.html|json`
-  and a replays row with id `<start>_<end><tag>`; the tag names the settings, e.g.
+  and a replays row with id `<start>_<end><tag>@<computed_at>`; the tag names the settings, e.g.
   `-aci-g0.01-regime-s0.15-m20`, plus `-t<DATE>` for a held-out run. Held-out check
   (`--aci-tune-end`): each of 8 variants (gamma 0.002/0.005/0.01/0.02, one alpha or one per regime)
   is replayed; the one with the lowest mean relative 80% interval score on the tuning rows (as-of
@@ -1114,9 +1121,13 @@ fundamentals metrics the view key, and for an India shareholding quarter the ids
 combines), `recorded_at` (the record's own timestamp: `first_seen_at`, `analyzed_at`, `made_at`,
 `scored_at`, `computed_at`, `added_at` or `recorded_at`) and `synced_at`. Record nodes also keep
 `record_id` and all fields of the record. Dates and timestamps are Neo4j `DATE` / `DATETIME`
-values. Not projected (time series or bookkeeping that stay in DuckDB): prices and quotes (each
+values. Exception: the nodes and relationships built from the market config, not from a record
+(`Market`, `Company`, `Sector`, `LISTED_ON`, `IN_SECTOR`, `IN_MARKET`), have `recorded_at` null.
+A `Holder`'s `name` is set on every write, so a corrected name is projected (issue #25).
+Not projected (time series or bookkeeping that stay in DuckDB): prices and quotes (each
 `FeatureDay` carries the close), options, calibration, delivery, reviews (nested JSON; the review
-report is in `reports/`) and graph_runs.
+report is in `reports/`), graph_runs, the macro, flow and short-selling kinds of issue #9 (macro,
+shorts, short_interest, fpi, indices) and the Yahoo consensus EPS (earnings_estimates).
 
 **Writes.** Statements are static Cypher; all values are parameters (`UNWIND $rows AS row`),
 batched 500 rows per request. Every write is a `MERGE` on an id (nodes) or on the two end nodes

@@ -157,7 +157,8 @@ def main() -> int:
                 parsed = parse_schedule13(edgar.get(url))
             except Exception as exc:
                 failed.append(
-                    {COL_TICKER: ticker, COL_ACCESSION: filing["accession"], "error": str(exc)[:ERROR_TEXT_LIMIT]}
+                    {COL_TICKER: ticker, "cik": filing["cik"], COL_ACCESSION: filing["accession"],
+                     "error": str(exc)[:ERROR_TEXT_LIMIT]}
                 )
                 continue
             read += 1
