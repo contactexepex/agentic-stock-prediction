@@ -57,7 +57,7 @@ def parser():
         p.add_argument("--date", help="the session (default: from the market status as of the clock)")
         if name == "intraday":
             p.add_argument("--check-id", help="the check run (default: the newest by the clock)")
-            p.add_argument("--feed", help="a JSONL file of alert records (B9's feed) instead of trade_checks")
+            p.add_argument("--feed", help="a JSONL file of B9's alert records instead of the stored feed")
     sub.add_parser("corrections").add_argument("--days", type=int, default=CORRECTION_DAYS,
                                                help="check the close posts of this many past days")
     sub.add_parser("weekly").add_argument("--week", help="ISO week, e.g. 2026-W41 (default: the newest)")
@@ -111,9 +111,9 @@ def build(args, cfg: dict) -> Message | None:
         text = build_close(market, day, reads.settled_today(con, day, cfg["timezone"], now),
                            reads.eod_analysis(con, day, now), names, currency)
         return Message(POST_CLOSE, f"{POST_CLOSE}:{market}:{day}", text, thread)
-    rows = (reads.feed_asof(read_feed(args.feed), now) if args.feed
-            else reads.latest_check(con, day, now, args.check_id))
-    text = build_alerts(market, rows, names, currency)
+    rows = ([reads.without_late_note(r, now) for r in reads.feed_asof(read_feed(args.feed), now)] if args.feed
+            else reads.latest_alerts(con, day, now, args.check_id))
+    text = build_alerts(market, rows, names)
     if text is None:
         return None
     run = args.check_id or max(str(r.get("check_id") or r.get("check_at") or r.get("id")) for r in rows)

@@ -19,6 +19,8 @@ export const SECRETS = {
 export const SECRET_VALUES = Object.values(SECRETS);
 
 export class FakeInbox implements InboxStore {
+  /** One list for both inbox tables (company_commands and requests): keys are unique across both, and the budget counts
+   * both, as in the real claim statements; tests/test_b5_tools.py checks the two-table SQL on DuckDB. */
   requests: InboxRequest[] = [];
   commands: CommandLogRow[] = [];
   /** Rows in insertion order = updated_at order; like the real SQL, the newest row per agent (and per '*') counts. */

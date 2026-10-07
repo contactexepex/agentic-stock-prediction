@@ -7,8 +7,9 @@ cost in place of the market costs: p x move - (1 - p) x loss - your_cost (all % 
 the last close, loss = the drop to the 80% range's low). Slack computes this itself from stored numbers; B2's
 `cost_viable` (move > cost) is not used.
 
-B2 stores the owner's costs. Until B2 documents its names in docs/ws/b2.md, the names below are this session's
-assumption (docs/ws/b6.md): a row without them shows no cost text."""
+B2 stores the owner's costs in its kind `cost_views` (docs/ws/b2.md), one row per prediction, pick or
+settlement (`record_kind`, `record_id`). reads.with_costs joins the newest row by the clock onto each record under
+the names below (COST_SOURCES maps B2's columns to them); a record without one shows no cost text."""
 from __future__ import annotations
 
 from marketbrief.alerts import text as fmt
@@ -17,6 +18,13 @@ YOUR_COST_PCT = "your_cost_pct"      # predictions and picks: the owner's round-
 YOUR_COSTS = "your_costs"            # settled trades: the owner's round-trip costs in the market currency
 YOUR_NET_PNL = "your_net_pnl"        # settled trades: net profit after the owner's costs
 YOUR_RETURN_PCT = "your_return_pct"  # settled trades: that net profit as % of the amount
+
+# cost_views record_kind -> {B2 column: the name the messages read}
+COST_SOURCES = {
+    "prediction": {"your_cost_pct": YOUR_COST_PCT},
+    "pick": {"your_cost_pct": YOUR_COST_PCT},
+    "settlement": {"your_costs": YOUR_COSTS, "net_pnl_your": YOUR_NET_PNL, "return_pct_your": YOUR_RETURN_PCT},
+}
 
 
 def first_cost(rows: list[dict]) -> float | None:

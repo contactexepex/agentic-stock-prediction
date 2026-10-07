@@ -9,16 +9,21 @@ from datetime import date, datetime
 import numpy as np
 import pandas as pd
 
+from marketbrief.alerts.costs import COST_SOURCES
 from marketbrief.constants.kinds import (
+    KIND_COST_VIEWS,
     KIND_COMMAND_LOG,
     KIND_EOD_ANALYSES,
     KIND_HEAD_TO_HEAD_PICKS,
     KIND_PAPER_TRADES_SETTLED,
     KIND_RESEARCH_REVIEWS,
     KIND_STRATEGY_PREDICTIONS,
-    KIND_TRADE_CHECKS,
 )
 from marketbrief.core.schemas import SCHEMAS
+from marketbrief.intraday.constants import KIND_INTRADAY_ALERTS
+
+VIEW_ALERTS_FEED = "intraday_alerts_feed"   # B9: intraday_alerts plus the explainer's note
+NOTE_COLUMNS = ("explanation_id", "attribution", "explanation", "cited_ids", "explained_at")
 
 
 def plain(value, is_json: bool = False):
@@ -59,45 +64,73 @@ def feed_asof(rows: list[dict], now: datetime) -> list[dict]:
             and (r.get("computed_at") is None or by_now(r.get("computed_at")))]
 
 
+def with_costs(con, rows: list[dict], record_kind: str, now: datetime) -> list[dict]:
+    """The rows with the owner's cost fields of B2's `cost_views` (the newest row per record computed by `now`,
+    joined on record_id = the row's id), under the names of costs.COST_SOURCES; a row without one is unchanged."""
+    if not rows:
+        return rows
+    mapping = COST_SOURCES[record_kind]
+    found = records(con, KIND_COST_VIEWS, f"""
+        SELECT * FROM {KIND_COST_VIEWS} WHERE record_kind = ? AND computed_at <= ?::TIMESTAMPTZ
+        AND record_id IN (SELECT unnest(?::VARCHAR[]))
+        QUALIFY row_number() OVER (PARTITION BY record_id ORDER BY computed_at DESC, id DESC) = 1""",
+                    [record_kind, now, [r["id"] for r in rows]])
+    by_id = {r["record_id"]: r for r in found}
+    return [{**row, **{name: by_id[row["id"]].get(column) for column, name in mapping.items()}}
+            if row["id"] in by_id else row for row in rows]
+
+
 def session_predictions(con, session_date: str, now: datetime) -> list[dict]:
-    """The session's strategy predictions made by `now` (one row per id, the first made)."""
-    return records(con, KIND_STRATEGY_PREDICTIONS, f"""
+    """The session's strategy predictions made by `now` (one row per id, the first made), with the owner's cost."""
+    return with_costs(con, records(con, KIND_STRATEGY_PREDICTIONS, f"""
         SELECT * FROM {KIND_STRATEGY_PREDICTIONS} WHERE session_date = ?::DATE AND made_at <= ?::TIMESTAMPTZ
-        QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at) = 1 ORDER BY id""", [session_date, now])
+        QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at) = 1 ORDER BY id""", [session_date, now]),
+        "prediction", now)
 
 
 def session_picks(con, session_date: str, now: datetime) -> list[dict]:
-    """The session's head-to-head picks made by `now`."""
-    return records(con, KIND_HEAD_TO_HEAD_PICKS, f"""
+    """The session's head-to-head picks made by `now`, with the owner's cost."""
+    return with_costs(con, records(con, KIND_HEAD_TO_HEAD_PICKS, f"""
         SELECT * FROM {KIND_HEAD_TO_HEAD_PICKS} WHERE session_date = ?::DATE AND made_at <= ?::TIMESTAMPTZ
-        QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at) = 1 ORDER BY id""", [session_date, now])
+        QUALIFY row_number() OVER (PARTITION BY id ORDER BY made_at) = 1 ORDER BY id""", [session_date, now]),
+        "pick", now)
 
 
-def latest_check(con, session_date: str, now: datetime, check_id: str | None = None) -> list[dict]:
-    """The trade checks of one check run of the session (the newest by `now` unless `check_id` is given)."""
+def latest_alerts(con, session_date: str, now: datetime, check_id: str | None = None) -> list[dict]:
+    """B9's alerts of one check run of the session (view intraday_alerts_feed; the newest run by `now` unless
+    `check_id` is given), only rows checked and computed by `now`. The explainer's note is dropped when it was
+    written after `now`."""
     if check_id is None:
-        newest = con.execute(f"""SELECT check_id FROM {KIND_TRADE_CHECKS} WHERE session_date = ?::DATE
+        newest = con.execute(f"""SELECT check_id FROM {VIEW_ALERTS_FEED} WHERE session_date = ?::DATE
             AND check_at <= ?::TIMESTAMPTZ AND computed_at <= ?::TIMESTAMPTZ
             ORDER BY check_at DESC, check_id DESC LIMIT 1""", [session_date, now, now]).fetchone()
         if newest is None:
             return []
         check_id = newest[0]
-    return records(con, KIND_TRADE_CHECKS, f"""
-        SELECT * FROM {KIND_TRADE_CHECKS} WHERE check_id = ? AND check_at <= ?::TIMESTAMPTZ
-        AND computed_at <= ?::TIMESTAMPTZ
-        QUALIFY row_number() OVER (PARTITION BY id ORDER BY computed_at) = 1 ORDER BY id""", [check_id, now, now])
+    rows = records(con, KIND_INTRADAY_ALERTS, f"""
+        SELECT * FROM {VIEW_ALERTS_FEED} WHERE check_id = ? AND check_at <= ?::TIMESTAMPTZ
+        AND computed_at <= ?::TIMESTAMPTZ ORDER BY ticker, id""", [check_id, now, now])
+    return [without_late_note(row, now) for row in rows]
+
+
+def without_late_note(row: dict, now: datetime) -> dict:
+    """The row without the explainer's note when it was written after `now` (or never)."""
+    written = row.get("explained_at")
+    if written is not None and pd.Timestamp(written) <= pd.Timestamp(now):
+        return row
+    return {**row, **dict.fromkeys(NOTE_COLUMNS)}
 
 
 def settled_today(con, session_date: str, timezone: str, now: datetime) -> list[dict]:
     """The trades first settled on the session's local date, each as its newest row by `now`. A trade first settled
     on an earlier day and re-settled on this one is not listed here: it is a correction of that day (corrections)."""
-    return records(con, KIND_PAPER_TRADES_SETTLED, f"""
+    return with_costs(con, records(con, KIND_PAPER_TRADES_SETTLED, f"""
         WITH first AS (SELECT trade_id, min(settled_at) AS first_at FROM {KIND_PAPER_TRADES_SETTLED}
                        WHERE settled_at <= ?::TIMESTAMPTZ GROUP BY trade_id)
         SELECT t.* FROM {KIND_PAPER_TRADES_SETTLED} t JOIN first f ON f.trade_id = t.trade_id
         WHERE CAST(timezone(?, f.first_at) AS DATE) = ?::DATE AND t.settled_at <= ?::TIMESTAMPTZ
         QUALIFY row_number() OVER (PARTITION BY t.trade_id ORDER BY t.settled_at DESC, t.id DESC) = 1
-        ORDER BY t.trade_id""", [now, timezone, session_date, now])
+        ORDER BY t.trade_id""", [now, timezone, session_date, now]), "settlement", now)
 
 
 def corrections(con, session_date: str, timezone: str, after: str, now: datetime) -> list[dict]:
