@@ -1,0 +1,18 @@
+# Warehouse (WS1, docs/ws/ws1.md): a derived copy of each market's data plus per-page read models, rebuilt
+# from the repo at any time by scripts/warehouse_sync.py. The repo's data/ stays the source of truth.
+# The MotherDuck token is only ever the environment variable MOTHERDUCK_TOKEN; it is never written here.
+provider: motherduck          # motherduck | local
+name: market_brief            # the MotherDuck database (md:market_brief)
+# MotherDuck's Postgres endpoint (the app's route handlers read the read models through it)
+pg_host: pg.eu-central-1-aws.motherduck.com
+pg_port: 5432
+pg_user: postgres
+sslmode: verify-full
+sslrootcert: system
+# Without the token (dev, tests) or with --local, the sync writes this DuckDB file instead (work/ is gitignored).
+local_path: work/warehouse/market_brief.duckdb
+# Kill switch (docs/ARCHITECTURE.md section 5): enabled: false skips every sync before connecting; a sync also
+# skips once this UTC month's recorded sync wall time (meta.sync_runs, an upper bound of MotherDuck compute)
+# reaches monthly_hours_ceiling. Skips are non-blocking and logged in rm.builds.
+enabled: true
+monthly_hours_ceiling: 7
