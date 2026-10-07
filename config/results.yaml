@@ -1,0 +1,46 @@
+# Results digests (WS6; scripts/results_digest.py, logic in scripts/marketbrief/results/, docs/ws/ws6.md).
+# Deterministic numbers per quarterly results release and earnings call, plus at most 5 quoted bullets by
+# the results-analyst agent, gated by `results_digest.py validate|add` and stored in results_digests.
+
+detection:
+  lookback_days: 10           # releases published in the last N days are considered (a missed run is caught up)
+  max_releases_per_run: 12    # newest first; the rest wait for the next run
+
+numbers:
+  report_window_days: 75      # US: the quarter a 2.02 release reports ended at most this many days before it (the
+                              # previous quarter ended ~91 days earlier, so it is never taken for the new one)
+  qoq_gap_days: [80, 125]     # the previous quarter ended this many days before the reported one (16-week quarters)
+  india_release_grace_hours: 24   # India: filings of the quarter within this long after the first are the release
+  india_basis_order: [consolidated, standalone]   # India: the basis shown (first found)
+
+consensus:
+  max_report_gap_days: 7      # a Yahoo consensus row belongs to the release when its report date is this close
+
+texts:
+  max_docs: 3                 # SEC documents stored per filing (main document, then EX-99 exhibits by name)
+  max_chars: 40000            # characters of text kept per stored document (quotes are checked against these)
+  input_max_chars: 12000      # characters per source shown in the agent's input
+  sec_forms: [8-K, 8-K/A, 6-K]
+  results_item_marker: "Item 2.02"   # an SEC filing whose main document states this is a results filing
+  concall_days: 3             # SEC filings accepted up to N days after the release can hold prepared remarks
+  # An SEC EX-99 document is an earnings-call text when its name or first 3000 characters match this
+  # (case-insensitive). "conference call" alone is not enough: press releases announce the call.
+  concall_terms: ["prepared remarks", "transcript", "prepared commentary"]
+  # India: NSE announcement attachments, from the NSE archive host only (https://nsearchives.nseindia.com).
+  india_results_categories: ["Financial Result Updates", "Outcome of Board Meeting", "Press Release",
+                             "Integrated Filing- Financial"]
+  india_results_terms: ["financial result", "results"]
+  india_results_days: [-1, 2] # an announcement belongs to the release when published this many days around it
+  india_concall_categories: ["Analysts/Institutional Investor Meet/Con. Call Updates"]
+  india_concall_terms: ["transcript"]
+  # PDF attachments need a PDF parser. None is in requirements.txt, so this stays null and PDF attachments are
+  # recorded as `pdf_not_parsed` (open question in docs/ws/ws6.md). `pypdf` reads them once that library is
+  # added to requirements.txt.
+  pdf_parser: null
+
+digest:
+  max_bullets: 5
+  quote_min_words: 3
+  quote_max_words: 40
+  text_max_chars: 300
+  topics: [headline_numbers, guidance, one_off, commentary]

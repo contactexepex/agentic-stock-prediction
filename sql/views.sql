@@ -678,3 +678,19 @@ SELECT d.id AS check_row_id, d.explanation_id, d.ticker, d.session_date, d.check
 FROM intraday_deviations d
 LEFT JOIN ohlc_raw o ON o.ticker = d.ticker AND o.date = d.session_date
 WHERE d.explanation_id IS NOT NULL;
+
+-- WS6: results digests (scripts/results_digest.py; docs/ws/ws6.md). A digest is appended when a release is new or
+-- its inputs changed (state_key); every input of a row (texts by availability, numbers_as_of, the consensus point)
+-- is <= inputs_until <= created_at. Digests as of a time: the newest row per release created by then.
+CREATE OR REPLACE MACRO results_digests_asof(ts) AS TABLE
+SELECT DISTINCT ON (id) * FROM results_digests
+WHERE created_at <= ts AND coalesce(inputs_until, created_at) <= ts
+ORDER BY id, created_at DESC, state_key;
+
+CREATE OR REPLACE VIEW results_digests_latest AS
+SELECT * FROM results_digests_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
+
+-- The latest release per ticker and kind (results | concall), newest release first.
+CREATE OR REPLACE VIEW results_digest_ticker_latest AS
+SELECT DISTINCT ON (ticker, release_kind) * FROM results_digests_latest
+ORDER BY ticker, release_kind, release_at DESC, id;
