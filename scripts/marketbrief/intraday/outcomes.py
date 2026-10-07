@@ -4,6 +4,7 @@ intraday_explanation_close; as_of keeps notes written and closes collected by th
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 
 from marketbrief.intraday.constants import OUTCOME_FADED, OUTCOME_HELD, OUTCOME_PENDING, OUTCOME_REVERSED
@@ -23,12 +24,27 @@ def classify(ret_at_check: float | None, ret_at_close: float | None, hold_fracti
     return OUTCOME_FADED
 
 
-def closed_outside(row: dict) -> bool | None:
-    """The close outside the 1-day 80% band (None without a close or band)."""
-    close, low, high = row.get("session_close"), row.get("lo80_1d"), row.get("hi80_1d")
+def closed_outside(row: dict, horizon: int = 1) -> bool | None:
+    """The close outside the 80% band of horizon k (bands JSON; for k = 1 the legacy _1d columns of rows written
+    before B9), or None without a close or band."""
+    bands = row.get("bands") or {}
+    if isinstance(bands, str):
+        bands = json.loads(bands)
+    band = bands.get(str(horizon)) or (
+        {"lo80": row.get("lo80_1d"), "hi80": row.get("hi80_1d")} if horizon == 1 else {})
+    close, low, high = row.get("session_close"), band.get("lo80"), band.get("hi80")
     if close is None or low is None or high is None:
         return None
     return close < low or close > high
+
+
+def closed_outside_by_horizon(row: dict) -> dict[str, bool | None]:
+    """{"<k>": closed outside the 80% band} for every horizon of the row's bands (B9: no fixed horizon)."""
+    bands = row.get("bands") or {}
+    if isinstance(bands, str):
+        bands = json.loads(bands)
+    keys = sorted({*bands, "1"} if row.get("lo80_1d") is not None else set(bands), key=int)
+    return {k: closed_outside(row, int(k)) for k in keys}
 
 
 def explanation_outcomes(con, settings: dict, start: date | None = None, end: date | None = None,
@@ -55,6 +71,7 @@ def explanation_outcomes(con, settings: dict, start: date | None = None, end: da
             "ret_after_check": rounded(row["ret_after_check"]),
             "outcome": classify(row["ret_since_open"], row["close_ret_since_open"], hold),
             "closed_outside_1d_80": closed_outside(row),
+            "closed_outside_80": closed_outside_by_horizon(row),
         })
     return out
 

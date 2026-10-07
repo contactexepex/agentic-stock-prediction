@@ -28,3 +28,19 @@ MSG_BAD_WINDOW = "news.google_news.window must look like 1d or 12h, not {value!r
 # window longer than a day is asked again per day (`after:D before:D+1`, Pacific-time days).
 GOOGLE_NEWS_ITEM_CAP = 100
 MAX_SLICE_QUERIES_PER_RUN = 200
+
+# De-duplication (owner decisions Q45-Q47, 2026-10-07; marketbrief/analytics/news_dedup.py; docs/DESIGN.md
+# section 3, "News de-duplication"): one article is stored once per market; a later headline at the same link is
+# a news_updates row. A match counts within DEDUP_WINDOW_DAYS of the matched item's newest stored row: items are
+# kept only when published within the catch-up cap (7 days), so a repeat sighting comes at most 7 days after the
+# first; 2 days of margin. The collector reads DEDUP_LOOKBACK_FILES daily files (one per UTC day: today and the
+# 9 days before), which cover those 9 days back from any time of today.
+DEDUP_WINDOW_DAYS = 9
+DEDUP_LOOKBACK_FILES = DEDUP_WINDOW_DAYS + 1
+OUTLET_HOST_PREFIXES = ("www.", "m.", "amp.", "mobile.")   # stripped from hosts: the same outlet
+OUTLET_LABEL_PREFIX = "label:"   # outlet key of a row with neither a host nor a configured or host-like label
+TRACKING_PARAMETER = r"^(?:utm_[a-z_]+|fbclid|gclid|ocid|cmpid)$"   # dropped from publisher links
+GOOGLE_NEWS_HOST = "news.google.com"   # its article links carry no meaningful query (?oc=5)
+MATCH_LINK = "link"     # same canonical article link, same outlet: the same article, maybe an edited headline
+MATCH_TITLE = "title"   # same normalised title from the same outlet
+NEWS_ID_MAP_TABLE = "news_id_map"   # every stored news id -> its canonical id (core.database.connect)

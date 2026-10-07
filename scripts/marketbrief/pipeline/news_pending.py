@@ -7,7 +7,10 @@ previous pre-open enrichment, not just today's file. The window is (since, now],
   the previous pre-open run was working, are pending; and
 - the start of today (UTC): today's items, the window used before light runs existed, are always in it;
 and never more than PENDING_MAX_DAYS (7) before now. No enrichment stored: the start of today.
-Pending = the window's news and announcement ids that have no news_enriched row yet.
+Pending = the window's news and announcement ids that have no news_enriched row yet, plus every news item whose
+headline changed in the window (a news_updates row seen in (since, now], news de-duplication, DESIGN.md section 3)
+after its latest enrichment: the analyst scores the new headline and appends a newer news_enriched row, so the
+latest enrichment as of a time belongs to the headline shown then. Such rows carry `headline_updated_at`.
 `validate.py --stage news` checks the analyst's file against the same window.
 
     python scripts/news_pending.py [--out work/news_pending.jsonl]
@@ -40,7 +43,7 @@ from marketbrief.core.database import connect
 LAST_ENRICHED_ITEM_SQL = """
 WITH done AS (SELECT DISTINCT id FROM news_enriched WHERE analyzed_at <= ?::TIMESTAMPTZ)
 SELECT max(first_seen_at) FROM (
-    SELECT first_seen_at FROM news WHERE id IN (SELECT id FROM done)
+    SELECT first_seen_at FROM news_stored WHERE id IN (SELECT id FROM done)
     UNION ALL SELECT first_seen_at FROM announcements WHERE id IN (SELECT id FROM done)
 ) WHERE first_seen_at <= ?::TIMESTAMPTZ"""
 ENRICHED_SQL = "SELECT DISTINCT id FROM news_enriched"
@@ -48,6 +51,16 @@ WINDOW_SQL = (
     "SELECT {columns} FROM {table} WHERE first_seen_at > ?::TIMESTAMPTZ AND first_seen_at <= ?::TIMESTAMPTZ "
     "ORDER BY first_seen_at, id"
 )
+NEWS_WINDOW_SQL = (  # one row per item, the headline seen by now
+    "SELECT {columns} FROM news_asof(?::TIMESTAMPTZ) WHERE first_seen_at > ?::TIMESTAMPTZ "
+    "AND first_seen_at <= ?::TIMESTAMPTZ ORDER BY first_seen_at, id"
+)
+UPDATED_SQL = """
+SELECT coalesce(m.canonical_id, u.news_id) AS id, max(u.seen_at) AS headline_at
+FROM news_updates u LEFT JOIN news_id_map m ON m.id = u.news_id
+WHERE u.seen_at > ?::TIMESTAMPTZ AND u.seen_at <= ?::TIMESTAMPTZ GROUP BY 1 ORDER BY 1"""
+LATEST_ENRICHMENT_SQL = "SELECT id, max(analyzed_at) FROM news_enriched_asof(?::TIMESTAMPTZ) GROUP BY id"
+UPDATED_ROWS_SQL = "SELECT {columns} FROM news_asof(?::TIMESTAMPTZ) WHERE list_contains(?, id) ORDER BY id"
 
 
 def as_utc(value) -> pd.Timestamp:
@@ -66,17 +79,54 @@ def enrichment_since(con, now) -> pd.Timestamp:
     return max(since, now - pd.Timedelta(days=PENDING_MAX_DAYS))
 
 
+def headline_updates(con, since: pd.Timestamp, now) -> dict[str, pd.Timestamp]:
+    """Item id -> its newest headline update seen in (since, now]."""
+    rows = con.execute(UPDATED_SQL, [since.isoformat(), as_utc(now).isoformat()]).fetchall()
+    return {news_id: as_utc(seen) for news_id, seen in rows}
+
+
+def rescore_ids(con, since: pd.Timestamp, now) -> set[str]:
+    """Items whose headline changed in the window after their latest enrichment analyzed by now (or never enriched)."""
+    updated = headline_updates(con, since, now)
+    if not updated:
+        return set()
+    scored = {
+        news_id: as_utc(at)
+        for news_id, at in con.execute(LATEST_ENRICHMENT_SQL, [as_utc(now).isoformat()]).fetchall()
+        if at is not None
+    }
+    return {news_id for news_id, seen in updated.items() if news_id not in scored or scored[news_id] < seen}
+
+
 def window_rows(con, since: pd.Timestamp, now) -> list[dict]:
-    """News and announcement rows first seen in (since, now], oldest first, each with its `kind`."""
-    bounds = [since.isoformat(), as_utc(now).isoformat()]
+    """News and announcement rows first seen in (since, now], oldest first, each with its `kind`, then the news items
+    first seen earlier whose headline changed in the window; a news row shows its headline as of now."""
+    now_text = as_utc(now).isoformat()
+    bounds = [since.isoformat(), now_text]
     rows = []
-    for kind, table, columns in (
-        (ITEM_KIND_NEWS, "news", NEWS_COLUMNS),
-        (ITEM_KIND_ANNOUNCEMENT, "announcements", ANNOUNCEMENT_COLUMNS),
+    for kind, sql, params in (
+        (ITEM_KIND_NEWS, NEWS_WINDOW_SQL.format(columns=", ".join(NEWS_COLUMNS)), [now_text, *bounds]),
+        (
+            ITEM_KIND_ANNOUNCEMENT,
+            WINDOW_SQL.format(columns=", ".join(ANNOUNCEMENT_COLUMNS), table="announcements"),
+            bounds,
+        ),
     ):
-        frame = con.execute(WINDOW_SQL.format(columns=", ".join(columns), table=table), bounds).df()
+        frame = con.execute(sql, params).df()
         for record in frame.to_dict("records"):
             rows.append({"kind": kind, **{key: clean(value) for key, value in record.items()}})
+    updated = headline_updates(con, since, now)
+    seen = {row["id"] for row in rows}
+    later = sorted(set(updated) - seen)
+    if later:
+        frame = con.execute(UPDATED_ROWS_SQL.format(columns=", ".join(NEWS_COLUMNS)), [now_text, later]).df()
+        rows += [
+            {"kind": ITEM_KIND_NEWS, **{key: clean(value) for key, value in record.items()}}
+            for record in frame.to_dict("records")
+        ]
+    for row in rows:
+        if row["kind"] == ITEM_KIND_NEWS and row["id"] in updated:
+            row["headline_updated_at"] = updated[row["id"]].isoformat()
     return rows
 
 
@@ -98,10 +148,11 @@ def window_ids(con, now) -> tuple[pd.Timestamp, set[str]]:
 
 
 def pending_rows(con, now) -> tuple[pd.Timestamp, list[dict]]:
-    """(since, the window's rows that have no enrichment yet)."""
+    """(since, the window's rows that have no enrichment yet or whose headline changed after their enrichment)."""
     since = enrichment_since(con, now)
     done = {row[0] for row in con.execute(ENRICHED_SQL).fetchall()}
-    return since, [row for row in window_rows(con, since, now) if row["id"] not in done]
+    again = rescore_ids(con, since, now)
+    return since, [row for row in window_rows(con, since, now) if row["id"] not in done or row["id"] in again]
 
 
 def write_pending(market: str, out: Path) -> dict:

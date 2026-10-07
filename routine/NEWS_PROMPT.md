@@ -33,7 +33,7 @@ a line or file there, and never run a tool that overwrites one. Only the collect
      the same news again.
 
 3. Save: add only the folders the script lists in `commit_paths` of `work/news_light_run.json`
-   (e.g. `git add data/<market>/news data/<market>/news_runs data/<market>/news_articles
+   (e.g. `git add data/<market>/news data/<market>/news_runs data/<market>/news_updates data/<market>/news_articles
    data/<market>/news_clusters`, plus `data/india/announcements` for India when listed), then
    `git diff --cached --quiet || git commit -m "<market> news TODAY HH:MM UTC"` (TODAY and the time from
    `date -u`) and `git push origin HEAD:main`. Never add `work/`, `reports/`, `summaries/` or any other

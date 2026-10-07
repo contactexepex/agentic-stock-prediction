@@ -76,8 +76,10 @@ def root(tmp_path, monkeypatch):
                                              "price": 5000.0, "prev_close": 4990.0, "change_pct": 0.2,
                                              "collected_at": "2026-10-06T11:00:00+00:00"}])
     write_jsonl(tmp_path, "news", TODAY, [news(GOOD_NEWS_ID)])
+    # a different headline: the same title from the same outlet would make GOOD_NEWS_ID a stored duplicate of it
     write_jsonl(tmp_path, "news", date(2026, 10, 5), [news(OLD_NEWS_ID, first_seen_at="2026-10-05T11:00:00+00:00",
-                                                           published_at="2026-10-05T10:00:00+00:00")])
+                                                           published_at="2026-10-05T10:00:00+00:00",
+                                                           title="Apple shares slip ahead of the iPhone event")])
     write_jsonl(tmp_path, "filings", TODAY, [{"id": "0000320193-26-000001", "ticker": "AAPL", "cik": "320193",
                                               "form": "8-K", "filing_date": "2026-10-05",
                                               "accepted_at": "2026-10-05T20:00:00+00:00", "description": "8-K",

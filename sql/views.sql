@@ -62,8 +62,9 @@ WINDOW w AS (PARTITION BY ticker ORDER BY date);
 -- (marketbrief/analytics/news_tags.py, registered in common.connect): headline first with the config's precise
 -- names minus `news_exclude` (never from news.google.com links, source names or a query hit
 -- alone), split into primary_tickers / mentioned_tickers with tag_confidence. Old wire rows whose
--- title names no company keep their tags as mentioned. `news_stored` is the rows as stored.
-CREATE OR REPLACE VIEW news AS
+-- title names no company keep their tags as mentioned. `news_stored` is the rows as stored, `news_tagged`
+-- every stored row re-tagged.
+CREATE OR REPLACE VIEW news_tagged AS
 WITH r AS (
     SELECT *, news_retag(feed, title, tickers, primary_tickers, mentioned_tickers, tag_confidence,
                          tag_version) AS t_
@@ -73,12 +74,86 @@ SELECT * EXCLUDE (t_) REPLACE (t_.tickers AS tickers, t_.primary_tickers AS prim
                                t_.mentioned_tickers AS mentioned_tickers, t_.tag_confidence AS tag_confidence)
 FROM r;
 
--- Latest enrichment per article (re-analysis appends a newer row, it never edits).
+-- News de-duplication (owner decisions Q45-Q47; marketbrief/analytics/news_dedup.py; DESIGN.md section 3).
+-- news_id_map (built by core.database.connect) maps every stored id to its item: itself, or the earlier stored
+-- item it duplicates (the same article link from the same outlet, or the same normalised title from the same
+-- outlet, within 9 days). Assigned in (first_seen_at, id) order, so a duplicate is hidden only behind an item
+-- first seen no later than itself: no look-ahead. news_aliases lists the duplicates (id -> canonical_id).
+CREATE OR REPLACE VIEW news_aliases AS
+SELECT id, canonical_id, match, first_seen_at FROM news_id_map WHERE id <> canonical_id;
+
+-- Every headline of every item with the time it was seen: the item's own stored row, its stored duplicates
+-- (rows written before de-duplication; an edited headline at the same link) and its news_updates rows.
+CREATE OR REPLACE VIEW news_headlines AS
+SELECT m.canonical_id AS id, s.title, s.first_seen_at AS seen_at, s.id AS from_id
+FROM news_stored s JOIN news_id_map m ON m.id = s.id
+UNION ALL
+SELECT coalesce(m.canonical_id, u.news_id) AS id, u.title, u.seen_at, u.id AS from_id
+FROM news_updates u LEFT JOIN news_id_map m ON m.id = u.news_id;
+
+-- Each item's latest headline seen by ts (Q45: readers see the latest headline as of a time).
+CREATE OR REPLACE MACRO news_title_asof(ts) AS TABLE
+SELECT DISTINCT ON (id) id, title, seen_at FROM news_headlines
+WHERE seen_at <= ts AND title IS NOT NULL ORDER BY id, seen_at DESC, from_id DESC;
+
+-- News items first seen by ts, one row per item (stored duplicates left out), each with its latest headline
+-- seen by ts. Use it for anything as of a time.
+CREATE OR REPLACE MACRO news_asof(ts) AS TABLE
+SELECT n.* REPLACE (coalesce(t.title, n.title) AS title)
+FROM news_tagged n
+JOIN news_id_map m ON m.id = n.id AND m.canonical_id = n.id
+LEFT JOIN news_title_asof(ts) t ON t.id = n.id
+WHERE n.first_seen_at <= ts;
+
+-- Every stored news item (duplicates left out), with its latest headline seen by now (the run's clock:
+-- MB_NOW freezes now()). Rows first seen after now keep their stored headline.
+CREATE OR REPLACE VIEW news AS
+SELECT n.* REPLACE (coalesce(t.title, n.title) AS title)
+FROM news_tagged n
+JOIN news_id_map m ON m.id = n.id AND m.canonical_id = n.id
+LEFT JOIN news_title_asof(now()) t ON t.id = n.id;
+
+-- Lookup by any stored id (a cited duplicate id included): the item's row under the id asked for, plus its
+-- canonical_id. Old predictions, clusters and claims may cite an id that is now a hidden duplicate.
+CREATE OR REPLACE VIEW news_lookup AS
+SELECT n.* REPLACE (m.id AS id), m.canonical_id
+FROM news n JOIN news_id_map m ON m.canonical_id = n.id;
+
+-- The same as of ts: ids first seen by ts, with their item's headline seen by ts.
+CREATE OR REPLACE MACRO news_lookup_asof(ts) AS TABLE
+SELECT n.* REPLACE (m.id AS id), m.canonical_id
+FROM news_asof(ts) n JOIN news_id_map m ON m.canonical_id = n.id
+WHERE m.first_seen_at <= ts;
+
+-- Latest enrichment per article analyzed by now (re-analysis appends a newer row, it never edits; the clock is the
+-- `news` view's, so a headline and its enrichment are read as of the same time: an item whose headline changed
+-- is scored again by the news analyst, news_pending.py). An item without its own enrichment takes the latest one
+-- of a stored duplicate (news_aliases), under its own id.
 CREATE OR REPLACE VIEW enriched_latest AS
-SELECT DISTINCT ON (id) * FROM news_enriched ORDER BY id, analyzed_at DESC;
+WITH own AS (SELECT DISTINCT ON (id) * FROM news_enriched WHERE coalesce(analyzed_at <= now(), true)
+             ORDER BY id, analyzed_at DESC)
+SELECT * FROM own
+UNION ALL
+SELECT * FROM (
+    SELECT DISTINCT ON (a.canonical_id) o.* REPLACE (a.canonical_id AS id)
+    FROM own o JOIN news_aliases a ON a.id = o.id
+    WHERE a.canonical_id NOT IN (SELECT id FROM own)
+    ORDER BY a.canonical_id, o.analyzed_at DESC, o.id);
+
+-- The same as of ts: the latest enrichment analyzed by ts per id, a duplicate's filling in for its item.
+CREATE OR REPLACE MACRO news_enriched_asof(ts) AS TABLE
+WITH own AS (SELECT DISTINCT ON (id) * FROM news_enriched WHERE analyzed_at <= ts ORDER BY id, analyzed_at DESC)
+SELECT * FROM own
+UNION ALL
+SELECT * FROM (
+    SELECT DISTINCT ON (a.canonical_id) o.* REPLACE (a.canonical_id AS id)
+    FROM own o JOIN news_aliases a ON a.id = o.id
+    WHERE a.canonical_id NOT IN (SELECT id FROM own)
+    ORDER BY a.canonical_id, o.analyzed_at DESC, o.id);
 
 -- One row per (ticker, article), dated by publish time (fallback: first seen). role: 'primary'
--- (the item is about the ticker) or 'mentioned'; tag_confidence 'low' marks tags to read with care.
+-- (the item is about the ticker) or 'mentioned'; tag_confidence 'low' marks tags to read with care. The headline
+-- (latest seen by now) and the enrichment (latest analyzed by now) are read at the same clock.
 CREATE OR REPLACE VIEW news_ticker_day AS
 WITH x AS (
     SELECT unnest(tickers) AS ticker, id, title, source, primary_tickers, tag_confidence,
@@ -584,15 +659,25 @@ FROM r a LEFT JOIN r b ON b.index_name = a.index_name AND b.k = 2
 WHERE a.k = 1;
 
 -- News verification phase A (docs/DESIGN.md 3a). Articles fetched by a time (collect_articles.py
--- writes one row per news id; the latest fetch wins should a later version ever add one).
+-- writes one row per news id; the latest fetch wins should a later version ever add one). An item without an
+-- article row of its own takes the latest one of a stored duplicate (news_aliases), under its own id.
 CREATE OR REPLACE MACRO news_articles_asof(ts) AS TABLE
-SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ts ORDER BY id, fetched_at DESC;
+WITH own AS (SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ts ORDER BY id, fetched_at DESC)
+SELECT * FROM own
+UNION ALL
+SELECT * FROM (
+    SELECT DISTINCT ON (a.canonical_id) o.* REPLACE (a.canonical_id AS id)
+    FROM own o JOIN news_aliases a ON a.id = o.id
+    WHERE a.canonical_id NOT IN (SELECT id FROM own)
+    ORDER BY a.canonical_id, o.fetched_at DESC, o.id);
 
 -- Cluster state as of a time, without look-ahead: only rows computed by then (as_of <= ts) whose
 -- inputs were all known by then (inputs_until <= ts: item first_seen_at, article fetched_at, filing
 -- accepted_at, NSE dissemination time) and whose news ids were all first seen by then. Each news
 -- id belongs to the newest such row that lists it (a cluster that merged into another, or
--- changed, is superseded); a cluster is that row.
+-- changed, is superseded); a cluster is that row. A listed id that is a stored duplicate counts as its item
+-- (news_aliases; news de-duplication, DESIGN.md section 3), so a row built after de-duplication that lists
+-- the item supersedes an older row that listed the duplicate.
 CREATE OR REPLACE MACRO news_cluster_items_asof(ts) AS TABLE
 WITH r AS (
     SELECT c.* FROM news_clusters c
@@ -600,9 +685,21 @@ WITH r AS (
       AND NOT EXISTS (SELECT 1 FROM news_stored n
                       WHERE list_contains(c.news_ids, n.id) AND n.first_seen_at > ts)
 ),
-i AS (SELECT unnest(news_ids) AS news_id, id AS row_id, cluster_id, ticker, as_of FROM r)
+i AS (SELECT coalesce(a.canonical_id, x.news_id) AS news_id, x.row_id, x.cluster_id, x.ticker, x.as_of
+      FROM (SELECT unnest(news_ids) AS news_id, id AS row_id, cluster_id, ticker, as_of FROM r) x
+      LEFT JOIN news_aliases a ON a.id = x.news_id)
 SELECT DISTINCT ON (news_id, ticker) news_id, ticker, cluster_id, row_id, as_of
 FROM i ORDER BY news_id, ticker, as_of DESC, row_id;
+
+-- Each cluster row's news_ids with stored duplicates replaced by their item (first position kept).
+CREATE OR REPLACE VIEW news_cluster_item_ids AS
+WITH x AS (SELECT id AS row_id, unnest(news_ids) AS news_id, generate_subscripts(news_ids, 1) AS pos
+           FROM news_clusters),
+y AS (SELECT DISTINCT ON (x.row_id, coalesce(a.canonical_id, x.news_id))
+             x.row_id, coalesce(a.canonical_id, x.news_id) AS news_id, x.pos
+      FROM x LEFT JOIN news_aliases a ON a.id = x.news_id
+      ORDER BY x.row_id, coalesce(a.canonical_id, x.news_id), x.pos)
+SELECT row_id, list(news_id ORDER BY pos) AS item_ids FROM y GROUP BY row_id;
 
 -- A cluster is its newest row still holding an item (above). Ids a newer row of another cluster
 -- took over are removed from news_ids (and n_items) and listed in moved_ids; the other columns
@@ -612,11 +709,12 @@ FROM i ORDER BY news_id, ticker, as_of DESC, row_id;
 CREATE OR REPLACE MACRO news_clusters_asof(ts) AS TABLE
 WITH m AS (SELECT * FROM news_cluster_items_asof(ts)),
 k AS (SELECT row_id, list(news_id) AS cur FROM m GROUP BY row_id),
-r AS (SELECT c.*, k.cur FROM news_clusters c JOIN k ON k.row_id = c.id)
-SELECT DISTINCT ON (cluster_id) * EXCLUDE (cur)
-    REPLACE (list_filter(news_ids, x -> list_contains(cur, x)) AS news_ids,
-             len(list_filter(news_ids, x -> list_contains(cur, x))) AS n_items),
-    list_filter(news_ids, x -> NOT list_contains(cur, x)) AS moved_ids
+r AS (SELECT c.*, k.cur, coalesce(d.item_ids, c.news_ids) AS item_ids_
+      FROM news_clusters c JOIN k ON k.row_id = c.id LEFT JOIN news_cluster_item_ids d ON d.row_id = c.id)
+SELECT DISTINCT ON (cluster_id) * EXCLUDE (cur, item_ids_)
+    REPLACE (list_filter(item_ids_, x -> list_contains(cur, x)) AS news_ids,
+             len(list_filter(item_ids_, x -> list_contains(cur, x))) AS n_items),
+    list_filter(item_ids_, x -> NOT list_contains(cur, x)) AS moved_ids
 FROM r ORDER BY cluster_id, as_of DESC;
 
 CREATE OR REPLACE VIEW news_clusters_latest AS
@@ -631,12 +729,17 @@ SELECT DISTINCT ON (cluster_id, coalesce(claim_id, '')) * FROM news_verified
 WHERE as_of <= ts AND coalesce(inputs_until, as_of) <= ts
 ORDER BY cluster_id, coalesce(claim_id, ''), as_of DESC, id;
 
--- Each news id's own status per ticker as of a time (from the newest cluster row listing it).
+-- Each news id's own status per ticker as of a time (from the newest cluster row listing it). A row listing a
+-- stored duplicate also gives that status to its item (news_aliases), unless a newer row lists the item itself.
 CREATE OR REPLACE MACRO news_status_ids_asof(ts) AS TABLE
 WITH c AS (SELECT * FROM news_verified_asof(ts) WHERE level = 'cluster'),
-i AS (SELECT unnest(status_ids) AS news_id, unnest(id_statuses) AS status, ticker, cluster_id, as_of FROM c)
+i AS (SELECT unnest(status_ids) AS news_id, unnest(id_statuses) AS status, ticker, cluster_id, as_of FROM c),
+j AS (SELECT *, true AS own FROM i
+      UNION ALL
+      SELECT a.canonical_id AS news_id, i.status, i.ticker, i.cluster_id, i.as_of, false AS own
+      FROM i JOIN news_aliases a ON a.id = i.news_id)
 SELECT DISTINCT ON (news_id, ticker) news_id, ticker, status, cluster_id, as_of
-FROM i ORDER BY news_id, ticker, as_of DESC, cluster_id;
+FROM j ORDER BY news_id, ticker, as_of DESC, own DESC, cluster_id, status;
 
 -- Signal model (docs/DESIGN.md section 15; model_scores.py): the newest score per id (a rerun appends a
 -- row only when the probability changed), and the stored model formula per fitted month (the newest fit of
@@ -669,11 +772,12 @@ SELECT * FROM intraday_deviations WHERE session_date = current_date AND check_at
 ORDER BY check_at, ticker;
 
 -- Learning loop: each explained deviation with the session's stored close (as stored, the basis of the
--- intraday bars). outcomes.py classifies held / reversed / faded from these columns.
+-- intraday bars). outcomes.py classifies held / reversed / faded from these columns. B9: `bands` carries every
+-- published horizon's edges (the _1d columns repeat k = 1 for older readers).
 CREATE OR REPLACE VIEW intraday_explanation_close AS
 SELECT d.id AS check_row_id, d.explanation_id, d.ticker, d.session_date, d.check_at, d.flags, d.attribution,
        d.explanation, d.cited_ids, d.explained_at, d.open_price, d.last_price, d.ret_since_open, d.band_1d,
-       d.lo80_1d, d.hi80_1d, o.close AS session_close, o.collected_at AS close_collected_at,
+       d.lo80_1d, d.hi80_1d, d.bands, o.close AS session_close, o.collected_at AS close_collected_at,
        o.close / d.open_price - 1 AS close_ret_since_open, o.close / d.last_price - 1 AS ret_after_check
 FROM intraday_deviations d
 LEFT JOIN ohlc_raw o ON o.ticker = d.ticker AND o.date = d.session_date
@@ -694,6 +798,31 @@ SELECT * FROM results_digests_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
 CREATE OR REPLACE VIEW results_digest_ticker_latest AS
 SELECT DISTINCT ON (ticker, release_kind) * FROM results_digests_latest
 ORDER BY ticker, release_kind, release_at DESC, id;
+
+-- B9: checks of open paper trades and the intraday alerts feed (scripts/intraday_check.py; docs/ws/b9.md).
+-- Monitoring only. Rows are written once per check time; the first stored row per id wins. Each trade check
+-- (W1's trade_checks columns) with its trade_check_details row (same id): quality, today's basis, target reached.
+CREATE OR REPLACE VIEW trade_check_rows AS
+SELECT t.*, d.family, d.pick_rule, d.quality, d.entry_source, d.basis_factor, d.entry_adj, d.target_adj,
+       d.lo80_adj, d.lo50_adj, d.hi50_adj, d.hi80_adj, d.last_time, d.sigma_1d, d.elapsed_fraction,
+       d.sessions_held, d.sessions_left, d.z_since_entry, d.target_reached, d.target_reached_session,
+       d.high_since_entry_pct, d.low_since_entry_pct, d.notes
+FROM (SELECT DISTINCT ON (id) * FROM trade_checks ORDER BY id, computed_at) t
+LEFT JOIN (SELECT DISTINCT ON (id) * FROM trade_check_details ORDER BY id, computed_at) d USING (id);
+
+-- The newest check of each open trade (any quality).
+CREATE OR REPLACE VIEW trade_checks_latest AS
+SELECT DISTINCT ON (trade_id) * FROM trade_check_rows ORDER BY trade_id, check_at DESC, id;
+
+-- The alerts feed for the Slack alerts (session B6): every alert with the explainer's note on the ticker's check
+-- row (null until one is stored; filter on explained_at for a time).
+CREATE OR REPLACE VIEW intraday_alerts_feed AS
+SELECT a.*, x.id AS explanation_id, x.attribution, x.text AS explanation, x.cited_ids,
+       x.created_at AS explained_at
+FROM (SELECT DISTINCT ON (id) * FROM intraday_alerts ORDER BY id, computed_at) a
+LEFT JOIN (SELECT DISTINCT ON (check_row_id) * FROM intraday_explanations ORDER BY check_row_id, created_at, id) x
+  ON x.check_row_id = a.check_row_id
+ORDER BY a.check_at, a.ticker, a.id;
 
 -- B10 (docs/SPEC.md F2.7; core/horizons.py): horizon labels on read. Horizon k is N+k (buy at the open of D, sell at
 -- the close of the k-th session after D). Rows written before B10 carry no horizon_label and keep their window:

@@ -254,11 +254,11 @@ def test_late_calls_left_out_of_slack_count_and_news_window(market, monkeypatch,
                                         "direction": "up", "confidence": 0.6, "rationale": "t", "evidence_ids": [],
                                         "prompt_version": "test", "range_widen": None}])
     made = at(now)
-    base = {"url": "https://example.com/n", "source": "Fixture", "tickers": ["AAPL"], "primary_tickers": ["AAPL"],
+    base = {"source": "Fixture", "tickers": ["AAPL"], "primary_tickers": ["AAPL"],
             "mentioned_tickers": [], "tag_confidence": "high"}
-    jsonl(root, "news", AS_OF, [
-        {**base, "id": f"n{k}", "title": f"Apple {k}", "published_at": (made + shift).isoformat(),
-         "first_seen_at": (made + shift).isoformat()}
+    jsonl(root, "news", AS_OF, [   # one link per article: a shared link is one article with edited headlines
+        {**base, "id": f"n{k}", "title": f"Apple {k}", "url": f"https://example.com/{k}",
+         "published_at": (made + shift).isoformat(), "first_seen_at": (made + shift).isoformat()}
         for k, shift in (("old", -timedelta(days=view_data.NEWS_LOOKBACK_DAYS, hours=1)), ("in", -timedelta(days=1)),
                          ("after", timedelta(hours=1)))])
     assert run("ranges.py", root, cfg_dir, "--now", now).returncode == 0

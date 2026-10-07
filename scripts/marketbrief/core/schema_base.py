@@ -39,6 +39,14 @@ BASE_SCHEMAS: Schemas = {
         "feeds": "INTEGER", "failed": "INTEGER", "google_queries": "INTEGER", "google_failed": "INTEGER",
         "sliced_queries": "INTEGER", "new_items": "INTEGER",
     }),
+    # A later headline of a stored news item (owner decision Q45; analytics/news_dedup.py): the same article link
+    # (same outlet) seen again with another title. news_id = the stored item it updates (read through
+    # news_id_map); seen_at = when collect_news.py saw it. The `news` view shows the latest headline seen by now,
+    # news_asof(ts) the latest seen by ts. id = hash of news_id, normalised title and seen_at.
+    "news_updates": ("jsonl", {
+        "id": "VARCHAR", "news_id": "VARCHAR", "title": "VARCHAR", "seen_at": "TIMESTAMPTZ", "url": "VARCHAR",
+        "source": "VARCHAR", "source_domain": "VARCHAR", "published_at": "TIMESTAMPTZ", "feed": "VARCHAR",
+    }),
     "news_enriched": ("jsonl", {
         "id": "VARCHAR", "analyzed_at": "TIMESTAMPTZ", "relevance": "DOUBLE",
         "sentiment": "DOUBLE", "novelty": "DOUBLE", "materiality": "VARCHAR",

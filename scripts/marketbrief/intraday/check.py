@@ -1,7 +1,9 @@
 """One intraday check of a market's watchlist (scripts/intraday_check.py run): fetch the session so far, compare
 each ticker with the session's published ranges and open calls as of the check time, flag deviations, list
-attribution candidates, and append one row per ticker plus one run row. Market closed: only the run row.
-A check time already stored (same minute) writes nothing (idempotent)."""
+attribution candidates, and append one row per ticker plus one run row. B9: every open paper trade of every
+strategy and horizon gets a trade_checks row (and its trade_check_details row), and the intraday alerts feed
+gets the check's alerts. Market closed: only the run row. A check time already stored (same minute) writes
+nothing (idempotent). Monitoring only: nothing is ever traded."""
 
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from marketbrief.constants.kinds import KIND_TRADE_CHECKS
 from marketbrief.constants.config_keys import (
     CFG_MARKET,
     CFG_SECTOR_ETFS,
@@ -24,10 +27,13 @@ from marketbrief.core import paths
 from marketbrief.core.calendar import is_session, prev_session, session_close_utc, session_open_utc
 from marketbrief.core.clock import utc_now
 from marketbrief.core.market_config import benchmark_key
-from marketbrief.intraday import inputs
+from marketbrief.intraday import inputs, trades
+from marketbrief.intraday.alerts import build_alerts, session_alerts
 from marketbrief.intraday.constants import (
+    KIND_INTRADAY_ALERTS,
     KIND_INTRADAY_CHECKS,
     KIND_INTRADAY_RUNS,
+    KIND_TRADE_CHECK_DETAILS,
     METHOD_VERSION,
     MSG_ALREADY_CHECKED,
     MSG_MARKET_CLOSED,
@@ -92,8 +98,8 @@ def fetch_cue(cfg: dict, fetcher, check_at: datetime, failed: list[dict]) -> dic
     return {"symbol": key, "ret": snap["change_pct"], "ts": snap["ts"]}
 
 
-def load_inputs(ctx: CheckContext) -> None:
-    """The stored inputs as of check_at."""
+def load_inputs(ctx: CheckContext) -> dict:
+    """The stored inputs as of check_at; returns the open-trade counts refused (not locked before D's open)."""
     con, day, at = ctx.con, ctx.session_date, ctx.check_at
     ctx.ranges = inputs.published_ranges(con, day, at)
     ctx.calls = inputs.open_calls(con, ctx.cfg, day, at)
@@ -103,6 +109,14 @@ def load_inputs(ctx: CheckContext) -> None:
     keys = [(ticker, call["entry_date"], call["entry_kind"]) for ticker, calls in ctx.calls.items() for call in calls
             if call["entry_date"] != day.isoformat()]
     ctx.entry_prices = inputs.entry_prices(bars, keys)
+    ctx.trades, skipped = trades.open_trades(con, ctx.cfg, day, at)
+    held = [trade for rows in ctx.trades.values() for trade in rows]
+    tickers = sorted(ctx.trades)
+    if held:
+        start = min(trade["entry_date"] for trade in held)
+        ctx.trade_bars = trades.window_bars(con, tickers, start, day, at)
+        ctx.adjustments = trades.adjustment_factors(con, tickers, day, at)
+    return skipped
 
 
 def run_row(ctx: CheckContext, status: str, counts: dict, note: str | None = None) -> dict:
@@ -112,7 +126,8 @@ def run_row(ctx: CheckContext, status: str, counts: dict, note: str | None = Non
         "status": status, "tickers": counts.get("tickers", 0), "written": counts.get("written", 0),
         "flagged": counts.get("flagged", 0), "stale": counts.get("stale", []),
         "failed": counts.get("failed", []), "note": note, "method_version": METHOD_VERSION,
-        "computed_at": ctx.computed_at,
+        "computed_at": ctx.computed_at, "open_trades": counts.get("open_trades", 0),
+        "trades_flagged": counts.get("trades_flagged", 0), "alerts": counts.get("alerts", 0),
     }
 
 
@@ -137,18 +152,33 @@ def run_check(cfg: dict, settings: dict, con, fetcher, now: datetime, out_root: 
         return {**summary, "status": RUN_MARKET_CLOSED, "note": note, "written": 0}
     failed = fetch_quotes(ctx, fetcher, symbols_needed(cfg))
     ctx.market_moves = {"benchmark": benchmark_key(cfg), "cue": fetch_cue(cfg, fetcher, check_at, failed)}
-    load_inputs(ctx)
+    refused = load_inputs(ctx)
     if settings["attribution"].get("news_window") == NEWS_SINCE_PREV_CLOSE:
         ctx.news_since = session_close_utc(cfg, prev_session(cfg, session_date, include=False))
     rows = [ticker_row(ctx, ticker, meta) for ticker, meta in cfg[CFG_TICKERS].items()]
+    unwatched = sorted(set(ctx.trades) - set(cfg[CFG_TICKERS]))
+    rows_unwatched = [ticker_row(ctx, ticker, {}) for ticker in unwatched]   # trades only, no ticker row
+    for details in ctx.trade_details:
+        if details["ticker"] in unwatched:
+            details["notes"].append("not_on_watchlist")
     stale = sorted(row["ticker"] for row in rows if row["quality"] != "ok")
     status = RUN_STALE if rows and len(stale) >= settings["quotes"]["stale_run_share"] * len(rows) else RUN_OK
+    alerts = build_alerts(ctx, session_alerts(con, session_date.isoformat(), out_root))
     written = write_rows(market, KIND_INTRADAY_CHECKS, check_at.date(), rows, out_root)
+    write_rows(market, KIND_TRADE_CHECKS, check_at.date(), ctx.trade_checks, out_root)
+    write_rows(market, KIND_TRADE_CHECK_DETAILS, check_at.date(), ctx.trade_details, out_root)
+    write_rows(market, KIND_INTRADAY_ALERTS, check_at.date(), alerts, out_root)
+    trades_flagged = sum(check["flagged"] for check in ctx.trade_checks)
     counts = {"tickers": len(rows), "written": written, "flagged": sum(row["flagged"] for row in rows),
-              "stale": stale, "failed": failed}
+              "stale": stale, "failed": failed, "open_trades": len(ctx.trade_checks),
+              "trades_flagged": trades_flagged, "alerts": len(alerts)}
     write_rows(market, KIND_INTRADAY_RUNS, check_at.date(), [run_row(ctx, status, counts)], out_root)
     flagged = {row["ticker"]: row["flags"] for row in rows if row["flagged"]}
     return {**summary, "status": status, **counts, "flagged_tickers": flagged,
+            "flagged_trades": {check["trade_id"]: check["flags"] for check in ctx.trade_checks if check["flagged"]},
+            "skipped_trades": {**refused, "price_above_amount": sorted(ctx.skipped_trades),
+                               "not_on_watchlist": [row["ticker"] for row in rows_unwatched]},
+            "alert_ids": [alert["id"] for alert in alerts],
             "benchmark_ret": ctx.ret(benchmark_key(cfg)), "cue": ctx.market_moves["cue"]}
 
 
