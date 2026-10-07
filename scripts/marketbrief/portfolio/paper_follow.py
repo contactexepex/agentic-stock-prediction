@@ -39,19 +39,20 @@ def scores_before_open(con, cfg: dict, clock) -> tuple[pd.DataFrame, int]:
     return frame, ids - len(frame)
 
 
-def blocks_before_open(con, as_of, before) -> dict[str, dict]:
-    """{ticker: quality and days_to_earnings} of the as-of date's newest feature row computed before `before`."""
+def blocks_before_open(con, as_of, before, clock) -> dict[str, dict]:
+    """{ticker: quality and days_to_earnings} of the as-of date's newest feature row computed before `before`
+    and by the clock."""
     frame = con.execute("SELECT DISTINCT ON (ticker) ticker, quality, days_to_earnings FROM features "
-                        "WHERE as_of_date = ? AND computed_at < ? ORDER BY ticker, computed_at DESC",
-                        [as_of, before]).df()
+                        "WHERE as_of_date = ? AND computed_at < ? AND computed_at <= ? "
+                        "ORDER BY ticker, computed_at DESC", [as_of, before, clock]).df()
     return {row["ticker"]: row for row in frame.to_dict("records")}
 
 
-def picks(con, scores: pd.DataFrame, settings: dict) -> pd.DataFrame:
+def picks(con, scores: pd.DataFrame, settings: dict, clock) -> pd.DataFrame:
     """The candidates of each as-of date (see the module docstring)."""
     chosen = []
     for as_of, rows in scores.groupby("as_of_date"):
-        blocks = blocks_before_open(con, as_of, rows["entry_open_at"].iloc[0])
+        blocks = blocks_before_open(con, as_of, rows["entry_open_at"].iloc[0], clock)
         open_ = pd.Series([blocked_reason(blocks.get(t), settings) is None for t in rows["ticker"]], index=rows.index)
         rows = rows[open_ & (rows["prob_up"] != 0.5)]
         rows = rows.assign(distance=(rows["prob_up"] - 0.5).abs())
@@ -67,7 +68,7 @@ def simulate(con, cfg: dict, clock, market: str, settings: dict, costs: dict) ->
         return {"label": SIMULATED_LABEL, "market": market, "as_of": clock.isoformat(), "positions": [], "sides": {},
                 "late_scores": late}
     dates = sorted(scores["as_of_date"].unique())[-settings["paper_follow"]["lookback_sessions"]:]
-    chosen = picks(con, scores[scores["as_of_date"].isin(dates)], settings)
+    chosen = picks(con, scores[scores["as_of_date"].isin(dates)], settings, clock)
     bars = reads.stored_bars(con, cfg, clock, sorted(chosen["ticker"].unique()), min(dates))
     bar_index = {(row["ticker"], row["date"]): row for row in bars.to_dict("records")}
     adjust = reads.adjustments(con, clock)

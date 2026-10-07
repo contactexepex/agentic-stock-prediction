@@ -29,7 +29,7 @@ Created:
 - `scripts/marketbrief/core/schema_portfolio.py`
 - `config/portfolio.yaml`
 - `tests/test_portfolio.py`, `tests/test_portfolio_signals.py`
-- `docs/ws/ws4.md`, `docs/ws/ws4-judgments.jsonl`
+- `docs/ws/ws4.md`, `docs/ws/ws4-judgments.jsonl` (one line per judge verdict)
 
 Shared files changed (additive only):
 - `scripts/marketbrief/core/schemas.py`: one import and one spread line:
@@ -44,8 +44,9 @@ Shared files changed (additive only):
   KIND_WATCHLIST_REQUESTS = "watchlist_requests"
   ```
 
-Not changed: `sql/views.sql`, `requirements.txt`, every existing daily-run step. The new kinds only add two
-empty tables to `connect()` when no file exists.
+Not changed: `sql/views.sql`, `requirements.txt`, every existing daily-run step. Being in `SCHEMAS`, the new kinds
+add two empty tables to `connect()` when no file exists, and `validate --stage collect` schema-checks their files
+and counts them in `rows_today` like every kind.
 
 ## Contract
 **Data kinds.** Both are append-only JSONL. A row goes in the day file of its UTC write time
@@ -132,9 +133,12 @@ is proven when any cell is.
   - **Strong Buy / Strong Sell:** the cell is proven, a forecaster call exists (`strong_requires_call`), and
     confidence ≥ 0.65;
   - **Buy / Sell:** confidence ≥ 0.55;
-  - **Hold/No call:** everything else, plus no model score, quality `BLOCKED`, or earnings within 1 session.
-- **Labels:** every row carries `paper_only` (true unless its cell is proven) and the label
-  "Paper only — no proven edge yet".
+  - **Hold/No call:** everything else, plus quality `BLOCKED`, or earnings within 1 calendar day
+    (`features.days_to_earnings`). Every watchlist ticker and horizon without a model score on the as-of date
+    also gets a Hold/No call row, with the reason "no model score".
+- **Labels:** a row has `paper_only: false` and the proven label only when it has a forecaster call in a
+  proven cell. Every other row, including model-only rows in a proven cell, has `paper_only: true` and the
+  label "Paper only — no proven edge yet". The payload-level `label` says proven when any cell is proven.
 - **No strong tier:** the payload says "No proven strong signals today". It lists up to 5 Paper candidates by
   |model_prob − 0.5|, ties broken by ticker and horizon. Each carries the score's own top 3 drivers on its
   side, from `contributions.up|down`.
@@ -166,7 +170,7 @@ returns a JSON-ready dict. Rejected writes return `{"ok": false, "errors": [...]
 
 stdout carries one JSON object; a short table goes to stderr. A rejected write exits with code 2. Every read
 is MB_NOW-aware: rows are filtered by `collected_at`, `entered_at`, `requested_at`, `computed_at`, `made_at`,
-`scored_at` or `detected_at` ≤ clock.
+`scored_at` or `detected_at` ≤ clock. Paper-follow's feature rows also have to be computed before the open of D.
 
 **Paper-follow.** It is a deterministic simulation on stored bars, labelled
 "SIMULATED — paper-follow on stored bars, not real trades".
@@ -177,7 +181,8 @@ is MB_NOW-aware: rows are filtered by `collected_at`, `entered_at`, `requested_a
 - Returns are after the round trip of `costs.yaml`.
 - Up candidates are simulated long. Down candidates are "sell if held", reported apart and never pooled.
 
-**Alignment with api/openapi.yaml.** `build/wave0` was fetched at 17eb531 on 2026-10-07. `api-signals` emits
+**Alignment with api/openapi.yaml.** `build/wave0` was first read at 17eb531 on 2026-10-07, and rechecked at
+7f448e2, whose later commits change only units notes, not these fields. `api-signals` emits
 `SignalTiers` exactly:
 - `headline`, `rule`, `strong[]` and `paper_candidates[]` of `SignalCandidate`;
 - each candidate has ticker, name, h, tier (`strong_buy|strong_sell|paper_up|paper_down`), model_prob,
@@ -238,10 +243,10 @@ Offline, on synthetic data roots (fixtures in the test files). Pasted from comma
 
 ```
 $ python -m pytest -q tests/test_portfolio.py tests/test_portfolio_signals.py tests/test_code_structure.py tests/test_judgments.py --deselect tests/test_judgments.py::test_every_logged_commit_exists
-42 passed, 1 deselected in 27.47s
+47 passed, 1 deselected in 30.88s
 
 $ python -m pytest -n auto -q
-1 failed, 918 passed, 2 skipped, 6453 warnings in 214.05s (0:03:34)
+1 failed, 923 passed, 2 skipped, 6453 warnings in 215.14s (0:03:35)
 ```
 
 The one failure is `tests/test_judgments.py::test_every_logged_commit_exists`. It fails the same way on a
@@ -253,9 +258,13 @@ $ ruff check scripts/marketbrief/portfolio scripts/portfolio.py scripts/marketbr
 All checks passed!
 ```
 
+These are round 2's runs, after the blocker fixes. Round 1's were "42 passed, 1 deselected" and
+"1 failed, 918 passed, 2 skipped", with the same single failure.
+
 What is covered:
 - validation failures: non-watchlist ticker, Saturday, future date, manual price outside low-high, a missing
-  price, a price with open/close, zero quantity, bad side, basis or source, no stored bar, a duplicate
+  or infinite price, a price with open/close, zero, infinite, NaN or bool quantity, bad side, basis or
+  source, no stored bar, a duplicate
   idempotency key (explicit and derived), selling more than held, the same-day open before close;
 - corrections: supersedes, a double correction, ticker change, an unknown target, cancel, a cancel that
   would uncover a sell;
@@ -265,13 +274,21 @@ What is covered:
 - the split basis;
 - no look-ahead for trades, bars, reviews and scores;
 - tiers: the pure rule; strong never without proof (skill false, close_to_close record, too few calls,
-  low Wilson); strong emitted when proven; blocks;
-- paper-follow, scored by hand;
+  low Wilson); strong emitted when proven; a model-only row in a proven cell stays paper only; every
+  watchlist ticker and horizon gets a row ("no model score"); blocks;
+- paper-follow, scored by hand; feature rows after the clock are ignored;
 - the openapi shapes;
 - the CLI's JSON, exit codes and table.
 
 ## Judge verdicts
-(below)
+- Round 1, FAIL, 6acd8e9. Blockers:
+  - look-ahead in paper-follow's feature blocks;
+  - no tier row for watchlist tickers without a score;
+  - quantity and price accepted infinity;
+  - ws4.md: the judgments file was listed before it existed, "sessions" was written for calendar-day
+    earnings, and the label rule did not match the code.
+  
+  All were fixed in round 2's commit, each with a test.
 
 ## Proposed edits to shared docs
 
@@ -299,14 +316,25 @@ bars and the market calendar; a correction is a new row with `supersedes`. Posit
 split basis, marked to the latest stored close, before and after the costs of `config/costs.yaml`. A signal tier is
 Strong only in a proven (horizon, confidence band) cell: the latest weekly review has `model_skill` true and the
 forecaster's open-to-close calls in that cell number >= `proof.min_count` with a Wilson 95% lower bound >=
-`proof.min_wilson_low` (`config/portfolio.yaml`); every other tier is labelled "Paper only — no proven edge yet".
+`proof.min_wilson_low` (`config/portfolio.yaml`); a row is labelled proven only when it carries a forecaster call in
+such a cell, and every other row is labelled "Paper only — no proven edge yet".
 ```
 
 **routine/PROMPT.md**: none needed. The tiers are computed on read. A later wave may add `portfolio.py signals` to the
 digest; that is WS2/WS3's call.
 
 ## Cosmetic follow-ups
-(after the judge)
+From round 1. Fixed in round 2's commit:
+- `trades.py`: a stored bar with a NaN or missing open/close is now rejected (`bar_price`).
+- The duplicate-key error now hints `--key`, for re-entering an identical trade after a cancel.
+- `service.request_company`: the ticker is uppercased before the "already listed" check.
+- `ws4.md`: the `validate --stage collect` wording and the wave 0 commit (7f448e2).
+
+Open:
+- `signals.py` `signal_row`: a pre-forecast-v11 call without `model_prob` combines the call's direction with
+  the model's probability (no stored calls exist today).
+- `signals.py` `candidates`: a Paper candidate's `tier` can be of the opposite side when the forecaster's
+  adjustment flips the side. Its `direction` is the model's side.
 
 ## Open questions
 1. **Proof thresholds** (`min_count` 50, `min_wilson_low` 0.55, strong at confidence ≥ 0.65 with a forecaster call

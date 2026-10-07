@@ -9,6 +9,7 @@ passes. Rows are appended via a temp file in work/ (CLAUDE.md data rules 1-2); t
 from __future__ import annotations
 
 import hashlib
+import math
 import json
 from datetime import datetime
 
@@ -35,6 +36,12 @@ def default_key(market: str, fields: dict) -> str:
                   fields.get("price"), fields["trade_date"], fields.get("supersedes"))
 
 
+def positive_number(value) -> bool:
+    """A finite number > 0 (bools, NaN and infinity are rejected)."""
+    return (isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+            and value > 0)
+
+
 def used_keys(con, clock: datetime) -> dict[str, str]:
     """{idempotency_key: row id} of every trade and request stored by the clock."""
     keys = {}
@@ -53,7 +60,7 @@ def check_fields(cfg: dict, settings: dict, fields: dict, clock: datetime) -> li
         errors.append(text.ERR_TICKER.format(ticker=fields["ticker"], market=cfg["market"]))
     if fields["side"] not in TRADE_SIDES:
         errors.append(text.ERR_SIDE.format(allowed=", ".join(TRADE_SIDES)))
-    if not isinstance(fields["quantity"], (int, float)) or not fields["quantity"] > 0:
+    if not positive_number(fields["quantity"]):
         errors.append(text.ERR_QUANTITY)
     if fields["price_basis"] not in rules["price_bases"]:
         errors.append(text.ERR_BASIS.format(allowed=", ".join(rules["price_bases"])))
@@ -72,14 +79,26 @@ def resolve_price(ctx, fields: dict) -> tuple[float | None, list[str]]:
     basis, price = fields["price_basis"], fields.get("price")
     if basis != BASIS_MANUAL and price is not None:
         return None, [text.ERR_PRICE_GIVEN]
-    if basis == BASIS_MANUAL and not (isinstance(price, (int, float)) and price > 0):
+    if basis == BASIS_MANUAL and not positive_number(price):
         return None, [text.ERR_PRICE_MISSING]
     bar = reads.bar_on(ctx.con, ctx.cfg, ctx.clock, fields["ticker"], fields["trade_date"])
     if bar is None:
         return None, [text.ERR_NO_BAR.format(ticker=fields["ticker"], day=fields["trade_date"],
                                              clock=ctx.clock.isoformat())]
-    if basis != BASIS_MANUAL:
-        return float(bar[basis]), []
+    return bar_price(fields, bar) if basis != BASIS_MANUAL else manual_price(ctx, fields, bar)
+
+
+def bar_price(fields: dict, bar: dict) -> tuple[float | None, list[str]]:
+    """The stored bar's open or close (rejected when it is missing, NaN or not positive)."""
+    basis = fields["price_basis"]
+    if not positive_number(bar[basis]):
+        return None, [text.ERR_BAR_PRICE.format(ticker=fields["ticker"], day=fields["trade_date"], basis=basis)]
+    return float(bar[basis]), []
+
+
+def manual_price(ctx, fields: dict, bar: dict) -> tuple[float | None, list[str]]:
+    """The manual price when it lies inside the stored bar's low-high (with trades.manual_price_tolerance)."""
+    price = fields["price"]
     slack = ctx.settings["trades"]["manual_price_tolerance"]
     low, high = float(bar["low"]) * (1 - slack), float(bar["high"]) * (1 + slack)
     if not low <= price <= high:

@@ -75,6 +75,7 @@ def cancel_trade(ctx: Context, target: str, source: str, note: str | None = None
 def request_company(ctx: Context, source: str, reason: str, ticker: str | None = None, name: str | None = None,
                     idempotency_key: str | None = None) -> dict:
     """Store a request to add a company to the watchlist (config changes stay a human or reviewed change)."""
+    ticker = ticker.strip().upper() if ticker else None
     errors = [] if (ticker or name) else [text.ERR_REQUEST_NAME]
     if ticker and ticker in ctx.cfg["tickers"]:
         errors.append(text.ERR_REQUEST_LISTED.format(ticker=ticker, market=ctx.market))

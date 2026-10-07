@@ -6,19 +6,23 @@ the direction is the side of 0.5 (the call's own direction when it exists) and c
 - Strong Buy / Strong Sell: only in a PROVEN (horizon, confidence band) cell (proof.py), with a forecaster call
   when tiers.strong_requires_call, and confidence >= tiers.strong_min_confidence.
 - Buy / Sell: confidence >= tiers.buy_min_confidence.
-- Hold/No call: otherwise, no model score, indicator quality BLOCKED, or earnings within earnings_block_days.
-Every row carries paper_only (true unless its cell is proven) and the label "Paper only — no proven edge yet".
+- Hold/No call: otherwise, no model score (every watchlist ticker x horizon gets a row), indicator quality BLOCKED,
+  or earnings within earnings_block_days calendar days (features.days_to_earnings).
+Every row carries paper_only (true unless it has a forecaster call in a proven cell) and then the label
+"Paper only — no proven edge yet".
 When no strong tier is emitted the payload says "No proven strong signals today" and lists up to
 tiers.max_candidates Paper candidates, ranked by |model_prob - 0.5| (ties: ticker, horizon), each with the
 score's own top drivers on its side as reasons. cockpit_payload() is the per-market payload for the cockpit's
 read models (WS1) and API (wave 2)."""
 from __future__ import annotations
 
+from marketbrief.core.market_config import load_market
 from marketbrief.portfolio import proof as proofs
 from marketbrief.portfolio import signal_inputs as inputs
 from marketbrief.portfolio.constants import (
     LABEL_PAPER_ONLY,
     LABEL_PROVEN,
+    MSG_NO_SCORE,
     MSG_NO_STRONG,
     STRONG_TIERS,
     TIER_BUY,
@@ -51,7 +55,7 @@ def blocked_reason(block: dict | None, settings: dict) -> str | None:
         return "indicator quality BLOCKED"
     days = number(block.get("days_to_earnings"))
     if days is not None and days <= settings["tiers"]["earnings_block_days"]:
-        return f"earnings in {int(days)} session(s)"
+        return f"earnings in {int(days)} day(s)"
     return None
 
 
@@ -91,9 +95,10 @@ def signal_row(score: dict, call: dict | None, band_range: dict | None, block: d
     direction = (call or {}).get("direction") or ("up" if final > 0.5 else "down" if final < 0.5 else None)
     confidence = round(max(final, 1 - final), PROB_DIGITS)   # rounded first: 1 - 0.35 is 0.6499999999999999
     cell = proofs.cell(proof, int(score["horizon_days"]), proofs.band_of(confidence, settings["proof"]["bands"]))
-    proven = bool(cell and cell["proven"])
+    cell_proven = bool(cell and cell["proven"])
+    proven = cell_proven and call is not None   # a model-only row stays paper only, even in a proven cell
     why_blocked = blocked_reason(block, settings)
-    tier = TIER_HOLD if why_blocked else tier_for(direction, confidence, proven, call is not None, settings)
+    tier = TIER_HOLD if why_blocked else tier_for(direction, confidence, cell_proven, call is not None, settings)
     reasons = [f"model P(up) {model_prob:.2f} (base rate {float(score['base_rate']):.2f})"]
     if call:
         reasons.append(f"forecaster: {call['direction']} at {float(call['confidence']):.2f}"
@@ -126,6 +131,21 @@ def candidates(rows: list[dict], scores: dict[str, dict], settings: dict) -> lis
     return out
 
 
+def unscored_rows(cfg: dict, as_of, scored: set[tuple[str, int]]) -> list[dict]:
+    """Hold/No call rows for every watchlist ticker x horizon with no model score on the as-of date."""
+    out = []
+    for ticker in sorted(cfg["tickers"]):
+        for horizon in proofs.HORIZONS:
+            if (ticker, horizon) in scored:
+                continue
+            out.append({"id": f"{as_of}-{ticker}-{horizon}d" if as_of else None, "ticker": ticker,
+                        "horizon_days": horizon, "tier": TIER_HOLD, "direction": None, "model_prob": None,
+                        "agent_adjustment": None, "final_prob": None, "confidence": None, "has_call": False,
+                        "range": None, "band": None, "proven": False, "paper_only": True, "label": LABEL_PAPER_ONLY,
+                        "blocked": MSG_NO_SCORE, "reasons": [MSG_NO_SCORE], "drivers": []})
+    return out
+
+
 def cockpit_payload(con, clock, market: str, settings: dict) -> dict:
     """Per market: proof status, the tier per ticker and horizon, Paper candidates and the as-of date."""
     proof = proofs.proof_status(con, clock, settings)
@@ -137,6 +157,8 @@ def cockpit_payload(con, clock, market: str, settings: dict) -> dict:
     blocks = inputs.feature_blocks(con, clock, as_of) if as_of else {}
     rows = [signal_row(score, calls.get(score["id"]), ranges.get(score["id"]), blocks.get(score["ticker"]), proof,
                        settings) for score in records]
+    rows += unscored_rows(load_market(market), as_of, {(s["ticker"], int(s["horizon_days"])) for s in records})
+    rows.sort(key=lambda row: (row["ticker"], row["horizon_days"]))
     strong = [row for row in rows if row["tier"] in STRONG_TIERS]
     proven = proof["status"] == proofs.PROOF_PROVEN
     return {"market": market, "as_of_date": as_of.isoformat() if as_of else None, "computed_at": clock.isoformat(),

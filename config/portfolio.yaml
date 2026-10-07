@@ -30,13 +30,15 @@ proof:
 #   Strong Buy / Strong Sell: the cell is proven, a forecaster call exists (when strong_requires_call),
 #                             and confidence >= strong_min_confidence;
 #   Buy / Sell:               confidence >= buy_min_confidence (paper only until proven);
-#   Hold/No call:             otherwise, or no model score, or indicator quality BLOCKED, or earnings within
-#                             `earnings_block_days` sessions (the prediction rules' own blocks).
+#   Hold/No call:             otherwise, or no model score (every watchlist ticker x horizon gets a row), or
+#                             indicator quality BLOCKED, or earnings within `earnings_block_days` calendar days
+#                             (features.days_to_earnings; the prediction rules' own blocks).
+# A row is paper_only (label "Paper only — no proven edge yet") unless it has a forecaster call in a proven cell.
 tiers:
   buy_min_confidence: 0.55
   strong_min_confidence: 0.65
   strong_requires_call: true
-  earnings_block_days: 1
+  earnings_block_days: 1                     # calendar days (features.days_to_earnings)
   max_candidates: 5                          # Paper candidates listed when no strong signal is emitted
   max_reasons: 3                             # top drivers per candidate (the score's own explanation)
 

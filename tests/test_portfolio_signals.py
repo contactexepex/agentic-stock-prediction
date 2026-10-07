@@ -66,17 +66,24 @@ def payload(market: str = "us") -> dict:
 
 
 def tiers_by_id(out: dict) -> dict[str, str]:
-    return {row["id"]: row["tier"] for row in out["tiers"]}
+    """The tiers of the scored rows (every other watchlist row is Hold/No call, "no model score")."""
+    return {row["id"]: row["tier"] for row in out["tiers"] if row["model_prob"] is not None}
 
 
 def strong_fixture(root) -> None:
     write_jsonl(root, "us", "model_scores", D4,
                 [score("AAPL", 1, 0.62), score("JPM", 1, 0.40), score("AAPL", 5, 0.53)])
+
     write_jsonl(root, "us", "predictions", D4, [call("AAPL", 1, 0.62, 0.05), call("JPM", 1, 0.40, -0.05)])
     write_jsonl(root, "us", "ranges", D4, [{"id": "2026-10-06-AAPL-1d", "made_at": SCORED_AT,
                                             "target_date": "2026-10-07", "ticker": "AAPL", "horizon_days": 1,
                                             "base_close": 214.0, "lo50": 212.0, "hi50": 216.0, "lo80": 210.0,
                                             "hi80": 218.0}])
+
+
+def strong_fixture_with_model_only(root) -> None:
+    strong_fixture(root)
+    write_jsonl(root, "us", "model_scores", D4, [score("BAC", 1, 0.66)])
 
 
 def test_pure_tier_rule():
@@ -100,6 +107,10 @@ def test_no_strong_without_proof(root):
     assert tiers_by_id(out) == {"2026-10-06-AAPL-1d": "Buy", "2026-10-06-JPM-1d": "Sell",
                                 "2026-10-06-AAPL-5d": "Hold/No call"}
     assert all(row["paper_only"] and row["label"] == LABEL_PAPER_ONLY for row in out["tiers"])
+    unscored = [row for row in out["tiers"] if row["model_prob"] is None]
+    assert len(out["tiers"]) == 2 * len(ctx_for().cfg["tickers"]) and len(unscored) == len(out["tiers"]) - 3
+    assert {row["tier"] for row in unscored} == {"Hold/No call"}
+    assert next(r for r in unscored if r["id"] == "2026-10-06-JPM-5d")["reasons"] == ["no model score"]
     assert [c["id"] for c in out["candidates"]] == ["2026-10-06-AAPL-1d", "2026-10-06-JPM-1d", "2026-10-06-AAPL-5d"]
     assert out["candidates"][1]["reasons"] == ["JPM RSI high: -0.5 pts"]        # drivers on the candidate's side
     aapl = next(row for row in out["tiers"] if row["id"] == "2026-10-06-AAPL-1d")
@@ -126,7 +137,7 @@ def test_too_few_calls_or_low_wilson_never_proves(root):
 
 
 def test_strong_emitted_when_proven(root):
-    strong_fixture(root)
+    strong_fixture_with_model_only(root)
     review(root, skill=True)
     track_record(root, 60, 50)                    # 1d band 0.6-0.7: 50/60, Wilson low ~0.72
     out = payload()
@@ -138,6 +149,9 @@ def test_strong_emitted_when_proven(root):
     assert row["paper_only"] is False and row["proven"] is True
     five = next(r for r in out["tiers"] if r["id"] == "2026-10-06-AAPL-5d")
     assert five["paper_only"] is True                              # the 5d cells have no record
+    model_only = next(r for r in out["tiers"] if r["id"] == "2026-10-06-BAC-1d")
+    assert model_only["tier"] == "Buy" and model_only["band"] == "0.6-0.7"   # proven cell, but no forecaster call
+    assert model_only["paper_only"] is True and model_only["label"] == LABEL_PAPER_ONLY
 
 
 def test_blocked_ticker_is_hold(root):
@@ -146,7 +160,7 @@ def test_blocked_ticker_is_hold(root):
                                               "computed_at": SCORED_AT, "quality": "OK", "days_to_earnings": 1}])
     out = payload()
     row = next(r for r in out["tiers"] if r["id"] == "2026-10-06-AAPL-1d")
-    assert row["tier"] == "Hold/No call" and row["blocked"] == "earnings in 1 session(s)"
+    assert row["tier"] == "Hold/No call" and row["blocked"] == "earnings in 1 day(s)"
     assert "2026-10-06-AAPL-1d" not in [c["id"] for c in out["candidates"]]
 
 
@@ -181,6 +195,21 @@ def test_paper_follow_simulation(root):
     assert jpm["direction"] == "down"
     assert jpm["net_pct"] == pytest.approx(round((-(308 / 302 - 1) - cost(302)) * 100, 4))
     assert out["sides"]["up"]["scored"] == 1 and out["sides"]["down"]["hit_rate"] == 0.0
+
+
+def test_paper_follow_ignores_feature_rows_after_the_clock(root, monkeypatch):
+    # clock 2026-10-07 12:00; D of as-of 2026-10-06 opens 13:30 UTC; a feature row computed at 12:30 (after the
+    # clock, before that open) must not block AAPL
+    write_jsonl(root, "us", "model_scores", D4, [score("AAPL", 1, 0.60)])
+    write_jsonl(root, "us", "features", D4, [{"id": "f", "as_of_date": "2026-10-06", "ticker": "AAPL",
+                                              "quality": "BLOCKED", "computed_at": "2026-10-07T12:30:00+00:00"}])
+    ctx = ctx_for()
+    out = paper_follow.simulate(ctx.con, ctx.cfg, ctx.clock, ctx.market, ctx.settings, ctx.costs)
+    assert [row["id"] for row in out["positions"]] == ["2026-10-06-AAPL-1d"]
+    monkeypatch.setenv("MB_NOW", "2026-10-07T13:00:00+00:00")
+    later = ctx_for()
+    assert paper_follow.simulate(later.con, later.cfg, later.clock, later.market, later.settings,
+                                 later.costs)["positions"] == []
 
 
 # ---------- the shapes of api/openapi.yaml (wave 0) ----------
