@@ -98,10 +98,11 @@ export class MotherDuckInboxStore implements InboxStore {
     const insert = () => row.kind === COMPANY_KIND
       ? this.query(SQL.claimCompany,
         [row.inbox_id, row.market, row.tool, JSON.stringify(row.arguments), row.submitted_by, row.channel, row.submitted_at,
-          row.command_id, preview, row.agent, row.args_sha256, budget.sinceIso, budget.limit])
+          row.command_id, preview, row.agent, row.args_sha256, budget.sinceIso, budget.limit, row.slack_channel, row.slack_ts])
       : this.query(SQL.claimRequest,
         [row.inbox_id, row.kind, row.tool, row.market, JSON.stringify(row.arguments), preview, row.channel, row.submitted_by,
-          row.agent, row.command_id, row.submitted_at, row.args_sha256, budget.sinceIso, budget.limit]);
+          row.agent, row.command_id, row.submitted_at, row.args_sha256, budget.sinceIso, budget.limit, row.slack_channel,
+          row.slack_ts]);
     let inserted;
     try {
       inserted = await insert();

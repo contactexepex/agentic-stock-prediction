@@ -993,7 +993,14 @@ always show the same numbers.
 - **Slack:** one thread per market per day: a short summary (mood, top 3, number of calls,
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
-  bot token the summary is posted alone through the webhook. Nothing else is posted.
+  bot token the summary is posted alone through the webhook. `notify_slack.py` posts nothing else.
+- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** `alerts.py` keeps its own
+  thread per market and day (its first post of the day starts it) with the morning paper picks, the intraday
+  alerts of each check run (B9's feed), the close results and correction replies. From Wave 5 the morning picks
+  open that thread and the brief above replies in it (`post_brief`), so each market has one thread a day. The
+  weekly research report is its own post and onboarding confirmations reply to the command that asked. Every signal is
+  labelled Paper and every number comes from stored data as of the run's clock. The ledger
+  `data/<market>/slack_posts/` makes every post idempotent.
 
 ## 9. Repo changes needed
 - `config/markets.yaml` (exchange, timezone, benchmark, regime index, holidays) and per-market
@@ -1496,6 +1503,11 @@ Opus.
 | results-analyst (quoted bullets per results release or call text; section 3c) | Claude Sonnet 5.5 | medium |
 | headline aboutness check, once built | Claude Haiku 4.5 (`claude-haiku-4-5`; no effort setting) | - |
 | claim-checker (claim extraction from article extracts and filing texts; section 3b) | Claude Sonnet 5.5 | high |
+| trader-news-results, trader-pattern-mood (blind AI traders; SPEC F4) | Claude Sonnet 5.5 | medium |
+| trader-combined (AI trader with the model score; SPEC F4) | Claude Sonnet 5.5 | high |
+| forecaster as ai.combined.opus.v1 (trader run; SPEC F4) | Claude Opus 5.5 | high |
+| eod-analyst (post-close reasons; SPEC F6.1) | Claude Sonnet 5.5 | medium |
+| research-director (weekly proposals; SPEC F6.2) | Claude Opus 5.5 | high |
 | orchestrator (the routine session itself, incl. report narrative) | the routine sessions' configured model: `claude-opus-5-5` (India and US routine sessions, checked 2026-10-06) | session default |
 
 Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the
@@ -1507,7 +1519,9 @@ after the validation-gate edits, forecast-v9 also covering the forecaster's less
 forecast-v10, news-v8 and claims-v3 with news verification phase B; forecast-v11 with the
 signal-model anchor and the debate record (section 15); forecast-v12 when calls are scored
 open-to-close from the `call_scoring` switch (section 6); reflect-v1 started with the Sonnet 5.5 /
-medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate), and a
+medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate; forecast-v13 with
+the Opus trader protocol (B3); trader-news-v1, trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1
+start with B3), and a
 per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
