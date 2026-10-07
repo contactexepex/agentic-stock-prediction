@@ -312,9 +312,10 @@ Warnings never block: list them in `data_quality`.
 
 14a. Weekly spot-check (first trading day of each ISO week, after the brief so it never delays
     it): `python scripts/spotcheck.py --if-due`. If it prints `due: false`, skip this step. If
-    `empty` is true (no calls and no filled report in the previous ISO week), append its `record`
+    `empty` is true (nothing to sample in the previous ISO week), append its `record`
     as printed (verdict SKIP). Otherwise run the judge subagent on its sample (2 forecasts with
-    their evidence rows and outcome, 1 filled report of that week; the sample is seeded by market
+    their evidence rows and outcome, 1 filled report, 1 reflector lesson and 2 claim-checker claims
+    with their event's status, all of that week; the sample is seeded by market
     and week, so a rerun picks the same items) with the instructions "Weekly spot-check
     (.claude/agents/judge.md): check every item of `checklist`", the sample JSON as the claims,
     and the report path and `data/<market>/` as where the work lives. One round only (no

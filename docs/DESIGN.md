@@ -112,9 +112,14 @@ in the summary's `dropped_non_session`. Cues and factors follow other exchanges'
 kept. Bars stored before stay (append-only) and are left out on read: `connect` builds a table
 `own_closed_days (ticker, date)` (each own-exchange ticker x each stored price date that is no
 session of the market calendar) and the `ohlc_raw` view, which `ohlc`, `bars` and `returns` read,
-excludes those rows. Known limits: India's Diwali Muhurat sessions are closed days in the calendar
-library, so their bars are dropped too, and stored flat zero-volume stock bars on real sessions are
-not removed on read.
+excludes those rows. India's Diwali Muhurat sessions are closed days in the calendar library;
+`special_sessions` in `config/markets/india.yaml` (2024-11-01 and 2025-10-21, each with 25 stored
+non-flat own-market bars) makes them sessions of the market calendar (`calendar.is_session`), so
+their bars are kept and read (issue #41); a new Muhurat date must be added there by hand, and a
+listed date also counts as a session for scheduling. Without the `exchange_calendars` package the
+calendar now fails loudly (`CalendarUnavailableError`, issue #43) instead of treating every
+weekday as a session. Known limit: stored flat zero-volume stock bars on real sessions are not
+removed on read.
 
 **Price basis: splits and bonus issues (issue #31, added 2026-10-06).** yfinance's `Close`
 (auto_adjust=False) is not dividend-adjusted but is split/bonus-adjusted as of the collection time,
@@ -577,6 +582,20 @@ exact values):
   (all time)"), the weekly review ("Proper scores") and the HTML report's track record (one
   reliability chart for calls with Wilson whiskers, Brier and log loss in its caption).
 
+**Call basis (owner-approved change A, from 2026-10-08).** Direction calls made at or after
+`call_scoring.from` in `config/settings.yaml` (`label_basis: open_to_close`) are scored open to
+close, the signal model's label convention (`model/labels.py`, same offsets): entry at the open of
+D, the first session after the as-of close, exit at the close of D+1 for 1-day calls and D+4 for
+5-day calls, hit = the move from that open has the called sign. Older calls stay close-to-close
+(as-of close to the close 1 or 5 sessions later); stored outcomes are never rescored. Each new
+outcome row carries `label_basis` (with `entry_date` and `entry_open` for open_to_close); rows
+stored before the field read as close_to_close (`track_record` view). A call whose entry bar has
+no open is not scored (summary `no_entry_open`). Hit rates, bands, proper scores and reliability
+are shown per basis and never pooled: `score_predictions.py`'s summary, the context pack, the
+weekly review (keys and rows labelled `· close→close` / `· open→close`, `call_basis_all`), the
+Slack line, the report and the HTML track record. Ranges are unchanged (still scored on the
+target-session close). Code: `marketbrief/analytics/call_basis.py`.
+
 ## 7. Testing approach
 | Part | How it is tested |
 |---|---|
@@ -765,6 +784,14 @@ always show the same numbers.
 - **Chart images** (`charts.py`, PNG): `ranges.png`, `sectors.png` and `track_record.png` (when
   scored data exists), the same views as the HTML charts, embedded in the md and posted to Slack.
   The old per-company PNGs and the overview collage are no longer drawn.
+- **Report gate extras:** an optional sign check (`narrative_sign_check` in `config/validate.yaml`,
+  off) warns (`NARRATIVE_SIGN`) when a number written after a falling word ("down", "fell", ...)
+  is matched only by a positive source value (issue #32; measured on one filled report: 3 such
+  numbers, 0 alarms, too few to switch it on).
+- **Weekly spot-check** (`spotcheck.py`, judge): a deterministic sample of the previous ISO week
+  seeded by market and week: 2 forecasts with their evidence rows and outcome, 1 filled report,
+  1 reflector lesson and 2 claim-checker claims with their event's latest status (issue #34);
+  `empty` (verdict SKIP) only when none of these exist.
 - **Slack:** one thread per market per day: a short summary (mood, top 3, number of calls,
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
@@ -792,6 +819,14 @@ always show the same numbers.
    cap) and walk-forward on stored prices (width parameters, regime and event widening).
    Below the minimum n in `config/review.yaml` it flags and proposes nothing. Proposed
    `config/ranges.yaml` changes go in `reports/<market>/review-YYYY-Www.md`; a human applies them.
+   Signal-model check (owner-approved change B, `pipeline/review/model_skill.py`): each review
+   reruns the walk-forward backtest of `scripts/model_backtest.py` for the market (output in
+   `work/model_backtest/`; `--no-model-backtest` skips it) and shows a headline table per
+   horizon (n, Brier vs the base-rate Brier, Brier skill, AUC with its 95% interval) and the paper
+   strategy's mean return after costs minus each baseline, then one plain verdict: the model shows
+   skill only when some horizon has n >= `min_n`, Brier skill > `min_brier_skill` and the AUC
+   interval's low end > `min_auc_low` (`model_skill:` in `config/review.yaml`: 500, 0.0, 0.5). A
+   failed backtest is noted and never stops the review; the record stores `model_skill`.
 5. Relationships (knowledge graph, public data only): insider trades (US Form 4, India SEBI
    disclosures), big-investor stakes (US 13D/13G, India bulk and block deals), holdings (US
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,
@@ -822,18 +857,21 @@ always show the same numbers.
    **US relationships built:** Form 4 insider trades, 13D/13G stakes and 13F holdings of 23
    tracked filers (`collect_insiders|stakes|holdings.py`), smart-money views and context
    section, and a fresh-13D note on ranges (widen gated in `config/ranges.yaml`, off).
-6. Fundamentals (US built; India from NSE results, separate collector): quarterly, half-yearly
-   (H1 year to date) and annual 10-Q/10-K values from SEC's free XBRL company facts API
+6. Fundamentals (US built; India from NSE results, separate collector): quarterly, half-yearly (H1
+   year to date) and annual 10-Q/10-K values from SEC's free XBRL company facts API
    (`collect_fundamentals.py`, daily; downloads only when a new 10-Q/10-K is listed). Standard
    concepts are read from a short priority list of us-gaap/dei tags per concept; a value is stored
-   once per filing that first reports it or changes it, so restatements and split adjustments
-   are new rows and the views take the newest filing. Fiscal Q4 (rarely tagged) is derived as
-   FY - 9M and quarterly cash flows from year-to-date totals, marked derived (a derived EPS is
-   approximate: AAPL Q4 FY2025 derives to 1.84 vs 1.85 reported). The context pack shows the last
-   reported quarter (YoY growth, margins, FCF, filed date, `new` if filed in the last 5 days) and
-   the latest balance sheet. No consensus estimates are available for free, so there is no
-   earnings "surprise". Gaps, counted on the live data of 2026-10-05 (all quarters since late 2023
-   in `fundamentals_metrics`, 10-12 per ticker):
+   once per filing that first reports it or changes it, so restatements and split adjustments are
+   new rows and the views take the newest filing. Fiscal Q4 (rarely tagged) is derived as FY - 9M
+   and quarterly cash flows from year-to-date totals, marked derived (a derived EPS is approximate:
+   AAPL Q4 FY2025 derives to 1.84 vs 1.85 reported). The context pack shows the last reported
+   quarter (YoY growth, margins, FCF, filed date, `new` if filed in the last 5 days) and the latest
+   balance sheet. SEC holds no consensus estimates; Yahoo's consensus EPS per report (yfinance
+   `get_earnings_dates`, issue #17) is stored point in time in `earnings_estimates` (a row when
+   first seen or changed, read with the `earnings_estimates_asof(ts)` macro) and shown in the
+   context pack's "Earnings estimates" section with reported EPS and surprise, for reading only: no
+   range or forecast rule uses it. Gaps, counted on the live data of 2026-10-05 (all quarters since
+   late 2023 in `fundamentals_metrics`, 10-12 per ticker):
    - Banks and insurers (ALL, BAC, JPM, PGR) tag no gross or operating profit: both margins blank.
    - Operating margin is also blank for CVX, LLY, MRK and XOM (no `OperatingIncomeLoss`) and for DE
      (no quarterly `OperatingIncomeLoss`: SEC companyconcept, read 2026-10-07, has DE quarters only
@@ -971,6 +1009,10 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     (`Backpage.aspx/getHistoricaldatatabletoString`, `.../getpepbHistoricaldataDBtoString`) return
     the home page and `Daily_Snapshot/ind_close_all_*.csv` its 404 page, so NSE's archive is used
     instead.
+  - Completeness (issue #27): a per-session file stored with `complete` false is fetched again on
+    later runs, but only while it is within the last 3 sessions (`REFETCH_SESSIONS`); a key still
+    absent after that is taken as absent at the source and no longer fetched or reported. Rows
+    stored before the field existed read as complete.
   - Not built: AMFI (`portal.amfiindia.com/spages/NAVAll.txt` answers HTTP 200, but scheme NAVs
     say nothing about 1- or 5-day stock moves, and AMFI's monthly net-flow figures come as monthly
     PDF/Excel reports about ten days after month end); BSE announcements: `www.bseindia.com`
