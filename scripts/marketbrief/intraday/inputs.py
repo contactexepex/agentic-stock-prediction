@@ -168,13 +168,13 @@ def news_since(con, ticker: str, since: datetime, check_at: datetime, limit: int
     verification status as of check_at (unverified when no status row lists it) and its enrichment by then."""
     frame = con.execute(
         "WITH s AS (SELECT news_id, status FROM news_status_ids_asof(?) WHERE ticker = ?), "
-        "e AS (SELECT DISTINCT ON (id) id, materiality, sentiment FROM news_enriched WHERE analyzed_at <= ? "
-        "ORDER BY id, analyzed_at DESC) "
+        "e AS (SELECT id, materiality, sentiment FROM news_enriched_asof(?::TIMESTAMPTZ)) "
         "SELECT n.id, n.title, n.source, n.published_at, n.first_seen_at, coalesce(s.status, 'unverified') AS status, "
-        "e.materiality, e.sentiment FROM news n LEFT JOIN s ON s.news_id = n.id LEFT JOIN e ON e.id = n.id "
+        "e.materiality, e.sentiment FROM news_asof(?::TIMESTAMPTZ) n "
+        "LEFT JOIN s ON s.news_id = n.id LEFT JOIN e ON e.id = n.id "
         "WHERE list_contains(n.tickers, ?) AND n.first_seen_at >= ? AND n.first_seen_at <= ? "
         "AND coalesce(n.published_at, n.first_seen_at) <= ? ORDER BY n.first_seen_at, n.id LIMIT ?",
-        [check_at, ticker, check_at, ticker, since, check_at, check_at, limit],
+        [check_at, ticker, check_at, check_at, ticker, since, check_at, check_at, limit],
     ).df()
     return records(frame)
 

@@ -33,7 +33,7 @@ STATE_HASH_KEYS = ("news_ids", "duplicate_ids", "primary_ids", "origins", "origi
 
 NEWS_ROWS_SQL = ("SELECT id, title, url, source, source_domain, published_at, first_seen_at, primary_tickers "
                  "FROM news WHERE first_seen_at <= ? AND first_seen_at >= ? ORDER BY first_seen_at, id")
-ARTICLES_SQL = "SELECT DISTINCT ON (id) * FROM news_articles WHERE fetched_at <= ? ORDER BY id, fetched_at DESC"
+ARTICLES_SQL = "SELECT * FROM news_articles_asof(?::TIMESTAMPTZ) ORDER BY id"   # with a duplicate's article
 FILINGS_SQL = ("SELECT id, ticker, coalesce(accepted_at, CAST(filing_date AS TIMESTAMPTZ) + INTERVAL 1 DAY) AS t "
                "FROM filings WHERE list_contains(?, form) ORDER BY t, id")
 ANNOUNCEMENTS_SQL = ("SELECT id, ticker, published_at FROM announcements "
