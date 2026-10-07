@@ -133,7 +133,7 @@ def section(title: str):
 
 
 def test_score_predictions_queries(cons):
-    calls = stable(cons, rows(score_predictions.SQL))
+    calls = stable(cons, rows(score_predictions.SQL, [2, 5]))           # the open_to_close target offsets
     assert len(calls) > 100 and [r[0] for r in calls] == sorted(r[0] for r in calls)
     stable(cons, rows(score_predictions.RANGE_SQL))
 

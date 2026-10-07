@@ -16,6 +16,13 @@ confidence_bands: [0.50, 0.60, 0.70, 0.80, 0.90]
 
 history_eval_sessions: 120  # walk-forward days replayed on stored prices (recent history)
 
+# Signal-model check (pipeline/review/model_skill.py): each review reruns the walk-forward backtest of
+# scripts/model_backtest.py for the market and says whether the model has shown skill: at least min_n
+# out-of-sample rows, a Brier skill above min_brier_skill against the base-rate Brier, and an AUC 95%
+# interval whose low end is above min_auc_low. Its paper strategy beats a baseline only when the 95%
+# interval of the after-cost difference is above 0 (and has the backtest's minimum number of dates).
+model_skill: {min_n: 500, min_brier_skill: 0.0, min_auc_low: 0.5}
+
 # Variants replayed on stored LIVE scored ranges (inputs that only exist live: cues, AI calls,
 # earnings and event widening as published). `set` overrides config/ranges.yaml values.
 live_variants:

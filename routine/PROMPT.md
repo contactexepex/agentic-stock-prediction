@@ -236,7 +236,10 @@ Warnings never block: list them in `data_quality`.
 10a. Weekly review (first trading day of each ISO week): `python scripts/review.py --if-due`.
     It reviews the previous ISO week once (it does nothing if that review is already stored, so
     a missed first day is caught up on the next run), writes `reports/<market>/review-<week>.md`
-    and appends a record to `data/<market>/reviews/`. Keep its JSON summary. Its proposed
+    and appends a record to `data/<market>/reviews/`. It also reruns the signal model's walk-forward
+    backtest for the market (about 20 seconds; JSON in `work/model_backtest/`) and states in the review
+    whether the model has shown skill (`model_skill` in its JSON summary; a failed backtest is reported
+    in the review and never stops it). Keep its JSON summary. Its proposed
     `config/ranges.yaml` changes are for a human to decide: never edit config in the routine.
     report.py links the review in the report and adds one Slack line on the day it is written.
 

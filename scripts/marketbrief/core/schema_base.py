@@ -215,6 +215,7 @@ BASE_SCHEMAS: Schemas = {
         "naive_score80_all": "DOUBLE", "call_hit_all": "DOUBLE", "always_up_all": "DOUBLE",
         "call_basis_all": "VARCHAR",  # the scoring basis of call_hit_all / always_up_all (call_basis.py)
         "low_sample": "BOOLEAN", "n_proposals": "INTEGER", "proposals": "JSON", "detail": "JSON",
+        "model_skill": "BOOLEAN",  # the signal-model check's verdict (review/model_skill.py); null when not run
     }),
     # Historical replay of the rule-based parts (replay.py): headline numbers as columns (scores are
     # the 80% interval score in % of price on rows with a naive range), the full results as JSON.

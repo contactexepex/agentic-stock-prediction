@@ -17,7 +17,20 @@ DEFAULTS = {
     "history_eval_sessions": 120,
     "live_variants": [],
     "history_variants": [],
+    # the signal-model check (pipeline/review/model_skill.py): skill = n >= min_n out-of-sample rows, Brier skill
+    # vs the base rate above min_brier_skill and the AUC's 95% interval above min_auc_low
+    "model_skill": {"min_n": 500, "min_brier_skill": 0.0, "min_auc_low": 0.5},
 }
+
+# ---------- signal-model check of the weekly review (model_skill.py) ----------
+MODEL_BACKTEST_DIR = "work/model_backtest"
+MSG_MODEL_SKILL = "Yes: the signal model has shown skill out of sample on {keys}."
+MSG_MODEL_NO_SKILL = ("No: the signal model has not shown skill. No horizon has at least {n} out-of-sample rows with a "
+                      "Brier skill above {margin} against the base rate and an AUC 95% interval above {auc}.")
+MSG_STRATEGY_BEATS = "Its paper long beats a baseline after costs on: {which}."
+MSG_STRATEGY_NONE = "Its paper long beats no baseline after costs (95% interval above 0)."
+MSG_MODEL_CHECK_SKIPPED = "skipped (--no-model-backtest)"
+MSG_MODEL_CHECK_FAILED = "the backtest failed: {error}"
 
 TARGETS = {"50": 0.5, "80": 0.8}
 

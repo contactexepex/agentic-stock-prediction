@@ -10,6 +10,10 @@ window and since start (all by target date, never past the week's end):
   changed (cue, AI drift, AI widening, earnings/event/regime widening, centre cap), and
   (b) walk-forward on stored prices (backtest.py) for the width parameters and the regime and
   event widening rebuilt from stored bars.
+- signal-model check (model_skill.py): the walk-forward backtest of scripts/model_backtest.py rerun
+  for the market, its headline numbers and a plain verdict on whether the model has shown skill
+  (--no-model-backtest skips it).
+Calls are summarised per scoring basis, never pooled (analytics/call_basis.py).
 Thresholds and variants live in config/review.yaml. Small samples are flagged and get no
 proposal. Proposed config/ranges.yaml changes are written to the report, never applied.
 Appends a record to data/<market>/reviews/ and writes reports/<market>/review-YYYY-Www.md."""
@@ -21,7 +25,12 @@ from datetime import date, timedelta
 
 from marketbrief.analytics import call_basis
 from marketbrief.analytics.features import load_bars
-from marketbrief.constants.review import DEFAULTS, MSG_HISTORY_ABLATION_SKIPPED
+from marketbrief.constants.review import (
+    DEFAULTS,
+    MSG_HISTORY_ABLATION_SKIPPED,
+    MSG_MODEL_CHECK_FAILED,
+    MSG_MODEL_CHECK_SKIPPED,
+)
 from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -39,6 +48,7 @@ from marketbrief.pipeline.review.helpers import (
     previous_week,
     week_bounds,
 )
+from marketbrief.pipeline.review import model_skill
 from marketbrief.pipeline.review.history_ablation import history_ablation
 from marketbrief.pipeline.review.live_ablation import live_ablation
 from marketbrief.pipeline.review.markdown import markdown
@@ -60,8 +70,19 @@ from marketbrief.pipeline.review.verdicts import (
 )
 
 
+def model_check(market: str, review_config: dict, enabled: bool) -> dict:
+    """The signal-model check (model_skill.py), or why it was not run; a failure never stops the review."""
+    if not enabled:
+        return {"skipped": MSG_MODEL_CHECK_SKIPPED}
+    try:
+        result, path = model_skill.rerun(market)
+    except (Exception, SystemExit) as exc:  # e.g. no config/model.yaml or too little history for any fit
+        return {"error": MSG_MODEL_CHECK_FAILED.format(error=str(exc)[:200])}
+    return model_skill.headline(result, market, path, review_config)
+
+
 def build(
-    cfg: dict, ranges_config: dict, review_config: dict, con, week: str, history: bool = True
+    cfg: dict, ranges_config: dict, review_config: dict, con, week: str, history: bool = True, model: bool = True
 ) -> tuple[dict, dict]:
     """Build the review record and its data for one ISO week."""
     start, end = week_bounds(week)
@@ -126,6 +147,7 @@ def build(
     proposal = aci_proposal(ranges_config, review_data["aci"]["replay"])
     if proposal:
         review_data["proposals"].append(proposal)
+    review_data["model"] = model_check(cfg["market"], review_config, model)
     review_data["advice"] = confidence_advice(review_data["bands"]["all"], review_data["calls"]["all"], review_config)
 
     # the record's call columns are of the current basis (the newest scored call's), named in call_basis_all
@@ -152,11 +174,12 @@ def build(
         "call_hit_all": call_all.get("hit_rate"),
         "always_up_all": call_all.get("always_up"),
         "low_sample": range_all["n"] < review_config["min_n_recommend"],
+        "model_skill": review_data["model"].get("skill"),
         "n_proposals": len(review_data["proposals"]),
         "proposals": review_data["proposals"],
         "detail": {
             key: review_data[key]
-            for key in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice", "scores", "aci")
+            for key in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice", "scores", "aci", "model")
         }
         | {
             "live_ablation": review_data["live_ablation"],
@@ -173,6 +196,7 @@ def main() -> int:
     parser.add_argument("--week", help="ISO week to review, e.g. 2026-W40 (default: the previous ISO week)")
     parser.add_argument("--if-due", action="store_true", help="do nothing if this week's review is already stored")
     parser.add_argument("--no-history", action="store_true", help="skip the walk-forward on stored prices")
+    parser.add_argument("--no-model-backtest", action="store_true", help="skip rerunning the signal-model backtest")
     args = parser.parse_args()
     cfg = require_market(args)
     week = args.week or previous_week(utc_today())
@@ -194,7 +218,8 @@ def main() -> int:
         return 0
     review_config = load_review_config()
     rec, review_data = build(
-        cfg, load_ranges_config(cfg["market"]), review_config, con, week, history=not args.no_history
+        cfg, load_ranges_config(cfg["market"]), review_config, con, week, history=not args.no_history,
+        model=not args.no_model_backtest,
     )
     path = paths.ROOT / rec["report"]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,6 +239,7 @@ def main() -> int:
                 "n_ranges_all": rec["n_ranges_all"],
                 "n_calls_all": rec["n_calls_all"],
                 "low_sample": rec["low_sample"],
+                "model_skill": rec["model_skill"],
                 "proposals": [
                     {**change, "source": proposal["source"], "n": proposal["n"], "rel_score": proposal["rel_score"]}
                     for proposal in rec["proposals"]

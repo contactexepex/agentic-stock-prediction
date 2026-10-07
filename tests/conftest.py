@@ -131,6 +131,7 @@ SLOW = {
         "test_replay_ranges_equal_ranges_py",
     },
     "tests/test_review.py": {
+        "test_model_check_reruns_the_backtest_into_work",
         "test_review_end_to_end",
         "test_review_with_little_data_makes_no_live_proposal",
     },

@@ -225,6 +225,9 @@ def build_market(tmp: Path):
     rv.update({"min_n": 30, "min_n_recommend": 100, "min_n_calls": 20, "history_eval_sessions": 30,
                "history_variants": rv["history_variants"][:1] + [{"name": "EWMA lambda 0.97", "set": {"ewma_lambda": 0.97}}]})
     (cfg / "review.yaml").write_text(yaml.safe_dump(rv))
+    settings = yaml.safe_load((cfg / "settings.yaml").read_text())   # every call here on one basis (close_to_close)
+    settings.pop("call_scoring", None)
+    (cfg / "settings.yaml").write_text(yaml.safe_dump(settings))
 
     rng = np.random.default_rng(5)
     n = 300
@@ -335,7 +338,8 @@ def test_review_end_to_end(tmp_path):
                    "### By confidence band", "## Calibration", "## Ablation: replay of live scored ranges",
                    "Round-trip consistency check against the current config",
                    "## Ablation: walk-forward on stored prices", "## Proposed changes to config/ranges.yaml",
-                   "`cue_weight`", "**Not applied.**", "drop overnight cue", "low n"):
+                   "`cue_weight`", "**Not applied.**", "drop overnight cue", "low n",
+                   "## Signal model: does it show skill?", "_Not checked: the backtest failed: "):
         assert needle in text, needle
     # every coverage row is flagged exactly when n < min_n (30), and both kinds occur
     section = text.split("## Ranges: coverage vs target")[1].split("###")[0]
@@ -575,3 +579,58 @@ def test_weekly_review_written_earlier_is_not_fresh():
                 "now() - INTERVAL 2 DAY)")
     rv = gather.weekly_review(con, date(2026, 10, 7))
     assert rv is not None and rv["fresh"] is False                          # linked in the report, no Slack line
+
+
+# ---------- change B: the signal-model check ----------
+
+def backtest_result(skill: bool, low: float) -> dict:
+    """A model_backtest.run() result with one scored horizon and a paper strategy at two thresholds."""
+    row = {"n": 900, "dates": 120, "brier": 0.24 if skill else 0.252, "brier_base_rate": 0.25,
+           "brier_skill": 0.04 if skill else -0.008, "auc": 0.56 if skill else 0.5, "auc95": [low, 0.6]}
+    diff = {"dates": 100, "positions": 100, "mean_pct": 0.2, "ci95_pct": [0.05, 0.4]}
+    paper = {"thresholds": {"0.55": {"long": {"positions": 300}, "vs": {"always_up": diff}},
+                            "0.65": {"long": {"positions": 0}, "vs": {"always_up": {"dates": 0}}}}}
+    return {"computed_at": "2026-10-05T12:00:00+00:00", "data": {"us": {"tickers": 3}},
+            "results": {"us": {"5d open_to_close": {**row, "paper": paper}, "1d close_to_close": {"skipped": "x"}}}}
+
+
+def test_model_check_says_plainly_whether_the_model_shows_skill():
+    from marketbrief.pipeline.review import model_skill
+    rv = {**review.DEFAULTS}
+    yes = model_skill.headline(backtest_result(True, 0.52), "us", "work/model_backtest/x.json", rv)
+    assert yes["skill"] and yes["verdict"].startswith("Yes: the signal model has shown skill out of sample on "
+                                                      "5d open_to_close.")
+    assert yes["strategy_beats"] and "5d open_to_close p>=0.55 vs always_up" in yes["verdict"]
+    assert [r["verdict"] for r in yes["strategy"]] == ["beats", "no positions"]
+    no = model_skill.headline(backtest_result(True, 0.49), "us", "x.json", rv)          # AUC interval reaches 0.5
+    assert not no["skill"] and no["verdict"].startswith("No: the signal model has not shown skill.")
+    stricter = model_skill.headline(backtest_result(True, 0.52), "us", "x.json",
+                                    {**rv, "model_skill": {"min_n": 1000, "min_brier_skill": 0.0, "min_auc_low": 0.5}})
+    assert not stricter["skill"]                                                         # thresholds from config
+    text = "\n".join(model_skill.markdown_lines(yes))
+    assert "| 5d open_to_close | 900 | 0.24 | 0.25 | 0.04 | 0.56 | 0.52 to 0.6 | yes |" in text
+    assert "| 1d close_to_close | – | – | – | – | – | – | x |" in text
+    assert "| 5d open_to_close | p>=0.65 | 0 | – | 0 | – | – to – | no positions |" in text
+    assert "_Not checked: skipped (--no-model-backtest)._" in "\n".join(
+        model_skill.markdown_lines({"skipped": "skipped (--no-model-backtest)"}))
+
+
+def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
+    """The review reruns the walk-forward backtest for its market, writes its JSON under work/ (never data/ or
+    reports/) and summarises it; a failing backtest is reported, never fatal."""
+    from marketbrief.core import paths
+    from marketbrief.model import backtest
+    from marketbrief.pipeline.review import model_skill
+    from test_signal_model import SETTINGS, synthetic_inputs, write_prices
+
+    write_prices(tmp_path, synthetic_inputs())
+    monkeypatch.setattr(paths, "ROOT", tmp_path)
+    monkeypatch.setattr(backtest, "load_model_config", lambda: SETTINGS)
+    out = cli.model_check("us", {**review.DEFAULTS}, True)
+    assert out["json"].startswith("work/model_backtest/model-backtest-us-") and (tmp_path / out["json"]).exists()
+    assert {row["key"] for row in out["scores"]} == {"1d close_to_close", "1d open_to_close", "5d close_to_close",
+                                                     "5d open_to_close"}
+    assert out["verdict"].startswith(("Yes:", "No:")) and not (tmp_path / "data" / "us" / "reviews").exists()
+    monkeypatch.setattr(model_skill, "run_backtest", lambda markets: 1 / 0)
+    assert cli.model_check("us", {**review.DEFAULTS}, True) == {"error": "the backtest failed: division by zero"}
+    assert cli.model_check("us", {**review.DEFAULTS}, False) == {"skipped": "skipped (--no-model-backtest)"}
