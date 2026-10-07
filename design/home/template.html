@@ -86,6 +86,23 @@ a.plain{color:inherit;text-decoration:none} a.plain:hover{text-decoration:underl
 .pipe .ok{color:var(--mb-color-up)} .pipe .bad{color:var(--mb-color-down)}
 .links{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-top:var(--mb-card-border)}
 
+/* news card */
+.news{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.nl{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.nl li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;padding:6px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px;min-width:0}
+.nl li:first-child{border-top:0}
+.nl .mb-dir{margin-top:1px}
+.nl .hd{min-width:0;overflow-wrap:anywhere} .nl .hd a{color:inherit;text-decoration:none;font-weight:600} .nl .hd a:hover{text-decoration:underline}
+.nl .hd small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px;margin-top:1px}
+.nl .hd .tk{font-weight:800;color:var(--md-sys-color-primary);text-decoration:none;margin-right:4px}
+.nl .hd .md-badge{margin-left:4px;vertical-align:1px}
+.nl .so{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.nl.plain li{grid-template-columns:1fr}
+.quiet{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);padding:6px 10px;border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius)}
+.aside{font-size:12.5px;margin:0}
+.aside summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12px;margin-top:4px}
+.evmore{margin-top:6px}
+
 /* bottom */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -95,7 +112,7 @@ a.plain{color:inherit;text-decoration:none} a.plain:hover{text-decoration:underl
 footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
 code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
 
-@media (max-width: 1000px){ .markets,.grid2{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 1000px){ .markets,.grid2,.news{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(2,1fr)} }
 @media (max-width: 760px){
   .pad{padding:0 var(--mb-gutter)}
   .hhead{grid-template-columns:1fr}
@@ -136,6 +153,8 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
 
 <div class="markets" id="markets"></div>
 
+<div class="news" id="news"></div>
+
 <div class="grid2">
   <section class="card" id="track">
     <h2>Track record <span class="sp">the proof gate for "Paper"</span></h2>
@@ -146,7 +165,8 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
     <h2>How to read this screen</h2>
     <div style="font-size:13px;display:grid;gap:6px">
       <div><b>Banner</b>: whether anything is worth doing today. "No proven strong signals" until a live YES exists and the track record proves the model; Paper candidates are companies at or above the call line without a confirmed call.</div>
-      <div><b>Market panels</b>: the session, regime and the big numbers; yesterday's largest moves with a cause (<svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-public"/></svg> market-wide, <svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-apartment"/></svg> company news, <svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-pending"/></svg> unexplained = mock, explainer agent coming); the week's events; what the latest run stored.</div>
+      <div><b>Market panels</b>: the session, regime and the big numbers; yesterday's largest moves with a cause (<svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-public"/></svg> market-wide, <svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-apartment"/></svg> company news, <svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-pending"/></svg> unexplained = mock, explainer agent coming); the week's events (eight weeks behind a click); what the latest run stored.</div>
+      <div><b>News</b>: the last 24 hours of the stored archive. What moved the whole market (grouped stories, weighed by how many outlets reported them), the company stories that are <span class="md-badge confirmed_primary">confirmed</span> or <span class="md-badge corroborated">corroborated</span> and so can carry a call, and what was set aside (<span class="md-badge single_source">single source</span>, <span class="md-badge unverified">unverified</span>, <span class="md-badge rumour">rumour</span>, <span class="md-badge promotional">promotional</span>) and why. Each company page has its own full news feed.</div>
       <div><b>Colours</b>: green up, red down, always with the sign; NO red, YES green (darker when strong); <span class="mb-tag live">live</span> stored by the pipeline, <span class="mb-tag bt">back-test</span> rule replay, <span class="mb-tag mock">mock</span> not built, <span class="mb-tag paper">paper</span> unproven.</div>
       <div>Click a company for its decision page, a market name for its watchlist.</div>
     </div>
@@ -183,7 +203,7 @@ const CAUSE = {market:{ico:'ms-public', name:'Market-wide'}, company:{ico:'ms-ap
 
 /* ---------- shell ---------- */
 for (const m of MK) $('#market-seg').append(el('a', {href: wlOf(m), 'aria-pressed':'false', 'data-tip': `Open the ${LABEL[m]} watchlist`}, LABEL[m]));
-const NAV = [['home','Home', true], ['format_list_bulleted','Watchlist', false, wlOf('india')], ['account_balance_wallet','Portfolio', false], ['query_stats','Record', false], ['newspaper','News', false], ['help','Help', false]];
+const NAV = [['home','Home', true], ['format_list_bulleted','Watchlist', false, wlOf('india')], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false]];
 const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
 $('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
 $('#navbar').append(...NAV.slice(0,5).map(navItem));
@@ -245,16 +265,21 @@ function panel(m) {
   mv.append(col(b.movers.up, 'Up'), col(b.movers.down, 'Down'));
   body.append(mv);
   // events
-  body.append(el('h3', {}, 'Next 7 days', el('span', {class:'mb-tag live'}, 'calendar')));
+  body.append(el('h3', {}, 'Next 7 days', el('span', {class:'mb-tag live'}, 'calendar'), help('Results and ex-dividend dates from the stored events, market-wide events from config/events.yaml. No new call is made within one day of a company\'s results; a major market event widens every range. The button shows the eight weeks behind this one.')));
   const ul = el('ul', {class:'evl'});
   const EV_ICO = {rbi_policy:'ms-account_balance', fomc:'ms-account_balance', earnings:'ms-receipt_long', fno_expiry:'ms-event', weekly_expiry:'ms-event', jobs_report:'ms-public', index_rebalance:'ms-layers', cpi:'ms-public'};
-  for (const e of b.events) { const d = dt(e.date); const li = el('li', {class: (e.date === b.today ? 'today ' : '') + (e.major ? 'major' : '')});
+  const evItem = e => { const d = dt(e.date); const li = el('li', {class: (e.date === b.today ? 'today ' : '') + (e.major ? 'major' : '')});
     li.append(el('div', {class:'when'}, el('small', {}, DOW[d.getUTCDay()]), el('b', {}, d.getUTCDate())));
     const what = el('div', {class:'what'}, icon(EV_ICO[e.type] || 'ms-calendar_month'), e.ticker ? el('a', {class:'plain', href: pageOf(e.ticker)}, e.name) : e.name,
-      el('small', {}, e.type === 'earnings' ? `Company results${e.timing ? ', ' + e.timing.replace('_',' ') : ''} · reaction session ${fmtD(e.reaction_session)} · no new call within 1 day` : e.date === b.today && h.major_event_names.some(n => e.name.includes(n) || n.includes(e.name)) ? `Today · the reason the regime is ${h.regime}` : e.major ? 'Market-wide major event · ranges widen' : 'Market-wide, minor'));
-    li.append(what); ul.append(li); }
-  if (!b.events.length) ul.append(el('li', {}, el('div'), el('div', {class:'what muted'}, 'No stored events in the next seven days.')));
+      el('small', {}, e.type === 'earnings' ? `Company results${e.timing ? ', ' + e.timing.replace('_',' ') : ''} · reaction session ${fmtD(e.reaction_session)} · no new call within 1 day` : e.type === 'ex_dividend' ? `Ex-dividend · the range shifts by the dividend` : e.date === b.today && h.major_event_names.some(n => e.name.includes(n) || n.includes(e.name)) ? `Today · the reason the regime is ${h.regime}` : e.major ? 'Market-wide major event · ranges widen' : 'Market-wide, minor'));
+    li.append(what); return li; };
+  const week = b.events.filter(e => e.this_week), later = b.events.filter(e => !e.this_week);
+  for (const e of week) ul.append(evItem(e));
+  if (!week.length) ul.append(el('li', {}, el('div'), el('div', {class:'what muted'}, 'No stored events in the next seven days.')));
   body.append(ul);
+  if (later.length) { const more = el('ul', {class:'evl evmore', hidden: ''}); let open = false; for (const e of later) more.append(evItem(e));
+    const btn = el('button', {class:'md-btn text', style:'margin-top:6px', onclick: () => { open = !open; more.hidden = !open; btn.textContent = open ? 'Hide the weeks after' : `Next 8 weeks (${later.length} more)`; }}, `Next 8 weeks (${later.length} more)`);
+    body.append(btn, more); }
   // pipeline status
   body.append(el('h3', {}, 'What the latest run stored', help('Counts from the stored data for the as-of date: bars, model scores, published ranges (1-day ranges are withheld when the run finishes after the open), forecaster records, headlines since the as-of close, verified news clusters, lessons. Green = complete for the 20 companies.')));
   const P = el('div', {class:'pipe'});
@@ -277,6 +302,50 @@ function panel(m) {
 }
 for (const m of MK) $('#markets').append(panel(m));
 
+/* ---------- news card: the last 24 hours, both markets ---------- */
+const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange filing, company release) confirms it. Can be the main evidence of a call.', 'ms-verified_user'],
+  corroborated: ['corroborated', 'Two or more independent outlets reported it on their own. Can be the main evidence of a call.', 'ms-check'],
+  single_source: ['single source', 'One independent origin so far (one agency story copied by many counts once). Lowers the forecaster\'s confidence; cannot be the main evidence.', 'ms-warning'],
+  unverified: ['unverified', 'No vetted outlet read yet, or only unread headlines. Lowers confidence; cannot be the main evidence.', null],
+  rumour: ['rumour', 'Reported as a rumour or from unnamed sources. Never supports a call.', 'ms-close'],
+  promotional: ['promotional', 'A paid or promotional item (press-release wire, law-firm notice). Never supports a call.', 'ms-close'],
+  contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close'],
+  'not assessed': ['not assessed', 'No verification row is stored for this story yet.', null]};
+const badge = st => { const s = STATUS[st] || STATUS['not assessed']; return el('span', {class:'md-badge ' + st.replace(' ', '_'), 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
+const sentIcon = v => { const s = v == null ? 'flat' : v > 0.05 ? 'up' : v < -0.05 ? 'dn' : 'flat'; return el('span', {class:'mb-dir s ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news-analyst\'s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+const fmtT = iso => { const d = new Date(iso); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')} UTC`; };
+const plural = (n, w) => `${n} ${n === 1 ? w : w.endsWith('y') ? w.slice(0, -1) + 'ies' : w + 's'}`;
+function newsPanel(m) {
+  const N = M[m].news, card = el('section', {class:'card', 'aria-label': `${LABEL[m]} news`});
+  card.append(el('h2', {}, `${LABEL[m]} news · last ${N.hours} hours`, el('span', {class:'mb-tag live'}, 'live'), el('span', {class:'sp'}, `to ${fmtT(N.until)}`)));
+  // market today
+  card.append(el('h3', {class:'micro', style:'margin:0 0 6px'}, 'What moved the whole market ', help(`Market-wide stories of the last ${N.hours} hours: macro items with no company tag, medium or high materiality, grouped by the news-analyst's one-line summary (copies of one story count once). The number of outlets is the weight; market-wide items are not verified against filings, only company stories are. ${N.macro_headlines} macro headlines in the window.`)));
+  const mw = el('ul', {class:'nl'});
+  for (const g of N.market_wide) mw.append(el('li', {}, sentIcon(g.sentiment), el('div', {class:'hd'}, el('a', {href: g.url, rel:'noopener', target:'_blank'}, g.summary || g.headline), el('small', {}, `${plural(g.outlets, 'outlet')}${g.n > g.outlets ? ` (${g.n} items)` : ''} · ${g.materiality} materiality · latest ${g.source}, ${fmtT(g.latest)}`))));
+  if (!N.market_wide.length) mw.append(el('li', {class:'muted'}, 'No market-wide macro story of medium or high materiality in the window.'));
+  card.append(mw);
+  // company stories that can carry a call
+  card.append(el('h3', {class:'micro', style:'margin:12px 0 6px'}, 'Company news that can carry a call ', help('Stories about the 20 companies whose newest verification status is confirmed (a filing or company release confirms it) or corroborated (independent outlets). Only these may be the main evidence of a call (DESIGN.md 3b). Click the company for its decision page.')));
+  if (N.can_carry.length) { const cc = el('ul', {class:'nl'});
+    for (const s of N.can_carry) cc.append(el('li', {}, sentIcon(s.sentiment), el('div', {class:'hd'}, el('a', {class:'tk', href: pageOf(s.ticker)}, s.ticker), el('a', {href: s.url, rel:'noopener', target:'_blank'}, s.headline), badge(s.status), el('small', {}, `${s.name} · ${s.materiality || 'unscored'} materiality${s.event_type ? ' · ' + s.event_type.replace(/_/g,' ') : ''} · ${plural(s.outlets, 'outlet')}, ${plural(s.independent, 'independent origin')}${s.filings ? `, ${plural(s.filings, 'filing')}` : ''} · ${fmtT(s.last)}`))));
+    card.append(cc); }
+  else card.append(el('div', {class:'quiet'}, `Nothing that changes a call: none of the ${plural(N.set_aside.length, 'company story')} of the last ${N.hours} hours is confirmed by a filing or corroborated by independent outlets.`));
+  // set aside
+  const order = ['single_source', 'unverified', 'rumour', 'promotional', 'contradicted', 'not assessed'];
+  const parts = order.filter(k => N.set_aside_counts[k]).map(k => `${N.set_aside_counts[k]} ${STATUS[k][0]}`);
+  const det = el('details', {class:'aside'});
+  det.append(el('summary', {}, `Set aside: ${parts.length ? parts.join(', ') : 'nothing'} (${N.company_headlines} company headlines in the window)`));
+  const sa = el('ul', {class:'nl', style:'margin-top:6px'});
+  const shown = N.set_aside.filter(s => s.materiality === 'high');
+  for (const s of shown) sa.append(el('li', {}, sentIcon(s.sentiment), el('div', {class:'hd'}, el('a', {class:'tk', href: pageOf(s.ticker)}, s.ticker), el('a', {href: s.url, rel:'noopener', target:'_blank'}, s.headline), badge(s.status), el('small', {}, `${s.name} · ${STATUS[s.status] ? STATUS[s.status][1] : ''} ${plural(s.outlets, 'outlet')}, ${plural(s.independent, 'independent origin')} · ${fmtT(s.last)}`))));
+  if (N.set_aside.length > shown.length) sa.append(el('li', {class:'muted'}, `${N.set_aside.length - shown.length} more of medium or low materiality: the company pages list them.`));
+  if (!N.set_aside.length) sa.append(el('li', {class:'muted'}, 'Nothing set aside.'));
+  det.append(el('p', {class:'note', style:'margin:6px 0 0'}, 'Why set aside: a single-source or unverified story lowers the forecaster\'s confidence and cannot be the main evidence; rumours and promotional items never support a call. The high-materiality ones are listed here.'), sa);
+  card.append(det);
+  return card;
+}
+for (const m of MK) $('#news').append(newsPanel(m));
+
 /* ---------- track record ---------- */
 const K = $('#kpis');
 const kp = [
@@ -289,10 +358,10 @@ $('#track-note').textContent = `Every signal stays Paper until the live track re
 
 /* ---------- sources + footer ---------- */
 $('#sources').innerHTML = `<dl class="md-kv">
-<dt>Live</dt><dd>Per market, data/&lt;market&gt;/: prices (last stored bars), model_scores_latest, ranges, features_latest, agent_reasoning, predictions and outcomes, quotes_latest, regime, events (calendar rules in config/events.yaml plus stored results dates), news with enrichment and news_verified, flows (India), lessons, reviews. Read through DuckDB views in sql/views.sql; the watchlist builder assembles the rows, this page adds movers, events and status.</dd>
+<dt>Live</dt><dd>Per market, data/&lt;market&gt;/: prices (last stored bars), model_scores_latest, ranges, features_latest, agent_reasoning, predictions and outcomes, quotes_latest, regime, events (calendar rules in config/events.yaml plus stored results dates), news with enrichment (news-analyst summaries, sentiment, materiality), news_clusters_latest and news_verified (the news card), flows (India), lessons, reviews. Read through DuckDB views in sql/views.sql; the watchlist builder assembles the rows, this page adds movers, events and status.</dd>
 <dt>Back-test</dt><dd>Range coverage from <code>scripts/replay.py</code> over each market's 35-session window ending at its as-of date. Not live.</dd>
-<dt>Derived</dt><dd>The cause of a mover (market-wide / company news / unexplained), Paper candidates (chance at or above the call line), blocked companies, "before/after the open" from the run time and the exchange calendar.</dd>
-<dt>Mock / coming</dt><dd>"Unexplained" causes (explainer agent not built); symbol search; Portfolio, Record, News and Help sections.</dd>
+<dt>Derived</dt><dd>The cause of a mover (market-wide / company news / unexplained), the grouping of market-wide headlines by the analyst's summary and the "can carry a call" split by verification status, Paper candidates (chance at or above the call line), blocked companies, "before/after the open" from the run time and the exchange calendar.</dd>
+<dt>Mock / coming</dt><dd>"Unexplained" causes (explainer agent not built); symbol search; the Help section.</dd>
 </dl>`;
 $('#foot').textContent = `Personal research project. Prices from Yahoo Finance and NSE bhavcopy; nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
 </script>

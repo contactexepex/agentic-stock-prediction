@@ -336,7 +336,7 @@ for (const [m, label] of Object.entries(MARKET_LABEL)) {
   if (m !== P.market) { b.setAttribute('aria-disabled', 'true'); b.dataset.tip = 'Coming: the market switch lives on the Home and Watchlist pages. This page is built per market and ticker.'; }
   $('#market-seg').append(b);
 }
-const NAV = [['home','Home', false], ['format_list_bulleted','Watchlist', true], ['account_balance_wallet','Portfolio', false], ['query_stats','Record', false], ['newspaper','News', false], ['help','Help', false]];
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', true], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false]];
 function navItem([ico, label, current]) {
   return el('a', {class: 'mb-nav-item' + (current ? '' : ' coming'), href: '#', 'aria-current': current ? 'page' : null, 'data-tip': current ? 'Coming: the watchlist page. This decision page is one of its company pages.' : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
 }

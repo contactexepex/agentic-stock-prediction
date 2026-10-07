@@ -34,11 +34,10 @@ cloud session, then one consolidation session turns them into the production gen
 |---|---|
 | `system/` Material 3 design system | done: tokens, components, icons, style guide (`design/system/README.md`) |
 | `decision/` Stock decision page | layout approved by the owner; recoloured to the design system; `build.py --market --ticker --out` regenerates it for any watchlist ticker (examples: HDFCBANK, ICICIBANK, AAPL) |
-| `home/` Home (Today): both markets, signals, movers with causes, week's events, run status | built, awaiting the owner's approval |
+| `home/` Home (Today): both markets, signals, movers with causes, the news card (last 24 hours: market-wide stories, company stories that can carry a call, what was set aside), week's events with eight weeks behind a click, run status | approved; news card added 7 Oct |
 | `watchlist/` Watchlist (20 companies per market, sortable, sector-grouped) | built, awaiting the owner's approval |
 | `portfolio/` Paper portfolio: live book and rehearsal book, 10,000 per trade after costs | built, awaiting the owner's approval |
 | `track/` Track record: proof gate, live record, weekly review, back-tests | built, awaiting the owner's approval |
-| `news/` News and events: stories with verification status, checked claims, all headlines, next eight weeks | built, awaiting the owner's approval |
-| Help | to do |
+| Help | to do. A separate News screen was built and dropped on 7 Oct: the owner judged it an archive nobody reads; its key content moved into the Home news card and the company pages keep their full feeds |
 
 `reference/` holds earlier rejected iterations (v2) for context only.

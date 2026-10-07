@@ -152,7 +152,7 @@ const td = (content, cls) => el('td', {class: cls}, content);
 /* ---------- shell ---------- */
 for (const m of Object.keys(D.markets)) $('#market-seg').append(el('button', {type:'button', 'aria-pressed': String(m === MKT), 'data-m': m}, LABEL[m]));
 $('#market-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; MKT = b.dataset.m; $('#market-seg').querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
-const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', true], ['query_stats','Record', false, '../track/track.html'], ['newspaper','News', false], ['help','Help', false]];
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', false, '../watchlist/watchlist-india.html'], ['account_balance_wallet','Portfolio', true], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false]];
 const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
 $('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
 $('#navbar').append(...NAV.slice(0,5).map(navItem));
@@ -201,7 +201,7 @@ function render() {
 <dt>Live book</dt><dd>data/${MKT}/: predictions (every live call) joined to outcomes (entry open, target close, return, hit once scored); costs at the entry open from config/costs.yaml. 0 calls on ${fmtD(m.as_of)}.</dd>
 <dt>Rehearsal book</dt><dd>The walk-forward out-of-sample rows of the signal model (model.walk_forward, ${m.fits} monthly fits, 5-day open-to-close label) with the entry open and the return, exactly the rows scripts/model_backtest.py scores for its paper strategy (<code>${m.bt_path}</code>); this page re-derives them and checks the totals against that JSON above. The trade table shows the newest 400 trades of a book.</dd>
 <dt>Derived</dt><dd>Running total = cumulative sum of each day's average net return × ${money(D.stake)}; win rate = trades with a net return above zero; largest drop = deepest fall of the running total from its previous high.</dd>
-<dt>Mock / coming</dt><dd>Nothing on this page is invented. Symbol search and the News and Help sections are not built.</dd>
+<dt>Mock / coming</dt><dd>Nothing on this page is invented. Symbol search and the Help section are not built.</dd>
 </dl>`;
   $('#foot').textContent = `Personal research project. Nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
 }
