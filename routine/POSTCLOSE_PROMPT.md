@@ -4,8 +4,8 @@ session's bar counts as final (`BAR_SETTLE_MINUTES` in `constants/calendar.py`);
 CLAUDE.md. Work from the repo root. Export `MB_MARKET=<market>` and `PYTHONPATH=scripts`. Research only: never place
 trades, never connect to a broker; a paper trade is a record, never an order.
 
-Data rules: files under `data/` are append-only. Only the scripts below write there (`collect_prices.py`, the
-settlement step and the `eod-add` gate); you and the EOD analyst write only under `work/`. Delete
+Data rules: files under `data/` are append-only. Only the scripts below write there (`collect_prices.py`,
+`lab.py settle` and the `eod-add` gate); you and the EOD analyst write only under `work/`. Delete
 `work/eod_analysis.jsonl` before the analyst runs and right after it is stored, so a stale file is never stored twice.
 Every step prints a JSON summary: save it under `work/steps/`.
 
@@ -19,15 +19,18 @@ Every step prints a JSON summary: save it under `work/steps/`.
    `python scripts/validate.py --stage collect > work/steps/validate_collect.json`. On a blocking failure settle
    nothing for the tickers it lists: they settle on the next stored close (flagged `exit_delayed` by the engine).
 
-4. Settle: `python -m marketbrief.traders settle > work/steps/traders_settle.json`. It settles, through session
-   B2's engine interface (`marketbrief.contracts.protocol.settle`), every paper trade whose exit session closed by
-   now, in both views (accuracy, head-to-head), and appends the rows to `data/<market>/paper_trades_settled/`. A
-   trade already settled is skipped (re-runnable); `pending` lists trades the engine cannot settle yet. Exit 2 = the
-   engine is not available: stop here and report it; nothing was written.
+4. Settle: `python scripts/lab.py settle > work/steps/lab_settle.json` (session B2's engine, docs/ws/b2.md). It
+   settles every paper trade whose exit bar is final, in both views (accuracy, head-to-head), exactly once, and
+   appends the rows to `data/<market>/paper_trades_settled/` and their two cost views to `data/<market>/cost_views/`.
+   It refuses a prediction or pick made or first committed at or after D's open (`refused_not_locked` in its
+   summary) and re-settles a trade as a new row when a split record changes. On a non-zero exit, stop here and
+   report it.
 
 5. EOD facts: `python -m marketbrief.traders eod-prepare > work/steps/eod_prepare.json` writes
    `work/eod_facts.json`: the day's results per family and pick rule, and the items to explain (every head-to-head
    trade settled today, the 5 biggest wins and 5 biggest misses by return %; reasons already stored are left out).
+   Its money numbers are the market-cost view (`paper_trades_settled`: costs, net_pnl, return_pct), on which
+   strategies are ranked; the your-cost view in `cost_views` is not quoted (owner decision, 2026-10-07).
    - `needs_agent` false (nothing to explain): go to step 7.
 
 6. EOD analyst: run the `eod-analyst` subagent with the market; it reads `work/eod_facts.json` only and writes

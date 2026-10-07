@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 from marketbrief.core import paths
 from marketbrief.traders.constants import PROPOSAL_FILES
 from marketbrief.traders.registry import load_registry
-from marketbrief.traders.settle_step import records
+from marketbrief.traders.rows import records
 
 LEADERS_SQL = """
 SELECT t.family, t.strategy_id, count(*) AS trades, round(sum(t.net_pnl), 2) AS net_pnl,
