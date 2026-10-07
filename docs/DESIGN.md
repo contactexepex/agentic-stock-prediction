@@ -1535,8 +1535,8 @@ forecast-v10, news-v8 and claims-v3 with news verification phase B; forecast-v11
 signal-model anchor and the debate record (section 15); forecast-v12 when calls are scored
 open-to-close from the `call_scoring` switch (section 6); reflect-v1 started with the Sonnet 5.5 /
 medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate; forecast-v13 with
-the Opus trader protocol (B3); trader-news-v1, trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1
-start with B3), and a
+the Opus trader protocol (B3); forecast-v14 with the N+k window wording (B10, decision 37); trader-news-v1,
+trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1 start with B3), and a
 per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
