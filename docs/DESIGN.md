@@ -18,12 +18,12 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 
 | Routine | Cron (exchange time) | Brief ready | Benchmark / regime |
 |---|---|---|---|
-| India (NSE) | `CRON_TZ=Asia/Kolkata 10 8 * * 1-5` (08:10 IST) | ~08:40 IST, before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
-| US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 15 8 * * 1-5` (08:15 ET) | ~08:45 ET (~14:45 Amsterdam) | SPY, VIX (`^VIX`) |
+| India (NSE) | `CRON_TZ=Asia/Kolkata 40 7 * * 1-5` (07:40 IST; 08:10 IST until 2026-10-07) | ~08:10 IST, before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
+| US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 45 7 * * 1-5` (07:45 ET; 08:15 ET until 2026-10-07) | ~08:15 ET (~14:15 Amsterdam) | SPY, VIX (`^VIX`) |
 
 News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"), every 4 hours, every day
 including weekends and holidays, in UTC and at least about 2.5 hours away from the same market's
-pre-open run (which starts 02:40 UTC for India; 12:15 UTC in US summer time, 13:15 UTC in winter), so
+pre-open run (which starts 02:10 UTC for India; 11:45 UTC in US summer time, 12:45 UTC in winter), so
 their pushes rarely meet on the same day file:
 
 | Light run | Cron (UTC) |
@@ -244,7 +244,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   least the config's `news.google_news.window` (1d) and the oldest item kept at least 3 days. Before the
   first `news_runs` row exists, the newest stored news `first_seen_at` stands in; with no stored news at
   all (a first run) the defaults apply; with runs stored but none `ok` in the newest 9 daily files, the
-  window is the 7-day cap. Examples: India's pre-open runs Friday 02:40 and Monday 02:40 UTC: `when:73h`;
+  window is the 7-day cap. Examples: India's pre-open runs Friday 02:10 and Monday 02:10 UTC: `when:73h`;
   Friday to Tuesday after a Monday holiday: `when:97h`; a light run 4 hours after the last: `when:1d`.
   The summary shows the `window` used and `ok`. De-duplication reads the newest 9 daily files (the cap
   plus 2 days).
@@ -816,7 +816,8 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   deals backfill. Rows keep their real publication/acceptance times (`first_seen_at` = the
   backfill time), which is what `prepare` filters on. Summary in `S/backfill-<M>.json`.
 - `prepare --market M --date D --root R [--source S]`: cutoff = the routine's start on the session
-  after D (08:15 ET, 08:10 IST; section 2). R gets copies of `config/`, `sql/`, `templates/` and
+  after D (08:15 ET, 08:10 IST: the start times until 2026-10-07; `CUTOFF_LOCAL` in
+  `constants/ai_replay.py` moves to the new times of section 2 in the app roadmap's Stage C, docs/SPEC.md). R gets copies of `config/`, `sql/`, `templates/` and
   `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
   (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
   time; events first seen by the cutoff plus backfilled past events dated <= D; predictions, ranges,
@@ -1647,10 +1648,10 @@ by the open of D (and every own-market bar after d) leaves the feature unchanged
 and changing the bar the rule names does change it; the session each symbol contributes is checked in
 summer and winter time; a stale bar is missing; a symbol without data is missing before it starts.
 Live caveat: `collect_prices.py` stores cue and factor bars only up to the previous UTC day, so at the
-US routine's run (08:15 ET) the Asia bar of D is not stored yet; the US `asia` group cannot be switched
+US routine's run (07:45 ET) the Asia bar of D is not stored yet; the US `asia` group cannot be switched
 on live until same-day Asia bars are stored once final (otherwise training and the live score would
-see different bars). The India groups see the same bars live: the India routine runs at 08:10 IST
-(02:40 UTC), when every bar the rule admits is dated before the UTC day and final.
+see different bars). The India groups see the same bars live: the India routine runs at 07:40 IST
+(02:10 UTC), when every bar the rule admits is dated before the UTC day and final.
 
 **Long-history cache (`scripts/model_history.py`, `marketbrief/model/history_cache.py`).** Yahoo daily
 bars from 2011-01-01 of every watchlist ticker and config symbol (yfinance, auto_adjust=False: the basis
