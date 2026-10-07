@@ -121,7 +121,7 @@ test("company commands go to B1's inbox.company_commands, paper trades to inbox.
   const inbox = new MotherDuckInboxStore(query);
   const company = { inbox_id: "key-000001", kind: "watchlist_events", tool: "reactivate_company", market: "us", arguments: { ticker: "AAPL" },
     preview: null, channel: "slack" as const, submitted_by: "slack:U1", agent: "slack-gateway", command_id: "cmd-1",
-    submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64) };
+    submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64), slack_channel: null, slack_ts: null };
   const budget = { sinceIso: "2026-10-07T00:00:00Z", limit: 20 };
   assert.deepEqual(await inbox.claimRequest(company, budget), { claimed: true, existing: null });
   assert.match(calls[0].text, /^INSERT INTO inbox\.company_commands \(inbox_id, market, tool, arguments, actor, channel, submitted_at, command_id,/);
@@ -142,4 +142,31 @@ test("company commands go to B1's inbox.company_commands, paper trades to inbox.
 test("redaction removes configured secrets and common token shapes", () => {
   const text = redact("a md-SECRET-value-123 b xoxb-12345-67890-abcdefghij c ghp_abcdefghijklmnopqrstuvwxyz1234 d sk-ant-api03-abcdefghijk", ["md-SECRET-value-123"]);
   assert.equal(text, "a [redacted] b [redacted] c [redacted] d [redacted]");
+});
+
+test("a concurrent claim that loses on the primary key answers with the stored row (issue #109)", async () => {
+  const query = async (text: string) => {
+    if (text.startsWith("INSERT INTO")) throw new Error("Constraint Error: Duplicate key \"inbox_id: key-000001\"");
+    return { rows: [{ inbox_id: "key-000001", tool: "reactivate_company", submitted_by: "slack:U1", command_id: "cmd-1",
+      args_sha256: "f".repeat(64) }] };
+  };
+  const row = { inbox_id: "key-000001", kind: "watchlist_events", tool: "reactivate_company", market: "us", arguments: {},
+    preview: null, channel: "slack" as const, submitted_by: "slack:U1", agent: "slack-gateway", command_id: "cmd-2",
+    submitted_at: "2026-10-07T10:00:00Z", args_sha256: "f".repeat(64), slack_channel: null, slack_ts: null };
+  const result = await new MotherDuckInboxStore(query).claimRequest(row, { sinceIso: "2026-10-07T00:00:00Z", limit: 20 });
+  assert.deepEqual(result, { claimed: false, existing: { inbox_id: "key-000001", tool: "reactivate_company", submitted_by: "slack:U1",
+    command_id: "cmd-1", args_sha256: "f".repeat(64) } });
+  const broken = new MotherDuckInboxStore(async () => { throw new Error("connection lost"); });
+  await assert.rejects(() => broken.claimRequest(row, { sinceIso: "2026-10-07T00:00:00Z", limit: 20 }), /connection lost/);
+  const noRow = new MotherDuckInboxStore(async (text: string) => {
+    if (text.startsWith("INSERT INTO")) throw new Error("insert failed");
+    return { rows: [] };
+  });
+  await assert.rejects(() => noRow.claimRequest(row, { sinceIso: "2026-10-07T00:00:00Z", limit: 20 }), /insert failed/,
+    "an INSERT error with no stored row is rethrown");
+  const lookupFails = new MotherDuckInboxStore(async (text: string) => {
+    throw new Error(text.startsWith("INSERT INTO") ? "insert failed" : "lookup failed");
+  });
+  await assert.rejects(() => lookupFails.claimRequest(row, { sinceIso: "2026-10-07T00:00:00Z", limit: 20 }), /insert failed/,
+    "a failed lookup keeps the INSERT's own error");
 });

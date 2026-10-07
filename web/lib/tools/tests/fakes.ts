@@ -19,6 +19,8 @@ export const SECRETS = {
 export const SECRET_VALUES = Object.values(SECRETS);
 
 export class FakeInbox implements InboxStore {
+  /** One list for both inbox tables (company_commands and requests): keys are unique across both, and the budget counts
+   * both, as in the real claim statements; tests/test_b5_tools.py checks the two-table SQL on DuckDB. */
   requests: InboxRequest[] = [];
   commands: CommandLogRow[] = [];
   /** Rows in insertion order = updated_at order; like the real SQL, the newest row per agent (and per '*') counts. */
@@ -140,6 +142,9 @@ export class FakeSlack implements SlackApi {
   opened: { triggerId: string; view: any }[] = [];
   updated: { viewId: string; view: any }[] = [];
   responses: { url: string; body: any }[] = [];
+  posts: { channel: string; text: string; ts: string }[] = [];
+  edits: { channel: string; ts: string; text: string }[] = [];
+  postFails = false;
   async viewsOpen(triggerId: string, view: unknown) {
     this.opened.push({ triggerId, view });
     return true;
@@ -150,6 +155,16 @@ export class FakeSlack implements SlackApi {
   }
   async respond(url: string, body: unknown) {
     this.responses.push({ url, body });
+    return true;
+  }
+  async postMessage(channel: string, text: string) {
+    if (this.postFails) return null;
+    const ts = `1791400000.${String(this.posts.length + 1).padStart(6, "0")}`;
+    this.posts.push({ channel, text, ts });
+    return ts;
+  }
+  async updateMessage(channel: string, ts: string, text: string) {
+    this.edits.push({ channel, ts, text });
     return true;
   }
 }

@@ -1,6 +1,7 @@
 // Starts the import: GitHub Actions workflow_dispatch of onboard.yml (session B1 builds the workflow). The token is a
 // fine-grained token limited to Actions on this repository. No inputs are sent (an input the workflow does not declare
-// makes GitHub answer 422); the workflow imports every inbox row not yet in data/<market>/inbox_imports/.
+// makes GitHub answer 422); the workflow (`company.py import-inbox`) imports every inbox.company_commands row that
+// its data/ command log has not settled yet.
 import type { Dispatcher } from "./types.ts";
 import type { FetchLike } from "./http.ts";
 

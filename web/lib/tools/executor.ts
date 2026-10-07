@@ -73,6 +73,15 @@ function keyOf(raw: unknown): string | null {
   return typeof key === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(key) ? key : null;
 }
 
+/** The Slack thread a confirmation replies in: only for the slack channel, and only well-formed ids. */
+function slackThread(ctx: CallContext, opts: ExecuteOptions): { slack_channel: string | null; slack_ts: string | null } {
+  const thread = opts.slackThread;
+  if (ctx.channel !== "slack" || !thread || !/^[CG][A-Z0-9]{2,20}$/.test(thread.channel) || !/^\d{1,12}\.\d{1,8}$/.test(thread.ts)) {
+    return { slack_channel: null, slack_ts: null };
+  }
+  return { slack_channel: thread.channel, slack_ts: thread.ts };
+}
+
 function safeToolName(name: unknown): string | null {
   return typeof name === "string" && /^[a-z_]{1,40}$/.test(name) ? name : null;
 }
@@ -219,14 +228,14 @@ export class ToolLayer {
     const secrets = this.deps.settings.secrets;   // caller text (note, reason) is stored with secret values scrubbed
     const stored = Object.fromEntries(Object.entries(args).map(([name, item]) =>
       [name, typeof item === "string" ? redact(item, secrets) : item])) as ToolArgs;
-    const { idempotency_key: _key, ...hashed } = stored;
+    const { idempotency_key: _key, ...hashed } = args;   // the hash of what was sent, so a reuse with other text is caught
     const argsSha = await sha256Hex(stableJson(hashed));
     let claim;
     try {
       claim = await this.deps.inbox.claimRequest({
         inbox_id: key, kind: writeKind(tool) ?? "unknown", tool: tool.name, market: String(args.market), arguments: stored,
         preview, channel: ctx.channel, submitted_by: ctx.actor, agent: agent.agent, command_id: id,
-        submitted_at: now.toISOString(), args_sha256: argsSha,
+        submitted_at: now.toISOString(), args_sha256: argsSha, ...slackThread(ctx, opts),
       }, { sinceIso: utcDayStart(now), limit: agent.daily_write_budget });
     } catch {
       return this.finish(ctx, now, { ...base, result: "failed", code: null,

@@ -5,6 +5,9 @@ export interface SlackApi {
   viewsOpen(triggerId: string, view: unknown): Promise<boolean>;
   viewsUpdate(viewId: string, view: unknown): Promise<boolean>;
   respond(responseUrl: string, body: unknown): Promise<boolean>;
+  /** Posts a message; returns its ts, or null when Slack did not take it. */
+  postMessage(channel: string, text: string): Promise<string | null>;
+  updateMessage(channel: string, ts: string, text: string): Promise<boolean>;
 }
 
 export function isSlackResponseUrl(url: string): boolean {
@@ -26,14 +29,28 @@ export class SlackWebApi implements SlackApi {
   }
 
   private async call(method: string, body: unknown): Promise<boolean> {
-    if (!this.botToken) return false;
+    return (await this.callFor(method, body)) !== null;
+  }
+
+  /** The parsed answer of a Web API call when Slack says ok, else null. */
+  private async callFor(method: string, body: unknown): Promise<Record<string, unknown> | null> {
+    if (!this.botToken) return null;
     const response = await this.fetcher(`https://slack.com/api/${method}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.botToken}`, "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify(body),
     });
-    const parsed = (await response.json().catch(() => null)) as { ok?: boolean } | null;
-    return response.ok && parsed?.ok === true;
+    const parsed = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    return response.ok && parsed?.ok === true ? parsed : null;
+  }
+
+  async postMessage(channel: string, text: string): Promise<string | null> {
+    const answer = await this.callFor("chat.postMessage", { channel, text, unfurl_links: false, unfurl_media: false });
+    return typeof answer?.ts === "string" ? answer.ts : null;
+  }
+
+  updateMessage(channel: string, ts: string, text: string): Promise<boolean> {
+    return this.call("chat.update", { channel, ts, text });
   }
 
   viewsOpen(triggerId: string, view: unknown): Promise<boolean> {

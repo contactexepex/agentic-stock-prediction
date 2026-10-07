@@ -141,6 +141,46 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Planned, not built: the API under `/api/v1` (WS2) and the Next.js app on
   Vercel (WS3) reading only `rm`; contract in `api/openapi.yaml` (checked by `tests/test_openapi.py`).
+- Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
+  example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
+  `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
+  `horizons: [1, 2, 3, 4, 5]` (N+k = sell at the close of the k-th session after the entry session D), `ai_horizons`
+  and the 8 rule strategies, 3 baselines and 4 AI traders, each differing from its `compared_to` in one parameter.
+  The new append-only kinds are in `core/schema_lab.py` (`strategy_predictions`, `strategy_abstentions`,
+  `paper_trades_settled`, `head_to_head_picks`, `trade_reasons_ai`, `trade_checks`, `eod_analyses`,
+  `research_reviews`, `news_impact`) and `core/schema_lifecycle.py` (`watchlist_events`, `command_log`); B2's
+  `cost_views` (`core/schema_b2.py`) is documented in the catalogue. Interfaces in `marketbrief/contracts/`:
+  `protocol` (F1, delegates to `marketbrief/lab/protocol.py`), `watchlist` (delegates to `marketbrief/lifecycle/`),
+  `horizons` (per-horizon score and range records, B10) and `strategies` (the registry's allowed values). Governed
+  tools per channel: `mcp/tools.yaml`. A field the pages need and the catalogue lacks is a data request to W1.
+- Company lifecycle (F8, B1; docs/ws/b1.md; code `marketbrief/lifecycle/`, settings `config/lifecycle.yaml`): the
+  watchlist is data. `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox`
+  validates and appends `data/<market>/watchlist_events/` (every command also gets a `command_log` row; delete needs
+  `--confirm <ticker>` and is never allowed from Slack). `load_market` rebuilds the company lists from the events as of
+  the run's clock (MB_NOW-aware): `cfg["tickers"]` = every collected company (active and inactive, never deleted;
+  collectors keep reading it), `cfg["sectors"]` rebuilt, `cfg["active_tickers"]` = active only; code that predicts or
+  displays uses `lifecycle.loader.active_tickers(cfg)` / `active_sectors(cfg)`; replays and new code use
+  `contracts.watchlist.watchlist(market, as_of, state)`. An event counts once both effective_from and recorded_at have
+  passed, except the seed's add events (channel `seed`, the 40 config companies, effective from the start of stored
+  history), which restate the config list and count from effective_from. Without events the config's `tickers:` act
+  as adds. Add runs the deterministic onboarding (identifiers from NSE's equity list or SEC's ticker/exchange file plus
+  Yahoo; no ETFs, BSE-only or unknown symbols; sector from `sector_rules`; backfill of prices from the first stored day,
+  15 years of daily history into the long-history cache `work/model_history/`, news, filings or announcements; the
+  candidate's collect gate) before its event is appended.
+  `.github/workflows/onboard.yml` imports the MotherDuck inbox (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
+- AI traders, EOD analyst, research director (B3, docs/SPEC.md F4 and F6, notes `docs/ws/b3.md`; code
+  `marketbrief/traders/`, run as `PYTHONPATH=scripts python -m marketbrief.traders <command>`). Four traders
+  (`.claude/agents/trader-news-results.md`, `trader-pattern-mood.md`, `trader-combined.md`, and `forecaster.md` as
+  `ai.combined.opus.v1`) each read only `work/traders/<id>.md` (`prepare`) and predict N+1, N+3 and N+5 or abstain.
+  Each agent file's `yaml trader` block holds its prompt_version, kill switch (`enabled`) and budget. `add` is the gate
+  (shared with prediction_rules and the forecast-v11 anchor, which binds only the combined traders; made_at of a
+  clockless trader = its file's write time, capped at the gate's clock). It allows one retry, then
+  `strategy_abstentions` (gate_failed, timeout 15 minutes before the open, killed, blocked_quality, earnings_window,
+  abstained). Post-close (`routine/POSTCLOSE_PROMPT.md`): B2's `scripts/lab.py settle`, the `eod-analyst` agent and
+  its gate `eod-validate|add` -> `trade_reasons_ai`, `eod_analyses` (market-cost view), B6's close alerts. Weekly
+  (`routine/WEEKLY_PROMPT.md`, Saturday 10:00 local): the `research-director` agent and its gate
+  `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
+  `reports/<market>/research-<week>.md`.
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
   context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
@@ -246,11 +286,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   graph-builder (monthly connection map; every edge cites a public source),
   deviation-explainer (one note per flagged intraday deviation, citing only the check's candidates),
   results-analyst (at most 5 quoted bullets per results release or earnings-call text, never a forecast or
-  advice), and judge
+  advice), the AI traders trader-news-results, trader-pattern-mood and trader-combined (Sonnet; the forecaster is
+  also the Opus combined trader), eod-analyst (Sonnet: at most 60 words per settled head-to-head trade and per
+  biggest win or miss), research-director (Opus: weekly findings and config-diff proposals), and judge
   (independent verifier of code, config, agent-instruction and process changes, the monthly
   graph-builder edges and the weekly spot-check sample).
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, claim
-  checking, the reflector, the deviation explainer, the results-analyst and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
+  checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
+  the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one per market, every 4 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
@@ -270,6 +313,18 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   numbers, enums, no prediction words) -> `intraday_explanations/`. Views `intraday_checks_latest`,
   `intraday_deviations`, `intraday_today`, `intraday_explanation_close`; `intraday/outcomes.py` pairs each note with
   the close (held / reversed / faded); `intraday/payload.py` is the cockpit's read model.
+- Slack notifications (B6, SPEC F9; `scripts/alerts.py`, code `marketbrief/alerts/`, notes `docs/ws/b6.md`): one
+  thread per market per day in #market-brief: `morning` (top 5 by agreement at N+1 with the strongest other horizon,
+  the day's head-to-head picks and whether each is viable at the owner's cost: expected gain after your cost > 0),
+  `intraday` (B9's `intraday_alerts_feed`: new flagged open trades and material news), `close` (rule vs AI, every
+  head-to-head trade, the 10 biggest wins and losses, net after market and your costs from B2's `cost_views`) and
+  `corrections` (a reply per trade re-settled after its close post, 30 days); `weekly` (the research review as its
+  own post) and `onboarding` (a reply to the command that asked; `post_onboarding_confirmation`); `post_brief`
+  puts `notify_slack.py`'s brief into the day's thread (wired in Wave 5). Every read as of the clock (MB_NOW-aware),
+  every signal labelled Paper, never advice. Each posted part is recorded in `data/<market>/slack_posts/` (kind
+  `slack_posts`), so reruns never double-post and later posts find the day's thread; `--dry-run` writes to
+  `work/alerts_dryrun/<market>/` and never posts. Token only from `SLACK_BOT_TOKEN` (without it, unthreaded
+  messages through `SLACK_WEBHOOK_URL`); neither is ever printed.
 - Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
   `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
   for the files it moves (ruff in `requirements-dev.txt`, dev and CI only) and shrinks the size
@@ -325,7 +380,9 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   tests go in `SLOW` in `tests/conftest.py`.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
-  for the deviation-explainer's notes by `scripts/intraday_check.py validate`, not by the judge: one retry (the run is time-boxed), then the failed
+  for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by
+  `python -m marketbrief.traders add`, for the EOD analyst by `eod-validate`, for the research director by
+  `director-validate`, not by the judge: one retry (the run is time-boxed), then the failed
   output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's
   `data_quality`. The judge still checks the monthly graph-builder edges, and once a week
   (`scripts/spotcheck.py --if-due`) a deterministic sample of the past week's output (2 forecasts
@@ -360,6 +417,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   confidence by at least 0.05 (at most 0.85).
 - No new call for a ticker with indicator quality `BLOCKED`, or with earnings within 1 day
   (`days_to_earnings` <= 1). Lower confidence in `EVENT_HEAVY` and `UNSTABLE` regimes.
+  No call for a company that is not active (`cfg["active_tickers"]`: inactive or deleted companies are never
+  predicted or traded; their open paper trades still settle).
 - Price ranges are computed by `scripts/ranges.py`, never by hand. The forecaster may only
   widen a range (`range_widen` 0-0.5), never narrow it.
 - Calibrate against the track record: if a confidence band hits less often than its stated

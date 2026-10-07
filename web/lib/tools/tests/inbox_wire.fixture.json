@@ -16,7 +16,9 @@
     "agent": "slack-gateway",
     "command_id": "cmd-20261007T100000Z-f779a45b",
     "submitted_at": "2026-10-07T10:00:00.000Z",
-    "args_sha256": "bc5e067a612eea4cff942dddd47b01ed36d9ad07ece586e4e6d5dca9ad4feef2"
+    "args_sha256": "bc5e067a612eea4cff942dddd47b01ed36d9ad07ece586e4e6d5dca9ad4feef2",
+    "slack_channel": "C0C6REB7QS2",
+    "slack_ts": "1791400000.000101"
   },
   {
     "inbox_id": "wire-amount-aapl-01",
@@ -35,7 +37,9 @@
     "agent": "claude-app",
     "command_id": "cmd-20261007T100000Z-9a83843f",
     "submitted_at": "2026-10-07T10:00:00.000Z",
-    "args_sha256": "7e17b3f7d7725b587d175a68647705d60bad5a41aad295d9f79042ce6b34a8ec"
+    "args_sha256": "7e17b3f7d7725b587d175a68647705d60bad5a41aad295d9f79042ce6b34a8ec",
+    "slack_channel": null,
+    "slack_ts": null
   },
   {
     "inbox_id": "wire-add-msft-01",
@@ -65,7 +69,9 @@
     "agent": "slack-gateway",
     "command_id": "cmd-20261007T100000Z-04ac2be2",
     "submitted_at": "2026-10-07T10:00:00.000Z",
-    "args_sha256": "59f746c77c46153530ee80898bc4b1f458e0bf274196adbb96f12cafea8fd863"
+    "args_sha256": "59f746c77c46153530ee80898bc4b1f458e0bf274196adbb96f12cafea8fd863",
+    "slack_channel": "C0C6REB7QS2",
+    "slack_ts": "1791400000.000102"
   },
   {
     "inbox_id": "wire-trade-aapl-01",
@@ -87,6 +93,8 @@
     "agent": "claude-app",
     "command_id": "cmd-20261007T100000Z-453719c8",
     "submitted_at": "2026-10-07T10:00:00.000Z",
-    "args_sha256": "58425b06fbb00d469d90e504ad327b268dc3dd5ab0df4f7966ef19d46385895f"
+    "args_sha256": "58425b06fbb00d469d90e504ad327b268dc3dd5ab0df4f7966ef19d46385895f",
+    "slack_channel": null,
+    "slack_ts": null
   }
 ]

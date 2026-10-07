@@ -6,6 +6,7 @@ import { SLACK_CHANNEL_ID } from "../constants.ts";
 import { MAX_AGE_SECONDS, verifiedBody, verifySlackRequest } from "../../../app/slack/_lib/verify.ts";
 import { handleCommand } from "../../../app/slack/_lib/commands.ts";
 import { handleInteraction } from "../../../app/slack/_lib/interactions.ts";
+import { slackContext } from "../identity.ts";
 
 const secret = SECRETS.SLACK_SIGNING_SECRET;
 async function sign(body: string, timestamp: number) {
@@ -67,6 +68,7 @@ test("help and a form Slack fails to open are logged too (issue #82)", async () 
   const reply = await handleCommand(commandParams("/trade", ""), s.deps);
   assert.match(JSON.stringify(reply.body), /could not be opened/);
   assert.equal(s.inbox.commands.at(-1)?.result, "failed");
+  assert.equal(s.inbox.commands.at(-1)?.message, "trade form not opened (Slack refused)");
   assert.equal(s.inbox.commands.at(-1)?.tool, "add_paper_trade");
   assert.equal(s.notifier.reports.at(-1)?.result, "failed");
   assert.equal(s.inbox.requests.length, 0);
@@ -192,4 +194,65 @@ test("/ask answers coming soon, is logged, and writes nothing", async () => {
   assert.equal(s.inbox.commands.at(-1)?.tool, "explain");
   assert.equal(s.inbox.commands.at(-1)?.result, "accepted");
   assert.equal(s.inbox.requests.length, 0);
+});
+
+test("an unknown slash command is refused, logged and reported (issue #109)", async () => {
+  const s = slackRig();
+  const reply = await handleCommand(commandParams("/frobnicate", "anything"), s.deps);
+  assert.match(JSON.stringify(reply.body), /\/company add/);
+  assert.equal(s.inbox.commands.at(-1)?.result, "refused");
+  assert.equal(s.inbox.commands.at(-1)?.message, "Unknown command");
+  assert.equal(s.notifier.reports.at(-1)?.refusal_code, "validation_failed");
+  assert.equal(s.inbox.requests.length, 0);
+});
+
+test("Confirm posts a visible request in #market-brief and stores its channel and ts for B6's onboarding reply", async () => {
+  const s = slackRig();
+  const reply = await handleCommand(commandParams("/company", "deactivate us AAPL"), s.deps);
+  const value = (reply.body as { blocks: { elements?: { action_id: string; value: string }[] }[] }).blocks[1]
+    .elements!.find((element) => element.action_id === "mb_confirm")!.value;
+  const click = { type: "block_actions", user: { id: USER }, channel: { id: CHANNEL }, response_url: "https://hooks.slack.com/actions/T/1/x",
+    actions: [{ action_id: "mb_confirm", value }] };
+  await handleInteraction(click as never, s.deps);
+  await s.settle();
+  assert.equal(s.slack.posts.length, 1);
+  assert.equal(s.slack.posts[0].channel, CHANNEL);
+  assert.match(s.slack.posts[0].text, /^:inbox_tray: <@U07ABCD123> asked: Deactivate AAPL \(US\)/);
+  assert.equal(s.inbox.requests[0].slack_channel, CHANNEL);
+  assert.equal(s.inbox.requests[0].slack_ts, s.slack.posts[0].ts);
+  assert.equal(s.slack.edits.length, 0, "a pending request leaves the message as posted");
+  await handleInteraction(click as never, s.deps);   // second click: the same key is a duplicate
+  await s.settle();
+  assert.equal(s.slack.posts.length, 2);
+  assert.match(s.slack.edits.at(-1)?.text ?? "", /Already received/);
+  assert.equal(s.slack.edits.at(-1)?.ts, s.slack.posts[1].ts);
+});
+
+test("a refused confirm edits its request message; without the message the request is still sent", async () => {
+  const s = slackRig();
+  s.inbox.controls.push({ agent: "slack-gateway", enabled: false });
+  const value = JSON.stringify({ tool: "reactivate_company", args: { market: "us", ticker: "AAPL", idempotency_key: "slk-refused-0001" } });
+  const click = { type: "block_actions", user: { id: USER }, channel: { id: CHANNEL }, response_url: "https://hooks.slack.com/actions/T/1/x",
+    actions: [{ action_id: "mb_confirm", value }] };
+  await handleInteraction(click as never, s.deps);
+  await s.settle();
+  assert.match(s.slack.edits.at(-1)?.text ?? "", /Not done: The slack-gateway agent is switched off/);
+  const t = slackRig();
+  t.slack.postFails = true;
+  await handleInteraction({ ...click, actions: [{ action_id: "mb_confirm", value: value.replace("slk-refused-0001", "slk-nopost-0001") }] } as never, t.deps);
+  await t.settle();
+  assert.equal(t.inbox.requests.length, 1);
+  assert.deepEqual([t.inbox.requests[0].slack_channel, t.inbox.requests[0].slack_ts], [null, null]);
+});
+
+test("names from the symbol search cannot ping or link in the request message", async () => {
+  const s = slackRig();
+  s.resolver.answers.set("us:EVIL", { ok: true, preview: { market: "us", symbol: "EVIL", name: "<!channel> <https://x.example|Evil>",
+    exchange: "NYSE", sector: null, yahoo: "EVIL", nse_symbol: null, cik: null, amount: 1000, amount_is_default: true, currency: "USD" } });
+  const preview = await s.layer.preview(slackContext(USER), "add_company", { market: "us", symbol: "EVIL", idempotency_key: "slk-evil-00001" });
+  await handleInteraction({ type: "view_submission", user: { id: USER }, view: { id: "V1", callback_id: "mb_company_confirm",
+    private_metadata: JSON.stringify({ tool: "add_company", args: preview.args, preview: preview.preview }), state: { values: {} } } } as never, s.deps);
+  await s.settle();
+  assert.doesNotMatch(s.slack.posts[0].text, /<!channel>|<https/);
+  assert.match(s.slack.posts[0].text, /&lt;!channel&gt;/);
 });
