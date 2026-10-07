@@ -255,7 +255,11 @@ host only (as `neo4j_sync` does).
 |---|---|---|
 | `MOTHERDUCK_TOKEN` | cloud routine sessions | read-write: sync, inbox import |
 | `MOTHERDUCK_READ_TOKEN` | Vercel (server env, not `NEXT_PUBLIC_`) | read-only where available |
-| `MOTHERDUCK_INBOX_TOKEN` (planned) | Vercel, only once the form ships | writes `inbox` (open question 3) |
+| `MOTHERDUCK_INBOX_TOKEN` | Vercel (both projects), cloud sessions, GitHub Actions secret | writes `market_brief_inbox` only (separate service account; `mcp/inbox.sql`) |
+| `GITHUB_DISPATCH_TOKEN` | Vercel | fine-grained, this repo only, Actions read and write: dispatches `onboard.yml` |
+| `SLACK_SIGNING_SECRET` | Vercel gateway | Slack request verification (`SLACK_BOT_TOKEN` unchanged) |
+| `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `MCP_ALLOWED_GITHUB_LOGIN`, `MB_OWNER_GITHUB_ID`, `SESSION_SECRET` | Vercel gateway | `/mcp` sign-in (GitHub OAuth, the owner's login and numeric id) and its signed tokens |
+| `MB_GATEWAY` | Vercel gateway | gateway mode (`market-brief-gateway`); unset in `market-brief-app` |
 | `REVALIDATE_SECRET` | both | the revalidate endpoint |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | cloud sessions | pass Vercel Authentication for the revalidate call |
 | `SLACK_*`, `NEO4J_*` | unchanged | unchanged |
@@ -301,6 +305,10 @@ import) is bounded to entries since the last run and visible as pending.
      and a Slack message to the owner; nothing is retried by the agent.
   6. Evals plus a prompt-injection suite (instructions hidden in news titles, filings, Slack text)
      run offline in CI; a release needs them green.
+
+  Built in Wave 2 by session B5 (docs/ws/b5.md): the agent files `mcp/agents/*.yaml`, the policy enforcement point
+  `web/lib/tools/executor.ts`, the injection suite `web/lib/tools/tests/injection.test.ts` (CI `web-tests.yml`).
+  The remote MCP endpoint is `/mcp` on the gateway deployment with GitHub OAuth (decision 22).
 - No tool can place, route or simulate a broker order; paper trades are records only.
 
 ## 11. Failure modes
