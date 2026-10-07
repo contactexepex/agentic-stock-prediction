@@ -56,8 +56,13 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 30 | Home picks | Agreement ranking: companies ranked by how many strategies would buy them, then by average probability. Clicking a company opens a stock strategy page with the agreement ranking, the best strategy, and all strategies ranked by profit after costs. |
 | 31 | Pre-open run | Starts 30 minutes earlier: India 07:40 IST, US 07:45 New York time (schedules changed 2026-10-07). |
 | 32 | Frontend order | This spec is merged first; the owner's design sessions then update the page designs from it; the frontend stage builds from those designs. |
+| 33 | Rule changes | Both approved: companies as validated data records (F8.1), and the prediction-rule changes for strategies (F2.6). |
+| 34 | Orchestrator defaults | Accepted: money-view budget ₹5,00,000 / $5,000 per strategy (at most 5 trades a day); weekly research run Saturday 10:00 local; chat history kept 90 days; the Slack add form asks market, symbol and optional amount only. |
+| 35 | Help page | Kept as page 12. |
+| 36 | Old commit 85416b0 | Kept with a git tag (the owner creates it on GitHub; this session may push branches but not tags). |
 
-Proposals made by the orchestrator (not owner decisions; the owner may change any of them): every
+Proposals made by the orchestrator that are not covered by decision 34 (the owner may change any of
+them): every
 command logged with who sent it; one Slack thread per market per day plus a weekly post; design widths
 390 px and 1280 px; money-view budget ₹5,00,000 / $5,000; the post-close, weekly and intraday times of
 section 7 (the intraday times are WS5's existing schedules); the Opus trader being the extended forecaster; chat logs kept 90 days; no bulk-storage move
@@ -380,9 +385,9 @@ a dedicated workspace with that limit) plus a code-side daily budget (about $0.6
 over budget the panel says so. Conversations are kept 90 days in MotherDuck schema `app` (operational
 log, not a fact store).
 
-### F12 Dashboard: 11 pages (section 6)
+### F12 Dashboard: 12 pages (section 6)
 
-The 10 pages of decision 17 plus the stock strategy page of decision 30.
+The 10 pages of decision 17, the stock strategy page of decision 30 and the Help page of decision 35.
 
 ## 4. Data: new kinds and read models
 
@@ -468,6 +473,7 @@ service is down, and works with keyboard and without colour alone.
 | 9 | News | news by company with verification status and impact category; news-impact table | open company | `rm.news`, `rm.review` |
 | 10 | Companies | active, inactive (news, price, Reactivate), pending requests; amounts | add, deactivate, reactivate, amount, delete (typed confirmation) | `rm.companies` |
 | 11 | Assistant | chat with sources and as-of times; also a side panel on every page | ask | `POST /api/assistant` |
+| 12 | Help | how to read the cockpit in plain words: signals, the Paper label, strategies, scores, the go-live bar; linked from every page | - | static content |
 
 Stock strategies page, guard against luck: a per-company "best strategy" over a few weeks is mostly
 noise (a handful of trades). The page therefore shows the trade count and the luck-test interval next
@@ -550,7 +556,7 @@ classified collect, predict or display, with each predict or display call site a
 | B4 API | the read models of section 4 (payload functions from B1-B3 via A's interfaces, stubbed until merged) and every route file under `web/app/api/v1/` (write handlers are thin calls into B5's tool layer), caching, revalidate | `web/app/api/v1/`, `web/lib/data/`, `marketbrief/warehouse/` (new `rm_*` modules and the call sites Stage A assigns to B4) | A |
 | B5 Tools and channels | the tool layer, the gateway mode (middleware), Slack commands, form and confirm step, `/mcp` with GitHub OAuth, inbox writes, workflow dispatch, injection suite | `web/lib/tools/`, `web/app/slack/`, `web/app/mcp/`, `web/middleware.ts`, `mcp/` except `tools.yaml` | A |
 | B6 Notifications | F9 Slack threads (morning, alerts, close, weekly) | `marketbrief/alerts/`, `scripts/alerts.py` | A |
-| B7 Frontend | the 11 pages from the owner's updated designs, against A's contract with fixture payloads | `web/` except the paths owned by B4, B5 and B8 | A + page designs |
+| B7 Frontend | the 12 pages from the owner's updated designs, against A's contract with fixture payloads | `web/` except the paths owned by B4, B5 and B8 | A + page designs |
 | B8 Assistant | F11 chat and Slack `/ask` with budget | `web/app/api/assistant/`, `web/lib/assistant/` | A |
 | B9 Monitoring | F5: intraday checks of every open paper trade, the extended explainer input, intraday alerts feed for B6 | `marketbrief/intraday/`, `scripts/intraday_check.py`, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | A |
 
