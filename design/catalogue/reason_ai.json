@@ -1,0 +1,397 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "ai_reason",
+  "kind": "trade_reasons_ai",
+  "catalogue": "docs/DATA_CATALOGUE.md#ai-reason",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "tra:h2h:highest_probability:rule.model_news.v1:2026-09-29-RELIANCE-3d",
+      "trade_id": "h2h:highest_probability:rule.model_news.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "h2h:highest_probability:rule.model_news.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "head_to_head",
+      "rank": null,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7781203 added about +2.84 points. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "h2h:highest_probability:rule.model_news.v1:2026-09-29-RELIANCE-3d",
+        "nse-ann-7781203"
+      ],
+      "reason_codes": [
+        "sector_drag",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:h2h:highest_probability:ai.combined.opus.v1:2026-09-29-RELIANCE-3d",
+      "trade_id": "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "ai.combined.opus.v1",
+      "session_date": "2026-10-06",
+      "kind": "head_to_head",
+      "rank": null,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7781203 added about +2.84 points. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-RELIANCE-3d",
+        "nse-ann-7781203"
+      ],
+      "reason_codes": [
+        "sector_drag",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:rule.model_news.v1:2026-09-29-RELIANCE-3d:biggest_win",
+      "trade_id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 1,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7781203 added about +2.84 points. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "acc:rule.model_news.v1:2026-09-29-RELIANCE-3d",
+        "nse-ann-7781203"
+      ],
+      "reason_codes": [
+        "sector_drag",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:base.always_up.v1:2026-09-29-RELIANCE-3d:biggest_win",
+      "trade_id": "acc:base.always_up.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "acc:base.always_up.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "base.always_up.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 2,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "acc:base.always_up.v1:2026-09-29-RELIANCE-3d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:base.model_only.v1:2026-09-29-RELIANCE-3d:biggest_win",
+      "trade_id": "acc:base.model_only.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "acc:base.model_only.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "base.model_only.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 3,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "acc:base.model_only.v1:2026-09-29-RELIANCE-3d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:ai.news_results.sonnet.v1:2026-09-29-RELIANCE-3d:biggest_win",
+      "trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "acc:ai.news_results.sonnet.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "ai.news_results.sonnet.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 4,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7781203 added about +2.84 points. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "acc:ai.news_results.sonnet.v1:2026-09-29-RELIANCE-3d",
+        "nse-ann-7781203"
+      ],
+      "reason_codes": [
+        "sector_drag",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:ai.combined.opus.v1:2026-09-29-RELIANCE-3d:biggest_win",
+      "trade_id": "acc:ai.combined.opus.v1:2026-09-29-RELIANCE-3d",
+      "settlement_id": "acc:ai.combined.opus.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "RELIANCE",
+      "strategy_id": "ai.combined.opus.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 5,
+      "text": "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7781203 added about +2.84 points. Net +2.16% after costs; target reached.",
+      "cited_ids": [
+        "acc:ai.combined.opus.v1:2026-09-29-RELIANCE-3d",
+        "nse-ann-7781203"
+      ],
+      "reason_codes": [
+        "sector_drag",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:rule.model_news.v1:2026-09-29-HDFCBANK-3d:biggest_miss",
+      "trade_id": "acc:rule.model_news.v1:2026-09-29-HDFCBANK-3d",
+      "settlement_id": "acc:rule.model_news.v1:2026-09-29-HDFCBANK-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "HDFCBANK",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_miss",
+      "rank": 1,
+      "text": "HDFCBANK moved -0.01% from entry: the market explains +0.60 points and the sector +1.27. Net -0.86% after costs; target reached.",
+      "cited_ids": [
+        "acc:rule.model_news.v1:2026-09-29-HDFCBANK-3d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:base.always_up.v1:2026-09-29-HDFCBANK-3d:biggest_miss",
+      "trade_id": "acc:base.always_up.v1:2026-09-29-HDFCBANK-3d",
+      "settlement_id": "acc:base.always_up.v1:2026-09-29-HDFCBANK-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "HDFCBANK",
+      "strategy_id": "base.always_up.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_miss",
+      "rank": 2,
+      "text": "HDFCBANK moved -0.01% from entry: the market explains +0.60 points and the sector +1.27. Net -0.86% after costs; target reached.",
+      "cited_ids": [
+        "acc:base.always_up.v1:2026-09-29-HDFCBANK-3d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:ai.news_results.sonnet.v1:2026-09-29-HDFCBANK-3d:biggest_miss",
+      "trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-HDFCBANK-3d",
+      "settlement_id": "acc:ai.news_results.sonnet.v1:2026-09-29-HDFCBANK-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "HDFCBANK",
+      "strategy_id": "ai.news_results.sonnet.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_miss",
+      "rank": 3,
+      "text": "HDFCBANK moved -0.01% from entry: the market explains +0.60 points and the sector +1.27. Net -0.86% after costs; target reached.",
+      "cited_ids": [
+        "acc:ai.news_results.sonnet.v1:2026-09-29-HDFCBANK-3d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:acc:ai.combined.opus.v1:2026-09-29-HDFCBANK-3d:biggest_miss",
+      "trade_id": "acc:ai.combined.opus.v1:2026-09-29-HDFCBANK-3d",
+      "settlement_id": "acc:ai.combined.opus.v1:2026-09-29-HDFCBANK-3d@20261006T121500Z",
+      "market": "india",
+      "ticker": "HDFCBANK",
+      "strategy_id": "ai.combined.opus.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_miss",
+      "rank": 4,
+      "text": "HDFCBANK moved -0.01% from entry: the market explains +0.60 points and the sector +1.27. Net -0.86% after costs; target reached.",
+      "cited_ids": [
+        "acc:ai.combined.opus.v1:2026-09-29-HDFCBANK-3d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T12:40:00Z"
+    },
+    {
+      "id": "tra:h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d",
+      "trade_id": "h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d",
+      "settlement_id": "h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "NVDA",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "head_to_head",
+      "rank": null,
+      "text": "NVDA moved +4.35% from entry: the market explains +3.09 points and the sector +1.69. Verified news a41c9e07b2d35f18 added about +0.00 points. Net +4.12% after costs; target reached.",
+      "cited_ids": [
+        "h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d",
+        "a41c9e07b2d35f18"
+      ],
+      "reason_codes": [
+        "market_up",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    },
+    {
+      "id": "tra:acc:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
+      "trade_id": "acc:rule.model_news.v1:2026-09-29-NVDA-4d",
+      "settlement_id": "acc:rule.model_news.v1:2026-09-29-NVDA-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "NVDA",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 1,
+      "text": "NVDA moved +4.35% from entry: the market explains +3.09 points and the sector +1.69. Verified news a41c9e07b2d35f18 added about +0.00 points. Net +4.12% after costs; target reached.",
+      "cited_ids": [
+        "acc:rule.model_news.v1:2026-09-29-NVDA-4d",
+        "a41c9e07b2d35f18"
+      ],
+      "reason_codes": [
+        "market_up",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    },
+    {
+      "id": "tra:acc:base.always_up.v1:2026-09-29-NVDA-4d:biggest_win",
+      "trade_id": "acc:base.always_up.v1:2026-09-29-NVDA-4d",
+      "settlement_id": "acc:base.always_up.v1:2026-09-29-NVDA-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "NVDA",
+      "strategy_id": "base.always_up.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 2,
+      "text": "NVDA moved +4.35% from entry: the market explains +3.09 points and the sector +1.69. Net +4.12% after costs; target reached.",
+      "cited_ids": [
+        "acc:base.always_up.v1:2026-09-29-NVDA-4d"
+      ],
+      "reason_codes": [
+        "market_up",
+        "target_reached",
+        "range_missed"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    },
+    {
+      "id": "tra:acc:base.model_only.v1:2026-09-29-NVDA-4d:biggest_win",
+      "trade_id": "acc:base.model_only.v1:2026-09-29-NVDA-4d",
+      "settlement_id": "acc:base.model_only.v1:2026-09-29-NVDA-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "NVDA",
+      "strategy_id": "base.model_only.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 3,
+      "text": "NVDA moved +4.35% from entry: the market explains +3.09 points and the sector +1.69. Net +4.12% after costs; target reached.",
+      "cited_ids": [
+        "acc:base.model_only.v1:2026-09-29-NVDA-4d"
+      ],
+      "reason_codes": [
+        "market_up",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    },
+    {
+      "id": "tra:h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
+      "trade_id": "h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d",
+      "settlement_id": "h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "NVDA",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 4,
+      "text": "NVDA moved +4.35% from entry: the market explains +3.09 points and the sector +1.69. Verified news a41c9e07b2d35f18 added about +0.00 points. Net +4.12% after costs; target reached.",
+      "cited_ids": [
+        "h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d",
+        "a41c9e07b2d35f18"
+      ],
+      "reason_codes": [
+        "market_up",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    },
+    {
+      "id": "tra:acc:rule.model_news.v1:2026-09-29-AAPL-4d:biggest_win",
+      "trade_id": "acc:rule.model_news.v1:2026-09-29-AAPL-4d",
+      "settlement_id": "acc:rule.model_news.v1:2026-09-29-AAPL-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "AAPL",
+      "strategy_id": "rule.model_news.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_win",
+      "rank": 5,
+      "text": "AAPL moved +0.86% from entry: the market explains +1.12 points and the sector +1.69. Net +0.62% after costs; target reached.",
+      "cited_ids": [
+        "acc:rule.model_news.v1:2026-09-29-AAPL-4d"
+      ],
+      "reason_codes": [
+        "company_specific",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    },
+    {
+      "id": "tra:acc:base.always_up.v1:2026-09-29-JPM-4d:biggest_miss",
+      "trade_id": "acc:base.always_up.v1:2026-09-29-JPM-4d",
+      "settlement_id": "acc:base.always_up.v1:2026-09-29-JPM-4d@20261006T221500Z",
+      "market": "us",
+      "ticker": "JPM",
+      "strategy_id": "base.always_up.v1",
+      "session_date": "2026-10-06",
+      "kind": "biggest_miss",
+      "rank": 1,
+      "text": "JPM moved -1.08% from entry: the market explains +1.29 points and the sector -1.61. Net -1.31% after costs; target reached.",
+      "cited_ids": [
+        "acc:base.always_up.v1:2026-09-29-JPM-4d"
+      ],
+      "reason_codes": [
+        "sector_drag",
+        "target_reached"
+      ],
+      "prompt_version": "eod-v1",
+      "created_at": "2026-10-06T22:40:00Z"
+    }
+  ]
+}

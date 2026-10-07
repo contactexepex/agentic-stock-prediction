@@ -13,6 +13,7 @@ from marketbrief.core.schema_filings import (
     SEC_TIMES_SCHEMA,
 )
 from marketbrief.core.schema_intraday import INTRADAY_SCHEMAS  # WS5
+from marketbrief.core.schema_lab import W1_SCHEMAS  # W1
 from marketbrief.core.schema_model import MODEL_SCHEMAS
 from marketbrief.core.schema_portfolio import PORTFOLIO_SCHEMAS  # WS4
 from marketbrief.core.schema_results import RESULTS_SCHEMAS  # WS6
@@ -34,6 +35,7 @@ def build_schemas() -> Schemas:
         **PORTFOLIO_SCHEMAS,  # WS4
         **INTRADAY_SCHEMAS,  # WS5
         **RESULTS_SCHEMAS,  # WS6
+        **W1_SCHEMAS,  # W1
     }
     for kind, (file_format, columns) in RELATION_SCHEMAS.items():
         if kind in schemas:

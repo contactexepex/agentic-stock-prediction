@@ -1,0 +1,96 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "command",
+  "kind": "command_log",
+  "catalogue": "docs/DATA_CATALOGUE.md#command",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "cmd-20261005T135500Z-0c7d5a21",
+      "market": "us",
+      "received_at": "2026-10-05T13:55:00Z",
+      "channel": "slack",
+      "actor": "slack:U07ABCD123",
+      "agent": "slack-gateway",
+      "tool": "add_company",
+      "kind": "write",
+      "arguments": {
+        "market": "us",
+        "symbol": "MSFT"
+      },
+      "idempotency_key": "add-msft-7Hq2",
+      "result": "accepted",
+      "refusal_code": null,
+      "message": "Microsoft (NASDAQ, Tech, CIK 0000789019), $1,000 per trade - confirmed",
+      "record_ids": [
+        "we-us-MSFT-add-20261005T140200Z"
+      ],
+      "budget_left": 19,
+      "completed_at": "2026-10-05T14:02:00Z"
+    },
+    {
+      "id": "cmd-20261005T140500Z-a2c4e6f8",
+      "market": "us",
+      "received_at": "2026-10-05T14:05:00Z",
+      "channel": "slack",
+      "actor": "slack:U07ABCD123",
+      "agent": "slack-gateway",
+      "tool": "add_company",
+      "kind": "write",
+      "arguments": {
+        "market": "us",
+        "symbol": "SPY"
+      },
+      "idempotency_key": "add-spy-1",
+      "result": "refused",
+      "refusal_code": "validation_failed",
+      "message": "SPY is an ETF; only common stocks can be added",
+      "record_ids": [],
+      "budget_left": 18,
+      "completed_at": "2026-10-05T14:05:02Z"
+    },
+    {
+      "id": "cmd-20261006T150000Z-77d0be13",
+      "market": "india",
+      "received_at": "2026-10-06T15:00:00Z",
+      "channel": "claude_app",
+      "actor": "github:owner",
+      "agent": "claude-app",
+      "tool": "get_scoreboard",
+      "kind": "read",
+      "arguments": {
+        "market": "india",
+        "view": "accuracy"
+      },
+      "idempotency_key": null,
+      "result": "accepted",
+      "refusal_code": null,
+      "message": null,
+      "record_ids": [],
+      "budget_left": null,
+      "completed_at": "2026-10-06T15:00:01Z"
+    },
+    {
+      "id": "cmd-20261006T151000Z-3e9f0a77",
+      "market": "us",
+      "received_at": "2026-10-06T15:10:00Z",
+      "channel": "slack",
+      "actor": "slack:U07ABCD123",
+      "agent": "slack-gateway",
+      "tool": "delete_company",
+      "kind": "write",
+      "arguments": {
+        "market": "us",
+        "ticker": "DAL"
+      },
+      "idempotency_key": "del-dal-x",
+      "result": "refused",
+      "refusal_code": "not_allowed_in_channel",
+      "message": "Delete is only available on the dashboard",
+      "record_ids": [],
+      "budget_left": 17,
+      "completed_at": "2026-10-06T15:10:00Z"
+    }
+  ]
+}

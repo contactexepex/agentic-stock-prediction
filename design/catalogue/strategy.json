@@ -1,0 +1,528 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "strategy",
+  "kind": null,
+  "catalogue": "docs/DATA_CATALOGUE.md#strategy",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "rule.model_news.v1",
+      "family": "rule",
+      "name": "Model + news",
+      "description": "The signal model's probability with verified news counted at normal weight. Buys when the model gives at least 55% for a rise. This is the reference the other rule strategies are compared against.",
+      "compared_to": null,
+      "differs_in": null,
+      "parameters": {
+        "signal": "model",
+        "news_weight": 1.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 16,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_half.v1",
+      "family": "rule",
+      "name": "Model + half news",
+      "description": "Like the reference, but news counts half as much. Tests whether news is over-weighted.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "news_weight",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 0.5,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_double.v1",
+      "family": "rule",
+      "name": "Model + double news",
+      "description": "Like the reference, but news counts twice as much. Tests whether news deserves more weight.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "news_weight",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 2.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_confirmed.v1",
+      "family": "rule",
+      "name": "Model + confirmed news only",
+      "description": "Like the reference, but only news confirmed by a filing or by two independent outlets counts; single-source stories are ignored. Tests whether unconfirmed news adds noise.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "news_statuses",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 1.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_high.v1",
+      "family": "rule",
+      "name": "Model + major news only",
+      "description": "Like the reference, but only news rated high materiality counts. Tests whether small news matters.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "news_materiality",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 1.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_global.v1",
+      "family": "rule",
+      "name": "Model + news + global cues",
+      "description": "Like the reference, plus the other markets' overnight moves, currencies, rates and commodities as model inputs. Tests whether global cues help (they showed no edge in the 15-year back-test).",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "cross_market",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 1.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": true,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_calm.v1",
+      "family": "rule",
+      "name": "Model + news, calm markets only",
+      "description": "Like the reference, but makes no trades when the market regime is unstable or event-heavy. Tests whether sitting out turbulent days helps.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "regime_filter",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 1.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": true
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "rule.model_news_strict.v1",
+      "family": "rule",
+      "name": "Model + news, 60% bar",
+      "description": "Like the reference, but buys only when the probability of a rise is at least 60%. Fewer trades; tests whether being pickier pays.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "threshold",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 1.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.6,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "base.always_up.v1",
+      "family": "baseline",
+      "name": "Always buy",
+      "description": "Buys every active company every day at every horizon. Any strategy worth having must beat it after costs.",
+      "compared_to": "base.model_only.v1",
+      "differs_in": "signal",
+      "parameters": {
+        "signal": "always_up",
+        "news_weight": 0.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": null,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 18,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "base.momentum.v1",
+      "family": "baseline",
+      "name": "Follow yesterday",
+      "description": "Buys a company when its last session closed higher than the one before; predicts down otherwise.",
+      "compared_to": "base.model_only.v1",
+      "differs_in": "signal",
+      "parameters": {
+        "signal": "momentum",
+        "news_weight": 0.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": null,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "base.model_only.v1",
+      "family": "baseline",
+      "name": "Model without news",
+      "description": "The signal model alone with news switched off (weight 0). Shows what news adds to the reference.",
+      "compared_to": "rule.model_news.v1",
+      "differs_in": "news_weight",
+      "parameters": {
+        "signal": "model",
+        "news_weight": 0.0,
+        "news_statuses": [
+          "confirmed_primary",
+          "corroborated",
+          "single_source"
+        ],
+        "news_materiality": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "cross_market": false,
+        "regime_filter": false
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 6,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "ai.news_results.sonnet.v1",
+      "family": "ai",
+      "name": "AI news & results (Sonnet)",
+      "description": "A Sonnet trader that reads the company's news with its verification status, results digests, filings and events, without the model score. Decides on what happened to the company.",
+      "compared_to": null,
+      "differs_in": null,
+      "parameters": {
+        "model": "sonnet",
+        "sees_model_score": false,
+        "inputs": [
+          "news",
+          "results",
+          "filings",
+          "events"
+        ]
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        3,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 10,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "ai.pattern_mood.sonnet.v1",
+      "family": "ai",
+      "name": "AI price pattern & mood (Sonnet)",
+      "description": "A Sonnet trader that reads prices, indicators, the market regime, global cues and sector moves, without news or the model score. Decides on how the stock and the market behave.",
+      "compared_to": null,
+      "differs_in": null,
+      "parameters": {
+        "model": "sonnet",
+        "sees_model_score": false,
+        "inputs": [
+          "prices",
+          "indicators",
+          "regime",
+          "cues",
+          "sectors"
+        ]
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        3,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "ai.combined.sonnet.v1",
+      "family": "ai",
+      "name": "AI combined (Sonnet)",
+      "description": "A Sonnet trader that sees everything the other two see plus the signal model's score and explanation; it may move the model's probability by at most 10 points, with a reason.",
+      "compared_to": null,
+      "differs_in": null,
+      "parameters": {
+        "model": "sonnet",
+        "sees_model_score": true,
+        "inputs": [
+          "news",
+          "results",
+          "filings",
+          "events",
+          "prices",
+          "indicators",
+          "regime",
+          "cues",
+          "sectors",
+          "model_score"
+        ]
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        3,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 0,
+      "status_note": "not live yet: switched on in Wave 5"
+    },
+    {
+      "id": "ai.combined.opus.v1",
+      "family": "ai",
+      "name": "AI combined (Opus)",
+      "description": "The same as the combined Sonnet trader on the stronger Opus model (the existing forecaster, extended). Tests whether the stronger model helps.",
+      "compared_to": "ai.combined.sonnet.v1",
+      "differs_in": "model",
+      "parameters": {
+        "model": "opus",
+        "sees_model_score": true,
+        "inputs": [
+          "news",
+          "results",
+          "filings",
+          "events",
+          "prices",
+          "indicators",
+          "regime",
+          "cues",
+          "sectors",
+          "model_score"
+        ]
+      },
+      "threshold": 0.55,
+      "horizons": [
+        1,
+        3,
+        5
+      ],
+      "live_from": null,
+      "live": false,
+      "settled_trades": 10,
+      "status_note": "not live yet: switched on in Wave 5"
+    }
+  ]
+}

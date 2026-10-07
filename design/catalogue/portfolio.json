@@ -1,0 +1,89 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "portfolio",
+  "kind": null,
+  "catalogue": "docs/DATA_CATALOGUE.md#portfolio",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "owner_trades": [
+        {
+          "id": "pt-us-20260930-AAPL-1",
+          "market": "us",
+          "ticker": "AAPL",
+          "side": "buy",
+          "quantity": 3.0,
+          "price": 330.8,
+          "price_basis": "open",
+          "trade_date": "2026-09-30",
+          "source": "dashboard",
+          "idempotency_key": "own-aapl-0930",
+          "entered_at": "2026-09-30T20:30:00Z",
+          "note": "own test",
+          "supersedes": null
+        },
+        {
+          "id": "pt-india-20260930-RELIANCE-1",
+          "market": "india",
+          "ticker": "RELIANCE",
+          "side": "buy",
+          "quantity": 50.0,
+          "price": 1182.0,
+          "price_basis": "open",
+          "trade_date": "2026-09-30",
+          "source": "slack",
+          "idempotency_key": "own-rel-0930",
+          "entered_at": "2026-09-30T11:00:00Z",
+          "note": null,
+          "supersedes": null
+        }
+      ],
+      "positions": [
+        {
+          "market": "us",
+          "ticker": "AAPL",
+          "quantity": 3.0,
+          "avg_price": 330.8,
+          "last_close": 333.63,
+          "last_close_date": "2026-10-06",
+          "currency": "USD",
+          "cost": 992.4,
+          "value": 1000.89,
+          "pnl": 8.49,
+          "pnl_pct": 0.86,
+          "eur_view": {
+            "eurusd_at_buy": 1.165,
+            "eurusd_now": 1.17,
+            "fx_fee_rate": 0.0025,
+            "cost_eur": 853.98,
+            "value_eur": 855.46,
+            "pnl_eur": 1.49,
+            "fx_effect_eur": -3.67,
+            "note": "rate change and BUX FX fee included; fee provisional"
+          }
+        },
+        {
+          "market": "india",
+          "ticker": "RELIANCE",
+          "quantity": 50.0,
+          "avg_price": 1182.0,
+          "last_close": 1218.0,
+          "last_close_date": "2026-10-06",
+          "currency": "INR",
+          "cost": 59100.0,
+          "value": 60900.0,
+          "pnl": 1800.0,
+          "pnl_pct": 3.05,
+          "eur_view": null
+        }
+      ],
+      "default_amounts": {
+        "india": 100000.0,
+        "us": 1000.0
+      },
+      "paper": true,
+      "head_to_head_portfolios": "see scoreboard_row.json rows with view head_to_head (per family and pick rule)"
+    }
+  ]
+}

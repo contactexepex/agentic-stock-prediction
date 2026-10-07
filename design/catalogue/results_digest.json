@@ -1,0 +1,86 @@
+{
+  "_example": true,
+  "_note": "EXAMPLE DATA for page design only. Prices and index moves are stored bars; predictions, trades, reasons, news, commands and portfolio entries are invented and consistent with each other. Not a forecast, not advice.",
+  "entity": "results_digest",
+  "kind": "results_digests",
+  "catalogue": "docs/DATA_CATALOGUE.md#results-digest",
+  "as_of": "2026-10-07T12:00:00Z",
+  "records": [
+    {
+      "id": "JPM-results-2026-07-14",
+      "release_kind": "results",
+      "ticker": "JPM",
+      "release_at": "2026-07-14T10:45:12Z",
+      "release_date": "2026-07-14",
+      "release_timing": "before_open",
+      "release_time_basis": "sec_acceptance",
+      "period_end": "2026-06-30",
+      "fiscal_label": "Q2 2026",
+      "basis": "consolidated",
+      "currency": "USD",
+      "status": "ok",
+      "numbers_status": "ok",
+      "numbers_as_of": "2026-08-04T20:15:00Z",
+      "numbers": {
+        "revenue": 46100000000.0,
+        "net_profit": 15200000000.0,
+        "eps_diluted": 5.31,
+        "net_margin_pct": 32.97,
+        "revenue_yoy_pct": 6.42,
+        "net_profit_yoy_pct": 4.83,
+        "eps_yoy_pct": 7.27,
+        "revenue_qoq_pct": 1.98,
+        "prev_year_period_end": "2025-06-30",
+        "derived": false
+      },
+      "consensus": {
+        "note": "context only",
+        "status": "before_release",
+        "eps_estimate": 5.05,
+        "eps_reported": 5.31,
+        "surprise_pct": 5.15,
+        "surprise_basis": "yahoo"
+      },
+      "reaction": {
+        "from": "2026-07-11",
+        "to": "2026-07-14",
+        "stock_pct": 1.84,
+        "benchmark_pct": 0.21,
+        "excess_pct": 1.63
+      },
+      "bullets": [
+        {
+          "topic": "headline_numbers",
+          "text": "Quarterly net income was $15.2 billion.",
+          "quote": "reported net income of $15.2 billion",
+          "source_id": "0000019617-26-000101",
+          "source_kind": "sec_exhibit"
+        },
+        {
+          "topic": "guidance",
+          "text": "Net interest income for the year is still expected near $95 billion.",
+          "quote": "we continue to expect net interest income of approximately $95 billion",
+          "source_id": "0000019617-26-000101",
+          "source_kind": "sec_exhibit"
+        }
+      ],
+      "source_ids": [
+        "0000019617-26-000101"
+      ],
+      "sources": [
+        {
+          "id": "0000019617-26-000101",
+          "kind": "sec_8k",
+          "doc": "ex99-1.htm",
+          "url": "https://www.sec.gov/Archives/edgar/data/19617/example/ex99-1.htm",
+          "available_at": "2026-07-14T10:45:12Z"
+        }
+      ],
+      "state_key": "texts:1|numbers:ok",
+      "inputs_until": "2026-08-04T20:15:00Z",
+      "created_at": "2026-08-05T11:50:00Z",
+      "prompt_version": "results-v1",
+      "method_version": "rd-v1"
+    }
+  ]
+}

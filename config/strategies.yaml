@@ -1,0 +1,231 @@
+# Strategy registry (docs/SPEC.md F2; W1). Research only: a strategy makes paper predictions; a paper trade is a
+# record, never an order. Read by the strategy lab (session B2), the AI traders (B3), the signal model, ranges.py
+# and the scoreboard (B10 moves config/ranges.yaml `horizons:` to read the list below). Checked by
+# tests/test_w1_catalogue.py against marketbrief/contracts/strategies.py. Field meanings: docs/DATA_CATALOGUE.md
+# section "Strategy".
+#
+# Rules:
+# - An id's behaviour never changes after its first live day (`live_from`). A change of parameters, threshold or
+#   horizons is a new id (`.v2`, ...), proposed by the weekly research director and approved by the owner (F6.2).
+# - `live_from: null` = not live yet. Wave 5 sets the first session when the new paper trading is switched on.
+# - The initial rule set differs from the reference strategy `rule.model_news.v1` in exactly one parameter each,
+#   so a difference in results points to that parameter (F2.5): `compared_to` names the strategy it is compared
+#   with and `differs_in` the one parameter that differs (`threshold` counts as a parameter; always_up and
+#   momentum carry no probability, so their threshold is null and they are compared with base.model_only.v1).
+# - Thresholds are provisional (owner may change them before live_from; afterwards only through a new version).
+
+version: 1
+
+# Horizons N+k: buy at the open of D, sell at the close of the k-th market session after D (decision 37).
+# Adding 10 (two weeks) or 21 (about a month) later is a config change plus a model refit (F2.7).
+horizons: [1, 2, 3, 4, 5]
+# AI traders forecast a subset (decision 38).
+ai_horizons: [1, 3, 5]
+
+# The reference parameter set; every strategy states its full parameters (no inheritance at read time), this
+# block only documents the defaults the rule set varies.
+reference:
+  signal: model               # model | always_up | momentum
+  news_weight: 1.0            # 0, 0.5, 1 or 2: multiplies the signal model's news term (F2.1)
+  news_statuses: [confirmed_primary, corroborated, single_source]   # statuses whose news counts at all
+  news_materiality: [high, medium, low]                             # materiality levels that count
+  cross_market: false         # cross-market feature groups of config/model.yaml switched on (all groups)
+  regime_filter: false        # true: no trades in UNSTABLE or EVENT_HEAVY regimes
+  threshold: 0.55             # minimum prob_up for an "up" prediction to trade
+
+strategies:
+  # ---------------- rule strategies (family rule) ----------------
+  - id: rule.model_news.v1
+    family: rule
+    name: Model + news
+    description: >-
+      The signal model's probability with verified news counted at normal weight. Buys when the model gives at
+      least 55% for a rise. This is the reference the other rule strategies are compared against.
+    compared_to: null
+    differs_in: null
+    parameters: {signal: model, news_weight: 1.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_half.v1
+    family: rule
+    name: Model + half news
+    description: >-
+      Like the reference, but news counts half as much. Tests whether news is over-weighted.
+    compared_to: rule.model_news.v1
+    differs_in: news_weight
+    parameters: {signal: model, news_weight: 0.5, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_double.v1
+    family: rule
+    name: Model + double news
+    description: >-
+      Like the reference, but news counts twice as much. Tests whether news deserves more weight.
+    compared_to: rule.model_news.v1
+    differs_in: news_weight
+    parameters: {signal: model, news_weight: 2.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_confirmed.v1
+    family: rule
+    name: Model + confirmed news only
+    description: >-
+      Like the reference, but only news confirmed by a filing or by two independent outlets counts; single-source
+      stories are ignored. Tests whether unconfirmed news adds noise.
+    compared_to: rule.model_news.v1
+    differs_in: news_statuses
+    parameters: {signal: model, news_weight: 1.0, news_statuses: [confirmed_primary, corroborated],
+                 news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_high.v1
+    family: rule
+    name: Model + major news only
+    description: >-
+      Like the reference, but only news rated high materiality counts. Tests whether small news matters.
+    compared_to: rule.model_news.v1
+    differs_in: news_materiality
+    parameters: {signal: model, news_weight: 1.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high], cross_market: false, regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_global.v1
+    family: rule
+    name: Model + news + global cues
+    description: >-
+      Like the reference, plus the other markets' overnight moves, currencies, rates and commodities as model
+      inputs. Tests whether global cues help (they showed no edge in the 15-year back-test).
+    compared_to: rule.model_news.v1
+    differs_in: cross_market
+    parameters: {signal: model, news_weight: 1.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: true, regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_calm.v1
+    family: rule
+    name: Model + news, calm markets only
+    description: >-
+      Like the reference, but makes no trades when the market regime is unstable or event-heavy. Tests whether
+      sitting out turbulent days helps.
+    compared_to: rule.model_news.v1
+    differs_in: regime_filter
+    parameters: {signal: model, news_weight: 1.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false, regime_filter: true}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: rule.model_news_strict.v1
+    family: rule
+    name: Model + news, 60% bar
+    description: >-
+      Like the reference, but buys only when the probability of a rise is at least 60%. Fewer trades; tests
+      whether being pickier pays.
+    compared_to: rule.model_news.v1
+    differs_in: threshold
+    parameters: {signal: model, news_weight: 1.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
+    threshold: 0.60
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+
+  # ---------------- baselines (family baseline; the yardstick, never in the head-to-head) ----------------
+  - id: base.always_up.v1
+    family: baseline
+    name: Always buy
+    description: >-
+      Buys every active company every day at every horizon. Any strategy worth having must beat it after costs.
+    compared_to: base.model_only.v1
+    differs_in: signal
+    parameters: {signal: always_up, news_weight: 0.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false,
+                 regime_filter: false}
+    threshold: null
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: base.momentum.v1
+    family: baseline
+    name: Follow yesterday
+    description: >-
+      Buys a company when its last session closed higher than the one before; predicts down otherwise.
+    compared_to: base.model_only.v1
+    differs_in: signal
+    parameters: {signal: momentum, news_weight: 0.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false,
+                 regime_filter: false}
+    threshold: null
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+  - id: base.model_only.v1
+    family: baseline
+    name: Model without news
+    description: >-
+      The signal model alone with news switched off (weight 0). Shows what news adds to the reference.
+    compared_to: rule.model_news.v1
+    differs_in: news_weight
+    parameters: {signal: model, news_weight: 0.0, news_statuses: [confirmed_primary, corroborated, single_source],
+                 news_materiality: [high, medium, low], cross_market: false,
+                 regime_filter: false}
+    threshold: 0.55
+    horizons: [1, 2, 3, 4, 5]
+    live_from: null
+
+  # ---------------- AI traders (family ai; F4, decision 9; definitions in .claude/agents/trader-*.md, B3) -------
+  - id: ai.news_results.sonnet.v1
+    family: ai
+    name: AI news & results (Sonnet)
+    description: >-
+      A Sonnet trader that reads the company's news with its verification status, results digests, filings and
+      events, without the model score. Decides on what happened to the company.
+    compared_to: null
+    differs_in: null
+    parameters: {model: sonnet, sees_model_score: false, inputs: [news, results, filings, events]}
+    threshold: 0.55
+    horizons: [1, 3, 5]
+    live_from: null
+  - id: ai.pattern_mood.sonnet.v1
+    family: ai
+    name: AI price pattern & mood (Sonnet)
+    description: >-
+      A Sonnet trader that reads prices, indicators, the market regime, global cues and sector moves, without
+      news or the model score. Decides on how the stock and the market behave.
+    compared_to: null
+    differs_in: null
+    parameters: {model: sonnet, sees_model_score: false, inputs: [prices, indicators, regime, cues, sectors]}
+    threshold: 0.55
+    horizons: [1, 3, 5]
+    live_from: null
+  - id: ai.combined.sonnet.v1
+    family: ai
+    name: AI combined (Sonnet)
+    description: >-
+      A Sonnet trader that sees everything the other two see plus the signal model's score and explanation; it
+      may move the model's probability by at most 10 points, with a reason.
+    compared_to: null
+    differs_in: null
+    parameters: {model: sonnet, sees_model_score: true,
+                 inputs: [news, results, filings, events, prices, indicators, regime, cues, sectors, model_score]}
+    threshold: 0.55
+    horizons: [1, 3, 5]
+    live_from: null
+  - id: ai.combined.opus.v1
+    family: ai
+    name: AI combined (Opus)
+    description: >-
+      The same as the combined Sonnet trader on the stronger Opus model (the existing forecaster, extended).
+      Tests whether the stronger model helps.
+    compared_to: ai.combined.sonnet.v1
+    differs_in: model
+    parameters: {model: opus, sees_model_score: true,
+                 inputs: [news, results, filings, events, prices, indicators, regime, cues, sectors, model_score]}
+    threshold: 0.55
+    horizons: [1, 3, 5]
+    live_from: null
