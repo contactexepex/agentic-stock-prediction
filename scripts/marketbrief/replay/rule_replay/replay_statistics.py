@@ -10,6 +10,7 @@ import pandas as pd
 from marketbrief.analytics import scoring
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.constants.replay import LEVELS, RSI_HIGH, RSI_LOW, SIGNAL_LABELS
+from marketbrief.core.horizons import window_sessions
 from marketbrief.utils.numbers import round_or_none
 
 wilson = scoring.wilson  # Wilson score interval (scoring.py)
@@ -37,7 +38,7 @@ def binom_p_two_sided(hits: int, trials: int, probability: float = 0.5) -> float
 
 def clustered_ci(values: np.ndarray, blocks: np.ndarray, z_critical: float = 1.96) -> tuple[float | None, float | None]:
     """95% interval of a mean when rows in the same date block move together (all stocks share a
-    day; 5-day outcomes overlap): ratio estimator with block-level residuals."""
+    day; the outcomes of N+k span k + 1 sessions and overlap): ratio estimator with block-level residuals."""
     count = len(values)
     if count == 0:
         return None, None
@@ -56,7 +57,7 @@ def range_summary(group: pd.DataFrame, horizon: int) -> dict:
     group = group[group["actual"].notna()] if "actual" in group.columns else group.iloc[0:0]
     if group.empty:
         return {"n": 0}
-    blocks = (group["rank"] // max(horizon, 1)).to_numpy()
+    blocks = (group["rank"] // window_sessions(horizon)).to_numpy()  # blocks as long as the N+k window
     hit80 = group["hit80"].astype(float).to_numpy()
     lower, upper = clustered_ci(hit80, blocks)
     naive_rows = group[group["naive_hit80"].notna()] if "naive_hit80" in group.columns else group.iloc[0:0]
@@ -127,13 +128,14 @@ def signals(group: pd.DataFrame) -> dict[str, pd.Series]:
 
 
 def baseline_stats(group: pd.DataFrame, horizon: int) -> dict:
-    """Hit rate per baseline signal (a flat close is a miss for both directions, as score_predictions.py)."""
+    """Hit rate per baseline signal on the N+k outcome (as-of close to the exit close; a flat close is a miss for
+    both directions, as score_predictions.py)."""
     group = group[group["actual"].notna()] if "actual" in group.columns else group.iloc[0:0]
     if group.empty:
         return {}
     up_moves, down_moves = group["fwd"] > 0, group["fwd"] < 0
     always_up_hit = up_moves.astype(float)
-    blocks = (group["rank"] // max(horizon, 1)).to_numpy()
+    blocks = (group["rank"] // window_sessions(horizon)).to_numpy()
     out = {}
     for name, signal in signals(group).items():
         has_call = signal != 0

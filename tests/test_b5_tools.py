@@ -182,7 +182,8 @@ def test_claim_enforces_the_day_budget_across_both_tables():
 def test_b1_imports_the_rows_the_tool_layer_writes(tmp_path, monkeypatch):
     """The wire: rows written by web/lib/tools (inbox_wire.fixture.json, checked by inbox_wire.test.ts) go through the
     real claim statements into a DuckDB file built from mcp/inbox.sql, and B1's import-inbox appends the company
-    commands to data/ with the identity from the row; the paper trade stays in inbox.requests (no importer yet)."""
+    commands to data/ with the identity from the row; B2's portfolio reader finds the paper trade in inbox.requests and
+    builds its trade input from the row (B2's own tests cover storing it)."""
     import common
     from marketbrief.lifecycle import inbox as b1_inbox
     from marketbrief.lifecycle.cli import main as company_cli

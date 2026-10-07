@@ -100,23 +100,36 @@ def company(ticker, ranges, calls=(), close=110.0, ret=0.01):
             "events": [{"date": "2026-10-08", "label": f"{ticker} earnings", "type": "earnings", "day": "Thu 8 Oct"}],
             "news": [{"id": "abcdef0123456789", "title": "Fed cuts rates", "url": "https://example.com/fed",
                       "source": "Reuters", "ts": "2026-10-02T12:00:00+00:00", "cited": True}],
-            "record": {"ranges": {"1": {"n": 2, "hit80": 2, "hit50": 1, "text": "Not enough history yet: 2 of 2 80% ranges were right so far."}},
+            "record": {"ranges": {"1d": {"h": 1, "name": "N+1", "n": 2, "hit80": 2, "hit50": 1,
+                                         "text": "Not enough history yet: 2 of 2 80% ranges were right so far."}},
                        "calls": {"n": 0, "hits": 0, "text": "No up/down calls checked yet."}}}
 
 
-def rng(h, lo80, hi80, late=False, direction=None, confidence=None, target="2026-10-09", label="Fri 9 Oct"):
-    return {"h": h, "target_date": target, "target_label": label, "base_close": 110.0, "center_price": 110.5,
+def rng(h, lo80, hi80, late=False, direction=None, confidence=None, target="2026-10-09", label="Fri 9 Oct",
+        horizon_label="n_plus_k"):
+    """A range row as view_data builds it: N+k (target k + 1 trading days after the as-of close) or an old window."""
+    nk = horizon_label == "n_plus_k"
+    days = h + 1 if nk else h
+    return {"h": h, "horizon_label": horizon_label, "name": f"N+{h}" if nk else f"{h}-day", "ahead": days,
+            "when": f"N+{h} ({days} trading days)" if nk else ("Next trading day" if h == 1 else f"{h} trading days"),
+            "phrase": f"in {days} trading days (N+{h})" if nk else (
+                "after the next trading day" if h == 1 else f"in {h} trading days"),
+            "target_date": target, "target_label": label, "base_close": 110.0, "center_price": 110.5,
             "lo50": lo80 + 2, "hi50": hi80 - 2, "lo80": lo80, "hi80": hi80, "direction": direction,
             "confidence": confidence, "late": late, "notes": ["earnings in horizon (x3.0 day)"]}
 
 
 def view():
-    aapl = company("AAPL", [rng(1, 104.0, 116.0, target="2026-10-05", label="Mon 5 Oct"),
-                            rng(5, 98.25, 121.5, direction="up", confidence=0.65)],
-                   calls=[{"h": 5, "direction": "up", "confidence": 0.65, "target_label": "Fri 9 Oct",
+    # AAPL: N+1 and N+5 (as of Fri 2 Oct, D = Mon 5 Oct: exits Tue 6 Oct and Mon 12 Oct); MSFT: a late range of the
+    # old 5-day window (D+4 = Fri 9 Oct)
+    aapl = company("AAPL", [rng(1, 104.0, 116.0, target="2026-10-06", label="Tue 6 Oct"),
+                            rng(5, 98.25, 121.5, direction="up", confidence=0.65, target="2026-10-12",
+                                label="Mon 12 Oct")],
+                   calls=[{"h": 5, "when": "N+5 (6 trading days)", "direction": "up", "confidence": 0.65,
+                           "target_label": "Mon 12 Oct",
                            "rationale": "Strong demand.", "evidence": [{"id": "abcdef0123456789", "title": "Fed cuts rates",
                                                                         "url": "https://example.com/fed", "source": "Reuters"}]}])
-    msft = company("MSFT", [rng(5, 300.0, 330.0, late=True)], close=315.0, ret=-0.02)
+    msft = company("MSFT", [rng(5, 300.0, 330.0, late=True, horizon_label="legacy_cc")], close=315.0, ret=-0.02)
     return {
         "market": "us", "name": "Test market", "currency": "USD", "symbol": "$", "session": "2026-10-05",
         "session_label": "Mon 5 Oct", "as_of": "2026-10-02", "as_of_label": "Fri 2 Oct",
@@ -128,7 +141,8 @@ def view():
                      "moves": [{"ticker": "AAPL", "ret_1d": 0.01}, {"ticker": "MSFT", "ret_1d": -0.02}]},
                     {"sector": "Banks", "tickers": ["JPM"], "move_1d": 0.02, "moves": [{"ticker": "JPM", "ret_1d": 0.02}]}],
         "companies": [aapl, msft],
-        "calibration": [{"kind": "range", "label": "80% ranges, 1-day", "stated": 0.8, "actual": 1.0, "n": 2}],
+        "calibration": [{"kind": "range", "label": "80% ranges, N+1", "stated": 0.8, "actual": 1.0, "n": 2}],
+        "primary_horizon": 1,   # view_data.primary_horizon: the shortest horizon with a range that is not late
         "min_sample": 10,
         "counts": {"calls": 1, "companies": 2, "with_ranges": 2, "late_ranges": 1, "scored_ranges": 2, "scored_calls": 0},
         "quality": {"partial": ["MSFT"], "blocked": [], "regime_notes": []},
@@ -284,7 +298,7 @@ const { chromium } = require('playwright');
   const p = await b.newPage({viewport: {width: 390, height: 800}});
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await p.goto('file://' + process.argv[2]);
-  const all = await p.textContent('#cards');
+  const all = await p.textContent('#cards'); const charts = await p.textContent('#charts');
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   await p.selectOption('#f-sector', 'Banks'); const banks = await p.locator('#cards article').count();
   await p.selectOption('#f-sector', 'Tech'); await p.selectOption('#f-company', 'MSFT');
@@ -293,7 +307,7 @@ const { chromium } = require('playwright');
   await p.click('#f-reset');
   const hrefs = await p.$$eval('a', as => as.map(a => a.getAttribute('href')));
   const dates = await p.$$eval('#cards svg text', ts => ts.map(t => t.textContent).filter(x => /[A-Z][a-z]{2}$/.test(x)));
-  console.log(JSON.stringify({errors, all, overflow, banks, one, open, search, hrefs, dates})); await b.close();
+  console.log(JSON.stringify({errors, all, charts, overflow, banks, one, open, search, hrefs, dates})); await b.close();
 })();
 """
 
@@ -321,7 +335,10 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert out["errors"] == [] and out["overflow"] is False
     text = out["all"]
     assert "80% chance between $98.25 and $121.50" in text            # numbers as given, never re-derived
-    assert "Next trading day · by Mon 5 Oct" in text and "5 trading days · by Fri 9 Oct" in text
+    assert "N+1 (2 trading days) · by Tue 6 Oct" in text and "N+5 (6 trading days) · by Mon 12 Oct" in text
+    assert "5 trading days · by Fri 9 Oct" in text                       # the old window keeps its wording
+    assert "Where each price may be in 2 trading days (N+1) (by Tue 6 Oct)" in out["charts"]   # primary_horizon
+    assert "N+5 (6 trading days) call: up" in text and "N+1 80% ranges: Not enough history yet" in text
     assert "Up call, 65% confidence" in text and "No call" in text
     assert "Late: made after this session opened. Not a forecast, never scored." in text
     assert "Range for the record: $300.00 to $330.00 (80%)" in text
@@ -468,3 +485,58 @@ def test_missing_file_manifest_posts_summary_only(slack_root, monkeypatch, capsy
     assert ns.main(["--market", "us"], http=http) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["posted"] == ["summary"] and "html_report.py" in out["files_warning"]
+
+
+def test_primary_horizon_is_the_shortest_on_time_horizon():
+    """view_data.primary_horizon (decision 37): the shortest horizon with a range that is not late; when every range
+    is late, the longest one published; with no range, the longest configured horizon."""
+    import view_data
+    from marketbrief.core.horizons import horizons
+    v = view()
+    assert view_data.primary_horizon(v) == 1
+    v["companies"][0]["ranges"][0]["late"] = True                        # N+1 late: N+5 of AAPL is on time
+    assert view_data.primary_horizon(v) == 5
+    for c in v["companies"]:
+        for r in c["ranges"]:
+            r["late"] = True
+    assert view_data.primary_horizon(v) == 5
+    for c in v["companies"]:
+        c["ranges"] = []
+    assert view_data.primary_horizon(v) == horizons()[-1]
+
+
+def test_report_parts_keep_old_windows_apart_and_cover_every_horizon():
+    """The report's 'Yesterday' line headlines the shortest horizon's N+k ranges; the old window and the other
+    horizons scored on the same date each get their own sentence (never pooled); today's table shows the shortest
+    and the longest configured horizon and lists the calls of every horizon (B10)."""
+    from types import SimpleNamespace
+
+    import pandas as pd
+    from marketbrief.core.market_config import load_market
+    from marketbrief.presentation.report import report_parts
+
+    cfg = load_market("us")
+    scored = pd.DataFrame([
+        {"ticker": t, "horizon_days": h, "horizon_label": label, "lo80": 1.0, "hi80": 2.0, "lo50": 1.2, "hi50": 1.8,
+         "actual_close": 1.5, "hit80": hit, "hit50": hit, "naive_hit80": hit}
+        for t, h, label, hit in (("JPM", 1, "n_plus_k", True), ("BAC", 1, "n_plus_k", False),
+                                 ("JPM", 1, "legacy_cc", True), ("JPM", 3, "n_plus_k", True))])
+    day = {"as_of": "2026-10-09", "market": pd.DataFrame(columns=["ticker", "close", "ret_1d"]), "scored": scored,
+           "calls_scored": pd.DataFrame(columns=["ticker", "horizon_days", "label_basis", "direction", "confidence",
+                                                 "actual_return", "hit"])}
+    out = report_parts.yesterday_tables(cfg, "USD", day, pd.DataFrame())
+    _, h50, h80, line5, _, _, one_day_count, one_day_name, _, scored_rows = out
+    assert (one_day_name, one_day_count, h80, h50, len(scored_rows)) == ("N+1", 2, 1, 1, 2)
+    assert line5 == ("1-day ranges that matured on the same date: 80% hit 1/1, 50% hit 1/1. "
+                     "N+3 ranges that matured on the same date: 80% hit 1/1, 50% hit 1/1.")
+
+    def published(h, direction=None):
+        return SimpleNamespace(ticker="JPM", horizon_days=h, horizon_label="n_plus_k", base_close=100.0,
+                               lo80=90.0 + h, hi80=110.0 + h, lo50=95.0, hi50=105.0, direction=direction,
+                               confidence=0.6 if direction else None, notes=[f"note {h}"], as_of_date=None,
+                               made_at=None)
+    ranges = {("JPM", h): published(h, "up" if h == 3 else None) for h in (1, 2, 3, 4, 5)}
+    _, rows = report_parts.today_rows_by_sector(cfg, "USD", pd.DataFrame(), ranges)
+    jpm = next(r for r in rows if r[0] == "JPM")
+    assert jpm[3] == "$91.00–$111.00" and jpm[5] == "$95.00–$115.00"          # N+1 80% and N+5 80%
+    assert jpm[6] == "3d ▲ up 60%" and jpm[8] == "note 1; note 2; note 3; note 4; note 5"

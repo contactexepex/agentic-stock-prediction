@@ -128,6 +128,9 @@ BASE_SCHEMAS: Schemas = {
         # the scoring basis (analytics/call_basis.py): close_to_close (also every row stored without it) or
         # open_to_close, whose return starts at entry_open, the open of entry_date (the session after as-of)
         "label_basis": "VARCHAR", "entry_date": "DATE", "entry_open": "DOUBLE",
+        # B10: n_plus_k, legacy_5d_d4 (open-to-close 5-day calls made before call_scoring.n_plus_k_from: sold at
+        # D+4's close) or legacy_cc (close-to-close); null on older rows (core/horizons.legacy_label)
+        "horizon_label": "VARCHAR",
     }),
     "prices": ("csv", {
         "date": "DATE", "ticker": "VARCHAR", "open": "DOUBLE", "high": "DOUBLE",
@@ -201,6 +204,10 @@ BASE_SCHEMAS: Schemas = {
         "calibration_id": "VARCHAR", "notes": "VARCHAR[]",
         "inputs": "VARCHAR[]",  # range inputs applied: earnings_history, ex_dividend, beta_split, implied_vol
         "iv_sigma_h": "DOUBLE",  # shadow: sigma_h with option-implied vol applied (same centre)
+        # B10 (docs/SPEC.md F2.7): n_plus_k on every range written from then on, the band of the close of the k-th
+        # session after D (exit_date = target_date; entry_date = D); null on older rows = legacy_cc (1-day: D's
+        # close, 5-day: D+4's close), labelled on read (core/horizons.legacy_label)
+        "horizon_label": "VARCHAR", "entry_date": "DATE", "exit_date": "DATE",
     }),
     "range_outcomes": ("jsonl", {
         "range_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "target_date": "DATE",
@@ -216,6 +223,7 @@ BASE_SCHEMAS: Schemas = {
         # ACI (adaptive_conformal.py), only when switched on in config/ranges.yaml: effective miss rates used for
         # the 50% and 80% bands and the scored target dates behind them
         "aci_alpha50": "DOUBLE", "aci_alpha80": "DOUBLE", "aci_steps": "INTEGER",
+        "horizon_label": "VARCHAR",  # B10: n_plus_k (pool on the k + 1 session window); null = before B10
     }),
     "regime": ("jsonl", {
         "id": "VARCHAR", "as_of_date": "DATE", "session_date": "DATE", "computed_at": "TIMESTAMPTZ",

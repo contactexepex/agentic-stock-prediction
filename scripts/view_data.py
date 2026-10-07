@@ -16,12 +16,15 @@ import pandas as pd
 
 from marketbrief.core import calendar as ev
 from marketbrief.analytics import call_basis, scoring
+from marketbrief.constants.horizon_names import BASIS_KEY_SQL, LABEL_ORDER_SQL, NAME_LEGACY_RECORD
 from marketbrief.constants.model import LABEL_CLOSE_TO_CLOSE
 from marketbrief.constants.scoring import MSG_SCORED_ON
+from marketbrief.core.horizons import horizon_key
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.constants.formatting import CURRENCY_SYMBOLS
 from marketbrief.constants.messages import MSG_NO_PUBLISHED_RANGES
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
+from marketbrief.presentation.horizon_names import horizon_name, primary_horizon, range_texts
 from marketbrief.utils.money import format_money
 from marketbrief.utils.numbers import json_safe_float
 from marketbrief.pipeline.score_predictions import is_late
@@ -84,19 +87,19 @@ def _list(v) -> list:
 
 # calls by stated-confidence band (exact decimal average: no dependence on row order) and the scored
 # calls in a fixed order for scoring.call_scores / reliability (docs/REFACTOR_PLAN.md, nondeterminism)
-# (per scoring basis, never pooled: analytics/call_basis.py; {src} = the track record as of the day's made_at)
-BANDS_SQL = """SELECT CASE WHEN confidence < 0.6 THEN '50-59%' WHEN confidence < 0.7 THEN '60-69%'
-                         WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band, label_basis,
-                    count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
-             FROM {src} GROUP BY band, label_basis ORDER BY band, label_basis"""
+# (per scoring basis key, never pooled: analytics/call_basis.py; {src} = the track record as of the day's made_at)
+BANDS_SQL = f"""SELECT CASE WHEN confidence < 0.6 THEN '50-59%' WHEN confidence < 0.7 THEN '60-69%'
+                          WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band, {BASIS_KEY_SQL} AS label_basis,
+                     count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
+              FROM {{src}} GROUP BY ALL ORDER BY band, label_basis"""
 SCORED_CALLS_SQL = ("SELECT confidence, hit FROM {src} WHERE confidence IS NOT NULL AND hit IS NOT NULL "
-                    "AND label_basis = ? ORDER BY id, scored_at")
+                    f"AND {BASIS_KEY_SQL} = ? ORDER BY id, scored_at")
 # the same for report.py: its confidence bands, and range_record with the averaged % columns as exact decimals
-CONF_BANDS_SQL = """SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59' WHEN confidence < 0.7 THEN '0.60-0.69'
-                              WHEN confidence < 0.8 THEN '0.70-0.79' ELSE '0.80-0.90' END AS band, label_basis,
-                         count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf,
-                         avg(hit::INT) AS hit
-                  FROM track_record GROUP BY band, label_basis ORDER BY band, label_basis"""
+CONF_BANDS_SQL = f"""SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59' WHEN confidence < 0.7 THEN '0.60-0.69'
+                               WHEN confidence < 0.8 THEN '0.70-0.79' ELSE '0.80-0.90' END AS band,
+                          {BASIS_KEY_SQL} AS label_basis, count(*) AS n,
+                          avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
+                   FROM track_record GROUP BY ALL ORDER BY band, label_basis"""
 EXACT_COLUMNS = ("width80_pct", "naive_width80_pct", "is80_pct", "naive_is80_pct", "center_err_pct",
                  "naive_center_err_pct")
 RANGE_RECORD_EXACT = ("(SELECT * REPLACE ("
@@ -133,7 +136,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     session = pd.Timestamp(ranges["session_date"].iloc[0]).date()
     made_at = pd.to_datetime(ranges["made_at"], utc=True).max()
     trs, rrs = asof_source(con, "track_record", made_at), asof_source(con, "range_record", made_at)
-    calls_seen = q(f"SELECT id, made_at, label_basis FROM {trs}")
+    calls_seen = q(f"SELECT id, made_at, {BASIS_KEY_SQL} AS label_basis FROM {trs}")
     basis = call_basis.current(calls_seen) or LABEL_CLOSE_TO_CLOSE  # per-company and proper scores: this basis
 
     regime = q("SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1")
@@ -142,9 +145,9 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     hist = q(f"""SELECT ticker, date, close FROM (
                    SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS k
                    FROM bars WHERE date <= ?) WHERE k <= {HISTORY_DAYS} ORDER BY ticker, date""", [as_of])
-    rr = q("""SELECT ticker, horizon_days AS h, count(*) AS n, sum(hit80::INT) AS h80, sum(hit50::INT) AS h50
-              FROM {rrs} GROUP BY ALL ORDER BY ticker, h""".format(rrs=rrs))
-    tr = q(f"SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM {trs} WHERE label_basis = ? "
+    rr = q(f"""SELECT ticker, horizon_days AS h, horizon_label AS label, count(*) AS n, sum(hit80::INT) AS h80,
+               sum(hit50::INT) AS h50 FROM {rrs} GROUP BY ticker, h, label ORDER BY ticker, h, {LABEL_ORDER_SQL}""")
+    tr = q(f"SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM {trs} WHERE {BASIS_KEY_SQL} = ? "
            "GROUP BY ALL ORDER BY ticker", [basis])
     preds = q("SELECT DISTINCT ON (id) * FROM predictions WHERE as_of_date = ? ORDER BY id, made_at", [as_of]) \
         if _has_rows(con, "predictions") else pd.DataFrame()
@@ -189,13 +192,12 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
             if ret1 is not None:
                 moves.append((t, ret1))
             rows = []
-            for hz in (1, 5):
-                r = by.get((t, hz))
-                if r is None:
-                    continue
+            for hz in sorted(h for tk, h in by if tk == t):   # every published horizon (config/strategies.yaml)
+                r = by[(t, hz)]
                 late = is_late(cfg, getattr(r, "as_of_date", None), getattr(r, "made_at", None))
-                rows.append({
-                    "h": hz, "target_date": iso(r.target_date), "target_label": day_label(r.target_date),
+                rows.append({  # name, trading days to the target (ahead), card text (when), chart phrase
+                    "h": hz, "horizon_label": r.horizon_label, **range_texts(hz, r.horizon_label),
+                    "target_date": iso(r.target_date), "target_label": day_label(r.target_date),
                     "base_close": json_safe_float(r.base_close),
                     "center_price": json_safe_float(r.base_close * math.exp(r.center)),
                     "lo50": json_safe_float(r.lo50), "hi50": json_safe_float(r.hi50), "lo80": json_safe_float(r.lo80),
@@ -209,8 +211,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 if x["direction"] and not x["late"]:
                     p = pred_by.get((t, x["h"]))
                     ids = _list(p.evidence_ids) if p is not None else []
-                    calls.append({"h": x["h"], "direction": x["direction"], "confidence": x["confidence"],
-                                  "target_label": x["target_label"],
+                    calls.append({"h": x["h"], "when": x["when"], "direction": x["direction"],
+                                  "confidence": x["confidence"], "target_label": x["target_label"],
                                   "rationale": (p.rationale if p is not None else None),
                                   "evidence": [{"id": i, **sources.get(i, {}),   # status as of the call's made_at
                                                 "verification": statuses.of(i, t, p.made_at)} for i in ids]})
@@ -249,10 +251,11 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                     evs.append({"date": e["date"].isoformat(), "label": e["name"], "type": e["type"],
                                 "day": day_label(e["date"]), "market": True})
             evs.sort(key=lambda e: e["date"])
-            rec_r = {}
+            rec_r = {}   # per horizon and label (core.horizons.horizon_key): old windows never pooled with N+k
             for x in rr[rr["ticker"] == t].itertuples():
-                rec_r[int(x.h)] = {"n": int(x.n), "hit80": int(x.h80), "hit50": int(x.h50),
-                                   "text": record_text(int(x.n), int(x.h80), "80% ranges")}
+                rec_r[horizon_key(x.h, x.label)] = {
+                    "h": int(x.h), "name": horizon_name(x.h, x.label, legacy=NAME_LEGACY_RECORD), "n": int(x.n),
+                    "hit80": int(x.h80), "hit50": int(x.h50), "text": record_text(int(x.n), int(x.h80), "80% ranges")}
             trow = tr[tr["ticker"] == t]
             nc, hc = (int(trow["n"].iloc[0]), int(trow["hits"].iloc[0])) if len(trow) else (0, 0)
             companies.append({
@@ -285,13 +288,13 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         }
 
     # track record, market-wide: stated vs actual hit rate (ranges by band, calls by confidence)
-    cal = q("""SELECT horizon_days AS h, count(*) AS n, avg(hit50::INT) AS c50, avg(hit80::INT) AS c80
-               FROM {rrs} GROUP BY ALL ORDER BY h""".format(rrs=rrs))
+    cal = q(f"""SELECT horizon_days AS h, horizon_label AS label, count(*) AS n, avg(hit50::INT) AS c50,
+                avg(hit80::INT) AS c80 FROM {rrs} GROUP BY h, label ORDER BY h, {LABEL_ORDER_SQL}""")
     bands = q(BANDS_SQL.format(src=trs))
     points = []
     for x in cal.itertuples():
         for stated, actual in ((0.5, x.c50), (0.8, x.c80)):
-            points.append({"kind": "range", "label": f"{int(stated * 100)}% ranges, {int(x.h)}-day",
+            points.append({"kind": "range", "label": f"{int(stated * 100)}% ranges, {horizon_name(x.h, x.label)}",
                            "stated": stated, "actual": json_safe_float(actual), "n": int(x.n)})
     for x in bands.itertuples():
         points.append({"kind": "call", "label": f"Calls at {x.band} confidence ({call_basis.label(x.label_basis)})",
@@ -314,7 +317,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     upcoming += [{"date": pd.Timestamp(x.date).date().isoformat(), "day": day_label(x.date), "label": x.name,
                   "major": False} for x in cevents.itertuples()]
     upcoming.sort(key=lambda e: e["date"])
-    return {
+    view = {
         "market": cfg["market"], "name": cfg["name"], "currency": cur, "symbol": CURRENCY.get(cur, ""),
         "session": session.isoformat(), "session_label": day_label(session), "as_of": as_of.isoformat(),
         "as_of_label": day_label(as_of), "made_at": made_at.isoformat() if not pd.isna(made_at) else None,
@@ -329,6 +332,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
         "quality": {"partial": partial, "blocked": blocked, "regime_notes": regime_view["notes"] if regime_view else []},
         "upcoming": upcoming, "sources": sources,
     }
+    view["primary_horizon"] = primary_horizon(view)
+    return view
 
 
 def _ts(v) -> str | None:
@@ -342,9 +347,3 @@ def _has_rows(con, view: str) -> bool:
         return con.execute(f"SELECT count(*) FROM {view}").fetchone()[0] > 0
     except Exception:  # view absent when the market has no such files yet
         return False
-
-
-def primary_horizon(view: dict) -> int:
-    """The horizon the overview shows: next day when non-late 1-day ranges exist, else 5 days."""
-    ok1 = any(r["h"] == 1 and not r["late"] for c in view["companies"] for r in c["ranges"])
-    return 1 if ok1 else 5

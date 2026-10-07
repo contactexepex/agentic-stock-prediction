@@ -9,9 +9,13 @@ import pandas as pd
 
 from marketbrief.analytics.call_basis import label as basis_label
 from marketbrief.analytics.scoring import percent
+from marketbrief.constants.horizon_names import NAME_LEGACY_SCORED_FIRST
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.core import calendar
+from marketbrief.core.horizons import horizon_key, horizons
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.pipeline.score_predictions import is_late
+from marketbrief.presentation.horizon_names import by_horizon, horizon_name
 from marketbrief.presentation.report.formatting import mark, pct
 from marketbrief.utils.money import format_money
 from view_data import fmt_call
@@ -39,6 +43,7 @@ class ReportParts:
     n_late: object
     nh80: object
     one_day_count: object
+    one_day_name: object
     partial: object
     range_by_ticker_horizon: object
     reg: object
@@ -100,8 +105,14 @@ def yesterday_tables(cfg, cur, day, feats):
         )
     market_line = f"Market on {day['as_of']}: " + " · ".join(market_parts) if market_parts else ""
     scored = day["scored"]
-    scored_one_day = scored[scored["horizon_days"] == 1] if not scored.empty else scored
+    # the headline group: the shortest configured horizon (its N+k ranges, else its old window); every other group
+    # (other horizons, the other window) gets a sentence in line5, never pooled with it
+    groups = by_horizon(scored)
+    first = next((item for item in groups if item[0][0] == horizons()[0]), None)
+    others = [item for item in groups if item is not first]
+    (one_day_h, one_day_label), scored_one_day = first or ((horizons()[0], LABEL_N_PLUS_K), scored.iloc[0:0])
     one_day_count = len(scored_one_day)
+    one_day_name = horizon_name(one_day_h, one_day_label, legacy=NAME_LEGACY_SCORED_FIRST)
     h80, h50 = (int(scored_one_day["hit80"].sum()), int(scored_one_day["hit50"].sum())) if one_day_count else (0, 0)
     nh80 = int(scored_one_day["naive_hit80"].fillna(False).sum()) if one_day_count else 0
     scored_rows = [
@@ -116,13 +127,10 @@ def yesterday_tables(cfg, cur, day, feats):
         ]
         for item in scored_one_day.itertuples()
     ]
-    scored_five_day = scored[scored["horizon_days"] == 5] if not scored.empty else scored
-    line5 = (
-        f"5-day ranges that matured on the same date: 80% hit "
-        f"{int(scored_five_day['hit80'].sum())}/{len(scored_five_day)}, "
-        f"50% hit {int(scored_five_day['hit50'].sum())}/{len(scored_five_day)}."
-        if len(scored_five_day)
-        else ""
+    line5 = " ".join(  # every other horizon (and old window) that matured on the same date, one sentence each
+        f"{horizon_name(h, label)} ranges that matured on the same date: 80% hit "
+        f"{int(group['hit80'].sum())}/{len(group)}, 50% hit {int(group['hit50'].sum())}/{len(group)}."
+        for (h, label), group in others
     )
     scored_calls = day["calls_scored"]
     call_rows = [
@@ -137,29 +145,30 @@ def yesterday_tables(cfg, cur, day, feats):
         for item in scored_calls.itertuples()
     ]
 
-    return call_rows, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows
+    return call_rows, h50, h80, line5, market_line, nh80, one_day_count, one_day_name, scored_calls, scored_rows
 
 
 def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
-    """Today's ranges and calls by sector, and the number of late (never scored) stocks."""
-    # today: ranges by sector
+    """Today's ranges and calls by sector, and the number of late (never scored) stocks. The table's range columns
+    show the shortest (80% and 50%) and the longest (80%) configured horizon (config/strategies.yaml); the call
+    column, the late flag and the notes cover every published horizon."""
+    first_horizon, last_horizon = horizons()[0], horizons()[-1]
     today_rows, n_late = [], 0
     for sector, members in (cfg.get("sectors") or {"": list(cfg["tickers"])}).items():
         for ticker_symbol in members:
-            one_day_range, five_day_range = (
-                range_by_ticker_horizon.get((ticker_symbol, 1)),
-                range_by_ticker_horizon.get((ticker_symbol, 5)),
+            published = sorted(
+                ((horizon, item) for (ticker, horizon), item in range_by_ticker_horizon.items()
+                 if ticker == ticker_symbol),
+                key=lambda pair: pair[0],
             )
-            if one_day_range is None and five_day_range is None:
+            if not published:
                 quality = feats.loc[ticker_symbol]["quality"] if ticker_symbol in feats.index else "no data"
                 today_rows.append([ticker_symbol, sector, "–", "–", "–", "–", f"no range ({quality})", "", ""])
                 continue
-            base = (one_day_range or five_day_range).base_close
-            made = [
-                (horizon, item)
-                for horizon, item in ((1, one_day_range), (5, five_day_range))
-                if item is not None and item.direction in ("up", "down")
-            ]
+            first_range = range_by_ticker_horizon.get((ticker_symbol, first_horizon))
+            last_range = range_by_ticker_horizon.get((ticker_symbol, last_horizon))
+            base = published[0][1].base_close
+            made = [(horizon, item) for horizon, item in published if item.direction in ("up", "down")]
             call = (
                 " · ".join(f"{horizon}d {fmt_call(item.direction, item.confidence)}" for horizon, item in made)
                 or "no call"
@@ -167,8 +176,7 @@ def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
             # made at/after the first target session's open: shown for the record, never scored
             late = any(
                 is_late(cfg, getattr(item, "as_of_date", None), getattr(item, "made_at", None))
-                for item in (one_day_range, five_day_range)
-                if item is not None
+                for _, item in published
             )
             n_late += late
             if late:
@@ -177,8 +185,7 @@ def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
                 sorted(
                     {
                         note
-                        for item in (one_day_range, five_day_range)
-                        if item is not None
+                        for _, item in published
                         for note in (list(item.notes) if item.notes is not None else [])
                     }
                 )
@@ -188,14 +195,14 @@ def today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon):
                     ticker_symbol,
                     sector,
                     format_money(cur, base),
-                    f"{format_money(cur, one_day_range.lo80)}–{format_money(cur, one_day_range.hi80)}"
-                    if one_day_range
+                    f"{format_money(cur, first_range.lo80)}–{format_money(cur, first_range.hi80)}"
+                    if first_range
                     else "–",
-                    f"{format_money(cur, one_day_range.lo50)}–{format_money(cur, one_day_range.hi50)}"
-                    if one_day_range
+                    f"{format_money(cur, first_range.lo50)}–{format_money(cur, first_range.hi50)}"
+                    if first_range
                     else "–",
-                    f"{format_money(cur, five_day_range.lo80)}–{format_money(cur, five_day_range.hi80)}"
-                    if five_day_range
+                    f"{format_money(cur, last_range.lo80)}–{format_money(cur, last_range.hi80)}"
+                    if last_range
                     else "–",
                     call,
                     "–"
@@ -257,9 +264,9 @@ def track_record_rows(day, feats):
     """Track-record tables (scorecard, regimes, direction, bands, calibration) and data-quality lists."""
     share = lambda value: "–" if value is None or pd.isna(value) else percent(value)  # noqa: E731
     num = lambda value, frame=".2f": "–" if value is None or pd.isna(value) else format(value, frame)  # noqa: E731
-    sc_rows = [
+    sc_rows = [  # per horizon and label (core.horizons.horizon_key: '1d' for N+1, '1d legacy_cc' for an old window)
         [
-            f"{item.h}d",
+            horizon_key(item.h, item.label),
             item.win,
             item.n,
             share(item.c50),
@@ -275,7 +282,7 @@ def track_record_rows(day, feats):
         for item in day["scorecard"].itertuples()
     ]
     regime_rows = [
-        [f"{item.h}d", item.regime, item.n, share(item.c50), share(item.c80), share(item.nc80)]
+        [horizon_key(item.h, item.label), item.regime, item.n, share(item.c50), share(item.c80), share(item.nc80)]
         for item in day["by_regime"].itertuples()
     ]
     dir_rows = [  # per scoring basis, never pooled
@@ -297,7 +304,7 @@ def track_record_rows(day, feats):
 def prepare_parts(cfg: dict, day: dict) -> ReportParts:
     """Compute the tables, lines and counts of one report from the gathered day data."""
     cur, feats, img, market, range_by_ticker_horizon, reg, regime_line, session, vol_name = report_basics(cfg, day)
-    (call_rows, h50, h80, line5, market_line, nh80, one_day_count, scored_calls, scored_rows) = (
+    (call_rows, h50, h80, line5, market_line, nh80, one_day_count, one_day_name, scored_calls, scored_rows) = (
         yesterday_tables(cfg, cur, day, feats)
     )
     n_late, today_rows = today_rows_by_sector(cfg, cur, feats, range_by_ticker_horizon)
@@ -323,6 +330,7 @@ def prepare_parts(cfg: dict, day: dict) -> ReportParts:
         n_late=n_late,
         nh80=nh80,
         one_day_count=one_day_count,
+        one_day_name=one_day_name,
         partial=partial,
         range_by_ticker_horizon=range_by_ticker_horizon,
         reg=reg,

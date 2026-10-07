@@ -200,7 +200,7 @@ test("a failed dispatch still answers pending, says the next run imports it, and
   r.dispatcher.fail = true;
   const outcome = await r.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "react-dispatch1" }, { confirmedSummary: true });
   assert.equal(outcome.result, "pending");
-  assert.match(outcome.message ?? "", /next scheduled run imports it/);
+  assert.match(outcome.message ?? "", /waits in the inbox for the next import run/);
   assert.match(r.notifier.reports.at(-1)?.message ?? "", /Workflow dispatch failed \(GitHub answered 500\)/);
 });
 

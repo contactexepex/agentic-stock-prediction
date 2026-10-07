@@ -369,7 +369,6 @@ const pct0 = v => (v == null || /e/i.test(String(v)) ? Math.round(v * 100) : Mat
 const fmtMoney = v => v == null ? '–' : cur + Number(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const fmtPct = (v, d) => { if (v == null) return '–'; const s = Math.abs(v * 100).toFixed(d == null ? 1 : d);
   return (+s === 0 ? '' : v > 0 ? '+' : '−') + s + '%'; };
-const horizonText = h => h === 1 ? 'Next trading day' : h + ' trading days';
 // links: only plain http(s) URLs ever become an href (defence in depth; the data is checked too)
 const safeUrl = u => (typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim())) ? u.trim() : null;
 function linkOrText(url, text){ const u = safeUrl(url); return u ? el('a', {href: u, target: '_blank', rel: 'noopener'}, text) : el('span', null, text); }
@@ -449,6 +448,7 @@ const gl = el('details'); gl.append(el('summary', null, 'How to read this'));
 const dl = el('dl', {class: 'gloss'});
 [['Price range', 'Where the closing price is likely to be on the target date. The 80% range should contain the real price about 8 times in 10; the narrower 50% range about half the time.'],
  ['Time period', 'Counted in trading days (days the exchange is open). "By Fri 9 Oct" is the close on that date.'],
+ ['N+k', 'The horizon of a range or call: bought at the open of the next trading day (D), sold at the close of the k-th trading day after D. N+1 ends at the close of D+1, two trading days after the last close.'],
  ['Call', 'An up or down view with a confidence between 50% and 90%. Most days most stocks get no call; that is on purpose.'],
  ['Track record', 'How often past ranges and calls were right once the real price was known. Below ' + D.min_sample + ' checked cases we say there is not enough history yet.'],
  ['Late', 'A range made after its session had already opened. It is shown for the record and is never scored or treated as a forecast.'],
@@ -457,7 +457,7 @@ const dl = el('dl', {class: 'gloss'});
 gl.append(dl); S.append(gl);
 
 // ---------- shared scales ----------
-const H = (() => { const ok1 = D.companies.some(c => c.ranges.some(r => r.h === 1 && !r.late)); return ok1 ? 1 : 5; })();
+const H = D.primary_horizon;   // view_data.primary_horizon: shortest horizon with a range that is not late
 function pctOf(c, v){ return c.close ? v / c.close - 1 : 0; }
 // one y-domain (in % from the last close) for every company, so cards can be compared
 let domLo = -0.02, domHi = 0.02;
@@ -472,7 +472,7 @@ function ticks(lo, hi, st){ const t = []; for (let v = Math.ceil(lo / st - 1e-9)
 // ---------- chart: price with the forecast fan (one per company) ----------
 function fanChart(c){
   const W = 440, Hh = 210, L = 44, R = 92, T = 10, B = 26;
-  const n = c.history.length, maxH = Math.max(0, ...c.ranges.map(r => r.h));
+  const n = c.history.length, maxH = Math.max(0, ...c.ranges.map(r => r.ahead));
   const xs = i => L + (W - L - R) * i / Math.max(1, n - 1 + maxH);
   const ys = v => T + (Hh - T - B) * (domHi - v) / (domHi - domLo);
   const s = svg('svg', {viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': `${c.name}: closing prices for the last ${n} trading days and the price range ahead`});
@@ -484,14 +484,14 @@ function fanChart(c){
   const rs = c.ranges.slice().sort((a, b) => a.h - b.h);
   if (rs.length) {
     const lateAll = rs.every(r => r.late);
-    const pts = [[last, 0, 0, 0, 0]].concat(rs.map(r => [last + r.h, pctOf(c, r.lo80), pctOf(c, r.hi80), pctOf(c, r.lo50), pctOf(c, r.hi50)]));
+    const pts = [[last, 0, 0, 0, 0]].concat(rs.map(r => [last + r.ahead, pctOf(c, r.lo80), pctOf(c, r.hi80), pctOf(c, r.lo50), pctOf(c, r.hi50)]));
     const area = (lo, hi) => 'M' + pts.map(p => xs(p[0]) + ',' + ys(p[hi])).join('L') + 'L' + pts.slice().reverse().map(p => xs(p[0]) + ',' + ys(p[lo])).join('L') + 'Z';
     s.append(svg('path', {d: area(1, 2), fill: lateAll ? 'var(--late)' : 'var(--band80)'}));
     s.append(svg('path', {d: area(3, 4), fill: lateAll ? 'var(--late)' : 'var(--band50)'}));
     const far = rs[rs.length - 1];
-    [['hi80', -2], ['lo80', 12]].forEach(k => s.append(sText(xs(last + far.h) + 6, ys(pctOf(c, far[k[0]])) + k[1], fmtMoney(far[k[0]]), {fill: 'var(--ink2)'})));
-    rs.forEach(r => s.append(sText(xs(last + r.h), Hh - 8, fmtDay(r.target_date), {'text-anchor': 'middle'})));
-    if (lateAll) s.append(sText(xs(last + far.h) + 6, ys(0) + 4, 'late', {fill: 'var(--ink2)', 'font-weight': 600}));
+    [['hi80', -2], ['lo80', 12]].forEach(k => s.append(sText(xs(last + far.ahead) + 6, ys(pctOf(c, far[k[0]])) + k[1], fmtMoney(far[k[0]]), {fill: 'var(--ink2)'})));
+    rs.forEach(r => s.append(sText(xs(last + r.ahead), Hh - 8, fmtDay(r.target_date), {'text-anchor': 'middle'})));
+    if (lateAll) s.append(sText(xs(last + far.ahead) + 6, ys(0) + 4, 'late', {fill: 'var(--ink2)', 'font-weight': 600}));
   }
   const path = c.history.map((p, i) => (i ? 'L' : 'M') + xs(i) + ',' + ys(pctOf(c, p.c))).join('');
   s.append(svg('path', {d: path, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
@@ -506,12 +506,12 @@ function fanChart(c){
     const box = s.getBoundingClientRect(), px = (ev.clientX - box.left) * W / box.width;
     let best = null, bd = 1e9;
     c.history.forEach((p, i) => { const d = Math.abs(xs(i) - px); if (d < bd) { bd = d; best = {i: i, p: p}; } });
-    rs.forEach(r => { const d = Math.abs(xs(last + r.h) - px); if (d < bd) { bd = d; best = {i: last + r.h, r: r}; } });
+    rs.forEach(r => { const d = Math.abs(xs(last + r.ahead) - px); if (d < bd) { bd = d; best = {i: last + r.ahead, r: r}; } });
     if (!best || ev.type === 'focus') { cross.setAttribute('visibility', 'hidden'); return [[c.name], ['last close ' + D.as_of_label, fmtMoney(c.close)]]; }
     cross.setAttribute('x1', xs(best.i)); cross.setAttribute('x2', xs(best.i)); cross.setAttribute('visibility', 'visible');
     if (best.p) return [[fmtDay(best.p.d, true)], ['close', fmtMoney(best.p.c)], ['vs last close', fmtPct(pctOf(c, best.p.c))]];
     const r = best.r;
-    return [[horizonText(r.h) + ', by ' + r.target_label + (r.late ? ' (late, not a forecast)' : '')],
+    return [[r.when + ', by ' + r.target_label + (r.late ? ' (late, not a forecast)' : '')],
             ['to ' + fmtMoney(r.hi80) + ' (80% range)', fmtMoney(r.lo80)], ['to ' + fmtMoney(r.hi50) + ' (50% range)', fmtMoney(r.lo50)]];
   });
   hit.addEventListener('pointerleave', () => cross.setAttribute('visibility', 'hidden'));
@@ -522,7 +522,7 @@ function fanChart(c){
 function rangesChart(list){
   const box = el('div', {class: 'panel chart wide'});
   const target = (list.find(c => c.ranges.some(r => r.h === H)) || {ranges: []}).ranges.find(r => r.h === H);
-  box.append(el('h2', null, 'Where each price may be ' + (H === 1 ? 'after the next trading day' : 'in ' + H + ' trading days') + (target ? ' (by ' + target.target_label + ')' : '')));
+  box.append(el('h2', null, 'Where each price may be ' + (target ? target.phrase + ' (by ' + target.target_label + ')' : 'at horizon ' + H)));
   box.append(el('p', {class: 'cap'}, 'Shaded bar: 80% range; darker middle: 50% range; dot: the centre. In % from the last close, on one scale for every company.'));
   const rows = list.filter(c => c.ranges.some(r => r.h === H));
   if (!rows.length) { box.append(el('p', {class: 'empty'}, 'No ranges at this horizon for the companies shown.')); return box; }
@@ -680,7 +680,7 @@ function card(c){
     a.append(fanChart(c));
     c.ranges.slice().sort((x, y) => x.h - y.h).forEach(r => {
       const d = el('div', {class: 'rng' + (r.late ? ' is-late' : '')});
-      d.append(el('div', {class: 'when'}, horizonText(r.h) + ' · by ' + r.target_label));
+      d.append(el('div', {class: 'when'}, r.when + ' · by ' + r.target_label));
       if (r.late) {
         d.append(el('span', {class: 'tag-late'}, 'Late: made after this session opened. Not a forecast, never scored.'));
         d.append(el('div', {class: 'second'}, 'Range for the record: ' + fmtMoney(r.lo80) + ' to ' + fmtMoney(r.hi80) + ' (80%), ' + fmtMoney(r.lo50) + ' to ' + fmtMoney(r.hi50) + ' (50%).'));
@@ -693,14 +693,14 @@ function card(c){
     });
   }
   const rec = el('div', {class: 'record'});
-  const parts = Object.keys(c.record.ranges).sort().map(k => (k === '1' ? 'Next-day' : k + '-day') + ' 80% ranges: ' + c.record.ranges[k].text);
+  const parts = Object.keys(c.record.ranges).map(k => c.record.ranges[k].name + ' 80% ranges: ' + c.record.ranges[k].text);   // in horizon order
   rec.textContent = 'Track record for ' + c.ticker + '. ' + (parts.length ? parts.join(' ') : 'No ranges checked yet.') + ' Calls: ' + c.record.calls.text;
   a.append(rec);
   // reasons, collapsed unless one company is chosen
   const why = el('details', {class: 'why'}); why.append(el('summary', null, 'Why: news, events and the analysts’ view'));
   const body = el('div', {class: 'prose'});
   calls.forEach(cl => {
-    body.append(el('h4', null, horizonText(cl.h) + ' call: ' + cl.direction));
+    body.append(el('h4', null, cl.when + ' call: ' + cl.direction));
     if (cl.rationale) body.append(el('p', null, cl.rationale));
     if (cl.evidence.length) { const ul = el('ul'); cl.evidence.forEach(e => { const li = el('li'); if (e.title || e.url) { const ln = linkOrText(e.url, e.title || e.id); li.append(ln, el('span', {class: 'meta'}, ' · ' + (e.source || ''))); } else li.textContent = 'Source ' + e.id + ' (not found)'; ul.append(li); }); body.append(ul); }
   });

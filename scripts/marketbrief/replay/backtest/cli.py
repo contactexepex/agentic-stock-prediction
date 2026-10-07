@@ -1,8 +1,10 @@
 """Walk-forward backtest of the range formula (no AI) on stored bars for one market.
 
-For each evaluation day d (the last --eval-sessions trading days) and horizon h, the range is built exactly as live
-(EWMA volatility at d, empirical quantiles from a recency-weighted pool of outcomes already known at d) and scored on
-the close h sessions later. The naive baseline is last close +/- 20-day realized volatility with normal quantiles.
+For each evaluation day d (the last --eval-sessions trading days) and horizon N+k of the configured list
+(config/strategies.yaml), the range is built exactly as live (EWMA volatility at d scaled to the k + 1 sessions of the
+window, empirical quantiles from a recency-weighted pool of outcomes already known at d) and scored on the exit close:
+the close of the k-th session after D, the first session after d (k + 1 sessions after d). The naive baseline is
+last close +/- 20-day realized volatility with normal quantiles.
 Regime and AI adjustments are not replayed, so the headline numbers test the core formula.
 
 Range inputs (config/ranges.yaml, docs/DESIGN.md section 11) are then switched off and on, each
