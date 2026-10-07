@@ -1,0 +1,200 @@
+/* market-brief cockpit: design tokens. ONE light scheme, "terminal light", modelled on the trading
+   terminals the owner pointed at (Meridian Terminal, TradingView symbol pages): a cool light-grey page,
+   white cards with hairline borders, one indigo accent, vivid green/red for signed numbers and signals,
+   uppercase micro-labels over large bold numerals. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and the pages need no renaming.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an
+   okay one. Up/down/hit/miss always carry a glyph and a word (dataviz checker: up #15803d vs down #dc2626
+   pass all gates, worst CVD dE 8.6). Contrast figures are WCAG on the colour named.
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- Colour roles (terminal light) ---------------------------------------------------- */
+  --md-sys-color-primary: #4f46e5;                 /* indigo accent (6.3:1 on white) */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #eef2ff;       /* accent tint: selected nav, selected segment */
+  --md-sys-color-on-primary-container: #3730a3;    /* 8.9:1 on the tint */
+  --md-sys-color-secondary: #475569;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #f1f5f9;
+  --md-sys-color-on-secondary-container: #1e293b;
+  --md-sys-color-tertiary: #7c3aed;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f3e8ff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #fee2e2;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #111827;              /* ink, 16.4:1 on the page */
+  --md-sys-color-surface-variant: #f1f5f9;
+  --md-sys-color-on-surface-variant: #6b7280;      /* muted labels, 4.8:1 on white */
+  --md-sys-color-surface-dim: #e5e7eb;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f5f6fa;    /* the page */
+  --md-sys-color-surface-container: #f3f4f6;        /* tiles and columns inside a card */
+  --md-sys-color-surface-container-high: #eceef2;   /* hairlines inside cards, table rules */
+  --md-sys-color-surface-container-highest: #e5e7eb;
+  --md-sys-color-outline: #9ca3af;
+  --md-sys-color-outline-variant: #e5e7eb;          /* card and control borders */
+  --md-sys-color-inverse-surface: #111827;          /* tooltips */
+  --md-sys-color-inverse-on-surface: #f9fafb;
+  --md-sys-color-inverse-primary: #a5b4fc;
+  --md-sys-color-surface-tint: #4f46e5;
+  --md-sys-color-background: #f5f6fa;
+  --md-sys-color-on-background: #111827;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white, white on the fills 5.0:1 / 4.8:1.
+     Verdict surfaces: NO red; YES strong = darker green, YES ok = lighter green (owner's rule). */
+  --mb-color-up: #15803d;
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #dcfce7;
+  --mb-color-on-up-container: #166534;    /* 6.5:1 */
+  --mb-color-down: #dc2626;
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #fee2e2;
+  --mb-color-on-down-container: #991b1b;  /* 6.8:1 */
+  --mb-color-neutral: #6b7280;
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #f3f4f6;
+  --mb-color-on-neutral-container: #374151;
+  --mb-color-warn: #d97706;               /* "direction unclear" (icons) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fef3c7;
+  --mb-color-on-warn-container: #b45309;  /* 4.5:1 */
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fee2e2;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;   /* 6.8:1 */
+  --mb-verdict-strong-bg: #bbf7d0;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d; /* 7.5:1 */
+  --mb-verdict-ok-bg: #dcfce7;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;  /* 6.5:1 */
+  /* Provenance labels: Live (green tint, like a terminal's LIVE badge), Back-test (hatched accent tint),
+     Mock (dashed), Paper (violet tint). Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(79,70,229,.14) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill: validated with scripts/validate_palette.js, see README) ---- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #4f46e5;   /* series 1 = the accent: ranges, model, everything "ours" */
+  --mb-chart-2: #d97706;   /* series 2 (amber; 3.0:1 on white: direct labels or the table view) */
+  --mb-chart-3: #0891b2;   /* series 3 (cyan) */
+  --mb-chart-4: #db2777;   /* series 4 (pink) */
+  --mb-chart-band-50: rgba(79,70,229,.32);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(79,70,229,.13);   /* outer band */
+  --mb-chart-fan: rgba(79,70,229,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 400 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 400 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 400 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 400 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 500 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.5px;
+  --md-sys-typescale-label-small-tracking: 0.5px;
+  --md-sys-typescale-title-medium-tracking: 0.15px;
+  --md-sys-typescale-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-small-tracking: 0.4px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 8px;        /* tiles and columns inside a card */
+  --mb-card-border: 1px solid var(--md-sys-color-outline-variant);
+
+  /* ---- Elevation (M3 light shadows, levels 0-5) ----------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --md-sys-elevation-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --md-sys-elevation-3: 0 1px 3px rgba(0,0,0,.30), 0 4px 8px 3px rgba(0,0,0,.15);
+  --md-sys-elevation-4: 0 2px 3px rgba(0,0,0,.30), 0 6px 10px 4px rgba(0,0,0,.15);
+  --md-sys-elevation-5: 0 4px 4px rgba(0,0,0,.30), 0 8px 12px 6px rgba(0,0,0,.15);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1120px;
+  --mb-rail-width: 72px;        /* navigation rail (>= 600px) */
+  --mb-navbar-height: 80px;     /* navigation bar (phone) */
+  --mb-topbar-height: 56px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 100ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.5px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }

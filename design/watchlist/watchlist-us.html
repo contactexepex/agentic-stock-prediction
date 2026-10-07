@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watchlist · US (NYSE/Nasdaq)</title>
+<meta name="description" content="The 20 US (NYSE/Nasdaq) watchlist companies: price, the model's chance of a rise, verdict, range, results date and news, as of 2026-10-06. Research only.">
+<style>
+/* market-brief cockpit: design tokens. ONE light scheme, "terminal light", modelled on the trading
+   terminals the owner pointed at (Meridian Terminal, TradingView symbol pages): a cool light-grey page,
+   white cards with hairline borders, one indigo accent, vivid green/red for signed numbers and signals,
+   uppercase micro-labels over large bold numerals. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and the pages need no renaming.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an
+   okay one. Up/down/hit/miss always carry a glyph and a word (dataviz checker: up #15803d vs down #dc2626
+   pass all gates, worst CVD dE 8.6). Contrast figures are WCAG on the colour named.
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- Colour roles (terminal light) ---------------------------------------------------- */
+  --md-sys-color-primary: #4f46e5;                 /* indigo accent (6.3:1 on white) */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #eef2ff;       /* accent tint: selected nav, selected segment */
+  --md-sys-color-on-primary-container: #3730a3;    /* 8.9:1 on the tint */
+  --md-sys-color-secondary: #475569;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #f1f5f9;
+  --md-sys-color-on-secondary-container: #1e293b;
+  --md-sys-color-tertiary: #7c3aed;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f3e8ff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #fee2e2;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #111827;              /* ink, 16.4:1 on the page */
+  --md-sys-color-surface-variant: #f1f5f9;
+  --md-sys-color-on-surface-variant: #6b7280;      /* muted labels, 4.8:1 on white */
+  --md-sys-color-surface-dim: #e5e7eb;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f5f6fa;    /* the page */
+  --md-sys-color-surface-container: #f3f4f6;        /* tiles and columns inside a card */
+  --md-sys-color-surface-container-high: #eceef2;   /* hairlines inside cards, table rules */
+  --md-sys-color-surface-container-highest: #e5e7eb;
+  --md-sys-color-outline: #9ca3af;
+  --md-sys-color-outline-variant: #e5e7eb;          /* card and control borders */
+  --md-sys-color-inverse-surface: #111827;          /* tooltips */
+  --md-sys-color-inverse-on-surface: #f9fafb;
+  --md-sys-color-inverse-primary: #a5b4fc;
+  --md-sys-color-surface-tint: #4f46e5;
+  --md-sys-color-background: #f5f6fa;
+  --md-sys-color-on-background: #111827;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white, white on the fills 5.0:1 / 4.8:1.
+     Verdict surfaces: NO red; YES strong = darker green, YES ok = lighter green (owner's rule). */
+  --mb-color-up: #15803d;
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #dcfce7;
+  --mb-color-on-up-container: #166534;    /* 6.5:1 */
+  --mb-color-down: #dc2626;
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #fee2e2;
+  --mb-color-on-down-container: #991b1b;  /* 6.8:1 */
+  --mb-color-neutral: #6b7280;
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #f3f4f6;
+  --mb-color-on-neutral-container: #374151;
+  --mb-color-warn: #d97706;               /* "direction unclear" (icons) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fef3c7;
+  --mb-color-on-warn-container: #b45309;  /* 4.5:1 */
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fee2e2;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;   /* 6.8:1 */
+  --mb-verdict-strong-bg: #bbf7d0;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d; /* 7.5:1 */
+  --mb-verdict-ok-bg: #dcfce7;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;  /* 6.5:1 */
+  /* Provenance labels: Live (green tint, like a terminal's LIVE badge), Back-test (hatched accent tint),
+     Mock (dashed), Paper (violet tint). Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(79,70,229,.14) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill: validated with scripts/validate_palette.js, see README) ---- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #4f46e5;   /* series 1 = the accent: ranges, model, everything "ours" */
+  --mb-chart-2: #d97706;   /* series 2 (amber; 3.0:1 on white: direct labels or the table view) */
+  --mb-chart-3: #0891b2;   /* series 3 (cyan) */
+  --mb-chart-4: #db2777;   /* series 4 (pink) */
+  --mb-chart-band-50: rgba(79,70,229,.32);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(79,70,229,.13);   /* outer band */
+  --mb-chart-fan: rgba(79,70,229,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 400 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 400 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 400 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 400 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 500 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.5px;
+  --md-sys-typescale-label-small-tracking: 0.5px;
+  --md-sys-typescale-title-medium-tracking: 0.15px;
+  --md-sys-typescale-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-small-tracking: 0.4px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 8px;        /* tiles and columns inside a card */
+  --mb-card-border: 1px solid var(--md-sys-color-outline-variant);
+
+  /* ---- Elevation (M3 light shadows, levels 0-5) ----------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --md-sys-elevation-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --md-sys-elevation-3: 0 1px 3px rgba(0,0,0,.30), 0 4px 8px 3px rgba(0,0,0,.15);
+  --md-sys-elevation-4: 0 2px 3px rgba(0,0,0,.30), 0 6px 10px 4px rgba(0,0,0,.15);
+  --md-sys-elevation-5: 0 4px 4px rgba(0,0,0,.30), 0 8px 12px 6px rgba(0,0,0,.15);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1120px;
+  --mb-rail-width: 72px;        /* navigation rail (>= 600px) */
+  --mb-navbar-height: 80px;     /* navigation bar (phone) */
+  --mb-topbar-height: 56px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 100ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.5px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* market-brief cockpit: Material 3 components on tokens.css. Plain CSS, no JS required (the
+   tooltip needs the page's own small script, see README). Prefix: md- for M3 components,
+   mb- for the cockpit's own (app shell, provenance tags, odds meter). Load after tokens.css. */
+
+/* ---- Base ----------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); -webkit-text-size-adjust: 100%; }
+body { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); font-family: var(--md-ref-typeface-plain); }
+a { color: var(--md-sys-color-primary); }
+button { font: inherit; color: inherit; letter-spacing: inherit; }
+:focus-visible { outline: none; box-shadow: var(--mb-focus-ring); border-radius: var(--md-sys-shape-corner-extra-small); }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- Icons (Material Symbols Outlined, inlined from icons.svg) ------------------------- */
+.ms { width: 1em; height: 1em; display: inline-block; vertical-align: -0.15em; fill: currentColor; flex: none; }
+.ms-20 { width: 20px; height: 20px; } .ms-24 { width: 24px; height: 24px; } .ms-40 { width: 40px; height: 40px; }
+
+/* ---- App shell: rail (>= 600px) / navigation bar (phone), top app bar ----------------- */
+.mb-app { min-height: 100vh; display: grid; grid-template-columns: var(--mb-rail-width) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.mb-rail { grid-row: 1 / span 2; background: var(--md-sys-color-surface); border-right: var(--mb-card-border); display: flex; flex-direction: column; align-items: center; gap: var(--mb-space-3); padding: var(--mb-space-3) 0; position: sticky; top: 0; height: 100vh; }
+.mb-rail .mb-rail-brand { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-small); background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); display: grid; place-items: center; font: var(--md-sys-typescale-label-large); margin-bottom: var(--mb-space-2); }
+.mb-nav-item { display: flex; flex-direction: column; align-items: center; gap: var(--mb-space-1); width: 72px; padding: 0; border: 0; background: none; color: var(--md-sys-color-on-surface-variant); text-decoration: none; cursor: pointer; font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.mb-nav-item .mb-nav-ind { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-small); display: grid; place-items: center; position: relative; transition: background var(--md-sys-motion-duration-short); }
+.mb-nav-item .ms { width: 22px; height: 22px; }
+.mb-nav-item:hover .mb-nav-ind { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
+.mb-nav-item[aria-current="page"] { color: var(--md-sys-color-on-surface); }
+.mb-nav-item[aria-current="page"] .mb-nav-ind { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); }
+.mb-nav-item.coming { color: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 55%, transparent); cursor: help; }
+.mb-nav-item.coming .mb-nav-ind::after { content: "soon"; position: absolute; top: -4px; right: -2px; font: var(--md-sys-typescale-label-small); letter-spacing: 0; padding: 0 5px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
+.mb-navbar { display: none; }
+.mb-topbar { grid-column: 2; position: sticky; top: 0; z-index: 20; height: var(--mb-topbar-height); background: var(--md-sys-color-surface); border-bottom: var(--mb-card-border); display: flex; align-items: center; gap: var(--mb-space-3); padding: 0 var(--mb-gutter-desktop); }
+.mb-topbar.scrolled { box-shadow: 0 1px 0 var(--md-sys-color-outline-variant); }
+.mb-topbar .mb-topbar-title { font: var(--md-sys-typescale-title-medium); font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-topbar .mb-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--mb-space-2); }
+.mb-content { grid-column: 2; min-width: 0; padding: 0 var(--mb-gutter-desktop) var(--mb-space-12); }
+.mb-content-inner { max-width: var(--mb-content-max); margin: 0 auto; }
+@media (max-width: 599px) {
+  .mb-app { grid-template-columns: minmax(0, 1fr); }
+  .mb-rail { display: none; }
+  .mb-topbar, .mb-content { grid-column: 1; }
+  .mb-topbar { padding: 0 var(--mb-gutter); }
+  .mb-content { padding: 0 var(--mb-gutter) calc(var(--mb-navbar-height) + var(--mb-space-6)); }
+  .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface); border-top: var(--mb-card-border); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
+  .mb-navbar .mb-nav-item { width: auto; flex: 1 1 0; min-width: 0; overflow: hidden; }
+  .mb-navbar { overflow: hidden; }
+  .mb-navbar .mb-nav-item .mb-nav-ind { width: 64px; }
+}
+
+/* ---- Cards ---------------------------------------------------------------------------- */
+.md-card { border-radius: var(--mb-card-radius); padding: var(--mb-space-4) var(--mb-space-5); background: var(--md-sys-color-surface-container-lowest); border: var(--mb-card-border); color: var(--md-sys-color-on-surface); }
+.md-card.elevated { box-shadow: var(--md-sys-elevation-1); }
+.md-card.filled { background: var(--md-sys-color-surface-container-high); }
+.md-card.outlined { background: var(--md-sys-color-surface-container-low); }
+.md-card > h2:first-child, .md-card > h3:first-child { margin-top: 0; }
+
+/* ---- Buttons -------------------------------------------------------------------------- */
+.md-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--mb-space-2); height: 34px; padding: 0 var(--mb-space-4); border-radius: var(--md-sys-shape-corner-small); border: 0; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); text-decoration: none; white-space: nowrap; position: relative; background: transparent; color: var(--md-sys-color-primary); }
+.md-btn .ms { width: 18px; height: 18px; margin-left: -8px; }
+.md-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
+.md-btn.filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.md-btn.tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.md-btn.outlined { border: var(--mb-card-border); color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface); }
+.md-btn.text { padding: 0 var(--mb-space-3); }
+.md-btn:disabled, .md-btn[aria-disabled="true"] { cursor: not-allowed; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); border-color: transparent; }
+.md-btn.text:disabled { background: transparent; }
+.md-icon-btn { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-full); border: 0; background: transparent; color: var(--md-sys-color-on-surface-variant); display: inline-grid; place-items: center; cursor: pointer; position: relative; padding: 0; }
+.md-icon-btn .ms { width: 24px; height: 24px; }
+.md-icon-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; }
+.md-icon-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-icon-btn.small { width: 24px; height: 24px; } .md-icon-btn.small .ms { width: 18px; height: 18px; }
+.md-icon-btn.outlined { border: 1px solid var(--md-sys-color-outline); }
+.md-icon-btn.tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+
+/* Help affordance: a small outlined icon button that opens a tooltip (hover, focus or tap) */
+.md-help { appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-small); letter-spacing: 0; display: inline-grid; place-items: center; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px; line-height: 1; }
+.md-help:hover, .md-help:focus-visible { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
+
+/* ---- Segmented buttons ---------------------------------------------------------------- */
+.md-segmented { display: inline-flex; border: var(--mb-card-border); border-radius: var(--md-sys-shape-corner-small); overflow: hidden; background: var(--md-sys-color-surface-container-low); padding: 2px; gap: 2px; }
+.md-segmented > button, .md-segmented > a { border: 0; border-radius: 6px; background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: 0; height: 30px; padding: 0 var(--mb-space-3); cursor: pointer; display: inline-flex; align-items: center; gap: var(--mb-space-2); text-decoration: none; white-space: nowrap; }
+.md-segmented > :first-child { border-left: 0; }
+.md-segmented > [aria-pressed="true"], .md-segmented > [aria-current="true"] { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); box-shadow: 0 1px 2px rgba(17,24,39,.12), 0 0 0 1px var(--md-sys-color-outline-variant); font-weight: 600; }
+.md-segmented > [aria-pressed="true"]::before { content: ""; width: 18px; height: 18px; margin-left: -4px; background: currentColor; -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; }
+.md-segmented > :disabled, .md-segmented > [aria-disabled="true"] { color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); cursor: not-allowed; }
+.md-segmented.dense > button, .md-segmented.dense > a { height: 26px; padding: 0 10px; font: var(--md-sys-typescale-label-medium); }
+.md-segmented.dense > [aria-pressed="true"]::before { width: 14px; height: 14px; }
+
+/* ---- Chips ---------------------------------------------------------------------------- */
+.md-chip { display: inline-flex; align-items: center; gap: var(--mb-space-2); height: 28px; padding: 0 var(--mb-space-3); border-radius: var(--md-sys-shape-corner-full); border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); white-space: nowrap; cursor: default; }
+.md-chip .ms { width: 18px; height: 18px; margin-left: -6px; color: var(--md-sys-color-primary); }
+.md-chip.assist { cursor: pointer; }
+.md-chip.filter { cursor: pointer; }
+.md-chip.filter[aria-pressed="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--md-sys-color-primary); }
+.md-chip.filter[aria-pressed="true"]::before { content: ""; width: 18px; height: 18px; margin-left: -6px; background: currentColor; -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; }
+.md-chip.small { height: 24px; padding: 0 var(--mb-space-2); font: var(--md-sys-typescale-label-medium); } .md-chip.small .ms { width: 14px; height: 14px; margin-left: -2px; }
+.md-chip .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+
+/* ---- Provenance tags: Live / Back-test / Mock / Paper / Derived (texture + colour) ------ */
+.mb-tag { display: inline-flex; align-items: center; gap: 4px; font: 600 10px/1 var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; border-radius: var(--md-sys-shape-corner-extra-small); padding: 3px 6px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); white-space: nowrap; vertical-align: middle; }
+.mb-tag .ms { width: 12px; height: 12px; }
+.mb-tag.live { border-color: transparent; color: var(--mb-color-on-live-container); background: var(--mb-color-live-container); }
+.mb-tag.bt, .mb-tag.backtest { background: var(--mb-color-backtest-container), var(--md-sys-color-surface-container-lowest); border-color: var(--mb-color-backtest); color: var(--mb-color-on-backtest-container); }
+.mb-tag.mock { border-style: dashed; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.derived { border-style: dotted; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.paper { border-color: transparent; color: var(--mb-color-on-paper-container); background: var(--mb-color-paper-container); }
+.mb-tag.coming { border-style: dashed; color: var(--md-sys-color-on-surface-variant); }
+/* The same provenance as a swatch inside a chip (header legends) */
+.md-chip.live .sw { background: var(--mb-color-live); }
+.md-chip.bt .sw { background: repeating-linear-gradient(135deg, var(--mb-color-backtest) 0 2px, #fff 2px 4px); border: 1px solid var(--mb-color-backtest); }
+.md-chip.mock .sw { border: 1.5px dashed var(--mb-color-mock); background: transparent; }
+
+/* ---- Status badges (never colour alone: always an icon or glyph plus the word) ---------- */
+.md-badge { display: inline-flex; align-items: center; gap: 4px; font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .02em; border-radius: var(--md-sys-shape-corner-extra-small); padding: 1px 6px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: transparent; white-space: nowrap; vertical-align: middle; }
+.md-badge.dot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--md-sys-color-error); }
+.md-badge.count { min-width: 16px; height: 16px; padding: 0 4px; border: 0; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); justify-content: center; }
+.mb-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.mb-status.up, .mb-status.hit { color: var(--mb-color-up); }
+.mb-status.down, .mb-status.miss { color: var(--mb-color-down); }
+.mb-status.neutral { color: var(--mb-color-neutral); }
+.mb-status.unknown { color: var(--mb-color-on-warn-container); }
+.md-badge.up, .md-badge.hit, .md-badge.confirmed_primary, .md-badge.corroborated { border-color: var(--mb-color-up); color: var(--mb-color-on-up-container); background: var(--mb-color-up-container); }
+.md-badge.down, .md-badge.miss, .md-badge.rumour, .md-badge.contradicted, .md-badge.promotional { border-color: var(--mb-color-down); color: var(--mb-color-on-down-container); background: var(--mb-color-down-container); }
+.md-badge.warn, .md-badge.single_source { border-color: var(--mb-color-warn); color: var(--mb-color-on-warn-container); background: var(--mb-color-warn-container); }
+.md-badge.neutral, .md-badge.unverified { border-color: var(--md-sys-color-outline-variant); color: var(--mb-color-on-neutral-container); background: var(--mb-color-neutral-container); }
+/* Square direction / sentiment markers: container tone with an on-container glyph */
+.mb-dir { width: 20px; height: 20px; border-radius: 4px; display: inline-grid; place-items: center; flex: none; }
+.mb-dir .ms { width: 15px; height: 15px; }
+.mb-dir.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-dir.dn, .mb-dir.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-dir.flat, .mb-dir.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-dir.unk { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+/* Round outcome markers: solid tone with a white glyph (strong, for ticks and crosses) */
+.mb-mark { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; flex: none; }
+.mb-mark .ms { width: 14px; height: 14px; }
+.mb-mark.ok, .mb-mark.hit { background: var(--mb-color-hit); }
+.mb-mark.no, .mb-mark.miss { background: var(--mb-color-miss); }
+.mb-mark.na { background: var(--mb-color-neutral); }
+
+/* ---- Tooltip (plain, M3: inverse surface) --------------------------------------------- */
+.md-tooltip { position: fixed; z-index: 50; max-width: min(320px, calc(100vw - 24px)); background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); padding: 8px 12px; border-radius: var(--md-sys-shape-corner-extra-small); box-shadow: var(--md-sys-elevation-2); pointer-events: none; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-tooltip.on { opacity: 1; }
+.md-tooltip b { color: var(--md-sys-color-inverse-on-surface); }
+.md-tooltip .row { display: flex; justify-content: space-between; gap: 14px; }
+.md-tooltip .row span:last-child { font-weight: 600; }
+.md-tooltip .dim { color: var(--md-ref-palette-neutral70); margin-top: 4px; }
+/* Rich tooltip (static, inside the flow) */
+.md-tooltip-rich { background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant); border-radius: var(--md-sys-shape-corner-medium); padding: var(--mb-space-3) var(--mb-space-4); box-shadow: var(--md-sys-elevation-2); max-width: 320px; font: var(--md-sys-typescale-body-medium); }
+.md-tooltip-rich .subhead { font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; }
+
+/* ---- Data tables ---------------------------------------------------------------------- */
+.md-table { width: 100%; border-collapse: collapse; font: var(--md-sys-typescale-body-medium); font-variant-numeric: tabular-nums; }
+.md-table th { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--md-sys-color-outline-variant); white-space: nowrap; }
+.md-table td { padding: 6px 8px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); vertical-align: middle; }
+.md-table tr:hover td { background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent); }
+.md-table td.num, .md-table th.num { text-align: right; }
+.md-table tr.muted td { color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-low); }
+.md-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---- Lists, key-value, dividers -------------------------------------------------------- */
+.md-divider { border: 0; border-top: 1px solid var(--md-sys-color-outline-variant); margin: var(--mb-space-4) 0; }
+.md-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font: var(--md-sys-typescale-body-medium); margin: 0; }
+.md-kv dt { color: var(--md-sys-color-on-surface-variant); } .md-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+code { font-family: var(--md-ref-typeface-mono); font-size: .92em; overflow-wrap: anywhere; }
+.md-list { list-style: none; margin: 0; padding: 0; }
+.md-list > li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--mb-space-3); align-items: center; padding: var(--mb-space-2) 0; border-top: 1px solid var(--md-sys-color-surface-container-high); }
+.md-list > li:first-child { border-top: 0; }
+
+/* ---- Progress and the odds meter ------------------------------------------------------- */
+.md-progress { height: 4px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-secondary-container); overflow: hidden; }
+.md-progress > i { display: block; height: 100%; background: var(--md-sys-color-primary); border-radius: inherit; }
+/* Odds meter: a 30-70% track with the midpoint tick; the dot sits at P(up). Up/down by colour AND
+   by side of the tick, and the number is printed next to it. */
+.mb-odds { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.mb-odds svg { width: 64px; height: 14px; display: block; }
+.mb-odds b { font-weight: 600; min-width: 30px; }
+.mb-odds .track { fill: var(--md-sys-color-surface-container-highest); }
+.mb-odds .mid { stroke: var(--md-sys-color-outline); }
+.mb-odds .dot { stroke: #fff; stroke-width: 1.5; } .mb-odds .dot.up { fill: var(--mb-color-up); } .mb-odds .dot.dn { fill: var(--mb-color-down); }
+/* Strength bar (signed, centred): up fills right of centre, down fills left, unknown straddles */
+.mb-bar { height: 8px; background: var(--md-sys-color-surface-container-highest); border-radius: 4px; position: relative; overflow: hidden; }
+.mb-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.mb-bar i.up { background: var(--mb-color-up); left: 50%; } .mb-bar i.dn { background: var(--mb-color-down); right: 50%; } .mb-bar i.unk { background: var(--mb-color-warn); left: 50%; transform: translateX(-50%); }
+.mb-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--md-sys-color-outline-variant); }
+
+/* ---- KPI tile (stat tile) ------------------------------------------------------------- */
+.mb-kpi { border-radius: var(--mb-panel-radius); padding: 12px 14px; background: var(--md-sys-color-surface); border: var(--mb-card-border); }
+.mb-kpi.accent { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); } .mb-kpi.accent .l { color: inherit; opacity: .85; }
+.mb-kpi .v { font: var(--md-sys-typescale-headline-small); font-weight: 700; line-height: 1.1; }
+.mb-kpi .l { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); margin-top: 4px; }
+
+/* ---- Details / expansion -------------------------------------------------------------- */
+details.md-expansion { background: var(--md-sys-color-surface-container-lowest); border: var(--mb-card-border); border-radius: var(--mb-card-radius); padding: 0 var(--mb-space-5); }
+details.md-expansion summary { cursor: pointer; padding: 14px 0; font: var(--md-sys-typescale-title-small); list-style: none; display: flex; align-items: center; gap: var(--mb-space-2); }
+details.md-expansion summary::-webkit-details-marker { display: none; }
+details.md-expansion summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--md-sys-color-on-surface-variant); border-bottom: 2px solid var(--md-sys-color-on-surface-variant); transform: rotate(-45deg); transition: transform .15s; margin-right: 4px; flex: none; }
+details.md-expansion[open] summary::before { transform: rotate(45deg); }
+details.md-expansion .inner { padding: 0 0 18px; }
+
+/* ---- Code / preformatted ---------------------------------------------------------------- */
+.md-pre { background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-small); padding: 10px; font: 11.5px/1.45 var(--md-ref-typeface-mono); overflow: auto; max-height: 320px; margin: 0; }
+
+/* ---- Verdict header (decision pages): NO red; YES green, darker when strong, lighter when okay ---- */
+.mb-verdict { display: grid; grid-template-columns: auto 1fr; gap: 18px 22px; padding: 20px 22px; align-items: center; }
+.mb-verdict .mb-verdict-box { width: 64px; height: 64px; border-radius: var(--md-sys-shape-corner-medium); color: #fff; display: grid; place-items: center; }
+.mb-verdict .mb-verdict-box .ms { width: 40px; height: 40px; }
+.mb-verdict .mb-verdict-word { font-size: 52px; font-weight: 800; line-height: .95; letter-spacing: -1.5px; }
+.mb-verdict .mb-verdict-word small { display: block; font-size: 13px; font-weight: 600; letter-spacing: .02em; margin-top: 6px; }
+.mb-verdict.no { background: var(--mb-verdict-no-bg); color: var(--mb-verdict-no-ink); } .mb-verdict.no .mb-verdict-box { background: var(--mb-verdict-no-box); }
+.mb-verdict.yes-strong { background: var(--mb-verdict-strong-bg); color: var(--mb-verdict-strong-ink); } .mb-verdict.yes-strong .mb-verdict-box { background: var(--mb-verdict-strong-box); }
+.mb-verdict.yes-ok { background: var(--mb-verdict-ok-bg); color: var(--mb-verdict-ok-ink); } .mb-verdict.yes-ok .mb-verdict-box { background: var(--mb-verdict-ok-box); }
+/* Signed number: green/red with its sign (the sign is the glyph) */
+.mb-delta { font-variant-numeric: tabular-nums; font-weight: 600; } .mb-delta.up { color: var(--mb-color-up); } .mb-delta.down { color: var(--mb-color-down); } .mb-delta.flat { color: var(--md-sys-color-on-surface-variant); }
+/* Uppercase micro label (section eyebrows, table headers, stat labels) */
+.mb-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+</style>
+<style>
+/* Watchlist screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+
+/* ticker tape */
+.tape{overflow:hidden;background:var(--md-sys-color-surface);border-bottom:var(--mb-card-border);height:40px;position:relative}
+.tape .track{display:flex;white-space:nowrap;width:max-content;animation:tape 90s linear infinite}
+.tape:hover .track{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tape .it{display:inline-flex;align-items:center;gap:8px;padding:0 18px;border-right:1px solid var(--md-sys-color-outline-variant);font-size:12.5px;height:40px;color:inherit;text-decoration:none}
+.tape .it b{font-weight:700}
+@media (prefers-reduced-motion: reduce){.tape .track{animation:none}.tape{overflow-x:auto}}
+
+/* market header */
+.mhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.mhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.mhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.mhead .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.mhead .meta .dot{width:7px;height:7px;border-radius:50%;background:var(--mb-color-down);display:inline-block;margin-right:4px}
+.mhead .meta .dot.open{background:var(--mb-color-up)}
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);border:var(--mb-card-border);border-radius:var(--mb-card-radius);background:var(--md-sys-color-surface);margin-top:14px;overflow:hidden}
+.tiles div{padding:10px 14px;border-left:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.tiles div:first-child{border-left:0}
+.tiles b{display:block;font-size:16px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.tiles small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* signals banner */
+.banner{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:14px 18px;border-radius:var(--mb-card-radius);margin-top:14px;border:1px solid transparent}
+.banner.none{background:var(--md-sys-color-surface-container-lowest);border-color:var(--md-sys-color-outline-variant)}
+.banner.yes{background:var(--mb-verdict-ok-bg);color:var(--mb-verdict-ok-ink)}
+.banner .ico{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant)}
+.banner.yes .ico{background:var(--mb-verdict-ok-box);color:#fff}
+.banner .ico .ms{width:26px;height:26px}
+.banner b.t{font-size:16px;display:block}
+.banner .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.banner.yes .s{color:inherit;opacity:.85}
+
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px}
+.toolbar .chips{display:flex;flex-wrap:wrap;gap:6px}
+.toolbar .md-chip{height:28px;padding:0 10px;font:var(--md-sys-typescale-label-medium)}
+.toolbar input[type=search]{height:30px;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-small);padding:0 10px 0 30px;font:inherit;background:var(--md-sys-color-surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%236b7280'><path d='M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z'/></svg>") 8px center/16px no-repeat;width:200px;color:inherit}
+.toolbar .right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolbar select{height:30px;border:var(--mb-card-border);border-radius:var(--md-sys-shape-corner-small);padding:0 8px;font:inherit;background:var(--md-sys-color-surface);color:inherit}
+
+/* table */
+.wl{width:100%;border-collapse:collapse;font-size:12.5px}
+.wl th{font:500 10.5px/16px var(--md-ref-typeface-plain);letter-spacing:.05em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);text-align:left;padding:8px 6px;border-bottom:1px solid var(--md-sys-color-outline-variant);white-space:nowrap;cursor:pointer;user-select:none;background:var(--md-sys-color-surface-container-lowest)}
+.wl th.num,.wl td.num{text-align:right}
+.wl th[aria-sort=ascending]::after{content:" ↑"} .wl th[aria-sort=descending]::after{content:" ↓"}
+.wl td{padding:6px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high);vertical-align:middle;white-space:nowrap}
+.wl tr.sec td{background:var(--md-sys-color-surface-container-low);font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:6px 8px}
+.wl tr.sec td b{color:var(--md-sys-color-on-surface);letter-spacing:0;text-transform:none;font-size:12px}
+.wl tr.row{cursor:pointer}
+.wl tr.row:hover td{background:color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent)}
+.wl tr.row:focus-visible{outline:none} .wl tr.row:focus-visible td{box-shadow:inset 0 0 0 2px var(--md-sys-color-primary)}
+.wl .sym{display:flex;align-items:center;gap:10px;min-width:0}
+.wl .sym .bx{width:30px;height:30px;border-radius:7px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);display:grid;place-items:center;font-weight:800;font-size:10px;letter-spacing:.2px;flex:none}
+.wl .sym b{display:block;font-size:13px}
+.wl .sym small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
+.wl .px{font-weight:700;font-size:13px}
+.wl .px small{display:block;color:var(--md-sys-color-on-surface-variant);font-weight:400;font-size:10.5px}
+.spark{width:64px;height:24px;display:block}
+.vd{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px}
+.vd .ms{width:14px;height:14px}
+.vd.no{background:var(--mb-verdict-no-bg);color:var(--mb-verdict-no-ink)}
+.vd.yes-ok{background:var(--mb-verdict-ok-bg);color:var(--mb-verdict-ok-ink)}
+.vd.yes-strong{background:var(--mb-verdict-strong-bg);color:var(--mb-verdict-strong-ink)}
+.rng{display:inline-flex;align-items:center;gap:6px}
+.rng svg{width:64px;height:16px;display:block}
+.wl .mb-odds svg{width:44px}
+.wl .mb-odds b{min-width:0}
+.rng small{color:var(--md-sys-color-on-surface-variant);font-size:10.5px}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.held{display:inline-flex;align-items:center;gap:6px}
+.held .md-progress{width:34px}
+.wl .evt b{display:block} .wl .evt small{color:var(--md-sys-color-on-surface-variant);font-size:10.5px}
+.wl .nw{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
+.wl .nw .md-badge{font-size:10px;padding:0 5px;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+.count{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:8px}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+
+@media (max-width: 1440px){ .wl .c-p5,.wl .c-cue{display:none} }
+@media (max-width: 1000px){ .tiles{grid-template-columns:repeat(3,1fr)} .tiles div{border-top:1px solid var(--md-sys-color-outline-variant)} .tiles div:nth-child(-n+3){border-top:0} .tiles div:nth-child(4){border-left:0} .wl .c-spark,.wl .c-cue,.wl .c-held{display:none} }
+@media (max-width: 760px){
+  .pad{padding:0 var(--mb-gutter)}
+  .mhead{grid-template-columns:1fr}
+  .tiles{grid-template-columns:repeat(2,1fr)} .tiles div:nth-child(-n+3){border-top:1px solid var(--md-sys-color-outline-variant)} .tiles div:nth-child(-n+2){border-top:0} .tiles div:nth-child(odd){border-left:0} .tiles div:nth-child(4){border-left:1px solid var(--md-sys-color-outline-variant)}
+  .banner{grid-template-columns:1fr}
+  .toolbar input[type=search]{width:100%}
+  .toolbar .right{margin-left:0;width:100%}
+  .wl .c-5d,.wl .c-p5,.wl .c-news,.wl .c-range{display:none}
+  .wl td,.wl th{padding:6px 5px}
+  .wl .sym small{max-width:110px}
+  .tape .it{padding:0 12px}
+  .mb-topbar .md-chip{display:none}
+}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <!-- Material Symbols Outlined (weight 400, fill 0, grade 0, optical size 24), Apache License 2.0, Google LLC; see LICENSE-material-symbols.txt.
+       Use: <svg class="ms"><use href="#ms-NAME"/></svg>. The symbols are the 24px outlined glyphs copied unchanged from
+       github.com/google/material-design-icons (symbols/web/NAME/materialsymbolsoutlined/NAME_24px.svg). -->
+  <symbol id="ms-account_balance" viewBox="0 -960 960 960"><path d="M200-280v-280h80v280h-80Zm240 0v-280h80v280h-80ZM80-120v-80h800v80H80Zm600-160v-280h80v280h-80ZM80-640v-80l400-200 400 200v80H80Zm178-80h444-444Zm0 0h444L480-830 258-720Z"/></symbol>
+  <symbol id="ms-account_balance_wallet" viewBox="0 -960 960 960"><path d="M200-200v-560 560Zm0 80q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v100h-80v-100H200v560h560v-100h80v100q0 33-23.5 56.5T760-120H200Zm320-160q-33 0-56.5-23.5T440-360v-240q0-33 23.5-56.5T520-680h280q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H520Zm280-80v-240H520v240h280Zm-160-60q25 0 42.5-17.5T700-480q0-25-17.5-42.5T640-540q-25 0-42.5 17.5T580-480q0 25 17.5 42.5T640-420Z"/></symbol>
+  <symbol id="ms-apartment" viewBox="0 -960 960 960"><path d="M120-120v-560h160v-160h400v320h160v400H520v-160h-80v160H120Zm80-80h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 320h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 480h80v-80h-80v80Zm0-160h80v-80h-80v80Z"/></symbol>
+  <symbol id="ms-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
+  <symbol id="ms-arrow_upward" viewBox="0 -960 960 960"><path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"/></symbol>
+  <symbol id="ms-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
+  <symbol id="ms-bolt" viewBox="0 -960 960 960"><path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z"/></symbol>
+  <symbol id="ms-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
+  <symbol id="ms-check" viewBox="0 -960 960 960"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></symbol>
+  <symbol id="ms-chevron_right" viewBox="0 -960 960 960"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></symbol>
+  <symbol id="ms-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="ms-construction" viewBox="0 -960 960 960"><path d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"/></symbol>
+  <symbol id="ms-description" viewBox="0 -960 960 960"><path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ms-event" viewBox="0 -960 960 960"><path d="M580-240q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Z"/></symbol>
+  <symbol id="ms-expand_more" viewBox="0 -960 960 960"><path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/></symbol>
+  <symbol id="ms-format_list_bulleted" viewBox="0 -960 960 960"><path d="M360-200v-80h480v80H360Zm0-240v-80h480v80H360Zm0-240v-80h480v80H360ZM200-160q-33 0-56.5-23.5T120-240q0-33 23.5-56.5T200-320q33 0 56.5 23.5T280-240q0 33-23.5 56.5T200-160Zm0-240q-33 0-56.5-23.5T120-480q0-33 23.5-56.5T200-560q33 0 56.5 23.5T280-480q0 33-23.5 56.5T200-400Zm0-240q-33 0-56.5-23.5T120-720q0-33 23.5-56.5T200-800q33 0 56.5 23.5T280-720q0 33-23.5 56.5T200-640Z"/></symbol>
+  <symbol id="ms-gavel" viewBox="0 -960 960 960"><path d="M160-120v-80h480v80H160Zm226-194L160-540l84-86 228 226-86 86Zm254-254L414-796l86-84 226 226-86 86Zm184 408L302-682l56-56 522 522-56 56Z"/></symbol>
+  <symbol id="ms-help" viewBox="0 -960 960 960"><path d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-history" viewBox="0 -960 960 960"><path d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
+  <symbol id="ms-home" viewBox="0 -960 960 960"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/></symbol>
+  <symbol id="ms-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-layers" viewBox="0 -960 960 960"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></symbol>
+  <symbol id="ms-menu" viewBox="0 -960 960 960"><path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></symbol>
+  <symbol id="ms-newspaper" viewBox="0 -960 960 960"><path d="M160-120q-33 0-56.5-23.5T80-200v-640l67 67 66-67 67 67 67-67 66 67 67-67 67 67 66-67 67 67 67-67 66 67 67-67v640q0 33-23.5 56.5T800-120H160Zm0-80h280v-240H160v240Zm360 0h280v-80H520v80Zm0-160h280v-80H520v80ZM160-520h640v-120H160v120Z"/></symbol>
+  <symbol id="ms-open_in_new" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></symbol>
+  <symbol id="ms-pending" viewBox="0 -960 960 960"><path d="M280-420q25 0 42.5-17.5T340-480q0-25-17.5-42.5T280-540q-25 0-42.5 17.5T220-480q0 25 17.5 42.5T280-420Zm200 0q25 0 42.5-17.5T540-480q0-25-17.5-42.5T480-540q-25 0-42.5 17.5T420-480q0 25 17.5 42.5T480-420Zm200 0q25 0 42.5-17.5T740-480q0-25-17.5-42.5T680-540q-25 0-42.5 17.5T620-480q0 25 17.5 42.5T680-420ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-public" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm-40-82v-78q-33 0-56.5-23.5T360-320v-40L168-552q-3 18-5.5 36t-2.5 36q0 121 79.5 212T440-162Zm276-102q20-22 36-47.5t26.5-53q10.5-27.5 16-56.5t5.5-59q0-98-54.5-179T600-776v16q0 33-23.5 56.5T520-680h-80v80q0 17-11.5 28.5T400-560h-80v80h240q17 0 28.5 11.5T600-440v120h40q26 0 47 15.5t29 40.5Z"/></symbol>
+  <symbol id="ms-query_stats" viewBox="0 -960 960 960"><path d="m105-233-65-47 200-320 120 140 160-260 109 163q-23 1-43.5 5.5T545-539l-22-33-152 247-121-141-145 233ZM863-40 738-165q-20 14-44.5 21t-50.5 7q-75 0-127.5-52.5T463-317q0-75 52.5-127.5T643-497q75 0 127.5 52.5T823-317q0 26-7 50.5T795-221L920-97l-57 57ZM643-217q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm89-320q-19-8-39.5-13t-42.5-6l205-324 65 47-188 296Z"/></symbol>
+  <symbol id="ms-receipt_long" viewBox="0 -960 960 960"><path d="M240-80q-50 0-85-35t-35-85v-120h120v-560l60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60v680q0 50-35 85t-85 35H240Zm480-80q17 0 28.5-11.5T760-200v-560H320v440h360v120q0 17 11.5 28.5T720-160ZM360-600v-80h240v80H360Zm0 120v-80h240v80H360Zm320-120q-17 0-28.5-11.5T640-640q0-17 11.5-28.5T680-680q17 0 28.5 11.5T720-640q0 17-11.5 28.5T680-600Zm0 120q-17 0-28.5-11.5T640-520q0-17 11.5-28.5T680-560q17 0 28.5 11.5T720-520q0 17-11.5 28.5T680-480ZM240-160h360v-80H200v40q0 17 11.5 28.5T240-160Zm-40 0v-80 80Z"/></symbol>
+  <symbol id="ms-remove" viewBox="0 -960 960 960"><path d="M200-440v-80h560v80H200Z"/></symbol>
+  <symbol id="ms-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
+  <symbol id="ms-science" viewBox="0 -960 960 960"><path d="M200-120q-51 0-72.5-45.5T138-250l222-270v-240h-40q-17 0-28.5-11.5T280-800q0-17 11.5-28.5T320-840h320q17 0 28.5 11.5T680-800q0 17-11.5 28.5T640-760h-40v240l222 270q32 39 10.5 84.5T760-120H200Zm0-80h560L520-492v-268h-80v268L200-200Zm280-280Z"/></symbol>
+  <symbol id="ms-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="ms-sensors" viewBox="0 -960 960 960"><path d="M197-197q-54-55-85.5-127.5T80-480q0-84 31.5-156.5T197-763l57 57q-44 44-69 102t-25 124q0 67 25 125t69 101l-57 57Zm113-113q-32-33-51-76.5T240-480q0-51 19-94.5t51-75.5l57 57q-22 22-34.5 51T320-480q0 33 12.5 62t34.5 51l-57 57Zm170-90q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm170 90-57-57q22-22 34.5-51t12.5-62q0-33-12.5-62T593-593l57-57q32 32 51 75.5t19 94.5q0 50-19 93.5T650-310Zm113 113-57-57q44-44 69-102t25-124q0-67-25-125t-69-101l57-57q54 54 85.5 126.5T880-480q0 83-31.5 155.5T763-197Z"/></symbol>
+  <symbol id="ms-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
+  <symbol id="ms-trending_down" viewBox="0 -960 960 960"><path d="M640-240v-80h104L536-526 376-366 80-664l56-56 240 240 160-160 264 264v-104h80v240H640Z"/></symbol>
+  <symbol id="ms-trending_flat" viewBox="0 -960 960 960"><path d="m700-300-57-56 84-84H120v-80h607l-83-84 57-56 179 180-180 180Z"/></symbol>
+  <symbol id="ms-trending_up" viewBox="0 -960 960 960"><path d="m136-240-56-56 296-298 160 160 208-206H640v-80h240v240h-80v-104L536-320 376-480 136-240Z"/></symbol>
+  <symbol id="ms-verified_user" viewBox="0 -960 960 960"><path d="m438-338 226-226-57-57-169 169-84-84-57 57 141 141Zm42 258q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
+  <symbol id="ms-warning" viewBox="0 -960 960 960"><path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z"/></symbol>
+</svg>
+
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title" id="topbar-title"></div>
+    <div class="mb-topbar-actions">
+      <span class="md-chip small" data-tip="Coming: symbol search across both markets. Use the filter box below for this list." aria-disabled="true"><svg class="ms"><use href="#ms-search"/></svg>Search symbols</span>
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner">
+    <div class="tape" id="tape" aria-label="Watchlist, last close and day move"><div class="track" id="tape-track"></div></div>
+    <div class="pad"><div class="wrap">
+
+<section class="mhead" aria-label="Market">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+<div class="tiles" id="tiles"></div>
+
+<div class="banner" id="banner"></div>
+
+<div class="toolbar">
+  <input type="search" id="q" placeholder="Filter by symbol or name" aria-label="Filter rows">
+  <div class="chips" id="sector-chips"></div>
+  <div class="right">
+    <label class="micro" for="sort">Sort</label>
+    <select id="sort">
+      <option value="sector">Sector (grouped)</option>
+      <option value="move">Day move</option>
+      <option value="move_5">5-day move</option>
+      <option value="p5">Chance up, 5d</option>
+      <option value="p1">Chance up, 1d</option>
+      <option value="cover80_1d">80% ranges held</option>
+      <option value="days_to_earnings">Next results</option>
+      <option value="news">News items</option>
+      <option value="ticker">Symbol</option>
+    </select>
+  </div>
+</div>
+
+<section class="card" style="padding:0 0 10px">
+<div class="tblwrap">
+<table class="wl" id="wl">
+  <thead><tr>
+    <th data-k="ticker">Company</th>
+    <th class="num" data-k="close">Last</th>
+    <th class="num" data-k="move">Day</th>
+    <th class="num c-5d" data-k="move_5">5d</th>
+    <th class="c-spark">20 sessions</th>
+    <th class="num" data-k="p1">Chance up 1d <button class="md-help" data-tip="The signal model's live probability that the stock closes above its next open (1 day) or above the open four sessions later (5 days). 50% is a coin flip. 60% is the cockpit's Paper-candidate line (a reading aid, not a pipeline rule); a YES is a live call the forecaster made." aria-label="Explain">?</button></th>
+    <th class="num c-p5" data-k="p5">5d</th>
+    <th data-k="verdict">Verdict <button class="md-help" data-tip="NO (red) when there is no live call for the latest date; YES (green) for a live up call, darker green when strong (confidence >= 0.75 or anchored probability >= 0.65), lighter when okay. Every signal is Paper until the live track record proves it." aria-label="Explain">?</button></th>
+    <th class="c-range">5-day range <button class="md-help" data-tip="The latest published 5-day 80% range (ranges.py), drawn around the last close. Hover for the numbers." aria-label="Explain">?</button></th>
+    <th class="c-held" data-k="cover80_1d">80% held <button class="md-help" data-tip="Back-test: how often the rule replay's 1-day 80% range contained the next close over the window (target 80%). scripts/replay.py, not live." aria-label="Explain">?</button></th>
+    <th data-k="days_to_earnings">Next results</th>
+    <th class="c-news" data-k="news">News 72h <button class="md-help" data-tip="Stored headlines tagged to the company in the last 72 hours of the archive, the number of high-materiality ones, and the best verification status of its news clusters." aria-label="Explain">?</button></th>
+    <th class="num c-cue" data-k="cue">Cue <button class="md-help" data-tip="Overnight cue: the ADR's move at the US close (India) or the pre-market gap (US). Half of it goes into the range centre." aria-label="Explain">?</button></th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+</div>
+<div class="count" id="count" style="padding:0 16px"></div>
+<div class="legend" style="padding:0 16px">
+  <span><span class="vd no"><svg class="ms"><use href="#ms-block"/></svg>NO</span> no edge</span>
+  <span><span class="vd yes-ok"><svg class="ms"><use href="#ms-check"/></svg>YES</span> okay signal</span>
+  <span><span class="vd yes-strong"><svg class="ms"><use href="#ms-bolt"/></svg>YES</span> strong signal</span>
+  <span><span class="mb-tag paper">paper</span> every signal until proven</span>
+  <span><span class="mb-tag live">live</span> stored by the pipeline</span>
+  <span><span class="mb-tag bt">back-test</span> rule replay / walk-forward</span>
+  <span>Click a row for the company's decision page.</span>
+</div>
+</section>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion" id="d-src"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+    </div></div>
+  </div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = {"market": "us", "market_name": "US (NYSE/Nasdaq)", "exchange": "NYSE/Nasdaq", "currency": {"code": "USD", "symbol": "$", "locale": "en-US", "unit": "bn"}, "as_of": "2026-10-06", "today": "2026-10-07", "built_at": "2026-10-07", "window": ["2026-08-18", "2026-10-06"], "call_threshold": 0.6, "header": {"regime": "TRENDING", "major_event_names": [], "vol_level": 15.79, "vol_name": "VIX", "vol_move": -3.29, "vol_close": 15.01, "bench_name": "S&P 500 ETF", "bench_close": 779.09, "bench_move": 0.55, "bench_move_5": 1.95, "bench_live": {"price": 775.62, "change_pct": -0.45, "ts": "2026-10-07 12:25:00+00:00"}, "flows": null, "run_at": "2026-10-07 12:33:57+00:00", "session": {"market": "us", "local_time": "2026-10-07T13:20-04:00", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00", "in_session": true, "late_run": false}, "n": 20, "yes": [], "candidates": [], "abstain": 20, "blocked": [], "scored_total": 0, "model_skill": false, "review_week": "2026-W40", "up": 16, "down": 4, "news_total": 1323, "news_high": 21}, "sectors": [{"name": "Banks", "members": ["JPM", "BAC"], "index": {"symbol": "XLF", "name": "Financials", "move": 0.24, "move_5": 0.0}}, {"name": "Tech", "members": ["NVDA", "AAPL"], "index": {"symbol": "XLK", "name": "Technology", "move": 0.53, "move_5": 3.86}}, {"name": "Internet", "members": ["GOOGL", "META"], "index": {"symbol": "XLC", "name": "Communication services", "move": 0.04, "move_5": 0.16}}, {"name": "Insurance", "members": ["PGR", "ALL"], "index": {"symbol": "IAK", "name": "US insurance (iShares)", "move": 0.28, "move_5": 0.37}}, {"name": "Airlines", "members": ["DAL", "UAL"], "index": {"symbol": "JETS", "name": "US airlines (U.S. Global Jets)", "move": 0.75, "move_5": -1.61}}, {"name": "Energy", "members": ["XOM", "CVX"], "index": {"symbol": "XLE", "name": "Energy", "move": 0.47, "move_5": 3.59}}, {"name": "Pharma", "members": ["LLY", "MRK"], "index": {"symbol": "XLV", "name": "Health care", "move": -0.17, "move_5": -2.13}}, {"name": "Autos", "members": ["TSLA", "GM"], "index": {"symbol": "XLY", "name": "Consumer discretionary", "move": 1.18, "move_5": 2.35}}, {"name": "Retail", "members": ["WMT", "COST"], "index": {"symbol": "XLP", "name": "Consumer staples", "move": 0.94, "move_5": -0.06}}, {"name": "Industrials", "members": ["CAT", "DE"], "index": {"symbol": "XLI", "name": "Industrials", "move": 0.87, "move_5": 1.45}}], "rows": [{"ticker": "JPM", "name": "JPMorgan", "sector": "Banks", "close": 331.28, "date": "2026-10-06", "move": -0.33, "move_5": -1.1, "move_20": -6.29, "spark": [353.51, 354.71, 353.56, 356.23, 350.13, 352.49, 348.92, 349.31, 349.67, 352.04, 340.0, 337.53, 338.56, 343.06, 336.59, 334.98, 330.83, 333.18, 332.38, 332.38, 331.28], "rsi": 33, "rel_sector_5d": 0.48, "quality": "OK", "days_to_earnings": 6, "p1": 0.5241, "p5": 0.5408, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 317.38, "hi80": 349.55, "lo50": 324.91, "hi50": 341.08, "target": "2026-10-13", "as_of": "2026-10-06", "base": 331.28}, "range1": {"lo80": 327.71, "hi80": 336.34, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 79, "cover_n": 34, "cover80_5d": 90, "next_earnings": {"date": "2026-10-13", "timing": null, "days": 6}, "news": {"n": 182, "high": 0, "latest": "2026-10-07 12:20:40+00:00"}, "best_status": "unverified", "cue": {"symbol": "JPM", "change_pct": -1.17, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "BAC", "name": "Bank of America", "sector": "Banks", "close": 54.09, "date": "2026-10-06", "move": 0.17, "move_5": -1.58, "move_20": -13.3, "spark": [62.39, 62.67, 62.56, 62.69, 59.47, 59.52, 57.9, 58.18, 57.73, 57.96, 56.2, 56.0, 56.03, 56.7, 55.47, 54.96, 54.43, 53.73, 53.75, 54.0, 54.09], "rsi": 25, "rel_sector_5d": -0.48, "quality": "OK", "days_to_earnings": 7, "p1": 0.5266, "p5": 0.5472, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 52.34, "hi80": 56.42, "lo50": 53.3, "hi50": 55.36, "target": "2026-10-13", "as_of": "2026-10-06", "base": 54.09}, "range1": {"lo80": 53.34, "hi80": 55.1, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 76, "cover_n": 34, "cover80_5d": 67, "next_earnings": {"date": "2026-10-14", "timing": null, "days": 7}, "news": {"n": 97, "high": 0, "latest": "2026-10-07 11:41:00+00:00"}, "best_status": "single_source", "cue": {"symbol": "BAC", "change_pct": -1.2, "ts": "2026-10-07 12:26:01+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "NVDA", "name": "Nvidia", "sector": "Tech", "close": 239.24, "date": "2026-10-06", "move": 0.14, "move_5": 5.29, "move_20": 5.99, "spark": [225.73, 223.67, 218.36, 218.29, 210.96, 212.17, 213.9, 219.34, 222.27, 227.38, 228.87, 225.51, 224.58, 225.07, 228.86, 227.21, 228.38, 230.86, 233.95, 238.9, 239.24], "rsi": 67, "rel_sector_5d": 4.01, "quality": "OK", "days_to_earnings": 41, "p1": 0.5271, "p5": 0.5369, "news_score": 0.1867, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 228.42, "hi80": 253.48, "lo50": 234.28, "hi50": 246.86, "target": "2026-10-13", "as_of": "2026-10-06", "base": 239.24}, "range1": {"lo80": 234.47, "hi80": 245.31, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 88, "cover_n": 34, "cover80_5d": 93, "next_earnings": {"date": "2026-11-17", "timing": null, "days": 41}, "news": {"n": 255, "high": 3, "latest": "2026-10-07 12:22:00+00:00"}, "best_status": "single_source", "cue": {"symbol": "NVDA", "change_pct": -1.03, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "AAPL", "name": "Apple", "sector": "Tech", "close": 333.63, "date": "2026-10-06", "move": 0.22, "move_5": 1.28, "move_20": 5.51, "spark": [316.22, 315.34, 326.57, 332.27, 333.08, 331.34, 332.41, 337.0, 336.13, 338.98, 339.75, 337.02, 335.92, 341.07, 338.4, 329.4, 333.02, 330.32, 333.69, 332.89, 333.63], "rsi": 55, "rel_sector_5d": -4.01, "quality": "OK", "days_to_earnings": 26, "p1": 0.5219, "p5": 0.5336, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 322.95, "hi80": 347.61, "lo50": 328.78, "hi50": 341.17, "target": "2026-10-13", "as_of": "2026-10-06", "base": 333.63}, "range1": {"lo80": 328.97, "hi80": 339.65, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 88, "cover_n": 34, "cover80_5d": 97, "next_earnings": {"date": "2026-10-29", "timing": null, "days": 22}, "news": {"n": 108, "high": 1, "latest": "2026-10-07 12:01:22+00:00"}, "best_status": "single_source", "cue": {"symbol": "AAPL", "change_pct": 1.11, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "GOOGL", "name": "Alphabet", "sector": "Internet", "close": 347.68, "date": "2026-10-06", "move": 0.35, "move_5": 1.98, "move_20": 2.75, "spark": [338.36, 330.65, 332.6, 338.5, 349.39, 344.98, 342.87, 347.33, 349.54, 354.97, 351.16, 337.83, 342.36, 343.92, 342.75, 340.92, 344.08, 338.24, 343.5, 346.47, 347.68], "rsi": 53, "rel_sector_5d": 1.97, "quality": "OK", "days_to_earnings": 21, "p1": 0.521, "p5": 0.5323, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 334.74, "hi80": 365.17, "lo50": 341.89, "hi50": 357.19, "target": "2026-10-13", "as_of": "2026-10-06", "base": 347.68}, "range1": {"lo80": 342.12, "hi80": 355.3, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 91, "cover_n": 34, "cover80_5d": 100, "next_earnings": {"date": "2026-10-28", "timing": null, "days": 21}, "news": {"n": 101, "high": 6, "latest": "2026-10-07 11:17:05+00:00"}, "best_status": "unverified", "cue": {"symbol": "GOOGL", "change_pct": -0.51, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "META", "name": "Meta Platforms", "sector": "Internet", "close": 738.88, "date": "2026-10-06", "move": -0.41, "move_5": 0.01, "move_20": 20.44, "spark": [613.48, 653.69, 644.38, 648.03, 665.6, 670.24, 673.31, 682.31, 665.75, 741.25, 736.6, 744.1, 777.59, 751.66, 715.62, 738.79, 725.18, 725.93, 728.08, 741.9, 738.88], "rsi": 63, "rel_sector_5d": -1.97, "quality": "OK", "days_to_earnings": 21, "p1": 0.5179, "p5": 0.5266, "news_score": -0.102, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 683.35, "hi80": 806.2, "lo50": 711.37, "hi50": 773.04, "target": "2026-10-13", "as_of": "2026-10-06", "base": 738.88}, "range1": {"lo80": 712.29, "hi80": 765.32, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 88, "cover_n": 34, "cover80_5d": 77, "next_earnings": {"date": "2026-10-28", "timing": null, "days": 21}, "news": {"n": 49, "high": 1, "latest": "2026-10-07 11:00:01+00:00"}, "best_status": "single_source", "cue": {"symbol": "META", "change_pct": -0.39, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "PGR", "name": "Progressive", "sector": "Insurance", "close": 212.05, "date": "2026-10-06", "move": -0.27, "move_5": 0.73, "move_20": -1.33, "spark": [214.9, 215.5, 216.19, 217.62, 221.02, 221.31, 216.99, 216.29, 213.48, 212.24, 206.94, 203.13, 202.17, 205.5, 209.47, 210.52, 207.31, 210.96, 210.31, 212.62, 212.05], "rsi": 49, "rel_sector_5d": 1.24, "quality": "OK", "days_to_earnings": 7, "p1": 0.5228, "p5": 0.5327, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 204.09, "hi80": 221.0, "lo50": 208.08, "hi50": 216.57, "target": "2026-10-13", "as_of": "2026-10-06", "base": 212.05}, "range1": {"lo80": 208.21, "hi80": 215.53, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 94, "cover_n": 34, "cover80_5d": 87, "next_earnings": {"date": "2026-10-14", "timing": null, "days": 7}, "news": {"n": 8, "high": 0, "latest": "2026-10-06 18:30:53+00:00"}, "best_status": "promotional", "cue": {"symbol": "PGR", "change_pct": 0.62, "ts": "2026-10-07 11:51:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "ALL", "name": "Allstate", "sector": "Insurance", "close": 224.27, "date": "2026-10-06", "move": -0.2, "move_5": -0.51, "move_20": -11.52, "spark": [253.46, 253.58, 251.79, 253.71, 258.48, 257.21, 254.85, 252.21, 249.83, 242.86, 229.5, 225.66, 227.17, 227.6, 227.55, 225.42, 221.86, 224.41, 223.74, 224.71, 224.27], "rsi": 30, "rel_sector_5d": -1.24, "quality": "OK", "days_to_earnings": 28, "p1": 0.5268, "p5": 0.5452, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 215.03, "hi80": 234.96, "lo50": 219.71, "hi50": 229.73, "target": "2026-10-13", "as_of": "2026-10-06", "base": 224.27}, "range1": {"lo80": 219.86, "hi80": 228.49, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 88, "cover_n": 34, "cover80_5d": 80, "next_earnings": {"date": "2026-11-04", "timing": null, "days": 28}, "news": {"n": 20, "high": 0, "latest": "2026-10-07 07:27:07+00:00"}, "best_status": "unverified", "cue": {"symbol": "ALL", "change_pct": 0.54, "ts": "2026-10-07 09:10:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "DAL", "name": "Delta Air Lines", "sector": "Airlines", "close": 83.66, "date": "2026-10-06", "move": 0.7, "move_5": -1.43, "move_20": 5.95, "spark": [78.96, 78.75, 78.24, 79.91, 79.8, 78.89, 77.87, 79.43, 79.62, 82.5, 83.92, 81.75, 82.76, 84.94, 84.03, 84.87, 83.46, 84.13, 84.09, 83.08, 83.66], "rsi": 53, "rel_sector_5d": -0.73, "quality": "OK", "days_to_earnings": 2, "p1": 0.5226, "p5": 0.532, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 78.46, "hi80": 90.89, "lo50": 81.31, "hi50": 87.55, "target": "2026-10-13", "as_of": "2026-10-06", "base": 83.66}, "range1": {"lo80": 82.38, "hi80": 85.71, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 79, "cover_n": 34, "cover80_5d": 87, "next_earnings": {"date": "2026-10-09", "timing": null, "days": 2}, "news": {"n": 30, "high": 0, "latest": "2026-10-07 12:17:20+00:00"}, "best_status": "unverified", "cue": {"symbol": "DAL", "change_pct": -1.28, "ts": "2026-10-07 12:20:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "UAL", "name": "United Airlines", "sector": "Airlines", "close": 111.87, "date": "2026-10-06", "move": 1.7, "move_5": -0.69, "move_20": 3.35, "spark": [108.24, 107.12, 106.49, 109.82, 108.96, 106.92, 106.3, 107.64, 108.71, 114.39, 115.21, 110.72, 111.19, 113.99, 111.51, 112.65, 110.95, 111.78, 112.51, 110.0, 111.87], "rsi": 50, "rel_sector_5d": 0.73, "quality": "OK", "days_to_earnings": 13, "p1": 0.5221, "p5": 0.5309, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 106.88, "hi80": 120.35, "lo50": 110.01, "hi50": 116.78, "target": "2026-10-13", "as_of": "2026-10-06", "base": 111.87}, "range1": {"lo80": 110.11, "hi80": 115.94, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 82, "cover_n": 34, "cover80_5d": 97, "next_earnings": {"date": "2026-10-20", "timing": null, "days": 13}, "news": {"n": 31, "high": 1, "latest": "2026-10-07 11:08:16+00:00"}, "best_status": "unverified", "cue": {"symbol": "UAL", "change_pct": -1.11, "ts": "2026-10-07 11:55:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "XOM", "name": "ExxonMobil", "sector": "Energy", "close": 164.48, "date": "2026-10-06", "move": 0.29, "move_5": 1.94, "move_20": 2.38, "spark": [160.66, 164.23, 165.23, 165.99, 165.08, 169.32, 163.32, 163.27, 163.54, 158.3, 158.71, 161.23, 162.14, 160.59, 162.52, 161.35, 162.75, 163.82, 164.01, 164.0, 164.48], "rsi": 56, "rel_sector_5d": 0.37, "quality": "OK", "days_to_earnings": 23, "p1": 0.5224, "p5": 0.5311, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 159.15, "hi80": 171.44, "lo50": 162.05, "hi50": 168.23, "target": "2026-10-13", "as_of": "2026-10-06", "base": 164.48}, "range1": {"lo80": 162.15, "hi80": 167.47, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 79, "cover_n": 34, "cover80_5d": 87, "next_earnings": {"date": "2026-10-30", "timing": null, "days": 23}, "news": {"n": 23, "high": 0, "latest": "2026-10-07 12:16:39+00:00"}, "best_status": "unverified", "cue": {"symbol": "XOM", "change_pct": 0.87, "ts": "2026-10-07 12:21:37+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "CVX", "name": "Chevron", "sector": "Energy", "close": 207.58, "date": "2026-10-06", "move": 0.54, "move_5": 1.57, "move_20": -1.06, "spark": [209.8, 213.81, 212.76, 214.06, 212.17, 217.77, 211.54, 211.57, 209.51, 203.67, 202.41, 205.51, 205.65, 204.45, 206.37, 204.38, 204.21, 207.1, 206.69, 206.47, 207.58], "rsi": 53, "rel_sector_5d": -0.37, "quality": "OK", "days_to_earnings": 23, "p1": 0.5229, "p5": 0.5332, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 201.58, "hi80": 215.99, "lo50": 204.99, "hi50": 212.24, "target": "2026-10-13", "as_of": "2026-10-06", "base": 207.58}, "range1": {"lo80": 205.1, "hi80": 211.35, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 82, "cover_n": 34, "cover80_5d": 83, "next_earnings": {"date": "2026-10-30", "timing": null, "days": 23}, "news": {"n": 49, "high": 0, "latest": "2026-10-07 12:00:20+00:00"}, "best_status": "single_source", "cue": {"symbol": "CVX", "change_pct": 0.67, "ts": "2026-10-07 11:40:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "LLY", "name": "Eli Lilly", "sector": "Pharma", "close": 1157.49, "date": "2026-10-06", "move": 1.26, "move_5": -2.29, "move_20": 2.99, "spark": [1123.91, 1124.21, 1123.0, 1115.7, 1138.28, 1136.11, 1137.82, 1152.44, 1152.93, 1164.89, 1170.14, 1150.99, 1181.89, 1183.46, 1184.78, 1184.63, 1157.08, 1149.85, 1142.85, 1143.12, 1157.49], "rsi": 48, "rel_sector_5d": 2.63, "quality": "OK", "days_to_earnings": 22, "p1": 0.522, "p5": 0.5312, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 1124.37, "hi80": 1215.65, "lo50": 1145.9, "hi50": 1191.78, "target": "2026-10-13", "as_of": "2026-10-06", "base": 1157.49}, "range1": {"lo80": 1146.6, "hi80": 1186.14, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 85, "cover_n": 34, "cover80_5d": 87, "next_earnings": {"date": "2026-10-29", "timing": null, "days": 22}, "news": {"n": 54, "high": 2, "latest": "2026-10-07 12:24:13+00:00"}, "best_status": "unverified", "cue": {"symbol": "LLY", "change_pct": 0.69, "ts": "2026-10-07 12:26:42+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "MRK", "name": "Merck", "sector": "Pharma", "close": 141.94, "date": "2026-10-06", "move": 1.72, "move_5": -4.92, "move_20": -4.39, "spark": [148.46, 147.53, 144.71, 143.93, 144.85, 143.79, 144.91, 147.15, 146.87, 149.5, 150.91, 148.08, 147.98, 148.78, 148.69, 149.28, 145.31, 143.81, 144.3, 139.54, 141.94], "rsi": 43, "rel_sector_5d": -2.63, "quality": "OK", "days_to_earnings": 22, "p1": 0.5224, "p5": 0.5349, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 136.21, "hi80": 150.76, "lo50": 139.61, "hi50": 146.92, "target": "2026-10-13", "as_of": "2026-10-06", "base": 141.94}, "range1": {"lo80": 139.72, "hi80": 146.02, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 91, "cover_n": 34, "cover80_5d": 93, "next_earnings": {"date": "2026-10-29", "timing": null, "days": 22}, "news": {"n": 27, "high": 2, "latest": "2026-10-07 08:29:25+00:00"}, "best_status": "unverified", "cue": {"symbol": "MRK", "change_pct": -0.01, "ts": "2026-10-07 11:05:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "TSLA", "name": "Tesla", "sector": "Autos", "close": 380.68, "date": "2026-10-06", "move": 0.51, "move_5": 7.89, "move_20": 3.4, "spark": [368.16, 367.81, 363.56, 365.44, 358.97, 356.58, 358.08, 366.2, 364.27, 375.3, 378.9, 380.12, 377.94, 372.11, 357.45, 352.84, 354.81, 354.11, 370.59, 378.73, 380.68], "rsi": 60, "rel_sector_5d": 5.98, "quality": "OK", "days_to_earnings": 14, "p1": 0.5196, "p5": 0.5294, "news_score": 0.027, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 357.35, "hi80": 410.74, "lo50": 369.65, "hi50": 396.46, "target": "2026-10-13", "as_of": "2026-10-06", "base": 380.68}, "range1": {"lo80": 370.05, "hi80": 393.12, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 79, "cover_n": 34, "cover80_5d": 100, "next_earnings": {"date": "2026-10-21", "timing": null, "days": 14}, "news": {"n": 123, "high": 2, "latest": "2026-10-07 12:02:00+00:00"}, "best_status": "confirmed_primary", "cue": {"symbol": "TSLA", "change_pct": -0.91, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "GM", "name": "General Motors", "sector": "Autos", "close": 82.01, "date": "2026-10-06", "move": 2.22, "move_5": 1.91, "move_20": -4.41, "spark": [85.79, 83.76, 86.12, 85.62, 87.16, 85.37, 84.29, 86.62, 82.2, 83.95, 83.45, 83.77, 80.57, 82.63, 80.64, 80.47, 77.0, 79.31, 78.27, 80.23, 82.01], "rsi": 49, "rel_sector_5d": -5.98, "quality": "OK", "days_to_earnings": 13, "p1": 0.5211, "p5": 0.5325, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 78.17, "hi80": 88.86, "lo50": 80.65, "hi50": 86.01, "target": "2026-10-13", "as_of": "2026-10-06", "base": 82.01}, "range1": {"lo80": 80.73, "hi80": 85.35, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 74, "cover_n": 34, "cover80_5d": 93, "next_earnings": {"date": "2026-10-20", "timing": null, "days": 13}, "news": {"n": 20, "high": 3, "latest": "2026-10-07 07:16:00+00:00"}, "best_status": "unverified", "cue": {"symbol": "GM", "change_pct": -1.16, "ts": "2026-10-07 11:50:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "WMT", "name": "Walmart", "sector": "Retail", "close": 107.2, "date": "2026-10-06", "move": 2.03, "move_5": 0.37, "move_20": 1.08, "spark": [106.05, 105.83, 105.73, 107.15, 109.08, 108.09, 107.5, 106.79, 106.73, 107.44, 110.12, 110.53, 107.59, 107.98, 108.73, 106.8, 103.92, 104.26, 104.26, 105.07, 107.2], "rsi": 50, "rel_sector_5d": -0.82, "quality": "OK", "days_to_earnings": 43, "p1": 0.522, "p5": 0.5329, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 103.9, "hi80": 113.57, "lo50": 106.17, "hi50": 111.03, "target": "2026-10-13", "as_of": "2026-10-06", "base": 107.2}, "range1": {"lo80": 106.05, "hi80": 110.23, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 85, "cover_n": 34, "cover80_5d": 90, "next_earnings": {"date": "2026-11-19", "timing": null, "days": 43}, "news": {"n": 55, "high": 0, "latest": "2026-10-07 12:18:34+00:00"}, "best_status": "unverified", "cue": {"symbol": "WMT", "change_pct": 0.68, "ts": "2026-10-07 12:25:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "COST", "name": "Costco", "sector": "Retail", "close": 935.68, "date": "2026-10-06", "move": 1.32, "move_5": 1.2, "move_20": 2.8, "spark": [910.18, 902.6, 902.38, 904.77, 918.91, 901.35, 893.74, 893.93, 895.31, 898.48, 899.41, 904.7, 896.48, 922.77, 922.92, 924.59, 910.34, 914.94, 920.65, 923.52, 935.68], "rsi": 58, "rel_sector_5d": 0.82, "quality": "OK", "days_to_earnings": 64, "p1": 0.5217, "p5": 0.5307, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 915.37, "hi80": 972.07, "lo50": 928.84, "hi50": 957.34, "target": "2026-10-13", "as_of": "2026-10-06", "base": 935.68}, "range1": {"lo80": 928.9, "hi80": 953.47, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 79, "cover_n": 34, "cover80_5d": 100, "next_earnings": {"date": "2026-12-10", "timing": null, "days": 64}, "news": {"n": 56, "high": 0, "latest": "2026-10-07 11:25:29+00:00"}, "best_status": "unverified", "cue": {"symbol": "COST", "change_pct": 1.0, "ts": "2026-10-07 12:20:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "CAT", "name": "Caterpillar", "sector": "Industrials", "close": 863.44, "date": "2026-10-06", "move": 1.8, "move_5": 4.45, "move_20": 4.98, "spark": [822.48, 815.56, 805.0, 818.57, 784.0, 783.54, 782.72, 798.57, 808.99, 816.5, 808.01, 812.02, 805.25, 821.58, 819.95, 826.64, 810.79, 826.35, 845.42, 848.14, 863.44], "rsi": 63, "rel_sector_5d": 4.12, "quality": "OK", "days_to_earnings": 22, "p1": 0.5211, "p5": 0.5287, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 833.83, "hi80": 918.26, "lo50": 853.61, "hi50": 896.03, "target": "2026-10-13", "as_of": "2026-10-06", "base": 863.44}, "range1": {"lo80": 853.42, "hi80": 889.93, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 97, "cover_n": 34, "cover80_5d": 100, "next_earnings": {"date": "2026-10-29", "timing": null, "days": 22}, "news": {"n": 22, "high": 0, "latest": "2026-10-07 11:13:05+00:00"}, "best_status": "unverified", "cue": {"symbol": "CAT", "change_pct": -1.69, "ts": "2026-10-07 12:24:48+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}, {"ticker": "DE", "name": "Deere", "sector": "Industrials", "close": 682.79, "date": "2026-10-06", "move": 0.09, "move_5": 0.34, "move_20": 0.3, "spark": [680.73, 677.21, 677.94, 675.74, 681.46, 684.04, 669.47, 685.63, 683.99, 684.73, 703.12, 709.48, 694.94, 690.46, 689.59, 680.5, 671.55, 667.26, 687.0, 682.2, 682.79], "rsi": 54, "rel_sector_5d": -4.12, "quality": "OK", "days_to_earnings": 49, "p1": 0.5208, "p5": 0.532, "news_score": 0.0, "decision_1d": "abstain", "decision_5d": "abstain", "verdict": {"word": "NO", "strength": null, "confidence": null, "horizon": null}, "range5": {"lo80": 653.85, "hi80": 718.52, "lo50": 669.01, "hi50": 701.51, "target": "2026-10-13", "as_of": "2026-10-06", "base": 682.79}, "range1": {"lo80": 669.5, "hi80": 697.5, "target": "2026-10-07", "as_of": "2026-10-06"}, "cover80_1d": 85, "cover_n": 34, "cover80_5d": 83, "next_earnings": {"date": "2026-11-25", "timing": null, "days": 49}, "news": {"n": 13, "high": 0, "latest": "2026-10-07 06:27:26+00:00"}, "best_status": "unverified", "cue": {"symbol": "DE", "change_pct": -0.26, "ts": "2026-10-07 11:30:00+00:00", "kind": "pre-market"}, "scored": {"n": 0, "hits": 0}}]};
+const H = D.header;
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const CUR = D.currency;
+const money = (x, dec=2) => CUR.symbol + Math.abs(x).toLocaleString(CUR.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const num = (x, dec=2) => x.toLocaleString(CUR.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const sgn = (x, dec=1, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = x => Math.round(x*100);
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const MARKET_LABEL = {india: 'India', us: 'US'};
+const pageOf = t => `../decision/decision-${t}.html`;
+
+/* ---------- shell ---------- */
+document.title = `Watchlist · ${MARKET_LABEL[D.market]}`;
+$('#topbar-title').textContent = `Watchlist · ${D.market_name}`;
+for (const [m, label] of Object.entries(MARKET_LABEL)) {
+  const b = el('button', {type:'button', 'aria-pressed': String(m === D.market)}, label);
+  if (m !== D.market) { b.setAttribute('aria-disabled', 'true'); b.dataset.tip = `Built per market: open watchlist-${m}.html for ${label}. The live switch comes with the consolidated app.`; }
+  $('#market-seg').append(b);
+}
+const NAV = [['home','Home', false, '../home/home.html'], ['format_list_bulleted','Watchlist', true], ['account_balance_wallet','Portfolio', false, '../portfolio/portfolio.html'], ['query_stats','Record', false, '../track/track.html'], ['help','Help', false, '../help/help.html']];
+const navItem = ([ico, label, current]) => el('a', {class: 'mb-nav-item' + (current ? '' : ' coming'), href: '#', 'aria-current': current ? 'page' : null, 'data-tip': current ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && !t.closest('tr.row')) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- tape ---------- */
+const track = $('#tape-track');
+const tapeItems = () => D.rows.map(t => el('a', {class:'it', href: pageOf(t.ticker)}, el('b', {}, t.ticker), el('span', {}, t.close==null?'—':num(t.close)), delta(t.move)));
+track.append(...tapeItems(), ...tapeItems());
+
+/* ---------- header ---------- */
+const sess = H.session || {}; const closed = !sess.in_session;
+$('#h-title').append(`${MARKET_LABEL[D.market]} watchlist`, el('small', {}, `${H.n} companies · ${D.exchange}`));
+$('#h-meta').append(el('span', {}, el('span', {class:'dot'+(closed?'':' open')}), closed ? `${D.exchange} closed` : `${D.exchange} open`), el('span', {class:'mb-tag live'}, 'live data'), el('span', {class:'mb-tag paper'}, 'paper'), el('span', {}, `as of close ${fmtD(D.as_of)} ${D.as_of.slice(0,4)}`), el('span', {}, H.run_at ? `· last model run ${H.run_at.slice(11,16)} UTC` : ''));
+$('#h-right').append(`${H.up} up · ${H.down} down on the day`, el('br'), `${H.news_total} headlines in 72h, ${H.news_high} high materiality`);
+const tiles = [
+  {l: 'Regime', v: H.regime, s: H.major_event_names.length ? H.major_event_names.join(', ') : 'no major event', t: 'regime (stored by the daily run): CALM / TRENDING / EVENT_HEAVY / UNSTABLE from the vol index, the benchmark and the event calendar. EVENT_HEAVY widens every range.'},
+  {l: H.bench_name, v: H.bench_close == null ? '—' : num(H.bench_close), d: H.bench_move, s: H.bench_move_5 == null ? '' : `5d ${sgn(H.bench_move_5,2)}` + (H.bench_live ? ` · live ${sgn(H.bench_live.change_pct,2)} at ${H.bench_live.ts.slice(11,16)} UTC` : ''), t: 'Benchmark index: last stored close and day move; 5-day move; the live quote at the run if stored.'},
+  {l: H.vol_name, v: H.vol_close == null ? '—' : num(H.vol_close), d: H.vol_move, s: `regime vol level ${H.vol_level}`, t: 'Volatility index: last stored close and day move. The regime thresholds are in config/markets/<market>.yaml.'},
+  H.flows ? {l: 'FII / DII, cr', v: `${sgn(H.flows.fii, 0, '')} / ${sgn(H.flows.dii, 0, '')}`, s: `NSE provisional, ${fmtD(H.flows.date)}`, t: 'Foreign and domestic institutional net flows (NSE provisional, Rs crore). Foreign selling is the conventional negative.'} : {l: 'Live calls scored', v: String(H.scored_total), s: 'across the watchlist', t: 'Live direction calls that have settled and been scored.'},
+  {l: 'Calls today', v: `${H.yes.length} YES`, s: `${H.abstain} of ${H.n} abstained · ${H.blocked.length} blocked`, t: 'Live calls for the latest date (predictions); abstentions from the forecaster (agent_reasoning); blocked = indicator quality BLOCKED or results within 1 day (prediction rules).'},
+  {l: 'Model skill', v: H.model_skill ? 'shown' : 'not shown', s: H.review_week ? `weekly review ${H.review_week}` : 'no review yet', t: 'The weekly review\'s verdict on the signal model (model_skill). Until it is true, the cockpit says "no proven edge" and every signal stays Paper.'},
+];
+for (const t of tiles) $('#tiles').append(el('div', {'data-tip': t.t}, el('span', {class:'micro'}, t.l), el('b', {}, t.v, ' ', t.d == null ? null : delta(t.d, 2, t.l === 'FII / DII' ? '' : '%')), el('small', {}, t.s)));
+
+/* ---------- banner ---------- */
+const B = $('#banner');
+if (H.yes.length) { B.classList.add('yes'); B.append(el('div', {class:'ico'}, icon('ms-check')), el('div', {}, el('b', {class:'t'}, `${H.yes.length} YES call${H.yes.length>1?'s':''} today: ${H.yes.join(', ')}`), el('div', {class:'s'}, `Paper until the track record proves them (${H.scored_total} live calls scored so far). Open the company page for the plan.`))); }
+else { B.classList.add('none'); B.append(el('div', {class:'ico'}, icon('ms-block')), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'), el('div', {class:'s'}, (H.candidates.length ? `Paper candidates at or above ${pct(D.call_threshold)}%: ${H.candidates.join(', ')}. ` : `No company reaches the ${pct(D.call_threshold)}% Paper-candidate line; `) + `the forecaster abstained on ${H.abstain} of ${H.n}` + (H.model_skill ? '.' : ', and the model has not shown skill in the back-test, so every signal stays Paper.')))); }
+
+/* ---------- table ---------- */
+let sortKey = 'sector', sortDir = 1, sectorFilter = null, query = '';
+const chips = $('#sector-chips');
+const allChip = el('button', {class:'md-chip filter', type:'button', 'aria-pressed':'true'}, 'All sectors');
+chips.append(allChip, ...D.sectors.map(s => el('button', {class:'md-chip filter', type:'button', 'aria-pressed':'false', 'data-s': s.name}, s.name, s.index && s.index.move != null ? delta(s.index.move, 1) : null)));
+chips.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sectorFilter = b.dataset.s || null; chips.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); render(); });
+$('#q').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); render(); });
+$('#sort').addEventListener('change', e => { sortKey = e.target.value; sortDir = ['ticker','sector','days_to_earnings'].includes(sortKey) ? 1 : -1; render(); });
+document.querySelectorAll('.wl th[data-k]').forEach(th => th.addEventListener('click', () => { const k = th.dataset.k; if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = ['ticker','sector','days_to_earnings','verdict'].includes(k) ? 1 : -1; } $('#sort').value = ['verdict','close','cue'].includes(k) ? $('#sort').value : k; render(); }));
+const val = (r, k) => k === 'news' ? (r.news ? r.news.n : -1) : k === 'cue' ? (r.cue ? r.cue.change_pct : -999) : k === 'verdict' ? (r.verdict.word === 'YES' ? (r.verdict.strength === 'strong' ? 0 : 1) : 2) : k === 'days_to_earnings' ? (r.next_earnings ? r.next_earnings.days : 999) : (r[k] == null ? -1e9 : r[k]);
+function spark(r) {
+  const s = svgEl('svg', {class:'spark', viewBox:'0 0 64 24'}); const v = r.spark; if (v.length < 2) return s;
+  const lo = Math.min(...v), hi = Math.max(...v), X = i => 2 + i * 60 / (v.length - 1), Y = x => hi === lo ? 12 : 21 - (x - lo) / (hi - lo) * 18;
+  const col = v[v.length-1] >= v[0] ? 'var(--mb-color-up)' : 'var(--mb-color-down)';
+  s.append(svgEl('path', {d: v.map((x, i) => (i?'L':'M') + X(i).toFixed(1) + ',' + Y(x).toFixed(1)).join(' ') + ` L${X(v.length-1).toFixed(1)},23 L2,23 Z`, fill: col, opacity: .12}));
+  s.append(svgEl('path', {d: v.map((x, i) => (i?'L':'M') + X(i).toFixed(1) + ',' + Y(x).toFixed(1)).join(' '), fill:'none', stroke: col, 'stroke-width': 1.5, 'stroke-linejoin':'round'}));
+  s.append(svgEl('circle', {cx: X(v.length-1), cy: Y(v[v.length-1]), r: 2.2, fill: col}));
+  return s;
+}
+function rangeBar(r) {
+  const rg = r.range5; if (!rg || r.close == null) return el('span', {class:'muted'}, '—');
+  const s = svgEl('svg', {viewBox:'0 0 64 16'});
+  const lo = Math.min(rg.lo80, r.close) * 0.995, hi = Math.max(rg.hi80, r.close) * 1.005, X = v => (v - lo) / (hi - lo) * 60 + 2;
+  s.append(svgEl('rect', {x: X(rg.lo80), y: 4, width: X(rg.hi80) - X(rg.lo80), height: 8, rx: 2, fill: 'var(--mb-chart-band-80)'}));
+  s.append(svgEl('rect', {x: X(rg.lo50), y: 4, width: X(rg.hi50) - X(rg.lo50), height: 8, rx: 2, fill: 'var(--mb-chart-band-50)'}));
+  s.append(svgEl('line', {x1: X(r.close), x2: X(r.close), y1: 1, y2: 15, stroke: 'var(--md-sys-color-on-surface)', 'stroke-width': 2}));
+  return el('span', {class:'rng', 'data-tip': `5-day range published for ${fmtD(rg.target)} (as of ${rg.as_of}): 50% ${money(rg.lo50,0)}–${money(rg.hi50,0)}, 80% ${money(rg.lo80,0)}–${money(rg.hi80,0)}; last close ${money(r.close)} (${sgn((r.close/rg.base-1)*100,1)} from the range's base ${money(rg.base)}).`}, s, el('small', {}, `${money(rg.lo80,0)}–${money(rg.hi80,0)}`));
+}
+function odds(p, h, r) {
+  if (p == null) return el('span', {class:'muted'}, '—');
+  const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13}));
+  const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5}));
+  return el('span', {class:'mb-odds', 'data-tip': `${h}-day P(up) ${(p*100).toFixed(1)}% (model_scores_latest)` + (r.decision_1d ? `; forecaster: ${h===1?r.decision_1d:r.decision_5d}` : '') + (r.news_score != null && h === 1 ? `; news score ${r.news_score}` : '')}, s, el('b', {}, pct(p)+'%'));
+}
+function verdictCell(r) {
+  const v = r.verdict; const cls = v.word === 'YES' ? (v.strength === 'strong' ? 'yes-strong' : 'yes-ok') : 'no';
+  const t = v.word === 'YES' ? `Live ${v.horizon}-day up call, confidence ${v.confidence} (${v.strength} signal). Paper until proven.` : v.confidence != null ? `Live ${v.horizon}-day down call, confidence ${v.confidence}: not a buy.` : `No live call for ${D.as_of}: ${r.decision_1d ? 'the forecaster ' + r.decision_1d + 'ed (1d) and ' + r.decision_5d + 'ed (5d)' : 'no forecaster record'}.`;
+  return el('span', {class:'vd '+cls, 'data-tip': t}, icon(v.word === 'YES' ? (v.strength === 'strong' ? 'ms-bolt' : 'ms-check') : 'ms-block'), v.word, v.word === 'YES' ? el('span', {class:'mb-tag paper', style:'margin-left:2px'}, 'paper') : null);
+}
+function row(r) {
+  const tr = el('tr', {class:'row', tabindex:'0', 'data-t': r.ticker, 'aria-label': `${r.name}: open the decision page`});
+  const open = () => { window.location.href = pageOf(r.ticker); };
+  tr.addEventListener('click', e => { if (!e.target.closest('.md-help, a')) open(); });
+  tr.addEventListener('keydown', e => { if (e.key === 'Enter') open(); });
+  tr.append(el('td', {}, el('div', {class:'sym'}, el('span', {class:'bx', 'aria-hidden':'true'}, r.ticker.slice(0,4)), el('div', {style:'min-width:0'}, el('b', {}, r.ticker), el('small', {}, `${r.name} · ${r.sector}`)))));
+  tr.append(el('td', {class:'num'}, el('span', {class:'px'}, r.close == null ? '—' : num(r.close), null)));
+  tr.append(el('td', {class:'num'}, delta(r.move)));
+  tr.append(el('td', {class:'num c-5d'}, delta(r.move_5)));
+  tr.append(el('td', {class:'c-spark'}, spark(r)));
+  tr.append(el('td', {class:'num'}, odds(r.p1, 1, r)));
+  tr.append(el('td', {class:'num c-p5'}, odds(r.p5, 5, r)));
+  tr.append(el('td', {}, verdictCell(r)));
+  tr.append(el('td', {class:'c-range'}, rangeBar(r)));
+  const held = r.cover80_1d == null ? el('span', {class:'muted'}, '—') : el('span', {class:'held', 'data-tip': `Rule replay ${fmtD(D.window[0], false)}–${fmtD(D.window[1], false)}: the 1-day 80% range held ${r.cover80_1d}% of ${r.cover_n} sessions (target 80%); 5-day ${r.cover80_5d == null ? '—' : r.cover80_5d + '%'}. Back-test, not live.`}, el('div', {class:'md-progress'}, el('i', {style:`width:${r.cover80_1d}%;background:${r.cover80_1d >= 75 ? 'var(--mb-color-up)' : 'var(--mb-color-warn)'}`})), el('b', {}, r.cover80_1d + '%'), null);
+  tr.append(el('td', {class:'c-held'}, held));
+  const ne = r.next_earnings;
+  tr.append(el('td', {class:'evt'}, ne ? el('span', {'data-tip': `Results ${fmtD(ne.date)} ${ne.date.slice(0,4)}${ne.timing ? ', ' + ne.timing.replace('_',' ') : ''} (events). ${ne.days <= 1 ? 'Within 1 day: no new call allowed.' : 'A call is blocked within 1 day of results.'}`}, el('b', {style: ne.days <= 1 ? 'color:var(--mb-color-down)' : ''}, `${ne.days} d`), el('small', {}, fmtD(ne.date, false))) : el('span', {class:'muted'}, 'none stored')));
+  const nw = r.news;
+  tr.append(el('td', {class:'c-news'}, nw ? el('div', {class:'nw', 'data-tip': `${nw.n} stored headlines in the last 72 hours of the archive, ${nw.high} high materiality; latest ${nw.latest.slice(0,16).replace('T',' ')} UTC. Best cluster status: ${r.best_status ? r.best_status.replace('_',' ') : 'not assessed'}.`}, el('span', {}, el('b', {}, nw.n), nw.high ? ` · ${nw.high} high` : ''), el('span', {class:'md-badge ' + (r.best_status || 'unverified')}, (r.best_status || 'not assessed').replace('_',' '))) : el('span', {class:'muted'}, '0')));
+  tr.append(el('td', {class:'num c-cue'}, r.cue ? el('span', {'data-tip': `${r.cue.kind} ${r.cue.symbol}: ${sgn(r.cue.change_pct, 2)} at ${r.cue.ts.slice(11,16)} UTC (quotes_latest).`}, delta(r.cue.change_pct), el('small', {class:'muted', style:'display:block;font-size:10px'}, r.cue.kind)) : el('span', {class:'muted'}, '—')));
+  return tr;
+}
+function render() {
+  const tb = $('#rows'); tb.innerHTML = '';
+  let rows = D.rows.filter(r => (!sectorFilter || r.sector === sectorFilter) && (!query || r.ticker.toLowerCase().includes(query) || r.name.toLowerCase().includes(query)));
+  if (sortKey === 'sector') {
+    for (const s of D.sectors) {
+      const members = rows.filter(r => r.sector === s.name); if (!members.length) continue;
+      const head = el('tr', {class:'sec'}); const td = el('td', {colspan: 13}, el('b', {}, s.name), ' · ', `${members.length} compan${members.length>1?'ies':'y'}`);
+      if (s.index) td.append(' · ', `${s.index.name} `, s.index.move == null ? '' : delta(s.index.move, 2), s.index.move_5 == null ? '' : el('span', {class:'muted'}, ` · 5d ${sgn(s.index.move_5, 2)}`)); else td.append(' · ', el('span', {class:'muted'}, 'no sector index stored'));
+      head.append(td); tb.append(head); members.forEach(r => tb.append(row(r)));
+    }
+  } else { rows.sort((a, b) => { const x = val(a, sortKey), y = val(b, sortKey); return (x < y ? -1 : x > y ? 1 : a.ticker.localeCompare(b.ticker)) * sortDir; }); rows.forEach(r => tb.append(row(r))); }
+  document.querySelectorAll('.wl th[data-k]').forEach(th => th.removeAttribute('aria-sort'));
+  const th = document.querySelector(`.wl th[data-k="${sortKey}"]`); if (th) th.setAttribute('aria-sort', sortDir > 0 ? 'ascending' : 'descending');
+  $('#count').textContent = `${rows.length} of ${D.rows.length} companies` + (sectorFilter ? ` · ${sectorFilter}` : '') + (query ? ` · "${query}"` : '') + ` · chances and ranges as of ${fmtD(D.as_of, false)}; 80% held over ${fmtD(D.window[0], false)}–${fmtD(D.window[1], false)} (back-test).`;
+}
+render();
+
+/* ---------- sources + footer ---------- */
+$('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live</dt><dd>data/${D.market}/: prices (last 21 stored bars per symbol: close, day, 5-day and 20-session sparkline), model_scores_latest (chance of a rise, latest date), ranges_latest (the latest published 5-day range), features_latest (RSI, results countdown, indicator quality), agent_reasoning (abstain / call), predictions and outcomes (verdicts and scored calls), quotes_latest (overnight cues, live benchmark), regime, events (next results date), news with enrichment and news_verified (72-hour counts and best status)${D.market==='india' ? ', flows (NSE FII/DII)' : ''}, reviews (model skill). Read through DuckDB views in sql/views.sql.</dd>
+<dt>Back-test</dt><dd>"80% held": <code>scripts/replay.py --market ${D.market} --start ${D.window[0]} --end ${D.window[1]}</code> run into a scratch root; per ticker coverage of the rule replay's 1-day and 5-day 80% ranges. Not live.</dd>
+<dt>Derived</dt><dd>Verdict colour and strength from the stored call (confidence >= 0.75 or anchored probability >= 0.65 = strong); Paper candidates = chance at or above the ${pct(D.call_threshold)}% Paper-candidate line; blocked = indicator quality BLOCKED or results within 1 day.</dd>
+<dt>Mock / coming</dt><dd>Symbol search across markets, the live market switch, and the rail's other sections are not built. Nothing on this page is invented: a missing value shows as a dash.</dd>
+</dl>`;
+$('#foot').textContent = `Personal research project. Prices from Yahoo Finance${D.market==='india' ? ' and NSE bhavcopy' : ''}; nothing here is investment advice and nothing trades. Built ${D.built_at} (UTC) from stored data as of ${D.as_of}.`;
+</script>
+</body>
+</html>
