@@ -52,12 +52,13 @@ def test_candidate_hand_checked():
     # costs at C: 10 shares, EUR 0.99 x 1.10 x 2 = 2.178 -> 2.18, SEC 0.0000206 x 1000 = 0.02 -> 2.20 = 0.22 %
     # expected gain = 0.6 x 1.595769 - 0.4 x 1.595769 - 0.22 = 0.099154; per session (N+2) 0.049577
     # decision 51 at N+2 (D Fri 2 Oct, exit Tue 6 Oct: 4 days): your cost 2.20 + FX .0075 x 2000 = 15.00 + fee
-    # .002 x 1000 x 4 / 365 = 0.0219 -> 0.02 = 17.22 = 1.722%; the target is C, so the move 0 is not viable
+    # .002 x 1000 x 4 / 365 = 0.0219 -> 0.02 = 17.22 = 1.722%; gain after your cost 0.6 x 1.595769 - 0.4 x
+    # 1.595769 - 1.722 = -1.402846: not viable
     out = picks.candidate(pred("rule.a.v1", "rule", 2, 0.6), "us", US_RATES, 1.10)
     assert out == {"horizon_days": 2, "prediction_id": "rule.a.v1:2026-10-01-AAPL-2d", "prob_up": 0.6,
                    "move_pct": 1.5958, "loss_pct": 1.5958, "costs_pct": 0.22, "expected_gain_pct": 0.0992,
                    "gain_per_session_pct": 0.0496, "expected_move_pct": 0.0, "your_cost_pct": 1.722,
-                   "cost_viable": False}
+                   "expected_gain_your_pct": -1.4028, "cost_viable": False}
     unaffordable = pred("rule.a.v1", "rule", 1, 0.6, market="india", amount=50.0, base_close=100.0)
     assert picks.candidate(unaffordable, "india", INDIA_RATES, None) is None     # would be skipped: no candidate
 

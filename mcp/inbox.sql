@@ -3,7 +3,7 @@
 -- leaked inbox token cannot touch market_brief). The tool layer (web/lib/tools/) appends; the importer (session B1:
 -- `scripts/company.py import-inbox`, run by onboard.yml and the routines; scripts/marketbrief/lifecycle/inbox.py) reads
 -- inbox.company_commands, validates with the same Python validators as the CLI and appends to data/. Rows are never
--- updated or deleted by the web tier. Idempotent: every statement is CREATE ... IF NOT EXISTS.
+-- updated or deleted by the web tier. Idempotent: every statement is CREATE ... IF NOT EXISTS or ADD COLUMN IF NOT EXISTS.
 -- The owner creates these tables once (docs/ws/b5.md, owner setup). tests/test_b5_tools.py checks the command_log
 -- columns against the schema and runs the tool layer's statements (web/lib/tools/sql.ts) on a local DuckDB.
 
@@ -16,7 +16,9 @@ CREATE SCHEMA IF NOT EXISTS inbox;
 -- arguments = the validated tool arguments (secret values scrubbed); actor = the identity the channel's auth gave,
 -- never taken from arguments; command_id = the web tier's command id. B5's own columns follow (B1 ignores them):
 -- preview = the identifiers the caller confirmed (add_company), agent, args_sha256 = sha256 of the arguments as JSON
--- with sorted keys (a reused key with other arguments is refused).
+-- with sorted keys (a reused key with other arguments is refused), slack_channel and slack_ts = the visible "request
+-- received" message the Slack confirm step posted in #market-brief (null for other channels); after importing, the
+-- importer passes them to B6's onboarding reply (scripts/alerts.py onboarding --channel --thread-ts).
 CREATE TABLE IF NOT EXISTS inbox.company_commands (
     inbox_id VARCHAR PRIMARY KEY,
     market VARCHAR NOT NULL,
@@ -28,7 +30,9 @@ CREATE TABLE IF NOT EXISTS inbox.company_commands (
     command_id VARCHAR,
     preview JSON,
     agent VARCHAR NOT NULL,
-    args_sha256 VARCHAR NOT NULL
+    args_sha256 VARCHAR NOT NULL,
+    slack_channel VARCHAR,
+    slack_ts VARCHAR
 );
 
 -- One row per other write request: today only add_paper_trade (kind portfolio_trades). NO IMPORTER YET: these rows
@@ -46,8 +50,16 @@ CREATE TABLE IF NOT EXISTS inbox.requests (
     agent VARCHAR NOT NULL,
     command_id VARCHAR NOT NULL,
     submitted_at TIMESTAMPTZ NOT NULL,
-    args_sha256 VARCHAR NOT NULL
+    args_sha256 VARCHAR NOT NULL,
+    slack_channel VARCHAR,
+    slack_ts VARCHAR
 );
+
+-- Added after the first version (B6's onboarding replies), for tables created before these columns existed.
+ALTER TABLE inbox.company_commands ADD COLUMN IF NOT EXISTS slack_channel VARCHAR;
+ALTER TABLE inbox.company_commands ADD COLUMN IF NOT EXISTS slack_ts VARCHAR;
+ALTER TABLE inbox.requests ADD COLUMN IF NOT EXISTS slack_channel VARCHAR;
+ALTER TABLE inbox.requests ADD COLUMN IF NOT EXISTS slack_ts VARCHAR;
 
 -- One row per command from the web tier's channels, the columns of the command_log kind
 -- (scripts/marketbrief/core/schema_lifecycle.py). An OPERATIONAL log only (budgets, the owner's view of refusals):
