@@ -1,6 +1,6 @@
 # market-brief: product specification and parallel roadmap
 
-Status: draft for the owner's approval (2026-10-07). It records every decision the owner made in the
+Status: approved by the owner (decisions 1-36, 2026-10-07). It records every decision the owner made in the
 question rounds of 2026-10-07 and turns them into features, data, API, pages, integrations and a
 roadmap of stages that can be built in parallel cloud sessions. It builds on what is already merged
 (docs/DESIGN.md, docs/ARCHITECTURE.md, api/openapi.yaml, docs/ws/) and changes none of its rules unless
@@ -40,7 +40,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 14 | Allowed companies | Common stocks listed on NSE (India) or NYSE/Nasdaq (US). No BSE-only stocks, no ETFs. |
 | 15 | Slack commands | Any member of the #market-brief channel may give commands. Delete is never available in Slack. |
 | 16 | Dashboard users | Owner only, Vercel Authentication. |
-| 17 | Pages | All 10 proposed pages, plus the stock strategy page of decision 30 (section 6). |
+| 17 | Pages | All 10 proposed pages (section 6; with decisions 30 and 35 the cockpit has 12). |
 | 18 | Screens | Phone and laptop equally. |
 | 19 | Charts | Our own charts from stored data (vendored Lightweight Charts); no TradingView widgets. |
 | 20 | Dashboard actions | All: add, deactivate, reactivate, change amount, delete (delete dashboard-only, with confirmation). |
@@ -61,12 +61,12 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 35 | Help page | Kept as page 12. |
 | 36 | Old commit 85416b0 | Kept with a git tag (the owner creates it on GitHub; this session may push branches but not tags). |
 
-Proposals made by the orchestrator that are not covered by decision 34 (the owner may change any of
-them): every
+Proposals made by the orchestrator that are still open (decision 34 accepted the budget, the weekly
+research time, the chat-log retention and the Slack form; the owner may change any of these): every
 command logged with who sent it; one Slack thread per market per day plus a weekly post; design widths
-390 px and 1280 px; money-view budget ₹5,00,000 / $5,000; the post-close, weekly and intraday times of
-section 7 (the intraday times are WS5's existing schedules); the Opus trader being the extended forecaster; chat logs kept 90 days; no bulk-storage move
-within a year (git + MotherDuck handle 50 companies).
+390 px and 1280 px; the post-close times of section 7 (the intraday times are WS5's existing
+schedules); the Opus trader being the extended forecaster; no bulk-storage move within a year (git +
+MotherDuck handle 50 companies).
 
 ## 2. Words used in this document
 
@@ -278,7 +278,7 @@ states each strategy's position against the bar.
 ### F8 Company lifecycle (watchlist as data)
 
 1. **Rule change** (proposed by the orchestrator so that decisions 12-15 and 20 can work at runtime;
-   the owner approves it with this spec): the list of companies moves from
+   approved by the owner, decision 33): the list of companies moves from
    `config/markets/<market>.yaml` `tickers:` into append-only records `data/<market>/watchlist_events/`
    (`add`, `deactivate`, `reactivate`, `delete`, `set_amount`), gated by a deterministic validator
    instead of a judge review. Market-level config (calendar, benchmark, sectors, feeds) stays in config
@@ -588,4 +588,5 @@ formal review at 2 months (decision 23).
 | Before B8 | Anthropic workspace with a $20 monthly limit and a key in it |
 | After B5 | Add the Claude app connector |
 | After this spec merges | Ask the design sessions to update the page designs from it (decision 32) |
+| Now (decision 36) | Create the tag `archive-dashboard-r1` on commit 85416b0 on GitHub (this session pushes a temporary branch with it if asked) |
 | At the first review | Set the maximum drawdown limit |
