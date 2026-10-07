@@ -28,6 +28,54 @@ REGIME_FEATURES = ("regime_calm", "regime_trending", "regime_event_heavy", "regi
 EVENT_FEATURES = ("earnings_in_window", "ex_dividend_in_window")
 FLOW_FEATURES = {"india": ("fii_net_cr", "dii_net_cr", "fpi_equity_net_cr"),
                  "us": ("insider_net_30d", "short_volume_pct")}
+# Cross-market features (cross_market.py; switched per market and group in config/model.yaml `cross_market`).
+# feature -> (market-config symbol key, kind). KIND_RETURN: close / previous close - 1 of the symbol's newest
+# bar available before the open of D; KIND_CHANGE: close - previous close (yields, in the symbol's points);
+# KIND_ADR_PREMIUM: the ADR premium's deviation from its 20-day mean (per ticker with an ADR).
+KIND_RETURN, KIND_CHANGE, KIND_ADR_PREMIUM = "return", "change", "adr_premium"
+CROSS_ASIA, CROSS_EUROPE, CROSS_US_SESSION = "asia", "europe", "us_session"
+CROSS_FX, CROSS_RATES_COMMODITIES, CROSS_ADR = "fx", "rates_commodities", "adr"
+CROSS_MARKET_FEATURES = {
+    "india": {
+        CROSS_ASIA: {"x_kospi_ret": ("KOSPI", KIND_RETURN), "x_taiwan_ret": ("TAIWAN", KIND_RETURN),
+                     "x_shanghai_ret": ("SHANGHAI", KIND_RETURN), "x_nikkei_ret": ("NIKKEI", KIND_RETURN),
+                     "x_hangseng_ret": ("HANGSENG", KIND_RETURN)},
+        CROSS_EUROPE: {"x_stoxx50_ret": ("STOXX50", KIND_RETURN)},
+        CROSS_US_SESSION: {"x_nasdaq_ret": ("NASDAQ", KIND_RETURN), "x_usvix_ret": ("USVIX", KIND_RETURN)},
+        CROSS_FX: {"x_usdjpy_ret": ("USDJPY", KIND_RETURN), "x_usdinr_ret": ("USDINR", KIND_RETURN),
+                   "x_dxy_ret": ("DXY", KIND_RETURN)},
+        CROSS_RATES_COMMODITIES: {"x_us10y_chg": ("US10Y", KIND_CHANGE), "x_brent_ret": ("BRENT", KIND_RETURN),
+                                  "x_gold_ret": ("GOLD", KIND_RETURN)},
+        CROSS_ADR: {"adr_premium_dev": ("USDINR", KIND_ADR_PREMIUM)},
+    },
+    "us": {
+        CROSS_ASIA: {"x_nikkei_ret": ("NIKKEI", KIND_RETURN), "x_hangseng_ret": ("HANGSENG", KIND_RETURN),
+                     "x_kospi_ret": ("KOSPI", KIND_RETURN)},
+        CROSS_EUROPE: {"x_stoxx50_ret": ("STOXX50", KIND_RETURN), "x_dax_ret": ("DAX", KIND_RETURN),
+                       "x_ftse_ret": ("FTSE", KIND_RETURN)},
+        CROSS_FX: {"x_usdjpy_ret": ("USDJPY", KIND_RETURN), "x_usdcny_ret": ("USDCNY", KIND_RETURN),
+                   "x_dxy_ret": ("DXY", KIND_RETURN)},
+        CROSS_RATES_COMMODITIES: {"x_us10y_chg": ("US10Y", KIND_CHANGE), "x_wti_ret": ("WTI", KIND_RETURN),
+                                  "x_gold_ret": ("GOLD", KIND_RETURN)},
+    },
+}
+CROSS_KEY = "cross_market"            # config/model.yaml: {market: {group: true|false}}
+CROSS_MAX_AGE_DAYS = 5                # a cross-market bar dated more than this many calendar days before D: missing
+ADR_PREMIUM_DAYS = 20                 # the ADR premium's deviation is from the mean of its previous 20 values
+META_CLOSE_TIME = "close_time"        # market config symbol: "<HH:MM> <IANA zone>" of its daily bar's close
+META_ADR_OF = "adr_of"                # market config symbol of role `adr`: the watchlist ticker it is the ADR of
+ROLE_ADR = "adr"
+# Long-history cache of the backtest (history_cache.py, scripts/model_history.py): under work/ (gitignored),
+# never data/
+DIR_MODEL_HISTORY = "work/model_history"
+FILE_HISTORY_BARS, FILE_HISTORY_MANIFEST = "bars.csv.gz", "manifest.json"
+HISTORY_DEFAULT_START = "2011-01-01"
+HISTORY_COLUMNS = ("ticker", "date", "open", "high", "low", "close", "volume")
+HISTORY_OVERLAP_DATES = 20            # stored dates compared with the cache to put the cache on the stored basis
+HISTORY_BASIS = ("Yahoo daily history via yfinance, auto_adjust=False: OHLC split-adjusted as of fetched_at, not "
+                 "dividend-adjusted (the basis of collect_prices.py)")
+MSG_NO_HISTORY = "no long-history cache for {market}: run scripts/model_history.py --market {market} first ({path})"
+MSG_NO_CLOSE_TIME ="symbol {key} has no close_time in the market config (needed by the cross-market features)"
 GROUP_MOMENTUM, GROUP_OSCILLATOR, GROUP_VOLATILITY = "momentum", "oscillator", "volatility"
 GROUP_VOLUME, GROUP_RELATIVE, GROUP_MARKET = "volume", "relative strength", "market"
 GROUP_REGIME, GROUP_EVENTS, GROUP_FLOWS, GROUP_NEWS = "regime", "events", "flows", "news"
@@ -43,6 +91,7 @@ FEATURE_GROUPS = {
     **{f: GROUP_REGIME for f in REGIME_FEATURES},
     **{f: GROUP_EVENTS for f in EVENT_FEATURES},
     **{f: GROUP_FLOWS for fs in FLOW_FEATURES.values() for f in fs},
+    **{f: f"cross: {group}" for groups in CROSS_MARKET_FEATURES.values() for group, fs in groups.items() for f in fs},
 }
 REGIME_COLUMNS = {"CALM": "regime_calm", "TRENDING": "regime_trending", "EVENT_HEAVY": "regime_event_heavy",
                   "UNSTABLE": "regime_unstable"}
@@ -69,6 +118,24 @@ FEATURE_TEXT = {
     "fpi_equity_net_cr": ("NSDL FPI equity net (Rs cr)", VALUE_PLAIN),
     "insider_net_30d": ("insider net buying, 30 days (signed log USD)", VALUE_PLAIN),
     "short_volume_pct": ("FINRA short-volume share", VALUE_PLAIN),
+    "x_kospi_ret": ("KOSPI last session return", VALUE_PERCENT),
+    "x_taiwan_ret": ("Taiwan Weighted last session return", VALUE_PERCENT),
+    "x_shanghai_ret": ("Shanghai Composite last session return", VALUE_PERCENT),
+    "x_nikkei_ret": ("Nikkei 225 last session return", VALUE_PERCENT),
+    "x_hangseng_ret": ("Hang Seng last session return", VALUE_PERCENT),
+    "x_stoxx50_ret": ("Euro Stoxx 50 last session return", VALUE_PERCENT),
+    "x_dax_ret": ("DAX last session return", VALUE_PERCENT), "x_ftse_ret": ("FTSE 100 last session return",
+                                                                            VALUE_PERCENT),
+    "x_nasdaq_ret": ("Nasdaq Composite last session return", VALUE_PERCENT),
+    "x_usvix_ret": ("US VIX last 1-day change", VALUE_PERCENT),
+    "x_usdjpy_ret": ("USD/JPY last 1-day change", VALUE_PERCENT),
+    "x_usdinr_ret": ("USD/INR last 1-day change", VALUE_PERCENT),
+    "x_usdcny_ret": ("USD/CNY last 1-day change", VALUE_PERCENT),
+    "x_dxy_ret": ("US dollar index last 1-day change", VALUE_PERCENT),
+    "x_us10y_chg": ("US 10-year yield last 1-day change (points)", VALUE_PLAIN),
+    "x_brent_ret": ("Brent last 1-day change", VALUE_PERCENT), "x_wti_ret": ("WTI last 1-day change", VALUE_PERCENT),
+    "x_gold_ret": ("gold last 1-day change", VALUE_PERCENT),
+    "adr_premium_dev": ("ADR premium vs its 20-day mean (log)", VALUE_PLAIN),
 }
 RSI_OVERSOLD, RSI_NEAR_OVERSOLD, RSI_NEAR_OVERBOUGHT, RSI_OVERBOUGHT = 30.0, 40.0, 60.0, 70.0
 TEXT_OVERSOLD, TEXT_NEAR_OVERSOLD = "oversold", "near oversold"

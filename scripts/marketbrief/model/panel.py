@@ -15,6 +15,7 @@ import pandas as pd
 from marketbrief.constants.config_keys import CFG_TICKERS
 from marketbrief.constants.model import (FLOW_FEATURES, HORIZONS, LABEL_OPEN_TO_CLOSE, MARKET_FEATURES,
                                          REGIME_FEATURES, TECHNICAL_FEATURES)
+from marketbrief.model.cross_market import add_cross_features, enabled_features
 from marketbrief.constants.features import MSG_NO_BENCHMARK_FOR_KEY
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.model import market_panel
@@ -98,8 +99,9 @@ def bench_labels(bench: pd.DataFrame, session_pos: pd.Series) -> pd.DataFrame:
     return out
 
 
-def build_panel(cfg: dict, inputs: dict, warmup: int) -> pd.DataFrame:
-    """The full panel of one market (features and labels), sorted by date and ticker."""
+def build_panel(cfg: dict, inputs: dict, warmup: int, cross_groups=()) -> pd.DataFrame:
+    """The full panel of one market (features and labels), sorted by date and ticker; plus the cross-market
+    features of `cross_groups` (cross_market.py; none by default)."""
     bars = inputs["bars"]
     bench_key = benchmark_key(cfg)
     if bench_key not in bars:
@@ -115,6 +117,7 @@ def build_panel(cfg: dict, inputs: dict, warmup: int) -> pd.DataFrame:
     panel = panel.merge(market.rename_axis("date").reset_index(), on="date", how="left")
     panel = add_sector_strength(cfg, panel)
     panel = add_flows(cfg, inputs, panel, bench.index)
+    panel = add_cross_features(cfg, bars, panel, cross_groups)
     for horizon in HORIZONS:
         for kind, column in (("earnings", "earnings_in_window"), ("ex_dividend", "ex_dividend_in_window")):
             values = np.full(len(panel), np.nan)
@@ -140,7 +143,9 @@ def add_flows(cfg: dict, inputs: dict, panel: pd.DataFrame, days: pd.DatetimeInd
     return panel
 
 
-def feature_columns(market: str, horizon: int) -> list[str]:
-    """The candidate model features of a market and horizon (event flags are per horizon)."""
+def feature_columns(market: str, horizon: int, cross_groups=()) -> list[str]:
+    """The candidate model features of a market and horizon (event flags are per horizon), plus the
+    cross-market features of the enabled groups."""
     events = [f"earnings_in_window_{horizon}d", f"ex_dividend_in_window_{horizon}d"]
-    return [*TECHNICAL_FEATURES, *MARKET_FEATURES, *REGIME_FEATURES, *events, *FLOW_FEATURES.get(market, ())]
+    return [*TECHNICAL_FEATURES, *MARKET_FEATURES, *REGIME_FEATURES, *events, *FLOW_FEATURES.get(market, ()),
+            *enabled_features(market, cross_groups or ())]

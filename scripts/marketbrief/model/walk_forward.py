@@ -17,6 +17,7 @@ import pandas as pd
 from marketbrief.model.labels import label_columns
 from marketbrief.model.logistic import LogisticModel, fit_logistic, logit, newton_fit, sigmoid
 from marketbrief.model.panel import feature_columns
+from marketbrief.model.settings import cross_groups
 
 
 @dataclass
@@ -76,7 +77,7 @@ def fit_month(panel: pd.DataFrame, oos: pd.DataFrame, cutoff: pd.Timestamp, spec
     if sessions < settings["min_train_sessions"]:
         return None
     up = (train[ret_col] > 0).to_numpy(dtype=float)
-    model = fit_logistic(train, up, feature_columns(market, horizon), settings)
+    model = fit_logistic(train, up, feature_columns(market, horizon, cross_groups(settings, market)), settings)
     past = oos[oos["end"] <= cutoff] if len(oos) else oos
     platt, platt_rows = fit_platt(past, settings["platt_min_rows"])
     return MonthlyFit(cutoff, model, platt, platt_rows, float(up.mean()), len(train), sessions)

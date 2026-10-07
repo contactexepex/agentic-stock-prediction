@@ -167,7 +167,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   JSON coefficients) to `data/<market>/model_versions/`. News enters as a fixed prior (not trainable yet; no
   news archive); `model_news_update` reports the re-estimation and the rows it needs. `model_backtest --out DIR`
   is the walk-forward test (both markets and horizons, open-to-close and close-to-close, baselines after costs;
-  writes only to DIR). The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
+  writes only to DIR; `--history` adds the long-history cache, `--cross-groups`/`--ablate` the cross-market
+  variants, `--no-gbm`). Cross-market features (`model/cross_market.py`: other markets' last sessions, FX, rates,
+  commodities, India's ADR premium; each symbol's `close_time` in the market config; a bar counts only when
+  final before the open of D) are switched per market and group under `cross_market:` in `config/model.yaml` (all off: no tradable skill
+  in the 15-year test, DESIGN.md section 15.1).
+  `model_history` fetches Yahoo daily bars from 2011 (`--start`) into `work/model_history/<market>/` (gitignored, manifest;
+  never data/). Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
   `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
   stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
