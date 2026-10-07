@@ -270,6 +270,18 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   numbers, enums, no prediction words) -> `intraday_explanations/`. Views `intraday_checks_latest`,
   `intraday_deviations`, `intraday_today`, `intraday_explanation_close`; `intraday/outcomes.py` pairs each note with
   the close (held / reversed / faded); `intraday/payload.py` is the cockpit's read model.
+- Slack notifications (B6, SPEC F9; `scripts/alerts.py`, code `marketbrief/alerts/`, notes `docs/ws/b6.md`): one
+  thread per market per day in #market-brief: `morning` (top 5 by agreement at N+1 with the strongest other horizon,
+  the day's head-to-head picks and whether each is viable at the owner's cost: expected gain after your cost > 0),
+  `intraday` (B9's `intraday_alerts_feed`: new flagged open trades and material news), `close` (rule vs AI, every
+  head-to-head trade, the 10 biggest wins and losses, net after market and your costs from B2's `cost_views`) and
+  `corrections` (a reply per trade re-settled after its close post, 30 days); `weekly` (the research review as its
+  own post) and `onboarding` (a reply to the command that asked; `post_onboarding_confirmation`); `post_brief`
+  puts `notify_slack.py`'s brief into the day's thread (wired in Wave 5). Every read as of the clock (MB_NOW-aware),
+  every signal labelled Paper, never advice. Each posted part is recorded in `data/<market>/slack_posts/` (kind
+  `slack_posts`), so reruns never double-post and later posts find the day's thread; `--dry-run` writes to
+  `work/alerts_dryrun/<market>/` and never posts. Token only from `SLACK_BOT_TOKEN` (without it, unthreaded
+  messages through `SLACK_WEBHOOK_URL`); neither is ever printed.
 - Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
   `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
   for the files it moves (ruff in `requirements-dev.txt`, dev and CI only) and shrinks the size

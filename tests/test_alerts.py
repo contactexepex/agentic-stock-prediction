@@ -191,8 +191,9 @@ def test_intraday_trade_alerts_from_b9_feed():
     head = f"*US — intraday check at 16:27 UTC: {len(feed)} companies with newly flagged open paper trades*"
     assert msg.splitlines()[0].startswith(head) and msg.splitlines()[1] == "Paper only — no proven edge yet."
     nvda = next(line for line in msg.splitlines() if "Model + news" in line)
-    assert nvda == ("   – N+5 Model + news (rule.model_news.v1) (accuracy): +5.16% since entry, above its 80% range,"
-                    " target already reached; flags: outside its predicted range [Paper]")
+    assert nvda == ("   – N+5 Model + news (rule.model_news.v1), accuracy view: +5.16% since entry, above its 80%"
+                    " range, target already reached; flags: outside its predicted range [Paper]")
+    assert "• *NVDA*: 2 flagged open paper trades [Paper]" in msg.splitlines()
     assert sum(len(r["trades"]) for r in feed) == sum(c["flagged"] for c in checks)
     assert len([x for x in msg.splitlines() if x.startswith("   – ")]) == sum(c["flagged"] for c in checks)
     assert all(PAPER in line for line in signal_lines(msg)) and "AAPL" not in msg   # AAPL is not flagged
@@ -446,6 +447,10 @@ def test_explainer_note_written_after_the_clock_is_not_quoted(scratch, monkeypat
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:45:00+00:00")
     run(["--market", "us", "--dry-run", "intraday", "--check-id", "ic-us-202610071627"], capsys)
     assert "Note (" not in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text()   # posted once already
+    shutil.rmtree(scratch / "work")   # a fresh ledger: the run posts at 16:45 with the note, read through the view
+    run(["--market", "us", "--dry-run", "intraday"], capsys)
+    assert "   Note (sector): NVDA rose with its sector. [XLK]" in (scratch / "work/alerts_dryrun/us/messages.jsonl"
+                                                                    ).read_text()
     rows = reads.latest_alerts(connect("us"), "2026-10-07", pd.Timestamp("2026-10-07T16:45:00Z"))
     assert next(r for r in rows if r["ticker"] == "NVDA")["explanation"] == "NVDA rose with its sector."
 

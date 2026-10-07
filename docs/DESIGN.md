@@ -979,6 +979,12 @@ always show the same numbers.
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
   bot token the summary is posted alone through the webhook. Nothing else is posted.
+- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** the same thread per market and
+  day also carries the morning paper picks (from Wave 5 the thread's first message, with the brief above as a
+  reply), the intraday alerts of each check run (B9's feed), the close results and correction replies; the weekly
+  research report is its own post and onboarding confirmations reply to the command that asked. Every signal is
+  labelled Paper and every number comes from stored data as of the run's clock. The ledger
+  `data/<market>/slack_posts/` makes every post idempotent.
 
 ## 9. Repo changes needed
 - `config/markets.yaml` (exchange, timezone, benchmark, regime index, holidays) and per-market
