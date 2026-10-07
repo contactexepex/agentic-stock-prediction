@@ -124,6 +124,22 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   through DuckDB; Neo4j is a derived copy that `--full` rebuilds from the repo. Idempotent MERGE
   batches, incremental by per-kind watermarks stored in Neo4j, `--dry-run` writes the statements to
   `work/neo4j_dryrun/`. Optional and non-blocking in the routine.
+- App architecture (docs/ARCHITECTURE.md; contract `api/openapi.yaml`, checked by `tests/test_openapi.py`):
+  `data/` stays the source of truth; MotherDuck `market_brief` (env `MOTHERDUCK_TOKEN`) is a derived copy
+  plus per-page read models in schema `rm` (one keyed row per market x page, payload JSON as of the run's
+  cut-off, rebuilt idempotently by hash), synced after each daily and news run, non-blocking. The Next.js
+  app on Vercel reads only `rm` through MotherDuck's Postgres endpoint under `/api/v1`. Static `reports/`
+  and Slack keep working when MotherDuck is down or capped. Workstream notes: `docs/ws/`.
+- Warehouse (WS1, docs/ws/ws1.md; code `marketbrief/warehouse/`, settings `config/warehouse.yaml`):
+  `warehouse_sync.py --market india|us [--full] [--dry-run] [--local] [--kind daily|news]` copies the
+  market's stored data as of the run's clock (MB_NOW-aware) into MotherDuck `market_brief` (without
+  `MOTHERDUCK_TOKEN`, never printed: the local file of the config under `work/`): one schema per market with
+  the cockpit's tables (bars, quotes, features, regime, predictions, track record per label basis, ranges,
+  model scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one
+  transaction, plus the read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`; key
+  `(market, page_key)`, payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds`
+  and `meta.sync_runs`. Kill switch `enabled` and `monthly_hours_ceiling` in the config. Optional,
+  non-blocking, rebuildable with `--full`.
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
   context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
@@ -161,6 +177,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `news_verified`, read with `news_verified_asof(ts)` / `news_status_ids_asof(ts)` (no look-ahead). The
   context pack shows events with their status; the forecast gate checks each cited id's status as of
   `made_at` (`prediction_rules.check_news_status`).
+- Results digests (WS6, docs/ws/ws6.md; code `marketbrief/results/`, settings `config/results.yaml`,
+  `routine/RESULTS_PROMPT.md`): `results_digest.py prepare` detects the watchlist's quarterly results releases (India:
+  first NSE Integrated Filing of a quarter; US: SEC 2.02 kept by `results_filter`) and earnings-call texts (India: NSE
+  transcript announcements; US: prepared remarks filed with the SEC, else `transcript_unavailable`) of the last 10
+  days, stores their primary texts in `primary_texts` (NSE attachments from the archive host only; no PDF parser, so
+  India digests hold numbers only until `pypdf` is added), computes the numbers as of the release (no later
+  restatement: India filings within 24 h of the first, US `fundamentals_metrics_asof` at the quarter's first
+  10-Q/10-K, `pending_report` until then), the consensus collected before the release (context only) and the
+  reaction, and writes the results-analyst's input; `validate|add` is the gate (ids, verbatim quotes, numbers from
+  the quote or the release, enums, no advice) and appends to `results_digests` (views `results_digests_asof(ts)`,
+  `results_digests_latest`, `results_digest_ticker_latest`). The context pack does not show digests yet.
 - Signal model (DESIGN.md section 15; `scripts/marketbrief/model/`, settings `config/model.yaml`, costs
   `config/costs.yaml`): `model_scores` (routine step 5a, again after the news append) appends per ticker and
   horizon P(up) of the open-to-close label (buy at the open of D, the first session after the as-of close; sell
@@ -179,6 +206,16 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   never data/). Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
   `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
   stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
+- Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
+  settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
+  `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
+  low-high, unused idempotency key, no selling more than held) and appends to `data/<market>/portfolio_trades/`
+  (corrections: a new row with `supersedes`, `cancel-trade`); `request-company` appends to
+  `data/<market>/watchlist_requests/` (config stays a human change); `positions` / `pnl` (FIFO, marked to the latest
+  stored close, before and after `config/costs.yaml` costs, split basis of `adjustments`); `signals` (tiers Strong Buy
+  .. Strong Sell; Strong only in a proven horizon x confidence band: review `model_skill` true and >= 50 open_to_close
+  calls with Wilson low >= 0.55; else "No proven strong signals today" + Paper candidates); `paper-follow` (SIMULATED).
+  Every read is as of the clock (MB_NOW-aware).
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
@@ -205,11 +242,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
 - `.claude/agents/` subagents: reflector (one lesson per settled call, after scoring), claim-checker
   (claims of material news events quoted from stored extracts and filing texts), news-analyst,
   bull-researcher, bear-researcher, forecaster (reads the lessons; never overriding the prediction rules),
-  graph-builder (monthly connection map; every edge cites a public source), and judge
+  graph-builder (monthly connection map; every edge cites a public source),
+  deviation-explainer (one note per flagged intraday deviation, citing only the check's candidates),
+  results-analyst (at most 5 quoted bullets per results release or earnings-call text, never a forecast or
+  advice), and judge
   (independent verifier of code, config, agent-instruction and process changes, the monthly
   graph-builder edges and the weekly spot-check sample).
   Each agent's model and effort are set in its frontmatter (Sonnet 5.5 for news scoring, claim
-  checking, the reflector and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
+  checking, the reflector, the deviation explainer, the results-analyst and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
   table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one per market, every 6 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
@@ -217,6 +257,18 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
   (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window)
+- Intraday checks (WS5; `scripts/intraday_check.py`, code `marketbrief/intraday/`, settings `config/intraday.yaml`,
+  `routine/INTRADAY_PROMPT.md`; schedules in DESIGN.md section 2): a few times per session, Yahoo 5-minute bars of
+  the watchlist, benchmark and sector indices (bars complete by the check time) are compared with the session's
+  published 1d/5d ranges and the open calls and model scores as of the check (MB_NOW-aware): band position, move
+  since the open scaled by the 1-day sigma, beta-adjusted residual, direction against an open call ->
+  `data/<market>/intraday_checks/` (one row per ticker, with deterministic attribution candidates: benchmark, sector,
+  cue, news/announcements first seen since the open with their status, today's events) and `intraday_runs/` (one row
+  per check; market closed: that row only; a repeated check time writes nothing). The `deviation-explainer` agent
+  writes <= 60 words per flagged row citing only those candidates; `intraday_check.py validate|add` is its gate (ids,
+  numbers, enums, no prediction words) -> `intraday_explanations/`. Views `intraday_checks_latest`,
+  `intraday_deviations`, `intraday_today`, `intraday_explanation_close`; `intraday/outcomes.py` pairs each note with
+  the close (held / reversed / faded); `intraday/payload.py` is the cockpit's read model.
 - Refactor (feature freeze, `docs/REFACTOR_PLAN.md`): every step proves byte-identical outputs with
   `tests/golden/golden.py record|compare` (recorded set in `work/golden/`), keeps `ruff.toml` clean
   for the files it moves (ruff in `requirements-dev.txt`, dev and CI only) and shrinks the size
@@ -271,7 +323,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   the full suite after any merge that brings in code changes (CI also runs on push). New end-to-end
   tests go in `SLOW` in `tests/conftest.py`.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
-  in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, not by the judge: one retry (the run is time-boxed), then the failed
+  in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
+  for the deviation-explainer's notes by `scripts/intraday_check.py validate`, not by the judge: one retry (the run is time-boxed), then the failed
   output is dropped or withheld as `routine/PROMPT.md` says and listed in the report's
   `data_quality`. The judge still checks the monthly graph-builder edges, and once a week
   (`scripts/spotcheck.py --if-due`) a deterministic sample of the past week's output (2 forecasts

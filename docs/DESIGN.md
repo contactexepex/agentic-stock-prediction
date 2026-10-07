@@ -31,6 +31,14 @@ their pushes rarely meet on the same day file:
 | India | `17 5,11,17,23 * * *` (05:17, 11:17, 17:17, 23:17 UTC) |
 | US | `47 3,9,15,21 * * *` (03:47, 09:47, 15:47, 21:47 UTC) |
 
+Intraday light runs (`routine/INTRADAY_PROMPT.md`, WS5): two checks per session, in exchange time so daylight
+saving never shifts them, away from the news light runs; on holidays the check writes only a `market_closed` row.
+
+| Intraday run | Cron | UTC |
+|---|---|---|
+| India | `CRON_TZ=Asia/Kolkata 13 11 * * 1-5` and `CRON_TZ=Asia/Kolkata 13 14 * * 1-5` | 05:43 and 08:43 (session 03:45-10:00) |
+| US | `CRON_TZ=America/New_York 27 12 * * 1-5` and `CRON_TZ=America/New_York 57 14 * * 1-5` | 16:27 and 18:57 in EDT, 17:27 and 19:57 in EST (session 13:30-20:00 EDT, 14:30-21:00 EST) |
+
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Session cut-off (issue #20): a session's bar counts as final 120 minutes after its close
   (`BAR_SETTLE_MINUTES`, `calendar.last_complete_session`). `collect_prices.py` stores the
@@ -562,6 +570,23 @@ many shown events may be main evidence now (and says so when none can), and the 
 `refused_news_status`), one `data_quality` line. `ai_replay record` applies the same rules to
 replayed calls, each cited id's status as of the replay cutoff (the stored `made_at`), when the
 replay root holds status rows by then (`news_status_rules` in the day's record), else not.
+
+### 3c. Results digests (WS6; built 2026-10-07)
+`scripts/results_digest.py` (code `marketbrief/results/`, settings `config/results.yaml`, step 3e of
+`routine/PROMPT.md` via `routine/RESULTS_PROMPT.md`, non-blocking) digests each watchlist company's quarterly
+results release and earnings-call text of the last 10 days. Detection is deterministic: India, the first NSE
+Integrated Filing of a quarter and NSE transcript announcements; US, an SEC 2.02 kept by `results_filter` and
+prepared remarks filed with the SEC (else `transcript_unavailable`; no transcript site is read). Primary texts go to
+`primary_texts`. The numbers are as of the release, never a later restatement (India: the filings within 24 h of the
+first; US: `fundamentals_metrics_asof` at the quarter's first 10-Q/10-K, `pending_report` until it is filed and the
+release is then digested again). Consensus is the Yahoo estimate collected before the release, context only; the
+reaction is the close-to-close move over `earnings_reaction.affected_sessions`. Only the bullets come from an agent
+(the results-analyst, at most 5 per release, each with a verbatim quote of 3 to 40 words); the gate
+(`results_digest.py validate`) checks ids, verbatim quotes, that every number comes from the quote or the release's
+numbers (value, scale, direction), the topic enum and that no buy/sell/recommendation words appear. Rows go to
+`data/<market>/results_digests/` (newest per id wins; `results_digests_asof(ts)` does not look ahead). India PDF
+attachments are not parsed until `texts.pdf_parser` is set (needs `pypdf`), so India digests hold numbers only
+until then. The context pack does not show digests yet.
 
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
@@ -1382,6 +1407,8 @@ Opus.
 | graph-builder (monthly, web research with sources) | Claude Opus 5.5 | high |
 | judge (code/process changes, weekly spot-check) | Claude Opus 5.5 | high |
 | reflector (lessons from settled calls) | Claude Sonnet 5.5 | medium |
+| deviation-explainer (one gated 60-word note per flagged intraday deviation; WS5) | Claude Sonnet 5.5 | medium |
+| results-analyst (quoted bullets per results release or call text; section 3c) | Claude Sonnet 5.5 | medium |
 | headline aboutness check, once built | Claude Haiku 4.5 (`claude-haiku-4-5`; no effort setting) | - |
 | claim-checker (claim extraction from article extracts and filing texts; section 3b) | Claude Sonnet 5.5 | high |
 | orchestrator (the routine session itself, incl. report narrative) | the routine sessions' configured model: `claude-opus-5-5` (India and US routine sessions, checked 2026-10-06) | session default |
@@ -1720,3 +1747,27 @@ one can buy at the as-of close. They do mean that pre-open calls scored close-to
 information the open already prices. The long history alone (b) shows no skill either. Decision: every
 `cross_market` group stays switched off in `config/model.yaml`. A confirmation should use only data
 after 2026-10-07 (a held-out period), with the India `asia` and `adr` groups fixed in advance.
+
+
+## 16. The app around the pipeline (contract 2026-10-07)
+The app (API, frontend, paper portfolio, governed actions) is specified in `docs/ARCHITECTURE.md` and
+`api/openapi.yaml`. It changes no daily-run step: MotherDuck `market_brief` is a derived copy of
+`data/` (like Neo4j, section 12) holding small per-page read models built as of the run's clock; the app
+does one keyed SELECT per page and Vercel caches it until the next build changes that page. Every signal
+stays "Paper only — no proven edge yet" until the weekly review's `model_skill` is true; Strong Buy /
+Strong Sell appear only once proven. User records (paper trades, add-company requests) enter `data/`
+only through validated CLIs, from Slack or Claude Code now and from an append-only inbox later.
+
+The warehouse copy is written by `scripts/warehouse_sync.py` (docs/ws/ws1.md): every table is rebuilt as
+of the run's clock with each view's own pick rule plus `<stored_at> <= cutoff`, so a replay with MB_NOW
+builds exactly what was known then; read models are the dashboard's own data sliced per page, so the app
+and `reports/<market>/dashboard.html` can never disagree.
+
+**Paper portfolio and tiers (WS4, built 2026-10-07).** Paper trades (`portfolio_trades`) and add-company requests
+(`watchlist_requests`) are append-only kinds written only by `scripts/portfolio.py` after validation against stored
+bars and the market calendar; a correction is a new row with `supersedes`. Positions and P&L are FIFO on today's
+split basis, marked to the latest stored close, before and after the costs of `config/costs.yaml`. A signal tier is
+Strong only in a proven (horizon, confidence band) cell: the latest weekly review has `model_skill` true and the
+forecaster's open-to-close calls in that cell number >= `proof.min_count` with a Wilson 95% lower bound >=
+`proof.min_wilson_low` (`config/portfolio.yaml`); a row is labelled proven only when it carries a forecaster call in
+such a cell, and every other row is labelled "Paper only — no proven edge yet".

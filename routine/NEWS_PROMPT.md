@@ -1,7 +1,8 @@
 Run the news-only light run for MARKET=<india|us> in this repository. Follow CLAUDE.md. Work from the
 repo root. Export `MB_MARKET=<market>` so every script uses this market. Research only: never place
 trades. This run collects news and nothing else: no prices, no agents (no news analyst, claim checker,
-researchers or forecaster), no report, no Slack message, no Neo4j sync. It runs every 6 hours, every
+researchers or forecaster), no report, no Slack message, no Neo4j sync (the one optional extra is the warehouse
+sync of step 3a). It runs every 6 hours, every
 day including weekends and exchange holidays, so the pre-open run (routine/PROMPT.md) finds every
 headline stored since it last ran (docs/DESIGN.md section 3, "News timing").
 
@@ -41,6 +42,11 @@ a line or file there, and never run a tool that overwrites one. Only the collect
    not resolve it by hand: `git rebase --abort`, `git reset --hard origin/main`, run step 2 once more
    (it re-collects; items already on main are skipped as duplicates) and step 3 once more. If it fails
    again, end the session and say so: the next run catches up.
+
+3a. Warehouse (optional, non-blocking): only when step 3 pushed a commit, run
+    `python scripts/warehouse_sync.py --kind news`. It refreshes the market's copy in MotherDuck and
+    rebuilds the read models whose payload changed (needs `MOTHERDUCK_TOKEN`). Name any failure or skip in
+    the final message; never retry and never run `--full`.
 
 4. Final message (no Slack): the market, `new_items`, the `window` (`google_when`, `reason`), the
    number of article rows and clusters written, the commit hash or "nothing committed", and every

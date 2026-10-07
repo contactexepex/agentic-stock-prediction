@@ -1,6 +1,6 @@
 Results digests for MARKET=<india|us> (WS6; docs/ws/ws6.md). This is one step of the daily run: it is meant to
-run inside routine/PROMPT.md after step 3 (all collectors, news verification d. included) and before step 4, as
-proposed in docs/ws/ws6.md, with `MB_MARKET=<market>` exported. Until that step is added it can be run on its
+run inside routine/PROMPT.md as step 3e (after all collectors and news verification a.-d., before the collect
+gate), with `MB_MARKET=<market>` exported. It can also be run on its
 own from the repo root with the same environment (SEC_USER_AGENT for the US). Follow CLAUDE.md. Research only:
 never place trades. Non-blocking: a failure here never stops the daily run; add one `data_quality` line each.
 
