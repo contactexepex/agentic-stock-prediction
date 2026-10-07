@@ -196,21 +196,27 @@ def test_cost_viable_flag():
     # market 2.18 + 0.02 = 2.20; your + FX .0075 x 2000 = 15.00 + fee .002 x 1000 x 3 / 365 = 0.02 -> 17.22 = 1.722%
     # Viable = expected gain after your cost > 0 (owner decision 2026-10-07, via B6), with the picks' move and loss:
     # 80% band 99.4369..104.5631 around the target 102 -> sigma 2, z = (100 - 102) / 2 = -1: P(X > C) = 0.841345,
-    # E[(X - C)+] = 2 x 0.841345 + 2 x phi(1) 0.241971 = 2.166631 -> move 2.575205%; E[(C - X)+] = -2 x 0.158655 +
-    # 0.483941 = 0.166631 -> loss 1.050272%. p 0.6: 1.545123 - 0.420109 - 1.722 = -0.596986 (not viable);
-    # p 0.9: 2.317685 - 0.105027 - 1.722 = 0.490658 (viable). The 2% move alone would have beaten 1.722% (old rule).
+    # E[(X - C)+] = 2 x 0.841345 + 2 x phi(1) 0.241971 = 2.166631 -> move 2.575200%; E[(C - X)+] = -2 x 0.158655 +
+    # 0.483941 = 0.166631 -> loss 1.050271%. p 0.6: 1.545120 - 0.420108 - 1.722 = -0.596988 (not viable);
+    # p 0.9: 2.317680 - 0.105027 - 1.722 = 0.490653 (viable). The 2% move alone would have beaten 1.722% (old rule).
     pred = prediction("us", "AAPL", 1, base_close=100.0, target_price=102.0, lo80=102.0 - Z80 * 2,
                       hi80=102.0 + Z80 * 2, prob_up=0.6)
     found = viability(pred, US_RATES, 1.10)
     assert (round(found["market_cost_pct"], 4), round(found["your_cost_pct"], 4)) == (0.22, 1.722)
     assert found["expected_move_pct"] == pytest.approx(2.0)
-    assert found["expected_gain_your_pct"] == pytest.approx(-0.596986, abs=1e-5) and found["cost_viable"] is False
+    assert found["expected_gain_your_pct"] == pytest.approx(-0.596988, abs=1e-5) and found["cost_viable"] is False
     sure = viability({**pred, "prob_up": 0.9}, US_RATES, 1.10)
-    assert sure["expected_gain_your_pct"] == pytest.approx(0.490658, abs=1e-5) and sure["cost_viable"] is True
+    assert sure["expected_gain_your_pct"] == pytest.approx(0.490653, abs=1e-5) and sure["cost_viable"] is True
     assert viability({**pred, "prob_up": None}, US_RATES, 1.10)["cost_viable"] is None   # always-up, momentum
     row = viability_row("prediction", pred["id"], pred, US_RATES, 1.10, NOW)
     assert row["id"] == f"cv:prediction:{pred['id']}" and row["cost_viable"] is False and row["your_costs"] == 17.22
     assert row["expected_gain_your_pct"] == -0.597
+    no_range = viability({**pred, "lo80": None, "hi80": None}, US_RATES, 1.10)   # a probability but no 80% range
+    assert (no_range["expected_gain_your_pct"], no_range["cost_viable"]) == (None, None)
+    # India, whole shares: Rs 500 cannot buy one share at 1000 -> no trade, no costs, no verdict
+    tiny = viability(prediction("india", "ITC", 1, amount=500.0, base_close=1000.0, target_price=1020.0,
+                                lo80=1000.0, hi80=1040.0, prob_up=0.9), INDIA_RATES, None)
+    assert (tiny["your_cost_pct"], tiny["expected_gain_your_pct"], tiny["cost_viable"]) == (None, None, None)
 
 
 def test_deterministic_and_resettle_on_a_split_correction():
