@@ -18,8 +18,8 @@ def lifecycle_events() -> list[dict]:
     rows = []
     for market in ("india", "us"):
         names = dict(COMPANIES[market])
-        names.update({"INDIGO": ("InterGlobe Aviation (IndiGo)", "Transport", "INDIGO.NS"),
-                      "DAL": ("Delta Air Lines", "Airlines", "DAL")})
+        names.update({"india": {"INDIGO": ("InterGlobe Aviation (IndiGo)", "Transport", "INDIGO.NS")},
+                      "us": {"DAL": ("Delta Air Lines", "Airlines", "DAL")}}[market])
         for ticker, meta in names.items():
             exchange = "NSE" if market == "india" else ("NYSE" if ticker in ("JPM", "DAL") else "NASDAQ")
             rows.append(row("watchlist_events", id=f"we-{market}-{ticker}-add-20260924T060000Z", market=market,
@@ -36,28 +36,28 @@ def lifecycle_events() -> list[dict]:
         row("watchlist_events", id="we-india-MARUTI-set_amount-20260925T091500Z", market="india", ticker="MARUTI",
             event="set_amount", effective_from="2026-09-28T02:10:00Z", recorded_at="2026-09-25T09:15:00Z",
             amount=10000.0, currency="INR", reason="smaller test amount", requested_by="dashboard:owner",
-            channel="dashboard", command_id="cmd-20260925T091500Z-4f1a9c2e", idempotency_key="amt-maruti-20260925",
+            channel="dashboard", command_id="cmd-20260925T091500Z-4e92e724", idempotency_key="amt-maruti-20260925",
             validator_version="lifecycle-v1"),
         row("watchlist_events", id="we-india-INDIGO-deactivate-20261002T091800Z", market="india", ticker="INDIGO",
             event="deactivate", effective_from="2026-10-05T02:10:00Z", recorded_at="2026-10-02T09:18:00Z",
             reason="pause airlines", requested_by="slack:U07ABCD123", channel="slack",
-            command_id="cmd-20261002T091800Z-9b3e11d0", idempotency_key="deact-indigo-1",
+            command_id="cmd-20261002T091800Z-22018a94", idempotency_key="deact-indigo-1",
             validator_version="lifecycle-v1"),
         row("watchlist_events", id="we-us-DAL-deactivate-20261002T200000Z", market="us", ticker="DAL",
             event="deactivate", effective_from="2026-10-05T11:45:00Z", recorded_at="2026-10-02T20:00:00Z",
             reason="pause airlines", requested_by="dashboard:owner", channel="dashboard",
-            command_id="cmd-20261002T200000Z-5d6e7f80", idempotency_key="deact-dal-1",
+            command_id="cmd-20261002T200000Z-597d6a7f", idempotency_key="deact-dal-1",
             validator_version="lifecycle-v1"),
         row("watchlist_events", id="we-us-MSFT-add-20261005T140200Z", market="us", ticker="MSFT", event="add",
             effective_from="2026-10-06T11:45:00Z", recorded_at="2026-10-05T14:02:00Z", name="Microsoft",
             exchange="NASDAQ", sector="Tech", yahoo="MSFT", cik="0000789019", amount=None, currency="USD",
-            requested_by="slack:U07ABCD123", channel="slack", command_id="cmd-20261005T135500Z-0c7d5a21",
+            requested_by="slack:U07ABCD123", channel="slack", command_id="cmd-20261005T135500Z-052b8228",
             idempotency_key="add-msft-7Hq2",
             onboarding={"identifiers": "ok", "not_etf": "ok", "listing": "ok", "backfill_prices": "ok",
                         "backfill_news": "ok", "collect_gate": "ok"}, validator_version="lifecycle-v1"),
-        row("watchlist_events", id="we-us-MSFT-delete-20261006T080000Z", market="us", ticker="MSFT", event="delete",
-            effective_from="2026-10-06T08:00:00Z", recorded_at="2026-10-06T08:00:00Z", reason="added by mistake",
-            requested_by="dashboard:owner", channel="dashboard", command_id="cmd-20261006T080000Z-61aa02f4",
+        row("watchlist_events", id="we-us-MSFT-delete-20261006T150000Z", market="us", ticker="MSFT", event="delete",
+            effective_from="2026-10-06T15:00:00Z", recorded_at="2026-10-06T15:00:00Z", reason="added by mistake",
+            requested_by="dashboard:owner", channel="dashboard", command_id="cmd-20261006T150000Z-f7d62492",
             idempotency_key="del-msft-confirm", validator_version="lifecycle-v1"),
     ]
     return rows
@@ -65,21 +65,21 @@ def lifecycle_events() -> list[dict]:
 
 def commands() -> list[dict]:
     return [
-        row("command_log", id="cmd-20261005T135500Z-0c7d5a21", market="us", received_at="2026-10-05T13:55:00Z",
+        row("command_log", id="cmd-20261005T135500Z-052b8228", market="us", received_at="2026-10-05T13:55:00Z",
             channel="slack", actor="slack:U07ABCD123", agent="slack-gateway", tool="add_company", kind="write",
             arguments={"market": "us", "symbol": "MSFT"}, idempotency_key="add-msft-7Hq2", result="accepted",
             message="Microsoft (NASDAQ, Tech, CIK 0000789019), $1,000 per trade - confirmed",
             record_ids=["we-us-MSFT-add-20261005T140200Z"], budget_left=19, completed_at="2026-10-05T14:02:00Z"),
-        row("command_log", id="cmd-20261005T140500Z-a2c4e6f8", market="us", received_at="2026-10-05T14:05:00Z",
+        row("command_log", id="cmd-20261005T140500Z-73abce0f", market="us", received_at="2026-10-05T14:05:00Z",
             channel="slack", actor="slack:U07ABCD123", agent="slack-gateway", tool="add_company", kind="write",
             arguments={"market": "us", "symbol": "SPY"}, idempotency_key="add-spy-1", result="refused",
             refusal_code="validation_failed", message="SPY is an ETF; only common stocks can be added",
             record_ids=[], budget_left=18, completed_at="2026-10-05T14:05:02Z"),
-        row("command_log", id="cmd-20261006T150000Z-77d0be13", market="india", received_at="2026-10-06T15:00:00Z",
+        row("command_log", id="cmd-20261006T150000Z-99c9b960", market="india", received_at="2026-10-06T15:00:00Z",
             channel="claude_app", actor="github:owner", agent="claude-app", tool="get_scoreboard", kind="read",
             arguments={"market": "india", "view": "accuracy"}, idempotency_key=None, result="accepted",
             record_ids=[], budget_left=None, completed_at="2026-10-06T15:00:01Z"),
-        row("command_log", id="cmd-20261006T151000Z-3e9f0a77", market="us", received_at="2026-10-06T15:10:00Z",
+        row("command_log", id="cmd-20261006T151000Z-3ffb1995", market="us", received_at="2026-10-06T15:10:00Z",
             channel="slack", actor="slack:U07ABCD123", agent="slack-gateway", tool="delete_company", kind="write",
             arguments={"market": "us", "ticker": "DAL"}, idempotency_key="del-dal-x", result="refused",
             refusal_code="not_allowed_in_channel", message="Delete is only available on the dashboard",
@@ -125,7 +125,7 @@ def trade_checks(opens: list[dict]) -> list[dict]:
         rows.append(row("trade_checks", id=f"{check_id}-{trade['trade_id']}", check_id=check_id,
                         check_row_id=f"{check_id}-{trade['ticker']}", check_at=check_at, session_date="2026-10-07",
                         market=trade["market"], ticker=trade["ticker"], trade_id=trade["trade_id"],
-                        prediction_id=trade["prediction_id"], strategy_id=trade["strategy_id"], view="accuracy",
+                        prediction_id=trade["prediction_id"], strategy_id=trade["strategy_id"], view=trade["view"],
                         horizon_days=trade["horizon_days"], entry_date=trade["entry_date"],
                         exit_date=trade["exit_date"],
                         session_number=sum(d >= trade["entry_date"] for d in BARS[trade["ticker"]]) + 1,

@@ -102,7 +102,7 @@ loader. Example file: `lifecycle_event.json`.
 | reason | Why, in the requester's words | request | text | `pause airlines` |
 | requested_by | Who asked; taken from the channel's sign-in, never typed in | channel auth (F10) | text | `slack:U07ABCD123`, `dashboard:owner` |
 | channel | Where the request came from | channel | `dashboard`, `slack`, `claude_code`, `claude_app`, `cli`, `seed` | `slack` |
-| command_id | The [command](#command) that asked | command log | text | `cmd-20261005T135500Z-0c7d5a21` |
+| command_id | The [command](#command) that asked | command log | text | `cmd-20261005T135500Z-052b8228` |
 | idempotency_key | Stops a double click from adding twice | client | text | `add-msft-7Hq2` |
 | onboarding | Result of each onboarding check (add only) | onboarding (F8.3) | check -> `ok`/`failed`/`skipped` | `{"not_etf": "ok", "backfill_prices": "ok"}` |
 | supersedes | The event this one corrects | validator | id | empty |
@@ -333,7 +333,7 @@ qualifying [predictions](#prediction), the entry bar and the latest close. Examp
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
-| trade_id, strategy_id, ticker, horizon_days | Which trade | prediction | text | `acc:rule.model_news.v1:2026-09-29-NVDA-5d` |
+| trade_id, view, strategy_id, ticker, horizon_days | Which trade, in which view (accuracy or head-to-head) | prediction, pick | text | `acc:rule.model_news.v1:2026-09-29-NVDA-5d`; `h2h:highest_probability:ai.combined.opus.v1:2026-09-29-NVDA-5d` |
 | entry_date, exit_date, entry_price, quantity | Entered when and at what price; planned exit | bars, engine rules | date, ₹ / $, shares | `2026-09-30`, `2026-10-07`, `229.27`, `4.36167` |
 | target_price, lo50..hi80 | What was predicted | prediction | ₹ / $ | `228.03`; 80 % `215.86`-`240.88` |
 | last_price, last_price_date | Latest stored close (intraday: see [trade check](#trade-check)) | `ohlc_raw` | ₹ / $ | `239.24` |
@@ -397,12 +397,15 @@ Status: kind `eod_analyses`; session **B3** writes it. Example file: `eod_analys
 
 How a strategy is doing (F7). There is one row per market × view × strategy × horizon, plus a row with every
 horizon pooled. Rows per company and per pick rule are cut the same way. Status: **derived for pages** (B2
-computes, B4 serves `rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (computed from the example
-trades, so every count matches `paper_trade.json`).
+computes, B4 serves `rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (78 rows computed from the
+example trades, so every count matches `paper_trade.json`).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
+| scope | Which cut: per strategy (all horizons and each horizon), per strategy and company (the stock strategies page), or per family and pick rule (head-to-head portfolios) | F7.1 | `strategy`, `strategy_company`, `pick_rule` | `strategy` |
 | view, strategy_id, family, horizon_days | Which slice (examples below: US, accuracy, `rule.model_news.v1`, all horizons) | settled trades | text; `all` or k | `accuracy`, `rule.model_news.v1`, `all` |
+| ticker | The company, for `strategy_company` rows (else empty) | settled trades | text | `NVDA`: 4 trades, $103.48 |
+| pick_rule | The pick rule, for `pick_rule` rows (head-to-head view; strategy_id empty, family set) | settled trades | text | rule family, `highest_probability`: 1 trade, $41.15 |
 | trades | Settled trades in the slice | count | count | `10` |
 | net_pnl | Profit after costs: the headline | sum | ₹ / $ | `99.00` ($) |
 | mean_return_pct | Average return per trade | mean | % | `0.99` |
@@ -412,7 +415,7 @@ trades, so every count matches `paper_trade.json`).
 | range_hit_rate | Share of exit closes inside the 80 % range | F1.9 | 0-1 | `0.9` |
 | worst_losing_streak | Most losses in a row | sequence | count | `2` |
 | max_drawdown | Deepest fall of cumulative profit from its peak | sequence | ₹ / $ | `-11.24` |
-| luck_test | 95 % bootstrap interval of the mean return, with a correction across all strategies. Only "excludes zero" after correction counts as an edge | F7.1 | %, yes/no | `0.01` to `2.16`, excludes zero `true` but `corrected: false` (no edge claimed) |
+| luck_test | 95 % bootstrap interval of the mean return, with a correction across all strategies. Only "excludes zero" after correction counts as an edge | F7.1 | %, yes/no | `0.00` to `2.12` (low end just above 0), excludes zero `true` but `corrected: false` (no edge claimed) |
 | sample_badge | Fewer than 20 trades: "too few trades to rank" (greyed out, SPEC section 6) | rule | `ok` / `too_few_to_rank` | `too_few_to_rank` |
 | go_live | Position against the go-live bar: proven, months forward, trades needed, beats the best baseline | F7.2 | mixed | `proven: false`, 300 trades needed |
 | basis | Forward or back-test; the two are never pooled (F2.3) | label | `forward` / `backtest` | `forward` |

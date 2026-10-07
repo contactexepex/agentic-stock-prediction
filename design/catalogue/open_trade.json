@@ -653,6 +653,33 @@
       "unrealised_pct": -0.01,
       "to_target_pct": 1.9,
       "paper": true
+    },
+    {
+      "trade_id": "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-NVDA-5d",
+      "view": "head_to_head",
+      "prediction_id": "ai.combined.opus.v1:2026-09-29-NVDA-5d",
+      "strategy_id": "ai.combined.opus.v1",
+      "family": "ai",
+      "market": "us",
+      "ticker": "NVDA",
+      "horizon_days": 5,
+      "entry_date": "2026-09-30",
+      "exit_date": "2026-10-07",
+      "entry_price": 229.27,
+      "quantity": 4.36167,
+      "amount": 1000.0,
+      "currency": "USD",
+      "target_price": 228.32,
+      "lo80": 214.54,
+      "lo50": 221.08,
+      "hi50": 235.56,
+      "hi80": 242.1,
+      "last_price": 239.24,
+      "last_price_date": "2026-10-06",
+      "unrealised_pnl": 43.49,
+      "unrealised_pct": 4.35,
+      "to_target_pct": -4.56,
+      "paper": true
     }
   ]
 }

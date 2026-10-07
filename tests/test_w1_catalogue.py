@@ -361,3 +361,50 @@ def test_catalogue_trades_are_internally_consistent():
     events = {e["id"] for e in load("lifecycle_event.json")}
     for command in load("command_log.json"):
         assert set(command["record_ids"]) <= events
+
+
+def test_tool_channel_values_read_the_same_in_yaml_1_1_and_1_2():
+    """yes/no/on/off are booleans in YAML 1.1 (PyYAML) but strings in YAML 1.2 (the TypeScript tool layer)."""
+    ambiguous = re.compile(r":\s*(yes|no|on|off|y|n)\s*[,}]", re.IGNORECASE)
+    for line in (REPO / "mcp" / "tools.yaml").read_text(encoding="utf-8").splitlines():
+        if not line.lstrip().startswith("#"):
+            assert not ambiguous.search(line), line
+
+
+def test_catalogue_lifecycle_events_match_their_market():
+    exchanges = {"india": {"NSE"}, "us": {"NYSE", "NASDAQ"}}
+    currencies = {"india": "INR", "us": "USD"}
+    events = load("lifecycle_event.json")
+    for event in events:
+        if event["event"] == "add":
+            assert event["exchange"] in exchanges[event["market"]], event["id"]
+            assert (event["nse_symbol"] is not None) == (event["market"] == "india"), event["id"]
+            assert event["cik"] is None or event["market"] == "us", event["id"]
+        if event["currency"] is not None:
+            assert event["currency"] == currencies[event["market"]], event["id"]
+    added = {(e["market"], e["ticker"]) for e in events if e["event"] == "add"}
+    for company in load("company.json"):
+        assert (company["market"], company["ticker"]) in added
+        assert company["currency"] == currencies[company["market"]]
+        assert company["exchange"] in exchanges[company["market"]]
+
+
+def test_catalogue_scoreboard_has_every_slice():
+    rows = load("scoreboard_row.json")
+    assert {r["scope"] for r in rows} == {"strategy", "strategy_company", "pick_rule"}
+    for r in rows:
+        assert (r["ticker"] is not None) == (r["scope"] == "strategy_company")
+        assert (r["pick_rule"] is not None) == (r["scope"] == "pick_rule")
+        assert (r["strategy_id"] is None) == (r["scope"] == "pick_rule")
+    trades = [t for t in load("paper_trade.json") if t["status"] == "settled"]
+    for r in rows:
+        if r["scope"] == "strategy_company":
+            mine = [t for t in trades if t["view"] == "accuracy" and t["strategy_id"] == r["strategy_id"]
+                    and t["ticker"] == r["ticker"]]
+        elif r["scope"] == "pick_rule":
+            mine = [t for t in trades if t["view"] == "head_to_head" and t["family"] == r["family"]
+                    and t["pick_rule"] == r["pick_rule"] and t["market"] == r["market"]]
+        else:
+            continue
+        assert r["trades"] == len(mine)
+        assert r["net_pnl"] == pytest.approx(sum(t["net_pnl"] for t in mine), abs=0.011)

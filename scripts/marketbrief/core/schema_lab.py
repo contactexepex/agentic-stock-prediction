@@ -98,9 +98,10 @@ LAB_SCHEMAS: Schemas = {
         "amount": "DOUBLE", "currency": "VARCHAR", "method_version": "VARCHAR",
     }),
     # The EOD analyst's reason per head-to-head trade settled today and per day's 5 biggest wins and misses
-    # (F6.1, decision 43), gated: id = tra:<trade_id>. kind head_to_head | biggest_win | biggest_miss; rank 1-5 for
-    # the biggest (null for head_to_head). text <= 60 words grounded in the trade's automatic reason; cited_ids:
-    # the trade id plus news/filing ids it names.
+    # (F6.1, decision 43), gated: id = tra:<trade_id> (head_to_head) or tra:<trade_id>:<kind> (a biggest win or
+    # miss, so a head-to-head trade that is also among the biggest gets both). kind head_to_head | biggest_win |
+    # biggest_miss; rank 1-5 for the biggest (null for head_to_head). text <= 60 words grounded in the trade's
+    # automatic reason; cited_ids: the trade id plus news/filing ids it names.
     KIND_TRADE_REASONS_AI: ("jsonl", {
         "id": "VARCHAR", "trade_id": "VARCHAR", "settlement_id": "VARCHAR", "market": "VARCHAR",
         "ticker": "VARCHAR", "strategy_id": "VARCHAR", "session_date": "DATE", "kind": "VARCHAR", "rank": "INTEGER",

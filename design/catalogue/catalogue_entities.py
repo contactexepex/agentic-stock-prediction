@@ -101,43 +101,57 @@ def agreement(preds: list[dict]) -> list[dict]:
     return out
 
 
+def score_row(key: dict, trades: list[dict], rng: random.Random) -> dict:
+    """One F7.1 row for a slice of settled trades."""
+    trades = sorted(trades, key=lambda t: (t["exit_date"], t["id"]))
+    rets = [t["return_pct"] for t in trades]
+    streak = worst = 0
+    cum = peak = drawdown = 0.0
+    for t in trades:
+        streak = streak + 1 if t["net_pnl"] < 0 else 0
+        worst = max(worst, streak)
+        cum += t["net_pnl"]
+        peak = max(peak, cum)
+        drawdown = min(drawdown, cum - peak)
+    means = sorted(statistics.mean(rng.choices(rets, k=len(rets))) for _ in range(1000))
+    reached = [t["target_reached_session"] for t in trades if t["target_reached"]]
+    return {
+        **key, "trades": len(trades), "net_pnl": r2(sum(t["net_pnl"] for t in trades)),
+        "currency": CURRENCY[key["market"]], "mean_return_pct": r2(statistics.mean(rets)),
+        "win_rate": r4(sum(t["net_pnl"] > 0 for t in trades) / len(trades)),
+        "target_reached_rate": r4(len(reached) / len(trades)),
+        "median_reached_session": statistics.median(reached) if reached else None,
+        "avg_target_error_pct": r2(statistics.mean(t["target_error_pct"] for t in trades)),
+        "range_hit_rate": r4(sum(t["range_hit"] for t in trades) / len(trades)),
+        "worst_losing_streak": worst, "max_drawdown": r2(drawdown),
+        "luck_test": {"method": "bootstrap 95% interval of the mean net return (%), 1000 resamples",
+                      "low_pct": r2(means[25]), "high_pct": r2(means[974]), "excludes_zero": means[25] > 0,
+                      "corrected": False},
+        "sample_badge": "too_few_to_rank" if len(trades) < 20 else "ok",
+        "go_live": {"proven": False, "months_forward": 0.0, "trades_needed": 300, "beats_best_baseline": None},
+        "basis": "forward", "as_of": "2026-10-06"}
+
+
 def scoreboard(settled: list[dict]) -> list[dict]:
-    rows, rng = [], random.Random(20261007)
+    """F7.1 slices: scope strategy (per strategy, all horizons and each horizon), strategy_company (per strategy and
+    company, all horizons; the stock strategies page) and pick_rule (head-to-head per family and pick rule: the
+    head-to-head portfolios)."""
+    rng = random.Random(20261007)
     groups = defaultdict(list)
     for t in settled:
-        if t["status"] == "settled":
-            groups[(t["market"], t["view"], t["strategy_id"], "all")].append(t)
-            groups[(t["market"], t["view"], t["strategy_id"], t["horizon_days"])].append(t)
-    for (market, view, sid, horizon), trades in sorted(groups.items(), key=lambda kv: str(kv[0])):
-        trades.sort(key=lambda t: (t["exit_date"], t["id"]))
-        rets = [t["return_pct"] for t in trades]
-        streak = worst = 0
-        cum = peak = drawdown = 0.0
-        for t in trades:
-            streak = streak + 1 if t["net_pnl"] < 0 else 0
-            worst = max(worst, streak)
-            cum += t["net_pnl"]
-            peak = max(peak, cum)
-            drawdown = min(drawdown, cum - peak)
-        means = sorted(statistics.mean(rng.choices(rets, k=len(rets))) for _ in range(1000))
-        reached = [t["target_reached_session"] for t in trades if t["target_reached"]]
-        rows.append({
-            "market": market, "view": view, "strategy_id": sid, "family": trades[0]["family"],
-            "horizon_days": horizon, "trades": len(trades), "net_pnl": r2(sum(t["net_pnl"] for t in trades)),
-            "currency": CURRENCY[market], "mean_return_pct": r2(statistics.mean(rets)),
-            "win_rate": r4(sum(t["net_pnl"] > 0 for t in trades) / len(trades)),
-            "target_reached_rate": r4(len(reached) / len(trades)),
-            "median_reached_session": statistics.median(reached) if reached else None,
-            "avg_target_error_pct": r2(statistics.mean(t["target_error_pct"] for t in trades)),
-            "range_hit_rate": r4(sum(t["range_hit"] for t in trades) / len(trades)),
-            "worst_losing_streak": worst, "max_drawdown": r2(drawdown),
-            "luck_test": {"method": "bootstrap 95% interval of the mean net return (%), 1000 resamples",
-                          "low_pct": r2(means[25]), "high_pct": r2(means[974]), "excludes_zero": means[25] > 0,
-                          "corrected": False},
-            "sample_badge": "too_few_to_rank" if len(trades) < 20 else "ok",
-            "go_live": {"proven": False, "months_forward": 0.0, "trades_needed": 300, "beats_best_baseline": None},
-            "basis": "forward", "as_of": "2026-10-06"})
-    return rows
+        if t["status"] != "settled":
+            continue
+        base = {"market": t["market"], "view": t["view"]}
+        strategy = {"strategy_id": t["strategy_id"], "family": t["family"], "pick_rule": None}
+        groups[("strategy", *base.values(), *strategy.values(), None, "all")].append(t)
+        groups[("strategy", *base.values(), *strategy.values(), None, t["horizon_days"])].append(t)
+        if t["view"] == "accuracy":
+            groups[("strategy_company", *base.values(), *strategy.values(), t["ticker"], "all")].append(t)
+        else:
+            groups[("pick_rule", *base.values(), None, t["family"], t["pick_rule"], None, "all")].append(t)
+    names = ("scope", "market", "view", "strategy_id", "family", "pick_rule", "ticker", "horizon_days")
+    return [score_row(dict(zip(names, key)), trades, rng)
+            for key, trades in sorted(groups.items(), key=lambda kv: str(kv[0]))]
 
 
 def company_rows(agree: list[dict], open_trades: list[dict]) -> list[dict]:
@@ -169,17 +183,22 @@ def company_rows(agree: list[dict], open_trades: list[dict]) -> list[dict]:
     return rows
 
 
-def open_trade_rows(past: list[dict]) -> list[dict]:
+def open_trade_rows(past: list[dict], picks: list[dict]) -> list[dict]:
+    """Accuracy-view trades of the settled strategies and head-to-head picks still open after the newest close."""
+    by_id = {p["id"]: p for p in past}
+    entries = [(f"acc:{p['id']}", "accuracy", p) for p in past
+               if p["qualifies"] and p["strategy_id"] in ACCURACY_STRATEGIES and p["ticker"] in SETTLED_TICKERS]
+    entries += [(f"h2h:{r['pick_rule']}:{r['prediction_id']}", "head_to_head", by_id[r["prediction_id"]])
+                for r in picks if r["status"] == "picked"]
     rows = []
-    for pred in past:
-        if pred["qualifies"] and pred["exit_date"] > SETTLED_UNTIL and pred["strategy_id"] in ACCURACY_STRATEGIES \
-                and pred["ticker"] in SETTLED_TICKERS:
+    for trade_id, view, pred in entries:
+        if pred["exit_date"] > SETTLED_UNTIL:
             entry = BARS[pred["ticker"]][pred["session_date"]][0]
             quantity = int(pred["amount"] // entry) if pred["market"] == "india" else round(pred["amount"] / entry, 6)
             if not quantity:
                 continue
             last = TODAY_CLOSE[pred["ticker"]]
-            rows.append({"trade_id": f"acc:{pred['id']}", "view": "accuracy", "prediction_id": pred["id"],
+            rows.append({"trade_id": trade_id, "view": view, "prediction_id": pred["id"],
                          "strategy_id": pred["strategy_id"], "family": pred["family"], "market": pred["market"],
                          "ticker": pred["ticker"], "horizon_days": pred["horizon_days"],
                          "entry_date": pred["session_date"], "exit_date": pred["exit_date"], "entry_price": entry,
@@ -206,7 +225,7 @@ def build_all(write, settle, today: list[dict], past: list[dict], specs: list[di
     settled = accuracy + h2h
     picks_today = [r for t in ("NVDA", "RELIANCE", "HDFCBANK") for r in head_to_head(today, settled, specs, t)]
     agree = agreement(today)
-    opens = open_trade_rows(past)
+    opens = open_trade_rows(past, picks_past)
     write("prediction.json", "prediction", "strategy_predictions",
           [p for p in today if p["ticker"] in ("NVDA", "RELIANCE")])
     write("agreement.json", "agreement", None, agree)

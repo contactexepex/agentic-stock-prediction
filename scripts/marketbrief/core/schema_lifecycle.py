@@ -27,8 +27,9 @@ LIFECYCLE_SCHEMAS: Schemas = {
     }),
     # One row per command from any channel (F10), in the day file of received_at, written by the tool layer
     # (MCP server, Slack handler, CLI, inbox import). id = cmd-<received_at as YYYYMMDDTHHMMSSZ>-<first 8 hex
-    # of sha256(idempotency_key)>. tool: the mcp/tools.yaml name; arguments: JSON as received, minus anything
-    # secret; actor: the channel identity (e.g. slack:U0123ABCD, github:<login>, dashboard:owner, cli:session).
+    # of sha256(idempotency_key), or of the arguments as JSON with sorted keys for a read without a key>.
+    # tool: the mcp/tools.yaml name; arguments: JSON as received, minus anything secret; actor: the channel
+    # identity (e.g. slack:U0123ABCD, github:<login>, dashboard:owner, cli:session).
     # result accepted | pending | refused | duplicate | failed; refusal_code when refused (e.g. budget_exceeded,
     # kill_switch, not_allowed_in_channel, validation_failed); record_ids: the data rows the command wrote.
     KIND_COMMAND_LOG: ("jsonl", {

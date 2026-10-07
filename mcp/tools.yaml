@@ -16,9 +16,10 @@
 # - refusals and anything ambiguous are reported to the owner in Slack; nothing is retried by an agent;
 # - every call is logged in command_log (core/schema_lifecycle.py).
 #
-# Channel values: yes | no | a short note on how (e.g. the Slack command). Slack: any member of #market-brief
-# (decision 15); the dashboard: the owner only (decision 16); the Claude app: the owner's GitHub account only
-# (decision 22).
+# Channel values: true | false | a short note on how (e.g. the Slack command; a note means allowed, in that way).
+# Booleans are written true/false, never yes/no, so YAML 1.1 and 1.2 parsers read them alike. Slack: any member of
+# #market-brief (decision 15); the dashboard: the owner only (decision 16); the Claude app: the owner's GitHub
+# account only (decision 22).
 
 version: 1
 
@@ -38,7 +39,7 @@ tools:
       market: {$ref: common_inputs.market}
       horizon_days: {type: integer, enum: [1, 2, 3, 4, 5], required: false, default: 1, description: "Horizon N+k shown first (decision 39)."}
     output: {entities: [market_status, agreement, head_to_head_pick, paper_trade, intraday_check], read_model: rm.home}
-    channels: {dashboard: yes, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
   - name: get_company
     kind: read
     description: One company - its decision card, predictions per strategy and horizon with targets and ranges, today's path, settled results, news with status, results digest, events.
@@ -46,7 +47,7 @@ tools:
       market: {$ref: common_inputs.market}
       ticker: {$ref: common_inputs.ticker, required: true}
     output: {entities: [company, prediction, paper_trade, intraday_check, news_item, results_digest, lifecycle_event], read_model: [rm.stock, rm.stock_strategies, rm.lifecycle]}
-    channels: {dashboard: yes, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
   - name: get_scoreboard
     kind: read
     description: Every strategy and baseline with profit after costs, win rate, target error, range hits, streaks, drawdown and the luck test, per horizon and view.
@@ -56,7 +57,7 @@ tools:
       horizon_days: {type: integer, enum: [1, 2, 3, 4, 5], required: false, description: "Omit for all horizons pooled."}
       strategy_id: {type: string, required: false, description: "One strategy's detail (an id of config/strategies.yaml)."}
     output: {entities: [strategy, scoreboard_row], read_model: rm.strategies}
-    channels: {dashboard: yes, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
   - name: compare_rule_vs_ai
     kind: read
     description: Rule strategies against AI traders on identical company-days, overall or for one company, with the EOD and weekly explanations.
@@ -64,7 +65,7 @@ tools:
       market: {$ref: common_inputs.market}
       ticker: {$ref: common_inputs.ticker, required: false}
     output: {entities: [scoreboard_row, eod_analysis, research_review], read_model: [rm.compare, rm.review]}
-    channels: {dashboard: yes, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
   - name: get_news
     kind: read
     description: News with verification status, impact category and headline history, for the market or one company; plus the news-impact table.
@@ -73,7 +74,7 @@ tools:
       ticker: {$ref: common_inputs.ticker, required: false}
       since: {type: string, format: date-time, required: false, description: "Only items first seen after this time."}
     output: {entities: [news_item, news_impact_row], read_model: [rm.news, rm.review]}
-    channels: {dashboard: yes, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
   - name: get_trades
     kind: read
     description: Open paper trades and recently settled ones with their automatic and AI reasons.
@@ -83,7 +84,7 @@ tools:
       strategy_id: {type: string, required: false}
       status: {type: string, enum: [open, settled, all], required: false, default: all}
     output: {entities: [paper_trade, automatic_reason, ai_reason], read_model: rm.trades}
-    channels: {dashboard: yes, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /ask, claude_code: true, claude_app: true}
   - name: explain
     kind: read_ai
     description: A plain-language answer to "why did X deviate" or "why did strategy Y win", from stored data only, citing ids and as-of times; never advice.
@@ -95,7 +96,7 @@ tools:
     output: {entities: [answer], fields: [text, cited_ids, as_of, not_in_data]}
     uses_tools: [get_overview, get_company, get_scoreboard, compare_rule_vs_ai, get_news, get_trades]
     budget: {model: sonnet, monthly_usd_cap: 20, daily_usd: 0.65}
-    channels: {dashboard: chat panel, slack: /ask, claude_code: yes, claude_app: yes}
+    channels: {dashboard: chat panel, slack: /ask, claude_code: true, claude_app: true}
 
   # ---------------- write (append-only records; pending until imported) ----------------
   - name: add_company
@@ -110,7 +111,7 @@ tools:
     writes: [watchlist_events, command_log]
     validator: F8 add validator (session B1, marketbrief/lifecycle/)
     refuses: [etf, bse_only, unknown_symbol, already_active, deleted_needs_new_add]
-    channels: {dashboard: yes, slack: /company add (form), claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /company add (form), claude_code: true, claude_app: true}
   - name: deactivate_company
     kind: write
     description: Stop predicting and trading a company from the next pre-open run; collection continues, open trades still settle.
@@ -122,7 +123,7 @@ tools:
     confirm: summary
     writes: [watchlist_events, command_log]
     validator: F8 lifecycle validator (session B1)
-    channels: {dashboard: yes, slack: /company deactivate, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /company deactivate, claude_code: true, claude_app: true}
   - name: reactivate_company
     kind: write
     description: Bring an inactive company back into predictions and trades from the next pre-open run.
@@ -133,7 +134,7 @@ tools:
     confirm: summary
     writes: [watchlist_events, command_log]
     validator: F8 lifecycle validator (session B1)
-    channels: {dashboard: yes, slack: /company reactivate, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /company reactivate, claude_code: true, claude_app: true}
   - name: set_paper_amount
     kind: write
     description: Change a company's per-trade paper amount (higher or lower than the default) from the next pre-open run; null returns to the default.
@@ -145,7 +146,7 @@ tools:
     confirm: summary
     writes: [watchlist_events, command_log]
     validator: F8 lifecycle validator (session B1)
-    channels: {dashboard: yes, slack: /company amount, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /company amount, claude_code: true, claude_app: true}
   - name: delete_company
     kind: write
     description: Hide a company everywhere (tombstone). Raw records stay in git history; scoreboards are recomputed without it.
@@ -157,7 +158,7 @@ tools:
     confirm: typed   # decision 20: dashboard only, typed confirmation
     writes: [watchlist_events, command_log]
     validator: F8 lifecycle validator (session B1)
-    channels: {dashboard: typed confirmation, slack: no, claude_code: no, claude_app: no}
+    channels: {dashboard: typed confirmation, slack: false, claude_code: false, claude_app: false}
   - name: add_paper_trade
     kind: write
     description: Record one of the owner's own paper trades (buy or sell) at a stored bar's open or close, or a manual price inside that day's range.
@@ -173,6 +174,6 @@ tools:
       idempotency_key: {$ref: common_inputs.idempotency_key, required: true}
     writes: [portfolio_trades, command_log]
     validator: scripts/portfolio.py add-trade (WS4, marketbrief/portfolio/)
-    channels: {dashboard: yes, slack: /trade, claude_code: yes, claude_app: yes}
+    channels: {dashboard: true, slack: /trade, claude_code: true, claude_app: true}
 
 refusal_codes: [not_allowed_in_channel, unknown_actor, budget_exceeded, kill_switch, validation_failed, duplicate_key, ambiguous]
