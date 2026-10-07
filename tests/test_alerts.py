@@ -619,13 +619,18 @@ def test_webhook_fallback_posts_unthreaded_once(monkeypatch, scratch):
     rows = [r for r in Ledger(scratch / "data/us/slack_posts").rows() if r["post_key"] == "morning:us:2026-10-07"]
     assert res["thread_ts"] is None and all(r["thread_ts"] is None for r in rows)    # nothing was threaded
     assert len({r["ts"] for r in rows}) == len(rows) and all(r["ts"].startswith("webhook.") for r in rows)
-    assert publisher("us", dry_run=False, http=hook).publish(
-        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))["posted"] == []
+    again = publisher("us", dry_run=False, http=hook).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert again["posted"] == [] and again["thread_ts"] is None                 # a rerun gives no made-up thread
     # a later run with the token starts a real thread (a webhook post is never a thread)
     monkeypatch.setenv("SLACK_BOT_TOKEN", TOKEN)
     http = FakeSlack()
     publisher("us", dry_run=False, http=http).publish(Message("alerts", "alerts:us:ic-1", "a", "us:2026-10-07"))
     assert "thread_ts" not in http.calls[0]["form"]
+    # a token run of the post that went out by webhook posts nothing and names no webhook ts as a thread
+    token_rerun = publisher("us", dry_run=False, http=http).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert token_rerun["posted"] == [] and token_rerun["thread_ts"] is None
     written = "".join(p.read_text() for p in scratch.rglob("*") if p.is_file())
     assert HOOK not in written and "SECRET-hook" not in repr(pub.client)
 
