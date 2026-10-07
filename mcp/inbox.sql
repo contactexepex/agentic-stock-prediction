@@ -35,9 +35,11 @@ CREATE TABLE IF NOT EXISTS inbox.company_commands (
     slack_ts VARCHAR
 );
 
--- One row per other write request: today only add_paper_trade (kind portfolio_trades). NO IMPORTER YET: these rows
--- wait here until a portfolio importer (WS4, marketbrief/portfolio/) reads them; the caller sees "pending".
--- Same meanings as above; submitted_by is the actor.
+-- One row per other write request: today only add_paper_trade (kind portfolio_trades). Read by
+-- `scripts/portfolio.py import-inbox` (B2/WS4, marketbrief/portfolio/inbox_import.py: explicit SELECT of inbox_id,
+-- kind, tool, market, arguments, channel, submitted_by, agent, command_id, submitted_at), which appends to
+-- data/<market>/portfolio_trades/; the caller sees "pending" until then. Same meanings as above; submitted_by is the
+-- actor.
 CREATE TABLE IF NOT EXISTS inbox.requests (
     inbox_id VARCHAR PRIMARY KEY,
     kind VARCHAR NOT NULL,

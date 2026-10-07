@@ -124,7 +124,7 @@ export interface StoredRequest {
 }
 
 /** One write request. kind watchlist_events -> inbox.company_commands (B1's importer; submitted_by is its actor
- * column); kind portfolio_trades -> inbox.requests (no importer yet). */
+ * column); kind portfolio_trades -> inbox.requests (B2's `portfolio.py import-inbox`). */
 export interface InboxRequest {
   inbox_id: string;
   kind: string;
