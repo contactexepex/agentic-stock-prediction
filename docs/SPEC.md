@@ -63,11 +63,12 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 37 | Horizon N+k | Buy at the open of D on any weekday; N+k = sell at the close of the k-th market session after D, skipping weekends and the market's holidays (example: bought Friday, N+1 = Monday's close). Horizons N+1 to N+5 now; the horizon list is a setting so N+10 (two weeks) and about N+21 (a month) can be added later without redesign. The old "5-day" records (sold at D+4) keep their definition and label and are never pooled with N+5. |
 | 38 | Who forecasts which horizons | Rule strategies and baselines: N+1 to N+5. AI traders: N+1, N+3 and N+5. |
 | 39 | Horizon on screens | A horizon selector (N+1 to N+5) on Home and the stock strategy page, opening on N+1; Slack morning picks show N+1 plus each pick's strongest other horizon (the other horizon with the highest agreement count; ties: the shorter). |
-| 40 | Trade size and count | No budget per strategy. Each paper trade uses the company's amount: ₹1,00,000 / $1,000 unless overridden (decision 26); one stock may have several open trades at once (one per strategy and horizon). The goal is statistics on prediction accuracy (reaching the predicted price within the predicted window) and profit. |
+| 40 | Trade size and count | No budget per strategy. Maximum per trade ₹1,00,000 / $1,000 (the owner's words), refined by decision 44: each paper trade uses the company's amount, ₹1,00,000 / $1,000 unless overridden; one stock may have several open trades at once (one per strategy and horizon). The goal is statistics on prediction accuracy (reaching the predicted price within the predicted window) and profit. |
 | 41 | Strongest strategy | For a stock on a day: in each family (rule-based, AI), the strategy with the highest profit after costs on that stock so far, once it has at least 20 settled trades on it; before that, the family's best by profit after costs across all stocks. |
-| 42 | Head-to-head picks | Both pick rules compete: "best expected gain" (the horizon with the highest probability-weighted profit after costs) and "highest probability" (the horizon the strategy is most sure of). Each day, per company, the strongest rule strategy and the strongest AI trader each get one ₹1,00,000 / $1,000 trade per pick rule (up to 4 head-to-head trades per company per day). Comparisons run across families (rule vs AI) and within each (rule vs rule, AI vs AI, gain-pick vs probability-pick), with heatmaps and charts over time. |
-| 37a | Ready before accurate | The horizon functionality is built and running from the start even though early predictions will be inaccurate; accuracy is expected to improve as data accumulates. |
+| 42 | Head-to-head picks | Both pick rules compete: "best expected gain" (the horizon with the highest probability-weighted profit after costs) and "highest probability" (the horizon the strategy is most sure of). Each day, per company, the strongest rule strategy and the strongest AI trader each get one trade of the company's amount (₹1,00,000 / $1,000 unless overridden, decision 44) per pick rule (up to 4 head-to-head trades per company per day). Comparisons run across families (rule vs AI) and within each (rule vs rule, AI vs AI, gain-pick vs probability-pick), with heatmaps and charts over time. |
 | 43 | Reasons for every trade | Every settled trade gets an automatic reason (computed, no AI: the move split into market, sector, news and company-specific parts; target and range hit or missed). AI writes plain-language reasons for the head-to-head trades and the day's biggest wins and misses. |
+| 37a | Ready before accurate | The horizon functionality is built and running from the start even though early predictions will be inaccurate; accuracy is expected to improve as data accumulates. |
+| 44 | Amount cap vs overrides | ₹1,00,000 / $1,000 is the default amount of every trade; a per-company override may raise or lower it (e.g. a stock whose single share costs more than ₹1,00,000). Comparisons therefore report % returns beside money. |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
@@ -110,9 +111,8 @@ part already does it, the feature says "exists" and what changes.
    Down predictions are scored as predictions only.
 3. **Amount.** Per company: the override if one is active at `made_at`, else the market default
    (₹1,00,000 India, $1,000 US). Overrides are watchlist events (F8) and may be higher or lower than
-   the default (decisions 4 and 26: e.g. raised for a stock whose single share costs more than the
-   default). "At most ₹1,00,000 / $1,000 per trade" (decision 40) means: every trade uses exactly the
-   company's amount, which is the default unless the owner overrides it.
+   the default (decisions 4, 26 and 44: e.g. raised for a stock whose single share costs more than
+   the default). Every trade uses exactly the company's amount.
 4. **Quantity.** From D's raw (unadjusted, `ohlc_raw`) open, as an investor would buy: India
    `floor(amount / open)` whole shares; 0 shares (one share costs more than the amount) = trade
    skipped, recorded `skipped_price_above_amount`. US: `amount / open` fractional, 6 decimals. The
@@ -141,7 +141,7 @@ part already does it, the feature says "exists" and what changes.
    symbol of role `fx` (collected as bars only, not a model feature).
 7. **Two views** (decisions 40-42), both from the same predictions:
    - **Accuracy view:** every qualifying prediction (each strategy, company and horizon) is its own
-     trade of the company's amount (at most ₹1,00,000 / $1,000); no limit on the number of trades,
+     trade of the company's amount (₹1,00,000 / $1,000 unless overridden, decision 44); no limit on the number of trades,
      and one stock can have several open trades at once.
    - **Head-to-head view:** each day, per company, up to four trades: {strongest rule strategy,
      strongest AI trader} x {best expected gain, highest probability}. Exact rules:
@@ -157,7 +157,7 @@ part already does it, the feature says "exists" and what changes.
         company today, recorded as `no_candidate`.
      3. Pick rules, applied to that strategy's candidate horizons, computed pre-open from the latest
         stored close `C` (the entry open is not known yet), all in percent of the trade amount:
-        `move = target / C - 1`, `loss = 1 - range_low / C`, `costs` = the round-trip cost of the
+        `move = target / C - 1`, `loss = 1 - range_low / C` (`range_low` = the lower edge of the 80% band), `costs` = the round-trip cost of the
         company's amount at `C` (F1.6) as a percent of the amount;
         "best expected gain" = the horizon with the highest `p x move - (1 - p) x loss - costs`
         (ties: the shorter horizon); "highest probability" = the horizon with the highest `p` (ties: the
@@ -237,13 +237,9 @@ exit, split and holiday cases; the engine is the only place P&L is computed.
      adjusted during a run; thresholds and weights change only through new strategy versions approved
      by the owner (F6.2) (**Rule change** for rule strategies and baselines).
 
-Done when: the registry validates; the pre-open run writes one prediction per strategy x company x
-horizon; back-test and forward results are stored separately; adding a strategy is a config change only.
-
 7. **Horizons as a setting.** The horizon list lives in `config/strategies.yaml` (`horizons: [1, 2, 3,
    4, 5]`), read by the signal model, `ranges.py`, the strategies and the scoreboard (B10 moves
-   `config/ranges.yaml` `horizons:` to read it), shared by
-   the signal model, `ranges.py`, the strategies and the scoreboard; adding 10 or 21 later is a config
+   `config/ranges.yaml` `horizons:` to read it); adding 10 or 21 later is a config
    change plus a model refit, no code change. Today the signal model and `ranges.py` support only
    horizons 1 and 5 (`HORIZONS = (1, 5)` in `constants/model.py`, `constants/prediction_rules.py`,
    `constants/dashboard.py` and `portfolio/proof.py`; `horizons: [1, 5]` in `config/ranges.yaml`; a
@@ -262,6 +258,9 @@ horizon; back-test and forward results are stored separately; adding a strategy 
 8. **Visual statistics** (decision 42): heatmaps of win rate and profit after costs by strategy x
    horizon, strategy x company and strategy x reason code, each over time (weekly), plus cumulative
    profit lines per strategy and per pick rule; on the Strategy lab and Rule vs AI pages.
+
+Done when: the registry validates; the pre-open run writes one prediction per strategy x company x
+horizon; back-test and forward results are stored separately; adding a strategy is a config change only.
 
 ### F3 News-impact study
 
@@ -335,7 +334,9 @@ proposal as an approvable diff.
 
 1. Per strategy, per market, per horizon, per company, per pick rule (head-to-head) and overall, for
    both views: trades, profit
-   after costs (headline), return %, win rate, average target error %, range-hit rate, worst losing
+   after costs (headline), return %, win rate, target-reached rate (share of trades with
+   `target_reached`, F1.9) and the median session it was reached, average target error %, range-hit
+   rate, worst losing
    streak, maximum drawdown, and a luck test (bootstrap interval of the mean net return; multiple-
    testing correction across all strategies compared). Rule vs AI head-to-head on identical
    company-days; rule vs rule and AI vs AI within each family; gain-pick vs probability-pick.
@@ -403,7 +404,7 @@ fixture company; the seeded watchlist reproduces today's outputs byte for byte (
 
 One thread per market per day in `#market-brief`: (1) morning picks before the open (top 5 per
 market by agreement at N+1, each also showing its strongest other horizon (decision 39), with family,
-probability, target, amount, Paper label, and today's four head-to-head trades per pick);
+probability, target, amount, Paper label, and today's head-to-head trades (up to four) per pick);
 (2) intraday alerts in the same thread (a flagged open trade, material news on a company with an open
 trade); (3) close results (each settled trade, rule vs AI today); plus (4) the weekly report as its own
 post, and onboarding confirmations as replies to the command that asked. Nothing is posted outside
@@ -545,7 +546,7 @@ service is down, and works with keyboard and without colour alone.
 | 1 | Home | per market, with a horizon selector N+1..N+5 opening on N+1 (decision 39): top 5 companies by agreement ("HDFC Bank: 9 of 15 strategies buy at N+1", average probability), today's head-to-head trades, or "No proven strong signals today" when nothing qualifies; rule vs AI today and to date; open trades; alerts; last runs | switch market, open a company's strategy page | `rm.home` |
 | 2 | Watchlist | active companies: price, move, agreement, open trades | open company, filter by sector | `rm.watchlist` |
 | 3 | Company | decision card; predictions with targets and ranges on the chart; today's path (intraday checks); settled results; why it moved; news with status; results digest; events | change amount, deactivate, ask, open strategy page | `rm.stock`, `rm.bars`, `rm.lifecycle`, `rm.trades` |
-| 4 | Stock strategies (decision 30) | for one company, with the horizon selector: agreement (n of N buy, by family, per horizon); today's four head-to-head picks with their horizons and why each was chosen; the best strategy for this company by profit after costs; every strategy ranked by profit after costs on this company with its trades, win rate, average target error, today's prediction (target, range) and a sample-size badge; the best strategy overall shown beside the per-company best; baselines in the same list | open a strategy | `rm.stock_strategies` |
+| 4 | Stock strategies (decision 30) | for one company, with the horizon selector: agreement (n of N buy, by family, per horizon); today's head-to-head picks (up to four) with their horizons and why each was chosen; the best strategy for this company by profit after costs; every strategy ranked by profit after costs on this company with its trades, win rate, average target error, today's prediction (target, range) and a sample-size badge; the best strategy overall shown beside the per-company best; baselines in the same list | open a strategy | `rm.stock_strategies` |
 | 5 | Strategy lab | all strategies and baselines, both views, every horizon; heatmaps (strategy x horizon, x company, x reason code, over time) and cumulative profit lines (F2.8); per strategy detail in plain words; back-test vs forward apart | open strategy | `rm.strategies` |
 | 6 | Rule vs AI | head-to-head per market and per company: profit, win rate, error; the "why" from EOD analyses and the weekly report | open company | `rm.compare`, `rm.review` |
 | 7 | Paper portfolios | head-to-head portfolios per family and pick rule, all open trades by strategy, and the owner's own (with EUR view) | add own paper trade | `rm.portfolio`, `rm.trades` |
