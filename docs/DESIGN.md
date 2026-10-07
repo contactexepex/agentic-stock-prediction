@@ -60,9 +60,10 @@ the sessions held against the direction). A trade whose exit close is missing st
 - Late runs (`market_status.py` `late_run`: started after the session's close, before its bar
   is final): no calls; `ranges.py` skips ranges whose target session has closed, labels the
   others late (never scored) and ignores cues quoted after that session's open.
-- Mid-session runs (`in_session`: started after the session's open, before its close): no calls
-  and no 1-day ranges; 5-day ranges are published for the record, noted late, never scored (the
-  day is partly known, and every horizon covers it). Any range or call made at or after the open
+- Mid-session runs (`in_session`: started after the session's open, before its close): no calls;
+  every N+k range is published for the record, noted late, never scored (the day is partly known,
+  and every horizon's window covers it; no N+k range exits at that session's close, so since B10
+  there is no 1-day exception). Any range or call made at or after the open
   of the first session it covers is never scored, and cues and option snapshots quoted after
   that open are ignored for every horizon (an intraday quote is not an overnight cue).
 - US macro data at 08:30 ET (CPI, jobs): on those days the brief states "call made before release".
@@ -685,7 +686,9 @@ stored before a refusal stay (append-only) and are reused when the add is retrie
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
    where available, implied vol. Range = quantiles of recent standardized returns scaled by that
-   volatility, for T+1 and T+5. Two bands: 50% and 80%.
+   volatility, for every horizon N+k of `config/strategies.yaml` (B10): the band of the close of the
+   k-th session after D, from the as-of close, so the window spans k + 1 sessions (sigma x sqrt(k + 1);
+   the calibration pool holds z over the same k + 1 sessions). Two bands: 50% and 80%.
 2. **Market + stock split:** predict the index range first; stock = beta x index move + its own
    residual (beta from the last year of daily returns).
 3. **Centre:** last close adjusted by the overnight cue (futures, ADRs, pre-market gap), minus any
@@ -777,8 +780,10 @@ exact values):
 **Call basis (owner-approved change A, from 2026-10-08).** Direction calls made at or after
 `call_scoring.from` in `config/settings.yaml` (`label_basis: open_to_close`) are scored open to
 close, the signal model's label convention (`model/labels.py`, same offsets): entry at the open of
-D, the first session after the as-of close, exit at the close of D+1 for 1-day calls and D+4 for
-5-day calls, hit = the move from that open has the called sign. Older calls stay close-to-close
+D, the first session after the as-of close, exit at the close of D+k for a call of horizon k (N+k,
+decision 37; B10), hit = the move from that open has the called sign. A 5-day call made before
+`call_scoring.n_plus_k_from` keeps the old exit at D+4; its outcome is labelled `legacy_5d_d4` and
+summarised apart (outcomes carry `horizon_label`). Older calls stay close-to-close
 (as-of close to the close 1 or 5 sessions later); stored outcomes are never rescored. Each new
 outcome row carries `label_basis` (with `entry_date` and `entry_open` for open_to_close); rows
 stored before the field read as close_to_close (`track_record` view). A call whose entry bar has
@@ -799,10 +804,10 @@ target-session close). Code: `marketbrief/analytics/call_basis.py`.
 everything rule-based is replayed walk-forward over all stored bars, one as-of day d at a time,
 with only what `ranges.py` would know pre-open the next session (bars up to d's close; earnings
 versions by the 10-Q/10-K reports accepted by that session date; dividends; major events).
-- Ranges: 1d and 5d 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles at
+- Ranges: every horizon N+k's 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles at
   d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches on,
   centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and
-  `backtest` helpers. Scored on the close h bars later: coverage overall and by regime, sector,
+  `backtest` helpers. Scored on the exit close of N+k (k + 1 bars after d; before B10 the close h bars later): coverage overall and by regime, sector,
   ticker, month, year, earnings and major event in horizon; interval score and width vs the naive
   range; calibration (stated vs actual coverage, the two published bands plus other levels of the
   same pool).
@@ -1557,10 +1562,11 @@ this with a stated formula, learned weights, a walk-forward test and a per-score
 forecaster now starts from it. Research only: the model never trades and never connects to a broker.
 
 **Trade convention (owner's decision; the primary label).** D is the first session after the as-of
-close. 1-day: buy at the open of D, sell at the close of D+1 (two sessions held). 5-day: buy at the
-open of D, sell at the close of D+4 (five sessions). Up = return > 0. A cost-aware label (return >
-round-trip cost) is reported too. Secondary label: close-to-close, from the as-of close to the close
-of D (1-day) or D+4 (5-day), the convention `score_predictions.py` uses for calls. A label is
+close. Horizon N+k (decision 37, B10; section 15.2): buy at the open of D, sell at the close of D+k
+(N+1: D+1, two sessions held; N+5: D+5). Before B10 the 5-day label sold at D+4 (now `legacy_5d_d4`).
+Up = return > 0. A cost-aware label (return > round-trip cost) is reported too. Secondary label:
+close-to-close, from the as-of close to the same exit close of D+k (before B10: to the close of D for
+1-day, D+4 for 5-day). A label is
 missing when the ticker has no bar on a benchmark session it spans (`marketbrief/model/labels.py`).
 
 **Features at the as-of date (no look-ahead; `technical_panel.py`, `market_panel.py`, `panel.py`).**
@@ -1856,6 +1862,42 @@ one can buy at the as-of close. They do mean that pre-open calls scored close-to
 information the open already prices. The long history alone (b) shows no skill either. Decision: every
 `cross_market` group stays switched off in `config/model.yaml`. A confirmation should use only data
 after 2026-10-07 (a held-out period), with the India `asia` and `adr` groups fixed in advance.
+
+### 15.2 Horizons N+1..N+5 (B10, built 2026-10-07)
+Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the k-th market session after D
+(weekends and holidays skipped through the market calendar). The list is `config/strategies.yaml` `horizons`
+(`core/horizons.py`; `config/ranges.yaml` follows it); adding N+10 is a config change and a refit.
+- **Labels and model.** `model/labels.end_offset` = k + 1 sessions after the as-of session, for both conventions.
+  The panel, the monthly refit, Platt calibration and the backtest run per horizon. N+1 keeps its model id
+  (`<market>-1d-open_to_close-...`, same label as before); N+2..N+5 use `-n_plus_k-` ids, so a stored D+4 fit is
+  never reused for N+5. A `cross_market` variant (every cross-market group on) is written beside the base model in
+  `model_variant_scores|versions` for strategies with `cross_market: true`.
+- **Ranges and calibration.** Target = the exit session (`target_date = exit_date`, `entry_date` = D), width
+  sigma x sqrt(k + 1), calibration pool z over k + 1 sessions; live pools and ACI use N+k ranges only.
+- **Legacy labels.** Rows written before B10 keep their window and are labelled on read: `legacy_cc` (old ranges,
+  close-to-close calls), `legacy_5d_d4` (open-to-close 5-day scores and calls sold at D+4); open-to-close 1-day
+  rows are N+1 (same window) and the only legacy rows that may pool with N+k. `call_scoring.n_plus_k_from` in
+  `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls.
+- **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
+  p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
+
+| market | horizon | n | AUC [95%] | Brier skill | long p>=0.55: positions, mean % after costs [95%] | vs always-up | vs momentum | vs RSI | vs benchmark |
+|---|---|---|---|---|---|---|---|---|---|
+| india | N+1 | 6640 | 0.4853 [0.4563, 0.5174] | -0.0069 | 25, -0.473 [-1.4, 0.38] | -0.4369 [-0.92, 0.01] | -0.2335 [-0.78, 0.03] | -0.5443 [-1.1, -0.05] | -0.4929 [-1.05, 0.0] |
+| india | N+2 | 6620 | 0.4929 [0.46, 0.5262] | -0.0157 | 1062, -0.4429 [-0.87, -0.06] | -0.0427 [-0.26, 0.16] | -0.1539 [-0.5, 0.22] | -0.1345 [-0.47, 0.28] | -0.0444 [-0.27, 0.18] |
+| india | N+3 | 6180 | 0.497 [0.4553, 0.537] | -0.0165 | 1409, -0.639 [-1.16, -0.23] | -0.1486 [-0.48, 0.02] | -0.2707 [-0.74, 0.09] | -0.2088 [-0.62, 0.2] | -0.1241 [-0.44, 0.08] |
+| india | N+4 | 6160 | 0.5023 [0.4529, 0.5469] | -0.0186 | 1592, -0.6947 [-1.4, -0.2] | -0.1706 [-0.6, 0.1] | -0.2491 [-0.8, 0.12] | -0.2357 [-0.62, 0.19] | -0.1492 [-0.55, 0.14] |
+| india | N+5 | 6140 | 0.5095 [0.4555, 0.553] | -0.0237 | 1699, -0.5426 [-1.36, 0.08] | 0.0204 [-0.3, 0.22] | -0.0444 [-0.52, 0.31] | -0.133 [-0.69, 0.55] | 0.0514 [-0.31, 0.27] |
+| us | N+1 | 6740 | 0.4826 [0.4591, 0.5061] | -0.0024 | 173, 0.2753 [-0.74, 1.06] | -0.1874 [-1.06, 0.56] | 0.1341 [-0.87, 0.89] | -2.5052 [-4.1, 0.85] | 0.0026 [-0.89, 0.82] |
+| us | N+2 | 6720 | 0.4841 [0.4613, 0.5072] | -0.0059 | 2110, 0.1668 [-0.07, 0.47] | -0.0601 [-0.14, 0.01] | 0.0568 [-0.11, 0.23] | 0.017 [-0.83, 1.37] | 0.1013 [-0.08, 0.41] |
+| us | N+3 | 6700 | 0.4769 [0.4551, 0.5058] | -0.0062 | 2655, 0.3127 [0.01, 0.71] | 0.055 [-0.05, 0.29] | 0.0993 [-0.09, 0.39] | -1.1236 [-2.32, 0.57] | 0.2972 [0.05, 0.66] |
+| us | N+4 | 6280 | 0.4845 [0.4563, 0.5134] | -0.0049 | 1970, 0.4036 [-0.08, 0.91] | 0.0113 [-0.18, 0.27] | 0.0849 [-0.24, 0.43] | -0.9116 [-2.12, 0.63] | 0.2638 [-0.15, 0.77] |
+| us | N+5 | 6260 | 0.4835 [0.4539, 0.5111] | -0.0056 | 3634, 0.5359 [0.15, 0.95] | -0.0041 [-0.17, 0.18] | 0.103 [-0.15, 0.4] | -1.1852 [-2.68, 0.39] | 0.4494 [0.16, 0.77] |
+
+  No horizon shows skill in either market: every AUC interval contains 0.5, every Brier skill is negative, and the
+  long never beats always-up (every interval contains 0). US N+3 and N+5 beat the benchmark-per-date baseline, as
+  always-up does: drift, not skill. The open-to-close N+1 numbers are equal to the pre-B10 1-day ones; the old 5-day
+  (D+4) numbers reappear as N+4. The daily refit takes about 7-10 s per market (docs/ws/b10.md).
 
 ## 16. The app around the pipeline (contract 2026-10-07)
 The app (API, frontend, paper portfolio, governed actions) is specified in `docs/ARCHITECTURE.md` and
