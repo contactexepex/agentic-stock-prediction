@@ -469,7 +469,6 @@ def test_gate_allows_only_the_horizons_a_row_knows(market):
     assert any("7" in error for error in bad[0]["errors"])
 
 
-
 def test_backfilled_earlier_check_ignores_later_alerts(market):
     """Issue #70: a later check stored first never suppresses an earlier check's alerts or sets its repeat."""
     root, cfg, settings = market
@@ -526,6 +525,49 @@ def test_unwatched_ticker_rows_and_alerts_cli_dates(market, monkeypatch, capsys)
     before = _horizons_in.cache_info().hits
     assert configured_horizons() == configured_horizons() == (1, 2, 3, 4, 5)
     assert _horizons_in.cache_info().hits >= before + 1
+
+
+def test_unwatched_ticker_alert_has_no_check_row(market):
+    """Issue #115: an alert on a ticker not on the watchlist carries a null check_row_id (no intraday_checks row)."""
+    root, cfg, settings = market
+    jl(root, "strategy_predictions", SESSION, [
+        custom("rule.b9_unwatched.v1:2026-10-06-MSFT-1d", ("2026-10-06", SESSION, "2026-10-08"), 400.0,
+               (380.0, 390.0, 410.0, 420.0))])
+    jl(root, "news", SESSION, [
+        {"id": "ms-high", "title": "Microsoft item", "url": "u2", "source": "Wire",
+         "published_at": "2026-10-07T15:00:00Z", "first_seen_at": "2026-10-07T15:00:00Z", "feed": "f",
+         "category": "company", "tickers": ["MSFT"], "primary_tickers": ["MSFT"],
+         "mentioned_tickers": [], "tag_confidence": "high", "tag_version": 99}])
+    jl(root, "news_enriched", SESSION, [{"id": "ms-high", "analyzed_at": "2026-10-07T15:05:00Z", "relevance": 0.9,
+                                         "sentiment": 0.2, "materiality": "high"}])
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
+    msft = [row for row in stored(root, "intraday_alerts") if row["ticker"] == "MSFT"]
+    assert [row["news_id"] for row in msft] == ["ms-high"] and msft[0]["check_row_id"] is None
+    assert not [row for row in stored(root, "intraday_checks") if row["ticker"] == "MSFT"]
+
+
+def test_stored_bars_apply_a_correction_only_once_detected(market):
+    """Issue #115: WS5's stored_bars uses the same as-of adjustments as the trade checks: a split detected by the check
+    is applied, and its cancellation counts only from its own detection."""
+    from marketbrief.intraday.inputs import stored_bars
+
+    root, _cfg, _settings = market
+    jl(root, "adjustments", "2026-10-07", [
+        {"id": "AAPL-2026-10-07", "ticker": "AAPL", "ex_date": SESSION, "factor": 0.5, "source": "yahoo",
+         "detected_at": "2026-10-07T05:00:00Z"},
+        {"id": "AAPL-2026-10-07-fix", "ticker": "AAPL", "ex_date": SESSION, "factor": 1.0, "source": "manual",
+         "detected_at": "2026-10-07T17:00:00Z", "supersedes": "AAPL-2026-10-07"}])
+
+    def aapl_close(at: datetime) -> float:
+        bars = stored_bars(connect(MARKET), datetime(2026, 10, 7).date(), at)
+        row = bars[(bars["ticker"] == "AAPL") & (bars["date"].astype(str).str[:10] == "2026-10-06")]
+        return float(row["close"].iloc[0])
+
+    assert aapl_close(CHECK) == pytest.approx(333.63 * 0.5)                          # split known, fix not yet
+    assert aapl_close(CHECK + timedelta(hours=1)) == pytest.approx(333.63)          # fix detected at 17:00
+    before_split = datetime(2026, 10, 7, 4, 45, tzinfo=timezone.utc)                # bars known, split not yet
+    assert aapl_close(before_split) == pytest.approx(333.63)
+
 
 
 def test_old_five_day_score_keeps_its_d4_window(market):

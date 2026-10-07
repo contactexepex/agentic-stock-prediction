@@ -219,7 +219,7 @@ export class ToolLayer {
     const secrets = this.deps.settings.secrets;   // caller text (note, reason) is stored with secret values scrubbed
     const stored = Object.fromEntries(Object.entries(args).map(([name, item]) =>
       [name, typeof item === "string" ? redact(item, secrets) : item])) as ToolArgs;
-    const { idempotency_key: _key, ...hashed } = stored;
+    const { idempotency_key: _key, ...hashed } = args;   // the hash of what was sent, so a reuse with other text is caught
     const argsSha = await sha256Hex(stableJson(hashed));
     let claim;
     try {

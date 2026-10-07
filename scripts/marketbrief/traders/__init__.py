@@ -11,7 +11,7 @@ scores, B1's watchlist). Research only: a prediction or paper trade is a record,
 - run, outcome   a trader's file: validate, add with one retry, abstention records
 - prepare        the trader's input file
 - track_record   its own record per confidence band
-- settle_step    post-close settlement through contracts.protocol.settle
+- rows           query rows as dicts
 - eod_facts, eod_gate, eod, numbers   the EOD analyst's facts, gate and storage
 - director_facts, director, director_report   the weekly research director
 - cli            the command line (`python -m marketbrief.traders`)"""

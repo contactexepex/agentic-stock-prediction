@@ -58,7 +58,7 @@ async function admitted(params: URLSearchParams, deps: SlackDeps, tool: string |
 async function logStep(ctx: CallContext, deps: SlackDeps, params: URLSearchParams, tool: string | null, done: boolean,
   message: string): Promise<void> {
   await deps.tools.record(ctx, { tool, kind: null, market: null, args: { text: params.get("text") ?? "" },
-    result: done ? "accepted" : "failed", code: null, message: done ? message : `${message}: Slack did not open it` });
+    result: done ? "accepted" : "failed", code: null, message: done ? message : message.replace(" opened", " not opened (Slack refused)") });
 }
 
 async function confirmStep(ctx: CallContext, deps: SlackDeps, tool: string, args: Record<string, unknown>): Promise<SlackReply> {

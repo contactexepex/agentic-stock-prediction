@@ -68,10 +68,10 @@ def listed_rows(rows: list[dict]) -> list[dict]:
 
 
 def trade_head(row: dict, names: dict) -> str:
-    """'*NVDA* N+1, Model + news (rule.model_news.v1) (accuracy)'."""
-    view = ("head-to-head, " + PICK_RULE_LABELS.get(row.get("pick_rule"), str(row.get("pick_rule")))
-            if row.get("view") == "head_to_head" else "accuracy")
-    return f"*{row['ticker']}* {fmt.horizon(row['horizon_days'])}, {fmt.who(row['strategy_id'], names)} ({view})"
+    """'*NVDA* N+1, Model + news (rule.model_news.v1), accuracy view'."""
+    view = ("head-to-head view, " + PICK_RULE_LABELS.get(row.get("pick_rule"), str(row.get("pick_rule")))
+            if row.get("view") == "head_to_head" else "accuracy view")
+    return f"*{row['ticker']}* {fmt.horizon(row['horizon_days'])}, {fmt.who(row['strategy_id'], names)}, {view}"
 
 
 def trade_line(row: dict, names: dict, currency: str) -> str:

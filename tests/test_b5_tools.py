@@ -79,16 +79,21 @@ WIRE_FIXTURE = REPO / "web" / "lib" / "tools" / "tests" / "inbox_wire.fixture.js
 COMPANY_KIND = "watchlist_events"
 
 
+def compact(value) -> str:
+    """JSON as motherduck.ts sends it (JSON.stringify: no spaces, key order kept)."""
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+
+
 def claim(con, row: dict, since: str = "2026-10-07T00:00:00Z", limit: int = 20) -> list:
     """Run the claim statement of web/lib/tools/sql.ts for one tool-layer row, with motherduck.ts's parameters."""
     sql = statements()
-    preview = None if row["preview"] is None else json.dumps(row["preview"])
+    preview = None if row["preview"] is None else compact(row["preview"])
     if row["kind"] == COMPANY_KIND:
-        params = [row["inbox_id"], row["market"], row["tool"], json.dumps(row["arguments"]), row["submitted_by"],
+        params = [row["inbox_id"], row["market"], row["tool"], compact(row["arguments"]), row["submitted_by"],
                   row["channel"], row["submitted_at"], row["command_id"], preview, row["agent"], row["args_sha256"],
                   since, limit]
         return con.execute(sql["claimCompany"], params).fetchall()
-    params = [row["inbox_id"], row["kind"], row["tool"], row["market"], json.dumps(row["arguments"]), preview,
+    params = [row["inbox_id"], row["kind"], row["tool"], row["market"], compact(row["arguments"]), preview,
               row["channel"], row["submitted_by"], row["agent"], row["command_id"], row["submitted_at"],
               row["args_sha256"], since, limit]
     return con.execute(sql["claimRequest"], params).fetchall()
