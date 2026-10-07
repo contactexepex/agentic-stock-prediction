@@ -31,7 +31,7 @@ def evidence_times(con) -> dict:
     of the filing date), NSE announcement time; first_seen_at when nothing else is stored."""
     out = {}
     for sql in (
-        "SELECT id, coalesce(published_at, first_seen_at) FROM news",
+        "SELECT id, coalesce(published_at, first_seen_at) FROM news_lookup",  # duplicate ids too
         "SELECT id, coalesce(accepted_at, CAST(filing_date + 1 AS TIMESTAMPTZ), first_seen_at) FROM filings",
         "SELECT id, coalesce(published_at, first_seen_at) FROM announcements",
     ):

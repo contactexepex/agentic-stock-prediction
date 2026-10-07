@@ -47,6 +47,8 @@ material_terms:
 # publisher URL path starts with it (the news desk); an item without a known URL is opinion.
 # fetch: false = the outlet answered 401/403/a bot challenge from the cloud: never requested (no
 # evasion), but still vetted: its headline counts as a vetted origin.
+# same_as: another listed domain of the same outlet; news de-duplication (analytics/news_dedup.py) treats the
+# two as one outlet, so one article under both hosts is stored once (verification tiers are unchanged).
 # A domain not listed here is unvetted: never fetched, never counted, and listed with counts in
 # the run summaries (`unvetted_domains`) so it can be reviewed and added.
 domains:
@@ -77,14 +79,14 @@ domains:
   economist.com: {tier: tier1, names: [The Economist]}
   theguardian.com: {tier: tier1, names: [The Guardian]}
   bbc.com: {tier: tier1, names: [BBC, BBC Business, BBC News]}
-  bbc.co.uk: {tier: tier1}
+  bbc.co.uk: {tier: tier1, same_as: bbc.com}
   theglobeandmail.com: {tier: tier1, names: [The Globe and Mail]}
   asia.nikkei.com: {tier: tier1, names: [Nikkei Asia]}
   # tier1: major Indian outlets (Economic Times verticals map to economictimes.indiatimes.com)
   economictimes.indiatimes.com: {tier: tier1, names: [The Economic Times, Economic Times, ET Markets, ETMarkets,
       ET EnergyWorld, ET BFSI, ET Auto, ET Telecom, ET Retail, ET Infra, ET HealthWorld, ET Realty, ET CIO,
       ET Government, ET Manufacturing, ET BrandEquity, ET Prime, Economic Times BFSI, ETAuto, ETTelecom]}
-  economictimes.com: {tier: tier1}
+  economictimes.com: {tier: tier1, same_as: economictimes.indiatimes.com}   # m.economictimes.com: ET's mobile host
   livemint.com: {tier: tier1, names: [Mint, mint, Livemint, Livemint Markets]}
   business-standard.com: {tier: tier1, names: [Business Standard, Business Standard Markets, Business Standard Companies]}
   thehindubusinessline.com: {tier: tier1, names: [BusinessLine, The Hindu BusinessLine, BusinessLine Markets, BusinessLine Companies, Hindu BusinessLine]}

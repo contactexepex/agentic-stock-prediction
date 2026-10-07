@@ -83,6 +83,7 @@ TARGET_DATE_KINDS = ("outcomes", "range_outcomes", "lessons")  # also need targe
 DROPPED = {
     "news": "stored news only starts when live collection began ({first}); no history before",
     "news_enriched": "AI enrichment of news (no news history before {first})",
+    "news_updates": "later headlines of stored news (no news history before {first})",
 }
 
 SOURCE_MARKER = ".ai_replay_source"

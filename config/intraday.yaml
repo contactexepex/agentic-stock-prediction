@@ -28,10 +28,25 @@ thresholds:
   against_call_z: 1.0
   # A model score counts as a side only when |prob_up - 0.5| is at least this.
   model_min_edge: 0.03
+  # B9 far_from_target (open paper trades): the target is not reached yet and (target / last - 1) /
+  # (sigma_1d * sqrt(sessions left to the exit close)) is at least this. against_prediction uses
+  # against_call_z above on the move since the trade's entry.
+  target_z: 2.0
 
-# Flags that mark a row `flagged` (sent to the explainer). Other flags are stored as information:
-# outside_1d_50, against_model, large_residual.
-flag_on: [outside_1d_80, outside_5d_80, large_move, against_call]
+# Flags that mark a ticker row `flagged` (sent to the explainer). Other flags are stored as information:
+# outside_<k>d_50 (the shortest horizon), against_model, large_residual. `outside_{k}d_80` stands for the 80%
+# band flag of every published horizon k (WS5 listed outside_1d_80 and outside_5d_80; B9 removed the fixed
+# horizons). open_trade_flagged: at least one open paper trade of the ticker is flagged (B9).
+flag_on: ["outside_{k}d_80", large_move, against_call, open_trade_flagged]
+
+# B9: flags that mark an open paper trade's check flagged (trade_checks.flagged; all of them by default).
+trade_flag_on: [outside_range, far_from_target, against_prediction]
+
+# B9: the intraday alerts feed (intraday_alerts) read by the Slack alerts (session B6). A news item on a ticker
+# with an open paper trade is alerted once per session when its enrichment (as of the check) has one of these
+# materiality levels; every item first seen since the previous session's close is read (no count limit).
+alerts:
+  news_materiality: [high]
 
 attribution:
   # News and announcements first seen from `open` (the session's open; default) or from `prev_close` (the

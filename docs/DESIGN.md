@@ -246,8 +246,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   all (a first run) the defaults apply; with runs stored but none `ok` in the newest 9 daily files, the
   window is the 7-day cap. Examples: India's pre-open runs Friday 02:10 and Monday 02:10 UTC: `when:73h`;
   Friday to Tuesday after a Monday holiday: `when:97h`; a light run 4 hours after the last: `when:1d`.
-  The summary shows the `window` used and `ok`. De-duplication reads the newest 9 daily files (the cap
-  plus 2 days).
+  The summary shows the `window` used and `ok`. De-duplication: "News de-duplication" below.
 - Google News checks (live, 2026-10-07, query `"Microsoft" stock`): `when:` accepts hours and days
   (`1h`, `6h`, `12h`, `30h`, `48h`, `72h`, `100h`, `170h`, `1d`, `2d`, `3d`, `5d`, `7d`, `8d` all
   answered with items no older than the span), while `when:1w` and `when:1m` returned nothing; a span
@@ -263,7 +262,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   market, every 4 hours, every day including weekends and holidays): `collect_news`, for India
   `collect_nse_india.py --only announcements` (one market-wide call), `collect_articles`, `news_clusters`
   and the gate `validate.py --stage news_collect` (files, schemas, duplicate ids and news sources of the
-  news kinds `news`, `news_runs`, `news_articles`, `news_clusters`, `announcements` written today, this
+  news kinds `news`, `news_runs`, `news_updates`, `news_articles`, `news_clusters`, `announcements` written today, this
   run's `news_runs` row from today and `ok`, the collectors' summaries; no price or calendar check). No
   agents, no Slack. The session commits and pushes only the news data folders the script lists
   (`commit_paths`); a rejected push is retried after `git pull --rebase`; a rebase conflict (the pre-open
@@ -275,7 +274,8 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   announcement id first seen in (since, now] without a `news_enriched` row, since = the earlier of the
   start of today (UTC; today's items, the window used before) and the newest `first_seen_at` among the
   items already enriched (items a light run stored after the last enriched one, even while the previous
-  pre-open run was working, stay pending), at most 7 days back. `validate.py --stage news` checks the
+  pre-open run was working, stay pending), at most 7 days back, plus items whose headline changed in the
+  window after their enrichment ("News de-duplication" below). `validate.py --stage news` checks the
   analyst's file against the same window (an id outside it blocks as `ENRICH_UNKNOWN_ID`; a pending id
   left out is the warning `ENRICH_MISSING`). `claims.py` considers clusters reported in the last 72 h or
   since that same `since` (+1 h) when longer, at most the clusters' 144 h lookback (`window_hours` in its
@@ -292,6 +292,70 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   Each query was checked live on 2026-10-07 for relevant headlines; weaker candidates were left out
   (`USFDA Indian pharma` and `USFDA warning letter` returned nothing over a day, `PBOC China stimulus`
   nothing, `IT services demand US clients` and `Gartner IT spending` mostly unrelated items).
+
+**News de-duplication** (built 2026-10-07; owner decisions Q45-Q47; `marketbrief/analytics/news_dedup.py`). One
+article is stored once per market (India and the US each keep their own copy; the per-market folders stay). The
+same story from different outlets is kept apart, because independent outlets feed the news verification (3a).
+- Before: the id (normalised title + source domain) was checked against the newest 9 daily files. Measured on
+  main on 2026-10-07: no repeated id, but 78 extra India rows (of 3,197) and 56 extra US rows (of 4,197) shared a
+  `url` with an earlier row, and the same outlet slipped through under two labels or hosts ("Business Today" /
+  "businesstoday.in" on rows without a domain, `m.economictimes.com` / `economictimes.indiatimes.com`, `amp.scmp.com`
+  / `scmp.com`, ET's and Mint's own feeds next to their Google News items).
+- Same link, other headline: every one of those 134 same-link pairs came from one outlet (127 by outlet key; the
+  other 7 are older rows without a domain, labelled once by name and once by host, e.g. "Daily Excelsior" and
+  "dailyexcelsior.com"); they were seen again within 52 h (India; 38 h US); India 67 and US 25 pairs kept the
+  same `published_at`. Titles can differ a lot (8 India and 18 US pairs below 0.5 similarity): the Reuters oil
+  report at one Google News link, `published_at` 00:48 UTC both times, read "Oil prices rise as storms and air
+  strikes threaten supply" and about 14 h later "Oil prices fall as IEA agrees to accelerate oil stock
+  release". The 21 pairs on publisher URLs (India: BusinessLine 9, Business Standard 5, Economic Times 3
+  (two live blogs, one article); US: BBC article pages 4) show the same in-place rewrites. Google News links
+  are opaque tokens (`CBMi...AU_yqL...`, not decodable offline), but no link was ever seen with two outlets.
+  So a link is one article and a new headline there is an edit: no title-similarity guard, which would split
+  those edits. Guards: the outlets must not be two different known hosts, and the match window.
+- Rules (`news_dedup.py`; rows taken in (first_seen_at, id) order): an item duplicates a stored item when it has
+  the same canonical article link (Google News URL without its query; publisher URL without tracking
+  parameters, host prefixes and trailing slash) from the same outlet, or the same normalised title from the
+  same outlet. Outlet key: the host without `www.`, `m.`, `amp.`, `mobile.`, mapped to its allowlisted domain
+  in `config/news_sources.yaml` (parent domains too) and that entry's `same_as` (`economictimes.com` ->
+  `economictimes.indiatimes.com`, `bbc.co.uk` -> `bbc.com`); without a host, a configured outlet name or a
+  host-like label; else `label:<label>`, which matches only itself (a bare label may still share a link with
+  its host). Two hosts never merge unless the allowlist says so ("The Week" on `theweek.in` and `theweek.com`
+  stay two outlets).
+- Match window: 9 days from the matched item's newest stored row (`DEDUP_WINDOW_DAYS`). Items are kept only
+  when published within the catch-up cap (7 days), so a repeat sighting comes at most 7 days after the first;
+  2 days of margin. The collector reads the newest 10 daily files (today and the 9 days before; one file per
+  UTC day, written every 4 hours by the light runs), which cover those 9 days from any time of today.
+- Collector: an entry matching a stored item by link with a different headline (normalised) than the item's
+  latest is appended to `data/<market>/news_updates/` (kind `news_updates`: `news_id` of the item, `title`,
+  `seen_at`, `url`, `source`, `source_domain`, `published_at`, `feed`), never stored as a new item; any other
+  match is skipped. One update per item and run (the first; further copies of the link in that run are
+  skipped). A headline that flips back is recorded again. The summary shows `duplicates_skipped`
+  (`same_link`, `same_title`, `same_id`, `within_run`: the same article from several feeds of the run) and
+  `headline_updates`. Tags stay those of the first headline.
+- Read side (`core.database.connect` builds `news_id_map` with the same rules over every stored row; nothing
+  in `data/` is edited): the `news` view shows one row per item (stored duplicates left out) with its latest
+  headline seen by now (the run's clock), `news_asof(ts)` the items first seen by ts with the headline seen by
+  ts, `news_title_asof(ts)` and `news_headlines` the headline history (own row, stored duplicates, updates).
+  `news_aliases` maps each stored duplicate id to its item. A row joins only an item stored before it, so no
+  later row changes what an earlier time saw (no look-ahead). Readers keyed by news id keep working:
+  `news_lookup` / `news_lookup_asof(ts)` resolve any stored id (old predictions' evidence, clusters and claims
+  citing a duplicate) to its item; `enriched_latest`, `news_enriched_asof(ts)` and `news_articles_asof(ts)` give
+  an item a duplicate's enrichment or article when it has none of its own; `news_status_ids_asof(ts)`,
+  `news_cluster_items_asof(ts)` and `news_clusters_asof(ts)` count a listed duplicate as its item. The gates
+  check stored rows (`news_stored`) for duplicate ids and freshness, and today's updates for their sources.
+  Neo4j keeps nodes of duplicates synced before this change until a `--full` rebuild; an item's node is
+  re-synced when its headline changes.
+- Enrichment follows the headline: `news_pending.py` also queues every item whose headline changed (a
+  `news_updates` row seen in its window) after the item's latest enrichment, with `headline_updated_at`; the
+  analyst scores the new headline and appends a newer `news_enriched` row, which `validate.py --stage news`
+  accepts for such an item only (`news_pending.rescore_ids`). Readers pair a headline with the latest enrichment
+  as of the same time: `news` with `enriched_latest` (both as of the run's clock, so `news_ticker_day`,
+  `view_data`, `news_hits` and Neo4j agree), `news_asof(ts)` with `news_enriched_asof(ts)` (dashboard, warehouse,
+  intraday), and the spot-check and reflector evidence of a past call read `news_lookup_asof(made_at)` and
+  `news_enriched_asof(made_at)`. Between an update and the next pre-open enrichment, the new headline shows with
+  the earlier enrichment. `news_lookup` (current state) is left only where no past time is involved: the
+  forecast gate's public times (published or first-seen time, not the headline) and the news-source gate's
+  tickers of today's updates.
 
 ### 3a. News verification, phase A (deterministic; built 2026-10-06)
 Headlines alone are not enough, so the routine reads the article behind material watchlist
@@ -372,9 +436,11 @@ The full text is never stored. Article text is untrusted data: it is measured, n
 **Clusters** (`scripts/news_clusters.py`, kind `news_clusters`):
 
 *Items and duplicates.* The items are news rows of the last 144 h whose title names a watchlist
-ticker as primary. An item's outlet is its domain. A row without one (older Google News rows) is
-mapped from its source label: a configured name, a label that is itself a host, or the domain other
-rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under
+ticker as primary. An item's outlet is its domain, keyed as news de-duplication keys it (section 3,
+"News de-duplication": host prefixes stripped, the allowlisted domain and its `same_as`, so
+`m.economictimes.com` and `economictimes.indiatimes.com` are one outlet and one origin). A row without one
+(older Google News rows) is mapped from its source label: a configured name, a label that is itself a host,
+or the domain other rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under
 two ids is kept once and the other ids are listed in `duplicate_ids`. Two ids are the same article
 when they share the canonical publisher URL, or the same title from the same outlet, as with the
 labels "Business Today" and "businesstoday.in".
@@ -442,7 +508,8 @@ if it was available by T):
   row's `as_of`. Ids can move only when a cluster's earliest items left the 144 h lookback, so
   this is rare. A cluster that stopped changing keeps its last row, as history.
 - `news_cluster_items_asof(ts)` maps each news id to its cluster at ts.
-- `news_articles_asof(ts)` returns the article rows fetched by ts.
+- `news_articles_asof(ts)` returns the article rows fetched by ts (an item without its own row takes a stored
+  duplicate's, section 3 "News de-duplication").
 - `news_clusters_latest` is the current state.
 
 The builder itself only reads inputs known at its run time (MB_NOW in a replay). `ai_replay

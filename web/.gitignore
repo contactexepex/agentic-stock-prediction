@@ -1,0 +1,8 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.env*
+
+# the root .gitignore ignores Python lib/ folders; the web tier's lib/ is source
+!lib/

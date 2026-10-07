@@ -100,11 +100,10 @@ TABLES = (
     ),
     Table(
         "news",
-        f"""WITH n AS (SELECT DISTINCT ON (id) * FROM news WHERE first_seen_at <= $cutoff ORDER BY id, first_seen_at),
+        f"""WITH n AS (SELECT DISTINCT ON (id) * FROM news_asof($cutoff) ORDER BY id, first_seen_at),
            t AS (SELECT n.*, coalesce(n.published_at, n.first_seen_at) AS ts,
                         unnest(CASE WHEN len(n.tickers) > 0 THEN n.tickers ELSE [NULL] END) AS ticker FROM n),
-           e AS (SELECT DISTINCT ON (id) * FROM news_enriched WHERE analyzed_at <= $cutoff
-                 ORDER BY id, analyzed_at DESC),
+           e AS (SELECT * FROM news_enriched_asof($cutoff)),
            s AS (SELECT * FROM news_status_ids_asof($cutoff))
            SELECT t.id, t.ticker,
                   CASE WHEN list_contains(t.primary_tickers, t.ticker) THEN 'primary' ELSE 'mentioned' END AS role,
