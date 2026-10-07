@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 
 from marketbrief.analytics import call_basis
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.constants.indicators import TRADING_DAYS
 from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
 from marketbrief.core.calendar import next_session, sessions_ahead
@@ -54,11 +55,14 @@ def published_ranges(con, session_date: date, check_at: datetime) -> dict[str, d
     return out
 
 
-def call_window(cfg: dict, as_of: date, horizon: int, basis: str) -> tuple[date, date]:
+def call_window(cfg: dict, as_of: date, horizon: int, basis: str,
+                label: str = LABEL_N_PLUS_K) -> tuple[date, date]:
     """(first session, last session) of a call's scored return (analytics/call_basis.py): open_to_close buys at the
-    open of D (the session after as-of) and sells at the close of D+1 (1d) or D+4 (5d); close_to_close runs from the
-    as-of close to the close of the h-th session after it."""
-    sessions = sessions_ahead(cfg, next_session(cfg, as_of, include=False), call_basis.target_offset(basis, horizon))
+    open of D (the session after as-of) and sells at the close of D+k (N+k, decision 37), or of D+4 for an old 5-day
+    call labelled legacy_5d_d4 (issue #94); close_to_close runs from the as-of close to the close of the h-th
+    session after it."""
+    offset = call_basis.target_offset(basis, horizon, label)
+    sessions = sessions_ahead(cfg, next_session(cfg, as_of, include=False), offset)
     return sessions[0], sessions[-1]
 
 
@@ -69,18 +73,19 @@ def open_calls(con, cfg: dict, session_date: date, check_at: datetime) -> dict[s
     the as-of close)."""
     since = session_date - timedelta(days=call_lookback_days(configured_horizons()))
     predictions = con.execute(
-        "SELECT id, ticker, horizon_days, as_of_date, made_at, direction, NULL AS prob_up, "
+        "SELECT id, ticker, horizon_days, as_of_date, made_at, made_at AS made_when, direction, NULL AS prob_up, "
         "NULL AS label_convention FROM predictions WHERE made_at <= ? AND as_of_date >= ? AND as_of_date < ? "
         "ORDER BY id",
         [check_at, since, session_date],
     ).df()
     scores = con.execute(
-        "SELECT DISTINCT ON (id) id, ticker, horizon_days, as_of_date, NULL AS made_at, NULL AS direction, prob_up, "
+        "SELECT DISTINCT ON (id) id, ticker, horizon_days, as_of_date, NULL AS made_at, computed_at AS made_when, "
+        "NULL AS direction, prob_up, "
         "label_convention FROM model_scores WHERE computed_at <= ? AND as_of_date >= ? AND as_of_date < ? "
         "ORDER BY id, computed_at DESC",
         [check_at, since, session_date],
     ).df()
-    rule = call_basis.switch()
+    rule, n_plus_k_since = call_basis.switch(), call_basis.n_plus_k_from()
     out: dict[str, list[dict]] = {}
     for source, frame in ((CALL_PREDICTION, predictions), (CALL_MODEL, scores)):
         for row in records(frame):
@@ -89,12 +94,14 @@ def open_calls(con, cfg: dict, session_date: date, check_at: datetime) -> dict[s
                 basis = call_basis.basis_for(row["made_at"], rule)
             else:
                 basis = row["label_convention"] or LABEL_OPEN_TO_CLOSE
-            first, last = call_window(cfg, as_of, int(row["horizon_days"]), basis)
+            horizon = int(row["horizon_days"])
+            label = call_basis.horizon_label(basis, horizon, row["made_when"], n_plus_k_since)   # issue #94
+            first, last = call_window(cfg, as_of, horizon, basis, label)
             if first <= session_date <= last:
                 by_open = basis == LABEL_OPEN_TO_CLOSE
                 out.setdefault(row["ticker"], []).append({
                     "source": source, "id": row["id"], "horizon_days": int(row["horizon_days"]),
-                    "direction": row["direction"], "prob_up": row["prob_up"], "basis": basis,
+                    "direction": row["direction"], "prob_up": row["prob_up"], "basis": basis, "horizon_label": label,
                     "entry_kind": "open" if by_open else "close",
                     "entry_date": (first if by_open else as_of).isoformat(), "last_session": last.isoformat(),
                     "sessions_held": len(sessions_between(cfg, first, session_date)),
