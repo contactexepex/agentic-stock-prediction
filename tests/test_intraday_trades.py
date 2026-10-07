@@ -468,3 +468,55 @@ def test_gate_allows_only_the_horizons_a_row_knows(market):
     _, bad = validate_records([{**base, "text": "NVDA sits above its N+7 range."}], rows, set(), rules)
     assert any("7" in error for error in bad[0]["errors"])
 
+
+
+def test_backfilled_earlier_check_ignores_later_alerts(market):
+    """Issue #70: a later check stored first never suppresses an earlier check's alerts or sets its repeat."""
+    root, cfg, settings = market
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK + timedelta(minutes=30))
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
+    early = [row for row in stored(root, "intraday_alerts") if row["check_id"] == CHECK_ID]
+    assert sorted(row["news_id"] for row in early if row["news_id"]) == ["nv-high", "nv-overnight"]
+    assert next(row for row in early if row["alert_type"] == "open_trade_flagged")["repeat"] is False
+
+
+def test_adjustment_correction_counts_only_once_detected(market):
+    """Issue #71: a correction (supersedes) detected after the check is not applied at the check."""
+    root, cfg, settings = market
+    jl(root, "adjustments", "2026-10-07", [
+        {"id": "AAPL-2026-10-07", "ticker": "AAPL", "ex_date": SESSION, "factor": 0.5, "source": "yahoo",
+         "detected_at": "2026-10-07T05:00:00Z"},
+        {"id": "AAPL-2026-10-07-fix", "ticker": "AAPL", "ex_date": SESSION, "factor": 1.0, "source": "manual",
+         "detected_at": "2026-10-07T17:00:00Z", "supersedes": "AAPL-2026-10-07"}])
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(scale={"AAPL": 0.5}), CHECK)
+    assert trade_view(root)["acc:rule.model_news.v1:2026-09-29-AAPL-5d"]["basis_factor"] == 0.5
+    later = CHECK + timedelta(hours=1)                      # the correction is known by then: no split
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(), later)
+    rows = [row for row in trade_view(root).values() if row["check_at"].startswith("2026-10-07T17:27")]
+    assert {row["basis_factor"] for row in rows if row["ticker"] == "AAPL"} == {1.0}
+
+
+def test_unwatched_ticker_rows_and_alerts_cli_dates(market, monkeypatch, capsys):
+    """Issue #74: a trade on a ticker without a check row has no check_row_id; issue #72: the alerts CLI prints
+    session_date as a date. Issue #75: the horizon list is read once per file version."""
+    from marketbrief.intraday import cli
+    from marketbrief.intraday.settings import _horizons_in, configured_horizons
+
+    root, cfg, settings = market
+    jl(root, "strategy_predictions", SESSION, [
+        custom("rule.b9_unwatched.v1:2026-10-06-MSFT-1d", ("2026-10-06", SESSION, "2026-10-08"), 400.0,
+               (380.0, 390.0, 410.0, 420.0))])
+    monkeypatch.setattr(cli, "YahooIntraday", lambda: FakeFetcher(spike=False))
+    monkeypatch.setenv("MB_NOW", CHECK.isoformat())
+    monkeypatch.setattr(sys, "argv", ["intraday_check.py", "--market", MARKET])
+    assert cli.main() == 0
+    capsys.readouterr()
+    msft = trade_view(root)["acc:rule.b9_unwatched.v1:2026-10-06-MSFT-1d"]
+    assert msft["check_row_id"] is None and "not_on_watchlist" in msft["notes"] and msft["quality"] == "no_quote"
+    monkeypatch.setattr(sys, "argv", ["intraday_check.py", "--market", MARKET, "alerts"])
+    assert cli.main() == 0
+    alerts = json.loads(capsys.readouterr().out)["alerts"]
+    assert alerts and {row["session_date"] for row in alerts} == {SESSION}
+    before = _horizons_in.cache_info().hits
+    assert configured_horizons() == configured_horizons() == (1, 2, 3, 4, 5)
+    assert _horizons_in.cache_info().hits >= before + 1

@@ -28,8 +28,8 @@ FAMILIES = ("rule", "baseline", "ai")
 
 def agreement(preds: list[dict], horizon_days: int) -> list[dict]:
     """Per company at one horizon: buy (qualifying calls), of (calls), by_family, avg_prob_up of the buyers
-    that give one (4 decimals), mean target of the buyers; ranked most buyers first, then the higher average
-    probability, then the ticker."""
+    that give one (4 decimals), mean target and mean 80% low of the buyers; ranked most buyers first, then the
+    higher average probability, then the ticker."""
     rows = []
     for ticker in sorted({p["ticker"] for p in preds}):
         mine = [p for p in preds if p["ticker"] == ticker and int(p["horizon_days"]) == horizon_days]
@@ -38,12 +38,14 @@ def agreement(preds: list[dict], horizon_days: int) -> list[dict]:
         buys = [p for p in mine if p.get("qualifies")]
         probs = [p["prob_up"] for p in buys if not fmt.missing(p.get("prob_up"))]
         targets = [p["target_price"] for p in buys if not fmt.missing(p.get("target_price"))]
+        lows = [p["lo80"] for p in buys if not fmt.missing(p.get("lo80"))]
         rows.append({
             "ticker": ticker, "horizon_days": horizon_days, "buy": len(buys), "of": len(mine),
             "by_family": {f: {"buy": sum(p.get("family") == f for p in buys),
                               "of": sum(p.get("family") == f for p in mine)} for f in FAMILIES},
             "avg_prob_up": round(statistics.mean(probs), 4) if probs else None,
             "avg_target": round(statistics.mean(targets), 2) if targets else None,
+            "avg_lo80": round(statistics.mean(lows), 2) if lows else None,
             "base_close": mine[0].get("base_close"), "amount": mine[0].get("amount"),
             "currency": mine[0].get("currency"), costs.YOUR_COST_PCT: costs.first_cost(mine),
         })
@@ -126,8 +128,8 @@ def build_morning(market: str, session_date: str, preds: list[dict], h2h: list[d
         lines.append(MSG_NO_PREDICTIONS)
     elif not top:
         lines.append(MSG_NO_PICKS)
-    verdicts = [costs.pick_viable(row) for row in top]
-    if verdicts and None not in verdicts and not any(verdicts):
+    gains = [g for g in (costs.pick_gain(row) for row in top) if g is not None]
+    if gains and not any(g > 0 for g in gains):
         lines.append(MSG_NONE_VIABLE)
     preds_by_id = {p["id"]: p for p in preds}
     for row in top:

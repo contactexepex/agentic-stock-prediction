@@ -1,6 +1,7 @@
 // The policy enforcement point of every channel (ARCHITECTURE.md section 10; docs/SPEC.md F10). Order of checks:
 // identity -> tool exists -> channel permission -> kill switch (agent file, then the inbox controls table) ->
-// arguments -> per-agent day budget -> confirmation -> idempotency -> inbox append -> workflow dispatch. Every call is logged
+// arguments -> read budget (reads; writes: the summary step only) -> confirmation -> idempotency, write budget and
+// inbox append in one statement (a key already stored answers duplicate even over budget) -> workflow dispatch. Every call is logged
 // in the inbox command log; refusals and failures are reported to the owner in Slack; nothing is retried here.
 import type {
   AgentDefinition,
@@ -99,7 +100,7 @@ export class ToolLayer {
     return Math.max(0, agent.daily_write_budget - usage.writes - extra);
   }
 
-  private async gate(ctx: CallContext, toolName: string, raw: unknown, now: Date): Promise<Passed | Stopped> {
+  private async gate(ctx: CallContext, toolName: string, raw: unknown, now: Date, writeBudget = false): Promise<Passed | Stopped> {
     const agent = getAgent(ctx.agent);
     const tool = getTool(toolName);
     const stop = (code: RefusalCode | null, message: string, usage: AgentUsage | null = null, result: CommandResult = "refused"): Stopped => ({
@@ -122,7 +123,10 @@ export class ToolLayer {
     if (usage.enabled === false) return stop("kill_switch", `The ${agent.agent} agent is switched off`, usage);
     const validation = validateArguments(tool, raw, now.toISOString().slice(0, 10));
     if (!validation.ok) return stop("validation_failed", validation.message, usage);
-    if (tool.kind === "write" ? usage.writes >= agent.daily_write_budget : usage.reads >= agent.daily_read_budget) {
+    const overBudget = tool.kind === "write"
+      ? writeBudget && usage.writes >= agent.daily_write_budget   // execute checks it atomically with the inbox append
+      : usage.reads >= agent.daily_read_budget;
+    if (overBudget) {
       return stop("budget_exceeded", `The ${agent.agent} agent has used today's ${tool.kind === "write" ? "write" : "read"} budget`, usage);
     }
     return { ok: true, tool, agent, args: validation.args, usage };
@@ -155,7 +159,7 @@ export class ToolLayer {
    * reported like any other (e.g. an ETF asked to be added). */
   async preview(ctx: CallContext, toolName: string, raw: unknown): Promise<PreviewOutcome> {
     const now = this.deps.clock();
-    const gate = await this.gate(ctx, toolName, raw, now);
+    const gate = await this.gate(ctx, toolName, raw, now, true);
     if (!gate.ok) return { ok: false, outcome: await this.stopped(ctx, now, toolName, raw, gate) };
     const { tool, args } = gate;
     if (tool.kind !== "write") {
@@ -206,22 +210,31 @@ export class ToolLayer {
       return refuse("validation_failed", "Confirm the summary first; nothing was written");
     }
     const preview = opts.preview ?? null;
-    if (tool.name === "add_company" && (!preview || preview.market !== args.market || preview.symbol !== args.symbol)) {
+    const amount = typeof args.amount === "number" ? args.amount : null;
+    if (tool.name === "add_company" && (!preview || preview.market !== args.market || preview.symbol !== args.symbol ||
+      preview.amount_is_default !== (amount === null) || (amount !== null && preview.amount !== amount))) {
       return refuse("validation_failed", "An add needs the resolved identifiers the caller confirmed");
     }
     const id = await commandId(now, key, args);
-    const { idempotency_key: _key, ...hashed } = args;
+    const secrets = this.deps.settings.secrets;   // caller text (note, reason) is stored with secret values scrubbed
+    const stored = Object.fromEntries(Object.entries(args).map(([name, item]) =>
+      [name, typeof item === "string" ? redact(item, secrets) : item])) as ToolArgs;
+    const { idempotency_key: _key, ...hashed } = stored;
     const argsSha = await sha256Hex(stableJson(hashed));
     let claim;
     try {
       claim = await this.deps.inbox.claimRequest({
-        inbox_id: key, kind: writeKind(tool) ?? "unknown", tool: tool.name, market: String(args.market), arguments: args,
+        inbox_id: key, kind: writeKind(tool) ?? "unknown", tool: tool.name, market: String(args.market), arguments: stored,
         preview, channel: ctx.channel, submitted_by: ctx.actor, agent: agent.agent, command_id: id,
         submitted_at: now.toISOString(), args_sha256: argsSha,
-      });
+      }, { sinceIso: utcDayStart(now), limit: agent.daily_write_budget });
     } catch {
       return this.finish(ctx, now, { ...base, result: "failed", code: null,
         message: "The inbox is unavailable, so nothing was written", budgetLeft: this.budgetLeft(agent, usage, tool.kind) });
+    }
+    if (!claim.claimed && claim.existing === null) {
+      return this.finish(ctx, now, { ...base, result: "refused", code: "budget_exceeded",
+        message: `The ${agent.agent} agent has used today's write budget`, budgetLeft: 0 });
     }
     if (!claim.claimed) return this.duplicate(ctx, now, gate, base, claim.existing, argsSha);
     const summary = writeSummary(tool.name, args, preview);

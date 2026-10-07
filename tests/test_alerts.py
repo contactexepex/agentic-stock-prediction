@@ -81,6 +81,7 @@ def scratch(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "CONFIG", config)
     monkeypatch.delenv("MB_NOW", raising=False)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)   # never reach a real webhook from a test
     return root
 
 
@@ -296,7 +297,7 @@ def test_onboarding_reply_goes_to_the_command_and_only_once(monkeypatch):
 
 @pytest.mark.usefixtures("scratch")
 def test_live_publisher_needs_token_and_channel():
-    with pytest.raises(NotConfiguredError, match="SLACK_BOT_TOKEN not set"):
+    with pytest.raises(NotConfiguredError, match="SLACK_BOT_TOKEN and SLACK_WEBHOOK_URL not set"):
         publisher("us", dry_run=False, environ={})
     (paths.CONFIG / "settings.yaml").write_text("repo_url: x\n")
     with pytest.raises(NotConfiguredError, match="slack_channel_id"):
@@ -387,7 +388,7 @@ def test_cli_without_token_posts_nothing(scratch, monkeypatch, capsys):
     store_us_examples(scratch)
     monkeypatch.setenv("MB_NOW", "2026-10-07T12:00:00+00:00")
     code, out = run(["--market", "us", "morning"], capsys)
-    assert code == 2 and "SLACK_BOT_TOKEN not set" in out["error"]
+    assert code == 2 and "SLACK_BOT_TOKEN and SLACK_WEBHOOK_URL not set" in out["error"]
 
 
 # ---------- as of the clock (judge round 1) ----------
@@ -518,33 +519,40 @@ def test_daily_brief_joins_the_day_thread(monkeypatch):
 
 # ---------- the owner's own costs (decisions 50-51; field names assumed until B2's docs/ws/b2.md) ----------
 
-def with_your_cost(preds: list[dict], cost: float) -> list[dict]:
-    """Fixture values in B6's assumed naming: your_cost_pct on every call, cost_viable = move > cost."""
-    return [{**p, "your_cost_pct": cost,
-             "cost_viable": (p["target_price"] / p["base_close"] - 1) * 100 > cost} for p in preds]
+def with_your_cost(rows: list[dict], cost: float) -> list[dict]:
+    """Fixture values in B6's assumed naming: the owner's round-trip cost on every call or pick."""
+    return [{**r, "your_cost_pct": cost} for r in rows]
 
 
-def test_morning_pick_says_whether_it_clears_your_cost():
+def test_morning_pick_viable_means_expected_gain_after_your_cost():
     preds = of_market(examples("prediction"), "us")
     row = agreement(preds, 1)[0]
-    move = round((row["avg_target"] / row["base_close"] - 1) * 100, 2)   # the buyers' average target vs last close
-    viable = build_morning("us", "2026-10-07", with_your_cost(preds, move - 0.05), [], HORIZONS)
-    assert f"Expected {move:+.2f}% vs your cost {move - 0.05:.2f}% — viable." in viable
+    p, base = row["avg_prob_up"], row["base_close"]
+    move, loss = (row["avg_target"] / base - 1) * 100, (1 - row["avg_lo80"] / base) * 100
+    gain = round(p * move - (1 - p) * loss - 0.30, 2)            # F1.7.3 with your cost instead of market costs
+    assert gain < 0                                               # wide ranges: the example pick does not pay
+    msg = build_morning("us", "2026-10-07", with_your_cost(preds, 0.30), [], HORIZONS)
+    assert f"Expected gain {gain:+.2f}% after your cost 0.30% — not viable." in msg
+    assert msg.splitlines()[2] == "No pick clears your costs today."
+    # a narrow range makes the same pick pay: loss 0.1% -> gain > 0
+    narrow = [{**c, "lo80": c["base_close"] * 0.999} for c in with_your_cost(preds, 0.01)]
+    row = agreement(narrow, 1)[0]
+    gain = round(row["avg_prob_up"] * (row["avg_target"] / row["base_close"] - 1) * 100
+                 - (1 - row["avg_prob_up"]) * (1 - row["avg_lo80"] / row["base_close"]) * 100 - 0.01, 2)
+    viable = build_morning("us", "2026-10-07", narrow, [], HORIZONS)
+    assert gain > 0 and f"Expected gain {gain:+.2f}% after your cost 0.01% — viable." in viable
     assert "No pick clears your costs today." not in viable
-    costly = build_morning("us", "2026-10-07", with_your_cost(preds, 2.7), [], HORIZONS)
-    assert f"Expected {move:+.2f}% vs your cost 2.70% — not viable at your costs." in costly
-    assert "No pick clears your costs today." in costly.splitlines()[2]
-    plain = build_morning("us", "2026-10-07", preds, [], HORIZONS)       # no cost fields stored: no cost text
-    assert "your cost" not in plain
+    assert "your cost" not in build_morning("us", "2026-10-07", preds, [], HORIZONS)   # no cost stored: no text
 
 
-def test_head_to_head_line_shows_the_stored_flag():
+def test_head_to_head_line_shows_expected_gain_after_your_cost():
     preds = of_market(examples("prediction"), "us")
-    h2h = [{**p, "cost_viable": p["family"] == "rule"}
-           for p in of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07")]
+    h2h = with_your_cost(of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07"), 0.30)
     lines = [x for x in build_morning("us", "2026-10-07", preds, h2h, HORIZONS).splitlines() if x.startswith("   • ")]
-    assert all("; viable at your costs [Paper]" in x for x in lines if x.startswith("   • Rule"))
-    assert all("; not viable at your costs [Paper]" in x for x in lines if x.startswith("   • AI"))
+    first = next(p for p in h2h if p["family"] == "rule" and p["pick_rule"] == "best_expected_gain")
+    gain = round(first["prob_up"] * first["move_pct"] - (1 - first["prob_up"]) * first["loss_pct"] - 0.30, 2)
+    assert f"; expected gain {gain:+.2f}% after your cost 0.30% — not viable [Paper]" in lines[0]
+    assert all("after your cost 0.30%" in x for x in lines)
 
 
 def test_close_shows_your_cost_result_beside_market_cost():
@@ -581,3 +589,76 @@ def test_resettlement_on_a_later_day_is_only_a_correction(scratch, monkeypatch, 
     code, out = run(["--market", "us", "--dry-run", "corrections"], capsys)
     assert out["posted"] == ["correction:us:acc:rule.model_news.v1:2026-09-29-NVDA-1d@resettled#1"]
     assert "bought $229.27 on 2026-09-30," in sent[0]["text"]   # DATE columns print as dates
+
+
+# ---------- webhook fallback and the fixes of issues #67, #69, #98 ----------
+
+HOOK = "https://hooks.slack.example/services/T000/B000/SECRET-hook"
+
+
+class FakeHook:
+    """Incoming-webhook stand-in: answers 'ok' (or the given status and body)."""
+
+    def __init__(self, status: int = 200, body: bytes = b"ok"):
+        self.calls: list[dict] = []
+        self.status, self.body = status, body
+
+    def __call__(self, url: str, data: bytes, headers: dict) -> tuple[int, bytes]:
+        self.calls.append({"url": url, "json": json.loads(data.decode()), "headers": headers})
+        return self.status, self.body
+
+
+def test_webhook_fallback_posts_unthreaded_once(monkeypatch, scratch):
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", HOOK)
+    hook = FakeHook()
+    pub = publisher("us", dry_run=False, http=hook)
+    long_text = "\n".join("v" * 200 for _ in range(40))
+    res = pub.publish(Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))
+    assert res["mode"] == "webhook" and len(hook.calls) == res["parts"] > 1
+    assert all(c["url"] == HOOK and set(c["json"]) == {"text"} for c in hook.calls)   # no thread field at all
+    assert publisher("us", dry_run=False, http=hook).publish(
+        Message("morning", "morning:us:2026-10-07", long_text, "us:2026-10-07"))["posted"] == []
+    # a later run with the token starts a real thread (a webhook post is never a thread)
+    monkeypatch.setenv("SLACK_BOT_TOKEN", TOKEN)
+    http = FakeSlack()
+    publisher("us", dry_run=False, http=http).publish(Message("alerts", "alerts:us:ic-1", "a", "us:2026-10-07"))
+    assert "thread_ts" not in http.calls[0]["form"]
+    written = "".join(p.read_text() for p in scratch.rglob("*") if p.is_file())
+    assert HOOK not in written and "SECRET-hook" not in repr(pub.client)
+
+
+def test_webhook_error_hides_the_url(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    monkeypatch.setenv("MB_NOW", "2026-10-07T12:00:00+00:00")
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", HOOK)
+    code, out = run(["--market", "us", "morning"], capsys, http=FakeHook(404, b"no_service"))
+    assert code == 1 and out["error"] == "webhook: HTTP 404 no_service" and "SECRET" not in PRINTED[-1]
+
+
+def test_partly_posted_message_with_a_new_split_is_flagged_incomplete(scratch):
+    long_text = "\n".join("w" * 200 for _ in range(60))
+    with pytest.raises(SlackError):
+        live(scratch, FakeSlack(fail_at=2)).publish(Message("close", "close:us:2026-10-07", long_text, "us:2026-10-07"))
+    http = FakeSlack()
+    res = live(scratch, http).publish(Message("close", "close:us:2026-10-07", "short now", "us:2026-10-07"))
+    expected = len(text.split_message(long_text))
+    assert http.calls == [] and res["incomplete"] is True and res["missing_parts"] == list(range(2, expected + 1))
+
+
+@pytest.mark.usefixtures("scratch")
+def test_feed_time_without_offset_is_read_as_utc(monkeypatch, capsys, tmp_path):
+    feed = tmp_path / "feed.jsonl"
+    rows = [{**r, "check_at": "2026-10-07T16:27:00", "computed_at": None}
+            for r in of_market(examples("trade_check"), "us")]
+    feed.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    args = ["--market", "us", "--dry-run", "intraday", "--date", "2026-10-07", "--feed", str(feed)]
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:00:00+00:00")
+    assert run(args, capsys)[1]["reason"] == "nothing to post"
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:30:00+00:00")
+    assert run(args, capsys)[1]["posted"]
+
+
+def test_your_cost_total_only_when_every_row_has_it():
+    rows = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
+    one = [{**r, "your_net_pnl": 1.0} if i == 0 else r for i, r in enumerate(rows)]
+    assert "after your costs +" not in build_close("us", "2026-10-01", one, None, {}, "USD").split("*Settled")[0]
