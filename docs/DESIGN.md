@@ -94,7 +94,8 @@ price vs 20-day high, ATR(14), 10-day realized vol, Bollinger width, OBV trend, 
 and the event calendar.
 
 **Closed-day bars (issue #40, added 2026-10-07).** Yahoo serves a bar for exchange holidays: a flat
-zero-volume bar for stocks and indices (all 24 India symbols on 2026-10-02, Gandhi Jayanti), a non-flat
+zero-volume bar for stocks (15 India stocks on 2026-10-02, Gandhi Jayanti; the other 9 stored bars that day are
+cues and factors that traded), a non-flat
 one for the VIX (US Memorial Day, Labor Day 2026). It would be a fake 0% day in returns, indicators and
 ranges. `collect_prices.py` therefore does not store a stock or own-exchange index bar (benchmark, vol
 index, sector index) on a day that is no session of the market calendar, and no flat zero-volume stock

@@ -185,7 +185,12 @@ def test_features_regime_and_context(tmp_path):
     a = feats["AAPL"]
     assert a["bars"] == len(days) and a["quality"] == "OK"
     assert 0 <= a["rsi_14"] <= 100 and a["atr_pct"] > 0 and a["beta_1y"] is not None
-    assert a["days_to_earnings"] is not None and a["days_to_earnings"] <= 5   # 3 days ahead, counted from the last session (a weekend adds days)
+    # features count from the next session of the exchange-local today (the test uses the UTC date for `soon`)
+    from zoneinfo import ZoneInfo
+
+    from marketbrief.core.calendar import next_session
+    local_today = datetime.now(ZoneInfo("America/New_York")).date()
+    assert a["days_to_earnings"] == (soon - next_session({"calendar": "XNYS"}, local_today)).days
     assert feats["MSFT"]["ret_1d"] == 0.0
     assert abs(feats["MSFT"]["rel_sector_5d"] + a["rel_sector_5d"]) < 1e-9   # mirror images
 
