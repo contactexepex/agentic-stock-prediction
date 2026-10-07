@@ -1,0 +1,10 @@
+# The Claude app's custom connector to the gateway's /mcp (remote MCP over HTTP, GitHub OAuth, the owner's account
+# only; decision 22). Every tool its channel allows except delete (dashboard only, decision 20).
+agent: claude-app
+channels: [claude_app]
+enabled: true
+tools: [get_overview, get_company, get_scoreboard, compare_rule_vs_ai, get_news, get_trades, explain,
+        add_company, deactivate_company, reactivate_company, set_paper_amount, add_paper_trade]
+daily_write_budget: 20
+daily_read_budget: 300
+fail_to: owner

@@ -1,0 +1,28 @@
+{
+  "name": "market-brief-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "market-brief cockpit and gateway (Next.js App Router). Research only: no tool places, routes or simulates a broker order.",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"lib/tools/tests/**/*.test.ts\""
+  },
+  "dependencies": {
+    "next": "15.5.26",
+    "pg": "8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/pg": "8.23.0",
+    "@types/react": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}
