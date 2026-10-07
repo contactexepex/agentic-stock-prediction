@@ -155,15 +155,16 @@ def run_check(cfg: dict, settings: dict, con, fetcher, now: datetime, out_root: 
     refused = load_inputs(ctx)
     if settings["attribution"].get("news_window") == NEWS_SINCE_PREV_CLOSE:
         ctx.news_since = session_close_utc(cfg, prev_session(cfg, session_date, include=False))
-    rows = [ticker_row(ctx, ticker, meta) for ticker, meta in cfg[CFG_TICKERS].items()]
     unwatched = sorted(set(ctx.trades) - set(cfg[CFG_TICKERS]))
+    ctx.unwatched = set(unwatched)
+    rows = [ticker_row(ctx, ticker, meta) for ticker, meta in cfg[CFG_TICKERS].items()]
     rows_unwatched = [ticker_row(ctx, ticker, {}) for ticker in unwatched]   # trades only, no ticker row
     for details in ctx.trade_details:
         if details["ticker"] in unwatched:
             details["notes"].append("not_on_watchlist")
     stale = sorted(row["ticker"] for row in rows if row["quality"] != "ok")
     status = RUN_STALE if rows and len(stale) >= settings["quotes"]["stale_run_share"] * len(rows) else RUN_OK
-    alerts = build_alerts(ctx, session_alerts(con, session_date.isoformat(), out_root))
+    alerts = build_alerts(ctx, session_alerts(con, session_date.isoformat(), check_at, out_root))
     written = write_rows(market, KIND_INTRADAY_CHECKS, check_at.date(), rows, out_root)
     write_rows(market, KIND_TRADE_CHECKS, check_at.date(), ctx.trade_checks, out_root)
     write_rows(market, KIND_TRADE_CHECK_DETAILS, check_at.date(), ctx.trade_details, out_root)

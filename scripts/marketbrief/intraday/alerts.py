@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from marketbrief.constants.config_keys import CFG_MARKET
 from marketbrief.core.calendar import prev_session, session_close_utc
 from marketbrief.core.schema_intraday import INTRADAY_SCHEMAS
@@ -19,22 +21,24 @@ from marketbrief.intraday.constants import (
     KIND_INTRADAY_ALERTS,
     TRADE_METHOD_VERSION,
 )
-from marketbrief.intraday.settings import alert_id, row_id
+from marketbrief.intraday.settings import alert_id
 
 TRADE_SUMMARY_FIELDS = ("trade_id", "strategy_id", "view", "horizon_days", "flags", "band", "ret_since_entry_pct",
                         "to_target_pct")
 
 
-def session_alerts(con, session_date: str, out_root: Path | None) -> list[dict]:
-    """The alerts already stored for this session (data/ through the connection, and under out_root when given)."""
+def session_alerts(con, session_date: str, check_at, out_root: Path | None) -> list[dict]:
+    """The alerts stored for this session by checks before check_at (data/ through the connection, and under
+    out_root when given). A later check that was stored first (a check backfilled out of order) never counts."""
     frame = con.execute(
-        "SELECT id, ticker, alert_type, trades, news_id FROM intraday_alerts WHERE session_date = ? ORDER BY id",
-        [session_date]).df()
+        "SELECT id, ticker, alert_type, trades, news_id FROM intraday_alerts WHERE session_date = ? "
+        "AND check_at < ? ORDER BY id", [session_date, check_at]).df()
     rows = inputs.records(frame)
     if out_root is not None:
         for path in sorted((out_root / KIND_INTRADAY_ALERTS).glob("**/*.jsonl")):
             rows += [row for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
-                     for row in [json.loads(line)] if row["session_date"] == session_date]
+                     for row in [json.loads(line)] if row["session_date"] == session_date
+                     and pd.Timestamp(row["check_at"]) < pd.Timestamp(check_at)]
     for row in rows:
         if isinstance(row.get("trades"), str):
             row["trades"] = json.loads(row["trades"])
@@ -94,6 +98,6 @@ def _base(ctx, ticker: str, alert_type: str, ident: str) -> dict:
         **dict.fromkeys(INTRADAY_SCHEMAS[KIND_INTRADAY_ALERTS][1]), "id": ident, "check_id": ctx.check_id,
         "check_at": ctx.check_at.isoformat(), "session_date": ctx.session_date.isoformat(),
         "market": ctx.cfg[CFG_MARKET], "ticker": ticker, "alert_type": alert_type,
-        "check_row_id": row_id(ctx.check_id, ticker), "method_version": TRADE_METHOD_VERSION,
+        "check_row_id": ctx.check_row(ticker), "method_version": TRADE_METHOD_VERSION,
         "computed_at": ctx.computed_at,
     }

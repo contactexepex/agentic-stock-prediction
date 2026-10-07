@@ -14,7 +14,7 @@ import pandas as pd
 
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.intraday.constants import PICK_PICKED, VIEW_ACCURACY, VIEW_HEAD_TO_HEAD
-from marketbrief.intraday.inputs import records, sessions_between
+from marketbrief.intraday.inputs import ADJUSTMENTS_ASOF, records, sessions_between
 
 PREDICTION_COLUMNS = (
     "id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction, "
@@ -97,13 +97,13 @@ def window_bars(con, tickers: list[str], start: date, session_date: date, check_
 
 def adjustment_factors(con, tickers: list[str], session_date: date, check_at: datetime) -> dict[str, list]:
     """{ticker: [(ex_date, factor)]} of the splits and bonus issues detected by check_at with an ex-date up to the
-    session (the price_adjustments view: corrections by `supersedes` applied)."""
+    session; a correction (`supersedes`) counts only once detected by check_at (inputs.ADJUSTMENTS_ASOF)."""
     if not tickers:
         return {}
     frame = con.execute(
-        "SELECT ticker, ex_date, factor FROM price_adjustments WHERE detected_at <= ? AND ex_date <= ? "
+        f"WITH {ADJUSTMENTS_ASOF} SELECT ticker, ex_date, factor FROM adj WHERE ex_date <= ? "
         "AND list_contains(?, ticker) ORDER BY ticker, ex_date, factor",
-        [check_at, session_date, tickers],
+        [check_at, check_at, session_date, tickers],
     ).df()
     out: dict[str, list] = {}
     for row in records(frame):

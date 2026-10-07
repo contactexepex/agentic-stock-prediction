@@ -33,7 +33,7 @@ from marketbrief.intraday.constants import (
 from marketbrief.intraday.inputs import sessions_between
 from marketbrief.intraday.measures import band_position, rounded, scaled
 from marketbrief.intraday.quotes import SessionQuote
-from marketbrief.intraday.settings import row_id, trade_check_id
+from marketbrief.intraday.settings import trade_check_id
 from marketbrief.intraday.trades import factor_after
 
 BAND_KEYS = ("lo80", "lo50", "hi50", "hi80")
@@ -160,7 +160,7 @@ def _base_rows(ctx, trade: dict, quality: str, source: str) -> tuple[dict, dict]
              "computed_at": ctx.computed_at}
     check = {
         **dict.fromkeys(SCHEMAS[KIND_TRADE_CHECKS][1]), **stamp, "id": ident,
-        "check_row_id": row_id(ctx.check_id, trade["ticker"]), "market": ctx.cfg[CFG_MARKET],
+        "check_row_id": ctx.check_row(trade["ticker"]), "market": ctx.cfg[CFG_MARKET],
         "prediction_id": trade["prediction_id"], "strategy_id": trade["strategy_id"], "view": trade["view"],
         "horizon_days": trade["horizon_days"], "entry_date": _iso(trade["entry_date"]),
         "exit_date": _iso(trade["exit_date"]), "session_number": trade["session_number"],

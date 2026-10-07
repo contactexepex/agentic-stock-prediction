@@ -113,21 +113,31 @@ def sessions_between(cfg: dict, start: date, end: date) -> list[date]:
     return found
 
 
+# The split/bonus records known at a time (bind check_at twice): each id's first row detected by then, minus the ones
+# a correction detected by then names in `supersedes` (the price_adjustments view, as of the time; issue #71).
+ADJUSTMENTS_ASOF = (
+    "adj AS (SELECT * FROM (SELECT DISTINCT ON (id) * FROM adjustments WHERE detected_at <= ? "
+    "ORDER BY id, detected_at) x WHERE id NOT IN (SELECT supersedes FROM adjustments WHERE detected_at <= ? "
+    "AND supersedes IS NOT NULL))"
+)
+
+
 def stored_bars(con, session_date: date, check_at: datetime) -> pd.DataFrame:
     """Daily bars before the session as known at check_at: per (ticker, date) the newest stored row collected by
     check_at, minus the exchange's closed days (as the ohlc_raw view), times the split/bonus factors detected by
-    check_at with an ex-date after the bar and up to the session (as the ohlc view, on today's basis)."""
+    check_at with an ex-date after the bar and up to the session (as the ohlc view, on today's basis; corrections
+    count only once detected by check_at)."""
     return con.execute(
-        "WITH p AS (SELECT DISTINCT ON (ticker, date) ticker, date, open, close FROM prices "
+        f"WITH {ADJUSTMENTS_ASOF}, p AS (SELECT DISTINCT ON (ticker, date) ticker, date, open, close FROM prices "
         "WHERE collected_at <= ? AND date < ? ORDER BY ticker, date, collected_at DESC), "
         "q AS (SELECT * FROM p WHERE NOT EXISTS (SELECT 1 FROM own_closed_days c WHERE c.ticker = p.ticker "
         "AND c.date = p.date)), "
         "f AS (SELECT q.ticker, q.date, coalesce(list_product(list_sort(list(a.factor))), 1.0) AS factor FROM q "
-        "LEFT JOIN price_adjustments a ON a.ticker = q.ticker AND a.ex_date > q.date AND a.ex_date <= ? "
-        "AND a.detected_at <= ? GROUP BY q.ticker, q.date) "
+        "LEFT JOIN adj a ON a.ticker = q.ticker AND a.ex_date > q.date AND a.ex_date <= ? "
+        "GROUP BY q.ticker, q.date) "
         "SELECT q.ticker, q.date, q.open * f.factor AS open, q.close * f.factor AS close FROM q JOIN f "
         "USING (ticker, date) ORDER BY q.ticker, q.date",
-        [check_at, session_date, session_date, check_at],
+        [check_at, check_at, check_at, session_date, session_date],
     ).df()
 
 
