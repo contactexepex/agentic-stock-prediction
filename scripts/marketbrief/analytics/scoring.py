@@ -25,7 +25,6 @@ import pandas as pd
 
 from marketbrief.analytics import range_math
 from marketbrief.constants.horizons import LABEL_LEGACY_5D_D4
-from marketbrief.core.horizons import horizon_key
 from marketbrief.constants.scoring import (
     BASIS_NOTE,
     BASIS_SHORT,
@@ -36,6 +35,7 @@ from marketbrief.constants.scoring import (
     RANGE_QUANTILES,
     WILSON_Z,
 )
+from marketbrief.core.horizons import horizon_key
 from marketbrief.utils.numbers import round_or_none
 
 

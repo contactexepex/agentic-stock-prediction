@@ -807,9 +807,9 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
 - Ranges: every horizon N+k's 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles at
   d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches on,
   centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and
-  `backtest` helpers. Scored on the exit close of N+k (k + 1 bars after d; before B10 the close h bars later): coverage overall and by regime, sector,
-  ticker, month, year, earnings and major event in horizon; interval score and width vs the naive
-  range; calibration (stated vs actual coverage, the two published bands plus other levels of the
+  `backtest` helpers. Scored on the exit close of N+k (k + 1 bars after d; before B10 the close
+  h bars later): coverage overall and by regime, sector, ticker, month, year, earnings and major
+  event in horizon; interval score and width vs the naive range; calibration (stated vs actual coverage, the two published bands plus other levels of the
   same pool).
 - Regime per day (`regime.classify` on the vol index and benchmark closes, as `features.py`).
 - Direction baselines, labelled as such (the forecaster must beat them live): always-up, 1d and
@@ -939,6 +939,9 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   confidence band with Wilson 95% intervals and an exact binomial test, stated vs actual
   confidence, always-up and `replay.py`'s rule baselines on the same ticker-days, abstention rate;
   a novice-first HTML page (three sentences, four numbers, two charts, details collapsed) and JSON.
+  Calls are scored on the N+k exit close (k + 1 bars after D's as-of bar); calls recorded before
+  `call_scoring.n_plus_k_from` keep the window they had then (the close h bars later), are labelled
+  `legacy_cc` and scored apart (`legacy_cc` block and a fourth sentence), never pooled (B10, #96).
 - Tests (`tests/test_ai_replay.py`): perturbing every row after the cutoff leaves the context pack,
   ranges, indicators, regime and calibration byte-identical (changing D's close does not);
   record's rejections; scoring on synthetic series; the date list; `prepare --source`; the
@@ -1870,14 +1873,16 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
 - **Labels and model.** `model/labels.end_offset` = k + 1 sessions after the as-of session, for both conventions.
   The panel, the monthly refit, Platt calibration and the backtest run per horizon. N+1 keeps its model id
   (`<market>-1d-open_to_close-...`, same label as before); N+2..N+5 use `-n_plus_k-` ids, so a stored D+4 fit is
-  never reused for N+5. A `cross_market` variant (every cross-market group on) is written beside the base model in
-  `model_variant_scores|versions` for strategies with `cross_market: true`.
+  never reused for N+5. A `cross_market` variant (every cross-market group on) is written beside the base model
+  in `model_variant_scores|versions` for strategies with `cross_market: true`.
 - **Ranges and calibration.** Target = the exit session (`target_date = exit_date`, `entry_date` = D), width
   sigma x sqrt(k + 1), calibration pool z over k + 1 sessions; live pools and ACI use N+k ranges only.
 - **Legacy labels.** Rows written before B10 keep their window and are labelled on read: `legacy_cc` (old ranges,
   close-to-close calls), `legacy_5d_d4` (open-to-close 5-day scores and calls sold at D+4); open-to-close 1-day
   rows are N+1 (same window) and the only legacy rows that may pool with N+k. `call_scoring.n_plus_k_from` in
-  `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls.
+  `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls. The context pack's
+  "Signal model" section shows N+k scores only (#95); the AI replay scores calls recorded before that moment on
+  their old window as `legacy_cc`, apart (section 7, #96).
 - **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
   p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
 

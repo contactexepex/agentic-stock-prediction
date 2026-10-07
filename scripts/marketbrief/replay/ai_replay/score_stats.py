@@ -9,6 +9,7 @@ import pandas as pd
 
 from marketbrief.constants import replay
 from marketbrief.constants.ai_replay import BANDS
+from marketbrief.constants.horizons import LABEL_LEGACY_CC, LABEL_N_PLUS_K
 from marketbrief.core.horizons import exit_offset
 from marketbrief.replay.rule_replay import inputs, replay_statistics
 from marketbrief.utils.numbers import round_or_none
@@ -19,19 +20,31 @@ def band_of(confidence: float) -> str:
     return next(name for name, lower, upper in BANDS if lower <= confidence < upper)
 
 
-def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
-    """One row per call: base close at as_of_date, the exit close of N+h (h + 1 stored bars later: the close of the
-    h-th session after D, the first session after as_of; core/horizons.exit_offset), hit as score_predictions.py
-    (a flat close is a miss), and the rule-baseline inputs known at as_of."""
+def window_of(call: dict, since: pd.Timestamp | None) -> tuple[str, int]:
+    """(horizon label, stored bars after the as-of bar whose close resolves the call). A call recorded before
+    `since` (config/settings.yaml call_scoring.n_plus_k_from) keeps the window it was scored on before B10, the
+    as-of close to the close h bars later (legacy_cc, issue #96); later ones are N+h (core/horizons.exit_offset)."""
+    horizon, recorded = int(call["horizon_days"]), call.get("recorded_at")
+    if since is not None and recorded and pd.Timestamp(recorded) < since:
+        return LABEL_LEGACY_CC, horizon
+    return LABEL_N_PLUS_K, exit_offset(horizon)
+
+
+def score_rows(_cfg: dict, calls: list[dict], bars: dict, since: pd.Timestamp | None = None) -> pd.DataFrame:
+    """One row per call: base close at as_of_date, the exit close of its window (`window_of`: N+h = h + 1 stored
+    bars later, the close of the h-th session after D, the first session after as_of; legacy_cc = h bars later),
+    hit as score_predictions.py (a flat close is a miss), and the rule-baseline inputs known at as_of."""
     rows, cache = [], {}
     for call in calls:
         ticker, horizon, as_of = call["ticker"], int(call["horizon_days"]), pd.Timestamp(call["as_of_date"])
+        label, offset = window_of(call, since)
         frame = bars.get(ticker)
         row = {
             "id": call["id"],
             "date": as_of.date(),
             "ticker": ticker,
             "h": horizon,
+            "horizon_label": label,
             "direction": call["direction"],
             "confidence": float(call["confidence"]),
             "prompt_version": call.get("prompt_version"),
@@ -56,7 +69,7 @@ def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
                         "status": "pending",
                     }
                 )
-                exit_position = position + exit_offset(horizon)
+                exit_position = position + offset
                 if exit_position < len(close):
                     target_close = float(close.iloc[exit_position])
                     called_up = call["direction"] == "up"

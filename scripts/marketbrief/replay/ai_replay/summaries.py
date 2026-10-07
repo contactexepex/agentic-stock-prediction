@@ -5,7 +5,9 @@ from __future__ import annotations
 import math
 from datetime import date
 
+from marketbrief.analytics.call_basis import n_plus_k_from
 from marketbrief.constants.ai_replay import BANDS, CONTAMINATED, FAIR
+from marketbrief.constants.horizons import LABEL_LEGACY_CC, LABEL_N_PLUS_K
 from marketbrief.core.clock import utc_now
 from marketbrief.core.horizons import horizons
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
@@ -16,7 +18,9 @@ from marketbrief.utils.numbers import round_or_none, share_percent_text
 def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict, cutoff: date | None = None) -> dict:
     """Scores per leakage group (ForecastBench rule): `fair` = as-of dates after the model's training
     cutoff, `contaminated` = on or before it. Each group is scored on its own rows only; nothing is
-    pooled across groups. The label comes from the current config cutoff, not from the stored rows."""
+    pooled across groups. The label comes from the current config cutoff, not from the stored rows.
+    Within a group, calls recorded before call_scoring.n_plus_k_from keep their old window (legacy_cc) and are
+    scored apart, never pooled with the N+k calls (issue #96)."""
     cutoff = cutoff or training_cutoff()
     out = {
         "market": cfg["market"],
@@ -35,9 +39,23 @@ def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict, cutoff
     return out
 
 
+def legacy_stats(frame) -> dict:
+    """The legacy_cc calls' own scores (calls recorded before B10, as-of close -> close h bars later): overall and
+    per horizon, never pooled with the N+k calls."""
+    scored = frame[frame["status"] == "scored"] if len(frame) else frame
+    out = {"label": LABEL_LEGACY_CC, "n_calls": int(len(frame)),
+           "overall": group_stats(scored) if len(scored) else {"n": 0}, "by_horizon": {}}
+    for horizon in sorted({int(h) for h in frame["h"]}) if len(frame) else []:
+        out["by_horizon"][str(horizon)] = group_stats(scored[scored["h"] == horizon]) if len(scored) else {"n": 0}
+    return out
+
+
 def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, label: str) -> dict:
-    """The scores of one leakage group: overall, by horizon (every configured N+k), by band, abstention, per day."""
-    frame = score_rows(cfg, calls, bars)
+    """The scores of one leakage group: overall, by horizon (every configured N+k), by band, abstention, per day,
+    on the N+k calls; `legacy_cc` holds the calls recorded before B10 on their old window."""
+    every = score_rows(cfg, calls, bars, n_plus_k_from())
+    legacy = every[every["horizon_label"] == LABEL_LEGACY_CC] if len(every) else every
+    frame = every[every["horizon_label"] == LABEL_N_PLUS_K] if len(every) else every
     horizon_list = horizons()
     scored = frame[frame["status"] == "scored"] if len(frame) else frame
     out = {
@@ -50,6 +68,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
         "n_no_bars": int((frame["status"] == "no bars").sum()) if len(frame) else 0,
         "prompt_versions": sorted({call.get("prompt_version") for call in calls if call.get("prompt_version")}),
         "fair_test": label == FAIR,
+        "legacy_cc": legacy_stats(legacy),
         "overall": group_stats(scored) if len(scored) else {"n": 0},
         "by_horizon": {
             str(horizon): group_stats(scored[scored["h"] == horizon]) if len(scored) else {"n": 0}
@@ -111,6 +130,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
         "date",
         "ticker",
         "h",
+        "horizon_label",
         "direction",
         "confidence",
         "status",
@@ -131,16 +151,28 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
                     for column, value in band_stats.items()
                 },
             }
-            for band_stats in frame.reindex(columns=keep)
+            for band_stats in every.reindex(columns=keep)
             .astype(object)
-            .where(frame.reindex(columns=keep).notna(), None)
+            .where(every.reindex(columns=keep).notna(), None)
             .to_dict("records")
         ]
-        if len(frame)
+        if len(every)
         else []
     )
-    out["top"] = top_sentences(out)
+    out["top"] = top_sentences(out) + legacy_sentence(out["legacy_cc"])
     return out
+
+
+def legacy_sentence(legacy: dict) -> list[str]:
+    """The answer about the calls recorded before B10 (legacy_cc), only when there are some."""
+    if not legacy["n_calls"]:
+        return []
+    overall = legacy["overall"]
+    result = (f"right {pct(overall['hit_rate'])} of {overall['n']} scored" if overall.get("n")
+              else "none scored yet")
+    return [f"What about calls recorded before N+k? {legacy['n_calls']} calls recorded before "
+            f"{n_plus_k_from()} keep their old window, the as-of close to the close h sessions later "
+            f"({LABEL_LEGACY_CC}): {result}; never pooled with the N+k calls above."]
 
 
 def pct(share, decimals: int = 1) -> str:
