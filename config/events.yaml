@@ -7,6 +7,10 @@
 # calendar day of the month, so after the shift the month's last trading session).
 # `release` = publication time for data released before the open; on those days the report
 # says the calls were made before the release (docs/DESIGN.md section 2).
+# Unconfirmed dates (issue #15): `provisional: true` on any entry, or on a rule `provisional_dates`
+# (emitted dates) / `provisional_from` (dates on or after it); the event row then has
+# `provisional: true` and its name says "provisional date" (a name that already says
+# "provisional" is kept as is and flagged too).
 
 rules:
   - {markets: [us], type: opex, rule: third_friday, name: US monthly options expiry, major: false}
@@ -45,9 +49,11 @@ rules:
   # www.spglobal.com is blocked by this environment's egress proxy (2026-10-05) and was not read.
   # When the third Friday is an exchange holiday (Juneteenth: 2026-06-19, 2027-06-18 observed) the
   # rule moves it to the previous session like triple witching (2026-06-18, 2027-06-17). Not
-  # checked against an S&P notice: PROVISIONAL for those dates.
+  # checked against an S&P notice: PROVISIONAL for those dates (`provisional_dates`: the event row
+  # and the report name them "provisional date").
   - {markets: [us], type: index_rebalance, rule: third_friday, months: [3, 6, 9, 12],
-     name: S&P 500 quarterly rebalance (at the close; with triple witching), major: false}
+     name: S&P 500 quarterly rebalance (at the close; with triple witching), major: false,
+     provisional_dates: [2026-06-18, 2027-06-17]}
   # Nifty 50 semi-annual review: changes effective from the last working day of March and
   # September, so funds trade at the close of the session before it (`month_end` = last calendar
   # day, moved to the last session, then `session_offset: -1`). Official source: NSE Indices,
@@ -74,10 +80,12 @@ rules:
   # F&O contracts will expire on 29 September 2026", the rebalance day; 2026-03-02
   # (app.bigdata.com/documents/92BF87EBF96A694B2E3E17AA939DE342) "The March 2026 F&O contracts
   # will expire on 30 March 2026", a session after that rebalance (2026-03-27).
-  # 2027 dates depend on NSE's 2027 holiday list (not published yet; see `holidays` in
-  # config/markets/india.yaml).
+  # 2027 dates (2027-03-30, 2027-09-29 by the rule today) are PROVISIONAL: they depend on NSE's
+  # 2027 holiday list (not published yet; see `holidays` in config/markets/india.yaml), so every
+  # date from 2027 on is marked provisional (`provisional_from`) until that list is in.
   - {markets: [india], type: index_rebalance, rule: month_end, months: [3, 9], session_offset: -1,
-     name: Nifty 50 semi-annual rebalance (at the close; effective next session), major: false}
+     name: Nifty 50 semi-annual rebalance (at the close; effective next session), major: false,
+     provisional_from: 2027-01-01}
 
 # One-off dates. Verify each year. (Index rebalances are rules above; add a fixed date here only
 # for an off-cycle rebalance.)

@@ -6,6 +6,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from marketbrief.constants.nse_collection import (
+    DELIVERY_WINDOW,
+    MSG_PENDING_TICKERS,
+    MSG_WHAT_RESULTS,
+    MSG_WHAT_SHAREHOLDING,
+    MSG_YOY_PENDING,
+)
 from marketbrief.core.clock import utc_today
 from marketbrief.utils.markdown import cursor_markdown_table
 
@@ -33,6 +40,41 @@ def _flows(con) -> str:
     return line + table
 
 
+def _coverage_notes(con, tickers: list[str]) -> str:
+    """Partial-data notes of the results table (issue #12): blank y/y and tickers still pending."""
+    blank_yoy = con.execute(
+        """SELECT count(DISTINCT ticker) FROM financials_quarterly_yoy
+           WHERE list_contains(?, ticker) AND revenue_yoy IS NULL AND net_profit_yoy IS NULL""",
+        [tickers],
+    ).fetchone()[0]
+    with_results = {row[0] for row in con.execute("SELECT DISTINCT ticker FROM financials_latest").fetchall()}
+    with_holdings = {row[0] for row in con.execute("SELECT DISTINCT ticker FROM holdings_quarterly").fetchall()}
+    notes = []
+    if blank_yoy:
+        notes.append(MSG_YOY_PENDING.format(n=blank_yoy))
+    for what, have in ((MSG_WHAT_RESULTS, with_results), (MSG_WHAT_SHAREHOLDING, with_holdings)):
+        pending = [ticker for ticker in tickers if ticker not in have]
+        if pending:
+            notes.append(MSG_PENDING_TICKERS.format(what=what, n=len(pending), total=len(tickers),
+                                                    tickers=", ".join(pending)))
+    return "".join(f"_{note}_\n\n" for note in notes)
+
+
+def _delivery_title(con, tickers: list[str]) -> str:
+    """The delivery section title with the real number of sessions in the average (issue #12)."""
+    low, high = con.execute(
+        """SELECT min(n_prior), max(n_prior) FROM (SELECT n_prior FROM delivery_stats WHERE list_contains(?, ticker)
+           QUALIFY row_number() OVER (PARTITION BY ticker ORDER BY date DESC) = 1)""",
+        [tickers],
+    ).fetchone()
+    if low is None or low == high == DELIVERY_WINDOW:
+        sessions = f"the {DELIVERY_WINDOW} sessions before"
+    else:
+        span = str(high) if low == high else f"{low}-{high}"
+        sessions = f"the {span} stored sessions before (up to {DELIVERY_WINDOW}; `sessions_in_avg` per ticker)"
+    return f"Delivery % (latest session vs average of {sessions}; high delivery = positions taken home)"
+
+
 def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
     """The NSE announcement, results, delivery and flows sections."""
     if (cfg.get("relations") or {}).get("source") != "nse":
@@ -58,7 +100,8 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
         ),
         (
             "Latest quarterly results (consolidated where filed; INR crore; y/y vs same quarter)",
-            cursor_markdown_table(
+            _coverage_notes(con, tickers)
+            + cursor_markdown_table(
                 con.execute(
                     """
             SELECT ticker, basis, period_end, round(revenue / 1e7, 0) AS revenue_cr,
@@ -73,7 +116,7 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
             ),
         ),
         (
-            "Delivery % (latest session vs average of the 20 sessions before; high delivery = positions taken home)",
+            _delivery_title(con, tickers),
             cursor_markdown_table(
                 con.execute(
                     """

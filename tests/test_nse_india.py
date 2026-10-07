@@ -14,6 +14,8 @@ import sys
 import urllib.error
 from pathlib import Path
 
+import yaml
+
 REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 REAL = REPO / "tests" / "fixtures" / "nse" / "real"
@@ -151,6 +153,14 @@ def test_nse_primary_sources_on_real_responses(tmp_path):
     for needle in ("FII/FPI net -4,699 cr, DII net +5,182 cr", "Company announcements on NSE",
                    "| INFY | consolidated | 2026-06-30 | 48211.0 |", "Delivery %", "| INFY | 2026-10-01 | 51.96 |"):
         assert needle in ctx.stdout, needle
+    # issue #12: partial data is labelled (one quarter stored: no y/y yet; 2 delivery sessions: 1 in the average)
+    results = ctx.stdout.split("## Latest quarterly results")[1].split("\n## ")[0]
+    with_results = sorted({x["ticker"] for x in rows(root, "financials")})
+    assert f"y/y growth is blank for {len(with_results)} ticker(s)" in results
+    pending = [t for t in yaml.safe_load((cfg / "markets" / "india.yaml").read_text())["tickers"] if t not in with_results]
+    assert f"Quarterly results not stored yet for {len(pending)} of" in results and ", ".join(pending) in results
+    assert "Shareholding (promoter, public, pledges) not stored yet for" in results
+    assert "## Delivery % (latest session vs average of the 1 stored sessions before (up to 20" in ctx.stdout
 
 
 def test_announcement_enrichment_view_and_context(tmp_path):

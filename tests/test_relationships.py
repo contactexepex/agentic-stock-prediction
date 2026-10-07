@@ -368,6 +368,17 @@ def test_views_cluster_buys_and_13f_actions(tmp_path, monkeypatch):
          "shares": 100, "complete": True},
         {**h, "id": "d2-AAPL", "filer_cik": "3", "ticker": "AAPL", "period": "2026-06-30", "filing_date": "2026-08-10",
          "shares": 110, "complete": True},
+        # filer 4: an incomplete (combination) Q2 report that does not list AAPL: still an incomplete filer (#3)
+        {**h, "id": "e2", "filer_cik": "4", "ticker": None, "period": "2026-06-30", "filing_date": "2026-08-10",
+         "shares": None, "complete": False, "report_type": "13F COMBINATION REPORT"},
+        # filer 5: a 13F notice (reported by another manager) is not an incomplete holdings report
+        {**h, "id": "n2", "filer_cik": "5", "ticker": None, "period": "2026-06-30", "filing_date": "2026-08-10",
+         "shares": None, "complete": False, "report_type": "13F NOTICE"},
+        # filer 6: incomplete Q1, complete Q2 -> 'incomplete' (either quarter incomplete; issue #2)
+        {**h, "id": "f1-AAPL", "filer_cik": "6", "ticker": "AAPL", "period": "2026-03-31", "filing_date": "2026-05-10",
+         "shares": 100, "complete": False},
+        {**h, "id": "f2-AAPL", "filer_cik": "6", "ticker": "AAPL", "period": "2026-06-30", "filing_date": "2026-08-10",
+         "shares": 50, "complete": True},
     ])
     monkeypatch.setattr(common, "ROOT", root)
     con = connect(MARKET)
@@ -380,11 +391,33 @@ def test_views_cluster_buys_and_13f_actions(tmp_path, monkeypatch):
     assert actions == {"AAPL": "new", "MSFT": "exit"}                 # latest filing per period wins
     by_filer = dict(con.execute("SELECT filer_cik, action FROM holdings_change "
                                 "WHERE period = '2026-06-30' AND ticker = 'AAPL'").fetchall())
-    assert by_filer == {"1": "new", "2": "incomplete", "3": "add"}
+    assert by_filer == {"1": "new", "2": "incomplete", "3": "add", "6": "incomplete"}
     q = con.execute("SELECT filers_holding, filers_incomplete, change_shares, change_pct, n_new, n_add, n_trim "
                     "FROM holdings_quarter WHERE ticker = 'AAPL' AND period = '2026-06-30'").fetchone()
-    # change math from filers 1 and 3 only: (10 + 10) / (0 + 100); filer 2's -40 is not a trim
-    assert q == (3, 1, 20.0, 0.2, 1, 1, 0)
+    # change math from filers 1 and 3 only: (10 + 10) / (0 + 100); filer 2's -40 and filer 6's -50 are no trims;
+    # incomplete filers: 2 (lists AAPL) and 4 (does not); not the notice filer 5 nor filer 6 (complete this quarter)
+    assert q == (4, 2, 20.0, 0.2, 1, 1, 0)
+    msft = con.execute("SELECT filers_incomplete FROM holdings_quarter "
+                       "WHERE ticker = 'MSFT' AND period = '2026-06-30'").fetchone()
+    assert msft == (2,)                                              # the same filers, whatever the ticker
+    q1 = con.execute("SELECT filers_incomplete FROM holdings_quarter "
+                     "WHERE ticker = 'AAPL' AND period = '2026-03-31'").fetchone()
+    assert q1 == (1,)                                                # filer 6
+
+
+def test_13f_report_beats_notice_whatever_the_dates_and_order():
+    """Issue #2: a 13F-HR wins over a 13F-NT of the same period, older or newer, listed first or second; between
+    two reports of a period the first listed (EDGAR lists newest first) wins."""
+    from marketbrief.collectors.holdings import newest_per_period
+
+    def filing(form, filed, acc):
+        return {"form": form, "report_date": "2026-06-30", "filing_date": filed, "accession": acc}
+    hr_new, nt_old = filing("13F-HR", "2026-08-10", "hr"), filing("13F-NT", "2026-08-01", "nt")
+    hr_old, nt_new = filing("13F-HR", "2026-08-01", "hr"), filing("13F-NT", "2026-08-10", "nt")
+    for found in ([hr_new, nt_old], [nt_old, hr_new], [nt_new, hr_old], [hr_old, nt_new]):
+        assert newest_per_period(found)["2026-06-30"]["accession"] == "hr", found
+    two = [filing("13F-HR", "2026-08-10", "newer"), filing("13F-HR", "2026-08-01", "older")]
+    assert newest_per_period(two)["2026-06-30"]["accession"] == "newer"
 
 
 def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:

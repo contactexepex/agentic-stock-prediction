@@ -172,6 +172,20 @@ def test_connect_without_a_market_config_keeps_stored_news_tags(monkeypatch, tmp
     assert con.execute("SELECT id, tickers FROM news").fetchall() == [("n1", ["AAA"])]
 
 
+def test_enriched_latest_newest_enrichment_wins(monkeypatch, tmp_path):
+    """Issue #2: the newest analysis of an item wins, whatever the file order (an oldest-wins mutation fails)."""
+    monkeypatch.setattr(paths, "ROOT", tmp_path)
+    monkeypatch.setattr(paths, "CONFIG", REAL_CONFIG)
+    base = {"id": "n1", "relevance": 0.5, "materiality": "low", "event_type": "other", "urgency": "low"}
+    storage.append_jsonl(storage.day_file("us", "news_enriched", date(2026, 10, 6)), [
+        {**base, "sentiment": 0.9, "summary": "newest", "analyzed_at": "2026-10-06T10:00:00Z"}])
+    storage.append_jsonl(storage.day_file("us", "news_enriched", date(2026, 10, 5)), [
+        {**base, "sentiment": -0.9, "summary": "oldest", "analyzed_at": "2026-10-05T10:00:00Z"},
+        {**base, "sentiment": 0.1, "summary": "middle", "analyzed_at": "2026-10-05T12:00:00Z"}])
+    con = database.connect("us")
+    assert con.execute("SELECT summary, sentiment FROM enriched_latest").fetchall() == [("newest", 0.9)]
+
+
 # ---------- utils ----------
 
 def test_the_number_parsers_differ_where_the_sources_differ():

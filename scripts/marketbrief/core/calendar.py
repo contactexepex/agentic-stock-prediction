@@ -29,12 +29,16 @@ from marketbrief.constants.calendar import (
     FILE_EVENTS_CONFIG,
     KEY_EVENTS_FIXED,
     KEY_EVENTS_RULES,
+    KEY_PROVISIONAL,
+    KEY_PROVISIONAL_DATES,
+    KEY_PROVISIONAL_FROM,
     MAJOR_WINDOW_DAYS,
     MAX_SESSION_OFFSET,
     MIN_SESSION_OFFSET,
     MSG_NO_EXCHANGE_CALENDARS,
     MSG_SESSION_OFFSET_RANGE,
     MSG_UNKNOWN_EVENT_RULE,
+    PROVISIONAL_SUFFIX,
     RULE_FIRST_FRIDAY,
     RULE_LAST_WEEKDAY,
     RULE_MONTH_END,
@@ -42,6 +46,7 @@ from marketbrief.constants.calendar import (
     RULE_WEEKLY,
     WEEKDAY_FRIDAY,
     WEEKS_PADDING_DAYS,
+    WORD_PROVISIONAL,
 )
 from marketbrief.constants.config_keys import (
     CFG_CALENDAR,
@@ -232,15 +237,34 @@ def session_offset(rule: dict) -> int:
     return offset
 
 
+def is_provisional(spec: dict, day: date) -> bool:
+    """True when an event's date is not confirmed (issue #15): `provisional: true`, the emitted date listed under
+    the rule's `provisional_dates`, on or after its `provisional_from`, or "provisional" in its name."""
+    listed = config_dates(spec, KEY_PROVISIONAL_DATES)
+    start = spec.get(KEY_PROVISIONAL_FROM)
+    start = start if start is None or isinstance(start, date) else date.fromisoformat(str(start))
+    return (
+        bool(spec.get(KEY_PROVISIONAL))
+        or day in listed
+        or (start is not None and day >= start)
+        or WORD_PROVISIONAL in spec["name"].lower()
+    )
+
+
 def _market_event(day: date, spec: dict) -> dict:
-    """One market-level event row."""
+    """One market-level event row; a provisional date gets `provisional: True` and the word in its name."""
+    provisional = is_provisional(spec, day)
+    name = spec["name"]
+    if provisional and WORD_PROVISIONAL not in name.lower():
+        name += PROVISIONAL_SUFFIX
     return {
         "date": day,
         "type": spec["type"],
-        "name": spec["name"],
+        "name": name,
         "major": bool(spec.get("major")),
         "ticker": None,
         "release": spec.get("release"),
+        "provisional": provisional,
     }
 
 

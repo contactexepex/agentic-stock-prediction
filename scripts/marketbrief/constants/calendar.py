@@ -23,6 +23,11 @@ RULE_MONTH_END = "month_end"   # last calendar day; market_events moves it to th
 KEY_EVENTS_RULES = "rules"
 KEY_EVENTS_FIXED = "fixed"
 FILE_EVENTS_CONFIG = "events.yaml"
+KEY_PROVISIONAL = "provisional"                 # an event spec flag (issue #15)
+KEY_PROVISIONAL_DATES = "provisional_dates"     # emitted dates of a rule that are not confirmed
+KEY_PROVISIONAL_FROM = "provisional_from"       # a rule's dates on or after this one are not confirmed
+WORD_PROVISIONAL = "provisional"
+PROVISIONAL_SUFFIX = " (provisional date)"
 
 MSG_UNKNOWN_EVENT_RULE = "unknown event rule {kind!r}"
 MSG_SESSION_OFFSET_RANGE = "session_offset must be between {low} and {high}, got {offset}"

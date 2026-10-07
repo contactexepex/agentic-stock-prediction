@@ -87,3 +87,11 @@ MSG_DELIVERY_HOLIDAY = "delivery: file for {day} holds {served} (holiday); ids u
 MSG_DELIVERY_COVERAGE = "delivery: bhavcopy {day}"
 MSG_FULL_NSE_HELP = "poll every ticker missing the latest quarter and parse all its listed filings"
 DELIVERY_ERROR_LIMIT = 40
+
+# ---------- India context pack: partial-data notes (pipeline/nse_sections.py, issue #12) ----------
+DELIVERY_WINDOW = 20   # sessions in delivery_stats' average (sql/views.sql)
+MSG_YOY_PENDING = ("y/y growth is blank for {n} ticker(s): it needs the same quarter a year earlier, so it appears "
+                   "once a year of filings is stored (or after a one-off `collect_nse_india.py --full` backfill)")
+MSG_PENDING_TICKERS = "{what} not stored yet for {n} of {total} tickers (capped per run; pending): {tickers}"
+MSG_WHAT_RESULTS = "Quarterly results"
+MSG_WHAT_SHAREHOLDING = "Shareholding (promoter, public, pledges)"

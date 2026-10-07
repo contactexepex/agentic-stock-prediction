@@ -284,18 +284,30 @@ FROM h WINDOW hw AS (PARTITION BY filer_cik, ticker ORDER BY period);
 -- 13F by ticker and quarter across the tracked filers. Holdings (filers_holding, shares,
 -- value) count every filing; change_shares, change_pct and the action counts use only filers
 -- whose filings for this and their previous period are both complete. filers_incomplete
--- counts the filers whose filing this quarter is incomplete (e.g. combination reports).
+-- counts every tracked filer whose filing this quarter (the latest original per period) is an
+-- incomplete holdings report (e.g. a combination or partial report), whether or not it lists
+-- the ticker (issue #3); a 13F notice (holdings reported by another manager) is not counted.
 CREATE OR REPLACE VIEW holdings_quarter AS
-SELECT ticker, period, count(*) AS filers_reporting,
-       count(*) FILTER (WHERE shares > 0) AS filers_holding,
-       count(*) FILTER (WHERE NOT complete) AS filers_incomplete,
-       sum(shares) AS shares, sum(value_usd) AS value_usd,
-       sum(change_shares) FILTER (WHERE action NOT IN ('first', 'incomplete')) AS change_shares,
-       round(sum(change_shares) FILTER (WHERE action NOT IN ('first', 'incomplete'))
-             / nullif(sum(prev_shares) FILTER (WHERE action NOT IN ('first', 'incomplete')), 0), 4) AS change_pct,
-       count(*) FILTER (WHERE action = 'new') AS n_new, count(*) FILTER (WHERE action = 'exit') AS n_exit,
-       count(*) FILTER (WHERE action = 'add') AS n_add, count(*) FILTER (WHERE action = 'trim') AS n_trim
-FROM holdings_change GROUP BY ticker, period;
+WITH f AS (
+    SELECT DISTINCT ON (filer_cik, period) filer_cik, period, report_type, coalesce(complete, true) AS complete
+    FROM holdings WHERE ticker IS NULL
+    ORDER BY filer_cik, period, filing_date DESC, first_seen_at
+), inc AS (
+    SELECT period, count(DISTINCT filer_cik) AS n FROM (
+        SELECT filer_cik, period FROM f WHERE NOT complete AND report_type IS DISTINCT FROM '13F NOTICE'
+        UNION SELECT filer_cik, period FROM holdings_change WHERE NOT complete)
+    GROUP BY period
+)
+SELECT c.ticker, c.period, count(*) AS filers_reporting,
+       count(*) FILTER (WHERE c.shares > 0) AS filers_holding,
+       coalesce(any_value(inc.n), 0) AS filers_incomplete,
+       sum(c.shares) AS shares, sum(c.value_usd) AS value_usd,
+       sum(c.change_shares) FILTER (WHERE c.action NOT IN ('first', 'incomplete')) AS change_shares,
+       round(sum(c.change_shares) FILTER (WHERE c.action NOT IN ('first', 'incomplete'))
+             / nullif(sum(c.prev_shares) FILTER (WHERE c.action NOT IN ('first', 'incomplete')), 0), 4) AS change_pct,
+       count(*) FILTER (WHERE c.action = 'new') AS n_new, count(*) FILTER (WHERE c.action = 'exit') AS n_exit,
+       count(*) FILTER (WHERE c.action = 'add') AS n_add, count(*) FILTER (WHERE c.action = 'trim') AS n_trim
+FROM holdings_change c LEFT JOIN inc ON inc.period = c.period GROUP BY c.ticker, c.period;
 
 -- Weekly reviews (review.py): latest record per ISO week; a rerun appends a newer record.
 CREATE OR REPLACE VIEW review_latest AS

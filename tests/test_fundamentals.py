@@ -285,6 +285,20 @@ def test_collect_gate_new_filing_and_views(tmp_path, monkeypatch):
                AND concept = 'revenue' AND period = 'quarter' AND period_end = '2025-06-30'"""
     assert con.execute(asof.format("2026-07-31 20:00:00+00")).fetchone() == (26463000000,)
     assert con.execute(asof.format("2026-07-31 21:00:00+00")).fetchone() == (27443000000,)
+    # exact edges (issue #2): known AT its acceptance time, not a second before
+    assert con.execute(asof.format("2026-07-31 20:29:59+00")).fetchone() == (26463000000,)
+    assert con.execute(asof.format("2026-07-31 20:30:00+00")).fetchone() == (27443000000,)
+    edge = """SELECT count(*) FROM fundamentals_{}_asof(TIMESTAMPTZ '{}') WHERE ticker = 'XOM'
+              AND accession = '0000034088-26-000067'"""
+    assert con.execute(edge.format("latest", "2026-05-04 23:59:59+00")).fetchone() == (0,)   # no acceptance time:
+    assert con.execute(edge.format("latest", "2026-05-05 00:00:00+00")).fetchone()[0] > 0    # known at day end
+    aapl_q3 = """SELECT count(*) FROM fundamentals_{}_asof(TIMESTAMPTZ '{}') WHERE ticker = 'AAPL'
+                 AND period_end = '2026-06-27'"""
+    accepted = con.execute(f"SELECT min(accepted_at) FROM fundamentals WHERE accession = '{NEW_ACC}'").fetchone()[0]
+    just_before = (accepted - timedelta(seconds=1)).isoformat()
+    for macro in ("quarterly", "metrics"):
+        assert con.execute(aapl_q3.format(macro, just_before)).fetchone() == (0,), macro
+        assert con.execute(aapl_q3.format(macro, accepted.isoformat())).fetchone()[0] > 0, macro
     before = con.execute("""SELECT max(period_end) FROM fundamentals_metrics_asof(TIMESTAMPTZ '2026-07-01 00:00:00+00')
                             WHERE ticker = 'AAPL'""").fetchone()
     assert before == (date(2026, 3, 28),)                       # the June quarter's 10-Q was not filed yet
