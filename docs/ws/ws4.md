@@ -290,6 +290,9 @@ What is covered:
   
   All were fixed in round 2's commit, each with a test.
 - Round 2, PASS, fed8f55: all six blockers verified fixed with tests; no new blockers.
+- Round 3, PASS, a1d432f: the merge of main (WS1, WS5, wave 0). Its one conflict was in `core/schemas.py`,
+  where the WS4 and WS5 spread lines were both kept. After the merge, the full suite gave "1 failed, 972 passed,
+  2 skipped" (the same shallow-clone failure).
 
 ## Proposed edits to shared docs
 
