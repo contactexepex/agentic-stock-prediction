@@ -3,14 +3,13 @@
 Target: `md:<name>` (MotherDuck) when the provider is motherduck and MOTHERDUCK_TOKEN is set, else the local
 DuckDB file of config/warehouse.yaml (dev and tests). The token is read from the environment only: the
 MotherDuck extension reads MOTHERDUCK_TOKEN itself, so the value is never put into SQL, a connection string or
-a config, and every error raised from here has it redacted. The MotherDuck extension is installed with
-DuckDB's own `INSTALL motherduck` from the official signed repository; unsigned extensions stay disallowed."""
+a config, and every error raised from here has it redacted. The MotherDuck extension is installed over HTTPS
+only, with DuckDB checking its signatures (marketbrief/warehouse/extension.py); unsigned extensions stay
+disallowed."""
 
 from __future__ import annotations
 
-import os
 import re
-import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,34 +25,12 @@ from marketbrief.constants.warehouse import (
     MSG_TOKEN_MISSING,
     PROVIDER_LOCAL,
     PROVIDER_MOTHERDUCK,
-    REDACTED,
 )
 from marketbrief.core import paths
+from marketbrief.warehouse.errors import WarehouseError, token
+from marketbrief.warehouse.extension import load_motherduck
 
 NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-
-
-class WarehouseError(RuntimeError):
-    """A warehouse failure whose message never carries the token."""
-
-    def __init__(self, message: str):
-        """Keep only the redacted message."""
-        super().__init__(redact(message))
-
-
-def token() -> str | None:
-    """The MotherDuck token from the environment, None when unset or blank."""
-    value = os.environ.get(ENV_MOTHERDUCK_TOKEN, "").strip()
-    return value or None
-
-
-def redact(text) -> str:
-    """The text with the token (as is and URL-encoded) replaced by ***."""
-    out, secret = str(text), token()
-    if secret:
-        for form in {secret, urllib.parse.quote(secret, safe=""), urllib.parse.quote_plus(secret)}:
-            out = out.replace(form, REDACTED)
-    return out
 
 
 def load_warehouse_config() -> dict:
@@ -102,8 +79,7 @@ def connect_motherduck(name: str, read_only: bool) -> duckdb.DuckDBPyConnection:
         raise WarehouseError(MSG_TOKEN_MISSING.format(env=ENV_MOTHERDUCK_TOKEN))
     try:
         con = duckdb.connect()  # the extension reads MOTHERDUCK_TOKEN from the environment itself
-        con.execute("INSTALL motherduck")  # DuckDB's official, signed extension repository
-        con.execute("LOAD motherduck")
+        load_motherduck(con, load_warehouse_config())
         if read_only:
             con.execute(f"ATTACH '{MOTHERDUCK_PREFIX}{name}' AS {name} (READ_ONLY)")
         else:

@@ -17,3 +17,10 @@ local_path: work/warehouse/market_brief.duckdb
 # meta.sync_runs, an enabled: false skip only in the summary (it never connects).
 enabled: true
 monthly_hours_ceiling: 7
+# The MotherDuck extension (marketbrief/warehouse/extension.py): both signed files are downloaded over HTTPS
+# only, from extensions.duckdb.org and ext.motherduck.com, and DuckDB checks their signatures on load.
+# duckdb_version must equal the duckdb pin in requirements.txt. implementation_version is MotherDuck's build
+# for that DuckDB; https://api.motherduck.com/extension_version names the current one (checked 2026-10-07).
+extension:
+  duckdb_version: v1.5.6
+  implementation_version: v1.5.6-2026-10-3

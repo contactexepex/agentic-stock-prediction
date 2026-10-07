@@ -165,7 +165,7 @@ SLOW = {
         "test_spotcheck_if_due",
         "test_spotcheck_sample_is_deterministic_and_in_week",
     },
-    # WS1: every test of the warehouse sync shares the module fixture (three local syncs of the US data)
+    # WS1: the warehouse sync tests that share the module fixture (several local syncs of the US data)
     "tests/test_warehouse_sync.py": {
         "test_cli_dry_run_and_missing_token",
         "test_dry_run_writes_nothing_and_counts_the_same_rows",

@@ -13,7 +13,7 @@ import sys
 
 from marketbrief.constants.warehouse import KIND_DAILY, KIND_NEWS
 from marketbrief.core import cli
-from marketbrief.warehouse.connection import WarehouseError
+from marketbrief.warehouse.errors import WarehouseError
 from marketbrief.warehouse.sync import sync_market
 
 

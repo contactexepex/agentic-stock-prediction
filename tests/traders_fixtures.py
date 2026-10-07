@@ -23,7 +23,7 @@ NOW = datetime(2026, 10, 7, 11, 50, tzinfo=timezone.utc)
 AGENT_KEYS = ("strategy_id", "ticker", "horizon_days", "direction", "prob_up", "target_price", "range_widen",
               "evidence_ids", "reason", "made_at", "model_prob", "agent_adjustment", "adjustment_reason")
 PROMPTS = {"ai.news_results.sonnet.v1": "trader-news-v1", "ai.pattern_mood.sonnet.v1": "trader-pattern-v1",
-           "ai.combined.sonnet.v1": "trader-combined-v1", "ai.combined.opus.v1": "forecast-v13"}
+           "ai.combined.sonnet.v1": "trader-combined-v1", "ai.combined.opus.v1": "forecast-v14"}
 
 
 def catalogue(name: str) -> list[dict]:
