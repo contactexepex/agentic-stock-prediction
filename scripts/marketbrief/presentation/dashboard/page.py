@@ -51,16 +51,29 @@ def vendor_script() -> str:
     return data.decode("utf-8")
 
 
+JSON_ESCAPES = str.maketrans({"<": "\\u003c", ">": "\\u003e", "&": "\\u0026", "\u2028": "\\u2028", "\u2029": "\\u2029"})
+
+
 def script_safe(text: str) -> str:
-    """Text placed inside a <script> element: a closing tag can never end it early."""
+    """Code placed inside a <script> element: a closing tag can never end it early, and code that could
+    switch the HTML parser into a script's escaped states ("<!--") is refused."""
+    if "<!--" in text:
+        raise ValueError("script text contains '<!--'")
     return text.replace("</", "<\\/")
+
+
+def json_script(data: dict) -> str:
+    """Data as JSON for a <script type="application/json"> element: every <, >, &, U+2028 and U+2029 is written
+    as a \\uXXXX escape (still the same JSON), so no stored text can open or close a tag or comment."""
+    text = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return text.translate(JSON_ESCAPES)
 
 
 def build_page(data: dict) -> str:
     """The HTML page with the stylesheet, the library, the app and the data inlined."""
     assets = HERE / ASSET_DIR
     app = "\n".join([*((assets / name).read_text() for name in ASSET_JS), APP_BOOT])
-    payload = script_safe(json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False))
+    payload = json_script(data)
     title = f"{data['name']} dashboard"
     values = {
         SLOT_TITLE: html.escape(title),

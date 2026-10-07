@@ -10,8 +10,23 @@ AS_OF_SQL = "SELECT max(as_of_date) FROM features WHERE computed_at <= ?::TIMEST
 # features_latest, as of the cut-off
 FEATURES_SQL = """SELECT DISTINCT ON (ticker) * FROM features
                   WHERE as_of_date = ? AND computed_at <= ?::TIMESTAMPTZ ORDER BY ticker, computed_at DESC"""
-BARS_SQL = """SELECT ticker, date, open, high, low, close, volume FROM ohlc
-              WHERE date <= ? AND date > ? ORDER BY ticker, date"""
+# the ohlc view (sql/views.sql: ohlc_raw, price_adjustments, bar_factors) rebuilt from the rows stored by the
+# cut-off: each bar's newest collection by then, the market's closed days left out, and only the split/bonus
+# records detected (and not yet superseded) by then applied
+BARS_SQL = """
+WITH p AS (SELECT DISTINCT ON (ticker, date) * FROM prices
+           WHERE collected_at <= $cutoff::TIMESTAMPTZ AND date <= $as_of AND date > $start
+           ORDER BY ticker, date, collected_at DESC),
+r AS (SELECT * FROM p WHERE NOT EXISTS (SELECT 1 FROM own_closed_days c WHERE c.ticker = p.ticker AND c.date = p.date)),
+a AS (SELECT DISTINCT ON (id) * FROM adjustments WHERE detected_at <= $cutoff::TIMESTAMPTZ
+      AND id NOT IN (SELECT supersedes FROM adjustments
+                     WHERE supersedes IS NOT NULL AND detected_at <= $cutoff::TIMESTAMPTZ)
+      ORDER BY id, detected_at),
+f AS (SELECT r.ticker, r.date, coalesce(list_product(list_sort(list(a.factor))), 1.0) AS factor
+      FROM r LEFT JOIN a ON a.ticker = r.ticker AND a.ex_date > r.date GROUP BY r.ticker, r.date)
+SELECT r.ticker, r.date, r.open * f.factor AS open, r.high * f.factor AS high, r.low * f.factor AS low,
+       r.close * f.factor AS close, CAST(round(r.volume / f.factor) AS BIGINT) AS volume
+FROM r JOIN f USING (ticker, date) ORDER BY ticker, date"""
 # ranges_latest (first stored row per id), as of the cut-off
 RANGES_SQL = """SELECT DISTINCT ON (id) * FROM ranges
                 WHERE as_of_date = ? AND made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at"""
@@ -33,8 +48,14 @@ NEWS_SQL = """WITH n AS (SELECT DISTINCT ON (id) * FROM news WHERE first_seen_at
               WHERE k <= ? ORDER BY ticker, ts DESC, id"""
 NEWS_BY_ID_SQL = """SELECT DISTINCT ON (id) id, title, url, source, coalesce(published_at, first_seen_at) AS ts
                     FROM news WHERE first_seen_at <= ?::TIMESTAMPTZ ORDER BY id, first_seen_at"""
-EARNINGS_SQL = """SELECT ticker, min(date) AS date FROM company_events
-                  WHERE type = ? AND date > ? AND first_seen_at <= ?::TIMESTAMPTZ GROUP BY ticker ORDER BY ticker"""
+# the company_events view (latest known date per ticker and type, "_history" sources left out) built from the
+# event rows first seen by the cut-off; the next earnings date is that date when it is after the as-of date
+EARNINGS_SQL = """
+SELECT ticker, date FROM (
+  SELECT DISTINCT ON (ticker, type) * FROM events
+  WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history') AND first_seen_at <= $cutoff::TIMESTAMPTZ
+  ORDER BY ticker, type, first_seen_at DESC, date)
+WHERE type = $kind AND date > $as_of ORDER BY ticker"""
 REGIME_SQL = """SELECT * FROM regime WHERE as_of_date <= ? AND computed_at <= ?::TIMESTAMPTZ
                 ORDER BY as_of_date DESC, computed_at DESC LIMIT 1"""
 QUOTES_SQL = """SELECT DISTINCT ON (symbol) symbol, price, prev_close, change_pct, ts, collected_at FROM quotes
@@ -45,7 +66,7 @@ PREDICTIONS_SQL = """SELECT DISTINCT ON (id) * FROM predictions
                      WHERE as_of_date = ? AND made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at"""
 
 
-def frame(con, sql: str, params: list | None = None) -> pd.DataFrame:
+def frame(con, sql: str, params: list | dict | None = None) -> pd.DataFrame:
     """A query result as a DataFrame; an empty frame when the view is missing (no such files yet)."""
     try:
         return con.execute(sql, params or []).df()
@@ -66,9 +87,9 @@ def features(con, as_of, cutoff: str) -> pd.DataFrame:
     return frame(con, FEATURES_SQL, [as_of, cutoff])
 
 
-def bars(con, as_of, start) -> pd.DataFrame:
-    """Split-adjusted daily OHLC bars from after `start` up to and including the as-of date."""
-    return frame(con, BARS_SQL, [as_of, start])
+def bars(con, as_of, start, cutoff: str) -> pd.DataFrame:
+    """Split-adjusted daily OHLC bars after `start` up to and including the as-of date, as stored by the cut-off."""
+    return frame(con, BARS_SQL, {"as_of": as_of, "start": start, "cutoff": cutoff})
 
 
 def ranges(con, as_of, cutoff: str) -> pd.DataFrame:
@@ -108,7 +129,7 @@ def news_by_id(con, cutoff: str) -> pd.DataFrame:
 
 def earnings(con, kind: str, as_of, cutoff: str) -> dict:
     """ticker -> the next earnings date after the as-of date, as known by the cut-off."""
-    rows = frame(con, EARNINGS_SQL, [kind, as_of, cutoff])
+    rows = frame(con, EARNINGS_SQL, {"kind": kind, "as_of": as_of, "cutoff": cutoff})
     return {r.ticker: pd.Timestamp(r.date).date() for r in rows.itertuples()}
 
 

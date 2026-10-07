@@ -63,11 +63,15 @@ def versions_used(versions: pd.DataFrame, model_ids: set[str]) -> list[dict]:
 
 
 def backtest_reliability(model: dict, market: str) -> dict:
-    """{key: reliability rows} from the review's backtest JSON, when that file is present."""
+    """{key: reliability rows} from the review's backtest JSON, only when that file is the very run the review
+    record (read as of the cut-off) summarises: same computed_at. A later rerun that overwrote the file is ignored."""
     path = paths.ROOT / (model.get("json") or "")
     if not model.get("json") or not path.is_file():
         return {}
-    results = (json.loads(path.read_text()).get("results") or {}).get(market) or {}
+    result = json.loads(path.read_text())
+    if result.get("computed_at") is None or result.get("computed_at") != model.get("computed_at"):
+        return {}
+    results = (result.get("results") or {}).get(market) or {}
     return {
         key: [same_keys(row) for row in res["reliability"]]
         for key, res in sorted(results.items())

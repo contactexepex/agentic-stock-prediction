@@ -103,9 +103,17 @@
   }
 
   function linkIds(text, evidence) {
-    var out = esc(text || '');
-    (evidence || []).forEach(function (e) { out = out.split(esc(e.id)).join('<code class="small" title="' + esc(e.title || '') + '">' + esc(e.id) + '</code>'); });
-    return out;
+    // one pass over the raw text, so an id inside an inserted title is never replaced again
+    var byId = {};
+    (evidence || []).forEach(function (e) { byId[e.id] = e; });
+    var ids = Object.keys(byId).map(function (i) { return i.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+    if (!ids.length) return esc(text || '');
+    var pattern = new RegExp(ids.join('|'), 'g'), out = '', last = 0, m, raw = text || '';
+    while ((m = pattern.exec(raw)) !== null) {
+      out += esc(raw.slice(last, m.index)) + '<code class="small" title="' + esc(byId[m[0]].title || '') + '">' + esc(m[0]) + '</code>';
+      last = m.index + m[0].length;
+    }
+    return out + esc(raw.slice(last));
   }
 
   function casesCard(c) {

@@ -8,6 +8,7 @@ plus synthetic rows: scored calls and ranges before the cut-off, and rows of eve
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import os
 import re
@@ -122,6 +123,18 @@ def scored_rows(root: Path) -> None:
     append(root, "range_outcomes", "2026-10-02", routs)
 
 
+def earlier_adjustment(root: Path) -> None:
+    """A split record detected before the cut-off: the page applies it, as the ohlc view does."""
+    split = {
+        "id": "BAC-test",
+        "ticker": "BAC",
+        "ex_date": "2026-09-01",
+        "factor": 0.5,
+        "detected_at": "2026-10-01T06:00:00+00:00",
+    }
+    append(root, "adjustments", "2026-10-01", [split])
+
+
 def later_rows(root: Path) -> None:
     """One row of each kind stored after the cut-off: none of them may reach the page."""
     append(
@@ -193,10 +206,24 @@ def later_rows(root: Path) -> None:
     append(root, "reviews", "2026-10-07", [{"id": "2026-W41", "computed_at": LATER, "model_skill": True, "detail": {}}])
     append(root, "replays", "2026-10-07", [{"id": "later", "computed_at": LATER, "n_days": 5}])
     prices = root / "data" / "us" / "prices" / "2026" / "10" / "2026-10-07.csv"
-    prices.write_text(
-        "date,ticker,open,high,low,close,adj_close,volume,collected_at\n"
-        f"2026-10-07,JPM,500,510,490,505,505,1000,{LATER}\n"
+    # CRLF line ends as collect_prices.py writes them (DuckDB's multi-file reader skips a file whose ends differ)
+    prices.write_bytes(
+        b"date,ticker,open,high,low,close,adj_close,volume,collected_at\r\n"
+        + f"2026-10-07,JPM,500.0,510.0,490.0,505.0,505.0,1000,{LATER}\r\n".encode()
+        + f"2026-10-05,JPM,700.0,710.0,690.0,705.0,705.0,1000,{LATER}\r\n".encode()  # a past bar re-collected later
     )
+    later = {"id": "JPM-later", "ticker": "JPM", "ex_date": "2026-10-07", "factor": 0.5, "detected_at": LATER}
+    append(root, "adjustments", "2026-10-07", [later])
+    next_quarter = {
+        "id": "JPM-next-q",
+        "date": "2027-01-14",
+        "type": "earnings",
+        "ticker": "JPM",
+        "name": "JPM earnings",
+        "source": "yahoo",
+        "first_seen_at": "2026-10-14T05:00:00+00:00",
+    }
+    append(root, "events", "2026-10-14", [next_quarter])
 
 
 @pytest.fixture(scope="module")
@@ -204,6 +231,7 @@ def built(tmp_path_factory):
     root = tmp_path_factory.mktemp("dash")
     shutil.copytree(REPO / "data" / "us", root / "data" / "us")
     scored_rows(root)
+    earlier_adjustment(root)
     later_rows(root)
     saved = common.ROOT
     common.ROOT = root
@@ -222,9 +250,12 @@ def company(data: dict, ticker: str) -> dict:
 def test_numbers_equal_the_source_views(built):
     con, data, jpm = built["con"], built["data"], company(built["data"], "JPM")
     assert data["as_of"] == "2026-10-06" and len(data["companies"]) == len(built["cfg"]["tickers"])
+    # each bar's newest collection by the cut-off (JPM has no split record known by then)
     bars = con.execute(
-        "SELECT date, open, close FROM ohlc WHERE ticker = 'JPM' AND date <= DATE '2026-10-06' "
-        "AND date > DATE '2026-10-06' - INTERVAL 380 DAY ORDER BY date"
+        "SELECT date, open, close FROM (SELECT DISTINCT ON (date) * FROM prices WHERE ticker = 'JPM' AND "
+        "collected_at <= ? ORDER BY date, collected_at DESC) WHERE date <= DATE '2026-10-06' "
+        "AND date > DATE '2026-10-06' - INTERVAL 380 DAY ORDER BY date",
+        [CUTOFF],
     ).fetchall()
     assert len(jpm["bars"]) == len(bars) and jpm["bars"][-1][0] == "2026-10-06"
     assert jpm["last"]["close"] == round(bars[-1][2], 4) and jpm["last"]["prev_close"] == round(bars[-2][2], 4)
@@ -257,10 +288,13 @@ def test_numbers_equal_the_source_views(built):
         "SELECT rsi_14 FROM features_latest WHERE ticker = 'JPM' AND as_of_date = '2026-10-06'"
     ).fetchone()[0]
     assert jpm["indicators"]["rsi_14"] == rsi
+    # company_events as of the cut-off: the newest earnings row first seen by then
     earn = con.execute(
-        "SELECT min(date) FROM company_events WHERE ticker = 'JPM' AND type = 'earnings' AND date > DATE '2026-10-06'"
+        "SELECT date FROM events WHERE ticker = 'JPM' AND type = 'earnings' AND first_seen_at <= ? "
+        "AND NOT ends_with(coalesce(source, ''), '_history') ORDER BY first_seen_at DESC, date LIMIT 1",
+        [CUTOFF],
     ).fetchone()[0]
-    assert jpm["earnings"] == (earn.isoformat() if earn else None)
+    assert earn.isoformat() > data["as_of"] and jpm["earnings"] == earn.isoformat()
     statuses = EvidenceStatuses(con)
     assert jpm["news"] and all(n["status"] == statuses.of(n["id"], "JPM", CUTOFF.isoformat()) for n in jpm["news"])
     sector = next(s for s in data["overview"]["sectors"] if s["sector"] == "Banks")
@@ -270,6 +304,10 @@ def test_numbers_equal_the_source_views(built):
 
 def test_nothing_after_the_cut_off_or_the_as_of(built):
     data, jpm = built["data"], company(built["data"], "JPM")
+    # the later rows are really there: today's views see them
+    con = built["con"]
+    assert con.execute("SELECT max(date) FROM ohlc WHERE ticker = 'JPM'").fetchone()[0].isoformat() == "2026-10-07"
+    assert con.execute("SELECT max(as_of_date) FROM features_latest").fetchone()[0].isoformat() == "2026-10-07"
     assert data["as_of"] == "2026-10-06" and all(b[0] <= data["as_of"] for b in jpm["bars"])
     assert all(m["prob_up"] != 0.99 for m in jpm["model"]) and jpm["reasoning"]["bull"] != "LATER BULL"
     assert LATE_NEWS not in {n["id"] for n in jpm["news"]} and jpm["indicators"]["rsi_14"] != 99.0
@@ -277,6 +315,43 @@ def test_nothing_after_the_cut_off_or_the_as_of(built):
     assert data["skill"]["state"] == "paper" and data["skill"]["review"]["id"] == "2026-W40"
     assert data["track"]["replay"] is None
     assert [r["inside80"]["n"] for r in data["track"]["ranges"]] == [1, 1]  # the range scored later is left out
+
+
+def test_bars_earnings_and_splits_as_of_the_cut_off(built):
+    con, jpm, bac = built["con"], company(built["data"], "JPM"), company(built["data"], "BAC")
+    # today's views see the later rows; the page does not
+    seen_now = con.execute("SELECT date FROM company_events WHERE ticker = 'JPM' AND type = 'earnings'").fetchone()[0]
+    assert seen_now.isoformat() == "2027-01-14" and jpm["earnings"] not in (None, "2027-01-14")
+    view_close = con.execute("SELECT close FROM ohlc WHERE ticker = 'JPM' AND date = '2026-10-05'").fetchone()[0]
+    stored = con.execute(
+        "SELECT close FROM prices WHERE ticker = 'JPM' AND date = '2026-10-05' AND collected_at <= ? "
+        "ORDER BY collected_at DESC LIMIT 1",
+        [CUTOFF],
+    ).fetchone()[0]
+    page_close = next(b[4] for b in jpm["bars"] if b[0] == "2026-10-05")
+    assert view_close == 705 * 0.5 and page_close == round(stored, 4) and page_close != round(view_close, 4)
+    # a split record known by the cut-off is applied to the bars before its ex-date only
+    raw = dict(
+        con.execute(
+            "SELECT date::VARCHAR, close FROM prices WHERE ticker = 'BAC' AND date IN ('2026-08-31', '2026-09-01') "
+            "AND collected_at <= ?",
+            [CUTOFF],
+        ).fetchall()
+    )
+    bars = {b[0]: b[4] for b in bac["bars"]}
+    assert bars["2026-08-31"] == round(raw["2026-08-31"] * 0.5, 4)
+    assert bars["2026-09-01"] == round(raw["2026-09-01"], 4)
+
+
+HOSTILE = ["Comment <!--<script> trick", "</script><script>alert(1)</script>", "a & b > c \u2028 \u2029"]
+
+
+def test_stored_text_cannot_break_the_page():
+    data = {"name": "T", "x": HOSTILE}
+    payload = page.json_script(data)
+    assert json.loads(payload) == data and not re.search("[<>&\u2028\u2029]", payload)
+    with pytest.raises(ValueError):
+        page.script_safe("var a = '<!--';")
 
 
 def test_track_record_per_basis_never_pooled(built):
@@ -377,18 +452,24 @@ const { chromium } = require('playwright');
   let b;
   try { b = await chromium.launch(); }
   catch (e) { b = await chromium.launch({executablePath: '/opt/pw-browsers/chromium'}); }
-  const out = {};
+  const out = {dialogs: 0};
   for (const [w, h] of [[1280, 900], [375, 812]]) {
     const errors = [], requests = [];
     const p = await b.newPage({viewport: {width: w, height: h}});
     p.on('pageerror', e => errors.push(e.message));
     p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     p.on('request', r => { if (!r.url().startsWith('file:') && !r.url().startsWith('data:')) requests.push(r.url()); });
+    p.on('dialog', d => { out.dialogs += 1; d.dismiss(); });
     await p.goto('file://' + process.argv[2]); await p.waitForTimeout(300);
+    out.parsed = await p.evaluate(() => {
+      try { return Array.isArray(JSON.parse(document.getElementById('mb-data').textContent).companies); }
+      catch (e) { return false; }
+    });
     const rows = await p.locator('#wl-body tr').count();
     await p.click('#wl-body button.tick[data-t="JPM"]'); await p.waitForTimeout(500);
     const canvases = await p.locator('#chart-box canvas').count();
     const fan = await p.locator('#chart-box svg.fan polygon').count();
+    out.stock_text = await p.textContent('#view-stock');
     const range = async () => p.evaluate(() => window.MB.chart().timeScale().getVisibleRange().from);
     await p.click('[data-span="1W"]'); await p.waitForTimeout(200); const week = await range();
     await p.click('[data-span="1Y"]'); await p.waitForTimeout(200); const year = await range();
@@ -406,16 +487,23 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
     root = _node_playwright()
     if root is None:
         pytest.skip("node + playwright not installed")
+    data = copy.deepcopy(built["data"])  # hostile stored text in headlines and agent reasoning
+    jpm = company(data, "JPM")
+    for item, title in zip(jpm["news"], HOSTILE, strict=False):
+        item["title"] = title
+    jpm["reasoning"]["bull"] = HOSTILE[0] + " " + HOSTILE[1]
     f = tmp_path / "dashboard.html"
-    f.write_text(page.build_page(built["data"]))
+    f.write_text(page.build_page(data))
     js = tmp_path / "render.js"
     js.write_text(RENDER_JS)
     r = subprocess.run(
         ["node", str(js), str(f)], capture_output=True, text=True, timeout=180, env={**os.environ, "NODE_PATH": root}
     )
     assert r.returncode == 0, r.stderr
-    out = json.loads(r.stdout.strip().splitlines()[-1])
+    out = json.loads(r.stdout.strip().split("\n")[-1])  # not splitlines(): the text holds U+2028
     banks = built["cfg"]["sectors"]["Banks"]
+    assert out["parsed"] is True and out["dialogs"] == 0
+    assert all(text in out["stock_text"] for text in HOSTILE[:2])  # shown as plain text, never parsed as HTML
     for width in ("1280", "375"):
         o = out[width]
         assert o["errors"] == [] and o["requests"] == [] and o["overflow"] is False, o

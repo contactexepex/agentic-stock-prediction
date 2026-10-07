@@ -121,7 +121,7 @@ def gather_dashboard(cfg: dict, con, cutoff_time) -> dict:
             "models": [],
         }
     feats = reads.features(con, as_of, cutoff)
-    bars = reads.bars(con, as_of, as_of - timedelta(days=BAR_CALENDAR_DAYS))
+    bars = reads.bars(con, as_of, as_of - timedelta(days=BAR_CALENDAR_DAYS), cutoff)
     statuses = EvidenceStatuses(con)
     reasoning = reads.reasoning(con, as_of, cutoff)
     reasoning_rows = {r["ticker"]: r for r in reasoning.to_dict("records")}
