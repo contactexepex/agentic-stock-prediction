@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from marketbrief.alerts.constants import WEBHOOK_TS_PREFIX
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
 from marketbrief.core.storage import append_jsonl
 
@@ -33,8 +34,10 @@ class Ledger:
         return {int(r["part"]): r for r in self.rows() if r["post_key"] == post_key}
 
     def thread_ts(self, thread_key: str) -> str | None:
-        """The ts of the day's thread: its first message (a row of that thread without a thread_ts)."""
-        roots = [r for r in self.rows() if r.get("thread_key") == thread_key and not r.get("thread_ts")]
+        """The ts of the day's thread: its first message (a row of that thread without a thread_ts). Webhook posts
+        are never a thread: a later token run starts the thread."""
+        roots = [r for r in self.rows() if r.get("thread_key") == thread_key and not r.get("thread_ts")
+                 and not str(r.get("ts")).startswith(WEBHOOK_TS_PREFIX)]
         return min(roots, key=lambda r: r["posted_at"])["ts"] if roots else None
 
     def append(self, row: dict) -> None:
