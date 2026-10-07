@@ -1,9 +1,10 @@
-# HDFC Bank decision page: rationale
+# Stock decision page: rationale
 
-Files: `decision-HDFCBANK.html` (self-contained, no network), `shot-1280-full.png`, `shot-390-full.png`,
-`shot-390-viewport.png`, `shot-1280-chart-hover.png` (tooltip), `shot-1280-chart-5d.png` (5-day bands),
-`crop-390-*.png` (phone sections), `notes.md` (queries/commands), `build.py` / `template.html` / `extract.py`
-(generator), `data.json` (everything the page shows), `bt/` and `replayroot/` (back-test outputs).
+Files: `template.html` + `build.py` (generator, any market and ticker), `decision-HDFCBANK.html`,
+`decision-ICICIBANK.html`, `decision-AAPL.html` (self-contained, no network), `data-HDFCBANK.json` (everything the
+HDFC Bank page shows), screenshots `shot-*.png`, `notes.md` (queries/commands). The layout below is the one the owner
+approved; on 2026-10-07 the page was recoloured onto the Material 3 design system (`design/system/`) and the builder
+made generic. What changed in that pass is listed at the end.
 
 ## How a novice reads it in 30 seconds
 
@@ -78,3 +79,25 @@ tooltip (hover, focus or tap). Status is never colour alone: tick/cross glyphs, 
 - Costs are the config's "verify" rates (brokerage assumed Rs 0; slippage not modelled).
 - The direction of market drivers (FII selling, oil, yields) is the conventional reading, stated in the
   tooltip, not a model output; the model's own technical contribution is 0 points.
+
+## Recolour to Material 3 (2026-10-07)
+
+- **Only the skin.** Same sections, order, grids, chart, strip, drivers, events and the three expansion panels.
+  Colours now come from `design/system/tokens.css`: page on `surface`, elevated cards on `surface-container-lowest`,
+  the decision head on `secondary-container` with the NO in `secondary` (calm, not alarming: NO means "no edge",
+  not "sell"; a YES would use the up container), numbered section badges in `primary`, hit/miss marks in the
+  up/down tokens with tick/cross glyphs, direction squares in the up/down/neutral/unclear containers, Live /
+  Back-test (hatched) / Mock (dashed) / Paper (tertiary) tags from the system, bands and fan in chart series 1
+  (`--mb-chart-1`), the actual line in on-surface ink, tooltips on the inverse surface.
+- **App shell.** The page sits in the shell: navigation rail (desktop) / navigation bar (phone) with Watchlist
+  marked current (this is one of its company pages) and the other sections "soon", top app bar with the title and
+  the India/US segmented button (the current market pressed; switching lives on Home/Watchlist).
+- **Icons** are Material Symbols Outlined (vendored, Apache 2.0) instead of hand-drawn line icons.
+- **Generic builder.** `build.py --market --ticker --out`; every string that was hand-written for HDFC Bank now
+  comes from stored data or config (`data.page`): company, exchange, sector, currency and stake, 52-week position,
+  the why-sentence, the five checks, the plan sources, driver rows, event texts, sources. Lost in the move: the
+  hand-written driver names ("Three senior exits; 52-week low") became the stored headline titles, the sector mood
+  row became the peer's top headline, and the chart note's hand-written miss commentary ("misses cluster on days
+  ...") became a pointer to the table. Numbers are unchanged (see notes.md).
+- **Checked** with Playwright at 1280 and 390 px for all three pages: no console errors, no horizontal scroll, no
+  external requests.

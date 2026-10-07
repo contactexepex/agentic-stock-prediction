@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cockpit design system</title>
+<meta name="description" content="Living style guide of the market-brief cockpit: Material 3 light tokens from seed #3B6EA8, type scale, shape, elevation, components and the app shell.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* style-guide-only layout */
+.sg-section{margin-top:var(--mb-space-8)}
+.sg-section>h2{font:var(--md-sys-typescale-headline-small);margin:0 0 var(--mb-space-1)}
+.sg-section>p.lede{color:var(--md-sys-color-on-surface-variant);margin:0 0 var(--mb-space-4)}
+.sg-grid{display:grid;gap:var(--mb-space-3);grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.sw{border-radius:var(--md-sys-shape-corner-small);padding:10px 12px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid var(--md-sys-color-outline-variant);font:var(--md-sys-typescale-label-medium)}
+.sw .hex{font-family:var(--md-ref-typeface-mono);font-size:11px;opacity:.85}
+.sw .cr{font-size:11px}
+.sg-row{display:flex;flex-wrap:wrap;gap:var(--mb-space-3);align-items:center}
+.sg-type>div{padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:baseline}
+.sg-type .n{font:var(--md-sys-typescale-label-medium);color:var(--md-sys-color-on-surface-variant);font-family:var(--md-ref-typeface-mono)}
+.sg-shape{width:88px;height:56px;background:var(--md-sys-color-primary-container);display:grid;place-items:center;font:var(--md-sys-typescale-label-small);color:var(--md-sys-color-on-primary-container)}
+.sg-elev{width:120px;height:72px;background:var(--md-sys-color-surface-container-lowest);border-radius:var(--md-sys-shape-corner-medium);display:grid;place-items:center;font:var(--md-sys-typescale-label-medium)}
+.sg-space{display:flex;align-items:flex-end;gap:8px}
+.sg-space i{display:block;background:var(--md-sys-color-tertiary-container);border:1px solid var(--md-sys-color-tertiary)}
+.sg-icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.sg-icons div{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border-radius:var(--md-sys-shape-corner-small);background:var(--md-sys-color-surface-container-low);font:var(--md-sys-typescale-label-small);color:var(--md-sys-color-on-surface-variant);text-align:center;word-break:break-all}
+.sg-icons .ms{width:24px;height:24px;color:var(--md-sys-color-on-surface)}
+.sg-note{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md-sys-color-surface-container);padding:0 4px;border-radius:3px}
+.sg-chart{display:block;width:100%;max-width:560px;height:auto}
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections">
+    <div class="mb-rail-brand" aria-hidden="true">MB</div>
+    <a class="mb-nav-item" href="#" aria-current="page"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-home"/></svg></span>Home</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming: not built yet"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-format_list_bulleted"/></svg></span>Watchlist</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming: not built yet"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-account_balance_wallet"/></svg></span>Portfolio</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming: not built yet"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-query_stats"/></svg></span>Track record</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming: not built yet"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-newspaper"/></svg></span>News</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming: not built yet"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-help"/></svg></span>Help</a>
+  </nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Design system</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense" role="group" aria-label="Market">
+        <button type="button" aria-pressed="true">India</button>
+        <button type="button" aria-pressed="false">US</button>
+      </div>
+      <button class="md-icon-btn" type="button" aria-label="Search" data-tip="Coming: search"><svg class="ms"><use href="#ms-search"/></svg></button>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner">
+    <h1 class="md-headline-medium" style="margin:var(--mb-space-4) 0 4px">Cockpit design system</h1>
+    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">Material 3 light, one seed colour <code>#3B6EA8</code> (HCT hue 256, chroma 42, tone 46), tonal-spot scheme. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
+    <p class="sg-row" style="margin-top:var(--mb-space-3)"><span class="mb-tag live"><svg class="ms"><use href="#ms-sensors"/></svg>Live</span><span class="mb-tag bt"><svg class="ms"><use href="#ms-history"/></svg>Back-test</span><span class="mb-tag mock"><svg class="ms"><use href="#ms-construction"/></svg>Mock</span><span class="mb-tag paper"><svg class="ms"><use href="#ms-science"/></svg>Paper</span><span class="mb-tag derived">derived</span><span class="mb-tag coming">Coming</span><span class="sg-note">provenance tags: a texture or border style besides the colour (hatched, dashed, dotted)</span></p>
+
+    <section class="sg-section" id="colour">
+      <h2>Colour roles</h2>
+      <p class="lede">Each swatch shows the role, its hex and the WCAG contrast of its "on" colour (or of the role on the surface, for accents). Text on a container needs 4.5:1; large text and icons 3:1.</p>
+      <div class="sg-grid" id="roles"></div>
+      <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Semantic: up / down / neutral / unclear, hit / miss</h3>
+      <p class="lede">Never colour alone: an arrow, tick or cross plus the word. The up/down pair sits in the dataviz checker's CVD warn band (protan ΔE 6.8), which makes the glyph rule mandatory.</p>
+      <div class="sg-grid" id="semantic"></div>
+      <div class="sg-row" style="margin-top:var(--mb-space-3)">
+        <span class="mb-status up"><span class="mb-dir up"><svg class="ms"><use href="#ms-arrow_upward"/></svg></span>up</span>
+        <span class="mb-status down"><span class="mb-dir dn"><svg class="ms"><use href="#ms-arrow_downward"/></svg></span>down</span>
+        <span class="mb-status neutral"><span class="mb-dir flat"><svg class="ms"><use href="#ms-remove"/></svg></span>neutral</span>
+        <span class="mb-status unknown"><span class="mb-dir unk"><svg class="ms"><use href="#ms-help"/></svg></span>unclear</span>
+        <span class="mb-status hit"><span class="mb-mark ok"><svg class="ms"><use href="#ms-check"/></svg></span>hit (inside the band)</span>
+        <span class="mb-status miss"><span class="mb-mark no"><svg class="ms"><use href="#ms-close"/></svg></span>miss (outside)</span>
+        <span class="mb-mark na"><svg class="ms"><use href="#ms-remove"/></svg></span><span class="sg-note">pending</span>
+      </div>
+      <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Chart colours (dataviz skill, validated)</h3>
+      <p class="lede">Series 1-4 in fixed order (adjacent pairs pass CVD ΔE ≥ 8 and normal-vision ≥ 15; series 2 is 2.83:1 on the surface, so it needs direct labels or the table view). Slots 1, 2 and 4 pass all-pairs (scatter, maps). Status up/down against series 1: all-pairs pass, up vs down in the warn band.</p>
+      <div class="sg-grid" id="chart"></div>
+      <svg class="sg-chart" viewBox="0 0 560 150" role="img" aria-label="Example: predicted bands against the actual close, with hit and miss marks">
+        <g fill="none" stroke="var(--mb-chart-grid)"><line x1="40" x2="550" y1="30" y2="30"/><line x1="40" x2="550" y1="70" y2="70"/><line x1="40" x2="550" y1="110" y2="110"/></g>
+        <g font-size="11" fill="var(--mb-chart-label)" text-anchor="end"><text x="34" y="34">730</text><text x="34" y="74">710</text><text x="34" y="114">690</text></g>
+        <rect x="372" y="20" width="178" height="100" fill="var(--mb-chart-future)"/>
+        <g fill="var(--mb-chart-band-80)"><rect x="60" y="40" width="30" height="60" rx="2"/><rect x="120" y="36" width="30" height="64" rx="2"/><rect x="180" y="50" width="30" height="60" rx="2"/><rect x="240" y="44" width="30" height="60" rx="2"/><rect x="300" y="52" width="30" height="58" rx="2"/></g>
+        <g fill="var(--mb-chart-band-50)"><rect x="60" y="55" width="30" height="28" rx="2"/><rect x="120" y="52" width="30" height="30" rx="2"/><rect x="180" y="66" width="30" height="28" rx="2"/><rect x="240" y="60" width="30" height="28" rx="2"/><rect x="300" y="68" width="30" height="26" rx="2"/></g>
+        <polygon points="345,78 550,40 550,120" fill="var(--mb-chart-band-80)"/><polygon points="345,78 550,60 550,100" fill="var(--mb-chart-band-50)"/>
+        <rect x="520" y="40" width="30" height="80" fill="none" stroke="var(--mb-chart-1)" stroke-width="1.5" rx="2"/>
+        <path d="M75,70 L135,62 L195,100 L255,70 L315,80 L345,78" fill="none" stroke="var(--mb-chart-ink)" stroke-width="2" stroke-linejoin="round"/>
+        <g stroke="#fff" stroke-width="2"><circle cx="75" cy="70" r="6" fill="var(--mb-color-hit)"/><circle cx="135" cy="62" r="6" fill="var(--mb-color-hit)"/><circle cx="195" cy="100" r="6" fill="var(--mb-color-miss)"/><circle cx="255" cy="70" r="6" fill="var(--mb-color-hit)"/><circle cx="315" cy="80" r="6" fill="var(--mb-color-hit)"/></g>
+        <g fill="#fff"><use href="#ms-check" x="71" y="66" width="8" height="8"/><use href="#ms-check" x="131" y="58" width="8" height="8"/><use href="#ms-close" x="191" y="96" width="8" height="8"/><use href="#ms-check" x="251" y="66" width="8" height="8"/><use href="#ms-check" x="311" y="76" width="8" height="8"/></g>
+        <text x="378" y="16" font-size="11" font-weight="700" fill="var(--md-sys-color-on-surface-variant)">Next 5 sessions →</text>
+        <g font-size="11" fill="var(--mb-chart-label)" text-anchor="middle"><text x="75" y="140">Mon</text><text x="195" y="140">Wed</text><text x="315" y="140">Fri</text><text x="535" y="140">+5</text></g>
+        <text x="516" y="36" font-size="11" fill="var(--mb-chart-1)" font-weight="600" text-anchor="end">731</text>
+      </svg>
+      <p class="sg-note">Light fill = 80% band, dark fill = 50% band (series 1 at two alphas), ink line = actual close, hit/miss dot with glyph, published range as an outlined box with its number.</p>
+    </section>
+
+    <section class="sg-section" id="type">
+      <h2>Typography</h2>
+      <p class="lede">M3 type roles on the system sans (<code>system-ui, -apple-system, "Segoe UI", Roboto, …</code>). No web font is loaded. Numbers in tables use <code>.md-numeric</code> (tabular figures).</p>
+      <div class="sg-type">
+        <div><span class="n">display-large</span><span class="md-display-large">57 / 64</span></div>
+        <div><span class="n">display-medium</span><span class="md-display-medium">45 / 52</span></div>
+        <div><span class="n">display-small</span><span class="md-display-small">36 / 44</span></div>
+        <div><span class="n">headline-large</span><span class="md-headline-large">Headline large 32 / 40</span></div>
+        <div><span class="n">headline-medium</span><span class="md-headline-medium">Headline medium 28 / 36</span></div>
+        <div><span class="n">headline-small</span><span class="md-headline-small">Headline small 24 / 32</span></div>
+        <div><span class="n">title-large</span><span class="md-title-large">Title large 22 / 28</span></div>
+        <div><span class="n">title-medium</span><span class="md-title-medium">Title medium 16 / 24, weight 500</span></div>
+        <div><span class="n">title-small</span><span class="md-title-small">Title small 14 / 20, weight 500</span></div>
+        <div><span class="n">body-large</span><span class="md-body-large">Body large 16 / 24. The model gives a rise 47%: a coin flip.</span></div>
+        <div><span class="n">body-medium</span><span class="md-body-medium">Body medium 14 / 20. The default body text of every page.</span></div>
+        <div><span class="n">body-small</span><span class="md-body-small">Body small 12 / 16. Notes, metadata, footers.</span></div>
+        <div><span class="n">label-large</span><span class="md-label-large">Label large 14 / 20 · buttons, chips</span></div>
+        <div><span class="n">label-medium</span><span class="md-label-medium">Label medium 12 / 16 · table headers, navigation</span></div>
+        <div><span class="n">label-small</span><span class="md-label-small">Label small 11 / 16 · tags</span></div>
+        <div><span class="n">verdict / hero</span><span class="md-display-large md-numeric" style="font-weight:800;letter-spacing:-1px;color:var(--md-sys-color-secondary)">NO</span></div>
+      </div>
+    </section>
+
+    <section class="sg-section" id="shape">
+      <h2>Shape, elevation, spacing</h2>
+      <p class="lede">Corner tokens extra-small 4 to extra-large 28 and full; cards use medium (12), buttons and chips full or small; five elevation levels; a 4px spacing grid; 16px phone gutter.</p>
+      <div class="sg-row">
+        <div class="sg-shape" style="border-radius:var(--md-sys-shape-corner-extra-small)">xs 4</div>
+        <div class="sg-shape" style="border-radius:var(--md-sys-shape-corner-small)">s 8</div>
+        <div class="sg-shape" style="border-radius:var(--md-sys-shape-corner-medium)">m 12</div>
+        <div class="sg-shape" style="border-radius:var(--md-sys-shape-corner-large)">l 16</div>
+        <div class="sg-shape" style="border-radius:var(--md-sys-shape-corner-extra-large)">xl 28</div>
+        <div class="sg-shape" style="border-radius:var(--md-sys-shape-corner-full)">full</div>
+      </div>
+      <div class="sg-row" style="margin-top:var(--mb-space-4)">
+        <div class="sg-elev" style="box-shadow:var(--md-sys-elevation-0);border:1px solid var(--md-sys-color-outline-variant)">level 0</div>
+        <div class="sg-elev" style="box-shadow:var(--md-sys-elevation-1)">level 1</div>
+        <div class="sg-elev" style="box-shadow:var(--md-sys-elevation-2)">level 2</div>
+        <div class="sg-elev" style="box-shadow:var(--md-sys-elevation-3)">level 3</div>
+        <div class="sg-elev" style="box-shadow:var(--md-sys-elevation-4)">level 4</div>
+        <div class="sg-elev" style="box-shadow:var(--md-sys-elevation-5)">level 5</div>
+      </div>
+      <div class="sg-space" style="margin-top:var(--mb-space-4)">
+        <i style="width:4px;height:4px"></i><i style="width:8px;height:8px"></i><i style="width:12px;height:12px"></i><i style="width:16px;height:16px"></i><i style="width:20px;height:20px"></i><i style="width:24px;height:24px"></i><i style="width:32px;height:32px"></i><i style="width:40px;height:40px"></i><i style="width:48px;height:48px"></i>
+        <span class="sg-note">--mb-space-1 … 12: 4, 8, 12, 16, 20, 24, 32, 40, 48</span>
+      </div>
+    </section>
+
+    <section class="sg-section" id="components">
+      <h2>Components</h2>
+      <p class="lede">Cards, chips, buttons, segmented buttons, help tooltips, badges, tables, meters. All keyboard-usable; the tooltip opens on hover, focus or tap.</p>
+      <div class="sg-row" style="align-items:stretch">
+        <div class="md-card elevated" style="width:220px"><h3 class="md-title-medium" style="margin:0 0 6px">Elevated card</h3><p class="md-body-medium" style="margin:0;color:var(--md-sys-color-on-surface-variant)">surface-container-lowest, elevation 1. The page's default card.</p></div>
+        <div class="md-card filled" style="width:220px"><h3 class="md-title-medium" style="margin:0 0 6px">Filled card</h3><p class="md-body-medium" style="margin:0;color:var(--md-sys-color-on-surface-variant)">surface-container-highest, no shadow.</p></div>
+        <div class="md-card outlined" style="width:220px"><h3 class="md-title-medium" style="margin:0 0 6px">Outlined card</h3><p class="md-body-medium" style="margin:0;color:var(--md-sys-color-on-surface-variant)">surface with an outline-variant border.</p></div>
+      </div>
+      <h3 class="md-title-small" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Chips</h3>
+      <div class="sg-row">
+        <span class="md-chip assist"><svg class="ms"><use href="#ms-info"/></svg>Assist chip</span>
+        <button class="md-chip filter" type="button" aria-pressed="true">Filter, selected</button>
+        <button class="md-chip filter" type="button" aria-pressed="false">Filter</button>
+        <span class="md-chip live"><span class="sw"></span>Live</span>
+        <span class="md-chip bt"><span class="sw"></span>Back-test</span>
+        <span class="md-chip mock"><span class="sw"></span>Mock</span>
+        <span class="md-chip small"><svg class="ms"><use href="#ms-verified_user"/></svg>Research only</span>
+      </div>
+      <h3 class="md-title-small" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Buttons and segmented buttons</h3>
+      <div class="sg-row">
+        <button class="md-btn filled" type="button"><svg class="ms"><use href="#ms-check"/></svg>Filled</button>
+        <button class="md-btn tonal" type="button">Tonal</button>
+        <button class="md-btn outlined" type="button">Outlined</button>
+        <button class="md-btn text" type="button">Text</button>
+        <button class="md-btn filled" type="button" disabled>Disabled</button>
+        <button class="md-icon-btn" type="button" aria-label="Settings"><svg class="ms"><use href="#ms-settings"/></svg></button>
+        <button class="md-icon-btn outlined" type="button" aria-label="Open"><svg class="ms"><use href="#ms-open_in_new"/></svg></button>
+        <button class="md-icon-btn tonal" type="button" aria-label="Menu"><svg class="ms"><use href="#ms-menu"/></svg></button>
+        <button class="md-help" type="button" aria-label="Explain" data-tip="A help tooltip: hover, focus or tap. Plain tooltip on the inverse surface.">?</button>
+      </div>
+      <div class="sg-row" style="margin-top:var(--mb-space-3)">
+        <div class="md-segmented" role="group" aria-label="Horizon"><button type="button" aria-pressed="true">1-day</button><button type="button" aria-pressed="false">5-day</button></div>
+        <div class="md-segmented dense" role="group" aria-label="Market"><button type="button" aria-pressed="true">India</button><button type="button" aria-pressed="false">US</button></div>
+        <div class="md-segmented" role="group" aria-label="Three"><button type="button" aria-pressed="false">Day</button><button type="button" aria-pressed="true">Week</button><button type="button" aria-pressed="false" disabled>Month</button></div>
+      </div>
+      <h3 class="md-title-small" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Badges (verification status, outcomes)</h3>
+      <div class="sg-row">
+        <span class="md-badge confirmed_primary"><svg class="ms"><use href="#ms-verified_user"/></svg>confirmed primary</span>
+        <span class="md-badge corroborated"><svg class="ms"><use href="#ms-check"/></svg>corroborated</span>
+        <span class="md-badge single_source"><svg class="ms"><use href="#ms-warning"/></svg>single source</span>
+        <span class="md-badge unverified">unverified</span>
+        <span class="md-badge rumour"><svg class="ms"><use href="#ms-close"/></svg>rumour</span>
+        <span class="md-badge promotional"><svg class="ms"><use href="#ms-close"/></svg>promotional</span>
+        <span class="md-badge">high · results</span>
+        <span class="md-badge count">3</span>
+        <span class="md-badge dot" aria-label="new"></span>
+      </div>
+      <h3 class="md-title-small" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Odds meter, strength bar, progress, KPI tile</h3>
+      <div class="sg-row">
+        <span class="mb-odds" data-tip="P(up) on a 30-70% track; the dot's side of the tick and its colour agree, and the number is printed."><svg viewBox="0 0 64 14"><rect class="track" x="0" y="5" width="64" height="4" rx="2"/><line class="mid" x1="32" x2="32" y1="1" y2="13"/><circle class="dot dn" cx="27" cy="7" r="4.5"/></svg><b>47%</b></span>
+        <span class="mb-odds"><svg viewBox="0 0 64 14"><rect class="track" x="0" y="5" width="64" height="4" rx="2"/><line class="mid" x1="32" x2="32" y1="1" y2="13"/><circle class="dot up" cx="48" cy="7" r="4.5"/></svg><b>60%</b></span>
+        <div class="mb-bar" style="width:120px" aria-label="strength 2 of 3, up"><i class="up" style="width:33%"></i></div>
+        <div class="mb-bar" style="width:120px" aria-label="strength 3 of 3, down"><i class="dn" style="width:49%"></i></div>
+        <div class="mb-bar" style="width:120px" aria-label="direction unclear"><i class="unk" style="width:20%"></i></div>
+        <div class="md-progress" style="width:160px" role="progressbar" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"><i style="width:65%"></i></div>
+        <div class="mb-kpi"><div class="v md-numeric">26/34</div><div class="l">80% ranges held <span class="mb-tag bt">back-test</span></div></div>
+      </div>
+      <h3 class="md-title-small" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Data table</h3>
+      <div class="md-table-wrap"><table class="md-table">
+        <thead><tr><th>For</th><th>Chance up</th><th class="num">Close</th><th>80%</th><th>Cause</th></tr></thead>
+        <tbody>
+          <tr><td>Tue 6 Oct</td><td><span class="mb-odds"><svg viewBox="0 0 64 14"><rect class="track" x="0" y="5" width="64" height="4" rx="2"/><line class="mid" x1="32" x2="32" y1="1" y2="13"/><circle class="dot dn" cx="27" cy="7" r="4.5"/></svg><b>47%</b></span></td><td class="num md-numeric">711.45</td><td><span class="mb-status hit"><svg class="ms"><use href="#ms-check"/></svg>in</span></td><td><svg class="ms"><use href="#ms-public"/></svg> Market-wide</td></tr>
+          <tr><td>Mon 5 Oct</td><td><span class="mb-odds"><svg viewBox="0 0 64 14"><rect class="track" x="0" y="5" width="64" height="4" rx="2"/><line class="mid" x1="32" x2="32" y1="1" y2="13"/><circle class="dot dn" cx="28" cy="7" r="4.5"/></svg><b>48%</b></span></td><td class="num md-numeric">723.10</td><td><span class="mb-status miss"><svg class="ms"><use href="#ms-close"/></svg>out</span></td><td><svg class="ms"><use href="#ms-apartment"/></svg> Company news</td></tr>
+          <tr class="muted"><td>Wed 7 Oct</td><td>—</td><td class="num">—</td><td>open</td><td>—</td></tr>
+        </tbody>
+      </table></div>
+      <h3 class="md-title-small" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Expansion panel</h3>
+      <details class="md-expansion"><summary>The maths: range inputs, model drivers, costs</summary><div class="inner"><dl class="md-kv"><dt>base close</dt><dd>₹711.45</dd><dt>50% band</dt><dd>₹696 – ₹731</dd></dl></div></details>
+    </section>
+
+    <section class="sg-section" id="icons">
+      <h2>Icons</h2>
+      <p class="lede">Material Symbols Outlined (Apache 2.0, Google), vendored in <code>icons.svg</code> as <code>&lt;symbol&gt;</code>s; <code>&lt;svg class="ms"&gt;&lt;use href="#ms-name"/&gt;&lt;/svg&gt;</code>, filled with <code>currentColor</code>.</p>
+      <div class="sg-icons" id="icons-grid"></div>
+    </section>
+
+    <section class="sg-section" id="shell">
+      <h2>App shell</h2>
+      <p class="lede">This page sits in the shell: a navigation rail on the left from 600px (72px items, 56×32 active indicator in secondary-container), a navigation bar at the bottom on phones, and a top app bar with the page title and the India/US segmented button. Sections not built yet are marked "soon" and explain themselves on hover.</p>
+    </section>
+    <footer class="sg-note" style="text-align:center;padding:var(--mb-space-6) 0 0">Personal research project · design system v1 · research only, nothing here trades.</footer>
+  </div></main>
+  <nav class="mb-navbar" aria-label="Sections">
+    <a class="mb-nav-item" href="#" aria-current="page"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-home"/></svg></span>Home</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-format_list_bulleted"/></svg></span>Watchlist</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-account_balance_wallet"/></svg></span>Portfolio</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-query_stats"/></svg></span>Record</a>
+    <a class="mb-nav-item coming" href="#" data-tip="Coming"><span class="mb-nav-ind"><svg class="ms"><use href="#ms-newspaper"/></svg></span>News</a>
+  </nav>
+</div>
+<script>
+const cs = getComputedStyle(document.documentElement);
+const v = n => cs.getPropertyValue(n).trim();
+const lum = hex => { const f = x => { x /= 255; return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); }; const n = parseInt(hex.slice(1), 16); return 0.2126*f(n>>16) + 0.7152*f((n>>8)&255) + 0.0722*f(n&255); };
+const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return ((x+0.05)/(y+0.05)).toFixed(1); };
+const el = (t, a={}, ...k) => { const n = document.createElement(t); for (const [key, val] of Object.entries(a)) { if (key === 'class') n.className = val; else if (key === 'style') n.style.cssText = val; else n.setAttribute(key, val); } for (const c of k) n.append(c.nodeType ? c : document.createTextNode(String(c))); return n; };
+const SURF = v('--md-sys-color-surface');
+function swatch(container, bg, fg, label, note) {
+  const b = v(bg), f = fg ? v(fg) : null;
+  const ratio = f ? cr(f, b) : cr(b, SURF);
+  const sw = el('div', {class: 'sw', style: `background:${f ? b : SURF};color:${f || b};${f ? '' : 'border-color:' + b}`});
+  sw.append(el('div', {}, el('b', {}, label), el('div', {class: 'hex'}, b + (f ? ' / ' + f : ''))));
+  sw.append(el('div', {class: 'cr'}, (f ? 'on-colour ' : 'on surface ') + ratio + ':1' + (note ? ' · ' + note : '')));
+  container.append(sw);
+}
+const R = document.getElementById('roles');
+for (const [bg, fg, label] of [
+  ['--md-sys-color-primary', '--md-sys-color-on-primary', 'primary'], ['--md-sys-color-primary-container', '--md-sys-color-on-primary-container', 'primary container'],
+  ['--md-sys-color-secondary', '--md-sys-color-on-secondary', 'secondary'], ['--md-sys-color-secondary-container', '--md-sys-color-on-secondary-container', 'secondary container'],
+  ['--md-sys-color-tertiary', '--md-sys-color-on-tertiary', 'tertiary'], ['--md-sys-color-tertiary-container', '--md-sys-color-on-tertiary-container', 'tertiary container'],
+  ['--md-sys-color-error', '--md-sys-color-on-error', 'error'], ['--md-sys-color-error-container', '--md-sys-color-on-error-container', 'error container'],
+  ['--md-sys-color-surface', '--md-sys-color-on-surface', 'surface'], ['--md-sys-color-surface-variant', '--md-sys-color-on-surface-variant', 'surface variant'],
+  ['--md-sys-color-surface-container-lowest', '--md-sys-color-on-surface', 'container lowest'], ['--md-sys-color-surface-container-low', '--md-sys-color-on-surface', 'container low'],
+  ['--md-sys-color-surface-container', '--md-sys-color-on-surface', 'container'], ['--md-sys-color-surface-container-high', '--md-sys-color-on-surface', 'container high'],
+  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface-variant', 'container highest'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
+  ['--md-sys-color-outline', null, 'outline'], ['--md-sys-color-outline-variant', null, 'outline variant (decorative)'],
+]) swatch(R, bg, fg, label);
+const S = document.getElementById('semantic');
+for (const [bg, fg, label] of [['--mb-color-up', '--mb-color-on-up', 'up / hit'], ['--mb-color-up-container', '--mb-color-on-up-container', 'up container'], ['--mb-color-down', '--mb-color-on-down', 'down / miss'], ['--mb-color-down-container', '--mb-color-on-down-container', 'down container'], ['--mb-color-neutral', '--mb-color-on-neutral', 'neutral (icons, large text)'], ['--mb-color-neutral-container', '--mb-color-on-neutral-container', 'neutral container'], ['--mb-color-warn', '--mb-color-on-warn', 'unclear (icons)'], ['--mb-color-warn-container', '--mb-color-on-warn-container', 'unclear container'], ['--mb-color-paper-container', '--mb-color-on-paper-container', 'Paper tag'], ['--mb-color-live-container', '--mb-color-on-live-container', 'Live tag']]) swatch(S, bg, fg, label);
+const C = document.getElementById('chart');
+for (const [bg, label, note] of [['--mb-chart-1', 'series 1', 'marks ≥ 3:1'], ['--mb-chart-2', 'series 2', 'label relief'], ['--mb-chart-3', 'series 3', ''], ['--mb-chart-4', 'series 4', ''], ['--mb-chart-ink', 'ink (actual)', ''], ['--mb-chart-label', 'axis labels', ''], ['--mb-chart-axis', 'axis line', 'decorative'], ['--mb-chart-grid', 'gridline', 'decorative']]) swatch(C, bg, null, label, note);
+const G = document.getElementById('icons-grid');
+for (const s of document.querySelectorAll('symbol[id^="ms-"]')) { const d = el('div'); const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'ms'); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#' + s.id); svg.append(u); d.append(svg, s.id.slice(3)); G.append(d); }
+/* tooltip */
+const tip = document.getElementById('tip'); let pinned = null;
+function showTip(t, html) { tip.innerHTML = html; tip.classList.add('on'); const r = t.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (!pinned) tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !pinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { pinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t) { if (pinned === t) { pinned = null; hideTip(); } else { pinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (pinned) { pinned = null; hideTip(); } });
+document.querySelectorAll('.md-segmented [aria-pressed], .md-chip.filter').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; const grp = b.parentElement.classList.contains('md-segmented') ? [...b.parentElement.children] : [b]; if (grp.length > 1) grp.forEach(o => o.setAttribute('aria-pressed', o === b)); else b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); }));
+window.addEventListener('scroll', () => document.getElementById('topbar').classList.toggle('scrolled', window.scrollY > 4), {passive: true});
+</script>
+</body>
+</html>

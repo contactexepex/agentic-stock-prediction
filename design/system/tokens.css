@@ -1,0 +1,205 @@
+/* market-brief cockpit: Material 3 (Material You) LIGHT design tokens.
+   Generated from ONE seed colour, #3B6EA8 (HCT hue 256.4, chroma 42.1, tone 45.5), with Google's
+   @material/material-color-utilities 0.4.0 SchemeTonalSpot (the default "Material You" scheme,
+   contrast level 0). Every --md-sys-color-* value below is that scheme's light role, unchanged.
+   Semantic and chart tokens (--mb-*) are HCT tonal palettes on fixed hues (see README.md): the
+   chart series are higher-chroma than the M3 roles on purpose (the dataviz checker's chroma floor).
+   Light theme only; the cockpit has no dark theme (owner's direction).
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- M3 colour roles (light) --------------------------------------------------------- */
+  --md-sys-color-primary: #39608f;                 /* tone 40 */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d3e4ff;       /* tone 90 */
+  --md-sys-color-on-primary-container: #1e4875;    /* tone 30 */
+  --md-sys-color-secondary: #545f70;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #d7e3f8;
+  --md-sys-color-on-secondary-container: #3c4758;
+  --md-sys-color-tertiary: #6c5677;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f5d9ff;
+  --md-sys-color-on-tertiary-container: #533f5e;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #93000a;
+  --md-sys-color-surface: #f8f9ff;
+  --md-sys-color-on-surface: #191c20;
+  --md-sys-color-surface-variant: #dfe2eb;
+  --md-sys-color-on-surface-variant: #43474e;
+  --md-sys-color-surface-dim: #d8dae0;
+  --md-sys-color-surface-bright: #f8f9ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f2f3fa;
+  --md-sys-color-surface-container: #ecedf4;
+  --md-sys-color-surface-container-high: #e7e8ee;
+  --md-sys-color-surface-container-highest: #e1e2e8;
+  --md-sys-color-outline: #73777f;
+  --md-sys-color-outline-variant: #c3c6cf;
+  --md-sys-color-inverse-surface: #2e3035;
+  --md-sys-color-inverse-on-surface: #eff0f7;
+  --md-sys-color-inverse-primary: #a3c9fe;
+  --md-sys-color-background: #f8f9ff;
+  --md-sys-color-on-background: #191c20;
+  --md-sys-color-surface-tint: #39608f;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-primary-fixed: #d3e4ff;
+  --md-sys-color-primary-fixed-dim: #a3c9fe;
+  --md-sys-color-on-primary-fixed: #001c38;
+  --md-sys-color-on-primary-fixed-variant: #1e4875;
+
+  /* Tonal palettes (the steps the roles above are picked from), for the rare page that needs one */
+  --md-ref-palette-primary30: #1e4875; --md-ref-palette-primary40: #39608f; --md-ref-palette-primary50: #5379a9;
+  --md-ref-palette-primary60: #6d93c5; --md-ref-palette-primary80: #a3c9fe; --md-ref-palette-primary90: #d3e4ff; --md-ref-palette-primary95: #eaf1ff;
+  --md-ref-palette-neutral50: #73777d; --md-ref-palette-neutral60: #8d9196; --md-ref-palette-neutral70: #a8abb1; --md-ref-palette-neutral90: #dfe3e8;
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     Never colour alone: every up/down/hit/miss mark also carries a glyph (arrow, tick, cross) and a
+     word. Contrast on surface #f8f9ff (WCAG, checked in styleguide.html): up #00732e 5.5:1,
+     down #c92f29 5.1:1, neutral #73777d 4.3:1 (icons and large text only, never small text), warn
+     #b37800 3.6:1 (icons only; its text form is on-warn-container #624000 on warn-container, 7.2:1). The up/down pair sits in the
+     dataviz checker's CVD warn band (protan dE 6.8), which is why the glyph + word rule is a rule.
+     On-container pairs: up 9.6:1, down 8.6:1, warn 7.2:1; white on up 6.0:1, on down 5.4:1. */
+  --mb-color-up: #00732e;                 /* HCT hue 150, chroma 60, tone 42 */
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #85f496;       /* tone 88 */
+  --mb-color-on-up-container: #003913;    /* tone 20 */
+  --mb-color-down: #c92f29;               /* HCT hue 25, chroma 80, tone 45 (the error family) */
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #ffdad6;     /* tone 90 */
+  --mb-color-on-down-container: #7e0007;  /* tone 25 */
+  --mb-color-neutral: #73777d;            /* neutral tone 50 */
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #e1e2e8;  /* surface-container-highest */
+  --mb-color-on-neutral-container: #43474e;
+  --mb-color-warn: #b37800;               /* HCT hue 75, chroma 70, tone 55: "direction unclear" */
+  --mb-color-on-warn: #1f1400;
+  --mb-color-warn-container: #ffddb2;     /* tone 90 */
+  --mb-color-on-warn-container: #624000;  /* tone 30 */
+  /* Outcome of a forecast: hit = up family, miss = down family (the glyph says which) */
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Provenance labels: Live (stored by the pipeline), Back-test (rebuilt, hatched), Mock (not built,
+     dashed), Paper (unproven signal, tertiary). Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--md-sys-color-primary);
+  --mb-color-live-container: var(--md-sys-color-primary-container);
+  --mb-color-on-live-container: var(--md-sys-color-on-primary-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(57,96,143,.16) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill: validated with scripts/validate_palette.js, see README) ---- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #0079d1;   /* series 1, the seed hue (HCT 256) at chroma 64: ranges, model, everything "ours" */
+  --mb-chart-2: #df7d00;   /* series 2 (2.83:1 on the surface: needs direct labels or a table view) */
+  --mb-chart-3: #876cc8;   /* series 3 */
+  --mb-chart-4: #009486;   /* series 4 */
+  --mb-chart-band-50: rgba(0,121,209,.32);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(0,121,209,.14);   /* outer band */
+  --mb-chart-fan: rgba(0,121,209,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 400 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 400 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 400 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 400 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 500 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.5px;
+  --md-sys-typescale-label-small-tracking: 0.5px;
+  --md-sys-typescale-title-medium-tracking: 0.15px;
+  --md-sys-typescale-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-small-tracking: 0.4px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* ---- Elevation (M3 light shadows, levels 0-5) ----------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --md-sys-elevation-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --md-sys-elevation-3: 0 1px 3px rgba(0,0,0,.30), 0 4px 8px 3px rgba(0,0,0,.15);
+  --md-sys-elevation-4: 0 2px 3px rgba(0,0,0,.30), 0 6px 10px 4px rgba(0,0,0,.15);
+  --md-sys-elevation-5: 0 4px 4px rgba(0,0,0,.30), 0 8px 12px 6px rgba(0,0,0,.15);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1120px;
+  --mb-rail-width: 80px;        /* navigation rail (>= 600px) */
+  --mb-navbar-height: 80px;     /* navigation bar (phone) */
+  --mb-topbar-height: 64px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 100ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.5px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
