@@ -558,3 +558,26 @@ def test_close_shows_your_cost_result_beside_market_cost():
     total = sum(r["your_net_pnl"] for r in rule)
     assert f"(after your costs {text.signed_money('USD', round(total, 2))})" in msg
     assert "your costs" not in build_close("us", "2026-10-01", rows, None, {}, "USD")
+
+
+def test_resettlement_on_a_later_day_is_only_a_correction(scratch, monkeypatch, capsys):
+    store_us_examples(scratch)
+    original = next(r for r in of_market(examples("paper_trade"), "us")
+                    if r["trade_id"] == "acc:rule.model_news.v1:2026-09-29-NVDA-1d")
+    # re-settled at 15:00 UTC on 10-02 = 11:00 New York time on 10-02, a later local day than the first settlement
+    store(scratch, "us", "paper_trades_settled", [resettle(original, "2026-10-02T15:00:00Z", 3.10)], "settled_at")
+    monkeypatch.setenv("MB_NOW", "2026-10-02T02:00:00+00:00")
+    run(["--market", "us", "--dry-run", "close", "--date", "2026-10-01"], capsys)
+    monkeypatch.setenv("MB_NOW", "2026-10-03T02:00:00+00:00")
+    run(["--market", "us", "--dry-run", "close", "--date", "2026-10-02"], capsys)
+    sent = [json.loads(x) for x in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()]
+    second_day = next(m["text"] for m in sent if "close results for Fri 2 Oct 2026" in m["text"])
+    assert not [x for x in second_day.splitlines() if "NVDA* N+1" in x and "(rule.model_news.v1) (accuracy)" in x]
+    assert "+$3.10" not in second_day
+    expected = tally([r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-02")
+                      and r["view"] == "accuracy" and r["family"] == "rule"])
+    assert f"Rule {expected['trades']} trade" in second_day
+    assert text.signed_money("USD", expected["net_pnl"]) in second_day
+    code, out = run(["--market", "us", "--dry-run", "corrections"], capsys)
+    assert out["posted"] == ["correction:us:acc:rule.model_news.v1:2026-09-29-NVDA-1d@resettled#1"]
+    assert "bought $229.27 on 2026-09-30," in sent[0]["text"]   # DATE columns print as dates

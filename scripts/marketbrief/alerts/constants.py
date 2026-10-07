@@ -11,10 +11,6 @@ POST_WEEKLY = "weekly"
 POST_ONBOARDING = "onboarding"
 POST_CORRECTION = "correction"
 POST_BRIEF = "brief"   # notify_slack.py's daily brief, posted into the day's thread (owner, 2026-10-07)
-POST_KINDS: tuple[str, ...] = (POST_MORNING, POST_ALERTS, POST_CLOSE, POST_WEEKLY, POST_ONBOARDING, POST_CORRECTION,
-                               POST_BRIEF)
-# posted into the day's thread
-THREAD_KINDS: tuple[str, ...] = (POST_MORNING, POST_BRIEF, POST_ALERTS, POST_CLOSE, POST_CORRECTION)
 
 ENV_SLACK_BOT_TOKEN = "SLACK_BOT_TOKEN"
 SETTING_CHANNEL_ID = "slack_channel_id"
