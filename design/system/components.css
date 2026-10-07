@@ -41,7 +41,8 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
   .mb-topbar { padding: 0 var(--mb-gutter); }
   .mb-content { padding: 0 var(--mb-gutter) calc(var(--mb-navbar-height) + var(--mb-space-6)); }
   .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface); border-top: var(--mb-card-border); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
-  .mb-navbar .mb-nav-item { width: auto; flex: 1 1 0; min-width: 0; }
+  .mb-navbar .mb-nav-item { width: auto; flex: 1 1 0; min-width: 0; overflow: hidden; }
+  .mb-navbar { overflow: hidden; }
   .mb-navbar .mb-nav-item .mb-nav-ind { width: 64px; }
 }
 
