@@ -177,8 +177,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   idempotency key; company commands are confirmed (summary; typed for delete, dashboard only), paper trades come from
   the `/trade` form (or a tool call) without a summary step. Writes are appended to the inbox
   (`mcp/inbox.sql`, database `market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`): company commands to
-  `inbox.company_commands` (read by `company.py import-inbox`; dispatches `onboard.yml`), paper trades to
-  `inbox.requests` (no importer yet, issue #112); pending until imported. Every call is logged in `inbox.command_log`
+  `inbox.company_commands` (read by `company.py import-inbox`), paper trades to `inbox.requests` (read by
+  `portfolio.py import-inbox`); each write dispatches `onboard.yml`; pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
   Vercel project `market-brief-gateway`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
   `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
