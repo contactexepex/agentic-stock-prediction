@@ -28,17 +28,17 @@ def latest_review(con, clock: datetime) -> dict | None:
 
 def scored_calls(con, clock: datetime, basis: str) -> pd.DataFrame:
     """Calls made by the clock with their first outcome scored by the clock, on `basis` only, that measure N+k
-    (portfolio/horizons.py: the legacy 5-day calls are never pooled with N+5)."""
+    (portfolio/horizons.py, issue #94: the legacy 5-day calls are never pooled with N+5)."""
     frame = con.execute(
-        f"SELECT p.id, p.horizon_days, {label_sql(con, 'predictions', 'p.')}, p.confidence, o.hit FROM "
+        f"SELECT p.id, p.horizon_days, {label_sql(con, 'predictions', 'p.')}, p.made_at, p.confidence, o.hit FROM "
         "(SELECT DISTINCT ON (id) * FROM predictions WHERE made_at <= ? ORDER BY id, made_at) p JOIN "
         "(SELECT DISTINCT ON (prediction_id) * FROM outcomes WHERE scored_at <= ? ORDER BY prediction_id, scored_at) o "
         "ON o.prediction_id = p.id WHERE coalesce(o.label_basis, 'close_to_close') = ? AND o.hit IS NOT NULL "
         "ORDER BY p.id", [clock, clock, basis]).df()
     if frame.empty:
         return frame
-    keep = [is_n_plus_k(h, None if pd.isna(label) else label)
-            for h, label in zip(frame["horizon_days"], frame["horizon_label"])]
+    keep = [is_n_plus_k(h, None if pd.isna(label) else label, made)
+            for h, label, made in zip(frame["horizon_days"], frame["horizon_label"], frame["made_at"])]
     return frame[keep].reset_index(drop=True)
 
 

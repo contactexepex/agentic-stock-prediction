@@ -22,6 +22,7 @@ from marketbrief.core import paths
 from marketbrief.model.explain import group_of
 from marketbrief.model.settings import load_costs, round_trip_cost
 from marketbrief.pipeline.review.helpers import load_review_config
+from marketbrief.presentation.dashboard.stock import row_label
 from marketbrief.utils.numbers import json_safe_float
 
 
@@ -33,7 +34,9 @@ def loaded(value):
 
 
 def version_view(row) -> dict:
-    """One stored fit: training size, base rate, Platt calibration and coefficient sizes per group."""
+    """One stored fit: horizon and horizon label (a fit stored before B10 has none and gets the label of the scores
+    it made, core.horizons.legacy_label), training size, base rate, Platt calibration and coefficient sizes per
+    group."""
     model = loaded(row.model) or {}
     by_group: dict[str, float] = {}
     for feature, coefficient in zip(model.get("features", []), model.get("coefficients", []), strict=False):
@@ -41,6 +44,7 @@ def version_view(row) -> dict:
     return {
         "id": row.id,
         "h": int(row.horizon_days),
+        "horizon_label": row_label(row, "model_scores"),
         "label": row.label_convention,
         "trained_until": pd.Timestamp(row.trained_until).date().isoformat(),
         "fitted_at": pd.Timestamp(row.fitted_at).isoformat(),

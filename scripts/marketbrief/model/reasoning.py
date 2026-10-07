@@ -29,6 +29,7 @@ from marketbrief.constants.model import (KIND_AGENT_REASONING, MSG_REASONING_ABS
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_now, utc_today
 from marketbrief.core.database import connect
+from marketbrief.core.horizons import horizons
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.pipeline.forecast_gate import evidence_times
@@ -39,6 +40,19 @@ TEXT_LIMITS = {"bull_case": REASONING_CASE_WORDS, "bear_case": REASONING_CASE_WO
 REQUIRED = ("id", "as_of_date", "ticker", "made_at", "bull_case", "bear_case", "verdict", "decision_1d",
             "decision_5d", "evidence_ids", "prediction_ids", "prompt_version")
 WRITTEN_AT = "written_at"
+REQUIRED_DECISION_HORIZONS = (1, 5)   # decision_1d and decision_5d are required; decision_<k>d of the other horizons
+ABSTAIN = "abstain"                   # of config/strategies.yaml is optional (absent = abstain)
+
+
+def decision(rec: dict, horizon: int):
+    """The record's decision for N+k: its decision_<k>d, an absent optional one counting as abstain."""
+    value = rec.get(f"decision_{horizon}d")
+    return ABSTAIN if value is None and horizon not in REQUIRED_DECISION_HORIZONS else value
+
+
+def decision_horizons() -> tuple[int, ...]:
+    """Every horizon with a decision column: the configured list plus the two required ones."""
+    return tuple(sorted({*horizons(), *REQUIRED_DECISION_HORIZONS}))
 
 
 def gate_context(cfg: dict, con) -> dict:
@@ -60,8 +74,8 @@ def text_errors(rec: dict) -> list[str]:
     for name, limit in TEXT_LIMITS.items():
         if not isinstance(rec[name], str) or not rec[name].strip() or len(rec[name].split()) > limit:
             errors.append(MSG_REASONING_TEXT.format(name=name, limit=limit))
-    for horizon in (1, 5):
-        if rec[f"decision_{horizon}d"] not in REASONING_DECISIONS:
+    for horizon in decision_horizons():
+        if decision(rec, horizon) not in REASONING_DECISIONS:
             errors.append(MSG_REASONING_DECISION.format(horizon=horizon, choices=", ".join(REASONING_DECISIONS)))
     return errors
 
@@ -89,13 +103,13 @@ def prediction_errors(rec: dict, ctx: dict) -> list[str]:
     errors = [MSG_REASONING_NOT_A_CALL.format(id=x, ticker=rec["ticker"], as_of=rec["as_of_date"]) for x in ids
               if x not in ctx["predictions"] or ctx["predictions"][x]["ticker"] != rec["ticker"]
               or ctx["predictions"][x]["as_of"] != str(rec["as_of_date"])]
-    for horizon in (1, 5):
-        decision = rec[f"decision_{horizon}d"]
+    for horizon in decision_horizons():
+        decided = decision(rec, horizon)
         call_id = f"{rec['as_of_date']}-{rec['ticker']}-{horizon}d"
         call = ctx["predictions"].get(call_id) if call_id in ids else None
-        if decision in ("up", "down") and (call is None or call["direction"] != decision):
-            errors.append(MSG_REASONING_NO_CALL.format(horizon=horizon, decision=decision, call_id=call_id))
-        if decision == "abstain" and call_id in ids:
+        if decided in ("up", "down") and (call is None or call["direction"] != decided):
+            errors.append(MSG_REASONING_NO_CALL.format(horizon=horizon, decision=decided, call_id=call_id))
+        if decided == ABSTAIN and call_id in ids:
             errors.append(MSG_REASONING_ABSTAIN_LISTED.format(horizon=horizon, call_id=call_id))
     return errors
 
@@ -159,7 +173,8 @@ def main() -> int:
     summary = {"step": "agent_reasoning", "action": args.action, "records": len(records), "errors": problems}
     if args.action == "add" and (not problems or args.valid_only):
         good = [r for line_no, r in records if line_no not in bad]
-        good = [{**r, WRITTEN_AT: utc_now()} for r in good]
+        columns = SCHEMAS[KIND_AGENT_REASONING][1]   # every column, an optional decision_<k>d absent -> null
+        good = [{**{column: None for column in columns}, **r, WRITTEN_AT: utc_now()} for r in good]
         if good:
             append_jsonl(day_file(cfg["market"], KIND_AGENT_REASONING, utc_today()), good)
         summary["added"] = len(good)

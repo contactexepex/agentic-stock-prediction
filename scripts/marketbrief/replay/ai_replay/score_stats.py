@@ -9,6 +9,7 @@ import pandas as pd
 
 from marketbrief.constants import replay
 from marketbrief.constants.ai_replay import BANDS
+from marketbrief.core.horizons import exit_offset
 from marketbrief.replay.rule_replay import inputs, replay_statistics
 from marketbrief.utils.numbers import round_or_none
 
@@ -19,8 +20,9 @@ def band_of(confidence: float) -> str:
 
 
 def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
-    """One row per call: base close at as_of_date, close `h` stored bars later, hit as
-    score_predictions.py (a flat close is a miss), and the rule-baseline inputs known at as_of."""
+    """One row per call: base close at as_of_date, the exit close of N+h (h + 1 stored bars later: the close of the
+    h-th session after D, the first session after as_of; core/horizons.exit_offset), hit as score_predictions.py
+    (a flat close is a miss), and the rule-baseline inputs known at as_of."""
     rows, cache = [], {}
     for call in calls:
         ticker, horizon, as_of = call["ticker"], int(call["horizon_days"]), pd.Timestamp(call["as_of_date"])
@@ -54,12 +56,13 @@ def score_rows(_cfg: dict, calls: list[dict], bars: dict) -> pd.DataFrame:
                         "status": "pending",
                     }
                 )
-                if position + horizon < len(close):
-                    target_close = float(close.iloc[position + horizon])
+                exit_position = position + exit_offset(horizon)
+                if exit_position < len(close):
+                    target_close = float(close.iloc[exit_position])
                     called_up = call["direction"] == "up"
                     row.update(
                         {
-                            "target_date": close.index[position + horizon].date(),
+                            "target_date": close.index[exit_position].date(),
                             "target": target_close,
                             "ret": target_close / base - 1,
                             "fwd": math.log(target_close / base),

@@ -82,7 +82,7 @@ SLOW = {
         "test_ranges_cli_in_session_flag",
         "test_ranges_cli_late_flag",
         "test_ranges_holiday_and_early_close",
-        "test_ranges_mid_session_publishes_5d_only_labelled_late",
+        "test_ranges_mid_session_publishes_every_horizon_labelled_late",
         "test_report_labels_late_ranges_and_links_the_review",
         "test_scoring_skips_every_horizon_made_after_the_open",
         "test_scoring_skips_records_made_after_the_first_session_closed",

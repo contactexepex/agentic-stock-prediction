@@ -1,6 +1,7 @@
 """Walk-forward backtest of the signal model, out-of-sample only (scripts/model_backtest.py).
 
-For each market, horizon (1, 5) and label convention (open_to_close primary, close_to_close secondary):
+For each market, horizon N+k of config/strategies.yaml (core/horizons.py) and label convention (open_to_close
+primary, close_to_close secondary):
 walk_forward.py's monthly expanding-window fits, scored only on as-of dates after each fit's cutoff, with
 labels the fit never saw. Reported: probability scores and reliability (metrics.py), hit rates and
 coverage at the thresholds of config/model.yaml, the paper strategy after costs vs the baselines
@@ -18,13 +19,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from marketbrief.constants.model import (HORIZONS, LABEL_CONVENTIONS, LABEL_DESCRIPTIONS, LABEL_OPEN_TO_CLOSE,
+from marketbrief.constants.model import (LABEL_CONVENTIONS, LABEL_DESCRIPTIONS, LABEL_OPEN_TO_CLOSE,
                                          MSG_VERDICT_NO_POSITIONS, MSG_VERDICT_SCORES, MSG_VERDICT_VS,
                                          MIN_VERDICT_DATES, MSG_VERDICT_TOO_FEW, VERDICT_BEATS, VERDICT_SAME,
                                          VERDICT_WORSE)
 from marketbrief.core.cli import market_arg
 from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
+from marketbrief.core.horizons import horizons
 from marketbrief.core.market_config import load_market
 from marketbrief.model.backtest_html import render_html
 from marketbrief.model.backtest_variants import CONFIG, headline, headline_lines, parse_groups, with_groups
@@ -129,7 +131,7 @@ def market_inputs(market: str, history: bool) -> tuple[dict, dict | None]:
 def evaluate_market(panel: pd.DataFrame, market: str, settings: dict, gbm: bool) -> dict:
     """{"<h>d <convention>": evaluate()} of one market and settings."""
     return {f"{h}d {c}": evaluate(panel, (market, c, h), settings, load_costs(market), gbm)
-            for h in HORIZONS for c in LABEL_CONVENTIONS}
+            for h in horizons() for c in LABEL_CONVENTIONS}
 
 
 def run(markets: tuple[str, ...], options: dict | None = None) -> dict:

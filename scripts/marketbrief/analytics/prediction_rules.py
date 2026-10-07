@@ -11,14 +11,13 @@ from marketbrief.constants.prediction_rules import (
     CONF_MIN,
     DEFAULT_AS_OF_LABEL,
     DEFAULT_EVIDENCE_LABEL,
-    HORIZONS,
     MSG_AS_OF_DATE_MISMATCH,
     MSG_CONFIDENCE_OUT_OF_RANGE,
     MSG_DIRECTION_MUST_BE_UP_OR_DOWN,
     MSG_EARNINGS_WITHIN_ONE_DAY,
     MSG_EVIDENCE_IDS_UNKNOWN,
     MSG_EVIDENCE_PUBLISHED_AFTER_MADE_AT,
-    MSG_HORIZON_MUST_BE_1_OR_5,
+    MSG_HORIZON_NOT_CONFIGURED,
     MSG_ID_ALREADY_RECORDED,
     MSG_ID_MUST_BE_DATE_TICKER_HORIZON,
     MSG_INDICATOR_QUALITY_BLOCKED,
@@ -43,6 +42,7 @@ from marketbrief.constants.verification import (
     WEAK_STATUSES,
     WIDEN_ONLY_STATUSES,
 )
+from marketbrief.core.horizons import horizons
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.utils.timefmt import as_utc_timestamp
 
@@ -60,8 +60,9 @@ def identity_errors(rec: dict, ctx: dict, seen: set[str], want, as_of, label: st
     ticker, horizon = rec["ticker"], rec["horizon_days"]
     if ticker not in ctx["tickers"]:
         errs.append(MSG_UNKNOWN_TICKER.format(ticker=ticker))
-    if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon not in HORIZONS:
-        errs.append(MSG_HORIZON_MUST_BE_1_OR_5.format(horizon=horizon))
+    allowed = horizons()
+    if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon not in allowed:
+        errs.append(MSG_HORIZON_NOT_CONFIGURED.format(horizon=horizon, allowed=", ".join(map(str, allowed))))
     if as_of is not None and str(rec["as_of_date"]) != str(want):
         errs.append(MSG_AS_OF_DATE_MISMATCH.format(as_of_date=rec["as_of_date"], label=label, want=want))
     if rec["id"] != f"{rec['as_of_date']}-{ticker}-{horizon}d":

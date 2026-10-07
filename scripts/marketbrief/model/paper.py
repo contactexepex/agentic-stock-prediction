@@ -1,8 +1,8 @@
 """The paper strategy of the backtest and its baselines (library; research only, never a trade).
 
-Every position follows the owner's convention: buy at the open of D, sell at the close of D+1 (1-day)
-or D+4 (5-day), net of the round-trip cost of config/costs.yaml at the entry open. Per as-of date the
-chosen stock-days are equally weighted; the statistics are the mean holding-period return per date
+Every position follows the owner's convention: buy at the open of D, sell at the close of the k-th session
+after D (N+k: D+1 for N+1, D+5 for N+5), net of the round-trip cost of config/costs.yaml at the entry open. Per
+as-of date the chosen stock-days are equally weighted; the statistics are the mean holding-period return per date
 (dates with at least one position) and per position, in %, with a 95% moving-block bootstrap interval
 over dates (metrics.block_bootstrap). Strategies:
 - model long at threshold t: p >= t;

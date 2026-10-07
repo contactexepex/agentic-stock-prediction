@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish today's price ranges per ticker and horizon for one market.
+"""Publish today's price ranges per ticker and horizon N+k for one market.
 
 Thin entry point; the code is in marketbrief/analytics/range_publication.py (`--help` shows its description)."""
 import sys

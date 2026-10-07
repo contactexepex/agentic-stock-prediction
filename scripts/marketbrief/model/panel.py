@@ -13,9 +13,10 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.constants.config_keys import CFG_TICKERS
-from marketbrief.constants.model import (FLOW_FEATURES, HORIZONS, LABEL_OPEN_TO_CLOSE, MARKET_FEATURES,
+from marketbrief.constants.model import (FLOW_FEATURES, LABEL_OPEN_TO_CLOSE, MARKET_FEATURES,
                                          REGIME_FEATURES, TECHNICAL_FEATURES)
 from marketbrief.constants.features import MSG_NO_BENCHMARK_FOR_KEY
+from marketbrief.core.horizons import horizons
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.model import market_panel
 from marketbrief.model.cross_market import add_cross_features, enabled_features
@@ -71,10 +72,11 @@ def session_windows(days: pd.DatetimeIndex) -> pd.DataFrame:
     benchmark's own sessions (the last dates of the panel run past them: approximated by weekdays)."""
     out = pd.DataFrame(index=days)
     ordered = list(days)
-    extra = pd.bdate_range(days[-1] + timedelta(days=1), periods=6) if len(days) else []
+    offsets = {horizon: end_offset(LABEL_OPEN_TO_CLOSE, horizon) for horizon in horizons()}
+    extra = pd.bdate_range(days[-1] + timedelta(days=1), periods=max(offsets.values())) if len(days) else []
     sessions = ordered + list(extra)
     out["session_d"] = [sessions[i + 1] for i in range(len(ordered))]
-    for horizon in HORIZONS:
+    for horizon in offsets:
         k = end_offset(LABEL_OPEN_TO_CLOSE, horizon)
         out[f"window_end_{horizon}d"] = [sessions[i + k] for i in range(len(ordered))]
     return out
@@ -84,7 +86,7 @@ def ticker_rows(key: str, bars: dict, bench: pd.DataFrame, session_pos: pd.Serie
     """One ticker's indicators and labels on benchmark sessions, from its warmup-th bar on."""
     frame = bars[key]
     rows = ticker_indicators(frame, bench["close"])
-    for horizon in HORIZONS:
+    for horizon in horizons():
         rows = rows.join(forward_labels(frame, session_pos, horizon))
     rows = rows[rows.index.isin(bench.index) & (rows["bars"] >= warmup)]
     return rows.assign(ticker=key)
@@ -93,7 +95,7 @@ def ticker_rows(key: str, bars: dict, bench: pd.DataFrame, session_pos: pd.Serie
 def bench_labels(bench: pd.DataFrame, session_pos: pd.Series) -> pd.DataFrame:
     """The benchmark's own open-to-close returns per as-of date (the benchmark_long_per_date baseline)."""
     out = pd.DataFrame(index=bench.index)
-    for horizon in HORIZONS:
+    for horizon in horizons():
         labels = forward_labels(bench, session_pos, horizon)
         out[f"bench_ret_{LABEL_OPEN_TO_CLOSE}_{horizon}d"] = labels[f"ret_{LABEL_OPEN_TO_CLOSE}_{horizon}d"]
     return out
@@ -118,7 +120,7 @@ def build_panel(cfg: dict, inputs: dict, warmup: int, cross_groups=()) -> pd.Dat
     panel = add_sector_strength(cfg, panel)
     panel = add_flows(cfg, inputs, panel, bench.index)
     panel = add_cross_features(cfg, bars, panel, cross_groups)
-    for horizon in HORIZONS:
+    for horizon in horizons():
         for kind, column in (("earnings", "earnings_in_window"), ("ex_dividend", "ex_dividend_in_window")):
             values = np.full(len(panel), np.nan)
             for ticker, idx in panel.groupby("ticker").groups.items():

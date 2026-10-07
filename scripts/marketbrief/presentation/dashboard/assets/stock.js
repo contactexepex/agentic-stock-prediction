@@ -69,8 +69,15 @@
     return out;
   }
 
+  // every configured horizon (config/strategies.yaml via D.plan.horizons) plus any other the stock's scores carry
+  function horizonsOf(c) {
+    var hs = ((D.plan || {}).horizons || []).slice();
+    (c.model || []).forEach(function (m) { if (hs.indexOf(m.h) < 0) hs.push(m.h); });
+    return hs.sort(function (a, b) { return a - b; });
+  }
+
   function forecastCard(c, h) {
-    var m = MB.modelOf(c, h), title = h === 1 ? 'Buy today, sell tomorrow' : 'Buy today, sell within 5 days';
+    var m = MB.modelOf(c, h), title = m ? m.name : 'N+' + h + ': sell at the close of D+' + h;
     if (!m) return '<div class="card fc"><h2>' + title + '</h2>' + MB.empty('No model score stored for this stock and day.') + '</div>';
     var p = m.prob_up;
     return '<div class="card fc"><div class="chart-tools"><h2 style="margin:0">' + title + '</h2>' + MB.paperTag() + '</div>' +
@@ -89,7 +96,7 @@
   function rangesCard(c) {
     if (!c.ranges.length) return '<div class="card section"><h2>Price ranges and risk/reward</h2>' + MB.empty('No ranges published for this stock and day.') + '</div>';
     var rows = c.ranges.map(function (r) {
-      return '<tr><td>' + (r.h === 1 ? 'Next session' : '5 sessions') + (r.late ? ' <span class="badge st-neutral" title="Made after this session opened">for the record</span>' : '') +
+      return '<tr><td>' + esc(r.name) + (r.late ? ' <span class="badge st-neutral" title="Made after this session opened">for the record</span>' : '') +
         '</td><td>' + esc(MB.day(r.target_date)) + '</td><td class="r">' + MB.money(r.lo50) + ' – ' + MB.money(r.hi50) + '</td><td class="r">' + MB.money(r.lo80) + ' – ' + MB.money(r.hi80) +
         '</td><td class="r up">' + MB.pct(r.up80, 1) + '</td><td class="r down">' + MB.pct(r.down80, 1) + '</td><td class="r">' + (MB.isNum(r.reward_risk) ? MB.num(r.reward_risk, 2) + ' : 1' : '–') + '</td></tr>';
     }).join('');
@@ -99,7 +106,7 @@
       MB.pct(c.cost, 2, false) + ' (config/costs.yaml).</p><div class="table-wrap"><table><thead><tr><th>Horizon</th><th>Target close</th><th class="r">50% range</th><th class="r">80% range</th>' +
       '<th class="r">Upside</th><th class="r">Downside</th><th class="r">Reward : risk</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       (late ? '<p class="small muted">"For the record": made after that session had opened, so it is not a forecast and is never scored.</p>' : '') +
-      (c.ranges.some(function (r) { return r.notes.length; }) ? '<p class="small muted">Range notes: ' + esc(c.ranges.map(function (r) { return r.h + 'd: ' + r.notes.join('; '); }).join(' · ')) + '</p>' : '') + '</div>';
+      (c.ranges.some(function (r) { return r.notes.length; }) ? '<p class="small muted">Range notes: ' + esc(c.ranges.filter(function (r) { return r.notes.length; }).map(function (r) { return r.name + ': ' + r.notes.join('; '); }).join(' · ')) + '</p>' : '') + '</div>';
   }
 
   function linkIds(text, evidence) {
@@ -116,14 +123,19 @@
     return out + esc(raw.slice(last));
   }
 
+  // the forecaster's decision per horizon (decision_<k>d); horizons it did not store are left out
+  function decisionText(decisions) {
+    var keys = Object.keys(decisions || {}).filter(function (k) { return decisions[k]; });
+    return keys.length ? keys.map(function (k) { return k + (k === '1' ? ' day: ' : ' days: ') + (DECISION[decisions[k]] || decisions[k]); }).join(' · ') : 'No decision stored';
+  }
+
   function casesCard(c) {
     var r = c.reasoning;
     if (!r) return '<div class="card section"><h2>Bull vs bear</h2>' + MB.empty('No forecaster reasoning stored for this stock and day.') + '</div>';
     var calls = c.calls.length ? c.calls.map(function (x) { return x.h + ' day: ' + x.direction + ' at ' + MB.prob(x.confidence) + ' stated confidence'; }).join('; ') : 'no call stored';
     return '<div class="card section"><div class="chart-tools"><h2 style="margin:0">Bull vs bear</h2><span class="small muted">Forecaster ' + esc(r.prompt_version || '') + ' · ' + esc(MB.stamp(r.made_at)) + '</span></div>' +
       '<div class="grid g2"><div class="case bull"><h3>Bull case</h3><p>' + linkIds(r.bull, r.evidence) + '</p></div><div class="case bear"><h3>Bear case</h3><p>' + linkIds(r.bear, r.evidence) + '</p></div></div>' +
-      '<div class="section"><h3>Verdict</h3><p>' + linkIds(r.verdict, r.evidence) + '</p><p class="small sub">1 day: ' + esc(DECISION[r.decision_1d] || r.decision_1d || '–') + ' · 5 days: ' +
-      esc(DECISION[r.decision_5d] || r.decision_5d || '–') + ' · Stored calls: ' + esc(calls) + '</p></div>' +
+      '<div class="section"><h3>Verdict</h3><p>' + linkIds(r.verdict, r.evidence) + '</p><p class="small sub">' + esc(decisionText(r.decisions)) + ' · Stored calls: ' + esc(calls) + '</p></div>' +
       (r.evidence.length ? '<h3>Evidence cited</h3><ul class="news">' + r.evidence.map(function (e) {
         return '<li><span>' + MB.link(e.title, e.url) + '</span><span class="meta">' + MB.badge(e.status) + '<span>' + esc(e.source || '') + '</span><span>' +
           esc(MB.stamp(e.ts)) + '</span><code class="small">' + esc(e.id) + '</code></span></li>';
@@ -164,14 +176,14 @@
   MB.renderStock = function () {
     var el = document.getElementById('view-stock'), c = MB.byTicker[state.ticker];
     if (!c) { el.innerHTML = MB.empty(D.empty || 'No stock data yet.'); return; }
-    el.innerHTML = header(c) + chartCard() + '<div class="grid g2 section">' + forecastCard(c, 1) + forecastCard(c, 5) + '</div>' + rangesCard(c) +
+    el.innerHTML = header(c) + chartCard() + '<div class="grid g2 section">' + horizonsOf(c).map(function (h) { return forecastCard(c, h); }).join('') + '</div>' + rangesCard(c) +
       casesCard(c) + '<div class="grid g2 section">' + newsCard(c) + indicatorsCard(c) + '</div>';
     var onHover = hover(c);
     var info = MB.mountChart(document.getElementById('chart-box'), c, state.span, onHover);
     onHover(null);
     var future = (c.ranges || []).map(function (r) { return r.target_date; }).sort();
     document.getElementById('fan-note').textContent = info.fan ? (info.fan.late ? 'Ranges shown in gray were made after the session opened: for the record, not forecasts.' :
-      'Shaded fan: the published 50% and 80% ranges for the next close and the close 5 sessions ahead, from the close of ' + MB.day(info.lastDay) + '.') : 'No ranges published for this stock and day.';
+      'Shaded fan: the published 50% and 80% ranges for the target close of each horizon (' + c.ranges.map(function (r) { return r.name; }).join(', ') + '), from the close of ' + MB.day(info.lastDay) + '.') : 'No ranges published for this stock and day.';
     el.querySelectorAll('[data-span]').forEach(function (b) {
       b.addEventListener('click', function () {
         state.span = b.dataset.span;

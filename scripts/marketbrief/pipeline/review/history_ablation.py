@@ -12,6 +12,7 @@ from marketbrief.analytics import regime as regime_rules
 from marketbrief.constants.regime import REGIME_ORDER
 from marketbrief.constants.review import BASELINE, MSG_NOT_ENOUGH_BENCHMARK_BARS
 from marketbrief.core import calendar
+from marketbrief.core.horizons import window_sessions
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.pipeline.review.helpers import merge
 from marketbrief.replay.backtest import evaluation, observations
@@ -80,9 +81,10 @@ def history_ablation(cfg: dict, ranges_config: dict, review_config: dict, bars: 
     session_dates = [timestamp.date() for timestamp in dates]
 
     def major_in(date_position: int, horizon: int) -> bool:
-        """True when a major market event falls inside the horizon of a date position."""
-        return date_position + horizon < len(session_dates) and major_event_between(
-            majors, session_dates[date_position], session_dates[date_position + horizon]
+        """True when a major market event falls inside the window of N+k from a date position (k + 1 sessions)."""
+        end = date_position + window_sessions(horizon)
+        return end < len(session_dates) and major_event_between(
+            majors, session_dates[date_position], session_dates[end]
         )
 
     cache, variants = {}, []

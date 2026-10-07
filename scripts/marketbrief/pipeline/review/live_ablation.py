@@ -7,12 +7,14 @@ import math
 import pandas as pd
 
 from marketbrief.analytics import range_math
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.constants.review import BASELINE, NOTE_PATTERNS
+from marketbrief.core.horizons import window_sessions
 from marketbrief.pipeline.review.helpers import merge, notes_list
 
 
 def decompose(row, ranges_config: dict) -> dict | None:
-    """Split a published range into its inputs (from its notes and stored numbers). Parts the
+    """Split a published N+k range into its inputs (from its notes and stored numbers). Parts the
     replay cannot attribute (new inputs, changed settings) are kept fixed in `residual`/`sd`."""
     horizon, base, horizon_sigma, center = (
         int(row["horizon_days"]),
@@ -44,7 +46,8 @@ def decompose(row, ranges_config: dict) -> dict | None:
     daily_sigma = (
         s_pre
         / ((regime_factor or 1.0) * (event_factor or 1.0))
-        / math.sqrt(horizon + (earnings_multiple * earnings_multiple - 1 if earnings_multiple else 0.0))
+        / math.sqrt(window_sessions(horizon)
+                    + (earnings_multiple * earnings_multiple - 1 if earnings_multiple else 0.0))
     )
     conf, direction = row["confidence"], row["direction"]
     sign = {"up": 1, "down": -1}.get(direction, 0) if isinstance(direction, str) else 0
@@ -72,7 +75,7 @@ def decompose(row, ranges_config: dict) -> dict | None:
 def replay_range(comp: dict, params: dict) -> dict:
     """Rebuild one stored range under changed settings and score it on its outcome."""
     daily_sigma, horizon = comp["sd"], comp["h"]
-    var = daily_sigma * daily_sigma * horizon + (
+    var = daily_sigma * daily_sigma * window_sessions(horizon) + (
         (params["earnings_vol_multiple"] ** 2 - 1) * daily_sigma * daily_sigma if comp["earnings"] else 0.0
     )
     horizon_sigma = math.sqrt(var) * params["regime_factor"].get(comp["regime"], 1.0)
@@ -118,7 +121,10 @@ def per_horizon(res: pd.DataFrame, horizons) -> dict:
 
 
 def live_ablation(frame: pd.DataFrame, ranges_config: dict, review_config: dict) -> dict:
-    """Ablation (a): the stored live ranges replayed with each variant of the config."""
+    """Ablation (a): the stored live N+k ranges replayed with each variant of the config (ranges of a legacy window,
+    stored before B10, are left out: the current config no longer makes them)."""
+    if not frame.empty:
+        frame = frame[frame["horizon_label"] == LABEL_N_PLUS_K]
     comps = (
         [
             component

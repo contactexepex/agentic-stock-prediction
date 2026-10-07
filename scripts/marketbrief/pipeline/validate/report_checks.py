@@ -26,6 +26,7 @@ from marketbrief.constants.validation import (
     MSG_UNMATCHED_NUMBERS,
     MSG_WORK_CONTEXT_MD_MISSING_NARRATIVE_NUMBERS,
 )
+from marketbrief.core.horizons import window_sessions
 from marketbrief.core import calendar, database, market_config, paths
 from marketbrief.core.settings import load_settings
 from marketbrief.pipeline.validate.collect_checks import check_files
@@ -180,7 +181,7 @@ def check_ranges(res: Result, cfg: dict, con, now: pd.Timestamp):
     first = target_date(cfg, as_of, 1)
     skipped, missing = {}, []
     for horizon in ranges_config["horizons"]:
-        target_day = target_date(cfg, as_of, horizon)
+        target_day = target_date(cfg, as_of, window_sessions(horizon))  # the exit session of N+k
         for ticker in cfg["tickers"]:
             if (ticker, horizon) in have:
                 continue

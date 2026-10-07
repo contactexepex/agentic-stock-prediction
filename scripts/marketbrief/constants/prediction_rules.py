@@ -1,6 +1,6 @@
-"""Constants of the prediction record rules (CLAUDE.md prediction rules)."""
+"""Constants of the prediction record rules (CLAUDE.md prediction rules). The allowed horizons are the list of
+config/strategies.yaml (core/horizons.horizons(); N+1..N+5, decision 37, docs/SPEC.md F2.6-F2.7)."""
 
-HORIZONS = (1, 5)
 CONF_MIN, CONF_MAX, WIDEN_MAX, RATIONALE_WORDS = 0.50, 0.90, 0.5, 40
 REQUIRED = (
     "id",
@@ -18,7 +18,7 @@ DEFAULT_EVIDENCE_LABEL = "the stored news/filings/announcements"
 
 # ---------- prediction rules ----------
 MSG_UNKNOWN_TICKER = "unknown ticker {ticker!r}"
-MSG_HORIZON_MUST_BE_1_OR_5 = "horizon_days must be 1 or 5 (got {horizon!r})"
+MSG_HORIZON_NOT_CONFIGURED = "horizon_days must be one of {allowed} (got {horizon!r})"
 MSG_AS_OF_DATE_MISMATCH = "as_of_date {as_of_date} is not {label} {want}"
 MSG_ID_MUST_BE_DATE_TICKER_HORIZON = (
     "id must be <as_of_date>-<ticker>-<horizon>d = {as_of_date}-{ticker}-{horizon}d (got {id!r})"

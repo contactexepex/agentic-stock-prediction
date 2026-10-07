@@ -25,7 +25,9 @@ def inputs_from_examples(ticker: str, **extra) -> TickerInputs:
            and r["as_of_date"] == "2026-10-06"}
     one = ref[1]
     scores = {k: {"id": r["range_id"], "prob_model": r["prob_up"], "prob_up": r["prob_up"]} for k, r in ref.items()}
-    ranges = {k: {"id": r["range_id"], "center": r["target_price"], "lo50": r["lo50"], "hi50": r["hi50"],
+    # B10's ranges: `center` is a log shift from base_close (target = base_close x exp(center)), not a price
+    ranges = {k: {"id": r["range_id"], "base_close": r["base_close"],
+                  "center": math.log(r["target_price"] / r["base_close"]), "lo50": r["lo50"], "hi50": r["hi50"],
                   "lo80": r["lo80"], "hi80": r["hi80"]} for k, r in ref.items()}
     values = dict(market=one["market"], ticker=ticker, as_of_date="2026-10-06", session_date=one["session_date"],
                   exit_dates={k: r["exit_date"] for k, r in ref.items()}, made_at=one["made_at"],

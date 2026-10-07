@@ -144,10 +144,12 @@ class Tracker:
         return out
 
 
+# N+k ranges only: legacy_cc ranges (stored before B10) covered another window than the same horizon now
 LIVE_SQL = """SELECT r.horizon_days, r.target_date, r.regime, r.hit50, r.hit80
 FROM range_record r JOIN (SELECT range_id, min(scored_at) AS scored_at FROM range_outcomes GROUP BY range_id) o
   ON o.range_id = r.id
-WHERE o.scored_at <= ?::TIMESTAMPTZ AND r.hit50 IS NOT NULL AND r.hit80 IS NOT NULL ORDER BY r.id"""
+WHERE o.scored_at <= ?::TIMESTAMPTZ AND r.hit50 IS NOT NULL AND r.hit80 IS NOT NULL
+  AND r.horizon_label = 'n_plus_k' ORDER BY r.id"""
 
 
 def live_tracker(con, ranges_config: dict, now: str, until=None) -> Tracker:

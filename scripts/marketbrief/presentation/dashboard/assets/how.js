@@ -15,9 +15,12 @@
     document.getElementById('view-how').innerHTML = '<div class="card how"><h1>How to read this</h1>' +
       '<p>This page is a research log for short trades on a watchlist of ' + D.companies.length + ' ' + esc(D.name) + ' stocks. ' + esc(D.disclaimer) +
       ' It never places a trade and nothing on it is a recommendation.</p>' +
-      '<h2>The two questions</h2><ul><li><strong>Buy today, sell tomorrow (1 day):</strong> buy at the open of the next session' +
-      (plan.entry ? ' (' + esc(MB.day(plan.entry)) + ')' : '') + ' and sell at the close of the session after it' + (plan.exit_1d ? ' (' + esc(MB.day(plan.exit_1d)) + ')' : '') + '.</li>' +
-      '<li><strong>Buy today, sell within 5 days:</strong> the same open, sold at the close of the fifth session' + (plan.exit_5d ? ' (' + esc(MB.day(plan.exit_5d)) + ')' : '') + '.</li></ul>' +
+      '<h2>The questions: horizons N+k</h2><p>Every signal buys at the open of the next session, D' + (plan.entry ? ' (' + esc(MB.day(plan.entry)) + ')' : '') +
+      ', and sells at the close of the k-th session after D: N+1 sells at the close of D+1, N+5 at the close of D+5. Weekends and holidays are skipped.</p><ul>' +
+      (plan.horizons || []).map(function (k) {
+        var exit = (plan.exits || {})[String(k)];
+        return '<li><strong>N+' + k + ':</strong> sold at the close of D+' + k + (exit ? ' (' + esc(MB.day(exit)) + ')' : '') + '.</li>';
+      }).join('') + '</ul>' +
       '<h2>P(up): the signal model\'s probability</h2><p>For each stock and question, a logistic model turns today\'s indicators into the probability that the trade above ends with a gain (before costs). ' +
       '50% means no view. The <em>base rate</em> is how often such trades gained in the training data; the model starts there and each group of indicators adds or takes away ' +
       '<em>points</em> (percentage points of probability). The groups and the top drivers, in plain words, are listed under every probability; "The formula" shows the exact calculation and the fitted numbers.</p>' +

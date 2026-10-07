@@ -8,7 +8,7 @@
 - Hit rates at a threshold t: long when p >= t (hit = return > 0), short when p <= 1 - t (hit = return < 0),
   with coverage = share of stock-days that qualify.
 - Intervals for means and differences: moving-block bootstrap over as-of dates (blocks of `block`
-  consecutive dates: every stock shares a date, and 5-day outcomes overlap), percentile 95%."""
+  consecutive dates: every stock shares a date, and multi-day outcomes overlap), percentile 95%."""
 from __future__ import annotations
 
 import numpy as np

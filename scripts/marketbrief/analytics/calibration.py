@@ -1,7 +1,8 @@
 """Daily range calibration for one market (self-calibration, docs/DESIGN.md section 4.5).
 
 Pool = standardized returns of all watchlist tickers over the last `history_sessions` (from
-stored bars, no AI) plus live scored ranges (their realized z), weighted by recency and with
+stored bars, no AI; for horizon N+k the log return over the k + 1 sessions from an as-of close to the exit
+close, core/horizons.window_sessions) plus live scored N+k ranges (their realized z), weighted by recency and with
 live results counting `live_weight` times more. Writes the 10/25/75/90% quantiles per horizon
 to data/<market>/calibration/. Falls back to normal quantiles when the pool is too small.
 With `aci:` switched on in config/ranges.yaml (off by default), the four levels come from the ACI
@@ -32,7 +33,9 @@ from marketbrief.constants.calibration import (
 )
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.core.database import connect
+from marketbrief.core.horizons import window_sessions
 from marketbrief.core.market_config import benchmark_key, load_ranges_config
 from marketbrief.core.storage import append_jsonl, day_file
 
@@ -45,10 +48,11 @@ def history_pool(
     last = max(session_rank.values()) if session_rank else 0
     for ticker in tickers:
         ticker_bars = bars.get(ticker)
-        if ticker_bars is None or len(ticker_bars) < ranges_config["warmup_bars"] + horizon + 1:
+        sessions = window_sessions(horizon)
+        if ticker_bars is None or len(ticker_bars) < ranges_config["warmup_bars"] + sessions + 1:
             continue
         standardized_rows = range_math.standardized(
-            ticker_bars["close"], horizon, ranges_config["ewma_lambda"], ranges_config["warmup_bars"]
+            ticker_bars["close"], sessions, ranges_config["ewma_lambda"], ranges_config["warmup_bars"]
         )
         standardized_rows = standardized_rows[np.isfinite(standardized_rows["z"])]
         for bar_date, standardized_return in zip(standardized_rows.index, standardized_rows["z"], strict=False):
@@ -128,6 +132,7 @@ def compute(cfg: dict, ranges_config: dict, con, bars: dict[str, pd.DataFrame], 
             "n_history": int(len(z_hist)),
             "n_live": int(len(z_live)),
             "source": source,
+            "horizon_label": LABEL_N_PLUS_K,
         }
         if use_aci:  # only when switched on, so rows with ACI off stay exactly as before
             row.update(

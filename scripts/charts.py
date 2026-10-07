@@ -2,8 +2,9 @@
 """Draw the day's single-purpose chart images (PNG) for the report and the Slack thread.
 
 Each image answers one question, sized to read on a phone:
-- ranges.png: where each company's price may be at one horizon (80% and 50% range, % from the
-  last close, one scale for all companies); late ranges in grey, labelled "late".
+- ranges.png: where each company's price may be at one horizon (view_data.primary_horizon: the shortest
+  horizon N+k with a range that is not late; 80% and 50% range, % from the last close, one scale for all
+  companies); late ranges in grey, labelled "late".
 - sectors.png: how each sector moved on the latest trading day (average one-day change).
 - track_record.png: promised vs actual hit rate (ranges and calls); only once something was scored.
 The numbers come from view_data.py, the same view the HTML report embeds. Writes
@@ -67,8 +68,7 @@ def ranges_chart(view: dict, path) -> bool:
     height = 1.3 + 0.32 * len(rows)
     fig, ax = plt.subplots(figsize=(7.2, height))
     fig.subplots_adjust(left=0.16, right=0.70, top=1 - 0.95 / height, bottom=0.55 / height)
-    target = rows[0][1]["target_label"]
-    when = "after the next trading day" if h == 1 else f"in {h} trading days"
+    target, when = rows[0][1]["target_label"], rows[0][1]["phrase"]   # e.g. "in 2 trading days (N+1)"
     _title(fig, f"Where each price may be {when} (by {target})",
            "Light bar: 80% range · dark: 50% range · dot: centre · % from the last close")
     for i, (c, r) in enumerate(rows):
