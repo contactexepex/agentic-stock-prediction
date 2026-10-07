@@ -48,6 +48,7 @@ class HorizonScore(TypedDict):
     horizon_label: str        # new: n_plus_k
     entry_date: date          # new: D
     exit_date: date           # new: the k-th session after D
+    model_variant: str | None  # new (B10): base (null on older rows) or cross_market
 
 
 class HorizonRange(TypedDict):
@@ -91,9 +92,12 @@ def horizons() -> tuple[int, ...]:
     return horizon_list()
 
 
-def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonScore]:
-    """The newest model score per ticker and horizon computed by `as_of` (no look-ahead; N+k rows only)."""
-    return records.scores_asof(market, as_of, horizon_days)
+def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None,
+                variant: str = "base") -> list[HorizonScore]:
+    """The newest model score per ticker and horizon computed by `as_of` (no look-ahead; N+k rows only). variant:
+    "base" (config/model.yaml as written; the default) or "cross_market" (every cross-market feature group on, for
+    strategies with `cross_market: true`; ids end in -cross_market)."""
+    return records.scores_asof(market, as_of, horizon_days, variant=variant)
 
 
 def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonRange]:

@@ -11,16 +11,19 @@ from datetime import datetime
 
 import pandas as pd
 
+from marketbrief.constants.model import (KIND_MODEL_SCORES, KIND_MODEL_VARIANT_SCORES, MODEL_VARIANTS,
+                                         MSG_UNKNOWN_VARIANT, VARIANT_BASE)
 from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES
 from marketbrief.core.database import connect
 from marketbrief.core.horizons import entry_exit
 from marketbrief.core.market_config import load_market
 
-# The newest score per id computed by the time; then per ticker and horizon the newest as-of date.
+# The newest score per id computed by the time; then per ticker and horizon the newest as-of date. {source}: the base
+# model's model_scores, or another variant's rows of model_variant_scores.
 SCORES_SQL = f"""
 WITH known AS (
     SELECT DISTINCT ON (id) * REPLACE ({SQL_LABEL_MODEL_SCORES} AS horizon_label)
-    FROM model_scores WHERE computed_at <= ?::TIMESTAMPTZ
+    FROM {{source}} WHERE computed_at <= ?::TIMESTAMPTZ
     ORDER BY id, computed_at DESC, prob_up, model_id
 )
 SELECT DISTINCT ON (ticker, horizon_days) * FROM known
@@ -71,11 +74,22 @@ def with_window(cfg: dict, rec: dict) -> dict:
     return rec
 
 
-def scores_asof(market: str, as_of, horizon_days: int | None = None, con=None) -> list[dict]:
-    """The newest N+k model score per ticker and horizon computed by `as_of` (HorizonScore records)."""
+def variant_name(variant: str) -> str:
+    """A known model variant's name (constants/model.py MODEL_VARIANTS), else exit with a message."""
+    if variant not in MODEL_VARIANTS:
+        raise SystemExit(MSG_UNKNOWN_VARIANT.format(variant=variant, known=", ".join(MODEL_VARIANTS)))
+    return variant
+
+
+def scores_asof(market: str, as_of, horizon_days: int | None = None, con=None,
+                variant: str = VARIANT_BASE) -> list[dict]:
+    """The newest N+k model score per ticker and horizon computed by `as_of` (HorizonScore records) of one model
+    variant: base (config/model.yaml as written) or cross_market (every cross-market group on)."""
     con = con or connect(market)
     cfg = load_market(market)
-    frame = con.execute(SCORES_SQL, [as_timestamp(as_of), horizon_days, horizon_days]).df()
+    source = KIND_MODEL_SCORES if variant == VARIANT_BASE else (
+        f"(SELECT * FROM {KIND_MODEL_VARIANT_SCORES} WHERE model_variant = '{variant_name(variant)}')")
+    frame = con.execute(SCORES_SQL.format(source=source), [as_timestamp(as_of), horizon_days, horizon_days]).df()
     out = []
     for rec in frame.to_dict("records"):
         rec = {key: plain(value) for key, value in rec.items()}
