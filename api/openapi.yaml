@@ -1,0 +1,1376 @@
+openapi: 3.1.0
+info:
+  title: market-brief app API
+  version: 1.0.0
+  summary: Read API over the precomputed read models (docs/ARCHITECTURE.md section 4), plus planned governed writes.
+  description: |
+    Research only: nothing here places, routes or suggests a trade, and nothing is investment advice.
+    Every signal carries "Paper only — no proven edge yet" until the weekly review's `model_skill` is true.
+
+    Each read response is `ReadModelMeta` plus `payload`. The payload schema of each response doubles as the
+    read-model payload schema: WS1 writes exactly that JSON into `rm.<table>.payload` (the table is named in
+    each operation's `x-read-model`), and WS2 returns it verbatim. Field names are those of the dashboard
+    payload (`scripts/marketbrief/presentation/dashboard/`), the data-kind schemas
+    (`scripts/marketbrief/core/schema*.py`) and the views (`sql/views.sql`); `x-source` names where each comes
+    from. Everything is as of the build's cut-off (`ReadModelMeta.cutoff`); nothing stored after it is used.
+
+    Conventions:
+    - `x-status: planned` marks an operation, schema or field whose data is not built yet. Planned operations
+      answer 501 until built; planned fields are omitted from payloads until built.
+    - `x-read-model` on a read operation names its `rm` table.
+    - Numbers are as stored or as the existing dashboard code computes them; fractions, not percentages,
+      unless a field name ends in `_pct`.
+    - Missing values are `null`, never invented.
+  license:
+    name: Private research project
+servers:
+  - url: /
+    description: The owner's private Vercel deployment (Vercel Authentication)
+tags:
+  - name: markets
+  - name: stocks
+  - name: record
+  - name: portfolio
+  - name: requests
+  - name: internal
+security:
+  - vercelAuthentication: []
+paths:
+  /api/v1/markets:
+    get:
+      tags: [markets]
+      operationId: listMarkets
+      summary: Markets with their name, currency and freshness
+      x-read-model: rm.markets
+      responses:
+        '200':
+          description: The markets list read model (market `_all`, page_key `_`)
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MarketListResponse'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/status:
+    get:
+      tags: [markets]
+      operationId: getMarketStatus
+      summary: Last daily and news run, session plan and freshness of one market
+      x-read-model: rm.status
+      parameters:
+        - $ref: '#/components/parameters/Market'
+      responses:
+        '200':
+          description: The status read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MarketStatusResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/overview:
+    get:
+      tags: [markets]
+      operationId: getMarketOverview
+      summary: Regime, benchmark, cues, sector heatmap, signal tiers and the skill disclaimer
+      x-read-model: rm.overview
+      parameters:
+        - $ref: '#/components/parameters/Market'
+      responses:
+        '200':
+          description: The overview read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OverviewResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/watchlist:
+    get:
+      tags: [markets]
+      operationId: getWatchlist
+      summary: One row per watchlist company (last session, model P(up), calls, ranges, quality)
+      x-read-model: rm.watchlist
+      parameters:
+        - $ref: '#/components/parameters/Market'
+      responses:
+        '200':
+          description: The watchlist read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WatchlistResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/stocks/{ticker}:
+    get:
+      tags: [stocks]
+      operationId: getStockDetail
+      summary: Signal with model_prob and explanation, ranges, bull vs bear, news with status, events
+      x-read-model: rm.stock
+      parameters:
+        - $ref: '#/components/parameters/Market'
+        - $ref: '#/components/parameters/Ticker'
+      responses:
+        '200':
+          description: The stock read model (page_key = ticker)
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StockDetailResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/stocks/{ticker}/bars:
+    get:
+      tags: [stocks]
+      operationId: getStockBars
+      summary: Split-adjusted daily OHLCV up to the as-of date, with the published ranges for the fan
+      x-read-model: rm.bars
+      parameters:
+        - $ref: '#/components/parameters/Market'
+        - $ref: '#/components/parameters/Ticker'
+      responses:
+        '200':
+          description: The bars read model (page_key = ticker)
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BarsResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/track-record:
+    get:
+      tags: [record]
+      operationId: getTrackRecord
+      summary: Live calls per scoring basis (never pooled), ranges with Wilson intervals, backtest and replay
+      x-read-model: rm.track_record
+      parameters:
+        - $ref: '#/components/parameters/Market'
+      responses:
+        '200':
+          description: The track-record read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TrackRecordResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/news:
+    get:
+      tags: [markets]
+      operationId: getNews
+      summary: Newest headlines with verification status and enrichment, market-wide or for one ticker
+      x-read-model: rm.news
+      parameters:
+        - $ref: '#/components/parameters/Market'
+        - name: ticker
+          in: query
+          required: false
+          description: A watchlist ticker (page_key = ticker); omitted = the market-wide feed (page_key `_`)
+          schema: {$ref: '#/components/schemas/Ticker'}
+      responses:
+        '200':
+          description: The news read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NewsFeedResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/runs:
+    get:
+      tags: [markets]
+      operationId: listRuns
+      summary: Recent daily runs, news runs and read-model builds of one market
+      x-read-model: rm.runs
+      parameters:
+        - $ref: '#/components/parameters/Market'
+      responses:
+        '200':
+          description: The runs read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RunListResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/portfolio:
+    get:
+      tags: [portfolio]
+      operationId: getPaperPortfolio
+      summary: The paper portfolio (records only, never orders)
+      x-status: planned
+      x-owner: WS4
+      x-read-model: rm.portfolio
+      parameters:
+        - $ref: '#/components/parameters/Market'
+      responses:
+        '200':
+          description: The paper-portfolio read model
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaperPortfolioResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/markets/{market}/portfolio/paper-trades:
+    post:
+      tags: [portfolio]
+      operationId: createPaperTrade
+      summary: Submit a paper trade record (pending until the next run validates and imports it into data/)
+      description: |
+        Writes one row to the append-only inbox (docs/ARCHITECTURE.md section 9). Never an order: nothing is
+        sent to any broker. The submitter is injected from the authenticated identity, never from the body.
+        Repeating a request with the same Idempotency-Key returns the first receipt.
+      x-status: planned
+      x-owner: WS2 (endpoint), WS4 (validation and import)
+      parameters:
+        - $ref: '#/components/parameters/Market'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeRequest'}
+      responses:
+        '200':
+          description: Accepted into the inbox (or the receipt of an earlier request with the same key)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InboxReceipt'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/company-requests:
+    post:
+      tags: [requests]
+      operationId: createCompanyRequest
+      summary: Ask for a company to be added to a watchlist (a human applies config changes)
+      x-status: planned
+      x-owner: WS2 (endpoint), WS4 (validation and import)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyRequest'}
+      responses:
+        '200':
+          description: Accepted into the inbox (or the receipt of an earlier request with the same key)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InboxReceipt'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/inbox/{inbox_id}:
+    get:
+      tags: [requests]
+      operationId: getInboxEntry
+      summary: The state of a submitted entry (pending, imported or rejected with reason)
+      x-status: planned
+      x-owner: WS2
+      parameters:
+        - name: inbox_id
+          in: path
+          required: true
+          schema: {type: string, maxLength: 64}
+      responses:
+        '200':
+          description: The receipt with its current state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InboxReceipt'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /api/v1/internal/revalidate:
+    post:
+      tags: [internal]
+      operationId: revalidateReadModels
+      summary: Called by the sync after a build commits; invalidates the cache tags of the changed keys
+      x-status: planned
+      x-owner: WS2 (endpoint), WS1 (caller)
+      security:
+        - revalidateSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RevalidateRequest'}
+      responses:
+        '200':
+          description: The tags invalidated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RevalidateResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+
+components:
+  securitySchemes:
+    vercelAuthentication:
+      type: apiKey
+      in: cookie
+      name: _vercel_jwt
+      description: Vercel Authentication (deployment protection) session cookie; OAuth only once the remote MCP endpoint goes live.
+    revalidateSecret:
+      type: apiKey
+      in: header
+      name: X-Revalidate-Secret
+      description: REVALIDATE_SECRET from the environment; the caller also sends Vercel's protection-bypass header.
+  headers:
+    ETag:
+      description: '"<payload_sha256>" of the read model; unchanged across builds that produce the same payload'
+      schema: {type: string}
+  parameters:
+    Market:
+      name: market
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Market'}
+    Ticker:
+      name: ticker
+      in: path
+      required: true
+      description: A ticker of the market's watchlist (config/markets/<market>.yaml `tickers`)
+      schema: {$ref: '#/components/schemas/Ticker'}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-generated unique key (UUID); becomes the inbox_id. A repeat returns the first receipt.
+      schema: {type: string, minLength: 16, maxLength: 64, pattern: '^[A-Za-z0-9-]+$'}
+  responses:
+    NotFound:
+      description: Unknown market, ticker or key
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unavailable:
+      description: The warehouse is down, capped or the read model is missing; links point to the static reports
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotImplemented:
+      description: A planned operation that is not built yet
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Conflict:
+      description: The Idempotency-Key was used with a different body
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Invalid:
+      description: The body failed validation
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unauthorized:
+      description: Missing or wrong secret
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+
+  schemas:
+    # ---------- shared scalars ----------
+    Market:
+      type: string
+      enum: [india, us]
+    Ticker:
+      type: string
+      pattern: '^[A-Z0-9.&-]{1,20}$'
+    Horizon:
+      type: integer
+      enum: [1, 5]
+      description: Trading days (prediction rules)
+    IsoDate:
+      type: string
+      format: date
+    IsoTime:
+      type: string
+      format: date-time
+    NullableNumber:
+      type: [number, 'null']
+    NewsStatus:
+      type: string
+      description: Verification status as of the cut-off (constants/verification.py STATUS_PRECEDENCE)
+      enum: [contradicted, confirmed_primary, corroborated, rumour, promotional, single_source, unverified]
+    LabelBasis:
+      type: string
+      description: Scoring basis (analytics/call_basis.py); the two are never pooled
+      enum: [close_to_close, open_to_close]
+    Problem:
+      type: object
+      description: RFC 9457 problem details
+      required: [title, status]
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        fallback_links:
+          type: array
+          description: Static pages that work without the warehouse (reports/<market>/dashboard.html, the latest report)
+          items: {type: string}
+
+    # ---------- envelope ----------
+    ReadModelMeta:
+      type: object
+      description: The metadata columns of every rm.<table> row (docs/ARCHITECTURE.md 4.1)
+      required: [market, page_key, as_of, cutoff, built_at, schema_version, source_commit, payload_sha256]
+      properties:
+        market: {type: string, enum: [india, us, _all]}
+        page_key: {type: string, description: '`_` for market-level pages, the ticker for per-stock pages'}
+        as_of: {type: ['string', 'null'], format: date, description: Newest indicator snapshot stored by the cut-off}
+        cutoff: {$ref: '#/components/schemas/IsoTime'}
+        built_at: {$ref: '#/components/schemas/IsoTime'}
+        schema_version: {type: string, description: info.version of this spec the payload conforms to}
+        source_commit: {type: string, description: git commit of data/ the build read}
+        payload_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+    MarketListResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/MarketList'}
+    MarketStatusResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/MarketStatus'}
+    OverviewResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/Overview'}
+    WatchlistResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/Watchlist'}
+    StockDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/StockDetail'}
+    BarsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/Bars'}
+    TrackRecordResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/TrackRecord'}
+    NewsFeedResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/NewsFeed'}
+    RunListResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/RunList'}
+    PaperPortfolioResponse:
+      x-status: planned
+      allOf:
+        - $ref: '#/components/schemas/ReadModelMeta'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {$ref: '#/components/schemas/PaperPortfolio'}
+
+    # ---------- payloads ----------
+    MarketList:
+      type: object
+      x-source: core/market_config.market_names + config/markets/*.yaml + rm.status
+      required: [markets]
+      properties:
+        markets:
+          type: array
+          items:
+            type: object
+            required: [market, name, currency]
+            properties:
+              market: {$ref: '#/components/schemas/Market'}
+              name: {type: string}
+              currency: {type: string}
+              symbol: {type: string, description: CURRENCY_SYMBOLS of the currency}
+              as_of: {type: ['string', 'null'], format: date}
+              last_daily_run_at: {type: ['string', 'null'], format: date-time}
+              last_news_run_at: {type: ['string', 'null'], format: date-time}
+
+    MarketStatus:
+      type: object
+      required: [market, name, as_of, session, last_daily_run, last_news_run]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        name: {type: string}
+        as_of: {type: ['string', 'null'], format: date}
+        session:
+          type: object
+          description: pipeline/market_status.status evaluated at the build's cut-off (not at request time)
+          x-source: pipeline/market_status.status
+          properties:
+            local_time: {type: string}
+            trading_day: {type: boolean}
+            session_date: {$ref: '#/components/schemas/IsoDate'}
+            previous_session: {$ref: '#/components/schemas/IsoDate'}
+            calendar_covered: {type: boolean}
+            session_open_utc: {$ref: '#/components/schemas/IsoTime'}
+            session_close_utc: {$ref: '#/components/schemas/IsoTime'}
+            in_session: {type: boolean}
+            late_run: {type: boolean}
+        plan: {$ref: '#/components/schemas/SessionPlan'}
+        last_daily_run:
+          type: ['object', 'null']
+          description: The newest features snapshot stored by the cut-off (the daily run's indicator step)
+          x-source: features (max computed_at for the newest as_of_date)
+          properties:
+            as_of_date: {$ref: '#/components/schemas/IsoDate'}
+            computed_at: {$ref: '#/components/schemas/IsoTime'}
+        last_news_run:
+          oneOf:
+            - {$ref: '#/components/schemas/NewsRun'}
+            - {type: 'null'}
+        last_build:
+          x-status: planned
+          x-owner: WS1
+          oneOf:
+            - {$ref: '#/components/schemas/Build'}
+            - {type: 'null'}
+        freshness:
+          type: object
+          x-status: planned
+          x-owner: WS2
+          description: Computed by the API at request time from built_at; thresholds in config/warehouse.yaml (WS1)
+          properties:
+            state: {type: string, enum: [fresh, stale, unknown]}
+            age_hours: {type: ['number', 'null']}
+            stale_after_hours: {type: number}
+
+    Overview:
+      type: object
+      x-source: presentation/dashboard/assemble.gather_dashboard (head) + presentation/dashboard/market.overview + presentation/dashboard/model_info.skill_status
+      required: [market, name, currency, as_of, disclaimer, skill, overview]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        name: {type: string}
+        currency: {type: string}
+        symbol: {type: string}
+        as_of: {type: ['string', 'null'], format: date}
+        disclaimer: {type: string, description: 'MSG_RESEARCH_ONLY: "Research only, not investment advice."'}
+        not_available: {type: string, description: MSG_NOT_AVAILABLE}
+        empty: {type: ['string', 'null'], description: MSG_NO_DATA when no indicator snapshot is stored yet}
+        plan:
+          oneOf:
+            - {$ref: '#/components/schemas/SessionPlan'}
+            - {type: 'null'}
+        skill: {$ref: '#/components/schemas/SkillStatus'}
+        overview:
+          oneOf:
+            - {$ref: '#/components/schemas/MarketOverview'}
+            - {type: 'null'}
+        signals: {$ref: '#/components/schemas/SignalTiers'}
+
+    MarketOverview:
+      type: object
+      x-source: presentation/dashboard/market.overview
+      required: [benchmark, vol_index, regime, cues, sectors]
+      properties:
+        benchmark:
+          oneOf: [{$ref: '#/components/schemas/IndexTile'}, {type: 'null'}]
+        vol_index:
+          oneOf: [{$ref: '#/components/schemas/IndexTile'}, {type: 'null'}]
+        regime:
+          oneOf: [{$ref: '#/components/schemas/RegimeView'}, {type: 'null'}]
+        cues:
+          type: array
+          items: {$ref: '#/components/schemas/CueRow'}
+        sectors:
+          type: array
+          description: The sector heatmap
+          items: {$ref: '#/components/schemas/SectorRow'}
+
+    SignalTiers:
+      type: object
+      x-status: planned
+      x-owner: WS4
+      description: |
+        Strong Buy / Strong Sell appear only once proven (skill.state = shown and WS4's tier rule holds).
+        Until then `strong` is empty and `headline` is "No proven strong signals today"; `paper_candidates`
+        lists the paper-only candidates. WS4 defines the rule in config/portfolio.yaml; this schema only
+        fixes the shape. Every candidate carries the paper label while skill.state is paper.
+      required: [headline, strong, paper_candidates, rule]
+      properties:
+        headline: {type: string}
+        rule: {type: string, description: The tier rule in plain words}
+        strong:
+          type: array
+          items: {$ref: '#/components/schemas/SignalCandidate'}
+        paper_candidates:
+          type: array
+          items: {$ref: '#/components/schemas/SignalCandidate'}
+    SignalCandidate:
+      type: object
+      x-status: planned
+      x-owner: WS4
+      required: [ticker, h, tier, model_prob, label]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        h: {$ref: '#/components/schemas/Horizon'}
+        tier: {type: string, enum: [strong_buy, strong_sell, paper_up, paper_down]}
+        model_prob: {type: number, description: model_scores.prob_up of the call's id}
+        prediction_id: {type: ['string', 'null'], description: The stored call (predictions.id), if the forecaster made one}
+        direction: {type: ['string', 'null'], enum: [up, down, null]}
+        confidence: {type: ['number', 'null']}
+        entry: {$ref: '#/components/schemas/IsoDate'}
+        exit: {$ref: '#/components/schemas/IsoDate'}
+        label: {type: string, description: 'skill.label, e.g. "Paper only — no proven edge yet"'}
+
+    Watchlist:
+      type: object
+      x-source: per-company slices of presentation/dashboard/assemble.company
+      required: [market, as_of, skill, rows]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        as_of: {type: ['string', 'null'], format: date}
+        plan:
+          oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
+        skill: {$ref: '#/components/schemas/SkillStatus'}
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/WatchlistRow'}
+    WatchlistRow:
+      type: object
+      required: [ticker, name, sector, last, model, calls, ranges]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        sector: {type: string}
+        last:
+          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
+        ret_1d: {$ref: '#/components/schemas/NullableNumber'}
+        ret_5d: {$ref: '#/components/schemas/NullableNumber'}
+        quality: {type: ['string', 'null'], description: features.quality (OK, PARTIAL or BLOCKED; constants/indicators.py)}
+        days_to_earnings: {type: ['integer', 'null']}
+        earnings: {type: ['string', 'null'], format: date}
+        model:
+          type: array
+          description: Per horizon, the headline of the model score (full explanation on the stock page)
+          items:
+            type: object
+            required: [h, id, prob_up]
+            properties:
+              h: {$ref: '#/components/schemas/Horizon'}
+              id: {type: string}
+              prob_up: {$ref: '#/components/schemas/NullableNumber'}
+              calibrated: {type: boolean}
+        calls:
+          type: array
+          items: {$ref: '#/components/schemas/CallRow'}
+        ranges:
+          type: array
+          items: {$ref: '#/components/schemas/RangeRow'}
+
+    StockDetail:
+      type: object
+      x-source: presentation/dashboard/assemble.company (without bars) + company_events as of the cut-off
+      required: [ticker, name, sector, as_of, skill, last, ranges, model, reasoning, calls, news, earnings, indicators]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        sector: {type: string}
+        as_of: {type: ['string', 'null'], format: date}
+        plan:
+          oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
+        skill: {$ref: '#/components/schemas/SkillStatus'}
+        last:
+          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
+        ranges:
+          type: array
+          items: {$ref: '#/components/schemas/RangeRow'}
+        model:
+          type: array
+          items: {$ref: '#/components/schemas/ModelScore'}
+        models:
+          type: array
+          description: The fits behind today's scores (model_info.versions_used)
+          items: {$ref: '#/components/schemas/ModelVersion'}
+        reasoning:
+          oneOf: [{$ref: '#/components/schemas/Reasoning'}, {type: 'null'}]
+        calls:
+          type: array
+          items: {$ref: '#/components/schemas/CallRow'}
+        news:
+          type: array
+          items: {$ref: '#/components/schemas/NewsItem'}
+        earnings: {type: ['string', 'null'], format: date, description: Next earnings date after as_of}
+        events:
+          type: array
+          description: Upcoming company events (company_events rows first seen by the cut-off, date after as_of)
+          items: {$ref: '#/components/schemas/CompanyEvent'}
+        indicators: {$ref: '#/components/schemas/Indicators'}
+        cost: {type: ['number', 'null'], description: Round-trip cost fraction at the last close (config/costs.yaml)}
+
+    Bars:
+      type: object
+      x-source: presentation/dashboard/stock.bar_rows + presentation/dashboard/stock.range_rows
+      required: [ticker, as_of, columns, bars, ranges]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        as_of: {type: ['string', 'null'], format: date}
+        columns:
+          type: array
+          items: {type: string}
+          const: [date, open, high, low, close, volume]
+        bars:
+          type: array
+          description: Split-adjusted bars, oldest first, BAR_CALENDAR_DAYS (380) calendar days up to as_of
+          items:
+            type: array
+            minItems: 6
+            maxItems: 6
+            prefixItems:
+              - {type: string, format: date}
+              - {type: ['number', 'null']}
+              - {type: ['number', 'null']}
+              - {type: ['number', 'null']}
+              - {type: ['number', 'null']}
+              - {type: ['integer', 'null']}
+        ranges:
+          type: array
+          items: {$ref: '#/components/schemas/RangeRow'}
+        spans:
+          type: array
+          items:
+            type: object
+            properties:
+              key: {type: string}
+              label: {type: string}
+              days: {type: integer}
+        default_span: {type: string}
+
+    TrackRecord:
+      type: object
+      x-source: presentation/dashboard/track.track_record + presentation/dashboard/model_info.backtest_view + presentation/dashboard/model_info.skill_status
+      required: [skill, calls, ranges, replay, min_sample]
+      description: Live calls per scoring basis; there is deliberately no pooled block.
+      properties:
+        skill: {$ref: '#/components/schemas/SkillStatus'}
+        calls:
+          type: array
+          items: {$ref: '#/components/schemas/CallBasisBlock'}
+        ranges:
+          type: array
+          items: {$ref: '#/components/schemas/RangeBlock'}
+        replay:
+          oneOf: [{$ref: '#/components/schemas/ReplayView'}, {type: 'null'}]
+        backtest:
+          oneOf: [{$ref: '#/components/schemas/BacktestView'}, {type: 'null'}]
+        min_sample: {type: integer, description: 'view_data.MIN_SAMPLE: below it, "not enough history yet"'}
+
+    NewsFeed:
+      type: object
+      x-source: presentation/dashboard/reads.news + EvidenceStatuses + news_enriched (analyzed_at <= cutoff)
+      required: [market, ticker, items]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        ticker: {type: ['string', 'null'], description: null for the market-wide feed}
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/NewsItem'}
+
+    RunList:
+      type: object
+      required: [market, daily_runs, news_runs]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        daily_runs:
+          type: array
+          description: Newest first, one per as_of_date (features, predictions and ranges stored by the cut-off)
+          items:
+            type: object
+            required: [as_of_date, computed_at]
+            properties:
+              as_of_date: {$ref: '#/components/schemas/IsoDate'}
+              computed_at: {$ref: '#/components/schemas/IsoTime'}
+              n_predictions: {type: integer}
+              n_ranges: {type: integer}
+        news_runs:
+          type: array
+          description: Newest first (data/<market>/news_runs/)
+          items: {$ref: '#/components/schemas/NewsRun'}
+        builds:
+          type: array
+          x-status: planned
+          x-owner: WS1
+          items: {$ref: '#/components/schemas/Build'}
+
+    PaperPortfolio:
+      type: object
+      x-status: planned
+      x-owner: WS4
+      description: Shape fixed here; WS4's data kinds supply it. Records only, never orders.
+      required: [market, as_of, label, positions, trades]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        as_of: {type: ['string', 'null'], format: date}
+        label: {type: string, description: 'skill.label ("Paper only — no proven edge yet" until model_skill)'}
+        positions:
+          type: array
+          items:
+            type: object
+            required: [ticker, quantity, entry_date, entry_price]
+            properties:
+              ticker: {$ref: '#/components/schemas/Ticker'}
+              quantity: {type: number}
+              entry_date: {$ref: '#/components/schemas/IsoDate'}
+              entry_price: {type: number, description: The open of entry_date from stored bars}
+              h: {$ref: '#/components/schemas/Horizon'}
+              exit_date: {type: ['string', 'null'], format: date}
+              mark_close: {$ref: '#/components/schemas/NullableNumber'}
+              unrealized_return: {$ref: '#/components/schemas/NullableNumber'}
+        trades:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              ticker: {$ref: '#/components/schemas/Ticker'}
+              side: {type: string, enum: [buy, sell]}
+              quantity: {type: number}
+              price: {type: number}
+              date: {$ref: '#/components/schemas/IsoDate'}
+              source: {type: string, enum: [slack, claude_code, dashboard]}
+              recorded_at: {$ref: '#/components/schemas/IsoTime'}
+        pending:
+          type: array
+          description: Inbox entries not yet imported (shown as pending, never as facts)
+          items: {$ref: '#/components/schemas/InboxReceipt'}
+
+    # ---------- building blocks (dashboard payload) ----------
+    SessionPlan:
+      type: object
+      x-source: presentation/dashboard/assemble.session_plan
+      description: D (entry at the open) and the exits (close of D+1 for 1d, D+4 for 5d)
+      required: [entry, exit_1d, exit_5d, sessions]
+      properties:
+        entry: {$ref: '#/components/schemas/IsoDate'}
+        exit_1d: {$ref: '#/components/schemas/IsoDate'}
+        exit_5d: {$ref: '#/components/schemas/IsoDate'}
+        sessions:
+          type: array
+          items: {$ref: '#/components/schemas/IsoDate'}
+    SkillStatus:
+      type: object
+      x-source: presentation/dashboard/model_info.skill_status
+      required: [state, label, why, rule, review]
+      properties:
+        state: {type: string, enum: [paper, shown]}
+        label: {type: string, description: '"Paper only — no proven edge yet" unless the review found skill'}
+        why: {type: string}
+        rule: {type: string}
+        review:
+          type: ['object', 'null']
+          properties:
+            id: {type: string}
+            computed_at: {$ref: '#/components/schemas/IsoTime'}
+    LastSession:
+      type: object
+      x-source: presentation/dashboard/stock.last_session
+      required: [date, open, high, low, close, volume, prev_close, gap, open_to_close, change]
+      properties:
+        date: {$ref: '#/components/schemas/IsoDate'}
+        open: {$ref: '#/components/schemas/NullableNumber'}
+        high: {$ref: '#/components/schemas/NullableNumber'}
+        low: {$ref: '#/components/schemas/NullableNumber'}
+        close: {$ref: '#/components/schemas/NullableNumber'}
+        volume: {type: ['integer', 'null']}
+        prev_close: {$ref: '#/components/schemas/NullableNumber'}
+        gap: {$ref: '#/components/schemas/NullableNumber'}
+        open_to_close: {$ref: '#/components/schemas/NullableNumber'}
+        change: {$ref: '#/components/schemas/NullableNumber'}
+    RangeRow:
+      type: object
+      x-source: presentation/dashboard/stock.range_rows (ranges_latest as of the cut-off)
+      required: [h, target_date, made_at, base_close, lo50, hi50, lo80, hi80, late]
+      properties:
+        h: {$ref: '#/components/schemas/Horizon'}
+        target_date: {$ref: '#/components/schemas/IsoDate'}
+        made_at: {$ref: '#/components/schemas/IsoTime'}
+        base_close: {$ref: '#/components/schemas/NullableNumber'}
+        lo50: {$ref: '#/components/schemas/NullableNumber'}
+        hi50: {$ref: '#/components/schemas/NullableNumber'}
+        lo80: {$ref: '#/components/schemas/NullableNumber'}
+        hi80: {$ref: '#/components/schemas/NullableNumber'}
+        up80: {$ref: '#/components/schemas/NullableNumber'}
+        down80: {$ref: '#/components/schemas/NullableNumber'}
+        reward_risk: {$ref: '#/components/schemas/NullableNumber'}
+        late: {type: boolean, description: 'Late ranges are "late, not a forecast"'}
+        notes:
+          type: array
+          items: {type: string}
+    Driver:
+      type: object
+      x-source: model/explain.driver_json
+      required: [feature, points, text]
+      properties:
+        feature: {type: string}
+        points: {type: number, description: Percentage points of P(up)}
+        text: {type: string}
+    ModelScore:
+      type: object
+      x-source: presentation/dashboard/stock.model_row (model_scores_latest as of the cut-off)
+      required: [h, id, prob_up, calibrated, label, model_id, groups, up, down]
+      properties:
+        h: {$ref: '#/components/schemas/Horizon'}
+        id: {type: string, description: '<as_of_date>-<ticker>-<h>d, the id of the call it anchors'}
+        prob_up: {$ref: '#/components/schemas/NullableNumber'}
+        prob_model: {$ref: '#/components/schemas/NullableNumber'}
+        base_rate: {$ref: '#/components/schemas/NullableNumber'}
+        calibrated: {type: boolean}
+        label: {type: string, description: model_scores.label_convention}
+        model_id: {type: string}
+        trained_until: {type: ['string', 'null'], format: date}
+        computed_at: {type: ['string', 'null'], format: date-time}
+        baseline_points: {$ref: '#/components/schemas/NullableNumber'}
+        groups:
+          type: array
+          items:
+            type: object
+            required: [group, points]
+            properties:
+              group: {type: string}
+              points: {$ref: '#/components/schemas/NullableNumber'}
+        up:
+          type: array
+          items: {$ref: '#/components/schemas/Driver'}
+        down:
+          type: array
+          items: {$ref: '#/components/schemas/Driver'}
+        missing:
+          type: array
+          items: {type: string}
+        news_note: {type: ['string', 'null']}
+        news_items: {description: The explanation's news items as stored (contributions.news.items)}
+        entry: {type: ['string', 'null'], format: date}
+        exit: {type: ['string', 'null'], format: date}
+    ModelVersion:
+      type: object
+      x-source: presentation/dashboard/model_info.version_view
+      required: [id, h, label, trained_until, fitted_at, train_rows, base_rate]
+      properties:
+        id: {type: string}
+        h: {$ref: '#/components/schemas/Horizon'}
+        label: {type: string}
+        trained_until: {$ref: '#/components/schemas/IsoDate'}
+        fitted_at: {$ref: '#/components/schemas/IsoTime'}
+        train_rows: {type: integer}
+        train_sessions: {type: integer}
+        base_rate: {$ref: '#/components/schemas/NullableNumber'}
+        intercept: {$ref: '#/components/schemas/NullableNumber'}
+        features: {type: integer}
+        platt_slope: {$ref: '#/components/schemas/NullableNumber'}
+        platt_offset: {$ref: '#/components/schemas/NullableNumber'}
+        platt_rows: {type: ['integer', 'null']}
+        group_weight:
+          type: object
+          additionalProperties: {type: number}
+    EvidenceRef:
+      type: object
+      x-source: presentation/dashboard/assemble.cited_sources
+      required: [id, title, url, source, ts, status]
+      properties:
+        id: {type: string}
+        title: {type: ['string', 'null']}
+        url: {type: ['string', 'null']}
+        source: {type: ['string', 'null']}
+        ts: {type: ['string', 'null'], format: date-time}
+        status: {$ref: '#/components/schemas/NewsStatus'}
+    Reasoning:
+      type: object
+      x-source: presentation/dashboard/stock.reasoning_view (agent_reasoning as of the cut-off)
+      required: [bull, bear, verdict, decision_1d, decision_5d, made_at, evidence]
+      properties:
+        bull: {type: ['string', 'null']}
+        bear: {type: ['string', 'null']}
+        verdict: {type: ['string', 'null']}
+        decision_1d: {type: ['string', 'null'], enum: [up, down, abstain, null]}
+        decision_5d: {type: ['string', 'null'], enum: [up, down, abstain, null]}
+        made_at: {type: ['string', 'null'], format: date-time}
+        prompt_version: {type: ['string', 'null']}
+        evidence:
+          type: array
+          items: {$ref: '#/components/schemas/EvidenceRef'}
+    CallRow:
+      type: object
+      x-source: presentation/dashboard/stock.call_rows (predictions of the as-of date)
+      required: [h, direction, confidence, made_at]
+      properties:
+        h: {$ref: '#/components/schemas/Horizon'}
+        direction: {type: string, enum: [up, down]}
+        confidence: {$ref: '#/components/schemas/NullableNumber'}
+        made_at: {$ref: '#/components/schemas/IsoTime'}
+    NewsItem:
+      type: object
+      x-source: presentation/dashboard/stock.news_rows; enrichment from news_enriched (analyzed_at <= cutoff)
+      required: [id, title, url, source, ts, status]
+      properties:
+        id: {type: string}
+        title: {type: ['string', 'null']}
+        url: {type: ['string', 'null']}
+        source: {type: ['string', 'null']}
+        ts: {type: ['string', 'null'], format: date-time}
+        status: {$ref: '#/components/schemas/NewsStatus'}
+        tickers:
+          type: array
+          description: Market-wide feed only (news.tickers)
+          items: {type: string}
+        sentiment: {$ref: '#/components/schemas/NullableNumber'}
+        relevance: {$ref: '#/components/schemas/NullableNumber'}
+        materiality: {type: ['string', 'null'], enum: [high, medium, low, null]}
+        event_type: {type: ['string', 'null']}
+        summary: {type: ['string', 'null']}
+        analyzed_at: {type: ['string', 'null'], format: date-time}
+    CompanyEvent:
+      type: object
+      x-source: events (company_events rule, first_seen_at <= cutoff)
+      required: [id, date, type]
+      properties:
+        id: {type: string}
+        date: {$ref: '#/components/schemas/IsoDate'}
+        type: {type: string}
+        name: {type: ['string', 'null']}
+        source: {type: ['string', 'null']}
+        timing: {type: ['string', 'null'], enum: [before_open, during, after_close, null]}
+        amount: {$ref: '#/components/schemas/NullableNumber'}
+    Indicators:
+      type: object
+      x-source: presentation/dashboard/stock.indicator_values (INDICATOR_COLUMNS of the features snapshot)
+      properties:
+        rsi_14: {$ref: '#/components/schemas/NullableNumber'}
+        ret_1d: {$ref: '#/components/schemas/NullableNumber'}
+        ret_5d: {$ref: '#/components/schemas/NullableNumber'}
+        ret_20d: {$ref: '#/components/schemas/NullableNumber'}
+        atr_pct: {$ref: '#/components/schemas/NullableNumber'}
+        volume_ratio_20d: {$ref: '#/components/schemas/NullableNumber'}
+        ema_ratio: {$ref: '#/components/schemas/NullableNumber'}
+        price_vs_20d_high: {$ref: '#/components/schemas/NullableNumber'}
+        realized_vol_10d: {$ref: '#/components/schemas/NullableNumber'}
+        bb_width: {$ref: '#/components/schemas/NullableNumber'}
+        beta_1y: {$ref: '#/components/schemas/NullableNumber'}
+        rel_sector_5d: {$ref: '#/components/schemas/NullableNumber'}
+        quality: {type: ['string', 'null']}
+        days_to_earnings: {type: ['integer', 'null']}
+        warnings:
+          type: array
+          items: {type: string}
+    IndexTile:
+      type: object
+      x-source: presentation/dashboard/market.index_tile
+      required: [key, name, last, spark]
+      properties:
+        key: {type: string}
+        name: {type: string}
+        last:
+          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
+        spark:
+          type: array
+          description: '[date, close] of the last 30 bars'
+          items:
+            type: array
+            prefixItems:
+              - {type: string, format: date}
+              - {type: ['number', 'null']}
+    RegimeView:
+      type: object
+      x-source: presentation/dashboard/market.regime_view
+      required: [code, plain, as_of, stress]
+      properties:
+        code: {type: string}
+        plain: {type: string}
+        as_of: {$ref: '#/components/schemas/IsoDate'}
+        stress: {type: boolean}
+        vol_level: {$ref: '#/components/schemas/NullableNumber'}
+        vol_change_1d: {$ref: '#/components/schemas/NullableNumber'}
+        bench_ret_5d: {$ref: '#/components/schemas/NullableNumber'}
+        major_events:
+          type: array
+          items: {type: string}
+        notes:
+          type: array
+          items: {type: string}
+    CueRow:
+      type: object
+      x-source: presentation/dashboard/market.cue_rows
+      required: [key, name, role, price, change]
+      properties:
+        key: {type: string}
+        name: {type: string}
+        role: {type: string, enum: [cue, factor]}
+        price: {$ref: '#/components/schemas/NullableNumber'}
+        change: {$ref: '#/components/schemas/NullableNumber'}
+        quoted_at: {type: ['string', 'null'], format: date-time}
+        collected_at: {type: ['string', 'null'], format: date-time}
+    SectorRow:
+      type: object
+      x-source: presentation/dashboard/market.sector_rows
+      required: [sector, stocks, move_1d, move_5d]
+      properties:
+        sector: {type: string}
+        move_1d: {$ref: '#/components/schemas/NullableNumber'}
+        move_5d: {$ref: '#/components/schemas/NullableNumber'}
+        stocks:
+          type: array
+          items:
+            type: object
+            required: [ticker, ret_1d, ret_5d]
+            properties:
+              ticker: {$ref: '#/components/schemas/Ticker'}
+              ret_1d: {$ref: '#/components/schemas/NullableNumber'}
+              ret_5d: {$ref: '#/components/schemas/NullableNumber'}
+
+    # ---------- track record blocks ----------
+    ShareWithInterval:
+      type: object
+      x-source: presentation/dashboard/track.share_with_interval
+      required: [n, hits, share, wilson_lo, wilson_hi]
+      properties:
+        n: {type: integer}
+        hits: {type: integer}
+        share: {$ref: '#/components/schemas/NullableNumber'}
+        wilson_lo: {$ref: '#/components/schemas/NullableNumber'}
+        wilson_hi: {$ref: '#/components/schemas/NullableNumber'}
+    ReliabilityRow:
+      type: object
+      x-source: analytics/scoring.reliability
+      properties:
+        bin: {type: string}
+        lo: {type: number}
+        hi: {type: number}
+        n: {type: integer}
+        mean_conf: {$ref: '#/components/schemas/NullableNumber'}
+        hit_rate: {$ref: '#/components/schemas/NullableNumber'}
+        wilson_lo: {$ref: '#/components/schemas/NullableNumber'}
+        wilson_hi: {$ref: '#/components/schemas/NullableNumber'}
+    CallScores:
+      type: object
+      x-source: analytics/scoring.call_scores
+      required: [n]
+      properties:
+        n: {type: integer}
+        brier: {$ref: '#/components/schemas/NullableNumber'}
+        log_loss: {$ref: '#/components/schemas/NullableNumber'}
+        brier_skill: {$ref: '#/components/schemas/NullableNumber'}
+    CallBlock:
+      x-source: presentation/dashboard/track.call_block
+      allOf:
+        - $ref: '#/components/schemas/ShareWithInterval'
+        - type: object
+          properties:
+            always_up: {$ref: '#/components/schemas/NullableNumber'}
+            edge: {$ref: '#/components/schemas/NullableNumber'}
+            mean_confidence: {$ref: '#/components/schemas/NullableNumber'}
+            scores: {$ref: '#/components/schemas/CallScores'}
+            reliability:
+              type: array
+              items: {$ref: '#/components/schemas/ReliabilityRow'}
+    CallBasisBlock:
+      type: object
+      x-source: presentation/dashboard/track.calls_by_basis
+      required: [basis, label, all, by_horizon]
+      properties:
+        basis: {$ref: '#/components/schemas/LabelBasis'}
+        label: {type: string}
+        all: {$ref: '#/components/schemas/CallBlock'}
+        by_horizon:
+          type: object
+          description: Keys "1d" and "5d" (only horizons with scored calls)
+          additionalProperties: {$ref: '#/components/schemas/CallBlock'}
+    RangeScores:
+      type: object
+      x-source: analytics/scoring.range_scores
+      required: [n]
+      properties:
+        n: {type: integer}
+        cover50: {$ref: '#/components/schemas/NullableNumber'}
+        cover80: {$ref: '#/components/schemas/NullableNumber'}
+        is50_pct: {$ref: '#/components/schemas/NullableNumber'}
+        is80_pct: {$ref: '#/components/schemas/NullableNumber'}
+        qs_pct: {$ref: '#/components/schemas/NullableNumber'}
+        width50_pct: {$ref: '#/components/schemas/NullableNumber'}
+        width80_pct: {$ref: '#/components/schemas/NullableNumber'}
+    RangeBlock:
+      type: object
+      x-source: presentation/dashboard/track.ranges_by_horizon
+      required: [h, inside50, inside80, scores]
+      properties:
+        h: {$ref: '#/components/schemas/Horizon'}
+        inside50: {$ref: '#/components/schemas/ShareWithInterval'}
+        inside80: {$ref: '#/components/schemas/ShareWithInterval'}
+        scores: {$ref: '#/components/schemas/RangeScores'}
+    ReplayView:
+      type: object
+      x-source: presentation/dashboard/track.replay_view (rules only, not live)
+      properties:
+        start_date: {type: ['string', 'null'], format: date}
+        end_date: {type: ['string', 'null'], format: date}
+        computed_at: {type: ['string', 'null'], format: date-time}
+        n_days: {$ref: '#/components/schemas/NullableNumber'}
+        n_ranges: {$ref: '#/components/schemas/NullableNumber'}
+        cover50_1d: {$ref: '#/components/schemas/NullableNumber'}
+        cover80_1d: {$ref: '#/components/schemas/NullableNumber'}
+        cover50_5d: {$ref: '#/components/schemas/NullableNumber'}
+        cover80_5d: {$ref: '#/components/schemas/NullableNumber'}
+        score80_1d: {$ref: '#/components/schemas/NullableNumber'}
+        naive_score80_1d: {$ref: '#/components/schemas/NullableNumber'}
+        score80_5d: {$ref: '#/components/schemas/NullableNumber'}
+        naive_score80_5d: {$ref: '#/components/schemas/NullableNumber'}
+        always_up_1d: {$ref: '#/components/schemas/NullableNumber'}
+        always_up_5d: {$ref: '#/components/schemas/NullableNumber'}
+        report: {type: ['string', 'null']}
+    BacktestView:
+      type: object
+      x-source: presentation/dashboard/model_info.backtest_view (the weekly review's model backtest)
+      description: Either the headline (computed_at ... reliability) or {error} when the review skipped the backtest
+      properties:
+        error: {type: ['string', 'null']}
+        computed_at: {type: ['string', 'null']}
+        data: {description: As stored in reviews.detail.model.data}
+        scores: {description: As stored in reviews.detail.model.scores}
+        strategy: {description: As stored in reviews.detail.model.strategy}
+        verdict: {type: ['string', 'null']}
+        json: {type: ['string', 'null']}
+        reliability:
+          type: object
+          additionalProperties:
+            type: array
+            items: {$ref: '#/components/schemas/ReliabilityRow'}
+
+    # ---------- runs ----------
+    NewsRun:
+      type: object
+      x-source: news_runs (core/schema_base.BASE_SCHEMAS)
+      required: [id, ran_at, ok]
+      properties:
+        id: {type: string}
+        ran_at: {$ref: '#/components/schemas/IsoTime'}
+        ok: {type: boolean}
+        since: {type: ['string', 'null'], format: date-time}
+        window_hours: {$ref: '#/components/schemas/NullableNumber'}
+        reason: {type: ['string', 'null']}
+        feeds: {type: ['integer', 'null']}
+        failed: {type: ['integer', 'null']}
+        google_queries: {type: ['integer', 'null']}
+        google_failed: {type: ['integer', 'null']}
+        new_items: {type: ['integer', 'null']}
+    Build:
+      type: object
+      x-status: planned
+      x-owner: WS1
+      x-source: rm.builds (docs/ARCHITECTURE.md 4.1)
+      required: [build_id, market, kind, cutoff, source_commit, started_at, ok]
+      properties:
+        build_id: {type: string}
+        market: {type: string}
+        kind: {type: string, enum: [daily, news, full]}
+        cutoff: {$ref: '#/components/schemas/IsoTime'}
+        source_commit: {type: string}
+        started_at: {$ref: '#/components/schemas/IsoTime'}
+        finished_at: {type: ['string', 'null'], format: date-time}
+        ok: {type: boolean}
+        pages_written: {type: integer}
+        pages_unchanged: {type: integer}
+        error: {type: ['string', 'null']}
+
+    # ---------- planned writes ----------
+    PaperTradeRequest:
+      type: object
+      x-status: planned
+      additionalProperties: false
+      required: [ticker, side, quantity]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        side: {type: string, enum: [buy, sell]}
+        quantity: {type: number, exclusiveMinimum: 0}
+        horizon_days: {$ref: '#/components/schemas/Horizon'}
+        note: {type: string, maxLength: 280}
+    CompanyRequest:
+      type: object
+      x-status: planned
+      additionalProperties: false
+      required: [market, ticker, reason]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        ticker: {type: string, maxLength: 20}
+        name: {type: string, maxLength: 120}
+        reason: {type: string, maxLength: 280}
+    InboxReceipt:
+      type: object
+      x-status: planned
+      required: [inbox_id, kind, state, submitted_at]
+      properties:
+        inbox_id: {type: string, description: The Idempotency-Key}
+        kind: {type: string, enum: [paper_trade, company_request]}
+        state: {type: string, enum: [pending, imported, rejected]}
+        submitted_at: {$ref: '#/components/schemas/IsoTime'}
+        imported_at: {type: ['string', 'null'], format: date-time}
+        record_id: {type: ['string', 'null'], description: The data/ record id once imported}
+        reason: {type: ['string', 'null'], description: Why it was rejected}
+    RevalidateRequest:
+      type: object
+      x-status: planned
+      required: [build_id, keys]
+      properties:
+        build_id: {type: string}
+        keys:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [table, market, page_key]
+            properties:
+              table: {type: string, enum: [markets, status, overview, watchlist, stock, bars, track_record, news, runs, portfolio]}
+              market: {type: string, enum: [india, us, _all]}
+              page_key: {type: string}
+    RevalidateResult:
+      type: object
+      x-status: planned
+      required: [revalidated]
+      properties:
+        revalidated: {type: integer}
