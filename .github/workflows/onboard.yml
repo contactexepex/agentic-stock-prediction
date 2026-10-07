@@ -7,6 +7,8 @@ name: onboard
 # Research only: a watchlist event is a record, never an order. Dispatched by the web tier (workflow_dispatch);
 # a command whose sources do not answer from GitHub's runners is logged `failed` and retried by the next import
 # (this workflow again, or the routine's import step).
+# A command whose inbox row names its Slack message (slack_channel, slack_ts) gets a threaded reply with its result
+# (B6's onboarding confirmation; data/<market>/slack_posts/ is committed with the import).
 # Secrets come only from the repository's Actions secrets; nothing here prints them.
 on:
   workflow_dispatch:
@@ -32,6 +34,7 @@ jobs:
     env:
       MOTHERDUCK_INBOX_TOKEN: ${{ secrets.MOTHERDUCK_INBOX_TOKEN }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}   # the reply to a Slack command (B6's onboarding confirmation)
       TZ: UTC
     steps:
       - uses: actions/checkout@v4
