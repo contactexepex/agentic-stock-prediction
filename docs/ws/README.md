@@ -64,6 +64,7 @@ track_record|news|runs`, planned `rm.portfolio`, bookkeeping `rm.builds` (ARCHIT
 
 ### Judge verdicts
 - Round 1, FAIL, 17eb531: README listed the judgments file as created; the units note was wrong for `atr_pct`.
+- Round 2, PASS, 8d1f20d: both blockers fixed; no new blockers.
 
 ### Proposed edits to shared docs
 
@@ -99,6 +100,10 @@ non-blocking, like step 10b `neo4j_sync`).
 Round 1's cosmetic findings were all fixed in round 2's commit: the x-source check now fails on a missing
 module, a new test checks that operations returning planned schemas are planned, the `rm` size and
 budget-total wording were corrected, and these wave 0 notes gained Tests and Judge verdicts sections.
+
+Open (round 2):
+- `docs/ARCHITECTURE.md` section 5, budget total row: the low case "~9.3" leaves out the 0.25 h of read
+  misses (about 9.5 h, under the cap), so "at or over the cap" overstates it; say "near the cap".
 
 ### Open questions
 1. News-run cadence: `routine/NEWS_PROMPT.md` says every 6 hours; the wave plan says 4-hourly. The
