@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>__TITLE__</title>
+<style>__CSS__</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <div class="top-row">
+    <div class="brand"><span class="logo" aria-hidden="true">◧</span><span>Market Brief</span></div>
+    <nav class="markets" aria-label="Market" id="markets"></nav>
+    <nav class="tabs" aria-label="Sections" role="tablist" id="tabs">
+      <button role="tab" data-view="overview" id="tab-overview">Overview</button>
+      <button role="tab" data-view="stock" id="tab-stock">Stock</button>
+      <button role="tab" data-view="track" id="tab-track">Track record</button>
+      <button role="tab" data-view="how" id="tab-how">How to read this</button>
+    </nav>
+  </div>
+  <div class="banner" id="banner" role="note"></div>
+</header>
+<main id="main" tabindex="-1">
+  <section id="view-overview" class="view" role="tabpanel" aria-labelledby="tab-overview"></section>
+  <section id="view-stock" class="view" role="tabpanel" aria-labelledby="tab-stock"></section>
+  <section id="view-track" class="view" role="tabpanel" aria-labelledby="tab-track"></section>
+  <section id="view-how" class="view" role="tabpanel" aria-labelledby="tab-how"></section>
+</main>
+<footer class="foot" id="foot"></footer>
+<script id="mb-data" type="application/json">__DATA__</script>
+<script>__LIB__</script>
+<script>__APP__</script>
+</body>
+</html>
