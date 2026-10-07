@@ -18,6 +18,7 @@ from marketbrief.constants.validation import (
     MSG_ROW_MISSING_ID,
     MSG_ROW_TIME_IN_THE_FUTURE,
     MSG_ROW_TYPE_PROBLEM,
+    FUTURE_TIME_COLUMNS,
     TRADING_DATE_KINDS,
 )
 from marketbrief.core import paths, schemas
@@ -135,6 +136,7 @@ def type_problem(value, typ: str, csv_row: bool) -> str | None:
 def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, tol: timedelta) -> list[str]:
     """Schema and timestamp problems of one kind's rows (at most a few per kind)."""
     cols = schemas.SCHEMAS[kind][1]
+    scheduled = FUTURE_TIME_COLUMNS.get(kind, set())
     out = []
     for index, row in enumerate(rows, 1):
         unknown = [key for key in row if key not in cols]
@@ -148,7 +150,7 @@ def check_rows(kind: str, rows: list[dict], csv_row: bool, now: pd.Timestamp, to
             why = type_problem(row[key], typ, csv_row)
             if why:
                 out.append(MSG_ROW_TYPE_PROBLEM.format(index=index, key=key, value=str(row[key])[:40], why=why))
-            elif typ == "TIMESTAMPTZ" and row[key]:
+            elif typ == "TIMESTAMPTZ" and row[key] and key not in scheduled:
                 timestamp = as_utc_timestamp(row[key])
                 if timestamp is not None and timestamp > now + tol:
                     out.append(

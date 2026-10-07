@@ -161,6 +161,16 @@ def test_schema_and_timestamps(root):
     assert "in the future" in d
 
 
+def test_scheduled_report_time_may_lie_in_the_future(root):
+    row = {"id": "AAPL-2026-10-29", "ticker": "AAPL", "report_date": "2026-10-29",
+           "report_at": "2026-10-29T20:30:00+00:00", "eps_estimate": 1.6, "source": "yahoo",
+           "collected_at": "2026-10-06T11:10:00+00:00"}
+    late = {**row, "id": "AAPL-x", "collected_at": "2026-10-07T09:00:00+00:00"}
+    write_jsonl(root, "earnings_estimates", TODAY, [row, late])
+    d = codes(run("collect"))["SCHEMA"]["detail"]
+    assert "collected_at" in d and "report_at" not in d          # only the row's own write time is checked
+
+
 def test_duplicate_ids_block(root):
     write_jsonl(root, "news", TODAY, [news(GOOD_NEWS_ID)])
     assert GOOD_NEWS_ID in codes(run("collect"))["DUPLICATE_ID"]["detail"]

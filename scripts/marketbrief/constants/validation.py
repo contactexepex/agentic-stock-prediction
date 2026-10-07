@@ -15,6 +15,9 @@ TRADING_DATE_KINDS = {
     "adjustments": "detected_at",
 }
 
+# timestamp columns that hold a scheduled time (may lie in the future), exempt from the "in the future" check
+FUTURE_TIME_COLUMNS = {"earnings_estimates": {"report_at"}}
+
 STAGE_KINDS = {"features": ("features", "regime", "calibration")}
 
 FETCH_COL = {
