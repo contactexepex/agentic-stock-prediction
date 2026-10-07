@@ -16,8 +16,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pandas as pd
-
 from marketbrief.analytics.prediction_rules import check_news_status
 from marketbrief.constants.model import CODE_MODEL_SCORE_MISSING
 from marketbrief.constants.verification import CODE_NEWS_STATUS_MISSING
@@ -25,6 +23,7 @@ from marketbrief.model.forecast_rules import anchor_errors, is_number
 from marketbrief.traders import constants as c
 from marketbrief.traders.inputs import GateInputs
 from marketbrief.traders.registry import Trader
+from marketbrief.utils.timefmt import as_utc_timestamp
 
 
 def citable_kinds(one: Trader) -> set[str]:
@@ -61,7 +60,7 @@ def news_errors(one: Trader, gi: GateInputs, made: datetime, ids: list[str]) -> 
     if unknown:
         out.append((c.CODE_EVIDENCE, c.MSG_EVIDENCE_UNKNOWN.format(ids=unknown)))
     late = [evidence_id for evidence_id in ids if gi.evidence.get(evidence_id) is not None
-            and pd.Timestamp(gi.evidence[evidence_id]) > pd.Timestamp(made)]
+            and as_utc_timestamp(gi.evidence[evidence_id]) > as_utc_timestamp(made)]
     if late:
         out.append((c.CODE_LOOKAHEAD, c.MSG_EVIDENCE_LATE.format(made_at=made.isoformat(), ids=late)))
     return out
@@ -97,7 +96,7 @@ def anchor_check(rec: dict, one: Trader, frame: dict, news_cited: bool) -> tuple
         if rec.get("model_prob") is None:
             return [], [(CODE_MODEL_SCORE_MISSING, f"no model score {frame['range']['id']}: anchor not applied")]
         return [(c.CODE_ANCHOR, "model_prob given but no model score is stored for this id")], []
-    if pd.Timestamp(score["computed_at"]) > pd.Timestamp(frame["made"]):
+    if as_utc_timestamp(score["computed_at"]) > as_utc_timestamp(frame["made"]):
         return [(c.CODE_LOOKAHEAD, c.MSG_SCORE_LATE.format(id=score["id"], computed=score["computed_at"],
                                                            made_at=frame["made"].isoformat()))], []
     view = {key: rec.get(key) for key in (*c.ANCHOR_FIELDS, "direction")} | {"confidence": frame["confidence"]}
