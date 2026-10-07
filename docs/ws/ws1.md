@@ -186,10 +186,15 @@ What could and could not be observed:
   then the keyed SELECT) timed out on TCP connect to `pg.eu-central-1-aws.motherduck.com:5432` (both
   resolved addresses, `timeout expired` after 40 s). This container allows outbound HTTPS only, so the
   endpoint is unverified from here; nothing was added to work around it.
-- A sync issues about 48 statements when every page changes. That is 3 connect statements, 10 to ensure
-  the schemas and tables, 1 ceiling check, 22 in the transaction for the 19 tables and its BEGIN, schema
-  and COMMIT, the hash read, up to 10 page deletes and inserts, and 2 bookkeeping inserts. An unchanged
-  rebuild issues about 38.
+- A sync to MotherDuck issues about 50 statements when every page changes, and about 40 when none does
+  (counted by the judge with an instrumented local sync, plus the connect statements):
+  - 5 to connect (INSTALL, LOAD, ATTACH, CREATE DATABASE, USE);
+  - 9 to ensure the schemas and tables;
+  - 1 ceiling check;
+  - 22 in the transaction (BEGIN, CREATE SCHEMA, 19 CTAS, COMMIT);
+  - 1 hash read;
+  - up to 10 page deletes and inserts;
+  - 2 bookkeeping inserts.
 
 ### Monthly compute estimate
 Counts follow ARCHITECTURE.md section 5: 44 daily syncs, and news syncs every 6 h (240) or every 4 h (360).
@@ -197,13 +202,13 @@ Counts follow ARCHITECTURE.md section 5: 44 daily syncs, and news syncs every 6 
 | Scenario | Per sync | 6-hourly news (284 syncs) | 4-hourly news (404 syncs) |
 |---|---|---|---|
 | A: billed time = measured connect + write wall time | ~12-14 s | ~1.0-1.1 h | ~1.4-1.6 h |
-| B: assumed 1 s minimum per statement, no cool-down | ~48 s | ~3.8 h | ~5.4 h |
+| B: assumed 1 s minimum per statement, no cool-down | ~50 s | ~3.9 h | ~5.6 h |
 | Reads: ~900 cache misses a month (ARCHITECTURE.md A4) | 0.14 s measured, or 1 s minimum | +0.04-0.25 h | +0.04-0.25 h |
 
 Both scenarios fit the 10 h cap; scenario B is not comfortable at 4-hourly. Cheap reductions if week 1
 shows B-like billing:
 - let `--kind news` rebuild only the news tables and news-dependent pages;
-- fold the 10 `CREATE ... IF NOT EXISTS` statements into a once-per-schema-version check;
+- fold the 9 schema and table `CREATE ... IF NOT EXISTS` statements of the ensure step into a once-per-schema-version check;
 - sync both markets on one connection.
 The kill switch's ceiling (7 h of recorded wall time) stops syncs before the cap in either case.
 
@@ -240,7 +245,8 @@ Lint: `ruff check` on every WS1 file prints `All checks passed!`. `ruff check te
 untouched tree.
 
 ## Judge verdicts
-(filled from docs/ws/ws1-judgments.jsonl)
+- Round 1: FAIL, commit 4883deff0d24aae821b49f06f94189dafc57703a. The code was verified; there were two
+  false doc statements: `ws1-judgments.jsonl` listed as created but missing, and wrong statement counts.
 
 ## Proposed edits to shared docs
 
@@ -292,7 +298,20 @@ and `reports/<market>/dashboard.html` can never disagree.
 ```
 
 ## Cosmetic follow-ups
-(none yet; filled from judge verdicts)
+From judge round 1. The stale test docstring and the `config/warehouse.yaml` skip comment were fixed in the
+round 2 diff.
+- `read_models.py` (`missing_keys`): contract 4.1 asks for required keys and types; only keys are checked.
+  Today's payloads pass a full jsonschema check against wave 0's spec (judge).
+- `read_models.py` `EVENTS_SQL` repeats the inner `company_events` rule of `reads.EARNINGS_SQL`; a
+  shared helper in `presentation/dashboard/reads.py` would avoid the copy.
+- `tables.py` (`stage_tables`, `count_tables`) puts paths into SQL with an f-string; use `rm_writer.sql_text`
+  as elsewhere.
+- CLI flag naming: contract 4.4 calls the rebuild `--rebuild-rm`; WS1's `--full` covers it.
+- `sync.py` `write_market`: if ROLLBACK itself raises, it hides the original error.
+- `tests/test_warehouse_sync.py`: the look-ahead test covers features, news, reviews and bars, not ranges,
+  predictions or lessons.
+- A changed page (delete and re-insert of the same key in one transaction) is not exercised live on
+  MotherDuck; locally it is covered by the `--full` and invalid-page paths.
 
 ## Open questions
 1. **Base schema shape.** The WS1 task asks for one schema per market (`india.*`, `us.*`) holding the

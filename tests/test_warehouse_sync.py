@@ -1,7 +1,7 @@
 """The warehouse sync (scripts/warehouse_sync.py, marketbrief/warehouse/) on the local fallback DuckDB file:
-idempotent (two runs, same rows), every run in meta.sync_runs, read models keyed (market, key, as_of) and cut
-from the dashboard's data, nothing stored after the run's clock (MB_NOW) copied, --full rebuilds, a failure
-is recorded with the token redacted, and a dry run writes nothing.
+idempotent (two runs, same rows), every run in meta.sync_runs and rm.builds, read models keyed (market,
+page_key), upserted by hash and cut from the dashboard's data, nothing stored after the run's clock (MB_NOW)
+copied, --full rebuilds, a failure is recorded with the token redacted, and a dry run writes nothing.
 
 The data is a copy of the repo's stored US data (append-only, so rows stored by the fixed cut-off never
 change), plus rows of several kinds stored after the cut-off."""
