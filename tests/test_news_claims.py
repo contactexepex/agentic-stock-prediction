@@ -325,6 +325,12 @@ def test_context_section_and_call_lines(env, capsys):
     con = connect(MARKET)
     title, body = news_events.context_section(con)
     assert title.startswith("News events and verification status")
+    first = body.splitlines()[0]          # issue #39: how many shown events may be main evidence now
+    assert first.startswith("Events that may be a call's main evidence now (confirmed_primary or corroborated): ")
+    assert first.endswith(": 2 of 8 shown (CVX, TSLA).")
+    assert news_events.main_evidence_line([{"ticker": "INFY", "status": "single_source"}]) == (
+        "Events that may be a call's main evidence now (confirmed_primary or corroborated): 0 of 1 shown. "
+        "With none, every news-based call fails the forecast gate today: abstain or wait.")
     tsla = next(line for line in body.splitlines() if line.startswith("| TSLA |") and "486,532" in line)
     assert "| confirmed_primary |" in tsla and TSLA_8K in tsla and "2026-10-02 13:04 |" in tsla   # confirmed
     cols = [c.strip() for c in tsla.split("|")]

@@ -13,7 +13,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from marketbrief.constants.verification import CODE_FORECAST_RULE, CODE_NEWS_STATUS_MISSING
+from marketbrief.constants.verification import (
+    CODE_FORECAST_RULE,
+    CODE_NEWS_STATUS_MISSING,
+    CODE_NEWS_STATUS_REFUSED,
+    MSG_NEWS_STATUS_REFUSED,
+)
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 from marketbrief.analytics.prediction_rules import check_news_status, check_prediction
@@ -96,7 +101,7 @@ def stage_forecast(res, cfg, con, run_state, now, validate_config, path: Path) -
     ctx, as_of, seen = forecast_context(cfg, con)
     statuses = EvidenceStatuses(con)
     tol = pd.Timedelta(minutes=validate_config["future_tolerance_minutes"])
-    good = 0
+    good, refused = 0, []
     for line_number, line in enumerate(lines, 1):
         try:
             rec = json.loads(line)
@@ -120,7 +125,13 @@ def stage_forecast(res, cfg, con, run_state, now, validate_config, path: Path) -
         else:  # both rule sets report their own failures
             news_ok = status_failures(res, rec, line_number, statuses)
             model_ok = model_rules_pass(res, con, rec, line_number)
+            refused += [] if news_ok else [rec["id"]]
             good += int(news_ok and model_ok)
         if isinstance(rec, dict) and rec.get("id"):
             seen.add(rec["id"])
-    res.info["forecast"] = {"records": len(lines), "valid": good}
+    res.info["forecast"] = {"records": len(lines), "valid": good, "refused_news_status": len(refused)}
+    if refused:  # issue #39: one line for data_quality (e.g. India's first days, with no confirmed events yet)
+        res.warn(
+            CODE_NEWS_STATUS_REFUSED,
+            MSG_NEWS_STATUS_REFUSED.format(refused=len(refused), records=len(lines), tickers=", ".join(refused)),
+        )

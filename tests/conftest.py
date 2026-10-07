@@ -54,6 +54,7 @@ SLOW = {
         "test_prepare_no_look_ahead",
         "test_prepare_reads_source",
         "test_prepare_refuses_unsafe_roots_and_training_period",
+        "test_record_applies_the_news_status_rules_as_of_the_cutoff",
         "test_record_validation",
         "test_sample_dates_cli",
         "test_score_cli_on_recorded_calls",

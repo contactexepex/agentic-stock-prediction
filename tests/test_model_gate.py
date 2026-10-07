@@ -81,7 +81,7 @@ def test_gate_requires_the_anchor_when_a_score_exists(root):
     write_jsonl(root, KIND_MODEL_SCORES, date(2026, 10, 6), [score(0.55)])
     out = forecast(root, [anchored()])
     assert out["ok"], out["failures"]
-    assert out["info"]["forecast"] == {"records": 1, "valid": 1}
+    assert out["info"]["forecast"] == {"records": 1, "valid": 1, "refused_news_status": 0}
     failed = codes(forecast(root, [call()]))
     assert "model_prob missing" in failed["MODEL_ADJUSTMENT"]["detail"]
     failed = codes(forecast(root, [anchored(agent_adjustment=0.2, confidence=0.75)]))

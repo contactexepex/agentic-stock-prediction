@@ -67,4 +67,11 @@ CODE_NEWS_STATUS_BLOCKED = "NEWS_STATUS_BLOCKED"
 CODE_NEWS_STATUS_CONTRADICTED = "NEWS_STATUS_CONTRADICTED"
 CODE_NEWS_STATUS_CONFIDENCE = "NEWS_STATUS_CONFIDENCE"
 CODE_NEWS_STATUS_MISSING = "NEWS_STATUS_MISSING"
+CODE_NEWS_STATUS_REFUSED = "NEWS_STATUS_REFUSED"   # issue #39: how many calls the status rules refused today
+MSG_NEWS_STATUS_REFUSED = ("{refused} of {records} call(s) refused by the news-verification rules (main evidence "
+                           "not confirmed_primary or corroborated as of made_at, or a rumour/promotional id): "
+                           "{tickers}")
+MSG_MAIN_EVIDENCE_EVENTS = ("Events that may be a call's main evidence now (confirmed_primary or corroborated): "
+                            "{eligible} of {shown} shown{tickers}. {consequence}")
+MSG_NO_MAIN_EVIDENCE = "With none, every news-based call fails the forecast gate today: abstain or wait."
 CODE_FORECAST_RULE = "FORECAST_RULE"

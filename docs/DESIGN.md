@@ -477,6 +477,13 @@ ticker's, a Form 4, a share allotment) is unverified:
 is the part it checks). Before any
 status row existed the rules are not applied (`NEWS_STATUS_MISSING` warning). The report adds one
 evidence-status line per call; view_data passes each cited and listed id's status to the HTML data.
+So that a market's first days with status rows (India: often no confirmed_primary event yet) do not
+silently refuse every news-based call (issue #39), the context pack's events section opens with how
+many shown events may be main evidence now (and says so when none can), and the gate adds one
+`NEWS_STATUS_REFUSED` warning naming the calls the status rules refused (`info.forecast`
+`refused_news_status`), one `data_quality` line. `ai_replay record` applies the same rules to
+replayed calls, each cited id's status as of the replay cutoff (the stored `made_at`), when the
+replay root holds status rows by then (`news_status_rules` in the day's record), else not.
 
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,

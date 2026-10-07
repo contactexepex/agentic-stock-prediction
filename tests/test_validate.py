@@ -297,7 +297,7 @@ def test_forecast_valid_and_absent(root):
     assert run("forecast")["ok"]                                   # no file: abstained
     out = forecast(root, [call(), call(h=1, evidence_ids=["0000320193-26-000001"], direction="down")])
     assert out["ok"], out["failures"]
-    assert out["info"]["forecast"] == {"records": 2, "valid": 2}
+    assert out["info"]["forecast"] == {"records": 2, "valid": 2, "refused_news_status": 0}
 
 
 @pytest.mark.parametrize("rec,word", [
