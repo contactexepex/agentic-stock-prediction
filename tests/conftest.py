@@ -165,6 +165,20 @@ SLOW = {
         "test_spotcheck_if_due",
         "test_spotcheck_sample_is_deterministic_and_in_week",
     },
+    # WS1: every test of the warehouse sync shares the module fixture (three local syncs of the US data)
+    "tests/test_warehouse_sync.py": {
+        "test_cli_dry_run_and_missing_token",
+        "test_dry_run_writes_nothing_and_counts_the_same_rows",
+        "test_failure_is_recorded_redacted_and_rolled_back",
+        "test_invalid_page_keeps_its_old_row",
+        "test_kill_switch_skips_without_writing",
+        "test_nothing_after_the_clock_is_copied",
+        "test_read_models_keys_envelope_and_payloads",
+        "test_replace_deletes_departed_pages_and_full_rebuilds",
+        "test_sync_is_idempotent",
+        "test_sync_runs_are_recorded",
+        "test_track_summary_keeps_the_label_bases_apart",
+    },
 }
 
 

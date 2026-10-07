@@ -1,0 +1,50 @@
+# Paper portfolio and signal tiers (WS4; scripts/portfolio.py, scripts/marketbrief/portfolio/, docs/ws/ws4.md).
+# Research only: a paper trade is a record, never an order; nothing here connects to a broker. Costs come
+# from config/costs.yaml (the same rates as the signal model's paper strategy).
+
+trades:
+  sources: [claude_code, slack, form]       # allowed `source` values of a trade or a watchlist request
+  price_bases: [open, close, manual]        # open/close = the stored bar's; manual = checked against its low-high
+  # A manual price may sit this fraction outside the stored bar's low-high (rounding of a typed price); 0 = none.
+  manual_price_tolerance: 0.0
+  allow_short: false                         # a sell may not exceed the quantity held (no paper short selling)
+
+# Proof status: a deterministic criterion from stored data, evaluated as of the run's clock (MB_NOW-aware).
+# A (horizon, confidence band) is PROVEN only when ALL of these hold:
+#   1. the newest weekly review (reviews, computed_at <= clock) has model_skill: true
+#      (config/review.yaml model_skill: >= min_n out-of-sample rows, Brier skill > 0, AUC 95% low > 0.5);
+#   2. the scored track record of the forecaster's calls on the `basis` scoring basis only (open_to_close;
+#      never pooled with close_to_close), made and scored by the clock, for that horizon and band, has at
+#      least `min_count` calls;
+#   3. the Wilson 95% lower bound of that band's hit rate is >= `min_wilson_low`.
+# The market is proven when at least one (horizon, band) is proven. Strong tiers exist only in proven cells.
+proof:
+  require_model_skill: true
+  basis: open_to_close
+  bands: [0.5, 0.6, 0.7, 0.8, 0.9]           # [0.5, 0.6), [0.6, 0.7), [0.7, 0.8), [0.8, 0.9]; same bins as scoring.py
+  min_count: 50
+  min_wilson_low: 0.55
+
+# Tiers per ticker and horizon from today's model score (and the forecaster's call when one exists):
+# final probability p = model_prob + agent_adjustment (the call's) or model_prob alone; confidence = max(p, 1 - p).
+#   Strong Buy / Strong Sell: the cell is proven, a forecaster call exists (when strong_requires_call),
+#                             and confidence >= strong_min_confidence;
+#   Buy / Sell:               confidence >= buy_min_confidence (paper only until proven);
+#   Hold/No call:             otherwise, or no model score (every watchlist ticker x horizon gets a row), or
+#                             indicator quality BLOCKED, or earnings within `earnings_block_days` calendar days
+#                             (features.days_to_earnings; the prediction rules' own blocks).
+# A row is paper_only (label "Paper only — no proven edge yet") unless it has a forecaster call in a proven cell.
+tiers:
+  buy_min_confidence: 0.55
+  strong_min_confidence: 0.65
+  strong_requires_call: true
+  earnings_block_days: 1                     # calendar days (features.days_to_earnings)
+  max_candidates: 5                          # Paper candidates listed when no strong signal is emitted
+  max_reasons: 3                             # top drivers per candidate (the score's own explanation)
+
+# Paper-follow: "what if I had followed every Paper candidate" on stored bars (simulated; open-to-close: buy at
+# the open of D, the first session after the as-of date, sell at the close of D+1 (1d) or D+4 (5d); after the
+# round-trip cost of config/costs.yaml). Up candidates are simulated long; down candidates as "sell if held"
+# (the return a holder avoids), reported apart. A score counts only when computed before the open of D.
+paper_follow:
+  lookback_sessions: 60

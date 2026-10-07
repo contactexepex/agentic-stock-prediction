@@ -1,0 +1,51 @@
+# Intraday checks and the deviation explainer (WS5; scripts/intraday_check.py, code in
+# scripts/marketbrief/intraday/, docs/ws/ws5.md). Research only: a check never predicts and never trades.
+
+quotes:
+  # Yahoo 5-minute bars of the regular session (the quotes collector's source and interval). A bar counts
+  # only once complete by the check time (bar start + bar_minutes <= check_at), so a rerun as of the same
+  # time sees the same bars (MB_NOW-aware).
+  bar_minutes: 5
+  # A ticker whose newest complete bar is older than this at check time is `stale_quote` (no measures, no flags).
+  stale_minutes: 30
+  # A run where at least this share of the watchlist is stale or missing is recorded with status `stale`.
+  stale_run_share: 0.5
+
+measures:
+  # Elapsed share of the session used to scale the 1-day sigma (sigma_1d * sqrt(elapsed)); never below this.
+  min_elapsed_fraction: 0.05
+  # Missing beta_1y in the features: this beta is used and the row notes `beta_default`.
+  default_beta: 1.0
+  beta_clip: [-1.0, 3.0]
+
+thresholds:
+  # large_move: |return since the open| / (sigma_1d * sqrt(elapsed)) at or above this.
+  move_z: 2.0
+  # large_residual (info): |return - beta x benchmark return| scaled the same way, at or above this.
+  residual_z: 2.0
+  # against_call: the move since the call's entry runs against its direction by at least this many
+  # sigma_1d * sqrt(elapsed sessions) (prediction records; model scores give against_model).
+  against_call_z: 1.0
+  # A model score counts as a side only when |prob_up - 0.5| is at least this.
+  model_min_edge: 0.03
+
+# Flags that mark a row `flagged` (sent to the explainer). Other flags are stored as information:
+# outside_1d_50, against_model, large_residual.
+flag_on: [outside_1d_80, outside_5d_80, large_move, against_call]
+
+attribution:
+  # News and announcements first seen from `open` (the session's open; default) or from `prev_close` (the
+  # previous session's close, so overnight items behind the gap are listed too) up to the check time.
+  news_window: open
+  # At most this many news items and announcements per flagged ticker (first seen since the open, oldest first).
+  max_news: 8
+
+explainer:
+  max_words: 60
+  prompt_version: deviation-v1
+
+outcome:
+  # Learning loop (outcomes.py): by the close the deviation `held` when the close-vs-open return has the
+  # same sign as at the check and keeps at least this share of it, `reversed` when the sign flipped,
+  # otherwise `faded`.
+  hold_fraction: 0.5

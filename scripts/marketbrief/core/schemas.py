@@ -12,7 +12,9 @@ from marketbrief.core.schema_filings import (
     SEC_RELATIONSHIP_SCHEMAS,
     SEC_TIMES_SCHEMA,
 )
+from marketbrief.core.schema_intraday import INTRADAY_SCHEMAS  # WS5
 from marketbrief.core.schema_model import MODEL_SCHEMAS
+from marketbrief.core.schema_portfolio import PORTFOLIO_SCHEMAS  # WS4
 from marketbrief.core.schema_results import RESULTS_SCHEMAS  # WS6
 from marketbrief.core.schema_sources import FREE_SOURCE_SCHEMAS, RELATION_SCHEMAS
 from marketbrief.core.schema_verification import VERIFICATION_SCHEMAS
@@ -29,6 +31,8 @@ def build_schemas() -> Schemas:
         **FREE_SOURCE_SCHEMAS,
         **VERIFICATION_SCHEMAS,
         **MODEL_SCHEMAS,
+        **PORTFOLIO_SCHEMAS,  # WS4
+        **INTRADAY_SCHEMAS,  # WS5
         **RESULTS_SCHEMAS,  # WS6
     }
     for kind, (file_format, columns) in RELATION_SCHEMAS.items():
