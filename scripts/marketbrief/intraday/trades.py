@@ -1,6 +1,7 @@
 """The open paper trades a check monitors (B9; docs/ws/b9.md), as of the check time: every qualifying strategy
 prediction (accuracy view, trade id acc:<prediction_id>) and every head-to-head pick (h2h:<pick_rule>:
-<prediction_id>) whose holding window D..exit_date contains this session, with the stored bars and split/bonus
+<prediction_id>) whose holding window D..exit_date contains this session, or that is past exit_date without a
+paper_trades_settled row (exit_delayed, issue #93; at most max_past_exit sessions), with the stored bars and split/bonus
 factors behind its measures. A trade is a record of the F1 protocol (docs/SPEC.md F1); nothing is ever traded.
 Only rows stored by check_at are read (no look-ahead), and a prediction or pick made after D's open is refused
 as the settlement refuses it (F1.8)."""
