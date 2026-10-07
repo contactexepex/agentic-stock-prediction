@@ -327,7 +327,8 @@ same story from different outlets is kept apart, because independent outlets fee
 - Collector: an entry matching a stored item by link with a different headline (normalised) than the item's
   latest is appended to `data/<market>/news_updates/` (kind `news_updates`: `news_id` of the item, `title`,
   `seen_at`, `url`, `source`, `source_domain`, `published_at`, `feed`), never stored as a new item; any other
-  match is skipped. A headline that flips back is recorded again. The summary shows `duplicates_skipped`
+  match is skipped. One update per item and run (the first; further copies of the link in that run are
+  skipped). A headline that flips back is recorded again. The summary shows `duplicates_skipped`
   (`same_link`, `same_title`, `same_id`, `within_run`: the same article from several feeds of the run) and
   `headline_updates`. Tags stay those of the first headline.
 - Read side (`core.database.connect` builds `news_id_map` with the same rules over every stored row; nothing

@@ -17,7 +17,7 @@ headline there is appended to data/<market>/news_updates/ instead: one item plus
 its normalised title was stored from the same outlet (outlet key: host without www./m./amp./mobile., the
 allowlisted domain and its `same_as` in config/news_sources.yaml, or a configured outlet name), or when its id
 was stored; matches count within 9 days. The same story from another outlet is kept. The summary shows
-`duplicates_skipped` (same_link, same_title, same_id, within_run) and `headline_updates`.
+`duplicates_skipped` (same_link, same_title, same_id, within_run) and `headline_updates` (at most one per item and run).
 An outlet with `watchlist_only: true` (press-release wires) keeps only items whose title or
 summary names a watchlist company: case-insensitive whole-word matching on each ticker's
 `wire_names` (full company names; default its name and aliases) after removing the
@@ -188,8 +188,10 @@ class NewsCollector:
         link from the same outlet (a new headline there is appended to news_updates instead), the same title
         from the same outlet, or the same id (also ids stored before domains)."""
         found = self.dedup.match(row)
-        if (found and found.news_id in self.items) or row.news_id in self.items:
-            self.duplicates["within_run"] += 1  # the same article from several feeds: keep the first
+        updated = found is not None and any(update["news_id"] == found.news_id for update in self.updates)
+        if (found and (found.news_id in self.items or updated)) or row.news_id in self.items:
+            # the same article from several feeds: keep the first (one headline update per item and run)
+            self.duplicates["within_run"] += 1
         elif found and found.rule == MATCH_LINK and self.dedup.is_new_headline(found.news_id, row.title):
             self.updates.append(update_record(found.news_id, row, self.now, published, job["feed"]))
             self.dedup.note_headline(found.news_id, row.title, self.seen_at)

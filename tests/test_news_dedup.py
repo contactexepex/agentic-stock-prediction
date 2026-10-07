@@ -157,9 +157,10 @@ def test_edited_headline_is_one_item_plus_an_update(root, monkeypatch, capsys):
     collect(monkeypatch, capsys, NOW, [item(rise, link + "?oc=5", "Reuters", "www.reuters.com", NOW)])
     later = NOW + timedelta(hours=4)
     out = collect(monkeypatch, capsys, later, [item(fall, link + "?oc=5", "Reuters", "www.reuters.com", NOW),
-                                               item(fall, link, "Reuters", "www.reuters.com", NOW)])  # 2 feeds
-    # the second feed's copy: the stored item's headline is already recorded in this run
-    assert out["new_items"] == 0 and out["headline_updates"] == 1 and out["duplicates_skipped"] == {"same_link": 1}
+                                               item(fall, link, "Reuters", "www.reuters.com", NOW),
+                                               item("Oil slips", link, "Reuters", "www.reuters.com", NOW)])
+    # more copies of the link in the same run: one headline update per item and run, the first
+    assert out["new_items"] == 0 and out["headline_updates"] == 1 and out["duplicates_skipped"] == {"within_run": 2}
     news, updates = stored(root, "news"), stored(root, "news_updates")
     assert len(news) == 1 and len(updates) == 1 and set(updates[0]) == set(SCHEMAS["news_updates"][1])
     assert updates[0]["news_id"] == news[0]["id"] and updates[0]["title"] == fall
