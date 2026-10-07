@@ -140,3 +140,78 @@ def test_drop_reason_rules_for_the_us_and_for_sector_indices():
     assert india.drop_reason("NIFTYBANK", date(2026, 10, 2), bar_row(55000)) == not_a_session  # sector_etf
     assert india.drop_reason("NIFTYBANK", date(2026, 10, 1), bar_row(55000)) is None
     assert india.drop_reason("SPX", date(2026, 10, 2), bar_row(6000)) is None
+
+
+@pytest.mark.parametrize("now, stored", [
+    ("2026-10-05T11:00:00+00:00", set()),                   # 16:30 IST: the close (10:00 UTC) is still settling
+    ("2026-10-05T14:40:00+00:00", {"NIFTY50", "INFY"}),     # 20:10 IST, before UTC midnight (issue #20)
+])
+def test_own_session_bar_is_stored_once_final_before_utc_midnight(tmp_path, monkeypatch, capsys, now, stored):
+    from marketbrief.collectors import prices as collect_prices
+
+    root = make_env(tmp_path, monkeypatch, ["INFY"], date(2026, 10, 5)).root
+    path = tmp_path / "config" / "markets" / "india.yaml"
+    doc = yaml.safe_load(path.read_text())
+    real = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "markets" / "india.yaml").read_text())
+    doc["symbols"] = {key: real["symbols"][key] for key in ("NIFTY50", "SPX")}
+    path.write_text(yaml.safe_dump(doc))
+    monkeypatch.setattr(collect_prices, "utc_now", lambda: now)
+    days = [date(2026, 9, 29), date(2026, 9, 30), date(2026, 10, 1), date(2026, 10, 5)]
+    FakeTicker.frames = {"^NSEI": daily(days, 22000), "INFY.NS": daily(days, 1000), "^GSPC": daily(days, 6000)}
+    run(monkeypatch, capsys)
+    assert set(bars(root, date(2026, 10, 5))) == stored   # the S&P 500 cue (another calendar) waits for UTC 10-06
+    assert set(bars(root, date(2026, 10, 1))) == {"NIFTY50", "INFY", "SPX"}
+
+
+MUHURAT = (date(2024, 11, 1), date(2025, 10, 21))  # NSE Diwali Muhurat sessions on exchange holidays
+
+
+def test_special_sessions_count_as_sessions():
+    """Issue #41: `special_sessions` in the market config are sessions although the exchange calendar is closed."""
+    from marketbrief.core.calendar import exchange_calendar, is_session, next_session, prev_session
+    from marketbrief.core.market_config import load_market
+
+    cfg = load_market("india")
+    assert set(cfg["special_sessions"]) == set(MUHURAT)
+    for day in MUHURAT:
+        assert not exchange_calendar("XBOM").is_session(day.isoformat())  # a holiday for the library
+        assert is_session(cfg, day)
+        assert not is_session({**cfg, "special_sessions": []}, day)
+        assert collector_for("india").drop_reason("INFY", day, bar_row(1500, flat=False, volume=10)) is None
+    assert not is_session(cfg, date(2025, 10, 22))  # the next day stays closed
+    assert next_session(cfg, date(2025, 10, 21)) == date(2025, 10, 21)
+    assert prev_session(cfg, date(2025, 10, 22)) == date(2025, 10, 21)
+
+
+@pytest.mark.usefixtures("env")
+def test_special_session_bars_are_kept_on_read():
+    header = "date,ticker,open,high,low,close,adj_close,volume,collected_at\n"
+    for day, close in ((date(2024, 10, 31), 1000.0), (MUHURAT[0], 1010.0), (date(2024, 11, 4), 1020.0)):
+        path = day_file("india", "prices", day, "csv")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(header + f"{day},INFY,{close},{close + 5},{close - 5},{close},{close},500,{day}T13:00:00+00:00\n")
+    con = connect("india")
+    days = [row[0] for row in con.execute("SELECT date FROM bars WHERE ticker = 'INFY' ORDER BY date").fetchall()]
+    assert days == [date(2024, 10, 31), MUHURAT[0], date(2024, 11, 4)]
+
+
+def test_missing_exchange_calendars_fails_loudly(monkeypatch):
+    """Issue #43: without the exchange_calendars package, is_session raises instead of a silent Monday-Friday rule."""
+    from marketbrief.core import calendar
+
+    calendar.exchange_calendar.cache_clear()
+    monkeypatch.setitem(sys.modules, "exchange_calendars", None)  # import now raises ImportError
+    try:
+        with pytest.raises(calendar.CalendarUnavailable, match="exchange_calendars cannot be imported"):
+            calendar.is_session({"calendar": "XNYS"}, date(2026, 10, 5))
+        with pytest.raises(calendar.CalendarUnavailable):
+            calendar.session_open_utc({"calendar": "XNYS", "timezone": "America/New_York"}, date(2026, 10, 5))
+    finally:
+        calendar.exchange_calendar.cache_clear()
+
+
+def test_connect_warns_without_a_market_config(capsys):
+    """Issue #41: a market without a config file gets an empty own_closed_days table and a warning, not silence."""
+    con = connect("nosuchmarket")
+    assert con.execute("SELECT count(*) FROM own_closed_days").fetchone()[0] == 0
+    assert "no config/markets/nosuchmarket.yaml" in capsys.readouterr().err

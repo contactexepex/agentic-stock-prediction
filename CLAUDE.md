@@ -213,6 +213,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   GitHub issue labelled `cosmetic` to fix later, and the work can merge.
 - Build work: on FAIL (any blocker), send the blocker list back and judge again, repeating until PASS.
   A re-check covers only the listed blockers and the diff that fixed them, not the whole batch again.
+  Nothing is merged or pushed to main before its PASS.
 - Batches: plan work as a few batches (a feature, a refactor chunk, or a group of related fixes with
   the cosmetic issues that touch the same files), build the whole batch, then one review per batch;
   never a review cycle per small item. The reviewer lists every finding in one pass.
@@ -225,8 +226,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   live collection) at a time on the session's machine.
 - Scope of a review follows the change: an end-to-end run of the routine is needed only when
   executable behaviour changes (scripts, SQL views, schemas, config). Docs, wording and
-  agent-instruction changes get a judge review of the diff only, never an end-to-end run. Nothing is
-  merged or pushed to main before its PASS.
+  agent-instruction changes get a judge review of the diff only, never an end-to-end run.
 - Merging: a batch is merged to main as soon as its review passes; the working branch is only where a
   batch is built. The end-to-end run of both markets is required before the routines are re-enabled,
   not before code reaches main.

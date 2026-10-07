@@ -99,8 +99,8 @@ def test_news_collect_tags_and_dedupes(tmp_path):
     r = run("collect_news.py", root, cfg)
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["new_items"] == 2
-    rows = [json.loads(l) for f in (root / "data" / MARKET / "news").glob("**/*.jsonl")
-            for l in f.read_text().splitlines()]
+    rows = [json.loads(line) for f in (root / "data" / MARKET / "news").glob("**/*.jsonl")
+            for line in f.read_text().splitlines()]
     tagged = {r["title"]: r["tickers"] for r in rows}
     assert tagged["Apple raises guidance"] == ["AAPL"]
     assert tagged["Fed holds rates"] == []
@@ -185,12 +185,11 @@ def test_features_regime_and_context(tmp_path):
     a = feats["AAPL"]
     assert a["bars"] == len(days) and a["quality"] == "OK"
     assert 0 <= a["rsi_14"] <= 100 and a["atr_pct"] > 0 and a["beta_1y"] is not None
-    # features count from the next session of the exchange-local today (the test uses the UTC date for `soon`)
-    from zoneinfo import ZoneInfo
-
+    # features count from the session after as_of (issue #21), so no clock reading can flake here (issue #43)
     from marketbrief.core.calendar import next_session
-    local_today = datetime.now(ZoneInfo("America/New_York")).date()
-    assert a["days_to_earnings"] == (soon - next_session({"calendar": "XNYS"}, local_today)).days
+    session = next_session({"calendar": "XNYS"}, days[-1], include=False)
+    assert out["session_date"] == str(session)
+    assert a["days_to_earnings"] == (soon - session).days
     assert feats["MSFT"]["ret_1d"] == 0.0
     assert abs(feats["MSFT"]["rel_sector_5d"] + a["rel_sector_5d"]) < 1e-9   # mirror images
 

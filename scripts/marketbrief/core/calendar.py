@@ -2,7 +2,10 @@
 
 - Trading days come from exchange_calendars (config `calendar`, e.g. XNYS, XBOM). Outside the
   library's covered range we fall back to Monday-Friday and say so. Dates listed under the
-  market config's `holidays` are always closed (exchange circulars the library lacks).
+  market config's `holidays` are always closed (exchange circulars the library lacks); dates under
+  `special_sessions` always trade (NSE's Diwali Muhurat sessions on a holiday; their open and close
+  are taken as the regular hours). Without the exchange_calendars package nothing falls back
+  silently: CalendarUnavailable is raised.
 - Market events come from config/events.yaml (rules + fixed dates) plus company earnings and
   ex-dividend dates collected into data/<market>/events/ by the events collector.
 """
@@ -17,6 +20,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from marketbrief.constants.calendar import (
+    BAR_SETTLE_MINUTES,
     CALENDAR_START,
     DEFAULT_CLOSE,
     DEFAULT_OPEN,
@@ -28,6 +32,7 @@ from marketbrief.constants.calendar import (
     MAJOR_WINDOW_DAYS,
     MAX_SESSION_OFFSET,
     MIN_SESSION_OFFSET,
+    MSG_NO_EXCHANGE_CALENDARS,
     MSG_SESSION_OFFSET_RANGE,
     MSG_UNKNOWN_EVENT_RULE,
     RULE_FIRST_FRIDAY,
@@ -38,24 +43,44 @@ from marketbrief.constants.calendar import (
     WEEKDAY_FRIDAY,
     WEEKS_PADDING_DAYS,
 )
-from marketbrief.constants.config_keys import CFG_CALENDAR, CFG_HOLIDAYS, CFG_MARKET, CFG_TIMEZONE
+from marketbrief.constants.config_keys import (
+    CFG_CALENDAR,
+    CFG_HOLIDAYS,
+    CFG_MARKET,
+    CFG_SPECIAL_SESSIONS,
+    CFG_TIMEZONE,
+)
 from marketbrief.core import paths
+
+
+class CalendarUnavailable(RuntimeError):
+    """The exchange_calendars package cannot be imported (never a silent Monday-Friday fallback, issue #43)."""
 
 
 @lru_cache(maxsize=None)
 def exchange_calendar(code: str):
     """The exchange_calendars calendar of an exchange code (XNYS, XBOM ...), loaded once."""
-    import exchange_calendars
+    try:
+        import exchange_calendars
+    except ImportError as exc:
+        raise CalendarUnavailable(MSG_NO_EXCHANGE_CALENDARS.format(error=exc)) from exc
 
     return exchange_calendars.get_calendar(code, start=CALENDAR_START)
 
 
+def config_dates(cfg: dict, key: str) -> set[date]:
+    """The dates listed under a market-config key (holidays, special_sessions)."""
+    return {listed if isinstance(listed, date) else date.fromisoformat(str(listed)) for listed in cfg.get(key) or []}
+
+
 def extra_holidays(cfg: dict) -> set[date]:
     """The market config's extra closed days."""
-    return {
-        holiday if isinstance(holiday, date) else date.fromisoformat(str(holiday))
-        for holiday in cfg.get(CFG_HOLIDAYS) or []
-    }
+    return config_dates(cfg, CFG_HOLIDAYS)
+
+
+def special_sessions(cfg: dict) -> set[date]:
+    """The market config's extra trading days on exchange holidays (issue #41)."""
+    return config_dates(cfg, CFG_SPECIAL_SESSIONS)
 
 
 def calendar_covers(cfg: dict, day: date) -> bool:
@@ -63,19 +88,20 @@ def calendar_covers(cfg: dict, day: date) -> bool:
     try:
         calendar = exchange_calendar(cfg[CFG_CALENDAR])
         return calendar.first_session.date() <= day <= calendar.last_session.date()
+    except CalendarUnavailable:
+        raise
     except Exception:
         return False
 
 
 def is_session(cfg: dict, day: date) -> bool:
     """True when the market trades on `day` (Monday-Friday outside the library's range)."""
+    if day in special_sessions(cfg):
+        return True
     if day in extra_holidays(cfg):
         return False
     if calendar_covers(cfg, day):
-        try:
-            return bool(exchange_calendar(cfg[CFG_CALENDAR]).is_session(day.isoformat()))
-        except Exception:
-            pass
+        return bool(exchange_calendar(cfg[CFG_CALENDAR]).is_session(day.isoformat()))
     return day.weekday() < 5
 
 
@@ -105,6 +131,8 @@ def _session_edge_utc(cfg: dict, day: date, edge: str) -> datetime:
             return edge_time.to_pydatetime().astimezone(timezone.utc)
         zone = ZoneInfo(str(calendar.tz))
         local_time = (calendar.open_times if edge == EDGE_OPEN else calendar.close_times)[-1][1]
+    except CalendarUnavailable:
+        raise
     except Exception:
         zone, local_time = ZoneInfo(cfg[CFG_TIMEZONE]), DEFAULT_OPEN if edge == EDGE_OPEN else DEFAULT_CLOSE
     return datetime.combine(day, local_time, zone).astimezone(timezone.utc)
@@ -120,6 +148,15 @@ def session_close_utc(cfg: dict, day: date) -> datetime:
     """Regular close of session `day` as an aware UTC datetime (exchange calendar, early closes
     included). Outside the calendar's range, its regular local close time is applied to `day`."""
     return _session_edge_utc(cfg, day, EDGE_CLOSE)
+
+
+def last_complete_session(cfg: dict, now: datetime) -> date:
+    """The newest session whose bar is final at `now` (aware): its close plus BAR_SETTLE_MINUTES has passed
+    (issue #20: the bar cut-off and market_status use the exchange's own session, not the UTC date)."""
+    day = prev_session(cfg, now.astimezone(ZoneInfo(cfg[CFG_TIMEZONE])).date())
+    while session_close_utc(cfg, day) + timedelta(minutes=BAR_SETTLE_MINUTES) > now:
+        day = prev_session(cfg, day, include=False)
+    return day
 
 
 def sessions_ahead(cfg: dict, start: date, count: int) -> list[date]:

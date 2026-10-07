@@ -46,11 +46,17 @@ def test_session_close_utc():
     (INDIA, "2026-10-05T02:40:00+00:00", True, "2026-10-05", False),    # 08:10 IST, pre-open
     (INDIA, "2026-10-05T09:59:00+00:00", True, "2026-10-05", False),    # 15:29 IST, still open
     (INDIA, "2026-10-05T10:00:00+00:00", True, "2026-10-05", True),     # 15:30 IST, the close
-    (INDIA, "2026-10-05T14:40:00+00:00", True, "2026-10-05", True),     # 20:10 IST, the incident
+    (INDIA, "2026-10-05T11:59:00+00:00", True, "2026-10-05", True),     # 17:29 IST, the bar is still settling
+    # issue #20: from the close plus BAR_SETTLE_MINUTES the day's bar is final (collect_prices stores it), so the
+    # run predicts the next session and is not late, also before UTC midnight (20:10 IST, the incident)
+    (INDIA, "2026-10-05T12:00:00+00:00", True, "2026-10-06", False),
+    (INDIA, "2026-10-05T14:40:00+00:00", True, "2026-10-06", False),
+    (INDIA, "2026-10-05T23:59:00+00:00", True, "2026-10-06", False),    # 05:29 IST on 10-06: local date moved on
     (INDIA, "2026-10-02T14:40:00+00:00", False, "2026-10-05", False),   # Gandhi Jayanti holiday
     (INDIA, "2026-10-03T14:40:00+00:00", False, "2026-10-05", False),   # Saturday
     (US, "2026-10-05T12:00:00+00:00", True, "2026-10-05", False),       # 08:00 ET
     (US, "2026-10-05T20:30:00+00:00", True, "2026-10-05", True),        # 16:30 ET
+    (US, "2026-10-05T22:00:00+00:00", True, "2026-10-06", False),       # 18:00 ET: the bar is final
     (US, "2026-11-26T22:00:00+00:00", False, "2026-11-27", False),      # Thanksgiving
     (US, "2026-11-27T17:30:00+00:00", True, "2026-11-27", False),       # before the 13:00 ET early close
     (US, "2026-11-27T18:30:00+00:00", True, "2026-11-27", True),        # after it
@@ -179,6 +185,23 @@ def test_ranges_cli_late_flag(market):
             for x in f.read_text().splitlines()]
     assert {r["made_at"] for r in rows} == {"2026-10-05T20:40:00+00:00", "2026-10-05T11:30:00+00:00"}
     assert run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00").returncode != 0   # needs an offset
+
+
+@pytest.mark.parametrize("now, late", [("2026-10-05T11:30:00+00:00", False), ("2026-10-05T20:40:00+00:00", True)])
+def test_slack_ranges_line_says_late(market, now, late):
+    """Issue #21: with no calls, the Slack line about the ranges says when they are late."""
+    root, cfg_dir, _, _ = market
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
+                                   "computed_at": "2026-10-05T11:01:00+00:00", "regime": "CALM", "stress": False,
+                                   "vol_level": 15.0, "notes": [], "major_event": False, "major_event_names": []}])
+    assert run("ranges.py", root, cfg_dir, "--now", now).returncode == 0
+    rep = run("report.py", root, cfg_dir)
+    assert rep.returncode == 0, rep.stderr
+    slack = (root / json.loads(rep.stdout)["slack_draft"]).read_text()
+    line = next(x for x in slack.splitlines() if x.startswith("Calls today: none."))
+    assert line.endswith("(late: made after the open of the first session they cover, so never scored).") is late
+    assert line.endswith("are in the report.") is not late
 
 
 # ---------- scoring never counts late records ----------

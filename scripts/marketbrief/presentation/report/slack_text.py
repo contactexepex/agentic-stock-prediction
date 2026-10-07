@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from marketbrief.constants.report import MSG_RANGES_LATE
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation.report.formatting import review_line
 from marketbrief.presentation.report.gather import report_url
@@ -45,8 +46,10 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
     if released:
         head += " · calls made before " + ", ".join(f"{event['name']} ({event['release']})" for event in released)
     by_horizon = lambda item: "next day" if item.horizon_days == 1 else f"{item.horizon_days} days"  # noqa: E731
-    if not calls:
-        call_line = f"Calls today: none. Price ranges for all {len(cfg['tickers'])} stocks are in the report."
+    if not calls:  # issue #21: the line says when the ranges are late (made after the first session's open)
+        call_line = f"Calls today: none. Price ranges for all {len(cfg['tickers'])} stocks are in the report" + (
+            MSG_RANGES_LATE if parts.n_late else "."
+        )
     elif len(calls) <= 3:
         call_line = f"Calls today: {len(calls)} · " + " · ".join(
             f"{ticker_symbol} {fmt_call(item.direction, item.confidence)} ({by_horizon(item)}, 80% range "

@@ -67,7 +67,8 @@ Warnings never block: list them in `data_quality`.
    to Slack #market-brief with
    `python scripts/notify_slack.py --text "<market name>: market closed today, next session <session_date>"`
    (exit code 2 = no bot token and no webhook: use the Slack connector as in step 13) and stop. If `late_run` is
-   true (the run started after the close of `session_date`, at `session_close_utc`), carry on,
+   true (the run started after the close of `session_date`, at `session_close_utc`, while that
+   session's bar is still settling), carry on,
    but tell the forecaster it is a late run: it abstains on every ticker with reason "late run".
    `ranges.py` then skips ranges whose target session has closed, labels the others late (never
    scored) and ignores cues quoted after that session's open. Say so in the report's `data_quality` section. If `in_session` is true (a manual run

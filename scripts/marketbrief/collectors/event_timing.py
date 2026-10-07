@@ -16,7 +16,7 @@ from marketbrief.constants.events import (
     TIMING_BEFORE_OPEN,
     TIMING_DURING,
 )
-from marketbrief.core.calendar import exchange_calendar
+from marketbrief.core.calendar import CalendarUnavailable, exchange_calendar
 
 
 def as_dates(value) -> list[date]:
@@ -45,6 +45,8 @@ def timing(cfg: dict, stamp) -> tuple[date, str | None]:
         if not calendar.is_session(day.isoformat()):
             return day, TIMING_BEFORE_OPEN  # weekend/holiday: first reaction is the next session
         opens, closes = calendar.session_open(day.isoformat()), calendar.session_close(day.isoformat())
+    except CalendarUnavailable:
+        raise
     except Exception:
         return day, None
     instant = stamp.tz_convert("UTC")

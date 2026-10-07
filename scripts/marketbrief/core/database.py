@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import duckdb
@@ -10,14 +11,14 @@ import duckdb
 from marketbrief.constants.columns import COL_ACCEPTED_AT, COL_ACCESSION, COL_CHECKED_AT
 from marketbrief.constants.config_keys import CFG_SYMBOLS, CFG_TICKERS, META_ROLE
 from marketbrief.constants.environment import ENV_NOW
-from marketbrief.constants.files import DIR_SQL, FILE_VIEWS_SQL, JSONL_GLOB
+from marketbrief.constants.files import DIR_CONFIG_MARKETS, DIR_SQL, FILE_VIEWS_SQL, JSONL_GLOB, YAML_SUFFIX
 from marketbrief.constants.kinds import (
     FILE_FORMAT_JSONL,
     KIND_NEWS,
     KIND_SEC_TIMES,
     NEWS_STORED_VIEW,
 )
-from marketbrief.constants.prices import OWN_EXCHANGE_ROLES
+from marketbrief.constants.prices import MSG_NO_MARKET_CONFIG_CLOSED_DAYS, OWN_EXCHANGE_ROLES
 from marketbrief.core import paths
 from marketbrief.core.calendar import is_session
 from marketbrief.core.clock import FrozenClockConnection, clock
@@ -102,12 +103,13 @@ def own_exchange_keys(cfg: dict) -> list[str]:
 def register_own_closed_days(con: duckdb.DuckDBPyConnection, market: str) -> None:
     """Create the `own_closed_days` table (ticker, date) the ohlc_raw view reads (issue #40): every stored price
     date that is no session of the market's own exchange, for each stock and own-exchange index of the config.
-    Built set-based from the distinct stored dates. No market config (some tests): the table is empty."""
+    Built set-based from the distinct stored dates. No market config file (some tests): the table is empty and a warning goes to stderr;
+    any other config error raises."""
     con.execute("CREATE TABLE own_closed_days (ticker VARCHAR, date DATE)")
-    try:
-        cfg = load_market(market)
-    except SystemExit:  # no market config (some tests): nothing is excluded
+    if not (paths.CONFIG / DIR_CONFIG_MARKETS / f"{market}{YAML_SUFFIX}").exists():
+        print(MSG_NO_MARKET_CONFIG_CLOSED_DAYS.format(market=market), file=sys.stderr)  # issue #41: never silent
         return
+    cfg = load_market(market)
     stored = [row[0] for row in con.execute("SELECT DISTINCT date FROM prices").fetchall()]
     closed = [day for day in stored if not is_session(cfg, day)]
     if closed:

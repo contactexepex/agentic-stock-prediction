@@ -116,3 +116,5 @@ MSG_CHECK_NO_STEP_PROOF = "{day}: no step proves the ex-date and the next sessio
 MSG_CHECK_CHAIN_BROKEN = ("{day}: PREV_CLOSE {prev_close:g} is neither Yahoo's close of {previous_day} "
                           "({yahoo_close:g}) nor it / {factor:.4f}")
 MSG_CHECK_NO_EX_DATE = "no ex-date found in the bhavcopies of {first}..{last}"
+MSG_NO_MARKET_CONFIG_CLOSED_DAYS = ("warning: no config/markets/{market}.yaml, so no closed-day bars are left out of "
+                                    "the price views (own_closed_days is empty)")

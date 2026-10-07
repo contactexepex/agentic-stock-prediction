@@ -1,7 +1,9 @@
 """Collect daily OHLCV bars via yfinance (free, unofficial Yahoo Finance access; personal use)
 for a market's tickers and market-level symbols (benchmark, vol index, cues, factors) into
 data/<market>/prices/YYYY/MM/<trading-date>.csv. One file per trading date; a bar is written
-once. Today's bar (UTC) is skipped because it may be incomplete.
+once. A bar that may be incomplete is skipped: for the market's own stocks and indices every bar after the
+newest session whose close plus BAR_SETTLE_MINUTES has passed (calendar.last_complete_session, issue #20),
+for cues and factors (other calendars) the bar of today's UTC date.
 First run: --period 2y (needed for 1-year beta and the range backtest).
 A symbol is listed in `failed` when Yahoo returns nothing, no completed bar, or only stale bars:
 the newest completed bar is older than the market's previous session (its stocks, benchmark, vol
@@ -51,7 +53,7 @@ recorded split no longer blocks the bhavcopy fallback."""
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from marketbrief.analytics.price_adjustments import factor_after, load_adjustments
 from marketbrief.collectors import nse_session
@@ -116,7 +118,7 @@ from marketbrief.constants.prices import (
     YAHOO_VOLUME,
 )
 from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SUMMARY_MARKET, SUMMARY_WARNINGS
-from marketbrief.core.calendar import is_session
+from marketbrief.core.calendar import is_session, last_complete_session
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file
@@ -133,7 +135,8 @@ class PriceCollector:
     def __init__(self, cfg: dict, period: str):
         """The price collector's config and download period."""
         self.cfg, self.period = cfg, period
-        self.run = PriceRun(cfg, utc_today(), utc_now())
+        now = utc_now()
+        self.run = PriceRun(cfg, utc_today(), now, last_complete_session(cfg, datetime.fromisoformat(now)))
         self.targets = {
             **{key: meta[META_YAHOO] for key, meta in cfg[CFG_SYMBOLS].items()},
             **{key: meta[META_YAHOO] for key, meta in cfg[CFG_TICKERS].items()},
@@ -204,6 +207,10 @@ class PriceCollector:
         else:
             self.failed.append({COL_TICKER: key, ENTRY_YAHOO: symbol, ENTRY_ERROR: MSG_HELD_NOTE})
 
+    def own_exchange(self, key: str) -> bool:
+        """True for a stock or an index of the market's own exchange (benchmark, vol index, sector index)."""
+        return key in self.cfg[CFG_TICKERS] or self.cfg[CFG_SYMBOLS].get(key, {}).get(META_ROLE) in OWN_EXCHANGE_ROLES
+
     def drop_reason(self, key: str, day: date, row) -> str | None:
         """Why Yahoo's bar is no real session bar, or None. Yahoo serves a bar for an exchange holiday (stocks and
         indices: a flat zero-volume bar, open = high = low = close = the previous close; the VIX: a bar that is not
@@ -212,8 +219,7 @@ class PriceCollector:
         zero volume on any day (indices report volume 0 legitimately; cues and factors trade on other exchanges'
         calendars and are never dropped by the calendar)."""
         is_stock = key in self.cfg[CFG_TICKERS]
-        own_exchange = is_stock or self.cfg[CFG_SYMBOLS].get(key, {}).get(META_ROLE) in OWN_EXCHANGE_ROLES
-        if own_exchange and not is_session(self.cfg, day):
+        if self.own_exchange(key) and not is_session(self.cfg, day):
             return DROP_REASON_NOT_A_SESSION
         flat = len({float(row[column]) for column in YAHOO_OHLC}) == 1
         volume = row[YAHOO_VOLUME]
@@ -224,10 +230,11 @@ class PriceCollector:
     def write_new_bars(self, key: str, frame) -> None:
         """Write each completed bar of the frame that no prices file holds yet (bars of days without a session
         and flat zero-volume stock bars are listed in `dropped_non_session`, not stored)."""
-        today = self.run.today
+        today, own = self.run.today, self.own_exchange(key)
         for stamp, row in frame.iterrows():
             day = stamp.date()
-            if day >= today or row.isna()[YAHOO_OHLC].any():
+            not_final = day > self.run.own_through if own and self.run.own_through else day >= today
+            if not_final or row.isna()[YAHOO_OHLC].any():
                 continue
             path = prices_file(self.cfg, day)
             if key in stored_bars(path):

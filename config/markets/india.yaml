@@ -12,6 +12,11 @@ premarket_quotes: false # NSE has no pre-market trading before the 09:00 pre-ope
 # library has no 2027 holidays yet. NSE publishes the 2027 list around mid-December 2026: replace these
 # provisional fixed-date holidays (Republic Day, Good Friday, Ambedkar Jayanti) with that list.
 holidays: [2027-01-26, 2027-03-26, 2027-04-14]
+# Trading days on exchange holidays (calendar.is_session counts them as sessions, issue #41): NSE's
+# Diwali Muhurat sessions. Both dates have real, non-flat bars for all 25 own-market symbols (20 stocks,
+# Nifty 50, India VIX, three Nifty sector indices) in data/india/prices/ (checked 2026-10-07).
+# Their open and close are taken as the regular hours (the real one-hour evening slot is not modelled).
+special_sessions: [2024-11-01, 2025-10-21]
 
 # Market-level symbols. Roles: benchmark (index the stocks are measured against),
 # vol_index (regime), cue (overnight / pre-open signal), factor (global driver),

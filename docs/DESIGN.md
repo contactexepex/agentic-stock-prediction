@@ -22,9 +22,14 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 15 8 * * 1-5` (08:15 ET) | ~08:45 ET (~14:45 Amsterdam) | SPY, VIX (`^VIX`) |
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
-- Late runs (`market_status.py` `late_run`: started after the session's close): no calls;
-  `ranges.py` skips ranges whose target session has closed, labels the others late (never
-  scored) and ignores cues quoted after that session's open.
+- Session cut-off (issue #20): a session's bar counts as final 120 minutes after its close
+  (`BAR_SETTLE_MINUTES`, `calendar.last_complete_session`). `collect_prices.py` stores the
+  market's own stocks and indices up to that session (cues and factors up to the previous UTC
+  day), and `market_status.py` predicts the session after it, so a run after the close and the
+  settling time is an early run for the next session, before UTC midnight too.
+- Late runs (`market_status.py` `late_run`: started after the session's close, before its bar
+  is final): no calls; `ranges.py` skips ranges whose target session has closed, labels the
+  others late (never scored) and ignores cues quoted after that session's open.
 - Mid-session runs (`in_session`: started after the session's open, before its close): no calls
   and no 1-day ranges; 5-day ranges are published for the record, noted late, never scored (the
   day is partly known, and every horizon covers it). Any range or call made at or after the open
@@ -799,7 +804,9 @@ always show the same numbers.
    earnings "surprise". Gaps, counted on the live data of 2026-10-05 (all quarters since late 2023
    in `fundamentals_metrics`, 10-12 per ticker):
    - Banks and insurers (ALL, BAC, JPM, PGR) tag no gross or operating profit: both margins blank.
-   - Operating margin is also blank for CVX, DE, LLY, MRK and XOM (no `OperatingIncomeLoss`).
+   - Operating margin is also blank for CVX, LLY, MRK and XOM (no `OperatingIncomeLoss`) and for DE
+     (no quarterly `OperatingIncomeLoss`: SEC companyconcept, read 2026-10-07, has DE quarters only up
+     to the 10-Q for the quarter ended 2023-07-30, and fiscal-year totals up to FY2024).
    - Gross margin is also blank for DAL, DE, GM, UAL and XOM (no gross profit and no cost of revenue
      among the collected tags).
    - FCF is blank for BAC and JPM (no capex tagged). DAL tags capex only in parts in its Q2 2026
