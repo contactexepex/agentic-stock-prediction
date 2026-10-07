@@ -7,7 +7,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from marketbrief.analytics import range_math, scoring
+from marketbrief.analytics import call_basis, range_math, scoring
 from marketbrief.pipeline.review.helpers import note_tags, numeric_series, rounded_mean
 
 
@@ -77,6 +77,18 @@ def breakdown(frame: pd.DataFrame, col: str) -> dict:
     return {
         f"{key} · {int(horizon)}d": range_summary(group)
         for (key, horizon), group in exploded.groupby([col, "horizon_days"])
+    }
+
+
+def per_basis(frame: pd.DataFrame, summarize) -> dict:
+    """`summarize` per scoring basis of the calls, never pooled (call_basis.py): {'<key> · <basis>': value};
+    `summarize(frame)` itself when there are no calls."""
+    if frame.empty:
+        return summarize(frame)
+    return {
+        f"{key} · {call_basis.label(basis)}": value
+        for basis, group in frame.groupby("label_basis", sort=True)
+        for key, value in summarize(group).items()
     }
 
 

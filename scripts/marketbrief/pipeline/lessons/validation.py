@@ -48,7 +48,7 @@ def allowed_numbers(fact: dict) -> list[tuple[float, str]]:
         allowed_values.append((abs(100 * fact["actual_return"]), "return"))
     if fact.get("confidence") is not None:
         allowed_values += [(fact["confidence"], "confidence"), (100 * fact["confidence"], "confidence_pct")]
-    for key in ("base_close", "target_close", "range_actual_close", "lo80", "lo50", "hi50", "hi80"):
+    for key in ("base_close", "entry_open", "target_close", "range_actual_close", "lo80", "lo50", "hi50", "hi80"):
         if fact.get(key) is not None:
             allowed_values.append((abs(fact[key]), key))
     for num in NUM_RE.findall(ID_RE.sub(" ", fact.get("rationale") or "")):  # numbers the stored rationale cites

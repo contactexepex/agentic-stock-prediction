@@ -24,7 +24,16 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.analytics import range_math
-from marketbrief.constants.scoring import CALL_BINS, COIN_FLIP_BRIER, EPS, MISSING_DASH, RANGE_QUANTILES, WILSON_Z
+from marketbrief.constants.scoring import (
+    BASIS_NOTE,
+    BASIS_SHORT,
+    CALL_BINS,
+    COIN_FLIP_BRIER,
+    EPS,
+    MISSING_DASH,
+    RANGE_QUANTILES,
+    WILSON_Z,
+)
 from marketbrief.utils.numbers import round_or_none
 
 
@@ -165,20 +174,23 @@ def range_scores(scored_ranges: pd.DataFrame) -> dict:
 
 
 def summary(con) -> dict:
-    """All-time proper scores from the scored track record: calls per horizon and overall
-    (Brier, log loss, reliability) and ranges per horizon (coverage, interval and quantile scores)."""
+    """All-time proper scores from the scored track record: calls per scoring basis (call_basis.py; never
+    pooled), per horizon and overall (Brier, log loss, reliability), and ranges per horizon (coverage,
+    interval and quantile scores)."""
     calls = con.execute(
-        "SELECT horizon_days, confidence, hit FROM track_record "
+        "SELECT label_basis, horizon_days, confidence, hit FROM track_record "
         "WHERE confidence IS NOT NULL AND hit IS NOT NULL ORDER BY id, scored_at"
     ).df()
     rng = con.execute(
         "SELECT horizon_days, lo50, hi50, lo80, hi80, actual_close, base_close, hit50, hit80 "
         "FROM range_record WHERE actual_close IS NOT NULL ORDER BY id"
     ).df()
-    out = {"calls": {"all": call_scores(calls)}, "ranges": {}}
-    out["calls"]["all"]["reliability"] = reliability(calls["confidence"], calls["hit"]) if len(calls) else []
-    for horizon, group in calls.groupby("horizon_days") if len(calls) else []:
-        out["calls"][f"{int(horizon)}d"] = call_scores(group)
+    out = {"calls": {}, "ranges": {}}
+    for basis, by_basis in calls.groupby("label_basis", sort=True) if len(calls) else []:
+        entry = out["calls"][basis] = {"all": call_scores(by_basis)}
+        entry["all"]["reliability"] = reliability(by_basis["confidence"], by_basis["hit"])
+        for horizon, group in by_basis.groupby("horizon_days"):
+            entry[f"{int(horizon)}d"] = call_scores(group)
     for horizon, group in rng.groupby("horizon_days") if len(rng) else []:
         out["ranges"][f"{int(horizon)}d"] = range_scores(group)
     return out
@@ -209,31 +221,36 @@ def markdown(scores: dict) -> str:
     """Compact Markdown for the context pack."""
     calls = scores["calls"]
     lines = [
-        "Calls: Brier (coin flip 0.250) and log loss (coin flip 0.693), lower is better; skill = 1 - Brier/0.25.",
+        "Calls: Brier (coin flip 0.250) and log loss (coin flip 0.693), lower is better; skill = 1 - Brier/0.25. "
+        + BASIS_NOTE,
         "",
-        "| h | n | brier | log_loss | skill |",
-        "|---|---|---|---|---|",
+        "| basis | h | n | brier | log_loss | skill |",
+        "|---|---|---|---|---|---|",
     ]
-    for horizon_label, entry in calls.items():
-        lines.append(
-            f"| {horizon_label} | {entry['n']} | {format_number(entry.get('brier'))} | "
-            f"{format_number(entry.get('log_loss'))} | "
-            f"{format_number(entry.get('brier_skill'))} |"
-        )
-    rel = [bin_row for bin_row in calls["all"].get("reliability", []) if bin_row["n"]]
+    for basis, by_horizon in calls.items():
+        for horizon_label, entry in by_horizon.items():
+            lines.append(
+                f"| {BASIS_SHORT[basis]} | {horizon_label} | {entry['n']} | {format_number(entry.get('brier'))} | "
+                f"{format_number(entry.get('log_loss'))} | "
+                f"{format_number(entry.get('brier_skill'))} |"
+            )
+    if not calls:
+        lines.append("| – | all | 0 | – | – | – |")
+    rel = [(basis, bin_row) for basis, by_horizon in calls.items()
+           for bin_row in by_horizon["all"].get("reliability", []) if bin_row["n"]]
     if rel:
         lines += [
             "",
-            "Reliability (all horizons): stated confidence vs hit rate, Wilson 95%.",
+            "Reliability (all horizons, per basis): stated confidence vs hit rate, Wilson 95%.",
             "",
-            "| bin | n | mean_conf | hit_rate | 95% |",
-            "|---|---|---|---|---|",
+            "| basis | bin | n | mean_conf | hit_rate | 95% |",
+            "|---|---|---|---|---|---|",
         ]
         lines += [
-            f"| {bin_row['bin']} | {bin_row['n']} | {format_percent(bin_row['mean_conf'])} | "
+            f"| {BASIS_SHORT[basis]} | {bin_row['bin']} | {bin_row['n']} | {format_percent(bin_row['mean_conf'])} | "
             f"{format_percent(bin_row['hit_rate'])} | "
             f"{format_percent(bin_row['wilson_lo'])}-{format_percent(bin_row['wilson_hi'])} |"
-            for bin_row in rel
+            for basis, bin_row in rel
         ]
     lines += [
         "",

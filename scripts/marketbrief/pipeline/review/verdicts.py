@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from marketbrief.analytics import scoring
+from marketbrief.analytics import call_basis, scoring
 from marketbrief.constants.config_keys import BY_MARKET_SUFFIX
 from marketbrief.constants.review import BASELINE, TARGETS
-from marketbrief.pipeline.review.summaries import by_horizon
+from marketbrief.pipeline.review.summaries import by_horizon, per_basis
 
 
 def compare(base: dict, var: dict) -> dict | None:
@@ -125,11 +125,16 @@ def proposals(ranges_config: dict, live: dict, hist: dict, market: str | None = 
 def proper_scores(ranges: pd.DataFrame, calls: pd.DataFrame) -> dict:
     """Brier, log loss and reliability for calls; interval and quantile scores for ranges (scoring.py)."""
     scored_calls = calls[calls["confidence"].notna() & calls["hit"].notna()] if not calls.empty else calls
-    out = {
-        "calls": by_horizon(scored_calls, scoring.call_scores) if not scored_calls.empty else {"all": {"n": 0}},
-        "reliability": scoring.reliability(scored_calls["confidence"], scored_calls["hit"])
+    out = {  # calls per scoring basis, never pooled (call_basis.py)
+        "calls": per_basis(scored_calls, lambda frame: by_horizon(frame, scoring.call_scores))
         if not scored_calls.empty
-        else [],
+        else {"all": {"n": 0}},
+        "reliability": {
+            call_basis.label(basis): scoring.reliability(group["confidence"], group["hit"])
+            for basis, group in scored_calls.groupby("label_basis", sort=True)
+        }
+        if not scored_calls.empty
+        else {},
         "ranges": by_horizon(ranges, scoring.range_scores) if not ranges.empty else {"all": {"n": 0}},
     }
     return out
@@ -143,19 +148,24 @@ def confidence_advice(bands: dict, calls: dict, review_config: dict) -> list[str
             band_stats.get("n", 0) >= review_config["min_n_calls"]
             and band_stats["gap"] < -review_config["calibration_tolerance"]
         ):
+            band_name, _, basis = band.partition(" · ")
             out.append(
-                f"Calls at {band} confidence hit {scoring.percent(band_stats['hit_rate'])} (mean stated "
+                f"Calls at {band_name} confidence{f' ({basis})' if basis else ''} hit "
+                f"{scoring.percent(band_stats['hit_rate'])} (mean stated "
                 f"{scoring.percent(band_stats['mean_confidence'])}, "
                 f"n={band_stats['n']}): use lower confidence or abstain in this band."
             )
-    all_calls = calls.get("all", {})
-    if (
-        all_calls.get("n", 0) >= review_config["min_n_calls"]
-        and all_calls["edge"] is not None
-        and all_calls["edge"] <= 0
-    ):
+    for key, all_calls in calls.items():  # 'all · <basis>': each scoring basis on its own
+        if not (
+            key.split(" · ")[0] == "all"
+            and all_calls.get("n", 0) >= review_config["min_n_calls"]
+            and all_calls["edge"] is not None
+            and all_calls["edge"] <= 0
+        ):
+            continue
+        basis = f" ({key.split(' · ')[1]})" if " · " in key else ""
         out.append(
-            f"Calls hit {scoring.percent(all_calls['hit_rate'])} vs always-up "
+            f"Calls{basis} hit {scoring.percent(all_calls['hit_rate'])} vs always-up "
             f"{scoring.percent(all_calls['always_up'])} (n={all_calls['n']}): no edge over the "
             "baseline; abstain more."
         )

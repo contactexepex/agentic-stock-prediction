@@ -95,8 +95,11 @@ CREATE OR REPLACE VIEW open_predictions AS
 SELECT p.* FROM predictions p
 WHERE p.id NOT IN (SELECT prediction_id FROM outcomes);
 
+-- Scored calls. label_basis: close_to_close (outcomes stored without it) or open_to_close (entry at the open of
+-- entry_date); the two are never pooled (analytics/call_basis.py).
 CREATE OR REPLACE VIEW track_record AS
-SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at
+SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at,
+       coalesce(o.label_basis, 'close_to_close') AS label_basis, o.entry_date, o.entry_open
 FROM predictions p JOIN outcomes o ON o.prediction_id = p.id;
 
 -- Where each stored bar came from: 'yahoo' unless data/<market>/price_sources/ names another
@@ -150,7 +153,7 @@ SELECT r.* FROM ranges_latest r WHERE r.id NOT IN (SELECT range_id FROM range_ou
 
 CREATE OR REPLACE VIEW range_record AS
 SELECT r.*, o.actual_close, o.z, o.hit50, o.hit80, o.naive_hit50, o.naive_hit80, o.is80_pct,
-       o.naive_is80_pct, o.width80_pct, o.naive_width80_pct, o.center_err_pct, o.naive_center_err_pct
+       o.naive_is80_pct, o.width80_pct, o.naive_width80_pct, o.center_err_pct, o.naive_center_err_pct, o.scored_at
 FROM ranges_latest r JOIN (SELECT DISTINCT ON (range_id) * FROM range_outcomes ORDER BY range_id, scored_at) o
   ON o.range_id = r.id;
 

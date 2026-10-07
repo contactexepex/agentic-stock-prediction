@@ -68,9 +68,10 @@ def gather(cfg: dict, con) -> dict:
         "by_regime": query("""SELECT horizon_days AS h, coalesce(regime, '?') AS regime, count(*) AS n,
                                  avg(hit50::INT) AS c50, avg(hit80::INT) AS c80, avg(naive_hit80::INT) AS nc80
                           FROM range_record GROUP BY ALL ORDER BY h, regime"""),
-        "direction": query(f"""SELECT horizon_days AS h, win, count(*) AS n, avg(hit::INT) AS hit,
+        "direction": query(f"""SELECT horizon_days AS h, label_basis, win, count(*) AS n, avg(hit::INT) AS hit,
                                   avg((actual_return > 0)::INT) AS up
-                           FROM ({WINDOWS.format(src="track_record")}) GROUP BY ALL ORDER BY h, win DESC"""),
+                           FROM ({WINDOWS.format(src="track_record")}) GROUP BY ALL
+                           ORDER BY h, label_basis, win DESC"""),
         "conf_bands": query(CONF_BANDS_SQL),
         "market": query(
             """SELECT ticker, close, ret_1d FROM returns WHERE date = ? AND list_contains(?, ticker)""",

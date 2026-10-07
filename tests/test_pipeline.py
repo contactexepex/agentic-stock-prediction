@@ -155,7 +155,7 @@ def test_scoring_and_context(tmp_path):
 
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
-    assert "| 5 | 2 | 0.5 |" in ctx.stdout                # 1 hit out of 2 scored
+    assert "| close_to_close | 5 | 2 | 0.5 |" in ctx.stdout   # 1 hit out of 2 scored, on the close basis
 
 
 def test_features_regime_and_context(tmp_path):
@@ -243,8 +243,9 @@ def fat_tailed_walk(rng, n: int, start: float, daily_vol: float) -> list[float]:
     return list(start * np.exp(np.cumsum(r)))
 
 
-def test_calibrate_ranges_and_scoring(tmp_path):
-    root, cfg = setup(tmp_path)
+def publish_ranges(root: Path, cfg: Path) -> tuple[dict, str, dict]:
+    """Calibrate on 520 synthetic sessions and publish one day's ranges with an AAPL 5-day call:
+    (series, made_at, ranges by id)."""
     rng = np.random.default_rng(11)
     days = weekdays(date(2024, 6, 3), 520)
     series = {"BENCH": fat_tailed_walk(rng, 520, 100, 0.01), "AAPL": fat_tailed_walk(rng, 520, 150, 0.015),
@@ -280,23 +281,36 @@ def test_calibrate_ranges_and_scoring(tmp_path):
         assert x["naive_lo80"] < x["base_close"] < x["naive_hi80"]
     assert a5["direction"] == "up" and a5["center"] > 0 and any("AI widened" in n for n in a5["notes"])
     assert m5["direction"] is None and m5["center"] == 0
+    return series, made_at, rows
 
-    # add the bars the ranges target and score them
-    targets = sorted({x["target_date"] for x in rows.values()})
-    for i, t in enumerate(targets):
+
+def score_targets(root: Path, cfg: Path, series: dict, made_at: str, rows: dict) -> None:
+    """Add the bars the ranges target and score them, on the clock of the ranges' made_at (so the HTML track
+    record, read as of made_at since issue #26, shows them)."""
+    for t in sorted({x["target_date"] for x in rows.values()}):
         d = date.fromisoformat(t)
         f = root / "data" / MARKET / "prices" / f"{d:%Y}" / f"{d:%m}" / f"{d}.csv"
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text("date,ticker,open,high,low,close,adj_close,volume,collected_at\n" +
                      "".join(f"{d},{k},{v[-1]},{v[-1]},{v[-1]},{v[-1]},{v[-1]},1000,2026-01-02T00:00:00+00:00\n"
                              for k, v in series.items()))
-    s = json.loads(run("score_predictions.py", root, cfg).stdout)
+    s = json.loads(run_at(made_at, "score_predictions.py", root, cfg).stdout)
     assert s["ranges_scored"] == 4 and s["ranges_open"] == 0
     assert s["hit80"] == 4                                      # unchanged price sits inside every range
     outs = [x for f in (root / "data" / MARKET / "range_outcomes").glob("**/*.jsonl")
             for x in map(json.loads, f.read_text().splitlines())]
     assert all(o["naive_hit80"] and o["width80_pct"] > 0 for o in outs)
 
+
+def run_at(now: str, script: str, root: Path, cfg: Path, *args: str) -> subprocess.CompletedProcess:
+    """A script run with MB_NOW set (the frozen clock)."""
+    env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET, "MB_NOW": now}
+    return subprocess.run([sys.executable, str(SCRIPTS / script), *args], cwd=SCRIPTS, env=env,
+                          capture_output=True, text=True, check=False)
+
+
+def check_charts_and_report(root: Path, cfg: Path) -> tuple[dict, dict, str]:
+    """charts.py and report.py on the scored day: (charts summary, report summary, report text)."""
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
     assert "Price ranges" in ctx.stdout and "Range scorecard" in ctx.stdout
@@ -314,13 +328,17 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     assert rep.returncode == 0, rep.stderr
     out = json.loads(rep.stdout)
     text = (root / out["report"]).read_text()
+    html_link = f"[{charts['session_date']}.html]({charts['session_date']}.html)"
     for needle in ("## Today", "<!-- AGENT:headline -->", "<!-- AGENT:top3 -->", "/ranges.png)", "/sectors.png)",
-                   "/track_record.png)", f"[{charts['session_date']}.html]({charts['session_date']}.html)", "80% hit 2/2",
+                   "/track_record.png)", html_link, "80% hit 2/2",
                    "## Track record", "<!-- AGENT:sector:Tech -->", "Market on ", "| 5d ▲ up 80% |",
                    "| 1d | since start | 2 |", "Ranges by regime", "Calls by confidence band"):
         assert needle in text, needle
+    return charts, out, text
 
-    # a filled report is kept by a re-run on the same data (only the Slack draft is rebuilt) ...
+
+def check_report_rebuilds(root: Path, cfg: Path, out: dict, text: str) -> Path:
+    """A filled report is kept by a re-run on the same data, rebuilt once the data changed."""
     rpath = root / out["report"]
     filled = re.sub(r"<!-- AGENT:[^>]*-->", "narrative", text)
     assert "<!-- report-data: as_of=" in filled
@@ -328,7 +346,6 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     again = run("report.py", root, cfg)
     assert again.returncode == 0 and json.loads(again.stdout)["report_kept"] is True
     assert rpath.read_text() == filled and (root / out["slack_draft"]).exists()
-    # ... but rebuilt (old copy saved, warning) once the data it was built from changed
     reg_file = sorted((root / "data" / MARKET / "regime").glob("**/*.jsonl"))[-1]
     last = json.loads(reg_file.read_text().splitlines()[-1])
     flipped = "UNSTABLE" if last["regime"] != "UNSTABLE" else "CALM"
@@ -341,12 +358,21 @@ def test_calibrate_ranges_and_scoring(tmp_path):
     assert "<!-- AGENT:headline -->" in rebuilt and f"regime={flipped} -->" in rebuilt
     forced = json.loads(run("report.py", root, cfg, "--force").stdout)
     assert forced["report_kept"] is False and "<!-- AGENT:headline -->" in rpath.read_text()
+    return rpath
+
+
+def notify(root: Path, cfg: Path, env_no_hook: dict, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py"), *args], cwd=SCRIPTS,
+                          capture_output=True, text=True,
+                          env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+
+
+def check_html_and_slack(root: Path, cfg: Path, charts: dict, out: dict, rpath: Path) -> None:
+    """The Slack draft, the HTML report (only from a filled report) and notify_slack.py's refusals and dry run."""
     slack = (root / out["slack_draft"]).read_text()
     assert "Calls today: 1 · AAPL ▲ up 80% (5 days, 80% range $" in slack
     assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.html") and out["url"] in slack
     assert len(slack.strip().splitlines()) <= 12
-
-    # the HTML report is built only from a filled report
     bad = run("html_report.py", root, cfg)
     assert bad.returncode == 1 and "AGENT markers" in bad.stdout
     rpath.write_text(re.sub(r"<!-- AGENT:[^>]*-->", "narrative", rpath.read_text()))
@@ -360,28 +386,30 @@ def test_calibrate_ranges_and_scoring(tmp_path):
 
     # notify refuses unfilled drafts, then (without a token or webhook) reports exit code 2
     env_no_hook = {k: v for k, v in os.environ.items() if k not in ("SLACK_WEBHOOK_URL", "SLACK_BOT_TOKEN")}
-    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
-                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    nb = notify(root, cfg, env_no_hook)
     assert nb.returncode == 1 and "AGENT markers" in nb.stdout
     draft = root / out["slack_draft"]
     draft.write_text(re.sub(r"<!-- AGENT:top3[^>]*-->", "• one\n• two\n• three", draft.read_text()))
-    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py")], cwd=SCRIPTS, capture_output=True, text=True,
-                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    nb = notify(root, cfg, env_no_hook)
     assert nb.returncode == 2 and "AGENT" not in json.loads(nb.stdout)["text"]
     # dry run: the planned thread (summary, charts, HTML) and its files land in work/
-    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py"), "--dry-run"], cwd=SCRIPTS,
-                        capture_output=True, text=True,
-                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    nb = notify(root, cfg, env_no_hook, "--dry-run")
     assert nb.returncode == 0, nb.stdout + nb.stderr
     plan = json.loads((root / json.loads(nb.stdout)["plan"]).read_text())
     assert [s["step"] for s in plan["thread"]] == ["summary", "charts", "report"]
     assert (root / "work" / f"slack_{MARKET}_plan" / f"{charts['session_date']}.html").exists()
-
     # holiday path: one free-text line, no draft needed
-    nb = subprocess.run([sys.executable, str(SCRIPTS / "notify_slack.py"), "--text", "Test market: market closed today"],
-                        cwd=SCRIPTS, capture_output=True, text=True,
-                        env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
+    nb = notify(root, cfg, env_no_hook, "--text", "Test market: market closed today")
     assert nb.returncode == 2 and json.loads(nb.stdout)["text"] == "Test market: market closed today\n"
+
+
+def test_calibrate_ranges_and_scoring(tmp_path):
+    root, cfg = setup(tmp_path)
+    series, made_at, rows = publish_ranges(root, cfg)
+    score_targets(root, cfg, series, made_at, rows)
+    charts, out, text = check_charts_and_report(root, cfg)
+    rpath = check_report_rebuilds(root, cfg, out, text)
+    check_html_and_slack(root, cfg, charts, out, rpath)
 
 
 def test_backtest_coverage_is_calibrated(tmp_path):

@@ -211,8 +211,10 @@ def test_events_time_jpm_results_before_the_open(tmp_path, monkeypatch):
     rows, failed = events_sec.sec_earnings(cfg, {"JPM": {}}, "t t@example.com", reports, times)
     assert failed == [] and rows == {"JPM": [(date(2026, 7, 14), "before_open", 0)]}
     assert event_timing.timing(cfg, pd.Timestamp("2026-07-14T14:30:38Z")) == (date(2026, 7, 14), "during")   # the JSON's
-    assert sorted(reports["JPM"]) == [(date(2026, 2, 13), "after_close", "10-K", date(2025, 12, 31)),
-                                      (date(2026, 8, 6), "after_close", "10-Q", date(2026, 6, 30))]
+    assert [report[:4] for report in sorted(reports["JPM"])] == [
+        (date(2026, 2, 13), "after_close", "10-K", date(2025, 12, 31)),
+        (date(2026, 8, 6), "after_close", "10-Q", date(2026, 6, 30))]
+    assert all(report[4] is not None for report in reports["JPM"])   # and the acceptance time (issue #24)
     assert times == {"ok": 0, "shifted": ["19617"], "unverified": {}}
 
 

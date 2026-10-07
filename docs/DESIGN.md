@@ -1235,7 +1235,8 @@ scheduled routine honours per-subagent `model:`/`effort:` is not documented; the
 must confirm it from the transcript (model per subagent call). The intent is to compare the track record before and after this change: prompt versions were bumped with it
 (forecast-v8, news-v6, graph-v3; forecast-v9, news-v7, graph-v4 after the validation-gate edits, forecast-v9
 also covering the forecaster's lessons bullet; forecast-v10, news-v8 and claims-v3 with news verification phase B;
-forecast-v11 with the signal-model anchor and the debate record (section 15);
+forecast-v11 with the signal-model anchor and the debate record (section 15); forecast-v12 when calls
+are scored open-to-close from the `call_scoring` switch (section 6);
 reflect-v1 started with the Sonnet 5.5 / medium frontmatter; news-v9 and reflect-v2 only reword the schema path and
 the lessons gate), and a per-call `model` field on predictions is a planned follow-up.
 

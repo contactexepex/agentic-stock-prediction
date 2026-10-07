@@ -275,7 +275,9 @@ Warnings never block: list them in `data_quality`.
     track record) and `reports/<market>/index.html` from the validated report plus the stored data,
     and lists the files for Slack in `work/slack_<market>_files.json`. It adds no narrative of its
     own (numbers come from the data, text is copied from the validated report), so it needs no
-    further check. If it fails, list the failure in the Slack failures line and post anyway.
+    further check. If it fails, add the failure to the Slack draft's failures line, then run
+    `python scripts/validate.py --stage report` again, so the draft that is posted is the one the gate
+    checked (one retry, as for the report), and post anyway.
 
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then

@@ -1,6 +1,9 @@
 """Score open predictions and open price ranges whose horizon has passed. Horizons count
-trading days (price bars). Prediction base = last close on or before as_of_date; a range is
-scored on its target_date close. Writes outcome records; never edits predictions or ranges.
+trading days (price bars). A call is scored on its basis (analytics/call_basis.py, stored as `label_basis`):
+close_to_close = the last close on or before as_of_date to the close h bars later (every call made before
+config/settings.yaml call_scoring.from); open_to_close = the open of the next bar (D) to the close of D+1 (1-day)
+or D+4 (5-day), with `entry_date` and `entry_open`; no open, no score (counted under `no_entry_open`). A range is
+scored on its target_date close. Writes outcome records; never edits predictions, ranges or stored outcomes.
 Late records are never scored: a range or call made at or after the open of the first session
 after its as_of_date (a mid-session or late run) already knew part of its outcome (CLAUDE.md:
 nothing after made_at), whatever its horizon, so it stays out of the track record and is counted
@@ -22,7 +25,8 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from marketbrief.analytics import price_adjustments, range_math, scoring
+from marketbrief.analytics import call_basis, price_adjustments, range_math, scoring
+from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
 from marketbrief.core import calendar
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
@@ -40,6 +44,8 @@ def is_late(cfg: dict, as_of, made_at) -> bool:
     return pd.Timestamp(made_at).to_pydatetime() >= calendar.session_open_utc(cfg, first)
 
 
+# every open call with its as-of bar, the entry bar (the next one, with its open) and the bars that close each
+# basis: close_to_close at rn + h, open_to_close at rn + 2 (1-day) or rn + 5 (5-day) (call_basis.target_offset)
 SQL = """
 WITH base AS (
     SELECT p.id, p.ticker, p.horizon_days, p.direction, p.as_of_date, p.made_at,
@@ -47,11 +53,14 @@ WITH base AS (
     FROM open_predictions p
     ASOF JOIN bars b ON p.ticker = b.ticker AND p.as_of_date >= b.date
 )
-SELECT base.id, base.ticker, base.as_of_date, base.made_at, base.base_date, base.base_close, t.date, t.close,
-       t.close / base.base_close - 1 AS ret,
-       CASE WHEN base.direction = 'up' THEN t.close > base.base_close
-            ELSE t.close < base.base_close END AS hit
-FROM base JOIN bars t ON t.ticker = base.ticker AND t.rn = base.rn + base.horizon_days
+SELECT base.*, e.date AS entry_date, eo.open AS entry_open, c.date AS c2c_date, c.close AS c2c_close,
+       o.date AS o2c_date, o.close AS o2c_close
+FROM base
+LEFT JOIN bars e ON e.ticker = base.ticker AND e.rn = base.rn + 1
+LEFT JOIN ohlc eo ON eo.ticker = e.ticker AND eo.date = e.date
+LEFT JOIN bars c ON c.ticker = base.ticker AND c.rn = base.rn + base.horizon_days
+LEFT JOIN bars o ON o.ticker = base.ticker
+     AND o.rn = base.rn + CASE base.horizon_days WHEN 1 THEN ? WHEN 5 THEN ? END
 ORDER BY base.id, base.made_at
 """
 
@@ -114,46 +123,52 @@ def score_ranges(cfg: dict, con, now: str) -> tuple[list[dict], int]:
     return out, late
 
 
+def missing(value) -> bool:
+    """True for a missing or non-positive price."""
+    return value is None or value != value or value <= 0
+
+
+def score_calls(cfg: dict, con, now: str) -> tuple[list[dict], int, int]:
+    """(outcome rows, late calls, calls whose entry session has no open) of the open calls that matured on
+    their basis (call_basis.basis_for: close_to_close, or open_to_close from the configured switch). Prices come
+    from the bars view (one basis), so the return and the hit hold across a split; the stored prices are put
+    back in the basis the call saw (record_basis)."""
+    rule = call_basis.switch()
+    offsets = [call_basis.target_offset(LABEL_OPEN_TO_CLOSE, horizon) for horizon in (1, 5)]
+    rows, late, no_open = [], 0, 0
+    adjs = load_adjustments(con)
+    for row in con.execute(SQL, offsets).df().itertuples():
+        basis = call_basis.basis_for(row.made_at, rule)
+        target_date, target_close = (row.o2c_date, row.o2c_close) if basis == LABEL_OPEN_TO_CLOSE else (
+            row.c2c_date, row.c2c_close)
+        if missing(target_close):
+            continue  # not matured yet
+        if is_late(cfg, row.as_of_date, row.made_at):
+            late += 1
+            continue
+        entry = row.entry_open if basis == LABEL_OPEN_TO_CLOSE else row.base_close
+        if missing(entry):
+            no_open += 1  # open_to_close needs the entry session's open: no open, no score
+            continue
+        key = record_basis(adjs, row.ticker, row.base_date, row.made_at)
+        out = {"prediction_id": row.id, "scored_at": now, "base_date": str(pd.Timestamp(row.base_date).date()),
+               "base_close": row.base_close / key, "target_date": str(pd.Timestamp(target_date).date()),
+               "target_close": target_close / key, "actual_return": round(target_close / entry - 1, 6),
+               "hit": bool(target_close > entry if row.direction == "up" else target_close < entry),
+               "label_basis": basis}
+        if basis == LABEL_OPEN_TO_CLOSE:
+            out |= {"entry_date": str(pd.Timestamp(row.entry_date).date()), "entry_open": entry / key}
+        rows.append(out)
+    return rows, late, no_open
+
+
 def main() -> int:
     """Score open calls and ranges and print the summary with the proper scores."""
     cfg = require_market(market_arg(__doc__).parse_args())
     market = cfg["market"]
     con = connect(market)
     now = utc_now()
-    rows, late_calls = [], 0
-    adjs = load_adjustments(con)
-    for (
-        pid,
-        ticker,
-        as_of,
-        made_at,
-        base_date,
-        base_close,
-        target_date,
-        target_close,
-        realized_return,
-        hit,
-    ) in con.execute(SQL).fetchall():
-        if is_late(cfg, as_of, made_at):
-            late_calls += 1
-            continue
-        # base and target both come from the bars view (one basis), so the return and the hit hold
-        # across a split; the two closes are stored in the basis the call saw (record_basis)
-        key = record_basis(adjs, ticker, base_date, made_at)
-        if key != 1:
-            base_close, target_close = base_close / key, target_close / key
-        rows.append(
-            {
-                "prediction_id": pid,
-                "scored_at": now,
-                "base_date": str(base_date),
-                "base_close": base_close,
-                "target_date": str(target_date),
-                "target_close": target_close,
-                "actual_return": round(realized_return, 6),
-                "hit": bool(hit),
-            }
-        )
+    rows, late_calls, no_open = score_calls(cfg, con, now)
     written = append_jsonl(day_file(market, "outcomes", utc_today()), rows)
     open_left = con.execute("SELECT count(*) FROM open_predictions").fetchone()[0] - written - late_calls
     ranges, late_ranges = score_ranges(cfg, con, now)
@@ -169,6 +184,7 @@ def main() -> int:
                 "scored": written,
                 "still_open": open_left,
                 "late_skipped": {"calls": late_calls, "ranges": late_ranges},
+                "no_entry_open": no_open,
                 "ranges_scored": r_written,
                 "ranges_open": r_open,
                 "hit80": sum(row["hit80"] for row in ranges),

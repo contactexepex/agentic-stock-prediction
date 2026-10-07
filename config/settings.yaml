@@ -9,3 +9,11 @@ slack_channel_id: C0C6REB7QS2   # notify_slack.py posts the thread here with SLA
 # (the model may have seen what happened), refused by `prepare` unless --allow-training-period, and
 # always scored separately, never pooled with fair ones. Change it when the model changes.
 model_training_cutoff: 2026-06-30
+# How direction calls are scored (analytics/call_basis.py, docs/DESIGN.md section 6): calls made at or after
+# `from` are scored open_to_close (the owner's trade: buy at the open of D, the first session after the as-of
+# close; sell at the close of D+1 for a 1-day call, D+4 for a 5-day call; no open, no score). Calls made
+# before stay close_to_close and their stored outcomes are never rescored; summaries never pool the two.
+# Set `from` to when the code with this switch runs live (owner-approved 2026-10-07).
+call_scoring:
+  label_basis: open_to_close
+  from: "2026-10-08T00:00:00+00:00"

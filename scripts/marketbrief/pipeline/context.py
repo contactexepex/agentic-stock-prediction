@@ -180,12 +180,13 @@ window,
             [],
         ),
         (
-            "Track record by horizon (all time; vs always-up baseline)",
+            "Track record by horizon (all time; vs always-up baseline; per scoring basis, never pooled: "
+            "close_to_close = as-of close to target close, open_to_close = next open to the close of D+1/D+4)",
             """
-            SELECT horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
+            SELECT label_basis, horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
                    round(avg((actual_return > 0)::INT), 3) AS always_up_rate,
                    round(avg(TRY_CAST(confidence AS DECIMAL(38,10))), 3) AS avg_confidence
-            FROM track_record GROUP BY horizon_days ORDER BY horizon_days""",
+            FROM track_record GROUP BY label_basis, horizon_days ORDER BY label_basis, horizon_days""",
             [],
         ),
         (
@@ -193,8 +194,9 @@ window,
             """
             SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59'
                         WHEN confidence < 0.7 THEN '0.60-0.69' ELSE '0.70+' END AS band,
-                   count(*) AS n, round(avg(hit::INT), 3) AS hit_rate
-            FROM track_record WHERE target_date >= current_date - 90 GROUP BY band ORDER BY band""",
+                   label_basis, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate
+            FROM track_record WHERE target_date >= current_date - 90
+            GROUP BY band, label_basis ORDER BY band, label_basis""",
             [],
         ),
     ]

@@ -58,6 +58,10 @@ SLOW = {
         "test_score_cli_on_recorded_calls",
         "test_training_cutoff_comes_from_config",
     },
+    "tests/test_call_basis.py": {
+        "test_no_entry_open_no_score_and_old_rows_read_as_close_to_close",
+        "test_scoring_bases_match_the_model_labels",
+    },
     "tests/test_determinism.py": {
         "test_score_predictions_queries",
         "test_views_insider_flow_and_split_factors",
@@ -68,6 +72,7 @@ SLOW = {
     "tests/test_guard.py": {
         "test_context_and_report_label_mid_session_ranges_late",
         "test_context_pack_labels_late_ranges",
+        "test_late_calls_left_out_of_slack_count_and_news_window",
         "test_market_status_cli_now",
         "test_ranges_cli_in_session_flag",
         "test_ranges_cli_late_flag",
@@ -76,6 +81,7 @@ SLOW = {
         "test_report_labels_late_ranges_and_links_the_review",
         "test_scoring_skips_every_horizon_made_after_the_open",
         "test_scoring_skips_records_made_after_the_first_session_closed",
+        "test_slack_ranges_line_says_late",
     },
     "tests/test_judge_fails.py": {
         "test_context_pack_prints_the_section",

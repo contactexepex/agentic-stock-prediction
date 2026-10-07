@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from marketbrief.analytics.call_basis import label as basis_label
 from marketbrief.constants.report import MSG_RANGES_LATE
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation.report.formatting import review_line
@@ -13,10 +14,15 @@ from marketbrief.utils.money import format_money
 from view_data import fmt_call
 
 
+def calls_by_basis(scored_calls: pd.DataFrame) -> str:
+    """Scored calls per scoring basis, never pooled: '2/3 close→close, 1/1 open→close'."""
+    return ", ".join(f"{int(group['hit'].sum())}/{len(group)} {basis_label(basis)}"
+                     for basis, group in scored_calls.groupby("label_basis", sort=True))
+
+
 def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tuple[str, str]:
     """The Slack summary draft and the link to the HTML report."""
     session, market = parts.session, parts.market
-    calls_hit = parts.calls_hit
     cur = parts.cur
     h50 = parts.h50
     h80 = parts.h80
@@ -71,7 +77,7 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
         call_line,
         (
             f"Yesterday: next-day 80% ranges hit {h80}/{one_day_count} (naive {nh80}/{one_day_count}) · 50% hit "
-            f"{h50}/{one_day_count}" + (f" · calls {calls_hit}/{len(scored_calls)}" if len(scored_calls) else "")
+            f"{h50}/{one_day_count}" + (f" · calls {calls_by_basis(scored_calls)}" if len(scored_calls) else "")
         )
         if one_day_count
         else "Yesterday: no ranges matured yet.",

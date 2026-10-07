@@ -38,8 +38,9 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   score, |adjustment| <= 0.10, the reason, the direction and the confidence. A ticker without a model
   row: decide as below and leave the three fields out (the gate warns MODEL_SCORE_MISSING). Note: the
   model's label is open-to-close (buy at the open of the first session after the as-of close, sell at the
-  close of the next session for 1 day, of the fifth for 5 days), while `score_predictions.py` still scores
-  calls close-to-close.
+  close of the next session for 1 day, of the fifth for 5 days), and from `call_scoring.from` in
+  `config/settings.yaml` on `score_predictions.py` scores your calls the same way: `up` means that close is
+  above that open. Older calls stay scored close-to-close; the track record shows the two bases apart.
 - Start from the base rate: roughly half of daily moves are up; a call needs specific evidence.
 - Prefer abstaining when evidence is mixed, stale or already reflected in recent returns.
 - Hard blocks (no call): indicator quality `BLOCKED`; `days_to_earnings` <= 1.
@@ -79,7 +80,7 @@ For each ticker decide: `up`, `down`, or abstain, for horizon 5 (default) and op
   your call adds a small capped drift to that range's centre.
 - `made_at`: current UTC time (ISO 8601, e.g. `date -u +%FT%T+00:00`); every cited id must have been
   published before it.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v11".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v12".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs
@@ -92,7 +93,7 @@ Debate record: also write `work/reasoning.jsonl`, one line per watchlist ticker 
 their cited ids), `verdict` (your reason, at most 60 words), `decision_1d` and `decision_5d` (`up`,
 `down` or `abstain`, as in your calls), `evidence_ids` (every news, filing or announcement id cited in the
 three texts) and `prediction_ids` (the ids of your calls for this ticker), and `prompt_version`
-"forecast-v11". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
+"forecast-v12". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
 the dashboard can show why each call was made or not.
 
 Return a table of calls and abstentions with 1-line reasons.

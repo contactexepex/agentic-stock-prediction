@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 
+from marketbrief.analytics import call_basis
 from marketbrief.analytics.features import load_bars
 from marketbrief.constants.review import DEFAULTS, MSG_HISTORY_ABLATION_SKIPPED
 from marketbrief.core import paths
@@ -48,6 +49,7 @@ from marketbrief.pipeline.review.summaries import (
     confidence_bands,
     load_calls,
     load_ranges,
+    per_basis,
     range_summary,
 )
 from marketbrief.pipeline.review.verdicts import (
@@ -76,8 +78,9 @@ def build(
         "ranges": {
             window: by_horizon(rows_since(ranges, start_date), range_summary) for window, start_date in windows.items()
         },
-        "calls": {
-            window: by_horizon(rows_since(calls, start_date), call_summary) for window, start_date in windows.items()
+        "calls": {  # per scoring basis, never pooled (call_basis.py)
+            window: per_basis(rows_since(calls, start_date), lambda frame: by_horizon(frame, call_summary))
+            for window, start_date in windows.items()
         },
         "breakdowns": {
             window: {
@@ -88,7 +91,9 @@ def build(
             for window, start_date in windows.items()
         },
         "bands": {
-            window: confidence_bands(rows_since(calls, start_date), review_config["confidence_bands"])
+            window: per_basis(
+                rows_since(calls, start_date), lambda frame: confidence_bands(frame, review_config["confidence_bands"])
+            )
             for window, start_date in windows.items()
         },
     }
@@ -123,7 +128,10 @@ def build(
         review_data["proposals"].append(proposal)
     review_data["advice"] = confidence_advice(review_data["bands"]["all"], review_data["calls"]["all"], review_config)
 
-    range_all, call_all = review_data["ranges"]["all"]["all"], review_data["calls"]["all"]["all"]
+    # the record's call columns are of the current basis (the newest scored call's), named in call_basis_all
+    basis = call_basis.current(calls)
+    range_all = review_data["ranges"]["all"]["all"]
+    call_all = review_data["calls"]["all"].get(f"all · {call_basis.label(basis)}", {}) if basis else {}
     rec = {
         "id": week,
         "week": week,
@@ -134,8 +142,9 @@ def build(
         "n_ranges_week": review_data["ranges"]["week"]["all"]["n"],
         "n_ranges_30d": review_data["ranges"]["rolling"]["all"]["n"],
         "n_ranges_all": range_all["n"],
-        "n_calls_week": review_data["calls"]["week"]["all"]["n"],
-        "n_calls_all": call_all["n"],
+        "n_calls_week": len(rows_since(calls, start)),
+        "n_calls_all": len(calls),
+        "call_basis_all": basis,
         "cover50_all": range_all.get("cover50"),
         "cover80_all": range_all.get("cover80"),
         "score80_all": range_all.get("score80_pct"),

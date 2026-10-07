@@ -220,6 +220,47 @@ def test_slack_ranges_line_says_late(market, now, late):
     assert line.endswith("are in the report.") is not late
 
 
+def full_regime(root: Path) -> None:
+    jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
+                                   "computed_at": "2026-10-05T11:01:00+00:00", "regime": "CALM", "stress": False,
+                                   "vol_level": 15.0, "notes": [], "major_event": False, "major_event_names": []}])
+
+
+@pytest.mark.parametrize("now, late", [("2026-10-05T11:30:00+00:00", False), ("2026-10-05T20:40:00+00:00", True)])
+def test_late_calls_left_out_of_slack_count_and_news_window(market, monkeypatch, now, late):
+    """Issue #26: a call on a late range is not counted in Slack or the HTML calls; a company's news is the news
+    published in the NEWS_LOOKBACK_DAYS before the ranges' made_at, nothing after it."""
+    import common
+    import view_data
+    from marketbrief.core.market_config import load_market
+
+    root, cfg_dir, _, _ = market
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    full_regime(root)
+    jsonl(root, "predictions", AS_OF, [{"id": f"{AS_OF}-AAPL-5d", "made_at": "2026-10-05T11:20:00+00:00",
+                                        "as_of_date": str(AS_OF), "ticker": "AAPL", "horizon_days": 5,
+                                        "direction": "up", "confidence": 0.6, "rationale": "t", "evidence_ids": [],
+                                        "prompt_version": "test", "range_widen": None}])
+    made = at(now)
+    base = {"url": "https://example.com/n", "source": "Fixture", "tickers": ["AAPL"], "primary_tickers": ["AAPL"],
+            "mentioned_tickers": [], "tag_confidence": "high"}
+    jsonl(root, "news", AS_OF, [
+        {**base, "id": f"n{k}", "title": f"Apple {k}", "published_at": (made + shift).isoformat(),
+         "first_seen_at": (made + shift).isoformat()}
+        for k, shift in (("old", -timedelta(days=view_data.NEWS_LOOKBACK_DAYS, hours=1)), ("in", -timedelta(days=1)),
+                         ("after", timedelta(hours=1)))])
+    assert run("ranges.py", root, cfg_dir, "--now", now).returncode == 0
+    rep = run("report.py", root, cfg_dir)
+    assert rep.returncode == 0, rep.stderr
+    slack = (root / json.loads(rep.stdout)["slack_draft"]).read_text()
+    assert slack.count("Calls today: none.") == int(late) and ("Calls today: 1 · AAPL" in slack) is not late
+    monkeypatch.setattr(common, "CONFIG", cfg_dir)
+    view = view_data.gather_view(load_market(MARKET), connect(MARKET))
+    aapl = next(c for c in view["companies"] if c["ticker"] == "AAPL")
+    assert len(aapl["calls"]) == (0 if late else 1)
+    assert [n["id"] for n in aapl["news"]] == ["nin"]
+
+
 # ---------- scoring never counts late records ----------
 
 def test_scoring_skips_records_made_after_the_first_session_closed(market):

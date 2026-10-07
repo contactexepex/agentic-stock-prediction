@@ -189,6 +189,18 @@ def test_narrative_links_sources_and_flags_unknown_ids():
     assert "<script>" not in n2["headline"] and "&lt;script&gt;" in n2["headline"]
 
 
+def test_inline_keeps_titles_intact_and_survives_nul_and_long_words():
+    """Issue #26: a source title with "Bull:" gets no markup inside its title attribute; a literal NUL
+    placeholder in the narrative raises nothing; long unbroken words wrap on phones."""
+    src = {"abcdef0123456789": {"source": "Reuters", "title": "Bull: shares jump", "url": "https://example.com/x"}}
+    used: set = set()
+    out = hr._inline("Bull: strong demand abcdef0123456789", src, used)
+    assert 'title="Bull: shares jump"' in out and out.startswith('<strong class="bull">Bull:</strong>')
+    assert out.count("<strong") == 1
+    assert hr._inline("odd \x000\x00 text [a](https://example.com/a)", {}, set()).startswith("odd 0 text <a href=")
+    assert "font:15px/1.5 var(--font);overflow-wrap:anywhere}" in Path(hr.__file__).read_text()   # body rule
+
+
 BAD_URLS = ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "JaVaScRiPt:alert(1)",
             "  javascript:alert(1)", "\tdata:text/html;base64,PHNjcmlwdD4="]
 

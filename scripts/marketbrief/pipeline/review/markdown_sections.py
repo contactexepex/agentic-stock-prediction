@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from marketbrief.analytics import scoring
 from marketbrief.constants.review import EARNINGS_5D
+from marketbrief.constants.scoring import BASIS_NOTE
 from marketbrief.pipeline.review.markdown_cells import flag, fnum, fpct, range_row
 from marketbrief.utils.markdown import markdown_table
 
@@ -125,7 +126,8 @@ def call_lines(review_config, review_data, win_names) -> list[str]:
     lines += [
         "## Direction calls",
         "",
-        "Hit rate vs the always-up baseline on the same tickers and dates.",
+        "Hit rate vs the always-up baseline on the same tickers and dates. " + BASIS_NOTE
+        + " H and Band name the basis.",
         "",
         markdown_table(["Window", "H", "n", "Hit rate", "Always-up", "Edge", "Mean conf.", "Flag"], rows),
         "### By confidence band",
@@ -167,15 +169,17 @@ def score_lines(review_config, review_data, win_names) -> list[str]:
         for window, per in review_data["scores"].items()
         for horizon, stats in per["calls"].items()
     ]
-    rel_rows = [
+    rel_rows = [  # per scoring basis
         [
+            basis,
             row["bin"],
             row["n"],
             fpct(row["mean_conf"]),
             fpct(row["hit_rate"]),
             f"{fpct(row['wilson_lo'])} to {fpct(row['wilson_hi'])}" if row["n"] else "–",
         ]
-        for row in review_data["scores"]["all"]["reliability"]
+        for basis, rows in review_data["scores"]["all"]["reliability"].items()
+        for row in rows
     ]
     rq_rows = [
         [
@@ -201,7 +205,7 @@ def score_lines(review_config, review_data, win_names) -> list[str]:
         markdown_table(["Window", "H", "n", "Brier", "Log loss", "Skill", "Flag"], sc_rows),
         "### Reliability (since start): stated confidence vs hit rate",
         "",
-        markdown_table(["Confidence", "n", "Mean stated", "Hit rate", "Wilson 95%"], rel_rows),
+        markdown_table(["Basis", "Confidence", "n", "Mean stated", "Hit rate", "Wilson 95%"], rel_rows),
         "### Ranges: interval and quantile scores",
         "",
         "In % of price, lower is better. Quantile score = mean pinball loss over the four published quantiles "

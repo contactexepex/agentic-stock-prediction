@@ -298,8 +298,9 @@ def test_review_end_to_end(tmp_path):
     for key in ("regime", "sector", "note"):                                  # windows nest: week <= 30d <= all
         n = {w: sum(x["n"] for x in b[w][key].values()) for w in b}
         assert 0 < n["week"] < n["rolling"] < n["all"], (key, n)
-    assert 0 < d["bands"]["week"]["80%-90%"]["n"] < d["bands"]["rolling"]["80%-90%"]["n"] < 40
-    assert d["bands"]["all"]["80%-90%"]["n"] == 40
+    band = "80%-90% · close→close"                                         # one scoring basis (before the switch)
+    assert 0 < d["bands"]["week"][band]["n"] < d["bands"]["rolling"][band]["n"] < 40
+    assert d["bands"]["all"][band]["n"] == 40
 
     # since-start coverage equals the scored outcomes on disk
     outs = [json.loads(x) for f in (root / "data" / tp.MARKET / "range_outcomes").glob("**/*.jsonl")
@@ -395,7 +396,8 @@ def window_con(target_dates: list[date]):
         "naive_hit80": True, "is80_pct": 10.0, "naive_is80_pct": 6.0, "width80_pct": 10.0, "naive_width80_pct": 6.0}
         for i, d in enumerate(target_dates)])
     calls = pd.DataFrame([{"id": f"c{i}", "target_date": d, "horizon_days": 1,  # noqa: F841
-                           "confidence": 0.85, "hit": True, "actual_return": 0.01} for i, d in enumerate(target_dates)])
+                           "confidence": 0.85, "hit": True, "actual_return": 0.01, "label_basis": "close_to_close",
+                           "made_at": pd.Timestamp(d, tz="UTC")} for i, d in enumerate(target_dates)])
     con.execute("CREATE TABLE range_record AS SELECT * FROM ranges")
     con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
     return con
@@ -410,11 +412,13 @@ def test_window_boundaries_and_no_data_after_the_week():
     rec, d = cli.build(cfg, RC, rv, window_con(dates), "2026-W40", history=False)
     # week: start, end · 30 days: end-29 .. end · since start: all up to end (end+1 is after the week)
     assert (rec["n_ranges_week"], rec["n_ranges_30d"], rec["n_ranges_all"]) == (2, 4, 5)
-    assert {w: d["calls"][w]["all"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
-    assert {w: d["bands"][w]["80%-90%"]["n"] for w in d["bands"]} == {"week": 2, "rolling": 4, "all": 5}
+    assert {w: d["calls"][w]["all · close→close"]["n"] for w in d["calls"]} == {"week": 2, "rolling": 4, "all": 5}
+    assert {w: d["bands"][w]["80%-90% · close→close"]["n"] for w in d["bands"]} == {"week": 2, "rolling": 4,
+                                                                                    "all": 5}
     assert {w: d["breakdowns"][w]["sector"]["Tech · 1d"]["n"] for w in d["breakdowns"]} == \
         {"week": 2, "rolling": 4, "all": 5}
     assert rec["detail"]["live_ablation"]["n"] == 5 and rec["n_calls_all"] == 5
+    assert (rec["call_basis_all"], rec["n_calls_week"]) == ("close_to_close", 2)
 
 
 def test_confidence_bands_edges():
