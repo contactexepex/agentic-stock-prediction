@@ -2,7 +2,7 @@
 // MOTHERDUCK_READ_TOKEN, the inbox in market_brief_inbox with MOTHERDUCK_INBOX_TOKEN (its own service account).
 // Pool size 1, statement timeout 5 s, TLS verified, no retries inside a request. Errors never carry driver text out.
 import pg from "pg";
-import type { AgentUsage, CommandLogRow, InboxRequest, InboxStore, ReadModelRow, ReadStore } from "./types.ts";
+import type { AgentUsage, CommandLogRow, InboxRequest, InboxStore, ReadModelRow, ReadStore, StoredRequest } from "./types.ts";
 import { READ_MODEL_TABLES } from "./reads.ts";
 import { INBOX_SQL_STATEMENTS as SQL, READ_MODEL_COLUMNS } from "./sql.ts";
 
@@ -66,14 +66,15 @@ export class MotherDuckReadStore implements ReadStore {
   }
 }
 
-function requestFrom(row: Record<string, unknown>): InboxRequest {
+function storedFrom(row: Record<string, unknown>): StoredRequest {
   return {
-    inbox_id: String(row.inbox_id), kind: String(row.kind), tool: String(row.tool), market: String(row.market),
-    arguments: json(row.arguments) as InboxRequest["arguments"], preview: json(row.preview) as InboxRequest["preview"],
-    channel: String(row.channel) as InboxRequest["channel"], submitted_by: String(row.submitted_by), agent: String(row.agent),
-    command_id: String(row.command_id), submitted_at: iso(row.submitted_at) ?? "", args_sha256: String(row.args_sha256),
+    inbox_id: String(row.inbox_id), tool: String(row.tool), submitted_by: String(row.submitted_by),
+    command_id: String(row.command_id), args_sha256: String(row.args_sha256),
   };
 }
+
+/** Company commands go to B1's inbox.company_commands; every other write (add_paper_trade) to inbox.requests. */
+export const COMPANY_KIND = "watchlist_events";
 
 export class MotherDuckInboxStore implements InboxStore {
   readonly query: Query;
@@ -92,15 +93,18 @@ export class MotherDuckInboxStore implements InboxStore {
     };
   }
 
-  async claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: InboxRequest | null }> {
-    const inserted = await this.query(SQL.claim,
-      [row.inbox_id, row.kind, row.tool, row.market, JSON.stringify(row.arguments),
-        row.preview === null ? null : JSON.stringify(row.preview), row.channel, row.submitted_by, row.agent,
-        row.command_id, row.submitted_at, row.args_sha256, budget.sinceIso, budget.limit],
-    );
+  async claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: StoredRequest | null }> {
+    const preview = row.preview === null ? null : JSON.stringify(row.preview);
+    const inserted = row.kind === COMPANY_KIND
+      ? await this.query(SQL.claimCompany,
+        [row.inbox_id, row.market, row.tool, JSON.stringify(row.arguments), row.submitted_by, row.channel, row.submitted_at,
+          row.command_id, preview, row.agent, row.args_sha256, budget.sinceIso, budget.limit])
+      : await this.query(SQL.claimRequest,
+        [row.inbox_id, row.kind, row.tool, row.market, JSON.stringify(row.arguments), preview, row.channel, row.submitted_by,
+          row.agent, row.command_id, row.submitted_at, row.args_sha256, budget.sinceIso, budget.limit]);
     if (inserted.rows.length) return { claimed: true, existing: null };
     const { rows } = await this.query(SQL.existing, [row.inbox_id]);
-    return { claimed: false, existing: rows[0] ? requestFrom(rows[0]) : null };
+    return { claimed: false, existing: rows[0] ? storedFrom(rows[0]) : null };
   }
 
   async appendCommand(row: CommandLogRow): Promise<void> {
