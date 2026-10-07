@@ -453,7 +453,7 @@ const CAUSE = {market:{ico:'ms-public', name:'Market-wide'}, company:{ico:'ms-ap
 let H = '1', MODE = 'candles';
 $('#tl-tag-bt').textContent = `back-test to ${fmtD(D.as_of, false)}`;
 $('#tl-sub').textContent = `${fmtD(D.replay.window[0], false)} – ${fmtD(D.as_of, false)} + next 5 sessions`;
-$('#tl-help').dataset.tip = `Candles are the stored daily bars; each bar's shaded range is what the rule replay would have predicted the evening before (dark = 50% band, light = 80% band), the dot says whether the close landed inside the 80% band. Past bands come from scripts/replay.py (not the live ranges). The fan: ${planSrc(1, plan1)} ${planSrc(5, plan5)}`;
+$('#tl-help').dataset.tip = `Candles are the stored daily bars; each bar's shaded range is what the rule replay would have predicted before that session (dark = 50% band, light = 80% band), the dot says whether the close landed inside the 80% band. Past bands come from scripts/replay.py (not the live ranges). The fan: ${planSrc(1, plan1)} ${planSrc(5, plan5)}`;
 function fanRows() {
   const b1 = plan1, b5 = plan5; const rows = []; if (!b1 || !b5) return rows;
   const lg = (a, b, k) => Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * (Math.sqrt(k) - 1) / (Math.sqrt(5) - 1));

@@ -18,7 +18,7 @@ and the baseline tables moved to a folded "for the record" section at the bottom
 
 ## Scorecard (third pass)
 The owner asked what the page proves, when it could be trusted and what to do then. The page is now a scorecard:
-1. **Guide**: the two promises the system makes every evening (a price range; a direction call when at least 60%
+1. **Guide**: the two promises the system makes before every session (a price range; a direction call when at least 60%
    sure), how trust is earned (keeping those promises on real days, beating a coin and the costs), and that every
    signal is Paper until all four tests are green.
 2. **Verdict** NOT YET / TRUSTED with "in plain words": which tests wait for real data, which fail, and when the

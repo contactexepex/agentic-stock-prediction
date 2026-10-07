@@ -137,7 +137,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
 </section>
 
 <div class="guide" id="guide">
-  <b>What this is.</b> A personal research tool that watches <b class="n" data-k="n_companies"></b> companies, <b class="n" data-k="n_per_market"></b> in India and <b class="n" data-k="n_per_market"></b> in the US. Every evening it collects prices, news and filings, works out each company's chance of rising over the next day and the next five days, says <b>YES</b> or <b>NO</b> for each, and writes down the result so it can be checked later. It never trades, and nothing here is advice. Until it has passed the four tests on the Record page, every signal is <b>paper</b>: something to watch, not to act on.
+  <b>What this is.</b> A personal research tool that watches <b class="n" data-k="n_companies"></b> companies, <b class="n" data-k="n_per_market"></b> in India and <b class="n" data-k="n_per_market"></b> in the US. It collects news several times a day, captures prices before each market opens and after it closes, and runs its analysis at both points, so it knows what changed overnight and what changed during the session. For each company it works out the chance of a rise over the next day and the next five days, says <b>YES</b> or <b>NO</b>, and writes the result down so it can be checked later. A paper-trading book and further agents are being added to sharpen the forecasts; the Record page decides when any of it may be trusted. It never trades, and nothing here is advice. Until it has passed the four tests on the Record page, every signal is <b>paper</b>: something to watch, not to act on.
 </div>
 
 <nav class="toc" aria-label="Contents" id="toc"></nav>
@@ -154,7 +154,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywh
 </section>
 
 <section class="card" id="call">
-  <h2>How a call is made <span class="sp">every evening, after the close</span></h2>
+  <h2>How a call is made <span class="sp">before the open and after the close; news several times a day</span></h2>
   <div class="flow" id="flow"></div>
   <table class="rules" aria-label="Rules the system never breaks">
     <thead><tr><th>The rule</th><th>What it means for you</th><th>Where it is checked</th></tr></thead>
@@ -245,16 +245,16 @@ const STEPS = [
   ['Look at the Portfolio', `The pretend account shows what following every YES would have done after costs, live and in the rehearsal on past prices. If that line is not above zero, the signals are not paying.`, '../portfolio/portfolio.html', 'Portfolio'],
 ];
 $('#steps').append(...STEPS.map(([t, p, href, l], i) => el('div', {class:'step'}, el('div', {class:'no'}, i + 1), el('div', {}, el('b', {}, t), el('p', {}, p)), el('a', {href}, l + ' →'))));
-$('#morning-note').textContent = `Timing: each market's run happens after its close and before its next open (${MK.map(m => `${LABEL[m]} opens ${M[m].open_local} local, ${M[m].open_utc} UTC`).join('; ')}). The data on every page is "as of" the last stored close; the Home status tiles say whether the run finished before the open.`;
+$('#morning-note').textContent = `Timing: each market is analysed after its close and again before its next open, with the news collected in between (${MK.map(m => `${LABEL[m]} opens ${M[m].open_local} local, ${M[m].open_utc} UTC`).join('; ')}). The data on every page is "as of" the last stored close; the Home status tiles say when the latest run happened and whether it finished before the open.`;
 
 /* ---------- pages ---------- */
 $('#pages-grid').append(...D.pages.map(p => el('a', {class:'pg', href: p.href}, el('div', {class:'t'}, icon('ms-' + p.icon), p.name), el('div', {class:'q'}, p.question), el('div', {class:'w'}, p.what))));
 
 /* ---------- how a call is made ---------- */
 const FLOW = [
-  ['1', 'Collect', `Prices, overnight cues, news headlines, exchange and SEC filings, results dates. Stored once, never edited.`],
-  ['2', 'Score the news', `An analyst agent gives each headline a mood, how material it is and what kind of event it is; stories are grouped and each story gets a verification status.`],
-  ['3', 'Model', `A small statistical model (${R.model_version}, refit ${R.model_refit}) turns the indicators and the news into a chance of a rise for 1 day and for 5 days.`],
+  ['1', 'Collect', `News headlines several times a day; prices and overnight cues before the open and after the close; exchange and SEC filings, results dates. Stored once, never edited.`],
+  ['2', 'Score the news', `On each pass an analyst agent gives the new headlines a mood, how material they are and what kind of event they are; stories are grouped and each story gets a verification status.`],
+  ['3', 'Model', `A small statistical model (${R.model_version}, refit ${R.model_refit}) turns the indicators and the news into a chance of a rise for 1 day and for 5 days, after the close and again before the open with the latest news.`],
   ['4', 'Debate', `A bull agent and a bear agent each build the strongest honest case from the stored evidence.`],
   ['5', 'Forecaster', `Weighs both cases against the track record and the lessons, and may move the model's number by at most ±${pct(R.agent_adjustment_max)} points. Abstaining is always allowed.`],
   ['6', 'Ranges', `A formula, not the agents, computes the ${R.bands.map(b => pct(b) + '%').join(' and ')} price ranges. The forecaster may widen one, never narrow it.`],
@@ -358,7 +358,8 @@ const FAQ = [
   ['Tomorrow the company page turns green. What do I do?', `Nothing with money, until the Record page says TRUSTED. In your head or in the pretend Portfolio: buy at the next open, sell at the close of the fifth session (or the first, for a 1-day call), equal small stakes, no averaging down. Then watch the call settle and the score land on the Record page.`],
   ['What does "70% confident" mean?', 'That out of 100 such calls, about 70 should come true. Not 100. The Record page checks exactly this: if the 70% calls come true only 60 times out of 100, the number is not to be relied on, and the forecaster must lower it.'],
   ['Why 1 day and 5 days, and not a month?', 'Because that is what the model is built and checked for: short holds from the open of the next session. It says nothing about a month or a year, and no page pretends otherwise.'],
-  ['How old is the news it uses?', `The model's news input looks back ${R.news_lookback_hours} hours; the Home news card shows the last 24. Everything older stays stored and appears in the company page's day-by-day history, but it no longer feeds a new call.`],
+  ['What changes between the after-close run and the before-open run?', 'The after-close run has the day\'s final prices and scores every company. The before-open run adds the news collected overnight and the overnight cues (other markets, futures, pre-market quotes where they exist) and scores again, so the call you see in the morning uses everything known at that point. The Home status tiles show which run the page is built from.'],
+  ['How often does it look at the news?', `Several times a day; each pass scores only the new headlines. The model's news input looks back ${R.news_lookback_hours} hours; the Home news card shows the last 24. Everything older stays stored and appears in the company page's day-by-day history, but it no longer feeds a new call.`],
   ['Who checks that the system is honest?', 'Scripted gates check every stage of the daily run (schemas, timestamps, no look-ahead, the prediction rules). An independent judge agent reviews every change to the code and instructions before it is merged, and once a week spot-checks a sample of the output. The weekly review reruns the back-test and says plainly whether the model shows skill.'],
   ['Is this advice? Does it trade?', 'No and no. It is a personal research project. It has no brokerage connection, places no orders, and nothing on any page is a recommendation.'],
   ['What is "back-test" and why is it kept apart?', `A back-test (the pages say "rehearsal") replays the rules on past prices. It is useful for finding out whether an idea has any merit, but the model may have been shaped by that very past, and no real day was lived. Live results are the only proof, which is why every back-test number is tagged and the four tests count real days only. AI replays are also split at the model's training cutoff (${fmtD(R.training_cutoff)}): earlier dates are marked contaminated and never pooled.`],

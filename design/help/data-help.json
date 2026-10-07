@@ -1,5 +1,5 @@
 {
- "built_at": "2026-10-07T16:38+00:00",
+ "built_at": "2026-10-07T16:47+00:00",
  "rules": {
   "call_threshold": 0.6,
   "strong_confidence": 0.75,
@@ -638,7 +638,7 @@
    "href": "../home/home.html",
    "icon": "home",
    "question": "Is there anything worth doing today?",
-   "what": "Both markets on one screen: the signals banner, each market's regime and big numbers, what moved yesterday and why, the news of the last 24 hours (what moved the whole market, which company stories can carry a call, what was set aside), this week's events and whether the overnight run finished cleanly."
+   "what": "Both markets on one screen: the signals banner, each market's regime and big numbers, what moved yesterday and why, the news of the last 24 hours (what moved the whole market, which company stories can carry a call, what was set aside), this week's events and whether the latest run finished cleanly."
   },
   {
    "id": "watchlist",

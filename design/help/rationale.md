@@ -16,7 +16,7 @@ page cannot drift from the rules the pipeline enforces.
 3. **Your five-minute morning**: the order to read the pages in (Home banner, the news card, a YES company
    page, Record, Portfolio), each step one card with a link; the run timing per market underneath.
 4. **The pages**: one card per page with the single question it answers and what is on it.
-5. **How a call is made**: the seven steps of the evening run (collect, score the news, model, debate,
+5. **How a call is made**: the seven steps of each run, after the close and before the open (collect, score the news, model, debate,
    forecaster, ranges, score it), then the table of rules the system never breaks, each with what it means
    for the reader and where in the repo it is checked.
 6. **Colours, words and badges**: the verdict (NO red, YES light green okay, dark green strong, with the
