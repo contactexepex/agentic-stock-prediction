@@ -8,8 +8,9 @@ regular close of `session_date` (a run in the settling window after the close, w
 session's bar is not final yet): the forecaster then abstains, because any call would be scored
 on an outcome that is already public.
 `in_session` is true between the open (`session_open_utc`) and the close of `session_date` (a
-manual mid-session run): that session's outcome is partly public, so no call is made, ranges.py
-publishes no 1-day range, and every range or call made then is late (never scored)."""
+manual mid-session run): that session's outcome is partly public, so no call is made, and every range
+ranges.py publishes then (every horizon N+k's window starts in that session) or call made then is late (never
+scored)."""
 
 from __future__ import annotations
 

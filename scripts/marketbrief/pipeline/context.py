@@ -138,9 +138,10 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
             [],
         ),
         (
-            "Price ranges published for the latest session (80% and 50%)",
+            "Price ranges published for the latest session (80% and 50%; h = N+k, target_date = the close of the k-th "
+            "session after D; label legacy_cc = a range of the old window, made before B10)",
             """
-            SELECT ticker, horizon_days AS h, target_date, round(base_close, 2) AS base,
+            SELECT ticker, horizon_days AS h, horizon_label AS label, target_date, round(base_close, 2) AS base,
                    round(lo80, 2) AS lo80, round(lo50, 2) AS lo50, round(hi50, 2) AS hi50, round(hi80, 2) AS hi80,
                    direction, confidence, notes,
                    CASE WHEN id IN (SELECT id FROM late_ranges) THEN 'late: not a forecast, never scored'
@@ -152,8 +153,8 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
         (
             "Ranges scored on the latest target date (yesterday's calls)",
             """
-            SELECT ticker, horizon_days AS h, target_date, round(lo80, 2) AS lo80, round(hi80, 2) AS hi80,
-                   round(actual_close, 2) AS actual, hit50, hit80, naive_hit80
+            SELECT ticker, horizon_days AS h, horizon_label AS label, target_date, round(lo80, 2) AS lo80,
+                   round(hi80, 2) AS hi80, round(actual_close, 2) AS actual, hit50, hit80, naive_hit80
             FROM range_record WHERE target_date = (SELECT max(target_date) FROM range_record)
             ORDER BY ticker, h, id""",
             [],
@@ -165,28 +166,30 @@ def sections(cfg: dict) -> list[tuple[str, str, list]]:
                     TRY_CAST(naive_width80_pct AS DECIMAL(38,10)) AS naive_width80_pct,
                     TRY_CAST(is80_pct AS DECIMAL(38,10)) AS is80_pct,
                     TRY_CAST(naive_is80_pct AS DECIMAL(38,10)) AS naive_is80_pct) FROM range_record)
-            SELECT horizon_days AS h, CASE WHEN target_date >= current_date - 30 THEN 'last 30d' ELSE 'older' END AS \
-window,
+            SELECT horizon_days AS h, horizon_label AS label,
+                   CASE WHEN target_date >= current_date - 30 THEN 'last 30d' ELSE 'older' END AS window,
                    count(*) AS n, round(avg(hit50::INT), 3) AS cover50, round(avg(hit80::INT), 3) AS cover80,
                    round(avg(naive_hit80::INT), 3) AS naive_cover80,
                    round(avg(width80_pct), 2) AS width80_pct, round(avg(naive_width80_pct), 2) AS naive_width80_pct,
                    round(avg(is80_pct), 3) AS score80, round(avg(naive_is80_pct), 3) AS naive_score80
             FROM rr GROUP BY ALL
             UNION ALL
-            SELECT horizon_days, 'all', count(*), round(avg(hit50::INT), 3), round(avg(hit80::INT), 3),
+            SELECT horizon_days, horizon_label, 'all', count(*), round(avg(hit50::INT), 3), round(avg(hit80::INT), 3),
                    round(avg(naive_hit80::INT), 3), round(avg(width80_pct), 2), round(avg(naive_width80_pct), 2),
                    round(avg(is80_pct), 3), round(avg(naive_is80_pct), 3)
-            FROM rr GROUP BY horizon_days ORDER BY 1, 2""",
+            FROM rr GROUP BY horizon_days, horizon_label ORDER BY 1, 2, 3""",
             [],
         ),
         (
-            "Track record by horizon (all time; vs always-up baseline; per scoring basis, never pooled: "
-            "close_to_close = as-of close to target close, open_to_close = next open to the close of D+1/D+4)",
+            "Track record by horizon (all time; vs always-up baseline; per scoring basis and horizon label, never "
+            "pooled: close_to_close = as-of close to target close (legacy_cc), open_to_close = the open of D to the "
+            "close of the k-th session after D (n_plus_k; legacy_5d_d4 = old 5-day calls sold at D+4's close))",
             """
-            SELECT label_basis, horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
+            SELECT label_basis, horizon_label, horizon_days, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate,
                    round(avg((actual_return > 0)::INT), 3) AS always_up_rate,
                    round(avg(TRY_CAST(confidence AS DECIMAL(38,10))), 3) AS avg_confidence
-            FROM track_record GROUP BY label_basis, horizon_days ORDER BY label_basis, horizon_days""",
+            FROM track_record GROUP BY label_basis, horizon_label, horizon_days
+            ORDER BY label_basis, horizon_label, horizon_days""",
             [],
         ),
         (
@@ -194,9 +197,9 @@ window,
             """
             SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59'
                         WHEN confidence < 0.7 THEN '0.60-0.69' ELSE '0.70+' END AS band,
-                   label_basis, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate
+                   label_basis, horizon_label, count(*) AS n, round(avg(hit::INT), 3) AS hit_rate
             FROM track_record WHERE target_date >= current_date - 90
-            GROUP BY band, label_basis ORDER BY band, label_basis""",
+            GROUP BY band, label_basis, horizon_label ORDER BY band, label_basis, horizon_label""",
             [],
         ),
     ]

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from marketbrief.analytics import scoring
-from marketbrief.constants.review import EARNINGS_5D
+from marketbrief.constants.review import EARNINGS_TAG
+from marketbrief.core.horizons import horizons
 from marketbrief.constants.scoring import BASIS_NOTE
 from marketbrief.pipeline.review.markdown_cells import flag, fnum, fpct, range_row
 from marketbrief.utils.markdown import markdown_table
@@ -84,15 +85,17 @@ def range_lines(review_config, review_data, win_names) -> list[str]:
             for group_name, stats in per[key].items()
         ]
         lines += [f"### {title}", "", markdown_table(["Window", "Group · H", *header[2:]], rows)]
+    earnings_keys = [f"{EARNINGS_TAG} · {horizon}d" for horizon in horizons()]
     earnings_rows = [
-        range_row([win_names[window], EARNINGS_5D], per["note"][EARNINGS_5D], review_config)
+        range_row([win_names[window], key], per["note"][key], review_config)
         for window, per in review_data["breakdowns"].items()
-        if EARNINGS_5D in per["note"]
+        for key in earnings_keys
+        if key in per["note"]
     ]
     lines += [
-        "### Earnings-day coverage, 5-day ranges",
+        "### Earnings-day coverage per horizon",
         "",
-        "5-day ranges with an earnings day in the horizon, against the 50% and 80% targets: the evidence for a "
+        "N+k ranges with an earnings day in the horizon, against the 50% and 80% targets: the evidence for a "
         "per-horizon earnings multiple (`earnings_vol_multiple`; issue #16).",
         "",
         markdown_table(["Window", "Group · H", *header[2:]], earnings_rows),

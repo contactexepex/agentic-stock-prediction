@@ -70,6 +70,14 @@ def setup(tmp: Path) -> tuple[Path, Path]:
     return root, cfg
 
 
+def horizons() -> tuple[int, ...]:
+    """The configured horizons N+k (config/strategies.yaml; B10)."""
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    from marketbrief.core.horizons import horizons as configured
+    return configured()
+
+
 def weekdays(start: date, n: int) -> list[date]:
     """n market sessions from `start`: weekdays that are no NYSE holiday (the test market's calendar), because the
     price views leave out bars on days the exchange is closed (issue #40)."""
@@ -157,7 +165,7 @@ def test_scoring_and_context(tmp_path):
 
     ctx = run("context.py", root, cfg)
     assert ctx.returncode == 0, ctx.stderr
-    assert "| close_to_close | 5 | 2 | 0.5 |" in ctx.stdout   # 1 hit out of 2 scored, on the close basis
+    assert "| close_to_close | legacy_cc | 5 | 2 | 0.5 |" in ctx.stdout   # 1 hit of 2 scored, close basis (legacy)
 
 
 def test_features_regime_and_context(tmp_path):
@@ -272,7 +280,7 @@ def publish_ranges(root: Path, cfg: Path) -> tuple[dict, str, dict]:
 
     r = run("ranges.py", root, cfg, "--now", made_at)
     assert r.returncode == 0, r.stderr
-    assert json.loads(r.stdout)["written"] == 4                 # 2 tickers x 2 horizons
+    assert json.loads(r.stdout)["written"] == 2 * len(horizons())   # 2 tickers x N+1..N+5
     assert json.loads(r.stdout)["late"] is False
     assert json.loads(run("ranges.py", root, cfg, "--now", made_at).stdout)["written"] == 0   # written once
     rows = {x["id"]: x for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
@@ -297,8 +305,8 @@ def score_targets(root: Path, cfg: Path, series: dict, made_at: str, rows: dict)
                      "".join(f"{d},{k},{v[-1]},{v[-1]},{v[-1]},{v[-1]},{v[-1]},1000,2026-01-02T00:00:00+00:00\n"
                              for k, v in series.items()))
     s = json.loads(run_at(made_at, "score_predictions.py", root, cfg).stdout)
-    assert s["ranges_scored"] == 4 and s["ranges_open"] == 0
-    assert s["hit80"] == 4                                      # unchanged price sits inside every range
+    assert s["ranges_scored"] == 2 * len(horizons()) and s["ranges_open"] == 0
+    assert s["hit80"] == 2 * len(horizons())                    # unchanged price sits inside every range
     outs = [x for f in (root / "data" / MARKET / "range_outcomes").glob("**/*.jsonl")
             for x in map(json.loads, f.read_text().splitlines())]
     assert all(o["naive_hit80"] and o["width80_pct"] > 0 for o in outs)
@@ -372,7 +380,7 @@ def notify(root: Path, cfg: Path, env_no_hook: dict, *args: str) -> subprocess.C
 def check_html_and_slack(root: Path, cfg: Path, charts: dict, out: dict, rpath: Path) -> None:
     """The Slack draft, the HTML report (only from a filled report) and notify_slack.py's refusals and dry run."""
     slack = (root / out["slack_draft"]).read_text()
-    assert "Calls today: 1 · AAPL ▲ up 80% (5 days, 80% range $" in slack
+    assert "Calls today: 1 · AAPL ▲ up 80% (N+5, 80% range $" in slack
     assert out["url"].endswith(f"/reports/{MARKET}/{charts['session_date']}.html") and out["url"] in slack
     assert len(slack.strip().splitlines()) <= 12
     bad = run("html_report.py", root, cfg)

@@ -9,15 +9,26 @@ FILE_COSTS_CONFIG = "costs.yaml"
 FILE_REASONING_WORK = "reasoning.jsonl"
 
 # ---------- label conventions (the owner's trade: buy at an open, sell at a close) ----------
-LABEL_OPEN_TO_CLOSE = "open_to_close"     # primary: open of D -> close of D + (h == 1 ? 1 : h - 1)
-LABEL_CLOSE_TO_CLOSE = "close_to_close"   # secondary: as-of close -> close of the h-th session after it
+# Horizon k = N+k (decision 37; the list is config/strategies.yaml `horizons`, read by core/horizons.horizons()).
+LABEL_OPEN_TO_CLOSE = "open_to_close"     # primary: open of D -> close of the k-th session after D
+LABEL_CLOSE_TO_CLOSE = "close_to_close"   # secondary: as-of close -> the same exit close (k + 1 sessions later)
 LABEL_CONVENTIONS = (LABEL_OPEN_TO_CLOSE, LABEL_CLOSE_TO_CLOSE)
 LABEL_DESCRIPTIONS = {
     LABEL_OPEN_TO_CLOSE: "buy at the open of D (the first session after the as-of close), sell at the close of "
-                         "D+1 (1-day) or D+4 (5-day)",
-    LABEL_CLOSE_TO_CLOSE: "as-of close to the close of the h-th session after it (D for 1-day, D+4 for 5-day)",
+                         "the k-th session after D (N+k: D+1 for N+1, D+5 for N+5)",
+    LABEL_CLOSE_TO_CLOSE: "as-of close to the exit close of N+k (the (k+1)-th session after the as-of session)",
 }
-HORIZONS = (1, 5)
+
+# ---------- model variants (B10; strategies.yaml parameter `cross_market`, docs/SPEC.md F2.1) ----------
+# base: the cross-market groups config/model.yaml switches on, stored in model_scores / model_versions (the
+# forecaster's anchor; ids <as_of>-<ticker>-<k>d). cross_market: every cross-market group of the market on, for
+# strategies with `cross_market: true`, stored apart in model_variant_scores / model_variant_versions (ids end in
+# -cross_market), so no reader of model_scores ever sees it.
+VARIANT_BASE, VARIANT_CROSS = "base", "cross_market"
+MODEL_VARIANTS = (VARIANT_BASE, VARIANT_CROSS)
+KIND_MODEL_VARIANT_SCORES = "model_variant_scores"
+KIND_MODEL_VARIANT_VERSIONS = "model_variant_versions"
+MSG_UNKNOWN_VARIANT = "unknown model variant {variant!r}; known: {known}"
 
 # ---------- feature names and groups ----------
 TECHNICAL_FEATURES = ("ret_1d", "ret_3d", "ret_5d", "ret_20d", "roc_10", "ema_ratio", "price_vs_20d_high",

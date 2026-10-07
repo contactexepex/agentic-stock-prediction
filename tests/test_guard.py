@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.core.horizons import horizons  # noqa: E402
 from marketbrief.core.market_config import load_ranges_config  # noqa: E402
 from marketbrief.core.storage import day_file  # noqa: E402
 from marketbrief.core import calendar as ev  # noqa: E402
@@ -80,10 +81,16 @@ def test_market_status_cli_now(tmp_path):
 
 # ---------- ranges guard ----------
 
-AS_OF = date(2026, 10, 2)        # Friday; first target session Monday 2026-10-05 closes 20:00 UTC
+AS_OF = date(2026, 10, 2)        # Friday; D = Monday 2026-10-05 (closes 20:00 UTC); N+1 exits at Tuesday's close
 DAY = date(2026, 10, 5)
+NEXT = date(2026, 10, 6)         # the exit session of N+1 (decision 37)
 CUE = 0.02
-ALL = [f"{AS_OF}-{t}-{h}d" for t in ("AAPL", "MSFT") for h in (1, 5)]
+H = horizons()                   # N+1..N+5 (config/strategies.yaml)
+ALL = sorted(f"{AS_OF}-{t}-{h}d" for t in ("AAPL", "MSFT") for h in H)
+
+
+def ids(day, tickers=("AAPL", "MSFT"), hs=H) -> list[str]:
+    return sorted(f"{day}-{t}-{h}d" for t in tickers for h in hs)
 
 
 def jsonl(root: Path, kind: str, day: date, rows: list[dict]) -> None:
@@ -140,7 +147,10 @@ def test_ranges_pre_open_unchanged(market):
     assert sorted(rows) == ALL
     assert all(r["notes"] == [f"cue {CUE:+.2%} x{rc['cue_weight']}"] for r in rows.values())
     assert_cue_applied(rows, rc)
-    assert rows[f"{AS_OF}-AAPL-1d"]["target_date"] == str(DAY)
+    assert rows[f"{AS_OF}-AAPL-1d"]["target_date"] == str(NEXT)                     # N+1: the close of D+1
+    assert rows[f"{AS_OF}-AAPL-5d"]["target_date"] == "2026-10-12"                  # N+5: the close of D+5
+    assert all(r["entry_date"] == str(DAY) and r["exit_date"] == r["target_date"] and r["horizon_label"] == "n_plus_k"
+               for r in rows.values())
 
 
 def test_ranges_late_run_skips_closed_targets_and_late_cues(market):
@@ -148,10 +158,12 @@ def test_ranges_late_run_skips_closed_targets_and_late_cues(market):
     quotes(root, "2026-10-05T20:25:00+00:00")                 # after the 20:00 close
     snapshot(root, "2026-10-05T20:30:00+00:00")
     rows = build(cfg, rc, "2026-10-05T20:40:00+00:00")
-    assert sorted(rows) == [f"{AS_OF}-AAPL-5d", f"{AS_OF}-MSFT-5d"]   # the 1d target closed
+    assert sorted(rows) == ALL                                # D closed; no N+k exits at D's close
     for r in rows.values():
         assert r["center"] == 0.0
         assert r["notes"] == ["late: 2026-10-05 closed before made_at", "cue ignored: quoted after 2026-10-05 open"]
+    later = build(cfg, rc, "2026-10-06T20:40:00+00:00")       # D+1 closed too: the N+1 target is public
+    assert sorted(later) == ids(AS_OF, hs=H[1:])
 
 
 def test_ranges_keep_the_cue_features_used_when_quotes_are_recollected(market):
@@ -161,7 +173,7 @@ def test_ranges_keep_the_cue_features_used_when_quotes_are_recollected(market):
     quotes(root, "2026-10-05T20:25:00+00:00")                 # re-collected after the close
     assert_cue_applied(build(cfg, rc, "2026-10-05T11:30:00+00:00"), rc)
     late = build(cfg, rc, "2026-10-05T20:40:00+00:00")        # still the pre-close cue, but late
-    assert sorted(late) == [f"{AS_OF}-AAPL-5d", f"{AS_OF}-MSFT-5d"]
+    assert sorted(late) == ALL
     assert_cue_applied(late, rc)
     assert all("late: 2026-10-05 closed before made_at" in r["notes"] for r in late.values())
 
@@ -177,13 +189,13 @@ def test_ranges_cli_late_flag(market):
     snapshot(root, "2026-10-05T11:00:00+00:00")
     out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-12T21:00:00+00:00").stdout)
     assert (out["written"], out["late"]) == (0, True)          # late even though nothing was written
-    out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-05T20:40:00+00:00").stdout)
-    assert (out["written"], out["late"]) == (2, True)
+    out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-06T20:40:00+00:00").stdout)
+    assert (out["written"], out["late"]) == (2 * (len(H) - 1), True)   # every horizon but N+1 (D+1 closed)
     out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00+00:00").stdout)
-    assert (out["written"], out["late"]) == (2, False)         # the 5d ids were already written
+    assert (out["written"], out["late"]) == (2, False)         # N+1 only: the other ids were already written
     rows = [json.loads(x) for f in (root / "data" / MARKET / "ranges").glob("**/*.jsonl")
             for x in f.read_text().splitlines()]
-    assert {r["made_at"] for r in rows} == {"2026-10-05T20:40:00+00:00", "2026-10-05T11:30:00+00:00"}
+    assert {r["made_at"] for r in rows} == {"2026-10-06T20:40:00+00:00", "2026-10-05T11:30:00+00:00"}
     assert run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00").returncode != 0   # needs an offset
 
 
@@ -280,14 +292,14 @@ def test_scoring_skips_records_made_after_the_first_session_closed(market):
          "prompt_version": "test"}
         for t, made in (("AAPL", "2026-10-05T11:30:00+00:00"), ("MSFT", "2026-10-05T20:00:00+00:00"))])
     days = [AS_OF - timedelta(days=i) for i in range(60) if (AS_OF - timedelta(days=i)).weekday() < 5][::-1]
-    write_bars(root, {"AAPL": [150 + i * 0.1 for i in range(len(days) + 1)],
-                      "MSFT": [300 - i * 0.1 for i in range(len(days) + 1)],
-                      "BENCH": [100.0] * (len(days) + 1)}, days + [DAY])
+    write_bars(root, {"AAPL": [150 + i * 0.1 for i in range(len(days) + 2)],
+                      "MSFT": [300 - i * 0.1 for i in range(len(days) + 2)],
+                      "BENCH": [100.0] * (len(days) + 2)}, days + [DAY, NEXT])
     r = run("score_predictions.py", root, cfg_dir)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
-    assert out["late_skipped"] == {"calls": 1, "ranges": 1}       # MSFT 1d call (made at the close) and range
-    assert (out["scored"], out["ranges_scored"]) == (1, 1)         # AAPL only; 5d targets have no bar yet
+    assert out["late_skipped"] == {"calls": 1, "ranges": 1}       # MSFT 1d call (made at the close) and N+1 range
+    assert (out["scored"], out["ranges_scored"]) == (1, 1)         # AAPL only; N+2.. targets have no bar yet
     con = connect(MARKET)
     assert [x for (x,) in con.execute("SELECT prediction_id FROM outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
     assert [x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()] == [f"{AS_OF}-AAPL-1d"]
@@ -335,7 +347,7 @@ def test_context_pack_labels_late_ranges(market):
     assert r.returncode == 0, r.stderr
     sec = r.stdout.split("## Price ranges published", 1)[1].split("\n## ", 1)[0]
     lines = [x for x in sec.splitlines() if x.startswith("| AAPL") or x.startswith("| MSFT")]
-    assert len(lines) == 4
+    assert len(lines) == 2 * len(H)
     assert all(x.rstrip(" |").endswith("late: not a forecast, never scored") == x.startswith("| MSFT") for x in lines)
 
 
@@ -384,15 +396,17 @@ def test_is_late_from_the_open_for_every_horizon():
     assert is_late(INDIA, date(2026, 10, 1), "2026-10-05T03:45:00+00:00")
 
 
-def test_ranges_mid_session_publishes_5d_only_labelled_late(market):
+def test_ranges_mid_session_publishes_every_horizon_labelled_late(market):
+    """No N+k exits at D's close (decision 37), so a run after D's open publishes every horizon, noted late (before
+    B10 the 1-day range targeted D itself and was left out)."""
     root, _, cfg, rc = market
     quotes(root, "2026-10-05T10:55:00+00:00")                 # pre-market cue
     snapshot(root, "2026-10-05T11:00:00+00:00")
     pre = build(cfg, rc, "2026-10-05T11:30:00+00:00")
     assert sorted(build(cfg, rc, "2026-10-05T13:29:59+00:00")) == ALL
     mid = build(cfg, rc, "2026-10-05T13:30:00+00:00")         # the open
-    assert sorted(mid) == [f"{AS_OF}-AAPL-5d", f"{AS_OF}-MSFT-5d"]
-    for rid, r in mid.items():                                 # 5d: same numbers, noted late
+    assert sorted(mid) == ALL
+    for rid, r in mid.items():                                 # same numbers, noted late
         assert r == {**pre[rid], "made_at": "2026-10-05T13:30:00+00:00",
                      "notes": ["late: 2026-10-05 opened before made_at", *pre[rid]["notes"]]}
     assert sorted(build(cfg, rc, "2026-10-05T19:59:00+00:00")) == sorted(mid)
@@ -423,7 +437,7 @@ def test_ranges_index_cue_cut_at_the_open(market):
     jsonl(root, "regime", AS_OF, [{"id": str(AS_OF), "as_of_date": str(AS_OF), "session_date": str(DAY),
                                    "computed_at": "2026-10-05T13:45:00+00:00", "regime": "CALM"}])
     rows = build(cfg, rc, "2026-10-05T13:29:00+00:00")
-    for h in (1, 5):
+    for h in (1, 5):                                          # the horizons beta split is switched on for
         assert "index cue ignored: BENCH quoted after 2026-10-05 open" in rows[f"{AS_OF}-AAPL-{h}d"]["notes"]
 
 
@@ -441,15 +455,16 @@ def test_ranges_ignore_an_option_snapshot_taken_after_the_open(market):
     before = build(cfg, rc, "2026-10-05T13:29:00+00:00")      # pre-open: AAPL's snapshot is not known yet
     assert before[f"{AS_OF}-AAPL-1d"]["iv_sigma_h"] is None and before[f"{AS_OF}-AAPL-5d"]["iv_sigma_h"] is None
     assert before[f"{AS_OF}-MSFT-5d"]["iv_sigma_h"] is not None
-    after = build(cfg, rc, "2026-10-05T13:45:00+00:00")       # mid-session: no 1d range
-    assert sorted(after) == [f"{AS_OF}-AAPL-5d", f"{AS_OF}-MSFT-5d"]
+    after = build(cfg, rc, "2026-10-05T13:45:00+00:00")       # mid-session: every horizon, noted late
+    assert sorted(after) == ALL
     assert after[f"{AS_OF}-AAPL-5d"]["iv_sigma_h"] is None    # quoted after the open: ignored
+    assert after[f"{AS_OF}-AAPL-1d"]["iv_sigma_h"] is None
     assert after[f"{AS_OF}-MSFT-5d"]["iv_sigma_h"] == before[f"{AS_OF}-MSFT-5d"]["iv_sigma_h"]
 
 
 def test_ranges_holiday_and_early_close(market):
-    """As of Wed 2026-11-25 the first target is Fri 11-27 (Thanksgiving in between; 13:00 ET early
-    close = 18:00 UTC, open 14:30 UTC)."""
+    """As of Wed 2026-11-25, D is Fri 11-27 (Thanksgiving in between; 13:00 ET early close = 18:00 UTC, open
+    14:30 UTC) and N+1 exits at Mon 11-30's close."""
     root, _, cfg, rc = market
     wed, thu = date(2026, 11, 25), date(2026, 11, 26)
     jsonl(root, "regime", wed, [{"id": str(wed), "as_of_date": str(wed), "session_date": "2026-11-27",
@@ -462,12 +477,13 @@ def test_ranges_holiday_and_early_close(market):
          "close": 100.0, "ewma_vol": 0.25, "quality": "OK", "cue_change_pct": CUE, "warnings": []}
         for t in ("AAPL", "MSFT")])
     holiday = build(cfg, rc, "2026-11-26T15:05:00+00:00")     # mid-day, but the exchange is closed
-    assert sorted(holiday) == [f"{wed}-{t}-{h}d" for t in ("AAPL", "MSFT") for h in (1, 5)]
-    assert holiday[f"{wed}-AAPL-1d"]["target_date"] == "2026-11-27"
+    assert sorted(holiday) == ids(wed)
+    assert holiday[f"{wed}-AAPL-1d"]["target_date"] == "2026-11-30"
+    assert holiday[f"{wed}-AAPL-1d"]["entry_date"] == "2026-11-27"
     assert holiday[f"{wed}-AAPL-1d"]["notes"] == [f"cue {CUE:+.2%} x{rc['cue_weight']}"]
     assert sorted(build(cfg, rc, "2026-11-27T14:29:00+00:00")) == sorted(holiday)
     opened = build(cfg, rc, "2026-11-27T14:30:00+00:00")
-    assert sorted(opened) == [f"{wed}-AAPL-5d", f"{wed}-MSFT-5d"]
+    assert sorted(opened) == ids(wed)
     assert all("late: 2026-11-27 opened before made_at" in r["notes"] for r in opened.values())
     closed = build(cfg, rc, "2026-11-27T18:00:00+00:00")      # the early close
     assert sorted(closed) == sorted(opened)
@@ -475,8 +491,8 @@ def test_ranges_holiday_and_early_close(market):
 
 
 def test_context_and_report_label_mid_session_ranges_late(market):
-    """Ranges made after the open (14:00 UTC) are labelled late for every horizon (AAPL: an old-code
-    1-day row and its 5-day row; MSFT: the 5-day row ranges.py publishes now); on-time ones are not."""
+    """Ranges made after the open (14:00 UTC) are labelled late for every horizon (AAPL: every horizon; MSFT: its
+    5-day row only); on-time ones are not."""
     root, cfg_dir, cfg, rc = market
     quotes(root, "2026-10-05T10:55:00+00:00")
     snapshot(root, "2026-10-05T11:00:00+00:00")
@@ -489,7 +505,7 @@ def test_context_and_report_label_mid_session_ranges_late(market):
     sec = r.stdout.split("## Price ranges published", 1)[1].split("\n## ", 1)[0]
     late = {" | ".join(x.split(" | ")[:2]): x.rstrip(" |").endswith("late: not a forecast, never scored")
             for x in sec.splitlines() if x.startswith("| AAPL") or x.startswith("| MSFT")}
-    assert late == {"| AAPL | 1": True, "| AAPL | 5": True, "| MSFT | 5": True}
+    assert late == {**{f"| AAPL | {h}": True for h in H}, "| MSFT | 5": True}
     jsonl(root, "ranges", AS_OF, [{**rows[f"{AS_OF}-MSFT-1d"], "made_at": "2026-10-05T11:30:00+00:00"}])
     sec = run("context.py", root, cfg_dir).stdout.split("## Price ranges published", 1)[1].split("\n## ", 1)[0]
     msft1 = next(x for x in sec.splitlines() if x.startswith("| MSFT | 1 "))
@@ -512,16 +528,16 @@ def test_ranges_cli_in_session_flag(market):
     root, cfg_dir, _, _ = market
     snapshot(root, "2026-10-05T11:00:00+00:00")
     out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-05T14:00:00+00:00").stdout)
-    assert (out["written"], out["late"], out["in_session"]) == (2, False, True)
+    assert (out["written"], out["late"], out["in_session"]) == (2 * len(H), False, True)   # every horizon, late
     out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-05T11:30:00+00:00").stdout)
-    assert (out["written"], out["late"], out["in_session"]) == (2, False, False)   # 1d ids now; 5d already written
+    assert (out["written"], out["late"], out["in_session"]) == (0, False, False)   # every id already written
     out = json.loads(run("ranges.py", root, cfg_dir, "--now", "2026-10-05T20:30:00+00:00").stdout)
     assert (out["late"], out["in_session"]) == (True, False)
 
 
 def test_scoring_skips_every_horizon_made_after_the_open(market):
-    """Ranges and calls made mid-session (14:00 UTC, after the 13:30 open), 1-day and 5-day alike,
-    are never scored; those made before the open are."""
+    """Ranges and calls made mid-session (14:00 UTC, after the 13:30 open), every horizon alike, are never scored;
+    those made before the open are."""
     root, cfg_dir, cfg, rc = market
     quotes(root, "2026-10-05T10:55:00+00:00")
     snapshot(root, "2026-10-05T11:00:00+00:00")
@@ -535,19 +551,17 @@ def test_scoring_skips_every_horizon_made_after_the_open(market):
          "direction": "up", "confidence": 0.6, "rationale": "test", "evidence_ids": ["x"],
          "prompt_version": "test"}
         for t, made in (("AAPL", "2026-10-05T11:30:00+00:00"), ("MSFT", "2026-10-05T14:00:00+00:00"))
-        for h in (1, 5)])
+        for h in H])
     days = [AS_OF - timedelta(days=i) for i in range(60) if (AS_OF - timedelta(days=i)).weekday() < 5][::-1]
-    after = [DAY + timedelta(days=i) for i in range(5)]           # 2026-10-05 .. 10-09: both targets
+    after = [DAY + timedelta(days=i) for i in range(8) if (DAY + timedelta(days=i)).weekday() < 5]  # to 10-12
     n = len(days) + len(after)
     write_bars(root, {"AAPL": [150 + i * 0.1 for i in range(n)], "MSFT": [300 - i * 0.1 for i in range(n)],
                       "BENCH": [100.0] * n}, days + after)
     r = run("score_predictions.py", root, cfg_dir)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
-    assert out["late_skipped"] == {"calls": 2, "ranges": 2}       # MSFT 1d and 5d, calls and ranges
-    assert (out["scored"], out["ranges_scored"]) == (2, 2)         # AAPL 1d and 5d
+    assert out["late_skipped"] == {"calls": len(H), "ranges": len(H)}   # every MSFT horizon, calls and ranges
+    assert (out["scored"], out["ranges_scored"]) == (len(H), len(H))     # every AAPL horizon
     con = connect(MARKET)
-    assert sorted(x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()) == \
-        [f"{AS_OF}-AAPL-1d", f"{AS_OF}-AAPL-5d"]
-    assert sorted(x for (x,) in con.execute("SELECT prediction_id FROM outcomes").fetchall()) == \
-        [f"{AS_OF}-AAPL-1d", f"{AS_OF}-AAPL-5d"]
+    assert sorted(x for (x,) in con.execute("SELECT range_id FROM range_outcomes").fetchall()) == ids(AS_OF, ("AAPL",))
+    assert sorted(x for (x,) in con.execute("SELECT prediction_id FROM outcomes").fetchall()) == ids(AS_OF, ("AAPL",))

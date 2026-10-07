@@ -192,8 +192,9 @@ def test_events_just_after_the_last_bar_still_flag_the_last_days():
     extra = {"earnings": {"X": [(None, [(D("2026-10-02"), "before_open")])]},
              "dividends": {"X": [(D("2026-10-01"), 1.0)]}, "bench": df, "index_cue": None}
     cols = observations.input_columns({**XNYS, "premarket_quotes": False}, rc, df, "X", 5, extra)
-    assert cols["earn"].tail(4).all() and not cols["earn"].iloc[-5]     # 10-02 is the 2nd session after 09-30
-    assert cols["has_div"].tail(5).all() and not cols["has_div"].iloc[-6]
+    # N+5 spans 6 sessions from the as-of close; 10-02 is the 2nd session after 09-30, 10-01 the 1st
+    assert cols["earn"].tail(5).all() and not cols["earn"].iloc[-6]
+    assert cols["has_div"].tail(6).all() and not cols["has_div"].iloc[-7]
 
 
 def test_fitted_index_cue_on_the_last_as_of_day():
@@ -241,10 +242,12 @@ def test_backtest_uses_the_events_known_at_each_day():
     # Allstate 2023-10-18: the 10-19 pre-announcement is pending as of then (the 10-Q that rules it
     # out comes on 11-01): it counts, as it would have live; a look-ahead replay would say no
     assert at("ALL", "2023-10-18")
-    assert at("ALL", "2023-10-31") is False and at("ALL", "2023-11-01")   # release after the close
+    # release 11-01 after the close, reaction 11-02: in the N+1 window (two sessions) from 10-31 on, not from 10-30
+    assert at("ALL", "2023-10-30") is False and at("ALL", "2023-10-31") and at("ALL", "2023-11-01")
     # Tesla 2025-10-01: the next day's 2.02 is a delivery report, known as such from history
     assert at("TSLA", "2025-10-01") is False and at("TSLA", "2026-10-01") is False
-    assert at("TSLA", "2025-10-22") and at("TSLA", "2025-10-21") is False  # results 10-22 after the close
+    # results 10-22 after the close, reaction 10-23
+    assert at("TSLA", "2025-10-22") and at("TSLA", "2025-10-21") and at("TSLA", "2025-10-20") is False
 
 
 def test_collector_stores_periodic_reports_and_reader_uses_them(tmp_path, monkeypatch, capsys):

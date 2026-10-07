@@ -8,6 +8,7 @@ import pandas as pd
 
 from marketbrief.analytics import range_math
 from marketbrief.constants.backtest import INPUT_ARMS
+from marketbrief.core.horizons import window_sessions
 
 
 def score(base: float, actual_close: float, center: float, horizon_sigma: float, quantiles: tuple) -> dict:
@@ -25,9 +26,10 @@ def score(base: float, actual_close: float, center: float, horizon_sigma: float,
 
 def arm_params(observation, horizon: int, ranges_config: dict, use: dict) -> dict[str, tuple[float, float]]:
     """(centre, horizon sigma) per arm for one observation. `configured` = the inputs switched on
-    in config/ranges.yaml for this market; `current` = the formula before these inputs."""
+    in config/ranges.yaml for this market; `current` = the formula before these inputs. The variance of N+k spans
+    its k + 1 sessions from the as-of close to the exit close (core/horizons.window_sessions)."""
     daily_sigma = observation.sigma
-    var = daily_sigma * daily_sigma * horizon
+    var = daily_sigma * daily_sigma * window_sessions(horizon)
     fixed = ranges_config["earnings_vol_multiple"]
     earn = bool(getattr(observation, "earn", False))
     m_hist = observation.m_hist if earn and observation.m_hist == observation.m_hist else fixed
@@ -77,14 +79,16 @@ def evaluate(
     scale: dict[int, float] | None = None,
 ) -> pd.DataFrame:
     """`use`: the range inputs switched on (config/ranges.yaml) for the per-input arms.
-    `scale` (keyword only) widens sigma per start rank (regime/event factors replayed by review.py)."""
+    `scale` (keyword only) widens sigma per start rank (regime/event factors replayed by review.py).
+    Horizon N+k: the outcome is known k + 1 sessions after the as-of close (core/horizons.window_sessions)."""
+    sessions = window_sessions(horizon)
     last = int(observation_frame["rank"].max())
     start = last - eval_sessions + 1
     z_all, r_all = observation_frame["z"].to_numpy(), observation_frame["rank"].to_numpy()
     with_inputs = "earn" in observation_frame.columns
     rows = []
     for position in range(start, last + 1):
-        known = (r_all + horizon <= position) & (r_all > position - ranges_config["history_sessions"])
+        known = (r_all + sessions <= position) & (r_all > position - ranges_config["history_sessions"])
         if known.sum() < ranges_config["min_pool"]:
             continue
         weights = range_math.recency_weights(
@@ -96,14 +100,14 @@ def evaluate(
         for observation in today.itertuples():
             base, horizon_sigma = (
                 observation.close,
-                observation.sigma * math.sqrt(horizon) * (scale.get(position, 1.0) if scale else 1.0),
+                observation.sigma * math.sqrt(sessions) * (scale.get(position, 1.0) if scale else 1.0),
             )
             actual_close = base * math.exp(observation.fwd)
             core = score(base, actual_close, 0.0, horizon_sigma, quantiles)
             lo50, hi50 = base * math.exp(quantiles[1] * horizon_sigma), base * math.exp(quantiles[2] * horizon_sigma)
             n50, n80 = (
-                range_math.naive_range(base, observation.s20, horizon, 0.5),
-                range_math.naive_range(base, observation.s20, horizon, 0.8),
+                range_math.naive_range(base, observation.s20, sessions, 0.5),
+                range_math.naive_range(base, observation.s20, sessions, 0.8),
             )
             row = {
                 "rank": position,

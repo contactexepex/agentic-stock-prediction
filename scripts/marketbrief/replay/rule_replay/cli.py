@@ -3,10 +3,12 @@
 For each trading day d in the window (as-of dates, default: from `warmup_bars` sessions after the
 first benchmark bar to the last one), using only what ranges.py would know pre-open the next
 session, i.e. bars up to d's close and events as known then:
-1. Ranges: the 1d and 5d 50%/80% ranges built as ranges.py builds them (calibration quantiles from
+1. Ranges: the 50%/80% ranges of every configured horizon N+k (config/strategies.yaml; buy at the open of D,
+   the first session after d, sell at the close of the k-th session after D) built as ranges.py builds them on
+   the window from d's close to that exit close, k + 1 sessions (calibration quantiles from
    the recency-weighted pool of outcomes known at d as calibrate.py, EWMA volatility, earnings,
    regime and major-event widening, beta-split centre and ex-dividend shift where config/ranges.yaml
-   switches them on), scored on the close h sessions later against the naive baseline: coverage
+   switches them on), scored on the exit close against the naive baseline: coverage
    overall and by regime, sector, ticker, month and earnings-in-horizon, interval score and width,
    and calibration (stated vs actual coverage, the published 50%/80% bands plus a curve of other
    levels from the same quantile pool).
@@ -14,7 +16,8 @@ session, i.e. bars up to d's close and events as known then:
    major events of config/events.yaml), as features.py computes it.
 3. Direction BASELINES (not the product's forecasts; the AI forecaster must beat them later):
    always-up, 1d and 5d momentum sign, and RSI(14) mean reversion (below 30 up, above 70 down;
-   indicators.py has no direction signal of its own, so the rule is defined here). Each with a hit
+   indicators.py has no direction signal of its own, so the rule is defined here), scored per horizon on the
+   N+k window (d's close to the exit close). Each with a hit
    rate, a 95% interval clustered by date blocks, a two-sided binomial test vs 50%, and the
    difference vs always-up on the same rows.
 Event dates: earnings via event_history.earnings_versions (SEC 2.02 filings judged only by the
@@ -28,7 +31,8 @@ Also, past event dates are taken as known in advance (scheduled), since backfill
 when each date was first announced.
 
 Writes reports/<market>/replay-<end>.html (self-contained) and .json, and appends one row to
-data/<market>/replays/ (schema `replays` in marketbrief/core/schemas.py). Prints a JSON summary."""
+data/<market>/replays/ (schema `replays` in marketbrief/core/schemas.py: headline columns for N+1 and N+5, every
+horizon in `detail`). Prints a JSON summary."""
 
 from __future__ import annotations
 
@@ -39,6 +43,7 @@ from datetime import date
 from marketbrief.analytics import adaptive_conformal, range_switches
 from marketbrief.constants.range_inputs import INPUTS
 from marketbrief.constants.replay import (
+    HEADLINE_HORIZONS,
     MSG_ACI_OPTIONS_NEED_ACI,
     MSG_NO_TRADING_DAYS_IN_THE_WINDOW,
 )
@@ -115,9 +120,12 @@ def run(cfg: dict, ranges_config: dict, con, start: date | None = None, end: dat
 
 
 def record(summary: dict, report: str) -> dict:
-    """The row appended to data/<market>/replays/ for a finished replay."""
-    overall = {horizon: summary["horizons"].get(horizon, {}).get("overall", {}) for horizon in ("1", "5")}
-    always_up = {horizon: (summary["baselines"].get(horizon) or {}).get("always_up", {}) for horizon in ("1", "5")}
+    """The row appended to data/<market>/replays/ for a finished replay: the schema's headline columns hold N+1 and
+    N+5 (None when that horizon is not configured), `n_ranges` counts every horizon and `detail` holds them all."""
+    overall = {horizon: value.get("overall", {}) for horizon, value in summary["horizons"].items()}
+    always_up = {horizon: (band or {}).get("always_up", {}) for horizon, band in summary["baselines"].items()}
+    overall.update({horizon: overall.get(horizon, {}) for horizon in HEADLINE_HORIZONS})
+    always_up.update({horizon: always_up.get(horizon, {}) for horizon in HEADLINE_HORIZONS})
     return {
         "id": f"{summary['start']}_{summary['end']}",
         "market": summary["market"],

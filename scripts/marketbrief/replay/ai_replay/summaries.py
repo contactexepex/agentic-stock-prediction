@@ -6,8 +6,8 @@ import math
 from datetime import date
 
 from marketbrief.constants.ai_replay import BANDS, CONTAMINATED, FAIR
-from marketbrief.constants.prediction_rules import HORIZONS
 from marketbrief.core.clock import utc_now
+from marketbrief.core.horizons import horizons
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.score_stats import group_stats, hit_rate_stats, score_rows
 from marketbrief.utils.numbers import round_or_none, share_percent_text
@@ -36,8 +36,9 @@ def summarize(cfg: dict, calls: list[dict], days: list[dict], bars: dict, cutoff
 
 
 def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, label: str) -> dict:
-    """The scores of one leakage group: overall, by horizon, by band, abstention, per day."""
+    """The scores of one leakage group: overall, by horizon (every configured N+k), by band, abstention, per day."""
     frame = score_rows(cfg, calls, bars)
+    horizon_list = horizons()
     scored = frame[frame["status"] == "scored"] if len(frame) else frame
     out = {
         "test": label,
@@ -52,7 +53,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
         "overall": group_stats(scored) if len(scored) else {"n": 0},
         "by_horizon": {
             str(horizon): group_stats(scored[scored["h"] == horizon]) if len(scored) else {"n": 0}
-            for horizon in HORIZONS
+            for horizon in horizon_list
         },
         "by_band": [],
     }
@@ -68,7 +69,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
     # abstention: a call slot is an eligible ticker (not BLOCKED, no earnings within 1 day) x horizon x day
     called = {(call["as_of_date"], call["ticker"], int(call["horizon_days"])) for call in calls}
     abstention = {}
-    for horizon in HORIZONS:
+    for horizon in horizon_list:
         slots = sum(len(day["eligible"]) for day in days)
         count = sum(1 for day in days for ticker in day["eligible"] if (day["date"], ticker, horizon) in called)
         abstention[f"{horizon}d"] = {
@@ -81,7 +82,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
         1
         for day in days
         for ticker in day["eligible"]
-        if any((day["date"], ticker, horizon) in called for horizon in HORIZONS)
+        if any((day["date"], ticker, horizon) in called for horizon in horizon_list)
     )
     abstention["any"] = {
         "slots": slots,

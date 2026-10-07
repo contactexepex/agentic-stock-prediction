@@ -21,8 +21,8 @@
     }
     if (D.plan) {
       out.push(tile('Next session plan', esc(MB.day(D.plan.entry)), '',
-        '<p class="small sub" style="margin-top:4px">Signals assume a buy at the open of ' + esc(MB.day(D.plan.entry)) +
-        '. 1 day: sell at the close of ' + esc(MB.day(D.plan.exit_1d)) + '. 5 days: sell at the close of ' + esc(MB.day(D.plan.exit_5d)) + '.</p>'));
+        '<p class="small sub" style="margin-top:4px">Signals assume a buy at the open of ' + esc(MB.day(D.plan.entry)) + '. ' +
+        D.plan.horizons.map(function (k) { return 'N+' + k + ': sell at the close of ' + esc(MB.day(D.plan.exits[String(k)])); }).join('. ') + '.</p>'));
     }
     return '<div class="grid g4 tiles">' + out.join('') + '</div>';
   }
@@ -66,13 +66,21 @@
       lo + ',rgb(240,239,236),' + hi + ')"></span><span>' + MB.pct(limit, 0) + ' or more</span></div></div>';
   }
 
-  var COLUMNS = [
-    ['ticker', 'Stock'], ['sector', 'Sector', 'hide-sm'], ['close', 'Close', 'r'], ['change', '1 day', 'r'], ['gap', 'Gap', 'r'],
-    ['p1', 'P(up) 1 day', 'r'], ['p5', 'P(up) 5 days', 'r'], ['range1', 'Next close, 80% range', 'r'], ['rsi', 'RSI', 'r'],
-    ['earn', 'Earnings', ''], ['trend', '20 sessions', 'hide-sm'], ['quality', 'Data', '']
-  ];
+  // the table shows P(up) of the shortest and the longest configured horizon (config/strategies.yaml via
+  // D.plan.horizons) and the range of the stock's shortest published horizon, with a pill naming any other
+  function horizonsShown() { var hs = D.plan.horizons; return { first: hs[0], last: hs[hs.length - 1] }; }
+  function columns() {
+    var hs = horizonsShown();
+    return [
+      ['ticker', 'Stock'], ['sector', 'Sector', 'hide-sm'], ['close', 'Close', 'r'], ['change', '1 day', 'r'], ['gap', 'Gap', 'r'],
+      ['p1', 'P(up) N+' + hs.first, 'r']].concat(hs.last !== hs.first ? [['p5', 'P(up) N+' + hs.last, 'r']] : []).concat([
+      ['range1', '80% range, N+' + hs.first, 'r'], ['rsi', 'RSI', 'r'],
+      ['earn', 'Earnings', ''], ['trend', '20 sessions', 'hide-sm'], ['quality', 'Data', '']
+    ]);
+  }
   function rowValues(c) {
-    var m1 = MB.modelOf(c, 1), m5 = MB.modelOf(c, 5), r1 = MB.rangeOf(c, 1) || MB.rangeOf(c, 5), last = c.last || {};
+    var hs = horizonsShown(), m1 = MB.modelOf(c, hs.first), m5 = MB.modelOf(c, hs.last), last = c.last || {};
+    var r1 = (c.ranges || [])[0] || null;   // ranges come sorted by horizon
     return { ticker: c.ticker, sector: c.sector, close: last.close, change: last.change, gap: last.gap,
       p1: m1 && m1.prob_up, p5: m5 && m5.prob_up, range1: r1 && r1.lo80, rsi: c.indicators.rsi_14,
       earn: c.earnings || '9999', trend: null, quality: c.indicators.quality || '', r: r1 };
@@ -92,7 +100,7 @@
     });
   }
   function table() {
-    var head = COLUMNS.map(function (col) {
+    var head = columns().map(function (col) {
       var sortable = col[0] !== 'trend', on = state.sort.key === col[0];
       return '<th class="' + (col[2] || '') + '"' + (on ? ' aria-sort="' + (state.sort.dir > 0 ? 'ascending' : 'descending') + '"' : '') + '>' +
         (sortable ? '<button class="sort" data-sort="' + col[0] + '">' + esc(col[1]) + '</button>' : esc(col[1])) + '</th>';
@@ -100,10 +108,10 @@
     var body = sorted().map(function (c) {
       var v = rowValues(c), r = v.r;
       var range = r ? (r.late ? '<span class="muted" title="Made after the session opened: for the record only">' : '<span>') +
-        MB.money(r.lo80) + ' – ' + MB.money(r.hi80) + (r.h === 5 ? ' <span class="pill">5 d</span>' : '') + '</span>' : '<span class="muted">–</span>';
+        MB.money(r.lo80) + ' – ' + MB.money(r.hi80) + (r.h !== horizonsShown().first || r.horizon_label !== 'n_plus_k' ? ' <span class="pill">' + esc(r.name) + '</span>' : '') + '</span>' : '<span class="muted">–</span>';
       return '<tr><td><button class="tick" data-t="' + esc(c.ticker) + '"><b>' + esc(c.ticker) + '</b><span>' + esc(c.name) + '</span></button></td>' +
         '<td class="hide-sm">' + esc(c.sector) + '</td><td class="r">' + MB.money(v.close) + '</td><td class="r">' + MB.signed(v.change, 2) +
-        '</td><td class="r">' + MB.signed(v.gap, 2) + '</td><td class="r">' + MB.probBar(v.p1) + '</td><td class="r">' + MB.probBar(v.p5) +
+        '</td><td class="r">' + MB.signed(v.gap, 2) + '</td><td class="r">' + MB.probBar(v.p1) + '</td>' + (horizonsShown().last !== horizonsShown().first ? '<td class="r">' + MB.probBar(v.p5) + '</td>' : '') + '<td class="r">' +
         '</td><td class="r">' + range + '</td><td class="r">' + MB.num(v.rsi, 1) + '</td><td>' + (c.earnings ? esc(MB.day(c.earnings)) : '<span class="muted">–</span>') +
         '</td><td class="hide-sm">' + MB.spark(c.bars.slice(-20).map(function (b) { return [b[0], b[4]]; }), 80, 22) + '</td><td>' +
         '<span class="pill">' + esc(v.quality || 'no data') + '</span></td></tr>';

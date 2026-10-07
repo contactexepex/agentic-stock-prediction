@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 
 from marketbrief.analytics import call_basis, range_math, scoring
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.core.horizons import horizon_key
 from marketbrief.pipeline.review.helpers import note_tags, numeric_series, rounded_mean
 
 
@@ -61,8 +63,15 @@ def range_summary(frame: pd.DataFrame) -> dict:
     }
 
 
-def by_horizon(frame: pd.DataFrame, summarizer) -> dict:
-    """A summary of all rows and of each horizon's rows."""
+def by_horizon(frame: pd.DataFrame, summarizer, labels: bool = False) -> dict:
+    """A summary of all rows and of each horizon's rows. labels (ranges): rows of a legacy horizon label (core/
+    horizons.py; ranges stored before B10) are kept apart, under '<k>d legacy_cc', and left out of 'all'."""
+    if labels and not frame.empty:
+        current = frame[frame["horizon_label"] == LABEL_N_PLUS_K]
+        out = {"all": summarizer(current)}
+        for (label, horizon), group in frame.groupby(["horizon_label", "horizon_days"]):
+            out[horizon_key(horizon, label)] = summarizer(group)
+        return dict(sorted(out.items(), key=lambda item: (item[0] != "all", " " in item[0], item[0])))
     out = {"all": summarizer(frame)}
     for horizon, group in frame.groupby("horizon_days") if not frame.empty else []:
         out[f"{int(horizon)}d"] = summarizer(group)
@@ -70,13 +79,13 @@ def by_horizon(frame: pd.DataFrame, summarizer) -> dict:
 
 
 def breakdown(frame: pd.DataFrame, col: str) -> dict:
-    """A summary per value of a column (regime, sector, note tag) and horizon."""
+    """A summary per value of a column (regime, sector, note tag) and horizon (legacy labels apart)."""
     if frame.empty:
         return {}
     exploded = frame.explode(col) if col == "tags" else frame
     return {
-        f"{key} · {int(horizon)}d": range_summary(group)
-        for (key, horizon), group in exploded.groupby([col, "horizon_days"])
+        f"{key} · {horizon_key(horizon, label)}": range_summary(group)
+        for (key, label, horizon), group in exploded.groupby([col, "horizon_label", "horizon_days"])
     }
 
 
@@ -85,9 +94,11 @@ def per_basis(frame: pd.DataFrame, summarize) -> dict:
     `summarize(frame)` itself when there are no calls."""
     if frame.empty:
         return summarize(frame)
+    keys = [scoring.basis_key(basis, label) for basis, label in zip(frame["label_basis"], frame["horizon_label"],
+                                                                    strict=True)]
     return {
         f"{key} · {call_basis.label(basis)}": value
-        for basis, group in frame.groupby("label_basis", sort=True)
+        for basis, group in frame.assign(_basis=keys).groupby("_basis", sort=True)
         for key, value in summarize(group).items()
     }
 

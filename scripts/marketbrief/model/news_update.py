@@ -11,9 +11,11 @@ import json
 import pandas as pd
 
 from marketbrief.constants.config_keys import CFG_MARKET
-from marketbrief.constants.model import HORIZONS, LABEL_OPEN_TO_CLOSE
+from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES
+from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.database import connect
+from marketbrief.core.horizons import horizons
 from marketbrief.model.labels import label_columns
 from marketbrief.model.logistic import logit
 from marketbrief.model.news_score import update_plan
@@ -21,9 +23,11 @@ from marketbrief.model.panel import build_panel
 from marketbrief.model.panel_inputs import read_inputs
 from marketbrief.model.settings import cross_groups, load_model_config
 
-SCORES_SQL = """
+# N+k scores only: a legacy_5d_d4 score was made for another window than the panel's N+5 label
+SCORES_SQL = f"""
 SELECT as_of_date, ticker, horizon_days, prob_model, news_score FROM model_scores_latest
-WHERE label_convention = ? ORDER BY as_of_date, ticker, horizon_days"""
+WHERE label_convention = ? AND {SQL_LABEL_MODEL_SCORES} = '{LABEL_N_PLUS_K}'
+ORDER BY as_of_date, ticker, horizon_days"""
 
 
 def live_rows(con, panel: pd.DataFrame, horizon: int) -> pd.DataFrame:
@@ -47,7 +51,7 @@ def main() -> int:
     con = connect(cfg[CFG_MARKET])
     panel = build_panel(cfg, read_inputs(con, cfg[CFG_MARKET]), settings["warmup_bars"],
                         cross_groups(settings, cfg[CFG_MARKET]))
-    report = {f"{h}d": update_plan(live_rows(con, panel, h), settings["news"]) for h in HORIZONS}
+    report = {f"{h}d": update_plan(live_rows(con, panel, h), settings["news"]) for h in horizons()}
     print(json.dumps({"step": "model_news_update", "market": cfg[CFG_MARKET], "news_prior": settings["news"],
                       "horizons": report}, indent=2, default=str))
     return 0

@@ -19,7 +19,8 @@ from __future__ import annotations
 
 from marketbrief.core.market_config import load_market
 from marketbrief.portfolio import proof as proofs
-from marketbrief.portfolio.horizons import active_tickers, horizons, is_n_plus_k
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.portfolio.horizons import active_tickers, horizons, resolved_label
 from marketbrief.portfolio import signal_inputs as inputs
 from marketbrief.portfolio.constants import (
     LABEL_PAPER_ONLY,
@@ -96,8 +97,9 @@ def signal_row(score: dict, call: dict | None, band_range: dict | None, block: d
     final, adjustment = final_probability(model_prob, call)
     direction = (call or {}).get("direction") or ("up" if final > 0.5 else "down" if final < 0.5 else None)
     confidence = round(max(final, 1 - final), PROB_DIGITS)   # rounded first: 1 - 0.35 is 0.6499999999999999
+    label = resolved_label(score["horizon_days"], score.get("horizon_label"), score.get("computed_at"))
     cell = proofs.cell(proof, int(score["horizon_days"]), proofs.band_of(confidence, settings["proof"]["bands"])) \
-        if is_n_plus_k(score["horizon_days"], score.get("horizon_label")) else None
+        if label == LABEL_N_PLUS_K else None
     cell_proven = bool(cell and cell["proven"])
     proven = cell_proven and call is not None   # a model-only row stays paper only, even in a proven cell
     why_blocked = blocked_reason(block, settings)
@@ -109,7 +111,8 @@ def signal_row(score: dict, call: dict | None, band_range: dict | None, block: d
     if band_range:
         reasons.append(f"80% range {band_range['lo80']:.2f}-{band_range['hi80']:.2f} by {band_range['target_date']}")
     reasons.append(why_blocked or proof_note(cell, settings))
-    return {"id": score["id"], "ticker": score["ticker"], "horizon_days": int(score["horizon_days"]), "tier": tier,
+    return {"id": score["id"], "ticker": score["ticker"], "horizon_days": int(score["horizon_days"]),
+            "horizon_label": label, "tier": tier,
             "direction": None if tier == TIER_HOLD and why_blocked else direction,
             "model_prob": round(model_prob, PROB_DIGITS), "agent_adjustment": adjustment,
             "final_prob": round(final, PROB_DIGITS), "confidence": confidence,

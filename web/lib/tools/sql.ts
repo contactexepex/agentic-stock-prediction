@@ -1,7 +1,7 @@
 // The statements the tool layer sends to MotherDuck (DuckDB SQL over the Postgres endpoint, $n parameters). Plain
 // template literals without interpolation: tests/test_b5_tools.py runs each against a local DuckDB with mcp/inbox.sql.
-// Company commands go to inbox.company_commands (read by B1's importer); add_paper_trade to inbox.requests (no importer
-// yet). Idempotency keys and the per-agent write budget span both tables.
+// Company commands go to inbox.company_commands (read by B1's company.py import-inbox); add_paper_trade to
+// inbox.requests (read by B2's portfolio.py import-inbox). Idempotency keys and the per-agent write budget span both.
 
 export const READ_MODEL_COLUMNS = `market, page_key, as_of, cutoff, built_at, schema_version, source_commit, payload_sha256, payload`;
 

@@ -10,9 +10,17 @@ from marketbrief.replay import html_parts
 from marketbrief.replay.ai_replay.summaries import pct
 
 
+def horizon_groups(summary: dict) -> list[tuple[str, dict]]:
+    """(name, stats) per horizon N+k of the group's summary, ascending, then ("All", overall)."""
+    by_horizon = summary["by_horizon"]
+    return [(f"N+{horizon}", by_horizon[horizon]) for horizon in html_parts.horizon_keys(by_horizon)] + [
+        ("All", summary["overall"])
+    ]
+
+
 def svg_hit_bars(summary: dict) -> str:
-    """Bar chart of the hit rate of the AI and of always-up by horizon."""
-    groups = [("1-day", summary["by_horizon"]["1"]), ("5-day", summary["by_horizon"]["5"]), ("All", summary["overall"])]
+    """Bar chart of the hit rate of the AI and of always-up by horizon N+k (every horizon in the summary) and all."""
+    groups = horizon_groups(summary)
     width, height, left, right, top, bottom = 640, 300, 48, 16, 16, 44
     plot_width, plot_height = width - left - right, height - top - bottom
     scale_y = lambda tick: top + (1 - tick) * plot_height  # noqa: E731
@@ -198,15 +206,13 @@ def group_html(group: dict) -> str:
     tiles = "".join(
         [
             tile(
-                "AI calls right, 5 days ahead",
-                by_horizon["5"],
-                f"{by_horizon['5'].get('n', 0)} scored calls · coin flip 50%",
-            ),
-            tile(
-                "AI calls right, 1 day ahead",
-                by_horizon["1"],
-                f"{by_horizon['1'].get('n', 0)} scored calls · coin flip 50%",
-            ),
+                f"AI calls right, N+{horizon}",
+                by_horizon[horizon],
+                f"{by_horizon[horizon].get('n', 0)} scored calls · coin flip 50%",
+            )
+            for horizon in html_parts.horizon_keys(by_horizon)
+        ]
+        + [
             tile(
                 "“Always up” right on the same calls", overall.get("always_up") or {}, "same stocks, days and horizons"
             ),
@@ -223,7 +229,7 @@ def group_html(group: dict) -> str:
         for sentence in group["top"]
     )
     hrows = []
-    for name, horizon_stats in (("1-day", by_horizon["1"]), ("5-day", by_horizon["5"]), ("All", overall)):
+    for name, horizon_stats in horizon_groups(group):
         if not horizon_stats.get("n"):
             hrows.append(f"<tr><td>{name}</td><td>0</td>" + "<td></td>" * 6 + "</tr>")
             continue
@@ -236,7 +242,7 @@ def group_html(group: dict) -> str:
             f"<td>{points_text(difference['pts'])}</td></tr>"
         )
     rrows = []
-    for name, horizon_stats in (("1-day", by_horizon["1"]), ("5-day", by_horizon["5"]), ("All", overall)):
+    for name, horizon_stats in horizon_groups(group):
         for stats in (horizon_stats.get("rules") or {}).values():
             if not stats.get("n"):
                 continue
@@ -264,7 +270,7 @@ def group_html(group: dict) -> str:
         for day_row in group["per_day"]
     )
     crows = "".join(
-        f"<tr><td>{escape_html(str(call['date']))}</td><td>{escape_html(call['test'])}</td><td>{escape_html(call['ticker'])}</td><td>{call['h']}d</td><td>{escape_html(call['direction'])}</td>"
+        f"<tr><td>{escape_html(str(call['date']))}</td><td>{escape_html(call['test'])}</td><td>{escape_html(call['ticker'])}</td><td>N+{call['h']}</td><td>{escape_html(call['direction'])}</td>"
         f"<td>{call['confidence']:.2f}</td><td>{escape_html(call['status'])}</td>"
         f"<td>{signed_pct(call.get('ret'))}</td>"
         f"<td>{'' if call.get('hit') is None else ('right' if call['hit'] else 'wrong')}</td>"
@@ -283,7 +289,8 @@ def group_html(group: dict) -> str:
     return f"""{tag}
 <div class="card top">{top}</div>
 <div class="tiles">{tiles}</div>
-<p class="note">A call is right if the close 1 or 5 trading days later moved the called way (no change counts as wrong).
+<p class="note">A call of horizon N+k is right if the exit close (the close of the k-th session after the next one, \
+k + 1 sessions after the as-of close) moved the called way from the as-of close (no change counts as wrong).
 95% interval = the span the true hit rate most likely lies in; with few calls it is wide.</p>
 <h2>Was the AI right more often than “always up”?</h2>
 <div class="card">{legend}{svg_hit_bars(group)}
