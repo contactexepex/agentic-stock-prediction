@@ -10,6 +10,7 @@ from marketbrief.constants.config_keys import META_SECTOR, META_SECTOR_ETF, META
 from marketbrief.core.schema_intraday import INTRADAY_SCHEMAS
 from marketbrief.intraday import attribution, inputs
 from marketbrief.intraday.constants import (
+    FLAG_OPEN_TRADE,
     KIND_INTRADAY_CHECKS,
     METHOD_VERSION,
     QUALITY_NO_QUOTE,
@@ -21,13 +22,18 @@ from marketbrief.intraday.measures import (
     band_position,
     elapsed_fraction,
     flags_for,
+    is_trigger,
     judge_call,
     residual,
     rounded,
     scaled,
 )
 from marketbrief.intraday.quotes import SessionQuote
-from marketbrief.intraday.settings import row_id
+from marketbrief.intraday.settings import configured_horizons, row_id
+from marketbrief.intraday.trade_rows import trade_pair
+
+LEGACY_HORIZONS = {1: ("lo80", "lo50", "hi50", "hi80"), 5: ("lo80", "hi80")}   # WS5's _1d / _5d columns
+BAND_FIELDS = ("range_id", "lo80", "lo50", "hi50", "hi80", "sigma_h")
 
 
 @dataclass
@@ -52,6 +58,18 @@ class CheckContext:
     entry_prices: dict = field(default_factory=dict)  # (ticker, date, open|close) -> price
     market_moves: dict = field(default_factory=dict)  # benchmark key, cue snapshot
     news_since: datetime | None = None                # start of the news window (attribution.news_window)
+    trades: dict = field(default_factory=dict)        # B9: ticker -> open paper trades (trades.open_trades)
+    trade_bars: dict = field(default_factory=dict)    # B9: (ticker, date) -> raw daily bar of a holding window
+    adjustments: dict = field(default_factory=dict)   # B9: ticker -> [(ex_date, factor)] detected by check_at
+    trade_checks: list = field(default_factory=list)  # B9: the trade_checks rows written by this check
+    trade_details: list = field(default_factory=list)  # B9: their trade_check_details rows
+    skipped_trades: list = field(default_factory=list)  # B9: trade ids skipped (India: a share above the amount)
+
+    def range_horizons(self) -> set[int]:
+        """Every horizon with a published range for this session (any ticker), or the configured ones when none
+        is published (each missing horizon is then noted on every row, as WS5 noted no_range_1d/5d)."""
+        found = {horizon for bands in self.ranges.values() for horizon in bands}
+        return found or set(configured_horizons()) or set(LEGACY_HORIZONS)
 
     def ret(self, key: str | None) -> float | None:
         """Return since the open of a symbol whose quote is fresh."""
@@ -93,29 +111,65 @@ def base_row(ctx: CheckContext, ticker: str, meta: dict) -> dict:
         "id": row_id(ctx.check_id, ticker), "check_id": ctx.check_id, "check_at": ctx.check_at.isoformat(),
         "session_date": ctx.session_date.isoformat(), "ticker": ticker, "yahoo": meta.get(META_YAHOO, ticker),
         "flags": [], "flagged": False, "candidates": [], "candidate_ids": [], "calls": [], "notes": [],
-        "method_version": METHOD_VERSION, "computed_at": ctx.computed_at,
+        "method_version": METHOD_VERSION, "computed_at": ctx.computed_at, "bands": {},
+        "open_trades": len(ctx.trades.get(ticker, [])),
     }
 
 
 def ticker_row(ctx: CheckContext, ticker: str, meta: dict) -> dict:
-    """The full row of one watchlist ticker."""
+    """The full row of one watchlist ticker, after its open trades' rows (added to ctx.trade_checks)."""
     row = base_row(ctx, ticker, meta)
     quote: SessionQuote | None = ctx.quotes.get(ticker)
     if quote is None or ctx.stale.get(ticker):
         row["quality"] = ctx.stale.get(ticker) or QUALITY_NO_QUOTE
         if quote is not None:
             row.update(last_price=rounded(quote.last_price, 4), last_time=quote.last_time.isoformat())
+        add_trade_rows(ctx, row, ticker, quote, None, None)
         return row
     row["quality"] = QUALITY_OK
     fill_measures(ctx, row, ticker, meta, quote)
     return row
 
 
+def add_trade_rows(ctx: CheckContext, row: dict, ticker: str, quote, sigma, elapsed) -> bool:
+    """Check the ticker's open trades (B9); True when at least one of them is flagged."""
+    flagged = False
+    for trade in ctx.trades.get(ticker, []):
+        pair = trade_pair(ctx, trade, quote, sigma, elapsed)
+        if pair is None:
+            ctx.skipped_trades.append(trade["trade_id"])
+            continue
+        ctx.trade_checks.append(pair[0])
+        ctx.trade_details.append(pair[1])
+        flagged = flagged or pair[0]["flagged"]
+    row["open_trades"] = len(ctx.trades.get(ticker, [])) - sum(
+        trade["trade_id"] in ctx.skipped_trades for trade in ctx.trades.get(ticker, []))
+    return flagged
+
+
+def fill_bands(ctx: CheckContext, row: dict, bands: dict[int, dict], price: float) -> None:
+    """bands JSON for every published horizon (and WS5's _1d / _5d columns for k = 1 and 5); a horizon published
+    for other tickers of the session but missing here is noted no_range_<k>d."""
+    for horizon in sorted(set(ctx.range_horizons()) | set(bands)):
+        band = bands.get(horizon)
+        if not band:
+            row["notes"].append(f"no_range_{horizon}d")
+            continue
+        position = band_position(price, band)
+        row["bands"][str(horizon)] = {
+            **{key: band["id"] if key == "range_id" else rounded(band.get(key), 6 if key == "sigma_h" else 4)
+               for key in BAND_FIELDS}, "band": position}
+        if horizon in LEGACY_HORIZONS:
+            row[f"range_id_{horizon}d"], row[f"band_{horizon}d"] = band["id"], position
+            for key in LEGACY_HORIZONS[horizon]:
+                row[f"{key}_{horizon}d"] = rounded(band[key], 4)
+
+
 def fill_measures(ctx: CheckContext, row: dict, ticker: str, meta: dict, quote: SessionQuote) -> None:
-    """Measures, calls, flags and candidates of a ticker with a fresh quote."""
+    """Measures, calls, open trades, flags and candidates of a ticker with a fresh quote."""
     settings, notes = ctx.settings, row["notes"]
     bands = ctx.ranges.get(ticker, {})
-    range_1d, range_5d = bands.get(1), bands.get(5)
+    shortest = bands.get(min(bands)) if bands else None
     sigma, sigma_note = inputs.daily_sigma(bands, ctx.features.get(ticker))
     if sigma_note:
         notes.append(sigma_note)
@@ -141,19 +195,15 @@ def fill_measures(ctx: CheckContext, row: dict, ticker: str, meta: dict, quote: 
         beta=rounded(beta, 4), residual=rounded(resid), residual_z=rounded(scaled(resid, sigma, elapsed), 3),
         sector_residual=rounded(ret - sector_ret) if sector_ret is not None else None,
     )
-    for horizon, band in ((1, range_1d), (5, range_5d)):
-        if band:
-            row[f"range_id_{horizon}d"] = band["id"]
-            row[f"band_{horizon}d"] = band_position(quote.last_price, band)
-            for key in ("lo80", "hi80") if horizon == 5 else ("lo80", "lo50", "hi50", "hi80"):
-                row[f"{key}_{horizon}d"] = rounded(band[key], 4)
-        else:
-            notes.append(f"no_range_{horizon}d")
+    fill_bands(ctx, row, bands, quote.last_price)
     row["calls"] = [_judged(ctx, call, ticker, quote, sigma, elapsed) for call in ctx.calls.get(ticker, [])]
     row["flags"] = flags_for(row, row["calls"], settings)
-    row["flagged"] = any(flag in settings["flag_on"] for flag in row["flags"])
+    if add_trade_rows(ctx, row, ticker, quote, sigma, elapsed):
+        row["flags"].append(FLAG_OPEN_TRADE)
+    row["flagged"] = any(is_trigger(flag, settings["flag_on"]) for flag in row["flags"])
     if row["flagged"]:
-        cue_notes = [note for note in (range_1d or {}).get("notes") or [] if "cue" in str(note)]
+        range_notes = (shortest or {}).get("notes")
+        cue_notes = [note for note in (list(range_notes) if range_notes is not None else []) if "cue" in str(note)]
         context = {**row, "sector_key": sector_key, "cue_notes": cue_notes}
         window = (ctx.news_since or ctx.session_open, ctx.check_at)
         row["candidates"] = attribution.market_candidates(context, ctx.market_moves) + attribution.item_candidates(

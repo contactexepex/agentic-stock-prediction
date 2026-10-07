@@ -14,8 +14,17 @@ from marketbrief.constants.indicators import TRADING_DAYS
 from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE
 from marketbrief.core.calendar import next_session, sessions_ahead
 from marketbrief.intraday.constants import CALL_MODEL, CALL_PREDICTION, EVENT_TYPES
+from marketbrief.intraday.settings import configured_horizons
 
-CALL_LOOKBACK_DAYS = 12   # calendar days back that cover the as-of dates of open 5-day calls
+CALL_LOOKBACK_DAYS = 12   # calendar days back that cover the as-of dates of open 5-day calls (the minimum)
+CALENDAR_DAYS_PER_SESSION = 2   # B9: a generous calendar-day bound per session of the longest horizon
+
+
+def call_lookback_days(horizons: tuple[int, ...]) -> int:
+    """Calendar days back to the oldest as-of date whose call can still be open: enough for the longest horizon
+    (configured or 5) plus the entry session, weekends and holidays; the exact window is checked per call."""
+    longest = max((*horizons, 5))
+    return max(CALL_LOOKBACK_DAYS, CALENDAR_DAYS_PER_SESSION * (longest + 1) + 7)
 
 
 def records(frame: pd.DataFrame) -> list[dict]:
@@ -57,7 +66,7 @@ def open_calls(con, cfg: dict, session_date: date, check_at: datetime) -> dict[s
     session. Each model score id: its newest row by check_at (basis = its label_convention); a prediction's basis is
     call_basis.basis_for(made_at). entry_kind: open (open_to_close: the open of entry_date) or close (close_to_close:
     the as-of close)."""
-    since = session_date - timedelta(days=CALL_LOOKBACK_DAYS)
+    since = session_date - timedelta(days=call_lookback_days(configured_horizons()))
     predictions = con.execute(
         "SELECT id, ticker, horizon_days, as_of_date, made_at, direction, NULL AS prob_up, "
         "NULL AS label_convention FROM predictions WHERE made_at <= ? AND as_of_date >= ? AND as_of_date < ? "
@@ -151,13 +160,13 @@ def latest_features(con, session_date: date, check_at: datetime) -> dict[str, di
 
 
 def daily_sigma(bands: dict[int, dict], features: dict | None) -> tuple[float | None, str | None]:
-    """The 1-day sigma: the published 1-day range's sigma_h, else the 5-day range's sigma_h / sqrt(5), else the
-    features' EWMA vol / sqrt(252) (the fallback used is returned as a note)."""
-    range_1d, range_5d = bands.get(1), bands.get(5)
-    if range_1d and range_1d.get("sigma_h"):
-        return float(range_1d["sigma_h"]), None
-    if range_5d and range_5d.get("sigma_h"):
-        return float(range_5d["sigma_h"]) / math.sqrt(5), "sigma_from_5d_range"
+    """The 1-day sigma: the shortest published horizon k with a sigma_h, as sigma_h / sqrt(k) (k = 1: as is; any
+    other k is noted sigma_from_<k>d_range), else the features' EWMA vol / sqrt(252) (noted)."""
+    for horizon in sorted(bands):
+        band = bands[horizon]
+        if band and band.get("sigma_h"):
+            note = None if horizon == 1 else f"sigma_from_{horizon}d_range"
+            return float(band["sigma_h"]) / math.sqrt(horizon), note
     if features and features.get("ewma_vol"):
         return float(features["ewma_vol"]) / math.sqrt(TRADING_DAYS), "sigma_from_ewma_vol"
     return None, "no_sigma"

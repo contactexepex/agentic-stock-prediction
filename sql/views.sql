@@ -669,11 +669,12 @@ SELECT * FROM intraday_deviations WHERE session_date = current_date AND check_at
 ORDER BY check_at, ticker;
 
 -- Learning loop: each explained deviation with the session's stored close (as stored, the basis of the
--- intraday bars). outcomes.py classifies held / reversed / faded from these columns.
+-- intraday bars). outcomes.py classifies held / reversed / faded from these columns. B9: `bands` carries every
+-- published horizon's edges (the _1d columns repeat k = 1 for older readers).
 CREATE OR REPLACE VIEW intraday_explanation_close AS
 SELECT d.id AS check_row_id, d.explanation_id, d.ticker, d.session_date, d.check_at, d.flags, d.attribution,
        d.explanation, d.cited_ids, d.explained_at, d.open_price, d.last_price, d.ret_since_open, d.band_1d,
-       d.lo80_1d, d.hi80_1d, o.close AS session_close, o.collected_at AS close_collected_at,
+       d.lo80_1d, d.hi80_1d, d.bands, o.close AS session_close, o.collected_at AS close_collected_at,
        o.close / d.open_price - 1 AS close_ret_since_open, o.close / d.last_price - 1 AS ret_after_check
 FROM intraday_deviations d
 LEFT JOIN ohlc_raw o ON o.ticker = d.ticker AND o.date = d.session_date
@@ -694,3 +695,28 @@ SELECT * FROM results_digests_asof(TIMESTAMPTZ '9999-12-31 00:00:00+00');
 CREATE OR REPLACE VIEW results_digest_ticker_latest AS
 SELECT DISTINCT ON (ticker, release_kind) * FROM results_digests_latest
 ORDER BY ticker, release_kind, release_at DESC, id;
+
+-- B9: checks of open paper trades and the intraday alerts feed (scripts/intraday_check.py; docs/ws/b9.md).
+-- Monitoring only. Rows are written once per check time; the first stored row per id wins. Each trade check
+-- (W1's trade_checks columns) with its trade_check_details row (same id): quality, today's basis, target reached.
+CREATE OR REPLACE VIEW trade_check_rows AS
+SELECT t.*, d.family, d.pick_rule, d.quality, d.entry_source, d.basis_factor, d.entry_adj, d.target_adj,
+       d.lo80_adj, d.lo50_adj, d.hi50_adj, d.hi80_adj, d.last_time, d.sigma_1d, d.elapsed_fraction,
+       d.sessions_held, d.sessions_left, d.z_since_entry, d.target_reached, d.target_reached_session,
+       d.high_since_entry_pct, d.low_since_entry_pct, d.notes
+FROM (SELECT DISTINCT ON (id) * FROM trade_checks ORDER BY id, computed_at) t
+LEFT JOIN (SELECT DISTINCT ON (id) * FROM trade_check_details ORDER BY id, computed_at) d USING (id);
+
+-- The newest check of each open trade (any quality).
+CREATE OR REPLACE VIEW trade_checks_latest AS
+SELECT DISTINCT ON (trade_id) * FROM trade_check_rows ORDER BY trade_id, check_at DESC, id;
+
+-- The alerts feed for the Slack alerts (session B6): every alert with the explainer's note on the ticker's check
+-- row (null until one is stored; filter on explained_at for a time).
+CREATE OR REPLACE VIEW intraday_alerts_feed AS
+SELECT a.*, x.id AS explanation_id, x.attribution, x.text AS explanation, x.cited_ids,
+       x.created_at AS explained_at
+FROM (SELECT DISTINCT ON (id) * FROM intraday_alerts ORDER BY id, computed_at) a
+LEFT JOIN (SELECT DISTINCT ON (check_row_id) * FROM intraday_explanations ORDER BY check_row_id, created_at, id) x
+  ON x.check_row_id = a.check_row_id
+ORDER BY a.check_at, a.ticker, a.id;

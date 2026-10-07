@@ -12,15 +12,19 @@ from marketbrief.collectors.quotes import priced, snapshot
 from marketbrief.constants.quotes import INTRADAY_INTERVAL, INTRADAY_PERIOD, YAHOO_CLOSE_COLUMN
 
 YAHOO_OPEN_COLUMN = "Open"
+YAHOO_HIGH_COLUMN, YAHOO_LOW_COLUMN = "High", "Low"
 
 
 @dataclass
 class SessionQuote:
-    """A symbol's session so far: the first bar's open, the newest complete bar's close and its time."""
+    """A symbol's session so far: the first bar's open, the newest complete bar's close and its time, and the
+    session's high and low over the complete bars (B9: whether a trade's target was reached today)."""
 
     open_price: float
     last_price: float
     last_time: datetime
+    high: float | None = None
+    low: float | None = None
 
 
 class YahooIntraday:
@@ -65,7 +69,17 @@ def session_quote(frame: pd.DataFrame, session_open: datetime, session_close: da
     open_price = first.get(YAHOO_OPEN_COLUMN)
     if open_price is None or pd.isna(open_price):
         open_price = first[YAHOO_CLOSE_COLUMN]
-    return SessionQuote(float(open_price), float(last[YAHOO_CLOSE_COLUMN]), today.index[-1].to_pydatetime())
+    high, low = _extreme(today, YAHOO_HIGH_COLUMN, max), _extreme(today, YAHOO_LOW_COLUMN, min)
+    return SessionQuote(float(open_price), float(last[YAHOO_CLOSE_COLUMN]), today.index[-1].to_pydatetime(),
+                        high, low)
+
+
+def _extreme(today: pd.DataFrame, column: str, pick) -> float | None:
+    """The session's high (pick=max) or low (min): over the bars' `column`, else over their opens and closes."""
+    cols = [column] if column in today.columns else [c for c in (YAHOO_OPEN_COLUMN, YAHOO_CLOSE_COLUMN)
+                                                      if c in today.columns]
+    values = [float(v) for c in cols for v in today[c].tolist() if v is not None and not pd.isna(v)]
+    return pick(values) if values else None
 
 
 def last_bar_time(frame: pd.DataFrame) -> datetime | None:

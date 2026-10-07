@@ -32,9 +32,16 @@ FLAG_LARGE_MOVE = "large_move"
 FLAG_LARGE_RESIDUAL = "large_residual"
 FLAG_AGAINST_CALL = "against_call"
 FLAG_AGAINST_MODEL = "against_model"
+FLAG_OPEN_TRADE = "open_trade_flagged"   # B9: at least one open paper trade of the ticker is flagged
+# B9: band flags exist for every published horizon k: outside_<k>d_80 (any k) and outside_<k>d_50 (the shortest
+# horizon only); the WS5 names outside_1d_80, outside_1d_50 and outside_5d_80 are the cases k = 1 and 5.
+# `outside_{k}d_80` in config/intraday.yaml `flag_on` makes every horizon's 80% flag a trigger.
+OUTSIDE_80_TEMPLATE = "outside_{k}d_80"
+OUTSIDE_50_TEMPLATE = "outside_{k}d_50"
+OUTSIDE_80_RE = r"outside_\d+d_80"
 ALL_FLAGS = (
     FLAG_OUTSIDE_1D_80, FLAG_OUTSIDE_1D_50, FLAG_OUTSIDE_5D_80, FLAG_LARGE_MOVE, FLAG_LARGE_RESIDUAL,
-    FLAG_AGAINST_CALL, FLAG_AGAINST_MODEL,
+    FLAG_AGAINST_CALL, FLAG_AGAINST_MODEL, FLAG_OPEN_TRADE,
 )
 
 # attribution candidate kinds and their id prefixes (news, announcement and event ids are the stored ids)
@@ -93,3 +100,31 @@ MSG_WRONG_SIGN = "signed number {sign}{num}{unit} has the wrong sign (stored {wh
 MSG_FORBIDDEN_WORD = "text predicts or recommends ({word!r}); describe only what happened"
 MSG_PROMPT_VERSION = "prompt_version {found!r} is not the configured {expected!r}"
 MSG_PATH_DOES_NOT_EXIST = "{path} does not exist"
+
+# ---------- B9: checks of open paper trades and the intraday alerts feed (docs/ws/b9.md). Monitoring only:
+# nothing is ever traded. trade_checks is W1's kind (core/schema_lab.py); the two kinds below are B9's
+# (core/schema_intraday.py).
+KIND_TRADE_CHECK_DETAILS = "trade_check_details"
+KIND_INTRADAY_ALERTS = "intraday_alerts"
+TRADE_METHOD_VERSION = "tc-v1"
+ALERT_ID_PREFIX = "ia"
+
+# trade check flags (contracts.protocol.CHECK_FLAGS)
+TRADE_FLAG_OUTSIDE_RANGE = "outside_range"
+TRADE_FLAG_FAR_FROM_TARGET = "far_from_target"
+TRADE_FLAG_AGAINST = "against_prediction"
+
+# trade check quality: ok | stale_quote | no_quote (as the ticker rows) | no_entry_price (D before today and no
+# stored bar of D by the check: the settlement records no_entry if it stays missing)
+QUALITY_NO_ENTRY = "no_entry_price"
+ENTRY_INTRADAY_OPEN = "intraday_open"   # D is today: the first 5-minute bar's open
+ENTRY_STORED_OPEN = "stored_open"       # D before today: D's stored raw open (ohlc_raw)
+
+# views of a trade
+VIEW_ACCURACY = "accuracy"
+VIEW_HEAD_TO_HEAD = "head_to_head"
+PICK_PICKED = "picked"
+
+# alert types
+ALERT_TRADE_FLAGGED = "open_trade_flagged"
+ALERT_MATERIAL_NEWS = "material_news_open_trade"

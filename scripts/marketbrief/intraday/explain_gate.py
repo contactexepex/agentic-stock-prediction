@@ -1,7 +1,9 @@
 """The deviation explainer's gate (intraday_check.py validate|add), modelled on lessons.py validate: the check
 row exists, is flagged and has no stored note; the text is 1-60 words, never predicts or recommends; every cited
 id is one of the row's attribution candidates; the attribution enum is valid and backed by a cited id of its
-kind; and every number in the text matches a stored measure of the row (or a number in a candidate's text)."""
+kind; and every number in the text matches a stored measure of the row (or a number in a candidate's text). B9: the
+row's band edges of every published horizon and its flagged open trades' measures (`trades`) count as stored
+measures, and any horizon of the row (bands, calls, trades or config/strategies.yaml) may be named."""
 
 from __future__ import annotations
 
@@ -33,6 +35,7 @@ from marketbrief.intraday.constants import (
     NUM_RE,
     SKIP_RE,
 )
+from marketbrief.intraday.settings import configured_horizons
 
 # measures stored as fractions (cited in %), measures cited as plain numbers
 PCT_MEASURES = ("ret_since_open", "gap", "bench_ret", "sector_ret", "residual", "sector_residual", "sigma_1d")
@@ -41,16 +44,56 @@ PLAIN_MEASURES = ("last_price", "open_price", "prev_close", "lo80_1d", "lo50_1d"
                   "lo80_5d", "hi80_5d", "beta")
 SIGNED_PLAIN = ("move_z", "residual_z")
 TEXT_FIELDS = ("title", "subject", "name")
+BAND_EDGES = ("lo80", "lo50", "hi50", "hi80")
+TRADE_SIGNED_PCT = ("ret_since_entry_pct", "to_target_pct")     # stored in percent points
+TRADE_PLAIN = ("entry_price", "last_price", "target_price", *BAND_EDGES, "entry_adj", "target_adj", "lo80_adj",
+               "lo50_adj", "hi50_adj", "hi80_adj", "session_number")
+TRADE_SIGNED_PLAIN = ("target_z", "z_since_entry")
+
+
+def horizon_numbers(row: dict) -> list[tuple[float, str, bool, bool]]:
+    """Every horizon the row knows: its bands, its calls, its trades and the configured list (N+k, k-day)."""
+    found = set(configured_horizons()) | {int(k) for k in (row.get("bands") or {})}
+    found |= {int(call["horizon_days"]) for call in row.get("calls") or [] if call.get("horizon_days")}
+    found |= {int(trade["horizon_days"]) for trade in row.get("trades") or [] if trade.get("horizon_days")}
+    return [(float(k), "horizon", False, False) for k in sorted(found | {1, 5})]
+
+
+def trade_numbers(trade: dict) -> list[tuple[float, str, bool, bool]]:
+    """An open trade's stored measures, and its last price's % distance from its target and range edges."""
+    out = [(trade[key], f"trade {key}", True, True) for key in TRADE_SIGNED_PCT if trade.get(key) is not None]
+    out += [(trade[key], f"trade {key}", False, False) for key in TRADE_PLAIN if trade.get(key) is not None]
+    out += [(trade[key], f"trade {key}", False, True) for key in TRADE_SIGNED_PLAIN if trade.get(key) is not None]
+    last = trade.get("last_price")
+    for key in BAND_EDGES:
+        edge = trade.get(f"{key}_adj") or trade.get(key)
+        if last and edge:
+            out.append((100 * (last / edge - 1), f"trade distance from {key}", True, True))
+    return out
+
+
+def band_numbers(row: dict) -> list[tuple[float, str, bool, bool]]:
+    """The band edges of every published horizon (bands JSON) and the last price's % distance from each."""
+    out, last = [], row.get("last_price")
+    for horizon, band in sorted((row.get("bands") or {}).items()):
+        for key in BAND_EDGES:
+            if band.get(key) is not None:
+                out.append((band[key], f"{key}_{horizon}d", False, False))
+                if last:
+                    out.append((100 * (last / band[key] - 1), f"distance from {key}_{horizon}d", True, True))
+    return out
 
 
 def allowed_numbers(row: dict) -> list[tuple[float, str, bool, bool]]:
     """(value, what, is_percent, signed) a note on this row may cite."""
-    out = [(1.0, "horizon", False, False), (5.0, "horizon", False, False),
+    out = [*horizon_numbers(row),
            (50.0, "band", True, False), (80.0, "band", True, False), (50.0, "band", False, False),
            (80.0, "band", False, False)]
-    out += measure_numbers(row)
+    out += measure_numbers(row) + band_numbers(row)
     for call in row.get("calls") or []:
         out += call_numbers(call)
+    for trade in row.get("trades") or []:
+        out += trade_numbers(trade)
     for cand in row.get("candidates") or []:
         out += candidate_numbers(cand)
     return out
@@ -103,7 +146,9 @@ def candidate_numbers(cand: dict) -> list[tuple[float, str, bool, bool]]:
 def number_errors(text: str, row: dict, cited: list[str]) -> list[str]:
     """Numbers in the text that match no stored measure (dates, times, ids and the ticker skipped)."""
     cleaned = text
-    for ident in sorted({*cited, *(row.get("candidate_ids") or []), row["id"]}, key=len, reverse=True):
+    trade_ids = {trade.get(key) for trade in row.get("trades") or [] for key in ("trade_id", "strategy_id")}
+    idents = {*cited, *(row.get("candidate_ids") or []), row["id"], *(trade_ids - {None})}
+    for ident in sorted(idents, key=len, reverse=True):
         cleaned = cleaned.replace(ident, " ")
     cleaned = re.sub(SKIP_RE, " ", cleaned)
     cleaned = re.sub(rf"(?<![\w]){re.escape(row['ticker'])}(?![\w])", " ", cleaned)
