@@ -23,6 +23,7 @@ from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.evidence import evidence
 from marketbrief.replay.ai_replay.roots import data_root
+from marketbrief.contracts.watchlist import watchlist
 
 
 def store_dir(results: Path, market: str) -> Path:
@@ -65,6 +66,9 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
         if status_rules:
             statuses.preload(meta["cutoff_utc"])
     evidence_frame, _ = evidence(cfg["market"], root, datetime.fromisoformat(meta["cutoff_utc"]))
+    # the companies active at the replay's cutoff (watchlist events as of then, no look-ahead)
+    active_at_cutoff = {company["ticker"] for company in watchlist(cfg["market"],
+                                                                   datetime.fromisoformat(meta["cutoff_utc"]))}
     return {
         "meta": meta,
         "features": {
@@ -75,7 +79,7 @@ def replay_context(cfg: dict, root: Path, as_of_day: date) -> dict:
             for row in feats.itertuples()
         },
         "evidence": set(evidence_frame["id"]),
-        "tickers": set(cfg["tickers"]),
+        "tickers": active_at_cutoff,
         "statuses": statuses if status_rules else None,
     }
 

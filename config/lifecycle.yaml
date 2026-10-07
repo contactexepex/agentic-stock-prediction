@@ -1,0 +1,50 @@
+# Company lifecycle and onboarding (F8, docs/SPEC.md section 3; code marketbrief/lifecycle/, CLI scripts/company.py).
+# Research only: a watchlist event is a record, never an order.
+
+# When deactivate, reactivate and set_amount take effect: the start of the next pre-open run (decision 31), in the
+# market's local time, on the next session of its calendar. add and delete count from the moment they are recorded
+# (an added company is collected at once and predicted from the next pre-open run).
+pre_open_local: {india: "07:40", us: "07:45"}
+
+# Onboarding backfill (deterministic, no AI).
+backfill:
+  # Daily prices into data/: from the market's first stored session, so a new company has the same stored window
+  # as the others (features, calibration pools, replays). The 15-year history goes where the repo keeps long history,
+  # the long-history cache work/model_history/<market>/ (gitignored; model_history.py rebuilds it for every collected
+  # company): onboarding fetches the candidate's daily bars from the cache's start (else long_history_years back), as
+  # far as Yahoo has them, and merges them into the cache (check long_history; its detail gives the years found).
+  long_history_years: 15
+  min_bars: 20          # the collect gate refuses a candidate with fewer stored bars
+
+# Sector of a new company (onboarding sets it on the add event). The owner's --sector wins when given; otherwise
+# the first rule whose pattern (case-insensitive regex) matches one of the source's industry strings decides:
+# India: NSE's industry info (basic industry, industry, sector, macro; NSE's API refuses some cloud networks) and
+# Yahoo's industry and sector; US: SEC's SIC description and Yahoo's industry and sector. No match and no --sector:
+# the add is refused (validation_failed) with the strings found, so the owner can pass --sector.
+sector_rules:
+  india:
+    - {sector: Banks, pattern: '\bbanks?\b'}
+    - {sector: Insurance, pattern: 'insurance'}
+    - {sector: IT, pattern: 'computers - software|it enabled|information technology|software'}
+    - {sector: Transport, pattern: 'airline|airport|\bport|shipping|logistics|transport|marine'}
+    - {sector: Pharma, pattern: 'pharma|drug|healthcare'}
+    - {sector: Autos, pattern: 'automobile|passenger cars|auto components|\bauto\b|tractor|farm & heavy'}
+    - {sector: Consumer goods, pattern: 'fast moving consumer goods|fmcg|personal care|personal products|cigarettes|tobacco|household|packaged foods|consumer defensive'}
+    - {sector: Construction, pattern: 'construction|cement|building materials|civil|engineering'}
+    - {sector: Metals, pattern: 'steel|alumin|metal|mining'}
+    - {sector: Energy, pattern: 'refiner|\boil\b|\bgas\b|petroleum|power|energy'}
+  us:
+    - {sector: Banks, pattern: 'commercial banks|savings institution'}
+    - {sector: Insurance, pattern: 'insurance'}
+    - {sector: Airlines, pattern: 'air transportation'}
+    - {sector: Energy, pattern: 'petroleum|crude|natural gas'}
+    - {sector: Pharma, pattern: 'pharmaceutical|biological products|medicinal|drug manufacturers'}
+    - {sector: Autos, pattern: 'motor vehicles|auto manufacturers'}
+    - {sector: Retail, pattern: 'retail|discount stores'}
+    - {sector: Internet, pattern: 'computer programming, data processing|information retrieval|internet content'}
+    - {sector: Tech, pattern: 'semiconductor|electronic computers|prepackaged software|computer'}
+    - {sector: Industrials, pattern: 'machinery|construction|aircraft|industrial'}
+
+# Exchanges accepted (decision 14) as the sources name them.
+exchanges:
+  us: {Nasdaq: NASDAQ, NYSE: NYSE}

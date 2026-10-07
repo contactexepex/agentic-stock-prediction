@@ -15,6 +15,7 @@ from marketbrief.constants.nse_collection import (
 )
 from marketbrief.core.clock import utc_today
 from marketbrief.utils.markdown import cursor_markdown_table
+from marketbrief.lifecycle.loader import active_tickers
 
 
 def _flows(con) -> str:
@@ -79,7 +80,7 @@ def context_sections(cfg: dict, con) -> list[tuple[str, str]]:
     """The NSE announcement, results, delivery and flows sections."""
     if (cfg.get("relations") or {}).get("source") != "nse":
         return []
-    tickers, today = list(cfg["tickers"]), utc_today()
+    tickers, today = active_tickers(cfg), utc_today()
     return [
         ("FII/DII cash-market flows (NSE provisional, INR crore)", _flows(con)),
         (
