@@ -64,15 +64,17 @@ class Publisher:
             if missing:   # partly posted, and the text now splits differently: left as is, but said so
                 summary.update({"incomplete": True, "missing_parts": missing})
             return summary   # posted before (a changed text is not posted again)
+        threaded = self.client.mode != WebhookClient.mode   # a webhook post is never a thread
         anchor = msg.reply_to or (self.ledger.thread_ts(msg.thread_key) if msg.thread_key else None)
+        anchor = anchor if threaded else None
         for number, part in enumerate(parts, 1):
             if number in done:
-                anchor = anchor or done[number]["ts"]
+                anchor = anchor or (done[number]["ts"] if threaded else None)
                 continue
             ts = self.client.post_message(self.channel, part, anchor)
             self.ledger.append(self.row(msg, number, len(parts), part, ts, anchor))
             summary["posted"].append(f"{msg.post_key}#{number}")
-            anchor = anchor or ts
+            anchor = anchor or (ts if threaded else None)
         summary["thread_ts"] = anchor
         return summary
 
