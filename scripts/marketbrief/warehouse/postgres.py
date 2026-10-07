@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 
 from marketbrief.constants.environment import ENV_MOTHERDUCK_TOKEN
 from marketbrief.constants.warehouse import MSG_TOKEN_MISSING, REDACTED
-from marketbrief.warehouse.connection import WarehouseError, load_warehouse_config, token
+from marketbrief.warehouse.connection import load_warehouse_config
+from marketbrief.warehouse.errors import WarehouseError, token
 
 
 @dataclass(frozen=True)
