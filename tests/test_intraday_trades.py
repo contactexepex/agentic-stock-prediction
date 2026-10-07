@@ -562,3 +562,41 @@ def test_stored_bars_apply_a_correction_only_once_detected(market):
     before_split = datetime(2026, 10, 7, 4, 45, tzinfo=timezone.utc)                # bars known, split not yet
     assert aapl_close(before_split) == pytest.approx(333.63)
 
+
+
+def test_delayed_exit_trade_is_watched_until_settled(market):
+    """Issue #93: a trade past its exit date without a paper_trades_settled row (exit close missing) is still
+    checked, noted exit_delayed, with the rest of today as the sessions left; a settlement row stored by the check
+    closes it (whatever its status); more than trades.max_sessions_past_exit sessions late: listed only."""
+    root, cfg, settings = market
+    jl(root, "strategy_predictions", "2026-10-01", [
+        # D = 10-02, exit N+1 = 10-05: two sessions late on 10-07 (10-06, 10-07)
+        custom("rule.b9_delayed.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z"),
+        # the same, but settled at 10-06 22:15 (before the check): closed
+        custom("rule.b9_settled.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z"),
+        # settled only after the check (17:00): still watched at 16:27 (no look-ahead)
+        custom("rule.b9_late_settle.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z"),
+        # D = 09-25, exit N+1 = 09-28: 7 sessions late, beyond max_sessions_past_exit (5)
+        custom("rule.b9_ancient.v1:2026-09-24-NVDA-1d", ("2026-09-24", "2026-09-25", "2026-09-28"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-09-25T11:45:00Z")])
+    jl(root, "paper_trades_settled", "2026-10-06", [
+        {"id": "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d@20261006T221500Z",
+         "trade_id": "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d", "status": "no_entry",
+         "settled_at": "2026-10-06T22:15:00Z"},
+        {"id": "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d@20261007T170000Z",
+         "trade_id": "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d", "status": "settled",
+         "settled_at": "2026-10-07T17:00:00Z"}])
+    summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
+    trades = trade_view(root)
+    delayed = trades["acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d"]
+    assert "exit_delayed" in delayed["notes"] and delayed["session_number"] == 4          # 10-02, 05, 06, 07
+    assert delayed["sessions_left"] == pytest.approx(1 - ELAPSED, abs=1e-4)
+    assert "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d" in trades
+    assert "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d" not in trades
+    assert "acc:rule.b9_ancient.v1:2026-09-24-NVDA-1d" not in trades
+    assert summary["skipped_trades"]["delayed_too_long"] == ["acc:rule.b9_ancient.v1:2026-09-24-NVDA-1d"]
+    on_time = trades["acc:rule.model_news.v1:2026-09-29-NVDA-5d"]                     # exits today: not delayed
+    assert "exit_delayed" not in on_time["notes"]
