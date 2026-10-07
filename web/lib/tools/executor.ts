@@ -247,20 +247,16 @@ export class ToolLayer {
     }
     if (!claim.claimed) return this.duplicate(ctx, now, gate, base, claim.existing, argsSha);
     const summary = writeSummary(tool.name, args, preview);
-    // Only company commands have an importer (B1's onboard.yml); a paper trade waits in inbox.requests.
-    const imported = writeKind(tool) === "watchlist_events";
-    let dispatched: { ok: boolean; reason: string | null } = { ok: true, reason: null };
-    if (imported) {
-      try {
-        dispatched = await this.deps.dispatcher.dispatch();
-      } catch {
-        dispatched = { ok: false, reason: "dispatch error" };
-      }
+    // Both kinds have an importer: company commands `company.py import-inbox` (B1), paper trades
+    // `portfolio.py import-inbox` (B2, marketbrief/portfolio/inbox_import.py); onboard.yml and the routines run them.
+    let dispatched: { ok: boolean; reason: string | null };
+    try {
+      dispatched = await this.deps.dispatcher.dispatch();
+    } catch {
+      dispatched = { ok: false, reason: "dispatch error" };
     }
-    const message = imported
-      ? `Pending: ${summary}. It shows as pending until the import writes it to the record` +
-        (dispatched.ok ? "." : "; the onboarding workflow could not be started now, so the next scheduled run imports it.")
-      : `Pending: ${summary}. Stored in the inbox; the paper-trade import is not built yet, so it stays pending until it is.`;
+    const message = `Pending: ${summary}. It shows as pending until the import writes it to the record` +
+      (dispatched.ok ? "." : "; the onboarding workflow could not be started now, so the next scheduled run imports it.");
     const outcome = await this.finish(ctx, now, { ...base, result: "pending", code: null, message, inboxId: key,
       budgetLeft: this.budgetLeft(agent, usage, tool.kind, 1) }, id);
     if (!dispatched.ok) {
