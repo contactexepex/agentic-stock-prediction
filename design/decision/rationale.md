@@ -83,11 +83,13 @@ tooltip (hover, focus or tap). Status is never colour alone: tick/cross glyphs, 
 ## Recolour to Material 3 (2026-10-07)
 
 - **Only the skin.** Same sections, order, grids, chart, strip, drivers, events and the three expansion panels.
-  Colours now come from `design/system/tokens.css` (vibrant Material You scheme from seed #1A73E8; the first,
-  muted tonal-spot pass was rejected as grey): page on the tinted `surface-container-low`, white cards with 24 px
-  corners and no shadow, tiles and columns on `surface-container`, the decision head on `primary-container` with
-  the verdict box in `primary` (NO means "no edge", not "sell"; a YES would use the up container), numbered
-  section badges in `primary`, the first KPI tile in `primary-container`, hit/miss marks in the
+  Colours now come from `design/system/tokens.css`, the "terminal light" scheme (third pass; the muted Material
+  tonal-spot pass and the vivid Material You pass were both rejected by the owner, who pointed at Meridian
+  Terminal / TradingView-style dashboards): cool light-grey page, white hairline-bordered cards with 12 px corners,
+  one indigo accent, green/red signed numbers. The decision head follows the owner's rule: NO is red, YES is green,
+  darker green for a strong signal and lighter green for an okay one (`page.verdict.strength`, set by the builder
+  from the live call's confidence and anchored probability; no live YES exists yet, the style guide shows the
+  states). Numbered section badges in the accent tint, hit/miss marks in the
   up/down tokens with tick/cross glyphs, direction squares in the up/down/neutral/unclear containers, Live /
   Back-test (hatched) / Mock (dashed) / Paper (tertiary) tags from the system, bands and fan in chart series 1
   (`--mb-chart-1`), the actual line in on-surface ink, tooltips on the inverse surface.

@@ -5114,7 +5114,8 @@
    "word": "NO",
    "small": "No edge today",
    "kind": "no_call",
-   "direction": null
+   "direction": null,
+   "strength": null
   },
   "why": {
    "coin_flip": true,

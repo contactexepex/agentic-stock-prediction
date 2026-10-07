@@ -55,18 +55,28 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
   </header>
   <main class="mb-content"><div class="mb-content-inner">
     <h1 class="md-headline-medium" style="margin:var(--mb-space-4) 0 4px">Cockpit design system</h1>
-    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">Material 3 light, one seed colour <code>#3B6EA8</code> (HCT hue 256, chroma 42, tone 46), tonal-spot scheme. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
+    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">One light scheme, "terminal light": a cool light-grey page, white hairline cards, one indigo accent (<code>#4f46e5</code>), green <code>#15803d</code> / red <code>#dc2626</code> for signals and signed numbers, uppercase micro-labels over big bold numerals. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
     <p class="sg-row" style="margin-top:var(--mb-space-3)"><span class="mb-tag live"><svg class="ms"><use href="#ms-sensors"/></svg>Live</span><span class="mb-tag bt"><svg class="ms"><use href="#ms-history"/></svg>Back-test</span><span class="mb-tag mock"><svg class="ms"><use href="#ms-construction"/></svg>Mock</span><span class="mb-tag paper"><svg class="ms"><use href="#ms-science"/></svg>Paper</span><span class="mb-tag derived">derived</span><span class="mb-tag coming">Coming</span><span class="sg-note">provenance tags: a texture or border style besides the colour (hatched, dashed, dotted)</span></p>
+
+    <section class="sg-section" id="verdict">
+      <h2>Verdict header</h2>
+      <p class="lede">The decision page's header. NO is red. YES is green: a darker green for a strong signal (forecaster confidence ≥ 0.75 or anchored probability ≥ 0.65), a lighter green for an okay one. The numbers below are the real HDFC Bank values of 6 Oct 2026 for NO; the two YES states show the component only (no live YES call exists yet, so their text is the rule, not data).</p>
+      <div style="display:grid;gap:10px">
+        <div class="mb-verdict no" style="border-radius:var(--mb-card-radius)"><div class="verdict" style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box"><svg class="ms"><use href="#ms-block"/></svg></div><div class="mb-verdict-word">NO<small>No edge today</small></div></div><p style="margin:0;font-size:15px"><b>Why:</b> the model gives a rise only <b>47%</b> (1 day) and <b>47%</b> (5 days) — a coin flip — and in the back-test it has shown <b>no skill</b>; the forecaster abstained.</p></div>
+        <div class="mb-verdict yes-ok" style="border-radius:var(--mb-card-radius)"><div class="verdict" style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box"><svg class="ms"><use href="#ms-check"/></svg></div><div class="mb-verdict-word">YES<small>okay signal</small></div></div><p style="margin:0;font-size:15px">Component state: a live <b>up</b> call with confidence below 0.75 and anchored probability below 0.65 (lighter green).</p></div>
+        <div class="mb-verdict yes-strong" style="border-radius:var(--mb-card-radius)"><div class="verdict" style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box"><svg class="ms"><use href="#ms-bolt"/></svg></div><div class="mb-verdict-word">YES<small>strong signal</small></div></div><p style="margin:0;font-size:15px">Component state: a live <b>up</b> call with confidence ≥ 0.75 or anchored probability ≥ 0.65 (darker green).</p></div>
+      </div>
+    </section>
 
     <section class="sg-section" id="colour">
       <h2>Colour roles</h2>
       <p class="lede">Each swatch shows the role, its hex and the WCAG contrast of its "on" colour (or of the role on the surface, for accents). Text on a container needs 4.5:1; large text and icons 3:1.</p>
       <div class="sg-grid" id="roles"></div>
-      <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Semantic: up / down / neutral / unclear, hit / miss</h3>
-      <p class="lede">Never colour alone: an arrow, tick or cross plus the word. The up/down pair sits in the dataviz checker's CVD warn band (protan ΔE 6.8), which makes the glyph rule mandatory.</p>
+      <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Signals: up / down / neutral / unclear, hit / miss</h3>
+      <p class="lede">Never colour alone: an arrow, tick, cross or the sign plus the word. up #15803d vs down #dc2626 pass every dataviz checker gate (worst CVD ΔE 8.6 deutan).</p>
       <div class="sg-grid" id="semantic"></div>
       <div class="sg-row" style="margin-top:var(--mb-space-3)">
-        <span class="mb-status up"><span class="mb-dir up"><svg class="ms"><use href="#ms-arrow_upward"/></svg></span>up</span>
+        <span class="mb-delta up">+0.94%</span> <span class="mb-delta down">−2.31%</span> <span class="mb-status up"><span class="mb-dir up"><svg class="ms"><use href="#ms-arrow_upward"/></svg></span>up</span>
         <span class="mb-status down"><span class="mb-dir dn"><svg class="ms"><use href="#ms-arrow_downward"/></svg></span>down</span>
         <span class="mb-status neutral"><span class="mb-dir flat"><svg class="ms"><use href="#ms-remove"/></svg></span>neutral</span>
         <span class="mb-status unknown"><span class="mb-dir unk"><svg class="ms"><use href="#ms-help"/></svg></span>unclear</span>
@@ -75,7 +85,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
         <span class="mb-mark na"><svg class="ms"><use href="#ms-remove"/></svg></span><span class="sg-note">pending</span>
       </div>
       <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Chart colours (dataviz skill, validated)</h3>
-      <p class="lede">Series 1-4 in fixed order (adjacent pairs pass CVD ΔE ≥ 8 and normal-vision ≥ 15; series 2 is 2.83:1 on the surface, so it needs direct labels or the table view). Slots 1, 2 and 4 pass all-pairs (scatter, maps). Status up/down against series 1: all-pairs pass, up vs down in the warn band.</p>
+      <p class="lede">Series 1 is the accent. Status up/down against it pass all-pairs. Series 2-4 are reserved slots (validate with the dataviz checker before a chart uses more than one series).</p>
       <div class="sg-grid" id="chart"></div>
       <svg class="sg-chart" viewBox="0 0 560 150" role="img" aria-label="Example: predicted bands against the actual close, with hit and miss marks">
         <g fill="none" stroke="var(--mb-chart-grid)"><line x1="40" x2="550" y1="30" y2="30"/><line x1="40" x2="550" y1="70" y2="70"/><line x1="40" x2="550" y1="110" y2="110"/></g>
@@ -221,7 +231,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
 
     <section class="sg-section" id="shell">
       <h2>App shell</h2>
-      <p class="lede">This page sits in the shell: a navigation rail on the left from 600px (72px items, 56×32 active indicator in secondary-container), a navigation bar at the bottom on phones, and a top app bar with the page title and the India/US segmented button. Sections not built yet are marked "soon" and explain themselves on hover.</p>
+      <p class="lede">This page sits in the shell: a white navigation rail with a hairline border on the left from 600px (40×40 active square in the accent tint), a navigation bar at the bottom on phones, and a white top bar with the page title and the India/US segmented control. Sections not built yet are marked "soon" and explain themselves on hover.</p>
     </section>
     <footer class="sg-note" style="text-align:center;padding:var(--mb-space-6) 0 0">Personal research project · design system v1 · research only, nothing here trades.</footer>
   </div></main>
@@ -254,10 +264,10 @@ for (const [bg, fg, label] of [
   ['--md-sys-color-secondary', '--md-sys-color-on-secondary', 'secondary'], ['--md-sys-color-secondary-container', '--md-sys-color-on-secondary-container', 'secondary container'],
   ['--md-sys-color-tertiary', '--md-sys-color-on-tertiary', 'tertiary'], ['--md-sys-color-tertiary-container', '--md-sys-color-on-tertiary-container', 'tertiary container'],
   ['--md-sys-color-error', '--md-sys-color-on-error', 'error'], ['--md-sys-color-error-container', '--md-sys-color-on-error-container', 'error container'],
-  ['--md-sys-color-surface', '--md-sys-color-on-surface', 'surface'], ['--md-sys-color-surface-variant', '--md-sys-color-on-surface-variant', 'surface variant'],
+  ['--md-sys-color-surface', '--md-sys-color-on-surface', 'surface'], ['--md-sys-color-surface-variant', '--md-sys-color-on-surface', 'surface variant'],
   ['--md-sys-color-surface-container-lowest', '--md-sys-color-on-surface', 'container lowest'], ['--md-sys-color-surface-container-low', '--md-sys-color-on-surface', 'container low'],
   ['--md-sys-color-surface-container', '--md-sys-color-on-surface', 'container'], ['--md-sys-color-surface-container-high', '--md-sys-color-on-surface', 'container high'],
-  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface-variant', 'container highest'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
+  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface', 'container highest (hairlines)'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
   ['--md-sys-color-outline', null, 'outline'], ['--md-sys-color-outline-variant', null, 'outline variant (decorative)'],
 ]) swatch(R, bg, fg, label);
 const S = document.getElementById('semantic');

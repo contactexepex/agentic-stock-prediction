@@ -422,10 +422,16 @@ def page_block(market, cfg, con, ticker, company, sector, peers, cur, D, today, 
     # verdict: a live call for today, else NO (no edge)
     call = next((p for p in predictions if str(p.get("as_of_date"))[:10] == str(end)), None)
     if call:
-        verdict = {"word": "YES" if call["direction"] == "up" else "NO", "small": f"call: {call['direction']}, confidence {call['confidence']}",
-                   "kind": "call", "direction": call["direction"]}
+        # strength of a YES (owner's rule: darker green when strong, lighter when okay): strong when the
+        # forecaster's confidence is at least 0.75 or the anchored probability (model_prob + adjustment)
+        # is at least 0.65; else okay
+        final = (call.get("model_prob") or 0) + (call.get("agent_adjustment") or 0)
+        strong = call["confidence"] >= 0.75 or final >= 0.65
+        verdict = {"word": "YES" if call["direction"] == "up" else "NO", "small": f"call: {call['direction']}, confidence {call['confidence']}"
+                   + (f" \u00b7 {'strong' if strong else 'okay'} signal" if call["direction"] == "up" else ""),
+                   "kind": "call", "direction": call["direction"], "strength": ("strong" if strong else "ok") if call["direction"] == "up" else None}
     else:
-        verdict = {"word": "NO", "small": "No edge today", "kind": "no_call", "direction": None}
+        verdict = {"word": "NO", "small": "No edge today", "kind": "no_call", "direction": None, "strength": None}
 
     # why sentence pieces
     coin = p1 is not None and p5 is not None and all(0.45 <= p <= 0.55 for p in (p1, p5))

@@ -6,104 +6,93 @@
 <title>Cockpit design system</title>
 <meta name="description" content="Living style guide of the market-brief cockpit: Material 3 light tokens from seed #3B6EA8, type scale, shape, elevation, components and the app shell.">
 <style>
-/* market-brief cockpit: Material 3 (Material You) LIGHT design tokens.
-   Generated from ONE seed colour, #1A73E8 (HCT hue 265.6, chroma 65.1, tone 49.9), with Google's
-   @material/material-color-utilities 0.4.0 SchemeVibrant (the high-chroma "Material You" scheme,
-   contrast level 0). Every --md-sys-color-* value below is that scheme's light role, unchanged.
-   Semantic and chart tokens (--mb-*) are HCT tonal palettes on fixed hues (see README.md): the
-   chart series are higher-chroma than the M3 roles on purpose (the dataviz checker's chroma floor).
-   Light theme only; the cockpit has no dark theme (owner's direction).
+/* market-brief cockpit: design tokens. ONE light scheme, "terminal light", modelled on the trading
+   terminals the owner pointed at (Meridian Terminal, TradingView symbol pages): a cool light-grey page,
+   white cards with hairline borders, one indigo accent, vivid green/red for signed numbers and signals,
+   uppercase micro-labels over large bold numerals. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and the pages need no renaming.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an
+   okay one. Up/down/hit/miss always carry a glyph and a word (dataviz checker: up #15803d vs down #dc2626
+   pass all gates, worst CVD dE 8.6). Contrast figures are WCAG on the colour named.
    Self-contained: no @import, no font files, system font stack. */
 :root {
   color-scheme: light;
 
-  /* ---- M3 colour roles (light): SchemeVibrant from seed #1A73E8 (HCT hue 265.6, chroma 65.1,
-     tone 49.9), contrast level 0. Alternatives with the same structure: tokens-variant-indigo.css,
-     tokens-variant-teal.css (override files for mockups; the chosen one is pasted here). ------ */
-  --md-sys-color-primary: #005bc0;
+  /* ---- Colour roles (terminal light) ---------------------------------------------------- */
+  --md-sys-color-primary: #4f46e5;                 /* indigo accent (6.3:1 on white) */
   --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #d8e2ff;
-  --md-sys-color-on-primary-container: #004493;
-  --md-sys-color-secondary: #585c7e;
+  --md-sys-color-primary-container: #eef2ff;       /* accent tint: selected nav, selected segment */
+  --md-sys-color-on-primary-container: #3730a3;    /* 8.9:1 on the tint */
+  --md-sys-color-secondary: #475569;
   --md-sys-color-on-secondary: #ffffff;
-  --md-sys-color-secondary-container: #dfe0ff;
-  --md-sys-color-on-secondary-container: #414465;
-  --md-sys-color-tertiary: #615789;
+  --md-sys-color-secondary-container: #f1f5f9;
+  --md-sys-color-on-secondary-container: #1e293b;
+  --md-sys-color-tertiary: #7c3aed;
   --md-sys-color-on-tertiary: #ffffff;
-  --md-sys-color-tertiary-container: #e7deff;
-  --md-sys-color-on-tertiary-container: #494070;
-  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-tertiary-container: #f3e8ff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
   --md-sys-color-on-error: #ffffff;
-  --md-sys-color-error-container: #ffdad6;
-  --md-sys-color-on-error-container: #93000a;
-  --md-sys-color-surface: #f9f9ff;
-  --md-sys-color-on-surface: #181c25;
-  --md-sys-color-surface-variant: #dee2f2;
-  --md-sys-color-on-surface-variant: #424753;
-  --md-sys-color-surface-dim: #d7d9e6;
-  --md-sys-color-surface-bright: #f9f9ff;
-  --md-sys-color-surface-container-lowest: #ffffff;
-  --md-sys-color-surface-container-low: #f1f3ff;
-  --md-sys-color-surface-container: #ebedfa;
-  --md-sys-color-surface-container-high: #e5e8f5;
-  --md-sys-color-surface-container-highest: #dfe2ef;
-  --md-sys-color-outline: #727785;
-  --md-sys-color-outline-variant: #c2c6d6;
-  --md-sys-color-inverse-surface: #2c303a;
-  --md-sys-color-inverse-on-surface: #eef0fd;
-  --md-sys-color-inverse-primary: #adc7ff;
-  --md-sys-color-surface-tint: #005bc0;
-  --md-sys-color-primary-fixed: #d8e2ff;
-  --md-sys-color-primary-fixed-dim: #adc7ff;
-  --md-sys-color-on-primary-fixed: #001a41;
-  --md-sys-color-on-primary-fixed-variant: #004493;
-  --md-sys-color-secondary-fixed: #dfe0ff;
-  --md-sys-color-secondary-fixed-dim: #c1c4eb;
-  --md-sys-color-on-secondary-fixed: #151937;
-  --md-sys-color-on-secondary-fixed-variant: #414465;
-  --md-sys-color-tertiary-fixed: #e7deff;
-  --md-sys-color-tertiary-fixed-dim: #cbbff8;
-  --md-sys-color-on-tertiary-fixed: #1d1341;
-  --md-sys-color-on-tertiary-fixed-variant: #494070;
-
+  --md-sys-color-error-container: #fee2e2;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #111827;              /* ink, 16.4:1 on the page */
+  --md-sys-color-surface-variant: #f1f5f9;
+  --md-sys-color-on-surface-variant: #6b7280;      /* muted labels, 4.8:1 on white */
+  --md-sys-color-surface-dim: #e5e7eb;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f5f6fa;    /* the page */
+  --md-sys-color-surface-container: #f3f4f6;        /* tiles and columns inside a card */
+  --md-sys-color-surface-container-high: #eceef2;   /* hairlines inside cards, table rules */
+  --md-sys-color-surface-container-highest: #e5e7eb;
+  --md-sys-color-outline: #9ca3af;
+  --md-sys-color-outline-variant: #e5e7eb;          /* card and control borders */
+  --md-sys-color-inverse-surface: #111827;          /* tooltips */
+  --md-sys-color-inverse-on-surface: #f9fafb;
+  --md-sys-color-inverse-primary: #a5b4fc;
+  --md-sys-color-surface-tint: #4f46e5;
+  --md-sys-color-background: #f5f6fa;
+  --md-sys-color-on-background: #111827;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 
   /* ---- Semantic tokens (finance) --------------------------------------------------------
-     Never colour alone: every up/down/hit/miss mark also carries a glyph (arrow, tick, cross) and a
-     word. Contrast on surface #f8f9ff (WCAG, checked in styleguide.html): up #00732e 5.5:1,
-     down #c92f29 5.1:1, neutral #73777d 4.3:1 (icons and large text only, never small text), warn
-     #b37800 3.6:1 (icons only; its text form is on-warn-container #624000 on warn-container, 7.2:1). The up/down pair sits in the
-     dataviz checker's CVD warn band (protan dE 6.8), which is why the glyph + word rule is a rule.
-     On-container pairs: up 9.6:1, down 8.6:1, warn 7.2:1; white on up 6.0:1, on down 5.4:1. */
-  --mb-color-up: #00732e;                 /* HCT hue 150, chroma 60, tone 42 */
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white, white on the fills 5.0:1 / 4.8:1.
+     Verdict surfaces: NO red; YES strong = darker green, YES ok = lighter green (owner's rule). */
+  --mb-color-up: #15803d;
   --mb-color-on-up: #ffffff;
-  --mb-color-up-container: #85f496;       /* tone 88 */
-  --mb-color-on-up-container: #003913;    /* tone 20 */
-  --mb-color-down: #c92f29;               /* HCT hue 25, chroma 80, tone 45 (the error family) */
+  --mb-color-up-container: #dcfce7;
+  --mb-color-on-up-container: #166534;    /* 6.5:1 */
+  --mb-color-down: #dc2626;
   --mb-color-on-down: #ffffff;
-  --mb-color-down-container: #ffdad6;     /* tone 90 */
-  --mb-color-on-down-container: #7e0007;  /* tone 25 */
-  --mb-color-neutral: #73777d;            /* neutral tone 50 */
+  --mb-color-down-container: #fee2e2;
+  --mb-color-on-down-container: #991b1b;  /* 6.8:1 */
+  --mb-color-neutral: #6b7280;
   --mb-color-on-neutral: #ffffff;
-  --mb-color-neutral-container: #e1e2e8;  /* surface-container-highest */
-  --mb-color-on-neutral-container: #43474e;
-  --mb-color-warn: #b37800;               /* HCT hue 75, chroma 70, tone 55: "direction unclear" */
-  --mb-color-on-warn: #1f1400;
-  --mb-color-warn-container: #ffddb2;     /* tone 90 */
-  --mb-color-on-warn-container: #624000;  /* tone 30 */
-  /* Outcome of a forecast: hit = up family, miss = down family (the glyph says which) */
+  --mb-color-neutral-container: #f3f4f6;
+  --mb-color-on-neutral-container: #374151;
+  --mb-color-warn: #d97706;               /* "direction unclear" (icons) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fef3c7;
+  --mb-color-on-warn-container: #b45309;  /* 4.5:1 */
   --mb-color-hit: var(--mb-color-up);
   --mb-color-hit-container: var(--mb-color-up-container);
   --mb-color-on-hit-container: var(--mb-color-on-up-container);
   --mb-color-miss: var(--mb-color-down);
   --mb-color-miss-container: var(--mb-color-down-container);
   --mb-color-on-miss-container: var(--mb-color-on-down-container);
-  /* Provenance labels: Live (stored by the pipeline), Back-test (rebuilt, hatched), Mock (not built,
-     dashed), Paper (unproven signal, tertiary). Each has a texture or border style besides its colour. */
-  --mb-color-live: var(--md-sys-color-primary);
-  --mb-color-live-container: var(--md-sys-color-primary-container);
-  --mb-color-on-live-container: var(--md-sys-color-on-primary-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fee2e2;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;   /* 6.8:1 */
+  --mb-verdict-strong-bg: #bbf7d0;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d; /* 7.5:1 */
+  --mb-verdict-ok-bg: #dcfce7;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;  /* 6.5:1 */
+  /* Provenance labels: Live (green tint, like a terminal's LIVE badge), Back-test (hatched accent tint),
+     Mock (dashed), Paper (violet tint). Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
   --mb-color-backtest: var(--md-sys-color-primary);
-  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(0,91,192,.16) 0 3px, transparent 3px 6px);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(79,70,229,.14) 0 3px, transparent 3px 6px);
   --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
   --mb-color-mock: var(--md-sys-color-outline);
   --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
@@ -113,15 +102,15 @@
 
   /* ---- Chart tokens (dataviz skill: validated with scripts/validate_palette.js, see README) ---- */
   --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
-  --mb-chart-1: #005bc0;   /* series 1 = the primary role: ranges, model, everything "ours" (4.3:1 passes) */
-  --mb-chart-2: #df7d00;   /* series 2 (2.83:1 on the surface: needs direct labels or a table view) */
-  --mb-chart-3: #876cc8;   /* series 3 */
-  --mb-chart-4: #009486;   /* series 4 */
-  --mb-chart-band-50: rgba(0,91,192,.34);    /* inner band, series 1 */
-  --mb-chart-band-80: rgba(0,91,192,.14);    /* outer band */
-  --mb-chart-fan: rgba(0,91,192,.10);
+  --mb-chart-1: #4f46e5;   /* series 1 = the accent: ranges, model, everything "ours" */
+  --mb-chart-2: #d97706;   /* series 2 (amber; 3.0:1 on white: direct labels or the table view) */
+  --mb-chart-3: #0891b2;   /* series 3 (cyan) */
+  --mb-chart-4: #db2777;   /* series 4 (pink) */
+  --mb-chart-band-50: rgba(79,70,229,.32);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(79,70,229,.13);   /* outer band */
+  --mb-chart-fan: rgba(79,70,229,.10);
   --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
-  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-grid: var(--md-sys-color-surface-container);
   --mb-chart-axis: var(--md-sys-color-outline-variant);
   --mb-chart-label: var(--md-sys-color-on-surface-variant);
   --mb-chart-future: var(--md-sys-color-surface-container-low);
@@ -160,8 +149,9 @@
   --md-sys-shape-corner-large: 16px;
   --md-sys-shape-corner-extra-large: 28px;
   --md-sys-shape-corner-full: 9999px;
-  --mb-card-radius: 24px;        /* cards and panels (M3 expressive large containers) */
-  --mb-panel-radius: 16px;       /* tiles and columns inside a card */
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 8px;        /* tiles and columns inside a card */
+  --mb-card-border: 1px solid var(--md-sys-color-outline-variant);
 
   /* ---- Elevation (M3 light shadows, levels 0-5) ----------------------------------------- */
   --md-sys-elevation-0: none;
@@ -185,9 +175,9 @@
   --mb-gutter: 16px;            /* phone side gutter (never less) */
   --mb-gutter-desktop: 24px;
   --mb-content-max: 1120px;
-  --mb-rail-width: 80px;        /* navigation rail (>= 600px) */
+  --mb-rail-width: 72px;        /* navigation rail (>= 600px) */
   --mb-navbar-height: 80px;     /* navigation bar (phone) */
-  --mb-topbar-height: 64px;
+  --mb-topbar-height: 56px;
 
   /* ---- Motion --------------------------------------------------------------------------- */
   --md-sys-motion-duration-short: 100ms;
@@ -215,6 +205,7 @@
 .md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
 .md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
 .md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
 
 /* market-brief cockpit: Material 3 components on tokens.css. Plain CSS, no JS required (the
    tooltip needs the page's own small script, see README). Prefix: md- for M3 components,
@@ -235,20 +226,20 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 
 /* ---- App shell: rail (>= 600px) / navigation bar (phone), top app bar ----------------- */
 .mb-app { min-height: 100vh; display: grid; grid-template-columns: var(--mb-rail-width) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-.mb-rail { grid-row: 1 / span 2; background: var(--md-sys-color-surface-container); display: flex; flex-direction: column; align-items: center; gap: var(--mb-space-3); padding: var(--mb-space-3) 0; position: sticky; top: 0; height: 100vh; }
-.mb-rail .mb-rail-brand { width: 48px; height: 48px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); display: grid; place-items: center; font: var(--md-sys-typescale-label-large); margin-bottom: var(--mb-space-2); }
+.mb-rail { grid-row: 1 / span 2; background: var(--md-sys-color-surface); border-right: var(--mb-card-border); display: flex; flex-direction: column; align-items: center; gap: var(--mb-space-3); padding: var(--mb-space-3) 0; position: sticky; top: 0; height: 100vh; }
+.mb-rail .mb-rail-brand { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-small); background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); display: grid; place-items: center; font: var(--md-sys-typescale-label-large); margin-bottom: var(--mb-space-2); }
 .mb-nav-item { display: flex; flex-direction: column; align-items: center; gap: var(--mb-space-1); width: 72px; padding: 0; border: 0; background: none; color: var(--md-sys-color-on-surface-variant); text-decoration: none; cursor: pointer; font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
-.mb-nav-item .mb-nav-ind { width: 56px; height: 32px; border-radius: var(--md-sys-shape-corner-full); display: grid; place-items: center; position: relative; transition: background var(--md-sys-motion-duration-short); }
-.mb-nav-item .ms { width: 24px; height: 24px; }
+.mb-nav-item .mb-nav-ind { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-small); display: grid; place-items: center; position: relative; transition: background var(--md-sys-motion-duration-short); }
+.mb-nav-item .ms { width: 22px; height: 22px; }
 .mb-nav-item:hover .mb-nav-ind { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
 .mb-nav-item[aria-current="page"] { color: var(--md-sys-color-on-surface); }
-.mb-nav-item[aria-current="page"] .mb-nav-ind { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-nav-item[aria-current="page"] .mb-nav-ind { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); }
 .mb-nav-item.coming { color: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 55%, transparent); cursor: help; }
 .mb-nav-item.coming .mb-nav-ind::after { content: "soon"; position: absolute; top: -4px; right: -2px; font: var(--md-sys-typescale-label-small); letter-spacing: 0; padding: 0 5px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
 .mb-navbar { display: none; }
-.mb-topbar { grid-column: 2; position: sticky; top: 0; z-index: 20; height: var(--mb-topbar-height); background: var(--md-sys-color-surface-container-low); display: flex; align-items: center; gap: var(--mb-space-3); padding: 0 var(--mb-gutter-desktop); }
-.mb-topbar.scrolled { background: var(--md-sys-color-surface-container); }
-.mb-topbar .mb-topbar-title { font: var(--md-sys-typescale-title-large); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-topbar { grid-column: 2; position: sticky; top: 0; z-index: 20; height: var(--mb-topbar-height); background: var(--md-sys-color-surface); border-bottom: var(--mb-card-border); display: flex; align-items: center; gap: var(--mb-space-3); padding: 0 var(--mb-gutter-desktop); }
+.mb-topbar.scrolled { box-shadow: 0 1px 0 var(--md-sys-color-outline-variant); }
+.mb-topbar .mb-topbar-title { font: var(--md-sys-typescale-title-medium); font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mb-topbar .mb-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--mb-space-2); }
 .mb-content { grid-column: 2; min-width: 0; padding: 0 var(--mb-gutter-desktop) var(--mb-space-12); }
 .mb-content-inner { max-width: var(--mb-content-max); margin: 0 auto; }
@@ -258,27 +249,27 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
   .mb-topbar, .mb-content { grid-column: 1; }
   .mb-topbar { padding: 0 var(--mb-gutter); }
   .mb-content { padding: 0 var(--mb-gutter) calc(var(--mb-navbar-height) + var(--mb-space-6)); }
-  .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface-container); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
+  .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface); border-top: var(--mb-card-border); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
   .mb-navbar .mb-nav-item { width: auto; flex: 1 1 0; min-width: 0; }
   .mb-navbar .mb-nav-item .mb-nav-ind { width: 64px; }
 }
 
 /* ---- Cards ---------------------------------------------------------------------------- */
-.md-card { border-radius: var(--mb-card-radius); padding: var(--mb-space-5); background: var(--md-sys-color-surface-container-lowest); color: var(--md-sys-color-on-surface); }
+.md-card { border-radius: var(--mb-card-radius); padding: var(--mb-space-4) var(--mb-space-5); background: var(--md-sys-color-surface-container-lowest); border: var(--mb-card-border); color: var(--md-sys-color-on-surface); }
 .md-card.elevated { box-shadow: var(--md-sys-elevation-1); }
 .md-card.filled { background: var(--md-sys-color-surface-container-high); }
-.md-card.outlined { background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-outline-variant); }
+.md-card.outlined { background: var(--md-sys-color-surface-container-low); }
 .md-card > h2:first-child, .md-card > h3:first-child { margin-top: 0; }
 
 /* ---- Buttons -------------------------------------------------------------------------- */
-.md-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--mb-space-2); height: 40px; padding: 0 var(--mb-space-6); border-radius: var(--md-sys-shape-corner-full); border: 0; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); text-decoration: none; white-space: nowrap; position: relative; background: transparent; color: var(--md-sys-color-primary); }
+.md-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--mb-space-2); height: 34px; padding: 0 var(--mb-space-4); border-radius: var(--md-sys-shape-corner-small); border: 0; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); text-decoration: none; white-space: nowrap; position: relative; background: transparent; color: var(--md-sys-color-primary); }
 .md-btn .ms { width: 18px; height: 18px; margin-left: -8px; }
 .md-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
 .md-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
 .md-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
 .md-btn.filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
 .md-btn.tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
-.md-btn.outlined { border: 1px solid var(--md-sys-color-outline); }
+.md-btn.outlined { border: var(--mb-card-border); color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface); }
 .md-btn.text { padding: 0 var(--mb-space-3); }
 .md-btn:disabled, .md-btn[aria-disabled="true"] { cursor: not-allowed; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); border-color: transparent; }
 .md-btn.text:disabled { background: transparent; }
@@ -291,37 +282,37 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 .md-icon-btn.tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 
 /* Help affordance: a small outlined icon button that opens a tooltip (hover, focus or tap) */
-.md-help { appearance: none; width: 18px; height: 18px; border-radius: 50%; border: 0; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-small); letter-spacing: 0; display: inline-grid; place-items: center; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px; line-height: 1; }
+.md-help { appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-small); letter-spacing: 0; display: inline-grid; place-items: center; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px; line-height: 1; }
 .md-help:hover, .md-help:focus-visible { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
 
 /* ---- Segmented buttons ---------------------------------------------------------------- */
-.md-segmented { display: inline-flex; border: 1px solid var(--md-sys-color-outline); border-radius: var(--md-sys-shape-corner-full); overflow: hidden; }
-.md-segmented > button, .md-segmented > a { border: 0; border-left: 1px solid var(--md-sys-color-outline); background: transparent; color: var(--md-sys-color-on-surface); font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); height: 38px; padding: 0 var(--mb-space-4); cursor: pointer; display: inline-flex; align-items: center; gap: var(--mb-space-2); text-decoration: none; white-space: nowrap; }
+.md-segmented { display: inline-flex; border: var(--mb-card-border); border-radius: var(--md-sys-shape-corner-small); overflow: hidden; background: var(--md-sys-color-surface-container-low); padding: 2px; gap: 2px; }
+.md-segmented > button, .md-segmented > a { border: 0; border-radius: 6px; background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: 0; height: 30px; padding: 0 var(--mb-space-3); cursor: pointer; display: inline-flex; align-items: center; gap: var(--mb-space-2); text-decoration: none; white-space: nowrap; }
 .md-segmented > :first-child { border-left: 0; }
-.md-segmented > [aria-pressed="true"], .md-segmented > [aria-current="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.md-segmented > [aria-pressed="true"], .md-segmented > [aria-current="true"] { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); box-shadow: 0 1px 2px rgba(17,24,39,.12), 0 0 0 1px var(--md-sys-color-outline-variant); font-weight: 600; }
 .md-segmented > [aria-pressed="true"]::before { content: ""; width: 18px; height: 18px; margin-left: -4px; background: currentColor; -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; }
 .md-segmented > :disabled, .md-segmented > [aria-disabled="true"] { color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); cursor: not-allowed; }
-.md-segmented.dense > button, .md-segmented.dense > a { height: 32px; padding: 0 var(--mb-space-3); font: var(--md-sys-typescale-label-medium); }
+.md-segmented.dense > button, .md-segmented.dense > a { height: 26px; padding: 0 10px; font: var(--md-sys-typescale-label-medium); }
 .md-segmented.dense > [aria-pressed="true"]::before { width: 14px; height: 14px; }
 
 /* ---- Chips ---------------------------------------------------------------------------- */
-.md-chip { display: inline-flex; align-items: center; gap: var(--mb-space-2); height: 32px; padding: 0 var(--mb-space-4); border-radius: var(--md-sys-shape-corner-full); border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); white-space: nowrap; cursor: default; }
+.md-chip { display: inline-flex; align-items: center; gap: var(--mb-space-2); height: 28px; padding: 0 var(--mb-space-3); border-radius: var(--md-sys-shape-corner-full); border: 1px solid var(--md-sys-color-outline-variant); background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); white-space: nowrap; cursor: default; }
 .md-chip .ms { width: 18px; height: 18px; margin-left: -6px; color: var(--md-sys-color-primary); }
 .md-chip.assist { cursor: pointer; }
 .md-chip.filter { cursor: pointer; }
-.md-chip.filter[aria-pressed="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: transparent; }
+.md-chip.filter[aria-pressed="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--md-sys-color-primary); }
 .md-chip.filter[aria-pressed="true"]::before { content: ""; width: 18px; height: 18px; margin-left: -6px; background: currentColor; -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><path d='M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z'/></svg>") center/contain no-repeat; }
 .md-chip.small { height: 24px; padding: 0 var(--mb-space-2); font: var(--md-sys-typescale-label-medium); } .md-chip.small .ms { width: 14px; height: 14px; margin-left: -2px; }
 .md-chip .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 
 /* ---- Provenance tags: Live / Back-test / Mock / Paper / Derived (texture + colour) ------ */
-.mb-tag { display: inline-flex; align-items: center; gap: 5px; font: var(--md-sys-typescale-label-small); letter-spacing: 0.2px; line-height: 1; border-radius: var(--md-sys-shape-corner-full); padding: 3px 8px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); white-space: nowrap; vertical-align: middle; }
+.mb-tag { display: inline-flex; align-items: center; gap: 4px; font: 600 10px/1 var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; border-radius: var(--md-sys-shape-corner-extra-small); padding: 3px 6px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); white-space: nowrap; vertical-align: middle; }
 .mb-tag .ms { width: 12px; height: 12px; }
-.mb-tag.live { border-color: var(--mb-color-live); color: var(--mb-color-on-live-container); background: var(--mb-color-live-container); }
+.mb-tag.live { border-color: transparent; color: var(--mb-color-on-live-container); background: var(--mb-color-live-container); }
 .mb-tag.bt, .mb-tag.backtest { background: var(--mb-color-backtest-container), var(--md-sys-color-surface-container-lowest); border-color: var(--mb-color-backtest); color: var(--mb-color-on-backtest-container); }
 .mb-tag.mock { border-style: dashed; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
 .mb-tag.derived { border-style: dotted; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
-.mb-tag.paper { border-color: var(--mb-color-paper); color: var(--mb-color-on-paper-container); background: var(--mb-color-paper-container); }
+.mb-tag.paper { border-color: transparent; color: var(--mb-color-on-paper-container); background: var(--mb-color-paper-container); }
 .mb-tag.coming { border-style: dashed; color: var(--md-sys-color-on-surface-variant); }
 /* The same provenance as a swatch inside a chip (header legends) */
 .md-chip.live .sw { background: var(--mb-color-live); }
@@ -329,7 +320,7 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 .md-chip.mock .sw { border: 1.5px dashed var(--mb-color-mock); background: transparent; }
 
 /* ---- Status badges (never colour alone: always an icon or glyph plus the word) ---------- */
-.md-badge { display: inline-flex; align-items: center; gap: 4px; font: var(--md-sys-typescale-label-small); letter-spacing: 0.2px; border-radius: var(--md-sys-shape-corner-full); padding: 2px 8px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: transparent; white-space: nowrap; vertical-align: middle; }
+.md-badge { display: inline-flex; align-items: center; gap: 4px; font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .02em; border-radius: var(--md-sys-shape-corner-extra-small); padding: 1px 6px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: transparent; white-space: nowrap; vertical-align: middle; }
 .md-badge.dot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--md-sys-color-error); }
 .md-badge.count { min-width: 16px; height: 16px; padding: 0 4px; border: 0; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); justify-content: center; }
 .mb-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
@@ -342,15 +333,15 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 .md-badge.warn, .md-badge.single_source { border-color: var(--mb-color-warn); color: var(--mb-color-on-warn-container); background: var(--mb-color-warn-container); }
 .md-badge.neutral, .md-badge.unverified { border-color: var(--md-sys-color-outline-variant); color: var(--mb-color-on-neutral-container); background: var(--mb-color-neutral-container); }
 /* Square direction / sentiment markers: container tone with an on-container glyph */
-.mb-dir { width: 20px; height: 20px; border-radius: var(--md-sys-shape-corner-extra-small); display: inline-grid; place-items: center; flex: none; }
+.mb-dir { width: 20px; height: 20px; border-radius: 4px; display: inline-grid; place-items: center; flex: none; }
 .mb-dir .ms { width: 15px; height: 15px; }
 .mb-dir.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
 .mb-dir.dn, .mb-dir.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
 .mb-dir.flat, .mb-dir.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
 .mb-dir.unk { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
 /* Round outcome markers: solid tone with a white glyph (strong, for ticks and crosses) */
-.mb-mark { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; flex: none; }
-.mb-mark .ms { width: 16px; height: 16px; }
+.mb-mark { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; flex: none; }
+.mb-mark .ms { width: 14px; height: 14px; }
 .mb-mark.ok, .mb-mark.hit { background: var(--mb-color-hit); }
 .mb-mark.no, .mb-mark.miss { background: var(--mb-color-miss); }
 .mb-mark.na { background: var(--mb-color-neutral); }
@@ -368,8 +359,7 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 
 /* ---- Data tables ---------------------------------------------------------------------- */
 .md-table { width: 100%; border-collapse: collapse; font: var(--md-sys-typescale-body-medium); font-variant-numeric: tabular-nums; }
-.md-table th { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--md-sys-color-outline-variant); white-space: nowrap; background: var(--md-sys-color-surface-container-low); }
-.md-table th:first-child { border-top-left-radius: var(--md-sys-shape-corner-small); } .md-table th:last-child { border-top-right-radius: var(--md-sys-shape-corner-small); }
+.md-table th { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--md-sys-color-outline-variant); white-space: nowrap; }
 .md-table td { padding: 6px 8px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); vertical-align: middle; }
 .md-table tr:hover td { background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent); }
 .md-table td.num, .md-table th.num { text-align: right; }
@@ -403,13 +393,13 @@ code { font-family: var(--md-ref-typeface-mono); font-size: .92em; overflow-wrap
 .mb-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--md-sys-color-outline-variant); }
 
 /* ---- KPI tile (stat tile) ------------------------------------------------------------- */
-.mb-kpi { border-radius: var(--mb-panel-radius); padding: 12px 14px; background: var(--md-sys-color-surface-container); }
+.mb-kpi { border-radius: var(--mb-panel-radius); padding: 12px 14px; background: var(--md-sys-color-surface); border: var(--mb-card-border); }
 .mb-kpi.accent { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); } .mb-kpi.accent .l { color: inherit; opacity: .85; }
 .mb-kpi .v { font: var(--md-sys-typescale-headline-small); font-weight: 700; line-height: 1.1; }
-.mb-kpi .l { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
+.mb-kpi .l { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); margin-top: 4px; }
 
 /* ---- Details / expansion -------------------------------------------------------------- */
-details.md-expansion { background: var(--md-sys-color-surface-container-lowest); border-radius: var(--mb-card-radius); padding: 0 var(--mb-space-5); }
+details.md-expansion { background: var(--md-sys-color-surface-container-lowest); border: var(--mb-card-border); border-radius: var(--mb-card-radius); padding: 0 var(--mb-space-5); }
 details.md-expansion summary { cursor: pointer; padding: 14px 0; font: var(--md-sys-typescale-title-small); list-style: none; display: flex; align-items: center; gap: var(--mb-space-2); }
 details.md-expansion summary::-webkit-details-marker { display: none; }
 details.md-expansion summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--md-sys-color-on-surface-variant); border-bottom: 2px solid var(--md-sys-color-on-surface-variant); transform: rotate(-45deg); transition: transform .15s; margin-right: 4px; flex: none; }
@@ -418,6 +408,20 @@ details.md-expansion .inner { padding: 0 0 18px; }
 
 /* ---- Code / preformatted ---------------------------------------------------------------- */
 .md-pre { background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-small); padding: 10px; font: 11.5px/1.45 var(--md-ref-typeface-mono); overflow: auto; max-height: 320px; margin: 0; }
+
+/* ---- Verdict header (decision pages): NO red; YES green, darker when strong, lighter when okay ---- */
+.mb-verdict { display: grid; grid-template-columns: auto 1fr; gap: 18px 22px; padding: 20px 22px; align-items: center; }
+.mb-verdict .mb-verdict-box { width: 64px; height: 64px; border-radius: var(--md-sys-shape-corner-medium); color: #fff; display: grid; place-items: center; }
+.mb-verdict .mb-verdict-box .ms { width: 40px; height: 40px; }
+.mb-verdict .mb-verdict-word { font-size: 52px; font-weight: 800; line-height: .95; letter-spacing: -1.5px; }
+.mb-verdict .mb-verdict-word small { display: block; font-size: 13px; font-weight: 600; letter-spacing: .02em; margin-top: 6px; }
+.mb-verdict.no { background: var(--mb-verdict-no-bg); color: var(--mb-verdict-no-ink); } .mb-verdict.no .mb-verdict-box { background: var(--mb-verdict-no-box); }
+.mb-verdict.yes-strong { background: var(--mb-verdict-strong-bg); color: var(--mb-verdict-strong-ink); } .mb-verdict.yes-strong .mb-verdict-box { background: var(--mb-verdict-strong-box); }
+.mb-verdict.yes-ok { background: var(--mb-verdict-ok-bg); color: var(--mb-verdict-ok-ink); } .mb-verdict.yes-ok .mb-verdict-box { background: var(--mb-verdict-ok-box); }
+/* Signed number: green/red with its sign (the sign is the glyph) */
+.mb-delta { font-variant-numeric: tabular-nums; font-weight: 600; } .mb-delta.up { color: var(--mb-color-up); } .mb-delta.down { color: var(--mb-color-down); } .mb-delta.flat { color: var(--md-sys-color-on-surface-variant); }
+/* Uppercase micro label (section eyebrows, table headers, stat labels) */
+.mb-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
 
 </style>
 <style>
@@ -514,18 +518,28 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
   </header>
   <main class="mb-content"><div class="mb-content-inner">
     <h1 class="md-headline-medium" style="margin:var(--mb-space-4) 0 4px">Cockpit design system</h1>
-    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">Material 3 light, one seed colour <code>#3B6EA8</code> (HCT hue 256, chroma 42, tone 46), tonal-spot scheme. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
+    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">One light scheme, "terminal light": a cool light-grey page, white hairline cards, one indigo accent (<code>#4f46e5</code>), green <code>#15803d</code> / red <code>#dc2626</code> for signals and signed numbers, uppercase micro-labels over big bold numerals. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
     <p class="sg-row" style="margin-top:var(--mb-space-3)"><span class="mb-tag live"><svg class="ms"><use href="#ms-sensors"/></svg>Live</span><span class="mb-tag bt"><svg class="ms"><use href="#ms-history"/></svg>Back-test</span><span class="mb-tag mock"><svg class="ms"><use href="#ms-construction"/></svg>Mock</span><span class="mb-tag paper"><svg class="ms"><use href="#ms-science"/></svg>Paper</span><span class="mb-tag derived">derived</span><span class="mb-tag coming">Coming</span><span class="sg-note">provenance tags: a texture or border style besides the colour (hatched, dashed, dotted)</span></p>
+
+    <section class="sg-section" id="verdict">
+      <h2>Verdict header</h2>
+      <p class="lede">The decision page's header. NO is red. YES is green: a darker green for a strong signal (forecaster confidence ≥ 0.75 or anchored probability ≥ 0.65), a lighter green for an okay one. The numbers below are the real HDFC Bank values of 6 Oct 2026 for NO; the two YES states show the component only (no live YES call exists yet, so their text is the rule, not data).</p>
+      <div style="display:grid;gap:10px">
+        <div class="mb-verdict no" style="border-radius:var(--mb-card-radius)"><div class="verdict" style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box"><svg class="ms"><use href="#ms-block"/></svg></div><div class="mb-verdict-word">NO<small>No edge today</small></div></div><p style="margin:0;font-size:15px"><b>Why:</b> the model gives a rise only <b>47%</b> (1 day) and <b>47%</b> (5 days) — a coin flip — and in the back-test it has shown <b>no skill</b>; the forecaster abstained.</p></div>
+        <div class="mb-verdict yes-ok" style="border-radius:var(--mb-card-radius)"><div class="verdict" style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box"><svg class="ms"><use href="#ms-check"/></svg></div><div class="mb-verdict-word">YES<small>okay signal</small></div></div><p style="margin:0;font-size:15px">Component state: a live <b>up</b> call with confidence below 0.75 and anchored probability below 0.65 (lighter green).</p></div>
+        <div class="mb-verdict yes-strong" style="border-radius:var(--mb-card-radius)"><div class="verdict" style="display:flex;align-items:center;gap:14px"><div class="mb-verdict-box"><svg class="ms"><use href="#ms-bolt"/></svg></div><div class="mb-verdict-word">YES<small>strong signal</small></div></div><p style="margin:0;font-size:15px">Component state: a live <b>up</b> call with confidence ≥ 0.75 or anchored probability ≥ 0.65 (darker green).</p></div>
+      </div>
+    </section>
 
     <section class="sg-section" id="colour">
       <h2>Colour roles</h2>
       <p class="lede">Each swatch shows the role, its hex and the WCAG contrast of its "on" colour (or of the role on the surface, for accents). Text on a container needs 4.5:1; large text and icons 3:1.</p>
       <div class="sg-grid" id="roles"></div>
-      <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Semantic: up / down / neutral / unclear, hit / miss</h3>
-      <p class="lede">Never colour alone: an arrow, tick or cross plus the word. The up/down pair sits in the dataviz checker's CVD warn band (protan ΔE 6.8), which makes the glyph rule mandatory.</p>
+      <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Signals: up / down / neutral / unclear, hit / miss</h3>
+      <p class="lede">Never colour alone: an arrow, tick, cross or the sign plus the word. up #15803d vs down #dc2626 pass every dataviz checker gate (worst CVD ΔE 8.6 deutan).</p>
       <div class="sg-grid" id="semantic"></div>
       <div class="sg-row" style="margin-top:var(--mb-space-3)">
-        <span class="mb-status up"><span class="mb-dir up"><svg class="ms"><use href="#ms-arrow_upward"/></svg></span>up</span>
+        <span class="mb-delta up">+0.94%</span> <span class="mb-delta down">−2.31%</span> <span class="mb-status up"><span class="mb-dir up"><svg class="ms"><use href="#ms-arrow_upward"/></svg></span>up</span>
         <span class="mb-status down"><span class="mb-dir dn"><svg class="ms"><use href="#ms-arrow_downward"/></svg></span>down</span>
         <span class="mb-status neutral"><span class="mb-dir flat"><svg class="ms"><use href="#ms-remove"/></svg></span>neutral</span>
         <span class="mb-status unknown"><span class="mb-dir unk"><svg class="ms"><use href="#ms-help"/></svg></span>unclear</span>
@@ -534,7 +548,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
         <span class="mb-mark na"><svg class="ms"><use href="#ms-remove"/></svg></span><span class="sg-note">pending</span>
       </div>
       <h3 class="md-title-medium" style="margin:var(--mb-space-5) 0 var(--mb-space-2)">Chart colours (dataviz skill, validated)</h3>
-      <p class="lede">Series 1-4 in fixed order (adjacent pairs pass CVD ΔE ≥ 8 and normal-vision ≥ 15; series 2 is 2.83:1 on the surface, so it needs direct labels or the table view). Slots 1, 2 and 4 pass all-pairs (scatter, maps). Status up/down against series 1: all-pairs pass, up vs down in the warn band.</p>
+      <p class="lede">Series 1 is the accent. Status up/down against it pass all-pairs. Series 2-4 are reserved slots (validate with the dataviz checker before a chart uses more than one series).</p>
       <div class="sg-grid" id="chart"></div>
       <svg class="sg-chart" viewBox="0 0 560 150" role="img" aria-label="Example: predicted bands against the actual close, with hit and miss marks">
         <g fill="none" stroke="var(--mb-chart-grid)"><line x1="40" x2="550" y1="30" y2="30"/><line x1="40" x2="550" y1="70" y2="70"/><line x1="40" x2="550" y1="110" y2="110"/></g>
@@ -680,7 +694,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
 
     <section class="sg-section" id="shell">
       <h2>App shell</h2>
-      <p class="lede">This page sits in the shell: a navigation rail on the left from 600px (72px items, 56×32 active indicator in secondary-container), a navigation bar at the bottom on phones, and a top app bar with the page title and the India/US segmented button. Sections not built yet are marked "soon" and explain themselves on hover.</p>
+      <p class="lede">This page sits in the shell: a white navigation rail with a hairline border on the left from 600px (40×40 active square in the accent tint), a navigation bar at the bottom on phones, and a white top bar with the page title and the India/US segmented control. Sections not built yet are marked "soon" and explain themselves on hover.</p>
     </section>
     <footer class="sg-note" style="text-align:center;padding:var(--mb-space-6) 0 0">Personal research project · design system v1 · research only, nothing here trades.</footer>
   </div></main>
@@ -713,10 +727,10 @@ for (const [bg, fg, label] of [
   ['--md-sys-color-secondary', '--md-sys-color-on-secondary', 'secondary'], ['--md-sys-color-secondary-container', '--md-sys-color-on-secondary-container', 'secondary container'],
   ['--md-sys-color-tertiary', '--md-sys-color-on-tertiary', 'tertiary'], ['--md-sys-color-tertiary-container', '--md-sys-color-on-tertiary-container', 'tertiary container'],
   ['--md-sys-color-error', '--md-sys-color-on-error', 'error'], ['--md-sys-color-error-container', '--md-sys-color-on-error-container', 'error container'],
-  ['--md-sys-color-surface', '--md-sys-color-on-surface', 'surface'], ['--md-sys-color-surface-variant', '--md-sys-color-on-surface-variant', 'surface variant'],
+  ['--md-sys-color-surface', '--md-sys-color-on-surface', 'surface'], ['--md-sys-color-surface-variant', '--md-sys-color-on-surface', 'surface variant'],
   ['--md-sys-color-surface-container-lowest', '--md-sys-color-on-surface', 'container lowest'], ['--md-sys-color-surface-container-low', '--md-sys-color-on-surface', 'container low'],
   ['--md-sys-color-surface-container', '--md-sys-color-on-surface', 'container'], ['--md-sys-color-surface-container-high', '--md-sys-color-on-surface', 'container high'],
-  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface-variant', 'container highest'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
+  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface', 'container highest (hairlines)'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
   ['--md-sys-color-outline', null, 'outline'], ['--md-sys-color-outline-variant', null, 'outline variant (decorative)'],
 ]) swatch(R, bg, fg, label);
 const S = document.getElementById('semantic');

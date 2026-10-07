@@ -1,101 +1,90 @@
-/* market-brief cockpit: Material 3 (Material You) LIGHT design tokens.
-   Generated from ONE seed colour, #1A73E8 (HCT hue 265.6, chroma 65.1, tone 49.9), with Google's
-   @material/material-color-utilities 0.4.0 SchemeVibrant (the high-chroma "Material You" scheme,
-   contrast level 0). Every --md-sys-color-* value below is that scheme's light role, unchanged.
-   Semantic and chart tokens (--mb-*) are HCT tonal palettes on fixed hues (see README.md): the
-   chart series are higher-chroma than the M3 roles on purpose (the dataviz checker's chroma floor).
-   Light theme only; the cockpit has no dark theme (owner's direction).
+/* market-brief cockpit: design tokens. ONE light scheme, "terminal light", modelled on the trading
+   terminals the owner pointed at (Meridian Terminal, TradingView symbol pages): a cool light-grey page,
+   white cards with hairline borders, one indigo accent, vivid green/red for signed numbers and signals,
+   uppercase micro-labels over large bold numerals. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and the pages need no renaming.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an
+   okay one. Up/down/hit/miss always carry a glyph and a word (dataviz checker: up #15803d vs down #dc2626
+   pass all gates, worst CVD dE 8.6). Contrast figures are WCAG on the colour named.
    Self-contained: no @import, no font files, system font stack. */
 :root {
   color-scheme: light;
 
-  /* ---- M3 colour roles (light): SchemeVibrant from seed #1A73E8 (HCT hue 265.6, chroma 65.1,
-     tone 49.9), contrast level 0. Alternatives with the same structure: tokens-variant-indigo.css,
-     tokens-variant-teal.css (override files for mockups; the chosen one is pasted here). ------ */
-  --md-sys-color-primary: #005bc0;
+  /* ---- Colour roles (terminal light) ---------------------------------------------------- */
+  --md-sys-color-primary: #4f46e5;                 /* indigo accent (6.3:1 on white) */
   --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #d8e2ff;
-  --md-sys-color-on-primary-container: #004493;
-  --md-sys-color-secondary: #585c7e;
+  --md-sys-color-primary-container: #eef2ff;       /* accent tint: selected nav, selected segment */
+  --md-sys-color-on-primary-container: #3730a3;    /* 8.9:1 on the tint */
+  --md-sys-color-secondary: #475569;
   --md-sys-color-on-secondary: #ffffff;
-  --md-sys-color-secondary-container: #dfe0ff;
-  --md-sys-color-on-secondary-container: #414465;
-  --md-sys-color-tertiary: #615789;
+  --md-sys-color-secondary-container: #f1f5f9;
+  --md-sys-color-on-secondary-container: #1e293b;
+  --md-sys-color-tertiary: #7c3aed;
   --md-sys-color-on-tertiary: #ffffff;
-  --md-sys-color-tertiary-container: #e7deff;
-  --md-sys-color-on-tertiary-container: #494070;
-  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-tertiary-container: #f3e8ff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
   --md-sys-color-on-error: #ffffff;
-  --md-sys-color-error-container: #ffdad6;
-  --md-sys-color-on-error-container: #93000a;
-  --md-sys-color-surface: #f9f9ff;
-  --md-sys-color-on-surface: #181c25;
-  --md-sys-color-surface-variant: #dee2f2;
-  --md-sys-color-on-surface-variant: #424753;
-  --md-sys-color-surface-dim: #d7d9e6;
-  --md-sys-color-surface-bright: #f9f9ff;
-  --md-sys-color-surface-container-lowest: #ffffff;
-  --md-sys-color-surface-container-low: #f1f3ff;
-  --md-sys-color-surface-container: #ebedfa;
-  --md-sys-color-surface-container-high: #e5e8f5;
-  --md-sys-color-surface-container-highest: #dfe2ef;
-  --md-sys-color-outline: #727785;
-  --md-sys-color-outline-variant: #c2c6d6;
-  --md-sys-color-inverse-surface: #2c303a;
-  --md-sys-color-inverse-on-surface: #eef0fd;
-  --md-sys-color-inverse-primary: #adc7ff;
-  --md-sys-color-surface-tint: #005bc0;
-  --md-sys-color-primary-fixed: #d8e2ff;
-  --md-sys-color-primary-fixed-dim: #adc7ff;
-  --md-sys-color-on-primary-fixed: #001a41;
-  --md-sys-color-on-primary-fixed-variant: #004493;
-  --md-sys-color-secondary-fixed: #dfe0ff;
-  --md-sys-color-secondary-fixed-dim: #c1c4eb;
-  --md-sys-color-on-secondary-fixed: #151937;
-  --md-sys-color-on-secondary-fixed-variant: #414465;
-  --md-sys-color-tertiary-fixed: #e7deff;
-  --md-sys-color-tertiary-fixed-dim: #cbbff8;
-  --md-sys-color-on-tertiary-fixed: #1d1341;
-  --md-sys-color-on-tertiary-fixed-variant: #494070;
-
+  --md-sys-color-error-container: #fee2e2;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #111827;              /* ink, 16.4:1 on the page */
+  --md-sys-color-surface-variant: #f1f5f9;
+  --md-sys-color-on-surface-variant: #6b7280;      /* muted labels, 4.8:1 on white */
+  --md-sys-color-surface-dim: #e5e7eb;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f5f6fa;    /* the page */
+  --md-sys-color-surface-container: #f3f4f6;        /* tiles and columns inside a card */
+  --md-sys-color-surface-container-high: #eceef2;   /* hairlines inside cards, table rules */
+  --md-sys-color-surface-container-highest: #e5e7eb;
+  --md-sys-color-outline: #9ca3af;
+  --md-sys-color-outline-variant: #e5e7eb;          /* card and control borders */
+  --md-sys-color-inverse-surface: #111827;          /* tooltips */
+  --md-sys-color-inverse-on-surface: #f9fafb;
+  --md-sys-color-inverse-primary: #a5b4fc;
+  --md-sys-color-surface-tint: #4f46e5;
+  --md-sys-color-background: #f5f6fa;
+  --md-sys-color-on-background: #111827;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 
   /* ---- Semantic tokens (finance) --------------------------------------------------------
-     Never colour alone: every up/down/hit/miss mark also carries a glyph (arrow, tick, cross) and a
-     word. Contrast on surface #f8f9ff (WCAG, checked in styleguide.html): up #00732e 5.5:1,
-     down #c92f29 5.1:1, neutral #73777d 4.3:1 (icons and large text only, never small text), warn
-     #b37800 3.6:1 (icons only; its text form is on-warn-container #624000 on warn-container, 7.2:1). The up/down pair sits in the
-     dataviz checker's CVD warn band (protan dE 6.8), which is why the glyph + word rule is a rule.
-     On-container pairs: up 9.6:1, down 8.6:1, warn 7.2:1; white on up 6.0:1, on down 5.4:1. */
-  --mb-color-up: #00732e;                 /* HCT hue 150, chroma 60, tone 42 */
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white, white on the fills 5.0:1 / 4.8:1.
+     Verdict surfaces: NO red; YES strong = darker green, YES ok = lighter green (owner's rule). */
+  --mb-color-up: #15803d;
   --mb-color-on-up: #ffffff;
-  --mb-color-up-container: #85f496;       /* tone 88 */
-  --mb-color-on-up-container: #003913;    /* tone 20 */
-  --mb-color-down: #c92f29;               /* HCT hue 25, chroma 80, tone 45 (the error family) */
+  --mb-color-up-container: #dcfce7;
+  --mb-color-on-up-container: #166534;    /* 6.5:1 */
+  --mb-color-down: #dc2626;
   --mb-color-on-down: #ffffff;
-  --mb-color-down-container: #ffdad6;     /* tone 90 */
-  --mb-color-on-down-container: #7e0007;  /* tone 25 */
-  --mb-color-neutral: #73777d;            /* neutral tone 50 */
+  --mb-color-down-container: #fee2e2;
+  --mb-color-on-down-container: #991b1b;  /* 6.8:1 */
+  --mb-color-neutral: #6b7280;
   --mb-color-on-neutral: #ffffff;
-  --mb-color-neutral-container: #e1e2e8;  /* surface-container-highest */
-  --mb-color-on-neutral-container: #43474e;
-  --mb-color-warn: #b37800;               /* HCT hue 75, chroma 70, tone 55: "direction unclear" */
-  --mb-color-on-warn: #1f1400;
-  --mb-color-warn-container: #ffddb2;     /* tone 90 */
-  --mb-color-on-warn-container: #624000;  /* tone 30 */
-  /* Outcome of a forecast: hit = up family, miss = down family (the glyph says which) */
+  --mb-color-neutral-container: #f3f4f6;
+  --mb-color-on-neutral-container: #374151;
+  --mb-color-warn: #d97706;               /* "direction unclear" (icons) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fef3c7;
+  --mb-color-on-warn-container: #b45309;  /* 4.5:1 */
   --mb-color-hit: var(--mb-color-up);
   --mb-color-hit-container: var(--mb-color-up-container);
   --mb-color-on-hit-container: var(--mb-color-on-up-container);
   --mb-color-miss: var(--mb-color-down);
   --mb-color-miss-container: var(--mb-color-down-container);
   --mb-color-on-miss-container: var(--mb-color-on-down-container);
-  /* Provenance labels: Live (stored by the pipeline), Back-test (rebuilt, hatched), Mock (not built,
-     dashed), Paper (unproven signal, tertiary). Each has a texture or border style besides its colour. */
-  --mb-color-live: var(--md-sys-color-primary);
-  --mb-color-live-container: var(--md-sys-color-primary-container);
-  --mb-color-on-live-container: var(--md-sys-color-on-primary-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fee2e2;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;   /* 6.8:1 */
+  --mb-verdict-strong-bg: #bbf7d0;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d; /* 7.5:1 */
+  --mb-verdict-ok-bg: #dcfce7;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;  /* 6.5:1 */
+  /* Provenance labels: Live (green tint, like a terminal's LIVE badge), Back-test (hatched accent tint),
+     Mock (dashed), Paper (violet tint). Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
   --mb-color-backtest: var(--md-sys-color-primary);
-  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(0,91,192,.16) 0 3px, transparent 3px 6px);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(79,70,229,.14) 0 3px, transparent 3px 6px);
   --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
   --mb-color-mock: var(--md-sys-color-outline);
   --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
@@ -105,15 +94,15 @@
 
   /* ---- Chart tokens (dataviz skill: validated with scripts/validate_palette.js, see README) ---- */
   --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
-  --mb-chart-1: #005bc0;   /* series 1 = the primary role: ranges, model, everything "ours" (4.3:1 passes) */
-  --mb-chart-2: #df7d00;   /* series 2 (2.83:1 on the surface: needs direct labels or a table view) */
-  --mb-chart-3: #876cc8;   /* series 3 */
-  --mb-chart-4: #009486;   /* series 4 */
-  --mb-chart-band-50: rgba(0,91,192,.34);    /* inner band, series 1 */
-  --mb-chart-band-80: rgba(0,91,192,.14);    /* outer band */
-  --mb-chart-fan: rgba(0,91,192,.10);
+  --mb-chart-1: #4f46e5;   /* series 1 = the accent: ranges, model, everything "ours" */
+  --mb-chart-2: #d97706;   /* series 2 (amber; 3.0:1 on white: direct labels or the table view) */
+  --mb-chart-3: #0891b2;   /* series 3 (cyan) */
+  --mb-chart-4: #db2777;   /* series 4 (pink) */
+  --mb-chart-band-50: rgba(79,70,229,.32);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(79,70,229,.13);   /* outer band */
+  --mb-chart-fan: rgba(79,70,229,.10);
   --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
-  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-grid: var(--md-sys-color-surface-container);
   --mb-chart-axis: var(--md-sys-color-outline-variant);
   --mb-chart-label: var(--md-sys-color-on-surface-variant);
   --mb-chart-future: var(--md-sys-color-surface-container-low);
@@ -152,8 +141,9 @@
   --md-sys-shape-corner-large: 16px;
   --md-sys-shape-corner-extra-large: 28px;
   --md-sys-shape-corner-full: 9999px;
-  --mb-card-radius: 24px;        /* cards and panels (M3 expressive large containers) */
-  --mb-panel-radius: 16px;       /* tiles and columns inside a card */
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 8px;        /* tiles and columns inside a card */
+  --mb-card-border: 1px solid var(--md-sys-color-outline-variant);
 
   /* ---- Elevation (M3 light shadows, levels 0-5) ----------------------------------------- */
   --md-sys-elevation-0: none;
@@ -177,9 +167,9 @@
   --mb-gutter: 16px;            /* phone side gutter (never less) */
   --mb-gutter-desktop: 24px;
   --mb-content-max: 1120px;
-  --mb-rail-width: 80px;        /* navigation rail (>= 600px) */
+  --mb-rail-width: 72px;        /* navigation rail (>= 600px) */
   --mb-navbar-height: 80px;     /* navigation bar (phone) */
-  --mb-topbar-height: 64px;
+  --mb-topbar-height: 56px;
 
   /* ---- Motion --------------------------------------------------------------------------- */
   --md-sys-motion-duration-short: 100ms;
@@ -207,3 +197,4 @@
 .md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
 .md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
 .md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }

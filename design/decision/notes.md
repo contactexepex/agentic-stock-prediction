@@ -1,6 +1,6 @@
 # Notes: queries and commands behind the decision pages
 
-Rebuilt on 2026-10-07 (UTC) with the Material 3 design system (vibrant blue scheme, second pass) (`design/system/`). The repo was read only;
+Rebuilt on 2026-10-07 (UTC) with the Material 3 design system ("terminal light" scheme, third pass) (`design/system/`). The repo was read only;
 everything written lives in this folder and under `work/design/` (gitignored scratch).
 
 ## Commands
