@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Today</title>
+<meta name="description" content="The morning screen of the personal stock cockpit: both markets at a glance, signals, yesterday's movers and their causes, this week's events, pipeline status and the track record. Research only.">
+<!--@@SYSTEM_CSS@@-->
+<style>
+/* Home (Today) screen, terminal layout (design/system/: "terminal light"). Every colour is a system token. */
+body{font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto}
+.mb-content{padding-left:0;padding-right:0}
+.mb-content-inner{max-width:none}
+.pad{padding:0 var(--mb-gutter-desktop)}
+.micro{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.card{background:var(--md-sys-color-surface-container-lowest);border:var(--mb-card-border);border-radius:var(--mb-card-radius);padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.04em}
+.card h2 .sp{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.note{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin:10px 0 0;overflow-wrap:anywhere}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+a.plain{color:inherit;text-decoration:none} a.plain:hover{text-decoration:underline}
+
+/* tape */
+.tape{overflow:hidden;background:var(--md-sys-color-surface);border-bottom:var(--mb-card-border);height:40px;position:relative}
+.tape .track{display:flex;white-space:nowrap;width:max-content;animation:tape 120s linear infinite}
+.tape:hover .track{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tape .it{display:inline-flex;align-items:center;gap:8px;padding:0 16px;border-right:1px solid var(--md-sys-color-outline-variant);font-size:12.5px;height:40px;color:inherit;text-decoration:none}
+.tape .it b{font-weight:700}
+.tape .mk{display:inline-flex;align-items:center;padding:0 12px;height:40px;font:600 10.5px/1 var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-primary);background:var(--md-sys-color-primary-container);border-right:1px solid var(--md-sys-color-outline-variant)}
+@media (prefers-reduced-motion: reduce){.tape .track{animation:none}.tape{overflow-x:auto}}
+
+/* header */
+.hhead{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;margin-top:16px}
+.hhead h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.3px}
+.hhead h1 small{font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:14px;margin-left:8px}
+.hhead .meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mb-color-down);display:inline-block;margin-right:4px}
+.dot.open{background:var(--mb-color-up)}
+
+/* banner */
+.banner{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:14px 18px;border-radius:var(--mb-card-radius);margin-top:14px;border:1px solid transparent}
+.banner.none{background:var(--md-sys-color-surface-container-lowest);border-color:var(--md-sys-color-outline-variant)}
+.banner.yes{background:var(--mb-verdict-ok-bg);color:var(--mb-verdict-ok-ink)}
+.banner .ico{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant)}
+.banner.yes .ico{background:var(--mb-verdict-ok-box);color:#fff}
+.banner .ico .ms{width:26px;height:26px}
+.banner b.t{font-size:16px;display:block}
+.banner .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.banner .s b{color:var(--md-sys-color-on-surface)}
+
+/* market panels */
+.markets{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.mk-card{padding:0;overflow:hidden}
+.mk-top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:var(--mb-card-border)}
+.mk-top h2{margin:0;font-size:15px;font-weight:800;letter-spacing:-.2px;text-transform:none}
+.mk-top .st{font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-left:auto;text-align:right}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr)}
+.tiles div{padding:10px 14px;border-left:1px solid var(--md-sys-color-outline-variant);border-bottom:var(--mb-card-border);min-width:0}
+.tiles div:nth-child(3n+1){border-left:0}
+.tiles b{display:block;font-size:15px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.tiles small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-body{padding:12px 16px}
+.mk-body h3{font:500 11px/16px var(--md-ref-typeface-plain);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);margin:10px 0 6px;display:flex;align-items:center;gap:8px}
+.mk-body h3:first-child{margin-top:0}
+.mv{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.mv a{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--md-sys-color-surface-container-high);color:inherit;text-decoration:none;min-width:0}
+.mv a:hover b{text-decoration:underline}
+.mv .bx{width:28px;height:28px;border-radius:7px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-primary);display:grid;place-items:center;font-weight:800;font-size:9.5px;flex:none}
+.mv .t{min-width:0} .mv .t b{display:block;font-size:12.5px} .mv .t small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv .t small .ms{width:12px;height:12px;vertical-align:-2px;margin-right:2px}
+.mv .mb-delta{font-size:13px}
+.evl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.evl li{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center;padding:6px 8px;border:var(--mb-card-border);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface);font-size:12.5px;min-width:0}
+.evl li.today{background:var(--md-sys-color-primary-container);border-color:transparent}
+.evl li.major{box-shadow:inset 3px 0 0 var(--md-sys-color-primary)}
+.evl .when{text-align:center;line-height:1.05}
+.evl .when b{display:block;font-size:16px;color:var(--md-sys-color-primary)} .evl .when small{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.evl .what{min-width:0;overflow-wrap:anywhere} .evl .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.evl .what .ms{width:14px;height:14px;vertical-align:-2px;margin-right:3px}
+.pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pipe div{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:8px 10px;background:var(--md-sys-color-surface);min-width:0}
+.pipe b{display:block;font-size:15px;font-weight:700}
+.pipe small{display:block;font-size:10.5px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pipe .ok{color:var(--mb-color-up)} .pipe .bad{color:var(--mb-color-down)}
+.links{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-top:var(--mb-card-border)}
+
+/* bottom */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpi{border:var(--mb-card-border);border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface);min-width:0}
+.kpi .v{font-size:20px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.kpi .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:3px}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:24px 0 8px}
+code{font-family:var(--md-ref-typeface-mono);font-size:.92em;overflow-wrap:anywhere}
+
+@media (max-width: 1000px){ .markets,.grid2{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 760px){
+  .pad{padding:0 var(--mb-gutter)}
+  .hhead{grid-template-columns:1fr}
+  .banner{grid-template-columns:1fr}
+  .mv{grid-template-columns:1fr}
+  .pipe{grid-template-columns:repeat(2,1fr)}
+  .tape .it{padding:0 12px}
+  .mb-topbar .md-chip{display:none}
+}
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-rail" aria-label="Sections" id="rail"></nav>
+  <header class="mb-topbar" id="topbar">
+    <div class="mb-topbar-title">Today · market brief</div>
+    <div class="mb-topbar-actions">
+      <span class="md-chip small" data-tip="Coming: symbol search across both markets." aria-disabled="true"><svg class="ms"><use href="#ms-search"/></svg>Search symbols</span>
+      <div class="md-segmented dense" role="group" aria-label="Market" id="market-seg"></div>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner">
+    <div class="tape" id="tape" aria-label="Both watchlists, last close and day move"><div class="track" id="tape-track"></div></div>
+    <div class="pad"><div class="wrap">
+
+<section class="hhead" aria-label="Today">
+  <div style="min-width:0">
+    <h1 id="h-title"></h1>
+    <div class="meta" id="h-meta"></div>
+  </div>
+  <div class="muted" style="font-size:12px;text-align:right" id="h-right"></div>
+</section>
+
+<div class="banner" id="banner"></div>
+
+<div class="markets" id="markets"></div>
+
+<div class="grid2">
+  <section class="card" id="track">
+    <h2>Track record <span class="sp">the proof gate for "Paper"</span></h2>
+    <div class="kpis" id="kpis"></div>
+    <p class="note" id="track-note"></p>
+  </section>
+  <section class="card" id="how">
+    <h2>How to read this screen</h2>
+    <div style="font-size:13px;display:grid;gap:6px">
+      <div><b>Banner</b>: whether anything is worth doing today. "No proven strong signals" until a live YES exists and the track record proves the model; Paper candidates are companies at or above the call line without a confirmed call.</div>
+      <div><b>Market panels</b>: the session, regime and the big numbers; yesterday's largest moves with a cause (<svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-public"/></svg> market-wide, <svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-apartment"/></svg> company news, <svg class="ms" style="width:13px;height:13px;vertical-align:-2px"><use href="#ms-pending"/></svg> unexplained = mock, explainer agent coming); the week's events; what the latest run stored.</div>
+      <div><b>Colours</b>: green up, red down, always with the sign; NO red, YES green (darker when strong); <span class="mb-tag live">live</span> stored by the pipeline, <span class="mb-tag bt">back-test</span> rule replay, <span class="mb-tag mock">mock</span> not built, <span class="mb-tag paper">paper</span> unproven.</div>
+      <div>Click a company for its decision page, a market name for its watchlist.</div>
+    </div>
+  </section>
+</div>
+
+<div style="display:grid;gap:10px;margin-top:16px">
+  <details class="md-expansion" id="d-src"><summary>Data sources and what is live, back-test or mock</summary><div class="inner" id="sources"></div></details>
+</div>
+<footer id="foot"></footer>
+    </div></div>
+  </div></main>
+  <nav class="mb-navbar" aria-label="Sections" id="navbar"></nav>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const M = D.markets, MK = ['india', 'us'];
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls}); const u = svgEl('use'); u.setAttribute('href', '#'+id); s.append(u); return s; };
+const sgn = (x, dec=1, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = x => Math.round(x*100);
+const numIn = (m, x, dec=2) => x.toLocaleString(M[m].currency.locale, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const help = (tip) => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const pageOf = t => `../decision/decision-${t}.html`, wlOf = m => `../watchlist/watchlist-${m}.html`;
+const CAUSE = {market:{ico:'ms-public', name:'Market-wide'}, company:{ico:'ms-apartment', name:'Company news'}, unexplained:{ico:'ms-pending', name:'Unexplained'}};
+
+/* ---------- shell ---------- */
+for (const m of MK) $('#market-seg').append(el('a', {href: wlOf(m), 'aria-pressed':'false', 'data-tip': `Open the ${LABEL[m]} watchlist`}, LABEL[m]));
+const NAV = [['home','Home', true], ['format_list_bulleted','Watchlist', false, wlOf('india')], ['account_balance_wallet','Portfolio', false], ['query_stats','Record', false], ['newspaper','News', false], ['help','Help', false]];
+const navItem = ([ico, label, current, href]) => el('a', {class: 'mb-nav-item' + (current || href ? '' : ' coming'), href: href || '#', 'aria-current': current ? 'page' : null, 'data-tip': current || href ? null : 'Coming: not built yet'}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), label);
+$('#rail').append(el('div', {class:'mb-rail-brand', 'aria-hidden':'true'}, 'MB'), ...NAV.map(navItem));
+$('#navbar').append(...NAV.slice(0,5).map(navItem));
+window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip'); let tipPinned = null;
+function showTip(target, html) { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; }
+function hideTip() { if (tipPinned) return; tip.classList.remove('on'); }
+document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A') { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); } });
+
+/* ---------- tape: both markets ---------- */
+const track = $('#tape-track');
+const tapeItems = () => MK.flatMap(m => [el('span', {class:'mk'}, LABEL[m]), ...M[m].rows.map(t => el('a', {class:'it', href: pageOf(t.ticker)}, el('b', {}, t.ticker), el('span', {}, t.close==null?'—':numIn(m, t.close)), delta(t.move)))]);
+track.append(...tapeItems(), ...tapeItems());
+
+/* ---------- header + banner ---------- */
+const todayIso = D.built_at.slice(0,10);
+$('#h-title').append(`${DOWL[dt(todayIso).getUTCDay()]} ${fmtD(todayIso, false)} ${todayIso.slice(0,4)}`, el('small', {}, 'both markets at a glance'));
+for (const m of MK) { const s = M[m].header.session || {}; const open = !!s.in_session; $('#h-meta').append(el('span', {}, el('span', {class:'dot'+(open?' open':'')}), `${M[m].exchange} ${open ? 'open' : 'closed'} · data as of ${fmtD(M[m].as_of, false)}`)); }
+$('#h-meta').append(el('span', {class:'mb-tag live'}, 'live data'), el('span', {class:'mb-tag paper'}, 'paper'));
+$('#h-right').append(`Built ${D.built_at.replace('T',' ').slice(0,16)} UTC`, el('br'), 'Research only · nothing here trades');
+const yes = MK.flatMap(m => M[m].header.yes.map(t => `${t} (${LABEL[m]})`)), cands = MK.flatMap(m => M[m].header.candidates.map(t => `${t} (${LABEL[m]})`));
+const skill = MK.some(m => M[m].header.model_skill), scored = MK.reduce((a, m) => a + M[m].header.scored_total, 0);
+const B = $('#banner');
+if (yes.length) { B.classList.add('yes'); B.append(el('div', {class:'ico'}, icon('ms-check')), el('div', {}, el('b', {class:'t'}, `${yes.length} YES call${yes.length>1?'s':''} today: ${yes.join(', ')}`), el('div', {class:'s'}, `Paper until the track record proves them (${scored} live calls scored so far). Open the company page for the plan.`))); }
+else { B.classList.add('none'); B.append(el('div', {class:'ico'}, icon('ms-block')), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'), el('div', {class:'s'}, (cands.length ? `Paper candidates at or above the ${pct(M.india.call_threshold)}% call line: ${cands.join(', ')}. ` : `No company in either market reaches the ${pct(M.india.call_threshold)}% call line. `) + `The forecaster abstained on ${MK.map(m => `${M[m].header.abstain} of ${M[m].header.n} (${LABEL[m]})`).join(' and ')}` + (skill ? '.' : '; the model has not shown skill in the back-test, so every signal stays Paper.')))); }
+
+/* ---------- market panels ---------- */
+function panel(m) {
+  const b = M[m], h = b.header, s = h.session || {}, open = !!s.in_session, st = b.status;
+  const card = el('section', {class:'card mk-card', 'aria-label': `${LABEL[m]} today`});
+  const top = el('div', {class:'mk-top'}, el('h2', {}, el('a', {class:'plain', href: wlOf(m)}, `${LABEL[m]} · ${b.market_name}`)), el('span', {class:'mb-tag live'}, 'live'),
+    el('span', {class:'st'}, el('span', {class:'dot'+(open?' open':'')}), open ? `${b.exchange} open` : `${b.exchange} closed`, el('br'), `${h.up} up · ${h.down} down on ${fmtD(b.as_of, false)}`));
+  card.append(top);
+  const tiles = el('div', {class:'tiles'});
+  const T = [
+    {l:'Regime', v: h.regime, s: h.major_event_names.length ? h.major_event_names.join(', ') : 'no major event', t:'Stored by the daily run: CALM / TRENDING / EVENT_HEAVY / UNSTABLE from the vol index, the benchmark and the event calendar.'},
+    {l: h.bench_name, v: h.bench_close == null ? '—' : numIn(m, h.bench_close), d: h.bench_move, s: (h.bench_move_5 == null ? '' : `5d ${sgn(h.bench_move_5,2)}`) + (h.bench_live ? ` · live ${sgn(h.bench_live.change_pct,2)}` : ''), t:'Benchmark: last stored close and day move; 5-day move; the live quote at the run where stored.'},
+    {l: h.vol_name, v: h.vol_close == null ? '—' : numIn(m, h.vol_close), d: h.vol_move, s: `vol level ${h.vol_level}`, t:'Volatility index: last stored close and day move.'},
+    {l:'Calls today', v: `${h.yes.length} YES`, s: `${h.abstain} of ${h.n} abstained · ${h.blocked.length} blocked`, t:'Live calls for the latest date; abstentions from the forecaster; blocked = indicator quality BLOCKED or results within 1 day.'},
+    {l:'Paper candidates', v: String(h.candidates.length), s: h.candidates.length ? h.candidates.join(', ') : `none at or above ${pct(b.call_threshold)}%`, t:'Companies whose live chance of a rise is at or above the call line (config/model.yaml).'},
+    h.flows ? {l:'FII / DII, cr', v: `${sgn(h.flows.fii,0,'')} / ${sgn(h.flows.dii,0,'')}`, s: `NSE provisional, ${fmtD(h.flows.date, false)}`, t:'Foreign and domestic institutional net flows, Rs crore.'} : {l:'Model skill', v: h.model_skill ? 'shown' : 'not shown', s: h.review_week ? `review ${h.review_week}` : 'no review', t:'The weekly review\'s verdict on the signal model.'},
+  ];
+  for (const t of T) tiles.append(el('div', {'data-tip': t.t}, el('span', {class:'micro'}, t.l), el('b', {}, t.v, ' ', t.d == null ? null : delta(t.d, 2)), el('small', {}, t.s)));
+  card.append(tiles);
+  const body = el('div', {class:'mk-body'});
+  // movers
+  body.append(el('h3', {}, `What moved on ${fmtD(b.as_of)}`, help('The three largest rises and falls of the watchlist on the last stored session, each with a deterministic cause: market-wide when the benchmark or the sector index moved at least 0.75% the same way; company news when high-materiality headlines are stored for that day; otherwise stock-specific and unexplained (mock: the explainer agent is not built).')));
+  const mv = el('div', {class:'mv'});
+  const col = (list, title) => { const c = el('div'); c.append(el('div', {class:'micro', style:'margin-bottom:2px'}, title)); if (!list.length) c.append(el('div', {class:'muted', style:'font-size:12px'}, 'none'));
+    for (const x of list) { const cz = CAUSE[x.cause.kind]; c.append(el('a', {href: pageOf(x.ticker), 'data-tip': `${x.name}: close ${numIn(m, x.close)} (${sgn(x.move,2)}). ${x.cause.label}${x.cause.source==='mock' ? ' (mock)' : x.cause.source==='derived' ? ' (derived from stored index moves)' : ' (from stored headlines)'}.`}, el('span', {class:'bx', 'aria-hidden':'true'}, x.ticker.slice(0,4)), el('div', {class:'t'}, el('b', {}, x.ticker), el('small', {}, icon(cz.ico), cz.name, x.cause.source==='mock' ? ' · mock' : '')), delta(x.move))); }
+    return c; };
+  mv.append(col(b.movers.up, 'Up'), col(b.movers.down, 'Down'));
+  body.append(mv);
+  // events
+  body.append(el('h3', {}, 'Next 7 days', el('span', {class:'mb-tag live'}, 'calendar')));
+  const ul = el('ul', {class:'evl'});
+  const EV_ICO = {rbi_policy:'ms-account_balance', fomc:'ms-account_balance', earnings:'ms-receipt_long', fno_expiry:'ms-event', weekly_expiry:'ms-event', jobs_report:'ms-public', index_rebalance:'ms-layers', cpi:'ms-public'};
+  for (const e of b.events) { const d = dt(e.date); const li = el('li', {class: (e.date === b.today ? 'today ' : '') + (e.major ? 'major' : '')});
+    li.append(el('div', {class:'when'}, el('small', {}, DOW[d.getUTCDay()]), el('b', {}, d.getUTCDate())));
+    const what = el('div', {class:'what'}, icon(EV_ICO[e.type] || 'ms-calendar_month'), e.ticker ? el('a', {class:'plain', href: pageOf(e.ticker)}, e.name) : e.name,
+      el('small', {}, e.type === 'earnings' ? `Company results${e.timing ? ', ' + e.timing.replace('_',' ') : ''} · reaction session ${fmtD(e.reaction_session)} · no new call within 1 day` : e.date === b.today && h.major_event_names.some(n => e.name.includes(n) || n.includes(e.name)) ? `Today · the reason the regime is ${h.regime}` : e.major ? 'Market-wide major event · ranges widen' : 'Market-wide, minor'));
+    li.append(what); ul.append(li); }
+  if (!b.events.length) ul.append(el('li', {}, el('div'), el('div', {class:'what muted'}, 'No stored events in the next seven days.')));
+  body.append(ul);
+  // pipeline status
+  body.append(el('h3', {}, 'What the latest run stored', help('Counts from the stored data for the as-of date: bars, model scores, published ranges (1-day ranges are withheld when the run finishes after the open), forecaster records, headlines since the as-of close, verified news clusters, lessons. Green = complete for the 20 companies.')));
+  const P = el('div', {class:'pipe'});
+  const n = h.n;
+  const items = [
+    ['Run', st.run_at ? st.run_at.slice(11,16) + ' UTC' : '—', st.run_before_open == null ? '' : (st.run_before_open ? 'before' : 'after') + ` the ${fmtD(b.today, false)} open` + (st.open_utc ? ` (${st.open_utc.slice(11,16)} UTC)` : ''), st.run_before_open == null ? '' : st.run_before_open ? 'ok' : 'bad'],
+    ['Bars', `${st.prices_stored}/${n}`, `close of ${fmtD(b.as_of, false)}`, st.prices_stored === n ? 'ok' : 'bad'],
+    ['Model scores', `${st.scores_stored}/${n * 2}`, '1d + 5d per company', st.scores_stored === n * 2 ? 'ok' : 'bad'],
+    ['Ranges', `${st.ranges_1d} · ${st.ranges_5d}`, '1-day · 5-day published', st.ranges_5d === n ? (st.ranges_1d === n ? 'ok' : '') : 'bad'],
+    ['Forecaster', `${st.reasoning_stored}/${n}`, 'bull / bear / verdict', st.reasoning_stored === n ? 'ok' : 'bad'],
+    ['Headlines', String(st.news_since_asof), `since ${fmtD(b.as_of, false)}`, ''],
+    ['Verified', String(st.clusters_verified), 'news clusters, latest pass', ''],
+    ['Lessons', String(st.lessons), 'reflection log', ''],
+  ];
+  for (const [l, v, s, cls] of items) P.append(el('div', {}, el('span', {class:'micro'}, l), el('b', {class: cls}, v), el('small', {}, s)));
+  body.append(P);
+  card.append(body);
+  card.append(el('div', {class:'links'}, el('a', {class:'md-btn outlined', href: wlOf(m)}, icon('ms-format_list_bulleted'), `${LABEL[m]} watchlist`), el('span', {class:'muted', style:'font-size:12px;align-self:center'}, `${h.news_total} headlines in 72h · ${h.news_high} high materiality · model skill ${h.model_skill ? 'shown' : 'not shown'}${h.review_week ? ' (' + h.review_week + ')' : ''}`)));
+  return card;
+}
+for (const m of MK) $('#markets').append(panel(m));
+
+/* ---------- track record ---------- */
+const K = $('#kpis');
+const kp = [
+  {v: String(scored), l: 'live calls scored, both markets', k:'live', t:'Live direction calls that have settled and been scored (outcomes).'},
+  ...MK.map(m => ({v: `${pct(M[m].replay_overall['1'].cover80)}%`, l: `${LABEL[m]} 1-day 80% ranges held, ${fmtD(M[m].window[0], false)}–${fmtD(M[m].window[1], false)}`, k:'bt', t:`Rule replay, all ${M[m].header.n} ${LABEL[m]} stocks: the 1-day 80% band contained the next close ${pct(M[m].replay_overall['1'].cover80)}% of the time (target 80%); 50% band ${pct(M[m].replay_overall['1'].cover50)}%; 5-day 80% band ${pct(M[m].replay_overall['5'].cover80)}%. Back-test, not live.`})),
+  {v: skill ? 'shown' : 'not shown', l: 'model skill (weekly review)', k:'live', t: MK.map(m => `${LABEL[m]}: ${M[m].header.model_skill ? 'shown' : 'not shown'}${M[m].header.review_week ? ' (' + M[m].header.review_week + ')' : ''}`).join('; ') + '. The weekly review reruns the signal-model back-test and says plainly whether it shows skill.'},
+];
+for (const k of kp) K.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l, ' ', el('span', {class:'mb-tag '+k.k}, k.k === 'bt' ? 'back-test' : 'live'), ' ', help(k.t))));
+$('#track-note').textContent = `Every signal stays Paper until the live track record proves it: enough scored calls with hit rates above the stated confidence and a weekly review that finds model skill. ${scored} live calls scored so far.`;
+
+/* ---------- sources + footer ---------- */
+$('#sources').innerHTML = `<dl class="md-kv">
+<dt>Live</dt><dd>Per market, data/&lt;market&gt;/: prices (last stored bars), model_scores_latest, ranges, features_latest, agent_reasoning, predictions and outcomes, quotes_latest, regime, events (calendar rules in config/events.yaml plus stored results dates), news with enrichment and news_verified, flows (India), lessons, reviews. Read through DuckDB views in sql/views.sql; the watchlist builder assembles the rows, this page adds movers, events and status.</dd>
+<dt>Back-test</dt><dd>Range coverage from <code>scripts/replay.py</code> over each market's 35-session window ending at its as-of date. Not live.</dd>
+<dt>Derived</dt><dd>The cause of a mover (market-wide / company news / unexplained), Paper candidates (chance at or above the call line), blocked companies, "before/after the open" from the run time and the exchange calendar.</dd>
+<dt>Mock / coming</dt><dd>"Unexplained" causes (explainer agent not built); symbol search; Portfolio, Record, News and Help sections.</dd>
+</dl>`;
+$('#foot').textContent = `Personal research project. Prices from Yahoo Finance and NSE bhavcopy; nothing here is investment advice and nothing trades. Built ${D.built_at.replace('T',' ')} UTC from stored data.`;
+</script>
+</body>
+</html>

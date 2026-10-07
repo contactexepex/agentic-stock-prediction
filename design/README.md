@@ -34,7 +34,7 @@ cloud session, then one consolidation session turns them into the production gen
 |---|---|
 | `system/` Material 3 design system | done: tokens, components, icons, style guide (`design/system/README.md`) |
 | `decision/` Stock decision page | layout approved by the owner; recoloured to the design system; `build.py --market --ticker --out` regenerates it for any watchlist ticker (examples: HDFCBANK, ICICIBANK, AAPL) |
-| Home | to do |
+| `home/` Home (Today): both markets, signals, movers with causes, week's events, run status | built, awaiting the owner's approval |
 | `watchlist/` Watchlist (20 companies per market, sortable, sector-grouped) | built, awaiting the owner's approval |
 | Portfolio (paper) | to do |
 | Track record | to do |
