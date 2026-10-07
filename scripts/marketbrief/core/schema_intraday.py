@@ -86,7 +86,8 @@ INTRADAY_SCHEMAS: Schemas = {
     # (one row per news id per ticker with an open trade, first alerted check only: id =
     # <check_id>-<ticker>-news-<news_id>). trades: JSON [{trade_id, strategy_id, view, horizon_days, flags, band,
     # ret_since_entry_pct, to_target_pct, target_reached}]; news_*: the item, its status and materiality as of
-    # check_at. check_row_id: the ticker's intraday_checks row (its explainer note joins on it). Never advice.
+    # check_at. check_row_id: the ticker's intraday_checks row (its explainer note joins on it); null for a ticker not
+    # on the watchlist, which has no such row (#74, #114). Never advice.
     KIND_INTRADAY_ALERTS: ("jsonl", {
         "id": "VARCHAR", "check_id": "VARCHAR", "check_at": "TIMESTAMPTZ", "session_date": "DATE",
         "market": "VARCHAR", "ticker": "VARCHAR", "alert_type": "VARCHAR", "check_row_id": "VARCHAR",

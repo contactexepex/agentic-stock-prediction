@@ -26,6 +26,7 @@ from marketbrief.intraday.constants import (
     TRADE_FLAG_AGAINST,
     TRADE_FLAG_FAR_FROM_TARGET,
     TRADE_FLAG_OUTSIDE_RANGE,
+    NOTE_UNSETTLED_PAST_EXIT,
     TRADE_METHOD_VERSION,
 )
 from marketbrief.intraday.inputs import sessions_between
@@ -67,7 +68,9 @@ def trade_row(ctx, trade: dict, quote: SessionQuote | None, sigma: float | None,
                    target_adj=rounded(adj["target_price"], 4),
                    **{f"{key}_adj": rounded(adj[key], 4) for key in BAND_KEYS})
     if trade.get("exit_delayed"):
-        check["notes"].append("exit_delayed")   # issue #93: past its exit date, no settlement row yet
+        # issue #93: past its exit date with no paper_trades_settled row yet (a missing exit close, a settle step
+        # that has not run, or a trade the settlement refused); the note names only what is known (#128)
+        check["notes"].append(NOTE_UNSETTLED_PAST_EXIT)
     reached, high, low = _so_far(ctx, trade, quote if ok else None, adj["target_price"], check["notes"])
     check.update(target_reached=reached[0], target_reached_session=reached[1])
     if quality != QUALITY_OK:
