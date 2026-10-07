@@ -20,6 +20,7 @@ from marketbrief.constants.validation import (
     STAGE_KINDS,
 )
 from marketbrief.core import paths, schemas
+from marketbrief.lifecycle.loader import active_tickers
 from marketbrief.pipeline import forecast_gate
 from marketbrief.pipeline.validate.collect_checks import (
     check_bars,
@@ -31,7 +32,6 @@ from marketbrief.pipeline.validate.collect_checks import (
 )
 from marketbrief.pipeline.validate.gate_result import work_dir
 from marketbrief.pipeline.validate.news_checks import check_articles, check_news_sources
-from marketbrief.lifecycle.loader import active_tickers
 
 
 def stage_collect(res, cfg, con, status, now, today, validate_config):  # noqa: PLR0913 (uniform stage signature)

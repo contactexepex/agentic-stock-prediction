@@ -155,20 +155,22 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `horizons` (per-horizon score and range records, B10) and `strategies` (the registry's allowed values). Governed
   tools per channel: `mcp/tools.yaml`. A field the pages need and the catalogue lacks is a data request to W1.
 - Company lifecycle (F8, B1; docs/ws/b1.md; code `marketbrief/lifecycle/`, settings `config/lifecycle.yaml`): the
-  watchlist is data. `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox`
-  validates and appends `data/<market>/watchlist_events/` (every command also gets a `command_log` row; delete needs
-  `--confirm <ticker>` and is never allowed from Slack). `load_market` rebuilds the company lists from the events as of
-  the run's clock (MB_NOW-aware): `cfg["tickers"]` = every collected company (active and inactive, never deleted;
-  collectors keep reading it), `cfg["sectors"]` rebuilt, `cfg["active_tickers"]` = active only; code that predicts or
-  displays uses `lifecycle.loader.active_tickers(cfg)` / `active_sectors(cfg)`; replays and new code use
-  `contracts.watchlist.watchlist(market, as_of, state)`. An event counts once both effective_from and recorded_at have
-  passed, except the seed's add events (channel `seed`, the 40 config companies, effective from the start of stored
-  history), which restate the config list and count from effective_from. Without events the config's `tickers:` act
-  as adds. Add runs the deterministic onboarding (identifiers from NSE's equity list or SEC's ticker/exchange file plus
-  Yahoo; no ETFs, BSE-only or unknown symbols; sector from `sector_rules`; backfill of prices from the first stored day,
-  15 years of daily history into the long-history cache `work/model_history/`, news, filings or announcements; the
-  candidate's collect gate) before its event is appended.
-  `.github/workflows/onboard.yml` imports the MotherDuck inbox (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
+  watchlist is data.
+  `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox` validates and
+  appends `data/<market>/watchlist_events/` (each add, deactivate, reactivate, set-amount, delete and imported inbox
+  command also gets a `command_log` row; delete needs `--confirm <ticker>` and is never allowed from Slack).
+  `load_market` rebuilds the company lists from the events as of the run's clock (MB_NOW-aware): `cfg["tickers"]` =
+  every collected company (active and inactive, never deleted; collectors keep reading it), `cfg["sectors"]` rebuilt,
+  `cfg["active_tickers"]` = active only; code that predicts or displays uses `lifecycle.loader.active_tickers(cfg)` /
+  `active_sectors(cfg)`; replays and new code use `contracts.watchlist.watchlist(market, as_of, state)`. An event
+  counts once both effective_from and recorded_at have passed, except the seed's add events (channel `seed`, the 20
+  config companies per market, effective from the start of stored history), which restate the config list and count
+  from effective_from. Without events the config's `tickers:` act as adds. Add runs the deterministic onboarding
+  (identifiers from NSE's equity list or SEC's ticker/exchange file plus Yahoo; no ETFs, BSE-only or unknown symbols;
+  sector from `sector_rules`; backfill of prices from the first stored day, daily history into the long-history cache
+  `work/model_history/` from its start, else 15 years back, news, filings or announcements; the candidate's collect
+  gate) before its event is appended. `.github/workflows/onboard.yml` imports the MotherDuck inbox
+  (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
 - AI traders, EOD analyst, research director (B3, docs/SPEC.md F4 and F6, notes `docs/ws/b3.md`; code
   `marketbrief/traders/`, run as `PYTHONPATH=scripts python -m marketbrief.traders <command>`). Four traders
   (`.claude/agents/trader-news-results.md`, `trader-pattern-mood.md`, `trader-combined.md`, and `forecaster.md` as

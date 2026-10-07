@@ -5,7 +5,7 @@ name: onboard
 # validator as the CLI), adds run the deterministic onboarding (identifiers, sector, backfill, collect gate), and the
 # web tier's paper trades (inbox.requests) are imported by scripts/portfolio.py import-inbox (B2); the
 # new records are committed to data/ with pull, rebase and retry so the run never races a routine's push.
-# Research only: a watchlist event is a record, never an order. Dispatched by the web tier (workflow_dispatch);
+# Research only: a watchlist event and a paper trade are records, never orders. Dispatched by the web tier (workflow_dispatch);
 # a command whose sources do not answer from GitHub's runners is logged `failed` and retried by the next import
 # (this workflow again, or the routine's import step).
 # A command whose inbox row names its Slack message (slack_channel, slack_ts) gets a threaded reply with its result

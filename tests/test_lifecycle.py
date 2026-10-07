@@ -471,7 +471,7 @@ def test_long_history_merges_into_the_market_cache(root):
     old = "ticker,date,open,high,low,close,volume\nAAPL,2011-01-03,1,1,1,1,1\nFIXT,2011-01-03,9,9,9,9,9\n"
     (folder / "bars.csv.gz").write_bytes(gzip.compress(old.encode(), mtime=0))
     (folder / "manifest.json").write_text(json.dumps({"market": "us", "start": "2011-01-01", "symbols": {
-        "AAPL": {"rows": 1}}, "failed": []}))
+        "AAPL": {"rows": 1}}, "failed": [], "fetched_at": "2026-10-01T00:00:00Z"}))
     code, added = cli("--market", "us", "add", "--symbol", "FIXT", "--key", "add-fixt-0005")
     assert code == 0 and added["details"]["long_history"]["requested_from"] == "2011-01-01"
     bars = pd.read_csv(folder / "bars.csv.gz")
@@ -480,6 +480,8 @@ def test_long_history_merges_into_the_market_cache(root):
     assert fixt["date"].min() == "2026-07-01" and len(fixt) == added["details"]["long_history"]["rows"]
     manifest = json.loads((folder / "manifest.json").read_text())
     assert set(manifest["symbols"]) == {"AAPL", "FIXT"} and manifest["rows"] == len(bars)
+    assert manifest["fetched_at"] == "2026-10-01T00:00:00Z"                 # the full fetch's time is kept (#108)
+    assert manifest["symbols"]["FIXT"]["fetched_at"] == "2026-10-07T12:00:00Z"
 
 
 def test_inbox_retries_failed_commands_only(root, monkeypatch):
@@ -563,7 +565,8 @@ def test_a_slack_failure_never_stops_the_import():
     inbox = common.ROOT / "slack_inbox.duckdb"
     make_slack_inbox(inbox, SLACK_ROWS)
     result = import_inbox("us", str(inbox), sources_for(load_market("us")), reply=broken)
-    assert result["imported"] == 3 and len(stored_events("us")) == 1      # the deactivate; delete refused (Slack)
+    assert result["imported"] == 3                                     # delete refused (Slack); the reactivate
+    assert [row["event"] for row in stored_events("us")] == ["deactivate", "reactivate"]   # cancels the pending one
     assert "slack.com unreachable" in result["results"][0]["slack_reply"]["error"]
 
 
@@ -589,3 +592,92 @@ def test_without_slack_reply_the_cli_posts_nothing(monkeypatch):
     make_slack_inbox(inbox, SLACK_ROWS[:1])
     code, result = cli("--market", "us", "import-inbox", "--inbox", str(inbox))
     assert code == 0 and result["results"][0]["slack_reply"] is None and len(stored_events("us")) == 1
+
+
+
+# ---------------- cosmetic batch (#101, #102, #104, #107, #131) ----------------
+
+def test_yahoo_serving_nothing_for_a_listed_symbol_is_a_failed_command():
+    data = json.loads((common.ROOT / "fixtures.json").read_text())
+    data["yahoo"].pop("FIXT")                       # SEC lists it; Yahoo answers nothing (blocked, rate-limited)
+    (common.ROOT / "fixtures.json").write_text(json.dumps(data))
+    code, result = cli("--market", "us", "add", "--symbol", "FIXT", "--key", "add-fixt-0101")
+    assert code == 2 and result["failed"] and "Yahoo served no daily bars" in result["errors"][0]
+    assert stored_rows("us", "command_log")[-1]["result"] == "failed" and stored_events("us") == []
+
+
+def test_a_yfinance_error_in_the_price_backfill_is_a_failed_command(monkeypatch):
+    from marketbrief.lifecycle import backfill
+
+    def rate_limited(*_args, **_kwargs):
+        raise RuntimeError("Too Many Requests")
+
+    monkeypatch.setattr(backfill, "backfill_prices", rate_limited)
+    code, result = cli("--market", "us", "add", "--symbol", "FIXT", "--key", "add-fixt-0107")
+    assert code == 2 and result["failed"] and "Too Many Requests" in result["errors"][0]
+    assert stored_rows("us", "command_log")[-1]["result"] == "failed" and stored_events("us") == []
+
+
+def test_reactivate_cancels_a_pending_deactivate(monkeypatch):
+    assert cli("--market", "us", "deactivate", "--ticker", "DAL", "--key", "deact-dal-01")[0] == 0
+    code, again = cli("--market", "us", "deactivate", "--ticker", "DAL", "--key", "deact-dal-02")
+    assert code == 2 and "state inactive" in again["errors"][0]       # already pending
+    code, done = cli("--market", "us", "reactivate", "--ticker", "DAL", "--key", "react-dal-01")
+    assert code == 0 and done["event"]["effective_from"] == "2026-10-08T11:45:00+00:00"
+    at(monkeypatch, "2026-10-08T12:00:00+00:00")
+    assert "DAL" in load_market("us")["active_tickers"]               # the deactivate never took hold
+
+
+def test_announcement_backfill_asks_from_the_configured_window(monkeypatch):
+    import marketbrief.collectors.nse_india as nse_india
+    from marketbrief.lifecycle import backfill
+
+    seen = {}
+    monkeypatch.setattr(nse_india, "collect", lambda _cfg, _nse, kinds, args=None: seen.update(
+        kinds=kinds, since=args.since) or {"new": {"announcements": 2}})
+    status, _detail = backfill.backfill_announcements(load_market("india"), object(), 30)
+    assert status == "ok" and seen == {"kinds": ["announcements"], "since": date(2026, 9, 7)}
+
+
+def test_masked_hides_the_inbox_and_slack_tokens(monkeypatch):
+    from marketbrief.lifecycle.inbox import masked
+
+    monkeypatch.setenv("MOTHERDUCK_INBOX_TOKEN", "md-secret-123")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-secret-456")
+    assert masked("auth md-secret-123 and xoxb-secret-456 failed") == "auth *** and *** failed"
+
+
+def test_old_inbox_schema_never_replies():
+    from marketbrief.lifecycle.inbox import import_inbox
+    from marketbrief.lifecycle.sources import sources_for
+
+    inbox = common.ROOT / "old_inbox.duckdb"
+    make_inbox(inbox, [("inbox-0030-dea", "us", "deactivate_company", json.dumps({"ticker": "DAL"}),
+                        "dashboard:owner", "dashboard", "2026-10-07T10:00:00Z", None)])
+    result = import_inbox("us", str(inbox), sources_for(load_market("us")),
+                          reply=lambda *_args: pytest.fail("replied without slack columns"))
+    assert result["results"][0]["ok"] and result["results"][0]["slack_reply"] is None
+
+
+def test_slack_reply_flag_passes_b6s_confirmation(monkeypatch):
+    import marketbrief.lifecycle.inbox as inbox_module
+
+    calls = []
+    monkeypatch.setattr(inbox_module, "default_reply", lambda record, channel, ts: calls.append(
+        (record["result"], channel, ts)) or {"posted": ["x#1"]})
+    inbox = common.ROOT / "slack_inbox.duckdb"
+    make_slack_inbox(inbox, SLACK_ROWS[:1])
+    code, result = cli("--market", "us", "import-inbox", "--inbox", str(inbox), "--slack-reply")
+    assert code == 0 and calls == [("accepted", "C0MARKET", "1728295200.000100")]
+    assert result["results"][0]["slack_reply"] == {"posted": ["x#1"]}
+
+
+def test_onboard_workflow_imports_company_commands_then_paper_trades():
+    workflow = yaml.safe_load((REAL_CONFIG.parent / ".github" / "workflows" / "onboard.yml").read_text())
+    script = next(step["run"] for step in workflow["jobs"]["import"]["steps"]
+                  if step.get("name") == "Import the inbox and onboard")
+    company = script.index('python scripts/company.py --market "$market" import-inbox --slack-reply')
+    trades = script.index('python scripts/portfolio.py --market "$market" import-inbox')
+    assert company < trades and "status=$?" in script[trades:]
+    env = workflow["jobs"]["import"]["env"]
+    assert {"MOTHERDUCK_INBOX_TOKEN", "SEC_USER_AGENT", "SLACK_BOT_TOKEN"} <= set(env)

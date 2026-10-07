@@ -30,12 +30,16 @@ INBOX_TABLE = "inbox.company_commands"
 INBOX_COLUMNS = "inbox_id, market, tool, arguments, actor, channel, submitted_at, command_id"
 SLACK_COLUMNS = ("slack_channel", "slack_ts")   # optional (B5); read when the table has them
 MOTHERDUCK_SETTING = "motherduck_token"
+ENV_SLACK_TOKEN = "SLACK_BOT_TOKEN"
 
 
 def masked(text: str) -> str:
-    """The text with the inbox token replaced by ***."""
-    secret = os.environ.get(ENV_INBOX_TOKEN, "").strip()
-    return str(text).replace(secret, "***") if secret else str(text)
+    """The text with the inbox and Slack tokens replaced by ***."""
+    out = str(text)
+    for env in (ENV_INBOX_TOKEN, ENV_SLACK_TOKEN):
+        secret = os.environ.get(env, "").strip()
+        out = out.replace(secret, "***") if secret else out
+    return out
 
 
 def open_inbox(path: str | None):
@@ -94,14 +98,13 @@ def request_of(row: dict) -> dict:
     return request
 
 
-def slack_reply(market: str, command_id: str | None, row: dict, reply) -> dict | None:
+def slack_reply(record: dict | None, row: dict, reply) -> dict | None:
     """Reply to the command's Slack message with its command_log record (None when replies are off or the row names
     no message)."""
-    if reply is None or not (command_id and row.get("slack_channel") and row.get("slack_ts")):
+    if reply is None or not (row.get("slack_channel") and row.get("slack_ts")):
         return None
-    record = next((stored for stored in stored_rows(market, KIND_COMMAND_LOG) if stored["id"] == command_id), None)
     if record is None:
-        return {"error": f"command_log row {command_id} not found"}
+        return {"error": "the command wrote no command_log row"}
     try:
         return reply(record, row["slack_channel"], row["slack_ts"])
     except Exception as exc:  # Slack is a notice, never part of the record: report and go on
@@ -135,5 +138,5 @@ def import_inbox(market: str, path: str | None, sources, skip_backfill: bool = F
                         "duplicate": bool(result.get("duplicate")), "refusal_code": result.get("refusal_code"),
                         "errors": result.get("errors"), "event_id": (result.get("event") or {}).get("id"),
                         "command_id": result.get("command_id"),
-                        "slack_reply": slack_reply(market, result.get("command_id"), row, reply)})
+                        "slack_reply": slack_reply(result.get("command_record"), row, reply)})
     return {"ok": True, "market": market, "imported": len(results), "results": results}

@@ -21,13 +21,13 @@ from marketbrief.constants.config_keys import (
     ROLE_VOL_INDEX,
 )
 from marketbrief.constants.files import DIR_CONFIG_MARKETS, FILE_RANGES_CONFIG, YAML_SUFFIX
+from marketbrief.constants.horizons import KEY_HORIZONS
 from marketbrief.constants.messages import (
-    MSG_SECTORS_ONLY_FOR_SECTOR_ETF,
     MSG_SECTOR_MAPPED_TWICE,
     MSG_SECTOR_UNKNOWN,
+    MSG_SECTORS_ONLY_FOR_SECTOR_ETF,
     MSG_UNKNOWN_MARKET,
 )
-from marketbrief.constants.horizons import KEY_HORIZONS
 from marketbrief.core import paths
 from marketbrief.core.horizons import horizons
 from marketbrief.lifecycle.loader import apply_watchlist

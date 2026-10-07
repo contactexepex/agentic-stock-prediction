@@ -6,13 +6,13 @@ the 1-day move)."""
 from __future__ import annotations
 
 import pandas as pd
+from view_data import REGIME_PLAIN
 
 from marketbrief.constants.dashboard import CUE_ROLES
 from marketbrief.core.market_config import benchmark_key, vol_index_key
+from marketbrief.lifecycle.loader import active_sectors, active_tickers
 from marketbrief.presentation.dashboard.stock import as_list, bar_rows, iso_time, last_session
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.lifecycle.loader import active_sectors, active_tickers
-from view_data import REGIME_PLAIN
 
 SPARK_BARS = 30
 
