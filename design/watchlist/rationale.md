@@ -17,7 +17,7 @@ look (the table, sortable and filterable).
    regime and today's major events, benchmark close and move (live quote at the run where stored), vol index,
    FII/DII flows (India) or live calls scored (US), calls today (YES count, abstentions, blocked), model skill
    (the weekly review's verdict).
-3. **Signals banner**: "No proven strong signals today" with the Paper candidates at or above the 60% call line
+3. **Signals banner**: "No proven strong signals today" with the Paper candidates at or above the cockpit's 60% Paper-candidate line (a reading aid, not a pipeline rule)
    (none on 6 Oct), or the YES calls in green when live calls exist.
 4. **Toolbar**: filter box, sector chips (with the sector index's day move where stored), sort select; column
    headers sort too.

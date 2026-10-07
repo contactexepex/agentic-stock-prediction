@@ -6,9 +6,10 @@ screenshots `shot-help-*.png`, `notes.md`. Same shell and design system as the o
 ## What it is for
 The owner's test for every screen was "how will someone who is not a financial wizard understand this". Help is
 the page that test points to: it explains the cockpit once, in plain words, so the other pages can stay terse.
-Every number on it (the call line, the adjustment cap, the four tests' thresholds, the costs, the session hours,
-the regime levels, the feed counts) is read from the repo's configuration or stored data by `build.py`, so the
-page cannot drift from the rules the pipeline enforces.
+The configured numbers on it (the four tests' thresholds, the costs, the session hours, the regime levels, the
+feed counts, the news weights) are read from the repo's configuration or stored data by `build.py`; the few
+rules restated from code (listed under "Real, derived") are named constants in `build.py` with their source.
+The 60% line is described as what it is: the cockpit's Paper-candidate line, not a pipeline rule.
 
 ## Layout
 1. **Guide**: what this is, in four sentences, ending with "every signal is paper until the four tests pass".

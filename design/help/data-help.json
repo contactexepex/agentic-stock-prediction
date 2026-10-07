@@ -1,5 +1,5 @@
 {
- "built_at": "2026-10-07T16:47+00:00",
+ "built_at": "2026-10-07T17:16+00:00",
  "rules": {
   "call_threshold": 0.6,
   "strong_confidence": 0.75,
@@ -646,7 +646,7 @@
    "href": "../watchlist/watchlist-india.html",
    "icon": "format_list_bulleted",
    "question": "Which of the 20 companies is closest to a call?",
-   "what": "One row per company, grouped by sector: price and move, the model's chance of a rise for 1 and 5 days, the published ranges, news count and verification status, results date, and the call line at 60%. Sort by any column."
+   "what": "One row per company, grouped by sector: price and move, the model's chance of a rise for 1 and 5 days, the published ranges, news count and verification status, results date, and the 60% Paper-candidate line. Sort by any column."
   },
   {
    "id": "decision",

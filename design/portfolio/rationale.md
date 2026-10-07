@@ -14,7 +14,7 @@ cockpit's plan to the letter, 10,000 per trade, after real costs. Nothing trades
   back-test JSON; a check table on the page proves it.
 
 ## Layout
-1. **Guide**: what the page is, the rule (YES = at least 60% sure; buy next open; sell close of D+4; costs),
+1. **Guide**: what the page is, the rule (follow the model from the 60% Paper-candidate line; buy next open; sell close of D+4; costs),
    live vs rehearsal, green profit / red loss.
 2. **Live book**: a sentence, four tiles (open, closed, profit or loss after costs, trades that made money),
    the trade table when trades exist.

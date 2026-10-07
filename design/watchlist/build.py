@@ -30,7 +30,7 @@ from marketbrief.pipeline.market_status import status as market_session  # noqa:
 from system import inline_system  # noqa: E402
 
 STATUS_ORDER = ["confirmed_primary", "corroborated", "single_source", "unverified", "rumour", "promotional", "contradicted"]
-CALL_THRESHOLD = 0.60   # config/model.yaml backtest thresholds start here: the "paper candidate" line
+CALL_THRESHOLD = 0.60   # the cockpit's Paper-candidate line (one of config/model.yaml's backtest thresholds 0.55/0.60/0.65); a reading aid, not a pipeline rule
 
 
 def build(market: str) -> dict:

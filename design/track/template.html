@@ -104,7 +104,7 @@ table.t tr.model td{background:var(--md-sys-color-surface-container-low)}
 </section>
 
 <div class="guide">
-  <b>What this page proves.</b> Before every session the system makes two kinds of promise for each company: a <b>price range</b> ("tomorrow the price stays between X and Y, 8 days out of 10") and, when it is at least 60% sure, a <b>direction call</b> ("70% sure it rises" = 7 times out of 10). Trust is earned by keeping those promises on <b>real</b> days, many times over, and by beating a coin and the costs. Four tests below say where it stands, what each means, what it takes to pass, and when that could happen. Until all four are green, every signal is <span class="mb-tag paper">paper</span>: look, don't act.
+  <b>What this page proves.</b> Before every session the system makes two kinds of promise for each company: a <b>price range</b> ("tomorrow the price stays between X and Y, 8 days out of 10") and, when the forecaster finds enough evidence, a <b>direction call</b> ("70% sure it rises" = 7 times out of 10). Trust is earned by keeping those promises on <b>real</b> days, many times over, and by beating a coin and the costs. Four tests below say where it stands, what each means, what it takes to pass, and when that could happen. Until all four are green, every signal is <span class="mb-tag paper">paper</span>: look, don't act.
 </div>
 
 <section class="card verdict" id="verdict-card">
@@ -271,16 +271,16 @@ function tests() {
      when: rangesEnough ? 'now' : `about ${fmtD(E.ranges_by)}: ${E.ranges_per_day} ranges a day, checked the next day`},
     {n: 2, name: 'Direction calls come true as often as promised', status: bandsOk ? 'green' : bandsScored.length ? 'red' : 'amber',
      means: 'When it says "70% sure", about 70 calls out of 100 come true. Then "70%" is a number you can rely on.',
-     today: `${L.calls_total} real calls checked · ${E.calls_made} made · it has not been sure enough (60%) to call yet`,
+     today: `${L.calls_total} real calls checked · ${E.calls_made} made · the forecaster has abstained on every company so far`,
      passes: `${callsNeeded} checked calls at a confidence level, and they came true at least that often (minus ${Math.round(R.calibration_tolerance*100)})`,
-     when: L.calls_total >= callsNeeded ? 'now' : E.calls_made ? 'as soon as the calls settle' : 'no date: it only starts counting once the model is at least 60% sure of a rise'},
+     when: L.calls_total >= callsNeeded ? 'now' : E.calls_made ? 'as soon as the calls settle' : 'no date: it only starts counting once the forecaster makes live calls'},
     {n: 3, name: 'It beats a coin', status: skillOk ? 'green' : 'red',
      means: 'Its "likely to rise" picks rise more often than a coin flip would get them, across thousands of rehearsal days.',
      today: g5 ? `rehearsal on ${g5.n} days: ranking score ${g5.auc.toFixed(2)} (0.50 = coin) · when at least 60% sure, the stock rose ${t60 ? of100(mod5.thresholds['0.60'].long.hit_rate) : '—'}; always betting on a rise: ${of100(mod5.up_share)}` : 'no rehearsal',
      passes: 'the weekly check-up finds a ranking score clearly above 0.50 and probabilities better than the average',
      when: skillOk ? 'now' : 'checked every week; passes only if the model improves (it is refit monthly as more days come in)'},
     {n: 4, name: 'Following it makes money after costs', status: moneyOk ? 'green' : 'red',
-     means: `On paper, buying when it is at least 60% sure and selling four days later leaves a profit after trading costs, not just on a lucky day.`,
+     means: `On paper, buying when the model is at least 60% sure (the cockpit's Paper-candidate line) and selling four days later leaves a profit after trading costs, not just on a lucky day.`,
      today: t60 ? `rehearsal: about ${t60.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(STAKE*t60.mean_pct/100))} per ${money(STAKE)} trade (${t60.positions} trades); buying everything: ${au.mean_pct >= 0 ? '+' : '−'}${money(Math.abs(STAKE*au.mean_pct/100))}` : 'no rehearsal',
      passes: 'the likely range of the average profit per trade sits entirely above zero',
      when: moneyOk ? 'now' : 'checked every week with test 3; needs the model to improve'},
@@ -308,18 +308,18 @@ function render() {
   // then + glossary
   const th = $('#then'); th.innerHTML = '';
   th.append(
-    el('p', {}, el('b', {}, 'The Paper label comes off.'), ` A call shown as YES on a company page (the model at least 60% sure, the forecaster agreeing) becomes a signal that has kept its promises on real days.`),
-    el('p', {}, el('b', {}, 'What you would do then.'), ` Only what the company page's plan says: buy at the open if the price is at or below the range centre, sell at the close of the planned day, exit early below the 80% range floor, with the amount the plan shows (it is written for ${money(STAKE)}). Below 60% the system itself says "no call", so there is nothing to act on.`),
+    el('p', {}, el('b', {}, 'The Paper label comes off.'), ` A call shown as YES on a company page (a live call the forecaster made) becomes a signal that has kept its promises on real days.`),
+    el('p', {}, el('b', {}, 'What you would do then.'), ` Only what the company page's plan says: buy at the open if the price is at or below the range centre, sell at the close of the planned day, exit early below the 80% range floor, with the amount the plan shows (it is written for ${money(STAKE)}). When there is no call, the page says NO and there is nothing to act on.`),
     el('p', {}, el('b', {}, 'What it never does.'), ' It never tells you when to invest or how much. It tells you whether the system has earned the right to be followed. The decision stays yours, and this remains a research project.'),
     el('p', {class:'muted', style:'font-size:12px'}, `If a test turns red later (promises stop holding), the Paper label comes back until it passes again.`));
   const gl = $('#gloss'); gl.innerHTML = '';
-  for (const [k, v] of [['"70% sure"', 'the direction call will come true about 7 times out of 10. Test 2 checks that this is honest.'], ['80% range', 'the price stays inside it 8 days out of 10; so about 2 days out of 10 it will be outside, and that is normal.'], ['50% range', 'the narrower band the price stays in half the days.'], ['60% (the call line)', 'below this the model stays silent; a YES on a company page needs at least this.'], ['a coin', 'right about half the time: the bar every call must beat. On these companies a rise happens about 47 days out of 100, so "always rise" is the coin here.'], ['rehearsal (back-test)', 'the system replayed on past prices it had not seen, day by day. It shows what it would have done; it is not real money and not real days.'], ['after costs', 'brokerage, taxes and fees taken off (config/costs.yaml); about ' + money(STAKE * (m.model['5d open_to_close'].paper ? m.model['5d open_to_close'].paper.mean_cost_pct : 0) / 100, 2) + ' per ' + money(STAKE) + ' trade.']]) gl.append(el('dt', {}, k), el('dd', {}, v));
+  for (const [k, v] of [['"70% sure"', 'the direction call will come true about 7 times out of 10. Test 2 checks that this is honest.'], ['80% range', 'the price stays inside it 8 days out of 10; so about 2 days out of 10 it will be outside, and that is normal.'], ['50% range', 'the narrower band the price stays in half the days.'], ['60% (the Paper-candidate line)', 'the cockpit\'s reading aid: a company at or above it is a Paper candidate, and the rehearsal follows the model from this line. Not a pipeline rule; a YES on a company page is a live call the forecaster made.'], ['a coin', 'right about half the time: the bar every call must beat. On these companies a rise happens about 47 days out of 100, so "always rise" is the coin here.'], ['rehearsal (back-test)', 'the system replayed on past prices it had not seen, day by day. It shows what it would have done; it is not real money and not real days.'], ['after costs', 'brokerage, taxes and fees taken off (config/costs.yaml); about ' + money(STAKE * (m.model['5d open_to_close'].paper ? m.model['5d open_to_close'].paper.mean_cost_pct : 0) / 100, 2) + ' per ' + money(STAKE) + ' trade.']]) gl.append(el('dt', {}, k), el('dd', {}, v));
   // test 1 details
   $('#t1-ans').textContent = `${L.ranges_scored} real ranges have been checked so far; ${L.open_ranges} are waiting for their day${L.open_ranges ? ` (${fmtD(L.open_first_target)} to ${fmtD(L.open_last_target)})` : ''}. With ${E.ranges_per_day} new ranges before every session, the ${E.ranges_needed} needed should be checked by about ${fmtD(E.ranges_by)}. Until then, the rehearsal below is the only evidence.`;
   const k1 = $('#t1-kpis'); k1.innerHTML = '';
   for (const k of [{v: String(L.ranges_scored), l: `real ranges checked · need ${E.ranges_needed}`}, {v: String(L.open_ranges), l: 'published, waiting for their day'}]) k1.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
   // test 2 details
-  $('#t2-ans').textContent = L.calls_total ? `${L.calls_total} real calls have been checked.` : `No direction call has been made yet: the model has not been at least 60% sure of a rise on any company, and the forecaster abstained. That is allowed and often right. The table below fills in once calls are made and their day passes; each row says whether "x% sure" came true x times out of 100.`;
+  $('#t2-ans').textContent = L.calls_total ? `${L.calls_total} real calls have been checked.` : `No direction call has been made yet: the forecaster abstained on every company. That is allowed and often right. The table below fills in once calls are made and their day passes; each row says whether "x% sure" came true x times out of 100.`;
   const k2 = $('#t2-kpis'); k2.innerHTML = '';
   for (const k of [{v: String(L.calls_total), l: `real calls checked · need ${R.min_n_calls} per level`}, {v: String(L.predictions), l: `calls made · ${L.open_predictions} waiting`}]) k2.append(el('div', {class:'kpi'}, el('div', {class:'v'}, k.v), el('div', {class:'l'}, k.l)));
   const bands = $('#bands'); bands.innerHTML = '';

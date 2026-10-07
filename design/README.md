@@ -15,7 +15,7 @@ cloud session, then one consolidation session turns them into the production gen
   the template; the builder computes everything at build time. The consolidation session will move the
   builders into the daily run, and later behind a database-backed app, so keep data assembly and
   presentation separate (builder -> JSON -> template).
-- **Design system.** Use the shared Material 3 light design system in `design/system/` (tokens,
+- **Design system.** Use the shared "terminal light" design system in `design/system/` (tokens,
   typography, components, icons). Do not invent page-local colours. Self-contained output: no CDNs,
   no external fonts or requests (vendor anything needed, with its licence).
 - **Owner's direction** (from conversation): personal cockpit for the 40 watchlist companies (20 India,
