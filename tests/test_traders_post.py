@@ -156,11 +156,31 @@ def test_track_record_bands_from_settled_ai_trades():
     assert track_record.refusal(0.55, {"0.50-0.60": {"n": 20, "hits": 10, "hit_rate": 0.5, "low": 0.5}}) is None
 
 
-@pytest.mark.usefixtures("root")
-def test_per_horizon_inputs_read_b10s_records(monkeypatch):
-    """B10 built contracts/horizons.py: per_horizon returns its N+k ranges and scores by id (no legacy row); a
-    contract that is not built yet still raises InputsUnavailableError."""
+def horizon_rows(as_of: str, ticker: str, h: int, at: str, labelled: bool) -> tuple[dict, dict]:
+    """A model_scores row and a ranges row of one id (labelled: written by B10's code; else an old-window row)."""
+    label = {"horizon_label": "n_plus_k"} if labelled else {}
+    rid = f"{as_of}-{ticker}-{h}d"
+    score = {"id": rid, "as_of_date": as_of, "ticker": ticker, "horizon_days": h, "label_convention": "open_to_close",
+             "prob_up": 0.55, "prob_model": 0.55, "calibrated": False, "base_rate": 0.5, "news_score": 0.0,
+             "news_logit": 0.0, "contributions": {"up": [], "down": []}, "model_version": "logit-v1", "model_id": "m",
+             "trained_until": "2026-10-01", "computed_at": at, **label}
+    rng = {"id": rid, "made_at": at, "as_of_date": as_of, "session_date": "2026-10-06", "target_date": "2026-10-07",
+           "ticker": ticker, "horizon_days": h, "base_close": 100.0, "center": 0.0, "sigma_h": 0.02, "lo50": 99.0,
+           "hi50": 101.0, "lo80": 97.0, "hi80": 103.0, "regime": "CALM", "notes": [], "inputs": [], **label}
+    return score, rng
+
+
+def test_per_horizon_inputs_read_b10s_records(root, monkeypatch):
+    """B10 built contracts/horizons.py: per_horizon returns its N+k ranges and scores by id, never an old-window
+    (legacy) row; a contract that is not built yet still raises InputsUnavailableError."""
+    at = "2026-10-06T11:00:00+00:00"                                   # before NOW (12:30)
+    new = [horizon_rows("2026-10-05", "AAPL", h, at, True) for h in (1, 3)]
+    old = [horizon_rows("2026-10-05", "MSFT", 5, at, False)]          # a D+4 score and an old range
+    put(root, "us", "model_scores", "2026-10-06", [score for score, _ in new + old])
+    put(root, "us", "ranges", "2026-10-06", [rng for _, rng in new + old])
     ranges, scores = per_horizon("us", NOW)
+    want = {"2026-10-05-AAPL-1d", "2026-10-05-AAPL-3d"}
+    assert set(ranges) == set(scores) == want                         # the legacy MSFT 5d rows are left out
     assert all(row["id"] == key and row["horizon_label"] == "n_plus_k" for key, row in {**ranges, **scores}.items())
     from marketbrief.contracts import horizons
 
