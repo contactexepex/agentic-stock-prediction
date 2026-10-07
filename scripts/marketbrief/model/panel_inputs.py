@@ -54,3 +54,17 @@ def read_inputs(con, market: str) -> dict:
         out["shorts"] = safe_frame(con, SHORTS_SQL)
         out["insiders"] = safe_frame(con, INSIDER_SQL, ("transaction_date", "seen"))
     return out
+
+
+def inputs_until(inputs: dict, end) -> dict:
+    """The inputs as known at the end of the day `end` (the weekly review's week end, issue #45.2): bars dated on or
+    before it; rows with a `seen` time by their first-seen day (an event date after `end` known by then stays), the
+    others by their date. Labels needing a later bar are then missing, as on that day."""
+    cut = pd.Timestamp(end)
+    out = {"bars": {key: frame.loc[frame.index <= cut] for key, frame in inputs["bars"].items()}}
+    for name, frame in inputs.items():
+        if name == "bars":
+            continue
+        column = "seen" if "seen" in frame.columns else "date" if "date" in frame.columns else None
+        out[name] = frame if column is None else frame[frame[column] <= cut].reset_index(drop=True)
+    return out

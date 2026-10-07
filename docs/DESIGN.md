@@ -787,7 +787,10 @@ summarised apart (outcomes carry `horizon_label`). Older calls stay close-to-clo
 (as-of close to the close 1 or 5 sessions later); stored outcomes are never rescored. Each new
 outcome row carries `label_basis` (with `entry_date` and `entry_open` for open_to_close); rows
 stored before the field read as close_to_close (`track_record` view). A call whose entry bar has
-no open is not scored (summary `no_entry_open`). Hit rates, bands, proper scores and reliability
+no open is not scored (summary `no_entry_open`). An open-to-close call is scored only when its
+entry bar is the calendar's first session after the as-of date and its exit bar the exit session
+(as `model/labels.py`); when a session of the window has no bar the call stays open, never scored
+on the next stored bars (summary `session_gap_open`, issue #45.3). Hit rates, bands, proper scores and reliability
 are shown per basis and never pooled: `score_predictions.py`'s summary, the context pack, the
 weekly review (keys and rows labelled `· close→close` / `· open→close`, `call_basis_all`), the
 Slack line, the report and the HTML track record. Ranges are unchanged (still scored on the
@@ -1049,7 +1052,11 @@ always show the same numbers.
    strategy's mean return after costs minus each baseline, then one plain verdict: the model shows
    skill only when some horizon has n >= `min_n`, Brier skill > `min_brier_skill` and the AUC
    interval's low end > `min_auc_low` (`model_skill:` in `config/review.yaml`: 500, 0.0, 0.5). A
-   failed backtest is noted and never stops the review; the record stores `model_skill`.
+   failed backtest is noted and never stops the review; the record stores `model_skill`. The
+   backtest reads only the inputs stored by the reviewed week's end (bars, flows and shorts dated
+   by then, events and insider trades first seen by then; `panel_inputs.inputs_until`, issue
+   #45.2), and runs with its native thread pools capped at one thread when threadpoolctl is
+   installed (issue #45.1).
 5. Relationships (knowledge graph, public data only): insider trades (US Form 4, India SEBI
    disclosures), big-investor stakes (US 13D/13G, India bulk and block deals), holdings (US
    13F, India shareholding incl. promoter pledges), and a per-company connection map (board,

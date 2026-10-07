@@ -630,6 +630,23 @@ def test_model_check_says_plainly_whether_the_model_shows_skill():
         model_skill.markdown_lines({"skipped": "skipped (--no-model-backtest)"}))
 
 
+def test_inputs_until_keeps_what_was_known_by_the_end():
+    """The review's backtest inputs as of its week end (issue #45.2): bars and dated rows up to the end; a row with a
+    first-seen time by that time, so an upcoming event date known by then stays."""
+    from marketbrief.model.panel_inputs import inputs_until
+    days = pd.to_datetime(["2026-09-03", "2026-09-04", "2026-09-07"])
+    inputs = {"bars": {"AAPL": pd.DataFrame({"close": [1.0, 2.0, 3.0]}, index=days)},
+              "events": pd.DataFrame({"ticker": ["AAPL", "AAPL"], "type": ["earnings"] * 2,
+                                      "date": pd.to_datetime(["2026-10-20", "2026-10-21"]),
+                                      "seen": pd.to_datetime(["2026-09-01", "2026-09-05"])}),
+              "shorts": pd.DataFrame({"ticker": ["AAPL"] * 2, "date": days[1:], "short_pct": [0.1, 0.2]}),
+              "other": pd.DataFrame({"x": [1]})}
+    got = inputs_until(inputs, date(2026, 9, 4))
+    assert list(got["bars"]["AAPL"]["close"]) == [1.0, 2.0]
+    assert list(got["events"]["date"].dt.strftime("%Y-%m-%d")) == ["2026-10-20"]       # known by 09-04
+    assert list(got["shorts"]["short_pct"]) == [0.1] and got["other"].equals(inputs["other"])
+
+
 def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
     """The review reruns the walk-forward backtest for its market, writes its JSON under work/ (never data/ or
     reports/) and summarises it; a failing backtest is reported, never fatal."""
@@ -646,6 +663,12 @@ def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
     assert {row["key"] for row in out["scores"]} == {f"{h}d {c}" for h in H for c in ("close_to_close",
                                                                                         "open_to_close")}
     assert out["verdict"].startswith(("Yes:", "No:")) and not (tmp_path / "data" / "us" / "reviews").exists()
-    monkeypatch.setattr(model_skill, "run_backtest", lambda _markets: 1 / 0)
+    full_end = out["data"]["last_panel_date"]
+    # issue #45.2: cut at the reviewed week's end, only the inputs stored by then (no bar or label after it)
+    week_end = date.fromisoformat(full_end) - timedelta(days=60)
+    cut = cli.model_check("us", {**review.DEFAULTS}, True, week_end)
+    assert cut["data"]["last_panel_date"] <= str(week_end) < full_end
+    assert cut["json"] == f"work/model_backtest/model-backtest-us-{cut['data']['last_panel_date']}.json"
+    monkeypatch.setattr(model_skill, "run_backtest", lambda *_: 1 / 0)
     assert cli.model_check("us", {**review.DEFAULTS}, True) == {"error": "the backtest failed: division by zero"}
     assert cli.model_check("us", {**review.DEFAULTS}, False) == {"skipped": "skipped (--no-model-backtest)"}

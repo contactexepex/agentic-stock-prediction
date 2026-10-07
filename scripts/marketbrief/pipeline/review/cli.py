@@ -72,12 +72,13 @@ from marketbrief.pipeline.review.verdicts import (
 )
 
 
-def model_check(market: str, review_config: dict, enabled: bool) -> dict:
-    """The signal-model check (model_skill.py), or why it was not run; a failure never stops the review."""
+def model_check(market: str, review_config: dict, enabled: bool, end: date | None = None) -> dict:
+    """The signal-model check (model_skill.py) on the inputs stored by the week's end, or why it was not run; a
+    failure never stops the review."""
     if not enabled:
         return {"skipped": MSG_MODEL_CHECK_SKIPPED}
     try:
-        result, path = model_skill.rerun(market)
+        result, path = model_skill.rerun(market, end)
     except (Exception, SystemExit) as exc:  # e.g. no config/model.yaml or too little history for any fit
         return {"error": MSG_MODEL_CHECK_FAILED.format(error=str(exc)[:200])}
     return model_skill.headline(result, market, path, review_config)
@@ -151,7 +152,7 @@ def build(
     proposal = aci_proposal(ranges_config, review_data["aci"]["replay"])
     if proposal:
         review_data["proposals"].append(proposal)
-    review_data["model"] = model_check(cfg["market"], review_config, SKIP_MODEL not in skip)
+    review_data["model"] = model_check(cfg["market"], review_config, SKIP_MODEL not in skip, end)
     review_data["advice"] = confidence_advice(review_data["bands"]["all"], review_data["calls"]["all"], review_config)
 
     # the record's call columns are of the current basis (the newest scored call's), named in call_basis_all

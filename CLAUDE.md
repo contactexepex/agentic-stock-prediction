@@ -75,11 +75,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
-  reruns the signal-model backtest and says plainly whether the model shows skill (`model_skill`).
+  reruns the signal-model backtest on the inputs stored by the reviewed week's end and says plainly
+  whether the model shows skill (`model_skill`).
   Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
   open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`); an open-to-close
   call of horizon k sells at the close of D+k (N+k), a 5-day call made before `call_scoring.n_plus_k_from` at D+4
-  (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled.
+  (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled. An open-to-close
+  call whose window has a session without a bar stays open (`session_gap_open`), never shifted.
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
