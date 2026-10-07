@@ -40,6 +40,7 @@ texts:
 
 digest:
   max_bullets: 5
+  quote_min_words: 3
   quote_max_words: 40
   text_max_chars: 300
   topics: [headline_numbers, guidance, one_off, commentary]

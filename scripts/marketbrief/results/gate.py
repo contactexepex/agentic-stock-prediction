@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from marketbrief.analytics.claim_numbers import plain_number_tokens, quoted_numbers
 from marketbrief.analytics.claim_rules import normalise
 from marketbrief.results.constants import (
     ADVICE_WORDS,
@@ -25,22 +24,19 @@ from marketbrief.results.constants import (
     PROMPT_VERSION_PATTERN,
     RELEASE_KINDS,
 )
+from marketbrief.results.gate_numbers import wrong_numbers
 from marketbrief.results.sources import TextSource
-
-PCT = "pct"
-MARKER_UNITS = (PCT, "bps")
-DIGITS = re.compile(r"\d[\d,]*(?:\.(\d+))?")
 
 
 @dataclass
 class ReleaseView:
     """What a record about one release may cite and state: its kind, stored texts by id and its numbers
-    (name -> value; names ending in _pct are percentages) plus the digit tokens of its period labels."""
+    (name -> value; names ending in _pct are percentages) plus the years of its period labels."""
 
     kind: str
     sources: dict[str, TextSource]
     values: dict[str, float] = field(default_factory=dict)
-    label_tokens: set[str] = field(default_factory=set)
+    label_years: set[str] = field(default_factory=set)
 
 
 def number_values(*blocks: dict) -> dict[str, float]:
@@ -51,45 +47,6 @@ def number_values(*blocks: dict) -> dict[str, float]:
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 out[name] = float(value)
     return out
-
-
-def stated_half_step(literal) -> float:
-    """Half the last stated decimal place, scale applied: '25%' -> 0.5, '25.0%' -> 0.05, '$95.7 billion' -> 0.05
-    billion. Trailing zeros of a whole number are not read as rounding ('30%' is 30 +- 0.5, never 25)."""
-    found = DIGITS.search(literal.literal)
-    if not found:
-        return 0.0
-    stated = float(found.group(0).replace(",", "")) or 1.0
-    decimals = len(found.group(1) or "")
-    return 0.5 * 10.0**-decimals * abs(literal.value / stated)
-
-
-def stated_in_quote(literal, quote: str, tolerance: float) -> bool:
-    """The quote states this number: a bare number as a digit token, a % or bps as the same marker, an amount as
-    the same currency or a bare number (a quote need not print the currency), within the text's rounding."""
-    if literal.unit is None:
-        return re.sub(r"[^\d.]", "", literal.literal.replace(",", "")).strip(".") in plain_number_tokens(quote)
-    return any(
-        (stated.unit == literal.unit or (stated.unit is None and literal.unit not in MARKER_UNITS))
-        and abs(stated.value - literal.value) <= tolerance
-        for stated in quoted_numbers(quote)
-    )
-
-
-def number_ok(literal, quote: str, view: ReleaseView) -> bool:
-    """A number of the bullet's text is fine when the quote states it, it is a digit of the period labels, or it
-    equals a release number as rounded in the text (a % only a percentage, an amount only an amount)."""
-    tolerance = stated_half_step(literal) + 1e-9
-    if stated_in_quote(literal, quote, tolerance):
-        return True
-    if literal.unit is None and re.sub(r"[^\d.]", "", literal.literal.replace(",", "")).strip(".") in view.label_tokens:
-        return True
-    wanted_pct = literal.unit == PCT
-    return any(
-        abs(literal.value - value) <= tolerance
-        for name, value in view.values.items()
-        if name.endswith("_pct") == wanted_pct
-    )
 
 
 def bullet_errors(index: int, bullet, view: ReleaseView, conf: dict, release_id: str) -> list[str]:
@@ -111,9 +68,9 @@ def bullet_errors(index: int, bullet, view: ReleaseView, conf: dict, release_id:
     limit = int(conf.get("text_max_chars", 300))
     if len(bullet["text"]) > limit:
         errors.append(f"{where}: text must be at most {limit} characters")
-    words = int(conf.get("quote_max_words", 40))
-    if len(bullet["quote"].split()) > words:
-        errors.append(f"{where}: quote must be at most {words} words")
+    words, least = int(conf.get("quote_max_words", 40)), int(conf.get("quote_min_words", 3))
+    if not least <= len(bullet["quote"].split()) <= words:
+        errors.append(f"{where}: quote must be {least} to {words} words")
     advice = ADVICE_WORDS.search(bullet["text"])
     if advice:
         errors.append(f"{where}: " + MSG_ADVICE.format(word=advice.group(0)))
@@ -122,9 +79,7 @@ def bullet_errors(index: int, bullet, view: ReleaseView, conf: dict, release_id:
         return [*errors, f"{where}: " + MSG_SOURCE.format(source_id=bullet["source_id"], release_id=release_id)]
     if normalise(bullet["quote"]) not in normalise(source.text):
         errors.append(f"{where}: " + MSG_QUOTE.format(source_id=bullet["source_id"]))
-    wrong = [
-        number.literal for number in quoted_numbers(bullet["text"]) if not number_ok(number, bullet["quote"], view)
-    ]
+    wrong = wrong_numbers(bullet["text"], bullet["quote"], view.values, view.label_years)
     if wrong:
         errors.append(f"{where}: " + MSG_NUMBER.format(numbers=wrong))
     return errors

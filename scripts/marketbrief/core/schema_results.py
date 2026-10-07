@@ -13,7 +13,7 @@ RESULTS_SCHEMAS: Schemas = {
     # the release time, or the first 10-Q/10-K of the quarter in the US; a later restatement is never used),
     # consensus (the newest Yahoo point collected before release_at; context only), reaction (close-to-close
     # from the session before the earnings window to the latest close by created_at). bullets (JSON list of
-    # {topic, text, quote, source_id, quote_field}) are the results-analyst's, each quote verbatim in a stored
+    # {topic, text, quote, source_id, source_kind}) are the results-analyst's, each quote verbatim in a stored
     # text. sources: JSON [{id, kind, doc, url, available_at}]. inputs_until = the newest input's availability.
     KIND_RESULTS_DIGESTS: (
         "jsonl",

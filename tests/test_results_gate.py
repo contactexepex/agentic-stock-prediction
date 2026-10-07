@@ -19,13 +19,22 @@ CONF = {
 }
 TEXT = (
     "Net sales were $95.7 billion, up 11% from $86.2 billion a year ago. “We remain cautious” on the "
-    "outlook for fiscal 2027, the CFO said."
+    "outlook for fiscal 2027, the CFO said. Net sales were $95.7 billion in the quarter ended June 30, 2026, the "
+    "company said. Net sales rose to $95.7 billion."
 )
 VIEW = ReleaseView(
     "results",
     {"d1": TextSource("d1", "filing", "ex99.htm", None, "2026-09-24T20:00:00+00:00", TEXT)},
-    {"revenue": 9.5723e10, "revenue_yoy_pct": 11.1, "eps_diluted": 6.75, "surprise_pct": 3.2},
-    {"2026", "4", "30", "08"},
+    {
+        "revenue": 9.5723e10,
+        "revenue_yoy_pct": 11.1,
+        "eps_diluted": 6.75,
+        "surprise_pct": 3.2,
+        "net_profit": 1.5e9,
+        "net_profit_qoq_pct": -15.3,
+        "move_pct": -2.0,
+    },
+    {"2026"},
 )
 
 
@@ -55,7 +64,22 @@ def test_numbers_in_text_come_from_the_quote_or_the_release():
     assert errors(rec(bullet("EPS was 6.8."))) == []  # 6.75 rounded to the stated 1 decimal
     assert errors(rec(bullet("EPS was 6.9.")))  # outside the stated rounding
     assert errors(rec(bullet("Net sales rose 30%.", quote="the outlook for fiscal 2027, the CFO said.")))
-    assert errors(rec(bullet("Results for quarter 4 of 2026."))) == []  # digits of the period labels
+    assert errors(rec(bullet("Results for fiscal 2026."))) == []  # a year of the period labels
+    assert errors(rec(bullet("Results for quarter 4 of 2026.")))  # other label digits are no shortcut
+
+
+def test_scale_dates_and_direction():
+    june = "Net sales were $95.7 billion in the quarter ended June 30, 2026, the company said."
+    assert errors(rec(bullet("Net profit was 150 crore.", quote=june))) == []  # 1.5e9 = the release's net profit
+    assert errors(rec(bullet("Net profit was 30 crore.", quote=june)))  # the 30 of June 30 is a date, not an amount
+    assert errors(rec(bullet("EPS of 9.", quote=june)))  # not 6.75 (to the stated rounding), not in the quote
+    assert errors(rec(bullet("The quarter ended June 30, 2026.", quote=june))) == []  # the date is quoted
+    assert errors(rec(bullet("The quarter ended July 31, 2026.", quote=june)))  # a date the quote lacks
+    assert errors(rec(bullet("Net profit fell 15.3% from the previous quarter."))) == []  # a fall of -15.3
+    assert errors(rec(bullet("Net profit rose 15.3% from the previous quarter.")))  # wrong direction
+    assert errors(rec(bullet("Revenue fell 11.1% year on year.")))  # it rose 11.1
+    assert errors(rec(bullet("Shares moved -2.0% over the window."))) == []  # minus sign = fall
+    assert errors(rec(bullet("Net sales fell to $95.7 billion.", quote="Net sales rose to $95.7 billion.")))
 
 
 def test_quotes_ids_enums_and_limits():

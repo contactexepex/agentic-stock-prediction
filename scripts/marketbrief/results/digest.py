@@ -5,13 +5,11 @@ records and the rows `add` appends to results_digests."""
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 
 import pandas as pd
 import yaml
 
-from marketbrief.analytics.claim_numbers import plain_number_tokens
 from marketbrief.constants.config_keys import CFG_FILINGS, FILINGS_SOURCE_SEC
 from marketbrief.core import paths
 from marketbrief.results.constants import (
@@ -25,6 +23,7 @@ from marketbrief.results.constants import (
 )
 from marketbrief.results.detection import Release, detect
 from marketbrief.results.gate import ReleaseView, number_values
+from marketbrief.results.gate_numbers import YEAR
 from marketbrief.results.numbers import india_numbers, us_numbers
 from marketbrief.results.sources import TextSource, iso, release_sources, state_key
 from marketbrief.results.surprise import consensus, reaction
@@ -65,12 +64,11 @@ class Prepared:
                 self.release.release_date,
             )
         )
-        tokens = plain_number_tokens(re.sub(r"[^0-9.]", " ", labels))
         return ReleaseView(
             self.release.kind,
             {source.id: source for source in self.sources},
             number_values(self.numbers, self.consensus, self.reaction),
-            tokens | {token.lstrip("0") for token in tokens if token.lstrip("0")},
+            set(YEAR.findall(labels)),
         )
 
 
