@@ -1,4 +1,4 @@
-"""The news-only light run (routine/NEWS_PROMPT.md; docs/DESIGN.md section 3, "News timing"): every 6 hours,
+"""The news-only light run (routine/NEWS_PROMPT.md; docs/DESIGN.md section 3, "News timing"): every 4 hours,
 every day including weekends and holidays, collect news so busy outlet feeds and a closed day lose nothing.
 
 Runs, one after the other, each as its own script with this market (MB_MARKET), saving each JSON summary to

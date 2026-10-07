@@ -124,22 +124,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   through DuckDB; Neo4j is a derived copy that `--full` rebuilds from the repo. Idempotent MERGE
   batches, incremental by per-kind watermarks stored in Neo4j, `--dry-run` writes the statements to
   `work/neo4j_dryrun/`. Optional and non-blocking in the routine.
-- App architecture (docs/ARCHITECTURE.md; contract `api/openapi.yaml`, checked by `tests/test_openapi.py`):
-  `data/` stays the source of truth; MotherDuck `market_brief` (env `MOTHERDUCK_TOKEN`) is a derived copy
-  plus per-page read models in schema `rm` (one keyed row per market x page, payload JSON as of the run's
-  cut-off, rebuilt idempotently by hash), synced after each daily and news run, non-blocking. The Next.js
-  app on Vercel reads only `rm` through MotherDuck's Postgres endpoint under `/api/v1`. Static `reports/`
-  and Slack keep working when MotherDuck is down or capped. Workstream notes: `docs/ws/`.
-- Warehouse (WS1, docs/ws/ws1.md; code `marketbrief/warehouse/`, settings `config/warehouse.yaml`):
-  `warehouse_sync.py --market india|us [--full] [--dry-run] [--local] [--kind daily|news]` copies the
-  market's stored data as of the run's clock (MB_NOW-aware) into MotherDuck `market_brief` (without
-  `MOTHERDUCK_TOKEN`, never printed: the local file of the config under `work/`): one schema per market with
-  the cockpit's tables (bars, quotes, features, regime, predictions, track record per label basis, ranges,
-  model scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one
-  transaction, plus the read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`; key
-  `(market, page_key)`, payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds`
-  and `meta.sync_runs`. Kill switch `enabled` and `monthly_hours_ceiling` in the config. Optional,
-  non-blocking, rebuildable with `--full`.
+- App and warehouse (WS1, docs/ws/ws1.md, docs/ARCHITECTURE.md; code `marketbrief/warehouse/`, settings `config/warehouse.yaml`):
+  `data/` stays the source of truth. `warehouse_sync.py --market india|us [--full] [--dry-run] [--local] [--kind daily|news]`
+  copies the market's stored data as of the run's clock (MB_NOW-aware) into MotherDuck `market_brief` (env
+  `MOTHERDUCK_TOKEN`, never printed; without it the local file of the config under `work/`): one schema per market
+  with the cockpit's tables (bars, quotes, features, regime, predictions, track record per label basis, ranges, model
+  scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
+  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`; key `(market, page_key)`,
+  payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
+  `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
+  `reports/` and Slack never depend on it. Planned, not built: the API under `/api/v1` (WS2) and the Next.js app on
+  Vercel (WS3) reading only `rm`; contract in `api/openapi.yaml` (checked by `tests/test_openapi.py`).
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
   context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),

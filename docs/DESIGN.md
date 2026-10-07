@@ -32,7 +32,9 @@ their pushes rarely meet on the same day file:
 | US | `47 0,4,8,16,20 * * *` (00:47, 04:47, 08:47, 16:47, 20:47 UTC) |
 
 Intraday light runs (`routine/INTRADAY_PROMPT.md`, WS5): two checks per session, in exchange time so daylight
-saving never shifts them, away from the news light runs; on holidays the check writes only a `market_closed` row.
+saving never shifts them; on holidays the check writes only a `market_closed` row. The checks sit close to the news light runs but write other data folders, so their pushes rarely
+conflict: the nearest news run is 34 and 94 min after the India checks, and 20 min after and
+110 min after the US checks in EDT (40 min before and 50 min after in EST).
 
 | Intraday run | Cron | UTC |
 |---|---|---|
@@ -1747,7 +1749,6 @@ one can buy at the as-of close. They do mean that pre-open calls scored close-to
 information the open already prices. The long history alone (b) shows no skill either. Decision: every
 `cross_market` group stays switched off in `config/model.yaml`. A confirmation should use only data
 after 2026-10-07 (a held-out period), with the India `asia` and `adr` groups fixed in advance.
-
 
 ## 16. The app around the pipeline (contract 2026-10-07)
 The app (API, frontend, paper portfolio, governed actions) is specified in `docs/ARCHITECTURE.md` and
