@@ -21,15 +21,15 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | India (NSE) | `CRON_TZ=Asia/Kolkata 10 8 * * 1-5` (08:10 IST) | ~08:40 IST, before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
 | US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 15 8 * * 1-5` (08:15 ET) | ~08:45 ET (~14:45 Amsterdam) | SPY, VIX (`^VIX`) |
 
-News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"), every 6 hours, every day
+News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"), every 4 hours, every day
 including weekends and holidays, in UTC and at least about 2.5 hours away from the same market's
 pre-open run (which starts 02:40 UTC for India; 12:15 UTC in US summer time, 13:15 UTC in winter), so
 their pushes rarely meet on the same day file:
 
 | Light run | Cron (UTC) |
 |---|---|
-| India | `17 5,11,17,23 * * *` (05:17, 11:17, 17:17, 23:17 UTC) |
-| US | `47 3,9,15,21 * * *` (03:47, 09:47, 15:47, 21:47 UTC) |
+| India | `17 6,10,14,18,22 * * *` (06:17, 10:17, 14:17, 18:17, 22:17 UTC) |
+| US | `47 0,4,8,16,20 * * *` (00:47, 04:47, 08:47, 16:47, 20:47 UTC) |
 
 Intraday light runs (`routine/INTRADAY_PROMPT.md`, WS5): two checks per session, in exchange time so daylight
 saving never shifts them, away from the news light runs; on holidays the check writes only a `market_closed` row.
@@ -243,7 +243,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   first `news_runs` row exists, the newest stored news `first_seen_at` stands in; with no stored news at
   all (a first run) the defaults apply; with runs stored but none `ok` in the newest 9 daily files, the
   window is the 7-day cap. Examples: India's pre-open runs Friday 02:40 and Monday 02:40 UTC: `when:73h`;
-  Friday to Tuesday after a Monday holiday: `when:97h`; a light run 6 hours after the last: `when:1d`.
+  Friday to Tuesday after a Monday holiday: `when:97h`; a light run 4 hours after the last: `when:1d`.
   The summary shows the `window` used and `ok`. De-duplication reads the newest 9 daily files (the cap
   plus 2 days).
 - Google News checks (live, 2026-10-07, query `"Microsoft" stock`): `when:` accepts hours and days
@@ -258,7 +258,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   from 07:00 UTC to 07:00 UTC), at most 200 such re-asks per run (`sliced_queries`, `slices_skipped`);
   items older than the window are dropped as usual and duplicates are stored once.
 - News-only light runs (`scripts/collect_news_only.py`, saved prompt `routine/NEWS_PROMPT.md`, one per
-  market, every 6 hours, every day including weekends and holidays): `collect_news`, for India
+  market, every 4 hours, every day including weekends and holidays): `collect_news`, for India
   `collect_nse_india.py --only announcements` (one market-wide call), `collect_articles`, `news_clusters`
   and the gate `validate.py --stage news_collect` (files, schemas, duplicate ids and news sources of the
   news kinds `news`, `news_runs`, `news_articles`, `news_clusters`, `announcements` written today, this

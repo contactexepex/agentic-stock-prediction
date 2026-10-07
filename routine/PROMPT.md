@@ -206,7 +206,7 @@ Warnings never block: list them in `data_quality`.
    `work/news_pending.jsonl`: every news item and, for India, every NSE announcement (ids
    `nse-ann-<seq_id>`, the one exception to the 16-character news id) first seen since the last
    enrichment and not enriched yet. That covers the news-only light runs (routine/NEWS_PROMPT.md, every
-   6 hours, weekends and holidays included) and a failed earlier run, not just today's file: the window
+   4 hours, weekends and holidays included) and a failed earlier run, not just today's file: the window
    starts at the earlier of the start of today (UTC) and the newest already-enriched item's
    `first_seen_at`, at most 7 days back (`since` in its summary). Delete `work/enriched.jsonl`, then run
    the news-analyst subagent on `work/news_pending.jsonl`. Keep its brief.

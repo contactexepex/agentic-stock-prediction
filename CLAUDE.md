@@ -252,7 +252,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   checking, the reflector, the deviation explainer, the results-analyst and the researchers, Opus 5.5 for the forecaster, graph-builder and judge;
   table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
-  run (one per market, every 6 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
+  run (one per market, every 4 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
   India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
   session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment

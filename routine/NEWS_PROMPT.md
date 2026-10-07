@@ -2,7 +2,7 @@ Run the news-only light run for MARKET=<india|us> in this repository. Follow CLA
 repo root. Export `MB_MARKET=<market>` so every script uses this market. Research only: never place
 trades. This run collects news and nothing else: no prices, no agents (no news analyst, claim checker,
 researchers or forecaster), no report, no Slack message, no Neo4j sync (the one optional extra is the warehouse
-sync of step 3a). It runs every 6 hours, every
+sync of step 3a). It runs every 4 hours, every
 day including weekends and exchange holidays, so the pre-open run (routine/PROMPT.md) finds every
 headline stored since it last ran (docs/DESIGN.md section 3, "News timing").
 

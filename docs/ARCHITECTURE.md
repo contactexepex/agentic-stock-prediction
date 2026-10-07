@@ -197,7 +197,7 @@ Budget against the Lite cap of 10 compute-hours per month. Assumptions (A) and u
 | News syncs | 360 | 15 s | 1.50 | 1.50 + 6.00 |
 | Read misses | 900 | 1 s | 0.25 | up to 15.0 if each miss wakes the instance |
 | Full rebuilds | 2 | 10 min | 0.33 | 0.33 |
-| **Total** | | | **~2.8** | **~9.3 (reads warmed by the sync) to ~24 (every miss wakes it): at or over the cap** |
+| **Total** | | | **~2.8** | **~9.3 (reads warmed by the sync) to ~24 (every miss wakes it): near the cap** |
 
 So the design holds under per-second billing and fails under a long per-wake cool-down. Guards:
 
