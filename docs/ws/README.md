@@ -106,8 +106,7 @@ Open (round 2):
   misses (about 9.5 h, under the cap), so "at or over the cap" overstates it; say "near the cap".
 
 ### Open questions
-1. News-run cadence: `routine/NEWS_PROMPT.md` says every 6 hours; the wave plan says 4-hourly. The
-   budget (ARCHITECTURE.md 5) assumes 4-hourly as the worst case. Which is it?
+1. News-run cadence: answered by the owner: every 4 hours, 5 runs per market per day (ARCHITECTURE.md 5, DESIGN.md section 2).
 2. MotherDuck billing (per-query minimum, idle cool-down, Postgres endpoint) decides whether news
    syncs may touch MotherDuck at all; to verify in week 1 from the usage page (ARCHITECTURE.md 5).
 3. Dashboard form writes need a MotherDuck token that can write the `inbox` schema in Vercel. If

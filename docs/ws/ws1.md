@@ -198,6 +198,7 @@ What could and could not be observed:
 
 ### Monthly compute estimate
 Counts follow ARCHITECTURE.md section 5: 44 daily syncs, and news syncs every 6 h (240) or every 4 h (360).
+Owner decision (2026-10-07): every 4 h with 5 runs per market per day, so 300 news syncs and 344 syncs a month in all.
 
 | Scenario | Per sync | 6-hourly news (284 syncs) | 4-hourly news (404 syncs) |
 |---|---|---|---|

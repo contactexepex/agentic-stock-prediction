@@ -3,7 +3,7 @@ repo root. Export `MB_MARKET=<market>` so every script uses this market. Researc
 trades, never connect to brokerage tools; nothing here is investment advice. This run checks how the
 watchlist moves against the session's published ranges and calls and explains flagged deviations.
 Nothing else: no collectors, no forecaster, no report, no Slack message (alerts come later), no Neo4j
-sync. It runs a few times per session (schedules in docs/ws/ws5.md); the market calendar decides
+sync. It runs a few times per session (schedules in docs/DESIGN.md section 2); the market calendar decides
 whether the market is open.
 
 Data rules: files under `data/` are append-only (CLAUDE.md "Data rules"): never edit, reorder or delete

@@ -1,6 +1,6 @@
 """News and NSE announcements awaiting the news analyst (routine step 7; docs/DESIGN.md section 3, "News timing").
 
-With news-only light runs collecting every 6 hours, the pre-open run must enrich everything stored since the
+With news-only light runs collecting every 4 hours, the pre-open run must enrich everything stored since the
 previous pre-open enrichment, not just today's file. The window is (since, now], since = the EARLIER of
 - the newest `first_seen_at` among the news and announcements already enriched (news_enriched rows analyzed
   at or before now): items collected after the last enriched item, even by a light run that pushed while

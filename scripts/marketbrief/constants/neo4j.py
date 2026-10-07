@@ -61,6 +61,7 @@ NOT_PROJECTED = {
     "news_claims": "claim statements quoted from articles and filings (verification inputs), DuckDB only",
     "news_verified": "per-run verification status snapshots read as of a time (news_verified_asof), DuckDB only",
     "primary_texts": "plain text of SEC filing documents quoted by claims, DuckDB only",
+    "results_digests": "per-release results digests (WS6), DuckDB only for now",
 }
 
 WATERMARK_STATEMENT = (

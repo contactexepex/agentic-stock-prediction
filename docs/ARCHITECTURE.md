@@ -175,13 +175,14 @@ and for building `rm` from MotherDuck when the local checkout is not at hand; th
 | Trigger | Work | Pages touched |
 |---|---|---|
 | Daily run (routine step after `dashboard`, non-blocking, consolidation wires it) | base incremental for all kinds; rebuild every `rm` page of the market | all 66 per market (+1 `rm.markets`), most change |
-| News run (every 4 hours, after its push; see open question on 4 vs 6 h) | base incremental for news kinds; rebuild `rm.news`, `rm.stock` (news section), `rm.status`, `rm.runs`, `rm.markets` | 43 per market (+1), most unchanged by hash |
+| News run (every 4 hours, after its push) | base incremental for news kinds; rebuild `rm.news`, `rm.stock` (news section), `rm.status`, `rm.runs`, `rm.markets` | 43 per market (+1), most unchanged by hash |
 | `--full` (manual) | drop and refill | all |
 
 Budget against the Lite cap of 10 compute-hours per month. Assumptions (A) and unknowns (U):
 
 - A1: ~22 sessions per market per month, so 44 daily syncs.
-- A2: news runs every 4 hours = 6 per day x 2 markets x 30 days = 360 news syncs.
+- A2: news runs every 4 hours, 5 runs per market per day (live crons: India 06:17, 10:17, 14:17, 18:17, 22:17 UTC;
+  US 00:47, 04:47, 08:47, 16:47, 20:47 UTC) = 5 x 2 markets x 30 days = 300 news syncs.
 - A3: an incremental daily sync runs ~60 s of MotherDuck compute (appends of a few hundred rows plus
   ~67 small upserts: 6 market-level pages + 3 x 20 per-ticker pages + `rm.markets`), a news sync ~15 s. To be measured in week 1.
 - A4: the app is used by one person; ~50 page views per day, of which, with tag-based caching, at most
@@ -191,18 +192,22 @@ Budget against the Lite cap of 10 compute-hours per month. Assumptions (A) and u
 - U2: whether the Postgres endpoint bills differently from the native client. **Verify in week 1.**
 - U3: whether a full rebuild (~all kinds, both markets) fits in a few minutes. **Measure in week 1.**
 
+Arithmetic: news 300 x 15 s = 4500 s = 1.25 h; wakes 300 x 60 s = 5.00 h; daily 44 x 60 s = 0.73 h; reads 900 x 1 s = 0.25 h;
+full rebuilds 2 x 10 min = 0.33 h. Column 1: 0.73 + 1.25 + 0.25 + 0.33 = 2.56 (~2.6). Column 2, warmed: 0.73 + 0.73 + 1.25 + 5.00 + 0.25 + 0.33 = 8.29 (~8.3);
+plus up to 15.0 h of read wakes = 23.29 (~23).
+
 | Item | Count / month | Per item | Hours (U1 = 1 s min, no cool-down) | Hours (U1 = 60 s cool-down per wake) |
 |---|---|---|---|---|
 | Daily syncs | 44 | 60 s | 0.73 | 0.73 + 0.73 |
-| News syncs | 360 | 15 s | 1.50 | 1.50 + 6.00 |
+| News syncs | 300 | 15 s | 1.25 | 1.25 + 5.00 |
 | Read misses | 900 | 1 s | 0.25 | up to 15.0 if each miss wakes the instance |
 | Full rebuilds | 2 | 10 min | 0.33 | 0.33 |
-| **Total** | | | **~2.8** | **~9.3 (reads warmed by the sync) to ~24 (every miss wakes it): at or over the cap** |
+| **Total** | | | **~2.6** | **~8.3 (reads warmed by the sync) to ~23 (every miss wakes it): the low case is near the cap** |
 
 So the design holds under per-second billing and fails under a long per-wake cool-down. Guards:
 
 1. Reads are cached until invalidated (no time-based revalidate below 24 h), so misses happen only
-   after a build changed a key: worst case 67 keys x 404 builds, realistic far fewer (news runs change
+   after a build changed a key: worst case 67 keys x 344 builds, realistic far fewer (news runs change
    few keys; hash-unchanged rows invalidate nothing).
 2. If week 1 shows a long cool-down: (a) news syncs drop to every other news run or batch both
    markets into one connection; (b) the sync also writes each payload to a Vercel-side JSON cache

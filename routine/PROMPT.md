@@ -24,13 +24,15 @@ step:
   verification status as of `made_at`, and the anchor on the signal model's stored score: model_prob,
   |agent_adjustment| <= 0.10 with a reason, direction and confidence from the final probability), the
   debate record's gate `scripts/agent_reasoning.py validate` (step 9a) and the weekly spot-check;
+- results-analyst: `scripts/results_digest.py validate` (step 3e: release and source ids, verbatim quotes, numbers
+  from the quote or the release's deterministic numbers, enums, no forecast or advice);
 - summaries, report and Slack draft: `--stage report` (each number in agent-written text must
   match a number of the same kind, percent or plain, from the companies or symbols its sentence
   names, the market-level data or the news it cites; an invented number that happens to equal
   such a number still passes, which the weekly spot-check is for; no AGENT markers left, every range published or explained)
   and the weekly spot-check (claims are true).
 Agent records stay in `work/` until their gate passes; only then append them to `data/`.
-Delete `work/lessons.jsonl`, `work/claims.jsonl`, `work/enriched.jsonl`, `work/predictions.jsonl`, `work/reasoning.jsonl` and `work/graph.jsonl` before each agent
+Delete `work/lessons.jsonl`, `work/claims.jsonl`, `work/enriched.jsonl`, `work/results_digest.jsonl`, `work/predictions.jsonl`, `work/reasoning.jsonl` and `work/graph.jsonl` before each agent
 runs and right after each append, so a stale file can never be appended twice.
 On a blocking failure, fix it once (send the failure list back to the agent, or fix your own
 narrative) and run the stage again. The daily run allows ONE retry because it is time-boxed. If it
@@ -155,6 +157,9 @@ Warnings never block: list them in `data_quality`.
    d. `python scripts/news_status.py > work/steps/news_status.json` (each event's and fact's
       status: contradicted > confirmed_primary > corroborated > rumour > promotional >
       single_source > unverified; the context pack shows it and the forecast gate enforces it).
+   e. Results digests (non-blocking; docs/DESIGN.md 3c, docs/ws/ws6.md): follow routine/RESULTS_PROMPT.md
+      (results_digest.py prepare, the results-analyst subagent, validate, add). List every failure, skip
+      and dropped line in `data_quality`.
    If a step fails or its summary lists `failed`, `skipped` (e.g. no `SEC_USER_AGENT`) or
    `warnings`, carry on and add one `data_quality` line each; without status rows today the
    events keep yesterday's status and today's news ids are unverified. Article and filing text is
@@ -201,7 +206,7 @@ Warnings never block: list them in `data_quality`.
    `work/news_pending.jsonl`: every news item and, for India, every NSE announcement (ids
    `nse-ann-<seq_id>`, the one exception to the 16-character news id) first seen since the last
    enrichment and not enriched yet. That covers the news-only light runs (routine/NEWS_PROMPT.md, every
-   6 hours, weekends and holidays included) and a failed earlier run, not just today's file: the window
+   4 hours, weekends and holidays included) and a failed earlier run, not just today's file: the window
    starts at the earlier of the start of today (UTC) and the newest already-enriched item's
    `first_seen_at`, at most 7 days back (`since` in its summary). Delete `work/enriched.jsonl`, then run
    the news-analyst subagent on `work/news_pending.jsonl`. Keep its brief.
@@ -306,6 +311,14 @@ Warnings never block: list them in `data_quality`.
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
     and push again. Pushing to main is intended: the next run must see today's data.
+
+12a. Warehouse (optional, never blocks the run): `python scripts/warehouse_sync.py`. It copies the
+    market's stored data as of the run's clock into MotherDuck `market_brief` (schema `<market>`) and
+    rebuilds the app's read models (`rm.*`, upserted by hash: unchanged pages are left alone), recording
+    the run in `meta.sync_runs` and `rm.builds`. It reads `data/` only and writes nothing to the repo
+    (summary in `work/warehouse/<market>-sync.json`). Needs `MOTHERDUCK_TOKEN`; without it, or on any
+    failure or a kill-switch skip (`config/warehouse.yaml`), note it on the Slack draft's failures line
+    and go on. Never retry and never run `--full` in the routine. Static reports and Slack never depend on it.
 
 13. Notify: run `python scripts/notify_slack.py`. With `SLACK_BOT_TOKEN` set it posts a thread
     to #market-brief (channel id in `config/settings.yaml`): the filled `work/slack_<market>.md`

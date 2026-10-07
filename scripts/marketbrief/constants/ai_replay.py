@@ -58,6 +58,7 @@ PUBLIC_AT: dict[str, list[str]] = {
     "primary_texts": ["fetched_at"],
     "news_claims": ["extracted_at"],
     "news_verified": ["as_of"],  # phase B
+    "results_digests": ["created_at"],  # WS6: a digest once stored (every input <= inputs_until <= created_at)
 }
 
 FIRST_SEEN_ONLY = ("macro", "shorts", "short_interest", "fpi", "indices", "flows", "delivery")
