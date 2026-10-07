@@ -14,6 +14,7 @@ from marketbrief.model.labels import label_columns
 from marketbrief.model.logistic import select_features
 from marketbrief.model.metrics import auc, brier, r
 from marketbrief.model.panel import feature_columns
+from marketbrief.model.settings import cross_groups
 from marketbrief.model.walk_forward import refit_dates, resolved
 
 GBM_PARAMS = {"max_depth": 3, "max_iter": 100, "learning_rate": 0.05, "random_state": 0}
@@ -27,7 +28,7 @@ def gbm_walk_forward(panel: pd.DataFrame, spec: tuple[str, str, int], settings: 
         return {"skipped": MSG_GBM_SKIPPED}
     market, convention, horizon = spec
     ret_col, _ = label_columns(convention, horizon)
-    candidates = feature_columns(market, horizon)
+    candidates = feature_columns(market, horizon, cross_groups(settings, market))
     starts = refit_dates(panel["date"])
     probs, ups, bases = [], [], []
     for i, cutoff in enumerate(starts):

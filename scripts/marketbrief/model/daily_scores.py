@@ -25,7 +25,7 @@ from marketbrief.model.logistic import LogisticModel
 from marketbrief.model.news_score import news_terms
 from marketbrief.model.panel import build_panel
 from marketbrief.model.panel_inputs import read_inputs
-from marketbrief.model.settings import load_model_config
+from marketbrief.model.settings import cross_groups, load_model_config
 from marketbrief.model.walk_forward import MonthlyFit, refit_dates, walk_forward
 
 PROB_DECIMALS = 4
@@ -100,7 +100,7 @@ def run(cfg: dict) -> dict:
     market, settings = cfg[CFG_MARKET], load_model_config()
     con = connect(market)
     inputs = read_inputs(con, market)
-    panel = build_panel(cfg, inputs, settings["warmup_bars"])
+    panel = build_panel(cfg, inputs, settings["warmup_bars"], cross_groups(settings, market))
     as_of = inputs["bars"][benchmark_key(cfg)].index[-1]
     tickers = list(cfg[CFG_TICKERS])
     news = news_terms(con, tickers, pd.Timestamp(clock()), settings["news"])

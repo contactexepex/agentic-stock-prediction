@@ -1561,3 +1561,162 @@ force on 2026-10-07 (`config/costs.yaml`, each marked "verify" with its source) 
 dates. Event and flow features have too little history to enter any fit; news has none (fixed
 prior). The overnight cue is the cue's last daily return, not the live pre-open quote. Splits are
 applied on read by the `ohlc` view; returns are ratios, so the re-basing does not leak.
+
+### 15.1 Cross-market inputs and the long-history test (built 2026-10-07)
+
+Why: markets are linked (US -> Asia -> India relay, US rates and the dollar -> FPI flows, oil, ADRs).
+The owner asked for every relevant cross-market input and for evidence, on a long history, whether it
+improves the signal model. Everything below is switchable; the result decides the default.
+
+**Symbols (market configs; collected by `collect_prices.py` like every symbol).** India adds KOSPI
+(`^KS11`), Taiwan (`^TWII`), Shanghai Composite (`000001.SS`), Euro Stoxx 50 (`^STOXX50E`), US VIX
+(`^VIX`, key USVIX), USD/JPY (`JPY=X`) and the ADRs of the four watchlist tickers that have one, as
+role `adr` with `adr_of` (ADR_HDB -> HDFCBANK, ADR_IBN -> ICICIBANK, ADR_INFY -> INFY, ADR_RDY ->
+DRREDDY; the other watchlist tickers have no `adr`, and Wipro is not on the watchlist). A role-`adr`
+symbol is stored as bars only: it is no quote role, so the context pack and the report do not list it
+twice (the ADR quote stays the ticker's `adr` snapshot). The US adds Nikkei 225, Hang Seng, KOSPI, Euro
+Stoxx 50, DAX (`^GDAXI`), FTSE 100 (`^FTSE`), USD/JPY and USD/CNY (`CNY=X`). Every one returned daily
+bars from Yahoo in a live check on 2026-10-07 (first bars in the market configs). Each cross symbol
+has a `close_time` ("HH:MM IANA-zone": its regular close incl. the closing auction, set at or after the
+real one; FX "23:59 Europe/London", the end of Yahoo's London-day bar; futures and the dollar index
+17:00 New York). Nikkei's close moved from 15:00 to 15:30 on 2024-11-05 and Hang Seng's closing auction
+ends at 16:10: the later times are used for all dates, which can only keep a bar out, never let one in
+early.
+
+**GIFT Nifty: not available as a free, reliable source.** Yahoo has no symbol for it (yfinance search
+for "GIFT Nifty", "SGX Nifty", "Nifty 50 futures" and "NSE IX Nifty" returned nothing, 2026-10-07).
+NSE IX (www.nseix.com, HTTPS, no bot challenge seen) lists one public daily settlement-price CSV
+(`api/daily-settlement-prices` -> `G_T_DSP_INDEX_<DDMMYYYY>.csv`, listed as "06-OCT-26 16:10"): a
+settlement price per contract and trade date, posted in the Indian afternoon, so it holds nothing from
+the evening and night trading that follows the US session. Its historical-data endpoint
+(`api/historical-derivative`) returned an empty `data` list for every window asked (2023-06,
+2023-07-03..14, 2026-09-22..10-06). The site's own script attaches a short-lived JWT from
+`api/generate-token` to every API call; that is the site's access mechanism, so it was not used. GIFT
+Nifty has also traded only since July 2023 (SGX Nifty before it, not free), too short for a 15-year
+test.
+
+**Features and the look-ahead rule (`marketbrief/model/cross_market.py`; names and groups in
+`constants/model.py` CROSS_MARKET_FEATURES).** The label buys at the open of D, so row d may use a bar
+only if it was final before that open, by clock time: a bar dated t is available at t + close_time +
+120 minutes (`BAR_SETTLE_MINUTES`), and row d takes the newest bar available at or before the regular
+open of D (`calendar.session_open_utc`), missing when it is dated more than 5 calendar days before D.
+Each feature is that bar's close over the symbol's previous close minus 1 (the 10-year yield: the
+difference in points). Missing data stays missing (NaN), never 0. What that gives:
+- India (open 09:15 IST = 03:45 UTC): `asia` (KOSPI, Taiwan, Shanghai, Nikkei, Hang Seng) are the
+  sessions of date d (their session of D closes after India opens); `europe` (Euro Stoxx 50) of d;
+  `us_session` (Nasdaq Composite, US VIX change; the S&P 500 is already `cue_ret_1d`) of the US session
+  of d, which closes before D opens; `fx` (USD/JPY, USD/INR, dollar index) and `rates_commodities` (US
+  10-year yield change, Brent, gold) of d; `adr`: premium_d = ln(ADR close of d x USD/INR / the
+  ticker's close of d), the feature is premium_d minus the mean of its previous 20 values (the ADR
+  ratio and the persistent premium cancel); 0 for tickers without an ADR (not applicable), NaN for an
+  ADR ticker before its ADR's data.
+- US (open 09:30 ET): `asia` (Nikkei, Hang Seng, KOSPI) are the sessions of D itself (closed and
+  settled by 10:10 UTC); `europe` (Euro Stoxx 50, DAX, FTSE) of d (their session of D closes after the
+  US open); `fx` (USD/JPY, USD/CNY, dollar index) and `rates_commodities` (10-year yield, WTI, gold) of d.
+Tests (`tests/test_cross_market.py`): for every feature of both markets, changing every bar not final
+by the open of D (and every own-market bar after d) leaves the feature unchanged on every row up to d,
+and changing the bar the rule names does change it; the session each symbol contributes is checked in
+summer and winter time; a stale bar is missing; a symbol without data is missing before it starts.
+Live caveat: `collect_prices.py` stores cue and factor bars only up to the previous UTC day, so at the
+US routine's run (08:15 ET) the Asia bar of D is not stored yet; the US `asia` group cannot be switched
+on live until same-day Asia bars are stored once final (otherwise training and the live score would
+see different bars). The India groups see the same bars live: the India routine runs at 08:10 IST
+(02:40 UTC), when every bar the rule admits is dated before the UTC day and final.
+
+**Long-history cache (`scripts/model_history.py`, `marketbrief/model/history_cache.py`).** Yahoo daily
+bars from 2011-01-01 of every watchlist ticker and config symbol (yfinance, auto_adjust=False: the basis
+collect_prices stores) in `work/model_history/<market>/bars.csv.gz` with `manifest.json` (Yahoo symbol,
+rows, first and last date, dropped holiday and flat bars per symbol, fetched_at, bytes, SHA-256);
+gitignored, never written to data/. Fetched 2026-10-07T09:02Z: India 167,288 rows (2,871,664 bytes),
+US 179,013 rows (2,830,901 bytes), no symbol failed. Holiday bars are dropped as the collector drops
+them (the exchange calendar from the start date). `model_backtest.py --history` reads data/ plus the
+cache: data/'s bars win on their dates, the cache adds only earlier dates, rebased by the median
+stored/cache close ratio over the first 20 common dates (in these runs the ratio was 1.0 with a largest
+deviation of 0 for every symbol with an overlap). Limits: survivorship (today's watchlist back to 2011:
+companies that left the index or failed are absent, and later listings enter late: SBI Life and HDFC
+Life 2017, IndiGo 2015, Meta 2012); old bars are split-adjusted by Yahoo as of the fetch, not as known
+at the time (returns are ratios, so a consistent re-basing does not leak; a wrong factor would show as
+a one-day jump); the 2026 cost rates are applied to every past date; event and flow features have no
+history before 2024-2026 and are excluded by the 80% coverage rule.
+
+**Runs (2026-10-07; `model_backtest.py [--history --ablate] --no-gbm --out DIR`; walk-forward,
+out-of-sample, every setting as in config/model.yaml before the run, nothing tuned; the gradient-boosted
+comparison was skipped: it took about 165 s per market x label x horizon on the 2-year panel alone).**
+
+(a) Current features, 2-year window. On the data of commit 67eeca0 (the run above) the US rows
+reproduce the table above exactly; the India rows have 20 more stock-days per label (e.g. 1d
+open-to-close n 6615, AUC 0.4862 [0.4567, 0.5157] vs 6595, 0.4859 [0.4548, 0.5172]) because the Muhurat
+session of 2025-10-21 has since become a session (`special_sessions`, issue #41) and enters the panel.
+On today's data/ (bars to 2026-10-06):
+
+| market | label | n | Brier | base | Brier skill | AUC [95%] |
+|---|---|---|---|---|---|---|
+| india | 1d open_to_close | 6640 | 0.2514 | 0.2496 | -0.0069 | 0.4853 [0.4563, 0.5174] |
+| india | 5d open_to_close | 6160 | 0.2555 | 0.2509 | -0.0186 | 0.5023 [0.4529, 0.5469] |
+| india | 1d close_to_close | 6660 | 0.2512 | 0.25 | -0.0045 | 0.5187 [0.4894, 0.5473] |
+| india | 5d close_to_close | 6160 | 0.2553 | 0.2512 | -0.0163 | 0.4999 [0.4469, 0.5451] |
+| us | 1d open_to_close | 6740 | 0.2503 | 0.2497 | -0.0024 | 0.4826 [0.4591, 0.5061] |
+| us | 5d open_to_close | 6280 | 0.2504 | 0.2492 | -0.0049 | 0.4845 [0.4563, 0.5134] |
+| us | 1d close_to_close | 6760 | 0.25 | 0.2495 | -0.0021 | 0.4921 [0.4712, 0.5147] |
+| us | 5d close_to_close | 6280 | 0.2499 | 0.2486 | -0.0051 | 0.4809 [0.4498, 0.51] |
+
+(b) Current features, long history (`--history`, variant `none`; India 71,540 and US 77,733 panel
+rows; first out-of-sample 1-day as-of date 2011-09-02 India, 2011-09-01 US) and (c) all cross-market groups
+(variant `all`):
+
+| market | label | variant | n | Brier | base | Brier skill | AUC [95%] |
+|---|---|---|---|---|---|---|---|
+| india | 1d open_to_close | (b) none | 69221 | 0.2502 | 0.25 | -0.0009 | 0.4966 [0.4879, 0.5051] |
+| india | 1d open_to_close | (c) all | 69221 | 0.25 | 0.25 | 0.0002 | 0.5156 [0.5065, 0.523] |
+| india | 5d open_to_close | (b) none | 68083 | 0.2504 | 0.2502 | -0.0009 | 0.4809 [0.4649, 0.4958] |
+| india | 5d open_to_close | (c) all | 68083 | 0.2504 | 0.2502 | -0.001 | 0.4869 [0.4724, 0.5005] |
+| india | 1d close_to_close | (b) none | 69488 | 0.2469 | 0.2501 | 0.0127 | 0.5625 [0.5535, 0.5707] |
+| india | 1d close_to_close | (c) all | 69488 | 0.2444 | 0.2501 | 0.0226 | 0.5811 [0.5728, 0.5892] |
+| india | 5d close_to_close | (b) none | 68083 | 0.2494 | 0.2496 | 0.0009 | 0.5118 [0.5004, 0.5227] |
+| india | 5d close_to_close | (c) all | 68083 | 0.2488 | 0.2496 | 0.0033 | 0.5286 [0.5192, 0.5386] |
+| us | 1d open_to_close | (b) none | 75622 | 0.2497 | 0.2496 | -0.0004 | 0.4862 [0.4764, 0.4962] |
+| us | 1d open_to_close | (c) all | 75622 | 0.2498 | 0.2496 | -0.0007 | 0.4845 [0.4748, 0.4942] |
+| us | 5d open_to_close | (b) none | 75562 | 0.2485 | 0.2484 | -0.0001 | 0.4751 [0.4608, 0.4894] |
+| us | 5d open_to_close | (c) all | 75562 | 0.2485 | 0.2484 | -0.0003 | 0.475 [0.4607, 0.49] |
+| us | 1d close_to_close | (b) none | 75642 | 0.2497 | 0.2497 | 0.0001 | 0.5064 [0.4967, 0.5153] |
+| us | 1d close_to_close | (c) all | 75642 | 0.2476 | 0.2497 | 0.0082 | 0.553 [0.544, 0.562] |
+| us | 5d close_to_close | (b) none | 75562 | 0.2482 | 0.2482 | -0.0001 | 0.4831 [0.4681, 0.4989] |
+| us | 5d close_to_close | (c) all | 75562 | 0.248 | 0.2482 | 0.0006 | 0.5059 [0.4931, 0.5196] |
+
+Paper strategy (open-to-close, after costs, model long minus baseline per date, 95% block bootstrap; a
+verdict needs 20 common dates). India 1d (c): p >= 0.55, 555 positions on 70 dates, minus always-up
+0.3338% [-0.08, 0.77], minus benchmark 0.3655% [-0.09, 0.87]; p >= 0.65, 190 positions on 22 dates,
+beats always-up 0.5149% [0.06, 1.13] and momentum 0.5328% [0.1, 1.01], not the benchmark 0.4698%
+[-0.12, 1.22], RSI reversion only 4 common dates. India 1d (b): p >= 0.55 minus always-up 0.2568%
+[0.01, 0.55]. US 1d (c): p >= 0.65 minus always-up 0.196% [0.07, 0.33] on 101 positions; US 5d (c):
+p >= 0.60 minus always-up 0.5904% [0.42, 1.06] on 417 positions, while the AUC interval is below 0.5.
+The long side rarely reaches a threshold (the calibrated probabilities stay near the base rate).
+
+(d) Ablations (same panel; `only <group>` = current features plus one group; `all minus <group>`).
+Open-to-close 1d AUC [95%], India: none 0.4966 [0.4879, 0.5051]; only asia 0.5091 [0.5002, 0.5173],
+europe 0.4964 [0.4877, 0.5048], us_session 0.4954 [0.4867, 0.5041], fx 0.4963 [0.4875, 0.505],
+rates_commodities 0.4983 [0.4894, 0.5065], adr 0.5071 [0.4995, 0.5146]; all minus asia 0.5073 [0.4996,
+0.5144], europe 0.5148 [0.5059, 0.5222], us_session 0.5158 [0.5069, 0.5231], fx 0.517 [0.5081,
+0.5243], rates_commodities 0.5156 [0.5072, 0.5234], adr 0.5084 [0.499, 0.5163]; every Brier skill
+between -0.001 and 0.0004. US: none 0.4862 [0.4764, 0.4962]; only asia 0.4844 [0.4742, 0.4943],
+europe 0.4839 [0.4737, 0.4939], fx 0.4882 [0.4787, 0.4981], rates_commodities 0.4887 [0.4787,
+0.498]; all minus asia 0.4873 [0.478, 0.4968], europe 0.4886 [0.479, 0.4979], fx 0.4838 [0.4738,
+0.494], rates_commodities 0.4835 [0.4732, 0.4935]; every Brier skill negative. Of the 48
+open-to-close rows (14 India and 10 US variants x 2 horizons, 3 thresholds each), one meets all three
+criteria below: India `all minus fx` 1d (Brier skill 0.0004, AUC 0.517 [0.5081, 0.5243], p >= 0.55
+beats every baseline, e.g. always-up 0.4364% [0.02, 0.89] on 76 dates). It was not specified before
+the run, and one pass among that many tests is what chance gives, so it is not evidence.
+
+**Verdict (plain).** Skill = Brier skill > 0, the AUC interval above 0.5, and the paper long beating
+every baseline after costs with an interval above 0 (`backtest_variants.py`). On the tradable
+open-to-close label no pre-specified variant shows skill in either market. India's cross-market groups
+(mostly Asia and the ADR premium) lift the 1-day open-to-close AUC from 0.4966 to 0.5156 with an
+interval above 0.5, but the Brier skill is 0.0002 (no better probabilities) and the paper long does not
+beat every baseline. The US groups change nothing, and the US open-to-close AUC sits below 0.5 with and
+without them. The clear gains are on close-to-close (India 1d AUC 0.5625 -> 0.5811, US 1d 0.5064 ->
+0.553), and they are not tradable: close-to-close starts at the as-of close, and these features (the
+US session, the ADRs, Asia of D for the US) arrive after it, so they predict the overnight gap that no
+one can buy at the as-of close. They do mean that pre-open calls scored close-to-close get credit for
+information the open already prices. The long history alone (b) shows no skill either. Decision: every
+`cross_market` group stays switched off in `config/model.yaml`. A confirmation should use only data
+after 2026-10-07 (a held-out period), with the India `asia` and `adr` groups fixed in advance.

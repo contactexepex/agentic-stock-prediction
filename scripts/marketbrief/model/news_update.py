@@ -19,7 +19,7 @@ from marketbrief.model.logistic import logit
 from marketbrief.model.news_score import update_plan
 from marketbrief.model.panel import build_panel
 from marketbrief.model.panel_inputs import read_inputs
-from marketbrief.model.settings import load_model_config
+from marketbrief.model.settings import cross_groups, load_model_config
 
 SCORES_SQL = """
 SELECT as_of_date, ticker, horizon_days, prob_model, news_score FROM model_scores_latest
@@ -45,7 +45,8 @@ def main() -> int:
     cfg = require_market(market_arg(__doc__).parse_args())
     settings = load_model_config()
     con = connect(cfg[CFG_MARKET])
-    panel = build_panel(cfg, read_inputs(con, cfg[CFG_MARKET]), settings["warmup_bars"])
+    panel = build_panel(cfg, read_inputs(con, cfg[CFG_MARKET]), settings["warmup_bars"],
+                        cross_groups(settings, cfg[CFG_MARKET]))
     report = {f"{h}d": update_plan(live_rows(con, panel, h), settings["news"]) for h in HORIZONS}
     print(json.dumps({"step": "model_news_update", "market": cfg[CFG_MARKET], "news_prior": settings["news"],
                       "horizons": report}, indent=2, default=str))

@@ -20,19 +20,39 @@ special_sessions: [2024-11-01, 2025-10-21]
 
 # Market-level symbols. Roles: benchmark (index the stocks are measured against),
 # vol_index (regime), cue (overnight / pre-open signal), factor (global driver),
-# sector_etf (sector context).
+# sector_etf (sector context), adr (US-listed ADR of the watchlist ticker `adr_of`; bars only, for the
+# signal model's ADR premium; its quote is the ticker's `adr` snapshot).
+# close_time: "<HH:MM> <IANA zone>" of the symbol's daily bar close (regular close incl. a closing
+# auction, set at or after the real one; FX: the end of Yahoo's London-day bar). The signal model's
+# cross-market features use a bar only once close_time + 120 min has passed before the open of D
+# (marketbrief/model/cross_market.py). Every cue, factor and adr symbol below returned daily bars from
+# Yahoo in a live check on 2026-10-07 (first bar: KOSPI 1996-12-11, Taiwan 1997-07-02, Shanghai
+# 1997-07-02, Euro Stoxx 50 2007-03-30, VIX 1990-01-02, USD/JPY 1996-10-30, INFY 1999-03-11, HDB
+# 2001-07-20, IBN 2000-03-28, RDY 2001-04-11). GIFT Nifty: no free source without access control
+# (docs/DESIGN.md section 15).
 symbols:
   NIFTY50:  {yahoo: "^NSEI", role: benchmark, name: Nifty 50}
   INDIAVIX: {yahoo: "^INDIAVIX", role: vol_index, name: India VIX}
-  SPX:      {yahoo: "^GSPC", role: cue, name: S&P 500 (previous US close)}
-  NASDAQ:   {yahoo: "^IXIC", role: cue, name: Nasdaq Composite (previous US close)}
-  NIKKEI:   {yahoo: "^N225", role: cue, name: Nikkei 225}
-  HANGSENG: {yahoo: "^HSI", role: cue, name: Hang Seng}
-  USDINR:   {yahoo: "INR=X", role: factor, name: USD/INR}
-  BRENT:    {yahoo: "BZ=F", role: factor, name: Brent crude}
-  GOLD:     {yahoo: "GC=F", role: factor, name: Gold}
-  US10Y:    {yahoo: "^TNX", role: factor, name: US 10-year yield}
-  DXY:      {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
+  SPX:      {yahoo: "^GSPC", role: cue, name: S&P 500 (previous US close), close_time: "16:00 America/New_York"}
+  NASDAQ:   {yahoo: "^IXIC", role: cue, name: Nasdaq Composite (previous US close), close_time: "16:00 America/New_York"}
+  NIKKEI:   {yahoo: "^N225", role: cue, name: Nikkei 225, close_time: "15:30 Asia/Tokyo"}
+  HANGSENG: {yahoo: "^HSI", role: cue, name: Hang Seng, close_time: "16:10 Asia/Hong_Kong"}
+  KOSPI:    {yahoo: "^KS11", role: cue, name: KOSPI, close_time: "15:30 Asia/Seoul"}
+  TAIWAN:   {yahoo: "^TWII", role: cue, name: Taiwan Weighted, close_time: "13:30 Asia/Taipei"}
+  SHANGHAI: {yahoo: "000001.SS", role: cue, name: Shanghai Composite, close_time: "15:00 Asia/Shanghai"}
+  STOXX50:  {yahoo: "^STOXX50E", role: cue, name: Euro Stoxx 50, close_time: "17:40 Europe/Berlin"}
+  USVIX:    {yahoo: "^VIX", role: factor, name: US VIX, close_time: "16:15 America/New_York"}
+  USDINR:   {yahoo: "INR=X", role: factor, name: USD/INR, close_time: "23:59 Europe/London"}
+  USDJPY:   {yahoo: "JPY=X", role: factor, name: USD/JPY, close_time: "23:59 Europe/London"}
+  BRENT:    {yahoo: "BZ=F", role: factor, name: Brent crude, close_time: "17:00 America/New_York"}
+  GOLD:     {yahoo: "GC=F", role: factor, name: Gold, close_time: "17:00 America/New_York"}
+  US10Y:    {yahoo: "^TNX", role: factor, name: US 10-year yield, close_time: "17:00 America/New_York"}
+  DXY:      {yahoo: "DX-Y.NYB", role: factor, name: US dollar index, close_time: "17:00 America/New_York"}
+  # ADRs of watchlist tickers (the tickers' `adr` below; TCS and the others have no US listing)
+  ADR_HDB:  {yahoo: HDB, role: adr, adr_of: HDFCBANK, name: HDFC Bank ADR, close_time: "16:00 America/New_York"}
+  ADR_IBN:  {yahoo: IBN, role: adr, adr_of: ICICIBANK, name: ICICI Bank ADR, close_time: "16:00 America/New_York"}
+  ADR_INFY: {yahoo: INFY, role: adr, adr_of: INFY, name: Infosys ADR, close_time: "16:00 America/New_York"}
+  ADR_RDY:  {yahoo: RDY, role: adr, adr_of: DRREDDY, name: Dr Reddy's ADR, close_time: "16:00 America/New_York"}
   # Nifty sector indices (sector context). Only these three have daily history on Yahoo; Auto,
   # FMCG, Metal, Energy, Infra and Financial Services return just the latest day (checked 2026-10-05).
   # `sectors` = the watchlist sectors each index stands for; the other seven watchlist sectors

@@ -11,6 +11,15 @@ min_train_sessions: 100     # distinct as-of sessions with resolved labels befor
 min_feature_coverage: 0.8   # a feature enters a fit only when non-missing in this share of its training rows
 refit: monthly              # refit at the first as-of date of each calendar month (expanding window)
 platt_min_rows: 1000        # Platt calibration once this many past out-of-sample rows have resolved
+# Cross-market feature groups (marketbrief/model/cross_market.py; features listed in constants/model.py
+# CROSS_MARKET_FEATURES; each bar only once final before the open of D, by its symbol's close_time).
+# Each group is switched separately so the backtest can ablate it (model_backtest.py --cross-groups, --ablate).
+# All off: the 15-year walk-forward test of 2026-10-07 showed no tradable (open-to-close) skill with any
+# pre-specified group set (docs/DESIGN.md section 15.1). The US `asia` group also needs same-day Asia bars
+# stored before the US routine runs, which collect_prices.py does not do yet.
+cross_market:
+  india: {asia: false, europe: false, us_session: false, fx: false, rates_commodities: false, adr: false}
+  us: {asia: false, europe: false, fx: false, rates_commodities: false}
 # News (live only; there is no historical news archive, so these are fixed priors, not estimates).
 # Per item: sentiment (-1..1) x relevance (0..1) x materiality weight x verification weight, summed per
 # ticker over the window, clipped to +-score_cap, times `coefficient` in logit units.

@@ -7,7 +7,10 @@ coverage at the thresholds of config/model.yaml, the paper strategy after costs 
 (paper.py, open_to_close only: that is the trade), the coefficient table and group importance of the
 latest fit, the features left out, and the gradient-boosted comparison (gbm_compare.py). Nothing here is
 tuned: every setting comes from config/model.yaml as written before the run. Writes model-backtest-
-<market|all>-<last date>.json and .html into --out (a scratch folder; never data/ or reports/)."""
+<market|all>-<last date>[-history][-ablate|-x-<groups>].json and .html into --out (a scratch folder; never
+data/ or reports/). --history also reads the long-history cache (history_cache.py; data/'s bars win on
+their dates); --cross-groups picks the cross-market groups of the reported variant and --ablate adds every
+ablation variant on the same panel (backtest_variants.py; their headlines are in `headlines`)."""
 from __future__ import annotations
 
 import json
@@ -24,14 +27,17 @@ from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
 from marketbrief.model.backtest_html import render_html
+from marketbrief.model.backtest_variants import CONFIG, headline, headline_lines, parse_groups, with_groups
+from marketbrief.model.backtest_variants import ablation_variants as variants_for_ablation
 from marketbrief.model.explain import coefficient_table, group_importance
 from marketbrief.model.gbm_compare import gbm_walk_forward
+from marketbrief.model.history_cache import load_cache, merged_bars
 from marketbrief.model.labels import end_offset
 from marketbrief.model.metrics import probability_scores, threshold_hits
 from marketbrief.model.panel import build_panel
 from marketbrief.model.panel_inputs import read_inputs
 from marketbrief.model.paper import nan_free, paper_results
-from marketbrief.model.settings import load_costs, load_model_config, round_trip_cost
+from marketbrief.model.settings import cross_groups, load_costs, load_model_config, round_trip_cost
 from marketbrief.model.walk_forward import walk_forward
 
 MARKETS = ("india", "us")
@@ -56,8 +62,8 @@ def model_summary(fits: list) -> dict:
             "excluded": last.model.excluded}
 
 
-def evaluate(panel: pd.DataFrame, spec: tuple[str, str, int], settings: dict, costs: dict) -> dict:
-    """Every result of one market x convention x horizon."""
+def evaluate(panel: pd.DataFrame, spec: tuple[str, str, int], settings: dict, costs: dict, gbm: bool = True) -> dict:
+    """Every result of one market x convention x horizon (the gradient-boosted comparison unless gbm is False)."""
     market, convention, horizon = spec
     oos, fits = walk_forward(panel, spec, settings)
     if not fits:
@@ -71,7 +77,8 @@ def evaluate(panel: pd.DataFrame, spec: tuple[str, str, int], settings: dict, co
     if convention == LABEL_OPEN_TO_CLOSE:
         out["paper"] = paper_results(done, market, costs, settings, block)
     out["model"] = model_summary(fits)
-    out["gbm_comparison"] = gbm_walk_forward(panel, spec, settings)
+    if gbm:
+        out["gbm_comparison"] = gbm_walk_forward(panel, spec, settings)
     return out
 
 
@@ -108,23 +115,56 @@ def threshold_verdicts(threshold: str, paper: dict) -> list[str]:
     return lines
 
 
-def run(markets: tuple[str, ...]) -> dict:
-    """The backtest of the given markets."""
+def market_inputs(market: str, history: bool) -> tuple[dict, dict | None]:
+    """The stored inputs of a market, with the long-history cache's earlier bars when `history`."""
+    inputs = read_inputs(connect(market), market)
+    if not history:
+        return inputs, None
+    cached, manifest = load_cache(market)
+    inputs["bars"], splice = merged_bars(inputs["bars"], cached)
+    keep = ("fetched_at", "start", "rows", "bytes", "sha256", "basis")
+    return inputs, {"manifest": {k: manifest.get(k) for k in keep}, "splice": splice}
+
+
+def evaluate_market(panel: pd.DataFrame, market: str, settings: dict, gbm: bool) -> dict:
+    """{"<h>d <convention>": evaluate()} of one market and settings."""
+    return {f"{h}d {c}": evaluate(panel, (market, c, h), settings, load_costs(market), gbm)
+            for h in HORIZONS for c in LABEL_CONVENTIONS}
+
+
+def run(markets: tuple[str, ...], options: dict | None = None) -> dict:
+    """The backtest of the given markets. options: history (read the long-history cache too), cross
+    ("config", "none", "all" or a comma list of groups: the reported variant), ablate (also every
+    ablation variant, backtest_variants.py), gbm (the gradient-boosted comparison, default true)."""
+    options = options or {}
     settings = load_model_config()
     out = {"computed_at": utc_now(), "settings": settings, "results": {}, "data": {}}
     for market in markets:
         cfg = load_market(market)
-        inputs = read_inputs(connect(market), market)
-        panel = build_panel(cfg, inputs, settings["warmup_bars"])
+        inputs, history = market_inputs(market, options.get("history", False))
+        configured = cross_groups(settings, market)
+        variants = (variants_for_ablation(market) if options.get("ablate") else
+                    [(options.get("cross", CONFIG), parse_groups(options.get("cross", CONFIG), market, configured))])
+        union = tuple(sorted({g for _, groups in variants for g in groups}))
+        panel = build_panel(cfg, inputs, settings["warmup_bars"], union)
         first_bar = min(frame.index[0] for frame in inputs["bars"].values())
         out["data"][market] = {"panel_rows": len(panel), "first_bar": str(first_bar.date()),
                                "first_panel_date": str(panel["date"].min().date()),
                                "last_panel_date": str(panel["date"].max().date()),
                                "tickers": int(panel["ticker"].nunique()),
                                "round_trip_cost_pct_at_100": round(round_trip_cost(market, load_costs(market)) * 100,
-                                                                   4)}
-        out["results"][market] = {f"{h}d {c}": evaluate(panel, (market, c, h), settings, load_costs(market))
-                                  for h in HORIZONS for c in LABEL_CONVENTIONS}
+                                                                   4),
+                               "cross_groups": list(variants[0][1]), "variant": variants[0][0]}
+        if history:
+            out.setdefault("history", {})[market] = history
+        main_name, main_groups = variants[0]
+        out["results"][market] = evaluate_market(panel, market, with_groups(settings, market, main_groups),
+                                                 options.get("gbm", True))
+        heads = out.setdefault("headlines", {}).setdefault(market, {})
+        heads[main_name] = {key: headline(res) for key, res in out["results"][market].items()}
+        for name, groups in variants[1:]:
+            results = evaluate_market(panel, market, with_groups(settings, market, groups), False)
+            heads[name] = {key: headline(res) for key, res in results.items()}
     out["verdicts"] = verdicts(out["results"])
     return nan_free(out)
 
@@ -133,14 +173,26 @@ def main() -> int:
     """Entry point of scripts/model_backtest.py."""
     parser = market_arg(__doc__)
     parser.add_argument("--out", type=Path, required=True, help="folder for the JSON and HTML (a scratch folder)")
+    parser.add_argument("--history", action="store_true",
+                        help="also read the long-history cache of scripts/model_history.py (work/model_history/)")
+    parser.add_argument("--cross-groups", default=CONFIG,
+                        help="cross-market groups of the reported variant: config (default), none, all or a list")
+    parser.add_argument("--ablate", action="store_true",
+                        help="report all groups and also every ablation variant (none, only <g>, all minus <g>)")
+    parser.add_argument("--no-gbm", action="store_true", help="skip the gradient-boosted comparison")
     args = parser.parse_args()
     markets = (args.market,) if args.market else MARKETS
-    result = run(markets)
+    result = run(markets, {"history": args.history, "cross": args.cross_groups, "ablate": args.ablate,
+                           "gbm": not args.no_gbm})
     args.out.mkdir(parents=True, exist_ok=True)
     last = max(d["last_panel_date"] for d in result["data"].values())
-    stem = args.out / f"model-backtest-{args.market or 'all'}-{last}"
+    tag = "".join(part for flag, part in ((args.history, "-history"), (args.ablate, "-ablate")) if flag)
+    tag += "" if args.ablate or args.cross_groups == CONFIG else "-x-" + args.cross_groups.replace(",", "+")
+    stem = args.out / f"model-backtest-{args.market or 'all'}-{last}{tag}"
     stem.with_suffix(".json").write_text(json.dumps(result, indent=1, default=str))
     stem.with_suffix(".html").write_text(render_html(result))
+    lines = [line for market, by_variant in result["headlines"].items() for variant, heads in by_variant.items()
+             for line in headline_lines(market, variant, heads)]
     print(json.dumps({"json": str(stem.with_suffix(".json")), "html": str(stem.with_suffix(".html")),
-                      "verdicts": result["verdicts"]}, indent=1))
+                      "verdicts": result["verdicts"], "headlines": lines}, indent=1))
     return 0

@@ -18,10 +18,24 @@ symbols:
   VIX:     {yahoo: "^VIX", role: vol_index, name: VIX}
   ES:      {yahoo: "ES=F", role: cue, name: S&P 500 futures}
   NQ:      {yahoo: "NQ=F", role: cue, name: Nasdaq 100 futures}
-  US10Y:   {yahoo: "^TNX", role: factor, name: US 10-year yield}
-  DXY:     {yahoo: "DX-Y.NYB", role: factor, name: US dollar index}
-  WTI:     {yahoo: "CL=F", role: factor, name: WTI crude}
-  GOLD:    {yahoo: "GC=F", role: factor, name: Gold}
+  US10Y:   {yahoo: "^TNX", role: factor, name: US 10-year yield, close_time: "17:00 America/New_York"}
+  DXY:     {yahoo: "DX-Y.NYB", role: factor, name: US dollar index, close_time: "17:00 America/New_York"}
+  WTI:     {yahoo: "CL=F", role: factor, name: WTI crude, close_time: "17:00 America/New_York"}
+  GOLD:    {yahoo: "GC=F", role: factor, name: Gold, close_time: "17:00 America/New_York"}
+  # Other markets (signal model cross-market features, marketbrief/model/cross_market.py). close_time:
+  # "<HH:MM> <IANA zone>" of the daily bar's close (regular close incl. a closing auction, set at or after
+  # the real one; FX: the end of Yahoo's London-day bar); a bar counts once close_time + 120 min has passed
+  # before the US open of D. Live check 2026-10-07: every symbol returned daily bars (first bar: Nikkei
+  # 1965-01-05, Hang Seng 1986-12-31, KOSPI 1996-12-11, Euro Stoxx 50 2007-03-30, DAX 1987-12-30, FTSE 100
+  # 1984-01-03, USD/JPY 1996-10-30, USD/CNY 2001-06-25).
+  NIKKEI:  {yahoo: "^N225", role: cue, name: Nikkei 225, close_time: "15:30 Asia/Tokyo"}
+  HANGSENG: {yahoo: "^HSI", role: cue, name: Hang Seng, close_time: "16:10 Asia/Hong_Kong"}
+  KOSPI:   {yahoo: "^KS11", role: cue, name: KOSPI, close_time: "15:30 Asia/Seoul"}
+  STOXX50: {yahoo: "^STOXX50E", role: cue, name: Euro Stoxx 50, close_time: "17:40 Europe/Berlin"}
+  DAX:     {yahoo: "^GDAXI", role: cue, name: DAX, close_time: "17:40 Europe/Berlin"}
+  FTSE:    {yahoo: "^FTSE", role: cue, name: FTSE 100, close_time: "16:40 Europe/London"}
+  USDJPY:  {yahoo: "JPY=X", role: factor, name: USD/JPY, close_time: "23:59 Europe/London"}
+  USDCNY:  {yahoo: "CNY=X", role: factor, name: USD/CNY, close_time: "23:59 Europe/London"}
   # Sector ETFs: `sectors` = the watchlist sectors (under `sectors:` below) each one stands for;
   # every watchlist sector has one (tests/test_signals.py). Eight SPDR sector ETFs plus JETS
   # (airlines; no SPDR fund) and IAK (iShares U.S. Insurance; XLF is mostly banks and payments).

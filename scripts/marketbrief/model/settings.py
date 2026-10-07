@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 import yaml
 
-from marketbrief.constants.model import FILE_COSTS_CONFIG, FILE_MODEL_CONFIG, MSG_NO_MODEL_CONFIG
+from marketbrief.constants.model import CROSS_KEY, FILE_COSTS_CONFIG, FILE_MODEL_CONFIG, MSG_NO_MODEL_CONFIG
 from marketbrief.core import paths
 
 
@@ -19,6 +19,12 @@ def read_config(name: str) -> dict:
 def load_model_config() -> dict:
     """config/model.yaml (regularisation, warm-up, refit, news priors, backtest settings)."""
     return read_config(FILE_MODEL_CONFIG)
+
+
+def cross_groups(settings: dict, market: str) -> tuple[str, ...]:
+    """The cross-market feature groups switched on for `market` in config/model.yaml (`cross_market`)."""
+    switches = (settings.get(CROSS_KEY) or {}).get(market) or {}
+    return tuple(group for group, enabled in switches.items() if enabled)
 
 
 def load_costs(market: str) -> dict:
