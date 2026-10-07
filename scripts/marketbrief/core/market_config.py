@@ -27,19 +27,14 @@ from marketbrief.constants.messages import (
     MSG_SECTOR_UNKNOWN,
     MSG_UNKNOWN_MARKET,
 )
-from marketbrief.constants.horizons import KEY_HORIZONS
 from marketbrief.core import paths
-from marketbrief.core.horizons import horizons
 from marketbrief.lifecycle.loader import apply_watchlist
 
 
 def load_ranges_config(market: str | None = None) -> dict:
     """config/ranges.yaml. With a market, a setting `<key>_by_market: {market: value}` replaces
-    `<key>` for that market (e.g. earnings_vol_multiple_by_market). `horizons` follows config/strategies.yaml
-    (core/horizons.py) unless the file sets its own list (test configs)."""
+    `<key>` for that market (e.g. earnings_vol_multiple_by_market)."""
     ranges_config = yaml.safe_load((paths.CONFIG / FILE_RANGES_CONFIG).read_text())
-    if KEY_HORIZONS not in ranges_config:
-        ranges_config[KEY_HORIZONS] = list(horizons())
     if market:
         for key in [setting for setting in ranges_config if setting.endswith(BY_MARKET_SUFFIX)]:
             if market in (ranges_config[key] or {}):

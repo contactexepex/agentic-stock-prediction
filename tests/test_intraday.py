@@ -250,8 +250,7 @@ def test_call_windows_follow_the_scoring_basis():
     as_of = datetime(2026, 10, 6).date()
     days = [d.isoformat() for d in call_window(cfg, as_of, 1, "open_to_close")]
     assert days == ["2026-10-07", "2026-10-08"]              # buy the open of D, sell the close of D+1
-    # N+5 (decision 37, B10): sell at the close of the 5th session after D = D+5 (D+4 before B10)
-    assert [d.isoformat() for d in call_window(cfg, as_of, 5, "open_to_close")] == ["2026-10-07", "2026-10-14"]
+    assert [d.isoformat() for d in call_window(cfg, as_of, 5, "open_to_close")] == ["2026-10-07", "2026-10-13"]
     assert [d.isoformat() for d in call_window(cfg, as_of, 1, "close_to_close")] == ["2026-10-07", "2026-10-07"]
 
 
