@@ -424,9 +424,11 @@ The full text is never stored. Article text is untrusted data: it is measured, n
 **Clusters** (`scripts/news_clusters.py`, kind `news_clusters`):
 
 *Items and duplicates.* The items are news rows of the last 144 h whose title names a watchlist
-ticker as primary. An item's outlet is its domain. A row without one (older Google News rows) is
-mapped from its source label: a configured name, a label that is itself a host, or the domain other
-rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under
+ticker as primary. An item's outlet is its domain, keyed as news de-duplication keys it (section 3,
+"News de-duplication": host prefixes stripped, the allowlisted domain and its `same_as`, so
+`m.economictimes.com` and `economictimes.indiatimes.com` are one outlet and one origin). A row without one
+(older Google News rows) is mapped from its source label: a configured name, a label that is itself a host,
+or the domain other rows of the run give that label ("The CSR Universe" -> thecsruniverse.com). One article stored under
 two ids is kept once and the other ids are listed in `duplicate_ids`. Two ids are the same article
 when they share the canonical publisher URL, or the same title from the same outlet, as with the
 labels "Business Today" and "businesstoday.in".

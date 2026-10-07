@@ -426,6 +426,22 @@ def clusters_by_ticker(rows: list[dict]) -> dict:
     return {r["ticker"]: r for r in rows}
 
 
+def test_one_outlet_under_two_hosts_is_one_origin(env, capsys):
+    """m.economictimes.com and economictimes.indiatimes.com are one outlet (news_dedup's outlet key with `same_as`),
+    so two different ET headlines about one event are one origin, never two independent ones."""
+    env.write("news", [
+        news_row(40, "Jio Platforms IPO priced at record valuation", "RELIANCE", source="The Economic Times",
+                 domain="m.economictimes.com"),
+        news_row(41, "Jio Platforms IPO priced at record valuation, anchor book opens", "RELIANCE",
+                 source="The Economic Times", domain="economictimes.indiatimes.com")])
+    env.run(news_clusters, capsys)
+    row = [r for r in env.rows("news_clusters") if {"n40", "n41"} <= set(r["news_ids"])][0]
+    groups = [g for g in row["origin_groups"] if {"n40", "n41"} & set(g["news_ids"])]
+    assert len(groups) == 1 and set(groups[0]["news_ids"]) >= {"n40", "n41"}
+    assert groups[0]["origin"] == "outlet:economictimes.indiatimes.com"
+    assert "m.economictimes.com" not in row["outlets"] and "economictimes.com" not in row["outlets"]
+
+
 def test_cluster_duplicate_step_still_merges_one_publisher_url():
     """Items the news view keeps apart (other Google News links, other titles) that decode to one publisher page are
     still one article inside a cluster (`duplicate_ids`)."""
