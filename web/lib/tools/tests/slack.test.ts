@@ -67,6 +67,7 @@ test("help and a form Slack fails to open are logged too (issue #82)", async () 
   const reply = await handleCommand(commandParams("/trade", ""), s.deps);
   assert.match(JSON.stringify(reply.body), /could not be opened/);
   assert.equal(s.inbox.commands.at(-1)?.result, "failed");
+  assert.equal(s.inbox.commands.at(-1)?.message, "trade form not opened (Slack refused)");
   assert.equal(s.inbox.commands.at(-1)?.tool, "add_paper_trade");
   assert.equal(s.notifier.reports.at(-1)?.result, "failed");
   assert.equal(s.inbox.requests.length, 0);
@@ -191,5 +192,15 @@ test("/ask answers coming soon, is logged, and writes nothing", async () => {
   assert.match(JSON.stringify(reply.body), /coming soon/);
   assert.equal(s.inbox.commands.at(-1)?.tool, "explain");
   assert.equal(s.inbox.commands.at(-1)?.result, "accepted");
+  assert.equal(s.inbox.requests.length, 0);
+});
+
+test("an unknown slash command is refused, logged and reported (issue #109)", async () => {
+  const s = slackRig();
+  const reply = await handleCommand(commandParams("/frobnicate", "anything"), s.deps);
+  assert.match(JSON.stringify(reply.body), /\/company add/);
+  assert.equal(s.inbox.commands.at(-1)?.result, "refused");
+  assert.equal(s.inbox.commands.at(-1)?.message, "Unknown command");
+  assert.equal(s.notifier.reports.at(-1)?.refusal_code, "validation_failed");
   assert.equal(s.inbox.requests.length, 0);
 });

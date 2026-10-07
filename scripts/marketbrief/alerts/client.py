@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from marketbrief.alerts.constants import DRY_RUN_TS_PREFIX, SLACK_API, WEBHOOK_TS_PREFIX
@@ -56,7 +57,7 @@ class SlackClient:
 
 class WebhookClient:
     """POSTs each part to the incoming webhook as its own message. A webhook answers no ts and cannot reply in a
-    thread, so thread_ts is ignored and the ledger records ts webhook.<n> (never used as a thread)."""
+    thread, so thread_ts is ignored and the ledger records a unique made-up ts webhook.<12 hex> (never a thread)."""
 
     mode = "webhook"
 
@@ -64,7 +65,6 @@ class WebhookClient:
         """`url` = SLACK_WEBHOOK_URL (hooks.slack.com)."""
         self._url = url
         self.http = http or default_http
-        self.count = 0
 
     def __repr__(self) -> str:
         """Never shows the URL."""
@@ -76,8 +76,7 @@ class WebhookClient:
         body = raw.decode(errors="replace")[:60]
         if status != 200 or body != "ok":
             raise SlackError(f"webhook: HTTP {status} {body}")
-        self.count += 1
-        return f"{WEBHOOK_TS_PREFIX}.{self.count:06d}"
+        return f"{WEBHOOK_TS_PREFIX}.{uuid.uuid4().hex[:12]}"
 
 
 class DryRunClient:
