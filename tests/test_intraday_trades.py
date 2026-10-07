@@ -596,17 +596,20 @@ def test_score_window_follows_its_stored_label_not_its_time(market):
     """Issue #94 (judge round 1): a model score's window is the label it is stored with, as B10's other readers do,
     whatever its computed_at: a 5-day score stored n_plus_k ends at D+5 even when computed before
     call_scoring.n_plus_k_from; an unlabelled 5-day score is legacy_5d_d4 (D+4) even when computed after it."""
+    from marketbrief.analytics import call_basis
     from marketbrief.intraday.inputs import open_calls
 
     root, cfg, _settings = market
+    cutoff = call_basis.n_plus_k_from()                                 # config/settings.yaml, whatever its value
+    assert cutoff is not None
+    after = (cutoff + pd.Timedelta(minutes=10)).isoformat()            # the unlabelled score: after the cut-off
     jl(root, "model_scores", "2026-10-07", [
         {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
          "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00",
-         "horizon_label": "n_plus_k"},
+         "horizon_label": "n_plus_k"},                               # stored n_plus_k, computed before the cut-off
         {"id": "2026-09-29-AAPL-5d", "as_of_date": "2026-09-29", "ticker": "AAPL", "horizon_days": 5,
-         "label_convention": "open_to_close", "prob_up": 0.6,
-         "computed_at": "2026-10-07T22:00:00+00:00"}])                 # after n_plus_k_from, before the check
-    late = datetime(2026, 10, 7, 23, 0, tzinfo=timezone.utc)          # after n_plus_k_from (2026-10-07T21:19Z)
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": after}])
+    late = (cutoff + pd.Timedelta(hours=1)).to_pydatetime()             # the check: after both rows
     calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), late)
     nvda = {call["id"]: call for call in calls.get("NVDA", [])}
     assert nvda["2026-09-29-NVDA-5d"]["horizon_label"] == "n_plus_k"

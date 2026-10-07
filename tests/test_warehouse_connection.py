@@ -14,7 +14,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
-from marketbrief.warehouse import connection, postgres  # noqa: E402
+from marketbrief.warehouse import connection, errors, postgres  # noqa: E402
 from marketbrief.warehouse.connection import WarehouseError  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
@@ -83,8 +83,8 @@ def test_bad_provider_or_name_is_refused(monkeypatch, tmp_path):
 
 def test_postgres_url_encodes_the_token(monkeypatch):
     monkeypatch.setenv("MOTHERDUCK_TOKEN", SECRET)
-    ep = postgres.endpoint(CFG)
-    url = ep.url()
+    pg_endpoint = postgres.endpoint(CFG)
+    url = pg_endpoint.url()
     assert url == (
         f"postgresql://postgres:{urllib.parse.quote(SECRET, safe='')}@pg.example.invalid:5432/market_brief"
         "?sslmode=verify-full&sslrootcert=system"
@@ -92,13 +92,20 @@ def test_postgres_url_encodes_the_token(monkeypatch):
     parsed = urllib.parse.urlsplit(url)
     assert urllib.parse.unquote(parsed.password) == SECRET
     assert parsed.hostname == "pg.example.invalid" and parsed.port == 5432 and parsed.path == "/market_brief"
-    assert ep.params()["password"] == SECRET and ep.params()["dbname"] == "market_brief"
+    assert pg_endpoint.params()["password"] == SECRET and pg_endpoint.params()["dbname"] == "market_brief"
 
 
 def test_repr_str_and_errors_never_show_the_token(monkeypatch):
     monkeypatch.setenv("MOTHERDUCK_TOKEN", SECRET)
-    ep = postgres.endpoint(CFG)
-    shown = [repr(ep), str(ep), f"{ep}", ep.redacted_url(), repr([ep]), str({"e": ep})]
+    pg_endpoint = postgres.endpoint(CFG)
+    shown = [
+        repr(pg_endpoint),
+        str(pg_endpoint),
+        f"{pg_endpoint}",
+        pg_endpoint.redacted_url(),
+        repr([pg_endpoint]),
+        str({"endpoint": pg_endpoint}),
+    ]
     for text in shown:
         assert "***" in text
         for form in forms(SECRET):
@@ -107,7 +114,7 @@ def test_repr_str_and_errors_never_show_the_token(monkeypatch):
     for text in (str(err), repr(err), str(err.args)):
         for form in forms(SECRET):
             assert form not in text
-    assert connection.redact(f"x {SECRET} y") == "x *** y"
+    assert errors.redact(f"x {SECRET} y") == "x *** y"
 
 
 def test_driver_errors_are_redacted(monkeypatch, tmp_path):
@@ -128,12 +135,17 @@ def test_driver_errors_are_redacted(monkeypatch, tmp_path):
 
 
 def test_extension_rules_in_the_source():
-    """The MotherDuck extension comes only from DuckDB's signed repository: INSTALL motherduck, never
-    allow_unsigned_extensions; the token never goes into SQL or a connection string."""
+    """The MotherDuck extension is installed by marketbrief/warehouse/extension.py only (HTTPS downloads, a
+    local-file INSTALL that DuckDB signature-checks): no `INSTALL motherduck` from DuckDB's plain-HTTP default
+    repository, no plain http:// URL, never allow_unsigned_extensions, and the token never goes into SQL or a
+    connection string."""
     package = REPO / "scripts" / "marketbrief" / "warehouse"
-    text = "\n".join(p.read_text() for p in package.glob("*.py"))
+    text = "\n".join(module.read_text() for module in package.glob("*.py"))
+    constants = (REPO / "scripts" / "marketbrief" / "constants" / "warehouse.py").read_text()
     assert "allow_unsigned_extensions" not in text
-    assert 'con.execute("INSTALL motherduck")' in (package / "connection.py").read_text()
+    assert 'execute("INSTALL motherduck' not in text
+    assert "http://" not in text + constants
+    assert "load_motherduck(con, load_warehouse_config())" in (package / "connection.py").read_text()
     assert "motherduck_token" not in text  # no config option or SET carrying the value
 
 
@@ -142,7 +154,7 @@ def test_local_read_only_connection_refuses_writes(tmp_path):
     con = connection.connect_warehouse(read_only=False, target=target)
     con.execute("CREATE TABLE t (a INTEGER)")
     con.close()
-    ro = connection.connect_warehouse(read_only=True, target=target)
+    read_only_con = connection.connect_warehouse(read_only=True, target=target)
     with pytest.raises(duckdb.Error):
-        ro.execute("CREATE TABLE u (a INTEGER)")
-    ro.close()
+        read_only_con.execute("CREATE TABLE u (a INTEGER)")
+    read_only_con.close()

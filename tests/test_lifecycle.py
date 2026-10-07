@@ -512,3 +512,80 @@ def test_command_ids_stay_unique_within_one_second():
         cli("--market", "us", "deactivate", "--ticker", "DAL", "--key", "deact-dal-01")
     ids = [row["id"] for row in stored_rows("us", "command_log")]
     assert len(set(ids)) == 3 and ids[1] == ids[0] + "-2" and ids[2] == ids[0] + "-3"
+
+
+# ---------------- Slack replies from the inbox import (B6's onboarding confirmation) ----------------
+
+def make_slack_inbox(path: Path, rows: list[tuple]) -> None:
+    con = duckdb.connect(str(path))
+    con.execute("CREATE SCHEMA inbox")
+    con.execute("CREATE TABLE inbox.company_commands (inbox_id VARCHAR, market VARCHAR, tool VARCHAR, "
+                "arguments JSON, actor VARCHAR, channel VARCHAR, submitted_at TIMESTAMPTZ, command_id VARCHAR, "
+                "slack_channel VARCHAR, slack_ts VARCHAR)")
+    con.executemany("INSERT INTO inbox.company_commands VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    con.close()
+
+
+SLACK_ROWS = [
+    ("inbox-0020-dea", "us", "deactivate_company", json.dumps({"ticker": "DAL"}), "slack:U07ABCD123", "slack",
+     "2026-10-07T10:00:00Z", None, "C0MARKET", "1728295200.000100"),
+    ("inbox-0021-del", "us", "delete_company", json.dumps({"ticker": "UAL", "confirm": "UAL"}), "slack:U07ABCD123",
+     "slack", "2026-10-07T10:01:00Z", None, "C0MARKET", "1728295260.000200"),
+    ("inbox-0022-rea", "us", "reactivate_company", json.dumps({"ticker": "DAL"}), "dashboard:owner", "dashboard",
+     "2026-10-07T10:02:00Z", None, None, None),
+]
+
+
+def test_inbox_replies_in_the_slack_thread_of_each_command():
+    from marketbrief.lifecycle.inbox import import_inbox
+    from marketbrief.lifecycle.sources import sources_for
+
+    inbox = common.ROOT / "slack_inbox.duckdb"
+    make_slack_inbox(inbox, SLACK_ROWS)
+    calls = []
+    result = import_inbox("us", str(inbox), sources_for(load_market("us")),
+                          reply=lambda record, channel, ts: calls.append((record, channel, ts)) or {"posted": 1})
+    by_id = {r["inbox_id"]: r for r in result["results"]}
+    assert [(record["result"], channel, ts) for record, channel, ts in calls] == [
+        ("accepted", "C0MARKET", "1728295200.000100"), ("refused", "C0MARKET", "1728295260.000200")]
+    assert calls[0][0]["id"] == by_id["inbox-0020-dea"]["command_id"] and calls[0][0]["tool"] == "deactivate_company"
+    assert by_id["inbox-0022-rea"]["slack_reply"] is None      # no Slack message named: no reply
+    assert by_id["inbox-0020-dea"]["slack_reply"] == {"posted": 1}
+
+
+def test_a_slack_failure_never_stops_the_import():
+    from marketbrief.lifecycle.inbox import import_inbox
+    from marketbrief.lifecycle.sources import sources_for
+
+    def broken(_record, _channel, _ts):
+        raise ConnectionError("slack.com unreachable")
+
+    inbox = common.ROOT / "slack_inbox.duckdb"
+    make_slack_inbox(inbox, SLACK_ROWS)
+    result = import_inbox("us", str(inbox), sources_for(load_market("us")), reply=broken)
+    assert result["imported"] == 3 and len(stored_events("us")) == 1      # the deactivate; delete refused (Slack)
+    assert "slack.com unreachable" in result["results"][0]["slack_reply"]["error"]
+
+
+def test_inbox_reply_through_b6_onboarding_confirmation_dry_run():
+    from marketbrief.alerts.onboarding import post_onboarding_confirmation
+    from marketbrief.lifecycle.inbox import import_inbox
+    from marketbrief.lifecycle.sources import sources_for
+
+    inbox = common.ROOT / "slack_inbox.duckdb"
+    make_slack_inbox(inbox, SLACK_ROWS[:1])
+    dry = lambda record, channel, ts: post_onboarding_confirmation(record, channel, ts, dry_run=True)  # noqa: E731
+    first = import_inbox("us", str(inbox), sources_for(load_market("us")), reply=dry)["results"][0]["slack_reply"]
+    assert first["posted"] and first["thread_ts"] == "1728295200.000100"
+    command_id = stored_rows("us", "command_log")[0]["id"]
+    assert first["post_key"].endswith(f"{command_id}:accepted")
+
+
+def test_without_slack_reply_the_cli_posts_nothing(monkeypatch):
+    import marketbrief.lifecycle.inbox as inbox_module
+
+    monkeypatch.setattr(inbox_module, "default_reply", lambda *_args: pytest.fail("posted without --slack-reply"))
+    inbox = common.ROOT / "slack_inbox.duckdb"
+    make_slack_inbox(inbox, SLACK_ROWS[:1])
+    code, result = cli("--market", "us", "import-inbox", "--inbox", str(inbox))
+    assert code == 0 and result["results"][0]["slack_reply"] is None and len(stored_events("us")) == 1

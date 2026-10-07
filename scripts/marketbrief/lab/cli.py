@@ -55,12 +55,12 @@ def predict(cfg: dict) -> dict:
     """The pre-open predictions of the rule strategies and baselines."""
     now, con = clock(), connect(cfg["market"])
     try:
-        scores, ranges = predict_inputs.horizon_rows(cfg["market"], now)
+        scores, ranges, cross_scores = predict_inputs.horizon_rows(cfg["market"], now)
     except NotImplementedError as error:
         return {"ok": False, "message": MSG_NO_HORIZON_SCORES.format(error=error)}
     news_cfg = load_model_config()["news"]
     preds, skipped = [], []
-    for inputs in predict_inputs.build_inputs(con, cfg, now, scores, ranges, news_cfg):
+    for inputs in predict_inputs.build_inputs(con, cfg, now, scores, ranges, news_cfg, cross_scores):
         rows, abstentions = company_rows(registry.rule_and_baselines(), inputs, news_cfg)
         preds += rows
         skipped += abstentions

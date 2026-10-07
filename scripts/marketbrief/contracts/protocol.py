@@ -40,7 +40,8 @@ class Costs(TypedDict):
 
 class Candidate(TypedDict):
     """One candidate horizon of a head-to-head pick, computed pre-open from the latest stored close C (F1.7.3),
-    all in percent of the amount: move_pct = (target / C - 1) x 100; loss_pct = (1 - lo80 / C) x 100; costs_pct =
+    all in percent of the amount: move_pct = E[X / C - 1 | X > C] x 100 and loss_pct = E[1 - X / C | X < C] x 100, X
+    the exit close of a normal fitted to the 80% range (lab/gain.py); costs_pct =
     the round trip at C; expected_gain_pct = p x move - (1 - p) x loss - costs."""
 
     horizon_days: int

@@ -10,6 +10,7 @@ import pandas as pd
 
 from marketbrief.contracts import horizons as horizons_contract
 from marketbrief.contracts import watchlist as watchlist_contract
+from marketbrief.constants.model import VARIANT_CROSS
 from marketbrief.contracts.watchlist import CURRENCY
 from marketbrief.lab import reads
 from marketbrief.lab.sizing import trade_amount
@@ -29,9 +30,11 @@ def active_tickers(cfg: dict, now: datetime) -> list[str]:
         return sorted(cfg.get("active_tickers") or cfg["tickers"])
 
 
-def horizon_rows(market: str, now: datetime) -> tuple[list[dict], list[dict]]:
-    """(scores, ranges) of every horizon as of `now`; raises NotImplementedError until B10 has built them."""
-    return horizons_contract.scores_asof(market, now), horizons_contract.ranges_asof(market, now)
+def horizon_rows(market: str, now: datetime) -> tuple[list[dict], list[dict], list[dict]]:
+    """(scores, ranges, cross_scores) of every horizon as of `now`: the base model's scores, the ranges and the
+    cross_market model variant's scores (B10); raises NotImplementedError until B10 has built them."""
+    return (horizons_contract.scores_asof(market, now), horizons_contract.ranges_asof(market, now),
+            horizons_contract.scores_asof(market, now, variant=VARIANT_CROSS))
 
 
 def feature_rows(con, now: datetime) -> dict[str, dict]:
@@ -63,8 +66,8 @@ def same_day(row: dict, ticker: str, as_of: str) -> bool:
     return row["ticker"] == ticker and str(row["as_of_date"])[:10] == as_of
 
 
-def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list[dict],
-                 news_cfg: dict) -> list[TickerInputs]:
+def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list[dict],  # noqa: PLR0913 (inputs)
+                 news_cfg: dict, cross_scores: list[dict] | None = None) -> list[TickerInputs]:
     """One TickerInputs per active company with a stored close."""
     market, tickers = cfg["market"], active_tickers(cfg, now)
     entry = entry_session(cfg, now)
@@ -79,6 +82,7 @@ def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list
         as_of = str(own["date"].iloc[-1])
         my_scores = {int(s["horizon_days"]): s for s in scores if same_day(s, ticker, as_of)}
         my_ranges = {int(r["horizon_days"]): r for r in ranges if same_day(r, ticker, as_of)}
+        my_cross = {int(s["horizon_days"]): s for s in cross_scores or [] if same_day(s, ticker, as_of)}
         scored_at = max((as_utc_timestamp(s["computed_at"]) for s in my_scores.values()), default=pd.Timestamp(now))
         since = scored_at - timedelta(hours=news_cfg["lookback_hours"])
         news = [n for n in reads.news_items(con, scored_at.to_pydatetime(), since.to_pydatetime())
@@ -91,5 +95,5 @@ def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list
             prev_close=previous_close(own, adjust, ticker), regime=regime,
             quality=feature.get("quality"), days_to_earnings=feature.get("days_to_earnings"),
             amount=trade_amount(market, ticker, now), currency=CURRENCY[market], scores=my_scores,
-            ranges=my_ranges, news=news))
+            cross_scores=my_cross, ranges=my_ranges, news=news))
     return out

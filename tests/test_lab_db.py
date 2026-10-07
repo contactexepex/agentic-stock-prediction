@@ -21,6 +21,7 @@ import common
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
 from marketbrief.lab import cli, registry, reports, run, settle_run, sizing, timing
+from marketbrief.lab.constants import MSG_NO_CROSS_SCORE
 from marketbrief.portfolio import service
 from marketbrief.portfolio.eur_view import lot_view
 
@@ -255,6 +256,32 @@ def test_predict_with_b10_scores_and_ranges(root, capsys, monkeypatch):
     assert cli.main(["--market", "us", "predict"]) == 0                                 # ids already stored
     assert json.loads(capsys.readouterr().out) == {"ok": True, "predictions": 0, "abstentions": 0}
 
+
+
+def test_global_strategy_reads_the_cross_market_variant(root, capsys, monkeypatch):
+    # rule.model_news_global.v1 (cross_market: true) predicts from B10's cross_market variant scores
+    # (model_variant_scores, ids ending -cross_market) where they exist, and abstains on the other horizons
+    exits = ["2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-12"]
+    rows = [horizon_rows(k, day) for k, day in zip(range(1, 6), exits)]
+    write_jsonl(root, "us", "model_scores", "2026-10-05", [score for score, _ in rows])
+    write_jsonl(root, "us", "ranges", "2026-10-05", [band for _, band in rows])
+    cross = [{**score, "id": f"{score['id']}-cross_market", "prob_up": 0.7, "prob_model": 0.7,
+              "model_variant": "cross_market"} for score, _ in rows[:2]]          # N+1 and N+2 only
+    write_jsonl(root, "us", "model_variant_scores", "2026-10-05", cross)
+    monkeypatch.setenv("MB_NOW", "2026-10-05T11:45:00+00:00")
+    assert cli.main(["--market", "us", "predict"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"ok": True, "predictions": 52, "abstentions": 1}
+    con = connect("us")
+    glob = {p["horizon_days"]: p for p in con.execute(
+        "SELECT * FROM strategy_predictions WHERE strategy_id = 'rule.model_news_global.v1'").df().to_dict("records")}
+    assert sorted(glob) == [1, 2]
+    assert (glob[1]["prob_up"], glob[1]["model_score_id"]) == (0.7, "2026-10-02-AAPL-1d-cross_market")
+    assert "model_scores:2026-10-02-AAPL-2d-cross_market" in list(glob[2]["evidence_ids"])
+    ref = con.execute("SELECT prob_up, model_score_id FROM strategy_predictions "
+                      "WHERE id = 'rule.model_news.v1:2026-10-02-AAPL-1d'").fetchone()
+    assert ref == (0.6, "2026-10-02-AAPL-1d")                                     # the base model, unchanged
+    skipped = con.execute("SELECT horizons, reason FROM strategy_abstentions").fetchall()
+    assert [(list(h), r) for h, r in skipped] == [([3, 4, 5], MSG_NO_CROSS_SCORE)]
 
 @pytest.mark.usefixtures("root")
 def test_backtest_reads_as_of_the_clock_and_adds_the_history_cache(monkeypatch):
