@@ -1,6 +1,6 @@
 # market-brief: product specification and parallel roadmap
 
-Status: approved by the owner (decisions 1-48, 2026-10-07). It records every decision the owner made in the
+Status: approved by the owner (decisions 1-52, 2026-10-07). It records every decision the owner made in the
 question rounds of 2026-10-07 and turns them into features, data, API, pages, integrations and a
 roadmap of waves that can be built in parallel cloud sessions. It builds on what is already merged
 (docs/DESIGN.md, docs/ARCHITECTURE.md, api/openapi.yaml, docs/ws/) and changes none of its rules unless
@@ -29,12 +29,12 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 3 | Down signals | Buy-only in both markets: a "down" prediction creates no trade (it is still scored as a prediction). |
 | 4 | India share price above the amount | Skip the trade unless the company's amount is raised. Whole shares only in India. |
 | 5 | US shares | Fractional shares: exactly the amount is invested. |
-| 6 | Costs | India: Axis Direct. US: BUX (ABN AMRO), owner trades from the Netherlands. Charges in F1.6 (provisional until confirmed). |
+| 6 | Costs | India: Axis Direct. US: BUX (ABN AMRO), owner trades from the Netherlands. Charges in F1.6 (provisional until confirmed). Refined by decisions 49 and 52: the plans and charges the owner provided. |
 | 7 | Trades per day | No limit on trades: every qualifying forecast is its own paper trade (accuracy view). The per-strategy money-view budget is superseded by decision 40. |
 | 8 | Who is better | Headline = profit after costs on the same trades and amounts; beside it win rate, price-prediction error, worst losing streak, drawdown and a luck test. |
 | 9 | AI traders | 3 on Sonnet (news & results; price pattern & market mood; combined) + 1 on Opus (combined), from day one. |
 | 10 | AI sees the rule-based score | Mixed: the news and pattern traders are blind; both combined traders see the model score. |
-| 11 | Currency (US) | Strategies are compared in USD ($1,000 per trade). The owner's own paper portfolio also shows EUR, including BUX's conversion fee and the rate change. |
+| 11 | Currency (US) | Strategies are compared in USD ($1,000 per trade). The owner's own paper portfolio also shows EUR, including BUX's conversion fee and the rate change. Refined by decision 50: the USD comparison uses the market cost (the order fee, no FX); the FX markup and the portfolio fee are part of the owner's "your cost". |
 | 12 | Delete company | Hide everywhere (tombstone): no display, no use, no collection, purged from derived stores; old records stay in git history, never shown. |
 | 13 | Deactivated company | Shown in an Inactive section on the Companies page (news, price, Reactivate); out of picks, strategies and the watchlist; collection continues. |
 | 14 | Allowed companies | Common stocks listed on NSE (India) or NYSE/Nasdaq (US). No BSE-only stocks, no ETFs. |
@@ -73,6 +73,10 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 46 | News: two markets | An article may be stored once per market (India, US), never twice within a market. |
 | 47 | News de-duplication timing | Fixed now as a small batch, before the waves (Wave 0). |
 | 48 | Waves | The wave plan of section 10: each session in its own cloud session, built, judged and merged to main in parallel; sessions merge to main themselves after a PASS (no pull requests); the orchestrator watches and resolves clashes. More automation and autonomy, less owner attention. |
+| 49 | India broker plan | Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS (charges in F1.6; owner-provided from the published schedule, marked verify in `config/costs.yaml` `broker:` until a contract note confirms them). |
+| 50 | Two cost views on every trade | "Market cost" = brokerage + statutory taxes + exchange/regulatory fees (US: the order fee, SEC fee and FINRA TAF, no FX); strategies are ranked on it. "Your cost" = market cost + the owner-specific items: India the ₹200 NRI reporting charge on the buy date and on the sell date and the DP charge; US BUX's FX markup of 0.75% each way and the 0.20% a year portfolio fee pro-rated over the calendar days held. The go-live bar and the owner's money decisions use your cost. |
+| 51 | Cost-viable flag | A prediction or pick is `cost_viable` when its expected gain after your cost is positive: P(up) × move − (1 − P(up)) × loss − your cost > 0, with move and loss the conditional expected rise/shortfall of the pick (lab/gain.py); null without a probability or 80% range. It is still made, traded and scored either way; picks and Slack show the flag. (Owner decision in the B6 session, 2026-10-07, replacing the first wording "predicted move exceeds your cost".) |
+| 52 | US broker plan | BUX Basic: €0.99 per order, FX markup 0.75% on each EUR↔USD conversion, 0.20% a year portfolio fee (charges in F1.6; owner-provided, marked verify in `config/costs.yaml` `broker:`). |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
@@ -126,23 +130,45 @@ part already does it, the feature says "exists" and what changes.
    entry and exit prices are the raw official open and close. A later correction of an adjustment
    (`supersedes`) re-settles the trade as a new settlement row (append-only), never an edit.
 6. **Costs** (applied to entry and exit value; the table lives in `config/costs.yaml`, each value
-   marked verify with its source):
+   marked verify with its source; engine code `marketbrief/lab/costs.py`). Owner decisions 49-52 (2026-10-07):
+   the broker values below are **owner-provided from the brokers' published schedules and marked verify** in
+   `config/costs.yaml` `broker:`; no contract note (India) or BUX fee page (US) has confirmed them yet. Each charge
+   belongs to one of the two cost views of decision 50: **market** (brokerage, statutory taxes and
+   exchange/regulatory fees; strategies are ranked on it) or **your** (the owner-specific items added to the market
+   cost; the go-live bar and the owner's money decisions use it).
 
-   | Market | Charge | Provisional value | Status |
-   |---|---|---|---|
-   | India (Axis Direct) | Brokerage, delivery | 0.50% each side ("Investment Plus") or 0.25% ("Now or Never"): owner to confirm the plan | SECONDARY SOURCE, not verified |
-   | India | DP charge per scrip sold | ₹30 or 0.04% (higher), source quoted it for NRI accounts | SECONDARY SOURCE, not verified |
-   | India | STT, exchange, SEBI, stamp duty, GST | as already in `config/costs.yaml` | as documented there |
-   | US (BUX) | Order fee, US stocks | €0.99 per market order | SECONDARY SOURCE (2024-era), not verified |
-   | US | FX conversion | 0.25% EUR->USD (USD->EUR not found) | SECONDARY SOURCE, not verified |
-   | US | SEC fee, FINRA TAF | as already in `config/costs.yaml` | official, as documented there |
+   | Market | Charge | Value | View | Source |
+   |---|---|---|---|---|
+   | India (Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS; decision 49) | Brokerage, delivery | 0.75% of the order value each side, at least ₹50 per order | market | owner-provided; verify with a contract note |
+   | India | GST | 18% on brokerage + exchange transaction charge + SEBI fee | market | owner-provided; verify |
+   | India | STT | 0.1% each side | market | owner-provided (agrees with `config/costs.yaml`); verify |
+   | India | Stamp duty | 0.015% on the buy side | market | owner-provided (agrees with `config/costs.yaml`); verify |
+   | India | NSE transaction charge, SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | as documented there (search-only sources) |
+   | India | NRO Non-PIS reporting charge | ₹200 per trade date: the full ₹200 on a paper trade's buy date and again on its sell date | your | owner-provided; verify with a contract note |
+   | India | DP charge per scrip sold | provisional: ₹30 or 0.04% of the sale value, the higher | your | SECONDARY SOURCE, unchanged; verify with a contract note |
+   | India | Demat AMC | about ₹885 a year: an account charge, in no trade's cost | none | owner-provided; verify |
+   | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session | market | owner-provided; verify with BUX |
+   | US | FX markup | 0.75% of the value on each EUR↔USD conversion (on the buy and on the sale) | your | owner-provided; verify with BUX |
+   | US | Portfolio fee | 0.20% a year on the entry value, pro-rated over the calendar days from D to the exit session | your | owner-provided; verify with BUX |
+   | US | SEC fee, FINRA TAF | as already in `config/costs.yaml` | market | official, as documented there |
 
-   The official broker pages could not be opened from the cloud environment. The owner confirms the
-   real charges from a contract note (India) and the BUX fee page (US); until then strategies are still
-   comparable because every account pays the same costs. The USD comparison (decision 11) applies the
-   order fee converted at the day's EUR/USD rate and leaves the FX conversion to the owner's EUR view.
-   No EUR/USD rate is stored today: Session B2 adds `EURUSD=X` (Yahoo daily close) as a US cross-market
-   symbol of role `fx` (collected as bars only, not a model feature).
+   No GST is added to the reporting and DP charges (the owner's facts put GST on brokerage + exchange + SEBI only).
+   Each cost line is rounded to cents and a view's total is the sum of its rounded lines.
+
+   **Round trip at the default amount** (flat price, entry value = exit value; F1.7.3 and decision 51 use the same
+   arithmetic at the latest close `C`), from `lab/costs.py`:
+   - India, ₹1,00,000: brokerage 2 × ₹750 = ₹1,500.00; STT ₹200.00; exchange ₹6.14; SEBI ₹0.20; stamp duty ₹15.00;
+     GST 18% × (1,500.00 + 6.14 + 0.20) = ₹271.14. **Market cost ₹1,992.48 = 1.99%.** Plus NRI reporting 2 × ₹200
+     and the provisional DP charge ₹40.00 (0.04% of ₹1,00,000 > ₹30): **your cost ₹2,432.48 = 2.43%.**
+   - US, $1,000 at an example EUR/USD of 1.17 (the stored close is used): order fee 2 × €0.99 × 1.17 = $2.32; SEC
+     fee $20.60 per million on the sale = $0.02; FINRA TAF $0.00 until 2026-12-31. **Market cost $2.34 = 0.23%.**
+     Plus the FX markup 0.75% on the buy and on the sale = $15.00 and the portfolio fee $0.01 for a one-day hold
+     ($0.04 over 7 calendar days): **your cost $17.35 = 1.74%** for N+1 on consecutive weekdays. FX dominates.
+
+   The USD comparison (decisions 11 and 50) applies the order fee converted at the stored EUR/USD close and leaves
+   the FX markup to your cost. Session B2 adds `EURUSD=X` (Yahoo daily close) as a US cross-market symbol of role
+   `fx` (collected as bars only, not a model feature); until a rate is stored, a US settlement waits
+   (`waiting_for_eurusd`).
 7. **Two views** (decisions 40-42), both from the same predictions:
    - **Accuracy view:** every qualifying prediction (each strategy, company and horizon) is its own
      trade of the company's amount (₹1,00,000 / $1,000 unless overridden, decision 44); no limit on the number of trades,
@@ -156,23 +182,42 @@ part already does it, the feature says "exists" and what changes.
      2. "Strongest" (decision 41): rank the family by profit after costs on this company in the
         accuracy view, all horizons pooled, counting only strategies with at least 20 settled trades on
         it; strategies below 20 are ranked after them by profit after costs across all companies (ties:
-        more settled trades, then the lower strategy id). Take the highest-ranked strategy that has at
+        more settled trades, then the lower strategy id). Strategies with no settled trade at all rank after
+        every strategy with one (B2 correction); a re-settled trade counts once, at its newest settlement. Take the highest-ranked strategy that has at
         least one candidate horizon today. No such strategy: no head-to-head trade for that family and
         company today, recorded as `no_candidate`.
      3. Pick rules, applied to that strategy's candidate horizons, computed pre-open from the latest
         stored close `C` (the entry open is not known yet), all in percent of the trade amount:
-        `move = target / C - 1`, `loss = 1 - range_low / C` (`range_low` = the lower edge of the 80% band), `costs` = the round-trip cost of the
-        company's amount at `C` (F1.6) as a percent of the amount;
-        "best expected gain" = the horizon with the highest `p x move - (1 - p) x loss - costs`
-        (ties: the shorter horizon); "highest probability" = the horizon with the highest `p` (ties: the
-        shorter horizon).
+        `move` = E[X / C − 1 | X > C] and `loss` = E[1 − X / C | X < C], in % of C, where the exit close X is
+        read as normal with mean = the strategy's target and sigma = (hi80 − lo80) / (2 × 1.2816) of its 80%
+        range for that horizon (`marketbrief/lab/gain.py`); `costs` = the market-cost round trip of the
+        company's amount at `C` (F1.6; ranking uses the market cost, decision 50) as a percent of the amount;
+        expected gain = `p x move - (1 - p) x loss - costs`; "best expected gain" = the horizon with the highest
+        expected gain per session held (expected gain / k; ties: the shorter horizon; owner decision of
+        2026-10-07) (B2 correction: the draft, `move = target / C - 1` and `loss = 1 - range_low / C`, compared
+        the band's low edge with its centre and always picked N+1; ranking the gain per trade would always pick
+        N+5 at equal p); "highest probability" = the horizon with the highest `p` (ties: the shorter horizon).
+        A prediction whose amount buys no whole share at C is no candidate. The pick lists the strongest
+        strategy's expected gain at every horizon it predicted for the company; only the qualifying ones
+        (`eligible`) can be picked.
      4. Both picks are recorded even when they name the same horizon, so each pick rule's results stay
         complete; each pick stores the ranking it came from and its expected-gain number.
+     5. **Cost-viable flag** (decision 51). At pick time, every qualifying prediction of D and every pick gets a
+        `cost_views` row (and each pick candidate the same fields): `expected_move_pct` = (target / C − 1) × 100,
+        the round trip at `C` in both views (`market_cost_pct`, `your_cost_pct`; the US portfolio fee over the
+        calendar days from D to the planned exit), `expected_gain_your_pct` = `p x move - (1 - p) x loss -
+        your_cost_pct` with the move and loss of item 3, and `cost_viable` = `expected_gain_your_pct > 0` (null
+        without a probability or an 80% range, e.g. the always-up and momentum baselines, and when the amount
+        buys no whole share at C). The flag never stops a prediction or a trade: it is made, traded under F1.2 and
+        scored either way, and a non-viable candidate can still be picked (owner decision of 2026-10-07).
 8. **Locked before the open.** Predictions are appended to `data/` and pushed before D's open; the
    settlement refuses any prediction whose `made_at` is after the entry open or whose record was
    first committed after it (checked from git when available).
 9. **Settlement** is deterministic and re-runnable: same stored bars give the same result. Each trade
-   records entry, exit, quantity, gross and net P&L (₹ or $), return %, costs, target error (exit close
+   records entry, exit, quantity, gross and net P&L (₹ or $), return %, costs under **both cost views** (decision
+   50: `costs`, `cost_lines`, `net_pnl` and `return_pct` of `paper_trades_settled` are the market cost; the
+   settlement's `cost_views` row holds `your_costs`, `your_cost_lines`, `net_pnl_your` and `return_pct_your`,
+   joined on `record_id` = the settlement id), target error (exit close
    vs predicted target, %), range hit (exit close inside the predicted range), and status, plus the
    price-reached measures of decision 40:
    - `target_reached`: true when any session's high from D to the exit session (inclusive) is at or
@@ -344,13 +389,18 @@ proposal as an approvable diff.
    streak, maximum drawdown, and a luck test (bootstrap interval of the mean net return; multiple-
    testing correction across all strategies compared). Rule vs AI head-to-head on identical
    company-days; rule vs rule and AI vs AI within each family; gain-pick vs probability-pick.
-   Baselines on the same table.
-2. **Go-live bar** (owner-approved): at least 2 months of forward paper trading and about 300 trades
-   per strategy (accuracy view; proposal: counted per strategy and horizon once the owner agrees);
-   beats the best baseline after costs with the corrected luck test
-   excluding zero; maximum drawdown within the owner's limit (to be set at the first review; proposal:
-   a cumulative loss of 10 times the default per-trade amount, i.e. ₹10,00,000 / $10,000, on the
-   strategy's accuracy-view trades); holds in calm and volatile regimes. First formal review 2 months after
+   Baselines on the same table. Money and return figures are shown under both cost views (decision 50):
+   strategies are ranked on the market cost; the your-cost figures (net profit, mean return, win rate, worst
+   losing streak, drawdown and the luck test) sit beside them.
+2. **Go-live bar** (owner-approved; decision 50: measured on **your cost**): at least 2 months of forward paper
+   trading and about 300 trades per strategy (accuracy view; proposal: counted per strategy and horizon once the
+   owner agrees); beats the best baseline after your cost with the corrected luck test (on `return_pct_your`)
+   excluding zero; maximum drawdown of the your-cost net P&L within the owner's limit (to be set at the first
+   review; proposal: a cumulative loss of 10 times the default per-trade amount, i.e. ₹10,00,000 / $10,000, on the
+   strategy's accuracy-view trades; costs alone take about ₹2,432 / $17.35 per trade at the default amount (F1.6),
+   about ₹7,29,744 / $5,205 over 300 trades, so a strategy that only breaks even before costs uses about 73%
+   (India) or 52% (US) of the limit in its first 300 trades); holds in calm and volatile regimes. The owner's own
+   money decisions use your cost too. First formal review 2 months after
    F1 goes live; then monthly. A strategy that meets the bar is "proven"; only proven strategies may show
    Strong Buy (the existing WS4 rule generalised to strategies).
 
@@ -408,7 +458,8 @@ fixture company; the seeded watchlist reproduces today's outputs byte for byte (
 
 One thread per market per day in `#market-brief`: (1) morning picks before the open (top 5 per
 market by agreement at N+1, each also showing its strongest other horizon (decision 39), with family,
-probability, target, amount, Paper label, and today's head-to-head trades (up to four) per pick);
+probability, target, amount, Paper label, whether it is viable at the owner's cost (expected gain after
+your cost > 0), and today's head-to-head trades (up to four) per pick, each with its flag);
 (2) intraday alerts in the same thread (a flagged open trade, material news on a company with an open
 trade); (3) close results (each settled trade, rule vs AI today); plus (4) the weekly report as its own
 post, and onboarding confirmations as replies to the command that asked. Nothing is posted outside
@@ -502,6 +553,7 @@ New append-only kinds (schemas in `scripts/marketbrief/core/schema_*.py`, `data/
 | `strategy_abstentions` | AI trader x company x day it abstained or failed its gate | pre-open run |
 | `paper_trades_settled` | settled trade x view (accuracy, head-to-head with its pick rule and family), with its automatic reason (F1.10) | post-close run (F1 engine) |
 | `head_to_head_picks` | company x day x family x pick rule: the chosen strategy, horizon and why it was chosen (or "no qualifying prediction") | pre-open run |
+| `cost_views` | prediction or pick that would trade, and settled trade: the two cost views (decision 50) and the cost-viable flag (decision 51) | pre-open and post-close runs (B2, `core/schema_b2.py`) |
 | `trade_reasons_ai` | AI-written reason per head-to-head trade and per biggest win or miss | post-close run, gated |
 | `trade_checks` | open trade x intraday check | intraday run (extends WS5 `intraday_checks`) |
 | `eod_analyses` | market x day | post-close run, gated |
@@ -760,7 +812,7 @@ review at 2 months (decision 23).
 
 | When | Action |
 |---|---|
-| Before B2 merges (Wave 2) | Confirm broker charges: Axis Direct plan (brokerage % per side, DP charge per sale) from a contract note; BUX order fee and FX fee from the BUX app or site |
+| Before Wave 5 switches on paper trading (B2 merges with the owner-provided values) | Confirm the broker charges of decisions 49 and 52 (F1.6): from an Axis Direct contract note, the 0.75% brokerage and its ₹50 minimum, GST, STT, stamp duty, the ₹200 NRO Non-PIS reporting charge per trade date and the DP charge per sale (still provisional); from the BUX app or site, the €0.99 order fee, the 0.75% FX markup and the 0.20% a year portfolio fee |
 | Before B4/B5 go live (Waves 2-3) | Create the two Vercel projects; MotherDuck read token and inbox service account; GitHub fine-grained token |
 | Before B5 Slack | Add `/company`, `/trade`, `/ask` and the interactivity URL to the Slack app |
 | Before B8 | Anthropic workspace with a $20 monthly limit and a key in it |
