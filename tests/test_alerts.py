@@ -571,43 +571,38 @@ def test_daily_brief_joins_the_day_thread(monkeypatch):
     assert http.calls[-1]["form"]["thread_ts"] == first["thread_ts"]
 
 
-# ---------- the owner's own costs (decisions 50-51; field names assumed until B2's docs/ws/b2.md) ----------
+# ---------- the owner's own costs (decisions 50-51; B2's stored cost_views values, docs/ws/b2.md) ----------
 
-def with_your_cost(rows: list[dict], cost: float) -> list[dict]:
-    """Fixture values in B6's assumed naming: the owner's round-trip cost on every call or pick."""
-    return [{**r, "your_cost_pct": cost} for r in rows]
+def with_your_cost(rows: list[dict], cost: float, gain=None) -> list[dict]:
+    """Fixture rows carrying B2's stored cost_views values as the reader joins them: the owner's round-trip cost and
+    the stored expected gain after it (`gain(row)` per row; none stored when gain is None)."""
+    return [{**r, "your_cost_pct": cost, **({"your_gain_pct": gain(r)} if gain else {})} for r in rows]
 
 
-def test_morning_pick_viable_means_expected_gain_after_your_cost():
+def test_morning_pick_shows_the_buyers_mean_stored_gain():
     preds = of_market(examples("prediction"), "us")
-    row = agreement(preds, 1)[0]
-    p, base = row["avg_prob_up"], row["base_close"]
-    move, loss = (row["avg_target"] / base - 1) * 100, (1 - row["avg_lo80"] / base) * 100
-    gain = round(p * move - (1 - p) * loss - 0.30, 2)            # F1.7.3 with your cost instead of market costs
-    assert gain < 0                                               # wide ranges: the example pick does not pay
-    msg = build_morning("us", "2026-10-07", with_your_cost(preds, 0.30), [], HORIZONS)
-    assert f"Expected gain {gain:+.2f}% after your cost 0.30% — not viable." in msg
+    buyers = [p for p in preds if p["horizon_days"] == 1 and p["qualifies"]]
+    losing = with_your_cost(preds, 0.30, lambda r: -1.2 if r["family"] == "rule" else -0.6)
+    mean = round(sum(-1.2 if p["family"] == "rule" else -0.6 for p in buyers) / len(buyers), 2)
+    msg = build_morning("us", "2026-10-07", losing, [], HORIZONS)
+    assert f"Expected gain {mean:+.2f}% after your cost 0.30% — not viable." in msg
     assert msg.splitlines()[2] == "No pick clears your costs today."
-    # a narrow range makes the same pick pay: loss 0.1% -> gain > 0
-    narrow = [{**c, "lo80": c["base_close"] * 0.999} for c in with_your_cost(preds, 0.01)]
-    row = agreement(narrow, 1)[0]
-    gain = round(row["avg_prob_up"] * (row["avg_target"] / row["base_close"] - 1) * 100
-                 - (1 - row["avg_prob_up"]) * (1 - row["avg_lo80"] / row["base_close"]) * 100 - 0.01, 2)
-    viable = build_morning("us", "2026-10-07", narrow, [], HORIZONS)
-    assert gain > 0 and f"Expected gain {gain:+.2f}% after your cost 0.01% — viable." in viable
+    paying = with_your_cost(preds, 0.30, lambda _row: 0.4)
+    viable = build_morning("us", "2026-10-07", paying, [], HORIZONS)
+    assert "Expected gain +0.40% after your cost 0.30% — viable." in viable
     assert "No pick clears your costs today." not in viable
-    assert "your cost" not in build_morning("us", "2026-10-07", preds, [], HORIZONS)   # no cost stored: no text
+    assert "your cost" not in build_morning("us", "2026-10-07", preds, [], HORIZONS)            # nothing stored
+    no_gain = build_morning("us", "2026-10-07", with_your_cost(preds, 0.30), [], HORIZONS)       # cost, no gain
+    assert "your cost" not in no_gain and "No pick clears" not in no_gain                       # nothing computed
 
 
-def test_head_to_head_line_shows_expected_gain_after_your_cost():
+def test_head_to_head_line_shows_the_picks_stored_gain():
     preds = of_market(examples("prediction"), "us")
-    h2h = with_your_cost(of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07"), 0.30)
+    h2h = with_your_cost(of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07"), 0.30,
+                         lambda r: 0.25 if r["family"] == "rule" else -1.44)
     lines = [x for x in build_morning("us", "2026-10-07", preds, h2h, HORIZONS).splitlines() if x.startswith("   • ")]
-    first = next(p for p in h2h if p["family"] == "rule" and p["pick_rule"] == "best_expected_gain")
-    gain = round(first["prob_up"] * first["move_pct"] - (1 - first["prob_up"]) * first["loss_pct"] - 0.30, 2)
-    verdict = "viable" if gain > 0 else "not viable"
-    assert f"; expected gain {gain:+.2f}% after your cost 0.30% — {verdict} [Paper]" in lines[0]
-    assert all("after your cost 0.30%" in x for x in lines)
+    assert all("; expected gain +0.25% after your cost 0.30% — viable [Paper]" in x for x in lines if "Rule" in x)
+    assert all("; expected gain -1.44% after your cost 0.30% — not viable [Paper]" in x for x in lines if "AI," in x)
 
 
 def test_close_shows_your_cost_result_beside_market_cost():
@@ -729,7 +724,8 @@ def test_your_cost_total_only_when_every_row_has_it():
 
 def test_no_pick_clears_with_some_picks_lacking_cost_numbers():
     preds = of_market(examples("prediction"), "us") + of_market(examples("prediction"), "india")
-    costed = [{**p, "your_cost_pct": 0.30} if p["ticker"] == "NVDA" else p for p in preds]   # RELIANCE: no cost
+    costed = [{**p, "your_cost_pct": 0.30, "your_gain_pct": -0.9} if p["ticker"] == "NVDA" else p
+              for p in preds]                                                                 # RELIANCE: none
     msg = build_morning("us", "2026-10-07", costed, [], HORIZONS)
     assert [r["ticker"] for r in picks(costed)] == ["NVDA", "RELIANCE"]
     assert msg.splitlines()[2] == "No pick clears your costs today."
@@ -748,7 +744,8 @@ def test_cost_views_join_as_of_the_clock(scratch, monkeypatch, capsys):
     store_us_examples(scratch)
     preds = of_market(examples("prediction"), "us")
     settled = [r for r in of_market(examples("paper_trade"), "us") if r["settled_at"].startswith("2026-10-01")]
-    views = [cost_view("prediction", p, "2026-10-07T11:46:00Z", your_cost_pct=0.30) for p in preds]
+    views = [cost_view("prediction", p, "2026-10-07T11:46:00Z", your_cost_pct=0.30, expected_gain_your_pct=-0.85,
+                       cost_viable=False) for p in preds]
     views += [cost_view("settlement", r, "2026-10-01T22:16:00Z", your_costs=round(r["costs"] + 0.46, 2),
                         net_pnl_your=round(r["net_pnl"] - 0.46, 2),
                         return_pct_your=round((r["net_pnl"] - 0.46) / r["amount"] * 100, 2)) for r in settled]
@@ -756,7 +753,7 @@ def test_cost_views_join_as_of_the_clock(scratch, monkeypatch, capsys):
     monkeypatch.setenv("MB_NOW", "2026-10-07T12:00:00+00:00")
     run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
     sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
-    assert "after your cost 0.30% — not viable." in sent
+    assert "Expected gain -0.85% after your cost 0.30% — not viable." in sent
     shutil.rmtree(scratch / "work")
     monkeypatch.setenv("MB_NOW", "2026-10-07T11:45:30+00:00")
     run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
@@ -770,3 +767,18 @@ def test_cost_views_join_as_of_the_clock(scratch, monkeypatch, capsys):
     assert "net +$4.60 (+0.46%) after $2.34 market costs; after your costs ($2.80) net +$4.14 (+0.41%);" in close
     rule = [r for r in settled if r["view"] == "accuracy" and r["family"] == "rule" and r["status"] == "settled"]
     assert f"(after your costs {text.signed_money('USD', round(sum(r['net_pnl'] - 0.46 for r in rule), 2))})" in close
+
+
+def test_viability_uses_the_unrounded_stored_gain_and_skips_null_gains():
+    preds = of_market(examples("prediction"), "us")
+    h2h = with_your_cost(of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07"), 0.30,
+                         lambda _row: 0.003)                       # B2: cost_viable = 0.003 > 0 = True
+    tiny = with_your_cost(preds, 0.30, lambda _row: 0.004)
+    msg = build_morning("us", "2026-10-07", tiny, h2h, HORIZONS)
+    assert "Expected gain +0.00% after your cost 0.30% — viable." in msg       # shown rounded, tested exact
+    assert all("; expected gain +0.00% after your cost 0.30% — viable [Paper]" in x
+               for x in msg.splitlines() if x.startswith("   • "))
+    assert "No pick clears your costs today." not in msg
+    mixed = with_your_cost(preds, 0.30, lambda r: None if r["family"] == "rule" else 0.5)  # rule: none stored
+    assert "Expected gain +0.50% after your cost 0.30% — viable." in build_morning("us", "2026-10-07", mixed, [],
+                                                                                  HORIZONS)

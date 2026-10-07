@@ -8,13 +8,13 @@ as the settlement refuses it (F1.8)."""
 from __future__ import annotations
 
 import math
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.intraday.constants import PICK_PICKED, VIEW_ACCURACY, VIEW_HEAD_TO_HEAD
-from marketbrief.intraday.inputs import ADJUSTMENTS_ASOF, records, sessions_between
+from marketbrief.intraday.inputs import ADJUSTMENTS_ASOF, CALENDAR_DAYS_PER_SESSION, records, sessions_between
 
 PREDICTION_COLUMNS = (
     "id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction, "
@@ -22,42 +22,50 @@ PREDICTION_COLUMNS = (
 )
 
 
-def open_trades(con, cfg: dict, session_date: date, check_at: datetime) -> tuple[dict[str, list[dict]], dict]:
-    """({ticker: trades sorted by trade_id}, {"not_locked": n}). A prediction id's first stored row wins (ids are
-    skipped once they exist), as does a pick id's."""
+def open_trades(con, cfg: dict, session_date: date, check_at: datetime,
+                max_past_exit: int = 0) -> tuple[dict[str, list[dict]], dict]:
+    """({ticker: trades sorted by trade_id}, {"not_locked": n, "delayed_too_long": [trade ids]}). A prediction id's
+    first stored row wins (ids are skipped once they exist), as does a pick id's. A trade with a paper_trades_settled
+    row stored by check_at is closed, whatever its status (B2: no_entry and skipped trades get a row too). Issue #93:
+    a trade past its exit date without such a row (exit_delayed: no exit close yet) stays open for at most
+    `max_past_exit` sessions after the exit date; later ones are listed as delayed_too_long."""
     preds = records(con.execute(
         f"SELECT DISTINCT ON (id) {PREDICTION_COLUMNS} FROM strategy_predictions WHERE made_at <= ? "
-        "ORDER BY id, made_at", [check_at]).df())
-    preds = {row["id"]: row for row in preds if _in_window(row, session_date)}
+        "AND session_date <= ? AND exit_date >= ? ORDER BY id, made_at",
+        [check_at, session_date, session_date - timedelta(days=CALENDAR_DAYS_PER_SESSION * (max_past_exit + 1) + 7)],
+    ).df())
+    preds = {row["id"]: row for row in preds if row.get("session_date") is not None
+             and row.get("exit_date") is not None}
+    settled = {row[0] for row in con.execute(
+        "SELECT DISTINCT trade_id FROM paper_trades_settled WHERE settled_at <= ?", [check_at]).fetchall()}
     picks = records(con.execute(
         "SELECT DISTINCT ON (id) id, made_at, family, pick_rule, status, prediction_id FROM head_to_head_picks "
         "WHERE made_at <= ? ORDER BY id, made_at", [check_at]).df())
-    out: dict[str, list[dict]] = {}
-    refused = 0
-    for pred in preds.values():
-        if pred["qualifies"] and pred["direction"] == "up":
-            trade = _trade(cfg, pred, VIEW_ACCURACY, None, pred["made_at"], session_date)
-            refused += trade is None
-            if trade:
-                out.setdefault(trade["ticker"], []).append(trade)
+    candidates = [(pred, VIEW_ACCURACY, None, pred["made_at"]) for pred in preds.values()
+                  if pred["qualifies"] and pred["direction"] == "up"]
     for pick in picks:
         pred = preds.get(pick["prediction_id"])
-        if pick["status"] != PICK_PICKED or pred is None:
+        if pick["status"] == PICK_PICKED and pred is not None:
+            made_at = max(pd.Timestamp(pick["made_at"]), pd.Timestamp(pred["made_at"]))
+            candidates.append((pred, VIEW_HEAD_TO_HEAD, pick, made_at))
+    out: dict[str, list[dict]] = {}
+    refused, too_long = 0, []
+    for pred, view, pick, made_at in candidates:
+        trade = _trade(cfg, pred, view, pick, made_at, session_date)
+        if trade is None:
+            refused += _day(pred["exit_date"]) >= session_date   # counted while it would still be open
             continue
-        made_at = max(pd.Timestamp(pick["made_at"]), pd.Timestamp(pred["made_at"]))
-        trade = _trade(cfg, pred, VIEW_HEAD_TO_HEAD, pick, made_at, session_date)
-        refused += trade is None
-        if trade:
-            out.setdefault(trade["ticker"], []).append(trade)
+        if trade["trade_id"] in settled:
+            continue
+        if trade["exit_date"] < session_date:
+            past = len(sessions_between(cfg, trade["exit_date"] + timedelta(days=1), session_date))
+            if past > max_past_exit:
+                too_long.append(trade["trade_id"])
+                continue
+            trade["exit_delayed"] = True
+        out.setdefault(trade["ticker"], []).append(trade)
     return {ticker: sorted(trades, key=lambda t: t["trade_id"]) for ticker, trades in sorted(out.items())}, {
-        "not_locked": refused}
-
-
-def _in_window(row: dict, session_date: date) -> bool:
-    """D <= this session <= the exit session."""
-    if row.get("session_date") is None or row.get("exit_date") is None:
-        return False
-    return _day(row["session_date"]) <= session_date <= _day(row["exit_date"])
+        "not_locked": refused, "delayed_too_long": sorted(too_long)}
 
 
 def _trade(cfg: dict, pred: dict, view: str, pick: dict | None, made_at, session_date: date) -> dict | None:
@@ -75,7 +83,7 @@ def _trade(cfg: dict, pred: dict, view: str, pick: dict | None, made_at, session
         "target_price": pred["target_price"], "lo50": pred["lo50"], "hi50": pred["hi50"], "lo80": pred["lo80"],
         "hi80": pred["hi80"], "amount": pred["amount"],
         "session_number": len(sessions_between(cfg, entry_date, session_date)),
-        "exit_session_number": len(sessions_between(cfg, entry_date, exit_date)),
+        "exit_session_number": len(sessions_between(cfg, entry_date, exit_date)), "exit_delayed": False,
     }
 
 
