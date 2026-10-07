@@ -6,6 +6,7 @@
   portfolio.py --market india positions | pnl | list | signals | paper-follow
   portfolio.py --market india api-signals | api-portfolio   (the shapes of api/openapi.yaml SignalTiers, PaperPortfolio)
   portfolio.py --market us request-company --ticker MSFT | --name "..." --reason "..." --source claude_code
+  portfolio.py --market us import-inbox [--inbox FILE]   (the web tier's add_paper_trade requests, issue #112)
 
 stdout is one JSON object (machine-readable; {"ok": false, "errors": [...]} and exit code 2 on a rejected
 write); a short readable table goes to stderr. Every read is as of the run's clock (MB_NOW-aware)."""
@@ -17,7 +18,7 @@ import sys
 from datetime import date
 
 from marketbrief.core.cli import market_arg, require_market
-from marketbrief.portfolio import api_shapes, paper_follow, service, signals
+from marketbrief.portfolio import api_shapes, inbox_import, paper_follow, service, signals
 from marketbrief.portfolio.tables import render
 
 EXIT_REJECTED = 2
@@ -48,6 +49,8 @@ def parser() -> argparse.ArgumentParser:
         writer.add_argument("--note")
     for name in ("positions", "pnl", "list", "signals", "paper-follow", "api-signals", "api-portfolio"):
         sub.add_parser(name)
+    inbox = sub.add_parser("import-inbox", help="import the add_paper_trade requests of the web tier (issue #112)")
+    inbox.add_argument("--inbox", help="a local DuckDB file instead of MotherDuck (MOTHERDUCK_INBOX_TOKEN)")
     return root
 
 
@@ -75,6 +78,7 @@ COMMANDS = {
     "paper-follow": lambda _a, c: paper_follow.simulate(c.con, c.cfg, c.clock, c.market, c.settings, c.costs),
     "api-signals": lambda _a, c: api_shapes.signal_tiers(payload(c), c.cfg),
     "api-portfolio": lambda _a, c: api_shapes.paper_portfolio(c),
+    "import-inbox": lambda a, c: inbox_import.import_inbox(c, a.inbox, service.add_trade),
 }
 
 

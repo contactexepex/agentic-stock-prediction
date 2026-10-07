@@ -73,6 +73,15 @@ function keyOf(raw: unknown): string | null {
   return typeof key === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(key) ? key : null;
 }
 
+/** The Slack thread a confirmation replies in: only for the slack channel, and only well-formed ids. */
+function slackThread(ctx: CallContext, opts: ExecuteOptions): { slack_channel: string | null; slack_ts: string | null } {
+  const thread = opts.slackThread;
+  if (ctx.channel !== "slack" || !thread || !/^[CG][A-Z0-9]{2,20}$/.test(thread.channel) || !/^\d{1,12}\.\d{1,8}$/.test(thread.ts)) {
+    return { slack_channel: null, slack_ts: null };
+  }
+  return { slack_channel: thread.channel, slack_ts: thread.ts };
+}
+
 function safeToolName(name: unknown): string | null {
   return typeof name === "string" && /^[a-z_]{1,40}$/.test(name) ? name : null;
 }
@@ -226,7 +235,7 @@ export class ToolLayer {
       claim = await this.deps.inbox.claimRequest({
         inbox_id: key, kind: writeKind(tool) ?? "unknown", tool: tool.name, market: String(args.market), arguments: stored,
         preview, channel: ctx.channel, submitted_by: ctx.actor, agent: agent.agent, command_id: id,
-        submitted_at: now.toISOString(), args_sha256: argsSha,
+        submitted_at: now.toISOString(), args_sha256: argsSha, ...slackThread(ctx, opts),
       }, { sinceIso: utcDayStart(now), limit: agent.daily_write_budget });
     } catch {
       return this.finish(ctx, now, { ...base, result: "failed", code: null,
@@ -238,20 +247,16 @@ export class ToolLayer {
     }
     if (!claim.claimed) return this.duplicate(ctx, now, gate, base, claim.existing, argsSha);
     const summary = writeSummary(tool.name, args, preview);
-    // Only company commands have an importer (B1's onboard.yml); a paper trade waits in inbox.requests.
-    const imported = writeKind(tool) === "watchlist_events";
-    let dispatched: { ok: boolean; reason: string | null } = { ok: true, reason: null };
-    if (imported) {
-      try {
-        dispatched = await this.deps.dispatcher.dispatch();
-      } catch {
-        dispatched = { ok: false, reason: "dispatch error" };
-      }
+    // Both kinds have an importer: company commands `company.py import-inbox` (B1), paper trades
+    // `portfolio.py import-inbox` (B2, marketbrief/portfolio/inbox_import.py); onboard.yml and the routines run them.
+    let dispatched: { ok: boolean; reason: string | null };
+    try {
+      dispatched = await this.deps.dispatcher.dispatch();
+    } catch {
+      dispatched = { ok: false, reason: "dispatch error" };
     }
-    const message = imported
-      ? `Pending: ${summary}. It shows as pending until the import writes it to the record` +
-        (dispatched.ok ? "." : "; the onboarding workflow could not be started now, so the next scheduled run imports it.")
-      : `Pending: ${summary}. Stored in the inbox; the paper-trade import is not built yet, so it stays pending until it is.`;
+    const message = `Pending: ${summary}. It shows as pending until the import writes it to the record` +
+      (dispatched.ok ? "." : "; the onboarding workflow could not be started now, so the next scheduled run imports it.");
     const outcome = await this.finish(ctx, now, { ...base, result: "pending", code: null, message, inboxId: key,
       budgetLeft: this.budgetLeft(agent, usage, tool.kind, 1) }, id);
     if (!dispatched.ok) {

@@ -91,11 +91,11 @@ def claim(con, row: dict, since: str = "2026-10-07T00:00:00Z", limit: int = 20) 
     if row["kind"] == COMPANY_KIND:
         params = [row["inbox_id"], row["market"], row["tool"], compact(row["arguments"]), row["submitted_by"],
                   row["channel"], row["submitted_at"], row["command_id"], preview, row["agent"], row["args_sha256"],
-                  since, limit]
+                  since, limit, row.get("slack_channel"), row.get("slack_ts")]
         return con.execute(sql["claimCompany"], params).fetchall()
     params = [row["inbox_id"], row["kind"], row["tool"], row["market"], compact(row["arguments"]), preview,
               row["channel"], row["submitted_by"], row["agent"], row["command_id"], row["submitted_at"],
-              row["args_sha256"], since, limit]
+              row["args_sha256"], since, limit, row.get("slack_channel"), row.get("slack_ts")]
     return con.execute(sql["claimRequest"], params).fetchall()
 
 
@@ -228,3 +228,34 @@ def test_b1_imports_the_rows_the_tool_layer_writes(tmp_path, monkeypatch):
     assert (events["set_amount"]["ticker"], events["set_amount"]["amount"], events["set_amount"]["requested_by"],
             events["set_amount"]["channel"]) == ("AAPL", 1500.0, "github:owner-login", "claude_app")
     assert code == 0 and result["imported"] == 2 and "add_paper_trade" not in by_tool
+    con = duckdb.connect(str(path), read_only=True)   # B6's onboarding reply reads these two after the import
+    stored = con.execute("SELECT inbox_id, slack_channel, slack_ts FROM inbox.company_commands "
+                         "ORDER BY inbox_id").fetchall()
+    con.close()
+    assert stored == [("wire-amount-aapl-01", None, None),
+                      ("wire-deact-dal-01", "C0C6REB7QS2", "1791400000.000101")]
+
+    # The paper trade: B2's reader (marketbrief/portfolio/inbox_import.py) finds the row and builds its trade input
+    # with the row's identity, channel and key (B2's own tests cover validation and storing).
+    from datetime import datetime, timezone
+
+    from marketbrief.portfolio import inbox_import as b2_inbox
+    reader = b1_inbox.open_inbox(str(path))
+    trades = b2_inbox.pending_requests(reader, "us", datetime(2026, 10, 7, 12, tzinfo=timezone.utc))
+    reader.close()
+    assert [row["inbox_id"] for row in trades] == ["wire-trade-aapl-01"]
+    entry = b2_inbox.trade_input(trades[0], b2_inbox.arguments_of(trades[0]))
+    assert (entry.ticker, entry.side, entry.quantity, str(entry.trade_date), entry.price_basis, entry.source,
+            entry.idempotency_key, entry.submitted_by) == (
+        "AAPL", "buy", 2, "2026-10-06", "close", "claude_app", "wire-trade-aapl-01", "github:owner-login")
+
+
+def test_inbox_sql_adds_the_slack_columns_to_older_tables():
+    con = duckdb.connect()
+    con.execute("CREATE SCHEMA inbox; CREATE TABLE inbox.company_commands (inbox_id VARCHAR PRIMARY KEY, "
+                "market VARCHAR, tool VARCHAR, arguments JSON, actor VARCHAR, channel VARCHAR, "
+                "submitted_at TIMESTAMPTZ, command_id VARCHAR, preview JSON, agent VARCHAR, args_sha256 VARCHAR)")
+    con.execute(INBOX_SQL.read_text(encoding="utf-8"))
+    con.execute(INBOX_SQL.read_text(encoding="utf-8"))
+    columns = [row[0] for row in con.execute("DESCRIBE inbox.company_commands").fetchall()]
+    assert columns[-2:] == ["slack_channel", "slack_ts"]

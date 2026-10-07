@@ -34,6 +34,8 @@ class TradeInput:
     note: str | None = None
     supersedes: str | None = None
     idempotency_key: str | None = None
+    submitted_by: str | None = None    # the channel identity (inbox import); never typed in
+    command_id: str | None = None      # the web tier's command id of the inbox row
 
 
 def context(market: str) -> Context:

@@ -1,4 +1,4 @@
-"""Post-close and weekly parts of B3 (docs/SPEC.md F6): settlement through B2's interface, the EOD analyst's facts and
+"""Post-close and weekly parts of B3 (docs/SPEC.md F6; settling is B2's `lab.py settle`): the EOD analyst's facts and
 gate (ids, numbers, enums, no advice), the research director's gate (diffs that apply, nothing applied), the track
 record by band and the per-horizon inputs. Data are W1's example records written to a scratch root. Offline."""
 from __future__ import annotations
@@ -10,12 +10,10 @@ from pathlib import Path
 import pytest
 from traders_fixtures import REPO, catalogue
 
-from marketbrief.contracts import protocol
 from marketbrief.core import paths
 from marketbrief.core.database import connect
 from marketbrief.traders import director, director_facts, director_report, eod, eod_facts, eod_gate, track_record
 from marketbrief.traders.inputs import InputsUnavailableError, per_horizon
-from marketbrief.traders.settle_step import EngineUnavailableError, settle_due
 
 INDIA_DAY = date(2026, 10, 6)
 NOW = datetime(2026, 10, 6, 12, 30, tzinfo=timezone.utc)
@@ -123,28 +121,6 @@ def test_quiet_day_needs_no_analyst():
     assert row["summary"] == "No paper trades settled on 2026-10-07."
 
 
-def test_settlement_goes_through_the_engine_interface(root, monkeypatch):
-    pred = {k: v for k, v in catalogue("prediction")[0].items() if not k.startswith("_")}
-    put(root, "us", "strategy_predictions", pred["made_at"][:10], [pred])
-    con = connect("us")
-    with pytest.raises(EngineUnavailableError):
-        settle_due({"market": "us"}, con, date(2026, 10, 8), datetime(2026, 10, 8, 22, 15, tzinfo=timezone.utc))
-    calls = []
-
-    def fake_settle(prediction, view, pick, cfg, settled_at):  # noqa: ARG001 - protocol.settle's signature
-        calls.append((prediction["id"], view))
-        return {"id": f"acc:{prediction['id']}@x", "trade_id": f"acc:{prediction['id']}", "view": view}
-
-    monkeypatch.setattr(protocol, "settle", fake_settle)
-    early = settle_due({"market": "us"}, con, date(2026, 10, 7), datetime(2026, 10, 7, 22, 15, tzinfo=timezone.utc))
-    assert early["settled"] == 0 and calls == []                         # exit 2026-10-08 is not due yet
-    done = settle_due({"market": "us"}, con, date(2026, 10, 8), datetime(2026, 10, 8, 22, 15, tzinfo=timezone.utc))
-    assert done["settled"] == 1 and calls == [(pred["id"], "accuracy")]
-    again = settle_due({"market": "us"}, connect("us"), date(2026, 10, 8),
-                       datetime(2026, 10, 8, 22, 20, tzinfo=timezone.utc))
-    assert again["settled"] == 0 and len(calls) == 1                     # already settled: skipped
-
-
 @pytest.mark.usefixtures("root")
 def test_track_record_bands_from_settled_ai_trades():
     bands = track_record.load(connect("us"), datetime(2026, 10, 7, tzinfo=timezone.utc))
@@ -156,9 +132,24 @@ def test_track_record_bands_from_settled_ai_trades():
     assert track_record.refusal(0.55, {"0.50-0.60": {"n": 20, "hits": 10, "hit_rate": 0.5, "low": 0.5}}) is None
 
 
-def test_per_horizon_inputs_wait_for_b10():
+def test_per_horizon_inputs_unavailable_while_the_contract_is_a_stub(monkeypatch):
+    """Without B10's per-horizon records (the W1 stub raises NotImplementedError) the traders stop with
+    InputsUnavailableError; with them, per_horizon keys every record by its id. Independent of whether B10 is merged."""
+    from traders_fixtures import published_range, score
+
+    from marketbrief.contracts import horizons
+
+    def stub(*_args, **_kwargs):
+        raise NotImplementedError("session B10")
+
+    monkeypatch.setattr(horizons, "ranges_asof", stub)
+    monkeypatch.setattr(horizons, "scores_asof", stub)
     with pytest.raises(InputsUnavailableError):
         per_horizon("us", NOW)
+    monkeypatch.setattr(horizons, "ranges_asof", lambda *_args, **_kwargs: [published_range(1), published_range(3)])
+    monkeypatch.setattr(horizons, "scores_asof", lambda *_args, **_kwargs: [score(1)])
+    ranges, scores = per_horizon("us", NOW)
+    assert set(ranges) == {"2026-10-06-NVDA-1d", "2026-10-06-NVDA-3d"} and set(scores) == {"2026-10-06-NVDA-1d"}
 
 
 def director_inputs() -> dict:

@@ -124,7 +124,7 @@ export interface StoredRequest {
 }
 
 /** One write request. kind watchlist_events -> inbox.company_commands (B1's importer; submitted_by is its actor
- * column); kind portfolio_trades -> inbox.requests (no importer yet). */
+ * column); kind portfolio_trades -> inbox.requests (B2's `portfolio.py import-inbox`). */
 export interface InboxRequest {
   inbox_id: string;
   kind: string;
@@ -138,6 +138,9 @@ export interface InboxRequest {
   command_id: string;
   submitted_at: string;
   args_sha256: string;
+  /** The Slack message the onboarding reply threads under (slack channel only), else null. */
+  slack_channel: string | null;
+  slack_ts: string | null;
 }
 
 export interface ReadModelRow {
@@ -220,4 +223,7 @@ export interface ExecuteOptions {
   confirmedSummary?: boolean;
   /** The preview the caller confirmed (add_company). */
   preview?: CompanyPreview | null;
+  /** Slack only: the visible "request received" message the confirm step posted in #market-brief; stored with the
+   * request so B6's onboarding confirmation replies in its thread (docs/ws/b6.md, "Function for B5 and B1"). */
+  slackThread?: { channel: string; ts: string } | null;
 }

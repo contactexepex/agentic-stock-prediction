@@ -657,6 +657,21 @@ numbers (value, scale, direction), the topic enum and that no buy/sell/recommend
 attachments are not parsed until `texts.pdf_parser` is set (needs `pypdf`), so India digests hold numbers only
 until then. The context pack does not show digests yet.
 
+### 3d. Company lifecycle (F8, B1; built 2026-10-07)
+
+The watchlist is the append-only kind `watchlist_events` (add, deactivate, reactivate, delete, set_amount), validated
+by `marketbrief/lifecycle/validator.py` and appended by `scripts/company.py` or the inbox import. The loader
+(`core/market_config.load_market`) folds the events as of the run's clock: active companies are collected,
+predicted and traded; inactive ones are collected only; deleted ones are neither collected nor shown. add and delete
+count from the moment they are recorded, deactivate, reactivate and set_amount from the next pre-open run
+(`config/lifecycle.yaml`), never before the company's newest event. A new company is onboarded before its add event:
+identifiers checked (India: NSE equity list and Yahoo `.NS`; US: SEC ticker/exchange file, NYSE or Nasdaq, and Yahoo),
+ETFs, BSE-only and unknown symbols refused, the sector set from `sector_rules` (NSE industry info or SEC SIC
+description, and Yahoo's profile) or by the owner, prices backfilled from the market's first stored day through the
+price collector's own code, 15 years of daily history merged into the long-history cache (work/model_history/), the
+company's news query, its SEC filings or NSE announcements, and the candidate's collect gate. Rows an onboarding
+stored before a refusal stay (append-only) and are reused when the add is retried.
+
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
    where available, implied vol. Range = quantiles of recent standardized returns scaled by that
@@ -978,7 +993,14 @@ always show the same numbers.
 - **Slack:** one thread per market per day: a short summary (mood, top 3, number of calls,
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
-  bot token the summary is posted alone through the webhook. Nothing else is posted.
+  bot token the summary is posted alone through the webhook. `notify_slack.py` posts nothing else.
+- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** `alerts.py` keeps its own
+  thread per market and day (its first post of the day starts it) with the morning paper picks, the intraday
+  alerts of each check run (B9's feed), the close results and correction replies. From Wave 5 the morning picks
+  open that thread and the brief above replies in it (`post_brief`), so each market has one thread a day. The
+  weekly research report is its own post and onboarding confirmations reply to the command that asked. Every signal is
+  labelled Paper and every number comes from stored data as of the run's clock. The ledger
+  `data/<market>/slack_posts/` makes every post idempotent.
 
 ## 9. Repo changes needed
 - `config/markets.yaml` (exchange, timezone, benchmark, regime index, holidays) and per-market
@@ -1481,6 +1503,11 @@ Opus.
 | results-analyst (quoted bullets per results release or call text; section 3c) | Claude Sonnet 5.5 | medium |
 | headline aboutness check, once built | Claude Haiku 4.5 (`claude-haiku-4-5`; no effort setting) | - |
 | claim-checker (claim extraction from article extracts and filing texts; section 3b) | Claude Sonnet 5.5 | high |
+| trader-news-results, trader-pattern-mood (blind AI traders; SPEC F4) | Claude Sonnet 5.5 | medium |
+| trader-combined (AI trader with the model score; SPEC F4) | Claude Sonnet 5.5 | high |
+| forecaster as ai.combined.opus.v1 (trader run; SPEC F4) | Claude Opus 5.5 | high |
+| eod-analyst (post-close reasons; SPEC F6.1) | Claude Sonnet 5.5 | medium |
+| research-director (weekly proposals; SPEC F6.2) | Claude Opus 5.5 | high |
 | orchestrator (the routine session itself, incl. report narrative) | the routine sessions' configured model: `claude-opus-5-5` (India and US routine sessions, checked 2026-10-06) | session default |
 
 Claude Fable (current version `claude-fable-5-1` in the platform's model list) is not assigned; the
@@ -1492,7 +1519,9 @@ after the validation-gate edits, forecast-v9 also covering the forecaster's less
 forecast-v10, news-v8 and claims-v3 with news verification phase B; forecast-v11 with the
 signal-model anchor and the debate record (section 15); forecast-v12 when calls are scored
 open-to-close from the `call_scoring` switch (section 6); reflect-v1 started with the Sonnet 5.5 /
-medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate), and a
+medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate; forecast-v13 with
+the Opus trader protocol (B3); trader-news-v1, trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1
+start with B3), and a
 per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
