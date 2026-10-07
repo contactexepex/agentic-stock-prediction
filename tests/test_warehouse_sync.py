@@ -366,3 +366,19 @@ def test_cli_dry_run_and_missing_token(synced, monkeypatch, capsys):
     assert wh_cli.main() == 1
     out = json.loads(capsys.readouterr().out)
     assert out["ok"] is False and "MOTHERDUCK_TOKEN" in out["error"]
+
+
+def test_a_failed_rollback_does_not_hide_the_original_error(tmp_path):
+    """write_market re-raises the error that broke the transaction even when ROLLBACK fails too."""
+
+    class BrokenWarehouse:
+        def execute(self, sql, *_args):
+            if sql.startswith("CREATE OR REPLACE TABLE"):
+                raise RuntimeError("the original failure")
+            if sql == "ROLLBACK":
+                raise duckdb.TransactionException("no transaction is active")
+            return self
+
+    staged = sync.Staged(tmp_path, {"bars": 1}, {}, [])
+    with pytest.raises(RuntimeError, match="the original failure"):
+        sync.write_market(BrokenWarehouse(), "us", staged, full=False)

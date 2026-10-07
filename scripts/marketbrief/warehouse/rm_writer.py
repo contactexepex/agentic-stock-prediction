@@ -10,7 +10,9 @@ import json
 from pathlib import Path
 
 from marketbrief.constants.warehouse import BUILDS_TABLE, READ_MODEL_SCHEMA, READ_MODEL_TABLES
+from marketbrief.core.database import column_spec
 from marketbrief.warehouse.read_models import READ_MODEL_COLUMNS
+from marketbrief.warehouse.sql_statements import column_definitions, insert_row, quoted
 
 BUILDS_COLUMNS = {
     "build_id": "VARCHAR",
@@ -25,74 +27,68 @@ BUILDS_COLUMNS = {
     "pages_unchanged": "INTEGER",
     "error": "VARCHAR",
 }
-STAGED_COLUMNS = {**READ_MODEL_COLUMNS, "payload": "VARCHAR"}  # cast to JSON on insert: the text stays verbatim
+STAGED_COLUMNS = {**READ_MODEL_COLUMNS, "payload": "VARCHAR"}
 
 
-def column_sql(columns: dict[str, str]) -> str:
-    """name TYPE, ... for CREATE TABLE."""
-    return ", ".join(f"{name} {sql_type}" for name, sql_type in columns.items())
-
-
-def sql_text(value: str) -> str:
-    """A string literal for SQL."""
-    return "'" + str(value).replace("'", "''") + "'"
-
-
-def ensure_read_model_tables(wh) -> None:
+def ensure_read_model_tables(warehouse) -> None:
     """Schema rm with one table per page type (primary key market, page_key) and rm.builds."""
-    wh.execute(f"CREATE SCHEMA IF NOT EXISTS {READ_MODEL_SCHEMA}")
+    warehouse.execute(f"CREATE SCHEMA IF NOT EXISTS {READ_MODEL_SCHEMA}")
     for table in READ_MODEL_TABLES:
-        wh.execute(
+        warehouse.execute(
             f"CREATE TABLE IF NOT EXISTS {READ_MODEL_SCHEMA}.{table} "
-            f"({column_sql(READ_MODEL_COLUMNS)}, PRIMARY KEY (market, page_key))"
+            f"({column_definitions(READ_MODEL_COLUMNS)}, PRIMARY KEY (market, page_key))"
         )
-    wh.execute(f"CREATE TABLE IF NOT EXISTS {READ_MODEL_SCHEMA}.{BUILDS_TABLE} ({column_sql(BUILDS_COLUMNS)})")
+    warehouse.execute(
+        f"CREATE TABLE IF NOT EXISTS {READ_MODEL_SCHEMA}.{BUILDS_TABLE} ({column_definitions(BUILDS_COLUMNS)})"
+    )
 
 
-def stored_hashes(wh, market: str) -> dict[str, dict[str, str]]:
+def stored_hashes(warehouse, market: str) -> dict[str, dict[str, str]]:
     """table -> page_key -> payload_sha256 of the market's stored pages (one query)."""
     union = " UNION ALL ".join(
-        f"SELECT '{t}' AS t, page_key, payload_sha256 FROM {READ_MODEL_SCHEMA}.{t} WHERE market = $market"
-        for t in READ_MODEL_TABLES
+        f"SELECT '{table}' AS page_table, page_key, payload_sha256 FROM {READ_MODEL_SCHEMA}.{table} "
+        "WHERE market = $market"
+        for table in READ_MODEL_TABLES
     )
-    out: dict[str, dict[str, str]] = {t: {} for t in READ_MODEL_TABLES}
-    for table, page_key, sha in wh.execute(union, {"market": market}).fetchall():
-        out[table][page_key] = sha
-    return out
+    hashes: dict[str, dict[str, str]] = {table: {} for table in READ_MODEL_TABLES}
+    for table, page_key, payload_sha256 in warehouse.execute(union, {"market": market}).fetchall():
+        hashes[table][page_key] = payload_sha256
+    return hashes
 
 
-def write_read_models(wh, market: str, rows: dict, keep: set[tuple[str, str]], folder: Path) -> dict:
+def insert_staged_pages(warehouse, table: str, pages: list[dict], folder: Path) -> None:
+    """Insert pages through a JSON-lines file (payload read as text and cast to JSON, so it stays verbatim)."""
+    path = folder / f"rm_{table}.jsonl"
+    path.write_text("".join(json.dumps(page, ensure_ascii=False) + "\n" for page in pages))
+    selected = ", ".join("CAST(payload AS JSON)" if column == "payload" else column for column in READ_MODEL_COLUMNS)
+    warehouse.execute(
+        f"INSERT INTO {READ_MODEL_SCHEMA}.{table} SELECT {selected} FROM read_json({quoted(path.as_posix())}, "
+        f"format='newline_delimited', columns={column_spec(STAGED_COLUMNS)})"
+    )
+
+
+def write_read_models(warehouse, market: str, rows: dict, keep: set[tuple[str, str]], folder: Path) -> dict:
     """Upsert the market's pages by hash; `keep` = (table, page_key) of pages that failed validation (their
     stored rows are neither replaced nor deleted). Returns pages_written, pages_unchanged and pages_deleted."""
-    stored = stored_hashes(wh, market)
-    stats = {"pages_written": 0, "pages_unchanged": 0, "pages_deleted": 0}
+    stored = stored_hashes(warehouse, market)
+    counts = {"pages_written": 0, "pages_unchanged": 0, "pages_deleted": 0}
     for table in READ_MODEL_TABLES:
-        new = rows.get(table, {})
-        changed = [k for k, row in new.items() if stored[table].get(k) != row["payload_sha256"]]
-        gone = [k for k in stored[table] if k not in new and (table, k) not in keep]
-        stats["pages_written"] += len(changed)
-        stats["pages_unchanged"] += len(new) - len(changed)
-        stats["pages_deleted"] += len(gone)
-        name = f"{READ_MODEL_SCHEMA}.{table}"
-        if changed or gone:
-            wh.execute(f"DELETE FROM {name} WHERE market = ? AND list_contains(?, page_key)", [market, changed + gone])
-        if changed:
-            path = folder / f"rm_{table}.jsonl"
-            path.write_text("".join(json.dumps(new[k], ensure_ascii=False) + "\n" for k in changed))
-            columns = ", ".join("CAST(payload AS JSON)" if c == "payload" else c for c in READ_MODEL_COLUMNS)
-            struct = "{" + ", ".join(f"'{c}': '{t}'" for c, t in STAGED_COLUMNS.items()) + "}"
-            wh.execute(
-                f"INSERT INTO {name} SELECT {columns} FROM "
-                f"read_json({sql_text(path.as_posix())}, format='newline_delimited', columns={struct})"
+        built = rows.get(table, {})
+        changed = [key for key, row in built.items() if stored[table].get(key) != row["payload_sha256"]]
+        departed = [key for key in stored[table] if key not in built and (table, key) not in keep]
+        counts["pages_written"] += len(changed)
+        counts["pages_unchanged"] += len(built) - len(changed)
+        counts["pages_deleted"] += len(departed)
+        if changed or departed:
+            warehouse.execute(
+                f"DELETE FROM {READ_MODEL_SCHEMA}.{table} WHERE market = ? AND list_contains(?, page_key)",
+                [market, changed + departed],
             )
-    return stats
+        if changed:
+            insert_staged_pages(warehouse, table, [built[key] for key in changed], folder)
+    return counts
 
 
-def record_build(wh, build: dict) -> None:
+def record_build(warehouse, build: dict) -> None:
     """Append the build to rm.builds."""
-    marks = ", ".join("?" for _ in BUILDS_COLUMNS)
-    names = ", ".join(BUILDS_COLUMNS)
-    wh.execute(
-        f"INSERT INTO {READ_MODEL_SCHEMA}.{BUILDS_TABLE} ({names}) VALUES ({marks})",
-        [build.get(c) for c in BUILDS_COLUMNS],
-    )
+    insert_row(warehouse, f"{READ_MODEL_SCHEMA}.{BUILDS_TABLE}", BUILDS_COLUMNS, build)

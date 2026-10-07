@@ -13,18 +13,22 @@ Created:
   No secret: the token is only ever the environment variable `MOTHERDUCK_TOKEN`.
 - `scripts/warehouse_sync.py`: thin entry point.
 - `scripts/marketbrief/warehouse/`:
-  - `connection.py`: target selection, `connect_warehouse(read_only=...)`, `WarehouseError`, `redact`.
+  - `connection.py`: target selection, `connect_warehouse(read_only=...)`.
+  - `errors.py`: the token from the environment, `redact`, `WarehouseError`.
+  - `extension.py`: the MotherDuck extension installed over HTTPS only (follow-up below).
   - `postgres.py`: `PostgresEndpoint` (URL with the token URL-encoded, libpq params; repr/str redacted).
   - `tables.py`: the mirrored tables and their cut-off-aware queries, Parquet staging.
   - `read_models.py`: the page payloads, sliced from `gather_dashboard`, plus the required-key check.
   - `rm_writer.py`: hash-based upsert of `rm.*` and the `rm.builds` row.
-  - `sync.py`: one market's sync (stage, one transaction, `meta.sync_runs`, summary, kill switch).
+  - `sql_statements.py`: shared SQL text (quoted literals, column definitions, one-row inserts).
+  - `sync.py`: one market's sync (`SyncRun`: stage, connect, kill switch, one transaction, record).
+  - `sync_records.py`: the run's `meta.sync_runs` and `rm.builds` rows, page facts, summary file.
   - `cli.py`: `--market india|us [--full] [--dry-run] [--local] [--kind daily|news]`.
 - `scripts/marketbrief/constants/warehouse.py`: names, required payload keys and messages. This is a new
   module in the shared `constants/` folder; no existing constants module was changed apart from
   `environment.py`, below.
-- `tests/test_warehouse_connection.py` (offline, no MotherDuck) and `tests/test_warehouse_sync.py`
-  (offline, local fallback DuckDB file on a copy of the US data).
+- `tests/test_warehouse_connection.py` and `tests/test_warehouse_extension.py` (offline, no MotherDuck), and
+  `tests/test_warehouse_sync.py` (offline, local fallback DuckDB file on a copy of the US data).
 - `docs/ws/ws1.md`, `docs/ws/ws1-judgments.jsonl`.
 
 Shared files changed (additive only):
@@ -36,8 +40,14 @@ Shared files changed (additive only):
 - `tests/conftest.py`: a `# WS1: ...` block in `SLOW` lists the 11 tests of `tests/test_warehouse_sync.py`.
   They share one module fixture that runs several local syncs (about 30 s together).
 
-Not changed: `core/schemas.py`, `sql/views.sql` and `requirements.txt`. No dependency was added: pyarrow is
-absent, so staging goes through DuckDB's own Parquet writer. No data kind was added and nothing under `data/`
+- `requirements.txt` (follow-up): `duckdb>=1.1` became `duckdb==1.5.6`, because the MotherDuck extension
+  is built per DuckDB version and `config/warehouse.yaml` pins the matching build.
+- `scripts/marketbrief/presentation/dashboard/reads.py` (follow-up): the company-events rule inside
+  `EARNINGS_SQL` became its own constant, `COMPANY_EVENTS_ASOF_SQL`, which the warehouse's `company_events`
+  table and the stock page's events now reuse. The golden harness shows the dashboard's outputs unchanged.
+
+Not changed: `core/schemas.py` and `sql/views.sql`. No dependency was added: pyarrow is absent, so staging
+goes through DuckDB's own Parquet writer. No data kind was added and nothing under `data/`
 was written.
 
 ## Contract
@@ -47,9 +57,10 @@ was written.
   the local file `work/warehouse/market_brief.duckdb`. `--local` forces the local file.
 - Without the token and without `--local`, the sync fails with a message that names the variable and
   `--local`. It never echoes a value.
-- The extension is installed with DuckDB's own `INSTALL motherduck` from the official signed repository;
-  `allow_unsigned_extensions` is never touched (it stays `false`). The extension reads `MOTHERDUCK_TOKEN`
-  from the environment itself, so the token is never put into SQL, a connection string or a config dict.
+- The extension is installed by `extension.py` over HTTPS only (see the follow-up section below). DuckDB
+  checks both files' signatures; `allow_unsigned_extensions` is never touched (it stays `false`). The
+  extension reads `MOTHERDUCK_TOKEN` from the environment itself, so the token is never put into SQL, a
+  connection string or a config dict.
 - Every error raised from the package goes through `redact()`, which hides the token both as is and
   URL-encoded. `PostgresEndpoint` keeps the password out of `repr`/`str`. Only `url()` and `params()`
   return it, for handing straight to a client.
@@ -302,15 +313,11 @@ and `reports/<market>/dashboard.html` can never disagree.
 
 ## Cosmetic follow-ups
 From judge round 1. The stale test docstring and the `config/warehouse.yaml` skip comment were fixed in the
-round 2 diff.
+round 2 diff. The duplicated company-events rule, the f-string paths in `tables.py` and the ROLLBACK that
+could hide the original error were fixed in the follow-up below.
 - `read_models.py` (`missing_keys`): contract 4.1 asks for required keys and types; only keys are checked.
   Today's payloads pass a full jsonschema check against wave 0's spec (judge).
-- `read_models.py` `EVENTS_SQL` repeats the inner `company_events` rule of `reads.EARNINGS_SQL`; a
-  shared helper in `presentation/dashboard/reads.py` would avoid the copy.
-- `tables.py` (`stage_tables`, `count_tables`) puts paths into SQL with an f-string; use `rm_writer.sql_text`
-  as elsewhere.
 - CLI flag naming: contract 4.4 calls the rebuild `--rebuild-rm`; WS1's `--full` covers it.
-- `sync.py` `write_market`: if ROLLBACK itself raises, it hides the original error.
 - `tests/test_warehouse_sync.py`: the look-ahead test covers features, news, reviews and bars, not ranges,
   predictions or lessons.
 - A changed page (delete and re-insert of the same key in one transaction) is not exercised live on

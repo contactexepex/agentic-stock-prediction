@@ -5,14 +5,26 @@ bars reuse the dashboard's cut-off-aware ohlc query (presentation/dashboard/read
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 import pandas as pd
 
 from marketbrief.presentation.dashboard import reads
+from marketbrief.warehouse.sql_statements import quoted
 
 BARS_START = date(1900, 1, 1)
+CUTOFF_PLACEHOLDER = re.compile(r"\$cutoff(?!::)")
+# the first stored row of each call, outcome, range and range outcome (the views' pick rules), as of the cut-off
+FIRST_CALLS_SQL = "SELECT DISTINCT ON (id) * FROM predictions WHERE made_at <= $cutoff ORDER BY id, made_at"
+FIRST_CALL_OUTCOMES_SQL = """SELECT DISTINCT ON (prediction_id) * FROM outcomes WHERE scored_at <= $cutoff
+                             ORDER BY prediction_id, scored_at"""
+FIRST_RANGES_SQL = "SELECT DISTINCT ON (id) * FROM ranges WHERE made_at <= $cutoff ORDER BY id, made_at"
+FIRST_RANGE_OUTCOMES_SQL = """SELECT DISTINCT ON (range_id) * FROM range_outcomes WHERE scored_at <= $cutoff
+                              ORDER BY range_id, scored_at"""
+SCORED_CALLS_CTE = f"WITH calls AS ({FIRST_CALLS_SQL}), scored AS ({FIRST_CALL_OUTCOMES_SQL})"
+SCORED_RANGES_CTE = f"WITH published AS ({FIRST_RANGES_SQL}), scored AS ({FIRST_RANGE_OUTCOMES_SQL})"
 # a plain http(s) link or NULL (view_data.safe_url in SQL): feed links are stored unchecked
 SAFE_URL_SQL = "CASE WHEN regexp_full_match(trim({col}), '(?i)https?://\\S+') THEN trim({col}) END"
 
@@ -45,45 +57,32 @@ TABLES = (
            ORDER BY as_of_date, computed_at DESC""",
         "market regime per as-of date (regime_latest)",
     ),
-    Table(
-        "predictions",
-        """SELECT DISTINCT ON (id) * FROM predictions WHERE made_at <= $cutoff ORDER BY id, made_at""",
-        "the forecaster's calls, first row per id",
-    ),
+    Table("predictions", FIRST_CALLS_SQL, "the forecaster's calls, first row per id"),
     Table(
         "track_record",
-        """WITH p AS (SELECT DISTINCT ON (id) * FROM predictions WHERE made_at <= $cutoff ORDER BY id, made_at),
-           o AS (SELECT DISTINCT ON (prediction_id) * FROM outcomes WHERE scored_at <= $cutoff
-                 ORDER BY prediction_id, scored_at)
-           SELECT p.*, o.base_date, o.target_date, o.actual_return, o.hit, o.scored_at,
-                  coalesce(o.label_basis, 'close_to_close') AS label_basis, o.entry_date, o.entry_open
-           FROM p JOIN o ON o.prediction_id = p.id ORDER BY p.id""",
+        f"""{SCORED_CALLS_CTE}
+           SELECT calls.*, scored.base_date, scored.target_date, scored.actual_return, scored.hit, scored.scored_at,
+                  coalesce(scored.label_basis, 'close_to_close') AS label_basis, scored.entry_date, scored.entry_open
+           FROM calls JOIN scored ON scored.prediction_id = calls.id ORDER BY calls.id""",
         "scored calls with label_basis (track_record)",
     ),
     Table(
         "track_summary",
-        """WITH p AS (SELECT DISTINCT ON (id) * FROM predictions WHERE made_at <= $cutoff ORDER BY id, made_at),
-           o AS (SELECT DISTINCT ON (prediction_id) * FROM outcomes WHERE scored_at <= $cutoff
-                 ORDER BY prediction_id, scored_at)
-           SELECT coalesce(o.label_basis, 'close_to_close') AS label_basis, p.horizon_days,
-                  count(*) AS calls, count(*) FILTER (WHERE o.hit) AS hits,
-                  count(*) FILTER (WHERE o.hit) / count(*) AS hit_rate, avg(p.confidence) AS mean_confidence
-           FROM p JOIN o ON o.prediction_id = p.id GROUP BY ALL ORDER BY label_basis, p.horizon_days""",
+        f"""{SCORED_CALLS_CTE}
+           SELECT coalesce(scored.label_basis, 'close_to_close') AS label_basis, calls.horizon_days,
+                  count(*) AS calls, count(*) FILTER (WHERE scored.hit) AS hits,
+                  count(*) FILTER (WHERE scored.hit) / count(*) AS hit_rate, avg(calls.confidence) AS mean_confidence
+           FROM calls JOIN scored ON scored.prediction_id = calls.id
+           GROUP BY ALL ORDER BY label_basis, calls.horizon_days""",
         "hit rate per label basis and horizon, the two bases never pooled",
     ),
-    Table(
-        "ranges",
-        """SELECT DISTINCT ON (id) * FROM ranges WHERE made_at <= $cutoff ORDER BY id, made_at""",
-        "published ranges, first row per id (ranges_latest)",
-    ),
+    Table("ranges", FIRST_RANGES_SQL, "published ranges, first row per id (ranges_latest)"),
     Table(
         "range_record",
-        """WITH r AS (SELECT DISTINCT ON (id) * FROM ranges WHERE made_at <= $cutoff ORDER BY id, made_at),
-           o AS (SELECT DISTINCT ON (range_id) * FROM range_outcomes WHERE scored_at <= $cutoff
-                 ORDER BY range_id, scored_at)
-           SELECT r.*, o.actual_close, o.z, o.hit50, o.hit80, o.naive_hit50, o.naive_hit80, o.is80_pct,
-                  o.width80_pct, o.center_err_pct, o.scored_at
-           FROM r JOIN o ON o.range_id = r.id ORDER BY r.id""",
+        f"""{SCORED_RANGES_CTE}
+           SELECT published.*, scored.actual_close, scored.z, scored.hit50, scored.hit80, scored.naive_hit50,
+                  scored.naive_hit80, scored.is80_pct, scored.width80_pct, scored.center_err_pct, scored.scored_at
+           FROM published JOIN scored ON scored.range_id = published.id ORDER BY published.id""",
         "scored ranges (range_record)",
     ),
     Table(
@@ -127,9 +126,7 @@ TABLES = (
     ),
     Table(
         "company_events",
-        """SELECT DISTINCT ON (ticker, type) * FROM events
-           WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history') AND first_seen_at <= $cutoff
-           ORDER BY ticker, type, first_seen_at DESC, date""",
+        reads.COMPANY_EVENTS_ASOF_SQL,
         "latest known date per ticker and event type (company_events)",
     ),
     Table(
@@ -154,17 +151,17 @@ TABLES = (
 
 def tickers_frame(cfg: dict) -> pd.DataFrame:
     """The watchlist from the market config: ticker, name, sector, position in the config."""
-    sector_of = {t: s for s, members in (cfg.get("sectors") or {}).items() for t in members}
+    sector_of = {ticker: sector for sector, members in (cfg.get("sectors") or {}).items() for ticker in members}
     rows = [
         {
-            "ticker": t,
-            "name": (meta or {}).get("name", t),
-            "sector": sector_of.get(t),
+            "ticker": ticker,
+            "name": (meta or {}).get("name", ticker),
+            "sector": sector_of.get(ticker),
             "market": cfg["market"],
             "currency": cfg.get("currency"),
-            "position": i,
+            "position": position,
         }
-        for i, (t, meta) in enumerate(cfg["tickers"].items())
+        for position, (ticker, meta) in enumerate(cfg["tickers"].items())
     ]
     return pd.DataFrame(rows, columns=["ticker", "name", "sector", "market", "currency", "position"])
 
@@ -174,10 +171,10 @@ def table_queries(cutoff: str) -> list[tuple[str, str, dict]]:
     bars are the dashboard's ohlc query with no start and every bar stored by the cut-off."""
     cutoff_day = pd.Timestamp(cutoff).date()
     bars_params = {"as_of": cutoff_day + timedelta(days=1), "start": BARS_START, "cutoff": cutoff}
-    out = [("bars", reads.BARS_SQL, bars_params)]
+    queries = [("bars", reads.BARS_SQL, bars_params)]
     for table in TABLES:
-        out.append((table.name, table.sql.replace("$cutoff", "$cutoff::TIMESTAMPTZ"), {"cutoff": cutoff}))
-    return out
+        queries.append((table.name, CUTOFF_PLACEHOLDER.sub("$cutoff::TIMESTAMPTZ", table.sql), {"cutoff": cutoff}))
+    return queries
 
 
 def stage_tables(cfg: dict, con, cutoff: str, folder) -> dict[str, int]:
@@ -186,9 +183,9 @@ def stage_tables(cfg: dict, con, cutoff: str, folder) -> dict[str, int]:
     con.register("_warehouse_tickers", tickers_frame(cfg))
     queries = [("tickers", "SELECT * FROM _warehouse_tickers ORDER BY position", {}), *table_queries(cutoff)]
     for name, sql, params in queries:
-        path = (folder / f"{name}.parquet").as_posix()
-        con.execute(f"COPY ({sql}) TO '{path}' (FORMAT parquet)", params)
-        counts[name] = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+        path = quoted((folder / f"{name}.parquet").as_posix())
+        con.execute(f"COPY ({sql}) TO {path} (FORMAT parquet)", params)
+        counts[name] = con.execute(f"SELECT count(*) FROM read_parquet({path})").fetchone()[0]
     con.unregister("_warehouse_tickers")
     return counts
 

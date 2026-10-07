@@ -48,88 +48,92 @@ READ_MODEL_COLUMNS = {
     "payload_sha256": "VARCHAR",
     "payload": "JSON",
 }
-# the company_events view (latest date per ticker and type, "_history" sources left out) from the rows first
-# seen by the cut-off, kept when the date is after the as-of date
-EVENTS_SQL = """
-SELECT ticker, id, date, type, name, source, timing, amount FROM (
-  SELECT DISTINCT ON (ticker, type) * FROM events
-  WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history') AND first_seen_at <= $cutoff::TIMESTAMPTZ
-  ORDER BY ticker, type, first_seen_at DESC, date)
+# the stock page's upcoming company events: the company_events rule as of the cut-off, dated after the as-of date
+EVENTS_SQL = f"""SELECT ticker, id, date, type, name, source, timing, amount FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
 WHERE date > $as_of ORDER BY ticker, date, type, id"""
+WATCHLIST_COMPANY_FIELDS = ("ticker", "name", "sector", "last", "calls", "ranges", "earnings")
+WATCHLIST_INDICATOR_FIELDS = ("ret_1d", "ret_5d", "quality", "days_to_earnings")
+WATCHLIST_SCORE_FIELDS = ("h", "id", "prob_up", "calibrated")
 HEADER = ("market", "name", "currency", "symbol", "as_of", "disclaimer", "not_available", "empty", "plan", "skill")
 
 
 def upcoming_events(con, as_of, cutoff: str) -> dict[str, list[dict]]:
     """ticker -> its upcoming company events (CompanyEvent) as known by the cut-off."""
-    rows = reads.frame(con, EVENTS_SQL, {"as_of": as_of, "cutoff": cutoff})
-    out: dict[str, list[dict]] = {}
-    for r in rows.itertuples():
-        event = {"id": r.id, "date": iso_day(r.date), "type": r.type, "name": r.name, "source": r.source}
-        event.update(timing=None if pd.isna(r.timing) else r.timing, amount=json_safe_float(r.amount))
-        out.setdefault(r.ticker, []).append(event)
-    return out
+    events_by_ticker: dict[str, list[dict]] = {}
+    for event in reads.frame(con, EVENTS_SQL, {"as_of": as_of, "cutoff": cutoff}).itertuples():
+        events_by_ticker.setdefault(event.ticker, []).append(
+            {
+                "id": event.id,
+                "date": iso_day(event.date),
+                "type": event.type,
+                "name": event.name,
+                "source": event.source,
+                "timing": None if pd.isna(event.timing) else event.timing,
+                "amount": json_safe_float(event.amount),
+            }
+        )
+    return events_by_ticker
 
 
 def watchlist_row(company: dict) -> dict:
     """One stock's row of the watchlist page."""
-    ind = company.get("indicators") or {}
-    model = [{k: m[k] for k in ("h", "id", "prob_up", "calibrated")} for m in company["model"]]
+    indicators = company.get("indicators") or {}
+    model = [{key: score[key] for key in WATCHLIST_SCORE_FIELDS} for score in company["model"]]
     return {
-        **{k: company[k] for k in ("ticker", "name", "sector", "last", "calls", "ranges", "earnings")},
-        "ret_1d": ind.get("ret_1d"),
-        "ret_5d": ind.get("ret_5d"),
-        "quality": ind.get("quality"),
-        "days_to_earnings": ind.get("days_to_earnings"),
+        **{key: company[key] for key in WATCHLIST_COMPANY_FIELDS},
+        **{key: indicators.get(key) for key in WATCHLIST_INDICATOR_FIELDS},
         "model": model,
     }
 
 
 def stock_payload(data: dict, company: dict, events: list[dict]) -> dict:
     """The stock page: the dashboard's stock data without bars, the fits behind its scores and its events."""
-    used = {m["model_id"] for m in company["model"]}
-    body = {k: v for k, v in company.items() if k != "bars"}
-    models = [v for v in data.get("models") or [] if v.get("id") in used]
+    model_ids = {score["model_id"] for score in company["model"]}
     return {
-        **body,
+        **{key: value for key, value in company.items() if key != "bars"},
         "as_of": data["as_of"],
         "plan": data["plan"],
         "skill": data["skill"],
-        "models": models,
+        "models": [version for version in data.get("models") or [] if version.get("id") in model_ids],
         "events": events,
+    }
+
+
+def bars_payload(data: dict, company: dict) -> dict:
+    """The chart page: the stock's split-adjusted bars and published ranges."""
+    return {
+        "ticker": company["ticker"],
+        "as_of": data["as_of"],
+        "columns": BAR_COLUMNS,
+        "bars": company["bars"],
+        "ranges": company["ranges"],
+        "spans": data["spans"],
+        "default_span": data["default_span"],
     }
 
 
 def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[str, dict]]:
     """table -> page_key -> payload for one market's dashboard data."""
-    head = {k: data.get(k) for k in HEADER}
-    common = {"market": data["market"], "as_of": data["as_of"], "plan": data["plan"], "skill": data["skill"]}
+    header = {key: data.get(key) for key in HEADER}
+    page_basics = {"market": data["market"], "as_of": data["as_of"], "plan": data["plan"], "skill": data["skill"]}
     companies = data["companies"]
     return {
-        RM_OVERVIEW: {MARKET_PAGE_KEY: {**head, "overview": data["overview"]}},
-        RM_WATCHLIST: {MARKET_PAGE_KEY: {**common, "rows": [watchlist_row(c) for c in companies]}},
-        RM_STOCK: {c["ticker"]: stock_payload(data, c, events.get(c["ticker"], [])) for c in companies},
-        RM_BARS: {
-            c["ticker"]: {
-                "ticker": c["ticker"],
-                "as_of": data["as_of"],
-                "columns": BAR_COLUMNS,
-                "bars": c["bars"],
-                "ranges": c["ranges"],
-                "spans": data["spans"],
-                "default_span": data["default_span"],
-            }
-            for c in companies
+        RM_OVERVIEW: {MARKET_PAGE_KEY: {**header, "overview": data["overview"]}},
+        RM_WATCHLIST: {MARKET_PAGE_KEY: {**page_basics, "rows": [watchlist_row(company) for company in companies]}},
+        RM_STOCK: {
+            company["ticker"]: stock_payload(data, company, events.get(company["ticker"], [])) for company in companies
         },
+        RM_BARS: {company["ticker"]: bars_payload(data, company) for company in companies},
         RM_TRACK_RECORD: {MARKET_PAGE_KEY: {"skill": data["skill"], **data["track"], "backtest": data["backtest"]}},
     }
 
 
 def missing_keys(table: str, payload: dict) -> list[str]:
     """Required keys (api/openapi.yaml) the payload lacks; watchlist rows are checked too."""
-    missing = [k for k in REQUIRED_KEYS[table] if k not in payload]
+    missing = [key for key in REQUIRED_KEYS[table] if key not in payload]
     if table == RM_WATCHLIST:
-        for i, row in enumerate(payload.get("rows") or []):
-            missing += [f"rows[{i}].{k}" for k in WATCHLIST_ROW_REQUIRED if k not in row]
+        for position, row in enumerate(payload.get("rows") or []):
+            missing += [f"rows[{position}].{key}" for key in WATCHLIST_ROW_REQUIRED if key not in row]
     return missing
 
 
@@ -138,31 +142,41 @@ def canonical(payload: dict) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def build_rows(cfg: dict, con, cutoff_time: datetime, source_commit: str, built_at: str) -> tuple[dict, list[str]]:
+def page_row(envelope: dict, page_key: str, payload: dict) -> dict:
+    """One rm row: the build's envelope, the page key, the canonical payload and its SHA-256."""
+    text = canonical(payload)
+    return {
+        **envelope,
+        "page_key": page_key,
+        "payload_sha256": hashlib.sha256(text.encode()).hexdigest(),
+        "payload": text,
+    }
+
+
+def build_rows(
+    cfg: dict, con, cutoff_time: datetime, source_commit: str, built_at: str
+) -> tuple[dict, list[tuple[str, str, list[str]]]]:
     """(table -> page_key -> row, invalid pages) of a market as of the cut-off. A row has READ_MODEL_COLUMNS
     with the payload as canonical JSON text; a page missing a required key is left out and listed as
     (table, page_key, missing keys)."""
     data = gather_dashboard(cfg, con, cutoff_time)
     cutoff = pd.Timestamp(cutoff_time).isoformat()
     events = upcoming_events(con, data["as_of"], cutoff) if data["as_of"] else {}
-    out, invalid = {}, []
+    envelope = {
+        "market": cfg["market"],
+        "as_of": data["as_of"],
+        "cutoff": cutoff,
+        "built_at": built_at,
+        "schema_version": READ_MODEL_SCHEMA_VERSION,
+        "source_commit": source_commit,
+    }
+    rows, invalid = {}, []
     for table, pages in page_payloads(data, events).items():
-        out[table] = {}
+        rows[table] = {}
         for page_key, payload in pages.items():
             missing = missing_keys(table, payload)
             if missing:
                 invalid.append((table, page_key, missing))
-                continue
-            text = canonical(payload)
-            out[table][page_key] = {
-                "market": cfg["market"],
-                "page_key": page_key,
-                "as_of": data["as_of"],
-                "cutoff": cutoff,
-                "built_at": built_at,
-                "schema_version": READ_MODEL_SCHEMA_VERSION,
-                "source_commit": source_commit,
-                "payload_sha256": hashlib.sha256(text.encode()).hexdigest(),
-                "payload": text,
-            }
-    return out, invalid
+            else:
+                rows[table][page_key] = page_row(envelope, page_key, payload)
+    return rows, invalid

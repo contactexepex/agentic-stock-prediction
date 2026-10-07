@@ -10,34 +10,28 @@ writes nothing. The kill switch of config/warehouse.yaml (enabled, monthly_hours
 
 from __future__ import annotations
 
-import json
-import subprocess
 import tempfile
 import time
-import uuid
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
+
+import duckdb
 
 from marketbrief.constants.warehouse import (
     KIND_DAILY,
     KIND_FULL,
-    MARKET_PAGE_KEY,
-    META_SCHEMA,
     MODE_DRY_RUN,
     MODE_FULL,
     MODE_REPLACE,
     MSG_BAD_NAME,
     MSG_DISABLED,
-    MSG_INVALID_PAGE,
     MSG_OVER_CEILING,
     MSG_SYNC_FAILED,
     READ_MODEL_SCHEMA,
     READ_MODEL_TABLES,
-    RM_OVERVIEW,
     SUMMARY_DIR,
-    SYNC_RUNS_TABLE,
-    UNKNOWN_COMMIT,
     WAREHOUSE_STEP,
 )
 from marketbrief.core import database, paths
@@ -45,32 +39,26 @@ from marketbrief.core.clock import clock
 from marketbrief.warehouse import rm_writer
 from marketbrief.warehouse.connection import (
     NAME_PATTERN,
-    WarehouseError,
+    Target,
     connect_warehouse,
     load_warehouse_config,
-    redact,
     select_target,
 )
+from marketbrief.warehouse.errors import WarehouseError, redact
 from marketbrief.warehouse.read_models import build_rows
+from marketbrief.warehouse.sql_statements import quoted
+from marketbrief.warehouse.sync_records import (
+    build_row,
+    ensure_sync_runs_table,
+    month_hours,
+    new_run_row,
+    page_facts,
+    record_sync_run,
+    source_commit,
+    wall_now,
+    write_summary,
+)
 from marketbrief.warehouse.tables import count_tables, stage_tables
-
-SYNC_RUNS_COLUMNS = {
-    "run_id": "VARCHAR",
-    "market": "VARCHAR",
-    "started_at": "TIMESTAMPTZ",
-    "finished_at": "TIMESTAMPTZ",
-    "cutoff": "TIMESTAMPTZ",
-    "target": "VARCHAR",
-    "tables": "VARCHAR[]",
-    "table_rows": "JSON",
-    "rows": "BIGINT",
-    "read_models": "INTEGER",
-    "mode": "VARCHAR",
-    "ok": "BOOLEAN",
-    "error": "VARCHAR",
-}
-MONTH_HOURS_SQL = f"""SELECT coalesce(sum(epoch(finished_at) - epoch(started_at)), 0) / 3600
-                      FROM {META_SCHEMA}.{SYNC_RUNS_TABLE} WHERE started_at >= ?"""
 
 
 @dataclass
@@ -83,139 +71,126 @@ class Staged:
     invalid: list[tuple[str, str, list[str]]]
 
 
-def wall_now() -> datetime:
-    """The real time (UTC): when the sync ran, as opposed to the data's cut-off (MB_NOW)."""
-    return datetime.now(timezone.utc)
+class PhaseTimer:
+    """Seconds spent in each named phase of a run (`<phase>_s`, rounded to 0.01 s)."""
+
+    def __init__(self):
+        """No phase timed yet."""
+        self.seconds: dict[str, float] = {}
+
+    @contextmanager
+    def phase(self, name: str):
+        """Time the block as phase `name`, also when it raises."""
+        started = time.monotonic()
+        try:
+            yield
+        finally:
+            self.seconds[f"{name}_s"] = round(time.monotonic() - started, 2)
 
 
-def source_commit() -> str:
-    """The git commit of the repo whose data/ the build reads, `unknown` outside a git checkout."""
-    try:
-        res = subprocess.run(
-            ["git", "-C", str(paths.ROOT), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return UNKNOWN_COMMIT
-    return res.stdout.strip() or UNKNOWN_COMMIT
-
-
-def page_facts(rows: dict, invalid: list) -> dict:
-    """The summary's view of the built pages: as_of, pages per table, payload bytes and invalid pages."""
-    overview = rows.get(RM_OVERVIEW, {}).get(MARKET_PAGE_KEY)
-    return {
-        "as_of": overview["as_of"] if overview else None,
-        "read_model_pages": {t: len(p) for t, p in rows.items()},
-        "read_model_bytes": {t: sum(len(r["payload"].encode()) for r in p.values()) for t, p in rows.items()},
-        "invalid_pages": [MSG_INVALID_PAGE.format(table=t, page_key=k, missing=", ".join(m)) for t, k, m in invalid],
-    }
-
-
-def ensure_meta(wh) -> None:
-    """The meta.sync_runs table."""
-    wh.execute(f"CREATE SCHEMA IF NOT EXISTS {META_SCHEMA}")
-    columns = rm_writer.column_sql(SYNC_RUNS_COLUMNS)
-    wh.execute(f"CREATE TABLE IF NOT EXISTS {META_SCHEMA}.{SYNC_RUNS_TABLE} ({columns})")
-
-
-def month_hours(wh, now: datetime) -> float:
-    """This UTC month's recorded sync wall time in hours (all markets)."""
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return float(wh.execute(MONTH_HOURS_SQL, [month_start]).fetchone()[0])
-
-
-def write_market(wh, market: str, staged: Staged, full: bool) -> dict:
+def write_market(warehouse, market: str, staged: Staged, full: bool) -> dict:
     """Replace the market's mirrored tables and upsert its read models in one transaction; the page counts."""
-    wh.execute("BEGIN TRANSACTION")
+    warehouse.execute("BEGIN TRANSACTION")
     try:
         if full:
-            wh.execute(f"DROP SCHEMA IF EXISTS {market} CASCADE")
+            warehouse.execute(f"DROP SCHEMA IF EXISTS {market} CASCADE")
             for table in READ_MODEL_TABLES:
-                wh.execute(f"DELETE FROM {READ_MODEL_SCHEMA}.{table} WHERE market = ?", [market])
-        wh.execute(f"CREATE SCHEMA IF NOT EXISTS {market}")
+                warehouse.execute(f"DELETE FROM {READ_MODEL_SCHEMA}.{table} WHERE market = ?", [market])
+        warehouse.execute(f"CREATE SCHEMA IF NOT EXISTS {market}")
         for name in staged.counts:
-            path = rm_writer.sql_text((staged.folder / f"{name}.parquet").as_posix())
-            wh.execute(f"CREATE OR REPLACE TABLE {market}.{name} AS SELECT * FROM read_parquet({path})")
-        keep = {(t, k) for t, k, _ in staged.invalid}
-        stats = rm_writer.write_read_models(wh, market, staged.rows, keep, staged.folder)
-        wh.execute("COMMIT")
-        return stats
+            path = quoted((staged.folder / f"{name}.parquet").as_posix())
+            warehouse.execute(f"CREATE OR REPLACE TABLE {market}.{name} AS SELECT * FROM read_parquet({path})")
+        keep = {(table, page_key) for table, page_key, _missing in staged.invalid}
+        page_counts = rm_writer.write_read_models(warehouse, market, staged.rows, keep, staged.folder)
+        warehouse.execute("COMMIT")
+        return page_counts
     except Exception:
-        wh.execute("ROLLBACK")
+        with suppress(duckdb.Error):  # a failed ROLLBACK must not hide the error that caused it
+            warehouse.execute("ROLLBACK")
         raise
 
 
-def stage_and_write(cfg: dict, con, run: dict, target, state: dict) -> None:
-    """Stage the market in a temporary folder under work/warehouse/, then write it. Fills `run` (counts) and
-    `state` (timings, page facts and counts, a skip reason, and the open warehouse connection under "wh" so
-    that a failed run is still recorded on it)."""
-    t0 = time.monotonic()
-    staging = paths.ROOT / SUMMARY_DIR
-    staging.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=staging, prefix=f"stage-{cfg['market']}-") as folder:
-        counts = stage_tables(cfg, con, run["cutoff"], Path(folder))
-        cutoff_time = datetime.fromisoformat(run["cutoff"])
-        rows, invalid = build_rows(cfg, con, cutoff_time, state["source_commit"], run["started_at"].isoformat())
-        state.update(page_facts(rows, invalid))
-        run.update(tables=list(counts), table_rows=counts, rows=sum(counts.values()))
-        run["read_models"] = sum(len(pages) for pages in rows.values())
-        state["stage_s"] = round(time.monotonic() - t0, 2)
-        t1 = time.monotonic()
-        state["wh"] = connect_warehouse(read_only=False, target=target)
-        state["connect_s"] = round(time.monotonic() - t1, 2)
-        ensure_meta(state["wh"])
-        rm_writer.ensure_read_model_tables(state["wh"])
-        hours, ceiling = month_hours(state["wh"], run["started_at"]), state["ceiling"]
-        if ceiling is not None and hours >= float(ceiling):
-            state["skipped"] = MSG_OVER_CEILING.format(hours=hours, ceiling=ceiling)
-            return
-        t2 = time.monotonic()
-        staged = Staged(Path(folder), counts, rows, invalid)
-        state.update(write_market(state["wh"], cfg["market"], staged, run["mode"] == MODE_FULL))
-        state["write_s"] = round(time.monotonic() - t2, 2)
+class SyncRun:
+    """One writing sync of a market: stage it locally, connect, check the monthly ceiling, write, record."""
 
+    def __init__(self, cfg: dict, warehouse_cfg: dict, mode: str, kind: str, target: Target, cutoff_time: datetime):
+        """A run that has not started: its sync_runs row, no connection, nothing counted."""
+        self.cfg, self.market, self.kind, self.target = cfg, cfg["market"], kind, target
+        self.full = mode == MODE_FULL
+        self.ceiling = warehouse_cfg.get("monthly_hours_ceiling")
+        self.cutoff_time = cutoff_time
+        self.commit = source_commit()
+        self.row = new_run_row(self.market, mode, wall_now(), cutoff_time.isoformat(), target.label())
+        self.timer = PhaseTimer()
+        self.warehouse = None
+        self.facts: dict = {}
+        self.page_counts: dict = {}
+        self.skipped: str | None = None
 
-def record_run(wh, run: dict) -> None:
-    """Append the run to meta.sync_runs."""
-    values = [json.dumps(run[k]) if k == "table_rows" else run[k] for k in SYNC_RUNS_COLUMNS]
-    marks = ", ".join("?" for _ in SYNC_RUNS_COLUMNS)
-    wh.execute(f"INSERT INTO {META_SCHEMA}.{SYNC_RUNS_TABLE} ({', '.join(SYNC_RUNS_COLUMNS)}) VALUES ({marks})", values)
+    def stage(self, con, folder: Path) -> Staged:
+        """Write the mirrored tables as Parquet and build the pages; counts go into the run's row."""
+        with self.timer.phase("stage"):
+            counts = stage_tables(self.cfg, con, self.row["cutoff"], folder)
+            built_at = self.row["started_at"].isoformat()
+            rows, invalid = build_rows(self.cfg, con, self.cutoff_time, self.commit, built_at)
+        self.facts = page_facts(rows, invalid)
+        self.row.update(tables=list(counts), table_rows=counts, rows=sum(counts.values()))
+        self.row["read_models"] = sum(len(pages) for pages in rows.values())
+        return Staged(folder, counts, rows, invalid)
 
+    def connect(self) -> None:
+        """Open the warehouse for writing and make sure the bookkeeping and read-model tables exist."""
+        with self.timer.phase("connect"):
+            self.warehouse = connect_warehouse(read_only=False, target=self.target)
+        ensure_sync_runs_table(self.warehouse)
+        rm_writer.ensure_read_model_tables(self.warehouse)
 
-def finish(run: dict, state: dict, kind: str) -> dict:
-    """Record the run in meta.sync_runs and rm.builds (when connected) and close the connection; the build row."""
-    run["finished_at"] = wall_now()
-    build = {
-        "build_id": run["run_id"],
-        "market": run["market"],
-        "kind": kind,
-        "cutoff": run["cutoff"],
-        "source_commit": state["source_commit"],
-        "started_at": run["started_at"],
-        "finished_at": run["finished_at"],
-        "ok": bool(run["ok"] and not state.get("invalid_pages")),
-        "pages_written": state.get("pages_written", 0),
-        "pages_unchanged": state.get("pages_unchanged", 0),
-        "error": run["error"] or "; ".join(state.get("invalid_pages") or []) or None,
-    }
-    wh = state.pop("wh", None)
-    if wh is None:
+    def over_ceiling(self) -> str | None:
+        """The skip reason when this month's recorded sync time has reached the ceiling, else None."""
+        if self.ceiling is None:
+            return None
+        hours = month_hours(self.warehouse, self.row["started_at"])
+        return MSG_OVER_CEILING.format(hours=hours, ceiling=self.ceiling) if hours >= float(self.ceiling) else None
+
+    def run(self, con) -> None:
+        """Stage, connect and write (unless over the ceiling). A failure becomes the run's redacted error."""
+        staging = paths.ROOT / SUMMARY_DIR
+        staging.mkdir(parents=True, exist_ok=True)
+        try:
+            with tempfile.TemporaryDirectory(dir=staging, prefix=f"stage-{self.market}-") as folder:
+                staged = self.stage(con, Path(folder))
+                self.connect()
+                self.skipped = self.over_ceiling()
+                if not self.skipped:
+                    with self.timer.phase("write"):
+                        self.page_counts = write_market(self.warehouse, self.market, staged, self.full)
+            self.row["ok"], self.row["error"] = not self.skipped, self.skipped
+        except Exception as exc:  # recorded in sync_runs, rm.builds and the summary; sync_market raises it
+            self.row["error"] = redact(f"{type(exc).__name__}: {exc}")
+
+    def record(self) -> dict:
+        """Record the run in meta.sync_runs and rm.builds (when connected), close the connection; the build row."""
+        self.row["finished_at"] = wall_now()
+        build = build_row(self.row, self.kind, self.commit, self.page_counts, self.facts.get("invalid_pages", []))
+        if self.warehouse is None:
+            return build
+        try:
+            record_sync_run(self.warehouse, self.row)
+            rm_writer.record_build(self.warehouse, build)
+        except Exception as exc:  # the sync's own error, if any, stays the one reported
+            self.row["error"] = self.row["error"] or redact(f"sync_runs: {type(exc).__name__}: {exc}")
+            self.row["ok"] = build["ok"] = False
+        self.warehouse.close()
         return build
-    try:
-        record_run(wh, run)
-        rm_writer.record_build(wh, build)
-    except Exception as exc:  # the sync's own error, if any, stays the one reported
-        run["error"] = run["error"] or redact(f"sync_runs: {type(exc).__name__}: {exc}")
-        run["ok"] = build["ok"] = False
-    wh.close()
-    return build
 
-
-def write_summary(market: str, summary: dict) -> str:
-    """work/warehouse/<market>-sync.json; returns its repo-relative path."""
-    folder = paths.ROOT / SUMMARY_DIR
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{market}-sync.json").write_text(json.dumps(summary, indent=2, default=str))
-    return f"{SUMMARY_DIR}/{market}-sync.json"
+    def summary_fields(self, build: dict) -> dict:
+        """The run's part of the step summary; a ceiling skip counts as ok."""
+        fields = {key: self.row[key] for key in ("run_id", "ok", "error", "rows", "read_models")}
+        fields.update(tables=self.row["table_rows"], **self.facts, **self.timer.seconds, **self.page_counts)
+        fields["build_ok"] = build["ok"]
+        if self.skipped:
+            fields.update(ok=True, skipped=self.skipped)
+        return fields
 
 
 def dry_run(cfg: dict, con, cutoff_time: datetime, commit: str) -> dict:
@@ -223,15 +198,6 @@ def dry_run(cfg: dict, con, cutoff_time: datetime, commit: str) -> dict:
     counts = count_tables(cfg, con, cutoff_time.isoformat())
     rows, invalid = build_rows(cfg, con, cutoff_time, commit, wall_now().isoformat())
     return {"tables": counts, "rows": sum(counts.values()), **page_facts(rows, invalid), "written": False}
-
-
-def new_run(market: str, mode: str, started: datetime, cutoff: str, target_label: str) -> dict:
-    """The meta.sync_runs row of a run before it starts."""
-    run = {c: None for c in SYNC_RUNS_COLUMNS}
-    run.update(run_id=f"{market}-{started:%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:6]}", market=market, mode=mode)
-    run.update(started_at=started, cutoff=cutoff, target=target_label, ok=False)
-    run.update(tables=[], table_rows={}, rows=0, read_models=0)
-    return run
 
 
 def sync_market(
@@ -242,34 +208,27 @@ def sync_market(
     market = cfg["market"]
     if not NAME_PATTERN.fullmatch(market):
         raise WarehouseError(MSG_BAD_NAME.format(name=market))
-    wcfg = load_warehouse_config()
+    warehouse_cfg = load_warehouse_config()
     mode = MODE_DRY_RUN if dry_run_only else (MODE_FULL if full else MODE_REPLACE)
     kind = KIND_FULL if full else kind
-    target = select_target(wcfg, force_local=force_local, require_token=not dry_run_only)
-    cutoff_time, started, t0 = clock(), wall_now(), time.monotonic()
+    target = select_target(warehouse_cfg, force_local=force_local, require_token=not dry_run_only)
+    cutoff_time, run_started = clock(), time.monotonic()
     summary = {"step": WAREHOUSE_STEP, "market": market, "mode": mode, "kind": kind, "target": target.label()}
     summary["cutoff"] = cutoff_time.isoformat()
-    if not wcfg.get("enabled", True) and not dry_run_only:
+    if not warehouse_cfg.get("enabled", True) and not dry_run_only:
         summary.update(ok=True, skipped=MSG_DISABLED)
         return {**summary, "summary_file": write_summary(market, summary)}
-    con, commit = database.connect(market), source_commit()
-    summary["source_commit"] = commit
+    con = database.connect(market)
     if dry_run_only:
-        return {**summary, **dry_run(cfg, con, cutoff_time, commit), "elapsed_s": round(time.monotonic() - t0, 2)}
-    run = new_run(market, mode, started, summary["cutoff"], target.label())
-    state: dict = {"source_commit": commit, "ceiling": wcfg.get("monthly_hours_ceiling")}
-    try:
-        stage_and_write(cfg, con, run, target, state)
-        run["ok"], run["error"] = not state.get("skipped"), state.get("skipped")
-    except Exception as exc:  # recorded (redacted) in sync_runs, rm.builds and the summary, then raised
-        run["error"] = redact(f"{type(exc).__name__}: {exc}")
-    build = finish(run, state, kind)
-    summary.update({k: run[k] for k in ("run_id", "ok", "error", "rows", "read_models")}, tables=run["table_rows"])
-    summary.update({k: v for k, v in state.items() if k not in ("source_commit", "ceiling")})
-    summary.update(build_ok=build["ok"], elapsed_s=round(time.monotonic() - t0, 2))
-    if state.get("skipped"):
-        summary["ok"] = True
+        commit = source_commit()
+        planned = dry_run(cfg, con, cutoff_time, commit)
+        return {**summary, "source_commit": commit, **planned, "elapsed_s": round(time.monotonic() - run_started, 2)}
+    sync_run = SyncRun(cfg, warehouse_cfg, mode, kind, target, cutoff_time)
+    sync_run.run(con)
+    build = sync_run.record()
+    summary.update(source_commit=sync_run.commit, **sync_run.summary_fields(build))
+    summary["elapsed_s"] = round(time.monotonic() - run_started, 2)
     summary["summary_file"] = write_summary(market, summary)
     if not summary["ok"]:
-        raise WarehouseError(MSG_SYNC_FAILED.format(market=market, error=run["error"]))
+        raise WarehouseError(MSG_SYNC_FAILED.format(market=market, error=sync_run.row["error"]))
     return summary
