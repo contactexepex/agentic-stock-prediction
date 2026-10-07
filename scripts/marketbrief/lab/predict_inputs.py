@@ -90,6 +90,6 @@ def build_inputs(con, cfg: dict, now: datetime, scores: list[dict], ranges: list
             base_close=float(own["close"].iloc[-1]),
             prev_close=previous_close(own, adjust, ticker), regime=regime,
             quality=feature.get("quality"), days_to_earnings=feature.get("days_to_earnings"),
-            amount=trade_amount(market, ticker, now, cfg), currency=CURRENCY[market], scores=my_scores,
+            amount=trade_amount(market, ticker, now), currency=CURRENCY[market], scores=my_scores,
             ranges=my_ranges, news=news))
     return out

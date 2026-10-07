@@ -69,13 +69,14 @@ broker:
     # the sale value, the higher (docs/SPEC.md F1.6: a source quoted it for NRI accounts).
     dp_charge_min: 30.0
     dp_charge_rate: 0.0004
-    demat_amc_per_year: 885.0          # owner-provided, about Rs 885 a year; not per trade, so in no trade's cost
+    demat_amc_per_year: 885.0          # verify. owner-provided; verify with a contract note: about Rs 885 a year;
+                                       # not per trade, so in no trade's cost
   us:
     name: BUX Basic
     order_fee_eur: 0.99                # verify. owner-provided; verify with a contract note: EUR 0.99 per order,
                                        # converted to USD at the EUR/USD close (symbol below) of that side's session
-    fx_fee_rate: 0.0075                # your_view. verify. owner-provided (BUX Basic): FX markup 0.75% of the
+    fx_fee_rate: 0.0075                # your_view. verify. owner-provided; verify with a contract note (BUX Basic): FX markup 0.75% of the
                                        # transaction value on each EUR<->USD conversion, on the buy and again on the sale
-    portfolio_fee_per_year: 0.002      # your_view. verify. owner-provided: 0.20% a year, pro-rated over the holding
+    portfolio_fee_per_year: 0.002      # your_view. verify. owner-provided; verify with a contract note: 0.20% a year, pro-rated over the holding
                                        # days (calendar days from D to the exit session) on the entry value
     eurusd_symbol: EURUSD              # config/markets/us.yaml symbols key (Yahoo EURUSD=X, role fx)

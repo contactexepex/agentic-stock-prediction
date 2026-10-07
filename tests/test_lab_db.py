@@ -172,15 +172,23 @@ def test_shallow_clone_boundary_lines_are_undated(tmp_path):
     assert timing.in_git_repo(shallow) and not timing.in_git_repo(tmp_path)
 
 
-@pytest.mark.usefixtures("root")
-def test_amount_override_raises_or_lowers_the_amount():
-    cfg = load_market("india")
-    when = datetime(2026, 10, 2, tzinfo=timezone.utc)
-    assert sizing.trade_amount("india", "MARUTI", when, cfg) == 100000.0                 # the default
-    cfg["tickers"]["MARUTI"]["amount"] = 200000.0                                        # raised (decision 44)
-    assert sizing.trade_amount("india", "MARUTI", when, cfg) == 200000.0
-    cfg["tickers"]["MARUTI"]["amount"] = 10000.0                                         # lowered
-    assert sizing.trade_amount("india", "MARUTI", when, cfg) == 10000.0
+def set_amount(day: str, amount: float) -> dict:
+    """A B1 set_amount lifecycle event for MARUTI taking effect (and recorded) at 00:00Z on `day`."""
+    return {"id": f"we-india-MARUTI-set_amount-{day}", "market": "india", "ticker": "MARUTI", "event": "set_amount",
+            "effective_from": f"{day}T00:00:00+00:00", "recorded_at": f"{day}T00:00:00+00:00", "amount": amount,
+            "currency": "INR", "reason": "test", "requested_by": "cli:session", "channel": "cli",
+            "idempotency_key": f"amount-{day}", "validator_version": "lifecycle-v1"}
+
+
+def test_amount_override_raises_or_lowers_the_amount(root):
+    # decision 44 through B1's accessor (contracts/watchlist.trade_amount): set_amount events raise, then lower it
+    write_jsonl(root, "india", "watchlist_events", "2026-10-01", [set_amount("2026-10-01", 200000.0)])
+    write_jsonl(root, "india", "watchlist_events", "2026-10-03", [set_amount("2026-10-03", 10000.0)])
+    at = {day: datetime(2026, 10, day, 12, tzinfo=timezone.utc) for day in (1, 2, 4)}
+    assert sizing.trade_amount("india", "MARUTI", datetime(2026, 9, 30, tzinfo=timezone.utc)) == 100000.0
+    assert sizing.trade_amount("india", "MARUTI", at[2]) == 200000.0                   # raised
+    assert sizing.trade_amount("india", "MARUTI", at[4]) == 10000.0                    # lowered
+    assert sizing.trade_amount("india", "RELIANCE", at[4]) == 100000.0                 # the default
 
 
 def test_eur_view_hand_checked():

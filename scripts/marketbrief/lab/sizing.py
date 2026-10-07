@@ -6,10 +6,8 @@ from datetime import datetime
 
 from marketbrief.contracts import watchlist as watchlist_contract
 from marketbrief.contracts.protocol import QUANTITY_DECIMALS
-from marketbrief.contracts.watchlist import DEFAULT_AMOUNT
 from marketbrief.lab.constants import UP
 
-KEY_AMOUNT = "amount"   # optional per-ticker override in the market config until B1's watchlist events exist
 
 
 def qualifies(prediction: dict) -> bool:
@@ -20,15 +18,10 @@ def qualifies(prediction: dict) -> bool:
     return prob is None or threshold is None or float(prob) >= float(threshold)
 
 
-def trade_amount(market: str, ticker: str, as_of: datetime, cfg: dict | None = None) -> float:
-    """F1.3: the company's paper amount at `as_of` through B1's accessor (contracts/watchlist.trade_amount);
-    until B1 has built it, the market config's per-ticker `amount` when set, else the market default."""
-    try:
-        return float(watchlist_contract.trade_amount(market, ticker, as_of))
-    except NotImplementedError:
-        meta = ((cfg or {}).get("tickers") or {}).get(ticker) or {}
-        override = meta.get(KEY_AMOUNT)
-        return float(override) if override else DEFAULT_AMOUNT[market]
+def trade_amount(market: str, ticker: str, as_of: datetime) -> float:
+    """F1.3: the company's paper amount at `as_of` through B1's accessor (contracts/watchlist.trade_amount): the
+    set_amount override in force (which may raise or lower it, decision 44), else the market default."""
+    return float(watchlist_contract.trade_amount(market, ticker, as_of))
 
 
 def quantity(market: str, amount: float, entry_open: float) -> float:
