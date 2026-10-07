@@ -285,8 +285,8 @@ states each strategy's position against the bar.
    existing readers of `cfg` tickers keep working unchanged and keep collecting inactive companies,
    as decision 13 wants. Only code that predicts, publishes ranges or picks, or trades reads `active_tickers`: the new
    strategy and trader code, and those existing steps, which Stage A lists file by file from a search
-   of every `cfg` tickers reader (each classified collect or predict); B1 owns exactly the predict
-   call sites on that list. The accessor `watchlist(market, as_of, state)` serves replays and new code.
+   of every `cfg` tickers reader (each classified collect or predict); each predict call site
+   belongs to exactly one stage on that list. The accessor `watchlist(market, as_of, state)` serves replays and new code.
 3. **Add** takes: market, exchange symbol, optional name, optional amount. The onboarding pipeline
    (deterministic, no AI needed): resolve and check identifiers (NSE symbol and Yahoo symbol; or
    NYSE/Nasdaq ticker, Yahoo symbol and SEC CIK), refuse ETFs, BSE-only and unknown symbols, set the
@@ -527,7 +527,9 @@ proposed shared-doc edits into `docs/ws/<stage>.md` as in waves 0-1.
 kinds (section 4), `config/strategies.yaml` schema and the initial strategy set, `mcp/tools.yaml` (tool
 names, inputs, outputs, permissions per channel), and the interfaces later stages code against: the F1
 protocol (function signatures, record formats), the watchlist accessor, each read model's payload
-function signature. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/schema_lifecycle.py`,
+function signature, and the list of every existing reader of `cfg` tickers, each classified collect or
+predict and assigned to one stage: the stage that owns the file (B2 `portfolio/`, B4 `warehouse/`, B9
+`intraday/`), else B1. Owns: `api/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/schema_lifecycle.py`,
 `config/strategies.yaml`, interface stubs in `marketbrief/contracts/`, `docs/ws/stageA.md`.
 
 **Stage B: parallel builds (after A merges; one session each). Ownership is disjoint:**
