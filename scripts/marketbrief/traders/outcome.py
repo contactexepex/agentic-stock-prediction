@@ -13,7 +13,8 @@ from marketbrief.traders import constants as c
 from marketbrief.traders.inputs import GateInputs
 from marketbrief.traders.records import abstention_row
 from marketbrief.traders.registry import Trader
-from marketbrief.traders.run import PRECEDENCE, automatic_code, gate_lines, read_lines, run_as_of, stored, timed_out
+from marketbrief.traders.run import (PRECEDENCE, automatic_code, file_stamp, gate_lines, read_lines, run_as_of, stored,
+                                     timed_out)
 from marketbrief.traders.sessions import entry_session
 
 
@@ -93,7 +94,7 @@ def add(one: Trader, gi: GateInputs, path: Path, attempt: int) -> tuple[int, dic
     if timed_out(gi):
         rows = everyone(one, gi, c.AB_TIMEOUT, "not through the gate by the deadline (open - 15 minutes)")
         return 0, {**summary, "status": c.AB_TIMEOUT, **store(gi, [], rows)}
-    gated = gate_lines(read_lines(path), one, gi)
+    gated = gate_lines(read_lines(path), one, gi, file_stamp(path, gi))
     summary |= {"valid": len(gated["rows"]), "errors": gated["errors"], "warnings": gated["warnings"]}
     if gated["errors"] and attempt < c.MAX_ATTEMPTS:
         return 1, {**summary, "status": "refused: send the errors back to the trader once, then add --attempt 2",

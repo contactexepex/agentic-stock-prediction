@@ -233,8 +233,8 @@ def test_load_inputs_reads_stored_data_and_b10_records(monkeypatch):
     from marketbrief.core.market_config import load_market
     from marketbrief.traders.inputs import load_inputs
 
-    monkeypatch.setattr(horizons, "ranges_asof", lambda market, as_of, horizon_days=None: [published_range(1)])
-    monkeypatch.setattr(horizons, "scores_asof", lambda market, as_of, horizon_days=None: [score(1)])
+    monkeypatch.setattr(horizons, "ranges_asof", lambda *_args, **_kwargs: [published_range(1)])
+    monkeypatch.setattr(horizons, "scores_asof", lambda *_args, **_kwargs: [score(1)])
     cfg = load_market("us")
     gi = load_inputs(cfg, datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc))
     assert gi.active == set(cfg["tickers"]) and gi.amounts["NVDA"] == 1000.0 and gi.currency == "USD"
@@ -243,3 +243,15 @@ def test_load_inputs_reads_stored_data_and_b10_records(monkeypatch):
     assert gi.evidence and all(when is None or when.tzinfo is not None for when in list(gi.evidence.values())[:50])
     assert set(gi.ranges) == set(gi.scores) == {"2026-10-06-NVDA-1d"}
     assert gi.stored_predictions == set() and gi.track == {}
+
+
+@pytest.mark.usefixtures("root")
+def test_director_diff_may_touch_only_its_file():
+    facts = director_inputs()
+    extra = ("--- /dev/null\n+++ b/scripts/evil.py\n@@ -0,0 +1 @@\n+print('x')\n")
+    proposal = {"proposal_id": "p-2026-W41-1", "kind": "threshold", "file": "config/strategies.yaml",
+                "diff": new_strategy_diff() + extra, "rationale": "Test.", "cited_ids": ["rule.model_news.v1"]}
+    errors = director.validate({"findings": [], "proposals": [proposal], "prompt_version": "director-v1"}, facts)
+    assert any("must change only config/strategies.yaml" in e for e in errors)
+    after, why = director.applied("config/costs.yaml", facts["config_files"]["config/costs.yaml"], extra)
+    assert after is None and "must change only" in why

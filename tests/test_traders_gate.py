@@ -174,3 +174,14 @@ def test_schema_strategy_and_duplicates():
     assert check_record(agent_record(NEWS), one, inputs(), seen).errors == []
     assert [code for code, _ in check_record(agent_record(NEWS), one, inputs(), seen).errors] == [c.CODE_DUPLICATE]
     assert MADE_AT.endswith("Z")
+
+
+def test_anchor_fields_without_a_score_and_repeated_evidence_are_refused():
+    rec = {k: v for k, v in agent_record(COMBINED).items() if k != "model_prob"}
+    assert c.CODE_ANCHOR in codes(rec, COMBINED, scores={})
+    assert c.CODE_EVIDENCE in codes(agent_record(NEWS, evidence_ids=[NEWS_ID, NEWS_ID]))
+
+
+def test_naive_score_time_is_read_as_utc():
+    late = {**score(1), "computed_at": "2026-10-07 11:46:00"}
+    assert c.CODE_LOOKAHEAD in codes(agent_record(COMBINED), COMBINED, scores=inputs().scores | {late["id"]: late})

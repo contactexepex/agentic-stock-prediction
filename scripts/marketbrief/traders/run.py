@@ -1,8 +1,10 @@
 """One trader's pre-open gate pass over its file (docs/SPEC.md F4.2-F4.3): validate, then add with one retry.
 
 The trader writes work/traders/<strategy_id>.jsonl: one prediction per active company x horizon it calls, and one
-abstain line `{"strategy_id", "ticker", "abstain": true, "horizons", "reason", "made_at", "prompt_version"}` for what
-it skips. `validate` checks every line (gate.check_record) and that every active company is covered. `add`:
+abstain line `{"strategy_id", "ticker", "abstain": true, "horizons", "reason", "prompt_version"}` for what
+it skips. A line without made_at gets the file's write time, capped at the gate's clock (file_stamp): the Sonnet
+traders have no clock, so the gate stamps their time deterministically. `validate` checks every line
+(gate.check_record) and that every active company is covered. `add`:
 
 - kill switch off (`enabled: false` in the agent file): nothing is read; every active company gets `killed`;
 - the gate's clock after the deadline (D's open - 15 minutes): nothing from the file is stored; every active
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from marketbrief.traders import constants as c
@@ -78,9 +81,23 @@ def abstain_errors(rec: dict, one: Trader, gi: GateInputs) -> list[tuple[str, st
     return errors
 
 
-def gate_lines(lines: list, one: Trader, gi: GateInputs) -> dict:
+def file_stamp(path: Path, gi: GateInputs) -> str:
+    """When the trader wrote its file: the file's modification time, never later than the gate's clock (ISO UTC).
+    It is the made_at of every line that states none (the Sonnet traders have no clock; CLAUDE.md data rule 3)."""
+    written = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc) if path.exists() else gi.now
+    return min(written, gi.now).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def stamped(lines: list, stamp: str) -> list:
+    """The lines with made_at set to `stamp` where the trader wrote none."""
+    return [{**rec, "made_at": stamp} if isinstance(rec, dict) and rec.get("made_at") in (None, "") else rec
+            for rec in lines]
+
+
+def gate_lines(lines: list, one: Trader, gi: GateInputs, stamp: str | None = None) -> dict:
     """Every line gated, plus coverage: {rows, errors, warnings, skipped: {ticker: (horizons, reason)},
-    failed: {ticker: {horizon: codes}}}."""
+    failed: {ticker: {horizon: codes}}}. stamp: the made_at of lines without one (file_stamp)."""
+    lines = stamped(lines, stamp) if stamp else lines
     out = {"rows": [], "errors": [], "warnings": [], "skipped": {}, "failed": defaultdict(dict)}
     seen: set[str] = set()
     covered: dict[str, set[int]] = defaultdict(set)

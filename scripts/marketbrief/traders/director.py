@@ -72,7 +72,8 @@ def text_errors(where: str, text, words: int, cited, known: dict) -> list[str]:
 
 
 def applied(file: str, current: str, diff: str) -> tuple[str | None, str]:
-    """(the file after the diff, '') or (None, git's message); never touches the repo."""
+    """(the file after the diff, '') or (None, why not); never touches the repo. The diff must change exactly `file`:
+    a patch that also creates, deletes, renames or edits any other path is refused before anything is applied."""
     with tempfile.TemporaryDirectory() as folder:
         target = Path(folder) / file
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -80,8 +81,20 @@ def applied(file: str, current: str, diff: str) -> tuple[str | None, str]:
         patch = Path(folder) / "proposal.diff"
         patch.write_text(diff if diff.endswith("\n") else diff + "\n", encoding="utf-8")
         env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(Path(folder).parent)}   # never find an enclosing repo
-        result = subprocess.run(["git", "apply", "--whitespace=nowarn", "proposal.diff"], cwd=folder, env=env,
-                                capture_output=True, text=True, check=False)
+
+        def git_apply(*flags: str) -> subprocess.CompletedProcess:
+            return subprocess.run(["git", "apply", "--whitespace=nowarn", *flags, "proposal.diff"], cwd=folder,
+                                  env=env, capture_output=True, text=True, check=False)
+
+        listing = git_apply("--numstat", "--summary")   # every path the patch touches, and any create/delete/mode
+        if listing.returncode != 0:
+            return None, (listing.stderr.strip() or listing.stdout.strip())[:300]
+        touched = [line.split("\t")[-1] for line in listing.stdout.splitlines() if "\t" in line]
+        summary = [line.strip() for line in listing.stdout.splitlines() if "\t" not in line and line.strip()]
+        if touched != [file] or summary:
+            return None, f"the diff must change only {file} (it touches {touched}{'; ' if summary else ''}" \
+                         f"{'; '.join(summary)})"
+        result = git_apply()
         if result.returncode != 0:
             return None, (result.stderr.strip() or result.stdout.strip())[:300]
         return target.read_text(encoding="utf-8"), ""

@@ -29,9 +29,9 @@ For every active company and each horizon N+1, N+3 and N+5, write either a predi
 - prediction: `{"strategy_id": "ai.pattern_mood.sonnet.v1", "ticker", "horizon_days" (1, 3 or 5), "direction"
   ("up"/"down"), "prob_up" (4 decimals: the probability that the exit close of N+k is above D's open),
   "target_price" (your expected exit close), "range_widen" (0-0.5, usually 0), "evidence_ids" (1-3 input ids),
-  "reason" (at most 60 words), "made_at" (now, `date -u +%FT%TZ`), "prompt_version": "trader-pattern-v1"}`;
+  "reason" (at most 60 words), "prompt_version": "trader-pattern-v1"}`;
 - abstention: `{"strategy_id": "ai.pattern_mood.sonnet.v1", "ticker", "abstain": true, "horizons": [1, 3, 5],
-  "reason" (at most 60 words), "made_at", "prompt_version": "trader-pattern-v1"}`. Abstaining is allowed and often
+  "reason" (at most 60 words), "prompt_version": "trader-pattern-v1"}`. Abstaining is allowed and often
   right: a mixed pattern = abstain.
 
 Rules (the gate `python -m marketbrief.traders validate` checks every one; the caller runs it and sends errors back
@@ -49,6 +49,9 @@ once, then you abstain on what still fails):
   band edges). `target_price` must lie inside the (widened) 80% range and on your call's side of C.
 - Do not state `model_prob`, `agent_adjustment` or `adjustment_reason`: you do not see the model.
 - The reason names the pattern or mood and why it points that way over that horizon; no advice words.
+
+Do not write `made_at`: you have no clock, so the gate stamps each line with the time your file was written (never
+later than the gate's clock); evidence published after that time is refused.
 
 Every active company needs, for each of N+1, N+3 and N+5, a prediction or an abstention line. Return a table: ticker,
 N+1/N+3/N+5 decision, one-line reason.

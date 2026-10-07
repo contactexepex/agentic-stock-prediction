@@ -155,3 +155,24 @@ def test_cli_commands_show_help():
     result = subprocess.run([sys.executable, "-m", "marketbrief.traders", "--market", "us", "check"], cwd=REPO,
                             env=env, capture_output=True, text=True, check=False)
     assert result.returncode == 0 and json.loads(result.stdout)["problems"] == []
+
+
+def test_gate_stamps_made_at_from_the_file_time(root):
+    """The Sonnet traders have no clock: a line without made_at gets the file's write time, capped at the gate's."""
+    from marketbrief.traders.run import file_stamp
+    lines = [{k: v for k, v in agent_record(NEWS, h).items() if k != "made_at"} for h in (1, 3, 5)]
+    path = write(root / "f.jsonl", lines)
+    written = datetime(2026, 10, 7, 11, 44, tzinfo=timezone.utc).timestamp()
+    os.utime(path, (written, written))
+    gi = inputs()
+    assert file_stamp(path, gi) == "2026-10-07T11:44:00Z"
+    code, summary = outcome.add(trader(NEWS), gi, path, 1)
+    assert code == 0 and summary["predictions"] == 3
+    assert {r["made_at"] for r in stored(root, "strategy_predictions")} == {"2026-10-07T11:44:00Z"}
+    future = datetime(2026, 10, 7, 13, 0, tzinfo=timezone.utc).timestamp()
+    os.utime(path, (future, future))
+    assert file_stamp(path, gi) == "2026-10-07T11:50:00Z"          # capped at the gate's clock
+    early = datetime(2026, 10, 7, 11, 30, tzinfo=timezone.utc).timestamp()   # before the range was published
+    os.utime(path, (early, early))
+    errors = outcome.add(trader(NEWS), inputs(stored_predictions=set()), path, 1)[1]["errors"]
+    assert {e["code"] for e in errors} == {"LOOK_AHEAD"}

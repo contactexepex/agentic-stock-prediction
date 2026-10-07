@@ -34,7 +34,7 @@ from marketbrief.traders import constants as c
 from marketbrief.traders import director, director_facts, director_report, eod, eod_facts, eod_gate, outcome, prepare
 from marketbrief.traders.inputs import InputsUnavailableError, load_inputs
 from marketbrief.traders.registry import load_traders, trader, trader_problems
-from marketbrief.traders.run import gate_lines, read_lines, timed_out
+from marketbrief.traders.run import file_stamp, gate_lines, read_lines, timed_out
 from marketbrief.traders.settle_step import EngineUnavailableError, settle_due
 
 WORK = Path("work")
@@ -99,7 +99,7 @@ def trader_command(args, cfg: dict) -> int:
     if args.cmd == "validate":
         if timed_out(gi):
             return emit({**step, "error": c.CODE_TIMEOUT, "detail": "past the deadline: run add, which abstains"}, 1)
-        gated = gate_lines(read_lines(args.file), one, gi)
+        gated = gate_lines(read_lines(args.file), one, gi, file_stamp(args.file, gi))
         return emit({**step, "records": len(read_lines(args.file)), "valid": len(gated["rows"]),
                      "errors": gated["errors"], "warnings": gated["warnings"]}, 1 if gated["errors"] else 0)
     code, summary = outcome.add(one, gi, args.file, args.attempt)

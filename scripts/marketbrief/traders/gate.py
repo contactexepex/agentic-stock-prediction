@@ -30,7 +30,7 @@ from marketbrief.traders.sessions import deadline, entry_session, exit_session
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 
 REQUIRED = ("strategy_id", "ticker", "horizon_days", "direction", "prob_up", "target_price", "evidence_ids", "reason",
-            "made_at", "prompt_version")
+            "made_at", "prompt_version")   # made_at: written by the trader, else stamped by run.file_stamp
 
 
 @dataclass

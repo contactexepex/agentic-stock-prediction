@@ -28,10 +28,9 @@ For every active company and each horizon N+1, N+3 and N+5, write either a predi
 
 - prediction: `{"strategy_id": "ai.combined.sonnet.v1", "ticker", "horizon_days" (1, 3 or 5), "direction",
   "prob_up", "model_prob", "agent_adjustment", "adjustment_reason", "target_price", "range_widen" (0-0.5, usually 0),
-  "evidence_ids" (1-3 ids), "reason" (at most 60 words), "made_at" (now, `date -u +%FT%TZ`),
-  "prompt_version": "trader-combined-v1"}`;
+  "evidence_ids" (1-3 ids), "reason" (at most 60 words), "prompt_version": "trader-combined-v1"}`;
 - abstention: `{"strategy_id": "ai.combined.sonnet.v1", "ticker", "abstain": true, "horizons": [1, 3, 5], "reason"
-  (at most 60 words), "made_at", "prompt_version": "trader-combined-v1"}`. Abstaining is allowed and often right.
+  (at most 60 words), "prompt_version": "trader-combined-v1"}`. Abstaining is allowed and often right.
 
 Rules (the gate `python -m marketbrief.traders validate` checks every one; the caller runs it and sends errors back
 once, then you abstain on what still fails):
@@ -48,12 +47,15 @@ once, then you abstain on what still fails):
   `model_scores:<as_of_date>-<TICKER>-<k>d`, `features:<as_of_date>-<TICKER>`, `regime:<as_of_date>` exactly as named.
   The first news id you cite must be `confirmed_primary` or `corroborated`; never `rumour` or `promotional`;
   `contradicted` only with `range_widen` > 0; a `single_source` or `unverified` id lowers your confidence by at least
-  0.05 (the gate caps such a call at 0.85). Nothing published after `made_at`.
+  0.05 (the gate caps such a call at 0.85). Nothing published after the time your file is written.
 - Track record: where your table marks a band CLOSED, give no confidence inside it (lower it below the band or
   abstain); where a band hits less often than stated, lower your confidence.
 - Range: you may only widen ranges.py's range with `range_widen` (do not write band edges). `target_price` must lie
   inside the (widened) 80% range and on your call's side of C.
 - The reason names what decided the call; no advice words.
+
+Do not write `made_at`: you have no clock, so the gate stamps each line with the time your file was written (never
+later than the gate's clock); evidence published after that time is refused.
 
 Every active company needs, for each of N+1, N+3 and N+5, a prediction or an abstention line. Return a table: ticker,
 N+1/N+3/N+5 decision with model P(up) and your adjustment, one-line reason.

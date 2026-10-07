@@ -29,9 +29,9 @@ For every active company and each horizon N+1, N+3 and N+5, write either a predi
 - prediction: `{"strategy_id": "ai.news_results.sonnet.v1", "ticker", "horizon_days" (1, 3 or 5), "direction"
   ("up"/"down"), "prob_up" (4 decimals: the probability that the exit close of N+k is above D's open),
   "target_price" (your expected exit close), "range_widen" (0-0.5, usually 0), "evidence_ids" (1-3 ids), "reason"
-  (at most 60 words), "made_at" (now, `date -u +%FT%TZ`), "prompt_version": "trader-news-v1"}`;
+  (at most 60 words), "prompt_version": "trader-news-v1"}`;
 - abstention: `{"strategy_id": "ai.news_results.sonnet.v1", "ticker", "abstain": true, "horizons": [1, 3, 5],
-  "reason" (at most 60 words), "made_at", "prompt_version": "trader-news-v1"}`. Abstaining is allowed and often right:
+  "reason" (at most 60 words), "prompt_version": "trader-news-v1"}`. Abstaining is allowed and often right:
   no news that matters = abstain.
 
 Rules (the gate `python -m marketbrief.traders validate` checks every one; the caller runs it and sends errors back
@@ -41,7 +41,7 @@ once, then you abstain on what still fails):
   be `confirmed_primary` or `corroborated` as of now; never cite `rumour` or `promotional`; `contradicted` only with
   `range_widen` > 0 (as the reason to widen, never as support); any `single_source` or `unverified` id lowers your
   confidence by at least 0.05 (the gate caps such a call at 0.85). Never cite an id that is not in your input, and
-  nothing published after `made_at`. You cannot cite `features:`, `regime:` or `model_scores:` ids.
+  nothing published after the time your file is written. You cannot cite `features:`, `regime:` or `model_scores:` ids.
 - Probability: direction = the side of 0.5 that prob_up is on; confidence = max(prob_up, 1 - prob_up) must be
   0.50-0.90 (exactly 0.5: abstain). Start from the base rate (about half of moves are up); a call needs specific,
   verified news the price may not reflect yet. Lower confidence in EVENT_HEAVY; in UNSTABLE at most 0.65.
@@ -51,6 +51,9 @@ once, then you abstain on what still fails):
   band edges). `target_price` must lie inside the (widened) 80% range and on your call's side of C.
 - Do not state `model_prob`, `agent_adjustment` or `adjustment_reason`: you do not see the model.
 - The reason names the evidence and why it moves the price over that horizon; no advice words.
+
+Do not write `made_at`: you have no clock, so the gate stamps each line with the time your file was written (never
+later than the gate's clock); evidence published after that time is refused.
 
 Every active company needs, for each of N+1, N+3 and N+5, a prediction or an abstention line. Return a table: ticker,
 N+1/N+3/N+5 decision, one-line reason.

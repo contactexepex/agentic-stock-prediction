@@ -69,7 +69,8 @@ def news_errors(one: Trader, gi: GateInputs, made: datetime, ids: list[str]) -> 
 def evidence_errors(rec: dict, one: Trader, gi: GateInputs, frame: dict) -> tuple[list, list]:
     """(errors, warnings) of the evidence ids and their news-verification status."""
     ids = rec["evidence_ids"]
-    if not isinstance(ids, list) or not 1 <= len(ids) <= c.MAX_EVIDENCE or not all(isinstance(i, str) for i in ids):
+    if (not isinstance(ids, list) or not 1 <= len(ids) <= c.MAX_EVIDENCE or not all(isinstance(i, str) for i in ids)
+            or len(set(ids)) != len(ids)):
         count = len(ids) if isinstance(ids, list) else ids
         return [(c.CODE_EVIDENCE, c.MSG_EVIDENCE_COUNT.format(most=c.MAX_EVIDENCE, count=count))], []
     inputs = [evidence_id for evidence_id in ids if evidence_id.startswith(c.INPUT_PREFIXES)]
@@ -93,9 +94,9 @@ def anchor_check(rec: dict, one: Trader, frame: dict, news_cited: bool) -> tuple
                 if stated else []), []
     score = frame["score"]
     if score is None:
-        if rec.get("model_prob") is None:
+        if not stated:
             return [], [(CODE_MODEL_SCORE_MISSING, f"no model score {frame['range']['id']}: anchor not applied")]
-        return [(c.CODE_ANCHOR, "model_prob given but no model score is stored for this id")], []
+        return [(c.CODE_ANCHOR, f"no model score is stored for this id: leave out {stated}")], []
     if as_utc_timestamp(score["computed_at"]) > as_utc_timestamp(frame["made"]):
         return [(c.CODE_LOOKAHEAD, c.MSG_SCORE_LATE.format(id=score["id"], computed=score["computed_at"],
                                                            made_at=frame["made"].isoformat()))], []
