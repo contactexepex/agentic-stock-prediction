@@ -1911,7 +1911,7 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   it replaces the first wording "move > cost"): `expected_gain_your_pct = p × move − (1 − p) × loss −
   your_cost_pct` and `cost_viable = expected_gain_your_pct > 0`, with move and loss those of the head-to-head picks
   (`lab/gain.py`, 17.2), so the flag and the picks agree. Without a probability or a range (always-up, momentum)
-  `cost_viable` is null; when the amount buys no whole share at C it is false. Stored as a `cost_views` row
+  `cost_viable` is null, and so it is when the amount buys no whole share at C (no trade, no costs, no gain). Stored as a `cost_views` row
   (`record_kind` prediction or pick) and on each head-to-head candidate (`expected_move_pct`, `your_cost_pct`,
   `expected_gain_your_pct`, `cost_viable`). Predictions are made and scored either way, and a non-viable candidate
   can still be picked; the flag is shown (owner decision, open question 9 of b2.md).
@@ -1981,9 +1981,8 @@ trade counts once (its newest row).
   supplies a cross-market model variant.
 - **Momentum** compares the as-of close with the previous close put on the same split basis.
 - **Target and range** come from the B10 range of the horizon (its bands, never narrowed). B10's `center` is a log
-  shift, so the centre price is `base_close × exp(center)`; `lab/strategies.py` copies `center` into
-  `target_price` unchanged today (its tests use price-valued fixtures), which must be converted before B10's ranges
-  are read.
+  shift, so the target price is `base_close × exp(center)` (`lab/strategies.py` `target_price`; the row's
+  `base_close`, else the as-of close).
 - **Live inputs.** `predict` reads `contracts.horizons.scores_asof` / `ranges_asof`; until B10 builds them it
   refuses with a message and writes nothing.
 - **Back-test** (`backtest`, F2.3): always-up and momentum on adjusted bars stored by the clock (plus the history

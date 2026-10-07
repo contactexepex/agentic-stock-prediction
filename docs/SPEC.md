@@ -207,7 +207,7 @@ part already does it, the feature says "exists" and what changes.
         the round trip at `C` in both views (`market_cost_pct`, `your_cost_pct`; the US portfolio fee over the
         calendar days from D to the planned exit), `expected_gain_your_pct` = `p x move - (1 - p) x loss -
         your_cost_pct` with the move and loss of item 3, and `cost_viable` = `expected_gain_your_pct > 0` (null
-        without a probability or an 80% range, e.g. the always-up and momentum baselines; false when the amount
+        without a probability or an 80% range, e.g. the always-up and momentum baselines, and when the amount
         buys no whole share at C). The flag never stops a prediction or a trade: it is made, traded under F1.2 and
         scored either way, and a non-viable candidate can still be picked (owner decision of 2026-10-07).
 8. **Locked before the open.** Predictions are appended to `data/` and pushed before D's open; the

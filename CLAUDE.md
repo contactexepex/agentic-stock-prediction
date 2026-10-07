@@ -283,7 +283,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
   pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
-  conditional move and loss of `lab/gain.py`; null without a probability or 80% range); the flag never blocks a
+  conditional move and loss of `lab/gain.py`; null without a probability or 80% range, or when the amount buys no
+  whole share); the flag never blocks a
   prediction or pick. The owner's paper portfolio uses the your-cost charges and shows a EUR view of US positions.
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
