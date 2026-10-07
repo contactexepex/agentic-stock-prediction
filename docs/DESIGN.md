@@ -781,6 +781,21 @@ always show the same numbers.
   Charts, each single-purpose and drawn as inline SVG: a price-and-fan chart per company (one
   % scale shared by every company), a range-per-company chart, a sector-move bar chart and a
   promised-vs-actual track-record chart once something was scored. `index.html` lists all days.
+- `reports/<market>/dashboard.html` (`dashboard.py`, after `html_report.py`; code in
+  `scripts/marketbrief/presentation/dashboard/`): the decision-support dashboard for the owner's two
+  questions (buy at the next open, sell at the close of D+1 or D+4). One self-contained light-theme
+  file, phone and desktop, no network at view time: market overview (benchmark, volatility index,
+  regime, cues), sector heatmap, sortable watchlist; per stock a TradingView Lightweight Charts
+  candlestick chart (1W/1M/3M/1Y, the library vendored and pinned by SHA-256 in `vendor/NOTICE`)
+  with the published 50%/80% ranges drawn as a fan, the last open/close/gap, P(up) per horizon
+  with points per feature group, top drivers and the formula, ranges with risk/reward and the
+  round-trip cost, bull vs bear from `agent_reasoning`, headlines with their verification status,
+  indicators and the next earnings date; a track record page (live calls per scoring basis, never
+  pooled, against always-up; ranges held with Wilson intervals; the weekly review's model backtest;
+  the historical replay apart as not live) and "How to read this". Everything is read as of the
+  run's clock (MB_NOW-aware): bars up to the newest indicator snapshot, every other row stored by
+  then. Every signal carries "Paper only — no proven edge yet" unless the latest weekly review's
+  `model_skill` is true (thresholds in `config/review.yaml`). It adds itself to the Slack file manifest.
 - **Chart images** (`charts.py`, PNG): `ranges.png`, `sectors.png` and `track_record.png` (when
   scored data exists), the same views as the HTML charts, embedded in the md and posted to Slack.
   The old per-company PNGs and the overview collage are no longer drawn.

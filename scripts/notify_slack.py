@@ -5,10 +5,12 @@ With SLACK_BOT_TOKEN set (bot scopes chat:write and files:write; the bot must be
 the channel `slack_channel_id` in config/settings.yaml), it posts:
   1. the filled summary draft work/slack_<market>.md as the thread's first message
      (chat.postMessage);
-  2. the chart images as one reply, then 3. the HTML report as a file reply, each through
-     files.getUploadURLExternal -> upload to the returned URL -> files.completeUploadExternal
+  2. the chart images as one reply, then 3. the HTML report as a file reply, then 4. the
+     dashboard (reports/<market>/dashboard.html) as a file reply when dashboard.py listed it, each
+     through files.getUploadURLExternal -> upload to the returned URL -> files.completeUploadExternal
      with channel_id and thread_ts. The files come from work/slack_<market>_files.json
-     (written by html_report.py); without it only the summary is posted, with a warning.
+     (written by html_report.py, the dashboard key added by dashboard.py); without it only the
+     summary is posted, with a warning.
 Without the token it falls back to one text message through the incoming webhook in
 SLACK_WEBHOOK_URL (hooks.slack.com). --dry-run posts nothing: it writes the planned thread to
 work/slack_<market>_plan.json and copies the files it would upload to work/slack_<market>_plan/.
@@ -104,6 +106,12 @@ def thread_plan(text: str, files: dict | None, root: Path = paths.ROOT) -> list[
         steps.append({"step": "report", "method": "files.completeUploadExternal",
                       "comment": "Full report: download and open in any browser. Filter by sector or company.",
                       "files": [{"path": str(html.relative_to(root)), "title": f"Report {html.stem}"}]})
+    board = root / files["dashboard"] if files.get("dashboard") else None   # added by dashboard.py
+    if board is not None and board.exists():
+        steps.append({"step": "dashboard", "method": "files.completeUploadExternal",
+                      "comment": "Dashboard: every stock's chart, ranges, model probability with its reasons, "
+                                 "and the track record. Opens offline in any browser. Research only.",
+                      "files": [{"path": str(board.relative_to(root)), "title": "Dashboard"}]})
     return steps
 
 

@@ -39,8 +39,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
   PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
   the `AGENT` markers, see `templates/report.md`). After the report gate passes, `html_report` builds
-  the reader's HTML report from the filled md plus the data, and `notify_slack` posts a thread
-  (summary, chart images, HTML file) with `SLACK_BOT_TOKEN`, or the summary text alone through
+  the reader's HTML report from the filled md plus the data, then `dashboard` builds
+  `reports/<market>/dashboard.html` (decision-support dashboard, stored data only as of the run's clock:
+  watchlist, sector heatmap, candlesticks with the published ranges via the vendored TradingView
+  Lightweight Charts in `marketbrief/presentation/dashboard/vendor/` (version and SHA-256 in its NOTICE),
+  the signal model's P(up) with its points and formula, bull vs bear, news with status, track record;
+  "Paper only — no proven edge yet" until the weekly review's `model_skill` is true), and `notify_slack` posts a thread
+  (summary, chart images, HTML file, dashboard) with `SLACK_BOT_TOKEN`, or the summary text alone through
   `SLACK_WEBHOOK_URL`. Processing data (data/, context pack, summaries) and presentation (HTML,
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
@@ -69,7 +74,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
-  Where the code of the daily steps lives (each `scripts/<name>.py` is a thin entry point with the same flags): `marketbrief/pipeline/` (validate, review and lessons as packages, `context`, `score_predictions`, `spotcheck`, `market_status`), `marketbrief/replay/` (`backtest/`, `rule_replay/`, `ai_replay/`), `marketbrief/graph/` (`connection_map`, `news_hits`, `neo4j/`) and `marketbrief/presentation/report/` (the report skeleton and Slack draft). Messages and constants of each live in `marketbrief/constants/`.
+  Where the code of the daily steps lives (each `scripts/<name>.py` is a thin entry point with the same flags): `marketbrief/pipeline/` (validate, review and lessons as packages, `context`, `score_predictions`, `spotcheck`, `market_status`), `marketbrief/replay/` (`backtest/`, `rule_replay/`, `ai_replay/`), `marketbrief/graph/` (`connection_map`, `news_hits`, `neo4j/`) `marketbrief/presentation/report/` (the report skeleton and Slack draft) and `marketbrief/presentation/dashboard/` (the dashboard: read helpers, data assembly, page build; `assets/` and `vendor/` hold its JS, CSS and the charting library). Messages and constants of each live in `marketbrief/constants/`.
 - India primary sources (NSE; shared session and replay guard in `marketbrief/collectors/nse_runner.py`, `nse_session.py` and `nse_replay_guard.py`): `collect_nse_india`
   -> `data/india/announcements|financials|flows|delivery/` (exchange announcements, Integrated
   Filing results per period and basis, FII/DII provisional flows, delivery %); context sections
