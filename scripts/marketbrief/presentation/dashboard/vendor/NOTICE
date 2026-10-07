@@ -1,0 +1,18 @@
+TradingView Lightweight Charts(TM), vendored for the dashboard (scripts/dashboard.py)
+
+Package:  lightweight-charts (npm), version 5.2.1, pinned
+File:     dist/lightweight-charts.standalone.production.js of the package, copied unchanged as
+          lightweight-charts.standalone.production.js
+Source:   https://registry.npmjs.org/lightweight-charts/-/lightweight-charts-5.2.1.tgz
+          (official npm registry tarball, downloaded over HTTPS on 2026-10-07; no install scripts run)
+Tarball:  sha1 5a27ead719573607d4d3483ad2728c055ccea8fd and sha512-IVwoK1RLFiLPubaKIjNbtjWLnpPMqiABSrTay6whmNa8L1+19292VtHJ+BWyPUuLCwF0tcQlhEWd1CLB2a1nsQ==,
+          both equal to the registry's dist.shasum and dist.integrity for 5.2.1
+SHA-256: e21cc5caa0226ef30bd8549c50b9ef926615f2a4ee6b4e486353477a55f598cf
+License:  Apache License 2.0, full text in LICENSE (copied from the same tarball)
+Copyright (c) 2026 TradingView, Inc. (header of the file; LICENSE: Copyright 2023 TradingView, Inc.)
+
+The dashboard inlines this file into reports/<market>/dashboard.html at build time
+(marketbrief/presentation/dashboard/page.py), after checking its SHA-256 against the line above.
+The library's TradingView attribution logo is left on (its default).
+To upgrade: download the new tarball from registry.npmjs.org only, check its dist.integrity, copy the
+same dist file and LICENSE, and update the version, URL and SHA-256 here.

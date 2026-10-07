@@ -282,6 +282,13 @@ Warnings never block: list them in `data_quality`.
     further check. If it fails, add the failure to the Slack draft's failures line, then run
     `python scripts/validate.py --stage report` again, so the draft that is posted is the one the gate
     checked (one retry, as for the report), and post anyway.
+    Then run `python scripts/dashboard.py`: it builds `reports/<market>/dashboard.html` (the
+    decision-support dashboard: watchlist and market overview, a candlestick chart per stock with
+    the published ranges, the signal model's P(up) with its reasons, bull vs bear, news with
+    verification status, track record; labelled "Paper only — no proven edge yet" until the weekly
+    review finds skill) from the stored data only, and adds it to `work/slack_<market>_files.json`.
+    It writes no data and adds no narrative, so it needs no further check; if it fails, note it on
+    the Slack draft's failures line as above and go on.
 
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
@@ -291,7 +298,7 @@ Warnings never block: list them in `data_quality`.
 13. Notify: run `python scripts/notify_slack.py`. With `SLACK_BOT_TOKEN` set it posts a thread
     to #market-brief (channel id in `config/settings.yaml`): the filled `work/slack_<market>.md`
     as the first message, then the chart images as one reply, then the HTML report file as a
-    reply. Without the token it posts the summary text as ONE message through the incoming
+    reply, then the dashboard file as a reply. Without the token it posts the summary text as ONE message through the incoming
     webhook in `SLACK_WEBHOOK_URL`. If it exits with code 2 (neither configured) and a Slack
     connector is available in this session, post the same text as one message to #market-brief
     with the connector instead. Nothing else is posted.

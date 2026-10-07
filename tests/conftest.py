@@ -64,6 +64,9 @@ SLOW = {
         "test_no_entry_open_no_score_and_old_rows_read_as_close_to_close",
         "test_scoring_bases_match_the_model_labels",
     },
+    "tests/test_dashboard.py": {
+        "test_dashboard_renders_in_a_browser",
+    },
     "tests/test_determinism.py": {
         "test_score_predictions_queries",
         "test_views_insider_flow_and_split_factors",
