@@ -33,7 +33,7 @@ and right after it is stored. Save every step's JSON summary under `work/steps/`
    `proposed`. A week already stored is refused. Delete `work/research_review.json`.
 
 6. Weekly post (session B6, docs/ws/b6.md): `python scripts/alerts.py weekly > work/steps/alerts_weekly.json` posts
-   the week's research report as its own #market-brief post. Exit 2 (no Slack token or webhook) or exit 1: note it
+   the week's research report as its own #market-brief post. Exit 2 (neither Slack token nor webhook, or a token without a channel) or exit 1: note it
    and go on; never retry by hand.
 
 7. Save: `git add data reports && git commit -m "<market> weekly research <iso_week>"` (this includes
