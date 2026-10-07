@@ -108,7 +108,8 @@ def test_no_strong_without_proof(root):
                                 "2026-10-06-AAPL-5d": "Hold/No call"}
     assert all(row["paper_only"] and row["label"] == LABEL_PAPER_ONLY for row in out["tiers"])
     unscored = [row for row in out["tiers"] if row["model_prob"] is None]
-    assert len(out["tiers"]) == 2 * len(ctx_for().cfg["tickers"]) and len(unscored) == len(out["tiers"]) - 3
+    # B2: a row per active ticker x horizon of config/strategies.yaml (N+1..N+5, decision 37)
+    assert len(out["tiers"]) == 5 * len(ctx_for().cfg["tickers"]) and len(unscored) == len(out["tiers"]) - 3
     assert {row["tier"] for row in unscored} == {"Hold/No call"}
     assert next(r for r in unscored if r["id"] == "2026-10-06-JPM-5d")["reasons"] == ["no model score"]
     assert [c["id"] for c in out["candidates"]] == ["2026-10-06-AAPL-1d", "2026-10-06-JPM-1d", "2026-10-06-AAPL-5d"]

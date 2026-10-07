@@ -42,3 +42,34 @@ us:
   finra_taf_max_per_trade: 0.0      # verify (9.79 from 2027-01-01)
   notional_per_trade: 10000.0       # USD per position, only for the per-share TAF and its cap
   slippage_each_side: 0.0
+
+# Broker charges of the paper-trading engine (B2: marketbrief/lab/costs.py, docs/SPEC.md F1.6) and of the owner's
+# paper portfolio (scripts/portfolio.py, F1.11), on top of the statutory rates above (india: STT, exchange, SEBI,
+# stamp duty, GST; us: SEC fee, FINRA TAF). The model's backtest keeps the sections above unchanged.
+# PROVISIONAL: the owner's actual plans are not confirmed (SPEC section 11, owner action). Every value is marked
+# "verify" and backed only by SECONDARY SOURCES (search results, 2026-10-07); the official broker pages were NOT
+# opened from this environment. Wave 5 switches on live paper trading only after the owner confirms them.
+broker:
+  india:
+    name: Axis Direct
+    # verify. SECONDARY SOURCE: 0.25% delivery brokerage per side after the plan's free turnover ("Now or Never",
+    # https://comparesharebrokers.com/faq/what-is-axis-direct-brokerage-charges/515 and
+    # https://stest.finology.in/broker/axis-direct/plans); the same search showed Axis Bank's own demat page
+    # quoting 0.20% for that plan (https://www.axis.bank.in/investment/demat-account, not opened) and 0.50% for
+    # "Investment Plus" (SPEC F1.6). The owner confirms the plan from a contract note.
+    brokerage_each_side: 0.0025
+    # verify. SECONDARY SOURCE: DP charge per scrip sold, Rs 30 or 0.04% of the sale value, the higher (SPEC
+    # F1.6: a source quoted it for NRI accounts; no page found for a resident account). GST applies to it.
+    dp_charge_min: 30.0
+    dp_charge_rate: 0.0004
+  us:
+    name: BUX
+    # verify. SECONDARY SOURCE: EUR 0.99 per US-share order (https://curvo.eu/article/bux-review,
+    # https://investingintheweb.com/broker-reviews/bux-review/; getbux.com pricing quoted in search results, not
+    # opened). Applied per side, converted to USD at the EUR/USD close (symbol below) of that side's session.
+    order_fee_eur: 0.99
+    # verify. SECONDARY SOURCE: FX markup 0.25% on EUR->USD (getbux.com pricing as quoted in search results; a 2026
+    # directory, https://www.findmymoat.com/tools/bux, lists Basic 0.75%, Plus 0.25%, Prime 0.20%). USD->EUR not
+    # found; the same rate is assumed. Used only by the owner's EUR view; strategies are compared in USD.
+    fx_fee_rate: 0.0025
+    eurusd_symbol: EURUSD     # config/markets/us.yaml symbols key (Yahoo EURUSD=X, role fx)
