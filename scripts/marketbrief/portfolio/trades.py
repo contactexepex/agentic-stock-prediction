@@ -161,4 +161,5 @@ def stored_row(fields: dict, price: float | None, key: str, clock: datetime) -> 
             "ticker": fields["ticker"], "side": fields["side"], "quantity": fields["quantity"], "price": price,
             "price_basis": fields["price_basis"], "trade_date": fields["trade_date"].isoformat(),
             "source": fields["source"], "idempotency_key": key, "entered_at": clock.replace(microsecond=0).isoformat(),
-            "note": fields.get("note"), "supersedes": fields.get("supersedes")}
+            "note": fields.get("note"), "supersedes": fields.get("supersedes"),
+            "submitted_by": fields.get("submitted_by"), "command_id": fields.get("command_id")}

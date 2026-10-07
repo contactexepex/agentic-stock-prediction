@@ -74,9 +74,15 @@ def api_shape(result: dict) -> str:
     return f"[{result['market']}] {result['label']}: {len(result['positions'])} open lot(s)"
 
 
+def imported(result: dict) -> str:
+    """One line per imported inbox request."""
+    return f"[{result['market']}] imported {result['imported']} request(s)\n" + table(
+        result["results"], ["inbox_id", "result", "refusal_code", "trade_ids"])
+
+
 RENDERERS = {"add-trade": stored_trade, "cancel-trade": stored_trade, "request-company": stored_request,
              "positions": positions, "pnl": pnl, "list": listing, "signals": tiers, "paper-follow": follow,
-             "api-signals": api_shape, "api-portfolio": api_shape}
+             "api-signals": api_shape, "api-portfolio": api_shape, "import-inbox": imported}
 
 
 def render(command: str, result: dict) -> str:
