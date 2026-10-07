@@ -13,6 +13,7 @@ from marketbrief.core.schema_filings import (
     SEC_TIMES_SCHEMA,
 )
 from marketbrief.core.schema_model import MODEL_SCHEMAS
+from marketbrief.core.schema_results import RESULTS_SCHEMAS  # WS6
 from marketbrief.core.schema_sources import FREE_SOURCE_SCHEMAS, RELATION_SCHEMAS
 from marketbrief.core.schema_verification import VERIFICATION_SCHEMAS
 
@@ -28,6 +29,7 @@ def build_schemas() -> Schemas:
         **FREE_SOURCE_SCHEMAS,
         **VERIFICATION_SCHEMAS,
         **MODEL_SCHEMAS,
+        **RESULTS_SCHEMAS,  # WS6
     }
     for kind, (file_format, columns) in RELATION_SCHEMAS.items():
         if kind in schemas:
