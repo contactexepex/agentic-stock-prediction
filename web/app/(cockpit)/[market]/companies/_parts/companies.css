@@ -1,0 +1,22 @@
+/* Companies page (design/mockups/10-companies/template.html page CSS, unchanged rules; tokens only). Scoped under .mb-companies: page CSS is global in Next. */
+.mb-companies .co td{vertical-align:middle}
+.mb-companies .co .nm{display:flex;align-items:center;gap:10px;min-width:0} .mb-companies .co .nm .t{min-width:0} .mb-companies .co .nm b{display:block;font-size:14px} .mb-companies .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere} .mb-companies .co .nm small.ph,.mb-companies .co .nm small.ph2{display:none}
+.mb-companies .co .last b{display:block;font-weight:600} .mb-companies .co .last .mb-delta{font-size:12.5px}
+.mb-companies .co .amt b{font-weight:600} .mb-companies .co .amt .mb-label{font-size:10.5px;padding:0 5px;margin-left:4px}
+.mb-companies .co .acts{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end} .mb-companies .co .acts .md-btn{height:30px;padding:0 10px;font-size:12px} .mb-companies .co .acts .md-btn .ms{width:16px;height:16px;margin-left:-2px}
+.mb-companies .co .acts .md-btn.danger{color:var(--mb-color-down)} .mb-companies .co .acts .md-btn.one{display:none}
+.mb-companies .ev{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.mb-companies .ev li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.mb-companies .ev li:first-child{border-top:0}
+.mb-companies .ev .when{font-size:12px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;padding-top:2px;width:92px}
+.mb-companies .ev .what{min-width:0;overflow-wrap:anywhere} .mb-companies .ev .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:2px}
+.mb-companies .ev .mb-label{font-size:11px;padding:1px 6px}
+.mb-companies .cmd code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere;display:inline-block;vertical-align:middle;max-width:100%}
+.mb-companies .pend{display:grid;gap:6px;margin-top:10px}
+.mb-companies .addbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+@media (max-width:1359px){ .mb-companies .co .c3{display:none} }
+@media (max-width:1439px){ .mb-companies .co th,.mb-companies .co td{padding:8px 8px} }
+@media (max-width:1199px){ .mb-companies .co .cw{display:none} .mb-companies .co .acts .md-btn span{display:none} .mb-companies .co .acts .md-btn{padding:0 8px} .mb-companies .co .acts .md-btn .ms{margin:0} .mb-companies .co .acts{flex-wrap:nowrap} }
+@media (max-width:900px){ .mb-companies .co .cm{display:none} .mb-companies .co .acts .md-btn.one{display:inline-flex} .mb-companies .co .acts .md-btn.many{display:none} .mb-companies .co .nm small.ph2{display:block} }
+@media (max-width:760px){ .mb-companies .co th,.mb-companies .co td{padding:8px 6px;white-space:normal} .mb-companies .co .nm .mb-avatar{display:none} .mb-companies .co .acts{justify-content:flex-start} .mb-companies .ev li{grid-template-columns:1fr} .mb-companies .ev .when{width:auto} }
+@media (max-width:599px){ .mb-companies .co .cp{display:none} .mb-companies .co .nm small.ph{display:block} .mb-companies .co th,.mb-companies .co td{padding:8px 4px} }

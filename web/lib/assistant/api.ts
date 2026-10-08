@@ -1,12 +1,12 @@
 // The assistant API of the dashboard (web/app/api/assistant/route.ts), served only behind Vercel Authentication
 // (the app project; a 404 in gateway mode). Identity: dashboardContext("assistant"), never from the request.
 //   POST /api/assistant {market, question, ticker?, strategy_id?} -> the explain tool through B5's tool layer.
-//   GET  /api/assistant?market=india|us -> the market's conversation (90 days, newest 100) and the budget state.
+//   GET  /api/assistant?market=india|us -> the market's conversation (90 days, newest 100) and the spend.
 import type { ToolLayer } from "../tools/executor.ts";
 import { dashboardContext } from "../tools/identity.ts";
 import type { ToolOutcome } from "../tools/types.ts";
-import { budgetState, utcDayStart, utcMonthStart } from "./budget.ts";
-import { DAILY_USD, MONTHLY_USD, QUESTION_MAX, QUESTION_USD, RETENTION_DAYS } from "./constants.ts";
+import { spendState, utcDayStart, utcMonthStart } from "./cost.ts";
+import { HISTORY_TURNS, QUESTION_MAX, RETENTION_DAYS } from "./constants.ts";
 import type { ConversationStore } from "./types.ts";
 
 export interface AssistantApiDeps {
@@ -23,14 +23,15 @@ const NO_STORE = { "Cache-Control": "no-store" };
 const MAX_BODY = 4096;
 export const HISTORY_LIMIT = 100;
 
-/** The fixed numbers the panel shows (the same as design/mockups/_shared/shell.js). */
-export const LIMITS = { question_max: QUESTION_MAX, daily_usd: DAILY_USD, monthly_usd: MONTHLY_USD,
-  question_usd: QUESTION_USD, retention_days: RETENTION_DAYS };
+/** The fixed numbers the panel shows (question length and retention as in design/mockups/_shared/shell.js; no money
+ * budget since the owner's decision of 2026-10-08). */
+export const LIMITS = { question_max: QUESTION_MAX, history_turns: HISTORY_TURNS, retention_days: RETENTION_DAYS };
 
 const json = (status: number, body: unknown) => Response.json(body, { status, headers: NO_STORE });
 const problem = (status: number, title: string, detail: string) =>
   new Response(JSON.stringify({ title, status, detail }), { status, headers: { ...NO_STORE, "Content-Type": "application/problem+json" } });
 
+/** budget_exceeded: the tool layer's day budget of reads (mcp/agents/assistant.yaml), not money. */
 const STATUS: Record<string, number> = { budget_exceeded: 429, kill_switch: 503, validation_failed: 422 };
 
 function httpStatus(outcome: ToolOutcome): number {
@@ -61,7 +62,7 @@ export async function postQuestion(request: Request, deps: AssistantApiDeps): Pr
   const data = (outcome.data ?? {}) as Record<string, unknown>;
   return json(httpStatus(outcome), {
     result: outcome.result, refusal_code: outcome.refusal_code, message: outcome.message, command_id: outcome.command_id,
-    answer: data.answer ?? null, budget: data.budget ?? null, limits: LIMITS,
+    answer: data.answer ?? null, spend: data.spend ?? null, limits: LIMITS,
   });
 }
 
@@ -77,7 +78,7 @@ export async function getConversation(request: Request, deps: AssistantApiDeps):
       deps.store.spend(utcDayStart(now), utcMonthStart(now)),
       deps.store.enabled(),
     ]);
-    return json(200, { market, answers: [...answers].reverse(), budget: budgetState(spent, now, enabled),
+    return json(200, { market, answers: [...answers].reverse(), spend: spendState(spent, now, enabled),
       limits: LIMITS, read_at: now.toISOString() });
   } catch {
     return problem(503, "Conversation log unavailable", "The assistant's log cannot be read right now");

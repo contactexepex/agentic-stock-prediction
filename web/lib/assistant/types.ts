@@ -36,27 +36,29 @@ export interface AnswerRecord {
   not_in_data: boolean;
   /** `advice`: asked for advice or a real trade; `refused`: the model declined; else null. */
   declined: "advice" | "refused" | null;
-  /** answered | not_in_data | declined | stopped (budget per question) | failed */
+  /** answered | not_in_data | declined | stopped (out of time) | failed | pending (no answer logged) */
   status: AnswerStatus;
   sources: AnswerSource[];
   cost_usd: number;
+  /** The conversation (the id of its first question) and how many earlier turns this answer was given. */
+  conversation_id: string;
+  history_turns: number;
+}
+
+/** One earlier question and answer of a conversation, sent before a new question (multi-turn). */
+export interface HistoryTurn {
+  id: string;
+  asked_at: string;
+  question: string;
+  text: string;
 }
 
 export type AnswerStatus = "answered" | "not_in_data" | "declined" | "stopped" | "failed" | "pending";
 
-export interface SpendWindow {
-  spent_usd: number;
-  budget_usd: number;
-  left_usd: number;
-}
-
-/** The budget state the panel shows (F11: "over budget the panel says so"). */
-export interface BudgetState {
-  day: SpendWindow & { starts_at: string };
-  month: SpendWindow & { starts_at: string };
-  /** The cost reserved per question; a question is refused when either window has less left. */
-  question_usd: number;
-  over_budget: boolean;
+/** The assistant's spend the panel shows (owner decision 2026-10-08: shown, never enforced in code). */
+export interface SpendState {
+  day: { spent_usd: number; starts_at: string };
+  month: { spent_usd: number; starts_at: string };
   /** false when the kill switch (agent `assistant`) is off; null when unknown. */
   enabled: boolean | null;
 }
@@ -71,7 +73,7 @@ export interface QuestionRow {
   ticker: string | null;
   strategy_id: string | null;
   asked_at: string;
-  reserved_usd: number;
+  conversation_id: string;
 }
 
 export interface AnswerRow {
@@ -93,14 +95,20 @@ export interface AnswerRow {
   completed_at: string;
 }
 
-/** The conversation log and budget in MotherDuck schema `app` (market_brief_inbox; app.sql). */
+/** The conversation log in MotherDuck schema `app` (market_brief_inbox; app.sql). */
 export interface ConversationStore {
-  /** Inserts the question unless the day's or the month's spend plus `reserved_usd` would pass its cap. */
-  reserve(row: QuestionRow, caps: { dayStart: string; monthStart: string; dayUsd: number; monthUsd: number }): Promise<boolean>;
+  /** Logs the question before the first model call. */
+  ask(row: QuestionRow): Promise<void>;
   answer(row: AnswerRow): Promise<void>;
   spend(dayStart: string, monthStart: string): Promise<{ day: number; month: number }>;
   /** The kill switch of the assistant agent in inbox.controls (newest row of `assistant` and of `*`). */
   enabled(): Promise<boolean | null>;
+  /** Whether `id` is the first question of a conversation asked by this actor in this market. */
+  owns(id: string, actor: string, market: string): Promise<boolean>;
+  /** The conversation of the actor's newest question in the market asked at or after `since`, or null. */
+  latestConversation(actor: string, market: string, since: string): Promise<string | null>;
+  /** The last `limit` finished turns of a conversation by this actor and market, oldest first. */
+  history(conversationId: string, actor: string, market: string, limit: number): Promise<HistoryTurn[]>;
   /** The market's answers asked since `since`, newest first, at most `limit`. */
   list(market: string, since: string, limit: number): Promise<AnswerRecord[]>;
   /** Deletes questions and answers asked before `before` (the 90-day retention). */
@@ -109,7 +117,7 @@ export interface ConversationStore {
 
 /** The part of the Anthropic client the assistant uses; tests pass a mock. */
 export interface ModelClient {
-  create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message>;
+  create(params: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming): Promise<Anthropic.Beta.BetaMessage>;
 }
 
 /** The explain hook of B5's tool layer (ToolDeps.explainer) and its answer, defined in web/lib/tools/types.ts. */

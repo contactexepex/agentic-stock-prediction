@@ -313,6 +313,12 @@ export const TOOL_DEFINITIONS: readonly unknown[] = [
       "strategy_id": {
         "type": "string",
         "required": false
+      },
+      "conversation_id": {
+        "type": "string",
+        "pattern": "^ask-(india|us)-\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{10}$",
+        "required": false,
+        "description": "Continue this conversation (the id of its first question); omit to start a new one."
       }
     },
     "output": {
@@ -335,9 +341,7 @@ export const TOOL_DEFINITIONS: readonly unknown[] = [
       "get_trades"
     ],
     "budget": {
-      "model": "sonnet",
-      "monthly_usd_cap": 20,
-      "daily_usd": 0.65
+      "model": "sonnet"
     },
     "channels": {
       "dashboard": "chat panel",

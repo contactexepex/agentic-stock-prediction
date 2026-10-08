@@ -93,9 +93,10 @@ tools:
       question: {type: string, max_length: 500, required: true}
       ticker: {$ref: common_inputs.ticker, required: false}
       strategy_id: {type: string, required: false}
+      conversation_id: {type: string, pattern: '^ask-(india|us)-\d{4}-\d{2}-\d{2}-[0-9a-f]{10}$', required: false, description: "Continue this conversation (the id of its first question); omit to start a new one."}
     output: {entities: [answer], fields: [text, cited_ids, as_of, not_in_data]}
     uses_tools: [get_overview, get_company, get_scoreboard, compare_rule_vs_ai, get_news, get_trades]
-    budget: {model: sonnet, monthly_usd_cap: 20, daily_usd: 0.65}
+    budget: {model: sonnet}
     channels: {dashboard: chat panel, slack: /ask, claude_code: true, claude_app: true}
 
   # ---------------- write (append-only records; pending until imported) ----------------

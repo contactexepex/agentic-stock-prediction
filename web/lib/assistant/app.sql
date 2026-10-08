@@ -1,16 +1,15 @@
--- The assistant's conversation log and budget (docs/SPEC.md F11; session B8, docs/ws/b8.md).
+-- The assistant's conversation log (docs/SPEC.md F11; session B8, docs/ws/b8.md).
 -- Schema `app` in the MotherDuck database market_brief_inbox, written with MOTHERDUCK_INBOX_TOKEN (the web tier's only
 -- writable database: market_brief is read-only for Vercel). An OPERATIONAL log, not a fact store: never imported into
--- data/, kept 90 days (the web tier deletes older rows on each question), and the source of the code-side budget
--- (spend = the real cost of each answered question, else its reservation, so a question that never finished still
--- counts). Idempotent: every statement is CREATE ... IF NOT EXISTS. The owner runs this file once in
+-- data/, kept 90 days (the web tier deletes older rows on each question). It holds each answer's real cost, so the
+-- pages can show the spend; no money budget is enforced in code (owner decision 2026-10-08). Idempotent: every
+-- statement is CREATE ... IF NOT EXISTS. The owner runs this file once in
 -- market_brief_inbox (docs/ws/b8.md, owner setup); tests/test_b8_assistant.py runs it and every statement of
 -- web/lib/assistant/sql.ts on a local DuckDB.
 
 CREATE SCHEMA IF NOT EXISTS app;
 
--- One row per question, inserted before the first model call together with the cost reserved for it (one statement
--- that refuses the row when the day's or the month's spend plus the reservation would pass its cap).
+-- One row per question, inserted before the first model call.
 CREATE TABLE IF NOT EXISTS app.assistant_questions (
     id VARCHAR PRIMARY KEY,          -- ask-<market>-<YYYY-MM-DD>-<random>
     market VARCHAR NOT NULL,
@@ -21,8 +20,14 @@ CREATE TABLE IF NOT EXISTS app.assistant_questions (
     ticker VARCHAR,
     strategy_id VARCHAR,
     asked_at TIMESTAMPTZ NOT NULL,
-    reserved_usd DOUBLE NOT NULL
+    conversation_id VARCHAR NOT NULL -- the id of the conversation's first question (its own id for a new one)
 );
+
+-- A table created by batch 1's version of this file (on main before 2026-10-08's owner decisions) is brought to this
+-- shape: it gains conversation_id (null on old rows; the statements read coalesce(conversation_id, id)) and loses the
+-- per-question reservation of the removed money budget, whose NOT NULL would refuse the new inserts.
+ALTER TABLE app.assistant_questions ADD COLUMN IF NOT EXISTS conversation_id VARCHAR;
+ALTER TABLE app.assistant_questions DROP COLUMN IF EXISTS reserved_usd;
 
 -- One row per finished question (answered, not in the data, declined, stopped or failed) with its real cost.
 CREATE TABLE IF NOT EXISTS app.assistant_answers (

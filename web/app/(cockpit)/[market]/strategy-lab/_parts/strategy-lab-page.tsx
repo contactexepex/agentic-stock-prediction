@@ -21,7 +21,7 @@ import { stockStrategiesPath } from "../../../../../lib/ui/routes.ts";
 import type { GoLive, PageBase } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
 import {
-  figure, niceTicks, REGIME_WORDS, rowsOf, tooFewToRank, type Basis, type CostView, type ScoreboardRow, type ScoreView, type Strategy,
+  byNetDesc, figure, niceTicks, REGIME_WORDS, rowsOf, tooFewToRank, type Basis, type CostView, type ScoreboardRow, type ScoreView, type Strategy,
 } from "../../../../../lib/strategy-pages/scoreboard.ts";
 import {
   cellValue, colouredSeries, compactProfit, cumulativeSeries, defaultSelection, fmtParam, forwardAccuracyRow, heatShares,
@@ -54,7 +54,9 @@ interface View {
 
 function StrategyLab({ p }: { p: Payload }) {
   const [v, setV] = useState<View>({ view: "accuracy", basis: "forward", cost: "market", horizon: p.default_horizon ?? "all" });
-  const [chosen, setChosen] = useState<string | null>(null);
+  // The selection is fixed once: the URL hash, else the first ranked strategy of the opening slice (the mockup keeps it
+  // while the switches change); a click or a new hash changes it.
+  const [chosen, setChosen] = useState<string>(() => defaultSelection(p, { view: "accuracy", basis: "forward", horizon: p.default_horizon ?? "all" }));
   useEffect(() => {
     const read = () => { const id = hashId(); if (id && p.strategies[id]) setChosen(id); };
     read();
@@ -62,7 +64,7 @@ function StrategyLab({ p }: { p: Payload }) {
     return () => window.removeEventListener("hashchange", read);
   }, [p.strategies]);
   const slice: Slice = { view: v.view, basis: v.basis, horizon: v.horizon };
-  const selected = chosen && p.strategies[chosen] ? chosen : defaultSelection(p, slice);
+  const selected = p.strategies[chosen] ? chosen : p.reference_strategy;
   const select = (id: string) => {
     setChosen(id);
     window.history.replaceState(null, "", `#${encodeURIComponent(id)}`);
@@ -243,7 +245,7 @@ function Leaderboard({ p, v, selected, onSelect }: { p: Payload; v: View; select
 }
 
 function PickRuleTable({ p, v }: { p: Payload; v: View }) {
-  const cur = p.currency, rows = rowsOf(p.rows, "pick_rule", v.horizon, v.view, v.basis).sort((a, b) => b.net_pnl - a.net_pnl);
+  const cur = p.currency, rows = rowsOf(p.rows, "pick_rule", v.horizon, v.view, v.basis).sort(byNetDesc);
   if (!rows.length) return null;
   return (
     <>
@@ -299,7 +301,7 @@ function Detail({ p, v, selected }: { p: Payload; v: View; selected: string }) {
   const regimes = p.rows.filter((r) => r.scope === "strategy_regime" && r.view === v.view && r.basis === v.basis && r.strategy_id === selected);
   const rgNets = nets(regimes), rgMax = maxOf(rgNets);
   const companies = p.rows.filter((r) => r.scope === "strategy_company" && r.view === v.view && r.basis === v.basis && r.strategy_id === selected && String(r.horizon_days) === String(v.horizon))
-    .sort((a, b) => b.net_pnl - a.net_pnl);
+    .sort(byNetDesc);
   const nameOf = (t: string) => p.companies.find((c) => c.ticker === t)?.name ?? t;
   const g = fwd?.go_live ?? null;
   let diff: ReactNode = null;
@@ -547,7 +549,7 @@ function Heatmaps({ p, v }: { p: Payload; v: View }) {
   const regimes = [...new Set(rgRows.map((r) => r.regime ?? ""))].sort();
   const rgIds = Object.keys(p.strategies).filter((id) => rgRows.some((r) => r.strategy_id === id));
   const codes = [...new Set(cells.filter((c) => c.dimension === "reason_code").map((c) => c.column))].sort();
-  const fromRow = (r: ScoreboardRow | undefined): HeatValue | null => (r ? { n: r.trades, net: r.net_pnl, win: r.win_rate } : null);
+  const fromRow = (r: ScoreboardRow | undefined): HeatValue | null => (r && r.net_pnl !== null ? { n: r.trades, net: r.net_pnl, win: r.win_rate } : null);
   return (
     <Card label="Heatmaps">
       {head}
