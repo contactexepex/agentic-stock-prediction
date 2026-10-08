@@ -346,8 +346,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   momentum and, on B10's walk-forward probabilities as of the clock, the model strategies without news; stored bars,
   `--history` adds the cache; basis backtest; `backtest --store` -> `lab_backtests`, once per run_id), `pick-study`. Costs (`lab/costs.py`): the statutory
   rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
-  owner-provided, marked verify; the owner confirms them with a contract note before Wave 5 switches paper trading
-  on); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
+  owner-provided, confirmed final for paper trading by the owner on 2026-10-08, SPEC decision 53); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
   reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
   pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
