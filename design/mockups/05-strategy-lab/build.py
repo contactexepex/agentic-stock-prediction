@@ -16,7 +16,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
 from mockup import HORIZONS, MARKETS, envelope, load, pick, run  # noqa: E402
 
-NAMES = ("market_status", "strategy", "scoreboard_row", "scoreboard_backtest_row", "paper_trade", "company")
+NAMES = ("market_status", "strategy", "scoreboard_row", "scoreboard_backtest_row", "heatmap_cell", "cumulative_line", "company")
+CELL_FIELDS = ("market", "view", "basis", "strategy_id", "dimension", "column", "week", "trades", "wins", "win_rate", "net_pnl")
+LINE_FIELDS = ("market", "view", "basis", "series", "date", "net_pnl", "cumulative_net_pnl")
 STRATEGY_FIELDS = ("id", "family", "name", "description", "compared_to", "differs_in", "parameters", "threshold",
                    "horizons", "live_from", "live", "settled_trades")
 LUCK_FIELDS = ("method", "n", "m", "low_pct", "high_pct", "excludes_zero", "corrected_low_pct", "corrected_high_pct",
@@ -28,9 +30,6 @@ ROW_FIELDS = ("scope", "market", "view", "basis", "strategy_id", "family", "pick
               "first_entry", "last_exit", "as_of")
 GO_LIVE_FIELDS = ("proven", "months_forward", "trades_needed", "beats_best_baseline", "best_baseline_net_pnl",
                   "drawdown_limit", "drawdown_within_limit", "holds_in_calm_and_volatile", "cost_view")
-TRADE_FIELDS = ("trade_id", "strategy_id", "family", "view", "pick_rule", "ticker", "horizon_days", "entry_date",
-                "exit_date", "exit_date_actual", "status", "amount", "currency", "net_pnl", "return_pct",
-                "reason_code", "reason_codes", "regime", "settled_at")
 COMPANY_FIELDS = ("market", "ticker", "name", "sector", "state")
 REFERENCE_STRATEGY = "rule.model_news.v1"
 
@@ -70,9 +69,14 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
                   key=lambda r: (r["scope"], r["view"], r["basis"], str(r["strategy_id"]), str(r["pick_rule"]),
                                  str(r["ticker"]), str(r["regime"]), str(r["horizon_days"])))
     backtest_run = pick(files["scoreboard_backtest_row"]["runs"][market], BACKTEST_RUN_FIELDS)
-    trades = sorted((pick(r, TRADE_FIELDS) for r in files["paper_trade"]["records"]
-                     if r["market"] == market and r["status"] == "settled" and r["settled_at"] <= cutoff),
-                    key=lambda r: (r["exit_date_actual"] or r["exit_date"], r["entry_date"], r["trade_id"]))
+    # F2.8 heatmap cells (per strategy, dimension horizon / company / reason_code, per ISO week of exit or all) and
+    # cumulative-profit points (per strategy in the accuracy view, per family:pick_rule in the head-to-head view),
+    # W1's answer to the track's data request; both built by B2's code from the example trades, forward basis
+    cells = sorted((pick(r, CELL_FIELDS) for r in files["heatmap_cell"]["records"] if r["market"] == market),
+                   key=lambda r: (r["view"], r["basis"], r["dimension"], r["week"], r["strategy_id"], r["column"]))
+    lines = sorted((pick(r, LINE_FIELDS) for r in files["cumulative_line"]["records"] if r["market"] == market),
+                   key=lambda r: (r["view"], r["basis"], r["series"], r["date"]))
+    assert all(r["date"] <= cutoff[:10] for r in lines), "a cumulative point after the cut-off"
     reference = next(r for r in rows if r["scope"] == "strategy" and r["view"] == "accuracy"
                      and r["strategy_id"] == REFERENCE_STRATEGY and r["horizon_days"] == "all")
     strategies = {r["id"]: pick(r, STRATEGY_FIELDS) for r in files["strategy"]["records"]}
@@ -84,7 +88,7 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
         "reference_strategy": REFERENCE_STRATEGY,
         "go_live": pick(reference["go_live"], ("proven", "months_forward", "trades_needed", "beats_best_baseline")),
         "strategies": strategies, "companies": sorted(companies, key=lambda c: c["ticker"]),
-        "rows": rows, "trades": trades,
+        "rows": rows, "cells": cells, "lines": lines,
         "bases": sorted({r["basis"] for r in rows}),
         "backtest_run": backtest_run,
     }
@@ -101,12 +105,13 @@ def compose() -> dict:
         "model-only and the rule strategies are not run; the US BUX fee at an ASSUMED EUR/USD), shown on the Back-test "
         "basis with the run's facts; a run on the history cache and the model-only rows stay open",
         "weekly scoreboard rows (per iso_week) and a per-reason-code scope for the F2.8 heatmaps over time: answered by "
-        "W1 with heatmap_cell.json and cumulative_line.json (per week, per company, per reason code); the mockup still "
-        "derives its heatmaps and lines from the settled trades of the one stored week; reading the cells is a follow-up",
+        "W1 with heatmap_cell.json (per strategy, by horizon / company / reason code, per ISO week of exit or all weeks) and "
+        "cumulative_line.json (per strategy, or per family and pick rule in the head-to-head view); both are read now: the "
+        "heatmaps have a week picker and the lines are the stored running totals",
     ]
     return data
 
 
 if __name__ == "__main__":
     run(compose, HERE, lambda p: f"rows {len(p['rows'])} (scopes {sorted({r['scope'] for r in p['rows']})}, bases {p['bases']}), "
-                                 f"settled trades {len(p['trades'])}, strategies {len(p['strategies'])}")
+                                 f"cells {len(p['cells'])}, line points {len(p['lines'])}, strategies {len(p['strategies'])}")

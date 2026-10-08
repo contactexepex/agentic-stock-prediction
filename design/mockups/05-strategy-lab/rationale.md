@@ -45,17 +45,18 @@ every figure carries Paper until a strategy is proven.
    this market, and the **go-live checklist** on your cost: trades to go, months
    forward, beats the best baseline, drawdown within the limit, holds in calm and volatile regimes, each with a tick,
    a cross or "not enough data yet".
-6. **Cumulative profit after market cost** (F2.8; always market cost, the view the settled trades carry): one line
-   per strategy by exit date, the selected one thick, the selected and the three highest coloured and named at the
+6. **Cumulative profit after market cost** (F2.8; always market cost, the view the stored points carry): W1's
+   cumulative-line points, one line per strategy in the accuracy view and per family and pick rule in the
+   head-to-head view, by exit date (flat between a line's own dates), the selected one thick, the selected and the three highest coloured and named at the
    line end (names cut at 22 characters, the legend has them in full; colours follow the registry order), the rest
    grey; the zero line dotted; hover or arrow keys list every line's value at a date. On the Back-test basis the
    chart, the reason map and the regime and company splits show an empty state: the settled trades are forward
    trades and are never pooled, and the back-test stores no split by regime or company.
 7. **Where each strategy wins and loses** (F2.8, decision 42): four heatmaps for the selected view, by horizon, by
-   company, by market regime and by the reason the price moved (the settled trades' automatic reason code), with a
-   Profit / Win rate switch. Green for profit (or a win rate above half), red for loss, darker for larger, and the
+   company and by the reason the price moved from W1's heatmap cells of the selected week (a week picker: all weeks
+   or one ISO week of exit), and by market regime from the scoreboard's regime rows, with a Profit / Win rate switch. Green for profit (or a win rate above half), red for loss, darker for larger, and the
    number in every cell so colour never stands alone; a dot for no trade; every cell's tooltip has the trade count.
-   One stored week in the example data; the real page adds a week picker.
+   The example data holds two weeks (2026-W40 and W41) and the pooled cells.
 8. **Legend** and **footer**.
 
 ## Data and contract
@@ -69,8 +70,8 @@ every figure carries Paper until a strategy is proven.
   15-year history cache; model-only and the rule strategies not run; the US order fee at an assumed EUR/USD), now
   read into the same `rows` list with their basis and shown on the Back-test basis with the run's facts (`backtest_run`);
   weekly rows plus a per-reason-code scope for the heatmaps over time, answered with `heatmap_cell.json` and
-  `cumulative_line.json`, not read yet (the heatmaps and lines still come from the settled trades of the one stored
-  week; reading the cells is a follow-up).
+  `cumulative_line.json`, read since 2026-10-08: the heatmaps by horizon, company and reason code come from the cells
+  of the selected week and the lines from the stored running totals; the settled trades are no longer in the payload.
 
 ## Design rules kept
 Design system v2 only (every colour a token; the heatmap scale mixes the up/down tokens into the surface); light
@@ -111,6 +112,15 @@ written before the older 760 px rule for the same selector and never took effect
 renders 10 px at 390-599 px), and the formatter rounded after picking the unit, so 99,999 could read "+100.0k"
 (it now rounds to three significant digits first: "+1.00L"); a value that rounds to zero reads "0", unsigned.
 
+Reading W1's cells and lines (2026-10-08, after the back-test batch): the heatmaps by horizon, company and reason code
+now come from `heatmap_cell.json` with a week picker (all weeks, 2026-W40, 2026-W41 in the example), the regime map stays
+the scoreboard's and says "(all weeks)" when a week is picked, and the cumulative lines come from `cumulative_line.json`
+(per strategy in the accuracy view, per family and pick rule in the head-to-head view, as the catalogue stores them);
+the settled trades left the payload. Checks rerun clean: page and text checks, no heatmap cell clipped at 8 widths x
+2 markets x 2 bases x 2 costs x 2 metrics, tooltips focusable, no chart label clipped or overlapping, every table
+inside its wrapper in every state; a render of both views in both markets shows the week picker, the four maps and
+the lines with their legend; rebuild byte-identical.
+
 Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
 lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;
 line-chart labels overflowed and overlapped; the pick-rule table and the your-cost scoreboard overflowed at some
@@ -126,7 +136,9 @@ for the threshold strategy.
 - The strategy detail is the "comparison with the reasoning": the one setting that differs, with both values, and
   the go-live checklist with ticks and crosses, rather than a paragraph.
 - Four heatmaps with the numbers in the cells and a Profit / Win rate switch, rather than win rate and profit maps
-  side by side (eight maps); the weekly dimension waits for weekly rows from W1.
+  side by side (eight maps); the week picker reads W1's per-week cells, pooled by default.
+- The head-to-head view's cumulative lines are per family and pick rule (the catalogue's series), not per strategy,
+  because that is the head-to-head question; the accuracy view keeps one line per strategy.
 - Back-test is a switch, not a hidden mode: forward and back-test are never shown on the same table; on the Back-test
   basis the run's facts (bars covered, no history cache, which strategies were not run, the assumed EUR/USD) sit
   above the table, and a strategy without a row reads "not run" rather than "no trades yet".
