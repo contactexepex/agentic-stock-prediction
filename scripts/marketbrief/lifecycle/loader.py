@@ -1,9 +1,10 @@
 """The loader switch (F8.2): the market config's company lists rebuilt from the watchlist events as of the run's
 clock (MB_NOW-aware).
 
-- cfg["tickers"]: every collected company (active and inactive; never deleted). A company still listed under the
-  config's `tickers:` keeps that entry (news names, aliases, ADR ...); a company added through onboarding gets its
-  identity from its add event (name, yahoo, exchange, nse, cik).
+- cfg["tickers"]: every collected company (active and inactive; never deleted). A company with an entry under the
+  config's `company_meta:` (or the legacy `tickers:`) keeps that entry (news names, aliases, ADR ...); a company
+  added through onboarding gets its identity from its add event (name, yahoo, exchange, nse, cik). The
+  `company_meta:` key itself is replaced by cfg["tickers"] at the same place; a config with both keys is refused.
 - cfg["sectors"]: membership rebuilt from the companies' sectors (set on the add event; the config's `sectors:`
   for config tickers without a stored add). The config's sector order and member order are kept; new sectors and
   members follow in watchlist order; a config sector left without a collected member is dropped.
@@ -11,9 +12,10 @@ clock (MB_NOW-aware).
   (or `active_sectors`); code that collects keeps reading cfg["tickers"].
 - Market symbols of role `adr` whose `adr_of` company is deleted are dropped (no collection of a deleted company).
 
-With no stored event the result equals the config (events.implicit_adds). During onboarding the environment
-variable MB_LIFECYCLE_CANDIDATE (lifecycle/constants.py) names a JSON file with one candidate company: the config
-then holds only that company and no market-level symbols, so collectors backfill it alone."""
+With no stored event the result equals the config's company list (events.implicit_adds; config_companies).
+During onboarding the environment variable MB_LIFECYCLE_CANDIDATE (lifecycle/constants.py) names a JSON file with
+one candidate company: the config then holds only that company and no market-level symbols, so collectors backfill
+it alone."""
 from __future__ import annotations
 
 import json
@@ -22,7 +24,7 @@ from pathlib import Path
 
 from marketbrief.constants.config_keys import CFG_SECTORS, CFG_SYMBOLS, CFG_TICKERS, META_ADR
 from marketbrief.core.clock import clock
-from marketbrief.lifecycle.constants import ENV_CANDIDATE, STATE_ACTIVE
+from marketbrief.lifecycle.constants import CFG_COMPANY_META, ENV_CANDIDATE, ERR_BOTH_COMPANY_KEYS, STATE_ACTIVE
 from marketbrief.lifecycle.events import fold, implicit_adds, not_deleted, stored_events
 from marketbrief.lifecycle.identity import meta_from_identity
 
@@ -30,11 +32,34 @@ CFG_ACTIVE_TICKERS = "active_tickers"
 ROLE_ADR, META_ADR_OF = "adr", "adr_of"
 
 
-def companies_as_of(market: str, config_tickers: dict, config_sectors: dict, as_of=None) -> dict[str, dict]:
-    """{ticker: company} of every company ever added (deleted included) as of `as_of` (default: the clock)."""
+def config_companies(market: str, config: dict) -> tuple[dict, bool]:
+    """(per-company metadata, meta_only) of a market config: its `company_meta:` (meta_only: an entry seeds only a
+    market without a stored seed event) or the legacy `tickers:`; a config with both is refused."""
+    meta, legacy = config.get(CFG_COMPANY_META), config.get(CFG_TICKERS)
+    if meta is not None and legacy is not None:
+        raise ValueError(ERR_BOTH_COMPANY_KEYS.format(market=market))
+    return (meta or {}, True) if meta is not None else (legacy or {}, False)
+
+
+def companies_as_of(market: str, config: dict, as_of=None) -> dict[str, dict]:
+    """{ticker: company} of every company ever added (deleted included) as of `as_of` (default: the clock); `config`
+    is the market config (its company metadata and `sectors:` give the implicit seed)."""
     stored = stored_events(market)
-    rows = implicit_adds(market, config_tickers, config_sectors, stored) + stored
+    config_tickers, meta_only = config_companies(market, config)
+    rows = implicit_adds(market, config_tickers, config.get(CFG_SECTORS) or {}, stored, meta_only) + stored
     return fold(rows, as_of or clock())
+
+
+def with_tickers(cfg: dict, tickers: dict) -> dict:
+    """cfg with cfg["tickers"] set at the place of its `company_meta:` key (or of `tickers:`), in place."""
+    if CFG_COMPANY_META not in cfg:
+        cfg[CFG_TICKERS] = tickers
+        return cfg
+    rebuilt = {(CFG_TICKERS if key == CFG_COMPANY_META else key): (tickers if key == CFG_COMPANY_META else value)
+               for key, value in cfg.items()}
+    cfg.clear()
+    cfg.update(rebuilt)
+    return cfg
 
 
 def rebuilt_sectors(config_sectors: dict, sector_of: dict[str, str | None]) -> dict[str, list[str]]:
@@ -58,12 +83,12 @@ def apply_watchlist(cfg: dict, market: str) -> dict:
     candidate = os.environ.get(ENV_CANDIDATE)
     if candidate:
         return apply_candidate(cfg, json.loads(Path(candidate).read_text()))
-    config_tickers, config_sectors = cfg.get(CFG_TICKERS) or {}, cfg.get(CFG_SECTORS) or {}
-    companies = not_deleted(companies_as_of(market, config_tickers, config_sectors))
+    config_tickers, config_sectors = config_companies(market, cfg)[0], cfg.get(CFG_SECTORS) or {}
+    companies = not_deleted(companies_as_of(market, cfg))
     tickers = {}
     for ticker, company in companies.items():
         tickers[ticker] = config_tickers[ticker] if ticker in config_tickers else meta_from_identity(company)
-    cfg[CFG_TICKERS] = tickers
+    with_tickers(cfg, tickers)
     cfg[CFG_SECTORS] = rebuilt_sectors(config_sectors, {ticker: company.get("sector")
                                                         for ticker, company in companies.items()})
     cfg[CFG_ACTIVE_TICKERS] = [ticker for ticker, company in companies.items() if company["state"] == STATE_ACTIVE]
@@ -79,7 +104,7 @@ def apply_candidate(cfg: dict, company: dict) -> dict:
     """The onboarding config: only the candidate company, no market-level symbols."""
     meta = meta_from_identity(company)
     meta.pop(META_ADR, None)
-    cfg[CFG_TICKERS] = {company["ticker"]: meta}
+    with_tickers(cfg, {company["ticker"]: meta})
     cfg[CFG_SECTORS] = {company["sector"]: [company["ticker"]]} if company.get("sector") else {}
     cfg[CFG_ACTIVE_TICKERS] = [company["ticker"]]
     cfg[CFG_SYMBOLS] = {}
