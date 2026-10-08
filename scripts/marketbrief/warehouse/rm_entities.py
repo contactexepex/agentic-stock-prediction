@@ -179,8 +179,9 @@ def agreement(ctx: BuildContext) -> dict[str, list[dict]]:
 
     def compute() -> dict[str, list[dict]]:
         first_live = earliest_live_from()
-        stored = [] if first_live is None else ctx.con.execute(PREDICTIONS_SQL, [ctx.cutoff, first_live]).df()
-        rows = [] if first_live is None else stored.to_dict("records")
+        rows = []
+        if first_live is not None:
+            rows = ctx.con.execute(PREDICTIONS_SQL, [ctx.cutoff, first_live]).df().to_dict("records")
         predictions = [row for row in newest_batch(live_rows(rows, "session_date")) if row["ticker"] in ctx.active]
         active = [company for company in ctx.companies if company["state"] == STATE_ACTIVE]
         return agreement_rows(predictions, sorted(active, key=lambda c: c["ticker"]), ctx.market)
@@ -234,7 +235,7 @@ def open_trades(ctx: BuildContext) -> list[dict]:
         past_exit = int(load_intraday_config().get("trades", {}).get("max_sessions_past_exit", 0))
         by_ticker, _skipped = intraday_trades.open_trades(ctx.con, ctx.cfg, session, ctx.cutoff_time, past_exit)
         trades = [trade for ticker, rows in by_ticker.items() if ticker in ctx.collected for trade in rows]
-        trades = live_rows(trades, "entry_date")
+        trades = live_rows(trades, "entry_date")  # B9's reader filters too; kept so this record never depends on it
         tickers = sorted({trade["ticker"] for trade in trades})
         opens = {(ticker, iso_day(day)): value for ticker, day, value in raw_bars(ctx, OPENS_SQL, tickers)}
         closes: dict[str, tuple] = {}

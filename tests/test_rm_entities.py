@@ -449,7 +449,7 @@ def test_agreement_reads_the_newest_live_batch_not_a_newer_rehearsal(stored, mon
     ).fetchall()
     newest, previous = rm_entities.iso_day(days[0][0]), rm_entities.iso_day(days[1][0])
     monkeypatch.setattr(
-        rm_entities.registry, "is_live", lambda _strategy, day, **_kwargs: rm_entities.iso_day(day) != newest
+        rm_entities.registry, "is_live", lambda _strategy, day, *_args, **_kwargs: rm_entities.iso_day(day) != newest
     )
     ctx = fresh("us")
     rows = rm_common.agreement(ctx)
@@ -471,7 +471,7 @@ def test_open_trades_and_settlements_of_a_strategy_not_live_are_dropped(stored, 
     dropped = {before_open[0]["strategy_id"], before_settled[0]["strategy_id"]}  # one with a trade, one settled
     kept_settled = [t["id"] for t in before_settled if t["strategy_id"] not in dropped]
     monkeypatch.setattr(
-        rm_entities.registry, "is_live", lambda strategy, _day, **_kwargs: strategy_of(strategy) not in dropped
+        rm_entities.registry, "is_live", lambda strategy, _day, *_args, **_kwargs: strategy_of(strategy) not in dropped
     )
     ctx = fresh("us")
     after_open = rm_common.open_trades(ctx)
