@@ -222,6 +222,7 @@ def reasons(settled: list[dict]) -> tuple[list[dict], list[dict]]:
 
 
 def build_rest(write, settled, opens, eurusd, r2) -> None:
+    from catalogue_calendar import calendar_events
     from catalogue_news import market_status, news_impact, news_items, portfolio, research_review, results_digests
 
     write("lifecycle_event.json", "lifecycle_event", "watchlist_events", lifecycle_events())
@@ -235,5 +236,6 @@ def build_rest(write, settled, opens, eurusd, r2) -> None:
     write("news_impact.json", "news_impact_row", "news_impact", news_impact(row))
     write("results_digest.json", "results_digest", "results_digests", results_digests(row))
     write("market_status.json", "market_status", None, market_status())
+    write("calendar_event.json", "calendar_event", None, calendar_events())
     write("research_review.json", "research_review", "research_reviews", research_review(row))
     write("portfolio.json", "portfolio", None, [portfolio(eurusd, r2, DEFAULT_AMOUNT)])
