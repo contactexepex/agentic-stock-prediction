@@ -59,5 +59,5 @@ export async function marketsResponse(deps: ReadDeps): Promise<Response> {
     payload_sha256: createHash("sha256").update(JSON.stringify(payload)).digest("hex"),
     payload,
   };
-  return Response.json(body, { headers: { "Cache-Control": "private, no-cache" } });
+  return Response.json(body, { headers: { ETag: `"${body.payload_sha256}"`, "Cache-Control": "private, no-cache" } });
 }

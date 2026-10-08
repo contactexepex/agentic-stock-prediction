@@ -93,7 +93,9 @@ def write_market(warehouse, market: str, staged: Staged, full: bool) -> dict:
     """Replace the market's mirrored tables and upsert its read models in one transaction; the page counts."""
     warehouse.execute("BEGIN TRANSACTION")
     try:
-        if full:
+        wiped = None
+        if full:  # the pages stored before the wipe, so a page no longer built is still revalidated
+            wiped = rm_writer.stored_hashes(warehouse, market)
             warehouse.execute(f"DROP SCHEMA IF EXISTS {market} CASCADE")
             for table in tables():
                 warehouse.execute(f"DELETE FROM {READ_MODEL_SCHEMA}.{table} WHERE market = ?", [market])
@@ -102,7 +104,7 @@ def write_market(warehouse, market: str, staged: Staged, full: bool) -> dict:
             path = quoted((staged.folder / f"{name}.parquet").as_posix())
             warehouse.execute(f"CREATE OR REPLACE TABLE {market}.{name} AS SELECT * FROM read_parquet({path})")
         keep = {(table, page_key) for table, page_key, _missing in staged.invalid}
-        page_counts = rm_writer.write_read_models(warehouse, market, staged.rows, keep, staged.folder)
+        page_counts = rm_writer.write_read_models(warehouse, market, staged.rows, keep, staged.folder, wiped)
         warehouse.execute("COMMIT")
         return page_counts
     except Exception:

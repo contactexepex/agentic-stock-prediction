@@ -165,8 +165,7 @@ def lab_summary(ctx: BuildContext) -> dict:
 
     def compute() -> dict:
         settled = settled_trades(ctx)
-        return {
-            "as_of": ctx.cutoff_time.isoformat(),
+        return {  # no cut-off inside (lab/reports.lab_summary adds one): the envelope carries it
             "basis": BASIS_FORWARD,
             "scoreboard": scoreboard.scoreboard(settled, BASIS_FORWARD, ctx.cutoff_time.isoformat()),
             "comparisons": compare.comparisons(settled, registry.strategies()),
