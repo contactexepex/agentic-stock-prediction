@@ -308,7 +308,7 @@ def test_catalogue_has_every_entity():
             "news_item", "results_digest", "trade_check", "lifecycle_event", "market_status", "portfolio",
             "agreement", "open_trade", "abstention", "command_log", "eod_analysis", "news_impact",
             "research_review", "calendar_event", "bar", "scoreboard_backtest_row", "heatmap_cell",
-            "cumulative_line", "track_record", "assistant_answer"} <= names
+            "cumulative_line", "track_record", "assistant_answer", "intraday_alert"} <= names
 
 
 @pytest.mark.parametrize("path", catalogue_files(), ids=lambda p: p.name)
@@ -446,6 +446,33 @@ def test_catalogue_trade_checks_use_the_real_check_ids_and_carry_the_b9_columns(
         assert r["id"] == f"{r['check_id']}-{r['trade_id']}" and r["check_row_id"] == f"{r['check_id']}-{r['ticker']}"
         assert r["quality"] == "ok" and r["entry_adj"] == r["entry_price"] * r["basis_factor"]
         assert r["sessions_held"] == pytest.approx(r["session_number"] - 1 + r["elapsed_fraction"], abs=0.0002)
+
+
+def test_catalogue_intraday_alerts_follow_b9_feed_rules():
+    """One trade alert per ticker with flagged example trade checks (their flags), one news alert per high item."""
+    checks, alerts = load("trade_check.json"), load("intraday_alert.json")
+    flagged = {}
+    for c in checks:
+        if c["flagged"]:
+            flagged.setdefault((c["check_id"], c["ticker"]), []).append(c)
+    trade_alerts = [a for a in alerts if a["alert_type"] == "open_trade_flagged"]
+    assert {(a["check_id"], a["ticker"]) for a in trade_alerts} == set(flagged) and trade_alerts
+    for a in trade_alerts:
+        rows = flagged[(a["check_id"], a["ticker"])]
+        assert a["id"] == f"{a['check_id']}-{a['ticker']}-trades" and a["repeat"] is False
+        assert a["trade_ids"] == [c["trade_id"] for c in rows] and a["news_id"] is None
+        assert a["flags"] == sorted({f for c in rows for f in c["flags"]})
+        assert [t["band"] for t in a["trades"]] == [c["band"] for c in rows]
+    news = [a for a in alerts if a["alert_type"] == "material_news_open_trade"]
+    assert news and len({(a["ticker"], a["news_id"]) for a in news}) == len(news)
+    for a in news:
+        assert a["id"] == f"{a['check_id']}-{a['ticker']}-news-{a['news_id']}" and a["news_materiality"] == "high"
+        assert a["trades"] == [] and a["flags"] == [] and a["repeat"] is False
+        assert a["news_first_seen_at"] <= a["check_at"] and a["check_at"].endswith("Z")
+        assert a["trade_ids"] == [c["trade_id"] for c in checks if (c["check_id"], c["ticker"])
+                                  == (a["check_id"], a["ticker"])]
+    for a in alerts:
+        assert a["check_row_id"] == f"{a['check_id']}-{a['ticker']}" and a["method_version"] == "tc-v1"
 
 
 def test_trade_check_rows_view_reads_old_split_rows_and_new_single_rows():

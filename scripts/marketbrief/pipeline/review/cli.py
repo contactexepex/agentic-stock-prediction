@@ -13,6 +13,8 @@ window and since start (all by target date, never past the week's end):
 - signal-model check (model_skill.py): the walk-forward backtest of scripts/model_backtest.py rerun
   for the market, its headline numbers and a plain verdict on whether the model has shown skill
   (--no-model-backtest skips it).
+- intraday deviations (intraday_review.py): the deviation explainer's notes paired with the close (held / reversed /
+  faded / pending), for the week and since start, per attribution.
 Calls are summarised per scoring basis, never pooled (analytics/call_basis.py).
 Thresholds and variants live in config/review.yaml. Small samples are flagged and get no
 proposal. Proposed config/ranges.yaml changes are written to the report, never applied.
@@ -51,6 +53,7 @@ from marketbrief.pipeline.review.helpers import (
     week_bounds,
 )
 from marketbrief.pipeline.review import model_skill
+from marketbrief.pipeline.review.intraday_review import intraday_outcomes
 from marketbrief.pipeline.review.history_ablation import history_ablation
 from marketbrief.pipeline.review.live_ablation import live_ablation
 from marketbrief.pipeline.review.markdown import markdown
@@ -153,6 +156,7 @@ def build(
     if proposal:
         review_data["proposals"].append(proposal)
     review_data["model"] = model_check(cfg["market"], review_config, SKIP_MODEL not in skip, end)
+    review_data["intraday"] = intraday_outcomes(con, start, end)
     review_data["advice"] = confidence_advice(review_data["bands"]["all"], review_data["calls"]["all"], review_config)
 
     # the record's call columns are of the current basis (the newest scored call's), named in call_basis_all
@@ -184,7 +188,8 @@ def build(
         "proposals": review_data["proposals"],
         "detail": {
             key: review_data[key]
-            for key in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice", "scores", "aci", "model")
+            for key in ("ranges", "calls", "breakdowns", "bands", "calibration", "advice", "scores", "aci", "model",
+                        "intraday")
         }
         | {
             "live_ablation": review_data["live_ablation"],

@@ -10,7 +10,9 @@ by `validate`.
                                  the call (direction, confidence, rationale, evidence ids and what they
                                  said), the outcome (return, hit) and its published range (position of
                                  the close vs the 50%/80% bands). A call whose range is still open
-                                 (not late, not yet scored) waits for it.
+                                 (not late, not yet scored) waits for it. intraday_notes: the deviation
+                                 explainer's notes on the ticker during the call's window (WS5), with
+                                 how each move ended by the close; read-only context, never stored.
   validate F                     checks the reflector's records (JSON summary; exit 1 on any error)
   add F                          validate, then append the full records to data/<market>/lessons/
                                  (all or nothing; a lesson id already stored is refused)
@@ -38,7 +40,7 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl, day_file
-from marketbrief.pipeline.lessons.facts import evidence, settled, stored_ids
+from marketbrief.pipeline.lessons.facts import evidence, intraday_notes, settled, stored_ids
 from marketbrief.pipeline.lessons.validation import check
 
 
@@ -65,7 +67,8 @@ def main() -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(
             "".join(
-                json.dumps({**fact, "evidence": evidence(con, fact["evidence_ids"], fact["made_at"])}, default=str)
+                json.dumps({**fact, "evidence": evidence(con, fact["evidence_ids"], fact["made_at"]),
+                            "intraday_notes": intraday_notes(con, fact)}, default=str)
                 + "\n"
                 for fact in todo
             ),

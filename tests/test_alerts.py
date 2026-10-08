@@ -25,6 +25,7 @@ from marketbrief.alerts.constants import (  # noqa: E402
     MSG_NO_PREDICTIONS,
     MSG_NO_SETTLED,
     MSG_NO_STRONG,
+    MSG_NOT_LIVE,
     PAPER,
 )
 from marketbrief.alerts.intraday import build_alerts  # noqa: E402
@@ -35,6 +36,7 @@ from marketbrief.alerts.publish import Message, NotConfiguredError, Publisher, p
 from marketbrief.alerts.weekly import build_weekly  # noqa: E402
 from marketbrief.core import paths  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.lab import registry as lab_registry  # noqa: E402
 
 CATALOGUE = REPO / "design" / "catalogue"
 TOKEN = "xoxb-test-0000-SECRET-never-printed"
@@ -79,12 +81,23 @@ def scratch(tmp_path, monkeypatch):
     (config / "markets").mkdir(parents=True)
     for name in ("markets/us.yaml", "markets/india.yaml", "events.yaml", "settings.yaml", "strategies.yaml"):
         shutil.copy(REPO / "config" / name, config / name)
+    set_live_from(config, "2026-01-01")   # the example strategies trade (B2's go-live switch); see test_rehearsal_*
     monkeypatch.setattr(paths, "ROOT", root)
     monkeypatch.setattr(paths, "CONFIG", config)
     monkeypatch.delenv("MB_NOW", raising=False)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)   # never reach a real webhook from a test
     return root
+
+
+def set_live_from(config: Path, live_from: str | None) -> None:
+    """Set every strategy's live_from in the scratch registry (config/strategies.yaml)."""
+    import yaml
+    doc = yaml.safe_load((config / "strategies.yaml").read_text())
+    for spec in doc["strategies"]:
+        spec["live_from"] = live_from
+    (config / "strategies.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    lab_registry._cached.cache_clear()   # the registry is cached per config folder; read the new file
 
 
 def store(root: Path, market: str, kind: str, rows: list[dict], time_key: str) -> None:
@@ -782,3 +795,46 @@ def test_viability_uses_the_unrounded_stored_gain_and_skips_null_gains():
     mixed = with_your_cost(preds, 0.30, lambda r: None if r["family"] == "rule" else 0.5)  # rule: none stored
     assert "Expected gain +0.50% after your cost 0.30% — viable." in build_morning("us", "2026-10-07", mixed, [],
                                                                                   HORIZONS)
+
+
+def test_rehearsal_predictions_are_not_shown_before_go_live(scratch, monkeypatch, capsys):
+    """B19 (Wave 5): before a strategy's live_from, its stored predictions and picks are rehearsal rows; the
+    morning post shows none of them as Paper picks and says why."""
+    store_us_examples(scratch)
+    set_live_from(paths.CONFIG, None)                                      # nothing is live yet
+    monkeypatch.setenv("MB_NOW", "2026-10-07T12:00:00+00:00")
+    run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
+    sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
+    assert MSG_NOT_LIVE in sent and "[Paper]" not in sent and "Head-to-head" not in sent
+    for live_from, shown in (("2026-10-08", False), ("2026-10-07", True)):   # live from the next session / from D
+        shutil.rmtree(scratch / "work")
+        set_live_from(paths.CONFIG, live_from)
+        run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
+        sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
+        assert (MSG_NOT_LIVE not in sent) is shown and ("[Paper]" in sent) is shown, live_from
+
+
+def test_only_live_strategies_count_and_their_picks_show(monkeypatch):
+    import yaml
+    doc = yaml.safe_load((REPO / "config" / "strategies.yaml").read_text())
+    live = {s["id"] for s in doc["strategies"] if s["family"] == "rule"}
+    monkeypatch.setattr(reads, "is_live", lambda sid, _day, _reg=None: sid in live)
+    kept = reads.live_only(of_market(examples("prediction"), "us"), "2026-10-07")
+    picks = of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07")
+    picks_kept = reads.live_only(picks, "2026-10-07")
+    assert kept and {p["strategy_id"] for p in kept} <= live
+    assert picks_kept and all(p["strategy_id"] in live for p in picks_kept) and len(picks_kept) < len(picks)
+    row = agreement(kept, 1)[0]
+    assert row["of"] == sum(1 for p in kept if p["horizon_days"] == 1)   # agreement counts live strategies only
+    msg = build_morning("us", "2026-10-07", kept, picks_kept, HORIZONS)
+    shown = {p["strategy_id"] for p in picks_kept if p.get("status") == "picked"}
+    assert shown and all(sid in msg for sid in shown)                     # every live pick is in the message
+    assert not any(p["strategy_id"] in msg for p in picks if p["strategy_id"] not in live)
+
+
+def test_buyers_without_a_probability_are_named():
+    preds = [{"id": f"b{i}", "ticker": "X", "horizon_days": 1, "qualifies": True, "family": "baseline",
+              "prob_up": None, "base_close": 10.0, "amount": 1000.0, "currency": "USD", "target_price": None}
+             for i in range(2)]
+    msg = build_morning("us", "2026-10-07", preds, [], HORIZONS)
+    assert "no average P(up) (its buyers give no probability)" in msg and "P(up) none" not in msg

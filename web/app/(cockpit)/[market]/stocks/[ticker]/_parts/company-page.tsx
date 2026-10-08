@@ -13,7 +13,7 @@ import type { Market } from "../../../../../../lib/data/constants.ts";
 import { lifecycleDates } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { CompanyPayload } from "../../../../../../lib/company-pages/types.ts";
 import { Icon } from "../../../../../../components/ui/icon.tsx";
-import { CommandDialog, type Intent, type Recorded } from "../../../companies/_parts/command-dialog.tsx";
+import { CommandDialog, type Intent, type Recorded } from "../../../../../../components/blocks/company-command-dialog.tsx";
 import { EventsCard, NewsCard, ReasonsCard, ResultsCard, WatchlistCard } from "./cards.tsx";
 import { pageCtx } from "./context.ts";
 import { CompanyLine, DecisionCard } from "./decision.tsx";

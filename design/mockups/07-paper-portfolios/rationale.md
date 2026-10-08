@@ -34,7 +34,7 @@ own paper trade, which is a request, never an order.
 5. **Your own paper portfolio** (WS4, F1.11): positions (shares, average price, last close, cost, value, profit with
    percent), the **euro view** of each US position as four tiles (euros paid at the buy-date rate plus markup, euros
    back at today's rate minus markup, profit in euros beside the dollar profit, and the part due to the rate alone,
-   with the provisional-fee note from the data), the recorded trades (side, quantity, price and basis, date, channel,
+   with the fee note from the data: the BUX FX fee of `config/costs.yaml`, owner-confirmed 2026-10-08), the recorded trades (side, quantity, price and basis, date, channel,
    note), and the **Add own paper trade** button: a dialog with company (active ones), side, shares, price basis (the
    session's open or close, or a typed price inside the day's range), price and date; recording it shows a pending
    request on the card (mockup state; the real page appends to the inbox with the sign-in and an idempotency key,
@@ -72,5 +72,6 @@ the luck label is qualified).
 - Open trades are grouped by strategy (the spec's "by strategy") with family and view filters, and reuse the Home
   page's row design so the two pages read the same.
 - The euro view is four tiles with the formula in each tooltip, rather than a second table, and keeps the data's
-  "fee provisional, verify" note visible.
+  fee note visible (the BUX FX fee, owner-confirmed 2026-10-08; it read "provisional, verify" until the owner confirmed the
+  broker charges).
 - Adding an own paper trade is a dialog that records a pending request, with the WS4 price rule stated in it.
