@@ -297,14 +297,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   calls with Wilson low >= 0.55; else "No proven strong signals today" + Paper candidates); `paper-follow` (SIMULATED);
   `import-inbox [--inbox FILE]` (issue #112, `marketbrief/portfolio/inbox_import.py`, docs/ws/ws4.md) imports the
   web tier's `add_paper_trade` requests from `market_brief_inbox.inbox.requests` (`MOTHERDUCK_INBOX_TOKEN`, read
-  only) through the same checks as `add-trade`; identity and channel come from the inbox row, the key is its
-  `inbox_id`, and each row gets one `command_log` row (a request not decidable yet is logged `failed` and tried again).
+  only) through the same checks as `add-trade`; identity and channel come from the inbox row (stored in the
+  `portfolio_trades` columns `submitted_by` and `command_id`, null for CLI trades; sources `dashboard` and
+  `claude_app` only through the import), the key is its `inbox_id`, and each row gets one `command_log` row (a
+  request not decidable yet is logged `failed` and tried again).
   Every read is as of the clock (MB_NOW-aware).
 - Strategy lab and paper-trading engine (B2; docs/SPEC.md F1-F3, F7; DESIGN.md section 17; notes `docs/ws/b2.md`;
   code `marketbrief/lab/`, entry `scripts/lab.py`): `predict` (pre-open, rule strategies and baselines from B10's
-  per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`), `pick` (pre-open,
+  per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
+  of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
   refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
-  and the cost-viable rows of decision 51 -> `cost_views`; "best expected gain" = the horizon with the highest
+  and the cost-viable rows of every pick and of each qualifying prediction without one yet -> `cost_views`; "best expected gain" = the horizon with the highest
   expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in
   the market-cost view and its your-cost view -> `cost_views`; F1.9 measures, F1.10 automatic reason; a prediction
   or pick made or first committed at or after D's open is refused; a split correction re-settles as a new row),
@@ -319,7 +322,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
   conditional move and loss of `lab/gain.py`; null without a probability or 80% range, or when the amount buys no
   whole share); the flag never blocks a
-  prediction or pick. The owner's paper portfolio uses the your-cost charges and shows a EUR view of US positions.
+  prediction or pick. The owner's paper portfolio uses the your-cost charges (the US portfolio fee pro-rated per lot over
+  the calendar days held, owner decision of 2026-10-08) and shows a EUR view of US positions.
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one

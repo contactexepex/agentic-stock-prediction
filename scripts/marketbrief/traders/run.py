@@ -2,8 +2,9 @@
 
 The trader writes work/traders/<strategy_id>.jsonl: one prediction per active company x horizon it calls, and one
 abstain line `{"strategy_id", "ticker", "abstain": true, "horizons", "reason", "prompt_version"}` for what
-it skips. A line without made_at gets the file's write time, capped at the gate's clock (file_stamp): the Sonnet
-traders have no clock, so the gate stamps their time deterministically. `validate` checks every line
+it skips. The file's write time, capped at the gate's clock (file_stamp), is the made_at of every line of a trader
+without a clock (the Sonnet traders: any made_at they state is replaced) and of every line of the forecaster that
+states none (stamped). `validate` checks every line
 (gate.check_record) and that every active company is covered. `add`:
 
 - kill switch off (`enabled: false` in the agent file): nothing is read; every active company gets `killed`;

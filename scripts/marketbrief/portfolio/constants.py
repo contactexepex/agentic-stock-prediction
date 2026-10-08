@@ -10,6 +10,8 @@ BASIS_OPEN, BASIS_CLOSE, BASIS_MANUAL = "open", "close", "manual"
 BASIS_ORDER = {BASIS_OPEN: 0, BASIS_MANUAL: 1, BASIS_CLOSE: 2}   # within a day: the open first, the close last
 STATUS_REQUESTED = "requested"
 TRADE_ID_PREFIX, REQUEST_ID_PREFIX = "pt", "wr"
+# sources only the inbox import may set (the inbox row's channel, issue #119): the CLI refuses them
+INBOX_ONLY_SOURCES = ("dashboard", "claude_app")
 
 TIER_STRONG_BUY, TIER_BUY, TIER_HOLD, TIER_SELL, TIER_STRONG_SELL = (
     "Strong Buy", "Buy", "Hold/No call", "Sell", "Strong Sell")
@@ -28,6 +30,8 @@ ERR_SIDE = "side must be one of {allowed}"
 ERR_QUANTITY = "quantity must be a positive, finite number"
 ERR_BASIS = "price_basis must be one of {allowed}"
 ERR_SOURCE = "source must be one of {allowed}"
+ERR_SOURCE_INBOX_ONLY = ("source {source!r} is set only by the inbox import (portfolio.py import-inbox); "
+                         "the command line uses {allowed}")
 ERR_DATE = "{day} is not a session of the {market} calendar"
 ERR_FUTURE = "trade_date {day} is after the run clock's date {today}"
 ERR_NO_BAR = "no stored bar for {ticker} on {day} (as of {clock}); record it once the session's bar is collected"

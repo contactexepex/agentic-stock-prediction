@@ -20,7 +20,7 @@ from __future__ import annotations
 from marketbrief.core.market_config import load_market
 from marketbrief.portfolio import proof as proofs
 from marketbrief.constants.horizons import LABEL_N_PLUS_K
-from marketbrief.portfolio.horizons import active_tickers, horizons, resolved_label
+from marketbrief.portfolio.horizons import active_tickers, horizons, score_label
 from marketbrief.portfolio import signal_inputs as inputs
 from marketbrief.portfolio.constants import (
     LABEL_PAPER_ONLY,
@@ -97,7 +97,7 @@ def signal_row(score: dict, call: dict | None, band_range: dict | None, block: d
     final, adjustment = final_probability(model_prob, call)
     direction = (call or {}).get("direction") or ("up" if final > 0.5 else "down" if final < 0.5 else None)
     confidence = round(max(final, 1 - final), PROB_DIGITS)   # rounded first: 1 - 0.35 is 0.6499999999999999
-    label = resolved_label(score["horizon_days"], score.get("horizon_label"), score.get("computed_at"))
+    label = score_label(score["horizon_days"], score.get("horizon_label"))
     cell = proofs.cell(proof, int(score["horizon_days"]), proofs.band_of(confidence, settings["proof"]["bands"])) \
         if label == LABEL_N_PLUS_K else None
     cell_proven = bool(cell and cell["proven"])

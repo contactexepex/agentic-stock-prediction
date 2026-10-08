@@ -59,18 +59,22 @@ def factor_after(adjust: pd.DataFrame, ticker: str, day: date) -> float:
 
 
 def trade_rows(con, clock: datetime) -> pd.DataFrame:
-    """Every stored paper-trade row entered by `clock` (active, cancelled and corrected), oldest first."""
+    """Every stored paper-trade row entered by `clock` (active, cancelled and corrected), oldest first. A row id
+    stored twice (the same idempotency key appended by two concurrent imports, docs/ws/ws4.md) counts once, at its
+    first entry."""
     frame = con.execute(
-        f"SELECT * FROM {KIND_PORTFOLIO_TRADES} WHERE entered_at <= ? ORDER BY entered_at, id", [clock]).df()
+        f"SELECT * FROM (SELECT DISTINCT ON (id) * FROM {KIND_PORTFOLIO_TRADES} WHERE entered_at <= ? "
+        "ORDER BY id, entered_at) ORDER BY entered_at, id", [clock]).df()
     if not frame.empty:
         frame["trade_date"] = pd.to_datetime(frame["trade_date"]).dt.date
     return frame
 
 
 def request_rows(con, clock: datetime) -> pd.DataFrame:
-    """Every stored watchlist request made by `clock`, oldest first."""
+    """Every stored watchlist request made by `clock`, oldest first (a row id stored twice counts once)."""
     return con.execute(
-        f"SELECT * FROM {KIND_WATCHLIST_REQUESTS} WHERE requested_at <= ? ORDER BY requested_at, id", [clock]).df()
+        f"SELECT * FROM (SELECT DISTINCT ON (id) * FROM {KIND_WATCHLIST_REQUESTS} WHERE requested_at <= ? "
+        "ORDER BY id, requested_at) ORDER BY requested_at, id", [clock]).df()
 
 
 def superseded_by(trades: pd.DataFrame) -> dict[str, str]:

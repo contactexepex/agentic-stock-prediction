@@ -43,13 +43,19 @@ def positive_number(value) -> bool:
             and value > 0)
 
 
+def keys_of(frame: pd.DataFrame) -> dict[str, str]:
+    """{idempotency_key: row id} of a frame of stored rows."""
+    return {} if frame.empty else dict(zip(frame["idempotency_key"], frame["id"]))
+
+
+def trade_keys(con, clock: datetime) -> dict[str, str]:
+    """{idempotency_key: trade id} of every paper-trade row stored by the clock."""
+    return keys_of(reads.trade_rows(con, clock))
+
+
 def used_keys(con, clock: datetime) -> dict[str, str]:
     """{idempotency_key: row id} of every trade and request stored by the clock."""
-    keys = {}
-    for frame in (reads.trade_rows(con, clock), reads.request_rows(con, clock)):
-        if not frame.empty:
-            keys.update(dict(zip(frame["idempotency_key"], frame["id"])))
-    return keys
+    return {**keys_of(reads.request_rows(con, clock)), **trade_keys(con, clock)}
 
 
 def check_fields(cfg: dict, settings: dict, fields: dict, clock: datetime) -> list[str]:
