@@ -1,11 +1,11 @@
 """Where the warehouse lives and how to connect to it.
 
 Target: `md:<name>` (MotherDuck) when the provider is motherduck and MOTHERDUCK_TOKEN is set, else the local
-DuckDB file of config/warehouse.yaml (dev and tests). The token is read from the environment only (or passed in
-by a caller with another account, e.g. the inbox import) and handed to DuckDB as a bound `SET motherduck_token = ?`
-parameter, so the value is never put into SQL text, a connection string or a config, and every error raised from
-here has it redacted. The MotherDuck extension is installed over HTTPS only, with DuckDB checking its signatures
-(marketbrief/warehouse/extension.py); unsigned extensions stay disallowed."""
+DuckDB file of config/warehouse.yaml (dev and tests). The token is read from the environment only: the
+MotherDuck extension reads MOTHERDUCK_TOKEN itself, so the value is never put into SQL, a connection string or
+a config, and every error raised from here has it redacted. The MotherDuck extension is installed over HTTPS
+only, with DuckDB checking its signatures (marketbrief/warehouse/extension.py); unsigned extensions stay
+disallowed."""
 
 from __future__ import annotations
 
@@ -73,18 +73,13 @@ def select_target(cfg: dict | None = None, force_local: bool = False, require_to
     return Target(PROVIDER_LOCAL, cfg["name"], paths.ROOT / cfg["local_path"])
 
 
-def connect_motherduck(name: str, read_only: bool, token_value: str | None = None) -> duckdb.DuckDBPyConnection:
-    """An in-memory DuckDB with the MotherDuck database `name` attached and in use, signed in with `token_value`
-    (another account's token, e.g. the inbox's) or else MOTHERDUCK_TOKEN. The extension is installed over HTTPS
-    (extension.py); the token is set as a bound parameter, so it never enters SQL text, and it takes precedence over
-    any MOTHERDUCK_TOKEN in the environment."""
-    secret = token_value or token()
-    if not secret:
+def connect_motherduck(name: str, read_only: bool) -> duckdb.DuckDBPyConnection:
+    """An in-memory DuckDB with the MotherDuck database attached as `name` and in use."""
+    if not token():
         raise WarehouseError(MSG_TOKEN_MISSING.format(env=ENV_MOTHERDUCK_TOKEN))
     try:
-        con = duckdb.connect()
+        con = duckdb.connect()  # the extension reads MOTHERDUCK_TOKEN from the environment itself
         load_motherduck(con, load_warehouse_config())
-        con.execute("SET motherduck_token = ?", [secret])
         if read_only:
             con.execute(f"ATTACH '{MOTHERDUCK_PREFIX}{name}' AS {name} (READ_ONLY)")
         else:
@@ -93,7 +88,7 @@ def connect_motherduck(name: str, read_only: bool, token_value: str | None = Non
         con.execute(f"USE {name}")
         return con
     except duckdb.Error as exc:
-        raise WarehouseError(f"{type(exc).__name__}: {exc}", other_secrets=(secret,)) from None
+        raise WarehouseError(f"{type(exc).__name__}: {exc}") from None
 
 
 def connect_local(path: Path, read_only: bool) -> duckdb.DuckDBPyConnection:
