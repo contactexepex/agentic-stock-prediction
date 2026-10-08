@@ -1,0 +1,264 @@
+# B13: the Rule vs AI payload (design/mockups/06-rule-vs-ai/notes.md; docs/DATA_CATALOGUE.md "Paper trade (settled)",
+# "Head-to-head pick", "Cost view", "AI reason", "End-of-day analysis", "Research review")
+RuleVsAiResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/RuleVsAi'}
+RuleVsAi:
+  x-source: warehouse/rm_compare.compare_pages
+  description: >-
+    One market's Rule vs AI page as of the cut-off (each record by its own storage time, collected companies only):
+    the head-to-head scoreboard rows (forward basis), the settled head-to-head trades and their your-cost rows, the
+    picks, the AI reasons, the end-of-day analyses and the research reviews (newest first). Paper only.
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, strategies, companies, session_date, rows, trades, your_costs, picks, reasons, eod,
+                 reviews, review_due]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+        companies:
+          type: array
+          items: {$ref: '#/components/schemas/CompanyBrief'}
+        session_date: {$ref: '#/components/schemas/IsoDate'}
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/ScoreboardRow'}
+        trades:
+          type: array
+          items: {$ref: '#/components/schemas/HeadToHeadTrade'}
+        your_costs:
+          type: array
+          items: {$ref: '#/components/schemas/YourCostRow'}
+        picks:
+          type: array
+          items: {$ref: '#/components/schemas/HeadToHeadPick'}
+        reasons:
+          type: array
+          items: {$ref: '#/components/schemas/AiReason'}
+        eod:
+          type: array
+          items: {$ref: '#/components/schemas/EodAnalysis'}
+        reviews:
+          type: array
+          items: {$ref: '#/components/schemas/ResearchReview'}
+        review_due: {$ref: '#/components/schemas/ReviewDue'}
+HeadToHeadTrade:
+  type: object
+  x-source: warehouse/rm_compare.head_to_head_trades
+  description: The newest settlement of a head-to-head paper trade (kind paper_trades_settled), market-cost view
+  required: [trade_id, prediction_id, strategy_id, family, view, pick_rule, ticker, horizon_days, entry_date,
+             exit_date, status, net_pnl, settled_at]
+  properties:
+    trade_id: {type: string}
+    prediction_id: {type: string}
+    strategy_id: {type: string}
+    family: {type: string, enum: [rule, baseline, ai]}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    pick_rule: {type: ['string', 'null']}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    made_at: {type: ['string', 'null'], format: date-time}
+    entry_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date_actual: {type: ['string', 'null'], format: date}
+    status: {type: string}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null']}
+    entry_price: {$ref: '#/components/schemas/NullableNumber'}
+    exit_price: {$ref: '#/components/schemas/NullableNumber'}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    target_price: {$ref: '#/components/schemas/NullableNumber'}
+    target_error_pct: {$ref: '#/components/schemas/NullableNumber'}
+    target_reached: {type: ['boolean', 'null']}
+    range_hit: {type: ['boolean', 'null']}
+    move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    market_pct: {$ref: '#/components/schemas/NullableNumber'}
+    sector_pct: {$ref: '#/components/schemas/NullableNumber'}
+    news_pct: {$ref: '#/components/schemas/NullableNumber'}
+    company_pct: {$ref: '#/components/schemas/NullableNumber'}
+    reason_code: {type: ['string', 'null']}
+    reason_codes:
+      type: ['array', 'null']
+      items: {type: string}
+    regime: {type: ['string', 'null']}
+    settled_at: {$ref: '#/components/schemas/IsoTime'}
+YourCostRow:
+  type: object
+  x-source: warehouse/rm_compare.your_costs
+  description: The cost_views settlement row of a head-to-head trade's newest settlement (market and your-cost views)
+  required: [trade_id, record_id, net_pnl_market, net_pnl_your, computed_at]
+  properties:
+    trade_id: {type: string}
+    record_id: {type: string}
+    net_pnl_market: {$ref: '#/components/schemas/NullableNumber'}
+    return_pct_market: {$ref: '#/components/schemas/NullableNumber'}
+    net_pnl_your: {$ref: '#/components/schemas/NullableNumber'}
+    return_pct_your: {$ref: '#/components/schemas/NullableNumber'}
+    market_costs: {$ref: '#/components/schemas/NullableNumber'}
+    your_costs: {$ref: '#/components/schemas/NullableNumber'}
+    your_cost_pct: {$ref: '#/components/schemas/NullableNumber'}
+    computed_at: {$ref: '#/components/schemas/IsoTime'}
+PickCandidate:
+  type: object
+  required: [horizon_days, prediction_id]
+  properties:
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    prediction_id: {type: string}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    loss_pct: {$ref: '#/components/schemas/NullableNumber'}
+    costs_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_gain_pct: {$ref: '#/components/schemas/NullableNumber'}
+    gain_per_session_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    your_cost_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_gain_your_pct: {$ref: '#/components/schemas/NullableNumber'}
+    cost_viable: {type: ['boolean', 'null']}
+    eligible: {type: ['boolean', 'null']}
+HeadToHeadPick:
+  type: object
+  x-source: warehouse/rm_compare.picks
+  description: A head-to-head pick (kind head_to_head_picks, first row of its id, made by the cut-off)
+  required: [id, market, ticker, made_at, session_date, family, pick_rule, status, candidates]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    made_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {type: ['string', 'null'], format: date}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    family: {type: string, enum: [rule, baseline, ai]}
+    pick_rule: {type: string}
+    status: {type: string}
+    strategy_id: {type: ['string', 'null']}
+    strongest_basis: {type: ['string', 'null']}
+    horizon_days:
+      oneOf: [{$ref: '#/components/schemas/Horizon'}, {type: 'null'}]
+    prediction_id: {type: ['string', 'null']}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    loss_pct: {$ref: '#/components/schemas/NullableNumber'}
+    costs_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_gain_pct: {$ref: '#/components/schemas/NullableNumber'}
+    candidates:
+      type: array
+      items: {$ref: '#/components/schemas/PickCandidate'}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null']}
+AiReason:
+  type: object
+  x-source: warehouse/rm_compare.reasons
+  description: An AI reason of kind head_to_head (kind trade_reasons_ai), at most 60 words
+  required: [id, trade_id, market, ticker, strategy_id, session_date, kind, text, created_at]
+  properties:
+    id: {type: string}
+    trade_id: {type: ['string', 'null']}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    strategy_id: {type: ['string', 'null']}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    kind: {type: string}
+    rank: {type: ['integer', 'null']}
+    text: {type: string}
+    cited_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    reason_codes:
+      type: ['array', 'null']
+      items: {type: string}
+    created_at: {$ref: '#/components/schemas/IsoTime'}
+EodFamilyResult:
+  type: object
+  required: [trades, net_pnl]
+  properties:
+    trades: {type: ['integer', 'null']}
+    wins: {type: ['integer', 'null']}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+EodAnalysis:
+  type: object
+  x-source: warehouse/rm_compare.eod_analyses
+  description: An end-of-day analysis (kind eod_analyses)
+  required: [id, market, session_date, settled_trades, results, summary, created_at]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    settled_trades: {type: ['integer', 'null']}
+    results:
+      type: object
+      properties:
+        rule: {$ref: '#/components/schemas/EodFamilyResult'}
+        baseline: {$ref: '#/components/schemas/EodFamilyResult'}
+        ai: {$ref: '#/components/schemas/EodFamilyResult'}
+        best_expected_gain: {$ref: '#/components/schemas/EodFamilyResult'}
+        highest_probability: {$ref: '#/components/schemas/EodFamilyResult'}
+    summary: {type: ['string', 'null']}
+    cited_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    reason_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    created_at: {$ref: '#/components/schemas/IsoTime'}
+ResearchReview:
+  type: object
+  x-source: warehouse/rm_compare.reviews
+  description: A weekly research review (kind research_reviews); its proposals stay `proposed` until the owner approves
+  required: [id, market, iso_week, period_start, period_end, leaders, findings, proposals, report_path, written_at]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    iso_week: {type: string}
+    period_start: {$ref: '#/components/schemas/IsoDate'}
+    period_end: {$ref: '#/components/schemas/IsoDate'}
+    leaders:
+      type: array
+      items:
+        type: object
+        properties:
+          scope: {type: string}
+          strategy_id: {type: ['string', 'null']}
+          net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+          trades: {type: ['integer', 'null']}
+    findings:
+      type: array
+      items:
+        type: object
+        properties:
+          text: {type: string}
+          cited_ids:
+            type: ['array', 'null']
+            items: {type: string}
+    proposals:
+      type: array
+      items:
+        type: object
+        properties:
+          proposal_id: {type: string}
+          kind: {type: string}
+          file: {type: ['string', 'null']}
+          diff: {type: ['string', 'null']}
+          rationale: {type: ['string', 'null']}
+          cited_ids:
+            type: ['array', 'null']
+            items: {type: string}
+          status: {type: string}
+    report_path: {type: ['string', 'null']}
+    written_at: {$ref: '#/components/schemas/IsoTime'}
+ReviewDue:
+  type: object
+  x-source: warehouse/rm_compare.review_due
+  description: The next weekly research review (Saturday, market-local date) whose ISO week has no stored review yet
+  required: [date, iso_week]
+  properties:
+    date: {$ref: '#/components/schemas/IsoDate'}
+    iso_week: {type: string}

@@ -1,7 +1,8 @@
-"""F2.3 back-test of the strategies that need no news (always-up and momentum from bars; model-only when B10's
-walk-forward probabilities per horizon are given), on adjusted daily bars: data/'s stored bars, plus the long-history
-cache's earlier dates with --history (model/history_cache.py). Labelled basis "backtest" and never pooled with
-forward results; written only to the output folder, never to data/.
+"""F2.3 back-test of the strategies that need no news (always-up and momentum from bars; the model strategies without
+news when B10's walk-forward probabilities per horizon are given, lab/backtest_probs.py), on adjusted daily bars:
+data/'s stored bars, plus the long-history cache's earlier dates with --history (model/history_cache.py). Labelled
+basis "backtest" and never pooled with forward results; written to the output folder, and to data/ only as the
+append-only kind lab_backtests with `lab.py backtest --store` (lab/backtest_store.py).
 
 Each as-of row t of a ticker (its own stored sessions): entry at the open of the next row (D), exit at the close of
 the k-th row after D (N+k), the market's default amount, the quantity rule of F1.4, both cost views of
@@ -113,13 +114,21 @@ def summary(trades: pd.DataFrame, key: str, m: int) -> dict:
             "last_exit": str(trades["exit_date"].max().date()) if len(net) else None}
 
 
+def model_without_news(spec: dict) -> bool:
+    """A model strategy the base walk-forward probabilities back-test alone: news weight 0 (no news archive), no
+    cross-market variant and no regime filter (neither is in the back-test)."""
+    params = spec["parameters"]
+    return (params["signal"] == SIGNAL_MODEL and params["news_weight"] == 0 and not params.get("cross_market")
+            and not params.get("regime_filter"))
+
+
 def run_backtest(market: str, bars: dict[str, pd.DataFrame], specs: list[dict], horizons: tuple[int, ...],
                  context: dict) -> list[dict]:
     """Scoreboard rows (basis backtest, view accuracy) per strategy and horizon ("all" = pooled). context: rate,
     eurusd (Series by date or None), probs ({(ticker, k): Series of p by as-of date} or None)."""
     probs = context.get("probs") or {}
     usable = [s for s in specs if s["parameters"]["signal"] in (SIGNAL_ALWAYS_UP, SIGNAL_MOMENTUM)
-              or (s["parameters"]["signal"] == SIGNAL_MODEL and s["parameters"]["news_weight"] == 0 and probs)]
+              or (probs and model_without_news(s))]
     per: dict[tuple[str, object], list[pd.DataFrame]] = {}
     for ticker in sorted(bars):
         for k in horizons:
