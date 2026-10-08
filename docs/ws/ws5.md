@@ -258,6 +258,7 @@ Mirrors `docs/ws/ws5-judgments.jsonl`.
   entry opens read without a collected_at bound; ws5-judgments.jsonl claimed but missing.
 - Round 2, PASS, 13433f8: the three blockers fixed; 3 new cosmetic findings (below).
 - Follow-up round 1, FAIL, f0bb93e: blocker = a wrong test count in the build report (51 claimed, 52 true).
+- Follow-up round 2, PASS, 7cd6a3f: count corrected; notes cut at settled_at.
 
 ## Proposed edits to shared docs
 
