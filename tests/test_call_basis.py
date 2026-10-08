@@ -167,6 +167,7 @@ def test_a_missing_session_bar_leaves_the_call_open(market):
     s = json.loads(run("score_predictions.py", root, cfg).stdout)
     assert s["scored"] == 0 and outcomes(root) == {}       # never scored on a shifted window
     assert (s["session_gap_open"], s["still_open"]) == (3, 3)
+    assert s["session_gap_ids"] == sorted(x["id"] for x in preds)          # a permanent gap stays visible by id
     preds = [call(12, 1, after)]                             # a window after the gap is scored as usual
     p.write_text("".join(json.dumps(x) + "\n" for x in preds))
     s = json.loads(run("score_predictions.py", root, cfg).stdout)

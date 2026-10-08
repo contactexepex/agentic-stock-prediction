@@ -61,7 +61,8 @@ def inputs_until(inputs: dict, end) -> dict:
     before it; rows with a `seen` time by their first-seen day (an event date after `end` known by then stays), the
     others by their date. Labels needing a later bar are then missing, as on that day."""
     cut = pd.Timestamp(end)
-    out = {"bars": {key: frame.loc[frame.index <= cut] for key, frame in inputs["bars"].items()}}
+    cut_bars = {key: frame.loc[frame.index <= cut] for key, frame in inputs["bars"].items()}
+    out = {"bars": {key: frame for key, frame in cut_bars.items() if len(frame)}}   # no bar by then: absent
     for name, frame in inputs.items():
         if name == "bars":
             continue

@@ -15,7 +15,10 @@ basis by the median stored/cache close ratio over the first HISTORY_OVERLAP_DATE
 they agree; the ratio and the largest deviation are reported). Limits (docs/DESIGN.md section 15):
 today's watchlist (survivorship bias: companies that left the index or failed are absent), and the
 split adjustment of old bars is Yahoo's as of the fetch, not what was known at the time (returns are
-ratios, so a consistent re-basing does not leak; a wrong split factor would show as a one-day jump)."""
+ratios, so a consistent re-basing does not leak; a wrong split factor would show as a one-day jump).
+A symbol whose fetch fails (an error, no data, or no bar left after cleaning; e.g. a Yahoo outage) keeps
+its rows of the previous cache and its previous manifest entry (`kept_from` = that fetch time), so a failed
+fetch never empties the cache; the summary's `failed` says so (`kept_previous_rows`)."""
 from __future__ import annotations
 
 import gzip
@@ -83,31 +86,57 @@ def clean_frame(cfg: dict, key: str, frame: pd.DataFrame, cut: dict) -> tuple[pd
     return out.assign(ticker=key)[list(HISTORY_COLUMNS)], counts
 
 
+def previous_cache(folder) -> tuple[dict[str, pd.DataFrame], dict]:
+    """({symbol: its HISTORY_COLUMNS rows}, manifest) of the cache already in `folder`; empty when there is none."""
+    path, manifest_path = folder / FILE_HISTORY_BARS, folder / FILE_HISTORY_MANIFEST
+    if not path.exists():
+        return {}, {}
+    bars = pd.read_csv(io.BytesIO(gzip.decompress(path.read_bytes())))
+    bars["date"] = pd.to_datetime(bars["date"]).dt.date
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    return {key: group[list(HISTORY_COLUMNS)] for key, group in bars.groupby("ticker")}, manifest
+
+
+def keep_previous(key: str, failure: dict, previous: tuple[dict, dict], kept: tuple[list, dict]) -> None:
+    """On a failed fetch of `key`, carry its previous rows and manifest entry into `kept` (frames, symbols)."""
+    rows = previous[0].get(key)
+    if rows is None or not len(rows):
+        return
+    kept[0].append(rows)
+    kept[1][key] = {**(previous[1].get("symbols") or {}).get(key, {}), "rows": len(rows),
+                    "kept_from": previous[1].get("fetched_at")}
+    failure["kept_previous_rows"] = len(rows)
+
+
 def fetch_market(cfg: dict, start: date, yfinance, now: datetime | None = None) -> dict:
-    """Fetch, clean and write one market's cache; returns the manifest."""
+    """Fetch, clean and write one market's cache (a failed symbol keeps its previous rows); returns the manifest."""
     now = now or datetime.now(timezone.utc)
     targets = {**{k: m[META_YAHOO] for k, m in cfg[CFG_SYMBOLS].items()},
                **{k: m[META_YAHOO] for k, m in cfg[CFG_TICKERS].items()}}
     cut = {"today": now.date(), "own_through": last_complete_session(cfg, now),
            "sessions": own_sessions(cfg, start, now.date())}
     frames, symbols, failed = [], {}, []
+    folder = cache_dir(cfg["market"])
+    previous = previous_cache(folder)
     for key, symbol in targets.items():
         try:
             frame = yfinance.Ticker(symbol).history(start=start.isoformat(), interval="1d", auto_adjust=False)
+            error = None if frame is not None and not frame.empty else "no data"
         except Exception as exc:  # one symbol's error must not stop the others
-            failed.append({"ticker": key, "yahoo": symbol, "error": str(exc)[:200]})
+            frame, error = None, str(exc)[:200]
+        rows, counts = clean_frame(cfg, key, frame, cut) if error is None else (None, {})
+        if error is None and not len(rows):
+            error = "no bar after cleaning"
+        if error is not None:
+            failed.append({"ticker": key, "yahoo": symbol, "error": error})
+            keep_previous(key, failed[-1], previous, (frames, symbols))
             continue
-        if frame is None or frame.empty:
-            failed.append({"ticker": key, "yahoo": symbol, "error": "no data"})
-            continue
-        rows, counts = clean_frame(cfg, key, frame, cut)
         frames.append(rows)
         symbols[key] = {"yahoo": symbol, "role": cfg[CFG_SYMBOLS].get(key, {}).get(META_ROLE, "ticker"),
                         "rows": len(rows), "first": str(rows["date"].min()) if len(rows) else None,
                         "last": str(rows["date"].max()) if len(rows) else None, **counts}
     bars = pd.concat(frames).sort_values(["ticker", "date"]) if frames else pd.DataFrame(columns=HISTORY_COLUMNS)
     payload = gzip.compress(bars.to_csv(index=False).encode(), mtime=0)
-    folder = cache_dir(cfg["market"])
     folder.mkdir(parents=True, exist_ok=True)
     (folder / FILE_HISTORY_BARS).write_bytes(payload)
     manifest = {"market": cfg["market"], "fetched_at": now.isoformat(timespec="seconds").replace("+00:00", "Z"),
