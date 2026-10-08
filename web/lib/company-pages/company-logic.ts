@@ -1,7 +1,8 @@
 // Presentation-only sums and groupings of the company page (design/mockups/03-company/notes.md "Shown but computed by
 // the page"): open-trade sums and flagged counts, the settled summary, the "why" bar parts, the chart's trade marks
 // and the company's next event. Pure functions of the payload; no formatting.
-import type { CalendarEvent, OpenTrade, Prediction, SettledTrade, TradeCheck } from "./types.ts";
+import type { RangeBands } from "../ui/types.ts";
+import type { AiReason, CalendarEvent, OpenTrade, Prediction, SettledTrade, TradeCheck } from "./types.ts";
 
 const num = (x: number | null | undefined): number => (x == null ? 0 : x);
 
@@ -82,3 +83,42 @@ export const horizonsOf = (rows: Array<{ horizon_days: number }>): number[] =>
 /** The company's own next event in the payload's window (events are sorted by date). */
 export const nextCompanyEvent = (events: CalendarEvent[], ticker: string, type?: string): CalendarEvent | null =>
   events.find(e => e.ticker === ticker && (type == null || e.type === type)) ?? null;
+
+/** The 50% and 80% ranges and target of a prediction or trade, or null when any is missing (no range bar then). */
+export function bandsOf(r: { lo80?: number | null; lo50?: number | null; hi50?: number | null; hi80?: number | null; target_price?: number | null }): RangeBands | null {
+  const { lo80, lo50, hi50, hi80, target_price } = r;
+  if (lo80 == null || lo50 == null || hi50 == null || hi80 == null || target_price == null) return null;
+  return { lo80, lo50, hi50, hi80, target_price };
+}
+
+/** The sessions whose call history (rm.lifecycle) the page links, newest first: the session being predicted and the
+ *  stored sessions before it, at most `count` (the read model keeps the last 30 market sessions). */
+export function lifecycleDates(bars: Array<{ date: string }>, sessionBeingPredicted: string | null | undefined, count = 10): string[] {
+  const dates = new Set(bars.map((b) => b.date).filter((d) => !sessionBeingPredicted || d < sessionBeingPredicted));
+  const ordered = [...dates].sort().reverse();
+  if (sessionBeingPredicted) ordered.unshift(sessionBeingPredicted);
+  return ordered.slice(0, count);
+}
+
+export interface PredictionPath {
+  prediction: Prediction;
+  checks: TradeCheck[];
+  settled: SettledTrade[];
+  reasons: AiReason[];
+}
+
+/** One session's calls with what became of them (SPEC section 2 "Lifecycle of a prediction": made -> checks ->
+ *  settled -> explained): the intraday checks and settlements of each prediction's trades (matched by prediction id;
+ *  a prediction can have an accuracy-view and a head-to-head trade), and the AI reasons about those trades (by trade
+ *  id). Ordered by horizon, then strategy. Checks newest first. */
+export function predictionPaths(day: { predictions: Prediction[]; trade_checks: TradeCheck[]; settled: SettledTrade[]; reasons: AiReason[] }): PredictionPath[] {
+  return [...day.predictions]
+    .sort((a, b) => a.horizon_days - b.horizon_days || a.strategy_id.localeCompare(b.strategy_id))
+    .map((prediction) => {
+      const checks = day.trade_checks.filter((c) => c.prediction_id === prediction.id).sort((a, b) => b.check_at.localeCompare(a.check_at));
+      const settled = day.settled.filter((t) => t.prediction_id === prediction.id);
+      const trades = new Set([...settled.map((t) => t.trade_id), ...checks.map((c) => c.trade_id)]);
+      const reasons = day.reasons.filter((r) => r.trade_id != null && trades.has(r.trade_id));
+      return { prediction, checks, settled, reasons };
+    });
+}

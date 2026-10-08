@@ -1,0 +1,66 @@
+"use client";
+// Page 03, Company (design/mockups/03-company/, SPEC section 6 page 3): one company's day in the order the investor
+// asks it — where it stands, the chart with today's targets and ranges, the open paper trades, the settled ones and
+// why they moved, the analyst's words, news with status, results, what is coming and the watchlist settings. Reads
+// GET /api/v1/markets/{market}/stocks/{ticker} (B12, rm.stock). Research only: every signal is Paper, nothing trades.
+import { useState } from "react";
+import { PageFooter, PageHead, SignalsBand } from "../../../../../../components/blocks/page-head.tsx";
+import { PageState } from "../../../../../../components/ui/states.tsx";
+import { MARKET_LABEL } from "../../../../../../lib/ui/constants.ts";
+import { fmtDate } from "../../../../../../lib/ui/format.ts";
+import { usePage } from "../../../../../../lib/ui/use-api.ts";
+import type { Market } from "../../../../../../lib/data/constants.ts";
+import { lifecycleDates } from "../../../../../../lib/company-pages/company-logic.ts";
+import type { CompanyPayload } from "../../../../../../lib/company-pages/types.ts";
+import { EventsCard, NewsCard, ReasonsCard, ResultsCard, WatchlistCard } from "./cards.tsx";
+import { pageCtx } from "./context.ts";
+import { CompanyLine, DecisionCard } from "./decision.tsx";
+import { CompanyLegend } from "./legend.tsx";
+import { PriceChart } from "./price-chart.tsx";
+import { OpenTradesTable, SettledCard } from "./trades.tsx";
+import "./company.css";
+
+function CompanyBody({ p }: { p: CompanyPayload }) {
+  const ctx = pageCtx(p);
+  const opening = typeof p.default_horizon === "number" ? p.default_horizon : p.horizons[0] ?? 1;
+  const [horizon, setHorizon] = useState<number>(opening);
+  const co = p.company;
+  const dates = lifecycleDates(p.bars, p.status.session.session_date);
+  return (
+    <>
+      <PageHead
+        page={p}
+        title={`${co.ticker} · ${co.name}`}
+        subtitle={`${co.sector ?? "sector not set"} · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing here trades`}
+      />
+      <CompanyLine p={p} ctx={ctx} actions={null} />
+      <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
+      <DecisionCard p={p} ctx={ctx} horizon={horizon} onHorizon={setHorizon} />
+      <PriceChart p={p} ctx={ctx} horizon={horizon} />
+      <div style={{ marginTop: 16 }}><OpenTradesTable p={p} ctx={ctx} /></div>
+      <div style={{ marginTop: 16 }}><SettledCard settled={p.settled} ctx={ctx} paperLabel={p.status.paper_label} ticker={co.ticker} /></div>
+      <div className="grid even">
+        <div className="col">
+          <ReasonsCard reasons={p.reasons} news={p.news} ctx={ctx} />
+          <ResultsCard p={p} ctx={ctx} />
+          <WatchlistCard p={p} ctx={ctx} onChangeAmount={null} pending={null} historyDates={dates} />
+        </div>
+        <div className="col">
+          <NewsCard p={p} ctx={ctx} />
+          <EventsCard p={p} />
+        </div>
+      </div>
+      <CompanyLegend />
+      <PageFooter page={p} endpoint={`stocks/${co.ticker}`} />
+    </>
+  );
+}
+
+export function CompanyPage({ market, ticker }: { market: Market; ticker: string }) {
+  const res = usePage<CompanyPayload>(market, "stocks/{ticker}", { ticker });
+  return (
+    <PageState result={res} loadingLabel={`Loading ${ticker} (${MARKET_LABEL[market]})`}>
+      {(p) => <CompanyBody key={`${p.market}/${p.ticker}`} p={p} />}
+    </PageState>
+  );
+}

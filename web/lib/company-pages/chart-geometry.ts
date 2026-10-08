@@ -2,6 +2,7 @@
 // of the stored sessions, then FUT wider slots for the N+1..N+5 exit sessions where the reference strategy's fan
 // (50% and 80% ranges from the last close), its targets and the spread of every strategy's target at the selected
 // horizon are drawn. Pure: the component renders the returned numbers as SVG.
+import { niceTicks } from "../ui/scales.ts";
 import type { Bar, Prediction } from "./types.ts";
 
 export interface ChartInput {
@@ -28,16 +29,6 @@ export const PHONE_WIDTH = 560, PHONE_SESSIONS = 30, FUTURE_SLOTS = 5;
 
 const hasRange = (r: Prediction): r is Prediction & { lo50: number; hi50: number; lo80: number; hi80: number; target_price: number } =>
   r.lo50 != null && r.hi50 != null && r.lo80 != null && r.hi80 != null && r.target_price != null;
-
-/** Round tick values covering [lo, hi], about n of them (1, 2 or 5 times a power of ten apart). */
-export function niceTicks(lo: number, hi: number, n: number): number[] {
-  const span = hi - lo;
-  if (!(span > 0)) return [lo];
-  const raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
-  const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag, out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) out.push(Number(v.toFixed(6)));
-  return out;
-}
 
 export function chartGeometry(input: ChartInput): ChartGeometry | null {
   const W = Math.max(280, input.width), phone = W < PHONE_WIDTH;

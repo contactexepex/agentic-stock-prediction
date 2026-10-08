@@ -3,9 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { chartGeometry, niceTicks, barAt } from "../chart-geometry.ts";
+import { chartGeometry, barAt } from "../chart-geometry.ts";
 import {
-  horizonOfId, nextCompanyEvent, openSummary, referencePrediction, settledSummary, tradeMarks, whyScale, whySegments,
+  horizonOfId, lifecycleDates, nextCompanyEvent, predictionPaths, openSummary, referencePrediction, settledSummary, tradeMarks, whyScale, whySegments,
 } from "../company-logic.ts";
 import { agreementAt, bestOf, expectedGainMoney, pooledRows, rankedIds } from "../strategies-logic.ts";
 import type { ScoreRow, SettledTrade } from "../types.ts";
@@ -85,12 +85,6 @@ test("chart geometry without predictions or bars", () => {
   assert.ok(g && g.fan80 === null && g.spread === null && g.targetTagY === null);
 });
 
-test("nice ticks are round and inside the span", () => {
-  assert.deepEqual(niceTicks(0, 10, 5), [0, 2, 4, 6, 8, 10]);
-  for (const v of niceTicks(1131.4, 1240.7, 5)) assert.ok(v >= 1131.4 && v <= 1240.7 && v % 20 === 0);
-  assert.deepEqual(niceTicks(5, 5, 5), [5]);
-});
-
 test("ranking: profit after costs, then trades, then id; unranked strategies after, by id", () => {
   const rows: ScoreRow[] = [
     { strategy_id: "b", horizon_days: "all", trades: 3, net_pnl: 10 }, { strategy_id: "a", horizon_days: "all", trades: 5, net_pnl: 10 },
@@ -109,4 +103,27 @@ test("stock strategies example: pooled rows, agreement per horizon, expected gai
   assert.equal(agreementAt({}, 3), null);
   assert.equal(expectedGainMoney(0.5, 100000), 500);
   assert.equal(expectedGainMoney(null, 100000), null);
+});
+
+test("call-history dates: the session being predicted first, then the stored sessions before it, newest first", () => {
+  const bars = [{ date: "2026-10-01" }, { date: "2026-10-05" }, { date: "2026-10-06" }, { date: "2026-10-07" }];
+  assert.deepEqual(lifecycleDates(bars, "2026-10-07", 3), ["2026-10-07", "2026-10-06", "2026-10-05"]);
+  assert.deepEqual(lifecycleDates(bars, null, 2), ["2026-10-07", "2026-10-06"]);
+  assert.deepEqual(lifecycleDates([], "2026-10-08"), ["2026-10-08"]);
+});
+
+test("prediction paths match checks and settlements by prediction id and reasons by their trades", () => {
+  const settled = reliance.settled.filter((t: SettledTrade) => t.status === "settled");
+  const ids = [...new Set(settled.map((t: SettledTrade) => t.prediction_id))] as string[];
+  const predictions = ids.map((id, i) => ({ ...reliance.predictions[0], id, strategy_id: `s${i}`, horizon_days: horizonOfId(id) ?? 1 }));
+  const paths = predictionPaths({ predictions, trade_checks: reliance.trade_checks, settled: reliance.settled, reasons: reliance.reasons });
+  assert.equal(paths.length, ids.length);
+  assert.equal(paths.reduce((n, p) => n + p.settled.length, 0), reliance.settled.filter((t: SettledTrade) => ids.includes(t.prediction_id)).length);
+  for (const p of paths) {
+    for (const c of p.checks) assert.equal(c.prediction_id, p.prediction.id);
+    const trades = new Set([...p.settled.map((t) => t.trade_id), ...p.checks.map((c) => c.trade_id)]);
+    for (const r of p.reasons) assert.ok(trades.has(r.trade_id as string));
+  }
+  assert.ok(paths.every((p, i) => i === 0 || paths[i - 1].prediction.horizon_days <= p.prediction.horizon_days));
+  assert.ok(paths.some((p) => p.reasons.length), "the example's reasons attach to their trades");
 });
