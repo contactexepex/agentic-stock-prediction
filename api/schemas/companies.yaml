@@ -71,8 +71,10 @@ CompaniesPageCompany:
 LifecycleEventRecord:
   type: object
   x-source: warehouse/company_records.lifecycle_rows (kind watchlist_events)
-  required: [id, event, ticker, market, effective_from, recorded_at, name, exchange, sector, amount, reason,
-             requested_by, channel, command_id, idempotency_key, onboarding, supersedes]
+  description: >-
+    A lifecycle event; `required` is the core every page carries (the Companies page adds the identity, command and
+    onboarding fields its mockup lists)
+  required: [id, event, ticker, market, effective_from, recorded_at, amount, reason, requested_by, channel, supersedes]
   properties:
     id: {type: string}
     event: {type: string, enum: [add, deactivate, reactivate, delete, set_amount]}

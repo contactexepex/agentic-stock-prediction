@@ -77,10 +77,10 @@ NewsItemRecord:
     The catalogue's News item as of the cut-off (docs/DATA_CATALOGUE.md). A company deleted by the cut-off is never in
     `tickers` or `primary_tickers` (decision 12). `status` is the item's own status for its first primary ticker
     (none for a market-wide item). `headline_history` and `headline_history_status` are carried where a page lists
-    them (Home), not on the News page
+    them (Home, the company page), not on the News page. `required` is the core every page carries; the other
+    fields are present where the page's mockup lists them (the contract test checks each page's keys)
   required: [id, market, tickers, primary_tickers, title, source, source_domain, url, published_at, first_seen_at,
-             status, status_as_of, independent_origins, primary_ids, cluster_id, scope, category, feed, summary,
-             summary_source, market_moving, origin, enrichment]
+             status, status_as_of, independent_origins, primary_ids, cluster_id, enrichment]
   properties:
     id: {type: string}
     market: {$ref: '#/components/schemas/Market'}
