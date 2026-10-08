@@ -1,7 +1,8 @@
 """The MotherDuck token and the warehouse's error type, which never carries it.
 
-The token is read from the environment only (MOTHERDUCK_TOKEN). Every warehouse error message goes through
-`redact`, which hides the token as is and URL-encoded."""
+The warehouse token is read from the environment only (MOTHERDUCK_TOKEN). Every warehouse error message goes
+through `redact`, which hides that token, and any other token a caller passed in (e.g. the inbox's), as is and
+URL-encoded."""
 
 from __future__ import annotations
 
@@ -18,18 +19,19 @@ def token() -> str | None:
     return value or None
 
 
-def redact(text) -> str:
-    """The text with the token (as is and URL-encoded) replaced by ***."""
-    redacted, secret = str(text), token()
-    if secret:
-        for form in {secret, urllib.parse.quote(secret, safe=""), urllib.parse.quote_plus(secret)}:
-            redacted = redacted.replace(form, REDACTED)
+def redact(text, other_secrets: tuple[str, ...] = ()) -> str:
+    """The text with the warehouse token and `other_secrets` (as is and URL-encoded) replaced by ***."""
+    redacted = str(text)
+    for secret in (token(), *other_secrets):
+        if secret:
+            for form in {secret, urllib.parse.quote(secret, safe=""), urllib.parse.quote_plus(secret)}:
+                redacted = redacted.replace(form, REDACTED)
     return redacted
 
 
 class WarehouseError(RuntimeError):
     """A warehouse failure whose message never carries the token."""
 
-    def __init__(self, message: str):
-        """Keep only the redacted message."""
-        super().__init__(redact(message))
+    def __init__(self, message: str, other_secrets: tuple[str, ...] = ()):
+        """Keep only the message with every token redacted."""
+        super().__init__(redact(message, other_secrets))

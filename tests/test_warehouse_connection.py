@@ -4,6 +4,7 @@ show (repr, str, exception messages). Offline: no MotherDuck connection is made.
 
 from __future__ import annotations
 
+import re
 import sys
 import urllib.parse
 from pathlib import Path
@@ -146,7 +147,8 @@ def test_extension_rules_in_the_source():
     assert 'execute("INSTALL motherduck' not in text
     assert "http://" not in text + constants
     assert "load_motherduck(con, load_warehouse_config())" in (package / "connection.py").read_text()
-    assert "motherduck_token" not in text  # no config option or SET carrying the value
+    # the token reaches DuckDB only as a bound parameter, never inside SQL text or a config option
+    assert re.findall(r"motherduck_token[^\n]*", text) == ["motherduck_token = ?`", 'motherduck_token = ?", [secret])']
 
 
 def test_local_read_only_connection_refuses_writes(tmp_path):
@@ -158,3 +160,46 @@ def test_local_read_only_connection_refuses_writes(tmp_path):
     with pytest.raises(duckdb.Error):
         read_only_con.execute("CREATE TABLE u (a INTEGER)")
     read_only_con.close()
+
+
+class RecordingConnection:
+    """Records every statement and its parameters; fails on the statement it is told to fail on."""
+
+    def __init__(self, fail_on: str | None = None):
+        self.statements, self.fail_on = [], fail_on
+
+    def execute(self, sql, params=None):
+        self.statements.append((sql, params))
+        if self.fail_on and sql.startswith(self.fail_on):
+            raise duckdb.IOException(f"cannot attach with token {params or ''} {INBOX_SECRET}")
+        return self
+
+
+INBOX_SECRET = "inbox/tok+en=x"
+
+
+def test_another_accounts_token_is_a_bound_parameter(monkeypatch):
+    monkeypatch.setenv("MOTHERDUCK_TOKEN", SECRET)
+    recording = RecordingConnection()
+    monkeypatch.setattr(connection.duckdb, "connect", lambda *_a, **_k: recording)
+    monkeypatch.setattr(connection, "load_motherduck", lambda *_a, **_k: None)
+    con = connection.connect_motherduck("market_brief_inbox", read_only=True, token_value=INBOX_SECRET)
+    assert con is recording
+    assert recording.statements == [
+        ("SET motherduck_token = ?", [INBOX_SECRET]),
+        ("ATTACH 'md:market_brief_inbox' AS market_brief_inbox (READ_ONLY)", None),
+        ("USE market_brief_inbox", None),
+    ]
+    for sql, _params in recording.statements:
+        assert INBOX_SECRET not in sql and SECRET not in sql
+
+
+def test_errors_redact_the_token_passed_in(monkeypatch):
+    monkeypatch.setenv("MOTHERDUCK_TOKEN", SECRET)
+    monkeypatch.setattr(connection.duckdb, "connect", lambda *_a, **_k: RecordingConnection(fail_on="ATTACH"))
+    monkeypatch.setattr(connection, "load_motherduck", lambda *_a, **_k: None)
+    with pytest.raises(WarehouseError) as err:
+        connection.connect_motherduck("market_brief_inbox", read_only=True, token_value=INBOX_SECRET)
+    for form in forms(INBOX_SECRET):
+        assert form not in str(err.value)
+    assert "***" in str(err.value)
