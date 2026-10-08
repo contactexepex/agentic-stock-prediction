@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.lab import registry  # noqa: E402
 from marketbrief.presentation.dashboard.assemble import gather_dashboard  # noqa: E402
 from marketbrief.warehouse import cli as wh_cli  # noqa: E402
 from marketbrief.warehouse import openapi_spec, read_models, rm_registry, sync  # noqa: E402
@@ -38,9 +39,29 @@ SECRET = "sync-secret/+="
 WAREHOUSE = Path("work/warehouse/market_brief.duckdb")
 MIRRORED = {"tickers", "bars", *(t.name for t in TABLES)}
 RM_TABLES = rm_registry.tables()  # every registered builder's table
-TICKER_TABLES = ("stock", "bars")  # one page per ticker; every other table has the market's one page `_`
-US_TICKERS = 20
-PAGES = {table: US_TICKERS if table in TICKER_TABLES else 1 for table in RM_TABLES}
+TICKER_TABLES = ("stock", "bars", "stock_strategies")  # one page per ticker (B12)
+MARKET_AND_TICKER_TABLES = ("compare", "trades")  # the market's page `_` and one page per ticker (B13, B12)
+MARKET_AND_STRATEGY_TABLES = ("strategies",)  # the market's page `_` and one page per registry strategy (B13)
+STRATEGY_IDS = [spec["id"] for spec in registry.strategies()]
+
+
+def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
+    """table -> the page keys a sync of the market writes (every other table: the market's one page `_`)."""
+    out = {}
+    for table in RM_TABLES:
+        if table in TICKER_TABLES:
+            out[table] = list(tickers)
+        elif table in MARKET_AND_TICKER_TABLES:
+            out[table] = ["_", *tickers]
+        elif table in MARKET_AND_STRATEGY_TABLES:
+            out[table] = ["_", *STRATEGY_IDS]
+        else:
+            out[table] = ["_"]
+    return out
+
+
+US_TICKERS = [f"T{i}" for i in range(20)]  # only the count matters for the totals (20 US companies)
+PAGES = {table: len(keys) for table, keys in expected_keys(US_TICKERS).items()}
 TOTAL_PAGES = sum(PAGES.values())
 SPEC = REPO / "api" / "openapi.yaml"
 
@@ -206,7 +227,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
     data, root = synced["dashboard"], synced["root"]
     as_of = datetime.fromisoformat(data["as_of"]).date()
     tickers = list(synced["cfg"]["tickers"])
-    keys = {table: tickers if table in TICKER_TABLES else ["_"] for table in RM_TABLES}
+    keys = expected_keys(tickers)
     for table, expected in keys.items():
         pages = stored_pages(root, table)
         assert sorted(pages) == sorted(expected)
@@ -214,16 +235,13 @@ def test_read_models_keys_envelope_and_payloads(synced):
             assert (market, page_as_of, version) == ("us", as_of, openapi_spec.version())
             assert hashlib.sha256(payload.encode()).hexdigest() == sha  # the ETag hashes the stored text
             assert "generated_at" not in payload  # no cut-off inside a payload (the envelope has it)
-    jpm = json.loads(stored_pages(root, "stock")["JPM"][4])
     company = next(c for c in data["companies"] if c["ticker"] == "JPM")
-    assert {k: v for k, v in jpm.items() if k in company} == json.loads(
-        json.dumps({k: v for k, v in company.items() if k != "bars"})
-    )  # exactly the dashboard's stock data, no bars
-    assert "bars" not in jpm and jpm["as_of"] == data["as_of"] and jpm["skill"] == data["skill"]
-    assert {m["id"] for m in jpm["models"]} <= {m["model_id"] for m in company["model"]}
-    assert all(e["date"] > data["as_of"] for e in jpm["events"])
+    # 2.0: the company page (B12, rm_company.py) carries its bars; rm.bars holds the same list
+    jpm = json.loads(stored_pages(root, "stock")["JPM"][4])
+    assert jpm["ticker"] == "JPM" and jpm["company"]["ticker"] == "JPM" and jpm["as_of"] == data["as_of"]
     bars = json.loads(stored_pages(root, "bars")["JPM"][4])
-    assert bars["bars"] == json.loads(json.dumps(company["bars"])) and bars["columns"][0] == "date"
+    assert bars["bars"] == jpm["bars"] and bars["bars"][-1]["date"] == company["last"]["date"]
+    assert all(e["date"] >= jpm["status"]["session"]["session_date"] for e in jpm["events"])
     overview = json.loads(stored_pages(root, "overview")["_"][4])
     assert overview["overview"] == json.loads(json.dumps(data["overview"]))
     assert overview["disclaimer"] == data["disclaimer"] and overview["plan"] == data["plan"]

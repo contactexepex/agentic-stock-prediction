@@ -1,0 +1,29 @@
+# B13: the Paper portfolios page's write (mcp/tools.yaml add_paper_trade)
+PaperTradeSubmission:
+  type: object
+  description: The add-trade form's body (web/lib/data/paper-trades.ts; validated again by the tool layer and by portfolio.py import-inbox)
+  additionalProperties: false
+  required: [ticker, side, quantity, trade_date, price_basis]
+  properties:
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    side: {type: string, enum: [buy, sell]}
+    quantity: {type: number, exclusiveMinimum: 0, description: Whole shares in India; fractional allowed in the US}
+    trade_date: {$ref: '#/components/schemas/IsoDate'}
+    price_basis: {type: string, enum: [open, close, manual], description: 'A stored bar''s open or close, or a manual price inside that day''s range'}
+    price: {type: number, description: Only with price_basis manual}
+    note: {type: string, maxLength: 200}
+PaperTradeReceipt:
+  type: object
+  description: The tool layer's outcome as the route returns it (web/lib/data/paper-trades.ts receipt; ToolOutcome of web/lib/tools/types.ts)
+  required: [command_id, result, refusal_code, message, inbox_id, record_ids, budget_left, paper]
+  properties:
+    command_id: {type: string}
+    result: {type: string, enum: [pending, accepted, duplicate, refused, failed]}
+    refusal_code: {type: ['string', 'null']}
+    message: {type: ['string', 'null']}
+    inbox_id: {type: ['string', 'null'], description: The Idempotency-Key, once the request is in the inbox}
+    record_ids:
+      type: array
+      items: {type: string}
+    budget_left: {type: ['integer', 'null']}
+    paper: {type: boolean, const: true}

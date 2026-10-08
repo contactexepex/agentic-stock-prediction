@@ -130,44 +130,6 @@ paths:
               schema: {$ref: '#/components/schemas/WatchlistResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/stocks/{ticker}:
-    get:
-      tags: [stocks]
-      operationId: getStockDetail
-      summary: Signal with model_prob and explanation, ranges, bull vs bear, news with status, events
-      x-read-model: rm.stock
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/Ticker'
-      responses:
-        '200':
-          description: The stock read model (page_key = ticker)
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StockDetailResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/stocks/{ticker}/bars:
-    get:
-      tags: [stocks]
-      operationId: getStockBars
-      summary: Split-adjusted daily OHLCV up to the as-of date, with the published ranges for the fan
-      x-read-model: rm.bars
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/Ticker'
-      responses:
-        '200':
-          description: The bars read model (page_key = ticker)
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/BarsResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/runs:
     get:
       tags: [markets]
@@ -186,56 +148,6 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/RunListResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/portfolio:
-    get:
-      tags: [portfolio]
-      operationId: getPaperPortfolio
-      summary: The paper portfolio (records only, never orders)
-      x-status: planned
-      x-owner: WS4
-      x-read-model: rm.portfolio
-      parameters:
-        - $ref: '#/components/parameters/Market'
-      responses:
-        '200':
-          description: The paper-portfolio read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/PaperPortfolioResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/portfolio/paper-trades:
-    post:
-      tags: [portfolio]
-      operationId: createPaperTrade
-      summary: Submit a paper trade record (pending until the next run validates and imports it into data/)
-      description: |
-        Writes one row to the append-only inbox (docs/ARCHITECTURE.md section 9). Never an order: nothing is
-        sent to any broker. The submitter is injected from the authenticated identity, never from the body.
-        Repeating a request with the same Idempotency-Key returns the first receipt.
-      x-status: planned
-      x-owner: WS2 (endpoint), WS4 (validation and import)
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/PaperTradeRequest'}
-      responses:
-        '200':
-          description: Accepted into the inbox (or the receipt of an earlier request with the same key)
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/InboxReceipt'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Invalid'}
         '501': {$ref: '#/components/responses/NotImplemented'}
         '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/company-requests:
@@ -457,20 +369,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/Watchlist'}
-    StockDetailResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/StockDetail'}
-    BarsResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/Bars'}
     RunListResponse:
       allOf:
         - $ref: '#/components/schemas/ReadModelMeta'
@@ -478,14 +376,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/RunList'}
-    PaperPortfolioResponse:
-      x-status: planned
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/PaperPortfolio'}
 
     # ---------- payloads ----------
     MarketList:
@@ -912,84 +802,6 @@ components:
           type: array
           items: {$ref: '#/components/schemas/RangeRow'}
 
-    StockDetail:
-      type: object
-      x-source: presentation/dashboard/assemble.company (without bars) + company_events as of the cut-off
-      required: [ticker, name, sector, as_of, skill, last, ranges, model, reasoning, calls, news, earnings, indicators]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        name: {type: string}
-        sector: {type: string}
-        as_of: {type: ['string', 'null'], format: date}
-        plan:
-          oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
-        skill: {$ref: '#/components/schemas/SkillStatus'}
-        last:
-          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
-        model:
-          type: array
-          items: {$ref: '#/components/schemas/ModelScore'}
-        models:
-          type: array
-          description: The fits behind today's scores (model_info.versions_used)
-          items: {$ref: '#/components/schemas/ModelVersion'}
-        reasoning:
-          oneOf: [{$ref: '#/components/schemas/Reasoning'}, {type: 'null'}]
-        calls:
-          type: array
-          items: {$ref: '#/components/schemas/CallRow'}
-        news:
-          type: array
-          items: {$ref: '#/components/schemas/NewsItem'}
-        earnings: {type: ['string', 'null'], format: date, description: Next earnings date after as_of}
-        events:
-          type: array
-          description: Upcoming company events (company_events rows first seen by the cut-off, date after as_of)
-          items: {$ref: '#/components/schemas/CompanyEvent'}
-        indicators: {$ref: '#/components/schemas/Indicators'}
-        cost: {type: ['number', 'null'], description: Round-trip cost fraction at the last close (config/costs.yaml)}
-
-    Bars:
-      type: object
-      x-source: presentation/dashboard/stock.bar_rows + presentation/dashboard/stock.range_rows
-      required: [ticker, as_of, columns, bars, ranges]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        as_of: {type: ['string', 'null'], format: date}
-        columns:
-          type: array
-          items: {type: string}
-          const: [date, open, high, low, close, volume]
-        bars:
-          type: array
-          description: Split-adjusted bars, oldest first, BAR_CALENDAR_DAYS (380) calendar days up to as_of
-          items:
-            type: array
-            minItems: 6
-            maxItems: 6
-            prefixItems:
-              - {type: string, format: date}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['integer', 'null']}
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
-        spans:
-          type: array
-          items:
-            type: object
-            properties:
-              key: {type: string}
-              label: {type: string}
-              days: {type: integer}
-        default_span: {type: string}
-
     RunList:
       type: object
       required: [market, daily_runs, news_runs]
@@ -1016,47 +828,6 @@ components:
           x-owner: WS1
           items: {$ref: '#/components/schemas/Build'}
 
-    PaperPortfolio:
-      type: object
-      x-status: planned
-      x-owner: WS4
-      description: Shape fixed here; WS4's data kinds supply it. Records only, never orders.
-      required: [market, as_of, label, positions, trades]
-      properties:
-        market: {$ref: '#/components/schemas/Market'}
-        as_of: {type: ['string', 'null'], format: date}
-        label: {type: string, description: 'skill.label ("Paper only — no proven edge yet" until model_skill)'}
-        positions:
-          type: array
-          items:
-            type: object
-            required: [ticker, quantity, entry_date, entry_price]
-            properties:
-              ticker: {$ref: '#/components/schemas/Ticker'}
-              quantity: {type: number}
-              entry_date: {$ref: '#/components/schemas/IsoDate'}
-              entry_price: {type: number, description: The open of entry_date from stored bars}
-              h: {$ref: '#/components/schemas/Horizon'}
-              exit_date: {type: ['string', 'null'], format: date}
-              mark_close: {$ref: '#/components/schemas/NullableNumber'}
-              unrealized_return: {$ref: '#/components/schemas/NullableNumber'}
-        trades:
-          type: array
-          items:
-            type: object
-            properties:
-              id: {type: string}
-              ticker: {$ref: '#/components/schemas/Ticker'}
-              side: {type: string, enum: [buy, sell]}
-              quantity: {type: number}
-              price: {type: number}
-              date: {$ref: '#/components/schemas/IsoDate'}
-              source: {type: string, enum: [slack, claude_code, dashboard]}
-              recorded_at: {$ref: '#/components/schemas/IsoTime'}
-        pending:
-          type: array
-          description: Inbox entries not yet imported (shown as pending, never as facts)
-          items: {$ref: '#/components/schemas/InboxReceipt'}
 
     # ---------- building blocks (dashboard payload) ----------
     SessionPlan:
@@ -1501,17 +1272,6 @@ components:
         error: {type: ['string', 'null']}
 
     # ---------- planned writes ----------
-    PaperTradeRequest:
-      type: object
-      x-status: planned
-      additionalProperties: false
-      required: [ticker, side, quantity]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        side: {type: string, enum: [buy, sell]}
-        quantity: {type: number, exclusiveMinimum: 0}
-        horizon_days: {$ref: '#/components/schemas/Horizon'}
-        note: {type: string, maxLength: 280}
     CompanyRequest:
       type: object
       x-status: planned

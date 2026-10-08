@@ -189,3 +189,29 @@ BacktestRun:
     last_date: {type: ['string', 'null'], format: date}
     eurusd: {type: ['string', 'null']}
     note: {type: ['string', 'null']}
+StrategyLabTable:
+  description: "An rm.strategies page: `_` is the Strategy lab (StrategyLab), a strategy id is one strategy's detail"
+  anyOf: [{$ref: '#/components/schemas/StrategyLab'}, {$ref: '#/components/schemas/StrategyDetail'}]
+StrategyDetail:
+  type: object
+  x-source: warehouse/rm_strategies.strategy_page
+  description: >-
+    One registry strategy (rm.strategies page key = its id; B5's get_scoreboard): its entry, every scoreboard row of
+    it (all scopes, views and bases, each carrying its basis), its heatmap cells, its cumulative line (accuracy view)
+    and the go-live block of its accuracy row over all horizons (null before any settled trade). Paper only.
+  required: [market, as_of, strategy, go_live, rows, cells, lines]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    as_of: {type: ['string', 'null'], format: date}
+    strategy: {$ref: '#/components/schemas/StrategyEntry'}
+    go_live:
+      oneOf: [{$ref: '#/components/schemas/RowGoLive'}, {type: 'null'}]
+    rows:
+      type: array
+      items: {$ref: '#/components/schemas/ScoreboardRow'}
+    cells:
+      type: array
+      items: {$ref: '#/components/schemas/HeatmapCell'}
+    lines:
+      type: array
+      items: {$ref: '#/components/schemas/CumulativeLine'}

@@ -265,3 +265,42 @@ test("isStored answers whether a key is in the inbox, logs nothing, and answers 
   r.inbox.down = true;
   assert.equal(await r.layer.isStored(args), false);
 });
+
+test("get_news with a ticker cuts the company's part out of the market News page (rm.news has only `_`)", async () => {
+  const r = rig();
+  r.reads.put("news", "us", "_", {
+    window: { days: 3 },
+    news: [
+      { id: "n1", title: "Apple results", tickers: ["AAPL"], primary_tickers: ["AAPL"] },
+      { id: "n2", title: "Supplier mentions Apple", tickers: ["TSM", "AAPL"], primary_tickers: ["TSM"] },
+      { id: "n3", title: "Microsoft deal", tickers: ["MSFT"], primary_tickers: ["MSFT"] },
+      { id: "n4", title: "Fed holds rates", tickers: [], primary_tickers: [] },
+    ],
+    calendar: [{ ticker: "AAPL", type: "earnings" }, { ticker: "MSFT", type: "earnings" }, { ticker: null, type: "closed" }],
+    companies: [{ ticker: "AAPL" }, { ticker: "MSFT" }],
+  });
+  r.reads.put("stock", "us", "AAPL", { ticker: "AAPL", prices: [1, 2], news: [{ id: "n1" }, { id: "n0", title: "older" }] });
+  const one = await r.layer.execute(app, "get_news", { market: "us", ticker: "AAPL" });
+  const data = one.data as { sources: { page_key: string; selection?: string; payload: Record<string, unknown> }[] };
+  assert.deepEqual(r.reads.calls, ["stock|us|AAPL", "news|us|_", "review|us|_"]);
+  const own = data.sources[0];
+  assert.deepEqual(own.payload, { news: [{ id: "n1" }, { id: "n0", title: "older" }] }, "only the company page's news field");
+  assert.match(own.selection ?? "", /30 days before the cut-off/);
+  const none = await r.layer.execute(app, "get_news", { market: "us", ticker: "MSFT" });
+  const missing = (none.data as { sources: { found: boolean; selection?: string; payload: unknown }[] }).sources[0];
+  assert.deepEqual([missing.found, missing.selection, missing.payload], [false, undefined, null], "no note on a missing page");
+  const page = data.sources[1];
+  assert.equal(page.page_key, "_");
+  assert.match(page.selection ?? "", /at most 50 items, half for company items/);
+  assert.deepEqual((page.payload.news as { id: string; about_ticker: boolean }[]).map((item) => [item.id, item.about_ticker]),
+    [["n1", true], ["n2", false]]);
+  assert.deepEqual((page.payload.calendar as { ticker: string | null }[]).map((row) => row.ticker), ["AAPL", null]);
+  assert.deepEqual(page.payload.companies, [{ ticker: "AAPL" }]);
+  assert.deepEqual(page.payload.window, { days: 3 });
+  r.reads.calls.length = 0;
+  const all = await r.layer.execute(app, "get_news", { market: "us" });
+  assert.deepEqual(r.reads.calls, ["news|us|_", "review|us|_"]);
+  const whole = (all.data as { sources: { selection?: string; payload: { news: unknown[] } }[] }).sources[0];
+  assert.equal(whole.selection, undefined);
+  assert.equal(whole.payload.news.length, 4);
+});
