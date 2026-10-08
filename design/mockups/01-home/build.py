@@ -36,7 +36,7 @@ SETTLED_FIELDS = ("trade_id", "view", "pick_rule", "strategy_id", "family", "tic
                   "exit_date", "exit_date_actual", "status", "amount", "currency", "net_pnl", "return_pct",
                   "reason_code", "settled_at")
 PICK_RULE_ROW_FIELDS = ("scope", "market", "view", "family", "pick_rule", "horizon_days", "trades", "net_pnl",
-                        "currency", "mean_return_pct", "win_rate", "sample_badge", "basis", "as_of")
+                        "mean_return_pct", "win_rate", "sample_badge", "basis", "as_of")
 
 
 def catalogue(name: str) -> dict:
