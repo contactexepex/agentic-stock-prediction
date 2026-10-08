@@ -1,15 +1,14 @@
 """The per-page read models (docs/ARCHITECTURE.md section 4; payload schemas in api/openapi.yaml): one JSON
 payload per (market, page_key) that the app reads with one keyed SELECT. Every payload is sliced from the
 dashboard's own data (presentation/dashboard/assemble.gather_dashboard, as of the run's clock); nothing is
-recomputed here. The upcoming company events of the stock page are read with the dashboard's as-of rule.
+recomputed here.
 
   rm.overview      page_key _        Overview: header, session plan, skill verdict, market overview tiles
   rm.watchlist     page_key _        Watchlist: one row per stock (last session, P(up), calls, ranges)
-  rm.stock         page_key ticker   StockDetail: the dashboard's stock data without bars, plus events
-  rm.bars          page_key ticker   Bars: split-adjusted OHLC bars and the published ranges
 
-`build_rows` runs every registered builder (warehouse/rm_registry.py; these four 1.0 pages are rm_dashboard.py's) and
-checks each payload against its schema in api/openapi.yaml before it is written.
+`build_rows` runs every registered builder (warehouse/rm_registry.py; these two 1.0 pages are rm_dashboard.py's) and
+checks each payload against its schema in api/openapi.yaml before it is written. The 1.0 rm.stock and rm.bars pages
+were replaced in 2.0 by the company page's (B12, warehouse/rm_company.py).
 
 A payload carries no cut-off time (the envelope's `cutoff` does), so a rebuild that finds the same data
 produces the same payload and hash (section 4.4)."""
@@ -23,11 +22,8 @@ from datetime import datetime
 import pandas as pd
 
 from marketbrief.constants.warehouse import (
-    BAR_COLUMNS,
     MARKET_PAGE_KEY,
-    RM_BARS,
     RM_OVERVIEW,
-    RM_STOCK,
     RM_WATCHLIST,
 )
 from marketbrief.presentation.dashboard import reads
@@ -47,7 +43,8 @@ READ_MODEL_COLUMNS = {
     "payload_sha256": "VARCHAR",
     "payload": "JSON",
 }
-# the stock page's upcoming company events: the company_events rule as of the cut-off, dated after the as-of date
+# upcoming company events as of the cut-off, dated after the as-of date (no longer a page of its own in 2.0; W1's
+# catalogue build, design/catalogue/catalogue_calendar.py, reads them)
 EVENTS_SQL = f"""SELECT ticker, id, date, type, name, source, timing, amount FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
 WHERE date > $as_of ORDER BY ticker, date, type, id"""
 WATCHLIST_COMPANY_FIELDS = ("ticker", "name", "sector", "last", "calls", "ranges", "earnings")
@@ -85,33 +82,7 @@ def watchlist_row(company: dict) -> dict:
     }
 
 
-def stock_payload(data: dict, company: dict, events: list[dict]) -> dict:
-    """The stock page: the dashboard's stock data without bars, the fits behind its scores and its events."""
-    model_ids = {score["model_id"] for score in company["model"]}
-    return {
-        **{key: value for key, value in company.items() if key != "bars"},
-        "as_of": data["as_of"],
-        "plan": data["plan"],
-        "skill": data["skill"],
-        "models": [version for version in data.get("models") or [] if version.get("id") in model_ids],
-        "events": events,
-    }
-
-
-def bars_payload(data: dict, company: dict) -> dict:
-    """The chart page: the stock's split-adjusted bars and published ranges."""
-    return {
-        "ticker": company["ticker"],
-        "as_of": data["as_of"],
-        "columns": BAR_COLUMNS,
-        "bars": company["bars"],
-        "ranges": company["ranges"],
-        "spans": data["spans"],
-        "default_span": data["default_span"],
-    }
-
-
-def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[str, dict]]:
+def page_payloads(data: dict) -> dict[str, dict[str, dict]]:
     """table -> page_key -> payload for one market's dashboard data."""
     header = {key: data.get(key) for key in HEADER}
     page_basics = {"market": data["market"], "as_of": data["as_of"], "plan": data["plan"], "skill": data["skill"]}
@@ -119,10 +90,6 @@ def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[s
     return {
         RM_OVERVIEW: {MARKET_PAGE_KEY: {**header, "overview": data["overview"]}},
         RM_WATCHLIST: {MARKET_PAGE_KEY: {**page_basics, "rows": [watchlist_row(company) for company in companies]}},
-        RM_STOCK: {
-            company["ticker"]: stock_payload(data, company, events.get(company["ticker"], [])) for company in companies
-        },
-        RM_BARS: {company["ticker"]: bars_payload(data, company) for company in companies},
     }
 
 

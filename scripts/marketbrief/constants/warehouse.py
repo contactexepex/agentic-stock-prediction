@@ -21,7 +21,6 @@ RM_TRACK_RECORD = "track_record"
 # the rm tables are those of the registered builders (warehouse/rm_registry.tables())
 BUILDS_TABLE = "builds"  # rm.builds: one row per build, append-only
 MARKET_PAGE_KEY = "_"  # the page_key of market-level pages
-BAR_COLUMNS = ["date", "open", "high", "low", "close", "volume"]
 UNKNOWN_COMMIT = "unknown"
 
 # ---- B4: the read-model framework (warehouse/rm_registry.py, rm_common.py, contract.py; docs/ws/b4.md) ----

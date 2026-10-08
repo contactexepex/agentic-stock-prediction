@@ -89,35 +89,42 @@ a row was stored, with the view's own pick rule (`DISTINCT ON ... ORDER BY`) and
 | `lessons` | `written_at` and `available_from` <= cut-off |
 | `reviews` | `computed_at` (carries `model_skill`) |
 
-### Read models: schema `rm` (docs/ARCHITECTURE.md section 4, api/openapi.yaml 1.0.0)
+### Read models: schema `rm` (docs/ARCHITECTURE.md section 4, api/openapi.yaml 2.0.0)
+Updated 2026-10-08 for contract 2.0. WS1 built the 1.0 pages, the sync (`sync.py`) and the writer (`rm_writer.py`).
+B4's framework batch (8aaad43, 7d1e8bf; docs/ws/b4.md "Framework") extended both and added the builder registry;
+each page type now belongs to the session named below, and WS1 keeps two builders.
 - Columns as in ARCHITECTURE.md 4.1: `market, page_key, as_of, cutoff, built_at, schema_version,
   source_commit, payload_sha256, payload`, primary key `(market, page_key)`, one current row per key.
-- `schema_version` is `1.0.0`. `source_commit` is `git rev-parse HEAD` of the repo root, or `unknown`
-  outside a checkout. `payload_sha256` is the SHA-256 of the canonical payload JSON (sorted keys, no
-  whitespace, strict). The text is stored verbatim, so `sha256(payload) == payload_sha256` (tested).
-- Pages built:
-  - `rm.overview` (`_`): payload `Overview`.
-  - `rm.watchlist` (`_`): payload `Watchlist`.
-  - `rm.stock` (ticker): payload `StockDetail`: the dashboard's company data without bars, plus `models`
-    and `events`.
-  - `rm.bars` (ticker): payload `Bars`.
-  - `rm.track_record` (`_`): payload `TrackRecord`.
-  Every page is sliced from `presentation/dashboard/assemble.gather_dashboard(cfg, con, clock())`. The
-  only new query is the stock page's upcoming `events`: the `company_events` rule with
-  `first_seen_at <= cutoff` and `date > as_of`. Payloads carry no cut-off time: `generated_at` is left
-  out, and the envelope has `cutoff`.
+- `schema_version` is the `info.version` of `api/openapi.yaml` (2.0.0 today). `source_commit` is
+  `git rev-parse HEAD` of the repo root, or `unknown` outside a checkout. `payload_sha256` is the SHA-256 of
+  the canonical payload JSON (sorted keys, no whitespace, strict). The text is stored verbatim, so
+  `sha256(payload) == payload_sha256` (tested).
+- Builders: each page type is a `PageBuilder` in a module `warehouse/rm_<page>.py`; `rm_registry.py` finds them
+  (no list to edit), and `rm_registry.tables()` is the list of rm tables the sync writes and prunes. On main
+  at 27f6eaf (table: payload schema, owner):
+  - `overview`: `Overview` (WS1); `watchlist`: `Watchlist` (WS1), registered in `rm_dashboard.py` and sliced
+    from `presentation/dashboard/assemble.gather_dashboard` in `read_models.page_payloads`.
+  - `stock`: `CompanyPage`, `bars`: `CompanyBars`, `stock_strategies`: `StockStrategiesPage`, `trades`:
+    `TradesPage` (B12, all in `rm_company.py`; they replaced WS1's 1.0 StockDetail and Bars at 27f6eaf).
+  - `track_record`: `TrackRecordPage`, `strategies`: `StrategyLabTable`, `compare`: `RuleVsAiTable`,
+    `review`: `ResearchReviewPage` (B13, `rm_track_record.py`, `rm_strategies.py`, `rm_compare.py`;
+    `track_record` moved from WS1 at 64ccd56).
+  - `companies`: `CompaniesPayload` (`rm_companies.py`), `news`: `NewsPayload` (`rm_news.py`) (B11); `status`:
+    `MarketStatus` (B4, `rm_platform.py`).
+  `read_models.upcoming_events` / `EVENTS_SQL` stay because W1's catalogue code imports them.
+- One writer: the sync is the only writer of every rm table. It builds all pages of a market from one
+  `BuildContext` as of the run's clock and writes them in the sync's one transaction. A builder reads only
+  rows stored by the cut-off and puts no build time into its payload, so a rebuild of the same data keeps
+  the same hash.
 - Upsert by hash (4.4): an unchanged page is left alone (`built_at` and `cutoff` unchanged). A changed or
-  new page replaces its row. A stored key the build no longer produces (a ticker that left the
-  watchlist) is deleted.
-- Each payload's top-level required keys, and each watchlist row's, are checked against
-  `constants.warehouse.REQUIRED_KEYS`. When `api/openapi.yaml` exists, the test compares those keys with
-  the spec's `required` lists and `info.version`; it passed against `origin/build/wave0`. A page that
-  fails the check is not written and its old row stays. The build row then records the error, and the
-  CLI exits 1.
+  new page replaces its row. A stored key the build no longer produces (a ticker that left the watchlist)
+  is deleted, which is why a page may only be written through a registered builder.
+- Validation: every payload is checked against its schema in `api/openapi.yaml` (`schema_check.py`, the
+  JSON Schema subset the contract uses) before it is written. A page that fails is not written and its old
+  row stays; the build row records the problems, and the CLI exits 1. (In 1.0 this was a required-key check
+  in `constants.warehouse.REQUIRED_KEYS`.)
 - `rm.builds` (append-only): `build_id, market, kind (daily|news|full), cutoff, source_commit,
   started_at, finished_at, ok, pages_written, pages_unchanged, error`.
-- Not built yet (follow-ups): `rm.markets`, `rm.status`, `rm.news`, `rm.runs`, and the planned
-  `signals`/`portfolio` (WS4).
 
 ### Bookkeeping
 - `meta.sync_runs` (as specified for WS1): `run_id, market, started_at, finished_at` (wall clock),
