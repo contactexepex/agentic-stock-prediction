@@ -11,7 +11,7 @@ from marketbrief.core.calendar import next_session
 from marketbrief.lab.timing import exit_session
 from marketbrief.portfolio import service
 from marketbrief.portfolio.constants import TIER_STRONG_BUY, TIER_STRONG_SELL
-from marketbrief.portfolio.horizons import resolved_label, sessions_after_d
+from marketbrief.portfolio.horizons import score_label, sessions_after_d
 
 API_TIERS = {TIER_STRONG_BUY: "strong_buy", TIER_STRONG_SELL: "strong_sell"}
 PAPER_TIERS = {"up": "paper_up", "down": "paper_down"}
@@ -27,8 +27,8 @@ def entry_exit(cfg: dict, as_of: str | None, horizon: int, label: str) -> tuple[
 
 
 def candidate(cfg: dict, as_of: str | None, row: dict, tier: str) -> dict:
-    """One SignalCandidate."""
-    label = resolved_label(row["horizon_days"], row.get("horizon_label"), None)
+    """One SignalCandidate (its window from the tier row's horizon_label, already resolved by signals.signal_row)."""
+    label = score_label(row["horizon_days"], row.get("horizon_label"))
     entry, exit_ = entry_exit(cfg, as_of, row["horizon_days"], label)
     meta = cfg["tickers"].get(row["ticker"]) or {}
     return {"ticker": row["ticker"], "name": meta.get("name"), "h": row["horizon_days"], "tier": tier,

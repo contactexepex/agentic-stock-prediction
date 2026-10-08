@@ -1951,14 +1951,16 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   - **Market cost** (`paper_trades_settled.costs`, `net_pnl`, `return_pct`; strategies are ranked on it). India:
     Axis brokerage 0.75% per side, at least ₹50 per order; STT 0.1% each side; exchange and SEBI fees; stamp duty
     0.015% on the buy; GST 18% on brokerage + exchange + SEBI. US: BUX's €0.99 per order at the EUR/USD close on or
-    before each side's session; SEC fee; FINRA TAF.
+    before each side's session (when none is stored that early, the oldest stored close, a later rate known by the
+    run's clock: `MarketData.eurusd_on`); SEC fee; FINRA TAF.
   - **Your cost** (`cost_views`; the go-live bar and the owner's money use it) = market cost plus, in India, the NRI
     reporting charge ₹200 on the purchase date and ₹200 on the sale date and the DP charge (provisional: ₹30 or
     0.04% of the sale value, the higher); in the US, BUX Basic's FX markup 0.75% of the value on the buy and on the
     sale and the 0.20% a year portfolio fee on the entry value, pro-rated over the calendar days from D to the exit.
   - A US trade whose fee cannot be converted yet (no EUR/USD stored at all) waits (`waiting_for_eurusd`).
-- **Cost-viable flag** (decision 51, `lab/cost_views.py`). At `pick` time, for every qualifying prediction of D (all
-  families) and every pick: the round trip of the company's amount bought and sold at C = base_close, in both
+- **Cost-viable flag** (decision 51, `lab/cost_views.py`). At `predict` time for each new qualifying rule or
+  baseline prediction, and at `pick` time for every qualifying prediction of D without a row yet (all families) and
+  every pick: the round trip of the company's amount bought and sold at C = base_close, in both
   views, and `expected_move_pct = (target / C − 1) × 100`. Viable (owner decision of 2026-10-07, made in session B6;
   it replaces the first wording "move > cost"): `expected_gain_your_pct = p × move − (1 − p) × loss −
   your_cost_pct` and `cost_viable = expected_gain_your_pct > 0`, with move and loss those of the head-to-head picks
@@ -1983,7 +1985,7 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
 | id | `cv:<record_kind>:<record_id>` |
 | record_kind, record_id | `prediction` (strategy_predictions id), `pick` (head_to_head_picks id) or `settlement` (paper_trades_settled id) |
 | trade_id, prediction_id, strategy_id, market, ticker, horizon_days, session_date, exit_date, amount, currency | the record's keys (exit_date: the planned exit, or the one used for a settlement) |
-| reference_price, target_price, expected_move_pct | C (base_close; for a settlement the entry price), the target, `(target / C − 1) × 100` |
+| reference_price, target_price, expected_move_pct | C (base_close; for a settlement the entry price), the prediction's target (copied on every row), `(target / C − 1) × 100` (null on settlement rows, and without a target) |
 | market_cost_pct, your_cost_pct | the round trip in each view as % of the amount |
 | expected_gain_your_pct, cost_viable | `p × move − (1 − p) × loss − your_cost_pct` with the picks' move and loss; viable when above 0 (pre-open rows; null without a probability or range, and on settlements) |
 | market_costs, market_cost_lines, your_costs, your_cost_lines | totals and `{charge: amount}` per view |

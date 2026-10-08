@@ -21,9 +21,9 @@ from dataclasses import dataclass, field, replace
 from marketbrief.constants.kinds import KIND_STRATEGY_ABSTENTIONS, KIND_STRATEGY_PREDICTIONS
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab.constants import (ABSTAIN_ABSTAINED, ABSTAIN_BLOCKED, ABSTAIN_EARNINGS, DOWN, EARNINGS_BLOCK_DAYS,
-                                       FILTERED_REGIMES, LAB_VERSION, MSG_NO_CROSS_SCORE, PROB_DIGITS,
-                                       PRICE_DIGITS, QUALITY_BLOCKED, SIGNAL_ALWAYS_UP, SIGNAL_MOMENTUM, UP,
-                                       VERIFIED_STATUSES)
+                                       FILTERED_REGIMES, LAB_VERSION, MSG_NO_CROSS_SCORE, MSG_NO_CROSS_SCORE_OR_RANGE,
+                                       PRICE_DIGITS, PROB_DIGITS, QUALITY_BLOCKED, SIGNAL_ALWAYS_UP, SIGNAL_MOMENTUM,
+                                       UP, VERIFIED_STATUSES)
 from marketbrief.lab.registry import config_hash
 from marketbrief.lab.sizing import qualifies
 from marketbrief.model.news_score import item_weight
@@ -176,7 +176,9 @@ def company_rows(specs: list[dict], inputs: TickerInputs, news_cfg: dict) -> tup
         usable = [k for k in wanted if not model_based or k in own.scores]
         missing = [k for k in spec["horizons"] if k not in usable]
         if missing:
-            reason = MSG_NO_CROSS_SCORE if cross else "no model score or range for these horizons"
+            no_range = any(k not in inputs.ranges for k in missing)
+            reason = ((MSG_NO_CROSS_SCORE_OR_RANGE if no_range else MSG_NO_CROSS_SCORE) if cross
+                      else "no model score or range for these horizons")
             skipped.append(abstention(spec, own, ABSTAIN_ABSTAINED, reason, missing))
         preds += [prediction(spec, own, k, news_cfg) for k in usable]
     return preds, skipped

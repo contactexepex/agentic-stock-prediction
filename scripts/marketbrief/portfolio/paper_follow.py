@@ -19,7 +19,7 @@ from marketbrief.lab.timing import exit_session
 from marketbrief.model.settings import round_trip_cost
 from marketbrief.portfolio import reads
 from marketbrief.portfolio.constants import SIMULATED_LABEL
-from marketbrief.portfolio.horizons import label_sql, resolved_label, sessions_after_d
+from marketbrief.portfolio.horizons import label_sql, score_label, sessions_after_d
 from marketbrief.portfolio.signals import blocked_reason
 
 PERCENT = 100.0
@@ -83,9 +83,10 @@ def simulate(con, cfg: dict, clock, market: str, settings: dict, costs: dict) ->
 
 def position(row: dict, cfg: dict, bar_index: dict, adjust, market: str, costs: dict) -> dict:
     """One simulated position: entry open of D, exit close of the k-th session after D for N+k (a legacy 5-day
-    score (made before call_scoring.n_plus_k_from, issue #94): D+4); None while pending."""
+    score (stored legacy_5d_d4 or unlabelled, portfolio/horizons.score_label; issue #94): D+4); None while
+    pending."""
     entry_day = next_session(cfg, row["as_of_date"], include=False)
-    label = resolved_label(row["horizon_days"], row.get("horizon_label"), row.get("computed_at"))
+    label = score_label(row["horizon_days"], row.get("horizon_label"))
     days = [entry_day, exit_session(cfg, entry_day, sessions_after_d(int(row["horizon_days"]), label))]
     entry, exit_ = bar_index.get((row["ticker"], days[0])), bar_index.get((row["ticker"], days[-1]))
     side = "up" if row["prob_up"] > 0.5 else "down"

@@ -1,5 +1,6 @@
-"""The lab's daily steps on stored data (scripts/lab.py): predict (pre-open: rule strategies and baselines),
-pick (pre-open, after every family has predicted: the head-to-head picks and the cost-viable rows); settle is in
+"""The lab's daily steps on stored data (scripts/lab.py): predict (pre-open: rule strategies and baselines, with
+the cost-viable rows of their new predictions), pick (pre-open, after every family has predicted: the head-to-head
+picks and the cost-viable rows of every prediction and pick not flagged yet, e.g. B3's AI predictions); settle is in
 settle_run.py. Each appends only new ids (append-only, CLAUDE.md data rules) and returns a summary."""
 from __future__ import annotations
 
@@ -64,13 +65,33 @@ def pick_day(con, cfg: dict, now: datetime, specs: list[dict], session_date: str
             "cost_viable": sum(bool(v["cost_viable"]) for v in views if v["record_kind"] == KIND_PREDICTION)}
 
 
+def prediction_views(con, cfg: dict, now: datetime, preds: list[dict]) -> dict:
+    """Append the cost-viable rows (decision 51) of the qualifying predictions among `preds` whose
+    cv:prediction:<id> is not stored yet (pick_day skips the same ids). US: without any stored EUR/USD close the
+    BUX order fee cannot be converted, so no row is written (pick writes them later)."""
+    trading = [p for p in preds if p.get("qualifies")]
+    if not trading:
+        return {"cost_views": 0}
+    start = min(as_date(p["session_date"]) for p in trading) - timedelta(days=10)
+    data = reads.market_data(con, cfg, now, [], start)
+    if data.rates.get("order_fee_eur") and not data.eurusd:
+        return {"cost_views": 0, "cost_views_message": MSG_NO_EURUSD.format(when=now.isoformat())}
+    views = [viability_row(KIND_PREDICTION, p["id"], p, data.rates, data.eurusd_on(as_date(p["session_date"])), now)
+             for p in trading]
+    known_views = {r["id"] for r in reads.stored(con, KIND_COST_VIEWS, "computed_at", now)}
+    return {"cost_views": append_new(cfg["market"], KIND_COST_VIEWS, views, "computed_at", known_views)}
+
+
 def write_predictions(cfg: dict, now: datetime, preds: list[dict], abstentions: list[dict], con) -> dict:
-    """Append new prediction and abstention rows (abstention ids skipped when already stored)."""
+    """Append new prediction and abstention rows (abstention ids skipped when already stored) and the cost-viable
+    rows of the new qualifying predictions (so they carry the flag even when pick does not run)."""
     known = {p["id"] for p in reads.predictions(con, now)}
+    new = [p for p in preds if p["id"] not in known]
     known_abstentions = {a["id"] for a in reads.stored(con, KIND_STRATEGY_ABSTENTIONS, "made_at", now)}
     return {"predictions": append_new(cfg["market"], KIND_STRATEGY_PREDICTIONS, preds, "made_at", known),
             "abstentions": append_new(cfg["market"], KIND_STRATEGY_ABSTENTIONS, abstentions, "made_at",
-                                      known_abstentions)}
+                                      known_abstentions),
+            **prediction_views(con, cfg, now, new)}
 
 
 def session_of(cfg: dict, now: datetime) -> date:
