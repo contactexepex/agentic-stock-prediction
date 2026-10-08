@@ -9,6 +9,9 @@ recomputed here. The upcoming company events of the stock page are read with the
   rm.bars          page_key ticker   Bars: split-adjusted OHLC bars and the published ranges
   rm.track_record  page_key _        TrackRecord: calls per scoring basis, ranges, replay, backtest
 
+`build_rows` runs every registered builder (warehouse/rm_registry.py; these five 1.0 pages are rm_dashboard.py's) and
+checks each payload against its schema in api/openapi.yaml before it is written.
+
 A payload carries no cut-off time (the envelope's `cutoff` does), so a rebuild that finds the same data
 produces the same payload and hash (section 4.4)."""
 
@@ -23,19 +26,17 @@ import pandas as pd
 from marketbrief.constants.warehouse import (
     BAR_COLUMNS,
     MARKET_PAGE_KEY,
-    READ_MODEL_SCHEMA_VERSION,
-    REQUIRED_KEYS,
     RM_BARS,
     RM_OVERVIEW,
     RM_STOCK,
     RM_TRACK_RECORD,
     RM_WATCHLIST,
-    WATCHLIST_ROW_REQUIRED,
 )
 from marketbrief.presentation.dashboard import reads
-from marketbrief.presentation.dashboard.assemble import gather_dashboard
 from marketbrief.presentation.dashboard.stock import iso_day
 from marketbrief.utils.numbers import json_safe_float
+from marketbrief.warehouse import openapi_spec, rm_registry, schema_check
+from marketbrief.warehouse.rm_registry import BuildContext, PageBuilder
 
 READ_MODEL_COLUMNS = {
     "market": "VARCHAR",
@@ -128,15 +129,6 @@ def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[s
     }
 
 
-def missing_keys(table: str, payload: dict) -> list[str]:
-    """Required keys (api/openapi.yaml) the payload lacks; watchlist rows are checked too."""
-    missing = [key for key in REQUIRED_KEYS[table] if key not in payload]
-    if table == RM_WATCHLIST:
-        for position, row in enumerate(payload.get("rows") or []):
-            missing += [f"rows[{position}].{key}" for key in WATCHLIST_ROW_REQUIRED if key not in row]
-    return missing
-
-
 def canonical(payload: dict) -> str:
     """The canonical JSON of a payload: sorted keys, no whitespace, strict (a NaN is an error)."""
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
@@ -153,30 +145,34 @@ def page_row(envelope: dict, page_key: str, payload: dict) -> dict:
     }
 
 
+def page_problems(builder: PageBuilder, payload: dict, document: dict) -> list[str]:
+    """The payload's problems against its schema in the bundled contract (empty = valid)."""
+    return schema_check.errors(payload, {"$ref": f"#/components/schemas/{builder.schema}"}, document)
+
+
 def build_rows(
     cfg: dict, con, cutoff_time: datetime, source_commit: str, built_at: str
 ) -> tuple[dict, list[tuple[str, str, list[str]]]]:
-    """(table -> page_key -> row, invalid pages) of a market as of the cut-off. A row has READ_MODEL_COLUMNS
-    with the payload as canonical JSON text; a page missing a required key is left out and listed as
-    (table, page_key, missing keys)."""
-    data = gather_dashboard(cfg, con, cutoff_time)
-    cutoff = pd.Timestamp(cutoff_time).isoformat()
-    events = upcoming_events(con, data["as_of"], cutoff) if data["as_of"] else {}
+    """(table -> page_key -> row, invalid pages) of a market as of the cut-off, from every registered builder
+    (rm_registry). A row has READ_MODEL_COLUMNS with the payload as canonical JSON text; a page that fails its
+    schema in api/openapi.yaml is left out and listed as (table, page_key, problems)."""
+    ctx = BuildContext(cfg, con, cutoff_time)
+    document = openapi_spec.spec()
     envelope = {
         "market": cfg["market"],
-        "as_of": data["as_of"],
-        "cutoff": cutoff,
+        "as_of": ctx.as_of,
+        "cutoff": ctx.cutoff,
         "built_at": built_at,
-        "schema_version": READ_MODEL_SCHEMA_VERSION,
+        "schema_version": openapi_spec.version(document),
         "source_commit": source_commit,
     }
     rows, invalid = {}, []
-    for table, pages in page_payloads(data, events).items():
-        rows[table] = {}
-        for page_key, payload in pages.items():
-            missing = missing_keys(table, payload)
-            if missing:
-                invalid.append((table, page_key, missing))
+    for builder in rm_registry.builders():
+        rows[builder.table] = {}
+        for page_key, payload in builder.build(ctx).items():
+            problems = page_problems(builder, payload, document)
+            if problems:
+                invalid.append((builder.table, page_key, problems))
             else:
-                rows[table][page_key] = page_row(envelope, page_key, payload)
+                rows[builder.table][page_key] = page_row(envelope, page_key, payload)
     return rows, invalid

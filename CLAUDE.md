@@ -141,11 +141,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `MOTHERDUCK_TOKEN`, never printed; without it the local file of the config under `work/`): one schema per market
   with the cockpit's tables (bars, quotes, features, regime, predictions, track record per label basis, ranges, model
   scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
-  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`; key `(market, page_key)`,
+  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`, `status`; key `(market, page_key)`,
   payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
   `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
-  `reports/` and Slack never depend on it. Planned, not built: the API under `/api/v1` (WS2) and the Next.js app on
-  Vercel (WS3) reading only `rm`; contract in `api/openapi.yaml` (checked by `tests/test_openapi.py`).
+  `reports/` and Slack never depend on it. Read-model framework (B4, docs/ws/b4.md): each `rm.<table>` is a
+  `PageBuilder` declared in a `warehouse/rm_<page>.py` module (found by name; shared page blocks in `rm_common.py`,
+  as of the clock, collected companies only via B1's `watchlist(market, cutoff, "collected")`), checked against its
+  schema before writing; a MotherDuck sync then revalidates the app's cache of the changed keys (`app_url`,
+  `REVALIDATE_SECRET`). The API under `/api/v1` (Next.js route handlers in `web/app/api/v1/`, shared helpers in
+  `web/lib/data/`) reads only `rm`; contract `api/openapi.yaml` 2.0 plus `api/paths/*.yaml` and `api/schemas/*.yaml`
+  (one file per page session; bundled by `warehouse/openapi_spec.py`), checked by `tests/test_openapi.py` and
+  against the approved mockups by `tests/test_api_contract.py` (`scripts/api_contract.py` for the live warehouse).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
