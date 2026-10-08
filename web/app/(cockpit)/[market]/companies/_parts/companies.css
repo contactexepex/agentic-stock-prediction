@@ -20,5 +20,3 @@
 @media (max-width:900px){ .mb-companies .co .cm{display:none} .mb-companies .co .acts .md-btn.one{display:inline-flex} .mb-companies .co .acts .md-btn.many{display:none} .mb-companies .co .nm small.ph2{display:block} }
 @media (max-width:760px){ .mb-companies .co th,.mb-companies .co td{padding:8px 6px;white-space:normal} .mb-companies .co .nm .mb-avatar{display:none} .mb-companies .co .acts{justify-content:flex-start} .mb-companies .ev li{grid-template-columns:1fr} .mb-companies .ev .when{width:auto} }
 @media (max-width:599px){ .mb-companies .co .cp{display:none} .mb-companies .co .nm small.ph{display:block} .mb-companies .co th,.mb-companies .co td{padding:8px 4px} }
-/* the shell's company cell (styles/app.css .co, .co .nm) shares the mockup's table class: keep the table a table and its name cell a row */
-.mb-companies table.co{display:table} .mb-companies table.co .nm{flex-direction:row}
