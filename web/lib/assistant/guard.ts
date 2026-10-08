@@ -37,6 +37,11 @@ export interface ReadText {
   sources: { source: AnswerSource; text: string }[];
 }
 
+/** A JSON string value (not a key): the quoted id followed by `,`, `}` or `]`. */
+function valuePattern(id: string): RegExp {
+  return new RegExp(`${JSON.stringify(id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s*[,}\\]])`);
+}
+
 /** Keeps each cited id that occurs as a whole JSON string value in what the model saw of the read tools' results;
  * drops the others. The id's as_of is the as-of time of the read model it was found in. */
 export function verifyCitations(cited: { id: string; kind: string }[], reads: ReadText[]): { kept: CitedRecord[]; dropped: string[] } {
@@ -47,9 +52,9 @@ export function verifyCitations(cited: { id: string; kind: string }[], reads: Re
     const id = item.id.trim();
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    const needle = JSON.stringify(id);
-    const read = id.length >= 3 ? reads.find((candidate) => candidate.text.includes(needle)) : undefined;
-    const found = read ? read.sources.find((part) => part.text.includes(needle)) ?? read.sources[0] : undefined;
+    const value = valuePattern(id);
+    const read = id.length >= 3 ? reads.find((candidate) => value.test(candidate.text)) : undefined;
+    const found = read ? read.sources.find((part) => value.test(part.text)) ?? read.sources[0] : undefined;
     if (!found) {
       dropped.push(id.slice(0, 120));
       continue;

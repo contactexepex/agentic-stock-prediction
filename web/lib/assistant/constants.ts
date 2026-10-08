@@ -32,6 +32,10 @@ export const MAX_TOKENS = 1500;
 export const MAX_ROUNDS = 4;
 export const MAX_TOOL_CALLS = 6;
 
+/** No new model call starts after this long (the route's maxDuration is 60 s; one call has 25 s, no retry). */
+export const DEADLINE_MS = 30000;
+export const CALL_TIMEOUT_MS = 25000;
+
 /** A read tool's result is cut to this many characters before the model sees it (it is told so). */
 export const TOOL_RESULT_MAX_CHARS = 16000;
 

@@ -6,7 +6,7 @@ import { recordFrom } from "../store.ts";
 import type { AnswerRecord, AnswerRow, ConversationStore, ModelClient, QuestionRow } from "../types.ts";
 import { rig } from "../../tools/tests/fakes.ts";
 import { dashboardContext } from "../../tools/identity.ts";
-import type { ToolArgs } from "../../tools/types.ts";
+import type { CallContext, ToolArgs } from "../../tools/types.ts";
 
 export class FakeConversationStore implements ConversationStore {
   questions: QuestionRow[] = [];
@@ -105,7 +105,8 @@ export function assistantRig(opts: { withModel?: boolean } = {}) {
     secrets: ["sk-ant-api03-SECRETSECRETSECRET", "md-inbox-SECRET-0987654321"],
     newId: () => `t${String(++counter).padStart(4, "0")}`,
   });
-  const read = (tool: string, args: ToolArgs) => tools.layer.execute(ASSISTANT, tool, args);
-  const ask = (args: ToolArgs) => explainer.explain(ASSISTANT, args, read);
+  const readAs = (ctx: CallContext) => (tool: string, args: ToolArgs) => tools.layer.execute(ctx, tool, args);
+  const read = readAs(ASSISTANT);
+  const ask = (args: ToolArgs, ctx: CallContext = ASSISTANT) => explainer.explain(ctx, args, readAs(ctx));
   return { ...tools, store, model, explainer, read, ask };
 }

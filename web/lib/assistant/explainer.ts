@@ -11,8 +11,8 @@ import type { CallContext, ToolArgs, ToolOutcome } from "../tools/types.ts";
 import type { ReadData } from "../tools/reads.ts";
 import { redact } from "../tools/text.ts";
 import {
-  AGENT, DAILY_USD, MAX_ROUNDS, MAX_TOKENS, MAX_TOOL_CALLS, MODEL, MONTHLY_USD, QUESTION_USD, RETENTION_DAYS,
-  TOOL_RESULT_MAX_CHARS,
+  DAILY_USD, DEADLINE_MS, MAX_ROUNDS, MAX_TOKENS, MAX_TOOL_CALLS, MODEL, MONTHLY_USD, QUESTION_USD, RETENTION_DAYS,
+  READ_TOOLS, TOOL_RESULT_MAX_CHARS,
 } from "./constants.ts";
 import {
   NO_TOKENS, type TokenUse, addTokens, budgetLine, budgetState, callCeilingUsd, costUsd, tokensOf, utcDayStart,
@@ -59,6 +59,8 @@ interface Run {
   toolCalls: number;
   sources: AnswerSource[];
   error: string | null;
+  /** A model call ended without an API answer (a timeout or a lost connection), so it may still be billed. */
+  uncertain: boolean;
 }
 
 const MARKETS = new Set(["india", "us"]);
@@ -153,9 +155,11 @@ export class AssistantExplainer implements Explainer {
 
     const run: Run = advice
       ? { outcome: { status: "declined", text: ADVICE_DECLINE, cited: [], not_in_data: false, declined: "advice" },
-        tokens: NO_TOKENS, calls: 0, toolCalls: 0, sources: [], error: null }
+        tokens: NO_TOKENS, calls: 0, toolCalls: 0, sources: [], error: null, uncertain: false }
       : await this.run(model, read, market as "india" | "us", askedAt, question, ticker, strategyId);
-    const cost = costUsd(run.tokens);
+    // A call that ended without an API answer may still be billed (a timeout the API finished), so such a failure
+    // keeps at least the reservation counted.
+    const cost = run.uncertain ? Math.max(costUsd(run.tokens), reserved) : costUsd(run.tokens);
     const text = redact(run.outcome.text, secrets).slice(0, 4000);
     const row: AnswerRow = {
       id, status: run.outcome.status, text, cited: run.outcome.cited, sources: run.sources,
@@ -187,6 +191,7 @@ export class AssistantExplainer implements Explainer {
 
   private async run(model: ModelClient, read: ReadTool, market: "india" | "us", askedAt: string, question: string,
     ticker: string | null, strategyId: string | null): Promise<Run> {
+    const started = this.deps.clock().getTime();
     const tools = readToolDefinitions();
     const messages: Anthropic.MessageParam[] = [
       { role: "user", content: userTurn({ market, askedAt, question, ticker, strategyId }) },
@@ -196,7 +201,8 @@ export class AssistantExplainer implements Explainer {
     let tokens = NO_TOKENS;
     let calls = 0;
     let toolCalls = 0;
-    const result = (outcome: Outcome, error: string | null = null): Run => ({ outcome, tokens, calls, toolCalls, sources, error });
+    let uncertain = false;
+    const result = (outcome: Outcome, error: string | null = null): Run => ({ outcome, tokens, calls, toolCalls, sources, error, uncertain });
     const failed = (text: string) => result({ status: "failed", text, cited: [], not_in_data: false, declined: null }, text);
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
       const last = round === MAX_ROUNDS || toolCalls >= MAX_TOOL_CALLS;
@@ -209,13 +215,14 @@ export class AssistantExplainer implements Explainer {
         messages,
         output_config: { effort: "low", format: { type: "json_schema", schema: ANSWER_SCHEMA as unknown as Record<string, unknown> } },
       };
-      if (costUsd(tokens) + callCeilingUsd(params) > QUESTION_USD) {
+      if (costUsd(tokens) + callCeilingUsd(params) > QUESTION_USD || this.deps.clock().getTime() - started > DEADLINE_MS) {
         return result({ status: "stopped", text: STOPPED, cited: [], not_in_data: true, declined: null });
       }
       let response: Anthropic.Message;
       try {
         response = await model.create(params);
       } catch (error) {
+        uncertain = !(error instanceof Anthropic.APIError && typeof error.status === "number");
         return failed(modelError(error));
       }
       calls += 1;
@@ -231,6 +238,11 @@ export class AssistantExplainer implements Explainer {
           if (toolCalls >= MAX_TOOL_CALLS) {
             results.push({ type: "tool_result", tool_use_id: use.id, is_error: true,
               content: "Not read: this question has used its tool calls; answer from what was read." });
+            continue;
+          }
+          if (!(READ_TOOLS as readonly string[]).includes(use.name)) {
+            results.push({ type: "tool_result", tool_use_id: use.id, is_error: true,
+              content: `Not read: ${use.name.slice(0, 40)} is not one of the assistant's read tools.` });
             continue;
           }
           toolCalls += 1;

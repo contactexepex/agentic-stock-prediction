@@ -49,7 +49,7 @@ export async function postQuestion(request: Request, deps: AssistantApiDeps): Pr
     return problem(403, "Forbidden", "Questions are taken from the app's own pages only");
   }
   const raw = await request.text();
-  if (raw.length > MAX_BODY) return problem(413, "Too large", `A question has at most ${QUESTION_MAX} characters`);
+  if (new TextEncoder().encode(raw).length > MAX_BODY) return problem(413, "Too large", `A question has at most ${QUESTION_MAX} characters`);
   let body: unknown;
   try {
     body = JSON.parse(raw);
