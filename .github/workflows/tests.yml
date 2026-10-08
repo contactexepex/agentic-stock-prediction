@@ -73,7 +73,7 @@ jobs:
         run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Real-engine Neo4j test
         env:
-          NEO4J_TEST_QUERY_URL: http://localhost:7474/db/neo4j/query/v2
+          NEO4J_TEST_QUERY_URL: http://localhost:7474
           NEO4J_TEST_USER: neo4j
           NEO4J_TEST_PASSWORD: ci-disposable-password
         run: |
