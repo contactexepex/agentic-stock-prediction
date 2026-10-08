@@ -3,8 +3,9 @@
     python design/mockups/12-help/build.py [--out DIR]
 
 The Help page is static content (SPEC section 6: "static content"). Its `data.json` carries only what the shared
-shell needs (the market status and the go-live state) and the strategy registry, so the strategy list and the
-go-live wording come from the catalogue rather than from typed text. Deterministic.
+shell needs (the market status and the go-live state), the strategy registry and one company's agreement count as
+the example, so the strategy list, the go-live wording and the example figures come from the catalogue rather than
+from typed text. Deterministic.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
 from mockup import HORIZONS, MARKETS, envelope, load, pick, run  # noqa: E402
 
-NAMES = ("market_status", "strategy", "scoreboard_row", "portfolio")
+NAMES = ("market_status", "strategy", "scoreboard_row", "portfolio", "company")
 STRATEGY_FIELDS = ("id", "family", "name", "description", "compared_to", "differs_in", "threshold", "horizons", "live")
 GO_LIVE_FIELDS = ("proven", "months_forward", "trades_needed", "beats_best_baseline", "best_baseline_net_pnl",
                   "drawdown_limit", "drawdown_within_limit", "holds_in_calm_and_volatile", "cost_view")
@@ -28,6 +29,9 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
                      if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy"
                      and r["strategy_id"] == REFERENCE_STRATEGY and r["horizon_days"] == "all")
     strategies = {r["id"]: pick(r, STRATEGY_FIELDS) for r in files["strategy"]["records"]}
+    # The agreement example of the horizons section: the market's first active company (alphabetical).
+    example = min((r for r in files["company"]["records"] if r["market"] == market and r["state"] == "active"),
+                  key=lambda r: r["ticker"])
     return {
         "market": market, "name": status["name"], "currency": status["currency"],
         "as_of": status["as_of"], "cutoff": cutoff, "built_at": status["freshness"]["built_at"],
@@ -36,6 +40,8 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
         "go_live_detail": pick(reference["go_live"], GO_LIVE_FIELDS),
         "default_amount": files["portfolio"]["records"][0]["default_amounts"][market],
         "strategies": strategies,
+        "agreement_example": {"ticker": example["ticker"], "name": example["name"],
+                              "agreement_n1": pick(example["agreement_n1"], ("buy", "of"))},
     }
 
 

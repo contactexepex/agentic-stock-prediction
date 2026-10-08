@@ -9,7 +9,8 @@
   "design/catalogue/market_status.json",
   "design/catalogue/strategy.json",
   "design/catalogue/scoreboard_row.json",
-  "design/catalogue/portfolio.json"
+  "design/catalogue/portfolio.json",
+  "design/catalogue/company.json"
  ],
  "as_of": "2026-10-06",
  "cutoff": "2026-10-07T12:00:00Z",
@@ -358,6 +359,14 @@
      ],
      "live": false
     }
+   },
+   "agreement_example": {
+    "ticker": "HDFCBANK",
+    "name": "HDFC Bank",
+    "agreement_n1": {
+     "buy": 2,
+     "of": 15
+    }
    }
   },
   "us": {
@@ -697,6 +706,14 @@
       5
      ],
      "live": false
+    }
+   },
+   "agreement_example": {
+    "ticker": "AAPL",
+    "name": "Apple",
+    "agreement_n1": {
+     "buy": 3,
+     "of": 15
     }
    }
   }

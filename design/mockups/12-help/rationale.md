@@ -21,13 +21,15 @@ check icons) with sample values labelled as such, and the glossary is folded awa
 from every page's sidebar and bottom bar.
 
 ## Layout (one column; an "on this page" chip row at the top)
-1. **Page head** (the shell's chips, so the page also shows the as-of and freshness it explains) and the **on-this-
-   page** navigation chips (anchors).
-2. **Paper, and the go-live bar**: what a paper trade is, what the tag means, the five checks of the bar with the
-   reference strategy's current state in the selected market (from the catalogue's go-live block), and what
-   "proven" allows.
-3. **Horizons, chances, targets and ranges**: N+k in words (from the shell's horizon wording), the odds meter and the
-   range bar as labelled samples, the strategy's bar, and what agreement does and does not mean.
+1. **Page head** (the shell's chips, so the page also shows the session, regime and freshness it explains; the
+   as-of time sits in the footer as on every page) and the **on-this-page** navigation chips (anchors).
+2. **Paper, and the go-live bar**: what a paper trade is, what the tag means, which pages say "No proven strong
+   signals today" (the seven that rank signals, linked), the five checks of the bar with the reference strategy's
+   current state in the selected market (from the catalogue's go-live block), and what "proven" allows.
+3. **Horizons, chances, targets and ranges**: D as the entry session (the first session after the prediction) and
+   N+k in words (from the shell's horizon wording), the odds meter and the range bar as labelled samples, the
+   reference strategy's bar from the registry, and what agreement does and does not mean, with one company's
+   agreement count of the day as the example.
 4. **The strategies**: the three families as boxes with a one-paragraph description each and the registry's
    strategies listed by name (the description in the tooltip, the one setting each differs in under it, a link to the
    Strategy lab), and the rule that a strategy never changes.
@@ -45,11 +47,13 @@ from every page's sidebar and bottom bar.
 11. **Glossary** (folded) and the research-only note; **footer**.
 
 ## Data and contract
-- Static content by the spec. `data.json` is composed from four catalogue files only for the shell, the go-live
-  checklist, the default amount and the strategy list (`notes.md` lists each field); every sentence is written for the
-  page. No new data request.
-- The constants the text cites (2 months, about 300 trades, 2 checks per session, 20 trades to rank, 15 years, the
-  95% interval) are the shell's named constants with their sources, never typed inline.
+- Static content by the spec. `data.json` is composed from five catalogue files only for the shell, the go-live
+  checklist, the default amount, the strategy list and one company's agreement count (`notes.md` lists each field);
+  every sentence is written for the page. No new data request.
+- The constants the text cites (2 months, about 300 trades, 2 checks per session, 20 trades to rank, the 95%
+  interval, the 60-word limit of an AI reason) are the shell's named constants with their sources, never typed
+  inline; every other figure (the horizon the pages open on, the reference strategy's bar, the agreement example,
+  the number of go-live checks, the AI traders' horizons) comes from `data.json` or the page's own list.
 
 ## Design rules kept
 Design system v2 only; light theme; phone and desktop (one column; the family boxes and page tiles stack on a phone);
@@ -60,6 +64,15 @@ research only, said in the first section and in the closing note.
 ## Checked
 `check_page.js`: no console errors, no overflow, no external requests at 1280 and 390 px. `check_text.js` (twelve
 widths, both markets): no clipped, overflowing or overlapping text. Rebuild is byte-identical.
+
+Judge round 1 (2026-10-08) found seven blockers, all fixed before round 2: the news section said every stored story
+is read from a vetted outlet (only the material watchlist headlines of vetted outlets are read); D was defined as the
+session being predicted instead of the entry session (horizons paragraph and glossary); "every page carries 'No
+proven strong signals today'" (now the seven pages that rank signals, linked); "every page shows its as-of time in
+the chips" (the chips hold session, regime and freshness; the as-of time is in the footer); "nothing is typed in by
+hand and nothing is estimated" (the owner's paper trades and the broker rates are hand-entered, the chances are
+estimates); figures typed inline (the opening horizon, the 55% bar, "12 of 15", "60 words", "N+3") now come from the
+data or a named shell constant; and notes.md and this file claimed the 15-year constant, which the page never used.
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - The Help page is one scrolling page with an anchor chip row rather than tabs, so a reader can search it and a link
