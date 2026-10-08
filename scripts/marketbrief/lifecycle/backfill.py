@@ -6,7 +6,8 @@ the collectors' own code stores only the candidate's rows, in the usual kinds an
 - news: the candidate's Google News company query over the news collector's current catch-up window, tagged with the
   whole watchlist plus the candidate; no news_runs row is written (that row steers the routine's own catch-up window);
 - filings (US): the SEC submissions of the candidate's CIK, as collect_filings stores them;
-- announcements (India): NSE corporate announcements of the candidate's symbol, as collect_nse_india stores them;
+- announcements (India): NSE corporate announcements of the candidate's symbol over `backfill.announcement_days`, as
+  collect_nse_india --since stores them;
 - long history: up to `long_history_years` (15) of Yahoo daily bars into the long-history cache
   work/model_history/<market>/ (model/history_cache.py's cleaning and format; gitignored, never data/), merged into
   the market's cache when one exists (the candidate's rows replaced, every other symbol kept).
@@ -119,11 +120,15 @@ def backfill_filings(cfg: dict, company: dict, edgar) -> tuple[str, dict]:
     return OK, {"new_filings": written, "since": since.isoformat(), "errors": errors}
 
 
-def backfill_announcements(cfg: dict, nse) -> tuple[str, dict]:
-    """The candidate's NSE corporate announcements over the collector's lookback (India)."""
+def backfill_announcements(cfg: dict, nse, days: int) -> tuple[str, dict]:
+    """The candidate's NSE corporate announcements of the last `days` days (India; one call per week, as the
+    collector's --since does)."""
+    from types import SimpleNamespace
+
     from marketbrief.collectors.nse_india import collect
 
-    summary = collect(cfg, nse, [KIND_ANNOUNCEMENTS])
+    since = utc_today() - timedelta(days=days)
+    summary = collect(cfg, nse, [KIND_ANNOUNCEMENTS], args=SimpleNamespace(since=since, full=False))
     written = (summary.get("new") or {}).get(KIND_ANNOUNCEMENTS)
     return (FAILED if written is None else OK), {"summary": summary}
 
@@ -152,13 +157,15 @@ def backfill_long_history(cfg: dict, yfinance, years: int) -> tuple[str, dict]:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / FILE_HISTORY_BARS).write_bytes(payload)
     first = rows["date"].min() if len(rows) else None
+    fetched_at = now.isoformat(timespec="seconds").replace("+00:00", "Z")
     manifest = manifest or {"market": cfg["market"], "start": start.isoformat(), "file": FILE_HISTORY_BARS,
-                            "symbols": {}, "failed": []}
+                            "symbols": {}, "failed": [], "fetched_at": fetched_at}
+    # the cache-wide fetched_at stays the full fetch's time; this symbol carries its own
     manifest["symbols"][ticker] = {"yahoo": meta["yahoo"], "role": "ticker", "rows": len(rows),
                                    "first": str(first) if first else None,
-                                   "last": str(rows["date"].max()) if len(rows) else None, **counts}
-    manifest.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest(), rows=len(bars),
-                    fetched_at=now.isoformat(timespec="seconds").replace("+00:00", "Z"))
+                                   "last": str(rows["date"].max()) if len(rows) else None, **counts,
+                                   "fetched_at": fetched_at}
+    manifest.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest(), rows=len(bars))
     manifest_path.write_text(json.dumps(manifest, indent=1))
     years_found = round((now.date() - first).days / 365.25, 1) if first else 0.0
     detail = {"rows": len(rows), "first": str(first) if first else None, "years": years_found,

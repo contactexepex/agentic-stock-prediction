@@ -104,8 +104,8 @@
         "tra:acc:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
         "tra:acc:base.always_up.v1:2026-09-29-NVDA-4d:biggest_win",
         "tra:acc:base.model_only.v1:2026-09-29-NVDA-4d:biggest_win",
-        "tra:h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
-        "tra:h2h:highest_probability:rule.model_news.v1:2026-09-29-NVDA-4d:biggest_win",
+        "tra:acc:rule.model_news.v1:2026-09-29-AAPL-4d:biggest_win",
+        "tra:acc:base.always_up.v1:2026-09-29-AAPL-4d:biggest_win",
         "tra:acc:base.always_up.v1:2026-09-29-JPM-4d:biggest_miss"
       ],
       "prompt_version": "eod-v1",

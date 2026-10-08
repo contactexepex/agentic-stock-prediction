@@ -106,7 +106,7 @@ def frame_of(rec: dict, gi: GateInputs) -> tuple[dict | None, list[tuple[str, st
                                                                 open=session_open_utc(cfg, session).isoformat(),
                                                                 minutes=c.DEADLINE_MINUTES)))
     rid = horizon_id(as_of, rec["ticker"], rec["horizon_days"])
-    rng = gi.ranges.get(rid)
+    rng = gi.range_for(rid, made)
     if rng is None:
         return None, [*errors, (c.CODE_RANGE, c.MSG_NO_RANGE.format(range_id=rid))]
     if str(rng["entry_date"]) != str(session) or str(rng["exit_date"]) != str(exit_day):
@@ -121,8 +121,10 @@ def frame_of(rec: dict, gi: GateInputs) -> tuple[dict | None, list[tuple[str, st
     prob = rec["prob_up"]
     confidence = round(max(prob, 1 - prob), c.PROB_DECIMALS) if is_number(prob) else None
     frame = {"market": gi.market, "as_of": as_of, "session": session, "exit": exit_day, "made": made, "range": rng,
-             "edges": widened(rng, float(widen)), "widen": float(widen), "score": gi.scores.get(rid),
-             "regime": gi.regimes[as_of][0], "quality": feats["quality"], "amount": gi.amounts.get(rec["ticker"]),
+             "edges": widened(rng, float(widen)), "widen": float(widen), "score": gi.score_for(rid, made),
+             "regime": gi.regimes[as_of][0], "regime_at": gi.regimes[as_of][1],
+             "features_at": feats.get("computed_at"), "quality": feats["quality"],
+             "amount": gi.amounts.get(rec["ticker"]),
              "currency": gi.currency, "confidence": confidence}
     return frame, errors
 

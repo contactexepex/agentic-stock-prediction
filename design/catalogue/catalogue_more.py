@@ -140,18 +140,18 @@ def trade_check(trade: dict, last: float) -> dict:
                prediction_id=trade["prediction_id"], strategy_id=trade["strategy_id"], view=trade["view"],
                horizon_days=trade["horizon_days"], entry_date=trade["entry_date"], exit_date=trade["exit_date"],
                session_number=session_number, entry_price=entry, last_price=last,
-               ret_since_entry_pct=round(ret * 100, 2), target_price=trade["target_price"],
-               to_target_pct=round((trade["target_price"] / last - 1) * 100, 2), lo80=lo80, lo50=lo50, hi50=hi50,
-               hi80=hi80, band=band, target_z=round(target_z, 4), flags=flags, flagged=bool(flags),
+               ret_since_entry_pct=round(ret * 100, 4), target_price=trade["target_price"],
+               to_target_pct=round((trade["target_price"] / last - 1) * 100, 4), lo80=lo80, lo50=lo50, hi50=hi50,
+               hi80=hi80, band=band, target_z=round(target_z, 3), flags=flags, flagged=bool(flags),
                method_version="tc-v1", computed_at=check_at, family=trade["family"],
                pick_rule=trade["trade_id"].split(":")[1] if trade["view"] == "head_to_head" else None,
                quality="ok", entry_source="stored_open", basis_factor=1.0, entry_adj=entry,
                target_adj=trade["target_price"], lo80_adj=lo80, lo50_adj=lo50, hi50_adj=hi50, hi80_adj=hi80,
                last_time=last_time, sigma_1d=round(sigma, 6), elapsed_fraction=round(elapsed, 4),
-               sessions_held=round(held, 4), sessions_left=round(left, 4), z_since_entry=round(z_since, 4),
+               sessions_held=round(held, 4), sessions_left=round(left, 4), z_since_entry=round(z_since, 3),
                target_reached=bool(reached), target_reached_session=reached[0] if reached else None,
-               high_since_entry_pct=round((max(highs) / entry - 1) * 100, 2),
-               low_since_entry_pct=round((min([bar[2] for bar in held_bars] + [last]) / entry - 1) * 100, 2),
+               high_since_entry_pct=round((max(highs) / entry - 1) * 100, 4),
+               low_since_entry_pct=round((min([bar[2] for bar in held_bars] + [last]) / entry - 1) * 100, 4),
                notes=[])
 
 
@@ -181,8 +181,9 @@ def reasons(settled: list[dict]) -> tuple[list[dict], list[dict]]:
     for market in ("india", "us"):
         day = "2026-10-06"
         today = [t for t in settled if t["market"] == market and t["exit_date"] == day and t["status"] == "settled"]
-        wins = sorted((t for t in today if t["net_pnl"] > 0), key=lambda t: -t["return_pct"])[:5]
-        misses = sorted((t for t in today if t["net_pnl"] <= 0), key=lambda t: t["return_pct"])[:5]
+        accuracy = [t for t in today if t["view"] == "accuracy"]   # a head-to-head trade repeats an accuracy trade
+        wins = sorted((t for t in accuracy if t["net_pnl"] > 0), key=lambda t: -t["return_pct"])[:5]
+        misses = sorted((t for t in accuracy if t["net_pnl"] <= 0), key=lambda t: t["return_pct"])[:5]
         chosen = [("head_to_head", None, t) for t in today if t["view"] == "head_to_head"]
         chosen += [("biggest_win", n + 1, t) for n, t in enumerate(wins)]
         chosen += [("biggest_miss", n + 1, t) for n, t in enumerate(misses)]

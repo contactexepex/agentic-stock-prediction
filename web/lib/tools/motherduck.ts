@@ -118,6 +118,11 @@ export class MotherDuckInboxStore implements InboxStore {
     return { claimed: false, existing: rows[0] ? storedFrom(rows[0]) : null };
   }
 
+  async findRequest(inboxId: string): Promise<StoredRequest | null> {
+    const { rows } = await this.query(SQL.existing, [inboxId]);
+    return rows[0] ? storedFrom(rows[0]) : null;
+  }
+
   async appendCommand(row: CommandLogRow): Promise<void> {
     await this.query(SQL.append,
       [row.id, row.market, row.received_at, row.channel, row.actor, row.agent, row.tool, row.kind,

@@ -185,3 +185,39 @@ def test_anchor_fields_without_a_score_and_repeated_evidence_are_refused():
 def test_naive_score_time_is_read_as_utc():
     late = {**score(1), "computed_at": "2026-10-07 11:46:00"}
     assert c.CODE_LOOKAHEAD in codes(agent_record(COMBINED), COMBINED, scores=inputs().scores | {late["id"]: late})
+
+
+def test_ranges_and_scores_are_read_as_of_made_at():
+    """#86: with the as-of readers, a rescore after made_at is not used (no false LOOK_AHEAD), and a range published
+    after made_at does not exist yet."""
+    early, late = score(1), {**score(1), "prob_up": 0.70, "computed_at": "2026-10-07T11:48:00Z"}
+
+    def scores_at(when):
+        return {early["id"]: late if when >= datetime(2026, 10, 7, 11, 48, tzinfo=timezone.utc) else early}
+
+    gi = inputs(scores_at=scores_at)
+    verdict = check_record(agent_record(COMBINED), trader(COMBINED), gi, set())
+    assert verdict.errors == [] and verdict.row["model_prob"] == early["prob_up"]
+    assert codes(agent_record(NEWS), ranges_at=lambda _when: {}) == [c.CODE_RANGE]
+
+
+def test_cited_inputs_must_be_computed_by_made_at():
+    """#86: a features: or regime: id computed after made_at is look-ahead."""
+    feats = {"NVDA": {"as_of_date": AS_OF, "quality": "OK", "days_to_earnings": 30,
+                      "computed_at": datetime(2026, 10, 7, 11, 46, tzinfo=timezone.utc)}}
+    pattern = agent_record(PATTERN, evidence_ids=[f"features:{AS_OF}-NVDA"])
+    assert c.CODE_LOOKAHEAD in codes(pattern, PATTERN, features=feats)
+    late_regime = {AS_OF: ("TRENDING", datetime(2026, 10, 7, 11, 47, tzinfo=timezone.utc))}
+    assert c.CODE_LOOKAHEAD in codes(agent_record(PATTERN, evidence_ids=[f"regime:{AS_OF}"]), PATTERN,
+                                     regimes=late_regime)
+
+
+@pytest.mark.parametrize("strategy_id", list(PROMPTS))
+@pytest.mark.parametrize("horizon", [1, 3, 5])
+def test_w1_reliance_examples_pass_in_india(strategy_id, horizon):
+    """#88: the India (RELIANCE, INR) AI examples of design/catalogue pass too; D = 2026-10-07, NSE open 03:45 UTC."""
+    from traders_fixtures import agent_record_for, inputs_for
+    gi = inputs_for("india", "RELIANCE", datetime(2026, 10, 7, 2, 15, tzinfo=timezone.utc))
+    verdict = check_record(agent_record_for(strategy_id, "RELIANCE", horizon), trader(strategy_id), gi, set())
+    assert verdict.errors == [] and verdict.row["currency"] == "INR" and verdict.row["amount"] == 100000.0
+    assert verdict.row["exit_date"] == {1: "2026-10-08", 3: "2026-10-12", 5: "2026-10-14"}[horizon]

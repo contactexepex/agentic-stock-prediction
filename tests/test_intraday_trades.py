@@ -231,9 +231,9 @@ def stored(root: Path, kind: str) -> list[dict]:
 def trade_view(root: Path) -> dict[str, dict]:
     """{trade_id: trade_checks row merged with its details row}: a column from trade_checks when set, else from the
     details row, as the view trade_check_rows does (issue #78: trade_checks gained the details' columns)."""
-    details = {row["id"]: row for row in stored(root, "trade_check_details")}
-    return {row["trade_id"]: {**details[row["id"]], **{k: v for k, v in row.items() if v is not None
-                                                        or k not in details[row["id"]]}}
+    details = {row["id"]: row for row in stored(root, "trade_check_details")}   # only rows written before #78
+    return {row["trade_id"]: {**details.get(row["id"], {}), **{k: v for k, v in row.items() if v is not None
+                                                                or k not in details.get(row["id"], {})}}
             for row in stored(root, "trade_checks")}
 
 
@@ -359,7 +359,7 @@ def test_idempotent_rerun_and_alerts_once_per_session(market):
     root, cfg, settings = market
     first = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
     counts = {kind: len(stored(root, kind)) for kind in
-              ("trade_checks", "trade_check_details", "intraday_alerts", "intraday_checks", "intraday_runs")}
+              ("trade_checks", "intraday_alerts", "intraday_checks", "intraday_runs")}
     again = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK + timedelta(seconds=20))
     assert again["status"] == "duplicate" and again["written"] == 0
     assert counts == {kind: len(stored(root, kind)) for kind in counts}
@@ -424,9 +424,13 @@ def test_payload_rows_pass_the_schema_gate_and_india_price_skip(market, monkeypa
     run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
     monkeypatch.delenv("MB_NOW")
     now = pd.Timestamp(CHECK) + pd.Timedelta(minutes=5)
-    for kind in ("trade_checks", "trade_check_details", "intraday_alerts", "intraday_checks", "intraday_runs"):
+    for kind in ("trade_checks", "intraday_alerts", "intraday_checks", "intraday_runs"):
         rows = stored(root, kind)
         assert rows and schema_problems(kind, rows, False, now, timedelta(minutes=5)) == [], kind
+    # issue #78: one trade_checks row per open trade, its detail columns filled; no trade_check_details row any more
+    assert stored(root, "trade_check_details") == []
+    checks = stored(root, "trade_checks")
+    assert all(row["quality"] and row["entry_source"] and row["notes"] is not None for row in checks)
     from marketbrief.core.schemas import SCHEMAS
 
     assert all(list(row) == list(SCHEMAS["trade_checks"][1]) for row in stored(root, "trade_checks"))   # W1 format
@@ -572,7 +576,6 @@ def test_stored_bars_apply_a_correction_only_once_detected(market):
     assert aapl_close(before_split) == pytest.approx(333.63)
 
 
-
 def test_old_five_day_score_keeps_its_d4_window(market):
     """Issue #94: a 5-day open-to-close score computed before call_scoring.n_plus_k_from (config/settings.yaml) is
     legacy_5d_d4: bought at the open of D (09-30) and sold at the close of D+4 (10-06), so it is no longer open on
@@ -600,16 +603,19 @@ def test_score_window_follows_its_stored_label_not_its_time(market):
     from marketbrief.intraday.inputs import open_calls
 
     root, cfg, _settings = market
-    cutoff = call_basis.n_plus_k_from()                                 # config/settings.yaml, whatever its value
-    assert cutoff is not None
-    after = (cutoff + pd.Timedelta(minutes=10)).isoformat()            # the unlabelled score: after the cut-off
+    cutoff = call_basis.n_plus_k_from()  # config/settings.yaml, whatever its value
+    nvda_at = pd.Timestamp("2026-09-30T04:40:00+00:00")
+    # the NVDA row must be computed before the cut-off and the check fall on the session (#132): else fail loudly
+    assert cutoff is not None and cutoff > nvda_at, cutoff
+    late = (cutoff + pd.Timedelta(hours=1)).to_pydatetime()  # the check: after both rows
+    assert late.date().isoformat() == SESSION, f"move the fixture's session with the cut-off ({late})"
+    after = (cutoff + pd.Timedelta(minutes=10)).isoformat()  # the unlabelled score: after the cut-off
     jl(root, "model_scores", "2026-10-07", [
         {"id": "2026-09-29-NVDA-5d", "as_of_date": "2026-09-29", "ticker": "NVDA", "horizon_days": 5,
-         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": "2026-09-30T04:40:00+00:00",
-         "horizon_label": "n_plus_k"},                               # stored n_plus_k, computed before the cut-off
+         "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": nvda_at.isoformat(),
+         "horizon_label": "n_plus_k"},  # stored n_plus_k, computed before the cut-off
         {"id": "2026-09-29-AAPL-5d", "as_of_date": "2026-09-29", "ticker": "AAPL", "horizon_days": 5,
          "label_convention": "open_to_close", "prob_up": 0.6, "computed_at": after}])
-    late = (cutoff + pd.Timedelta(hours=1)).to_pydatetime()             # the check: after both rows
     calls = open_calls(connect(MARKET), cfg, datetime(2026, 10, 7).date(), late)
     nvda = {call["id"]: call for call in calls.get("NVDA", [])}
     assert nvda["2026-09-29-NVDA-5d"]["horizon_label"] == "n_plus_k"
@@ -619,8 +625,8 @@ def test_score_window_follows_its_stored_label_not_its_time(market):
 
 def test_delayed_exit_trade_is_watched_until_settled(market):
     """Issue #93: a trade past its exit date without a paper_trades_settled row (exit close missing) is still
-    checked, noted exit_delayed, with the rest of today as the sessions left; a settlement row stored by the check
-    closes it (whatever its status); more than trades.max_sessions_past_exit sessions late: listed only."""
+    checked, noted unsettled_past_exit, with the rest of today as the sessions left; a settlement row stored by the
+    check closes it (whatever its status); more than trades.max_sessions_past_exit sessions late: listed only."""
     root, cfg, settings = market
     jl(root, "strategy_predictions", "2026-10-01", [
         # D = 10-02, exit N+1 = 10-05: two sessions late on 10-07 (10-06, 10-07)
@@ -645,11 +651,24 @@ def test_delayed_exit_trade_is_watched_until_settled(market):
     summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
     trades = trade_view(root)
     delayed = trades["acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d"]
-    assert "exit_delayed" in delayed["notes"] and delayed["session_number"] == 4          # 10-02, 05, 06, 07
+    assert "unsettled_past_exit" in delayed["notes"] and delayed["session_number"] == 4          # 10-02, 05, 06, 07
     assert delayed["sessions_left"] == pytest.approx(1 - ELAPSED, abs=1e-4)
     assert "acc:rule.b9_late_settle.v1:2026-10-01-NVDA-1d" in trades
     assert "acc:rule.b9_settled.v1:2026-10-01-NVDA-1d" not in trades
     assert "acc:rule.b9_ancient.v1:2026-09-24-NVDA-1d" not in trades
     assert summary["skipped_trades"]["delayed_too_long"] == ["acc:rule.b9_ancient.v1:2026-09-24-NVDA-1d"]
     on_time = trades["acc:rule.model_news.v1:2026-09-29-NVDA-5d"]                     # exits today: not delayed
-    assert "exit_delayed" not in on_time["notes"]
+    assert "unsettled_past_exit" not in on_time["notes"]
+
+
+def test_missing_max_sessions_past_exit_keeps_trades_to_their_exit_date(market):
+    """Issue #128: without trades.max_sessions_past_exit in config/intraday.yaml (default 0), a trade past its exit
+    date is no longer checked; it is only listed under skipped_trades.delayed_too_long."""
+    root, cfg, settings = market
+    settings = {key: value for key, value in settings.items() if key != "trades"}
+    jl(root, "strategy_predictions", "2026-10-01", [
+        custom("rule.b9_delayed.v1:2026-10-01-NVDA-1d", ("2026-10-01", "2026-10-02", "2026-10-05"), 250.0,
+               (225.0, 232.0, 248.0, 255.0), made_at="2026-10-02T11:45:00Z")])
+    summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
+    assert "acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d" not in trade_view(root)
+    assert summary["skipped_trades"]["delayed_too_long"] == ["acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d"]

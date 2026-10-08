@@ -73,11 +73,16 @@ def command_row(market: str, received: datetime, request: dict, result: str, *, 
 
 
 def log_command(market: str, row: dict) -> str:
-    """Append one command_log row and return its id; an id already stored (the same key twice in one second) gets a
-    -2, -3 ... suffix."""
+    """Append one command_log row and return its id (B2's paper-trade importer uses this contract)."""
+    return log_command_row(market, row)["id"]
+
+
+def log_command_row(market: str, row: dict) -> dict:
+    """Append one command_log row and return it as stored; an id already stored (the same key twice in one second)
+    gets a -2, -3 ... suffix."""
     taken, base, count = {stored["id"] for stored in stored_rows(market, KIND_COMMAND_LOG)}, row["id"], 1
     while row["id"] in taken:
         count += 1
         row = {**row, "id": f"{base}-{count}"}
     store_rows([row], KIND_COMMAND_LOG, market, datetime.fromisoformat(row["received_at"]))
-    return row["id"]
+    return row

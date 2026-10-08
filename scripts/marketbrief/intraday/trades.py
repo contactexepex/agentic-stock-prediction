@@ -1,10 +1,10 @@
 """The open paper trades a check monitors (B9; docs/ws/b9.md), as of the check time: every qualifying strategy
 prediction (accuracy view, trade id acc:<prediction_id>) and every head-to-head pick (h2h:<pick_rule>:
 <prediction_id>) whose holding window D..exit_date contains this session, or that is past exit_date without a
-paper_trades_settled row (exit_delayed, issue #93; at most max_past_exit sessions), with the stored bars and split/bonus
-factors behind its measures. A trade is a record of the F1 protocol (docs/SPEC.md F1); nothing is ever traded.
-Only rows stored by check_at are read (no look-ahead), and a prediction or pick made after D's open is refused
-as the settlement refuses it (F1.8)."""
+paper_trades_settled row (issue #93; note unsettled_past_exit; at most max_past_exit sessions), with the stored bars
+and split/bonus factors behind its measures. A trade is a record of the F1 protocol (docs/SPEC.md F1); nothing is
+ever traded. Only rows stored by check_at are read (no look-ahead), and a prediction or pick made after D's open is
+refused as the settlement refuses it (F1.8)."""
 
 from __future__ import annotations
 
@@ -23,27 +23,44 @@ PREDICTION_COLUMNS = (
 )
 
 
-def open_trades(con, cfg: dict, session_date: date, check_at: datetime,
-                max_past_exit: int = 0) -> tuple[dict[str, list[dict]], dict]:
+def open_trades(
+    con, cfg: dict, session_date: date, check_at: datetime, max_past_exit: int = 0
+) -> tuple[dict[str, list[dict]], dict]:
     """({ticker: trades sorted by trade_id}, {"not_locked": n, "delayed_too_long": [trade ids]}). A prediction id's
     first stored row wins (ids are skipped once they exist), as does a pick id's. A trade with a paper_trades_settled
     row stored by check_at is closed, whatever its status (B2: no_entry and skipped trades get a row too). Issue #93:
-    a trade past its exit date without such a row (exit_delayed: no exit close yet) stays open for at most
+    a trade past its exit date without such a row (no exit close stored yet, the settle step not run, or refused)
+    stays open for at most
     `max_past_exit` sessions after the exit date; later ones are listed as delayed_too_long."""
-    preds = records(con.execute(
-        f"SELECT DISTINCT ON (id) {PREDICTION_COLUMNS} FROM strategy_predictions WHERE made_at <= ? "
-        "AND session_date <= ? AND exit_date >= ? ORDER BY id, made_at",
-        [check_at, session_date, session_date - timedelta(days=CALENDAR_DAYS_PER_SESSION * (max_past_exit + 1) + 7)],
-    ).df())
-    preds = {row["id"]: row for row in preds if row.get("session_date") is not None
-             and row.get("exit_date") is not None}
-    settled = {row[0] for row in con.execute(
-        "SELECT DISTINCT trade_id FROM paper_trades_settled WHERE settled_at <= ?", [check_at]).fetchall()}
-    picks = records(con.execute(
-        "SELECT DISTINCT ON (id) id, made_at, family, pick_rule, status, prediction_id FROM head_to_head_picks "
-        "WHERE made_at <= ? ORDER BY id, made_at", [check_at]).df())
-    candidates = [(pred, VIEW_ACCURACY, None, pred["made_at"]) for pred in preds.values()
-                  if pred["qualifies"] and pred["direction"] == "up"]
+    oldest_exit = session_date - timedelta(days=CALENDAR_DAYS_PER_SESSION * (max_past_exit + 1) + 7)
+    preds = records(
+        con.execute(  # the first stored row per id decides, then the window filter (#128)
+            f"SELECT * FROM (SELECT DISTINCT ON (id) {PREDICTION_COLUMNS} FROM strategy_predictions WHERE made_at <= ? "
+            "ORDER BY id, made_at) WHERE session_date <= ? AND exit_date >= ? ORDER BY id",
+            [check_at, session_date, oldest_exit],
+        ).df()
+    )
+    preds = {
+        row["id"]: row for row in preds if row.get("session_date") is not None and row.get("exit_date") is not None
+    }
+    settled = {
+        row[0]
+        for row in con.execute(
+            "SELECT DISTINCT trade_id FROM paper_trades_settled WHERE settled_at <= ?", [check_at]
+        ).fetchall()
+    }
+    picks = records(
+        con.execute(
+            "SELECT DISTINCT ON (id) id, made_at, family, pick_rule, status, prediction_id FROM head_to_head_picks "
+            "WHERE made_at <= ? ORDER BY id, made_at",
+            [check_at],
+        ).df()
+    )
+    candidates = [
+        (pred, VIEW_ACCURACY, None, pred["made_at"])
+        for pred in preds.values()
+        if pred["qualifies"] and pred["direction"] == "up"
+    ]
     for pick in picks:
         pred = preds.get(pick["prediction_id"])
         if pick["status"] == PICK_PICKED and pred is not None:
@@ -54,7 +71,7 @@ def open_trades(con, cfg: dict, session_date: date, check_at: datetime,
     for pred, view, pick, made_at in candidates:
         trade = _trade(cfg, pred, view, pick, made_at, session_date)
         if trade is None:
-            refused += _day(pred["exit_date"]) >= session_date   # counted while it would still be open
+            refused += _day(pred["exit_date"]) >= session_date  # counted while it would still be open
             continue
         if trade["trade_id"] in settled:
             continue
@@ -66,7 +83,9 @@ def open_trades(con, cfg: dict, session_date: date, check_at: datetime,
             trade["exit_delayed"] = True
         out.setdefault(trade["ticker"], []).append(trade)
     return {ticker: sorted(trades, key=lambda t: t["trade_id"]) for ticker, trades in sorted(out.items())}, {
-        "not_locked": refused, "delayed_too_long": sorted(too_long)}
+        "not_locked": refused,
+        "delayed_too_long": sorted(too_long),
+    }
 
 
 def _trade(cfg: dict, pred: dict, view: str, pick: dict | None, made_at, session_date: date) -> dict | None:
@@ -77,14 +96,27 @@ def _trade(cfg: dict, pred: dict, view: str, pick: dict | None, made_at, session
     pick_rule = pick["pick_rule"] if pick else None
     trade_id = f"acc:{pred['id']}" if view == VIEW_ACCURACY else f"h2h:{pick_rule}:{pred['id']}"
     return {
-        "trade_id": trade_id, "view": view, "pick_rule": pick_rule, "prediction_id": pred["id"],
-        "strategy_id": pred["strategy_id"], "family": pred["family"], "ticker": pred["ticker"],
-        "horizon_days": int(pred["horizon_days"]), "as_of_date": _day(pred["as_of_date"]),
-        "entry_date": entry_date, "exit_date": exit_date, "direction": pred["direction"],
-        "target_price": pred["target_price"], "lo50": pred["lo50"], "hi50": pred["hi50"], "lo80": pred["lo80"],
-        "hi80": pred["hi80"], "amount": pred["amount"],
+        "trade_id": trade_id,
+        "view": view,
+        "pick_rule": pick_rule,
+        "prediction_id": pred["id"],
+        "strategy_id": pred["strategy_id"],
+        "family": pred["family"],
+        "ticker": pred["ticker"],
+        "horizon_days": int(pred["horizon_days"]),
+        "as_of_date": _day(pred["as_of_date"]),
+        "entry_date": entry_date,
+        "exit_date": exit_date,
+        "direction": pred["direction"],
+        "target_price": pred["target_price"],
+        "lo50": pred["lo50"],
+        "hi50": pred["hi50"],
+        "lo80": pred["lo80"],
+        "hi80": pred["hi80"],
+        "amount": pred["amount"],
         "session_number": len(sessions_between(cfg, entry_date, session_date)),
-        "exit_session_number": len(sessions_between(cfg, entry_date, exit_date)), "exit_delayed": False,
+        "exit_session_number": len(sessions_between(cfg, entry_date, exit_date)),
+        "exit_delayed": False,
     }
 
 

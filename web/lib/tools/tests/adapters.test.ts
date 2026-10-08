@@ -170,3 +170,17 @@ test("a concurrent claim that loses on the primary key answers with the stored r
   await assert.rejects(() => lookupFails.claimRequest(row, { sinceIso: "2026-10-07T00:00:00Z", limit: 20 }), /insert failed/,
     "a failed lookup keeps the INSERT's own error");
 });
+
+test("findRequest looks a key up in both inbox tables with the claim's lookup statement (issue #123)", async () => {
+  const calls: { text: string; values: unknown[] }[] = [];
+  const stored = { inbox_id: "key-000001", tool: "reactivate_company", submitted_by: "slack:U1", command_id: "cmd-1",
+    args_sha256: "f".repeat(64) };
+  const inbox = new MotherDuckInboxStore(async (text: string, values: unknown[] = []) => {
+    calls.push({ text, values });
+    return { rows: values[0] === "key-000001" ? [stored] : [] };
+  });
+  assert.deepEqual(await inbox.findRequest("key-000001"), stored);
+  assert.equal(await inbox.findRequest("key-000002"), null);
+  assert.match(calls[0].text, /FROM inbox\.company_commands WHERE inbox_id = \$1 UNION ALL .* FROM inbox\.requests WHERE inbox_id = \$1$/);
+  assert.deepEqual(calls[0].values, ["key-000001"]);
+});
