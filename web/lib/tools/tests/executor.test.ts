@@ -364,3 +364,22 @@ test("explain: a throw or an impossible result is a failure; a refusal keeps a k
   assert.deepEqual([killed.result, killed.refusal_code, calls], ["refused", "kill_switch", 4], "the assistant is not called");
   assert.doesNotMatch(observable(r.inbox.commands, r.notifier.reports), /SECRET/);
 });
+
+test("explain's reads refuse writes even for agents that list write tools (claude-app, slack-gateway): nothing is written", async () => {
+  for (const ctx of [app, slackContext("U07ABCD123")]) {
+    const r = rig();
+    const seen: string[] = [];
+    const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async (_ctx, _args, read) => {
+      const trade = await read("add_paper_trade", { market: "india", ticker: "HDFCBANK", side: "buy", quantity: 10,
+        trade_date: "2026-10-06", price_basis: "close", idempotency_key: "trade-hdfc-0001" });
+      const deactivate = await read("deactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "deact-aapl-0001" });
+      seen.push(`${trade.result}:${trade.refusal_code}`, `${deactivate.result}:${deactivate.refusal_code}`);
+      return { result: "accepted", refusal_code: null, message: null, data: { text: "done", cited_ids: [], as_of: null, not_in_data: true } };
+    } } });
+    const outcome = await layer.execute(ctx, "explain", { market: "us", question: "buy it for me" });
+    assert.equal(outcome.result, "accepted", ctx.agent);
+    assert.deepEqual(seen, ["refused:not_allowed_in_channel", "refused:not_allowed_in_channel"], ctx.agent);
+    assert.equal(r.inbox.requests.length, 0, `${ctx.agent}: no inbox write`);
+    assert.equal(r.dispatcher.calls, 0, `${ctx.agent}: no dispatch`);
+  }
+});
