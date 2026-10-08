@@ -1,0 +1,561 @@
+# B12, company pages (docs/ws/b12.md): 03-company (GET /markets/{market}/stocks/{ticker}, rm.stock), its bars
+# (GET .../stocks/{ticker}/bars, rm.bars), the trades read model (GET /markets/{market}/trades, rm.trades) and
+# 04-stock-strategies (GET .../stocks/{ticker}/strategies, rm.stock_strategies). Field lists: the mockups' notes.md
+# (design/mockups/03-company/, 04-stock-strategies/); field meanings: docs/DATA_CATALOGUE.md. Stored measures may be
+# null (a missing bar, a trade not entered), so numbers are nullable unless the engine always sets them.
+
+# ---------- responses ----------
+CompanyPageResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/CompanyPage'}
+StockStrategiesResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/StockStrategiesPage'}
+CompanyBarsResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/CompanyBars'}
+TradesResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/TradesPage'}
+
+# ---------- pages ----------
+CompanyPage:
+  description: >-
+    The company page (design/mockups/03-company/data.json, one page per collected company): the market blocks every
+    page shares, the company, its watchlist events, agreement per horizon, head-to-head picks for the session being
+    predicted, strategy predictions of the as-of date, open trades, the latest intraday trade checks, settled paper
+    trades, AI reasons, news with status, results digests, calendar events from the session being predicted, bars up
+    to the as-of date and its rows on the scoreboard. Paper only, never advice
+  x-source: warehouse/rm_company.company_pages
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, reference_strategy, go_live, strategies, companies, ticker, company, lifecycle, agreement,
+                 head_to_head, predictions, open_trades, trade_checks, settled, reasons, news, results, events, bars,
+                 on_company]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        reference_strategy: {type: string, description: The registry's reference rule strategy (rule.model_news.v1)}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+        companies:
+          type: array
+          description: The market's collected companies (names for the picker and links), by ticker
+          items: {$ref: '#/components/schemas/CompanyRecord'}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        company: {$ref: '#/components/schemas/CompanyRecord'}
+        lifecycle:
+          type: array
+          description: The company's watchlist events recorded by the cut-off, oldest first
+          items: {$ref: '#/components/schemas/LifecycleEventRecord'}
+        agreement: {$ref: '#/components/schemas/AgreementByHorizon'}
+        head_to_head:
+          type: array
+          description: The company's picks for the session being predicted, by family then pick rule
+          items: {$ref: '#/components/schemas/HeadToHeadPick'}
+        predictions:
+          type: array
+          description: The company's strategy predictions of the as-of date, by strategy then horizon
+          items: {$ref: '#/components/schemas/StrategyPrediction'}
+        open_trades:
+          type: array
+          items: {$ref: '#/components/schemas/OpenTrade'}
+        trade_checks:
+          type: array
+          description: The rows of the company's latest intraday trade check at or before the cut-off
+          items: {$ref: '#/components/schemas/TradeCheck'}
+        settled:
+          type: array
+          description: The newest settlement of each of the company's paper trades, every status, newest exit first
+          items: {$ref: '#/components/schemas/SettledTrade'}
+        reasons:
+          type: array
+          description: The company's AI reasons written by the cut-off, newest session first
+          items: {$ref: '#/components/schemas/AiReason'}
+        news:
+          type: array
+          description: Stories tagged with the company first seen by the cut-off, status as of the company, newest first
+          items: {$ref: '#/components/schemas/NewsItemRecord'}
+        results:
+          type: array
+          description: The company's results digests written by the cut-off, newest release first
+          items: {$ref: '#/components/schemas/ResultsDigest'}
+        events:
+          type: array
+          description: From the session being predicted, the company's own events, the market's major events and closed days
+          items: {$ref: '#/components/schemas/CalendarEvent'}
+        bars:
+          type: array
+          description: The company's split-adjusted sessions up to the as-of date (the last 250), oldest first
+          items: {$ref: '#/components/schemas/CompanyBar'}
+        on_company:
+          type: array
+          description: Scope strategy_company, accuracy view, all horizons, by strategy
+          items: {$ref: '#/components/schemas/CompanyScoreRow'}
+StockStrategiesPage:
+  description: >-
+    Every strategy's view of one company (design/mockups/04-stock-strategies/data.json): agreement per horizon, the
+    picks for the session being predicted, every strategy's prediction of the as-of date, the scoreboard rows on this
+    company (all horizons and per horizon) and overall (all horizons). Paper only, never advice
+  x-source: warehouse/rm_company.stock_strategies_pages
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [ticker, status, company, agreement, head_to_head, predictions, on_company, overall, go_live, strategies]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        company: {$ref: '#/components/schemas/CompanyRecord'}
+        agreement: {$ref: '#/components/schemas/AgreementByHorizon'}
+        head_to_head:
+          type: array
+          items: {$ref: '#/components/schemas/HeadToHeadPick'}
+        predictions:
+          type: array
+          items: {$ref: '#/components/schemas/StrategyPrediction'}
+        on_company:
+          type: array
+          description: Scope strategy_company, accuracy view, this company, all horizons and each horizon
+          items: {$ref: '#/components/schemas/ScoreboardRow'}
+        overall:
+          type: array
+          description: Scope strategy, accuracy view, all horizons
+          items: {$ref: '#/components/schemas/ScoreboardRow'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+CompanyBars:
+  type: object
+  description: The company's split-adjusted sessions up to the as-of date (rm.bars, page_key = ticker)
+  x-source: warehouse/rm_company.bars_pages
+  required: [market, ticker, as_of, bars]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    as_of: {type: ['string', 'null'], format: date}
+    bars:
+      type: array
+      items: {$ref: '#/components/schemas/CompanyBar'}
+TradesPage:
+  type: object
+  description: >-
+    rm.trades: page_key `_` = every open paper trade of the market and the rows of its latest intraday check
+    (07-paper-portfolios); page_key = ticker adds the company's settled trades and AI reasons. Paper only
+  x-source: warehouse/rm_company.trades_pages
+  required: [market, as_of, open_trades, trade_checks]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    as_of: {type: ['string', 'null'], format: date}
+    open_trades:
+      type: array
+      items: {$ref: '#/components/schemas/OpenTrade'}
+    trade_checks:
+      type: array
+      items: {$ref: '#/components/schemas/TradeCheck'}
+    settled:
+      type: array
+      items: {$ref: '#/components/schemas/SettledTrade'}
+    reasons:
+      type: array
+      items: {$ref: '#/components/schemas/AiReason'}
+
+# ---------- records ----------
+CompanyBar:
+  type: object
+  description: One stored session, split-adjusted as of the cut-off; `adjusted` = a split or bonus factor was applied
+  required: [date, open, high, low, close, volume, adjusted]
+  properties:
+    date: {$ref: '#/components/schemas/IsoDate'}
+    open: {type: number}
+    high: {type: number}
+    low: {type: number}
+    close: {type: number}
+    volume: {type: ['integer', 'null']}
+    adjusted: {type: boolean}
+PickRanking:
+  type: object
+  required: [strategy_id, rank, basis, settled_trades, net_pnl]
+  properties:
+    strategy_id: {type: string}
+    rank: {type: integer}
+    basis: {type: string}
+    settled_trades: {type: integer}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+PickCandidate:
+  type: object
+  required: [horizon_days, prediction_id]
+  properties:
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    prediction_id: {type: string}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    loss_pct: {$ref: '#/components/schemas/NullableNumber'}
+    costs_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_gain_pct: {$ref: '#/components/schemas/NullableNumber'}
+    gain_per_session_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    your_cost_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_gain_your_pct: {$ref: '#/components/schemas/NullableNumber'}
+    cost_viable: {type: ['boolean', 'null']}
+    eligible: {type: ['boolean', 'null']}
+HeadToHeadPick:
+  type: object
+  description: A head-to-head pick (kind head_to_head_picks); status other than `picked` = no candidate
+  x-source: lab/reads.picks
+  required: [id, market, ticker, made_at, as_of_date, session_date, family, pick_rule, status]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    made_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {$ref: '#/components/schemas/IsoDate'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    family: {type: string, enum: [rule, baseline, ai]}
+    pick_rule: {type: string}
+    status: {type: string}
+    strategy_id: {type: ['string', 'null']}
+    strongest_basis: {type: ['string', 'null']}
+    ranking:
+      type: ['array', 'null']
+      items: {$ref: '#/components/schemas/PickRanking'}
+    horizon_days: {type: ['integer', 'null'], minimum: 1, maximum: 5}
+    prediction_id: {type: ['string', 'null']}
+    base_close: {$ref: '#/components/schemas/NullableNumber'}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    loss_pct: {$ref: '#/components/schemas/NullableNumber'}
+    costs_pct: {$ref: '#/components/schemas/NullableNumber'}
+    expected_gain_pct: {$ref: '#/components/schemas/NullableNumber'}
+    candidates:
+      type: ['array', 'null']
+      items: {$ref: '#/components/schemas/PickCandidate'}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null']}
+    method_version: {type: ['string', 'null'], description: 04-stock-strategies only}
+StrategyPrediction:
+  type: object
+  description: >-
+    A strategy prediction (kind strategy_predictions). The company page carries the fields up to `quality`;
+    04-stock-strategies adds confidence, threshold, the model anchor, evidence, reason, amount and currency
+  x-source: lab/reads.predictions
+  required: [id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction,
+             qualifies]
+  properties:
+    id: {type: string}
+    strategy_id: {type: string}
+    family: {type: string, enum: [rule, baseline, ai]}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    made_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {$ref: '#/components/schemas/IsoDate'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    direction: {type: ['string', 'null'], enum: [up, down, null]}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    confidence: {$ref: '#/components/schemas/NullableNumber'}
+    threshold: {$ref: '#/components/schemas/NullableNumber'}
+    qualifies: {type: boolean}
+    base_close: {$ref: '#/components/schemas/NullableNumber'}
+    target_price: {$ref: '#/components/schemas/NullableNumber'}
+    lo50: {$ref: '#/components/schemas/NullableNumber'}
+    hi50: {$ref: '#/components/schemas/NullableNumber'}
+    lo80: {$ref: '#/components/schemas/NullableNumber'}
+    hi80: {$ref: '#/components/schemas/NullableNumber'}
+    range_widen: {$ref: '#/components/schemas/NullableNumber'}
+    model_prob: {$ref: '#/components/schemas/NullableNumber'}
+    agent_adjustment: {$ref: '#/components/schemas/NullableNumber'}
+    adjustment_reason: {type: ['string', 'null']}
+    evidence_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    reason: {type: ['string', 'null']}
+    regime: {type: ['string', 'null']}
+    quality: {type: ['string', 'null']}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null']}
+OpenTrade:
+  type: object
+  description: >-
+    A paper trade still open after the newest stored close (catalogue "Open trade"; the shared derivation
+    rm_common.open_trades, which Company.open_trades counts). Monitoring only, nothing is traded
+  x-source: warehouse/rm_common.open_trades
+  required: [trade_id, view, prediction_id, strategy_id, family, market, ticker, horizon_days, entry_date, exit_date,
+             paper]
+  properties:
+    trade_id: {type: string}
+    view: {type: string, enum: [accuracy, head_to_head]}
+    prediction_id: {type: string}
+    strategy_id: {type: string}
+    family: {type: string, enum: [rule, baseline, ai]}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    entry_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    entry_price: {$ref: '#/components/schemas/NullableNumber'}
+    quantity: {$ref: '#/components/schemas/NullableNumber'}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null']}
+    target_price: {$ref: '#/components/schemas/NullableNumber'}
+    lo80: {$ref: '#/components/schemas/NullableNumber'}
+    lo50: {$ref: '#/components/schemas/NullableNumber'}
+    hi50: {$ref: '#/components/schemas/NullableNumber'}
+    hi80: {$ref: '#/components/schemas/NullableNumber'}
+    last_price: {$ref: '#/components/schemas/NullableNumber'}
+    last_price_date: {type: ['string', 'null'], format: date}
+    unrealised_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    unrealised_pct: {$ref: '#/components/schemas/NullableNumber'}
+    to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
+    paper: {type: boolean}
+TradeCheck:
+  type: object
+  description: One open paper trade's row of an intraday check (kind trade_checks, view trade_check_rows). Monitoring only
+  x-source: sql/views.sql trade_check_rows
+  required: [id, check_id, check_at, session_date, market, ticker, trade_id, strategy_id, view, horizon_days]
+  properties:
+    id: {type: string}
+    check_id: {type: string}
+    check_row_id: {type: ['string', 'null']}
+    check_at: {$ref: '#/components/schemas/IsoTime'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    trade_id: {type: string}
+    prediction_id: {type: ['string', 'null']}
+    strategy_id: {type: string}
+    view: {type: string, enum: [accuracy, head_to_head]}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    entry_date: {type: ['string', 'null'], format: date}
+    exit_date: {type: ['string', 'null'], format: date}
+    session_number: {type: ['integer', 'null']}
+    entry_price: {$ref: '#/components/schemas/NullableNumber'}
+    last_price: {$ref: '#/components/schemas/NullableNumber'}
+    ret_since_entry_pct: {$ref: '#/components/schemas/NullableNumber'}
+    target_price: {$ref: '#/components/schemas/NullableNumber'}
+    to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
+    lo80: {$ref: '#/components/schemas/NullableNumber'}
+    lo50: {$ref: '#/components/schemas/NullableNumber'}
+    hi50: {$ref: '#/components/schemas/NullableNumber'}
+    hi80: {$ref: '#/components/schemas/NullableNumber'}
+    band: {type: ['string', 'null']}
+    target_z: {$ref: '#/components/schemas/NullableNumber'}
+    flags:
+      type: ['array', 'null']
+      items: {type: string}
+    flagged: {type: ['boolean', 'null']}
+    quality: {type: ['string', 'null']}
+    target_reached: {type: ['boolean', 'null']}
+    target_reached_session: {type: ['integer', 'null']}
+    high_since_entry_pct: {$ref: '#/components/schemas/NullableNumber'}
+    low_since_entry_pct: {$ref: '#/components/schemas/NullableNumber'}
+    sessions_left: {$ref: '#/components/schemas/NullableNumber'}
+    last_time: {type: ['string', 'null'], format: date-time}
+    method_version: {type: ['string', 'null'], description: 'Full rows only (rm_company.trade_checks, the market pages)'}
+    computed_at: {type: ['string', 'null'], format: date-time}
+    family: {type: ['string', 'null']}
+    pick_rule: {type: ['string', 'null']}
+    entry_source: {type: ['string', 'null']}
+    basis_factor: {$ref: '#/components/schemas/NullableNumber'}
+    entry_adj: {$ref: '#/components/schemas/NullableNumber'}
+    target_adj: {$ref: '#/components/schemas/NullableNumber'}
+    lo80_adj: {$ref: '#/components/schemas/NullableNumber'}
+    lo50_adj: {$ref: '#/components/schemas/NullableNumber'}
+    hi50_adj: {$ref: '#/components/schemas/NullableNumber'}
+    hi80_adj: {$ref: '#/components/schemas/NullableNumber'}
+    sigma_1d: {$ref: '#/components/schemas/NullableNumber'}
+    elapsed_fraction: {$ref: '#/components/schemas/NullableNumber'}
+    sessions_held: {$ref: '#/components/schemas/NullableNumber'}
+    z_since_entry: {$ref: '#/components/schemas/NullableNumber'}
+    notes:
+      type: ['array', 'null']
+      items: {type: string}
+SettledTrade:
+  type: object
+  description: >-
+    A settled paper trade (kind paper_trades_settled, the newest settlement of the trade), market-cost view, with
+    its automatic reason (F1.10); a row with a status other than `settled` (no entry, skipped) carries nulls
+  x-source: warehouse/rm_common.settled_trades
+  required: [id, trade_id, prediction_id, strategy_id, family, view, market, ticker, horizon_days, entry_date,
+             exit_date, status, settled_at]
+  properties:
+    id: {type: string}
+    trade_id: {type: string}
+    prediction_id: {type: string}
+    strategy_id: {type: string}
+    family: {type: string, enum: [rule, baseline, ai]}
+    view: {type: string, enum: [accuracy, head_to_head]}
+    pick_rule: {type: ['string', 'null']}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    made_at: {type: ['string', 'null'], format: date-time}
+    entry_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date_actual: {type: ['string', 'null'], format: date}
+    status: {type: string}
+    flags:
+      type: ['array', 'null']
+      items: {type: string}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null']}
+    entry_price: {$ref: '#/components/schemas/NullableNumber'}
+    exit_price: {$ref: '#/components/schemas/NullableNumber'}
+    quantity: {$ref: '#/components/schemas/NullableNumber'}
+    gross_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    costs: {$ref: '#/components/schemas/NullableNumber'}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    target_price: {$ref: '#/components/schemas/NullableNumber'}
+    lo80: {$ref: '#/components/schemas/NullableNumber'}
+    hi80: {$ref: '#/components/schemas/NullableNumber'}
+    range_hit: {type: ['boolean', 'null']}
+    target_reached: {type: ['boolean', 'null']}
+    target_reached_session: {type: ['integer', 'null']}
+    max_favourable_pct: {$ref: '#/components/schemas/NullableNumber'}
+    max_adverse_pct: {$ref: '#/components/schemas/NullableNumber'}
+    move_pct: {$ref: '#/components/schemas/NullableNumber'}
+    market_pct: {$ref: '#/components/schemas/NullableNumber'}
+    sector_pct: {$ref: '#/components/schemas/NullableNumber'}
+    news_pct: {$ref: '#/components/schemas/NullableNumber'}
+    company_pct: {$ref: '#/components/schemas/NullableNumber'}
+    reason_code: {type: ['string', 'null']}
+    reason_codes:
+      type: ['array', 'null']
+      items: {type: string}
+    news_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    reason_detail: {type: ['object', 'null'], description: 'benchmark, benchmark_pct, beta, sector_source, news_statuses; note on skipped rows'}
+    regime: {type: ['string', 'null']}
+    settled_at: {$ref: '#/components/schemas/IsoTime'}
+AiReason:
+  type: object
+  description: An AI reason of the EOD analyst (kind trade_reasons_ai), at most 60 words; never advice
+  x-source: warehouse/company_sources.REASONS_SQL
+  required: [id, market, ticker, session_date, kind, text, created_at]
+  properties:
+    id: {type: string}
+    trade_id: {type: ['string', 'null']}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    strategy_id: {type: ['string', 'null']}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    kind: {type: string}
+    rank: {type: ['integer', 'null']}
+    text: {type: string}
+    cited_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    reason_codes:
+      type: ['array', 'null']
+      items: {type: string}
+    created_at: {$ref: '#/components/schemas/IsoTime'}
+ResultsDigest:
+  type: object
+  description: A results digest (kind results_digests, macro results_digests_asof); numbers as of the release
+  x-source: warehouse/company_sources.DIGESTS_SQL
+  required: [id, release_kind, ticker, release_at, status, created_at]
+  properties:
+    id: {type: string}
+    release_kind: {type: string}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    release_at: {$ref: '#/components/schemas/IsoTime'}
+    release_date: {type: ['string', 'null'], format: date}
+    release_timing: {type: ['string', 'null']}
+    period_end: {type: ['string', 'null'], format: date}
+    fiscal_label: {type: ['string', 'null']}
+    basis: {type: ['string', 'null']}
+    currency: {type: ['string', 'null']}
+    status: {type: string}
+    numbers_status: {type: ['string', 'null']}
+    numbers_as_of: {type: ['string', 'null'], format: date-time}
+    numbers: {type: ['object', 'null'], description: Which keys a digest has depends on the filing}
+    consensus: {type: ['object', 'null']}
+    reaction: {type: ['object', 'null']}
+    bullets:
+      type: ['array', 'null']
+      items: {type: object}
+    sources:
+      type: ['array', 'null']
+      items: {type: object}
+    created_at: {$ref: '#/components/schemas/IsoTime'}
+LuckTest:
+  type: object
+  description: lab/luck.luck_test (bootstrap interval of the mean return, Bonferroni-corrected over m)
+  required: [method, n, m]
+  properties:
+    method: {type: string}
+    n: {type: integer}
+    m: {type: integer}
+    low_pct: {$ref: '#/components/schemas/NullableNumber'}
+    high_pct: {$ref: '#/components/schemas/NullableNumber'}
+    excludes_zero: {type: ['boolean', 'null']}
+    corrected_low_pct: {$ref: '#/components/schemas/NullableNumber'}
+    corrected_high_pct: {$ref: '#/components/schemas/NullableNumber'}
+    corrected: {type: ['boolean', 'null']}
+CompanyScoreRow:
+  type: object
+  description: A scoreboard row as the company page carries it (lab/scoreboard; scope strategy_company)
+  x-source: warehouse/rm_common.lab_summary
+  required: [scope, market, view, strategy_id, family, ticker, horizon_days, trades]
+  properties:
+    scope: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    view: {type: string}
+    strategy_id: {type: ['string', 'null']}
+    family: {type: ['string', 'null']}
+    ticker: {type: ['string', 'null']}
+    horizon_days: {oneOf: [{$ref: '#/components/schemas/Horizon'}, {type: string, const: all}]}
+    trades: {type: integer}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    win_rate: {$ref: '#/components/schemas/NullableNumber'}
+    sample_badge: {type: ['string', 'null']}
+ScoreboardRow:
+  type: object
+  description: A scoreboard row (lab/scoreboard, market-cost view, forward basis) as 04-stock-strategies carries it
+  x-source: warehouse/rm_common.lab_summary
+  required: [scope, market, view, basis, strategy_id, family, ticker, horizon_days, trades]
+  properties:
+    scope: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    view: {type: string}
+    basis: {type: string}
+    strategy_id: {type: ['string', 'null']}
+    family: {type: ['string', 'null']}
+    ticker: {type: ['string', 'null']}
+    horizon_days: {oneOf: [{$ref: '#/components/schemas/Horizon'}, {type: string, const: all}]}
+    trades: {type: integer}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    mean_return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    win_rate: {$ref: '#/components/schemas/NullableNumber'}
+    target_reached_rate: {$ref: '#/components/schemas/NullableNumber'}
+    median_reached_session: {$ref: '#/components/schemas/NullableNumber'}
+    avg_target_error_pct: {$ref: '#/components/schemas/NullableNumber'}
+    range_hit_rate: {$ref: '#/components/schemas/NullableNumber'}
+    worst_losing_streak: {type: ['integer', 'null']}
+    max_drawdown: {$ref: '#/components/schemas/NullableNumber'}
+    sample_badge: {type: ['string', 'null']}
+    first_entry: {type: ['string', 'null'], format: date}
+    last_exit: {type: ['string', 'null'], format: date}
+    luck_test:
+      oneOf: [{$ref: '#/components/schemas/LuckTest'}, {type: 'null'}]
+    as_of: {type: ['string', 'null']}

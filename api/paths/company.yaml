@@ -1,0 +1,87 @@
+# B12, company pages (docs/ws/b12.md; schemas in api/schemas/company.yaml).
+/api/v1/markets/{market}/stocks/{ticker}:
+  get:
+    tags: [stocks]
+    operationId: getCompanyPage
+    summary: >-
+      The company page: agreement, picks and predictions with targets and ranges, open trades and today's checks,
+      settled results and why they moved, news with status, results digest, events, bars (design/mockups/03-company)
+    x-read-model: rm.stock
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/Ticker'
+    responses:
+      '200':
+        description: The company page (page_key = ticker; every collected company, deleted ones never)
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyPageResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/stocks/{ticker}/bars:
+  get:
+    tags: [stocks]
+    operationId: getCompanyBars
+    summary: The company's split-adjusted daily bars up to the as-of date (the company page's `bars`)
+    x-read-model: rm.bars
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/Ticker'
+    responses:
+      '200':
+        description: The bars read model (page_key = ticker)
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyBarsResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/stocks/{ticker}/strategies:
+  get:
+    tags: [stocks]
+    operationId: getStockStrategies
+    summary: >-
+      Every strategy's view of one company: agreement, the head-to-head picks, all strategies' predictions and their
+      record on this company and overall (design/mockups/04-stock-strategies)
+    x-read-model: rm.stock_strategies
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/Ticker'
+    responses:
+      '200':
+        description: The stock strategies read model (page_key = ticker)
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StockStrategiesResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/trades:
+  get:
+    tags: [portfolio]
+    operationId: getTrades
+    summary: >-
+      Open paper trades and the latest intraday check of the market, or with `ticker` of one company plus its settled
+      trades and AI reasons (docs/SPEC.md section 5). Paper only: nothing is traded
+    x-read-model: rm.trades
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - name: ticker
+        in: query
+        required: false
+        description: One collected company (page_key = ticker); without it the market's page (page_key `_`)
+        schema: {$ref: '#/components/schemas/Ticker'}
+    responses:
+      '200':
+        description: The trades read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TradesResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}

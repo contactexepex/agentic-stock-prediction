@@ -4,15 +4,31 @@ fields each page copies (design/mockups/03-company/notes.md and 04-stock-strateg
 objects (ranking, candidates, reason_detail, enrichment, luck_test, ...) are copied whole, as the mockups do."""
 from __future__ import annotations
 
-RM_LIFECYCLE = "lifecycle"
 RM_TRADES = "trades"
 RM_STOCK_STRATEGIES = "stock_strategies"
+OWNER = "B12"
+MOCKUP_COMPANY = "design/mockups/03-company/data.json"
+MOCKUP_STOCK_STRATEGIES = "design/mockups/04-stock-strategies/data.json"
+# the company page's news: items about the company first seen in the NEWS_DAYS before the cut-off, the newest
+# NEWS_MAX (the mockup sets no window; docs/ws/b12.md "Open questions")
+NEWS_DAYS = 30
+NEWS_MAX = 50
+# the company page's calendar: from the session being predicted to EVENT_DAYS later (the mockup's reach ~7 weeks)
+EVENT_DAYS = 60
 
 # the stored sessions the company chart shows, up to the as-of date (the mockup's example holds 60)
 BAR_SESSIONS = 250
 # calendar days read back to find BAR_SESSIONS sessions (weekends and holidays included)
 BAR_LOOKBACK_DAYS = 400
 
+COMPANY_FIELDS = ("market", "ticker", "name", "exchange", "sector", "state", "state_since", "added_at", "amount",
+                  "amount_overridden", "currency", "yahoo", "nse_symbol", "cik", "last_close", "last_close_date",
+                  "change_pct", "agreement_n1", "open_trades")
+STRATEGIES_COMPANY_FIELDS = ("market", "ticker", "name", "exchange", "sector", "state", "amount", "amount_overridden",
+                             "currency", "last_close", "last_close_date", "change_pct", "agreement_n1", "open_trades")
+STRATEGY_FIELDS = ("id", "family", "name", "threshold", "horizons", "live", "settled_trades")
+STRATEGIES_STRATEGY_FIELDS = ("id", "family", "name", "description", "compared_to", "differs_in", "parameters",
+                              "threshold", "horizons", "live", "settled_trades")
 LIFECYCLE_FIELDS = ("id", "event", "ticker", "market", "effective_from", "recorded_at", "amount", "reason",
                     "requested_by", "channel", "supersedes")
 PICK_FIELDS = ("id", "market", "ticker", "made_at", "as_of_date", "session_date", "family", "pick_rule", "status",

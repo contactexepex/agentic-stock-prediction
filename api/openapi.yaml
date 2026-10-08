@@ -130,44 +130,6 @@ paths:
               schema: {$ref: '#/components/schemas/WatchlistResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/stocks/{ticker}:
-    get:
-      tags: [stocks]
-      operationId: getStockDetail
-      summary: Signal with model_prob and explanation, ranges, bull vs bear, news with status, events
-      x-read-model: rm.stock
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/Ticker'
-      responses:
-        '200':
-          description: The stock read model (page_key = ticker)
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StockDetailResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/stocks/{ticker}/bars:
-    get:
-      tags: [stocks]
-      operationId: getStockBars
-      summary: Split-adjusted daily OHLCV up to the as-of date, with the published ranges for the fan
-      x-read-model: rm.bars
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/Ticker'
-      responses:
-        '200':
-          description: The bars read model (page_key = ticker)
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/BarsResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/track-record:
     get:
       tags: [record]
@@ -500,20 +462,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/Watchlist'}
-    StockDetailResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/StockDetail'}
-    BarsResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/Bars'}
     TrackRecordResponse:
       allOf:
         - $ref: '#/components/schemas/ReadModelMeta'
@@ -864,84 +812,6 @@ components:
         ranges:
           type: array
           items: {$ref: '#/components/schemas/RangeRow'}
-
-    StockDetail:
-      type: object
-      x-source: presentation/dashboard/assemble.company (without bars) + company_events as of the cut-off
-      required: [ticker, name, sector, as_of, skill, last, ranges, model, reasoning, calls, news, earnings, indicators]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        name: {type: string}
-        sector: {type: string}
-        as_of: {type: ['string', 'null'], format: date}
-        plan:
-          oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
-        skill: {$ref: '#/components/schemas/SkillStatus'}
-        last:
-          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
-        model:
-          type: array
-          items: {$ref: '#/components/schemas/ModelScore'}
-        models:
-          type: array
-          description: The fits behind today's scores (model_info.versions_used)
-          items: {$ref: '#/components/schemas/ModelVersion'}
-        reasoning:
-          oneOf: [{$ref: '#/components/schemas/Reasoning'}, {type: 'null'}]
-        calls:
-          type: array
-          items: {$ref: '#/components/schemas/CallRow'}
-        news:
-          type: array
-          items: {$ref: '#/components/schemas/NewsItem'}
-        earnings: {type: ['string', 'null'], format: date, description: Next earnings date after as_of}
-        events:
-          type: array
-          description: Upcoming company events (company_events rows first seen by the cut-off, date after as_of)
-          items: {$ref: '#/components/schemas/CompanyEvent'}
-        indicators: {$ref: '#/components/schemas/Indicators'}
-        cost: {type: ['number', 'null'], description: Round-trip cost fraction at the last close (config/costs.yaml)}
-
-    Bars:
-      type: object
-      x-source: presentation/dashboard/stock.bar_rows + presentation/dashboard/stock.range_rows
-      required: [ticker, as_of, columns, bars, ranges]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        as_of: {type: ['string', 'null'], format: date}
-        columns:
-          type: array
-          items: {type: string}
-          const: [date, open, high, low, close, volume]
-        bars:
-          type: array
-          description: Split-adjusted bars, oldest first, BAR_CALENDAR_DAYS (380) calendar days up to as_of
-          items:
-            type: array
-            minItems: 6
-            maxItems: 6
-            prefixItems:
-              - {type: string, format: date}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['integer', 'null']}
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
-        spans:
-          type: array
-          items:
-            type: object
-            properties:
-              key: {type: string}
-              label: {type: string}
-              days: {type: integer}
-        default_span: {type: string}
 
     TrackRecord:
       type: object

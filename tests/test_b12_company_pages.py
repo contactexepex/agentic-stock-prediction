@@ -18,6 +18,7 @@ from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.warehouse import rm_company  # noqa: E402
 from marketbrief.warehouse.company_sources import read_sources  # noqa: E402
+from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 CATALOGUE = REPO / "design" / "catalogue"
@@ -26,7 +27,7 @@ CUTOFF = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
 AS_OF, SESSION = "2026-10-06", "2026-10-07"
 STORED = ("lifecycle_event", "head_to_head_pick", "prediction", "paper_trade", "cost_view", "trade_check", "reason_ai",
           "results_digest")
-EMPTY_BLOCKS = {"company": {}, "agreement": {}, "news": [], "events": []}
+EMPTY_BLOCKS = {"company": {}, "agreement": {}, "open_trades": [], "news": [], "events": []}
 
 
 def catalogue(name: str) -> dict:
@@ -59,8 +60,8 @@ def root(tmp_path, monkeypatch):
     return tmp_path
 
 
-def sources_of(market: str):
-    return read_sources(load_market(market), connect(market), CUTOFF, AS_OF, SESSION)
+def sources_of(market: str, cutoff: datetime = CUTOFF, as_of: str = AS_OF, session: str = SESSION):
+    return read_sources(BuildContext(load_market(market), connect(market), cutoff), as_of, session)
 
 
 def company_mockup() -> dict:
@@ -77,10 +78,9 @@ def test_company_page_keys_equal_the_mockup(market):
     sources = sources_of(market)
     pages = company_mockup()[market]["pages"]
     for ticker, page in pages.items():
-        trades = rm_company.trades_payload(sources, ticker, page["open_trades"])
-        blocks = {key: page[key] for key in ("company", "agreement", "news", "events")}
-        stock = rm_company.stock_payload(sources, ticker, {}, blocks)
-        built = {**stock, **trades, "lifecycle": rm_company.lifecycle_payload(sources, ticker)["lifecycle"]}
+        blocks = {key: page[key] for key in ("company", "agreement", "open_trades", "news", "events")}
+        built = rm_company.stock_payload(sources, ticker, {}, blocks)
+        assert rm_company.trades_payload(sources, ticker, page["open_trades"])["settled"] == built["settled"]
         for key in ("lifecycle", "head_to_head", "predictions", "open_trades", "trade_checks", "settled", "reasons",
                     "results", "events", "on_company"):
             assert built[key] == page[key], f"{market} {ticker} {key}"
@@ -137,7 +137,7 @@ def test_nothing_stored_after_the_cutoff_is_read():
         sources, tickers = sources_of(market), load_market(market)["tickers"]
         text = json.dumps([rm_company.trades_payload(sources, t, []) for t in tickers], default=str)
         stock = json.dumps([rm_company.stock_payload(sources, t, {}, EMPTY_BLOCKS) for t in tickers], default=str)
-        life = json.dumps([rm_company.lifecycle_payload(sources, t) for t in tickers], default=str)
+        life = json.dumps([rm_company.bars_payload(sources, t) for t in tickers], default=str)
         for record_id in ("late-pick", "late-pred", "late-trade", "late-check", "late-reason", "late-digest",
                           "late-event"):
             assert record_id not in text + stock + life
@@ -164,11 +164,10 @@ def test_bars_apply_only_the_splits_known_by_the_cutoff(tmp_path, monkeypatch):
     path = tmp_path / "data" / "us" / "adjustments" / "2026" / "10" / "2026-10-02.jsonl"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(split) + "\n")
-    before = rm_company.bars_payload(read_sources(load_market("us"), connect("us"),
-                                                  datetime(2026, 10, 2, 21, 15, tzinfo=timezone.utc), "2026-10-02",
-                                                  "2026-10-05"), "AAPL")
+    before = rm_company.bars_payload(sources_of("us", datetime(2026, 10, 2, 21, 15, tzinfo=timezone.utc),
+                                                "2026-10-02", "2026-10-05"), "AAPL")
     assert [(b["date"], b["close"], b["adjusted"]) for b in before["bars"]] == [
         ("2026-10-01", 200.0, False), ("2026-10-02", 100.0, False)]
-    after = rm_company.bars_payload(read_sources(load_market("us"), connect("us"), CUTOFF, AS_OF, SESSION), "AAPL")
+    after = rm_company.bars_payload(sources_of("us"), "AAPL")
     assert [(b["date"], b["close"], b["adjusted"]) for b in after["bars"]] == [
         ("2026-10-01", 100.0, True), ("2026-10-02", 100.0, False), ("2026-10-05", 101.0, False)]

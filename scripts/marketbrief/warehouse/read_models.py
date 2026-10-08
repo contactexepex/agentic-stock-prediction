@@ -1,16 +1,15 @@
 """The per-page read models (docs/ARCHITECTURE.md section 4; payload schemas in api/openapi.yaml): one JSON
 payload per (market, page_key) that the app reads with one keyed SELECT. Every payload is sliced from the
 dashboard's own data (presentation/dashboard/assemble.gather_dashboard, as of the run's clock); nothing is
-recomputed here. The upcoming company events of the stock page are read with the dashboard's as-of rule.
+recomputed here.
 
   rm.overview      page_key _        Overview: header, session plan, skill verdict, market overview tiles
   rm.watchlist     page_key _        Watchlist: one row per stock (last session, P(up), calls, ranges)
-  rm.stock         page_key ticker   StockDetail: the dashboard's stock data without bars, plus events
-  rm.bars          page_key ticker   Bars: split-adjusted OHLC bars and the published ranges
   rm.track_record  page_key _        TrackRecord: calls per scoring basis, ranges, replay, backtest
 
 `build_rows` runs every registered builder (warehouse/rm_registry.py; these five 1.0 pages are rm_dashboard.py's) and
-checks each payload against its schema in api/openapi.yaml before it is written.
+checks each payload against its schema in api/openapi.yaml before it is written. The 1.0 rm.stock and rm.bars pages
+were replaced in 2.0 by the company page's (B12, warehouse/rm_company.py).
 
 A payload carries no cut-off time (the envelope's `cutoff` does), so a rebuild that finds the same data
 produces the same payload and hash (section 4.4)."""
@@ -21,20 +20,13 @@ import hashlib
 import json
 from datetime import datetime
 
-import pandas as pd
 
 from marketbrief.constants.warehouse import (
-    BAR_COLUMNS,
     MARKET_PAGE_KEY,
-    RM_BARS,
     RM_OVERVIEW,
-    RM_STOCK,
     RM_TRACK_RECORD,
     RM_WATCHLIST,
 )
-from marketbrief.presentation.dashboard import reads
-from marketbrief.presentation.dashboard.stock import iso_day
-from marketbrief.utils.numbers import json_safe_float
 from marketbrief.warehouse import openapi_spec, rm_registry, schema_check
 from marketbrief.warehouse.rm_registry import BuildContext, PageBuilder
 
@@ -49,31 +41,10 @@ READ_MODEL_COLUMNS = {
     "payload_sha256": "VARCHAR",
     "payload": "JSON",
 }
-# the stock page's upcoming company events: the company_events rule as of the cut-off, dated after the as-of date
-EVENTS_SQL = f"""SELECT ticker, id, date, type, name, source, timing, amount FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
-WHERE date > $as_of ORDER BY ticker, date, type, id"""
 WATCHLIST_COMPANY_FIELDS = ("ticker", "name", "sector", "last", "calls", "ranges", "earnings")
 WATCHLIST_INDICATOR_FIELDS = ("ret_1d", "ret_5d", "quality", "days_to_earnings")
 WATCHLIST_SCORE_FIELDS = ("h", "id", "prob_up", "calibrated")
 HEADER = ("market", "name", "currency", "symbol", "as_of", "disclaimer", "not_available", "empty", "plan", "skill")
-
-
-def upcoming_events(con, as_of, cutoff: str) -> dict[str, list[dict]]:
-    """ticker -> its upcoming company events (CompanyEvent) as known by the cut-off."""
-    events_by_ticker: dict[str, list[dict]] = {}
-    for event in reads.frame(con, EVENTS_SQL, {"as_of": as_of, "cutoff": cutoff}).itertuples():
-        events_by_ticker.setdefault(event.ticker, []).append(
-            {
-                "id": event.id,
-                "date": iso_day(event.date),
-                "type": event.type,
-                "name": event.name,
-                "source": event.source,
-                "timing": None if pd.isna(event.timing) else event.timing,
-                "amount": json_safe_float(event.amount),
-            }
-        )
-    return events_by_ticker
 
 
 def watchlist_row(company: dict) -> dict:
@@ -87,33 +58,7 @@ def watchlist_row(company: dict) -> dict:
     }
 
 
-def stock_payload(data: dict, company: dict, events: list[dict]) -> dict:
-    """The stock page: the dashboard's stock data without bars, the fits behind its scores and its events."""
-    model_ids = {score["model_id"] for score in company["model"]}
-    return {
-        **{key: value for key, value in company.items() if key != "bars"},
-        "as_of": data["as_of"],
-        "plan": data["plan"],
-        "skill": data["skill"],
-        "models": [version for version in data.get("models") or [] if version.get("id") in model_ids],
-        "events": events,
-    }
-
-
-def bars_payload(data: dict, company: dict) -> dict:
-    """The chart page: the stock's split-adjusted bars and published ranges."""
-    return {
-        "ticker": company["ticker"],
-        "as_of": data["as_of"],
-        "columns": BAR_COLUMNS,
-        "bars": company["bars"],
-        "ranges": company["ranges"],
-        "spans": data["spans"],
-        "default_span": data["default_span"],
-    }
-
-
-def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[str, dict]]:
+def page_payloads(data: dict) -> dict[str, dict[str, dict]]:
     """table -> page_key -> payload for one market's dashboard data."""
     header = {key: data.get(key) for key in HEADER}
     page_basics = {"market": data["market"], "as_of": data["as_of"], "plan": data["plan"], "skill": data["skill"]}
@@ -121,10 +66,6 @@ def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[s
     return {
         RM_OVERVIEW: {MARKET_PAGE_KEY: {**header, "overview": data["overview"]}},
         RM_WATCHLIST: {MARKET_PAGE_KEY: {**page_basics, "rows": [watchlist_row(company) for company in companies]}},
-        RM_STOCK: {
-            company["ticker"]: stock_payload(data, company, events.get(company["ticker"], [])) for company in companies
-        },
-        RM_BARS: {company["ticker"]: bars_payload(data, company) for company in companies},
         RM_TRACK_RECORD: {MARKET_PAGE_KEY: {"skill": data["skill"], **data["track"], "backtest": data["backtest"]}},
     }
 
