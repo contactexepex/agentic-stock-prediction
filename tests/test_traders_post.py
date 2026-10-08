@@ -245,10 +245,12 @@ def test_stored_ids_are_read_as_of_the_clock():
     con = duckdb.connect()
     con.execute("CREATE TABLE strategy_predictions (id VARCHAR, made_at TIMESTAMPTZ)")
     con.execute("INSERT INTO strategy_predictions VALUES ('early', '2026-10-07T11:00:00Z'),"
-                " ('late', '2026-10-07T13:00:00Z')")
+                " ('ahead', '2026-10-07T12:04:00Z'), ('late', '2026-10-07T13:00:00Z')")
     noon, one = (datetime(2026, 10, 7, hour, 0, tzinfo=timezone.utc) for hour in (12, 13))
-    assert stored_ids(con, "strategy_predictions", noon) == {"early"}
-    assert stored_ids(con, "strategy_predictions", one) == {"early", "late"}
+    # 'ahead': a forecaster row whose own made_at is inside the gate's 5-minute future tolerance; a rerun at noon
+    # must still skip it as stored
+    assert stored_ids(con, "strategy_predictions", noon) == {"early", "ahead"}
+    assert stored_ids(con, "strategy_predictions", one) == {"early", "ahead", "late"}
 
 
 @pytest.mark.usefixtures("root")

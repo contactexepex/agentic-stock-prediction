@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 
 import pandas as pd
@@ -18,7 +18,7 @@ from marketbrief.core.database import connect
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.pipeline.forecast_gate import evidence_times
 from marketbrief.traders import track_record
-from marketbrief.traders.constants import MSG_INPUTS
+from marketbrief.traders.constants import FUTURE_TOLERANCE_MINUTES, MSG_INPUTS
 
 # The newest snapshot known by the clock, with the time its as-of date was first computed: a snapshot recomputed
 # between a record's made_at and the gate existed by made_at (the LOOK_AHEAD check of gate_evidence reads that time).
@@ -139,9 +139,12 @@ def stored_regimes(con, now: datetime) -> dict[date, tuple[str, datetime | None]
 
 
 def stored_ids(con, table: str, now: datetime) -> set[str]:
-    """The ids of one of the lab tables stored by `now` (made_at; a replay's clock does not see later rows)."""
+    """The ids of one of the lab tables stored by `now` (a replay's clock does not see later rows). The limit adds the
+    gate's future tolerance: a trader with a clock (the forecaster) may store a made_at up to that far after the gate's
+    clock, and a rerun inside that window must still see it as stored."""
+    until = now + timedelta(minutes=FUTURE_TOLERANCE_MINUTES)
     return {row[0] for row in con.execute(f"SELECT id FROM {table} WHERE made_at <= ?::TIMESTAMPTZ",
-                                          [now.isoformat()]).fetchall()}
+                                          [until.isoformat()]).fetchall()}
 
 
 def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
