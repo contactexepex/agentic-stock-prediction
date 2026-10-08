@@ -86,9 +86,9 @@ def pending_company(market: str, ticker: str, stored: list[dict], received) -> d
     """The company after every stored event, including those not in effect yet (a deactivate waiting for the next
     pre-open run): a request is checked against that state, so a reactivate can cancel a pending deactivate and a
     second deactivate is refused. The new event never takes effect before the newest stored one (effective_time)."""
-    tickers, sectors = accessor.config_lists(market)
     newest = newest_effective(stored, ticker)
-    return companies_as_of(market, tickers, sectors, max(received, newest) if newest else received).get(ticker)
+    as_of = max(received, newest) if newest else received
+    return companies_as_of(market, accessor.config_lists(market), as_of).get(ticker)
 
 
 def strip(row: dict) -> dict:

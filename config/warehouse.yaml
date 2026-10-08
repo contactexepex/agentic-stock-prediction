@@ -14,9 +14,11 @@ local_path: work/warehouse/market_brief.duckdb
 # The app whose cached pages a sync to MotherDuck revalidates after it commits (warehouse/revalidate.py; B4).
 app_url: https://omenix.vercel.app
 # Kill switch (docs/ARCHITECTURE.md section 5): enabled: false skips every sync before connecting; a sync also
-# skips once this UTC month's recorded sync wall time (meta.sync_runs, an upper bound of MotherDuck compute)
-# reaches monthly_hours_ceiling. Skips are non-blocking; a ceiling skip is logged in rm.builds and
-# meta.sync_runs, an enabled: false skip only in the summary (it never connects).
+# skips once this UTC month's recorded MotherDuck time (meta.sync_runs connected_s: from the connect until the
+# run is recorded; the local staging is not counted) reaches monthly_hours_ceiling. It bounds MotherDuck compute
+# only if billing is per active second; the plan's usage page has to confirm that (docs/ws/ws1.md).
+# Skips are non-blocking; a ceiling skip is logged in rm.builds and meta.sync_runs, an enabled: false skip
+# only in the summary (it never connects).
 enabled: true
 monthly_hours_ceiling: 7
 # The MotherDuck extension (marketbrief/warehouse/extension.py): both signed files are downloaded over HTTPS

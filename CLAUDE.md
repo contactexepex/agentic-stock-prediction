@@ -144,7 +144,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
   per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`, `status`; key `(market, page_key)`,
   payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
-  `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
+  `enabled` and `monthly_hours_ceiling` in the config. The MotherDuck extension is installed by
+  `marketbrief/warehouse/extension.py` over HTTPS only (both signed files downloaded through the proxy, DuckDB checks
+  the signatures; never `INSTALL motherduck`, whose downloads are plain HTTP); `duckdb` is pinned in requirements.txt
+  and the matching extension build under `extension:` in `config/warehouse.yaml`. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Read-model framework (B4, docs/ws/b4.md): each `rm.<table>` is a
   `PageBuilder` declared in a `warehouse/rm_<page>.py` module (found by name; shared page blocks in `rm_common.py`,
   as of the clock, collected companies only via B1's `watchlist(market, cutoff, "collected")`), checked against its
@@ -198,7 +201,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `active_sectors(cfg)`; replays and new code use `contracts.watchlist.watchlist(market, as_of, state)`. An event
   counts once both effective_from and recorded_at have passed, except the seed's add events (channel `seed`, the 20
   config companies per market, effective from the start of stored history), which restate the config list and count
-  from effective_from. Without events the config's `tickers:` act as adds. Add runs the deterministic onboarding
+  from effective_from. The config's `company_meta:` (legacy `tickers:`) holds per-company metadata; its entries act
+  as adds only while a market has no stored seed event (test roots, unseeded markets). Add runs the deterministic onboarding
   (identifiers from NSE's equity list or SEC's ticker/exchange file plus Yahoo; no ETFs, BSE-only or unknown symbols;
   sector from `sector_rules`; backfill of prices from the first stored day, daily history into the long-history cache
   `work/model_history/` from its start, else 15 years back, news, filings or announcements; the candidate's collect

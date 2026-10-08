@@ -1,4 +1,5 @@
-"""Seeding (F8.1): the config's `tickers:` written once as add events, so the watchlist events hold today's list.
+"""Seeding (F8.1): the config's companies (`company_meta:`, or the legacy `tickers:`) written once as add events,
+so the watchlist events hold today's list.
 
 effective_from = the start of stored history (00:00 UTC of the market's first stored price day), recorded_at = the
 seeding time, channel `seed`, one row per company in config order (the loader keeps that order). Identity: name and
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from marketbrief.constants.config_keys import META_NSE_SYMBOL
+from marketbrief.constants.config_keys import CFG_SECTORS, META_NSE_SYMBOL
 from marketbrief.constants.kinds import KIND_PRICES, KIND_WATCHLIST_EVENTS
 from marketbrief.core import paths
 from marketbrief.core.clock import clock
@@ -17,6 +18,7 @@ from marketbrief.lifecycle import accessor
 from marketbrief.lifecycle import constants as text
 from marketbrief.lifecycle.constants import CHANNEL_SEED, EVENT_ADD, OK, SKIPPED
 from marketbrief.lifecycle.events import stored_events
+from marketbrief.lifecycle.loader import config_companies
 from marketbrief.lifecycle.store import iso, load_lifecycle_config, store_rows
 from marketbrief.lifecycle.validator import event_row, field_errors
 
@@ -32,7 +34,8 @@ def history_start(market: str) -> datetime | None:
 
 def seed_requests(market: str, sources) -> tuple[list[dict], list[str]]:
     """(one add request per config ticker, problems)."""
-    tickers, sectors = accessor.config_lists(market)
+    config = accessor.config_lists(market)
+    tickers, sectors = config_companies(market, config)[0], config.get(CFG_SECTORS) or {}
     sector_of = {ticker: sector for sector, members in sectors.items() for ticker in members or []}
     exchanges = (load_lifecycle_config().get("exchanges") or {}).get(market, {})
     requests, problems = [], []
