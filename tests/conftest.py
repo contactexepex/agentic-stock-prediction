@@ -148,6 +148,13 @@ SLOW = {
         "test_review_end_to_end",
         "test_review_with_little_data_makes_no_live_proposal",
     },
+    "tests/test_rm_entities.py": {
+        "test_agreement_counts_match_the_catalogue",
+        "test_companies_carry_the_agreement_and_open_trade_counts",
+        "test_open_trades_match_the_catalogue",
+        "test_records_validate_against_their_shared_schemas",
+        "test_settled_late_and_future_predictions_are_not_open",
+    },
     "tests/test_sec_times.py": {
         "test_stored_shifted_rows_are_corrected_on_read",
     },

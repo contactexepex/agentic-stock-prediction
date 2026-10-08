@@ -191,8 +191,14 @@ def capped(records: list[dict], max_items: int) -> list[dict]:
     return sorted(kept, key=newest_first)
 
 
-def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = None, since: datetime | None = None,
-               status_ticker: str | None = None) -> list[dict]:
+def news_items(
+    cfg: dict,
+    con,
+    cutoff: datetime,
+    tickers: list[str] | None = None,
+    since: datetime | None = None,
+    status_ticker: str | None = None,
+) -> list[dict]:
     """Every News item record first seen in (since, cutoff] (since None: from the first stored item) that the
     analyst scored by the cut-off, about a company collected at the cut-off (B1's records) or market-wide and
     relevant (`shown`), deleted companies taken out of its tags (nothing for a deleted `status_ticker`); with
@@ -204,8 +210,12 @@ def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = Non
     deleted = sorted(record["ticker"] for record in records if record["state"] == STATE_DELETED)
     if status_ticker in deleted:
         return []
-    params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat(), "status_ticker": status_ticker,
-              "deleted": deleted}
+    params = {
+        "cutoff": cutoff.isoformat(),
+        "start": (since or EARLIEST).isoformat(),
+        "status_ticker": status_ticker,
+        "deleted": deleted,
+    }
     rows = [row for row in con.execute(ITEMS_SQL, params).df().to_dict("records") if shown(row, collected)]
     if tickers is not None:
         wanted = set(tickers)
