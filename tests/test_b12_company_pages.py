@@ -9,7 +9,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -51,22 +50,6 @@ def store(root: Path, name: str, extra: list[dict] | None = None) -> None:
             handle.write(json.dumps(record) + "\n")
 
 
-def utc(value):
-    """An ISO time as UTC 'Z' text (stored rows read back as +00:00), other values unchanged."""
-    if isinstance(value, str) and len(value) > 10 and value[10] == "T":
-        return pd.Timestamp(value).tz_convert("UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
-    return value
-
-
-def normal(value):
-    """The value with every ISO time in UTC 'Z' text, recursively."""
-    if isinstance(value, dict):
-        return {key: normal(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [normal(item) for item in value]
-    return utc(value)
-
-
 @pytest.fixture
 def root(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "ROOT", tmp_path)
@@ -100,7 +83,7 @@ def test_company_page_keys_equal_the_mockup(market):
         built = {**stock, **trades, "lifecycle": rm_company.lifecycle_payload(sources, ticker)["lifecycle"]}
         for key in ("lifecycle", "head_to_head", "predictions", "open_trades", "trade_checks", "settled", "reasons",
                     "results", "events", "on_company"):
-            assert normal(built[key]) == normal(page[key]), f"{market} {ticker} {key}"
+            assert built[key] == page[key], f"{market} {ticker} {key}"
 
 
 @pytest.mark.usefixtures("root")
@@ -110,9 +93,9 @@ def test_stock_strategies_keys_equal_the_mockup(market):
     blocks = {"company": page["company"], "agreement": page["agreement"]}
     built = rm_company.stock_strategies_payload(sources_of(market), page["ticker"], {}, blocks)
     for key in ("predictions", "on_company", "overall"):
-        assert normal(built[key]) == normal(page[key]), f"{market} {key}"
+        assert built[key] == page[key], f"{market} {key}"
     # the mockup keeps the catalogue's order of picks; the read model orders them by family and pick rule
-    assert normal(built["head_to_head"]) == normal(sorted(page["head_to_head"],
+    assert built["head_to_head"] == (sorted(page["head_to_head"],
                                                           key=lambda row: (row["family"], row["pick_rule"])))
 
 

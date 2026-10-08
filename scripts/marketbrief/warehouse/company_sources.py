@@ -2,7 +2,8 @@
 and sliced per company: lifecycle events, head-to-head picks, strategy predictions, settled paper trades, intraday
 trade checks, AI reasons, results digests, the scoreboard and the split-adjusted bars. Every read keeps only what was
 stored by the cut-off (no look-ahead); nothing is recomputed that an engine already computes (B2's lab readers and
-scoreboard, B1's lifecycle rule, WS6's results macro, the dashboard's as-of bar rule)."""
+scoreboard, B11's lifecycle-event rows, WS6's results macro, the dashboard's as-of bar rule). Times are ISO UTC
+`YYYY-MM-DDTHH:MM:SSZ`, as in B11's records."""
 from __future__ import annotations
 
 import json
@@ -10,10 +11,12 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from marketbrief.constants.rm_company import BAR_LOOKBACK_DAYS, BAR_SESSIONS
+from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab import reads as lab_reads
 from marketbrief.lab.scoreboard import latest_settlements, scoreboard
-from marketbrief.lifecycle.events import event_order, is_visible, parse_time, stored_events
 from marketbrief.presentation.dashboard import reads as dashboard_reads
+from marketbrief.warehouse.company_records import lifecycle_rows, shown_companies
+from marketbrief.warehouse.news_items import iso
 
 # the dashboard's as-of bar rule (newest collection by the cut-off, closed days left out, the split records known
 # by then applied) with `adjusted`: a split or bonus factor other than 1 was applied to the bar
@@ -47,12 +50,13 @@ def parsed(rows: list[dict], columns: tuple[str, ...]) -> list[dict]:
     return rows
 
 
-def lifecycle_rows(market: str, cutoff: datetime) -> list[dict]:
-    """The market's watchlist events known by the cut-off: recorded by then, or a seed event counting by then (B1's
-    rule: the seed restates the config list from the start of history). In the order they apply."""
-    rows = [row for row in stored_events(market)
-            if parse_time(row["recorded_at"]) <= cutoff or is_visible(row, cutoff)]
-    return sorted(rows, key=event_order)
+def zulu(rows: list[dict], *kinds: str) -> list[dict]:
+    """The rows with the kinds' TIMESTAMPTZ columns as ISO UTC `...Z` text."""
+    columns = {column for kind in kinds for column, kind_type in SCHEMAS[kind][1].items() if kind_type == "TIMESTAMPTZ"}
+    for row in rows:
+        for column in columns & row.keys():
+            row[column] = iso(row[column])
+    return rows
 
 
 def latest_checks(rows: list[dict]) -> list[dict]:
@@ -96,20 +100,25 @@ def read_sources(cfg: dict, con, cutoff: datetime, as_of: str | None, session_da
     `session_date` the session being predicted (the market header's), both as YYYY-MM-DD or None."""
     market = cfg["market"]
     sources = CompanySources(market=market, as_of=as_of, session_date=session_date)
-    sources.lifecycle = by_ticker(lifecycle_rows(market, cutoff))
+    shown, _deleted = shown_companies(market, cutoff)
+    events = lifecycle_rows(con, cutoff, {company["ticker"] for company in shown})
+    sources.lifecycle = by_ticker(sorted(events, key=lambda row: (row["recorded_at"], row["id"])))
     params = {"cutoff": cutoff.isoformat()}
-    checks = lab_reads.records(con.execute(CHECKS_SQL, params).df(), "trade_checks")
+    checks = zulu(lab_reads.records(con.execute(CHECKS_SQL, params).df(), "trade_checks"), "trade_checks",
+                  "trade_check_details")
     sources.checks = {ticker: latest_checks(rows) for ticker, rows in by_ticker(checks).items()}
     sources.market_checks = latest_checks(checks)
-    sources.reasons = by_ticker(lab_reads.records(con.execute(REASONS_SQL, params).df(), "trade_reasons_ai"))
+    reasons = lab_reads.records(con.execute(REASONS_SQL, params).df(), "trade_reasons_ai")
+    sources.reasons = by_ticker(zulu(reasons, "trade_reasons_ai"))
     digests = lab_reads.records(con.execute(DIGESTS_SQL, params).df(), "results_digests")
-    sources.digests = by_ticker(parsed(digests, DIGEST_JSON_COLUMNS))
+    sources.digests = by_ticker(zulu(parsed(digests, DIGEST_JSON_COLUMNS), "results_digests"))
     settlements = lab_reads.settlements(con, cutoff)
-    sources.settled = by_ticker(latest_settlements(settlements))
+    sources.settled = by_ticker(zulu(latest_settlements(settlements), "paper_trades_settled"))
     sources.scoreboard = scoreboard(settlements, "forward", as_of)
     if as_of:
-        sources.picks = by_ticker([row for row in lab_reads.picks(con, cutoff) if row["session_date"] == session_date])
-        sources.predictions = by_ticker([row for row in lab_reads.predictions(con, cutoff)
-                                         if row["as_of_date"] == as_of])
+        picks = [row for row in lab_reads.picks(con, cutoff) if row["session_date"] == session_date]
+        sources.picks = by_ticker(zulu(picks, "head_to_head_picks"))
+        predictions = [row for row in lab_reads.predictions(con, cutoff) if row["as_of_date"] == as_of]
+        sources.predictions = by_ticker(zulu(predictions, "strategy_predictions"))
         sources.bars = bar_rows(con, as_of, cutoff)
     return sources
