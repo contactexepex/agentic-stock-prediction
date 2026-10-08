@@ -29,14 +29,16 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
                      if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy"
                      and r["strategy_id"] == REFERENCE_STRATEGY and r["horizon_days"] == "all")
     answers = []
-    # An answer is shown when the data it read (`as_of`) is at or before the cut-off: no look-ahead on data. The
-    # question itself may be asked later (the example questions are asked 10-25 minutes after the noon cut-off,
-    # about data up to it), as a conversation log reads.
+    # An answer is a record written when the question was asked: it is shown only when `asked_at` is at or before
+    # the cut-off (the record's write time, as every page of the track filters), and the data it read (`as_of`) is
+    # at or before `asked_at`. The catalogue's example answers are all asked 10-25 minutes after the noon cut-off,
+    # so the example payload holds none (judge round 1); answers asked before the cut-off are requested from W1.
     for r in sorted((r for r in files["assistant_answer"]["records"] if r["market"] == market), key=lambda r: r["asked_at"]):
-        if r["as_of"] > cutoff:
+        if r["asked_at"] > cutoff:
             continue
         rec = pick(r, ANSWER_FIELDS)
         rec["cited"] = [pick(c, CITED_FIELDS) for c in r["cited"]]
+        assert rec["as_of"] <= rec["asked_at"], (rec["id"], rec["as_of"], rec["asked_at"])
         for c in rec["cited"]:
             assert c["as_of"] <= rec["as_of"], (rec["id"], c)
         answers.append(rec)
@@ -55,6 +57,10 @@ def compose() -> dict:
     data = envelope("assistant", "docs/SPEC.md section 6, page 11; F11; F10 explain tool", "POST /api/assistant (the explain tool)",
                     "(none: conversations are an operational log in MotherDuck schema app, kept 90 days)", NAMES, cutoff, markets)
     data["_data_requests"] = [
+        "example answers asked at or before the catalogue's as_of (asked_at <= 2026-10-07T12:00:00Z) with as_of at or "
+        "before asked_at and every cited record stored by then: the stored examples are asked 12:10-12:25Z, after the "
+        "cut-off, so a page at the cut-off's clock shows none of them (judge round 1); the page shows its empty state "
+        "and generic starter questions until then",
         "the assistant's budget state (today's spend against the daily budget and the month's against the cap, F11) "
         "so the panel can say when it is over budget: not in the catalogue; the page shows the caps as spec constants "
         "and says the spend is not stored in the example data",

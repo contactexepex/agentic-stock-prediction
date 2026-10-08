@@ -28,6 +28,7 @@
 .composer .cnt{font-size:11px;color:var(--md-sys-color-on-surface-variant);text-align:right;margin-top:4px}
 .sugg{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .pend .bub{border:1px dashed var(--md-sys-color-outline)}
+.mb-avatar.you{font-size:10px;font-weight:700;letter-spacing:.2px}
 .rules li{margin:0 0 6px;font-size:13.5px;line-height:1.5}
 .rules{padding-left:18px;margin:0}
 .src{display:grid;gap:8px}
@@ -78,7 +79,7 @@ function citeChip(m, c) {
 }
 
 function message(m, a) {
-  const q = el('div', {class:'msg q'}, el('div', {}, el('div', {class:'bub'}, a.question), el('div', {class:'meta', style:'justify-content:flex-end'}, el('span', {class:'md-chip assist'}, icon(a.channel === 'slack' ? 'ms-public' : 'ms-home'), CHANNEL[a.channel] || a.channel), `asked ${fmtLocal(a.asked_at, m, true)}`)), avatar('verified_user', 'neutral', 'sm'));
+  const q = el('div', {class:'msg q'}, el('div', {}, el('div', {class:'bub'}, a.question), el('div', {class:'meta', style:'justify-content:flex-end'}, el('span', {class:'md-chip assist'}, icon(a.channel === 'slack' ? 'ms-public' : 'ms-home'), CHANNEL[a.channel] || a.channel), `asked ${fmtLocal(a.asked_at, m, true)}`)), el('span', {class:'mb-avatar neutral sm you', 'aria-hidden':'true'}, 'You'));
   const state = a.declined ? ['dec', 'mb-label paper', 'ms-close', a.declined === 'advice' ? 'declined: no advice on real trades' : `declined: ${a.declined}`, 'The assistant never advises a real trade or a real buy or sell; it offers the paper record instead.']
     : a.not_in_data ? ['nid', 'mb-label warn', 'ms-info', 'not in the data', 'The stored data cannot answer this; the answer says what the data ends with and never guesses.']
     : ['', 'mb-label success', 'ms-check', 'answered from the data', 'Every number in the answer comes from the cited records; nothing stored after the as-of time was used.'];
@@ -95,9 +96,9 @@ function chatCard(m) {
   const p = P(m), card = el('section', {class:'card', 'aria-label':'Conversation'});
   card.append(el('div', {class:'head'}, el('h2', {}, 'Ask the data', help('The assistant reads the cockpit’s stored data through its read tools only (F10) and answers in plain words. It cites the ids and as-of times it used, says "not in the data" when the data cannot answer, and never advises a real trade. Nothing it says is a signal.')), el('span', {class:'mb-tag paper end'}, 'paper')));
   const chat = el('div', {class:'chat', role:'log', 'aria-live':'polite', 'aria-label':'Questions and answers'});
-  if (!p.answers.length) chat.append(el('div', {class:'quiet'}, 'No question asked yet in this market.'));
+  if (!p.answers.length) chat.append(el('div', {class:'quiet'}, `No question asked in ${p.name} by the cut-off (${fmtLocal(p.cutoff, m, true)}). Ask one below; the real panel answers from the stored data and shows the conversation here, newest last.`));
   for (const a of p.answers) chat.append(...message(m, a));
-  for (const q of pending[m]) chat.append(el('div', {class:'msg q pend'}, el('div', {}, el('div', {class:'bub'}, q), el('div', {class:'meta', style:'justify-content:flex-end'}, el('span', {class:'mb-label neutral'}, 'mockup: not sent'), 'the real panel sends it to the explain tool and shows the answer here')), avatar('verified_user', 'neutral', 'sm')));
+  for (const q of pending[m]) chat.append(el('div', {class:'msg q pend'}, el('div', {}, el('div', {class:'bub'}, q), el('div', {class:'meta', style:'justify-content:flex-end'}, el('span', {class:'mb-label neutral'}, 'mockup: not sent'), 'the real panel sends it to the explain tool and shows the answer here')), el('span', {class:'mb-avatar neutral sm you', 'aria-hidden':'true'}, 'You')));
   card.append(chat);
   const ta = el('textarea', {'aria-label':'Your question', placeholder:'Ask about a company, a trade, a strategy or the news, in plain words…', maxlength: String(ASSISTANT_QUESTION_MAX_CHARS)});
   const cnt = el('div', {class:'cnt'}, `0 / ${ASSISTANT_QUESTION_MAX_CHARS}`);
@@ -106,9 +107,11 @@ function chatCard(m) {
   const submit = () => { const t = ta.value.trim(); if (!t) { ta.focus(); return; } pending[m].push(t); render(); };
   send.addEventListener('click', submit); ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { submit(); e.preventDefault(); } });
   card.append(el('div', {class:'composer'}, el('div', {}, ta, cnt), send));
+  /* the questions already asked, or, with none yet, generic starters (page copy: no company, date or number) */
   const sugg = el('div', {class:'sugg', 'aria-label':'Example questions'});
-  for (const a of p.answers) { const b = el('button', {class:'md-chip assist', type:'button'}, a.question); b.addEventListener('click', () => { ta.value = a.question; ta.dispatchEvent(new Event('input')); ta.focus(); }); sugg.append(b); }
-  card.append(el('div', {class:'note', style:'margin-top:10px'}, 'Example questions (click to fill):'), sugg);
+  const starters = p.answers.length ? p.answers.map(a => a.question) : ['Why did a paper trade end as it did?', 'Rule or AI: who did better on the last settled day?', 'Which strategies agree on a company today, and why?'];
+  for (const q of starters) { const b = el('button', {class:'md-chip assist', type:'button'}, q); b.addEventListener('click', () => { ta.value = q; ta.dispatchEvent(new Event('input')); ta.focus(); }); sugg.append(b); }
+  card.append(el('div', {class:'note', style:'margin-top:10px'}, p.answers.length ? 'Questions asked so far (click to fill):' : 'Ways to start (click to fill):'), sugg);
   return card;
 }
 
