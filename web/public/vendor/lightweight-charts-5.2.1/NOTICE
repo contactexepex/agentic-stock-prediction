@@ -1,0 +1,17 @@
+TradingView Lightweight Charts(TM), vendored for the cockpit app (web/, session B7)
+
+Package:  lightweight-charts (npm), version 5.2.1, pinned
+File:     dist/lightweight-charts.standalone.production.js of the package, copied unchanged from the dashboard's
+          vendored copy (scripts/marketbrief/presentation/dashboard/vendor/, see its NOTICE for the download record)
+Source:   https://registry.npmjs.org/lightweight-charts/-/lightweight-charts-5.2.1.tgz
+SHA-256:  e21cc5caa0226ef30bd8549c50b9ef926615f2a4ee6b4e486353477a55f598cf
+SRI:      sha256-4hzFyqAibvML2FScULnvkmYV8qTua05IY1NHelX1mM8= (the same digest in base64, the script tag's integrity)
+License:  Apache License 2.0, full text in LICENSE (copied from the same tarball)
+Copyright (c) 2026 TradingView, Inc.
+
+Served by the app itself from /vendor/lightweight-charts-5.2.1/ (Next.js public/); never from a CDN. Loaded only by
+web/components/charts/candles.tsx, which pins the URL and the SRI digest above (web/lib/ui/vendor.ts);
+web/lib/ui/tests/vendor.test.ts checks the file's SHA-256 against this NOTICE and the dashboard's copy.
+The library's TradingView attribution logo is left on (its default).
+To upgrade: take the new file the dashboard vendored (registry.npmjs.org only, dist.integrity checked), copy it
+and LICENSE into a new versioned folder, and update the version, SHA-256 and SRI here and in web/lib/ui/vendor.ts.

@@ -1,0 +1,28 @@
+/* Help page (SPEC section 6 page 12; design/mockups/12-help/template.html): page-local layout only, every colour a token. */
+.toc{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.toc a{text-decoration:none}
+.card.help{margin-top:16px}
+.help h2{scroll-margin-top:80px}
+.help p{font-size:14px;line-height:1.6;margin:0 0 10px;max-width:78ch} .help p b,.help p a{display:inline-block}
+.help ul{margin:0 0 10px;padding-left:20px;font-size:14px;line-height:1.6;max-width:78ch} .help li{margin:3px 0}
+.help .ex{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;font-size:13px;margin:6px 0 12px;padding:10px 12px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low)}
+.help .ex .l{color:var(--md-sys-color-on-surface-variant)}
+.help dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;margin:0 0 10px;max-width:84ch}
+.help dt{font-weight:600;white-space:nowrap} .help dd{margin:0;color:var(--md-sys-color-on-surface-variant);line-height:1.5}
+.fam{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 12px}
+.fam .f{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.fam .f .h{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:6px}
+.fam .f ul{margin:0;padding-left:16px;font-size:12.5px} .fam .f li{margin:4px 0} .fam .f li .tk{display:inline-block} .fam .f li small.muted{display:block;font-size:11px}
+.fam .f small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.chk{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px;font-size:13.5px;max-width:84ch}
+.chk li{display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:start} .chk .ms{width:18px;height:18px;margin-top:1px}
+.chk li.ok .ms{color:var(--mb-color-up)} .chk li.no .ms{color:var(--mb-color-down)} .chk li.na .ms{color:var(--md-sys-color-outline)}
+.pages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 4px}
+.pages a{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:10px;background:var(--md-sys-color-surface-container-low);text-decoration:none;color:inherit;font-size:13px}
+.pages a b{display:block;color:var(--md-sys-color-primary)} .pages a:hover{background:var(--md-sys-color-surface-container)}
+.pages a:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:2px}
+.sample{display:inline-flex;align-items:center;gap:8px}
+.sample .rng svg{width:100px}
+details.gl{margin-top:6px} details.gl summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:13.5px}
+.note2{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13.5px;line-height:1.5;margin-top:16px} .note2 .ms{flex:none;width:20px;height:20px;margin-top:1px}
+@media (max-width:760px){ .fam{grid-template-columns:1fr} .pages{grid-template-columns:1fr} .help dl{grid-template-columns:1fr;gap:2px 0} .help dt{margin-top:6px} }
