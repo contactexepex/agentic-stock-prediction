@@ -36,10 +36,10 @@ implements the mockups as React components on the design system.
 | 5 | Strategy lab | `mockups/05-strategy-lab/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at a7c4ff3; on main; cosmetic issues #197-#207 |
 | 6 | Rule vs AI | `mockups/06-rule-vs-ai/` | built on the owner's delegated authority (2026-10-08); judge PASS round 4 at e0d2b7d and, rebuilt on W1's W40 research reviews, round 7 at 821298d; on main; cosmetic issues #179-#189 |
 | 7 | Paper portfolios | `mockups/07-paper-portfolios/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 5d22863; on main; cosmetic issues #190-#193 |
-| 8 | Track record | `mockups/08-track-record/` | built on W1's `track_record` entity (2026-10-08); with the judge |
+| 8 | Track record | `mockups/08-track-record/` | built on W1's `track_record` entity (2026-10-08); judge PASS round 2 at 17c5c6f; on main; cosmetic issues #213-#216 |
 | 9 | News | | the owner decided in the earlier round to fold the news into Home (the news card) and the Company page; to be confirmed |
 | 10 | Companies | `mockups/10-companies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 23c56a4; on main; cosmetic issues #194-#196 |
-| 11 | Assistant | `mockups/11-assistant/` | built on W1's `assistant_answer` entity (2026-10-08); being built |
+| 11 | Assistant | `mockups/11-assistant/` | built on W1's `assistant_answer` entity (2026-10-08); judge PASS round 2 at 656b699 (the example conversation is empty until W1 supplies answers asked before the cut-off, data request 7); on main; cosmetic issue #217 |
 | 12 | Help | `mockups/12-help/` | built on the owner's delegated authority (2026-10-08); judge PASS round 3 at 962b8dc; on main; cosmetic issues #208-#212 |
 
 Order: the spec's, proposed to the owner with Home first.
