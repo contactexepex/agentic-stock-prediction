@@ -33,11 +33,11 @@
 .mb-foot-stale{color:var(--mb-color-warn)}
 
 /* shared cells */
-.co{display:inline-flex;align-items:center;gap:10px;min-width:0}
-.co .nm{display:flex;flex-direction:column;min-width:0}
-.co .nm small{color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere}
-.ag b{font-weight:700;font-size:14px}
-.ag small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.mb-co{display:inline-flex;align-items:center;gap:10px;min-width:0}
+.mb-co .nm{display:flex;flex-direction:column;min-width:0}
+.mb-co .nm small{color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere}
+.mb-ag b{font-weight:700;font-size:14px}
+.mb-ag small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
 .mb-agbar{height:7px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);margin-top:5px;overflow:hidden;display:flex;width:120px;max-width:100%}
 .mb-agbar i{display:block;height:100%}
 .mb-strat{display:inline-flex;align-items:center;gap:2px}
@@ -70,3 +70,24 @@
 .mb-notfound .card{max-width:480px}
 .mb-notfound h1{font:700 22px/1.2 var(--md-ref-typeface-plain);margin:0 0 8px}
 .mb-pending-h1{font:700 24px/1.2 var(--md-ref-typeface-plain);margin:0 0 14px}
+
+/* filter chips and the pager (the News mockup's) */
+.mb-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mb-chips .md-chip.filter{cursor:pointer}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant)}
+.pager .pg{display:flex;gap:4px;flex-wrap:wrap}
+.pager .pg button[aria-current="page"]{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent}
+
+/* the open-trades card (OpenTradesCard; Home's .ot rules, design/mockups/01-home/template.html): every column from
+   1360 px; Entry, Last, To target and the dates only there (.cw); the range bar from 761 px (.cm) */
+.mb-ot{font-size:13px} .mb-ot th{padding:9px 10px} .mb-ot td{padding:8px 10px}
+.mb-ot td.num,.mb-ot th.num{text-align:right;white-space:nowrap}
+.mb-ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.mb-ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.mb-ot td:first-child{white-space:normal}
+@media (min-width:761px){ .mb-ot td:first-child{min-width:120px} }
+.mb-ot .st{display:inline-flex;align-items:center;gap:4px;white-space:nowrap} .mb-ot .st .ms{width:14px;height:14px}
+.mb-ot .st.flag{color:var(--mb-color-on-warn-container);font-weight:600} .mb-ot .st.ok{color:var(--mb-color-up)}
+@media (max-width:1359px){ .mb-ot th.cw,.mb-ot td.cw,.mb-ot .cw{display:none} .mb-ot th{padding:8px 6px} .mb-ot td{padding:8px 6px} .mb-ot .st{white-space:normal;align-items:start} .mb-ot tr.grp td small{display:block;margin-left:0} }
+@media (max-width:760px){ .mb-ot th.cm,.mb-ot td.cm{display:none} .mb-ot td.num{white-space:normal} }
+@media (max-width:599px){ .mb-ot tr.grp td small{display:block;margin-left:0} .mb-ot td.num{white-space:normal} }

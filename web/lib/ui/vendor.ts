@@ -1,5 +1,5 @@
 // Vendored browser libraries served from web/public/vendor/ (never a CDN). Each pins its URL and its SHA-256, which
-// the browser checks through Subresource Integrity; web/lib/ui/tests/vendor.test.ts checks the files against these.
+// the browser checks through Subresource Integrity; web/lib/ui/tests/design-sync.test.ts checks the files against these.
 
 export const LIGHTWEIGHT_CHARTS = {
   version: "5.2.1",
