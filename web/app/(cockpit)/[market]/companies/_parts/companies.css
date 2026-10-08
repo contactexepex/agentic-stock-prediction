@@ -14,23 +14,11 @@
 .mb-companies .cmd code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere;display:inline-block;vertical-align:middle;max-width:100%}
 .mb-companies .pend{display:grid;gap:6px;margin-top:10px}
 .mb-companies .addbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
-.mb-companies dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(500px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
-.mb-companies dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
-.mb-companies dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
-.mb-companies dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
-.mb-companies dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
-.mb-companies dialog .dbody input,.mb-companies dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
-.mb-companies dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mb-companies dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
-.mb-companies dialog .summ{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);font-size:13px;display:grid;gap:4px}
-.mb-companies dialog .summ .r{display:grid;grid-template-columns:110px 1fr;gap:8px} .mb-companies dialog .summ .r span:first-child{color:var(--md-sys-color-on-surface-variant)}
-.mb-companies dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13px} .mb-companies dialog .warn .ms{flex:none;width:18px;height:18px;margin-top:1px}
 @media (max-width:1359px){ .mb-companies .co .c3{display:none} }
 @media (max-width:1439px){ .mb-companies .co th,.mb-companies .co td{padding:8px 8px} }
 @media (max-width:1199px){ .mb-companies .co .cw{display:none} .mb-companies .co .acts .md-btn span{display:none} .mb-companies .co .acts .md-btn{padding:0 8px} .mb-companies .co .acts .md-btn .ms{margin:0} .mb-companies .co .acts{flex-wrap:nowrap} }
 @media (max-width:900px){ .mb-companies .co .cm{display:none} .mb-companies .co .acts .md-btn.one{display:inline-flex} .mb-companies .co .acts .md-btn.many{display:none} .mb-companies .co .nm small.ph2{display:block} }
 @media (max-width:760px){ .mb-companies .co th,.mb-companies .co td{padding:8px 6px;white-space:normal} .mb-companies .co .nm .mb-avatar{display:none} .mb-companies .co .acts{justify-content:flex-start} .mb-companies .ev li{grid-template-columns:1fr} .mb-companies .ev .when{width:auto} }
-@media (max-width:599px){ .mb-companies dialog .row2{grid-template-columns:1fr} .mb-companies .co .cp{display:none} .mb-companies .co .nm small.ph{display:block} .mb-companies .co th,.mb-companies .co td{padding:8px 4px} }
-.mb-companies .dmsg{font-size:12.5px} .mb-companies .dmsg.err{padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container)}
+@media (max-width:599px){ .mb-companies .co .cp{display:none} .mb-companies .co .nm small.ph{display:block} .mb-companies .co th,.mb-companies .co td{padding:8px 4px} }
 /* the shell's company cell (styles/app.css .co, .co .nm) shares the mockup's table class: keep the table a table and its name cell a row */
 .mb-companies table.co{display:table} .mb-companies table.co .nm{flex-direction:row}

@@ -3,7 +3,7 @@
 // manageDialog) on B11's routes: the form, then the server's preview (its summary and, for an add, the resolved
 // identifiers), then Confirm, which sends that summary back unchanged. One Idempotency-Key per dialog, so a double
 // click or a retry never records twice. A request is pending until the next run imports it; nothing here trades.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../../../../../components/ui/icon.tsx";
 import type { Market } from "../../../../../lib/data/constants.ts";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../../../../lib/market-pages/company-commands-client.ts";
 import { cleanReason, deleteConfirmed, parseAmount, REASON_MAX_CHARS } from "../../../../../lib/market-pages/companies.ts";
 import { fmtDateYear, money } from "../../../../../lib/ui/format.ts";
+import "./command-dialog.css";
 import type { CompanyRecord } from "../../../../../lib/ui/types.ts";
 
 export type Intent =
@@ -34,6 +35,7 @@ export function CommandDialog({ intent, market, currency, defaultAmount, onClose
   onClose: () => void; onRecorded: (r: Recorded) => void; onSwitch: (next: Intent) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const [key] = useState(() => newIdempotencyKey());
   const [stage, setStage] = useState<Stage>("form");
   const [preview, setPreview] = useState<CommandPreview | null>(null);
@@ -231,10 +233,10 @@ export function CommandDialog({ intent, market, currency, defaultAmount, onClose
   }
 
   return (
-    <dialog ref={ref} className="md-dialog" aria-labelledby="dlg-title" onClose={onClose}>
+    <dialog ref={ref} className="md-dialog mb-cmd-dialog" aria-labelledby={titleId} onClose={onClose}>
       <form method="dialog" onSubmit={(e) => { e.preventDefault(); if (stage === "confirm") void confirm(); else if (stage === "form") void check(); }}>
         <div className="dbody">
-          <h3 id="dlg-title">{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           {body}
           {error ? <div className="dmsg err" role="alert">{error}</div> : null}
         </div>
