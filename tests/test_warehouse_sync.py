@@ -382,3 +382,15 @@ def test_a_failed_rollback_does_not_hide_the_original_error(tmp_path):
     staged = sync.Staged(tmp_path, {"bars": 1}, {}, [])
     with pytest.raises(RuntimeError, match="the original failure"):
         sync.write_market(BrokenWarehouse(), "us", staged, full=False)
+
+
+def test_safe_url_sql_mirrors_view_data_safe_url():
+    """Issue #48: the warehouse's SQL copy percent-encodes " ' < > and backtick exactly as view_data.safe_url does."""
+    from marketbrief.warehouse.tables import SAFE_URL_SQL
+    from view_data import safe_url
+
+    query = f"SELECT {SAFE_URL_SQL.format(col='u')} FROM (SELECT ?::VARCHAR AS u)"
+    urls = ["https://a.example/x\"y'z<b>`c", " https://ok.example/p?q=1 ", "javascript:alert(1)", "https://a b", None]
+    for url in urls:
+        assert duckdb.execute(query, [url]).fetchone()[0] == safe_url(url), url
+    assert duckdb.execute(query, ["https://a.example/\"'<>`"]).fetchone()[0] == "https://a.example/%22%27%3C%3E%60"

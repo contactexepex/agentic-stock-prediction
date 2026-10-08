@@ -23,7 +23,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `PRICE_HELD_TOO_LONG`); a wrong record is cancelled by a later one with `supersedes`
   (`adjustment_records.py` lists the calls and ranges made while the wrong row was active);
   DESIGN.md section 3; the market calendar counts `special_sessions` of the market config, e.g. India's
-  Muhurat days, as sessions), `collect_quotes`, `collect_events` (also backfills past earnings
+  Muhurat days, as sessions with their own hours from `special_session_hours`), `collect_quotes`,
+  `collect_events` (also backfills past earnings
   days, India from NSE results filings, US from SEC 8-K item 2.02, every 2.02 stored as filed and kept only when it is a
   quarter's results release when read (`event_history.results_filter`, anchored on stored 10-Q/10-K `periodic_report`
   rows), and dividends; also Yahoo's consensus EPS point in time -> `earnings_estimates`, read with
@@ -83,7 +84,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   call of horizon k sells at the close of D+k (N+k), a 5-day call made before `call_scoring.n_plus_k_from` at D+4
   (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled. An open-to-close
   call whose window has a session without a bar stays open (`session_gap_open`), never shifted.
-  `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
+  `validate` is the daily run's deterministic gate (`--stage collect|news_collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
@@ -367,7 +368,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
   session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
-  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window)
+  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window; each line has a
+  `priority`, watchlist lines first; the news gate warns `ENRICH_TEMPLATED` on templated watchlist summaries)
 - Intraday checks (WS5; `scripts/intraday_check.py`, code `marketbrief/intraday/`, settings `config/intraday.yaml`,
   `routine/INTRADAY_PROMPT.md`; schedules in DESIGN.md section 2): a few times per session, Yahoo 5-minute bars of
   the watchlist, benchmark and sector indices (bars complete by the check time) are compared with the session's
@@ -485,6 +487,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 5. Don't read raw data files in bulk. Use the context pack, DuckDB queries and the summaries.
 6. A market's agents only read and write that market's `data/<market>/`, `summaries/<market>/`
    and `reports/<market>/`.
+7. Stored CSVs keep CRLF line endings (`csv.writer`); the collect gate blocks on a bare LF
+   (`CSV_LINE_ENDINGS`, issue #47) because DuckDB's glob read silently drops such a file.
 
 ## Prediction rules
 - One record per call: `id` = `<as_of_date>-<ticker>-<horizon>d`; skip if the id already exists.
