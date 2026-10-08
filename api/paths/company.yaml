@@ -91,8 +91,8 @@
     tags: [stocks]
     operationId: getCompanyLifecycle
     summary: >-
-      One session's path of a company: predictions and picks made for it, its intraday trade checks, the trades
-      settled on it and the AI reasons (docs/SPEC.md sections 4-5; the last 30 sessions, older: 404)
+      The path of a company's predictions made for one session: the predictions and picks, their intraday trade
+      checks, settled trades and AI reasons (docs/SPEC.md sections 2, 4-5; the last 30 sessions, older: 404)
     x-read-model: rm.lifecycle
     parameters:
       - $ref: '#/components/parameters/Market'

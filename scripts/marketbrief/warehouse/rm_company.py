@@ -129,7 +129,8 @@ def first_of(days: list[str]) -> str | None:
 
 def trades_pages(ctx: BuildContext) -> dict[str, dict]:
     """rm.trades: the market's page (settled trades of the last TRADES_MARKET_SESSIONS sessions to the as-of date)
-    and one page per collected company (the last TRADES_TICKER_SESSIONS)."""
+    and one page per collected company (the last TRADES_TICKER_SESSIONS). Without an as-of date (nothing stored yet)
+    no window applies."""
     data, open_trades = sources(ctx), company_blocks(ctx)["open_trades"]
     market_from = first_of(sessions_back(ctx.cfg, data.as_of, TRADES_MARKET_SESSIONS))
     ticker_from = first_of(sessions_back(ctx.cfg, data.as_of, TRADES_TICKER_SESSIONS))
@@ -143,8 +144,9 @@ def lifecycle_key(ticker: str, day: str) -> str:
 
 
 def lifecycle_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.lifecycle: one page per collected company and session, the last LIFECYCLE_SESSIONS sessions ending at the
-    session being predicted (an older day has no page: the route answers 404)."""
+    """rm.lifecycle: one page per collected company and session D (the path of the predictions made for D), the last
+    LIFECYCLE_SESSIONS sessions ending at the session being predicted (an older day has no page: the route answers
+    404). The rm.trades windows end at the as-of date instead: they count exit sessions, which are never after it."""
     data = sources(ctx)
     days = sessions_back(ctx.cfg, rm_common.status_block(ctx)["session"]["session_date"], LIFECYCLE_SESSIONS)
     return {lifecycle_key(ticker, day): lifecycle_payload(data, ticker, day) for ticker in tickers(ctx) for day in days}

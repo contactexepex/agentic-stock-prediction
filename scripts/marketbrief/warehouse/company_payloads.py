@@ -102,23 +102,29 @@ def market_trades_payload(sources: CompanySources, open_trades: list[dict], firs
 
 
 def lifecycle_payload(sources: CompanySources, ticker: str, day: str) -> dict:
-    """rm.lifecycle `<ticker>:<day>`: one session's path of the company (docs/SPEC.md sections 4-5): the strategy
-    predictions and head-to-head picks made for the session, every intraday trade check of the session, the trades
-    settled on it and the AI reasons written about it, as stored by the cut-off."""
-    checks = [row for row in sources.all_checks.get(ticker, []) if row["session_date"] == day]
+    """rm.lifecycle `<ticker>:<day>`: the path of the company's predictions made for session `day` (docs/SPEC.md
+    section 2 "Lifecycle of a prediction", docs/DATA_CATALOGUE.md: made -> checks -> settled -> explained): the
+    strategy predictions and head-to-head picks made for the session, every intraday trade check of those
+    predictions' trades on any session so far, their settled trades and the AI reasons about those trades, as stored
+    by the cut-off."""
+    predictions = [row for row in sources.all_predictions.get(ticker, []) if row["session_date"] == day]
+    picks = [row for row in sources.all_picks.get(ticker, []) if row["session_date"] == day]
+    made = {row["id"] for row in predictions} | {row["prediction_id"] for row in picks if row.get("prediction_id")}
+    checks = [row for row in sources.all_checks.get(ticker, []) if row.get("prediction_id") in made]
+    settled = [row for row in settled_rows(sources.settled.get(ticker, [])) if row["prediction_id"] in made]
+    trades = {row["trade_id"] for row in checks} | {row["trade_id"] for row in settled}
     return {
         "market": sources.market,
         "ticker": ticker,
         "session_date": day,
-        "predictions": sorted((pick(row, PREDICTION_FIELDS) for row in sources.all_predictions.get(ticker, [])
-                               if row["session_date"] == day),
+        "predictions": sorted((pick(row, PREDICTION_FIELDS) for row in predictions),
                               key=lambda row: (row["strategy_id"], row["horizon_days"])),
-        "head_to_head": sorted((pick(row, PICK_FIELDS) for row in sources.all_picks.get(ticker, [])
-                                if row["session_date"] == day), key=lambda row: (row["family"], row["pick_rule"])),
+        "head_to_head": sorted((pick(row, PICK_FIELDS) for row in picks),
+                               key=lambda row: (row["family"], row["pick_rule"])),
         "trade_checks": sorted((pick(row, CHECK_FIELDS) for row in checks),
                                key=lambda row: (row["check_at"], row["trade_id"])),
-        "settled": [row for row in settled_rows(sources.settled.get(ticker, [])) if exit_day(row) == day],
-        "reasons": [row for row in reason_rows(sources.reasons.get(ticker, [])) if row["session_date"] == day],
+        "settled": settled,
+        "reasons": [row for row in reason_rows(sources.reasons.get(ticker, [])) if row["trade_id"] in trades],
     }
 
 

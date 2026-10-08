@@ -202,22 +202,51 @@ def test_w1_catalogue_modules_still_import():
 
 @pytest.mark.usefixtures("root")
 @pytest.mark.parametrize("market", ["india", "us"])
-def test_lifecycle_day_holds_that_sessions_records(market):
-    """A day's page: the predictions and picks made for the session, every check of the session, the trades that
-    exited on it and the reasons about it, the same records (and fields) the company page shows."""
+def test_lifecycle_page_holds_the_predictions_made_for_the_session(market):
+    """The page of D holds the predictions and picks made for D (as the company page shows them) and only the
+    checks, settlements and reasons of those predictions' trades."""
     sources = sources_of(market)
     for ticker, page in company_mockup()[market]["pages"].items():
         day = company_payloads.lifecycle_payload(sources, ticker, SESSION)
         assert day["predictions"] == [p for p in page["predictions"] if p["session_date"] == SESSION]
         assert day["head_to_head"] == sorted(page["head_to_head"], key=lambda r: (r["family"], r["pick_rule"]))
-        assert day["trade_checks"] == page["trade_checks"]          # one check per company by the cut-off
-        assert day["reasons"] == [r for r in page["reasons"] if r["session_date"] == SESSION]
-        for settled in page["settled"]:
-            exit_day = settled["exit_date_actual"] or settled["exit_date"]
-            assert settled in company_payloads.lifecycle_payload(sources, ticker, exit_day)["settled"]
+        made = {p["id"] for p in day["predictions"]} | {p["prediction_id"] for p in day["head_to_head"]}
+        assert all(row["prediction_id"] in made for row in day["trade_checks"] + day["settled"])
         assert company_payloads.lifecycle_payload(sources, ticker, "2026-09-01") == {
             "market": market, "ticker": ticker, "session_date": "2026-09-01", "predictions": [], "head_to_head": [],
             "trade_checks": [], "settled": [], "reasons": []}
+
+
+@pytest.mark.usefixtures("root")
+def test_lifecycle_follows_a_prediction_to_its_checks_settlement_and_reasons():
+    """An N+k prediction made for D is checked and settled on later sessions: all of it shows on D's page."""
+    checks = [c for c in catalogue("trade_check")["records"] if c["market"] == "india" and c["view"] == "accuracy"]
+    settled = {s["prediction_id"]: s for s in catalogue("paper_trade")["records"] if s["market"] == "india"}
+    check = checks[0]
+    template = next(p for p in catalogue("prediction")["records"] if p["market"] == "india")
+    made = {**template, "id": check["prediction_id"], "ticker": check["ticker"], "strategy_id": check["strategy_id"],
+            "horizon_days": check["horizon_days"], "session_date": check["entry_date"],
+            "exit_date": check["exit_date"], "made_at": f"{check['entry_date']}T02:10:00Z"}
+    trade = {**next(iter(settled.values())), "id": "settled-of-made", "trade_id": check["trade_id"],
+             "prediction_id": check["prediction_id"], "ticker": check["ticker"], "entry_date": check["entry_date"],
+             "exit_date": check["exit_date"], "exit_date_actual": check["exit_date"],
+             "settled_at": "2026-10-07T11:00:00Z"}
+    reason = {**catalogue("reason_ai")["records"][0], "id": "reason-of-made", "trade_id": check["trade_id"],
+              "market": "india", "ticker": check["ticker"], "session_date": check["exit_date"],
+              "created_at": "2026-10-07T11:30:00Z"}
+    store(common.ROOT, "prediction", [made])
+    store(common.ROOT, "paper_trade", [trade])
+    store(common.ROOT, "reason_ai", [reason])
+    sources = sources_of("india")
+    page = company_payloads.lifecycle_payload(sources, check["ticker"], check["entry_date"])
+    assert check["entry_date"] < check["session_date"]          # checked on a later session than D
+    assert check["prediction_id"] in {p["id"] for p in page["predictions"]}
+    assert check["id"] in {c["id"] for c in page["trade_checks"]}
+    assert "settled-of-made" in {s["id"] for s in page["settled"]}
+    assert "reason-of-made" in {r["id"] for r in page["reasons"]}
+    other = company_payloads.lifecycle_payload(sources, check["ticker"], check["session_date"])
+    assert check["id"] not in {c["id"] for c in other["trade_checks"]}
+    assert "settled-of-made" not in {s["id"] for s in other["settled"]}
 
 
 def test_sessions_back_skips_closed_days():

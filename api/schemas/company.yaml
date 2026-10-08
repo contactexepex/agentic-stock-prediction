@@ -170,7 +170,7 @@ TradesPage:
     open trades and latest checks, and its settled trades and AI reasons of the last 60 sessions (docs/SPEC.md
     section 4). Paper only
   x-source: warehouse/rm_company.trades_pages
-  required: [market, as_of, open_trades, trade_checks]
+  required: [market, as_of, open_trades, trade_checks, settled]
   properties:
     market: {$ref: '#/components/schemas/Market'}
     ticker: {$ref: '#/components/schemas/Ticker'}
@@ -191,10 +191,11 @@ TradesPage:
 LifecyclePage:
   type: object
   description: >-
-    One session's path of one company (rm.lifecycle, page_key `<ticker>:<session_date>`, the last 30 sessions ending
-    at the session being predicted; docs/SPEC.md sections 4-5): the strategy predictions and head-to-head picks made
-    for the session, every intraday trade check of the session, the trades settled on it (exit session) and the AI
-    reasons about it, as stored by the cut-off. Monitoring and paper records only
+    The path of one company's predictions made for one session (rm.lifecycle, page_key `<ticker>:<session_date>`, the
+    last 30 sessions ending at the session being predicted; docs/SPEC.md section 2 "Lifecycle of a prediction" and
+    sections 4-5, docs/DATA_CATALOGUE.md): made -> checks -> settled -> explained. The strategy predictions and
+    head-to-head picks made for the session, every intraday check of their trades on any session so far, their
+    settled trades and the AI reasons about those trades, as stored by the cut-off. Paper records only
   x-source: warehouse/rm_company.lifecycle_pages
   required: [market, ticker, session_date, predictions, head_to_head, trade_checks, settled, reasons]
   properties:
@@ -203,21 +204,23 @@ LifecyclePage:
     session_date: {$ref: '#/components/schemas/IsoDate'}
     predictions:
       type: array
-      description: By strategy then horizon
+      description: Made for the session (session_date = the page's), by strategy then horizon
       items: {$ref: '#/components/schemas/StrategyPrediction'}
     head_to_head:
       type: array
-      description: By family then pick rule
+      description: The session's picks, by family then pick rule
       items: {$ref: '#/components/schemas/HeadToHeadPick'}
     trade_checks:
       type: array
-      description: Every check of the session, by check time then trade id
+      description: Every check of those predictions' trades (by prediction_id), by check time then trade id
       items: {$ref: '#/components/schemas/TradeCheck'}
     settled:
       type: array
+      description: Those predictions' settled trades (by prediction_id, newest settlement each), newest exit first
       items: {$ref: '#/components/schemas/SettledTrade'}
     reasons:
       type: array
+      description: The AI reasons about those trades (by trade_id), newest session first
       items: {$ref: '#/components/schemas/AiReason'}
 
 # ---------- records ----------
