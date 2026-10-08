@@ -16,6 +16,7 @@ from marketbrief.warehouse import rm_common, rm_compare, rm_strategies
 from marketbrief.warehouse.market_page_parts import companies, news_selection, pick, session_date, shell, trade_checks
 from marketbrief.warehouse.rm_news import market_mockup
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
+from marketbrief.warehouse.rm_watchlist import CHECK_FIELDS as WATCHLIST_CHECK_FIELDS
 
 COMPANY_FIELDS = ("market", "ticker", "name", "exchange", "sector", "state", "amount", "amount_overridden",
                   "currency", "last_close", "last_close_date", "change_pct", ("agreement_n1", ("buy", "of")),
@@ -32,6 +33,11 @@ SETTLED_FIELDS = ("trade_id", "view", "pick_rule", "strategy_id", "family", "tic
                   "exit_date", "exit_date_actual", "status", "amount", "currency", "net_pnl", "return_pct",
                   "reason_code", "settled_at")
 STRATEGY_FIELDS = ("id", "family", "name", "threshold", "horizons", "live", "settled_trades")
+# the Intraday trade check's base fields (as on the Watchlist) and its detail columns (issue #78)
+CHECK_FIELDS = WATCHLIST_CHECK_FIELDS + (
+    "family", "pick_rule", "quality", "entry_source", "basis_factor", "entry_adj", "target_adj", "lo80_adj",
+    "lo50_adj", "hi50_adj", "hi80_adj", "last_time", "sigma_1d", "elapsed_fraction", "sessions_held", "sessions_left",
+    "z_since_entry", "target_reached", "target_reached_session", "high_since_entry_pct", "low_since_entry_pct", "notes")
 SCOPE_PICK_RULE = "pick_rule"
 VIEW_HEAD_TO_HEAD = "head_to_head"
 ALL_HORIZONS = "all"
@@ -72,7 +78,7 @@ def home_pages(ctx: BuildContext) -> dict[str, dict]:
         "agreement": top_agreement(ctx),
         "head_to_head": head_to_head(ctx),
         "open_trades": rm_common.open_trades(ctx),
-        "trade_checks": trade_checks(ctx),
+        "trade_checks": trade_checks(ctx, CHECK_FIELDS),
         "eod": newest_eod(ctx),
         "to_date": to_date(ctx),
         "strategies": rm_common.strategies(ctx, STRATEGY_FIELDS),

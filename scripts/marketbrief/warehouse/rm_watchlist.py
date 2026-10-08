@@ -14,7 +14,7 @@ import pandas as pd
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY, RM_WATCHLIST
 from marketbrief.utils.numbers import json_safe_float
 from marketbrief.warehouse import rm_common
-from marketbrief.warehouse.market_page_parts import companies, pick, shell, trade_checks
+from marketbrief.warehouse.market_page_parts import companies, shell, trade_checks
 from marketbrief.warehouse.news_items import iso
 from marketbrief.warehouse.rm_news import market_mockup
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
@@ -61,7 +61,7 @@ def watchlist_pages(ctx: BuildContext) -> dict[str, dict]:
         "companies": sorted(companies(ctx, COMPANY_FIELDS), key=lambda row: row["ticker"]),
         "agreement": rm_common.agreement(ctx),
         "open_trades": rm_common.open_trades(ctx),
-        "trade_checks": [pick(check, CHECK_FIELDS) for check in trade_checks(ctx)],
+        "trade_checks": trade_checks(ctx, CHECK_FIELDS),
         "ranges": ranges(ctx),
         "strategies": rm_common.strategies(ctx, STRATEGY_FIELDS),
     }
