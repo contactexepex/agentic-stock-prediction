@@ -1,0 +1,704 @@
+{
+ "_example": true,
+ "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.",
+ "page": "help",
+ "spec": "docs/SPEC.md section 6, page 12; decision 35",
+ "endpoint": "(static content; no endpoint)",
+ "read_model": "(none)",
+ "sources": [
+  "design/catalogue/market_status.json",
+  "design/catalogue/strategy.json",
+  "design/catalogue/scoreboard_row.json",
+  "design/catalogue/portfolio.json"
+ ],
+ "as_of": "2026-10-06",
+ "cutoff": "2026-10-07T12:00:00Z",
+ "built_at": "2026-10-07T11:58:00Z",
+ "markets": {
+  "india": {
+   "market": "india",
+   "name": "India (NSE)",
+   "currency": "INR",
+   "as_of": "2026-10-06",
+   "cutoff": "2026-10-07T12:00:00Z",
+   "built_at": "2026-10-07T10:31:00Z",
+   "status": {
+    "market": "india",
+    "name": "India (NSE)",
+    "as_of": "2026-10-06",
+    "currency": "INR",
+    "session": {
+     "local_time": "2026-10-07T17:30+05:30",
+     "trading_day": true,
+     "session_date": "2026-10-07",
+     "previous_session": "2026-10-06",
+     "calendar_covered": true,
+     "session_open_utc": "2026-10-07T03:45:00+00:00",
+     "session_close_utc": "2026-10-07T10:00:00+00:00",
+     "in_session": false,
+     "late_run": true
+    },
+    "benchmark": {
+     "symbol": "NIFTY50",
+     "name": "Nifty 50",
+     "close": 22776.0996,
+     "close_date": "2026-10-06",
+     "change_pct": 0.98,
+     "change_5d_pct": -0.02
+    },
+    "vol_index": {
+     "symbol": "INDIAVIX",
+     "name": "India VIX",
+     "close": 13.61,
+     "close_date": "2026-10-06",
+     "change_pct": -7.92,
+     "change_5d_pct": -0.22
+    },
+    "regime": "EVENT_HEAVY",
+    "runs": {
+     "pre_open": {
+      "at": "2026-10-07T02:10:00Z",
+      "ok": true
+     },
+     "intraday": [
+      {
+       "at": "2026-10-07T05:43:00Z",
+       "ok": true
+      }
+     ],
+     "post_close": {
+      "at": null,
+      "ok": null,
+      "next_at": "2026-10-07T12:15:00Z"
+     },
+     "news": {
+      "at": "2026-10-07T10:17:00Z",
+      "ok": true,
+      "new_items": 37
+     }
+    },
+    "freshness": {
+     "state": "fresh",
+     "built_at": "2026-10-07T10:31:00Z",
+     "age_minutes": 29
+    },
+    "paper_label": "Paper only - no proven edge yet"
+   },
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "default_horizon": 1,
+   "go_live": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 294,
+    "beats_best_baseline": false
+   },
+   "go_live_detail": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 294,
+    "beats_best_baseline": false,
+    "best_baseline_net_pnl": 574.89,
+    "drawdown_limit": 1000000.0,
+    "drawdown_within_limit": true,
+    "holds_in_calm_and_volatile": null,
+    "cost_view": "your"
+   },
+   "default_amount": 100000.0,
+   "strategies": {
+    "rule.model_news.v1": {
+     "id": "rule.model_news.v1",
+     "family": "rule",
+     "name": "Model + news",
+     "description": "The signal model's probability with verified news counted at normal weight. Buys when the model gives at least 55% for a rise. This is the reference the other rule strategies are compared against.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_half.v1": {
+     "id": "rule.model_news_half.v1",
+     "family": "rule",
+     "name": "Model + half news",
+     "description": "Like the reference, but news counts half as much. Tests whether news is over-weighted.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_weight",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_double.v1": {
+     "id": "rule.model_news_double.v1",
+     "family": "rule",
+     "name": "Model + double news",
+     "description": "Like the reference, but news counts twice as much. Tests whether news deserves more weight.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_weight",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_confirmed.v1": {
+     "id": "rule.model_news_confirmed.v1",
+     "family": "rule",
+     "name": "Model + confirmed news only",
+     "description": "Like the reference, but only news confirmed by a filing or by two independent outlets counts; single-source stories are ignored. Tests whether unconfirmed news adds noise.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_statuses",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_high.v1": {
+     "id": "rule.model_news_high.v1",
+     "family": "rule",
+     "name": "Model + major news only",
+     "description": "Like the reference, but only news rated high materiality counts. Tests whether small news matters.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_materiality",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_global.v1": {
+     "id": "rule.model_news_global.v1",
+     "family": "rule",
+     "name": "Model + news + global cues",
+     "description": "Like the reference, plus the other markets' overnight moves, currencies, rates and commodities as model inputs. Tests whether global cues help (they showed no edge in the 15-year back-test).",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "cross_market",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_calm.v1": {
+     "id": "rule.model_news_calm.v1",
+     "family": "rule",
+     "name": "Model + news, calm markets only",
+     "description": "Like the reference, but makes no trades when the market regime is unstable or event-heavy. Tests whether sitting out turbulent days helps.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "regime_filter",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_strict.v1": {
+     "id": "rule.model_news_strict.v1",
+     "family": "rule",
+     "name": "Model + news, 60% bar",
+     "description": "Like the reference, but buys only when the probability of a rise is at least 60%. Fewer trades; tests whether being pickier pays.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "threshold",
+     "threshold": 0.6,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "base.always_up.v1": {
+     "id": "base.always_up.v1",
+     "family": "baseline",
+     "name": "Always buy",
+     "description": "Buys every active company every day at every horizon. Any strategy worth having must beat it after costs.",
+     "compared_to": "base.model_only.v1",
+     "differs_in": "signal",
+     "threshold": null,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "base.momentum.v1": {
+     "id": "base.momentum.v1",
+     "family": "baseline",
+     "name": "Follow yesterday",
+     "description": "Buys a company when its last session closed higher than the one before; predicts down otherwise.",
+     "compared_to": "base.model_only.v1",
+     "differs_in": "signal",
+     "threshold": null,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "base.model_only.v1": {
+     "id": "base.model_only.v1",
+     "family": "baseline",
+     "name": "Model without news",
+     "description": "The signal model alone with news switched off (weight 0). Shows what news adds to the reference.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_weight",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "ai.news_results.sonnet.v1": {
+     "id": "ai.news_results.sonnet.v1",
+     "family": "ai",
+     "name": "AI news & results (Sonnet)",
+     "description": "A Sonnet trader that reads the company's news with its verification status, results digests, filings and events, without the model score. Decides on what happened to the company.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    },
+    "ai.pattern_mood.sonnet.v1": {
+     "id": "ai.pattern_mood.sonnet.v1",
+     "family": "ai",
+     "name": "AI price pattern & mood (Sonnet)",
+     "description": "A Sonnet trader that reads prices, indicators, the market regime, global cues and sector moves, without news or the model score. Decides on how the stock and the market behave.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    },
+    "ai.combined.sonnet.v1": {
+     "id": "ai.combined.sonnet.v1",
+     "family": "ai",
+     "name": "AI combined (Sonnet)",
+     "description": "A Sonnet trader that sees everything the other two see plus the signal model's score and explanation; it may move the model's probability by at most 10 points, with a reason.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    },
+    "ai.combined.opus.v1": {
+     "id": "ai.combined.opus.v1",
+     "family": "ai",
+     "name": "AI combined (Opus)",
+     "description": "The same as the combined Sonnet trader on the stronger Opus model (the existing forecaster, extended). Tests whether the stronger model helps.",
+     "compared_to": "ai.combined.sonnet.v1",
+     "differs_in": "model",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    }
+   }
+  },
+  "us": {
+   "market": "us",
+   "name": "US (NYSE/Nasdaq)",
+   "currency": "USD",
+   "as_of": "2026-10-06",
+   "cutoff": "2026-10-07T12:00:00Z",
+   "built_at": "2026-10-07T11:58:00Z",
+   "status": {
+    "market": "us",
+    "name": "US (NYSE/Nasdaq)",
+    "as_of": "2026-10-06",
+    "currency": "USD",
+    "session": {
+     "local_time": "2026-10-07T08:00-04:00",
+     "trading_day": true,
+     "session_date": "2026-10-07",
+     "previous_session": "2026-10-06",
+     "calendar_covered": true,
+     "session_open_utc": "2026-10-07T13:30:00+00:00",
+     "session_close_utc": "2026-10-07T20:00:00+00:00",
+     "in_session": false,
+     "late_run": false
+    },
+    "benchmark": {
+     "symbol": "SPY",
+     "name": "S&P 500 ETF",
+     "close": 779.09,
+     "close_date": "2026-10-06",
+     "change_pct": 0.55,
+     "change_5d_pct": 1.95
+    },
+    "vol_index": {
+     "symbol": "VIX",
+     "name": "VIX",
+     "close": 15.01,
+     "close_date": "2026-10-06",
+     "change_pct": -3.29,
+     "change_5d_pct": -6.42
+    },
+    "regime": "TRENDING",
+    "runs": {
+     "pre_open": {
+      "at": "2026-10-07T11:45:00Z",
+      "ok": true
+     },
+     "intraday": [],
+     "post_close": {
+      "at": null,
+      "ok": null,
+      "next_at": "2026-10-07T22:15:00Z"
+     },
+     "news": {
+      "at": "2026-10-07T08:47:00Z",
+      "ok": true,
+      "new_items": 52
+     }
+    },
+    "freshness": {
+     "state": "fresh",
+     "built_at": "2026-10-07T11:58:00Z",
+     "age_minutes": 2
+    },
+    "paper_label": "Paper only - no proven edge yet"
+   },
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "default_horizon": 1,
+   "go_live": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 290,
+    "beats_best_baseline": false
+   },
+   "go_live_detail": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 290,
+    "beats_best_baseline": false,
+    "best_baseline_net_pnl": 33.88,
+    "drawdown_limit": 10000.0,
+    "drawdown_within_limit": true,
+    "holds_in_calm_and_volatile": null,
+    "cost_view": "your"
+   },
+   "default_amount": 1000.0,
+   "strategies": {
+    "rule.model_news.v1": {
+     "id": "rule.model_news.v1",
+     "family": "rule",
+     "name": "Model + news",
+     "description": "The signal model's probability with verified news counted at normal weight. Buys when the model gives at least 55% for a rise. This is the reference the other rule strategies are compared against.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_half.v1": {
+     "id": "rule.model_news_half.v1",
+     "family": "rule",
+     "name": "Model + half news",
+     "description": "Like the reference, but news counts half as much. Tests whether news is over-weighted.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_weight",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_double.v1": {
+     "id": "rule.model_news_double.v1",
+     "family": "rule",
+     "name": "Model + double news",
+     "description": "Like the reference, but news counts twice as much. Tests whether news deserves more weight.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_weight",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_confirmed.v1": {
+     "id": "rule.model_news_confirmed.v1",
+     "family": "rule",
+     "name": "Model + confirmed news only",
+     "description": "Like the reference, but only news confirmed by a filing or by two independent outlets counts; single-source stories are ignored. Tests whether unconfirmed news adds noise.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_statuses",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_high.v1": {
+     "id": "rule.model_news_high.v1",
+     "family": "rule",
+     "name": "Model + major news only",
+     "description": "Like the reference, but only news rated high materiality counts. Tests whether small news matters.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_materiality",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_global.v1": {
+     "id": "rule.model_news_global.v1",
+     "family": "rule",
+     "name": "Model + news + global cues",
+     "description": "Like the reference, plus the other markets' overnight moves, currencies, rates and commodities as model inputs. Tests whether global cues help (they showed no edge in the 15-year back-test).",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "cross_market",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_calm.v1": {
+     "id": "rule.model_news_calm.v1",
+     "family": "rule",
+     "name": "Model + news, calm markets only",
+     "description": "Like the reference, but makes no trades when the market regime is unstable or event-heavy. Tests whether sitting out turbulent days helps.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "regime_filter",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "rule.model_news_strict.v1": {
+     "id": "rule.model_news_strict.v1",
+     "family": "rule",
+     "name": "Model + news, 60% bar",
+     "description": "Like the reference, but buys only when the probability of a rise is at least 60%. Fewer trades; tests whether being pickier pays.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "threshold",
+     "threshold": 0.6,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "base.always_up.v1": {
+     "id": "base.always_up.v1",
+     "family": "baseline",
+     "name": "Always buy",
+     "description": "Buys every active company every day at every horizon. Any strategy worth having must beat it after costs.",
+     "compared_to": "base.model_only.v1",
+     "differs_in": "signal",
+     "threshold": null,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "base.momentum.v1": {
+     "id": "base.momentum.v1",
+     "family": "baseline",
+     "name": "Follow yesterday",
+     "description": "Buys a company when its last session closed higher than the one before; predicts down otherwise.",
+     "compared_to": "base.model_only.v1",
+     "differs_in": "signal",
+     "threshold": null,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "base.model_only.v1": {
+     "id": "base.model_only.v1",
+     "family": "baseline",
+     "name": "Model without news",
+     "description": "The signal model alone with news switched off (weight 0). Shows what news adds to the reference.",
+     "compared_to": "rule.model_news.v1",
+     "differs_in": "news_weight",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "live": false
+    },
+    "ai.news_results.sonnet.v1": {
+     "id": "ai.news_results.sonnet.v1",
+     "family": "ai",
+     "name": "AI news & results (Sonnet)",
+     "description": "A Sonnet trader that reads the company's news with its verification status, results digests, filings and events, without the model score. Decides on what happened to the company.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    },
+    "ai.pattern_mood.sonnet.v1": {
+     "id": "ai.pattern_mood.sonnet.v1",
+     "family": "ai",
+     "name": "AI price pattern & mood (Sonnet)",
+     "description": "A Sonnet trader that reads prices, indicators, the market regime, global cues and sector moves, without news or the model score. Decides on how the stock and the market behave.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    },
+    "ai.combined.sonnet.v1": {
+     "id": "ai.combined.sonnet.v1",
+     "family": "ai",
+     "name": "AI combined (Sonnet)",
+     "description": "A Sonnet trader that sees everything the other two see plus the signal model's score and explanation; it may move the model's probability by at most 10 points, with a reason.",
+     "compared_to": null,
+     "differs_in": null,
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    },
+    "ai.combined.opus.v1": {
+     "id": "ai.combined.opus.v1",
+     "family": "ai",
+     "name": "AI combined (Opus)",
+     "description": "The same as the combined Sonnet trader on the stronger Opus model (the existing forecaster, extended). Tests whether the stronger model helps.",
+     "compared_to": "ai.combined.sonnet.v1",
+     "differs_in": "model",
+     "threshold": 0.55,
+     "horizons": [
+      1,
+      3,
+      5
+     ],
+     "live": false
+    }
+   }
+  }
+ }
+}

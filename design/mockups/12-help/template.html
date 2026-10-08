@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Help</title>
+<meta name="description" content="Help page of the personal stock cockpit: how to read it in plain words. What Paper means and the go-live bar, horizons and chances, targets and ranges, the strategies and their families, the scores and the luck test, head-to-head picks and costs, news statuses, intraday checks, and what each page is for. Research only, nothing here is advice.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Help mockup (design track, SPEC section 6 page 12). Page-local layout only; every colour is a token. */
+.toc{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.toc a{text-decoration:none}
+.help h2{scroll-margin-top:80px}
+.help p{font-size:14px;line-height:1.6;margin:0 0 10px;max-width:78ch} .help p b{display:inline-block}
+.help ul{margin:0 0 10px;padding-left:20px;font-size:14px;line-height:1.6;max-width:78ch} .help li{margin:3px 0}
+.help .ex{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;font-size:13px;margin:6px 0 12px;padding:10px 12px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low)}
+.help .ex .l{color:var(--md-sys-color-on-surface-variant)}
+.help dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;margin:0 0 10px;max-width:84ch}
+.help dt{font-weight:600;white-space:nowrap} .help dd{margin:0;color:var(--md-sys-color-on-surface-variant);line-height:1.5}
+.fam{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 12px}
+.fam .f{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.fam .f .h{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:6px}
+.fam .f ul{margin:0;padding-left:16px;font-size:12.5px} .fam .f li{margin:4px 0} .fam .f li .tk{display:inline-block} .fam .f li small.muted{display:block;font-size:11px}
+.fam .f small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.chk{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px;font-size:13.5px;max-width:84ch}
+.chk li{display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:start} .chk .ms{width:18px;height:18px;margin-top:1px}
+.chk li.ok .ms{color:var(--mb-color-up)} .chk li.no .ms{color:var(--mb-color-down)} .chk li.na .ms{color:var(--md-sys-color-outline)}
+.pages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 4px}
+.pages a{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:10px;background:var(--md-sys-color-surface-container-low);text-decoration:none;color:inherit;font-size:13px}
+.pages a b{display:block;color:var(--md-sys-color-primary)} .pages a:hover{background:var(--md-sys-color-surface-container)}
+.pages a:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:2px}
+.sample{display:inline-flex;align-items:center;gap:8px}
+.sample .rng svg{width:100px}
+details.gl{margin-top:6px} details.gl summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:13.5px}
+.note2{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13.5px;line-height:1.5;margin-top:16px} .note2 .ms{flex:none;width:20px;height:20px;margin-top:1px}
+@media (max-width:760px){ .fam{grid-template-columns:1fr} .pages{grid-template-columns:1fr} .help dl{grid-template-columns:1fr;gap:2px 0} .help dt{margin-top:6px} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Help</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+shell(PAGES.help, 'Help', {bar: [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['science','Strategy lab',PAGES.lab], ['help','Help',PAGES.help]]});
+onMarketChange = () => render();
+const SECTIONS = [['paper', 'Paper and the go-live bar'], ['horizons', 'Horizons, chances and ranges'], ['strategies', 'The strategies'], ['scores', 'Scores and the luck test'], ['h2h', 'Head-to-head and costs'], ['news', 'News and its status'], ['intraday', 'Intraday checks'], ['pages', 'The pages'], ['numbers', 'Where the numbers come from'], ['glossary', 'Glossary']];
+const card = (id, title, ...kids) => { const c = el('section', {class:'card help', 'aria-labelledby': 'h-' + id, id}); c.append(el('div', {class:'head'}, el('h2', {id: 'h-' + id}, title))); c.append(...kids); return c; };
+const p_ = (...kids) => el('p', {}, ...kids);
+const dl = rows => { const d = el('dl'); for (const [t, s] of rows) d.append(el('dt', {}, t), el('dd', {}, s)); return d; };
+
+function render() {
+  const p = P(market), cur = p.currency, g = p.go_live_detail, page = $('#page'); page.innerHTML = '';
+  document.title = `Market brief · Help · ${LABEL[market]}`; $('#title').textContent = 'Help';
+  sideFoot(market); marketSeg(() => render());
+  page.append(pageHead(market, 'How to read the cockpit', `in plain words · the examples below use ${p.name}'s numbers · research only, nothing here is advice`));
+  const toc = el('nav', {class:'toc', 'aria-label':'On this page'}); for (const [id, t] of SECTIONS) toc.append(el('a', {class:'md-chip assist', href: '#' + id}, t)); page.append(toc);
+
+  /* paper */
+  page.append(card('paper', 'Paper, and the go-live bar',
+    p_('Everything in this cockpit is a ', el('b', {}, 'paper trade'), ': a record of what a strategy would have done, settled against the stored prices. Nothing is bought or sold, no broker is connected, and no page ever tells you to buy or sell. The ', el('span', {class:'mb-tag paper'}, 'paper'), ' tag on a figure means "measured, not acted on".'),
+    p_('A strategy stays Paper until it meets the ', el('b', {}, 'go-live bar'), ' (measured on your own costs, decision 50). Until one does, every page carries "No proven strong signals today". The bar has five checks; here is where the reference strategy stands in ', p.name, ':'),
+    el('ul', {class:'chk'}, el('li', {class: g.trades_needed === 0 ? 'ok' : 'no'}, icon(g.trades_needed === 0 ? 'ms-check' : 'ms-close'), el('span', {}, `About ${GO_LIVE_TRADES_ABOUT} settled trades per strategy`, el('small', {class:'muted', style:'display:block'}, `${g.trades_needed} still to go`))), el('li', {class: g.months_forward >= GO_LIVE_MONTHS ? 'ok' : 'no'}, icon(g.months_forward >= GO_LIVE_MONTHS ? 'ms-check' : 'ms-close'), el('span', {}, `${GO_LIVE_MONTHS} months of forward paper trading`, el('small', {class:'muted', style:'display:block'}, `${g.months_forward} so far`))), el('li', {class: g.beats_best_baseline ? 'ok' : 'no'}, icon(g.beats_best_baseline ? 'ms-check' : 'ms-close'), el('span', {}, 'Beats the best baseline after your cost, with the corrected luck test excluding zero', el('small', {class:'muted', style:'display:block'}, `best baseline ${money(cur, g.best_baseline_net_pnl, dec(cur), true)}`))), el('li', {class: g.drawdown_within_limit ? 'ok' : 'no'}, icon(g.drawdown_within_limit ? 'ms-check' : 'ms-close'), el('span', {}, 'Its worst fall from a peak stays within the limit', el('small', {class:'muted', style:'display:block'}, `limit ${money(cur, g.drawdown_limit)}`))), el('li', {class: g.holds_in_calm_and_volatile == null ? 'na' : g.holds_in_calm_and_volatile ? 'ok' : 'no'}, icon(g.holds_in_calm_and_volatile == null ? 'ms-remove' : g.holds_in_calm_and_volatile ? 'ms-check' : 'ms-close'), el('span', {}, 'Holds up in calm and in volatile markets', el('small', {class:'muted', style:'display:block'}, g.holds_in_calm_and_volatile == null ? 'not enough data yet' : '')))),
+    p_(el('b', {}, 'Proven'), ' means all five hold. A proven strategy may show a "Strong" signal; everything else is a ranking of who agrees, never a recommendation.')));
+
+  /* horizons */
+  const horizonText = `N+${p.horizons[0]} is ${horizonWords(p.horizons[0])}, N+${p.horizons[p.horizons.length - 1]} is ${horizonWords(p.horizons[p.horizons.length - 1])}`;
+  page.append(card('horizons', 'Horizons, chances, targets and ranges',
+    p_('Every prediction names a ', el('b', {}, 'horizon'), ': buy at the open of the session being predicted (called D), sell at the close of the k-th market session after it. The pages write it ', el('span', {class:'h-lab'}, `N+${p.horizons[2]}`), '. Weekends and holidays are skipped. ', horizonText, '. Every page with a horizon selector opens on N+1.'),
+    p_('The ', el('b', {}, 'chance of a rise'), ' is the strategy’s probability that the close at the horizon is above the entry. The odds meter shows it against the 50% coin-flip mark: ', el('span', {class:'sample'}, odds(0.57, 'A sample: 57% chance of a rise.'), el('span', {class:'l muted'}, '(sample value)')), '. A rule strategy buys only when the chance clears its own bar (for example 55%); below it, "no trade".'),
+    p_('The ', el('b', {}, 'target'), ' is the expected exit close. The ', el('b', {}, '50% and 80% ranges'), ' are where the close is expected to land that often. The range bar draws them around the last close: ', el('span', {class:'sample'}, rangeBar(cur, {lo80: 96, lo50: 98.5, hi50: 102, hi80: 104, target_price: 101}, 100, null), el('span', {class:'l muted'}, '(sample: the triangle is the target, the dark line the last close)')), '. Ranges are computed by a script, never by hand; an AI trader may widen one, never narrow it.'),
+    p_('"', el('b', {}, 'Agreement'), '" counts how many strategies would buy a company at a horizon (for example 12 of 15). A majority means they lean the same way; it does not mean they are right. The track record says that.')));
+
+  /* strategies */
+  const fams = el('div', {class:'fam'});
+  for (const f of ['rule', 'baseline', 'ai']) { const list = Object.values(p.strategies).filter(s => s.family === f); const box = el('div', {class:'f'}); box.append(el('div', {class:'h'}, avatar(FAMILY[f][1], f === 'ai' ? 'info' : f === 'baseline' ? 'warn' : '', 'sm'), FAMILY[f][0], el('span', {class:'muted', style:'font-weight:400'}, `· ${list.length}`)), el('small', {}, f === 'rule' ? 'Fixed rules on the signal model and verified news. Each differs from the reference in exactly one setting, so a difference in results points to that setting.' : f === 'baseline' ? 'Yardsticks, not contenders: a strategy must beat the best of them after your cost to go live.' : 'Claude traders that read the day’s evidence and write a probability and a reason of at most 60 words; two see the signal model, two are blind to it.')); const ul = el('ul'); for (const s of list) ul.append(el('li', {}, el('a', {class:'tk', href: `${PAGES.lab}#${market}/${s.id}`, 'data-tip': s.description}, s.name), el('small', {class:'muted'}, s.id === 'rule.model_news.v1' ? 'the reference' : s.differs_in ? `differs in ${s.differs_in.replace(/_/g, ' ')}` : s.threshold != null ? `bar ${pct(s.threshold)}` : 'no probability'))); box.append(ul); fams.append(box); }
+  page.append(card('strategies', 'The strategies',
+    p_(`${Object.keys(p.strategies).length} strategies predict every active company every session, in three families. Hover a name for what it does; click it for its page in the Strategy lab.`), fams,
+    p_('A strategy never changes behaviour after its first live day; a change is a new strategy with a new id, proposed by the weekly research director and approved by the owner.')));
+
+  /* scores */
+  page.append(card('scores', 'Scores, and the luck test',
+    dl([['Profit after costs', 'The headline. Market cost = brokerage, taxes and fees; strategies are ranked on it. Your cost adds your own broker’s charges; the go-live bar and your own decisions use it.'], ['Return per trade', `Profit as a percent of the amount per paper trade (${money(cur, p.default_amount)} by default, or the company’s own amount), so companies with different amounts compare.`], ['Win rate', 'The share of trades that made money after costs.'], ['Target reached', 'The share of trades whose price touched the target at some point in the window, and the typical session it happened.'], ['In range', 'The share of exit closes that landed inside the 80% range: how honest the ranges are.'], ['Drawdown', 'The deepest fall of cumulative profit from its peak, and the worst losing streak.'], ['Too few to rank', `Fewer than ${MIN_TRADES_TO_RANK} settled trades. A handful of trades is mostly luck, so such rows are greyed and a per-company "best strategy" is never trusted on its own.`]]),
+    p_(el('b', {}, 'The luck test.'), ` The pages draw it as a bar: a thin line for the ${LUCK_INTERVAL_PCT}% interval of the mean return per trade, a thick line for the same interval corrected for how many strategies were compared at once (the more you compare, the more one looks good by chance), and a tick at zero. Only when the thick bar clears zero does the label say `, el('span', {class:'mb-label success'}, 'edge'), '; otherwise ', el('span', {class:'mb-label neutral'}, 'luck?'), '. On fewer than ', String(MIN_TRADES_TO_RANK), ' trades the label is qualified.')));
+
+  /* head-to-head */
+  page.append(card('h2h', 'Head-to-head picks, and the two cost views',
+    p_('Besides the ', el('b', {}, 'accuracy view'), ' (every qualifying prediction is its own paper trade), there is a ', el('b', {}, 'head-to-head view'), ': every session, for each company, the strongest rule strategy and the strongest AI trader each pick one horizon under two pick rules, ', el('b', {}, 'best expected gain'), ' (chance × move up − (1 − chance) × move down − costs, per session held) and ', el('b', {}, 'highest probability'), '. Up to four paper trades a day per company, on identical company-days, so rule and AI compare fairly.'),
+    p_('Each pick shows two cost labels: ', el('span', {class:'mb-label success'}, 'clears market costs'), ' or ', el('span', {class:'mb-label neutral'}, 'below market costs'), ' (the expected gain after the market charges, the ranking view), and ', el('span', {class:'mb-label success'}, 'viable at your cost'), ' or ', el('span', {class:'mb-label warn'}, 'not viable at your cost'), ' (after your own broker’s charges too, decision 51). The flag never blocks a paper trade; it tells you whether the same trade would be worth it for you.'),
+    el('div', {class:'ex'}, el('span', {class:'l'}, 'Pick-rule labels:'), el('span', {class:'h-lab'}, 'N+3'), 'the horizon', el('span', {class:'mb-label neutral', style:'font-size:10.5px;padding:0 5px'}, 'H2H'), 'a head-to-head trade in a list of open trades')));
+
+  /* news */
+  const nl = el('dl'); for (const [k, v] of Object.entries(STATUS)) nl.append(el('dt', {}, statusBadge(k)), el('dd', {}, v[1]));
+  page.append(card('news', 'News, and what its status allows',
+    p_('Every stored story is read from a vetted outlet and checked: how many independent outlets carry it, whether a filing or company release confirms it, whether it is a rumour or a promotion. The status is computed, not guessed, and shown as of the time it was known.'),
+    nl,
+    p_('Only a confirmed or corroborated item may be the main evidence of a call; a single-source or unverified item lowers the confidence; rumours and promotional items never support a call; a contradicted item may only widen a range. The arrow beside a headline is the news analyst’s sentiment: ', el('span', {class:'sample'}, sentSquare(0.6), sentSquare(0), sentSquare(-0.6), el('span', {class:'l muted'}, '(sample values: positive, neutral, negative)')), '.')));
+
+  /* intraday */
+  const bl = el('dl'); for (const [k, v] of Object.entries(BAND)) bl.append(el('dt', {}, BAND_SHORT[k]), el('dd', {}, `The price is ${v[0]} of the trade’s own prediction.`)); for (const [k, v] of Object.entries(FLAG)) bl.append(el('dt', {}, el('span', {class:'st flag', style:'display:inline-flex;align-items:center;gap:4px'}, icon('ms-warning'), FLAG_SHORT[k])), el('dd', {}, `Flagged: the trade is ${v}.`));
+  page.append(card('intraday', 'Intraday checks',
+    p_(`${INTRADAY_CHECKS_PER_SESSION} times per session every open paper trade is compared with its own prediction at that moment’s price: where it sits in its range, how far it is from its target, and whether it moves against the prediction. Monitoring only: nothing is traded on a check. A flagged trade gets a short note from the deviation explainer, citing only stored causes (the market, the sector, news, events).`),
+    bl));
+
+  /* pages */
+  const pg = el('div', {class:'pages'});
+  const rows = [[PAGES.home, 'home', 'Home', 'the day at a glance: who agrees, today’s head-to-head trades, rule vs AI, open trades, alerts, the runs'], [PAGES.watchlist, 'format_list_bulleted', 'Watchlist', 'every active company with price, move, agreement, range and open trades; filter by sector'], [PAGES.company, 'apartment', 'Company', 'one company: the decision card, the chart with targets and ranges, today’s path, settled results and why, news, results, events, settings'], [PAGES.strategies, 'query_stats', 'Stock strategies', 'every strategy on one company, ranked by profit after costs, with the luck guard'], [PAGES.lab, 'science', 'Strategy lab', 'all strategies on one scoreboard, each in plain words, cumulative lines and heatmaps'], [PAGES.compare, 'layers', 'Rule vs AI', 'the head-to-head: scorecard, matches, the analyst’s reasons, the weekly review'], [PAGES.portfolios, 'account_balance_wallet', 'Paper portfolios', 'head-to-head portfolios, open trades by strategy, your own paper trades with a euro view'], [PAGES.track, 'query_stats', 'Track record', 'accuracy over time, calibration, scoring bases apart'], [PAGES.news, 'newspaper', 'News', 'news by company with status and impact (folded into Home and Company in this design round)'], [PAGES.companies, 'apartment', 'Companies', 'the watchlist as data: add, pause, amounts, delete, requests, history'], [PAGES.assistant, 'bolt', 'Assistant', 'ask in plain words; answers cite ids and as-of times and never advise real trades']];
+  for (const [href, ico, t, s] of rows) pg.append(el('a', {href}, avatar(ico, 'neutral', 'sm'), el('span', {}, el('b', {}, t), s)));
+  page.append(card('pages', 'The pages', p_('Every page shows its "as of" time and freshness in the chips at the top, works on a phone and with the keyboard, and marks every signal Paper.'), pg));
+
+  /* numbers */
+  page.append(card('numbers', 'Where the numbers come from',
+    p_('Prices, news, filings and events are collected from free public sources every session; predictions are made before the open; trades are settled after the close against the stored closes; the scoreboard, the luck test and the go-live bar are recomputed from the settled trades. Nothing is typed in by hand and nothing is estimated.'),
+    p_('Every page reads data only up to its own "as of" time, so a page about a past day never uses anything learned later. The ', el('b', {}, 'freshness'), ' chip says when the page was built and how old its data is; a stale page says so.'),
+    p_('The assistant answers in plain words from the same data, cites the ids and as-of times it used, says "not in the data" when it is not, and never advises a real trade.')));
+
+  /* glossary */
+  const gl = el('details', {class:'gl'}, el('summary', {}, 'Glossary'));
+  gl.append(dl([['As of', 'The newest trading date with stored indicators; every number on a page is computed to it.'], ['Cut-off', 'The time after which nothing is read for a page; stops look-ahead.'], ['D', 'The session being predicted: a trade enters at its open.'], ['Regime', 'The market mood label stored by the daily run: CALM, TRENDING, EVENT_HEAVY or UNSTABLE. Rule strategies either skip the last two or not; AI traders lower their probability in them.'], ['Signal model', 'The explainable up/down probability built from the stored indicators and verified news, refitted monthly; the reference rule strategy trades it as is.'], ['Baseline', 'A yardstick strategy: always buy, follow yesterday, or the signal model without news.'], ['Pick rule', 'How a family chooses one horizon for its head-to-head trade: best expected gain or highest probability.'], ['Cost view', 'Market cost (the ranking view) or your cost (market cost plus your own broker’s charges).'], ['Settled', 'A paper trade whose exit close is stored; its profit after costs is final.'], ['Unrealised', 'The profit of an open paper trade at the latest stored close, before costs.'], ['Reason split', 'A settled trade’s move split into what the market explains, the sector, verified news, and the company itself.'], ['EOD analyst', 'The Claude agent that writes a reason of at most 60 words per head-to-head trade and the day’s biggest wins and misses, after the close.'], ['Research director', 'The Claude agent that writes the weekly review and proposes changes as config diffs; it changes nothing itself.'], ['Inactive company', 'Still collected, never predicted or traded; its open paper trades still settle.']]));
+  page.append(card('glossary', 'Glossary', gl));
+  page.append(el('div', {class:'note2'}, icon('ms-info'), el('div', {}, el('b', {}, 'Research only.'), ' This is a personal research project. Nothing here is investment advice, nothing trades, and no broker is connected. Every figure is a paper record until a strategy meets the go-live bar; even then the cockpit ranks and explains, it never instructs.')));
+  page.append(footer(market, 'static content (no endpoint)'));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>
