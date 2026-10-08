@@ -580,7 +580,7 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
 .ci{display:inline-flex;align-items:center;gap:8px;min-width:0}
 .ci svg{display:block;width:120px;height:14px;flex:none}
 .ci .track{fill:var(--md-sys-color-surface-container-highest)} .ci .band{stroke:var(--mb-chart-1);stroke-width:4;stroke-linecap:round}
-.ci .band.dn{stroke:var(--mb-color-down)} .ci .band.up{stroke:var(--mb-color-up)}
+.ci .band.down{stroke:var(--mb-color-down)} .ci .band.up{stroke:var(--mb-color-up)}
 .ci .pt{fill:var(--md-sys-color-on-surface)} .ci .mid{stroke:var(--mb-chart-axis);stroke-width:1;stroke-dasharray:2 2} .ci .base{stroke:var(--mb-color-warn);stroke-width:2}
 .ci b{font-weight:700;font-variant-numeric:tabular-nums}
 .tbl td.num .ci{justify-content:flex-end}
@@ -703,8 +703,9 @@ const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange f
   promotional: ['promotional', 'A paid, promotional or opinion item. Never supports a call.', 'ms-close'],
   contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close']};
 const CAN_CARRY = ['confirmed_primary', 'corroborated'];
-/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading and about 300 settled trades per strategy; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank; F2.3 = the back-test runs on the 15-year history cache; F7.1 luck test = a 95% percentile bootstrap interval (marketbrief/lab/luck.py, alpha 0.05); F4.2, section 7 and F6 = an AI trader's reason, a deviation note and an EOD reason are at most 60 words. */
+/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading and about 300 settled trades per strategy; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank; F2.3 = the back-test runs on the 15-year history cache; F7.1 luck test = a 95% percentile bootstrap interval (marketbrief/lab/luck.py, alpha 0.05); F4.2, section 7 and F6 = an AI trader's reason, a deviation note and an EOD reason are at most 60 words; F11 and mcp/tools.yaml (explain) = the assistant's question is at most 500 characters, its budget $0.65 a day under a $20 monthly hard cap, conversations kept 90 days. */
 const GO_LIVE_MONTHS = 2, GO_LIVE_TRADES_ABOUT = 300, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20, BACKTEST_YEARS = 15, LUCK_INTERVAL_PCT = 95, REASON_MAX_WORDS = 60;
+const ASSISTANT_QUESTION_MAX_CHARS = 500, ASSISTANT_DAILY_USD = 0.65, ASSISTANT_MONTHLY_USD_CAP = 20, ASSISTANT_LOG_DAYS = 90;
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
 const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
@@ -829,7 +830,7 @@ onMarketChange = () => { basisKey = null; render(); };
 const T = m => P(m).track;
 const f3 = x => x == null ? '—' : (Math.round(x * 1000) / 1000).toFixed(3);
 const f4 = x => x == null ? '—' : (Math.round(x * 10000) / 10000).toFixed(4);
-const sk = x => x == null ? '—' : (x > 0 ? '+' : '') + f4(x);
+const sk = x => x == null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + f4(Math.abs(x));
 const BASELINE = {always_up: 'Always up', momentum_5d: 'Momentum (5 days)', rsi_mean_reversion: 'RSI mean reversion', benchmark_long_per_date: 'Benchmark long, per date', '–': '(no baseline)'};
 const BASIS_WORDS = {close_to_close: 'from the as-of close to the close h sessions later (calls made before the switch date in the settings)', open_to_close: 'N+k: bought at the open of the first session after the call, sold at the close of the k-th session after it (calls from the switch date on)'};
 const keyWords = key => { const m = /^(\d+)d (\w+)$/.exec(key); return m ? `${m[1]} session${m[1] === '1' ? '' : 's'} · ${call_basisLabel(m[2])}` : key; };
@@ -854,17 +855,17 @@ function skillBand(m) {
   const s = T(m).skill, shown = s.state === 'shown';
   return el('section', {class:'mb-alert band ' + (shown ? 'success' : 'paper'), 'aria-label':'Signal model skill'}, icon(shown ? 'ms-check' : 'ms-info'),
     el('div', {}, el('b', {class:'t'}, s.label), el('div', {class:'s'}, `From the weekly review ${s.review.id}, computed ${fmtLocal(s.review.computed_at, m, true)}; the back-test below says why. Nothing here is advice.`)),
-    help(`${s.why} ${s.rule}`));
+    help(s.rule));
 }
 
 function kpis(m) {
   const p = P(m), t = T(m), c = t.calls[0], a = c ? c.all : null, min = t.min_sample;
   const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
   const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
-  K.append(card('verified', t.skill.state === 'shown' ? 'success' : 'paper', 'Signal model', t.skill.state === 'shown' ? 'Skill shown' : 'No proven skill', el('span', {class:'labs'}, el('span', {class:'mb-tag paper'}, 'paper'), ` review ${t.skill.review.id}`), t.skill.rule));
-  K.append(card('track_changes', 'info', c ? `Calls scored · ${c.label}` : 'Calls scored', a ? String(a.n) : '0', a ? el('span', {class:'labs'}, `${a.hits} hit${a.hits === 1 ? '' : 's'} · ${pct(a.share)} `, few(a.n, min) ? fewTag(a.n, min) : el('span', {class:'mb-label neutral'}, `${pct(a.wilson_lo)}–${pct(a.wilson_hi)}`)) : 'no call scored yet', a ? `${a.n} direction calls scored on the ${c.label} basis, all horizons; ${a.hits} came true. The range ${pct(a.wilson_lo)}–${pct(a.wilson_hi)} is the Wilson 95% interval of the hit rate: with this few calls it is wide.` : 'No call has been scored yet.'));
-  K.append(card('balance', a && a.edge > 0 ? 'success' : 'neutral', 'Against always-up', a ? delta(a.edge * 100, 1, ' pts') : '—', a ? `always-up would have hit ${pct(a.always_up)}` : 'no call scored yet', 'The hit rate minus the share of calls whose stock simply went up (the always-up baseline). Positive means the calls beat a coin that always says up.'));
-  K.append(card('query_stats', a && a.scores.brier_skill > 0 ? 'success' : 'neutral', 'Brier score', a ? f3(a.scores.brier) : '—', a ? el('span', {class:'labs'}, `skill ${sk(a.scores.brier_skill)} vs the base rate · log loss ${f3(a.scores.log_loss)}`) : 'no call scored yet', 'The Brier score is the mean squared error of the stated confidence (0 is perfect, 0.25 is a coin flip). Brier skill compares it with always predicting the base rate: positive is better than the base rate.'));
+  K.append(card('verified_user', t.skill.state === 'shown' ? 'success' : 'paper', 'Signal model', t.skill.state === 'shown' ? 'Skill shown' : 'No proven skill', el('span', {class:'labs'}, el('span', {class:'mb-tag paper'}, 'paper'), ` review ${t.skill.review.id}`), t.skill.rule));
+  K.append(card('history', 'info', c ? `Calls scored · ${c.label}` : 'Calls scored', a ? String(a.n) : '0', a ? el('span', {class:'labs'}, `${a.hits} hit${a.hits === 1 ? '' : 's'} · ${pct(a.share)} `, few(a.n, min) ? fewTag(a.n, min) : el('span', {class:'mb-label neutral'}, `${pct(a.wilson_lo)}–${pct(a.wilson_hi)}`)) : 'no call scored yet', a ? `${a.n} direction calls scored on the ${c.label} basis, all horizons; ${a.hits} came true. The range ${pct(a.wilson_lo)}–${pct(a.wilson_hi)} is the Wilson 95% interval of the hit rate${few(a.n, min) ? ': with this few calls it is wide' : ''}.` : 'No call has been scored yet.'));
+  K.append(card('trending_flat', a && !few(a.n, min) && a.edge > 0 ? 'success' : 'neutral', 'Against always-up', a ? delta(a.edge * 100, 1, ' pts') : '—', a ? `always-up would have hit ${pct(a.always_up)}` : 'no call scored yet', 'The hit rate minus the share of calls whose stock simply went up (the always-up baseline). Positive means the calls beat a coin that always says up.'));
+  K.append(card('query_stats', a && !few(a.n, min) && a.scores.brier_skill > 0 ? 'success' : 'neutral', 'Brier score', a ? f3(a.scores.brier) : '—', a ? el('span', {class:'labs'}, `skill ${sk(a.scores.brier_skill)} vs the base rate · log loss ${f3(a.scores.log_loss)}`) : 'no call scored yet', 'The Brier score is the mean squared error of the stated confidence (0 is perfect, 0.25 is a coin flip). Brier skill compares it with always predicting the base rate: positive is better than the base rate.'));
   return K;
 }
 
@@ -888,11 +889,11 @@ function basisCard(m) {
     tr.append(el('td', {class:'num'}, `${b.n}`, el('small', {class:'muted', style:'display:block'}, `${b.hits} hit${b.hits === 1 ? '' : 's'}`)));
     tr.append(el('td', {class:'num'}, ciBar(b.wilson_lo, b.wilson_hi, b.share, {mid: 0.5, base: b.always_up, text: pct(b.share), tip: `${b.hits} of ${b.n} came true (${pct(b.share)}); Wilson 95% interval ${pct(b.wilson_lo)}–${pct(b.wilson_hi)}; always-up ${pct(b.always_up)}.`})));
     tr.append(el('td', {class:'num c2'}, pct(b.always_up)));
-    tr.append(el('td', {class:'num c2'}, el('span', {class:'mb-delta ' + (b.edge > 0 ? 'up' : b.edge < 0 ? 'dn' : '')}, delta(b.edge * 100, 1, ' pts'))));
+    tr.append(el('td', {class:'num c2'}, el('span', {class:'mb-delta ' + (b.edge > 0 ? 'up' : b.edge < 0 ? 'down' : '')}, delta(b.edge * 100, 1, ' pts'))));
     tr.append(el('td', {class:'num c3'}, pct(b.mean_confidence, 1)));
     tr.append(el('td', {class:'num'}, f3(b.scores.brier)));
     tr.append(el('td', {class:'num c3'}, f3(b.scores.log_loss)));
-    tr.append(el('td', {class:'num c2'}, el('span', {class:'mb-delta ' + (b.scores.brier_skill > 0 ? 'up' : b.scores.brier_skill < 0 ? 'dn' : '')}, sk(b.scores.brier_skill))));
+    tr.append(el('td', {class:'num c2'}, el('span', {class:'mb-delta ' + (b.scores.brier_skill > 0 ? 'up' : b.scores.brier_skill < 0 ? 'down' : '')}, sk(b.scores.brier_skill))));
     body.append(tr);
   }
   tb.append(body); wrap.append(tb); card.append(wrap);
@@ -933,7 +934,7 @@ function drawCalibration(m) {
   for (const b of bands) {
     const cx = b.n ? X(b.mean_conf) : X((b.lo + b.hi) / 2);
     if (b.n) { s.append(svgEl('line', {class:'wil', x1: cx, x2: cx, y1: Y(b.wilson_lo), y2: Y(b.wilson_hi)})); s.append(svgEl('circle', {class:'pt', cx, cy: Y(b.hit_rate), r: 6})); const n = svgEl('text', {class:'n', x: cx + 10, y: Y(b.hit_rate) + 4}); n.textContent = `${b.n}`; s.append(n); }
-    else s.append(svgEl('circle', {class:'pt empty', cx, cy: Y((b.lo + b.hi) / 2), r: 5}));
+    else s.append(svgEl('circle', {class:'pt empty', cx, cy: Y(0), r: 5}));   /* no calls: a hollow mark on the axis; the band's tooltip and the table say so */
     s.append(svgEl('rect', {class:'hit', x: X(b.lo), y: Tp, width: X(b.hi) - X(b.lo), height: H - Tp - B, tabindex: 0, 'data-tip': b.n ? `${b.bin} confidence: ${b.n} call${b.n === 1 ? '' : 's'}, mean confidence ${pct(b.mean_conf, 1)}, hit rate ${pct(b.hit_rate)} (Wilson ${pct(b.wilson_lo)}–${pct(b.wilson_hi)}).` : `${b.bin} confidence: no calls in this band yet.`}));
   }
   s.append(grid, axis); host.append(s); makeFocusable(host);
@@ -963,18 +964,18 @@ function backtestCard(m) {
   card.append(el('div', {class:'head'}, el('h2', {}, 'Signal model back-test', help('The weekly review’s walk-forward test of the signal model on the stored history: each month’s model is fitted on the past and scored on the next month, never on what it saw. Not live, and not a paper trade.')), el('span', {class:'end muted'}, `computed ${fmtLocal(b.computed_at, m, true)}`)));
   card.append(el('p', {class:'verd'}, el('b', {}, 'Verdict. '), b.verdict));
   const d = b.data;
-  card.append(el('div', {class:'kv'}, el('div', {}, el('div', {class:'l'}, 'Companies'), el('div', {class:'v'}, String(d.tickers))), el('div', {}, el('div', {class:'l'}, 'Bars from'), el('div', {class:'v'}, fmtDY(d.first_bar))), el('div', {}, el('div', {class:'l'}, 'Scored days'), el('div', {class:'v'}, `${fmtDY(d.first_panel_date)} – ${fmtDY(d.last_panel_date)}`)), el('div', {}, el('div', {class:'l'}, 'Rows'), el('div', {class:'v'}, d.panel_rows.toLocaleString('en-US'))), el('div', {'data-tip':'The round trip (buy and sell) cost in percent of a 100-unit trade, taken off every back-test position.'}, el('div', {class:'l'}, 'Round-trip cost'), el('div', {class:'v'}, `${d.round_trip_cost_pct_at_100}%`))));
+  card.append(el('div', {class:'kv'}, el('div', {}, el('div', {class:'l'}, 'Companies'), el('div', {class:'v'}, String(d.tickers))), el('div', {}, el('div', {class:'l'}, 'Bars from'), el('div', {class:'v'}, fmtDY(d.first_bar))), el('div', {}, el('div', {class:'l'}, 'Scored days'), el('div', {class:'v'}, `${fmtDY(d.first_panel_date)} – ${fmtDY(d.last_panel_date)}`)), el('div', {}, el('div', {class:'l'}, 'Rows'), el('div', {class:'v'}, d.panel_rows.toLocaleString('en-US'))), el('div', {'data-tip':'The round-trip (buy and sell) cost in percent at a price of 100, taken off every back-test position.'}, el('div', {class:'l'}, 'Round-trip cost'), el('div', {class:'v'}, `${d.round_trip_cost_pct_at_100}%`))));
   /* scores per horizon and basis */
   const w1 = el('div', {class:'md-table-wrap'}), t1 = el('table', {class:'md-table tbl x'});
-  t1.append(el('thead', {}, el('tr', {}, el('th', {}, 'Horizon · basis'), el('th', {class:'num c2'}, 'Rows', help('Company-days scored, and the number of days.')), el('th', {class:'num'}, 'Brier', help('Against the base-rate Brier beside it; skill = the gap, positive is better.')), el('th', {class:'num c3'}, 'Base rate'), el('th', {class:'num'}, 'Skill'), el('th', {class:'num'}, 'AUC', help('Area under the curve: 0.5 is no ranking ability, 1 is perfect. The line is its 95% interval; skill needs the whole interval above 0.5.')), el('th', {class:'cw'}, 'Skill shown'))));
+  t1.append(el('thead', {}, el('tr', {}, el('th', {}, 'Horizon · basis'), el('th', {class:'num c2'}, 'Rows', help('Company-days scored, and the number of days.')), el('th', {class:'num'}, 'Brier', help('Against the Brier of always predicting the base rate (its own column on wide screens, in each row’s tooltip otherwise); skill = the gap, positive is better.')), el('th', {class:'num c3'}, 'Base rate'), el('th', {class:'num'}, 'Skill'), el('th', {class:'num'}, 'AUC', help('Area under the curve: 0.5 is no ranking ability, 1 is perfect. The line is its 95% interval; skill needs the whole interval above 0.5.')), el('th', {class:'cw'}, 'Skill shown'))));
   const b1 = el('tbody');
   const skillTag = r => el('span', {class:'mb-label ' + (r.skill ? 'success' : 'neutral')}, icon(r.skill ? 'ms-check' : 'ms-close'), r.skill ? 'skill shown' : 'no skill shown');
-  for (const r of b.scores) b1.append(el('tr', {}, el('td', {}, el('b', {}, keyWords(r.key)), el('small', {class:'ph'}, skillTag(r))), el('td', {class:'num c2'}, r.n.toLocaleString('en-US'), el('small', {class:'muted', style:'display:block'}, `${r.dates} days`)), el('td', {class:'num'}, f4(r.brier)), el('td', {class:'num c3'}, f4(r.brier_base_rate)), el('td', {class:'num'}, el('span', {class:'mb-delta ' + (r.brier_skill > 0 ? 'up' : r.brier_skill < 0 ? 'dn' : '')}, sk(r.brier_skill))), el('td', {class:'num'}, ciBar(r.auc95[0], r.auc95[1], r.auc, {min: 0.4, max: 0.6, mid: 0.5, text: f3(r.auc), cls: r.auc95[0] > 0.5 ? 'up' : r.auc95[1] < 0.5 ? 'dn' : '', tip: `AUC ${f4(r.auc)}, 95% interval ${f4(r.auc95[0])}–${f4(r.auc95[1])} (axis 0.40–0.60).`})), el('td', {class:'cw'}, skillTag(r))));
+  for (const r of b.scores) b1.append(el('tr', {}, el('td', {}, el('b', {}, keyWords(r.key)), el('small', {class:'ph'}, skillTag(r))), el('td', {class:'num c2'}, r.n.toLocaleString('en-US'), el('small', {class:'muted', style:'display:block'}, `${r.dates} days`)), el('td', {class:'num', 'data-tip': `Brier ${f4(r.brier)} against ${f4(r.brier_base_rate)} for always predicting the base rate, on ${r.n.toLocaleString('en-US')} rows over ${r.dates} days.`}, f4(r.brier)), el('td', {class:'num c3'}, f4(r.brier_base_rate)), el('td', {class:'num'}, el('span', {class:'mb-delta ' + (r.brier_skill > 0 ? 'up' : r.brier_skill < 0 ? 'down' : '')}, sk(r.brier_skill))), el('td', {class:'num'}, ciBar(r.auc95[0], r.auc95[1], r.auc, {min: 0.4, max: 0.6, mid: 0.5, text: f3(r.auc), cls: r.auc95[0] > 0.5 ? 'up' : r.auc95[1] < 0.5 ? 'down' : '', tip: `AUC ${f4(r.auc)}, 95% interval ${f4(r.auc95[0])}–${f4(r.auc95[1])} (axis 0.40–0.60).`})), el('td', {class:'cw'}, skillTag(r))));
   t1.append(b1); w1.append(t1);
   card.append(el('h3', {class:'sub2'}, 'Scores'), w1);
   /* paper long vs baselines */
   const w2 = el('div', {class:'md-table-wrap', style:'margin-top:12px'}), t2 = el('table', {class:'md-table tbl x'});
-  t2.append(el('thead', {}, el('tr', {}, el('th', {}, 'Baseline'), el('th', {class:'num c2'}, 'Bar'), el('th', {class:'num c2'}, 'Positions'), el('th', {class:'num c3'}, 'Days'), el('th', {class:'num'}, 'Mean per day', help('The model’s paper long minus the baseline, mean per day in percent, with its 95% interval; the dashed tick is zero.')), el('th', {class:'cw'}, 'Verdict'))));
+  t2.append(el('thead', {}, el('tr', {}, el('th', {}, 'Baseline'), el('th', {class:'num c2'}, 'Bar'), el('th', {class:'num c2'}, 'Positions'), el('th', {class:'num c3'}, 'Days'), el('th', {class:'num'}, 'Mean per entry date', help('The model’s paper long minus the baseline: the return over the whole window (1 or 5 sessions), averaged per entry date, in percent, with its 95% interval; the dashed tick is zero.')), el('th', {class:'cw'}, 'Verdict'))));
   const b2 = el('tbody'), groups = new Map();
   for (const r of b.strategy) { if (!groups.has(r.key)) groups.set(r.key, []); groups.get(r.key).push(r); }
   for (const [key, rows] of groups) {
@@ -983,7 +984,7 @@ function backtestCard(m) {
       const lo = r.ci95_pct ? r.ci95_pct[0] : null, hi = r.ci95_pct ? r.ci95_pct[1] : null, span = Math.max(1, Math.abs(lo ?? 0), Math.abs(hi ?? 0), Math.abs(r.mean_pct ?? 0)) * 1.1;
       const v = r.verdict, vk = /beat|better|above/.test(v) ? 'success' : /lose|worse|below/.test(v) ? 'danger' : 'neutral';
       const vtag = () => el('span', {class:'mb-label ' + vk}, v);
-      b2.append(el('tr', {class: r.positions ? '' : 'few'}, el('td', {}, el('b', {}, BASELINE[r.baseline] || r.baseline), el('small', {class:'ph'}, vtag())), el('td', {class:'num c2'}, pct(Number(r.threshold))), el('td', {class:'num c2'}, String(r.positions)), el('td', {class:'num c3'}, String(r.dates)), el('td', {class:'num'}, r.mean_pct == null ? '—' : ciBar(lo, hi, r.mean_pct, {min: -span, max: span, mid: 0, text: sgn(r.mean_pct), cls: lo != null && lo > 0 ? 'up' : hi != null && hi < 0 ? 'dn' : '', tip: lo != null ? `Mean ${sgn(r.mean_pct)} a day, 95% interval ${sgn(lo)} to ${sgn(hi)}.` : `Mean ${sgn(r.mean_pct)} a day; no interval.`})), el('td', {class:'cw'}, vtag())));
+      b2.append(el('tr', {class: r.positions ? '' : 'few'}, el('td', {}, el('b', {}, BASELINE[r.baseline] || r.baseline), el('small', {class:'ph'}, `bar ${pct(Number(r.threshold))} · `, vtag())), el('td', {class:'num c2'}, pct(Number(r.threshold))), el('td', {class:'num c2'}, String(r.positions)), el('td', {class:'num c3'}, String(r.dates)), el('td', {class:'num'}, r.mean_pct == null ? '—' : ciBar(lo, hi, r.mean_pct, {min: -span, max: span, mid: 0, text: sgn(r.mean_pct), cls: lo != null && lo > 0 ? 'up' : hi != null && hi < 0 ? 'down' : '', tip: lo != null ? `Mean ${sgn(r.mean_pct)} per entry date over the window, 95% interval ${sgn(lo)} to ${sgn(hi)}.` : `Mean ${sgn(r.mean_pct)} per entry date over the window; no interval.`})), el('td', {class:'cw'}, vtag())));
     }
   }
   t2.append(b2); w2.append(t2);

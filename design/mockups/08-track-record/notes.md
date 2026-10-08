@@ -16,8 +16,9 @@ copied with the keys named, and the Track record's nested blocks are copied whol
 
 Shown but computed by the page (presentation only): the "not enough history yet" gate (`n` below `min_sample`), the
 interval bars (hit rate with its Wilson interval and the always-up tick; AUC with its 95% interval on a 0.40-0.60
-axis; mean return per day with its 95% interval around zero), the calibration chart (each band's `mean_conf` against
-its `hit_rate` with the Wilson interval, the diagonal, empty bands hollow), the grouping of the back-test's strategy
+axis; the mean per entry date of the paper long's return over the window, with its 95% interval around zero), the
+calibration chart (each band's `mean_conf` against its `hit_rate` with the Wilson interval, the diagonal, empty bands
+as hollow marks on the axis), the grouping of the back-test's strategy
 rows by `key`, the words for a back-test key (`1d close_to_close` = "1 session · close→close"), the baseline names
 (`always_up` = "Always up", `momentum_5d`, `rsi_mean_reversion`, `benchmark_long_per_date`, `–` = "(no baseline)"),
 and the verdict badge colour (a verdict that beats is green, one that loses red, anything else neutral; the example

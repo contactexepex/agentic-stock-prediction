@@ -20,8 +20,8 @@ ranges held, the weekly review's back-test, and the historical replay kept apart
 the page ranks and explains, it never says buy or sell.
 
 ## Layout (desktop: band, KPIs, calls table, calibration beside ranges and over-time, back-test, replay; phone: one column)
-1. **Page head** and the **skill band**: the read model's own label and the review it comes from; the full "why" and
-   the skill rule in the info icon; the back-test card below says why in full.
+1. **Page head** and the **skill band**: the read model's own label and the review it comes from; the skill rule in
+   the info icon; the back-test card below says why in full.
 2. **KPIs**: the signal model's state; calls scored on the first basis with hits, hit rate and its Wilson 95% interval
    (or "not enough history yet" below `min_sample`); the edge against always-up in points; the Brier score with its
    skill against the base rate and the log loss. Each tooltip explains the measure in one sentence.
@@ -30,11 +30,12 @@ the page ranks and explains, it never says buy or sell.
    old window marked "legacy", never pooled with N+k); the hit rate as an interval bar (thick line = Wilson 95%
    interval, dot = the hit rate, dashed tick = 50%, orange tick = the always-up baseline), always-up, edge, mean
    confidence, Brier, log loss and Brier skill with the sign. Rows below `min_sample` are greyed with the gate's
-   words. Columns by width: log loss, mean confidence and always-up from 1360 px; edge and Brier skill from 1001 px;
+   words. Columns by width: log loss and mean confidence from 1360 px; always-up, edge and Brier skill from 1001 px;
    on a phone the first column wraps and the bars shrink. A note names the example block (`example_parts`).
 4. **Calibration**: the reliability bands of the selected basis drawn at the card's width: stated confidence (band)
    on the x axis, the share that came true on the y axis, the dashed diagonal where a well-calibrated forecaster
-   sits, each band a dot with its Wilson interval and its call count, empty bands hollow; every band is a focusable
+   sits, each band a dot with its Wilson interval and its call count, an empty band a hollow mark on the axis
+   (its tooltip and the table say "no calls"); every band is a focusable
    hit area with the numbers in its tooltip; the same numbers in a small table under it.
 5. **Ranges held** (empty state until a range is scored: the catalogue's `ranges` is empty and names no fields; the
    page expects per-horizon rows with the inside-50% and inside-80% shares and their Wilson intervals) and
@@ -43,9 +44,10 @@ the page ranks and explains, it never says buy or sell.
    block as tiles (companies, bars from, scored days, rows, the round-trip cost), the **scores** per horizon and basis
    (rows and days, Brier against the base-rate Brier, Brier skill with the sign, AUC with its 95% interval on a
    0.40–0.60 axis, "skill shown" yes/no as a labelled badge), and the **paper long against the baselines** grouped
-   by horizon and basis (the bar, positions, days, the mean per day with its 95% interval around zero, the engine's
-   verdict as a badge: "not distinguishable", "fewer than 20 dates", "no positions"). On narrow screens the badge
-   moves under the row's name.
+   by horizon and basis (the bar, positions, days, the mean per entry date of the return over the window with its
+   95% interval around zero, the engine's verdict as a badge: "not distinguishable", "fewer than 20 dates", "no
+   positions"). On narrow screens the bar and the badge move under the row's name, so rows of one baseline at
+   different bars stay apart.
 7. **Historical replay**: "not live" tag; the empty state when none is stored by the cut-off (the example).
 8. **Legend** (Paper, Wilson interval, Brier, the gate, legacy) and **footer**.
 
@@ -74,9 +76,17 @@ markets: no table wider than its wrapper. A script at six widths in both markets
 chart clipped or overlapping, every tooltip element focusable, no page error; the market switch and a keyboard pass
 over the chart's bands work. Rebuild is byte-identical.
 
+Judge round 1 (2026-10-08) found four blockers, all fixed before round 2: the back-test's strategy column said "mean
+per day" where the engine averages the whole window's return per entry date; the bar (threshold) column was hidden
+at and below 1000 px with nothing replacing it, so rows of one baseline at different bars read alike on a phone;
+this file misstated the calls table's column breakpoints; and it said the "why" sentence appears once while the band's
+info icon also held it. The cosmetics fixed with them: the three KPI icons that were not in the icon sheet, the
+negative Brier skill's colour and minus sign, empty calibration bands moved from the diagonal to the axis, the Brier and always-up KPIs stay neutral below `min_sample`, the round-trip cost and base-rate wordings,
+and the "wide interval" remark only below `min_sample`.
+
 ## Decisions taken for the owner (reported to the orchestrator)
-- The skill verdict leads the page as a band with the review it comes from, and the long "why" sentence appears once
-  (in the back-test card, with the rule in the band's info icon), so the top of the page stays short.
+- The skill verdict leads the page as a band with the review it comes from; the band's info icon holds only the skill
+  rule, and the long "why" sentence appears once, as the back-test card's verdict, so the top of the page stays short.
 - Uncertainty is drawn, not only written: every hit rate carries its Wilson interval as a bar with the always-up
   baseline as a tick, so a reader sees at once that four calls prove nothing.
 - Calibration is a chart with the diagonal, the pages' usual way of showing "did the confidence mean anything",
