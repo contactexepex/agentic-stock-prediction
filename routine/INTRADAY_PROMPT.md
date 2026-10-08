@@ -3,8 +3,9 @@ repo root. Export `MB_MARKET=<market>` so every script uses this market. Researc
 trades, never connect to brokerage tools; nothing here is investment advice. This run checks how the
 watchlist moves against the session's published ranges and calls, checks every open paper trade (all
 strategies and horizons N+1..N+5) against its entry, target and range, writes the intraday alerts feed,
-explains flagged deviations, posts the check's alerts into the day's Slack thread and refreshes the warehouse.
-Monitoring only: nothing is ever traded. Nothing else: no collectors, no forecaster, no report, no Neo4j sync.
+explains flagged deviations and posts the check's alerts into the day's Slack thread.
+Monitoring only: nothing is ever traded. Nothing else: no collectors, no forecaster, no report, no Neo4j sync, and
+no warehouse sync yet (it waits for WS1's ceiling change, docs/ws/b17.md).
 It runs twice per session (India 11:13 and 14:13 IST, US 12:27 and 14:57 New York time; cron in docs/DESIGN.md section 2);
 the market calendar decides whether the market is open.
 
@@ -47,7 +48,9 @@ a line or file there, and never run a tool that overwrites one. Only `scripts/in
      remain) and list the dropped check row ids in your final message. No second retry.
 
 4b. Alerts (session B6, docs/ws/b6.md; only for `status` `ok` or `stale`):
-    `python scripts/alerts.py intraday > work/intraday_alerts_post.json`. It reads this check's rows of the stored
+    `python scripts/alerts.py intraday --check-id <check_id of step 2's summary> > work/intraday_alerts_post.json`
+    (always pass this run's `check_id`: without it the newest check that has alert rows is posted, an earlier one
+    when this check wrote none). It reads this check's rows of the stored
     alerts feed (`intraday_alerts_feed`: new flagged open paper trades, material news on a company with an open
     trade) and posts them into today's #market-brief thread for the market; nothing to alert posts nothing. Exit 2
     (neither Slack token nor webhook, or a token without a channel) or 1: note it in your final message and go on;
@@ -63,15 +66,9 @@ a line or file there, and never run a tool that overwrites one. Only `scripts/in
    `git reset --hard origin/main` and end the session, saying so (the next check runs on its own
    schedule; a check time is never repeated).
 
-5a. Warehouse (optional, never blocking): only when step 5 pushed a commit, run
-    `python scripts/warehouse_sync.py > work/warehouse_sync.json`. It refreshes the market's copy in MotherDuck as
-    of now and rebuilds the read models whose payload changed (needs `MOTHERDUCK_TOKEN`; without it the local file
-    under `work/` is written instead, which nothing reads). Name any failure or skip in your final message; never
-    retry and never run `--full`.
-
 6. Final message (the alerts were posted in step 4b): the market, `check_id`, `status`, the counts (`tickers`, `written`,
    `flagged`, `stale`, `failed`, `open_trades`, `trades_flagged`, `alerts`, `skipped_trades`), each
    flagged ticker with its flags and the explainer's attribution, the flagged trades
    (`flagged_trades`), the alerts (`python scripts/intraday_check.py alerts` lists them), any notes
-   dropped by the gate, the Slack result of step 4b, the warehouse result of step 5a, and the commit hash or
+   dropped by the gate, the Slack result of step 4b, and the commit hash or
    "nothing committed". Paper only — no proven edge yet.

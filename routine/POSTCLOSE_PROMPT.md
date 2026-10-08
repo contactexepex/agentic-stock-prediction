@@ -26,9 +26,17 @@ Every step prints a JSON summary: save it under `work/steps/`.
     `python scripts/company.py import-inbox --slack-reply > work/steps/company_import.json`, then
     `python scripts/portfolio.py import-inbox > work/steps/portfolio_import.json` (paper trades from the dashboard
     or the Claude app, checked against today's stored bars). Commands that `onboard.yml` could not finish (logged
-    `failed`) are retried here. List refused or failed ones in your final message and go on.
+    `failed`) are retried here. Never blocking: a non-zero exit of either (a source down, MotherDuck unreachable)
+    or a refused or failed command goes into your final message, and the run goes on to step 4. Step 9's
+    `git add data` commits everything they write (watchlist_events, command_log, slack_posts, portfolio_trades and
+    an added company's backfilled history). On a holiday step 2 stops before this step; `onboard.yml` imports then.
 
-4. Settle: `python scripts/lab.py settle > work/steps/lab_settle.json` (session B2's engine, docs/ws/b2.md). It
+4. Settle: first deepen a shallow clone, so the lock check (a prediction or pick counts only when its row was
+   first committed before D's open) can find each row's first commit:
+   `[ "$(git rev-parse --is-shallow-repository)" = true ] && git fetch --shallow-since="$(date -u -d '21 days ago' +%F)" origin main || true`
+   (21 days cover N+5 plus the sessions a trade may stay due; a failed fetch never blocks: the lock then checks
+   `made_at` only; say so in your final message). Then
+   `python scripts/lab.py settle > work/steps/lab_settle.json` (session B2's engine, docs/ws/b2.md). It
    settles every paper trade whose exit bar is final, in both views (accuracy, head-to-head), exactly once, and
    appends the rows to `data/<market>/paper_trades_settled/` and their two cost views to `data/<market>/cost_views/`.
    It refuses a prediction or pick made or first committed at or after D's open (`refused_not_locked` in its
