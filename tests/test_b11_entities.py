@@ -67,6 +67,7 @@ def store(root: Path) -> None:
         # PGR is deleted before the cut-off; DAL went inactive on 2026-10-05
         news("aapl-pgr", BEFORE, ["PGR", "AAPL"], ["PGR", "AAPL"], "Progressive and Apple sign insurance deal"),
         news("pgr-only", BEFORE, ["PGR"], ["PGR"], "Progressive raises auto insurance rates"),
+        news("pgr-primary", BEFORE, ["PGR", "AAPL"], ["PGR"], "Progressive cites Apple as a client"),
         news("dal-new", BEFORE, ["DAL"], ["DAL"], "Delta Air Lines adds routes"),
         news("dal-pre", "2026-10-04T00:00:00+00:00", ["DAL"], ["DAL"], "Delta Air Lines cuts fares"),
     ])
@@ -74,7 +75,8 @@ def store(root: Path) -> None:
         enriched("aapl-ok", BEFORE), enriched("aapl-late", AFTER), enriched("aapl-unscored", AFTER),
         enriched("macro-high", BEFORE, materiality="high", event_type="macro"),
         enriched("macro-offtopic", BEFORE, relevance=0.2), enriched("aapl-old", "2026-09-20T09:00:00+00:00"),
-        enriched("aapl-pgr", BEFORE), enriched("pgr-only", BEFORE), enriched("dal-new", BEFORE),
+        enriched("aapl-pgr", BEFORE), enriched("pgr-only", BEFORE), enriched("pgr-primary", BEFORE),
+        enriched("dal-new", BEFORE),
         enriched("dal-pre", "2026-10-04T01:00:00+00:00"),
     ])
     append(root, "news_verified", day, [verified("v1", BEFORE, "single_source", "aapl-ok"),
@@ -154,11 +156,13 @@ def test_news_items_never_show_a_deleted_company(market):
     cfg, con = market
     items = {i["id"]: i for i in news_items.news_items(cfg, con, CUTOFF)}
     assert "pgr-only" not in items                                       # tagged with the deleted company only
+    assert "pgr-primary" not in items              # about the deleted company: never turned into a market-wide item
     shared = items["aapl-pgr"]
     assert (shared["tickers"], shared["primary_tickers"]) == (["AAPL"], ["AAPL"])
     assert shared["status"] is None and shared["cluster_id"] is None    # PGR's status is not shown
     assert "PGR" not in json.dumps(list(items.values()))
     assert news_items.news_items(cfg, con, CUTOFF, tickers=["PGR"]) == []
+    assert news_items.news_items(cfg, con, CUTOFF, status_ticker="PGR") == []
 
 
 def test_news_items_filters_by_ticker_and_since(market):

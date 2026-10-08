@@ -7,9 +7,10 @@ and Home's selection.
 
 The rules are W1's of the catalogue build (design/catalogue/catalogue_newsfeed.py, data request 8): `scope`, the
 `summary` line and the `market_moving` flag. A company deleted by the cut-off is never shown (decision 12): it is
-taken out of every item's `tickers` and `primary_tickers`, and an item tagged only with deleted companies is left
-out. The item's status is the one of its first primary ticker (or of the
-ticker the caller names); a market-wide item has none, because verification is per company."""
+taken out of every item's `tickers` and `primary_tickers`, and an item tagged only with deleted companies, or whose
+primary companies are all deleted, is left out (it never becomes a market-wide item). The item's status is the one
+of its first primary ticker (or of the ticker the caller names); a market-wide item has none, because verification
+is per company."""
 
 from __future__ import annotations
 
@@ -40,12 +41,13 @@ from marketbrief.utils.numbers import json_safe_float
 # the items first seen in (from, to], each with its newest enrichment, article read, status and cluster by the cut-off
 ITEMS_SQL = """
 WITH n AS (SELECT DISTINCT ON (id) * FROM news_asof($cutoff::TIMESTAMPTZ) ORDER BY id, first_seen_at),
-t AS (SELECT *, len(coalesce(tickers, [])) > 0 AS tagged FROM n
+t AS (SELECT *, len(coalesce(tickers, [])) > 0 AS tagged, len(coalesce(primary_tickers, [])) > 0 AS about FROM n
       WHERE first_seen_at > $start::TIMESTAMPTZ AND first_seen_at <= $cutoff::TIMESTAMPTZ),
 d AS (SELECT * REPLACE (list_filter(tickers, x -> NOT list_contains($deleted, x)) AS tickers,
                         list_filter(primary_tickers, x -> NOT list_contains($deleted, x)) AS primary_tickers)
       FROM t),
-w AS (SELECT * EXCLUDE (tagged) FROM d WHERE NOT tagged OR len(coalesce(tickers, [])) > 0),
+w AS (SELECT * EXCLUDE (tagged, about) FROM d
+      WHERE (NOT tagged OR len(coalesce(tickers, [])) > 0) AND (NOT about OR len(coalesce(primary_tickers, [])) > 0)),
 e AS (SELECT DISTINCT ON (id) * FROM news_enriched WHERE analyzed_at <= $cutoff::TIMESTAMPTZ
       ORDER BY id, analyzed_at DESC),
 s AS (SELECT * FROM news_status_ids_asof($cutoff::TIMESTAMPTZ)),
@@ -193,13 +195,15 @@ def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = Non
                status_ticker: str | None = None) -> list[dict]:
     """Every News item record first seen in (since, cutoff] (since None: from the first stored item) that the
     analyst scored by the cut-off, about a company collected at the cut-off (B1's records) or market-wide and
-    relevant (`shown`), deleted companies taken out of its tags; with `tickers`,
-    only items tagged with one of them. `status`, `status_as_of`, `cluster_id`, `independent_origins` and
+    relevant (`shown`), deleted companies taken out of its tags (nothing for a deleted `status_ticker`); with
+    `tickers`, only items tagged with one of them. `status`, `status_as_of`, `cluster_id`, `independent_origins` and
     `primary_ids` are those of `status_ticker` (a company page's own company) when given, else of the item's first
     primary ticker. Newest first, uncapped."""
     records = accessor.records(cfg["market"], cutoff)
     collected = {record["ticker"] for record in records if record["state"] != STATE_DELETED}
     deleted = sorted(record["ticker"] for record in records if record["state"] == STATE_DELETED)
+    if status_ticker in deleted:
+        return []
     params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat(), "status_ticker": status_ticker,
               "deleted": deleted}
     rows = [row for row in con.execute(ITEMS_SQL, params).df().to_dict("records") if shown(row, collected)]
