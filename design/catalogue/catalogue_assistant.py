@@ -65,8 +65,21 @@ def track_records(settled: list[dict]) -> list[dict]:
     return out
 
 
+MINUS = "\u2212"
+STATUS_WORDS = {"confirmed_primary": "confirmed by a filing", "corroborated": "confirmed by independent outlets"}
+REASON_WORDS = {"market_up": "the market rose", "market_down": "the market fell", "sector_lift": "its sector rose",
+                "sector_drag": "its sector fell", "news_positive": "positive news", "news_negative": "negative news",
+                "company_specific": "a company-specific move"}
+FAMILY_WORDS = {"rule": "Rule strategies", "ai": "AI traders", "baseline": "Baselines"}
+
+
+def signed(value: float) -> str:
+    """A number with its sign, a proper minus for negatives."""
+    return f"{MINUS if value < 0 else '+'}{abs(value):.2f}"
+
+
 def money(market: str, value: float) -> str:
-    return f"{'-' if value < 0 else ''}{CURRENCY[market]}{abs(value):,.2f}"
+    return f"{MINUS if value < 0 else ''}{CURRENCY[market]}{abs(value):,.2f}"
 
 
 def cite(record: dict, kind: str, at: str) -> dict:
@@ -79,34 +92,35 @@ def trade_answer(market: str, ticker: str, horizon: int) -> tuple[str, str, list
                  == (market, ticker, horizon, "rule.model_news.v1", "accuracy"))
     news = next(n for n in records("news_item.json") if n["id"] == trade["news_ids"][0])
     question = f"Why did the N+{horizon} paper trade in {ticker} bought on {trade['entry_date']} end as it did?"
-    text = (f"rule.model_news.v1 bought {ticker} at the {trade['entry_date']} open and sold at the "
-            f"{trade['exit_date_actual']} close: {trade['return_pct']:+.2f} % after market costs "
-            f"({money(market, trade['net_pnl'])}). Of the {trade['move_pct']:+.2f} % move, the market gave "
-            f"{trade['market_pct']:+.2f}, the sector {trade['sector_pct']:+.2f}, verified news "
-            f"{trade['news_pct']:+.2f} (\"{news['title']}\", {news['status']}) and the company itself "
-            f"{trade['company_pct']:+.2f}. Main reason: {trade['reason_code']}. Paper trade only.")
+    text = (f"The rule strategy rule.model_news.v1 bought {ticker} at the {trade['entry_date']} open and sold at the "
+            f"{trade['exit_date_actual']} close: {signed(trade['return_pct'])} % after market costs "
+            f"({money(market, trade['net_pnl'])}). Of the {signed(trade['move_pct'])} % move, the market gave "
+            f"{signed(trade['market_pct'])}, the sector {signed(trade['sector_pct'])}, verified news "
+            f"{signed(trade['news_pct'])} (\"{news['title']}\", {STATUS_WORDS[news['status']]}) and the company itself "
+            f"{signed(trade['company_pct'])}. Main reason: {REASON_WORDS[trade['reason_code']]}. Paper trade only.")
     return question, text, [cite(trade, "paper_trades_settled", "settled_at"), cite(news, "news", "first_seen_at")]
 
 
 def rule_vs_ai_answer(market: str) -> tuple[str, str, list[dict]]:
     eod = next(e for e in records("eod_analysis.json") if e["market"] == market)
     results = eod["results"]
-    parts = [f"{family} {results[family]['trades']} trades, {results[family]['wins']} won, "
+    parts = [f"{FAMILY_WORDS[family]}: {results[family]['trades']} trades, {results[family]['wins']} won, "
              f"{money(market, results[family]['net_pnl'])}" for family in ("rule", "ai", "baseline")]
     question = f"Rule or AI: who did better on {eod['session_date']}?"
-    text = (f"Paper trades settled on {eod['session_date']}, after market costs: " + "; ".join(parts) +
+    text = (f"Paper trades settled on {eod['session_date']}, after market costs. " + "; ".join(parts) +
             ". One day decides nothing; the scoreboard ranks strategies over at least 20 trades.")
     return question, text, [cite(eod, "eod_analyses", "created_at")]
 
 
 def answer(market: str, number: int, asked_at: str, content: tuple[str, str, list[dict]],
            flags: dict | None = None) -> dict:
-    """One answer of the `explain` tool; flags: not_in_data (default false), declined (default none)."""
+    """One answer of the `explain` tool, reading the data as of the moment it was asked (as_of = asked_at, both
+    before the examples' cut-off); flags: not_in_data (default false), declined (default none)."""
     question, text, cited = content
     flags = flags or {}
     return {"id": f"ask-{market}-{asked_at[:10]}-{number}", "market": market, "channel": "dashboard",
             "asked_at": asked_at, "question": question, "text": text, "cited_ids": [c["id"] for c in cited],
-            "cited": cited, "as_of": AS_OF, "not_in_data": flags.get("not_in_data", False),
+            "cited": cited, "as_of": asked_at, "not_in_data": flags.get("not_in_data", False),
             "declined": flags.get("declined")}
 
 
@@ -115,12 +129,12 @@ def assistant_answers() -> list[dict]:
               "I can't advise real trades: this is a research tool and every signal here is a paper record. I can "
               "show NVDA's paper predictions and how its strategies have done.", [])
     past = ("What did Reliance close at on 8 Oct?",
-            "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 12:00 UTC.", [])
+            "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 11:55 UTC.", [])
     return [
-        answer("us", 1, "2026-10-07T12:10:00Z", trade_answer("us", "NVDA", 3)),
-        answer("us", 2, "2026-10-07T12:12:00Z", rule_vs_ai_answer("us")),
-        answer("us", 3, "2026-10-07T12:15:00Z", advice, {"declined": "advice"}),
-        answer("india", 1, "2026-10-07T12:20:00Z", trade_answer("india", "RELIANCE", 3)),
-        answer("india", 2, "2026-10-07T12:22:00Z", rule_vs_ai_answer("india")),
-        answer("india", 3, "2026-10-07T12:25:00Z", past, {"not_in_data": True}),
+        answer("us", 1, "2026-10-07T11:40:00Z", trade_answer("us", "NVDA", 3)),
+        answer("us", 2, "2026-10-07T11:42:00Z", rule_vs_ai_answer("us")),
+        answer("us", 3, "2026-10-07T11:45:00Z", advice, {"declined": "advice"}),
+        answer("india", 1, "2026-10-07T11:50:00Z", trade_answer("india", "RELIANCE", 3)),
+        answer("india", 2, "2026-10-07T11:52:00Z", rule_vs_ai_answer("india")),
+        answer("india", 3, "2026-10-07T11:55:00Z", past, {"not_in_data": True}),
     ]
