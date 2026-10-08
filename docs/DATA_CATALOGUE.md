@@ -48,7 +48,8 @@ Contents:
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
-  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check)
+  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check),
+  [Intraday alert](#intraday-alert)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Heatmap cell](#heatmap-cell), [Cumulative line](#cumulative-line),
   [Research review](#research-review), [Track record](#track-record), [Assistant answer](#assistant-answer)
@@ -478,6 +479,36 @@ A day's path for one prediction (made -> checks -> settled -> explained) combine
 its trade checks, its [settled trade](#paper-trade) and any [AI reason](#ai-reason) (read model `rm.lifecycle`,
 last 30 sessions).
 
+<a id="intraday-alert"></a>
+## Intraday alert
+
+What a check found worth telling the owner about open paper trades (monitoring only: an alert never predicts or
+recommends a trade). Each check writes one **trade alert** per company with at least one flagged open trade, and one
+**news alert** per news item tagged with a company that has an open trade. A news alert needs an item first seen
+since the previous session's close, published by the check, and of a materiality in `config/intraday.yaml`
+`alerts.news_materiality` (`high`); each item is alerted once per session and company. Status: kind
+`intraday_alerts`; session **B9** writes it (contract: docs/ws/b9.md, "The alerts feed"). The view
+`intraday_alerts_feed` adds the deviation explainer's note on the check row (`explanation_id`, `attribution`,
+`explanation`, `cited_ids`, `explained_at`); `python scripts/intraday_check.py alerts [--check ID]` prints one check's
+alerts. B6's Slack alerts and the Home page's alerts read it. Example file: `intraday_alert.json`, built with B9's
+code from the example [trade checks](#trade-check) and the news stored by each check's time (both checks are the first
+of their session, so no example is a repeat).
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| id | `<check_id>-<ticker>-trades` (trade alert) or `<check_id>-<ticker>-news-<news_id>` (news alert) | B9 | id | `ic-us-2026-10-07T16:27Z-NVDA-trades` |
+| check_id, check_at, session_date, market, ticker | The check and the company | intraday run | id, time, date, text | `ic-us-2026-10-07T16:27Z`, `2026-10-07T16:27:00Z`, `2026-10-07`, `us`, `NVDA` |
+| alert_type | Which alert | B9 | `open_trade_flagged`, `material_news_open_trade` | `open_trade_flagged` |
+| check_row_id | The company's intraday check row (its explainer note joins on it); empty for a company not on the watchlist | `intraday_checks` | id | `ic-us-2026-10-07T16:27Z-NVDA` |
+| trade_ids | The flagged trades (trade alert), or every open trade of the company (news alert) | trade checks | ids | `acc:rule.model_news.v1:2026-09-29-NVDA-5d`, `acc:base.always_up.v1:2026-09-29-NVDA-5d` |
+| trades | Trade alert only: each flagged trade's `trade_id`, `strategy_id`, `view`, `horizon_days`, `flags`, `band`, `ret_since_entry_pct`, `to_target_pct`, `target_reached`; empty for news | [trade checks](#trade-check) | list | rule.model_news.v1 N+5: `above80`, `5.1599`, `-5.421`, `true` |
+| flags | The trades' flags together (trade alert); empty for news | trade checks | `outside_range`, `far_from_target`, `against_prediction` | `["outside_range"]` |
+| repeat | Trade alert: every listed trade was already alerted with the same flags earlier that session (B6 posts only `false`); news: always `false` | B9 | yes/no | `false` |
+| news_id, news_title, news_source | News alert only: the item | `news` | id, text | `7adc88b52892f54c`, "AAPL Falls After Jefferies Downgrades Stock ...", `Stocktwits` |
+| news_status, news_materiality | News alert only: the item's verification status and the news analyst's materiality, both as of `check_at` | `news_verified`, `news_enriched` | see [News item](#news-item) | `unverified`, `high` |
+| news_first_seen_at | News alert only: when the item was first collected | `news` | time | `2026-10-07T12:28:07Z` |
+| method_version, computed_at | The check's method and run time | B9 | text, time | `tc-v1`, `2026-10-07T16:27:00Z` |
+
 ---
 
 <a id="ai-reason"></a>
@@ -812,7 +843,7 @@ The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
   - today's [head-to-head picks](#head-to-head-pick);
   - rule vs AI today, from the [EOD analysis](#eod-analysis) `results`, and to date, from the
     [Scoreboard](#scoreboard-row);
-  - [open trades](#open-trade) and alerts (flagged [trade checks](#trade-check));
+  - [open trades](#open-trade) and [intraday alerts](#intraday-alert) (flagged [trade checks](#trade-check) and material news);
   - [market status](#market-status) with the benchmark and volatility index;
   - the coming week of [calendar events](#calendar-event).
 - **Stock strategies (decision 30).** For one ticker:
