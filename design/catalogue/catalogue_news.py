@@ -147,13 +147,17 @@ def results_digests(row) -> list[dict]:
 
 
 def market_status() -> list[dict]:
-    """MarketStatus (api/openapi.yaml 1.0, rm.status) plus the new runs of SPEC section 7."""
+    """MarketStatus (api/openapi.yaml 1.0, rm.status) plus the new runs of SPEC section 7 and the benchmark and
+    vol-index blocks (catalogue_calendar.level_block)."""
+    from catalogue_calendar import level_block
+
     return [
         {"market": "india", "name": "India (NSE)", "as_of": "2026-10-06", "currency": "INR",
          "session": {"local_time": "2026-10-07T17:30+05:30", "trading_day": True, "session_date": "2026-10-07",
                      "previous_session": "2026-10-06", "calendar_covered": True,
                      "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00",
                      "in_session": False, "late_run": True},
+         "benchmark": level_block("india", "benchmark"), "vol_index": level_block("india", "vol_index"),
          "regime": "EVENT_HEAVY",
          # one intraday run: the check whose rows are in trade_check.json
          "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": True},
@@ -167,6 +171,7 @@ def market_status() -> list[dict]:
                      "previous_session": "2026-10-06", "calendar_covered": True,
                      "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00",
                      "in_session": False, "late_run": False},
+         "benchmark": level_block("us", "benchmark"), "vol_index": level_block("us", "vol_index"),
          "regime": "TRENDING",
          "runs": {"pre_open": {"at": "2026-10-07T11:45:00Z", "ok": True}, "intraday": [],
                   "post_close": {"at": None, "ok": None, "next_at": "2026-10-07T22:15:00Z"},
