@@ -233,7 +233,22 @@ def test_load_inputs_reads_stored_data_and_b10_records(monkeypatch):
     assert gi.regimes[date(2026, 10, 6)][0] == "TRENDING"
     assert gi.evidence and all(when is None or when.tzinfo is not None for when in list(gi.evidence.values())[:50])
     assert set(gi.ranges) == set(gi.scores) == {"2026-10-06-NVDA-1d"}
-    assert gi.stored_predictions == set() and gi.track == {}
+    assert gi.stored_predictions == set() and gi.track == {}   # ids stored after the clock are not seen
+
+
+def test_stored_ids_are_read_as_of_the_clock():
+    """Duplicate checks see only the lab rows made by the gate's clock (MB_NOW replays)."""
+    import duckdb
+
+    from marketbrief.traders.inputs import stored_ids
+
+    con = duckdb.connect()
+    con.execute("CREATE TABLE strategy_predictions (id VARCHAR, made_at TIMESTAMPTZ)")
+    con.execute("INSERT INTO strategy_predictions VALUES ('early', '2026-10-07T11:00:00Z'),"
+                " ('late', '2026-10-07T13:00:00Z')")
+    noon, one = (datetime(2026, 10, 7, hour, 0, tzinfo=timezone.utc) for hour in (12, 13))
+    assert stored_ids(con, "strategy_predictions", noon) == {"early"}
+    assert stored_ids(con, "strategy_predictions", one) == {"early", "late"}
 
 
 @pytest.mark.usefixtures("root")

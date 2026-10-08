@@ -138,6 +138,12 @@ def stored_regimes(con, now: datetime) -> dict[date, tuple[str, datetime | None]
             for as_of, regime, computed in con.execute(REGIME_SQL, [now.isoformat()]).fetchall()}
 
 
+def stored_ids(con, table: str, now: datetime) -> set[str]:
+    """The ids of one of the lab tables stored by `now` (made_at; a replay's clock does not see later rows)."""
+    return {row[0] for row in con.execute(f"SELECT id FROM {table} WHERE made_at <= ?::TIMESTAMPTZ",
+                                          [now.isoformat()]).fetchall()}
+
+
 def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
     """GateInputs from stored data as of `now` (raises InputsUnavailableError without B10's per-horizon records)."""
     market = cfg["market"]
@@ -148,8 +154,8 @@ def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
         cfg=cfg, now=now, active=set(tickers), features=stored_features(con, now), regimes=stored_regimes(con, now),
         evidence=evidence_times(con), statuses=EvidenceStatuses(con), ranges=ranges, scores=scores,
         track=track_record.load(con, now),
-        stored_predictions={row[0] for row in con.execute("SELECT id FROM strategy_predictions").fetchall()},
-        stored_abstentions={row[0] for row in con.execute("SELECT id FROM strategy_abstentions").fetchall()},
+        stored_predictions=stored_ids(con, "strategy_predictions", now),
+        stored_abstentions=stored_ids(con, "strategy_abstentions", now),
         amounts={ticker: amount_of(market, ticker, now) for ticker in tickers},
         ranges_at=as_of_lookup(market, horizons.ranges_asof), scores_at=as_of_lookup(market, horizons.scores_asof),
     )
