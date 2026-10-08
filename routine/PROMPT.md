@@ -267,9 +267,35 @@ Warnings never block: list them in `data_quality`.
        work/steps/traders_add_<id>.json`. On exit 1, send the errors to that trader once, then run
        `add ... --attempt 2`. `add` stores `killed` for a disabled trader and `timeout` past the deadline. List
        every abstention code count in `data_quality`.
-    5. Delete `work/traders/*.jsonl`. All of 9b runs before session B2's `python scripts/lab.py pick`, which ranks
+    5. Delete `work/traders/*.jsonl`. All of 9b runs before step 9d's `python scripts/lab.py pick`, which ranks
        the families and writes the head-to-head picks from every stored qualifying prediction, AI included, and
        refuses to run at or after D's open.
+
+9c. Rule strategies (docs/SPEC.md F2, session B2's lab; never blocks the brief; needs the per-horizon scores of
+    step 5a and the ranges of step 9): `python scripts/lab.py predict > work/steps/lab_predict.json`. It appends the
+    rule strategies' and baselines' N+1..N+5 predictions for D (the first session whose open is after the clock) to
+    `data/<market>/strategy_predictions/`, their blocks to `strategy_abstentions` and the cost-viable rows of the new
+    qualifying predictions to `cost_views` (expected gain after your cost; the flag never blocks a prediction). A
+    rerun appends only ids not stored yet. Exit 2 (`ok` false, e.g. the per-horizon scores are missing): note its
+    `message` in `data_quality` and go on. List `cost_views_message` (US: no stored EUR/USD close yet) when present.
+    Skip 9c and 9d on a late or mid-session run (step 2): their inputs would not be the final close before D.
+
+9d. Head-to-head picks (session B2): after 9b and 9c, `python scripts/lab.py pick > work/steps/lab_pick.json`. It
+    writes one pick per company, family and pick rule for D to `data/<market>/head_to_head_picks/` from every stored
+    qualifying prediction (rule and AI), and the cost-viable rows of every pick and of each qualifying prediction
+    without one yet to `cost_views`. It refuses at or after D's open (`ok` false, exit 2: the traders were too slow)
+    and, for the US, without a stored EUR/USD close; note either `message` in `data_quality` and go on. Paper only:
+    a pick is a record, never an order.
+
+9e. Lock the paper trades (F1.8), right after 9d and before D's open: the settlement counts a prediction or pick
+    only when its row was first committed (committer time) before D's open, so these rows are pushed now, not at
+    step 12. `git add` those of `data/<market>/strategy_predictions data/<market>/strategy_abstentions
+    data/<market>/head_to_head_picks data/<market>/cost_views` that exist, then
+    `git diff --cached --quiet || git commit -m "<market> paper predictions TODAY"` and `git push origin HEAD:main`.
+    If the push is rejected: `git fetch origin main && git rebase --committer-date-is-author-date origin/main`
+    (a plain rebase would move the commit's time past the open) and push again. If that rebase stops on a
+    conflict, `git rebase --abort`, add a `data_quality` line and leave the rows to step 12. Skip 9e when 9b-9d
+    wrote nothing.
 
 10. Summaries (in `summaries/<market>/`):
    - Write `daily/TODAY.md` (max 400 words): regime, per ticker what changed and why, macro
@@ -340,8 +366,8 @@ Warnings never block: list them in `data_quality`.
 
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
-    `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
-    and push again. If that rebase stops on a conflict in an append-only data file (a news-only light run
+    `git push origin HEAD:main`. If the push is rejected, `git fetch origin main && git rebase
+    --committer-date-is-author-date origin/main` (keeps an unpushed step 9e commit's time) and push again. If that rebase stops on a conflict in an append-only data file (a news-only light run
     appended to the same day file meanwhile), never keep both sides by hand: a plain union can store one news id
     twice, and `DUPLICATE_ID` then blocks later runs. For each conflicted `data/` file, write main's version
     unchanged (`git show origin/main:<path>`), then append only this run's added lines whose `id` is not already
@@ -358,14 +384,28 @@ Warnings never block: list them in `data_quality`.
     (summary in `work/warehouse/<market>-sync.json`). Needs `MOTHERDUCK_TOKEN`; without it, or on any
     failure or a kill-switch skip (`config/warehouse.yaml`), note it on the Slack draft's failures line
     and go on. Never retry and never run `--full` in the routine. Static reports and Slack never depend on it.
+    After writing to MotherDuck the sync also revalidates the app's cache of the changed pages (`app_url` in
+    `config/warehouse.yaml`, env `REVALIDATE_SECRET`, and `VERCEL_AUTOMATION_BYPASS_SECRET` for Vercel
+    Authentication); the summary's `revalidate` line gives the outcome, never blocking. Nothing else to run.
 
-13. Notify: run `python scripts/notify_slack.py`. With `SLACK_BOT_TOKEN` set it posts a thread
-    to #market-brief (channel id in `config/settings.yaml`): the filled `work/slack_<market>.md`
-    as the first message, then the chart images as one reply, then the HTML report file as a
-    reply, then the dashboard file as a reply. Without the token it posts the summary text as ONE message through the incoming
-    webhook in `SLACK_WEBHOOK_URL`. If it exits with code 2 (neither configured) and a Slack
-    connector is available in this session, post the same text as one message to #market-brief
-    with the connector instead. Nothing else is posted.
+13a. Morning picks (session B6, docs/ws/b6.md): `python scripts/alerts.py morning > work/steps/alerts_morning.json`.
+    It posts the top 5 paper picks by agreement at N+1 with the strongest other horizon, and the day's head-to-head
+    picks with whether each is viable at your cost, as the first message of today's #market-brief thread for the
+    market (or into it when one exists). Run it before step 13, so the daily brief replies into this thread. Then
+    `git add data/<market>/slack_posts && git diff --cached --quiet || git commit -m "<market> slack posts TODAY"`
+    and push as in step 12. Exit 2 (neither token nor webhook, or a token without a channel) or 1: note it in the
+    final message and go on; never retry by hand (a rerun posts only what is missing).
+
+13. Notify: run `python scripts/notify_slack.py`. With `SLACK_BOT_TOKEN` set it posts into today's
+    #market-brief thread for the market (channel id in `config/settings.yaml`; the thread step 13a's
+    morning picks started, or a new one when none exists): the filled `work/slack_<market>.md` as a
+    reply (once per day, recorded in `data/<market>/slack_posts/`), then the chart images as one reply,
+    then the HTML report file as a reply, then the dashboard file as a reply. Without the token it
+    posts the summary text as ONE message through the incoming webhook in `SLACK_WEBHOOK_URL`. If it
+    exits with code 2 (neither configured) and a Slack connector is available in this session, post
+    the same text as one message to #market-brief with the connector instead. Nothing else is posted.
+    Then `git add data/<market>/slack_posts && git diff --cached --quiet || git commit -m "<market>
+    slack posts TODAY"` and push as in step 12.
 
 14. Connection map (monthly): if `python scripts/graph.py status` reports `refresh_due: true`
     (no refresh attempt yet this month), delete `work/graph.jsonl`, run the graph-builder subagent
