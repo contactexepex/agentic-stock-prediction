@@ -23,7 +23,7 @@ CompaniesPayload:
         default_amount: {type: number, description: Money per paper trade unless a company sets its own (decision 26)}
         companies:
           type: array
-          items: {$ref: '#/components/schemas/CompaniesPageCompany'}
+          items: {$ref: '#/components/schemas/CompanyRecord'}
         lifecycle:
           type: array
           description: Newest first (recorded_at)
@@ -36,38 +36,6 @@ CompaniesPayload:
           type: array
           items: {$ref: '#/components/schemas/InactiveNewsItem'}
         deleted_count: {type: integer, minimum: 0}
-CompaniesPageCompany:
-  type: object
-  description: The Company record (docs/DATA_CATALOGUE.md "Company"; B4's rm_common.companies) with every field
-  required: [market, ticker, name, exchange, sector, state, state_since, added_at, amount, amount_overridden,
-             currency, yahoo, nse_symbol, cik, last_close, last_close_date, change_pct, agreement_n1, open_trades]
-  properties:
-    market: {$ref: '#/components/schemas/Market'}
-    ticker: {$ref: '#/components/schemas/Ticker'}
-    name: {type: string}
-    exchange: {type: ['string', 'null']}
-    sector: {type: ['string', 'null']}
-    state: {type: string, enum: [active, inactive]}
-    state_since: {type: ['string', 'null'], format: date-time}
-    added_at: {type: ['string', 'null'], format: date-time}
-    amount: {$ref: '#/components/schemas/NullableNumber'}
-    amount_overridden: {type: boolean}
-    currency: {type: ['string', 'null'], enum: [INR, USD, null]}
-    yahoo: {type: ['string', 'null']}
-    nse_symbol: {type: ['string', 'null']}
-    cik: {type: ['string', 'null']}
-    last_close: {$ref: '#/components/schemas/NullableNumber'}
-    last_close_date: {type: ['string', 'null'], format: date}
-    change_pct: {$ref: '#/components/schemas/NullableNumber'}
-    agreement_n1:
-      oneOf:
-        - type: object
-          required: [buy, of]
-          properties:
-            buy: {type: integer, minimum: 0}
-            of: {type: integer, minimum: 0}
-        - {type: 'null'}
-    open_trades: {type: integer, minimum: 0}
 LifecycleEventRecord:
   type: object
   x-source: warehouse/company_records.lifecycle_rows (kind watchlist_events)

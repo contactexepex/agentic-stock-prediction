@@ -37,7 +37,7 @@ LATE_NEWS = "feedfacefeedface"
 SECRET = "sync-secret/+="
 WAREHOUSE = Path("work/warehouse/market_brief.duckdb")
 MIRRORED = {"tickers", "bars", *(t.name for t in TABLES)}
-RM_TABLES = ("bars", "overview", "status", "stock", "track_record", "watchlist")
+RM_TABLES = ("bars", "companies", "home", "news", "overview", "status", "stock", "track_record", "watchlist")
 SPEC = REPO / "api" / "openapi.yaml"
 
 
@@ -150,8 +150,9 @@ def test_sync_is_idempotent(synced):
     assert synced["first"]["tables"] == synced["second"]["tables"]
     assert set(synced["first"]["tables"]) == MIRRORED
     assert synced["snap1"] == synced["snap2"]  # built_at and cutoff of the unchanged pages included
-    assert synced["first"]["pages_written"] == 44 and synced["first"]["pages_unchanged"] == 0
-    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == 44
+    pages = sum(synced["first"]["read_model_pages"].values())  # every registered page of the market
+    assert synced["first"]["pages_written"] == pages and synced["first"]["pages_unchanged"] == 0
+    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == pages
     assert synced["first"]["tables"]["bars"] > 1000 and synced["first"]["tables"]["tickers"] == 20
 
 
@@ -160,14 +161,9 @@ def test_dry_run_writes_nothing_and_counts_the_same_rows(synced):
     assert dry["mode"] == "dry_run" and dry["written"] is False
     assert synced["dry_left_files"] == []  # no warehouse file, no stage folder, no summary
     assert dry["tables"] == synced["first"]["tables"]
-    assert dry["read_model_pages"] == {
-        "overview": 1,
-        "watchlist": 1,
-        "stock": 20,
-        "bars": 20,
-        "track_record": 1,
-        "status": 1,
-    }
+    expected = {"overview": 1, "watchlist": 1, "stock": 20, "bars": 20, "track_record": 1, "status": 1,
+                "home": 1, "news": 1, "companies": 1}
+    assert {table: dry["read_model_pages"].get(table) for table in expected} == expected
     assert dry["invalid_pages"] == [] and dry["as_of"] == synced["dashboard"]["as_of"]
 
 
@@ -180,7 +176,8 @@ def test_sync_runs_are_recorded(synced):
     assert [r[0] for r in rows[:2]] == [synced["first"]["run_id"], synced["second"]["run_id"]]
     for r in rows[:2]:
         assert r[1:5] == ("us", "replace", True, None)
-        assert r[5] == sum(synced["first"]["tables"].values()) and r[6] == 44
+        assert r[5] == sum(synced["first"]["tables"].values())
+        assert r[6] == sum(synced["first"]["read_model_pages"].values())
         assert r[7] == datetime.fromisoformat(CUTOFF) and r[8] == WAREHOUSE.as_posix()
         assert set(r[9]) == MIRRORED and json.loads(r[10]) == synced["first"]["tables"] and r[11]
     summary = json.loads((synced["root"] / "work" / "warehouse" / "us-sync.json").read_text())
@@ -192,7 +189,9 @@ def test_sync_runs_are_recorded(synced):
         "FROM rm.builds ORDER BY started_at",
     )
     assert [b[0] for b in builds[:2]] == [r[0] for r in rows[:2]]
-    assert [b[1:7] for b in builds[:2]] == [("us", "daily", True, 44, 0, None), ("us", "daily", True, 0, 44, None)]
+    pages = sum(synced["first"]["read_model_pages"].values())
+    expected = [("us", "daily", True, pages, 0, None), ("us", "daily", True, 0, pages, None)]
+    assert [b[1:7] for b in builds[:2]] == expected
     assert builds[0][7] == "unknown"  # the copied root is no git checkout
     assert builds[0][8] == datetime.fromisoformat(CUTOFF)
 
@@ -207,7 +206,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
     as_of = datetime.fromisoformat(data["as_of"]).date()
     tickers = list(synced["cfg"]["tickers"])
     keys = {"overview": ["_"], "watchlist": ["_"], "stock": tickers, "bars": tickers, "track_record": ["_"]}
-    keys["status"] = ["_"]
+    keys.update({"status": ["_"], "home": ["_"], "news": ["_"], "companies": ["_"]})
     for table, expected in keys.items():
         pages = stored_pages(root, table)
         assert sorted(pages) == sorted(expected)
@@ -228,10 +227,9 @@ def test_read_models_keys_envelope_and_payloads(synced):
     overview = json.loads(stored_pages(root, "overview")["_"][4])
     assert overview["overview"] == json.loads(json.dumps(data["overview"]))
     assert overview["disclaimer"] == data["disclaimer"] and overview["plan"] == data["plan"]
-    watch = json.loads(stored_pages(root, "watchlist")["_"][4])
-    assert [r["ticker"] for r in watch["rows"]] == [c["ticker"] for c in data["companies"]]
-    row = next(r for r in watch["rows"] if r["ticker"] == "JPM")
-    assert row["last"] == json.loads(json.dumps(company["last"])) and row["ret_1d"] == company["indicators"]["ret_1d"]
+    watch = json.loads(stored_pages(root, "watchlist")["_"][4])  # B11's 2.0 page (warehouse/rm_watchlist.py)
+    assert sorted(c["ticker"] for c in watch["companies"]) == sorted(tickers)
+    assert watch["status"]["market"] == "us" and set(watch["agreement"]) == {"1", "2", "3", "4", "5"}
     track = json.loads(stored_pages(root, "track_record")["_"][4])
     assert {k: track[k] for k in data["track"]} == json.loads(json.dumps(data["track"]))
 

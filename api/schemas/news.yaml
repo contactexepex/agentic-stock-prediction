@@ -32,8 +32,10 @@ NewsPayload:
         calendar_days: {type: integer, description: Days after the session being predicted the calendar covers (7)}
         companies:
           type: array
-          description: The collected companies (active and inactive), by ticker
-          items: {$ref: '#/components/schemas/NewsCompany'}
+          description: >-
+            The collected companies (active and inactive), by ticker, with market, ticker, name, sector, state and
+            open_trades
+          items: {$ref: '#/components/schemas/CompanyRecord'}
 NewsWindow:
   type: object
   x-source: warehouse/news_items.news_window
@@ -45,17 +47,6 @@ NewsWindow:
     max_items: {type: integer}
     stored_in_window: {type: integer, description: Listable items first seen in the window (before the cap)}
     older_hidden: {type: integer, description: Stored items first seen before the window}
-NewsCompany:
-  type: object
-  description: A Company record's fields the News rail uses
-  required: [market, ticker, name, sector, state, open_trades]
-  properties:
-    market: {$ref: '#/components/schemas/Market'}
-    ticker: {$ref: '#/components/schemas/Ticker'}
-    name: {type: string}
-    sector: {type: ['string', 'null']}
-    state: {type: string, enum: [active, inactive]}
-    open_trades: {type: integer, minimum: 0}
 NewsEnrichment:
   type: object
   x-source: news_enriched (newest row analyzed by the cut-off)
