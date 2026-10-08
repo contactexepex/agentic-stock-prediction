@@ -284,7 +284,8 @@ def test_bhavcopy_parse_matches_stored_yahoo_bars():
     """The real 01-10 bhavcopy against the Yahoo bars stored for 2026-10-01
     (data/india/prices/2026/10/2026-10-01.csv, collected 2026-10-05): identical OHLC and volume."""
     from marketbrief.sources.nse_parsing import nse_symbols
-    cfg = yaml.safe_load((REPO / "config" / "markets" / "india.yaml").read_text())
+    cfg = {("tickers" if key == "company_meta" else key): value   # the raw config as a cfg
+           for key, value in yaml.safe_load((REPO / "config" / "markets" / "india.yaml").read_text()).items()}
     got, problem = price_nse_fallback.bhavcopy_bars((FIX / "real" / "sec_bhavdata_full_01102026.csv").read_text(),
                                                 date(2026, 10, 1), nse_symbols(cfg))
     assert problem is None and len(got) == 20
