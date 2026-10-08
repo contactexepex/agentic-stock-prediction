@@ -107,7 +107,10 @@ def store(root: Path) -> None:
               "idempotency_key": "del-pgr-1"}
     later = {**deactivate, "id": "we-us-JPM-deactivate-20261007T130000Z", "ticker": "JPM",
              "effective_from": AFTER, "recorded_at": AFTER, "idempotency_key": "deact-jpm-1"}
-    append(root, "watchlist_events", "2026-10-05", [deactivate])
+    amount = {**deactivate, "id": "we-us-AAPL-set_amount-20261005T010000Z", "ticker": "AAPL", "event": "set_amount",
+              "effective_from": "2026-10-05T01:00:00+00:00", "recorded_at": "2026-10-05T01:00:00+00:00",
+              "amount": 500.0, "reason": "half, like PGR", "idempotency_key": "amt-aapl-1"}
+    append(root, "watchlist_events", "2026-10-05", [deactivate, amount])
     append(root, "watchlist_events", "2026-10-06", [delete])
     append(root, "watchlist_events", day, [later])
     command = {"id": "cmd-1", "market": "us", "received_at": "2026-10-06T00:00:00+00:00", "channel": "dashboard",
@@ -118,7 +121,11 @@ def store(root: Path) -> None:
              "idempotency_key": "add-spy-1", "result": "refused", "message": "SPY is an ETF", "record_ids": []}
     read = {**other, "id": "cmd-3", "tool": "get_scoreboard"}
     late = {**other, "id": "cmd-4", "received_at": AFTER}
+    cli = {**command, "id": "cmd-5", "received_at": "2026-10-05T23:00:00+00:00", "channel": "cli",  # B1's CLI format
+           "arguments": {"market": "us", "ticker": "PGR", "event": "delete", "reason": "PGR merger closed"},
+           "idempotency_key": "cli-77", "message": "accepted", "record_ids": []}
     append(root, "command_log", "2026-10-06", [command, other, read])
+    append(root, "command_log", "2026-10-05", [cli])
     append(root, "command_log", day, [late])
 
 
@@ -226,16 +233,28 @@ def test_lifecycle_and_commands_hide_deleted_company(market):
     tickers = {r["ticker"]: r["state"] for r in shown}
     assert deleted == {"PGR"} and "PGR" not in tickers
     assert tickers["DAL"] == "inactive" and tickers["JPM"] == "active"   # JPM's deactivation is recorded later
-    events = company_records.lifecycle_rows(con, CUTOFF, set(tickers))
-    assert [e["id"] for e in events] == ["we-us-DAL-deactivate-20261005T000000Z"]
-    assert events[0]["recorded_at"] == "2026-10-05T00:00:00Z"
+    events = company_records.lifecycle_rows(con, CUTOFF, set(tickers), deleted)
+    assert [e["id"] for e in events] == ["we-us-AAPL-set_amount-20261005T010000Z",
+                                         "we-us-DAL-deactivate-20261005T000000Z"]
+    assert events[1]["recorded_at"] == "2026-10-05T00:00:00Z"
+    assert "PGR" not in json.dumps(events) and events[1]["reason"] == "pause airlines"   # a reason naming it is masked
     commands = company_records.command_rows(con, CUTOFF, deleted)
-    assert [c["id"] for c in commands] == ["cmd-1", "cmd-2"]             # read tools and later commands left out
+    assert [c["id"] for c in commands] == ["cmd-1", "cmd-2", "cmd-5"]    # read tools and later commands left out
+    cli = commands[2]
+    assert cli["arguments"] == {"market": "us", "ticker": "(deleted company)"}   # the mockup's keys; reason dropped
+    assert "PGR" not in json.dumps(cli) and cli["idempotency_key"] == "(masked)"
     masked = commands[0]
     assert masked["arguments"] == {"market": "us", "ticker": "(deleted company)"}
     assert masked["idempotency_key"] == "(masked)" and masked["record_ids"] == ["(masked)"]
     assert "PGR" not in json.dumps(masked)
     assert commands[1]["message"] == "SPY is an ETF"
+
+
+def test_names_matches_a_whole_ticker_only():
+    assert company_records.names("del-pgr-1", "PGR") and company_records.names("PGR merger", "PGR")
+    assert company_records.names("M&M results", "M&M")
+    assert not company_records.names("merge pending", "GE") and not company_records.names("PGRX", "PGR")
+    assert not company_records.names(None, "PGR")
 
 
 def test_inactive_news_since_deactivation(market):

@@ -51,3 +51,8 @@ def companies(ctx: BuildContext, fields: tuple) -> list[dict]:
     `fields`."""
     return [pick(company, fields) for company in rm_common.companies(ctx)]
 
+
+
+def market_mockup(mockup: dict, market: str, _page_key: str) -> dict:
+    """A market page's payload in its mockup's data.json (the contract cases' `mockup_payload`)."""
+    return mockup["markets"][market]

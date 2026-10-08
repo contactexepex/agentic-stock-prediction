@@ -7,11 +7,18 @@ never shown (decision 12): its records are left out and every echo of it in a co
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 
 import pandas as pd
 
-from marketbrief.constants.market_pages import COMPANY_COMMAND_TOOLS, MASKED, MASKED_COMPANY, MASKED_MESSAGE
+from marketbrief.constants.market_pages import (
+    COMMAND_ARGUMENT_FIELDS,
+    COMPANY_COMMAND_TOOLS,
+    MASKED,
+    MASKED_COMPANY,
+    MASKED_MESSAGE,
+)
 from marketbrief.lifecycle import accessor
 from marketbrief.lifecycle.constants import STATE_ACTIVE, STATE_DELETED
 from marketbrief.warehouse.news_items import iso
@@ -47,27 +54,44 @@ def plain(value):
     return value
 
 
-def lifecycle_rows(con, cutoff: datetime, shown: set[str]) -> list[dict]:
-    """The lifecycle events recorded by the cut-off of the companies shown, newest first."""
+def names(text, ticker: str) -> bool:
+    """Whether a text names a ticker as a whole word (any case; `PGR` in "del-pgr-1", not `GE` in "merge")."""
+    pattern = rf"(?<![A-Za-z0-9]){re.escape(ticker)}(?![A-Za-z0-9])"
+    return isinstance(text, str) and re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def lifecycle_rows(con, cutoff: datetime, shown: set[str], deleted: set[str] = frozenset()) -> list[dict]:
+    """The lifecycle events recorded by the cut-off of the companies shown, newest first; a reason that names a
+    deleted company is masked (decision 12)."""
     frame = con.execute(EVENTS_SQL, {"cutoff": cutoff.isoformat()}).df()
-    return [{field: plain(row[field]) for field in LIFECYCLE_FIELDS}
-            for row in frame.to_dict("records") if row["ticker"] in shown]
+    rows = []
+    for row in frame.to_dict("records"):
+        if row["ticker"] not in shown:
+            continue
+        event = {field: plain(row[field]) for field in LIFECYCLE_FIELDS}
+        if any(names(event["reason"], ticker) for ticker in deleted):
+            event["reason"] = MASKED_MESSAGE
+        rows.append(event)
+    return rows
 
 
 def mentions(command: dict, ticker: str) -> bool:
-    """Whether a command echoes a ticker in its arguments, message, idempotency key or record ids."""
-    arguments = command["arguments"] or {}
-    return (ticker in (arguments.get("symbol"), arguments.get("ticker")) or ticker in (command["message"] or "")
-            or ticker.lower() in (command["idempotency_key"] or "").lower()
-            or any(ticker in record_id for record_id in command["record_ids"] or []))
+    """Whether a command names a ticker anywhere: an argument value, its message, idempotency key or record ids."""
+    texts = [*(command["arguments"] or {}).values(), command["message"], command["idempotency_key"],
+             *(command["record_ids"] or [])]
+    return any(names(text, ticker) for text in texts)
 
 
 def masked(command: dict, deleted: set[str]) -> dict:
-    """The command with every echo of a deleted company masked (decision 12)."""
+    """The command with the mockup's argument keys (`market`, `symbol`, `ticker`, whichever it has) and every echo of
+    a deleted company masked (decision 12): its argument values, message, idempotency key and record ids."""
+    arguments = command["arguments"] or {}
+    command = {**command, "arguments": {key: arguments[key] for key in COMMAND_ARGUMENT_FIELDS if key in arguments}}
     for ticker in sorted(deleted):
-        if mentions(command, ticker):
-            arguments = command["arguments"] or {}
-            command = {**command, "arguments": {k: MASKED_COMPANY if v == ticker else v for k, v in arguments.items()},
+        if mentions({**command, "arguments": arguments}, ticker):
+            command = {**command,
+                       "arguments": {k: MASKED_COMPANY if names(v, ticker) else v
+                                     for k, v in command["arguments"].items()},
                        "message": MASKED_MESSAGE, "idempotency_key": MASKED if command["idempotency_key"] else None,
                        "record_ids": [MASKED] * len(command["record_ids"] or [])}
     return command

@@ -14,9 +14,8 @@ from marketbrief.constants.warehouse import MARKET_PAGE_KEY
 from marketbrief.contracts.watchlist import DEFAULT_AMOUNT
 from marketbrief.lifecycle.constants import STATE_ACTIVE
 from marketbrief.warehouse.company_records import command_rows, inactive_news, lifecycle_rows, shown_companies
-from marketbrief.warehouse.market_page_parts import companies, pick, shell
+from marketbrief.warehouse.market_page_parts import companies, market_mockup, pick, shell
 from marketbrief.warehouse.news_items import news_items
-from marketbrief.warehouse.rm_news import market_mockup
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 
 COMPANY_FIELDS = ("market", "ticker", "name", "exchange", "sector", "state", "state_since", "added_at", "amount",
@@ -46,7 +45,7 @@ def companies_pages(ctx: BuildContext) -> dict[str, dict]:
         **shell(ctx),
         "default_amount": DEFAULT_AMOUNT[ctx.market],
         "companies": rows,
-        "lifecycle": lifecycle_rows(ctx.con, ctx.cutoff_time, {row["ticker"] for row in rows}),
+        "lifecycle": lifecycle_rows(ctx.con, ctx.cutoff_time, {row["ticker"] for row in rows}, deleted),
         "commands": command_rows(ctx.con, ctx.cutoff_time, deleted),
         "news_inactive": news_of_inactive(ctx, records),
         "deleted_count": len(deleted),

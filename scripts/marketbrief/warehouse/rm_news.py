@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from marketbrief.constants.market_pages import NEWS_CALENDAR_DAYS, RM_NEWS
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY
 from marketbrief.warehouse.calendar_events import calendar_events
-from marketbrief.warehouse.market_page_parts import companies, news_selection, pick, session_date, shell
+from marketbrief.warehouse.market_page_parts import companies, market_mockup, news_selection, pick, session_date, shell
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 
 ENRICHMENT_FIELDS = ("event_type", "materiality", "sentiment", "relevance", "novelty", "urgency", "priced_in",
@@ -44,11 +44,6 @@ def news_pages(ctx: BuildContext) -> dict[str, dict]:
         "companies": sorted(companies(ctx, COMPANY_FIELDS), key=lambda company: company["ticker"]),
     }
     return {MARKET_PAGE_KEY: payload}
-
-
-def market_mockup(mockup: dict, market: str, _page_key: str) -> dict:
-    """The mockup's payload of a market."""
-    return mockup["markets"][market]
 
 
 BUILDERS = (PageBuilder(RM_NEWS, "NewsPayload", news_pages, owner="B11"),)
