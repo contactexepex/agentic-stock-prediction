@@ -65,6 +65,11 @@ REASON_FIELDS = ("id", "trade_id", "market", "ticker", "strategy_id", "session_d
 NEWS_FIELDS = ("id", "market", "tickers", "primary_tickers", "title", "source", "source_domain", "url", "published_at",
                "first_seen_at", "enrichment", "status", "status_as_of", "cluster_id", "independent_origins",
                "primary_ids", "headline_history")
+# nested objects copy the keys the mockups name (notes.md `{...}`)
+ENRICHMENT_FIELDS = ("event_type", "materiality", "sentiment", "relevance", "novelty", "urgency", "priced_in",
+                     "analyzed_at", "geopolitical")
+HEADLINE_FIELDS = ("title", "seen_at")
+REASON_DETAIL_FIELDS = ("benchmark", "benchmark_pct", "beta", "sector_source", "news_statuses", "note")
 DIGEST_FIELDS = ("id", "release_kind", "ticker", "release_at", "release_date", "release_timing", "period_end",
                  "fiscal_label", "basis", "currency", "status", "numbers_status", "numbers_as_of", "numbers",
                  "consensus", "reaction", "bullets", "sources", "created_at")

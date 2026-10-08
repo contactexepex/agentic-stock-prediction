@@ -60,8 +60,20 @@ def root(tmp_path, monkeypatch):
     return tmp_path
 
 
+class FixtureContext(BuildContext):
+    """A build context whose as-of date is the catalogue's (the fixture root stores no features)."""
+
+    as_of_date: str = AS_OF
+
+    @property
+    def as_of(self) -> str:
+        return self.as_of_date
+
+
 def sources_of(market: str, cutoff: datetime = CUTOFF, as_of: str = AS_OF, session: str = SESSION):
-    return read_sources(BuildContext(load_market(market), connect(market), cutoff), as_of, session)
+    ctx = FixtureContext(load_market(market), connect(market), cutoff)
+    ctx.as_of_date = as_of
+    return read_sources(ctx, as_of, session)
 
 
 def company_mockup() -> dict:

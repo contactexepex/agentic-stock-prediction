@@ -20,7 +20,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from marketbrief.constants.rm_company import (ALL_HORIZONS, BAR_FIELDS, CALENDAR_FIELDS, CHECK_FIELDS,
-                                              COMPANY_FIELDS, COMPANY_ROW_FIELDS, DIGEST_FIELDS, EVENT_DAYS,
+                                              COMPANY_FIELDS, COMPANY_ROW_FIELDS, DIGEST_FIELDS, ENRICHMENT_FIELDS,
+                                              EVENT_DAYS, HEADLINE_FIELDS, REASON_DETAIL_FIELDS,
                                               EVENT_TYPE_HOLIDAY, LIFECYCLE_FIELDS, MOCKUP_COMPANY,
                                               MOCKUP_STOCK_STRATEGIES, NEWS_DAYS, NEWS_FIELDS, NEWS_MAX,
                                               OPEN_TRADE_FIELDS, OWNER, PICK_FIELDS, PREDICTION_FIELDS,
@@ -69,9 +70,15 @@ def check_rows(checks: list[dict]) -> list[dict]:
     return sorted((pick(row, CHECK_FIELDS) for row in checks), key=lambda row: (row["ticker"], row["trade_id"]))
 
 
+def present(record: dict | None, fields: tuple[str, ...]) -> dict | None:
+    """The listed keys a nested record holds (a skipped settlement's reason_detail holds only its note)."""
+    return None if record is None else {name: record[name] for name in fields if name in record}
+
+
 def settled_rows(settled: list[dict]) -> list[dict]:
     """Settled paper trades (every status; the page counts the skipped ones), newest exit first."""
-    rows = [pick(row, SETTLED_FIELDS) for row in settled]
+    rows = [{**pick(row, SETTLED_FIELDS), "reason_detail": present(row.get("reason_detail"), REASON_DETAIL_FIELDS)}
+            for row in settled]
     return sorted(rows, key=lambda row: (row["exit_date_actual"] or row["exit_date"], row["entry_date"],
                                          row["trade_id"]), reverse=True)
 
@@ -124,9 +131,16 @@ def scoreboard_rows(sources: CompanySources, scope: str, ticker: str | None, fie
     return sorted(rows, key=lambda row: (row["strategy_id"], str(row["horizon_days"])))
 
 
+def news_row(item: dict) -> dict:
+    """A news item with the fields the company page carries."""
+    return {**pick(item, NEWS_FIELDS),
+            "enrichment": None if item.get("enrichment") is None else pick(item["enrichment"], ENRICHMENT_FIELDS),
+            "headline_history": [pick(entry, HEADLINE_FIELDS) for entry in item.get("headline_history") or []]}
+
+
 def company_news(news: list[dict]) -> list[dict]:
     """B11's news items of the company (status as of the company), newest first."""
-    return sorted((pick(row, NEWS_FIELDS) for row in news),
+    return sorted((news_row(row) for row in news),
                   key=lambda row: (row["published_at"] or row["first_seen_at"], row["id"]), reverse=True)
 
 
@@ -295,7 +309,10 @@ def company_mockup(mockup: dict, market: str, page_key: str) -> dict:
     held = mockup["markets"][market]
     page = held["pages"].get(page_key) or held["pages"][held["default_ticker"]]
     shared = {key: value for key, value in held.items() if key not in ("pages", "default_ticker")}
-    return {**shared, **page}
+    # a news item's shape is the market's example items together: W1's invented items predate
+    # enrichment.geopolitical (design/mockups/09-news/notes.md), so one company's example may lack it
+    news = [item for example in held["pages"].values() for item in example["news"]]
+    return {**shared, **page, "news": news}
 
 
 def strategies_mockup(mockup: dict, market: str, _page_key: str) -> dict:
