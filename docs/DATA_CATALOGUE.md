@@ -679,7 +679,16 @@ One article or announcement, with its verification status. Status:
   same link kept as a `news_updates` row; decisions 45-46; the `news` view shows the latest headline by now).
 - The combined record is **derived for pages** (B4, `rm.news`).
 
-Example file: `news_item.json`.
+Example file: `news_item.json` (62 items). The first six are invented (`origin` `invented`) and show the confirmed and
+corroborated states. The other 56 (`origin` `stored`) are real stored news as of `2026-10-07T12:00:00Z`, 28 per market
+first seen in the 3 days before it (16 about a watchlist company, 12 market-wide). They are read with the as-of views
+(`news_asof`, `news_status_ids_asof`, and the newest `news_enriched` and `news_articles` rows by then). Limits of the
+stored data:
+- Statuses: the stored statuses at that time are `unverified`, `single_source`, `rumour` and `promotional` only, and
+  no stored cluster has more than one independent origin. `contradicted` occurs nowhere yet.
+- First-seen times: the collectors started on 5 Oct, and every US item was first stored in one run (7 Oct 04:32 UTC).
+  The invented items first seen on 29 Sep are older than 3 days.
+- Region: there is no `region` field, because no stored field says it.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -694,6 +703,13 @@ Example file: `news_item.json`.
 | status_as_of | Time the status refers to | `news_verified_asof` | time | `2026-09-30T11:15:00Z` |
 | independent_origins, primary_ids, cluster_id | Independent outlets confirming it; filings or exchange announcements behind it; its same-event group | `news_clusters` (exists) | count, ids | `2`, `[]` |
 | headline_history | Earlier headlines at the same link, with when each was seen | `news_updates` (exists) | list | "Nvidia said to win data-centre order" at `2026-09-29T22:47:05Z` |
+| market | The market whose news store holds it (each market collects its own feeds, so a Fed item appears in India only when India's feeds carried it) | `news` | `india`/`us` | `india` |
+| scope | `company` when the tagger found a primary watchlist company, else `market` (market-wide) | derived for pages | text | `market` |
+| category, feed | The feed the item came from and its category (in the example: `macro`, `rates`, `global`, `geopolitics`, `flows`, `markets`, `general`, `company`) | `news` | text | `rates`, `gnews:Treasury yields` |
+| enrichment.geopolitical | The analyst marked it as geopolitical (stored items) | `news_enriched` | yes/no | `false` |
+| summary, summary_source | One or two lines under the headline: the first two stored key sentences of the read article (`article`); else the news analyst's summary when it is not the templated "<type> item on <ticker>" form (`analyst`); else empty (`none`, the page shows the headline alone). The article text itself is never stored | `news_articles`, `news_enriched` | text | India: "RBI raised the repo rate 25 bps to 5.5% and shifted to calibrated tight..." |
+| market_moving | W1's proposed rule for the "market movers" band: materiality `high` and either market-wide or a results item (`event_type` `earnings`) | derived for pages | yes/no | `true` |
+| origin | `stored` (real stored news) or `invented` (example only) | catalogue | text | `stored` |
 
 Rumour and promotional items never support a call. A single-source or unverified item lowers the confidence of
 any call that cites it.
