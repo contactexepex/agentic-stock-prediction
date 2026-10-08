@@ -35,6 +35,7 @@ from marketbrief.alerts.onboarding import onboarding_text, post_onboarding_confi
 from marketbrief.alerts.publish import Message, NotConfiguredError, Publisher, post_brief, publisher  # noqa: E402
 from marketbrief.alerts.weekly import build_weekly  # noqa: E402
 from marketbrief.core import paths  # noqa: E402
+from marketbrief.lab import registry as lab_registry  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 
 CATALOGUE = REPO / "design" / "catalogue"
@@ -96,6 +97,7 @@ def set_live_from(config: Path, live_from: str | None) -> None:
     for spec in doc["strategies"]:
         spec["live_from"] = live_from
     (config / "strategies.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    lab_registry._cached.cache_clear()   # the registry is cached per config folder; read the new file
 
 
 def store(root: Path, market: str, kind: str, rows: list[dict], time_key: str) -> None:
@@ -804,31 +806,30 @@ def test_rehearsal_predictions_are_not_shown_before_go_live(scratch, monkeypatch
     run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
     sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
     assert MSG_NOT_LIVE in sent and "[Paper]" not in sent and "Head-to-head" not in sent
-    shutil.rmtree(scratch / "work")
-    set_live_from(paths.CONFIG, "2026-10-08")                              # live only from the next session
-    run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
-    sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
-    assert MSG_NOT_LIVE in sent
+    for live_from, shown in (("2026-10-08", False), ("2026-10-07", True)):   # live from the next session / from D
+        shutil.rmtree(scratch / "work")
+        set_live_from(paths.CONFIG, live_from)
+        run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
+        sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
+        assert (MSG_NOT_LIVE not in sent and "[Paper]" in sent) is shown, live_from
 
 
-def test_only_live_strategies_count_and_their_picks_show():
+def test_only_live_strategies_count_and_their_picks_show(monkeypatch):
     import yaml
-    from marketbrief.alerts.reads import live_only
-    preds = of_market(examples("prediction"), "us")
     doc = yaml.safe_load((REPO / "config" / "strategies.yaml").read_text())
     live = {s["id"] for s in doc["strategies"] if s["family"] == "rule"}
-    import marketbrief.alerts.reads as reads_module
-    original = reads_module.is_live
-    reads_module.is_live = lambda sid, _day, _reg=None: sid in live
-    try:
-        kept = live_only(preds, "2026-10-07")
-        picks_kept = live_only(of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07"), "2026-10-07")
-    finally:
-        reads_module.is_live = original
+    monkeypatch.setattr(reads, "is_live", lambda sid, _day, _reg=None: sid in live)
+    kept = reads.live_only(of_market(examples("prediction"), "us"), "2026-10-07")
+    picks = of_market(examples("head_to_head_pick"), "us", session_date="2026-10-07")
+    picks_kept = reads.live_only(picks, "2026-10-07")
     assert kept and {p["strategy_id"] for p in kept} <= live
-    assert all(p["strategy_id"] in live for p in picks_kept)
+    assert picks_kept and all(p["strategy_id"] in live for p in picks_kept) and len(picks_kept) < len(picks)
     row = agreement(kept, 1)[0]
     assert row["of"] == sum(1 for p in kept if p["horizon_days"] == 1)   # agreement counts live strategies only
+    msg = build_morning("us", "2026-10-07", kept, picks_kept, HORIZONS)
+    shown = {p["strategy_id"] for p in picks_kept if p.get("status") == "picked" and p["ticker"] in msg}
+    assert shown and all(sid in msg for sid in shown)                     # the live picks are in the message
+    assert not any(p["strategy_id"] in msg for p in picks if p["strategy_id"] not in live)
 
 
 def test_buyers_without_a_probability_are_named():
