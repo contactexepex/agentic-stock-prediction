@@ -61,17 +61,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": -0.32,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -133,17 +129,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 0.42,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -198,8 +190,8 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
@@ -207,7 +199,7 @@
         "range_missed"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -215,7 +207,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -278,17 +270,13 @@
         "market_up",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.65,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -479,21 +467,25 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.0,
-      "company_pct": 0.45,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
         "target_reached",
         "range_missed"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "d93b1f5e7c2a4b60"
+      ],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.09,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {}
+        "news_statuses": {
+          "d93b1f5e7c2a4b60": "corroborated"
+        }
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -753,21 +745,25 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.0,
-      "company_pct": 0.45,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
         "target_reached",
         "range_missed"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "d93b1f5e7c2a4b60"
+      ],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.09,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {}
+        "news_statuses": {
+          "d93b1f5e7c2a4b60": "corroborated"
+        }
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -880,8 +876,8 @@
       "prob_up": 0.581,
       "target_price": 227.56,
       "target_error_pct": 1.45,
-      "lo80": 221.42,
-      "hi80": 233.7,
+      "lo80": 221.51,
+      "hi80": 233.78,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -897,17 +893,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": -0.32,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -952,8 +944,8 @@
       "prob_up": 0.593,
       "target_price": 227.91,
       "target_error_pct": 4.82,
-      "lo80": 217.26,
-      "hi80": 238.56,
+      "lo80": 217.51,
+      "hi80": 238.81,
       "range_hit": false,
       "target_reached": true,
       "target_reached_session": 1,
@@ -962,8 +954,8 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
@@ -971,7 +963,7 @@
         "range_missed"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -979,7 +971,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -1025,8 +1017,8 @@
       "prob_up": 0.601,
       "target_price": 227.65,
       "target_error_pct": 1.41,
-      "lo80": 221.51,
-      "hi80": 233.79,
+      "lo80": 221.59,
+      "hi80": 233.87,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1042,17 +1034,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": -0.32,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -1097,9 +1085,9 @@
       "prob_up": 0.613,
       "target_price": 228.06,
       "target_error_pct": 4.75,
-      "lo80": 217.41,
-      "hi80": 238.71,
-      "range_hit": false,
+      "lo80": 217.65,
+      "hi80": 238.97,
+      "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
       "max_favourable_pct": 4.72,
@@ -1107,16 +1095,15 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
-        "target_reached",
-        "range_missed"
+        "target_reached"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -1124,7 +1111,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -1782,8 +1769,8 @@
       "prob_up": 0.563,
       "target_price": 329.68,
       "target_error_pct": 0.19,
-      "lo80": 323.4,
-      "hi80": 335.96,
+      "lo80": 323.46,
+      "hi80": 336.03,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1850,8 +1837,8 @@
       "prob_up": 0.566,
       "target_price": 329.91,
       "target_error_pct": 0.9,
-      "lo80": 319.01,
-      "hi80": 340.81,
+      "lo80": 319.19,
+      "hi80": 340.99,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1918,8 +1905,8 @@
       "prob_up": 0.583,
       "target_price": 329.77,
       "target_error_pct": 0.17,
-      "lo80": 323.48,
-      "hi80": 336.06,
+      "lo80": 323.54,
+      "hi80": 336.12,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1986,8 +1973,8 @@
       "prob_up": 0.586,
       "target_price": 330.06,
       "target_error_pct": 0.86,
-      "lo80": 319.16,
-      "hi80": 340.96,
+      "lo80": 319.34,
+      "hi80": 341.14,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2462,8 +2449,8 @@
       "prob_up": 0.567,
       "target_price": 335.23,
       "target_error_pct": -0.61,
-      "lo80": 330.03,
-      "hi80": 340.43,
+      "lo80": 330.07,
+      "hi80": 340.47,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2530,8 +2517,8 @@
       "prob_up": 0.559,
       "target_price": 335.36,
       "target_error_pct": -0.89,
-      "lo80": 326.35,
-      "hi80": 344.37,
+      "lo80": 326.47,
+      "hi80": 344.49,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2598,8 +2585,8 @@
       "prob_up": 0.587,
       "target_price": 335.3,
       "target_error_pct": -0.63,
-      "lo80": 330.1,
-      "hi80": 340.5,
+      "lo80": 330.14,
+      "hi80": 340.54,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2666,8 +2653,8 @@
       "prob_up": 0.579,
       "target_price": 335.48,
       "target_error_pct": -0.92,
-      "lo80": 326.47,
-      "hi80": 344.49,
+      "lo80": 326.59,
+      "hi80": 344.62,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2748,24 +2735,20 @@
       "move_pct": -1.21,
       "market_pct": -1.01,
       "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
+      "news_pct": 0.0,
+      "company_pct": 2.13,
       "reason_code": "sector_drag",
       "reason_codes": [
         "sector_drag",
         "target_reached"
       ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -1.07,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
+        "news_statuses": {}
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -2824,15 +2807,15 @@
       "move_pct": 0.37,
       "market_pct": -0.45,
       "sector_pct": -1.82,
-      "news_pct": 1.32,
-      "company_pct": 1.32,
-      "reason_code": "sector_drag",
+      "news_pct": 2.65,
+      "company_pct": -0.01,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -2840,7 +2823,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -2900,15 +2883,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -2916,7 +2899,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -3048,20 +3031,24 @@
       "move_pct": 0.37,
       "market_pct": -0.45,
       "sector_pct": -1.82,
-      "news_pct": 0.0,
-      "company_pct": 2.64,
-      "reason_code": "company_specific",
+      "news_pct": 2.65,
+      "company_pct": -0.01,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "company_specific",
+        "news_positive",
         "target_reached"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "nse-ann-7790412"
+      ],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -0.48,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {}
+        "news_statuses": {
+          "nse-ann-7790412": "confirmed_primary"
+        }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3120,20 +3107,24 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 0.0,
-      "company_pct": 5.69,
-      "reason_code": "company_specific",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "company_specific",
+        "news_positive",
         "target_reached"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "nse-ann-7790412"
+      ],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": 0.49,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {}
+        "news_statuses": {
+          "nse-ann-7790412": "confirmed_primary"
+        }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3192,20 +3183,24 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 0.0,
-      "company_pct": 5.69,
-      "reason_code": "company_specific",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "company_specific",
+        "news_positive",
         "target_reached"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "nse-ann-7790412"
+      ],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": 0.49,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {}
+        "news_statuses": {
+          "nse-ann-7790412": "confirmed_primary"
+        }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3254,8 +3249,8 @@
       "prob_up": 0.568,
       "target_price": 1183.45,
       "target_error_pct": -1.33,
-      "lo80": 1153.44,
-      "hi80": 1213.46,
+      "lo80": 1153.81,
+      "hi80": 1213.84,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3264,24 +3259,20 @@
       "move_pct": -1.21,
       "market_pct": -1.01,
       "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
+      "news_pct": 0.0,
+      "company_pct": 2.13,
       "reason_code": "sector_drag",
       "reason_codes": [
         "sector_drag",
         "target_reached"
       ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -1.07,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
+        "news_statuses": {}
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3330,8 +3321,8 @@
       "prob_up": 0.579,
       "target_price": 1184.91,
       "target_error_pct": 2.79,
-      "lo80": 1132.85,
-      "hi80": 1236.97,
+      "lo80": 1134.0,
+      "hi80": 1238.12,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3340,15 +3331,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -3356,7 +3347,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -3406,8 +3397,8 @@
       "prob_up": 0.588,
       "target_price": 1183.87,
       "target_error_pct": -1.37,
-      "lo80": 1153.85,
-      "hi80": 1213.89,
+      "lo80": 1154.23,
+      "hi80": 1214.28,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3416,24 +3407,20 @@
       "move_pct": -1.21,
       "market_pct": -1.01,
       "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
+      "news_pct": 0.0,
+      "company_pct": 2.13,
       "reason_code": "sector_drag",
       "reason_codes": [
         "sector_drag",
         "target_reached"
       ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -1.07,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
+        "news_statuses": {}
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3482,8 +3469,8 @@
       "prob_up": 0.599,
       "target_price": 1185.65,
       "target_error_pct": 2.73,
-      "lo80": 1133.56,
-      "hi80": 1237.74,
+      "lo80": 1134.7,
+      "hi80": 1238.89,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3492,15 +3479,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -3508,7 +3495,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -3988,8 +3975,8 @@
       "prob_up": 0.562,
       "target_price": 723.5,
       "target_error_pct": -0.32,
-      "lo80": 705.39,
-      "hi80": 741.61,
+      "lo80": 705.61,
+      "hi80": 741.84,
       "range_hit": true,
       "target_reached": false,
       "target_reached_session": null,
@@ -4059,8 +4046,8 @@
       "prob_up": 0.561,
       "target_price": 724.06,
       "target_error_pct": -1.74,
-      "lo80": 692.65,
-      "hi80": 755.46,
+      "lo80": 693.34,
+      "hi80": 756.14,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 3,
@@ -4131,8 +4118,8 @@
       "prob_up": 0.582,
       "target_price": 723.75,
       "target_error_pct": -0.35,
-      "lo80": 705.63,
-      "hi80": 741.87,
+      "lo80": 705.86,
+      "hi80": 742.1,
       "range_hit": true,
       "target_reached": false,
       "target_reached_session": null,
@@ -4202,8 +4189,8 @@
       "prob_up": 0.581,
       "target_price": 724.5,
       "target_error_pct": -1.8,
-      "lo80": 693.08,
-      "hi80": 755.92,
+      "lo80": 693.76,
+      "hi80": 756.61,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 3,
@@ -4615,8 +4602,8 @@
       "prob_up": 0.566,
       "target_price": 11893.0,
       "target_error_pct": null,
-      "lo80": 11550.87,
-      "hi80": 12235.13,
+      "lo80": 11555.78,
+      "hi80": 12240.07,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4673,8 +4660,8 @@
       "prob_up": 0.561,
       "target_price": 11902.63,
       "target_error_pct": null,
-      "lo80": 11309.42,
-      "hi80": 12495.84,
+      "lo80": 11324.16,
+      "hi80": 12510.66,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4731,8 +4718,8 @@
       "prob_up": 0.586,
       "target_price": 11897.86,
       "target_error_pct": null,
-      "lo80": 11555.59,
-      "hi80": 12240.13,
+      "lo80": 11560.5,
+      "hi80": 12245.06,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4789,8 +4776,8 @@
       "prob_up": 0.581,
       "target_price": 11911.05,
       "target_error_pct": null,
-      "lo80": 11317.42,
-      "hi80": 12504.68,
+      "lo80": 11332.16,
+      "hi80": 12519.5,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4867,17 +4854,13 @@
         "market_up",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.65,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -4939,17 +4922,13 @@
         "market_up",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.65,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -4994,9 +4973,9 @@
       "prob_up": 0.613,
       "target_price": 228.06,
       "target_error_pct": 4.75,
-      "lo80": 217.41,
-      "hi80": 238.71,
-      "range_hit": false,
+      "lo80": 217.65,
+      "hi80": 238.97,
+      "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
       "max_favourable_pct": 4.72,
@@ -5004,16 +4983,15 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
-        "target_reached",
-        "range_missed"
+        "target_reached"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -5021,7 +4999,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -5081,15 +5059,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -5097,7 +5075,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -5147,8 +5125,8 @@
       "prob_up": 0.599,
       "target_price": 1185.65,
       "target_error_pct": 2.73,
-      "lo80": 1133.56,
-      "hi80": 1237.74,
+      "lo80": 1134.7,
+      "hi80": 1238.89,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -5157,15 +5135,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -5173,7 +5151,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",

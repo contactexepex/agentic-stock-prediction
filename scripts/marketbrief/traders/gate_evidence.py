@@ -46,7 +46,18 @@ def input_errors(rec: dict, one: Trader, frame: dict, ids: list[str]) -> list[tu
             out.append((c.CODE_EVIDENCE, c.MSG_INPUT_ID.format(id=evidence_id, want=want[prefix])))
         elif prefix == c.INPUT_MODEL and frame["score"] is None:
             out.append((c.CODE_EVIDENCE, c.MSG_EVIDENCE_UNKNOWN.format(ids=[evidence_id])))
+        else:
+            out += input_time_errors(prefix, evidence_id, frame)
     return out
+
+
+def input_time_errors(prefix: str, evidence_id: str, frame: dict) -> list[tuple[str, str]]:
+    """A cited indicator snapshot or regime row must have been computed by made_at (no look-ahead)."""
+    computed = {c.INPUT_FEATURES: frame.get("features_at"), c.INPUT_REGIME: frame.get("regime_at")}.get(prefix)
+    if computed is not None and as_utc_timestamp(computed) > as_utc_timestamp(frame["made"]):
+        return [(c.CODE_LOOKAHEAD, c.MSG_BEFORE_INPUT.format(made_at=frame["made"].isoformat(), what=evidence_id,
+                                                             published=computed))]
+    return []
 
 
 def news_errors(one: Trader, gi: GateInputs, made: datetime, ids: list[str]) -> list[tuple[str, str]]:

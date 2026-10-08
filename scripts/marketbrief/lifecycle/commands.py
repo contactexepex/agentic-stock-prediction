@@ -18,7 +18,7 @@ from marketbrief.lifecycle.constants import (
 )
 from marketbrief.lifecycle.events import stored_events
 from marketbrief.lifecycle.loader import companies_as_of
-from marketbrief.lifecycle.store import command_row, iso, load_lifecycle_config, log_command, store_rows
+from marketbrief.lifecycle.store import command_row, iso, load_lifecycle_config, log_command_row, store_rows
 from marketbrief.lifecycle.validator import (
     effective_time,
     event_row,
@@ -46,7 +46,8 @@ def finish(request: dict, received, result: dict, outcome: str, refusal: str | N
     message = "; ".join(result.get("errors") or []) or None
     row = command_row(request["market"], received, logged, outcome, refusal_code=refusal, message=message,
                       record_ids=record_ids, completed=clock())
-    return {**result, "command_id": log_command(request["market"], row)}
+    stored = log_command_row(request["market"], row)
+    return {**result, "command_id": stored["id"], "command_record": stored}
 
 
 def refused(request: dict, received, errors: list[str], code: str) -> dict:
@@ -69,8 +70,7 @@ def submit(request: dict) -> dict:
         result = {"ok": True, "duplicate": True, "event": strip(existing),
                   "message": text.ERR_DUPLICATE.format(key=request["idempotency_key"], existing=existing["id"])}
         return finish(request, received, result, RESULT_DUPLICATE, record_ids=[existing["id"]])
-    tickers, sectors = accessor.config_lists(market)
-    company = companies_as_of(market, tickers, sectors, received).get(ticker)
+    company = pending_company(market, ticker, stored, received)
     errors, code = state_errors(request, company)
     errors += supersedes_errors(request, stored)
     if errors:
@@ -80,6 +80,15 @@ def submit(request: dict) -> dict:
     row = event_row(request, received, effective, {stored_row["id"] for stored_row in stored})
     path = store_rows([row], KIND_WATCHLIST_EVENTS, market, received)
     return finish(request, received, {"ok": True, "event": row, "path": path}, RESULT_ACCEPTED, record_ids=[row["id"]])
+
+
+def pending_company(market: str, ticker: str, stored: list[dict], received) -> dict | None:
+    """The company after every stored event, including those not in effect yet (a deactivate waiting for the next
+    pre-open run): a request is checked against that state, so a reactivate can cancel a pending deactivate and a
+    second deactivate is refused. The new event never takes effect before the newest stored one (effective_time)."""
+    tickers, sectors = accessor.config_lists(market)
+    newest = newest_effective(stored, ticker)
+    return companies_as_of(market, tickers, sectors, max(received, newest) if newest else received).get(ticker)
 
 
 def strip(row: dict) -> dict:
@@ -113,8 +122,7 @@ def precheck_add(request: dict) -> dict | None:
         result = {"ok": True, "duplicate": True, "event": strip(existing),
                   "message": text.ERR_DUPLICATE.format(key=request["idempotency_key"], existing=existing["id"])}
         return finish(request, received, result, RESULT_DUPLICATE, record_ids=[existing["id"]])
-    tickers, sectors = accessor.config_lists(request["market"])
-    company = companies_as_of(request["market"], tickers, sectors, received).get(request["ticker"])
+    company = pending_company(request["market"], request["ticker"], stored, received)
     errors, code = state_errors(request, company)
     return refused(request, received, errors, code) if errors else None
 

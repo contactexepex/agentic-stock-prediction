@@ -8,7 +8,7 @@
                              --out DIR writes the same tree under DIR instead of data/ (live tests).
                              B9: every open paper trade (all strategies and horizons, both views) gets a
                              trade_checks row (price vs entry, target and its own range; flags outside_range,
-                             far_from_target, against_prediction) and a trade_check_details row (quality,
+                             far_from_target, against_prediction; one row with its detail columns: quality,
                              target reached so far); the alerts feed -> data/<market>/intraday_alerts/.
   alerts [--check ID]        the alerts of a check (default the newest), as JSON (the feed for Slack alerts)
   prepare [--check ID] [--out F]   the flagged rows of a check (default the newest) without a note

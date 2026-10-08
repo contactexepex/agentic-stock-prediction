@@ -50,7 +50,6 @@ def build_alerts(ctx, earlier: list[dict]) -> list[dict]:
     by_ticker: dict[str, list[dict]] = {}
     for check in ctx.trade_checks:
         by_ticker.setdefault(check["ticker"], []).append(check)
-    reached = {row["id"]: row["target_reached"] for row in ctx.trade_details}
     seen = {(row["trade_id"], tuple(row["flags"])) for alert in earlier if alert["alert_type"] == ALERT_TRADE_FLAGGED
             for row in alert.get("trades") or []}
     out = []
@@ -58,7 +57,7 @@ def build_alerts(ctx, earlier: list[dict]) -> list[dict]:
         flagged = [check for check in checks if check["flagged"]]
         if not flagged:
             continue
-        trades = [{**{key: check[key] for key in TRADE_SUMMARY_FIELDS}, "target_reached": reached.get(check["id"])}
+        trades = [{**{key: check[key] for key in TRADE_SUMMARY_FIELDS}, "target_reached": check["target_reached"]}
                   for check in flagged]
         out.append({
             **_base(ctx, ticker, ALERT_TRADE_FLAGGED, alert_id(ctx.check_id, ticker, "trades")),

@@ -17,7 +17,7 @@ def news_items() -> list[dict]:
              {"title": "Nvidia said to win data-centre order", "seen_at": "2026-09-29T22:47:05Z"},
              {"title": "Nvidia wins multi-year data-centre order from cloud provider, sources say",
               "seen_at": "2026-09-30T02:47:11Z"}],
-         "headline_history_status": "planned (Wave 0 news de-duplication, kind news_updates)"},
+         "headline_history_status": "exists (kind news_updates)"},
         {"id": "nse-ann-7781203", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"],
          "title": "Reliance Industries: board approves capital raise for retail subsidiary (exchange filing)",
          "source": "NSE announcement", "source_domain": "nseindia.com", "url": "https://nsearchives.nseindia.com/example.pdf",
@@ -26,7 +26,7 @@ def news_items() -> list[dict]:
                         "novelty": 0.9, "urgency": "medium", "priced_in": False, "analyzed_at": "2026-09-30T02:00:00Z"},
          "status": "confirmed_primary", "status_as_of": "2026-09-30T01:55:00Z", "cluster_id": "reliance-20260929-raise",
          "independent_origins": 1, "primary_ids": ["nse-ann-7781203"], "headline_history": [],
-         "headline_history_status": "planned (Wave 0)"},
+         "headline_history_status": "exists (kind news_updates)"},
         {"id": "c0d2e4f6a8b1c3d5", "market": "us", "tickers": ["JPM"], "primary_tickers": ["JPM"],
          "title": "JPMorgan said to weigh sale of payments unit stake",
          "source": "Example Business Wire Blog", "source_domain": "example-blog.com", "url": "https://example-blog.com/jpm",
@@ -35,7 +35,7 @@ def news_items() -> list[dict]:
                         "novelty": 0.7, "urgency": "low", "priced_in": False, "analyzed_at": "2026-10-07T11:20:00Z"},
          "status": "rumour", "status_as_of": "2026-10-07T11:15:00Z", "cluster_id": "jpm-20261006-stake",
          "independent_origins": 0, "primary_ids": [], "headline_history": [],
-         "headline_history_status": "planned (Wave 0)"},
+         "headline_history_status": "exists (kind news_updates)"},
         {"id": "3a5bd4c4813eb044", "market": "us", "tickers": ["NVDA"], "primary_tickers": ["NVDA"],
          "title": "Should You Buy Nvidia Stock in October?", "source": "Yahoo Finance",
          "source_domain": "finance.yahoo.com",
@@ -45,7 +45,27 @@ def news_items() -> list[dict]:
                         "novelty": 0.1, "urgency": "low", "priced_in": True, "analyzed_at": "2026-10-07T13:00:00Z"},
          "status": "promotional", "status_as_of": "2026-10-07T12:40:00Z", "cluster_id": "nvda-20261007-opinion",
          "independent_origins": 0, "primary_ids": [], "headline_history": [],
-         "headline_history_status": "planned (Wave 0)"},
+         "headline_history_status": "exists (kind news_updates)"},
+        # Verified news first seen inside example trades' windows: the automatic reason's news part (B2's rule)
+        {"id": "d93b1f5e7c2a4b60", "market": "us", "tickers": ["NVDA"], "primary_tickers": ["NVDA"],
+         "title": "Nvidia supplier confirms record AI server shipments", "source": "Bloomberg",
+         "source_domain": "bloomberg.com", "url": "https://www.bloomberg.com/news/example-nvda",
+         "published_at": "2026-10-02T13:40:00Z", "first_seen_at": "2026-10-02T14:10:00Z",
+         "enrichment": {"event_type": "sector", "materiality": "medium", "sentiment": 0.5, "relevance": 0.8,
+                        "novelty": 0.6, "urgency": "medium", "priced_in": False, "analyzed_at": "2026-10-05T11:20:00Z"},
+         "status": "corroborated", "status_as_of": "2026-10-02T18:00:00Z", "cluster_id": "nvda-20261002-servers",
+         "independent_origins": 2, "primary_ids": [], "headline_history": [],
+         "headline_history_status": "exists (kind news_updates)"},
+        {"id": "nse-ann-7790412", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"],
+         "title": "Reliance Industries: retail subsidiary allots shares to investors (exchange filing)",
+         "source": "NSE announcement", "source_domain": "nseindia.com",
+         "url": "https://nsearchives.nseindia.com/example-2.pdf",
+         "published_at": "2026-10-05T09:05:00Z", "first_seen_at": "2026-10-05T09:20:00Z",
+         "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.4, "relevance": 0.95,
+                        "novelty": 0.7, "urgency": "medium", "priced_in": False, "analyzed_at": "2026-10-06T02:00:00Z"},
+         "status": "confirmed_primary", "status_as_of": "2026-10-05T09:30:00Z",
+         "cluster_id": "reliance-20261005-allotment", "independent_origins": 1, "primary_ids": ["nse-ann-7790412"],
+         "headline_history": [], "headline_history_status": "exists (kind news_updates)"},
     ]
 
 
@@ -65,6 +85,18 @@ def news_impact(row) -> list[dict]:
             materiality="medium", horizon_days=1, n_events=4, mean_abnormal_pct=None, ci_low_pct=None,
             ci_high_pct=None, mean_benchmark_pct=None, mean_sector_pct=None, enough=False,
             news_ids=["c0d2e4f6a8b1c3d5"], **base),
+        row("news_impact", id="ni-india-2026-W41-ma-confirmed_primary-high-3", market="india", iso_week="2026-W41",
+            as_of="2026-10-10T04:30:00Z", event_type="ma", status="confirmed_primary", materiality="high",
+            horizon_days=3, n_events=12, mean_abnormal_pct=None, ci_low_pct=None, ci_high_pct=None,
+            mean_benchmark_pct=None, mean_sector_pct=None, enough=False,
+            news_ids=["nse-ann-7781203", "nse-ann-7790412"], method_version="ni-v1",
+            computed_at="2026-10-10T04:30:00Z"),
+        row("news_impact", id="ni-india-2026-W41-earnings-confirmed_primary-high-1", market="india",
+            iso_week="2026-W41", as_of="2026-10-10T04:30:00Z", event_type="earnings", status="confirmed_primary",
+            materiality="high", horizon_days=1, n_events=27, mean_abnormal_pct=0.86, ci_low_pct=0.05,
+            ci_high_pct=1.67, mean_benchmark_pct=-0.12, mean_sector_pct=0.09, enough=True,
+            news_ids=["nse-ann-7702219", "nse-ann-7715530"], method_version="ni-v1",
+            computed_at="2026-10-10T04:30:00Z"),
     ]
 
 
@@ -92,6 +124,25 @@ def results_digests(row) -> list[dict]:
                   "url": "https://www.sec.gov/Archives/edgar/data/19617/example/ex99-1.htm",
                   "available_at": "2026-07-14T10:45:12Z"}],
         state_key="texts:1|numbers:ok", inputs_until="2026-08-04T20:15:00Z", created_at="2026-08-05T11:50:00Z",
+        prompt_version="results-v1", method_version="rd-v1"),
+        row(
+        "results_digests", id="HDFCBANK-results-2026-06-30", release_kind="results", ticker="HDFCBANK",
+        release_at="2026-07-19T10:32:00Z", release_date="2026-07-19", release_timing="after_close",
+        release_time_basis="nse_dissemination", period_end="2026-06-30", fiscal_label="Q1 FY27",
+        basis="consolidated", currency="INR", status="text_unavailable", numbers_status="ok",
+        numbers_as_of="2026-07-19T10:32:00Z",   # India: no PDF parser yet, so numbers only (WS6)
+        numbers={"revenue": 875400000000.0, "net_profit": 182300000000.0, "eps_diluted": 23.84,
+                 "net_margin_pct": 20.82, "revenue_yoy_pct": 7.91, "net_profit_yoy_pct": 10.36,
+                 "profit_before_tax": 241900000000.0, "pbt_margin_pct": 27.63, "operating_profit": None,
+                 "prev_year_period_end": "2025-06-30", "derived": False},
+        consensus={"note": "context only", "status": "none_before_release"},
+        reaction={"from": "2026-07-18", "to": "2026-07-21", "stock_pct": -0.84, "benchmark_pct": 0.37,
+                  "excess_pct": -1.21},
+        bullets=[], source_ids=["nse-ann-7655120"],
+        sources=[{"id": "nse-ann-7655120", "kind": "nse_announcement", "doc": "results.pdf",
+                  "url": "https://nsearchives.nseindia.com/example-results.pdf",
+                  "available_at": "2026-07-19T10:32:00Z"}],
+        state_key="texts:0|numbers:ok", inputs_until="2026-07-19T10:32:00Z", created_at="2026-07-20T02:15:00Z",
         prompt_version="results-v1", method_version="rd-v1")]
 
 
@@ -137,7 +188,23 @@ def research_review(row) -> list[dict]:
                     "Trades between 0.55 and 0.57 lost after costs in 3 of 3 weeks.",
                     "cited_ids": ["rule.model_news.v1"], "status": "proposed"}],
         report_path="reports/us/research-2026-W41.md", prompt_version="director-v1",
-        written_at="2026-10-10T14:20:00Z")]
+        written_at="2026-10-10T14:20:00Z"),
+        row(
+        "research_reviews", id="rr-india-2026-W41", market="india", iso_week="2026-W41", period_start="2026-10-05",
+        period_end="2026-10-09",
+        leaders=[{"scope": "rule", "strategy_id": "rule.model_news.v1", "net_pnl": -9309.36, "trades": 6},
+                 {"scope": "ai", "strategy_id": "ai.combined.opus.v1", "net_pnl": -4783.58, "trades": 4}],
+        findings=[{"text": "Both India leaders lost after market costs (rule.model_news.v1 -9,309.36 INR on 6 trades, "
+                           "ai.combined.opus.v1 -4,783.58 INR on 4); at your cost the losses are -11,949.07 and "
+                           "-6,543.96 INR.",
+                   "cited_ids": ["rule.model_news.v1", "ai.combined.opus.v1"]}],
+        proposals=[{"proposal_id": "p-india-2026-W41-1", "kind": "new_strategy_version",
+                    "file": "config/strategies.yaml",
+                    "diff": "+  - id: rule.model_news_n5.v1\n+    horizons: [5]",
+                    "rationale": "Costs are paid once per trade; holding to N+5 spreads them over more sessions.",
+                    "cited_ids": ["rule.model_news.v1"], "status": "proposed"}],
+        report_path="reports/india/research-2026-W41.md", prompt_version="director-v1",
+        written_at="2026-10-10T04:50:00Z")]
 
 
 def portfolio(eurusd: float, r2, default_amount) -> dict:

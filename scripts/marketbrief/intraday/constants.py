@@ -117,6 +117,7 @@ TRADE_FLAG_AGAINST = "against_prediction"
 # trade check quality: ok | stale_quote | no_quote (as the ticker rows) | no_entry_price (D before today and no
 # stored bar of D by the check: the settlement records no_entry if it stays missing)
 QUALITY_NO_ENTRY = "no_entry_price"
+NOTE_UNSETTLED_PAST_EXIT = "unsettled_past_exit"   # issue #93/#128: past exit_date, no settlement row by the check
 ENTRY_INTRADAY_OPEN = "intraday_open"   # D is today: the first 5-minute bar's open
 ENTRY_STORED_OPEN = "stored_open"       # D before today: D's stored raw open (ohlc_raw)
 

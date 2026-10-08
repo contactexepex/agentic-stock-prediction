@@ -81,6 +81,64 @@
       "created_at": "2026-08-05T11:50:00Z",
       "prompt_version": "results-v1",
       "method_version": "rd-v1"
+    },
+    {
+      "id": "HDFCBANK-results-2026-06-30",
+      "release_kind": "results",
+      "ticker": "HDFCBANK",
+      "release_at": "2026-07-19T10:32:00Z",
+      "release_date": "2026-07-19",
+      "release_timing": "after_close",
+      "release_time_basis": "nse_dissemination",
+      "period_end": "2026-06-30",
+      "fiscal_label": "Q1 FY27",
+      "basis": "consolidated",
+      "currency": "INR",
+      "status": "text_unavailable",
+      "numbers_status": "ok",
+      "numbers_as_of": "2026-07-19T10:32:00Z",
+      "numbers": {
+        "revenue": 875400000000.0,
+        "net_profit": 182300000000.0,
+        "eps_diluted": 23.84,
+        "net_margin_pct": 20.82,
+        "revenue_yoy_pct": 7.91,
+        "net_profit_yoy_pct": 10.36,
+        "profit_before_tax": 241900000000.0,
+        "pbt_margin_pct": 27.63,
+        "operating_profit": null,
+        "prev_year_period_end": "2025-06-30",
+        "derived": false
+      },
+      "consensus": {
+        "note": "context only",
+        "status": "none_before_release"
+      },
+      "reaction": {
+        "from": "2026-07-18",
+        "to": "2026-07-21",
+        "stock_pct": -0.84,
+        "benchmark_pct": 0.37,
+        "excess_pct": -1.21
+      },
+      "bullets": [],
+      "source_ids": [
+        "nse-ann-7655120"
+      ],
+      "sources": [
+        {
+          "id": "nse-ann-7655120",
+          "kind": "nse_announcement",
+          "doc": "results.pdf",
+          "url": "https://nsearchives.nseindia.com/example-results.pdf",
+          "available_at": "2026-07-19T10:32:00Z"
+        }
+      ],
+      "state_key": "texts:0|numbers:ok",
+      "inputs_until": "2026-07-19T10:32:00Z",
+      "created_at": "2026-07-20T02:15:00Z",
+      "prompt_version": "results-v1",
+      "method_version": "rd-v1"
     }
   ]
 }
