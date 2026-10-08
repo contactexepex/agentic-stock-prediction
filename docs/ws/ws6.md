@@ -332,12 +332,28 @@ ORDER BY release_at DESC, id
 `consensus->>'surprise_pct'`, `reaction->>'move_pct'`). The forecast gate need not change: digests cite filing and
 announcement ids, not news ids.
 
+Applied by WS6 on 2026-10-08 (owner's rule: each session applies its own proposals; requested by the B18 shared-doc
+audit): the section is `scripts/marketbrief/results/context_section.py`, printed after "Fundamentals" by a 3-line hook
+plus one import in `scripts/marketbrief/pipeline/context.py`, and the `CLAUDE.md` line "The context pack does not show
+digests yet" now says it does. Differences from the proposal: only active companies (`lifecycle.loader.
+active_tickers`, like the other sections); the window is `detection.lookback_days`; the table adds the release
+`kind` and `numbers_status`; the section is omitted when no digest is in the window, so the pack is unchanged on such
+days; the title says "context only, not a range or forecast input"; rows also need `release_at <= now()`. Each bullet
+ends with `cite: <filing or NSE announcement id>` only when the forecast gate accepts that id as evidence
+(`forecast_gate.evidence_times`); a stored text's own id (`<id>:<document>`) is never shown as citable, and a source
+the gate does not know (e.g. an SEC filing found through the submissions fallback, not in `filings`) reads
+`context only`. The AI traders' inputs (`traders/prepare.py` `SECTION_INPUTS`, B3's) do not take this section: it
+appears in their `left_out` lists; adding it there is B3's call. Test: `tests/test_results_context.py`.
+
 **scripts/marketbrief/constants/ai_replay.py** `PUBLIC_AT` (so an as-of replay can copy digests):
 `"results_digests": ["created_at"],  # WS6: a digest once stored (every input <= inputs_until <= created_at)`.
 Until then `ai_replay` lists the kind as "no known publication-time rule" and leaves it out (safe).
 
 **scripts/marketbrief/constants/neo4j.py** `NOT_PROJECTED`:
 `"results_digests": "per-release results digests (WS6), DuckDB only for now",`.
+
+- Context-pack section (ws6.md proposed edit 8): round 1 FAIL at 38e4d22 (bullets offered stored-text ids the forecast
+  gate rejects), round 2 PASS at a2e0b34.
 
 ## Cosmetic follow-ups
 From round 1 (fixed in the round-1 fix commit: the `schema_results.py` comment naming `quote_field`; the pasted ruff
@@ -359,6 +375,9 @@ file count; the ambiguous "local midnight" wording; a minimum quote length, now 
 
 - `tests/test_judgments.py::test_every_logged_commit_exists` fails locally on main too (logged commits missing
   from this checkout); it hides real regressions locally (merge review).
+
+- `tests/test_results_context.py`: no test of the `release_at <= now()` filter on its own or of a non-default
+  `lookback_days` (context-section review, round 2).
 
 ## Open questions
 1. **PDF parsing (India).** NSE attachments (results press releases, transcripts) are PDFs. The safety rules allow
