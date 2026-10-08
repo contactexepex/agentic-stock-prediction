@@ -112,6 +112,16 @@ export const cases = [
     waitFor: ".chat .msg.a",
     expectText: ["switched off by the owner"],
     expectSelector: [".composer button[disabled]"],
+    check: async (page) => {
+      // font metrics differ between machines (the orchestrator's run overflowed by 43 px): widen the text on purpose
+      // and require the label to stay inside its card
+      const out = await page.$$eval(".mb-label.warn", (els) => els.map((el) => {
+        el.style.letterSpacing = "3px";
+        const card = el.closest(".card").getBoundingClientRect();
+        return el.getBoundingClientRect().right - card.right;
+      }));
+      return out.filter((d) => d > 0.5).map((d) => `a warning label overflows its card by ${Math.round(d)} px with wider text`);
+    },
   },
   {
     name: "chat-panel",

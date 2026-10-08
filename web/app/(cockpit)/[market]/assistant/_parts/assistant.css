@@ -45,3 +45,7 @@
 .chat-panel .pf{padding:10px 14px 12px;border-top:1px solid var(--md-sys-color-outline-variant)}
 .chat-panel .msg{max-width:100%}
 .chat-panel .ctx{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);margin-top:6px}
+/* long labels (the switched-off note, a refusal notice) wrap inside their card instead of overflowing it: .mb-label is
+   nowrap, and their width depends on the fonts of the machine */
+.mb-label.wrap{white-space:normal;height:auto;max-width:100%;box-sizing:border-box;align-items:flex-start;overflow-wrap:anywhere}
+.mb-label.wrap .ms{flex:none;margin-top:2px}

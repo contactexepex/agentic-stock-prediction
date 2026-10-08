@@ -79,7 +79,7 @@ export function SpendCard({ spend, state }: { spend: SpendState | null; state: "
             <div><div className="l">This month (UTC)</div><div className="v">{usd(spend.month.spent_usd)}</div></div>
           </div>
           {spend.enabled === false ? (
-            <div className="mb-label warn"><Icon name="block" />switched off by the owner: questions are not answered</div>
+            <div className="mb-label warn wrap"><Icon name="block" />switched off by the owner: questions are not answered</div>
           ) : null}
         </>
       ) : <Quiet>{state === "error" ? "The spend cannot be read right now." : "Reading the spend…"}</Quiet>}
@@ -133,7 +133,7 @@ export function AssistantPage({ market }: { market: Market }) {
                 : `No question asked in ${name} in the last ${a.limits?.retention_days ?? 90} days. Ask one below; the answer reads only the stored data.`}
             />
           )}
-          {a.notice ? <div className="mb-label warn notice" role="alert"><Icon name="warning" />{a.notice}</div> : null}
+          {a.notice ? <div className="mb-label warn notice wrap" role="alert"><Icon name="warning" />{a.notice}</div> : null}
           <Composer
             max={max}
             busy={Boolean(a.pending)}
