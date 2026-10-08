@@ -152,6 +152,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `web/lib/data/`) reads only `rm`; contract `api/openapi.yaml` 2.0 plus `api/paths/*.yaml` and `api/schemas/*.yaml`
   (one file per page session; bundled by `warehouse/openapi_spec.py`), checked by `tests/test_openapi.py` and
   against the approved mockups by `tests/test_api_contract.py` (`scripts/api_contract.py` for the live warehouse).
+- Market pages (B11, docs/ws/b11.md; contract 2.0): `scripts/marketbrief/warehouse/rm_home.py`, `rm_watchlist.py`,
+  `rm_news.py` and `rm_companies.py` build rm.home, rm.watchlist (replacing the 1.0 dashboard slice), rm.news and
+  rm.companies as of the run's clock, served by `/api/v1/markets/{market}/home|watchlist|news|companies`
+  (`api/paths|schemas/<page>.yaml`, routes in `web/app/api/v1/markets/[market]/`). Shared reads B12 reuses:
+  `news_items.news_items` (decision 12: a company deleted by the cut-off is never in an item's tags) and
+  `news_window` (3 days, at most 50: up to 25 company and 25 market-wide, a share one scope leaves unused going to the
+  other, each kept by market movers, high materiality, then newest; owner, 2026-10-08), `calendar_events.calendar_events`,
+  `company_records` (lifecycle events, commands with deleted companies masked).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list

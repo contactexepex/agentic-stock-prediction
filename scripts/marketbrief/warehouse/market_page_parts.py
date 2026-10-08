@@ -6,7 +6,7 @@ carries exactly the keys its mockup's notes.md lists."""
 from __future__ import annotations
 
 from marketbrief.constants.market_pages import NEWS_MAX_ITEMS, NEWS_WINDOW_DAYS
-from marketbrief.warehouse import rm_common
+from marketbrief.warehouse import rm_common, rm_company
 from marketbrief.warehouse.news_items import news_window
 from marketbrief.warehouse.rm_registry import BuildContext
 
@@ -51,6 +51,11 @@ def companies(ctx: BuildContext, fields: tuple) -> list[dict]:
     `fields`."""
     return [pick(company, fields) for company in rm_common.companies(ctx)]
 
+
+def trade_checks(ctx: BuildContext, fields: tuple[str, ...]) -> list[dict]:
+    """B12's rows of the market's latest intraday trade check by the cut-off (rm_company.trade_checks: every column of
+    the view trade_check_rows, collected companies, by ticker and trade) with `fields`."""
+    return [pick(check, fields) for check in rm_company.trade_checks(ctx)]
 
 
 def market_mockup(mockup: dict, market: str, _page_key: str) -> dict:

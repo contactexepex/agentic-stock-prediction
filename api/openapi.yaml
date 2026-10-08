@@ -112,24 +112,6 @@ paths:
               schema: {$ref: '#/components/schemas/OverviewResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/watchlist:
-    get:
-      tags: [markets]
-      operationId: getWatchlist
-      summary: One row per watchlist company (last session, model P(up), calls, ranges, quality)
-      x-read-model: rm.watchlist
-      parameters:
-        - $ref: '#/components/parameters/Market'
-      responses:
-        '200':
-          description: The watchlist read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/WatchlistResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/runs:
     get:
       tags: [markets]
@@ -362,13 +344,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/Overview'}
-    WatchlistResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/Watchlist'}
     RunListResponse:
       allOf:
         - $ref: '#/components/schemas/ReadModelMeta'
@@ -756,51 +731,6 @@ components:
         entry: {$ref: '#/components/schemas/IsoDate'}
         exit: {$ref: '#/components/schemas/IsoDate'}
         label: {type: string, description: 'skill.label, e.g. "Paper only — no proven edge yet"'}
-
-    Watchlist:
-      type: object
-      x-source: per-company slices of presentation/dashboard/assemble.company
-      required: [market, as_of, skill, rows]
-      properties:
-        market: {$ref: '#/components/schemas/Market'}
-        as_of: {type: ['string', 'null'], format: date}
-        plan:
-          oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
-        skill: {$ref: '#/components/schemas/SkillStatus'}
-        rows:
-          type: array
-          items: {$ref: '#/components/schemas/WatchlistRow'}
-    WatchlistRow:
-      type: object
-      required: [ticker, name, sector, last, model, calls, ranges]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        name: {type: string}
-        sector: {type: string}
-        last:
-          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
-        ret_1d: {$ref: '#/components/schemas/NullableNumber'}
-        ret_5d: {$ref: '#/components/schemas/NullableNumber'}
-        quality: {type: ['string', 'null'], description: 'features.quality (OK, PARTIAL or BLOCKED; constants/indicators.py)'}
-        days_to_earnings: {type: ['integer', 'null']}
-        earnings: {type: ['string', 'null'], format: date}
-        model:
-          type: array
-          description: Per horizon, the headline of the model score (full explanation on the stock page)
-          items:
-            type: object
-            required: [h, id, prob_up]
-            properties:
-              h: {$ref: '#/components/schemas/Horizon'}
-              id: {type: string}
-              prob_up: {$ref: '#/components/schemas/NullableNumber'}
-              calibrated: {type: boolean}
-        calls:
-          type: array
-          items: {$ref: '#/components/schemas/CallRow'}
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
 
     RunList:
       type: object

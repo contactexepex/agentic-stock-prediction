@@ -1,14 +1,18 @@
-// The market pages' read specs (B11: lib/data/news.ts, companies.ts): each reads its own rm
+// The market pages' read specs (B11: lib/data/home.ts, watchlist.ts, news.ts, companies.ts): each reads its own rm
 // table with one keyed read of page `_`, serves a 2.0 page payload (cutoff and built_at at the top, freshness in the
 // status block), and answers 404 for an unknown market without a read.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readPage } from "../handler.ts";
 import { COMPANIES_PAGE } from "../companies.ts";
+import { HOME_PAGE } from "../home.ts";
 import { NEWS_PAGE } from "../news.ts";
+import { WATCHLIST_PAGE } from "../watchlist.ts";
 import { MemoryRowStore, NOW, row } from "./fakes.ts";
 
 const PAGES = [
+  ["home", HOME_PAGE],
+  ["watchlist", WATCHLIST_PAGE],
   ["news", NEWS_PAGE],
   ["companies", COMPANIES_PAGE],
 ] as const;

@@ -1,0 +1,68 @@
+# The Watchlist page (B11; design/mockups/02-watchlist/notes.md); replaces the 1.0 Watchlist payload (contract 2.0).
+# Builder: scripts/marketbrief/warehouse/rm_watchlist.py.
+WatchlistResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/WatchlistPayload'}
+WatchlistPayload:
+  x-source: warehouse/rm_watchlist.watchlist_pages
+  description: >-
+    The Watchlist page: the page shell, the Company records (the page lists the active ones and names the inactive
+    under the table, decision 13), the Agreement per horizon, the open trades, the latest trade checks by the
+    cut-off, the reference rule strategy's ranges and the strategies. Every signal is Paper until `go_live.proven`
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, companies, agreement, open_trades, trade_checks, ranges, strategies]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        companies:
+          type: array
+          items: {$ref: '#/components/schemas/CompanyRecord'}
+        agreement: {$ref: '#/components/schemas/AgreementMap'}
+        open_trades:
+          type: array
+          items: {$ref: '#/components/schemas/OpenTrade'}
+        trade_checks:
+          type: array
+          description: The rows of the market's latest intraday trade check at or before the cut-off
+          items: {$ref: '#/components/schemas/TradeCheck'}
+        ranges:
+          type: array
+          items: {$ref: '#/components/schemas/PredictionRange'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+PredictionRange:
+  type: object
+  x-source: warehouse/rm_watchlist.ranges (kind strategy_predictions)
+  description: >-
+    One prediction of the reference rule strategy (rule.model_news.v1) of its newest as-of date made by the cut-off,
+    with the fields of the range column (catalogue entity Prediction)
+  required: [id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction,
+             prob_up, qualifies, base_close, target_price, lo50, hi50, lo80, hi80, range_widen, regime, quality]
+  properties:
+    id: {type: string}
+    strategy_id: {type: string}
+    family: {type: string, enum: [rule, baseline, ai]}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    made_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {$ref: '#/components/schemas/IsoDate'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {type: ['string', 'null'], format: date}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    direction: {type: ['string', 'null'], enum: [up, down, null]}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    qualifies: {type: ['boolean', 'null']}
+    base_close: {$ref: '#/components/schemas/NullableNumber'}
+    target_price: {$ref: '#/components/schemas/NullableNumber'}
+    lo50: {$ref: '#/components/schemas/NullableNumber'}
+    hi50: {$ref: '#/components/schemas/NullableNumber'}
+    lo80: {$ref: '#/components/schemas/NullableNumber'}
+    hi80: {$ref: '#/components/schemas/NullableNumber'}
+    range_widen: {$ref: '#/components/schemas/NullableNumber'}
+    regime: {type: ['string', 'null']}
+    quality: {type: ['string', 'null']}
