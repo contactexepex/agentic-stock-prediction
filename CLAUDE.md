@@ -333,7 +333,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   request not decidable yet is logged `failed` and tried again).
   Every read is as of the clock (MB_NOW-aware).
 - Strategy lab and paper-trading engine (B2; docs/SPEC.md F1-F3, F7; DESIGN.md section 17; notes `docs/ws/b2.md`;
-  code `marketbrief/lab/`, entry `scripts/lab.py`): `predict` (pre-open, rule strategies and baselines from B10's
+  code `marketbrief/lab/`, entry `scripts/lab.py`; a strategy trades only from its `live_from` in
+  `config/strategies.yaml` (`registry.is_live`: settle, pick and the forward summary skip pre-live rows, predict
+  rehearses)): `predict` (pre-open, rule strategies and baselines from B10's
   per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
   of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
   refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,

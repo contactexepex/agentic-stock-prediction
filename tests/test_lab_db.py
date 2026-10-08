@@ -36,6 +36,19 @@ US_BARS = {"AAPL": {"2026-10-02": (100, 101.5, 99, 101), "2026-10-05": (101, 102
                       "2026-10-06": (1.2, 1.2, 1.2, 1.20)}}
 
 
+LIVE_FROM = "2026-01-02"     # every fixture session is on or after it: all strategies trade
+
+
+def set_live_from(config: Path, live_from: str | None, ids: tuple[str, ...] | None = None) -> None:
+    """Set `live_from` of the strategies (all, or `ids`) in a config copy's strategies.yaml."""
+    path = config / "strategies.yaml"
+    reg = yaml.safe_load(path.read_text())
+    for spec in reg["strategies"]:
+        if ids is None or spec["id"] in ids:
+            spec["live_from"] = live_from
+    path.write_text(yaml.safe_dump(reg, sort_keys=False))
+
+
 def write_jsonl(root: Path, market: str, kind: str, day: str, rows: list[dict]) -> None:
     path = root / "data" / market / kind / day[:4] / day[5:7] / f"{day}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,9 +68,11 @@ def write_bars(root: Path, market: str, bars: dict) -> None:
 
 @pytest.fixture
 def root(tmp_path, monkeypatch):
-    """A data root with the US fixture bars and a config copy whose costs are the fixture's rates."""
+    """A data root with the US fixture bars and a config copy whose costs are the fixture's rates and whose
+    strategies are all live from LIVE_FROM (the go-live switch; tests of the switch itself override it)."""
     config = tmp_path / "config"
     shutil.copytree(REPO / "config", config)
+    set_live_from(config, LIVE_FROM)
     costs = yaml.safe_load((config / "costs.yaml").read_text())
     costs["us"].update({k: v for k, v in US_RATES.items() if k != "order_fee_eur"})
     costs["broker"]["us"]["order_fee_eur"] = US_RATES["order_fee_eur"]
