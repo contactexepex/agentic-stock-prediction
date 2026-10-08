@@ -22,33 +22,12 @@ import { bandsOf, isSettled, lifecycleDates, predictionPaths, type PredictionPat
 import { expectedGainMoney } from "../../../../../../../../lib/company-pages/strategies-logic.ts";
 import type { CompanyPayload, HeadToHeadPick, LifecyclePayload, TradeCheck } from "../../../../../../../../lib/company-pages/types.ts";
 import { ReasonsCard } from "../../../_parts/cards.tsx";
+import { CheckState, StrategyCell } from "../../../_parts/cells.tsx";
 import { pageCtx, type PageCtx } from "../../../_parts/context.ts";
 import { plural } from "../../../_parts/labels.ts";
 import { SettledCard } from "../../../_parts/trades.tsx";
 import "../../../_parts/company.css";
 import "./lifecycle.css";
-
-function StrategyCell({ id, sub, ctx }: { id: string | null; sub?: string; ctx: PageCtx }) {
-  const st = strategyOf(ctx.strategies, id ?? "");
-  return (
-    <span className="nm">
-      <b>{st.name} <FamilyLabel family={st.family}>{FAMILY_SHORT[st.family] ?? st.family}</FamilyLabel></b>
-      {sub ? <small>{sub}</small> : null}
-    </span>
-  );
-}
-
-function CheckWords({ c, ctx }: { c: TradeCheck; ctx: PageCtx }) {
-  const [words, cls] = BAND[c.band] ?? [c.band, ""];
-  const flags = c.flags.map((f) => FLAG[f] ?? f);
-  return (
-    <span className={`st ${c.flagged ? "flag" : cls}`} tabIndex={0}
-      data-tip={`${ctx.at(c.check_at, true)}: ${price(ctx.currency, c.last_price)}, ${signed(c.ret_since_entry_pct)} since entry, ${words}${flags.length ? "; " + flags.join(", ") : ""}.`}>
-      <Icon name={c.flagged ? "warning" : "check"} />
-      {c.flagged ? c.flags.map((f) => FLAG_SHORT[f] ?? f).join(", ") : BAND_SHORT[c.band] ?? c.band}
-    </span>
-  );
-}
 
 /** The path of one call in words: made, checked, settled, explained (each step says when it has not happened yet). */
 function PathCell({ path, ctx }: { path: PredictionPath; ctx: PageCtx }) {
@@ -63,7 +42,7 @@ function PathCell({ path, ctx }: { path: PredictionPath; ctx: PageCtx }) {
             {path.checks.length ? <>{path.checks.length} {plural(path.checks.length, "check")}{last.flagged ? <Icon name="warning" /> : null}</> : "no check yet"}
           </span>
           <span className={"step" + (done.length ? " on" : "")}>
-            {done.length ? <>settled <MoneyDelta currency={ctx.currency} value={net} decimals={ctx.decimals} /></> : path.settled.length ? path.settled.map((t) => t.status.replace(/_/g, " ")).join(", ") : "not settled yet"}
+            {done.length ? <span tabIndex={0} data-tip={done.length > 1 ? `Net after costs of its ${done.length} settled trades together (${done.map((t) => t.view === "head_to_head" ? "head-to-head" : "accuracy view").join(" and ")}).` : `Net after costs of its ${done[0].view === "head_to_head" ? "head-to-head" : "accuracy-view"} trade.`}>settled <MoneyDelta currency={ctx.currency} value={net} decimals={ctx.decimals} /></span> : path.settled.length ? path.settled.map((t) => t.status.replace(/_/g, " ")).join(", ") : "not settled yet"}
           </span>
           <span className={"step" + (path.reasons.length ? " on" : "")}>{path.reasons.length ? `${path.reasons.length} ${plural(path.reasons.length, "note")}` : "no note"}</span>
         </>
@@ -127,7 +106,7 @@ function ChecksCard({ checks, ctx }: { checks: TradeCheck[]; ctx: PageCtx }) {
     { key: "strategy", header: "Trade", render: (c) => <StrategyCell id={c.strategy_id ?? null} ctx={ctx} sub={`${c.view === "head_to_head" ? "head-to-head" : "accuracy view"}${c.horizon_days ? ` · N+${c.horizon_days}` : ""}${c.session_number != null ? ` · session ${c.session_number}` : ""}`} /> },
     { key: "price", header: "Price", numeric: true, className: "cm", render: (c) => price(ctx.currency, c.last_price) },
     { key: "since", header: "Since entry", numeric: true, render: (c) => signed(c.ret_since_entry_pct) },
-    { key: "state", header: "Check", render: (c) => <CheckWords c={c} ctx={ctx} /> },
+    { key: "state", header: "Check", render: (c) => <CheckState check={c} ctx={ctx} withDate /> },
   ];
   return (
     <Card label="Intraday checks">

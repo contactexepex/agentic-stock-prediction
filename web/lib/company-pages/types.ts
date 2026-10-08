@@ -31,13 +31,13 @@ export interface TradeCheck extends SharedCheck {
 export interface SettledTrade {
   id: string; trade_id: string; prediction_id: string; strategy_id: string; family: Family; view: string;
   pick_rule: string | null; horizon_days: number; made_at?: IsoTime; entry_date: IsoDate; exit_date: IsoDate;
-  exit_date_actual: IsoDate | null; status: string; flags: string[]; amount: number | null; currency?: string;
+  exit_date_actual: IsoDate | null; status: string; flags: string[] | null; amount: number | null; currency?: string;
   entry_price: number | null; exit_price: number | null; quantity: number | null; gross_pnl: number | null;
   costs: number | null; net_pnl: number | null; return_pct: number | null; prob_up: number | null;
   target_price: number | null; range_hit: boolean | null; target_reached: boolean | null;
   target_reached_session: number | null; max_favourable_pct: number | null; max_adverse_pct: number | null;
   move_pct: number | null; market_pct: number | null; sector_pct: number | null; news_pct: number | null;
-  company_pct: number | null; reason_code: string | null; reason_codes: string[];
+  company_pct: number | null; reason_code: string | null; reason_codes: string[] | null;
   reason_detail?: { benchmark?: string | null; benchmark_pct?: number | null; beta?: number | null; sector_source?: string | null; note?: string | null } | null;
   settled_at?: IsoTime;
 }
@@ -56,12 +56,12 @@ export interface NewsItem {
 
 export interface ResultsDigest {
   id: string; fiscal_label: string | null; release_date: IsoDate | null; release_timing: string | null;
-  period_end: IsoDate | null; basis: string | null; currency: string; status: string; numbers_as_of: IsoTime | null;
+  period_end: IsoDate | null; basis: string | null; currency: string | null; status: string; numbers_as_of: IsoTime | null;
   numbers: Record<string, number | null | undefined> & { derived?: unknown };
   consensus: { eps_estimate?: number | null; eps_reported?: number | null; surprise_pct?: number | null } | null;
   reaction: { from: IsoDate; to: IsoDate; stock_pct: number | null; benchmark_pct: number | null; excess_pct: number | null } | null;
-  bullets: Array<{ topic?: string; text?: string; quote?: string }>;
-  sources: Array<{ id: string; kind: string; doc?: string | null; url?: string | null }>;
+  bullets: Array<{ topic?: string; text?: string; quote?: string }> | null;
+  sources: Array<{ id: string; kind: string; doc?: string | null; url?: string | null }> | null;
 }
 
 export interface CalendarEvent {
@@ -87,7 +87,7 @@ export interface HeadToHeadPick extends Pick {
 }
 
 export interface ScoreRow {
-  strategy_id: string; horizon_days: number | "all"; trades: number; net_pnl: number; mean_return_pct?: number | null;
+  strategy_id: string | null; horizon_days: number | "all"; trades: number; net_pnl: number | null; mean_return_pct?: number | null;
   win_rate?: number | null; avg_target_error_pct?: number | null; sample_badge?: string | null;
   luck_test?: {
     method: string; n: number; m?: number | null; low_pct: number | null; high_pct: number | null;

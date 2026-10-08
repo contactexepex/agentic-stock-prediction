@@ -9,6 +9,7 @@ import {
 } from "../company-logic.ts";
 import { agreementAt, bestOf, expectedGainMoney, pooledRows, rankedIds } from "../strategies-logic.ts";
 import type { ScoreRow, SettledTrade } from "../types.ts";
+import type { StrategyRow } from "../strategies-logic.ts";
 
 const root = fileURLToPath(new URL("../../../../", import.meta.url));
 // The mockups' data.json files carry Python's NaN for a few missing strings; read it as null.
@@ -86,13 +87,16 @@ test("chart geometry without predictions or bars", () => {
 });
 
 test("ranking: profit after costs, then trades, then id; unranked strategies after, by id", () => {
-  const rows: ScoreRow[] = [
+  const rows: StrategyRow[] = [
     { strategy_id: "b", horizon_days: "all", trades: 3, net_pnl: 10 }, { strategy_id: "a", horizon_days: "all", trades: 5, net_pnl: 10 },
     { strategy_id: "c", horizon_days: "all", trades: 9, net_pnl: -4 }, { strategy_id: "z", horizon_days: "all", trades: 0, net_pnl: 0 },
   ];
   assert.deepEqual(rankedIds(["y", "c", "b", "x", "a", "z"], rows), ["a", "b", "z", "c", "x", "y"]);
   assert.equal(bestOf(rows)?.strategy_id, "a");
   assert.equal(bestOf([{ strategy_id: "z", horizon_days: "all", trades: 0, net_pnl: 5 }]), null);
+  assert.equal(bestOf([{ strategy_id: "n", horizon_days: "all", trades: 4, net_pnl: null }]), null, "a row without a stored profit is not the best");
+  const raw: ScoreRow[] = [{ strategy_id: null, horizon_days: "all", trades: 3, net_pnl: 1 }, { strategy_id: "a", horizon_days: 1, trades: 3, net_pnl: 1 }, ...rows];
+  assert.deepEqual(pooledRows(raw).map((r) => r.strategy_id), rows.map((r) => r.strategy_id), "null ids and per-horizon rows are left out");
 });
 
 test("stock strategies example: pooled rows, agreement per horizon, expected gain in money", () => {

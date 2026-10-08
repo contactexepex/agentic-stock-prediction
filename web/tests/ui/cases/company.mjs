@@ -202,7 +202,7 @@ cases.push(
   },
 );
 
-// ---------- the watchlist actions (preview, confirm, pending) through B11's command routes ----------
+// ---------- the watchlist actions: B14's CommandDialog on B11's command routes (preview, confirm, pending) ----------
 const commandsApi = (previewStatus = 200) => (rest, market) => {
   if (rest === "companies/preview") {
     return previewStatus === 200
@@ -212,6 +212,7 @@ const commandsApi = (previewStatus = 200) => (rest, market) => {
   if (rest === "companies/commands") return { status: 202, body: { command_id: "c2", result: "pending", refusal_code: null, message: null, inbox_id: "6f1c2a7e-0000-4000-8000-000000000001", record_ids: [], budget_left: 8, paper: true } };
   return companyApi()(rest, market);
 };
+const DIALOG = "dialog.mb-cmd-dialog[open]";
 
 cases.push(
   {
@@ -223,15 +224,15 @@ cases.push(
     check: async (page) => {
       const problems = [];
       await page.click('.cohead button:has-text("Deactivate")');
-      if (!(await page.isVisible("dialog[open]"))) return ["the Deactivate button did not open the dialog"];
-      await page.click('dialog[open] button:has-text("Review")');
-      await page.waitForSelector('dialog[open] button:has-text("Record deactivation")', { timeout: 3000 }).catch(() => problems.push("no Record button after the preview"));
-      if (!(await page.textContent("dialog[open]")).includes("Deactivate RELIANCE (Reliance Industries)")) problems.push("the server's summary is not shown");
-      await page.click('dialog[open] button:has-text("Record deactivation")');
+      if (!(await page.isVisible(DIALOG))) return ["the Deactivate button did not open the dialog"];
+      await page.click(`${DIALOG} button:has-text("Check the request")`);
+      await page.waitForSelector(`${DIALOG} button:has-text("Confirm")`, { timeout: 3000 }).catch(() => problems.push("no Confirm button after the preview"));
+      if (!(await page.textContent(DIALOG)).includes("Deactivate RELIANCE (Reliance Industries)")) problems.push("the server's summary is not shown");
+      await page.click(`${DIALOG} button:has-text("Confirm")`);
       await page.waitForSelector(".pend .mb-alert", { timeout: 3000 }).catch(() => problems.push("no pending line after Confirm"));
-      if (await page.isVisible("dialog[open]")) problems.push("the dialog stayed open after the request was recorded");
+      if (await page.isVisible(DIALOG)) problems.push("the dialog stayed open after the request was recorded");
       const pend = await page.textContent(".pend").catch(() => "");
-      if (!pend.includes("Pending: deactivate (pending, request 6f1c2a7e)")) problems.push(`pending line reads: ${pend}`);
+      if (!pend.includes("Pending: Deactivate RELIANCE (Reliance Industries)")) problems.push(`pending line reads: ${pend}`);
       return problems;
     },
   },
@@ -245,13 +246,12 @@ cases.push(
     check: async (page) => {
       const problems = [];
       await page.click('.cohead button:has-text("Change amount")');
-      await page.fill("dialog[open] input", "150000");
-      await page.click('dialog[open] button:has-text("Review")');
-      await page.waitForSelector('dialog[open] [role="alert"]', { timeout: 3000 }).catch(() => problems.push("no refusal shown"));
-      const text = await page.textContent("dialog[open]");
-      if (!text.includes("Nothing was recorded") || !text.includes("RELIANCE is already inactive")) problems.push("the refusal does not say why or that nothing was recorded");
+      await page.fill(`${DIALOG} input`, "150000");
+      await page.click(`${DIALOG} button:has-text("Check the request")`);
+      await page.waitForSelector(`${DIALOG} [role="alert"]`, { timeout: 3000 }).catch(() => problems.push("no refusal shown"));
+      if (!(await page.textContent(DIALOG)).includes("RELIANCE is already inactive")) problems.push("the refusal does not say why");
       await page.keyboard.press("Escape");
-      if (await page.isVisible("dialog[open]")) problems.push("Escape did not close the dialog");
+      if (await page.isVisible(DIALOG)) problems.push("Escape did not close the dialog");
       if (await page.$(".pend .mb-alert")) problems.push("a refused request shows as pending");
       return problems;
     },

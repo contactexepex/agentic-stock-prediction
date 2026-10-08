@@ -13,7 +13,7 @@ import type { Market } from "../../../../../../lib/data/constants.ts";
 import { lifecycleDates } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { CompanyPayload } from "../../../../../../lib/company-pages/types.ts";
 import { Icon } from "../../../../../../components/ui/icon.tsx";
-import { useWatchlistActions } from "./actions.tsx";
+import { CommandDialog, type Intent, type Recorded } from "../../../companies/_parts/command-dialog.tsx";
 import { EventsCard, NewsCard, ReasonsCard, ResultsCard, WatchlistCard } from "./cards.tsx";
 import { pageCtx } from "./context.ts";
 import { CompanyLine, DecisionCard } from "./decision.tsx";
@@ -28,21 +28,26 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
   const [horizon, setHorizon] = useState<number>(opening);
   const co = p.company;
   const dates = lifecycleDates(p.bars, p.status.session.session_date);
-  const actions = useWatchlistActions(co, ctx);
+  // Change amount / Deactivate / Reactivate: B14's confirm dialog on B11's routes (the server's summary, then Confirm;
+  // one Idempotency-Key per opening, so each opening is mounted with a new key). Pending until the next run imports it.
+  const [intent, setIntent] = useState<Intent | null>(null);
+  const [openings, setOpenings] = useState(0);
+  const [recorded, setRecorded] = useState<Recorded[]>([]);
+  const open = (kind: "amount" | "deactivate" | "reactivate") => { setOpenings((n) => n + 1); setIntent({ kind, company: co }); };
   const buttons = (
     <>
-      <button className="md-btn outlined small" type="button" onClick={() => actions.open("amount")}><Icon name="account_balance_wallet" />Change amount</button>
+      <button className="md-btn outlined small" type="button" onClick={() => open("amount")}><Icon name="account_balance_wallet" />Change amount</button>
       {co.state === "active"
-        ? <button className="md-btn outlined small" type="button" onClick={() => actions.open("deactivate")}><Icon name="pending" />Deactivate</button>
-        : <button className="md-btn outlined small" type="button" onClick={() => actions.open("reactivate")}><Icon name="check" />Reactivate</button>}
+        ? <button className="md-btn outlined small" type="button" onClick={() => open("deactivate")}><Icon name="pending" />Deactivate</button>
+        : <button className="md-btn outlined small" type="button" onClick={() => open("reactivate")}><Icon name="check" />Reactivate</button>}
     </>
   );
-  const pending = actions.pending.length ? (
+  const pending = recorded.length ? (
     <div className="pend">
-      {actions.pending.map((r, i) => (
+      {recorded.map((r, i) => (
         <div className="mb-alert" key={i} style={{ padding: "10px 14px" }} role="status">
           <Icon name="pending" />
-          <div><b className="t">Pending: {r}</b><div className="s">Recorded as a request; the next run imports it (F10). Nothing is bought or sold.</div></div>
+          <div><b className="t">{r.result === "duplicate" ? "Already requested" : "Pending"}: {r.summary}</b><div className="s">Recorded as a request; the next run imports it (F10). Nothing is bought or sold.</div></div>
         </div>
       ))}
     </div>
@@ -64,7 +69,7 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
         <div className="col">
           <ReasonsCard reasons={p.reasons} news={p.news} ctx={ctx} />
           <ResultsCard p={p} ctx={ctx} />
-          <WatchlistCard p={p} ctx={ctx} onChangeAmount={() => actions.open("amount")} pending={pending} historyDates={dates} />
+          <WatchlistCard p={p} ctx={ctx} onChangeAmount={() => open("amount")} pending={pending} historyDates={dates} />
         </div>
         <div className="col">
           <NewsCard p={p} ctx={ctx} />
@@ -73,7 +78,10 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
       </div>
       <CompanyLegend />
       <PageFooter page={p} endpoint={`stocks/${co.ticker}`} />
-      {actions.element}
+      {intent ? (
+        <CommandDialog key={openings} intent={intent} market={ctx.market} currency={ctx.currency} defaultAmount={co.amount ?? 0}
+          onClose={() => setIntent(null)} onRecorded={(r) => setRecorded((list) => [...list, r])} onSwitch={setIntent} />
+      ) : null}
     </>
   );
 }

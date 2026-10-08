@@ -173,7 +173,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
           <rect className="hit" x={L} y={T} width={W - L - R} height={H - T - AX} onPointerMove={onMove} onPointerLeave={() => setHover(null)} />
         </svg>
         <div className={"ctip" + (hb ? " on" : "")} role="status" aria-live="polite"
-          style={hb ? { left: Math.max(0, x(hover!) > W * 0.6 ? x(hover!) - 244 : x(hover!) + 14), top: Math.max(0, y(hb.close) - 40) } : undefined}>
+          style={hb ? { ...(x(hover!) > W * 0.6 ? { right: Math.max(0, W - x(hover!) + 14) } : { left: x(hover!) + 14 }), top: Math.max(0, y(hb.close) - 40) } : undefined}>
           {hb ? (
             <>
               <b>{fmtDateYear(hb.date)}</b><br />

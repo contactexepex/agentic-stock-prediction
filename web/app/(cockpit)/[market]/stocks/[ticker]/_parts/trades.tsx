@@ -12,34 +12,15 @@ import { fmtDate, money, pct, price, signed } from "../../../../../../lib/ui/for
 import { stockStrategiesPath } from "../../../../../../lib/ui/routes.ts";
 import { bandsOf, isSettled, settledSummary, whyScale, whySegments } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { CompanyPayload, OpenTrade, SettledTrade, TradeCheck } from "../../../../../../lib/company-pages/types.ts";
+import { CheckState, StrategyCell } from "./cells.tsx";
 import type { PageCtx } from "./context.ts";
 import { plural, reasonWords } from "./labels.ts";
 
-function StrategyCell({ id, sub, ctx }: { id: string; sub: string; ctx: PageCtx }) {
-  const st = strategyOf(ctx.strategies, id);
-  return (
-    <span className="nm">
-      <b>{st.name} <FamilyLabel family={st.family}>{FAMILY_SHORT[st.family] ?? st.family}</FamilyLabel></b>
-      <small>{sub}</small>
-    </span>
-  );
-}
-
 function CheckCell({ check, ctx }: { check: TradeCheck | undefined; ctx: PageCtx }) {
   if (!check) return <span className="st muted" data-tip="No intraday check stored for this trade by the cut-off.">—</span>;
-  const [bandWords, bandClass] = BAND[check.band] ?? [check.band, ""];
-  const flags = check.flags.map((f) => FLAG[f] ?? f);
-  const tip =
-    `${ctx.at(check.check_at)}: ${price(ctx.currency, check.last_price)}, ${signed(check.ret_since_entry_pct)} since entry, ${bandWords}` +
-    (flags.length ? `; ${flags.join(", ")}` : "") +
-    `. Best so far ${signed(check.high_since_entry_pct)}, worst ${signed(check.low_since_entry_pct)}` +
-    (check.target_reached ? `; target reached in session ${check.target_reached_session}` : "") + ".";
   return (
     <>
-      <span className={`st ${check.flagged ? "flag" : bandClass}`} data-tip={tip}>
-        <Icon name={check.flagged ? "warning" : "check"} />
-        {check.flagged ? check.flags.map((f) => FLAG_SHORT[f] ?? f).join(", ") : BAND_SHORT[check.band] ?? check.band}
-      </span>
+      <CheckState check={check} ctx={ctx} />
       <small className="muted" style={{ display: "block", fontSize: 11 }}>at {price(ctx.currency, check.last_price)} · {signed(check.ret_since_entry_pct)} since entry</small>
     </>
   );
@@ -102,7 +83,7 @@ export function SettledCard({ settled, ctx, paperLabel, ticker }: { settled: Set
   const cur = ctx.currency, rows = settled.filter(isSettled), skipped = settled.filter((t) => !isSettled(t));
   const sum = settledSummary(settled), scale = whyScale(rows);
   const columns: Column<SettledTrade>[] = [
-    { key: "exit", header: "Exit", render: (t) => (<>{fmtDate(t.exit_date_actual ?? t.exit_date, false)}{t.flags.length ? <small className="muted" data-tip={t.flags.join(", ")}> *</small> : null}</>) },
+    { key: "exit", header: "Exit", render: (t) => (<>{fmtDate(t.exit_date_actual ?? t.exit_date, false)}{t.flags?.length ? <small className="muted" tabIndex={0} data-tip={t.flags.join(", ")}> *</small> : null}</>) },
     { key: "strategy", header: "Strategy", render: (t) => <StrategyCell id={t.strategy_id} ctx={ctx} sub={t.view === "head_to_head" ? `head-to-head · ${PICK_RULE[t.pick_rule ?? ""] ?? t.pick_rule ?? "pick"}` : "accuracy view"} /> },
     { key: "horizon", header: "Horizon", render: (t) => <span className="h-lab">N+{t.horizon_days}</span> },
     { key: "prices", header: "Entry → exit", numeric: true, className: "cw", render: (t) => (
@@ -116,7 +97,7 @@ export function SettledCard({ settled, ctx, paperLabel, ticker }: { settled: Set
       </span>) },
     { key: "why", header: "Why it moved", className: "cm", render: (t) => {
       const main = reasonWords(t.reason_code);
-      const also = t.reason_codes.filter((c) => c !== t.reason_code).map((c) => reasonWords(c)[0]).join(", ");
+      const also = (t.reason_codes ?? []).filter((c) => c !== t.reason_code).map((c) => reasonWords(c)[0]).join(", ");
       const d = t.reason_detail ?? {};
       const tip = `Move ${signed(t.move_pct)} = market ${signed(t.market_pct)} (${d.benchmark ?? "benchmark"} × beta ${d.beta ?? "—"}) + sector ${signed(t.sector_pct)} (${d.sector_source ?? "sector"}) + news ${signed(t.news_pct)} + company ${signed(t.company_pct)}. Main cause: ${main[0]}${also ? `; also ${also}` : ""}. ${main[1]}`;
       return <span className="why" data-tip={tip}><WhyBar t={t} scale={scale} /><Label tone="neutral">{main[0]}</Label></span>;

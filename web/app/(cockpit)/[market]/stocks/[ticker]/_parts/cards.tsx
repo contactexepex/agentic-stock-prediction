@@ -98,12 +98,12 @@ export function NewsCard({ p, ctx }: { p: CompanyPayload; ctx: PageCtx }) {
   );
 }
 
-function bigMoney(d: ResultsDigest, v: number | null | undefined): string {
+function bigMoney(currency: string, v: number | null | undefined): string {
   if (v == null) return "—";
-  const sym = CURRENCY_SYMBOL[d.currency] ?? "", loc = LOCALE[d.currency] ?? "en-US";
+  const sym = CURRENCY_SYMBOL[currency] ?? "", loc = LOCALE[currency] ?? "en-US";
   if (Math.abs(v) >= 1e9) return `${sym}${(v / 1e9).toLocaleString(loc, { maximumFractionDigits: 1 })} bn`;
   if (Math.abs(v) >= 1e6) return `${sym}${(v / 1e6).toLocaleString(loc, { maximumFractionDigits: 1 })} mn`;
-  return money(d.currency, v, 2);
+  return money(currency, v, 2);
 }
 
 function NumberTile({ label, value, yoy, tip }: { label: string; value: string; yoy: number | null | undefined; tip: string }) {
@@ -129,22 +129,22 @@ export function ResultsCard({ p, ctx }: { p: CompanyPayload; ctx: PageCtx }) {
     const next = nextCompanyEvent(p.events, p.company.ticker, "earnings");
     return <Card label="Results">{head()}<Quiet>No results digest stored for this company yet.{next ? ` Next results ${fmtDateYear(next.date)}.` : ""}</Quiet></Card>;
   }
-  const N = d.numbers;
+  const N = d.numbers, cur = d.currency ?? ctx.currency;
   const margin = N.net_margin_pct;
   return (
     <Card label="Results">
       {head(`${d.fiscal_label ?? "latest period"} · released ${fmtDate(d.release_date)}${d.release_timing ? ` ${d.release_timing.replace("_", " ")}` : ""}`)}
       <div className="nums">
-        <NumberTile label="Revenue" value={bigMoney(d, N.revenue)} yoy={N.revenue_yoy_pct} tip={`Revenue ${bigMoney(d, N.revenue)} for the period to ${fmtDateYear(d.period_end)} (${d.basis ?? "basis not stored"}).`} />
-        <NumberTile label="Net profit" value={bigMoney(d, N.net_profit)} yoy={N.net_profit_yoy_pct} tip={`Net profit ${bigMoney(d, N.net_profit)}; margin ${margin != null ? margin.toFixed(1) + "%" : "—"}.`} />
-        <NumberTile label="EPS (diluted)" value={N.eps_diluted != null ? money(d.currency, N.eps_diluted, 2) : "—"} yoy={N.eps_yoy_pct} tip="Earnings per share, diluted, as reported." />
+        <NumberTile label="Revenue" value={bigMoney(cur, N.revenue)} yoy={N.revenue_yoy_pct} tip={`Revenue ${bigMoney(cur, N.revenue)} for the period to ${fmtDateYear(d.period_end)} (${d.basis ?? "basis not stored"}).`} />
+        <NumberTile label="Net profit" value={bigMoney(cur, N.net_profit)} yoy={N.net_profit_yoy_pct} tip={`Net profit ${bigMoney(cur, N.net_profit)}; margin ${margin != null ? margin.toFixed(1) + "%" : "—"}.`} />
+        <NumberTile label="EPS (diluted)" value={N.eps_diluted != null ? money(cur, N.eps_diluted, 2) : "—"} yoy={N.eps_yoy_pct} tip="Earnings per share, diluted, as reported." />
       </div>
       <div className="rline">
         {margin != null ? <span>net margin <b>{margin.toFixed(1)}%</b></span> : null}
         {N.revenue_qoq_pct != null ? <span>revenue vs last quarter <b>{signed(N.revenue_qoq_pct)}</b></span> : null}
         {d.consensus && d.consensus.eps_estimate != null ? (
           <span tabIndex={0} data-tip="Yahoo’s consensus EPS collected before the release; context only, no call is scored on it.">
-            consensus EPS <b>{money(d.currency, d.consensus.eps_estimate, 2)}</b> → reported <b>{money(d.currency, d.consensus.eps_reported, 2)}</b> (<Delta value={d.consensus.surprise_pct} /> surprise)
+            consensus EPS <b>{money(cur, d.consensus.eps_estimate, 2)}</b> → reported <b>{money(cur, d.consensus.eps_reported, 2)}</b> (<Delta value={d.consensus.surprise_pct} /> surprise)
           </span>
         ) : (
           <span>consensus: <b>none collected before the release</b></span>
@@ -155,14 +155,14 @@ export function ResultsCard({ p, ctx }: { p: CompanyPayload; ctx: PageCtx }) {
           </span>
         ) : null}
       </div>
-      {d.bullets.length ? (
+      {d.bullets?.length ? (
         <ul className="bul">{d.bullets.map((b, i) => <li key={i}>{b.text || b.quote}</li>)}</ul>
       ) : (
         <div className="note">{d.status === "text_unavailable" ? "Numbers only: the filing text could not be read (no PDF reader for NSE attachments yet), so there are no quoted bullets." : `No quoted bullets (status ${d.status.replace(/_/g, " ")}).`}</div>
       )}
       <div className="note">
         Sources:{" "}
-        {d.sources.map((s, i) => (
+        {(d.sources ?? []).map((s, i) => (
           <span key={s.id}>
             {i ? ", " : ""}
             {s.url ? <a href={s.url} rel="noopener noreferrer" target="_blank">{`${s.kind.replace(/_/g, " ")} ${s.doc ?? ""}`.trim()}</a> : `${s.kind.replace(/_/g, " ")} ${s.doc ?? ""}`.trim()}
@@ -186,7 +186,7 @@ export function EventsCard({ p }: { p: CompanyPayload }) {
       {p.events.length ? (
         <ul className="ev">
           {p.events.map((e, i) => {
-            const mine = e.ticker === ticker;
+            const mine = e.ticker === ticker, effect = mine ? companyEventEffect(e.type) : null;
             const detail = [
               eventWords(e.type) + (e.timing ? ` · ${e.timing.replace("_", " ")}` : mine && e.type === "earnings" ? " · timing not known yet" : ""),
               e.reaction_sessions?.length ? `reaction in ${e.reaction_sessions.map((d) => fmtDate(d, false)).join(" and ")}` : null,
@@ -199,7 +199,7 @@ export function EventsCard({ p }: { p: CompanyPayload }) {
                   <span>
                     {e.name}
                     {e.provisional ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="The date is not confirmed yet.">provisional</Label></span> : null}
-                    {mine && companyEventEffect(e.type) ? <span style={{ marginLeft: 6 }}><Label tone={companyEventEffect(e.type)!.tone} tip={companyEventEffect(e.type)!.tip}>{companyEventEffect(e.type)!.label}</Label></span>
+                    {effect ? <span style={{ marginLeft: 6 }}><Label tone={effect.tone} tip={effect.tip}>{effect.label}</Label></span>
                       : e.major ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="A major market event: the regime becomes EVENT_HEAVY within 2 days before it and every range whose window contains it is widened.">major</Label></span> : null}
                   </span>
                   <small>{detail}</small>
