@@ -27,7 +27,11 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
     });
   }
-  function safeUrl(u) { return typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim()) ? u.trim() : null; }
+  // plain http(s) with quote and angle-bracket characters percent-encoded, as view_data.safe_url (issue #48)
+  function safeUrl(u) {
+    if (typeof u !== 'string' || !/^https?:\/\/\S+$/i.test(u.trim())) return null;
+    return u.trim().replace(/["'<>`]/g, function (ch) { return '%' + ch.charCodeAt(0).toString(16).toUpperCase(); });
+  }
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
   function num(v, d) {
     if (!isNum(v)) return '–';
@@ -95,10 +99,13 @@
 
   // ---------- shell: market switch, tabs, banner, footer ----------
   function shell() {
+    // absolute on the owner's site (settings pages_url) so a downloaded page still switches; else relative (#48)
+    var site = safeUrl(D.pages_url);
+    var base = site ? site.replace(/\/+$/, '') + '/' : '../';
     document.getElementById('markets').innerHTML = (D.markets || [D.market]).map(function (m) {
       var label = m === 'us' ? 'US' : cap(m);
       return m === D.market ? '<span aria-current="page">' + esc(label) + '</span>' :
-        '<a href="../' + encodeURIComponent(m) + '/dashboard.html">' + esc(label) + '</a>';
+        '<a href="' + esc(base + encodeURIComponent(m) + '/dashboard.html') + '">' + esc(label) + '</a>';
     }).join('');
     var b = document.getElementById('banner');
     if (D.skill.state === 'shown') b.classList.add('shown');
