@@ -14,8 +14,8 @@ from marketbrief.constants.nse_collection import (
     MSG_YOY_PENDING,
 )
 from marketbrief.core.clock import utc_today
-from marketbrief.utils.markdown import cursor_markdown_table
 from marketbrief.lifecycle.loader import active_tickers
+from marketbrief.utils.markdown import cursor_markdown_table
 
 
 def _flows(con) -> str:

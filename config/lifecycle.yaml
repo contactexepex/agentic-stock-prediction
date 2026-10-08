@@ -15,6 +15,7 @@ backfill:
   # far as Yahoo has them, and merges them into the cache (check long_history; its detail gives the years found).
   long_history_years: 15
   min_bars: 20          # the collect gate refuses a candidate with fewer stored bars
+  announcement_days: 30 # India: NSE announcements of the last 30 days (one call per week, as collect_nse_india --since)
 
 # Sector of a new company (onboarding sets it on the add event). The owner's --sector wins when given; otherwise
 # the first rule whose pattern (case-insensitive regex) matches one of the source's industry strings decides:

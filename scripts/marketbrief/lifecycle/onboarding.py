@@ -43,11 +43,16 @@ class Refusal(Exception):  # noqa: N818 (a refusal is an expected outcome, not a
         self.code, self.errors = code, errors
 
 
+class SourceUnavailable(Exception):  # noqa: N818 (an expected outcome: the command is retried by the next import)
+    """A source did not answer (or answered nothing for a symbol another source confirmed): nothing is decided."""
+
+
 def yahoo_checks(sources, yahoo: str, symbol: str) -> dict:
-    """Yahoo's metadata of the symbol; refuses unknown symbols and ETFs."""
+    """Yahoo's metadata of a symbol the exchange's own list (NSE) or SEC confirmed; refuses ETFs. Yahoo serving
+    nothing for a confirmed symbol is a source that did not answer (blocked, rate-limited), not an unknown symbol."""
     meta = sources.yahoo_meta(yahoo)
     if not meta:
-        raise Refusal(text.REFUSE_UNKNOWN, [f"Yahoo serves no daily bars for {yahoo}"])
+        raise SourceUnavailable(f"Yahoo served no daily bars for {yahoo}, which {symbol}'s listing confirms")
     kind = (meta.get("instrument_type") or "").upper()
     if kind in ETF_TYPES:
         raise Refusal(text.REFUSE_ETF, [f"{symbol} is an ETF or fund ({kind}); only common stocks can be added"])
@@ -135,9 +140,12 @@ def run_backfill(company: dict, sources, full_cfg: dict, lifecycle_cfg: dict) ->
     """(checks, details) of the backfill and the gate."""
     checks, details = {}, {}
     with backfill.candidate_mode(company) as cand_cfg:
-        checks[CHECK_BACKFILL_PRICES], details["prices"] = backfill.backfill_prices(cand_cfg, sources.yfinance())
-        checks[CHECK_LONG_HISTORY], details["long_history"] = backfill.backfill_long_history(
-            cand_cfg, sources.yfinance(), int(lifecycle_cfg["backfill"]["long_history_years"]))
+        try:   # a yfinance error (rate limit, network) leaves the command undecided: failed, retried later
+            checks[CHECK_BACKFILL_PRICES], details["prices"] = backfill.backfill_prices(cand_cfg, sources.yfinance())
+            checks[CHECK_LONG_HISTORY], details["long_history"] = backfill.backfill_long_history(
+                cand_cfg, sources.yfinance(), int(lifecycle_cfg["backfill"]["long_history_years"]))
+        except Exception as exc:
+            raise SourceUnavailable(f"{type(exc).__name__}: {str(exc)[:200]}") from exc
         steps = {CHECK_BACKFILL_NEWS: ("news", lambda: backfill.backfill_news(
             backfill.with_candidate(full_cfg, company), company["ticker"]))}
         if company["market"] == "us":
@@ -145,7 +153,7 @@ def run_backfill(company: dict, sources, full_cfg: dict, lifecycle_cfg: dict) ->
                                                                                          sources.edgar()))
         else:
             steps[CHECK_BACKFILL_ANNOUNCEMENTS] = ("announcements", lambda: backfill.backfill_announcements(
-                cand_cfg, sources.nse()))
+                cand_cfg, sources.nse(), int(lifecycle_cfg["backfill"]["announcement_days"])))
         for check, (label, step) in steps.items():
             if getattr(sources, "offline", False):
                 checks[check], details[label] = SKIPPED, {"reason": "offline fixture sources (no news, filings or "
@@ -160,6 +168,12 @@ def run_backfill(company: dict, sources, full_cfg: dict, lifecycle_cfg: dict) ->
     return checks, details
 
 
+def failed_result(what: str, exc: BaseException) -> dict:
+    """The result of an onboarding a source left undecided (logged `failed`, retried by the next import)."""
+    return {"ok": False, "refusal_code": None, "failed": True,
+            "errors": [f"{what}: {type(exc).__name__}: {str(exc)[:200]}"]}
+
+
 def onboard(market: str, symbol: str, sources, full_cfg: dict, sector: str | None = None,  # noqa: PLR0913
             name: str | None = None, skip_backfill: bool = False) -> dict:
     """The whole pipeline: {"ok", "company", "onboarding", "details"} or {"ok": False, "refusal_code", "errors"}."""
@@ -169,15 +183,17 @@ def onboard(market: str, symbol: str, sources, full_cfg: dict, sector: str | Non
     except Refusal as refusal:
         return {"ok": False, "refusal_code": refusal.code, "errors": refusal.errors}
     except Exception as exc:  # a source that did not answer: nothing is decided, the command can be retried
-        return {"ok": False, "refusal_code": None, "failed": True,
-                "errors": [f"identifier sources did not answer: {type(exc).__name__}: {str(exc)[:200]}"]}
+        return failed_result("identifier sources did not answer", exc)
     company, yahoo = resolved["company"], resolved["yahoo"]
     checks = {CHECK_IDENTIFIERS: OK, CHECK_NOT_ETF: OK, CHECK_EXCHANGE: OK, CHECK_SECTOR: OK}
     details = {"yahoo": yahoo, "industry": resolved["industry"]}
     if skip_backfill:
         checks.update({CHECK_BACKFILL_PRICES: SKIPPED, CHECK_LONG_HISTORY: SKIPPED, CHECK_COLLECT_GATE: SKIPPED})
     else:
-        backfill_checks, backfill_details = run_backfill(company, sources, full_cfg, lifecycle_cfg)
+        try:
+            backfill_checks, backfill_details = run_backfill(company, sources, full_cfg, lifecycle_cfg)
+        except SourceUnavailable as exc:   # Yahoo failed during the price backfill: retried by the next import
+            return failed_result("the price backfill's source did not answer", exc)
         checks.update(backfill_checks)
         details.update(backfill_details)
         if checks[CHECK_COLLECT_GATE] != OK:

@@ -155,20 +155,22 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `horizons` (per-horizon score and range records, B10) and `strategies` (the registry's allowed values). Governed
   tools per channel: `mcp/tools.yaml`. A field the pages need and the catalogue lacks is a data request to W1.
 - Company lifecycle (F8, B1; docs/ws/b1.md; code `marketbrief/lifecycle/`, settings `config/lifecycle.yaml`): the
-  watchlist is data. `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox`
-  validates and appends `data/<market>/watchlist_events/` (every command also gets a `command_log` row; delete needs
-  `--confirm <ticker>` and is never allowed from Slack). `load_market` rebuilds the company lists from the events as of
-  the run's clock (MB_NOW-aware): `cfg["tickers"]` = every collected company (active and inactive, never deleted;
-  collectors keep reading it), `cfg["sectors"]` rebuilt, `cfg["active_tickers"]` = active only; code that predicts or
-  displays uses `lifecycle.loader.active_tickers(cfg)` / `active_sectors(cfg)`; replays and new code use
-  `contracts.watchlist.watchlist(market, as_of, state)`. An event counts once both effective_from and recorded_at have
-  passed, except the seed's add events (channel `seed`, the 40 config companies, effective from the start of stored
-  history), which restate the config list and count from effective_from. Without events the config's `tickers:` act
-  as adds. Add runs the deterministic onboarding (identifiers from NSE's equity list or SEC's ticker/exchange file plus
-  Yahoo; no ETFs, BSE-only or unknown symbols; sector from `sector_rules`; backfill of prices from the first stored day,
-  15 years of daily history into the long-history cache `work/model_history/`, news, filings or announcements; the
-  candidate's collect gate) before its event is appended.
-  `.github/workflows/onboard.yml` imports the MotherDuck inbox (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
+  watchlist is data.
+  `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox` validates and
+  appends `data/<market>/watchlist_events/` (each add, deactivate, reactivate, set-amount, delete and imported inbox
+  command also gets a `command_log` row; delete needs `--confirm <ticker>` and is never allowed from Slack).
+  `load_market` rebuilds the company lists from the events as of the run's clock (MB_NOW-aware): `cfg["tickers"]` =
+  every collected company (active and inactive, never deleted; collectors keep reading it), `cfg["sectors"]` rebuilt,
+  `cfg["active_tickers"]` = active only; code that predicts or displays uses `lifecycle.loader.active_tickers(cfg)` /
+  `active_sectors(cfg)`; replays and new code use `contracts.watchlist.watchlist(market, as_of, state)`. An event
+  counts once both effective_from and recorded_at have passed, except the seed's add events (channel `seed`, the 20
+  config companies per market, effective from the start of stored history), which restate the config list and count
+  from effective_from. Without events the config's `tickers:` act as adds. Add runs the deterministic onboarding
+  (identifiers from NSE's equity list or SEC's ticker/exchange file plus Yahoo; no ETFs, BSE-only or unknown symbols;
+  sector from `sector_rules`; backfill of prices from the first stored day, daily history into the long-history cache
+  `work/model_history/` from its start, else 15 years back, news, filings or announcements; the candidate's collect
+  gate) before its event is appended. `.github/workflows/onboard.yml` imports the MotherDuck inbox
+  (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
 - AI traders, EOD analyst, research director (B3, docs/SPEC.md F4 and F6, notes `docs/ws/b3.md`; code
   `marketbrief/traders/`, run as `PYTHONPATH=scripts python -m marketbrief.traders <command>`). Four traders
   (`.claude/agents/trader-news-results.md`, `trader-pattern-mood.md`, `trader-combined.md`, and `forecaster.md` as
@@ -369,14 +371,16 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   B9 (docs/ws/b9.md): every open paper trade (a qualifying `strategy_predictions` row or a picked
   `head_to_head_picks` row whose window D..exit_date contains the session, made before D's open; every
   strategy, horizon N+1..N+5 and view; past exit_date while it has no `paper_trades_settled` row, at most
-  `trades.max_sessions_past_exit` sessions, note `exit_delayed`) gets a `trade_checks` row per check (W1's format:
+  `trades.max_sessions_past_exit` sessions, note `unsettled_past_exit`) gets a `trade_checks` row per check (W1's format:
   price vs entry, target and its own range, band, target_z; flags outside_range | far_from_target |
-  against_prediction) and a `trade_check_details` row (quality, today's price basis, target reached so far);
+  against_prediction; with its detail columns: quality, today's price basis, target reached so far, issue #78;
+  rows written before #78 keep those in `trade_check_details`);
   views `trade_check_rows`, `trade_checks_latest`; a ticker with a flagged open trade is flagged
   `open_trade_flagged`, and the explainer's input carries its flagged trades. Band flags exist for every published
-  horizon (`outside_<k>d_80`; `bands` JSON on each check row). The intraday alerts feed (`intraday_alerts`, view `intraday_alerts_feed`,
-  `intraday_check.py alerts`): flagged open trades per ticker and material news on a company with an open trade,
-  once per session; read by B6's `alerts.py intraday`. Monitoring only, nothing is traded.
+  horizon (`outside_<k>d_80`; `bands` JSON on each check row). The intraday alerts feed (`intraday_alerts`, view
+  `intraday_alerts_feed`, `intraday_check.py alerts`): one row per ticker with flagged open trades per check (`repeat`
+  when already alerted with the same flags that session) and material news on a company with an open trade, once
+  per session and item; read by B6's `alerts.py intraday`. Monitoring only, nothing is traded.
 - Slack notifications (B6, SPEC F9; `scripts/alerts.py`, code `marketbrief/alerts/`, notes `docs/ws/b6.md`): one
   thread per market per day in #market-brief: `morning` (top 5 by agreement at N+1 with the strongest other horizon,
   the day's head-to-head picks and whether each is viable at the owner's cost: expected gain after your cost > 0),
