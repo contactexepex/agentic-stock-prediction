@@ -1,7 +1,7 @@
 // Types of the assistant (docs/SPEC.md F11; docs/DATA_CATALOGUE.md "Assistant answer"). Research only: an answer
 // explains stored data and cites it; it never advises a real trade.
 import type Anthropic from "@anthropic-ai/sdk";
-import type { CallContext, CommandResult, RefusalCode, ToolArgs, ToolOutcome } from "../tools/types.ts";
+import type { ToolArgs, ToolOutcome } from "../tools/types.ts";
 import type { CitedKind } from "./constants.ts";
 
 export interface CitedRecord {
@@ -112,17 +112,7 @@ export interface ModelClient {
   create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message>;
 }
 
-/** The answer of the explain tool to the tool layer (B5's executor logs it and returns it to the channel). */
-export interface ExplainAnswer {
-  result: CommandResult;
-  refusal_code: RefusalCode | null;
-  message: string | null;
-  data: unknown;
-}
+/** The explain hook of B5's tool layer (ToolDeps.explainer) and its answer, defined in web/lib/tools/types.ts. */
+export type { ExplainAnswer, Explainer } from "../tools/types.ts";
 
 export type ReadTool = (tool: string, args: ToolArgs) => Promise<ToolOutcome>;
-
-/** The explain hook of B5's tool layer (ToolDeps.explainer). */
-export interface Explainer {
-  explain(ctx: CallContext, args: ToolArgs, read: ReadTool): Promise<ExplainAnswer>;
-}

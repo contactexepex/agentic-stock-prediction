@@ -6,7 +6,6 @@ import { pgQuery } from "../tools/motherduck.ts";
 import { hexOf } from "../tools/crypto.ts";
 import { type Env, secretValues, value } from "../tools/env.ts";
 import { INBOX_DATABASE, MOTHERDUCK_PG_HOST } from "../tools/constants.ts";
-import type { ToolDeps } from "../tools/types.ts";
 import { AssistantExplainer } from "./explainer.ts";
 import { anthropicModel } from "./model.ts";
 import { MotherDuckConversationStore } from "./store.ts";
@@ -43,5 +42,5 @@ export function conversationStoreFromEnv(env: Env = process.env): MotherDuckConv
 
 /** The tool layer with the explain tool answered by the assistant (B5's ToolDeps.explainer hook). */
 export function withAssistant(layer: ToolLayer, env: Env = process.env): ToolLayer {
-  return new ToolLayer({ ...layer.deps, explainer: assistantFromEnv(env) } as ToolDeps);
+  return new ToolLayer({ ...layer.deps, explainer: assistantFromEnv(env) });
 }

@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FakeConversationStore } from "./fakes.ts";
+import { FakeConversationStore, assistantRig, finalAnswer, toolUse } from "./fakes.ts";
+import { ToolLayer } from "../../tools/executor.ts";
 import { type AssistantApiDeps, LIMITS, getConversation, postQuestion } from "../api.ts";
 import { formatSlackAnswer } from "../slack.ts";
 import { asksForAdvice, readsAsAdvice, verifyCitations } from "../guard.ts";
 import { budgetState, callCeilingUsd } from "../budget.ts";
 import { DAILY_USD, MONTHLY_USD, QUESTION_MAX, RETENTION_DAYS } from "../constants.ts";
-import type { ToolLayer } from "../../tools/executor.ts";
 import type { CallContext, ToolOutcome } from "../../tools/types.ts";
 
 function outcome(fields: Partial<ToolOutcome>): ToolOutcome {
@@ -131,4 +131,28 @@ test("citations match whole JSON string values only", () => {
   const { kept, dropped } = verifyCitations([{ id: "abc-12", kind: "news" }, { id: "abc-123", kind: "bogus" }, { id: "abc-123", kind: "news" }], reads);
   assert.deepEqual(dropped, ["abc-12"]);
   assert.deepEqual(kept, [{ id: "abc-123", kind: "record", as_of: "2026-10-07T01:00:00Z", source: "rm.trades _" }]);
+});
+
+test("end to end through B5's real executor: the dashboard's assistant asks, reads and gets a cited answer", async () => {
+  const r = assistantRig();
+  r.reads.put("trades", "us", "_", { open: [{ trade_id: "trade-0001" }] });
+  r.model.script = [toolUse("get_trades", {}), finalAnswer({ text: "One open paper trade.", cited: [{ id: "trade-0001", kind: "paper_trades_settled" }] })];
+  const tools = new ToolLayer({ ...r.layer.deps, explainer: r.explainer });
+  const deps: AssistantApiDeps = { tools, store: r.store, clock: () => r.now.value, gatewayMode: false, origins: [] };
+  const res = await postQuestion(post(JSON.stringify({ market: "us", question: "How many open trades?" })), deps);
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.answer.status, "answered");
+  assert.deepEqual(body.answer.cited_ids, ["trade-0001"]);
+  assert.equal(body.budget.day.budget_usd, 0.65);
+  const logged = r.inbox.commands.map((row) => [row.tool, row.agent, row.kind, row.result]);
+  assert.deepEqual(logged, [["get_trades", "assistant", "read", "accepted"], ["explain", "assistant", "read_ai", "accepted"]]);
+
+  r.inbox.controls.push({ agent: "assistant", enabled: false });
+  const off = await postQuestion(post(JSON.stringify({ market: "us", question: "Again?" })), deps);
+  assert.equal(off.status, 503);
+  assert.equal((await off.json()).refusal_code, "kill_switch");
+  r.inbox.controls.push({ agent: "assistant", enabled: true });
+  const long = await postQuestion(post(JSON.stringify({ market: "us", question: "x".repeat(501) })), deps);
+  assert.equal(long.status, 422, "the 500-character limit is the tools.yaml max_length, checked by the gate");
 });
