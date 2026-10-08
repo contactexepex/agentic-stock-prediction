@@ -71,9 +71,9 @@ export function DataTable<R>({
             {columns.map((c) => {
               const sorted = sort && sort.key === c.key ? (sort.dir < 0 ? "descending" : "ascending") : undefined;
               return (
-                <th key={c.key} scope="col" className={cellClass(c)} data-tip={c.tip} aria-sort={sorted}>
+                <th key={c.key} scope="col" className={cellClass(c)} data-tip={c.sortValue ? undefined : c.tip} aria-sort={sorted}>
                   {c.sortValue ? (
-                    <button type="button" className="sort" onClick={() => toggle(c.key)} aria-label={`Sort by ${c.label ?? (typeof c.header === "string" ? c.header : c.key)}`}>
+                    <button type="button" className="sort" data-tip={c.tip} onClick={() => toggle(c.key)} aria-label={`Sort by ${c.label ?? (typeof c.header === "string" ? c.header : c.key)}`}>
                       {c.header}
                       {sorted ? <Icon name={sorted === "descending" ? "arrow_downward" : "arrow_upward"} /> : null}
                     </button>
