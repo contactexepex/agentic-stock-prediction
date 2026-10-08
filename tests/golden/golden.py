@@ -35,7 +35,10 @@ Child processes load tests/golden/site/sitecustomize.py: the network guard. Duck
 default threads, as in production: the queries whose row order or float sums reach an output have a
 full ORDER BY or an order-independent aggregate (docs/REFACTOR_PLAN.md, "Known nondeterminism",
 fixed). GOLDEN_DUCKDB_THREADS=N sets N threads on every DuckDB connection (a stress check; the
-manifest records it).
+manifest records it). The OpenMP / BLAS thread pools of numpy and scikit-learn get one thread per child
+(OMP_NUM_THREADS, OPENBLAS_NUM_THREADS, MKL_NUM_THREADS = 1 unless already set; issue #45): the seed steps run in
+parallel, and two concurrent harness or review runs oversubscribed the cores (1316 s instead of 122 s). A set
+recorded before this setting may differ in the last float digits of the model outputs: record it again.
 Nothing else is masked. The recorded set (manifest plus full copies, for diffs) lives under --dir,
 by default work/golden (git-ignored)."""
 from __future__ import annotations
@@ -174,8 +177,12 @@ def steps(market: str) -> list[tuple[str, str, object, str | None]]:
     return [("pre_open", *s) for s in pre_open] + [("late", *s) for s in late]
 
 
+THREAD_POOL_VARIABLES = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+
+
 def environment(root: Path, market: str, clock: str) -> dict[str, str]:
-    """The child environment: frozen clock, fixed hash seed, network guard, no credentials or proxies."""
+    """The child environment: frozen clock, fixed hash seed, network guard, one OpenMP/BLAS thread, no credentials
+    or proxies."""
     dropped = {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "SLACK_BOT_TOKEN", "SLACK_WEBHOOK_URL",
                "NEO4J_URI", "NEO4J_USER", "NEO4J_PASSWORD", "NEO4J_DATABASE", "SEC_USER_AGENT"}
     env = {k: v for k, v in os.environ.items() if not k.startswith("MB_") and k.upper() not in dropped}
@@ -183,6 +190,8 @@ def environment(root: Path, market: str, clock: str) -> dict[str, str]:
                 "PYTHONHASHSEED": "0", "TZ": "UTC", "LC_ALL": "C.UTF-8", "MPLBACKEND": "Agg",
                 "PYTHONPATH": os.pathsep.join([str(GOLDEN_SITE), str(NETGUARD)]),
                 "MB_NETGUARD": "on", "MB_NETGUARD_LOG": str(root.parent / "netguard.log")})
+    for name in THREAD_POOL_VARIABLES:
+        env.setdefault(name, "1")
     return env
 
 

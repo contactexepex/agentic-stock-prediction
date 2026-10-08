@@ -14,7 +14,8 @@ Google News accepts `when:<n>h` and `when:<n>d` (checked live 2026-10-07: 1h-170
 `when:1w` and `when:1m` returned nothing), so a span above the floor is asked as whole hours, rounded up.
 Google News answers at most GOOGLE_NEWS_ITEM_CAP items per query, so a query that fills the cap over a
 window longer than a day is asked again per day (`after:YYYY-MM-DD before:YYYY-MM-DD`, Google's days end
-at midnight Pacific time; the slices start a day before the window and items older than it are dropped)."""
+at midnight Pacific time; the slices are the Pacific days from the window's start through now, issue #51: a day
+before the window or after today in Pacific time holds nothing the run keeps)."""
 
 from __future__ import annotations
 
@@ -23,11 +24,13 @@ import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from marketbrief.constants.files import ENCODING_UTF8, JSONL_GLOB
 from marketbrief.constants.kinds import KIND_NEWS, KIND_NEWS_RUNS
 from marketbrief.constants.news import (
     DEFAULT_WINDOW,
+    GOOGLE_NEWS_DAY_TIMEZONE,
     HOURS_PER_DAY,
     MAX_AGE_DAYS,
     MSG_BAD_WINDOW,
@@ -145,9 +148,11 @@ def window_for(market: str, now: datetime, floor_when: str = DEFAULT_WINDOW) -> 
 
 
 def slice_days(window: NewsWindow, now: datetime) -> list[date]:
-    """The days asked one by one when a query fills Google News' item cap: from the day before the window's
-    start (Google's days are Pacific time) through today (UTC); none for a window of a day or less."""
+    """The days asked one by one when a query fills Google News' item cap: the Pacific days (Google's days end at
+    midnight Pacific time) from the window's start through now; none for a window of a day or less."""
     if window.hours <= HOURS_PER_DAY:
         return []
-    first = (now - timedelta(hours=window.hours)).date() - timedelta(days=1)
-    return [first + timedelta(days=offset) for offset in range((now.date() - first).days + 1)]
+    pacific = ZoneInfo(GOOGLE_NEWS_DAY_TIMEZONE)
+    first = (now - timedelta(hours=window.hours)).astimezone(pacific).date()
+    last = now.astimezone(pacific).date()
+    return [first + timedelta(days=offset) for offset in range((last - first).days + 1)]

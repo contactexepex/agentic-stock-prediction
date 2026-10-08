@@ -43,3 +43,39 @@ jobs:
         # live only on local, unpushed build branches (and PASS verdicts before their merge), which a
         # CI checkout cannot see. Reviewers run tests/test_judgments.py locally, where it is strict.
         run: python -m pytest -q -n auto --deselect tests/test_judgments.py::test_every_logged_commit_exists
+
+  neo4j-engine:
+    # Issue #25: the Cypher of scripts/neo4j_sync.py (graph DELETE, the events `current` flag, HAS_RANGE, idempotent
+    # MERGE) is checked only by tests/test_neo4j_sync.py::test_real_engine_full_then_idempotent_incremental, which
+    # skips without NEO4J_TEST_QUERY_URL. Here it runs against a disposable Neo4j in a service container (no secret:
+    # the password is the throwaway container's) and the step fails unless that test ran and passed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      neo4j:
+        image: neo4j:5.26-community
+        env:
+          NEO4J_AUTH: neo4j/ci-disposable-password
+          NEO4J_server_http__enabled__modules: TRANSACTIONAL_ENDPOINTS,UNMANAGED_EXTENSIONS,BROWSER,QUERY_API_ENDPOINTS
+        ports:
+          - 7474:7474
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p ci-disposable-password 'RETURN 1'"
+          --health-interval 5s --health-timeout 10s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install requirements
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Real-engine Neo4j test
+        env:
+          NEO4J_TEST_QUERY_URL: http://localhost:7474
+          NEO4J_TEST_USER: neo4j
+          NEO4J_TEST_PASSWORD: ci-disposable-password
+        run: |
+          python -m pytest -q -rs tests/test_neo4j_sync.py -k real_engine | tee neo4j-engine.txt
+          grep -q "1 passed" neo4j-engine.txt

@@ -44,3 +44,6 @@ GOOGLE_NEWS_HOST = "news.google.com"   # its article links carry no meaningful q
 MATCH_LINK = "link"     # same canonical article link, same outlet: the same article, maybe an edited headline
 MATCH_TITLE = "title"   # same normalised title from the same outlet
 NEWS_ID_MAP_TABLE = "news_id_map"   # every stored news id -> its canonical id (core.database.connect)
+
+# Google News `after:`/`before:` days end at midnight Pacific time (DESIGN.md section 3, "News timing")
+GOOGLE_NEWS_DAY_TIMEZONE = "America/Los_Angeles"
