@@ -270,7 +270,7 @@ def group_html(group: dict) -> str:
         for day_row in group["per_day"]
     )
     crows = "".join(
-        f"<tr><td>{escape_html(str(call['date']))}</td><td>{escape_html(call['test'])}</td><td>{escape_html(call['ticker'])}</td><td>N+{call['h']}</td><td>{escape_html(call['direction'])}</td>"
+        f"<tr><td>{escape_html(str(call['date']))}</td><td>{escape_html(call['test'])}</td><td>{escape_html(call['ticker'])}</td><td>{escape_html(call['horizon'])}</td><td>{escape_html(call['direction'])}</td>"
         f"<td>{call['confidence']:.2f}</td><td>{escape_html(call['status'])}</td>"
         f"<td>{signed_pct(call.get('ret'))}</td>"
         f"<td>{'' if call.get('hit') is None else ('right' if call['hit'] else 'wrong')}</td>"

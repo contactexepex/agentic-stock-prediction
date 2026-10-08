@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import json
 
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.constants.model import LABEL_DESCRIPTIONS, LABEL_OPEN_TO_CLOSE, MAX_AGENT_ADJUSTMENT
 
 TITLE = "Signal model: P(up) per ticker (logistic, open-to-close; anchor for the forecaster's confidence)"
-SQL = """
+# N+k rows only (decision 37): a legacy_5d_d4 score (old D+4 exit) would read like an N+5 one (issue #95).
+SQL = f"""
+WITH scores AS (SELECT * FROM model_scores_latest WHERE horizon_label = '{LABEL_N_PLUS_K}')
 SELECT id, ticker, horizon_days, prob_up, prob_model, calibrated, base_rate, news_score, trained_until, contributions
-FROM model_scores_latest WHERE as_of_date = (SELECT max(as_of_date) FROM model_scores_latest)
+FROM scores WHERE as_of_date = (SELECT max(as_of_date) FROM scores)
 ORDER BY ticker, horizon_days, id"""
 NOTE = ("P(up) = probability that {label} returns more than 0; drivers in probability points vs the base rate "
         "(docs/DESIGN.md section 15). The forecaster's final probability = model P(up) + an adjustment of at most "

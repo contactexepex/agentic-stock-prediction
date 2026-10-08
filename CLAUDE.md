@@ -59,9 +59,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
   range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
-  each past day's N+k ranges (every horizon of `config/strategies.yaml`) as `ranges.py` builds them, the regime, and direction baselines
-  (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
-  and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
+  each past day's N+k ranges (every horizon of `config/strategies.yaml`) as `ranges.py` builds
+  them, the regime, and direction baselines (always-up, momentum, RSI mean reversion), scored ->
+  `reports/<market>/replay-<end>.html|json` and `data/<market>/replays/` (DESIGN.md section 7);
+  `replay --aci` compares fixed bands with
   Adaptive Conformal Inference (`adaptive_conformal.py`: per horizon x band x regime miss rate alpha_t updated from
   outcomes scored before `calibrate` runs; `aci:` in `config/ranges.yaml`, off by default; the weekly
   review shows alpha_t and proposes switching it on from a replay with the same settings, marked
@@ -75,11 +76,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
-  reruns the signal-model backtest and says plainly whether the model shows skill (`model_skill`).
+  reruns the signal-model backtest on the inputs stored by the reviewed week's end and says plainly
+  whether the model shows skill (`model_skill`).
   Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
   open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`); an open-to-close
   call of horizon k sells at the close of D+k (N+k), a 5-day call made before `call_scoring.n_plus_k_from` at D+4
-  (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled.
+  (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled. An open-to-close
+  call whose window has a session without a bar stays open (`session_gap_open`), never shifted.
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
@@ -255,9 +258,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   as-of close; sell at the close of the k-th session after D, k in `config/strategies.yaml` `horizons`;
   `core/horizons.py`) with its explanation (points per feature group, top 3 drivers each
   way) to `data/<market>/model_scores/` (view `model_scores_latest`), plus a `cross_market` variant (every
-  cross-market group on, for strategies with `cross_market: true`) in `model_variant_scores|versions`; the month's model (L2 logistic, monthly
-  expanding-window refit on labels resolved by the refit date, Platt calibration on past out-of-sample rows,
-  JSON coefficients) to `data/<market>/model_versions/`. News enters as a fixed prior (not trainable yet; no
+  cross-market group on, for strategies with `cross_market: true`) in `model_variant_scores|versions`;
+  the month's model (L2 logistic, monthly expanding-window refit on labels resolved by the refit date,
+  Platt calibration on past out-of-sample rows, JSON coefficients) to `data/<market>/model_versions/`.
+  News enters as a fixed prior (not trainable yet; no
   news archive); `model_news_update` reports the re-estimation and the rows it needs. `model_backtest --out DIR`
   is the walk-forward test (both markets and horizons, open-to-close and close-to-close, baselines after costs;
   writes only to DIR; `--history` adds the long-history cache, `--cross-groups`/`--ablate` the cross-market
@@ -273,11 +277,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   at the open of D, sell at the close of the k-th market session after D (weekends and holidays skipped). The list is
   `config/strategies.yaml` `horizons` (`config/ranges.yaml` follows it). Model labels, ranges (target = the exit
   session, width over k + 1 sessions), calibration, call scoring and the prediction rules use it. New
-  `model_scores`, `ranges`, `outcomes`, `calibration` and `model_versions` rows carry `horizon_label` (`n_plus_k`),
-  ranges and scores also `entry_date` and `exit_date`; older rows are labelled on read (B10 block of
-  `sql/views.sql`): `legacy_cc` (old ranges, close-to-close calls), `legacy_5d_d4` (open-to-close 5-day rows sold at
-  D+4), open-to-close 1-day = N+1. Legacy rows are never pooled with N+k. `contracts/horizons.py` `scores_asof`
-  (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of a time (no look-ahead).
+  `model_scores`, `ranges`, `calibration` and `model_versions` rows carry `horizon_label` (`n_plus_k`), ranges and
+  scores also `entry_date` and `exit_date`; a new `outcomes` row carries the label of the window its call is scored
+  on (a close-to-close call: `legacy_cc`; an open-to-close 5-day call made before `call_scoring.n_plus_k_from`:
+  `legacy_5d_d4`; else `n_plus_k`). Older rows are labelled on read (B10 block of `sql/views.sql`): `legacy_cc`
+  (old ranges, close-to-close calls), `legacy_5d_d4` (open-to-close 5-day rows sold at D+4), open-to-close 1-day =
+  N+1. Legacy rows are never pooled with N+k; the context pack's signal-model section shows N+k scores only, and
+  `ai_replay score` scores calls recorded before `n_plus_k_from` on their old window apart (`legacy_cc`).
+  `contracts/horizons.py` `scores_asof` (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of
+  a time (no look-ahead).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
