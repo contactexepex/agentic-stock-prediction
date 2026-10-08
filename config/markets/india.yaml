@@ -92,7 +92,12 @@ sectors:
 # only when the title names no watchlist company),
 # after that ticker's `news_exclude` regexes were removed (other listed companies sharing a name).
 # Names and aliases must be unambiguous; a Google News query hit alone does not tag.
-tickers:
+# company_meta: per-company metadata (name, Yahoo symbol, news names, aliases, ADR ...) of the companies on the
+# watchlist. The companies themselves come only from the watchlist events (data/<market>/watchlist_events/,
+# `scripts/company.py`; marketbrief/lifecycle/loader.py): an entry here never adds a company, and a company added
+# through onboarding without an entry gets its meta from its add event. (Until B18 this key was the company list
+# `tickers:`.)
+company_meta:
   HDFCBANK:   {yahoo: HDFCBANK.NS, name: HDFC Bank, adr: HDB}
   ICICIBANK:  {yahoo: ICICIBANK.NS, name: ICICI Bank, adr: IBN}
   INFY:       {yahoo: INFY.NS, name: Infosys, adr: INFY}
