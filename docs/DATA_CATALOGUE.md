@@ -658,12 +658,12 @@ record.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
-| id, market, channel, asked_at | The question's id, market, where it was asked (`dashboard` or `slack`) and when | chat log | | `ask-us-2026-10-07-1`, `dashboard` |
+| id, market, channel, asked_at | The question's id, market, where it was asked (`dashboard` or `slack`) and when; the examples are asked between 11:40 and 11:55 UTC, before the cut-off | chat log | | `ask-us-2026-10-07-1`, `dashboard`, `2026-10-07T11:40:00Z` |
 | question | What the owner asked | chat | text | "Rule or AI: who did better on 2026-10-06?" |
-| text | The answer in plain words; never advice; numbers only from cited records | `explain` | text | "Paper trades settled on 2026-10-06 ..." |
+| text | The answer in plain words (no internal codes; a proper minus sign); never advice; numbers only from cited records | `explain` | text | "Paper trades settled on 2026-10-06 ..." |
 | cited_ids | The records the answer rests on | `explain` | ids | `["eod-us-2026-10-06"]` |
 | cited | The same ids with their kind and the time each was stored or written, so the side panel can open them (derived for pages from `cited_ids`; proposed for B8) | catalogue records | | `{"id": "eod-us-2026-10-06", "kind": "eod_analyses", "as_of": "2026-10-06T22:40:00Z"}` |
-| as_of | The data time the answer reads up to; nothing later is used | `explain` | time | `2026-10-07T12:00:00Z` |
+| as_of | The data time the answer reads up to: the moment it was asked; nothing later is used | `explain` | time | `2026-10-07T11:42:00Z` |
 | not_in_data | True when the data cannot answer (e.g. a date after `as_of`) | `explain` | yes/no | "What did Reliance close at on 8 Oct?": `true` |
 | declined | `advice` when the question asks for advice or a real trade, which the assistant never gives (proposed for B8; not yet in `mcp/tools.yaml`) | | text or empty | "Should I buy NVDA tomorrow with real money?" |
 

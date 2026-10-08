@@ -607,7 +607,10 @@ def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_
 
 def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():
     by_id = {r["id"]: r for name in ("paper_trade.json", "eod_analysis.json", "news_item.json") for r in load(name)}
+    cut_off = json.loads((CATALOGUE / "assistant_answer.json").read_text(encoding="utf-8"))["as_of"]
+    words = {"rule": "Rule strategies", "ai": "AI traders", "baseline": "Baselines"}
     for answer in load("assistant_answer.json"):
+        assert answer["as_of"] <= answer["asked_at"] <= cut_off   # a page at the cut-off can show every answer
         assert answer["cited_ids"] == [c["id"] for c in answer["cited"]]
         for cited in answer["cited"]:
             assert cited["as_of"] <= answer["as_of"] and cited["id"] in by_id
@@ -616,7 +619,9 @@ def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():
             continue
         record = by_id[answer["cited_ids"][0]]
         if "return_pct" in record:
-            assert f"{record['return_pct']:+.2f} %" in answer["text"]
+            value, minus = record["return_pct"], "\u2212"
+            assert f"{minus if value < 0 else '+'}{abs(value):.2f} %" in answer["text"]
         else:
-            for family in ("rule", "ai", "baseline"):
-                assert f"{family} {record['results'][family]['trades']} trades" in answer["text"]
+            for family, word in words.items():
+                assert f"{word}: {record['results'][family]['trades']} trades" in answer["text"]
+        assert "_" not in answer["text"].replace("rule.model_news.v1", "")   # plain words, no raw codes
