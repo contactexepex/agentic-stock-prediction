@@ -1,4 +1,5 @@
-// Playwright scan of a built page for clipped, overflowing and overlapping text at eight widths (390-1680 px) and both
+// Playwright scan of a built page for clipped, overflowing and overlapping text at twelve widths (390-1680 px, both sides
+// of the shell's and the tables' breakpoints) and both
 // markets (#india, #us): node design/system/check_text.js <page.html>. Inline elements that wrap (a ticker before a
 // multi-line headline) are reported as overlaps by their bounding boxes; read the list, it is not a pass/fail gate.
 // A table cell cut at its scrolling wrapper's edge counts as clipped (the wrapper's scrollbar is not a fix).
@@ -7,7 +8,7 @@ const { chromium } = require('playwright'); const path = require('path');
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
   const file = 'file://' + path.resolve(process.argv[2] || 'design/mockups/01-home/page.html');
   const out = [];
-  for (const [w, mobile] of [[390, true], [600, false], [768, false], [1024, false], [1199, false], [1280, false], [1440, false], [1680, false]]) {
+  for (const [w, mobile] of [[390, true], [600, false], [768, false], [1024, false], [1199, false], [1200, false], [1240, false], [1280, false], [1359, false], [1360, false], [1440, false], [1680, false]]) {
     for (const m of ['india', 'us']) {
       const ctx = await b.newContext({ viewport: { width: w, height: 900 }, isMobile: mobile, hasTouch: mobile });
       const p = await ctx.newPage(); await p.goto(file + '#' + m); await p.waitForTimeout(300);
@@ -20,7 +21,7 @@ const { chromium } = require('playwright'); const path = require('path');
         // 1. clipped: own text wider than the box when overflow is hidden/clip/auto (scrolling wrappers excluded)
         for (const el of all) {
           const cs = getComputedStyle(el);
-                    if (['hidden','clip'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim() && cs.textOverflow !== 'ellipsis') res.push(`clipped ${desc(el)} (${el.scrollWidth}>${el.clientWidth})`);
+          if (['hidden','clip'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim() && cs.textOverflow !== 'ellipsis') res.push(`clipped ${desc(el)} (${el.scrollWidth}>${el.clientWidth})`);
           if (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1 && !el.classList.contains('mb-topbar-title')) res.push(`ellipsis ${desc(el)}`);
         }
         // 2. text leaf past its nearest clipping ancestor or past a sized parent (visible overflow)

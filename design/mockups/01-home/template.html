@@ -117,7 +117,7 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 .nl .hd .md-badge{margin-left:4px;vertical-align:1px}
 .aside{font-size:12.5px;margin:8px 0 0} .aside summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12.5px}
 
-/* open trades: every column from 1200 px; Entry, Last, To target and the dates only there (.cw); the range bar from 761 px (.cm) */
+/* open trades: every column from 1360 px; Entry, Last, To target and the dates only there (.cw); the range bar from 761 px (.cm) */
 .ot{font-size:13px} .ot th{padding:9px 10px} .ot td{padding:8px 10px}
 .ot td.num,.ot th.num{text-align:right;white-space:nowrap}
 .ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
@@ -127,7 +127,7 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 .ot .st{display:inline-flex;align-items:center;gap:4px;white-space:nowrap} .ot .st .ms{width:14px;height:14px}
 .ot .st.flag{color:var(--mb-color-on-warn-container);font-weight:600} .ot .st.ok{color:var(--mb-color-up)}
 .rng{display:inline-flex;align-items:center;gap:8px} .rng svg{width:100px;height:18px;display:block} .rng small{color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
-@media (max-width:1199px){ .ot th.cw,.ot td.cw,.ot .cw{display:none} .ot th{padding:8px 6px} .ot td{padding:8px 6px} .ot .st{white-space:normal;align-items:start} .ot tr.grp td small{display:block;margin-left:0} }
+@media (max-width:1359px){ .ot th.cw,.ot td.cw,.ot .cw{display:none} .ot th{padding:8px 6px} .ot td{padding:8px 6px} .ot .st{white-space:normal;align-items:start} .ot tr.grp td small{display:block;margin-left:0} }
 @media (max-width:760px){ .ot th.cm,.ot td.cm{display:none} .ot td.num{white-space:normal} }
 
 /* alerts */
@@ -523,14 +523,14 @@ function runs(m) {
   const p = P(m), r = p.status.runs, news = r.news;
   const done = [r.pre_open, ...r.intraday, r.post_close, r.news].filter(x => x.ok).length, total = 1 + INTRADAY_CHECKS_PER_SESSION + 1 + 1;
   const card = el('section', {class:'card', 'aria-label':'Last runs'});
-  card.append(el('div', {class:'head'}, el('h2', {}, 'Runs today'), help('The routines of this market: pre-open (collect, model, strategies, AI traders, picks), two intraday checks, post-close (settlement, end-of-day analysis) and the news run every four hours. A tick means the run finished and its gates passed.'), el('div', {class:'end'}, el('span', {class:'mb-label ' + (done === total ? 'success' : 'neutral')}, `${done} of ${total} ok`))));
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Runs today'), help('The routines of this market: pre-open (collect, model, strategies, AI traders, picks), two intraday checks, post-close (settlement, end-of-day analysis) and the news run every four hours (the latest one counts here). A tick means the run finished and its gates passed.'), el('div', {class:'end'}, el('span', {class:'mb-label ' + (done === total ? 'success' : 'neutral')}, `${done} of ${total} ok`))));
   const ul = el('ul', {class:'runs'});
   const mark = ok => el('span', {class:'mb-mark ' + (ok == null ? 'na' : ok ? 'ok' : 'no'), 'aria-label': ok == null ? 'not run yet' : ok ? 'ok' : 'failed'}, icon(ok == null ? 'ms-schedule' : ok ? 'ms-check' : 'ms-close'));
   const item = (ok, what, sub, when) => el('li', {}, mark(ok), el('span', {}, what, el('small', {}, sub)), el('span', {class:'t'}, when));
   ul.append(item(r.pre_open.ok, 'Pre-open', 'collect · model · strategies · AI traders · picks', fmtLocal(r.pre_open.at, m)));
   for (let i = 0; i < INTRADAY_CHECKS_PER_SESSION; i++) { const x = r.intraday[i]; ul.append(x ? item(x.ok, `Intraday check ${i + 1}`, 'open trades vs range and target', fmtLocal(x.at, m)) : item(null, `Intraday check ${i + 1}`, 'open trades vs range and target · not yet', '—')); }
   ul.append(item(r.post_close.ok, 'Post-close', r.post_close.at ? 'settlement · end-of-day analysis' : 'settlement · end-of-day analysis · not yet', r.post_close.at ? fmtLocal(r.post_close.at, m) : el('span', {}, el('small', {}, 'next '), fmtLocal(r.post_close.next_at, m))));
-  ul.append(item(news.ok, 'News', `every 4 hours · ${news.new_items} new items`, fmtLocal(news.at, m)));
+  ul.append(item(news.ok, 'News (latest run)', `every 4 hours · ${news.new_items} new items`, fmtLocal(news.at, m)));
   card.append(ul);
   card.append(el('p', {class:'note'}, `Cut-off ${fmtLocal(p.cutoff, m, true)}: every number on this page was stored by then.`));
   return card;

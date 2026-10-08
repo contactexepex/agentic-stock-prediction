@@ -80,7 +80,7 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
     unrealised in money and percent, a **range bar** (the trade's own 50% and 80% bands, the entry dotted, the
     target as a triangle, the last price as the dark line; the numbers in the tooltip), distance to target ("past
     target" once reached), and **today's check** from the latest intraday trade check stored by the cut-off (band
-    position, flags; tooltip with the check's numbers). Below 1200 px the entry, last and to-target columns and the
+    position, flags; tooltip with the check's numbers). Below 1360 px the entry, last and to-target columns and the
     dates go (the tooltips keep them); below 761 px the range bar goes too: strategy, horizon, unrealised, check.
 13. **Legend** (signs, tags, badges) and the **footer**: research-only line, `as_of`, `cutoff`, `built_at` and the
     endpoint.
@@ -118,8 +118,10 @@ errors, no horizontal overflow, no external requests, at 1280 and 390 px. Rebuil
 
 - Keyboard: every element with a tooltip is focusable (links and buttons natively, the rest with `tabindex=0`), so
   the range bars' and checks' figures can be reached without a mouse; Escape closes a tooltip and the drawer.
-- Text fit: `design/system/check_text.js` scans for clipped, overflowing and overlapping text at 390-1680 px for both
-  markets; the only reports left are bounding-box artefacts of an inline ticker before a wrapped headline.
+- Text fit: `design/system/check_text.js` scans for clipped, overflowing and overlapping text at twelve widths from
+  390 to 1680 px (both sides of the shell's and the table's breakpoints) for both markets; at those widths the only
+  reports left are bounding-box artefacts of an inline ticker before a wrapped headline, and the trades table is
+  never wider than its wrapper.
 - Catalogue data note for W1 (cosmetic): India's market status lists two intraday runs (05:43Z and 08:43Z ok) but
   trade_check.json holds rows for 05:43Z only, so the runs timeline shows check 2 done while the alerts card's
   latest check is 11:13 IST.
