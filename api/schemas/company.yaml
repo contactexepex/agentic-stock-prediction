@@ -236,7 +236,7 @@ StrategyPrediction:
 TradeCheck:
   type: object
   description: One open paper trade's row of an intraday check (kind trade_checks, view trade_check_rows). Monitoring only
-  x-source: sql/views.sql trade_check_rows
+  x-source: warehouse/company_sources.CHECKS_SQL
   required: [id, check_id, check_at, session_date, market, ticker, trade_id, strategy_id, view, horizon_days]
   properties:
     id: {type: string}
