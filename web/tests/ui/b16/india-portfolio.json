@@ -1,0 +1,542 @@
+{
+ "market": "india",
+ "name": "India (NSE)",
+ "currency": "INR",
+ "as_of": "2026-10-07",
+ "status": {
+  "market": "india",
+  "name": "India (NSE)",
+  "currency": "INR",
+  "as_of": "2026-10-07",
+  "session": {
+   "local_time": "2026-10-08T19:31+05:30",
+   "trading_day": true,
+   "session_date": "2026-10-09",
+   "previous_session": "2026-10-08",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-09T03:45:00+00:00",
+   "session_close_utc": "2026-10-09T10:00:00+00:00",
+   "in_session": false,
+   "late_run": false
+  },
+  "regime": "CALM",
+  "benchmark": {
+   "symbol": "NIFTY50",
+   "name": "Nifty 50",
+   "close": 22603.0508,
+   "close_date": "2026-10-07",
+   "change_pct": -0.76,
+   "change_5d_pct": -0.5
+  },
+  "vol_index": {
+   "symbol": "INDIAVIX",
+   "name": "India VIX",
+   "close": 13.89,
+   "close_date": "2026-10-07",
+   "change_pct": 2.06,
+   "change_5d_pct": 3.58
+  },
+  "runs": {
+   "pre_open": {
+    "at": "2026-10-08T02:17:36Z",
+    "ok": true
+   },
+   "intraday": [],
+   "post_close": {
+    "at": null,
+    "ok": null,
+    "next_at": "2026-10-09T12:15:00Z"
+   },
+   "news": {
+    "at": "2026-10-08T10:19:00Z",
+    "ok": true,
+    "new_items": 378
+   }
+  },
+  "paper_label": "Paper only \u2014 no proven edge yet"
+ },
+ "horizons": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "default_horizon": 1,
+ "go_live": {
+  "proven": false,
+  "months_forward": 0.0,
+  "trades_needed": 300,
+  "beats_best_baseline": null
+ },
+ "strategies": {
+  "rule.model_news.v1": {
+   "id": "rule.model_news.v1",
+   "family": "rule",
+   "name": "Model + news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_half.v1": {
+   "id": "rule.model_news_half.v1",
+   "family": "rule",
+   "name": "Model + half news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_double.v1": {
+   "id": "rule.model_news_double.v1",
+   "family": "rule",
+   "name": "Model + double news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_confirmed.v1": {
+   "id": "rule.model_news_confirmed.v1",
+   "family": "rule",
+   "name": "Model + confirmed news only",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_high.v1": {
+   "id": "rule.model_news_high.v1",
+   "family": "rule",
+   "name": "Model + major news only",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_global.v1": {
+   "id": "rule.model_news_global.v1",
+   "family": "rule",
+   "name": "Model + news + global cues",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_calm.v1": {
+   "id": "rule.model_news_calm.v1",
+   "family": "rule",
+   "name": "Model + news, calm markets only",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_strict.v1": {
+   "id": "rule.model_news_strict.v1",
+   "family": "rule",
+   "name": "Model + news, 60% bar",
+   "threshold": 0.6,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.always_up.v1": {
+   "id": "base.always_up.v1",
+   "family": "baseline",
+   "name": "Always buy",
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.momentum.v1": {
+   "id": "base.momentum.v1",
+   "family": "baseline",
+   "name": "Follow yesterday",
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.model_only.v1": {
+   "id": "base.model_only.v1",
+   "family": "baseline",
+   "name": "Model without news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.news_results.sonnet.v1": {
+   "id": "ai.news_results.sonnet.v1",
+   "family": "ai",
+   "name": "AI news & results (Sonnet)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.pattern_mood.sonnet.v1": {
+   "id": "ai.pattern_mood.sonnet.v1",
+   "family": "ai",
+   "name": "AI price pattern & mood (Sonnet)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.sonnet.v1": {
+   "id": "ai.combined.sonnet.v1",
+   "family": "ai",
+   "name": "AI combined (Sonnet)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.opus.v1": {
+   "id": "ai.combined.opus.v1",
+   "family": "ai",
+   "name": "AI combined (Opus)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  }
+ },
+ "companies": [
+  {
+   "market": "india",
+   "ticker": "ADANIPORTS",
+   "name": "Adani Ports",
+   "sector": "Transport",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1750.1,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "DRREDDY",
+   "name": "Dr Reddy's",
+   "sector": "Pharma",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1203.8,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "HDFCBANK",
+   "name": "HDFC Bank",
+   "sector": "Banks",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 702.75,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "HDFCLIFE",
+   "name": "HDFC Life",
+   "sector": "Insurance",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 546.05,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "HINDALCO",
+   "name": "Hindalco",
+   "sector": "Metals",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 910.85,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "HINDUNILVR",
+   "name": "Hindustan Unilever",
+   "sector": "Consumer goods",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1865.4,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "ICICIBANK",
+   "name": "ICICI Bank",
+   "sector": "Banks",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1357.5,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "INDIGO",
+   "name": "InterGlobe Aviation",
+   "sector": "Transport",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 4990.0,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "INFY",
+   "name": "Infosys",
+   "sector": "IT",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 992.0,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "ITC",
+   "name": "ITC",
+   "sector": "Consumer goods",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 265.7,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "LT",
+   "name": "Larsen & Toubro",
+   "sector": "Construction",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 3701.5,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "M&M",
+   "name": "Mahindra & Mahindra",
+   "sector": "Autos",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 2800.0,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "MARUTI",
+   "name": "Maruti Suzuki",
+   "sector": "Autos",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 11450.0,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "ONGC",
+   "name": "ONGC",
+   "sector": "Energy",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 221.88,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "RELIANCE",
+   "name": "Reliance Industries",
+   "sector": "Energy",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1207.7,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "SBILIFE",
+   "name": "SBI Life Insurance",
+   "sector": "Insurance",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1726.1,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "SUNPHARMA",
+   "name": "Sun Pharma",
+   "sector": "Pharma",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 1781.0,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "TATASTEEL",
+   "name": "Tata Steel",
+   "sector": "Metals",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 175.64,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "TCS",
+   "name": "Tata Consultancy Services",
+   "sector": "IT",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 2080.3,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "india",
+   "ticker": "ULTRACEMCO",
+   "name": "UltraTech Cement",
+   "sector": "Construction",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR",
+   "last_close": 10658.0,
+   "last_close_date": "2026-10-07"
+  }
+ ],
+ "h2h_rows": [],
+ "open_trades": [],
+ "trade_checks": [],
+ "owner": {
+  "trades": [],
+  "positions": [],
+  "default_amount": 100000.0,
+  "paper": true
+ }
+}

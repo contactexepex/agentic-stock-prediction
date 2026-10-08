@@ -1,0 +1,431 @@
+{
+ "market": "us",
+ "name": "US (NYSE/Nasdaq)",
+ "currency": "USD",
+ "as_of": "2026-10-07",
+ "status": {
+  "market": "us",
+  "name": "US (NYSE/Nasdaq)",
+  "currency": "USD",
+  "as_of": "2026-10-07",
+  "session": {
+   "local_time": "2026-10-08T10:01-04:00",
+   "trading_day": true,
+   "session_date": "2026-10-08",
+   "previous_session": "2026-10-07",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-08T13:30:00+00:00",
+   "session_close_utc": "2026-10-08T20:00:00+00:00",
+   "in_session": true,
+   "late_run": false
+  },
+  "regime": "TRENDING",
+  "benchmark": {
+   "symbol": "SPY",
+   "name": "S&P 500 ETF",
+   "close": 777.22,
+   "close_date": "2026-10-07",
+   "change_pct": -0.24,
+   "change_5d_pct": 1.91
+  },
+  "vol_index": {
+   "symbol": "VIX",
+   "name": "VIX",
+   "close": 15.08,
+   "close_date": "2026-10-07",
+   "change_pct": 0.47,
+   "change_5d_pct": -7.71
+  },
+  "runs": {
+   "pre_open": {
+    "at": "2026-10-08T11:53:05Z",
+    "ok": true
+   },
+   "intraday": [],
+   "post_close": {
+    "at": null,
+    "ok": null,
+    "next_at": "2026-10-08T22:15:00Z"
+   },
+   "news": {
+    "at": "2026-10-08T11:48:24Z",
+    "ok": true,
+    "new_items": 406
+   }
+  },
+  "paper_label": "Paper only \u2014 no proven edge yet"
+ },
+ "horizons": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "default_horizon": 1,
+ "go_live": {
+  "proven": false,
+  "months_forward": 0.0,
+  "trades_needed": 300,
+  "beats_best_baseline": null
+ },
+ "track": {
+  "market": "us",
+  "as_of": "2026-10-07",
+  "skill": {
+   "state": "paper",
+   "label": "Paper only \u2014 no proven edge yet",
+   "why": "No: the signal model has not shown skill. No horizon has at least 500 out-of-sample rows with a Brier skill above 0.0 against the base rate and an AUC 95% interval above 0.5. Its paper long beats no baseline after costs (95% interval above 0).",
+   "rule": "Skill means: at least 500 out-of-sample rows, a Brier skill above 0.0 against the base rate, and an AUC 95% interval whose low end is above 0.5 (config/review.yaml model_skill).",
+   "review": {
+    "id": "2026-W40",
+    "computed_at": "2026-10-07T04:46:18+00:00"
+   }
+  },
+  "calls": [],
+  "ranges": [
+   {
+    "h": 1,
+    "key": "1d legacy_cc",
+    "horizon_label": "legacy_cc",
+    "name": "Next session",
+    "inside50": {
+     "n": 20,
+     "hits": 9,
+     "share": 0.45,
+     "wilson_lo": 0.25819502085709295,
+     "wilson_hi": 0.6579179916924003
+    },
+    "inside80": {
+     "n": 20,
+     "hits": 17,
+     "share": 0.85,
+     "wilson_lo": 0.6395767041130426,
+     "wilson_hi": 0.9476322080405041
+    },
+    "scores": {
+     "n": 20,
+     "cover50": 0.45,
+     "cover80": 0.85,
+     "is50_pct": 4.9395,
+     "is80_pct": 7.4143,
+     "qs_pct": 0.4941,
+     "width50_pct": 1.9927,
+     "width80_pct": 4.0854
+    }
+   }
+  ],
+  "replay": null,
+  "min_sample": 10,
+  "backtest": {
+   "computed_at": "2026-10-07T04:46:07+00:00",
+   "data": {
+    "panel_rows": 8840,
+    "first_bar": "2024-10-07",
+    "first_panel_date": "2024-12-31",
+    "last_panel_date": "2026-10-06",
+    "tickers": 20,
+    "round_trip_cost_pct_at_100": 0.0021
+   },
+   "scores": [
+    {
+     "key": "1d close_to_close",
+     "n": 6760,
+     "dates": 338,
+     "brier": 0.25,
+     "brier_base_rate": 0.2495,
+     "brier_skill": -0.0021,
+     "auc": 0.4921,
+     "auc95": [
+      0.4712,
+      0.5147
+     ],
+     "skill": false
+    },
+    {
+     "key": "1d open_to_close",
+     "n": 6740,
+     "dates": 337,
+     "brier": 0.2503,
+     "brier_base_rate": 0.2497,
+     "brier_skill": -0.0024,
+     "auc": 0.4826,
+     "auc95": [
+      0.4591,
+      0.5061
+     ],
+     "skill": false
+    },
+    {
+     "key": "5d close_to_close",
+     "n": 6280,
+     "dates": 314,
+     "brier": 0.2499,
+     "brier_base_rate": 0.2486,
+     "brier_skill": -0.0051,
+     "auc": 0.4809,
+     "auc95": [
+      0.4498,
+      0.51
+     ],
+     "skill": false
+    },
+    {
+     "key": "5d open_to_close",
+     "n": 6280,
+     "dates": 314,
+     "brier": 0.2504,
+     "brier_base_rate": 0.2492,
+     "brier_skill": -0.0049,
+     "auc": 0.4845,
+     "auc95": [
+      0.4563,
+      0.5134
+     ],
+     "skill": false
+    }
+   ],
+   "strategy": [
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 173,
+     "baseline": "always_up",
+     "dates": 27,
+     "mean_pct": -0.1874,
+     "ci95_pct": [
+      -1.06,
+      0.56
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 173,
+     "baseline": "momentum_5d",
+     "dates": 27,
+     "mean_pct": 0.1341,
+     "ci95_pct": [
+      -0.87,
+      0.89
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 173,
+     "baseline": "rsi_mean_reversion",
+     "dates": 6,
+     "mean_pct": -2.5052,
+     "ci95_pct": [
+      -4.1,
+      0.85
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 173,
+     "baseline": "benchmark_long_per_date",
+     "dates": 27,
+     "mean_pct": 0.0026,
+     "ci95_pct": [
+      -0.89,
+      0.82
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.60",
+     "positions": 3,
+     "baseline": "always_up",
+     "dates": 2,
+     "mean_pct": -0.677,
+     "ci95_pct": [
+      -0.68,
+      -0.68
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.60",
+     "positions": 3,
+     "baseline": "momentum_5d",
+     "dates": 2,
+     "mean_pct": -0.4964,
+     "ci95_pct": [
+      -0.5,
+      -0.5
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.60",
+     "positions": 3,
+     "baseline": "rsi_mean_reversion",
+     "dates": 0,
+     "mean_pct": null,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.60",
+     "positions": 3,
+     "baseline": "benchmark_long_per_date",
+     "dates": 2,
+     "mean_pct": -0.9129,
+     "ci95_pct": [
+      -0.91,
+      -0.91
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.65",
+     "positions": 0,
+     "baseline": "\u2013",
+     "dates": 0,
+     "mean_pct": null,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "no positions"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1970,
+     "baseline": "always_up",
+     "dates": 130,
+     "mean_pct": 0.0113,
+     "ci95_pct": [
+      -0.18,
+      0.27
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1970,
+     "baseline": "momentum_5d",
+     "dates": 130,
+     "mean_pct": 0.0849,
+     "ci95_pct": [
+      -0.24,
+      0.43
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1970,
+     "baseline": "rsi_mean_reversion",
+     "dates": 25,
+     "mean_pct": -0.9116,
+     "ci95_pct": [
+      -2.12,
+      0.63
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1970,
+     "baseline": "benchmark_long_per_date",
+     "dates": 130,
+     "mean_pct": 0.2638,
+     "ci95_pct": [
+      -0.15,
+      0.77
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 1,
+     "baseline": "always_up",
+     "dates": 1,
+     "mean_pct": -6.0506,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 1,
+     "baseline": "momentum_5d",
+     "dates": 1,
+     "mean_pct": -4.9252,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 1,
+     "baseline": "rsi_mean_reversion",
+     "dates": 0,
+     "mean_pct": null,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 1,
+     "baseline": "benchmark_long_per_date",
+     "dates": 1,
+     "mean_pct": -6.9636,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.65",
+     "positions": 0,
+     "baseline": "\u2013",
+     "dates": 0,
+     "mean_pct": null,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "no positions"
+    }
+   ],
+   "verdict": "No: the signal model has not shown skill. No horizon has at least 500 out-of-sample rows with a Brier skill above 0.0 against the base rate and an AUC 95% interval above 0.5. Its paper long beats no baseline after costs (95% interval above 0).",
+   "json": "work/model_backtest/model-backtest-us-2026-10-06.json",
+   "reliability": {}
+  },
+  "example_parts": []
+ },
+ "weekly": []
+}

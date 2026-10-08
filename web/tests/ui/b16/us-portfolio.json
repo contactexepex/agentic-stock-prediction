@@ -1,0 +1,542 @@
+{
+ "market": "us",
+ "name": "US (NYSE/Nasdaq)",
+ "currency": "USD",
+ "as_of": "2026-10-07",
+ "status": {
+  "market": "us",
+  "name": "US (NYSE/Nasdaq)",
+  "currency": "USD",
+  "as_of": "2026-10-07",
+  "session": {
+   "local_time": "2026-10-08T10:01-04:00",
+   "trading_day": true,
+   "session_date": "2026-10-08",
+   "previous_session": "2026-10-07",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-08T13:30:00+00:00",
+   "session_close_utc": "2026-10-08T20:00:00+00:00",
+   "in_session": true,
+   "late_run": false
+  },
+  "regime": "TRENDING",
+  "benchmark": {
+   "symbol": "SPY",
+   "name": "S&P 500 ETF",
+   "close": 777.22,
+   "close_date": "2026-10-07",
+   "change_pct": -0.24,
+   "change_5d_pct": 1.91
+  },
+  "vol_index": {
+   "symbol": "VIX",
+   "name": "VIX",
+   "close": 15.08,
+   "close_date": "2026-10-07",
+   "change_pct": 0.47,
+   "change_5d_pct": -7.71
+  },
+  "runs": {
+   "pre_open": {
+    "at": "2026-10-08T11:53:05Z",
+    "ok": true
+   },
+   "intraday": [],
+   "post_close": {
+    "at": null,
+    "ok": null,
+    "next_at": "2026-10-08T22:15:00Z"
+   },
+   "news": {
+    "at": "2026-10-08T11:48:24Z",
+    "ok": true,
+    "new_items": 406
+   }
+  },
+  "paper_label": "Paper only \u2014 no proven edge yet"
+ },
+ "horizons": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "default_horizon": 1,
+ "go_live": {
+  "proven": false,
+  "months_forward": 0.0,
+  "trades_needed": 300,
+  "beats_best_baseline": null
+ },
+ "strategies": {
+  "rule.model_news.v1": {
+   "id": "rule.model_news.v1",
+   "family": "rule",
+   "name": "Model + news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_half.v1": {
+   "id": "rule.model_news_half.v1",
+   "family": "rule",
+   "name": "Model + half news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_double.v1": {
+   "id": "rule.model_news_double.v1",
+   "family": "rule",
+   "name": "Model + double news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_confirmed.v1": {
+   "id": "rule.model_news_confirmed.v1",
+   "family": "rule",
+   "name": "Model + confirmed news only",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_high.v1": {
+   "id": "rule.model_news_high.v1",
+   "family": "rule",
+   "name": "Model + major news only",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_global.v1": {
+   "id": "rule.model_news_global.v1",
+   "family": "rule",
+   "name": "Model + news + global cues",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_calm.v1": {
+   "id": "rule.model_news_calm.v1",
+   "family": "rule",
+   "name": "Model + news, calm markets only",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_strict.v1": {
+   "id": "rule.model_news_strict.v1",
+   "family": "rule",
+   "name": "Model + news, 60% bar",
+   "threshold": 0.6,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.always_up.v1": {
+   "id": "base.always_up.v1",
+   "family": "baseline",
+   "name": "Always buy",
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.momentum.v1": {
+   "id": "base.momentum.v1",
+   "family": "baseline",
+   "name": "Follow yesterday",
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.model_only.v1": {
+   "id": "base.model_only.v1",
+   "family": "baseline",
+   "name": "Model without news",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.news_results.sonnet.v1": {
+   "id": "ai.news_results.sonnet.v1",
+   "family": "ai",
+   "name": "AI news & results (Sonnet)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.pattern_mood.sonnet.v1": {
+   "id": "ai.pattern_mood.sonnet.v1",
+   "family": "ai",
+   "name": "AI price pattern & mood (Sonnet)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.sonnet.v1": {
+   "id": "ai.combined.sonnet.v1",
+   "family": "ai",
+   "name": "AI combined (Sonnet)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.opus.v1": {
+   "id": "ai.combined.opus.v1",
+   "family": "ai",
+   "name": "AI combined (Opus)",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  }
+ },
+ "companies": [
+  {
+   "market": "us",
+   "ticker": "AAPL",
+   "name": "Apple",
+   "sector": "Tech",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 336.67,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "ALL",
+   "name": "Allstate",
+   "sector": "Insurance",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 223.95,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "BAC",
+   "name": "Bank of America",
+   "sector": "Banks",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 53.52,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "CAT",
+   "name": "Caterpillar",
+   "sector": "Industrials",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 813.83,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "COST",
+   "name": "Costco",
+   "sector": "Retail",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 942.25,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "CVX",
+   "name": "Chevron",
+   "sector": "Energy",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 205.15,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "DAL",
+   "name": "Delta Air Lines",
+   "sector": "Airlines",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 82.97,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "DE",
+   "name": "Deere",
+   "sector": "Industrials",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 656.87,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "GM",
+   "name": "General Motors",
+   "sector": "Autos",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 80.99,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "GOOGL",
+   "name": "Alphabet",
+   "sector": "Internet",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 350.5,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "JPM",
+   "name": "JPMorgan",
+   "sector": "Banks",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 329.58,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "LLY",
+   "name": "Eli Lilly",
+   "sector": "Pharma",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 1188.72,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "META",
+   "name": "Meta Platforms",
+   "sector": "Internet",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 721.31,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "MRK",
+   "name": "Merck",
+   "sector": "Pharma",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 142.79,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "NVDA",
+   "name": "Nvidia",
+   "sector": "Tech",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 237.47,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "PGR",
+   "name": "Progressive",
+   "sector": "Insurance",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 214.12,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "TSLA",
+   "name": "Tesla",
+   "sector": "Autos",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 377.81,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "UAL",
+   "name": "United Airlines",
+   "sector": "Airlines",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 110.17,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "WMT",
+   "name": "Walmart",
+   "sector": "Retail",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 108.16,
+   "last_close_date": "2026-10-07"
+  },
+  {
+   "market": "us",
+   "ticker": "XOM",
+   "name": "ExxonMobil",
+   "sector": "Energy",
+   "state": "active",
+   "amount": 1000.0,
+   "amount_overridden": false,
+   "currency": "USD",
+   "last_close": 164.05,
+   "last_close_date": "2026-10-07"
+  }
+ ],
+ "h2h_rows": [],
+ "open_trades": [],
+ "trade_checks": [],
+ "owner": {
+  "trades": [],
+  "positions": [],
+  "default_amount": 1000.0,
+  "paper": true
+ }
+}

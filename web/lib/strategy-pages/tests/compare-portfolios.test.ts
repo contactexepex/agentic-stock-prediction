@@ -8,13 +8,13 @@ import { fileURLToPath } from "node:url";
 import {
   familyLines, familyRow, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
   type RuleVsAiPayload, type SettledTrade,
-} from "../../rule-vs-ai/logic.ts";
+} from "../rule-vs-ai.ts";
 import {
   groupOpenTrades, latestChecks, newIdempotencyKey, openSummary, positionsSummary, receiptState, tradeRequest,
   type PaperPortfoliosPayload, type TradeForm,
-} from "../../paper-portfolios/logic.ts";
+} from "../paper-portfolios.ts";
 
-const REPO = fileURLToPath(new URL("../../../../../../", import.meta.url));
+const REPO = fileURLToPath(new URL("../../../../", import.meta.url));
 const mockup = <T>(page: string, market = "india"): T =>
   JSON.parse(readFileSync(`${REPO}design/mockups/${page}/data.json`, "utf8")).markets[market] as T;
 

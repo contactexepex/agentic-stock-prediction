@@ -11,14 +11,14 @@ import {
 import {
   colouredSeries, compactProfit, cumulativeSeries, defaultSelection, fmtParam, heatShares, heatWeeks, kpiPicks,
   ranking, type StrategyLabPayload,
-} from "../../strategy-lab/logic.ts";
+} from "../strategy-lab.ts";
 import {
   basisLabel, calibrationLayout, groupByKey, horizonRows, intervalClass, keyWords, selectedBasis, symmetricSpan,
   verdictKind, weeklyOf,
-} from "../../track-record/logic.ts";
-import type { TrackRecordPayload } from "../../track-record/types.ts";
+} from "../track-record.ts";
+import type { TrackRecordPayload } from "../track-record-types.ts";
 
-const REPO = fileURLToPath(new URL("../../../../../../", import.meta.url));
+const REPO = fileURLToPath(new URL("../../../../", import.meta.url));
 const mockup = <T>(page: string, market = "india"): T =>
   JSON.parse(readFileSync(`${REPO}design/mockups/${page}/data.json`, "utf8")).markets[market] as T;
 

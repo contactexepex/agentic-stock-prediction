@@ -1,7 +1,7 @@
 // The Paper portfolios page's own presentation logic (B16; design/mockups/07-paper-portfolios, notes.md "Shown but
 // computed by the page"): the KPI sums, the open trades filtered and grouped by strategy, and the add-trade form's
 // request (body, Idempotency-Key, the receipt's words). A paper trade is a record, never an order. Pure.
-import { FAMILY_ORDER, type Family, type ScoreboardRow, type Strategy } from "../_b16/scoreboard.ts";
+import { FAMILY_ORDER, type Family, type ScoreboardRow, type Strategy } from "./scoreboard.ts";
 
 export interface OpenTrade {
   trade_id: string;

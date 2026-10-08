@@ -3,7 +3,7 @@
 // cumulative lines per series. Forward and back-test rows are never pooled: every function takes one basis. Pure.
 import {
   FAMILY_ORDER, figure, rowsOf, type Basis, type CostView, type ScoreboardRow, type ScoreView, type Strategy,
-} from "../_b16/scoreboard.ts";
+} from "./scoreboard.ts";
 
 export interface HeatmapCell {
   market: string;

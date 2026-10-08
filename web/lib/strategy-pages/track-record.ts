@@ -1,7 +1,7 @@
 // The Track record page's own presentation logic (B16; design/mockups/08-track-record, notes.md "Shown but computed
 // by the page"): the words for a back-test key and a baseline, the verdict badge, the "not enough history yet" gate,
 // interval-bar and calibration geometry, and the weekly series of the selected scoring basis. Pure: no React, no DOM.
-import type { CallBasisBlock, CallBlock, ReliabilityBand, TrackRecordPayload, WeeklyCallSeries } from "./types.ts";
+import type { CallBasisBlock, CallBlock, ReliabilityBand, TrackRecordPayload, WeeklyCallSeries } from "./track-record-types.ts";
 
 export const BASELINE: Readonly<Record<string, string>> = {
   always_up: "Always up",

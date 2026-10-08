@@ -1,7 +1,7 @@
 // Shared by B16's strategy and performance pages (05 Strategy lab, 06 Rule vs AI, 07 Paper portfolios): the
 // scoreboard row as B13's endpoints serve it (api/schemas/strategy-lab.yaml ScoreboardRow, Strategy) and the pure
 // logic the mockups compute on it: the cost view of a figure, the luck test's verdict and bar geometry, nice axis
-// ticks. Pure: no React, no DOM. The `_b16` folder is private (no route).
+// ticks. Pure: no React, no DOM. Lives in lib/ so `npm test` covers its tests.
 
 export type Family = "rule" | "baseline" | "ai";
 export type CostView = "market" | "your";

@@ -1,7 +1,7 @@
 // The Rule vs AI page's own presentation logic (B16; design/mockups/06-rule-vs-ai, notes.md "Shown but computed by
 // the page"): who leads, the matches on identical company-days, the per-company sums, the cumulative lines per
 // family and the picks' cost counts. Pure: no React, no DOM.
-import { figure, type CostView, type Family, type ScoreboardRow, type Strategy } from "../_b16/scoreboard.ts";
+import { figure, type CostView, type Family, type ScoreboardRow, type Strategy } from "./scoreboard.ts";
 
 export interface SettledTrade {
   trade_id: string;
