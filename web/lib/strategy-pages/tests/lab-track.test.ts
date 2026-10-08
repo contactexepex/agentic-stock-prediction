@@ -73,7 +73,11 @@ test("a missing profit ranks after every number and beats no baseline", () => {
   const { ids, byId } = ranking(p, slice);
   const withRow = ids.filter((id) => byId.has(id));
   assert.equal(withRow[withRow.length - 1], top);
-  assert.ok(kpiPicks(p, slice).beat >= 0);
+  // the null-profit baseline is no longer the best yardstick: the next baseline (Always buy, −₹9,309) is, and the two
+  // AI traders at −₹4,784 beat it; Model + news (−₹9,309, equal) does not
+  const picks = kpiPicks(p, slice);
+  assert.equal(picks.bestBaseline!.strategy_id, "base.always_up.v1");
+  assert.equal(picks.beat, 2);
 });
 
 test("forward and back-test rows are never pooled", () => {

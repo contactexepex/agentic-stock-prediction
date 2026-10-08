@@ -19,7 +19,7 @@ import type { GoLive, PageBase } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
 import { figure, REGIME_WORDS, tooFewToRank, type CostView, type ScoreboardRow } from "../../../../../lib/strategy-pages/scoreboard.ts";
 import {
-  familyLines, familyRow, matches, matchTally, matchWinner, perCompany, pickCandidate, pickFor, tradeNet, tradeReturn,
+  familyLines, familyRow, matches, NOT_ENTERED, notEnteredFor, matchTally, matchWinner, perCompany, pickCandidate, pickFor, tradeNet, tradeReturn,
   viableLine, whoLeads, type Match, type Pick, type ReviewPayload, type RuleVsAiPayload, type SettledTrade,
 } from "../../../../../lib/strategy-pages/rule-vs-ai.ts";
 import { CostSwitch, LuckBar } from "../../_b16/parts.tsx";
@@ -179,6 +179,8 @@ function Matches({ p, cost }: { p: Payload; cost: CostView }) {
         </span>
       );
     }
+    const never = notEnteredFor(p.trades, m, f);
+    if (never) return <span className="res"><b className="muted">no trade</b><small>{`${strategyName(p, never.strategy_id)} · N+${never.horizon_days} · ${NOT_ENTERED[never.status] ?? never.status.replace(/_/g, " ")}`}</small></span>;
     const k = pickFor(p.picks, m, f);
     if (k && k.status === "picked") return <span className="res"><b className="muted">open</b><small>{`${strategyName(p, k.strategy_id)} · N+${k.horizon_days} · not settled by the cut-off`}</small></span>;
     return <span className="muted" data-tip={k ? "This family had no strategy buying this company at any horizon that day." : "No head-to-head pick stored for this family and day."}>{k ? "no candidate" : "no pick stored"}</span>;
@@ -189,7 +191,9 @@ function Matches({ p, cost }: { p: Payload; cost: CostView }) {
     if (w === "rule") return <Label icon="settings">rule</Label>;
     if (w === "ai") return <Label tone="info" icon="bolt">AI</Label>;
     if (w === "unknown") return <span className="muted" data-tip="A your-cost figure of this match is not stored.">not stored</span>;
-    const k = pickFor(p.picks, m, m.rule ? "ai" : "rule");
+    const missing = m.rule ? "ai" : "rule";
+    if (notEnteredFor(p.trades, m, missing)) return <span className="muted" data-tip="The other family’s trade never entered, so there is no match to score.">no match</span>;
+    const k = pickFor(p.picks, m, missing);
     return <span className="muted">{k && k.status === "picked" ? "waiting" : "no match"}</span>;
   };
   return (

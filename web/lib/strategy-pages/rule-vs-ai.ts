@@ -9,14 +9,16 @@ export interface SettledTrade {
   strategy_id: string;
   family: Family;
   view: string;
-  pick_rule: string;
+  pick_rule: string | null;
   ticker: string;
   horizon_days: number;
   entry_date: string;
   exit_date: string;
   exit_date_actual: string | null;
-  net_pnl: number;
-  return_pct: number;
+  /** settled, or a trade that never entered (no_entry, skipped_price_above_amount): no profit then. */
+  status: string;
+  net_pnl: number | null;
+  return_pct: number | null;
   target_error_pct: number | null;
   target_reached: boolean | null;
   regime?: string | null;
@@ -132,6 +134,15 @@ export function familyRow(rows: readonly ScoreboardRow[], family: Family): Score
     && row.basis === "forward") ?? null;
 }
 
+/** The trade statuses that mean the trade was never entered (B2's settlement), in words. */
+export const NOT_ENTERED: Readonly<Record<string, string>> = {
+  no_entry: "did not enter (no stored open on the entry day)",
+  skipped_price_above_amount: "skipped (one share costs more than the amount)",
+};
+
+/** Only the trades that entered and settled (the scoreboard counts these only, lab/scoreboard.py). */
+export const settledOnly = (trades: readonly SettledTrade[]): SettledTrade[] => trades.filter((trade) => trade.status === "settled");
+
 /** A trade's profit on the cost view: the your-cost figure from its cost-view record, else the market figure is
  * NOT substituted; null when the your-cost record is missing. */
 export function tradeNet(trade: SettledTrade, costs: readonly YourCostRecord[], cost: CostView): number | null {
@@ -164,13 +175,15 @@ export interface Match {
   ai: SettledTrade | null;
 }
 
-/** The settled head-to-head trades grouped by entry date, company and pick rule; newest entry first. */
+/** The settled head-to-head trades grouped by entry date, company and pick rule; newest entry first. A trade that
+ * never entered is not a side of a match (see `notEnteredFor`). */
 export function matches(trades: readonly SettledTrade[]): Match[] {
   const groups = new Map<string, Match>();
-  for (const trade of trades) {
+  for (const trade of settledOnly(trades)) {
     if (trade.family !== "rule" && trade.family !== "ai") continue;
-    const key = `${trade.entry_date}|${trade.ticker}|${trade.pick_rule}`;
-    const match = groups.get(key) ?? { entry_date: trade.entry_date, ticker: trade.ticker, pick_rule: trade.pick_rule, rule: null, ai: null };
+    const rule = trade.pick_rule ?? "";
+    const key = `${trade.entry_date}|${trade.ticker}|${rule}`;
+    const match = groups.get(key) ?? { entry_date: trade.entry_date, ticker: trade.ticker, pick_rule: rule, rule: null, ai: null };
     match[trade.family] = trade;
     groups.set(key, match);
   }
@@ -201,6 +214,12 @@ export function matchTally(list: readonly Match[], costs: readonly YourCostRecor
   return tally;
 }
 
+/** A trade of one family for a match's day, company and pick rule that never entered, or null. */
+export function notEnteredFor(trades: readonly SettledTrade[], match: Match, family: Family): SettledTrade | null {
+  return trades.find((trade) => trade.status !== "settled" && trade.family === family && trade.entry_date === match.entry_date
+    && trade.ticker === match.ticker && (trade.pick_rule ?? "") === match.pick_rule) ?? null;
+}
+
 /** The pick of one family for a match's day, company and rule (an open pick or a missing candidate), or null. */
 export function pickFor(picks: readonly Pick[], match: Match, family: Family): Pick | null {
   return picks.find((pick) => pick.session_date === match.entry_date && pick.ticker === match.ticker
@@ -217,7 +236,8 @@ export interface CompanySum {
  * figure is missing). */
 export function perCompany(trades: readonly SettledTrade[], costs: readonly YourCostRecord[], cost: CostView):
   Array<{ ticker: string; rule: CompanySum | null; ai: CompanySum | null }> {
-  const tickers = [...new Set(trades.map((trade) => trade.ticker))].sort();
+  const settled = settledOnly(trades);
+  const tickers = [...new Set(settled.map((trade) => trade.ticker))].sort();
   const sum = (list: SettledTrade[]): CompanySum | null => {
     if (!list.length) return null;
     const nets = list.map((trade) => tradeNet(trade, costs, cost));
@@ -227,13 +247,14 @@ export function perCompany(trades: readonly SettledTrade[], costs: readonly Your
   };
   return tickers.map((ticker) => ({
     ticker,
-    rule: sum(trades.filter((trade) => trade.ticker === ticker && trade.family === "rule")),
-    ai: sum(trades.filter((trade) => trade.ticker === ticker && trade.family === "ai")),
+    rule: sum(settled.filter((trade) => trade.ticker === ticker && trade.family === "rule")),
+    ai: sum(settled.filter((trade) => trade.ticker === ticker && trade.family === "ai")),
   }));
 }
 
 /** The cumulative head-to-head lines (market cost): the first entry date at zero, then each exit date. */
-export function familyLines(trades: readonly SettledTrade[]): { dates: string[]; rule: number[]; ai: number[] } {
+export function familyLines(all: readonly SettledTrade[]): { dates: string[]; rule: number[]; ai: number[] } {
+  const trades = settledOnly(all);
   const exitOf = (trade: SettledTrade) => trade.exit_date_actual ?? trade.exit_date;
   const exits = [...new Set(trades.map(exitOf))].sort();
   if (!exits.length) return { dates: [], rule: [], ai: [] };
@@ -242,7 +263,7 @@ export function familyLines(trades: readonly SettledTrade[]): { dates: string[];
   const line = (family: Family) => {
     let running = 0;
     return dates.map((date) => {
-      for (const trade of trades) if (trade.family === family && exitOf(trade) === date) running += trade.net_pnl;
+      for (const trade of trades) if (trade.family === family && exitOf(trade) === date) running += trade.net_pnl ?? 0;
       return running;
     });
   };

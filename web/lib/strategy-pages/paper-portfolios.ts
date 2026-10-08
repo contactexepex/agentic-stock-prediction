@@ -42,8 +42,8 @@ export interface OwnerTrade {
   id: string;
   ticker: string;
   side: "buy" | "sell";
-  quantity: number;
-  price: number;
+  quantity: number | null;
+  price: number | null;
   price_basis: "open" | "close" | "manual";
   trade_date: string;
   source: string;
@@ -221,6 +221,13 @@ export function receiptState(status: number): ReceiptState {
 }
 
 /** One Idempotency-Key per opened form, reused on a retry (crypto.randomUUID where available). */
-export function newIdempotencyKey(random: () => string = () => globalThis.crypto.randomUUID()): string {
+export function newIdempotencyKey(random: () => string = randomId): string {
   return `web-${random()}`;
+}
+
+/** 32 random hex digits: crypto.randomUUID where the page is a secure context, else crypto.getRandomValues. */
+function randomId(): string {
+  const c = globalThis.crypto;
+  if (typeof c.randomUUID === "function") return c.randomUUID().replace(/-/g, "");
+  return Array.from(c.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 }

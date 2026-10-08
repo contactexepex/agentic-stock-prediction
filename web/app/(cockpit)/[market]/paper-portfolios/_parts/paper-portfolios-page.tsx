@@ -252,7 +252,7 @@ function OwnerCard({ p, sent, onSent }: { p: Payload; sent: Sent[]; onSent: (s: 
               <li key={t.id}>
                 <Label tone={t.side === "buy" ? "success" : "warn"}>{t.side}</Label>
                 <span>
-                  {`${t.quantity} ${t.ticker} at ${price(cur, t.price)} (${t.price_basis === "manual" ? "manual price" : `the ${t.price_basis}`}) on ${fmtDate(t.trade_date)}`}
+                  {`${t.quantity ?? DASH} ${t.ticker} at ${price(cur, t.price)} (${t.price_basis === "manual" ? "manual price" : `the ${t.price_basis}`}) on ${fmtDate(t.trade_date)}`}
                   <small>{`from ${SOURCE[t.source] ?? t.source} · entered ${fmtLocal(t.entered_at, p.market, lt, true)}${t.note ? ` · “${t.note}”` : ""}${t.supersedes ? " · corrects an earlier record" : ""}`}</small>
                 </span>
               </li>
@@ -285,7 +285,8 @@ function TradeDialog({ p, onClose, onSent }: { p: Payload; onClose: () => void; 
   const [form, setForm] = useState<TradeForm>({ ticker: active[0]?.ticker ?? "", side: "buy", quantity: "1", trade_date: p.as_of ?? "", price_basis: "open", price: "", note: "" });
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const key = useRef(newIdempotencyKey());
+  const key = useRef<string>("");
+  if (!key.current) key.current = newIdempotencyKey();
   const usedFor = useRef<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const setRef = (node: HTMLDialogElement | null) => {
@@ -366,7 +367,7 @@ function TradeDialog({ p, onClose, onSent }: { p: Payload; onClose: () => void; 
           {errors.length ? (
             <div className="mb-alert danger" role="alert" style={{ padding: "10px 14px" }}>
               <Icon name="warning" />
-              <div>{errors.map((m) => <div key={m}>{m}</div>)}</div>
+              <div>{errors.map((m, i) => <div key={i}>{m}</div>)}</div>
             </div>
           ) : null}
         </div>
