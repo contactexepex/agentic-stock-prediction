@@ -74,8 +74,8 @@ def test_load_inputs_hands_made_at_to_the_horizon_readers(monkeypatch):
     monkeypatch.setattr(trader_inputs, "EvidenceStatuses", lambda _con: inputs().statuses)
     monkeypatch.setattr(trader_inputs.track_record, "load", lambda _con, _now: {})
     con = snapshot_con()
-    con.execute("CREATE TABLE strategy_predictions (id VARCHAR)")
-    con.execute("CREATE TABLE strategy_abstentions (id VARCHAR)")
+    con.execute("CREATE TABLE strategy_predictions (id VARCHAR, made_at TIMESTAMPTZ)")
+    con.execute("CREATE TABLE strategy_abstentions (id VARCHAR, made_at TIMESTAMPTZ)")
     gi = trader_inputs.load_inputs({**inputs().cfg, "active_tickers": ["NVDA"]}, NOW, con)
     for kind in asked:
         asked[kind].clear()
