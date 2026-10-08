@@ -86,7 +86,7 @@ export function SignalsBand({ page, goLive, strategies, context = "Nothing here 
     );
   }
   const bar = goLive
-    ? ` None of the ${strategies ?? "registered"} strategies has met the go-live bar (${goLive.trades_needed} settled trades, ${goLive.months_forward} of ${GO_LIVE_MONTHS} months forward so far, beating the best baseline after costs).`
+    ? ` None of the ${strategies ?? "registered"} strategies has met the go-live bar (${goLive.trades_needed} more settled trades needed, ${goLive.months_forward} of ${GO_LIVE_MONTHS} months forward so far, and beating the best baseline after costs).`
     : "";
   return (
     <section className="mb-alert band" aria-label="Signals">

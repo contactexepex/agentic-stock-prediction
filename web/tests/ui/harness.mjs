@@ -125,6 +125,18 @@ async function runCase(browser, c) {
         await route.fulfill({ status: 500, body: "fixture error" });
       }
     });
+    // Same-origin routes outside /api/v1 a case answers itself: routes = {"/api/assistant": async (request) => ({status, body})}.
+    for (const [path, handler] of Object.entries(c.routes ?? {})) {
+      await page.route((url) => url.origin === origin && url.pathname === path, async (route) => {
+        try {
+          const answer = await handler(route.request());
+          await route.fulfill({ status: answer.status ?? 200, contentType: answer.contentType ?? "application/json", body: typeof answer.body === "string" ? answer.body : JSON.stringify(answer.body) });
+        } catch (error) {
+          errors.push(`${tag} route ${path} failed: ${error.message}`);
+          await route.fulfill({ status: 500, body: "route error" });
+        }
+      });
+    }
     const response = await page.goto(origin + c.path, { waitUntil: c.apiStatus === "slow" ? "load" : "networkidle" });
     if (!response || response.status() !== (c.status ?? 200)) errors.push(`${tag} HTTP ${response?.status()} (expected ${c.status ?? 200})`);
     await page.waitForTimeout(300);
