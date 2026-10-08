@@ -251,10 +251,27 @@ def test_lifecycle_and_commands_hide_deleted_company(market):
 
 
 def test_names_matches_a_whole_ticker_only():
-    assert company_records.names("del-pgr-1", "PGR") and company_records.names("PGR merger", "PGR")
+    assert company_records.names("PGR merger", "PGR") and company_records.names("we-us-PGR-delete-x", "PGR")
+    assert not company_records.names("pgr merger", "PGR")                # case-sensitive: "all" is not ALL
     assert company_records.names("M&M results", "M&M")
     assert not company_records.names("merge pending", "GE") and not company_records.names("PGRX", "PGR")
     assert not company_records.names(None, "PGR")
+
+
+def test_a_shown_companys_text_is_kept_when_a_deleted_ticker_is_a_word():
+    deleted = {"ALL"}   # Allstate, a US watchlist ticker that is also an English word
+    dal = {"id": "cmd-9", "arguments": {"market": "us", "ticker": "DAL", "reason": "pause all airlines"},
+           "message": "all checks passed", "idempotency_key": "deact-dal-all-1", "record_ids": ["we-us-DAL-x"]}
+    kept = company_records.masked(dal, deleted)
+    assert kept["message"] == "all checks passed" and kept["record_ids"] == ["we-us-DAL-x"]
+    assert kept["arguments"] == {"market": "us", "ticker": "DAL"} and kept["idempotency_key"] == "deact-dal-all-1"
+    named = company_records.masked({**dal, "message": "DAL paused after ALL was dropped"}, deleted)
+    assert named["message"] == "DAL paused after (deleted company) was dropped"
+    about = company_records.masked({**dal, "arguments": {"market": "us", "ticker": "ALL"}}, deleted)
+    assert about["arguments"]["ticker"] == "(deleted company)" and about["record_ids"] == ["(masked)"]
+    assert company_records.masked({**dal, "arguments": None}, deleted)["arguments"] is None
+    assert company_records.without("pause all airlines", deleted) == "pause all airlines"
+    assert company_records.without("like ALL, paused", deleted) == "like (deleted company), paused"
 
 
 def test_inactive_news_since_deactivation(market):

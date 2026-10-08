@@ -54,47 +54,63 @@ def plain(value):
     return value
 
 
+def word_pattern(ticker: str) -> str:
+    """A ticker as a whole word (not inside a longer symbol: `PGR` not in "PGRX", `GE` not in "merge")."""
+    return rf"(?<![A-Za-z0-9]){re.escape(ticker)}(?![A-Za-z0-9])"
+
+
 def names(text, ticker: str) -> bool:
-    """Whether a text names a ticker as a whole word (any case; `PGR` in "del-pgr-1", not `GE` in "merge")."""
-    pattern = rf"(?<![A-Za-z0-9]){re.escape(ticker)}(?![A-Za-z0-9])"
-    return isinstance(text, str) and re.search(pattern, text, re.IGNORECASE) is not None
+    """Whether a text names a ticker as a whole word, case-sensitive ("all" is not ALL)."""
+    return isinstance(text, str) and re.search(word_pattern(ticker), text) is not None
+
+
+def without(text, deleted: set[str]):
+    """Free text with each whole-word, case-sensitive mention of a deleted ticker replaced by MASKED_COMPANY."""
+    if not isinstance(text, str):
+        return text
+    for ticker in sorted(deleted):
+        text = re.sub(word_pattern(ticker), MASKED_COMPANY, text)
+    return text
 
 
 def lifecycle_rows(con, cutoff: datetime, shown: set[str], deleted: set[str] = frozenset()) -> list[dict]:
-    """The lifecycle events recorded by the cut-off of the companies shown, newest first; a reason that names a
-    deleted company is masked (decision 12)."""
+    """The lifecycle events recorded by the cut-off of the companies shown, newest first; in a reason, a deleted
+    company's ticker is replaced by MASKED_COMPANY (decision 12)."""
     frame = con.execute(EVENTS_SQL, {"cutoff": cutoff.isoformat()}).df()
     rows = []
     for row in frame.to_dict("records"):
-        if row["ticker"] not in shown:
-            continue
-        event = {field: plain(row[field]) for field in LIFECYCLE_FIELDS}
-        if any(names(event["reason"], ticker) for ticker in deleted):
-            event["reason"] = MASKED_MESSAGE
-        rows.append(event)
+        if row["ticker"] in shown:
+            event = {field: plain(row[field]) for field in LIFECYCLE_FIELDS}
+            rows.append({**event, "reason": without(event["reason"], deleted)})
     return rows
 
 
-def mentions(command: dict, ticker: str) -> bool:
-    """Whether a command names a ticker anywhere: an argument value, its message, idempotency key or record ids."""
-    texts = [*(command["arguments"] or {}).values(), command["message"], command["idempotency_key"],
-             *(command["record_ids"] or [])]
-    return any(names(text, ticker) for text in texts)
+def concerns(command: dict, ticker: str) -> bool:
+    """Whether a command is about a company: its `ticker` or `symbol` argument is the ticker (every company tool
+    names its company there), or a record id it wrote names it. Free text and idempotency keys never decide it, so a
+    deleted ticker that is also a word (ALL) never masks another company's command."""
+    arguments = command["arguments"] or {}
+    return (ticker in (arguments.get("ticker"), arguments.get("symbol"))
+            or any(names(record_id, ticker) for record_id in command["record_ids"] or []))
 
 
 def masked(command: dict, deleted: set[str]) -> dict:
-    """The command with the mockup's argument keys (`market`, `symbol`, `ticker`, whichever it has) and every echo of
-    a deleted company masked (decision 12): its argument values, message, idempotency key and record ids."""
-    arguments = command["arguments"] or {}
-    command = {**command, "arguments": {key: arguments[key] for key in COMMAND_ARGUMENT_FIELDS if key in arguments}}
-    for ticker in sorted(deleted):
-        if mentions({**command, "arguments": arguments}, ticker):
-            command = {**command,
-                       "arguments": {k: MASKED_COMPANY if names(v, ticker) else v
-                                     for k, v in command["arguments"].items()},
-                       "message": MASKED_MESSAGE, "idempotency_key": MASKED if command["idempotency_key"] else None,
-                       "record_ids": [MASKED] * len(command["record_ids"] or [])}
-    return command
+    """The command with the mockup's argument keys (`market`, `symbol`, `ticker`, whichever it has; other keys such as
+    `reason` never reach the page) and no echo of a deleted company (decision 12): a command about one has its
+    ticker argument, message, idempotency key and record ids masked; any other command keeps its fields, with a
+    deleted ticker named in its message replaced by MASKED_COMPANY."""
+    arguments = command["arguments"]
+    if arguments is not None:
+        arguments = {key: arguments[key] for key in COMMAND_ARGUMENT_FIELDS if key in arguments}
+    command = {**command, "arguments": arguments}
+    about = [ticker for ticker in sorted(deleted) if concerns(command, ticker)]
+    if about:
+        return {**command,
+                "arguments": None if arguments is None
+                else {k: MASKED_COMPANY if v in about else v for k, v in arguments.items()},
+                "message": MASKED_MESSAGE, "idempotency_key": MASKED if command["idempotency_key"] else None,
+                "record_ids": [MASKED] * len(command["record_ids"] or [])}
+    return {**command, "message": without(command["message"], deleted)}
 
 
 def command_rows(con, cutoff: datetime, deleted: set[str]) -> list[dict]:
