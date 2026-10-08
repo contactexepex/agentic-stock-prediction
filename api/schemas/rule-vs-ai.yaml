@@ -262,3 +262,83 @@ ReviewDue:
   properties:
     date: {$ref: '#/components/schemas/IsoDate'}
     iso_week: {type: string}
+RuleVsAiTable:
+  description: "An rm.compare page: `_` is the Rule vs AI page (RuleVsAi), a ticker is that company's head-to-head cut"
+  anyOf: [{$ref: '#/components/schemas/RuleVsAi'}, {$ref: '#/components/schemas/CompanyCompare'}]
+CompanyCompare:
+  type: object
+  x-source: warehouse/rm_compare.company_page
+  description: >-
+    One collected company's head-to-head cut (rm.compare page key = its ticker; B5's compare_rule_vs_ai with a
+    ticker): its head-to-head heatmap cells of dimension company, its trades, their your-cost rows, its picks and its
+    AI reasons; empty lists before any. Paper only.
+  required: [market, as_of, ticker, cells, trades, your_costs, picks, reasons]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    as_of: {type: ['string', 'null'], format: date}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    cells:
+      type: array
+      items: {$ref: '#/components/schemas/HeatmapCell'}
+    trades:
+      type: array
+      items: {$ref: '#/components/schemas/HeadToHeadTrade'}
+    your_costs:
+      type: array
+      items: {$ref: '#/components/schemas/YourCostRow'}
+    picks:
+      type: array
+      items: {$ref: '#/components/schemas/HeadToHeadPick'}
+    reasons:
+      type: array
+      items: {$ref: '#/components/schemas/AiReason'}
+ResearchReviewPageResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/ResearchReviewPage'}
+ResearchReviewPage:
+  x-source: warehouse/rm_compare.review_pages
+  description: >-
+    rm.review (page `_`): the weekly research reviews written by the cut-off (newest first; proposals stay
+    `proposed` until the owner approves, nothing is applied), the next review due and the news-impact rows (F3) of the
+    newest ISO week computed by the cut-off
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - type: object
+      required: [reviews, review_due, news_impact]
+      properties:
+        reviews:
+          type: array
+          items: {$ref: '#/components/schemas/ResearchReview'}
+        review_due: {$ref: '#/components/schemas/ReviewDue'}
+        news_impact:
+          type: array
+          items: {$ref: '#/components/schemas/NewsImpactRow'}
+NewsImpactRow:
+  type: object
+  x-source: lab/news_impact.impact_rows (kind news_impact)
+  description: The mean abnormal move after news of one event type, status and materiality at one horizon (F3)
+  required: [id, market, iso_week, event_type, status, materiality, horizon_days, n_events, enough, computed_at]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    iso_week: {type: string}
+    as_of: {type: ['string', 'null'], format: date-time}
+    event_type: {type: string}
+    status: {type: string}
+    materiality: {type: string}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    n_events: {type: integer}
+    mean_abnormal_pct: {$ref: '#/components/schemas/NullableNumber'}
+    ci_low_pct: {$ref: '#/components/schemas/NullableNumber'}
+    ci_high_pct: {$ref: '#/components/schemas/NullableNumber'}
+    mean_benchmark_pct: {$ref: '#/components/schemas/NullableNumber'}
+    mean_sector_pct: {$ref: '#/components/schemas/NullableNumber'}
+    enough: {type: boolean}
+    news_ids:
+      type: ['array', 'null']
+      items: {type: string}
+    computed_at: {$ref: '#/components/schemas/IsoTime'}

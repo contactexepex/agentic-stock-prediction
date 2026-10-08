@@ -10,7 +10,11 @@ gives the forward rows in the catalogue's fields, computed once per build."""
 
 from __future__ import annotations
 
+import json
+
+from marketbrief.constants.kinds import KIND_LAB_BACKTESTS
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY
+from marketbrief.lab import reads as lab_reads
 from marketbrief.lab import reports as lab_reports
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
@@ -18,6 +22,8 @@ from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBu
 RM_STRATEGIES = "strategies"
 ALL_HORIZONS = "all"
 BASIS_BACKTEST = "backtest"
+BASIS_FORWARD = "forward"
+VIEW_ACCURACY = "accuracy"
 SCOPE_STRATEGY = "strategy"
 # Scoreboard row fields (docs/DATA_CATALOGUE.md "Scoreboard row"; 05-strategy-lab notes.md `rows`)
 ROW_FIELDS = (
@@ -154,11 +160,57 @@ def backtest_row(row: dict) -> dict:
     }
 
 
+def stored_row(row: dict) -> dict:
+    """One stored lab_backtests row as a back-test scoreboard row (the same fields as backtest_row)."""
+    horizon = row["horizon"]
+    luck_test = json.loads(row["luck_test"]) if isinstance(row["luck_test"], str) else row["luck_test"]
+    return backtest_row(
+        {
+            **row,
+            "scope": SCOPE_STRATEGY,
+            "view": VIEW_ACCURACY,
+            "basis": BASIS_BACKTEST,
+            "horizon_days": horizon if horizon == ALL_HORIZONS else int(horizon),
+            "luck_test": luck_test,
+            "your_cost": {"net_pnl": row["your_net_pnl"], "mean_return_pct": row["your_mean_return_pct"]},
+        }
+    )
+
+
+def stored_backtest(ctx: BuildContext) -> dict | None:
+    """{run, rows} of the newest back-test run B2 stored by the cut-off (kind lab_backtests, `lab.py backtest
+    --store`): the newest run on the 15-year history cache when one exists, else the newest on the stored bars; None
+    when nothing is stored yet."""
+    rows = lab_reads.stored(ctx.con, KIND_LAB_BACKTESTS, "computed_at", ctx.cutoff_time)
+    if not rows:
+        return None
+    newest = {}
+    for row in rows:  # time then id order: the last run of each history flag wins
+        newest[bool(row["history"])] = row["run_id"]
+    chosen = newest.get(True, newest.get(False))
+    run_rows = [row for row in rows if row["run_id"] == chosen]
+    head = run_rows[0]
+    return {
+        "run": {
+            "history": bool(head["history"]),
+            "first_date": head["data_first_date"],
+            "last_date": head["data_last_date"],
+            "eurusd": head["eurusd_source"],
+            "note": head["note"],
+        },
+        "rows": sorted((stored_row(row) for row in run_rows), key=row_order),
+    }
+
+
 def backtest(ctx: BuildContext) -> dict:
-    """{run, rows} of B2's back-test (lab/reports.run_backtest, no history cache) on the bars stored by the cut-off;
-    a refused run (US without stored EUR/USD closes) has no rows and its message as the run's note."""
+    """{run, rows} of the back-test basis: B2's newest stored run (stored_backtest) when one exists by the cut-off,
+    else B2's back-test computed in the build (lab/reports.run_backtest, no history cache) on the bars stored by the
+    cut-off; a refused run (US without stored EUR/USD closes) has no rows and its message as the run's note."""
 
     def compute() -> dict:
+        stored = stored_backtest(ctx)
+        if stored is not None:
+            return stored
         result = lab_reports.run_backtest(ctx.con, ctx.cfg, ctx.cutoff_time, history=False)
         if result.get("ok") is False:
             return {
@@ -194,10 +246,12 @@ def heatmaps(ctx: BuildContext) -> dict:
 
 
 def strategy_lab_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.strategies: the market's one Strategy lab page."""
+    """rm.strategies: the market's Strategy lab page `_` and one page per registry strategy (its id)."""
     tested = backtest(ctx)
     rows = scoreboard_rows(ctx) + tested["rows"]
+    entries = rm_common.strategies(ctx)
     return {
+        **{strategy_id: strategy_page(ctx, strategy_id, entry) for strategy_id, entry in entries.items()},
         MARKET_PAGE_KEY: {
             **rm_common.header(ctx),
             "status": rm_common.status_block(ctx),
@@ -205,13 +259,41 @@ def strategy_lab_pages(ctx: BuildContext) -> dict[str, dict]:
             "default_horizon": ALL_HORIZONS,
             "reference_strategy": REFERENCE_STRATEGY,
             "go_live": rm_common.go_live(ctx),
-            "strategies": rm_common.strategies(ctx),
+            "strategies": entries,
             "companies": companies(ctx),
             "rows": rows,
             **heatmaps(ctx),
             "bases": sorted({row["basis"] for row in rows}),
             "backtest_run": tested["run"],
-        }
+        },
+    }
+
+
+def strategy_page(ctx: BuildContext, strategy_id: str, entry: dict) -> dict:
+    """One strategy's detail (B5's get_scoreboard with a strategy id): its registry entry, every scoreboard row of it
+    (all scopes, views and bases), its heatmap cells, its cumulative line (accuracy view) and the go-live block of its
+    accuracy row over all horizons (null before any settled trade); empty lists before any."""
+    rows = [row for row in scoreboard_rows(ctx) + backtest(ctx)["rows"] if row["strategy_id"] == strategy_id]
+    data = heatmaps(ctx)
+    accuracy = next(
+        (
+            row
+            for row in rows
+            if row["scope"] == SCOPE_STRATEGY
+            and row["view"] == VIEW_ACCURACY
+            and row["basis"] == BASIS_FORWARD
+            and str(row["horizon_days"]) == ALL_HORIZONS
+        ),
+        None,
+    )
+    return {
+        "market": ctx.market,
+        "as_of": ctx.as_of,
+        "strategy": entry,
+        "go_live": None if accuracy is None else accuracy.get("go_live"),
+        "rows": rows,
+        "cells": [cell for cell in data["cells"] if cell["strategy_id"] == strategy_id],
+        "lines": [line for line in data["lines"] if line["view"] == VIEW_ACCURACY and line["series"] == strategy_id],
     }
 
 
@@ -220,7 +302,7 @@ def market_mockup(mockup: dict, market: str, _page_key: str) -> dict:
     return mockup["markets"][market]
 
 
-BUILDERS = (PageBuilder(RM_STRATEGIES, "StrategyLab", strategy_lab_pages, owner="B13"),)
+BUILDERS = (PageBuilder(RM_STRATEGIES, "StrategyLabTable", strategy_lab_pages, owner="B13"),)
 CONTRACT_CASES = (
     ContractCase(
         path="/api/v1/markets/{market}/strategies",
@@ -228,5 +310,6 @@ CONTRACT_CASES = (
         mockup="design/mockups/05-strategy-lab/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies",),
+        page_keys=lambda key: key == MARKET_PAGE_KEY,
     ),
 )

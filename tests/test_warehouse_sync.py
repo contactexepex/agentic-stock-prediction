@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.lab import registry  # noqa: E402
 from marketbrief.presentation.dashboard.assemble import gather_dashboard  # noqa: E402
 from marketbrief.warehouse import cli as wh_cli  # noqa: E402
 from marketbrief.warehouse import openapi_spec, read_models, rm_registry, sync  # noqa: E402
@@ -38,12 +39,29 @@ SECRET = "sync-secret/+="
 WAREHOUSE = Path("work/warehouse/market_brief.duckdb")
 MIRRORED = {"tickers", "bars", *(t.name for t in TABLES)}
 RM_TABLES = rm_registry.tables()  # every registered builder's table
-TICKER_TABLES = ("stock", "bars", "stock_strategies")  # one page per ticker
-TICKER_AND_MARKET_TABLES = ("trades",)  # one page per ticker plus the market's page `_`
-# every other table has the market's one page `_`
-US_TICKERS = 20
-PAGES = {table: US_TICKERS if table in TICKER_TABLES else US_TICKERS + 1 if table in TICKER_AND_MARKET_TABLES else 1
-         for table in RM_TABLES}
+TICKER_TABLES = ("stock", "bars", "stock_strategies")  # one page per ticker (B12)
+MARKET_AND_TICKER_TABLES = ("compare", "trades")  # the market's page `_` and one page per ticker (B13, B12)
+MARKET_AND_STRATEGY_TABLES = ("strategies",)  # the market's page `_` and one page per registry strategy (B13)
+STRATEGY_IDS = [spec["id"] for spec in registry.strategies()]
+
+
+def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
+    """table -> the page keys a sync of the market writes (every other table: the market's one page `_`)."""
+    out = {}
+    for table in RM_TABLES:
+        if table in TICKER_TABLES:
+            out[table] = list(tickers)
+        elif table in MARKET_AND_TICKER_TABLES:
+            out[table] = ["_", *tickers]
+        elif table in MARKET_AND_STRATEGY_TABLES:
+            out[table] = ["_", *STRATEGY_IDS]
+        else:
+            out[table] = ["_"]
+    return out
+
+
+US_TICKERS = [f"T{i}" for i in range(20)]  # only the count matters for the totals (20 US companies)
+PAGES = {table: len(keys) for table, keys in expected_keys(US_TICKERS).items()}
 TOTAL_PAGES = sum(PAGES.values())
 SPEC = REPO / "api" / "openapi.yaml"
 
@@ -209,8 +227,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
     data, root = synced["dashboard"], synced["root"]
     as_of = datetime.fromisoformat(data["as_of"]).date()
     tickers = list(synced["cfg"]["tickers"])
-    keys = {table: tickers if table in TICKER_TABLES else ["_"] for table in RM_TABLES}
-    keys |= {table: ["_", *tickers] for table in TICKER_AND_MARKET_TABLES}
+    keys = expected_keys(tickers)
     for table, expected in keys.items():
         pages = stored_pages(root, table)
         assert sorted(pages) == sorted(expected)
