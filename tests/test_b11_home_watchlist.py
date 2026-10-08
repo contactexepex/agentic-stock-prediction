@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.lab import registry  # noqa: E402
 from marketbrief.warehouse import rm_common, rm_compare, rm_home, rm_strategies, rm_watchlist  # noqa: E402
 from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
@@ -61,6 +62,9 @@ def store(root: Path) -> None:
     append(root, "strategy_predictions", "2026-10-06", [
         prediction("AAPL", "2026-10-05", "2026-10-06T11:00:00+00:00"),        # an older as-of date
     ])
+    append(root, "strategy_predictions", "2026-10-05", [
+        {**prediction("AAPL", "2026-10-04", "2026-10-05T11:00:00+00:00"), "session_date": "2026-10-05"},
+    ])
     append(root, "strategy_predictions", "2026-10-07", [
         prediction("AAPL", "2026-10-06", BEFORE),
         prediction("AAPL", "2026-10-06", BEFORE, k=3),
@@ -82,6 +86,11 @@ def store(root: Path) -> None:
         "id": "eod-us-2026-10-06", "market": "us", "session_date": "2026-10-06", "settled_trades": 0,
         "results": {}, "summary": "No trades settled.", "cited_ids": [], "reason_ids": [],
         "prompt_version": "eod-v1", "created_at": "2026-10-06T22:40:00+00:00"}])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def live(all_strategies_live):
+    """Every strategy live (B4's conftest fixture); the go-live tests below narrow it per test."""
 
 
 @pytest.fixture(scope="module")
@@ -117,6 +126,32 @@ def test_home_picks_of_the_session_made_by_the_cutoff(ctx, monkeypatch):
     assert only["ranking"] == [{"strategy_id": "rule.model_news.v1", "rank": 1, "basis": "all_companies",
                                 "settled_trades": 0, "net_pnl": 0.0}]
     assert set(only["candidates"][0]) == set(rm_compare.CANDIDATE_FIELDS)
+
+
+def live_from(day: str):
+    """is_live as B2's registry answers it once every strategy's live_from is `day`."""
+    return lambda _strategy, session_date, _reg=None: str(session_date)[:10] >= day
+
+
+def test_watchlist_ranges_leave_out_rehearsal_predictions(ctx, monkeypatch):
+    monkeypatch.setattr(registry, "is_live", live_from("2026-10-08"))
+    assert rm_watchlist.ranges(ctx) == []   # every stored prediction is for D 2026-10-07: a rehearsal run
+    monkeypatch.setattr(registry, "is_live", lambda strategy, _day, _reg=None: strategy != "rule.model_news.v1")
+    assert rm_watchlist.ranges(ctx) == []   # only the reference strategy's rows are ranges
+
+
+def test_watchlist_ranges_are_the_newest_live_batch(ctx, monkeypatch):
+    # live only on D 2026-10-05: the older stored batch (as of 2026-10-04) is shown, the newer rehearsal rows are not
+    monkeypatch.setattr(registry, "is_live", lambda _s, day, _reg=None: str(day)[:10] == "2026-10-05")
+    assert [r["id"] for r in rm_watchlist.ranges(ctx)] == ["rule.model_news.v1:2026-10-04-AAPL-1d"]
+
+
+def test_home_picks_leave_out_rehearsal_picks(ctx, monkeypatch):
+    monkeypatch.setattr(rm_home, "session_date", lambda _ctx: SESSION)
+    monkeypatch.setattr(registry, "is_live", live_from("2026-10-08"))
+    assert rm_home.head_to_head(ctx) == []
+    monkeypatch.setattr(registry, "is_live", live_from("2026-10-07"))
+    assert [p["id"] for p in rm_home.head_to_head(ctx)] == ["h2h-aapl"]
 
 
 def test_home_agreement_is_the_active_top_five(ctx, monkeypatch):

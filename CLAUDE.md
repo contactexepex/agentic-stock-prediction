@@ -295,7 +295,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   10-Q/10-K, `pending_report` until then), the consensus collected before the release (context only) and the
   reaction, and writes the results-analyst's input; `validate|add` is the gate (ids, verbatim quotes, numbers from
   the quote or the release, enums, no advice) and appends to `results_digests` (views `results_digests_asof(ts)`,
-  `results_digests_latest`, `results_digest_ticker_latest`). The context pack does not show digests yet.
+  `results_digests_latest`, `results_digest_ticker_latest`). The context pack shows the active companies' digests of
+  the last 10 days after "Fundamentals" (`results/context_section.py`, as of now; omitted when there is none).
 - Signal model (DESIGN.md section 15; `scripts/marketbrief/model/`, settings `config/model.yaml`, costs
   `config/costs.yaml`): `model_scores` (routine step 5a, again after the news append) appends per ticker and
   horizon P(up) of the open-to-close label (N+k, decision 37: buy at the open of D, the first session after the
