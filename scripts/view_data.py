@@ -46,14 +46,12 @@ NEWS_ID = re.compile(r"\b(?:[0-9a-f]{16}|nse-ann-\d+|\d{10}-\d{2}-\d{6})\b")
 
 
 SAFE_URL = re.compile(r"^https?://\S+$", re.I)
-# issue #48: quote and angle-bracket characters are percent-encoded, so a link can never end an HTML attribute
-# (pages escape it as well); the link still opens the same page
-URL_ESCAPES = str.maketrans({'"': "%22", "'": "%27", "<": "%3C", ">": "%3E", "`": "%60"})
+URL_ESCAPES = str.maketrans({'"': "%22", "'": "%27", "<": "%3C", ">": "%3E", "`": "%60"})   # issue #48
 
 
 def safe_url(url) -> str | None:
-    """The URL if it is plain http(s), else None, with quote and angle-bracket characters percent-encoded. Feed
-    links are stored unchecked, and a javascript: or data: link must never become a clickable href in the report."""
+    """The plain http(s) URL, else None: feed links are stored unchecked (no javascript: or data: href); quote and
+    angle-bracket characters are percent-encoded so a link never ends an HTML attribute (issue #48)."""
     if not isinstance(url, str):
         return None
     u = url.strip()
