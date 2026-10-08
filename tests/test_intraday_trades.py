@@ -672,3 +672,20 @@ def test_missing_max_sessions_past_exit_keeps_trades_to_their_exit_date(market):
     summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
     assert "acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d" not in trade_view(root)
     assert summary["skipped_trades"]["delayed_too_long"] == ["acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d"]
+
+
+def test_explainer_instructions_pass_the_gate_and_share_its_version():
+    """#76 (judge round 1): the agent file's example clause and its replacement for "target" pass the gate's word
+    and number rules, and the agent file names the prompt_version config/intraday.yaml requires."""
+    import re
+
+    from marketbrief.intraday.explain_gate import text_errors
+
+    agent = (REPO / ".claude" / "agents" / "deviation-explainer.md").read_text()
+    example = re.search(r'\(e\.g\. "([^"]+)"\)', agent).group(1)
+    replacement = re.search(r'write "([^"]+)" instead', agent).group(1)
+    assert example and replacement
+    assert text_errors(f"{example}; {replacement}.", 60) == []
+    version = load_intraday_config()["explainer"]["prompt_version"]
+    assert f'"prompt_version": "{version}"' in agent
+

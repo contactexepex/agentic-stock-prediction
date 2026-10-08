@@ -24,8 +24,9 @@ A row may also carry `trades`: its flagged open paper trades (monitoring records
 `band`, `target_z`, `target_reached` and `flags` (`outside_range`, `far_from_target`,
 `against_prediction`). When present, say in one clause how the move stands against those trades (e.g. "up
 5.16% since entry, above its 80% range at N+5"), using only their stored numbers; the candidates remain the
-only causes you may cite. Do not use the word "target" (the gate rejects it): write "the trade's predicted
-price" instead.
+only causes you may cite. After a split (`basis_factor` not 1) use the adjusted values `entry_adj`,
+`target_adj` and `lo80_adj` ... `hi80_adj`, which are on the price basis of `last_price`. Do not use the word
+"target" (the gate rejects it, as it rejects "predicted"): write "the trade's goal price" instead.
 Candidate kinds: `benchmark` (id `bench:<symbol>`), `sector` (`sector:<symbol or sector>`), `cue`
 (`cue:<symbol>`), `news` (a stored news id, with its verification `status` as of the check),
 `announcement` (an NSE announcement id) and `event` (an earnings or ex-dividend event id). Read
