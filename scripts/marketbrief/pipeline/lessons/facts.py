@@ -7,6 +7,8 @@ import math
 import pandas as pd
 
 from marketbrief.constants.lessons import RANGE_SQL, SETTLED_SQL
+from marketbrief.intraday.outcomes import notes_in_window
+from marketbrief.intraday.settings import intraday_config_or_default
 from marketbrief.pipeline.score_predictions import is_late
 
 
@@ -142,3 +144,13 @@ def evidence(con, ids: list[str], made_at) -> list[dict]:
         first.get(cited_id, {"id": cited_id, "kind": "unknown", "text": None, "at": None})
         for cited_id in dict.fromkeys(ids)
     ]
+
+
+
+def intraday_notes(con, fact: dict) -> list[dict]:
+    """The intraday notes (WS5) on the call's ticker for the sessions after its base date up to its target date, for
+    the reflector to read; not stored. Empty when none exist."""
+    if not fact.get("base_date") or not fact.get("target_date"):
+        return []
+    return notes_in_window(con, intraday_config_or_default(), fact["ticker"], pd.Timestamp(fact["base_date"]).date(),
+                           pd.Timestamp(fact["target_date"]).date())

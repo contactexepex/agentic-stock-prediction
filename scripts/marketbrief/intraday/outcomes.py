@@ -91,3 +91,13 @@ def outcome_summary(rows: list[dict]) -> dict:
 def as_list(value) -> list:
     """A stored list column (array or None) as a list."""
     return [] if value is None else list(value)
+
+
+def notes_in_window(con, settings: dict, ticker: str, after: date, through: date) -> list[dict]:
+    """The reflector's optional input (lessons.py prepare): the stored intraday notes of a ticker for the sessions
+    after `after` (a call's as-of or base date) up to `through` (its target date), each with its outcome by the
+    close. Read only for settled calls, so every note and close is in the past; nothing here is stored."""
+    rows = [row for row in explanation_outcomes(con, settings, after, through) if row["ticker"] == ticker
+            and row["session_date"] > after.isoformat()]
+    keys = ("explanation_id", "session_date", "check_at", "flags", "attribution", "explanation", "outcome")
+    return [{key: row[key] for key in keys} for row in rows]

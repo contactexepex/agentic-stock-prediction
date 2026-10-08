@@ -297,13 +297,25 @@ saving never shifts them, away from the news light runs; on holidays the check w
 **docs/DESIGN.md**, section 13 (model table): a row `deviation-explainer | Sonnet 5.5 | medium | one gated
 60-word note per flagged intraday deviation`.
 
-**Weekly review** (`marketbrief/pipeline/review/`, not changed by WS5): add a section from
-`outcome_summary(explanation_outcomes(con, load_intraday_config(), week_start, week_end, as_of=clock()))`:
-counts of held / reversed / faded per attribution.
+**Weekly review** and **Reflector**: applied by WS5 itself after launch (owner's ownership rule, 2026-10-08;
+requested by B18), see "Follow-up: weekly review and reflector" below.
 
-**Reflector** (`.claude/agents/reflector.md`, not changed): optional later input, the intraday notes of a
-settled call's session (`intraday_deviations` where session_date in the call's window), so a lesson can say
-whether an intraday deviation foreshadowed the outcome.
+### Follow-up: weekly review and reflector (applied 2026-10-08)
+- `scripts/marketbrief/pipeline/review/intraday_review.py` (new): `intraday_outcomes(con, week_start, week_end)` =
+  `outcome_summary(explanation_outcomes(...))` for the review week and since start, as of the clock (MB_NOW-aware),
+  and the report section "Intraday deviations: held or reversed by the close" (counts per window and attribution;
+  context only, never scored). A connection without the views (bare test connections) gives empty counts.
+  `review/cli.py`: `review_data["intraday"]` and `detail.intraday` in the stored record (3 lines);
+  `review/markdown.py`: the section after the signal-model check (3 lines).
+- `scripts/marketbrief/intraday/outcomes.py`: `notes_in_window(con, settings, ticker, after, through)`;
+  `intraday/settings.py`: `intraday_config_or_default()` (the outcome default when config/intraday.yaml is absent).
+- `scripts/marketbrief/pipeline/lessons/facts.py`: `intraday_notes(con, fact)` (the notes on the call's ticker for
+  the sessions after its base date up to its target date); `lessons/cli.py` prepare adds `intraday_notes` to each
+  line of `work/lesson_facts.jsonl` (read-only context, like `evidence`; nothing new is stored).
+- `.claude/agents/reflector.md`: describes `intraday_notes` as optional context, words only (no numbers from the
+  notes: the lessons gate accepts only the call's facts); prompt_version `reflect-v2` -> `reflect-v3`.
+- Proposed doc line for DESIGN.md section 13 / the prompt-version note: "reflect-v3 adds the optional
+  `intraday_notes` input (WS5)".
 
 ## Cosmetic follow-ups
 From judge round 1 (fixed in round 2: `could`/`might` added to the banned words; the wrong-sign message no longer
