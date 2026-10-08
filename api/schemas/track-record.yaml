@@ -1,0 +1,72 @@
+# B13: the Track record payload (design/mockups/08-track-record/notes.md; contract 2.0 replaces the 1.0 TrackRecord)
+TrackRecordPageResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/TrackRecordPage'}
+TrackRecordPage:
+  x-source: warehouse/rm_track_record.track_record_pages
+  description: One market's Track record. Calls per scoring basis; there is deliberately no pooled block.
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, track, weekly]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        track: {$ref: '#/components/schemas/TrackRecord'}
+        weekly:
+          type: array
+          description: Accuracy over time per scoring basis key (the same keys as track.calls, never pooled)
+          items: {$ref: '#/components/schemas/WeeklyCallSeries'}
+TrackRecord:
+  type: object
+  x-source: warehouse/rm_track_record.track_block
+  description: >-
+    The dashboard's track record as of the cut-off (presentation/dashboard/track.track_record, model_info.backtest_view,
+    the skill verdict), with the market and its as-of date
+  required: [market, as_of, skill, calls, ranges, replay, min_sample, backtest, example_parts]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    as_of: {type: ['string', 'null'], format: date}
+    skill: {$ref: '#/components/schemas/SkillStatus'}
+    calls:
+      type: array
+      items: {$ref: '#/components/schemas/CallBasisBlock'}
+    ranges:
+      type: array
+      items: {$ref: '#/components/schemas/RangeBlock'}
+    replay:
+      oneOf: [{$ref: '#/components/schemas/ReplayView'}, {type: 'null'}]
+    backtest:
+      oneOf: [{$ref: '#/components/schemas/BacktestView'}, {type: 'null'}]
+    min_sample: {type: integer, description: 'view_data.MIN_SAMPLE: below it, "not enough history yet"'}
+    example_parts:
+      type: array
+      description: Blocks computed from example data (always empty in a read model built from the stored data)
+      items: {type: string}
+WeeklyCallSeries:
+  type: object
+  x-source: warehouse/rm_track_record.weekly_series
+  required: [basis, key, label, weeks]
+  properties:
+    basis: {$ref: '#/components/schemas/LabelBasis'}
+    key: {type: string, description: 'scoring.basis_key (e.g. `close_to_close`, `open_to_close legacy_5d_d4`)'}
+    label: {type: string}
+    weeks:
+      type: array
+      description: Oldest first; a week = the ISO week of the calls' target date
+      items: {$ref: '#/components/schemas/WeeklyCallBlock'}
+WeeklyCallBlock:
+  x-source: warehouse/rm_track_record.week_block
+  allOf:
+    - $ref: '#/components/schemas/ShareWithInterval'
+    - type: object
+      required: [week, brier, log_loss]
+      properties:
+        week: {type: string, pattern: '^[0-9]{4}-W[0-9]{2}$'}
+        brier: {$ref: '#/components/schemas/NullableNumber'}
+        log_loss: {$ref: '#/components/schemas/NullableNumber'}

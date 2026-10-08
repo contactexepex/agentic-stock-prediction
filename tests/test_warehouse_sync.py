@@ -25,7 +25,7 @@ from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.presentation.dashboard.assemble import gather_dashboard  # noqa: E402
 from marketbrief.warehouse import cli as wh_cli  # noqa: E402
-from marketbrief.warehouse import openapi_spec, read_models, sync  # noqa: E402
+from marketbrief.warehouse import openapi_spec, read_models, rm_registry, sync  # noqa: E402
 from marketbrief.warehouse.connection import WarehouseError  # noqa: E402
 from marketbrief.warehouse.read_models import READ_MODEL_COLUMNS  # noqa: E402
 from marketbrief.warehouse.tables import TABLES  # noqa: E402
@@ -37,7 +37,11 @@ LATE_NEWS = "feedfacefeedface"
 SECRET = "sync-secret/+="
 WAREHOUSE = Path("work/warehouse/market_brief.duckdb")
 MIRRORED = {"tickers", "bars", *(t.name for t in TABLES)}
-RM_TABLES = ("bars", "companies", "home", "news", "overview", "status", "stock", "track_record", "watchlist")
+RM_TABLES = rm_registry.tables()  # every registered builder's table
+TICKER_TABLES = ("stock", "bars")  # one page per ticker; every other table has the market's one page `_`
+US_TICKERS = 20
+PAGES = {table: US_TICKERS if table in TICKER_TABLES else 1 for table in RM_TABLES}
+TOTAL_PAGES = sum(PAGES.values())
 SPEC = REPO / "api" / "openapi.yaml"
 
 
@@ -150,9 +154,8 @@ def test_sync_is_idempotent(synced):
     assert synced["first"]["tables"] == synced["second"]["tables"]
     assert set(synced["first"]["tables"]) == MIRRORED
     assert synced["snap1"] == synced["snap2"]  # built_at and cutoff of the unchanged pages included
-    pages = sum(synced["first"]["read_model_pages"].values())  # every registered page of the market
-    assert synced["first"]["pages_written"] == pages and synced["first"]["pages_unchanged"] == 0
-    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == pages
+    assert synced["first"]["pages_written"] == TOTAL_PAGES and synced["first"]["pages_unchanged"] == 0
+    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == TOTAL_PAGES
     assert synced["first"]["tables"]["bars"] > 1000 and synced["first"]["tables"]["tickers"] == 20
 
 
@@ -161,9 +164,7 @@ def test_dry_run_writes_nothing_and_counts_the_same_rows(synced):
     assert dry["mode"] == "dry_run" and dry["written"] is False
     assert synced["dry_left_files"] == []  # no warehouse file, no stage folder, no summary
     assert dry["tables"] == synced["first"]["tables"]
-    expected = {"overview": 1, "watchlist": 1, "stock": 20, "bars": 20, "track_record": 1, "status": 1,
-                "home": 1, "news": 1, "companies": 1}
-    assert {table: dry["read_model_pages"].get(table) for table in expected} == expected
+    assert dry["read_model_pages"] == PAGES
     assert dry["invalid_pages"] == [] and dry["as_of"] == synced["dashboard"]["as_of"]
 
 
@@ -176,8 +177,7 @@ def test_sync_runs_are_recorded(synced):
     assert [r[0] for r in rows[:2]] == [synced["first"]["run_id"], synced["second"]["run_id"]]
     for r in rows[:2]:
         assert r[1:5] == ("us", "replace", True, None)
-        assert r[5] == sum(synced["first"]["tables"].values())
-        assert r[6] == sum(synced["first"]["read_model_pages"].values())
+        assert r[5] == sum(synced["first"]["tables"].values()) and r[6] == TOTAL_PAGES
         assert r[7] == datetime.fromisoformat(CUTOFF) and r[8] == WAREHOUSE.as_posix()
         assert set(r[9]) == MIRRORED and json.loads(r[10]) == synced["first"]["tables"] and r[11]
     summary = json.loads((synced["root"] / "work" / "warehouse" / "us-sync.json").read_text())
@@ -189,9 +189,10 @@ def test_sync_runs_are_recorded(synced):
         "FROM rm.builds ORDER BY started_at",
     )
     assert [b[0] for b in builds[:2]] == [r[0] for r in rows[:2]]
-    pages = sum(synced["first"]["read_model_pages"].values())
-    expected = [("us", "daily", True, pages, 0, None), ("us", "daily", True, 0, pages, None)]
-    assert [b[1:7] for b in builds[:2]] == expected
+    assert [b[1:7] for b in builds[:2]] == [
+        ("us", "daily", True, TOTAL_PAGES, 0, None),
+        ("us", "daily", True, 0, TOTAL_PAGES, None),
+    ]
     assert builds[0][7] == "unknown"  # the copied root is no git checkout
     assert builds[0][8] == datetime.fromisoformat(CUTOFF)
 
@@ -205,8 +206,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
     data, root = synced["dashboard"], synced["root"]
     as_of = datetime.fromisoformat(data["as_of"]).date()
     tickers = list(synced["cfg"]["tickers"])
-    keys = {"overview": ["_"], "watchlist": ["_"], "stock": tickers, "bars": tickers, "track_record": ["_"]}
-    keys.update({"status": ["_"], "home": ["_"], "news": ["_"], "companies": ["_"]})
+    keys = {table: tickers if table in TICKER_TABLES else ["_"] for table in RM_TABLES}
     for table, expected in keys.items():
         pages = stored_pages(root, table)
         assert sorted(pages) == sorted(expected)
@@ -231,7 +231,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
     assert sorted(c["ticker"] for c in watch["companies"]) == sorted(tickers)
     assert watch["status"]["market"] == "us" and set(watch["agreement"]) == {"1", "2", "3", "4", "5"}
     track = json.loads(stored_pages(root, "track_record")["_"][4])
-    assert {k: track[k] for k in data["track"]} == json.loads(json.dumps(data["track"]))
+    assert {k: track["track"][k] for k in data["track"]} == json.loads(json.dumps(data["track"]))  # B13's page
 
 
 def test_version_and_envelope_match_the_spec():
@@ -270,7 +270,7 @@ def test_replace_deletes_departed_pages_and_full_rebuilds(synced):
     assert query(root, "SELECT count(*) FROM rm.stock WHERE page_key = 'OLD'") == [(0,)]
     assert query(root, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stale_table'") == [(1,)]
     full = sync.sync_market(cfg, full=True, force_local=True)
-    assert full["mode"] == "full" and full["kind"] == "full" and full["ok"] and full["pages_written"] == 44
+    assert full["mode"] == "full" and full["kind"] == "full" and full["ok"] and full["pages_written"] == TOTAL_PAGES
     assert query(root, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stale_table'") == [(0,)]
     # same payloads and hashes as the incremental build; only built_at and cutoff are new
     assert snapshot(root / WAREHOUSE, envelope=False) == synced["snap_bare"]
@@ -285,9 +285,9 @@ def test_invalid_page_keeps_its_old_row(synced, monkeypatch):
     monkeypatch.setattr(
         read_models,
         "page_problems",
-        lambda builder, payload, document: ["$: missing 'not_built_yet'"]
-        if builder.table == "track_record"
-        else real(builder, payload, document),
+        lambda builder, payload, document: (
+            ["$: missing 'not_built_yet'"] if builder.table == "track_record" else real(builder, payload, document)
+        ),
     )
     res = sync.sync_market(cfg, force_local=True)
     assert res["ok"] and not res["build_ok"]

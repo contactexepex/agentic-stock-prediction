@@ -1,0 +1,19 @@
+# B13: the Strategy lab page (design/mockups/05-strategy-lab; docs/ws/b13.md)
+/api/v1/markets/{market}/strategies:
+  get:
+    tags: [record]
+    operationId: getStrategyLab
+    summary: Every strategy's scoreboard rows (forward and back-test bases, never pooled), heatmap cells and cumulative lines
+    x-read-model: rm.strategies
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The Strategy lab read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StrategyLabResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}

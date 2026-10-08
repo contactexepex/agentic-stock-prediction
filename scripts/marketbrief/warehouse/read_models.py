@@ -7,9 +7,8 @@ recomputed here. The upcoming company events of the stock page are read with the
   rm.watchlist     page_key _        Watchlist: one row per stock (last session, P(up), calls, ranges)
   rm.stock         page_key ticker   StockDetail: the dashboard's stock data without bars, plus events
   rm.bars          page_key ticker   Bars: split-adjusted OHLC bars and the published ranges
-  rm.track_record  page_key _        TrackRecord: calls per scoring basis, ranges, replay, backtest
 
-`build_rows` runs every registered builder (warehouse/rm_registry.py; these five 1.0 pages are rm_dashboard.py's) and
+`build_rows` runs every registered builder (warehouse/rm_registry.py; these four 1.0 pages are rm_dashboard.py's) and
 checks each payload against its schema in api/openapi.yaml before it is written.
 
 A payload carries no cut-off time (the envelope's `cutoff` does), so a rebuild that finds the same data
@@ -29,7 +28,6 @@ from marketbrief.constants.warehouse import (
     RM_BARS,
     RM_OVERVIEW,
     RM_STOCK,
-    RM_TRACK_RECORD,
     RM_WATCHLIST,
 )
 from marketbrief.presentation.dashboard import reads
@@ -125,7 +123,6 @@ def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[s
             company["ticker"]: stock_payload(data, company, events.get(company["ticker"], [])) for company in companies
         },
         RM_BARS: {company["ticker"]: bars_payload(data, company) for company in companies},
-        RM_TRACK_RECORD: {MARKET_PAGE_KEY: {"skill": data["skill"], **data["track"], "backtest": data["backtest"]}},
     }
 
 
