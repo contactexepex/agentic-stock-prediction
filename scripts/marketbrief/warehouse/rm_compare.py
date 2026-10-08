@@ -85,11 +85,14 @@ def your_costs(ctx: BuildContext) -> list[dict]:
 
 
 def picks(ctx: BuildContext) -> list[dict]:
-    """Every head-to-head pick made by the cut-off (collected companies; first row of each id), in its page fields,
-    by session date, company, family and pick rule (Home filters today's session from it)."""
+    """Every head-to-head pick made by the cut-off (collected companies; first row of each id) of a strategy live on
+    its session date D (rm_common.live_rows: rehearsal picks before go-live are never shown; a no_candidate pick stays
+    when some strategy of its family is live on D), in its page fields, by session date, company, family and pick
+    rule (Home filters today's session from it)."""
 
     def compute() -> list[dict]:
-        rows = [row for row in lab_reads.picks(ctx.con, ctx.cutoff_time) if row["ticker"] in ctx.collected]
+        collected = [row for row in lab_reads.picks(ctx.con, ctx.cutoff_time) if row["ticker"] in ctx.collected]
+        rows = rm_common.live_rows(collected, "session_date")
         out = []
         for row in rows:
             item = pick(row, PICK_FIELDS)
