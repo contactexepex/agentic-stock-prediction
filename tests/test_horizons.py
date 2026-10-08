@@ -21,7 +21,7 @@ from marketbrief.core import paths  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_ranges_config  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
-from marketbrief.model import daily_scores  # noqa: E402
+from marketbrief.model import context_section, daily_scores  # noqa: E402
 from test_pipeline import MARKET, setup  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
@@ -151,7 +151,8 @@ def market(tmp_path, monkeypatch):
     return root
 
 
-def test_views_label_rows_written_before_b10(market):
+@pytest.mark.usefixtures("market")
+def test_views_label_rows_written_before_b10():
     con = connect(MARKET)
     scores = dict(con.execute("SELECT id, horizon_label FROM model_scores_latest").fetchall())
     assert scores["2026-10-05-AAPL-1d"] == "n_plus_k" and scores["2026-10-05-AAPL-5d"] == "legacy_5d_d4"
@@ -162,7 +163,8 @@ def test_views_label_rows_written_before_b10(market):
     assert con.execute("SELECT count(*) FROM open_ranges WHERE horizon_label IS NULL").fetchone()[0] == 0
 
 
-def test_scores_asof_newest_n_plus_k_only_and_no_look_ahead(market):
+@pytest.mark.usefixtures("market")
+def test_scores_asof_newest_n_plus_k_only_and_no_look_ahead():
     before = contract.scores_asof(MARKET, "2026-10-06T23:00:00+00:00")       # only the pre-B10 rows exist
     assert [(r["horizon_days"], r["horizon_label"]) for r in before] == [(1, "n_plus_k")]   # the D+4 one is left out
     assert (str(before[0]["entry_date"]), str(before[0]["exit_date"])) == ("2026-10-06", "2026-10-07")
@@ -175,14 +177,14 @@ def test_scores_asof_newest_n_plus_k_only_and_no_look_ahead(market):
     assert [r["horizon_days"] for r in contract.scores_asof(MARKET, "2026-10-07T13:00:00+00:00", 5)] == [5]
 
 
-def test_ranges_asof_first_published_n_plus_k_of_the_newest_as_of_date(market):
+@pytest.mark.usefixtures("market")
+def test_ranges_asof_first_published_n_plus_k_of_the_newest_as_of_date():
     assert contract.ranges_asof(MARKET, "2026-10-06T23:00:00+00:00") == []      # legacy ranges are never offered
     rows = contract.ranges_asof(MARKET, "2026-10-07T12:00:00+00:00")
     assert [(r["id"], str(r["exit_date"])) for r in rows] == [("2026-10-06-AAPL-1d", "2026-10-08"),
                                                               ("2026-10-06-AAPL-5d", "2026-10-14")]
     assert all(str(r["target_date"]) == str(r["exit_date"]) for r in rows)
     assert contract.ranges_asof(MARKET, "2026-10-07T11:00:00+00:00") == []      # made after the time asked
-
 
 
 def test_scores_asof_reads_one_model_variant(market):
@@ -201,3 +203,15 @@ def test_scores_asof_reads_one_model_variant(market):
     assert "2026-10-06-AAPL-1d-cross_market" not in ids
     with pytest.raises(SystemExit):
         contract.scores_asof(MARKET, "2026-10-07T12:00:00+00:00", variant="nope")
+
+
+def test_context_section_shows_n_plus_k_scores_only(market):
+    """A legacy_5d_d4 score (old D+4 exit) newer than every N+k row never reaches the context pack, where it would
+    read like an N+5 one (issue #95): the section shows the newest as-of date of the N+k rows."""
+    jsonl(market, "model_scores", "2026-10-08", [score("2026-10-07", 5, 0.9, "2026-10-08T11:00:00+00:00")])
+    con = connect(MARKET)
+    assert con.execute("SELECT horizon_label FROM model_scores_latest WHERE id = '2026-10-07-AAPL-5d'").fetchone() == (
+        "legacy_5d_d4",)
+    body = context_section.context_section(con)[1]
+    assert "2026-10-07-AAPL-5d" not in body and "0.9000" not in body
+    assert all(f"| 2026-10-06-AAPL-{h}d |" in body for h in (1, 3, 5))

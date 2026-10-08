@@ -416,6 +416,32 @@ def test_score_synthetic():
     assert "http" not in page.replace("http-equiv", "")          # self-contained
 
 
+def test_calls_recorded_before_n_plus_k_keep_their_window():
+    """Issue #96: a call recorded before call_scoring.n_plus_k_from (config/settings.yaml) is scored on the window it
+    had then, the as-of close to the close h bars later (legacy_cc), and apart from the N+k calls."""
+    days = sessions(date(2026, 7, 1), date(2026, 7, 31))
+    closes = [100.0] * len(days)
+    closes[11], closes[12] = 101.0, 99.0                # as of days[10]: up after 1 bar, down after 2 (N+1's exit)
+    bars = bars_from({"ZZ": closes}, days)
+    as_of = str(days[10])
+    old = {"id": f"{as_of}-ZZ-1d", "as_of_date": as_of, "ticker": "ZZ", "horizon_days": 1, "direction": "up",
+           "confidence": 0.6, "prompt_version": "v", "evidence_ids": ["e"], "recorded_at": "2026-10-01T10:00:00+00:00"}
+    new = {**old, "recorded_at": "2026-10-08T10:00:00+00:00"}
+    rec = [{"date": as_of, "n_tickers": 1, "eligible": ["ZZ"], "n_calls": 1, "n_rejected": 0, "citable_ids": 1}]
+    s = summaries.summarize({"market": "syn"}, [old, new], rec, bars)["fair"]
+    assert s["n_calls"] == 1 and s["overall"]["n"] == 1 and s["overall"]["hits"] == 0      # N+1: 99 < 100
+    legacy = s["legacy_cc"]
+    assert legacy["n_calls"] == 1 and legacy["overall"]["hits"] == 1 and legacy["by_horizon"]["1"]["n"] == 1
+    assert sorted((c["horizon_label"], str(c["target_date"])) for c in s["calls"]) == [
+        ("legacy_cc", str(days[11])), ("n_plus_k", str(days[12]))]
+    assert s["top"][-1].startswith("What about calls recorded before N+k? 1 call recorded before 2026-10-07 22:41 UTC")
+    assert [(d["calls"], d["legacy_calls"], d["scored"]) for d in s["per_day"]] == [(1, 1, 1)]
+    page = ai_html.group_html(s)                             # the legacy call never reads as N+1 on the page
+    assert "<td>1d legacy_cc</td>" in page and page.count("<td>N+1</td>") == 2      # the N+1 call and its tile row
+    alone = summaries.summarize({"market": "syn"}, [new], rec, bars)["fair"]
+    assert alone["legacy_cc"]["n_calls"] == 0 and len(alone["top"]) == 3
+
+
 def test_score_cli_on_recorded_calls(prepared, tmp_path):
     results = tmp_path / "results"
     p = record(prepared, [call(), call(ticker="MSFT", h=1, direction="down", ev_ids=("0001-26-000002",))], results)
