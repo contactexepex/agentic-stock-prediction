@@ -725,7 +725,11 @@ def test_only_strategies_live_on_d_are_open_trades(market):
     live_registry(paths.CONFIG, {"ai.combined.opus.v1": None, "rule.b9_far.v1": "2026-10-06",
                                  "rule.b9_reached.v1": "2026-10-05"})   # b9_far and b9_reached: D = 2026-10-05
     registry._cached.cache_clear()
-    trades, skipped = open_trades(connect(MARKET), cfg, day, CHECK)
+    try:
+        trades, skipped = open_trades(connect(MARKET), cfg, day, CHECK)
+        summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
+    finally:
+        registry._cached.cache_clear()
     ids = {t["trade_id"] for group in trades.values() for t in group}
     gone = {t["trade_id"] for group in every.values() for t in group} - ids
     assert "acc:rule.b9_reached.v1:2026-10-02-NVDA-3d" in ids                      # live_from == D
@@ -733,7 +737,5 @@ def test_only_strategies_live_on_d_are_open_trades(market):
     assert "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-NVDA-5d" in gone   # a pick of a pre-live call
     assert {trade_id.split(":")[-2] for trade_id in gone} == {"ai.combined.opus.v1", "rule.b9_far.v1"}
     assert skipped["not_live"] == len(gone) and skipped["not_locked"] == before["not_locked"]
-    summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
     assert summary["skipped_trades"]["not_live"] == len(gone)
     assert not gone & {row["trade_id"] for row in stored(root, "trade_checks")}
-    registry._cached.cache_clear()

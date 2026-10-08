@@ -17,7 +17,7 @@ import pandas as pd
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.intraday.constants import PICK_PICKED, VIEW_ACCURACY, VIEW_HEAD_TO_HEAD
 from marketbrief.intraday.inputs import ADJUSTMENTS_ASOF, CALENDAR_DAYS_PER_SESSION, records, sessions_between
-from marketbrief.lab.registry import is_live, registry
+from marketbrief.lab.registry import by_id, is_live, registry
 
 PREDICTION_COLUMNS = (
     "id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction, "
@@ -30,8 +30,9 @@ def open_trades(
 ) -> tuple[dict[str, list[dict]], dict]:
     """({ticker: trades sorted by trade_id}, {"not_locked": n, "not_live": n, "delayed_too_long": [trade ids]}). A
     prediction or pick counts only when its strategy is live on D (registry.is_live of the current config, as settle
-    reads it); the others are counted as not_live (one per would-be trade id). A prediction id's
-    first stored row wins (ids are skipped once they exist), as does a pick id's. A trade with a paper_trades_settled
+    reads it); the others are counted as not_live (one per would-be trade id, also past its exit date; not_locked
+    counts only rows whose exit date is not past). A prediction id's first stored row wins (ids are skipped once they
+    exist), as does a pick id's. A trade with a paper_trades_settled
     row stored by check_at is closed, whatever its status (B2: no_entry and skipped trades get a row too). Issue #93:
     a trade past its exit date without such a row (no exit close stored yet, the settle step not run, or refused)
     stays open for at most
@@ -72,9 +73,10 @@ def open_trades(
             candidates.append((pred, VIEW_HEAD_TO_HEAD, pick, made_at))
     out: dict[str, list[dict]] = {}
     refused, not_live, too_long = 0, 0, []
-    reg = registry() if candidates else None   # read only when there is a row to check
+    specs = by_id(registry()) if candidates else {}   # read only when there is a row to check
     for pred, view, pick, made_at in candidates:
-        if not is_live(pred["strategy_id"], pred["session_date"], reg):
+        spec = specs.get(pred["strategy_id"])
+        if spec is None or not is_live(spec, pred["session_date"]):   # an unknown id is not live (as is_live)
             not_live += 1
             continue
         trade = _trade(cfg, pred, view, pick, made_at, session_date)
