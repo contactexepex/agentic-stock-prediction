@@ -332,14 +332,14 @@ def test_out_folder_leaves_data_untouched(market, tmp_path):
     assert len(list((out / "intraday_checks").glob("**/*.jsonl"))) == 1
 
 
-SETTINGS = {"explainer": {"max_words": 60, "prompt_version": "deviation-v1"}}
+SETTINGS = {"explainer": {"max_words": 60, "prompt_version": "deviation-v2"}}
 
 
 def good_note(row_id: str) -> dict:
     return {"check_row_id": row_id, "attribution": "news", "cited_ids": ["n-in", "bench:SPY"],
             "text": "AAPL is 4.95% above its open and above the 80% band (105); the benchmark rose 1%. "
                     "Headline n-in (single source) cites up 4.5%.",
-            "prompt_version": "deviation-v1"}
+            "prompt_version": "deviation-v2"}
 
 
 def test_gate_rejects_invented_ids_wrong_numbers_and_predictions(market):

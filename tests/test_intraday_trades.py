@@ -404,11 +404,11 @@ def test_explainer_input_and_gate_cover_the_trades(market, tmp_path):
     nvda = rows["NVDA"]
     flagged = {row["trade_id"] for row in trade_view(root).values() if row["ticker"] == "NVDA" and row["flagged"]}
     assert {trade["trade_id"] for trade in nvda["trades"]} == flagged and nvda["candidate_ids"]
-    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v1"}}
+    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v2"}}
     note = {"check_row_id": nvda["id"], "attribution": "idiosyncratic", "cited_ids": [],
             "text": "NVDA trade acc:rule.model_news.v1:2026-09-29-NVDA-5d is up 5.16% since entry, above its 80% "
                     "range at N+5 (session 6); the price is 0.09% over its upper edge.",
-            "prompt_version": "deviation-v1"}
+            "prompt_version": "deviation-v2"}
     good, bad = validate_records([note], explain.flagged_rows(con), set(), rules)
     assert bad == [] and len(good) == 1
     wrong = {**note, "text": "NVDA trade is up 7.7% since entry."}
@@ -467,9 +467,9 @@ def test_gate_allows_only_the_horizons_a_row_knows(market):
     con = connect(MARKET)
     rows = explain.flagged_rows(con)
     row = rows[f"{CHECK_ID}-NVDA"]
-    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v1"}}
+    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v2"}}
     base = {"check_row_id": row["id"], "attribution": "idiosyncratic", "cited_ids": [],
-            "prompt_version": "deviation-v1"}
+            "prompt_version": "deviation-v2"}
     good, _ = validate_records([{**base, "text": "NVDA sits above its N+5 range."}], rows, set(), rules)
     assert len(good) == 1
     _, bad = validate_records([{**base, "text": "NVDA sits above its N+7 range."}], rows, set(), rules)
