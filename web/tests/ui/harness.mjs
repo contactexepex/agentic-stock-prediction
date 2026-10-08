@@ -13,7 +13,7 @@
 // Fonts: the app self-hosts the design's face Inter (styles/fonts.css), so text widths do not depend on the machine;
 // every case checks that the self-hosted Inter loaded. `--fallback-fonts` blocks the font files and hides any
 // installed Inter from the browser (it falls back to the next installed face, e.g. DejaVu Sans) to check the pages
-// also hold when the font cannot load; that mode is advisory and never fails the run.
+// also hold when the font cannot load; there, width findings are advisory (WIDE) and other findings still fail.
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -254,12 +254,18 @@ try {
 }
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, "report.json"), JSON.stringify(results, null, 2));
+/* In the fallback run only width findings (overflow, elements past the edge, tables wider than their wrapper) are
+   advisory: they are what a different face changes. Every other finding still fails the run. */
+const WIDTH_FINDING = /horizontal overflow|elements past the edge|wider than its wrapper/;
+const blocking = (e) => !(fallbackFonts && WIDTH_FINDING.test(e));
 let failed = 0;
+let advisory = 0;
 for (const r of results) {
-  if (r.errors.length) failed++;
-  console.log(`${r.errors.length ? "FAIL" : "ok  "} ${r.name} (${r.file})`);
-  for (const e of r.errors) console.log("     " + e);
+  const hard = r.errors.filter(blocking);
+  if (hard.length) failed++;
+  else if (r.errors.length) advisory++;
+  console.log(`${hard.length ? "FAIL" : r.errors.length ? "WIDE" : "ok  "} ${r.name} (${r.file})`);
+  for (const e of r.errors) console.log(`     ${blocking(e) ? "" : "(advisory) "}${e}`);
 }
-console.log(`${results.length} cases, ${failed} failed; screenshots and comparisons in ${out}`);
-if (fallbackFonts && failed) console.log("advisory run without Inter: the failures above do not fail the harness");
-process.exit(failed && !fallbackFonts ? 1 : 0);
+console.log(`${results.length} cases, ${failed} failed${fallbackFonts ? `, ${advisory} with advisory width findings only` : ""}; screenshots and comparisons in ${out}`);
+process.exit(failed ? 1 : 0);
