@@ -1,6 +1,6 @@
 """Calendar events as the market pages show them (catalogue entity "Calendar event", docs/DATA_CATALOGUE.md): the
 market's scheduled events (`core/calendar.market_events`, config/events.yaml), the weekday holidays of the exchange
-calendar and the active companies' results and ex-dividend dates (the stored `events` kind read as of the cut-off:
+calendar and the companies' results and ex-dividend dates (the stored `events` kind read as of the cut-off:
 per company and type, the newest date first seen by then, warehouse/read_models.upcoming_events' rule), from a first
 date to a last date. Rules as in W1's catalogue build (design/catalogue/catalogue_calendar.py)."""
 
@@ -23,6 +23,7 @@ from marketbrief.constants.market_pages import (
 )
 from marketbrief.core import calendar
 from marketbrief.lifecycle import accessor
+from marketbrief.lifecycle.constants import STATE_COLLECTED
 from marketbrief.presentation.dashboard import reads
 
 COMPANY_EVENTS_SQL = f"""SELECT ticker, id, date, type, source, timing FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
@@ -71,12 +72,12 @@ def market_rows(cfg: dict, first: date, last: date) -> list[dict]:
     return rows
 
 
-def company_rows(con, cfg: dict, active: set[str], first: date, last: date, cutoff: str) -> list[dict]:
-    """The active companies' results and ex-dividend dates known by the cut-off."""
+def company_rows(con, cfg: dict, tickers: set[str], first: date, last: date, cutoff: str) -> list[dict]:
+    """The results and ex-dividend dates of `tickers` known by the cut-off."""
     rows = []
     frame = reads.frame(con, COMPANY_EVENTS_SQL, {"first": first, "last": last, "cutoff": cutoff})
     for event in frame.to_dict("records"):
-        if event["ticker"] not in active or event["type"] not in COMPANY_EVENT_LABEL:
+        if event["ticker"] not in tickers or event["type"] not in COMPANY_EVENT_LABEL:
             continue
         day = pd.Timestamp(event["date"]).date()
         timing = event["timing"] if isinstance(event["timing"], str) else None
@@ -89,11 +90,14 @@ def company_rows(con, cfg: dict, active: set[str], first: date, last: date, cuto
     return rows
 
 
-def calendar_events(cfg: dict, con, cutoff: datetime, from_date: date, to_date: date) -> list[dict]:
-    """Every calendar row from `from_date` to `to_date` as known by the cut-off (the active companies as of it), by
-    date, major events first, then market rows before company rows, by type and name. Shared with the company page
-    (B12), which filters it per ticker."""
-    active = {record["ticker"] for record in accessor.watchlist(cfg["market"], cutoff)}
-    rows = market_rows(cfg, from_date, to_date) + company_rows(con, cfg, active, from_date, to_date,
+def calendar_events(cfg: dict, con, cutoff: datetime, from_date: date, to_date: date,
+                    tickers: list[str] | None = None) -> list[dict]:
+    """Every calendar row from `from_date` to `to_date` as known by the cut-off: the market's rows and the company
+    rows of `tickers` (None: every collected company, i.e. active and inactive at the cut-off; the market pages pass
+    the active ones). Order: date, major first, market rows before company rows, type, name. Shared with the company
+    page (B12), which filters it per ticker."""
+    if tickers is None:
+        tickers = [record["ticker"] for record in accessor.watchlist(cfg["market"], cutoff, STATE_COLLECTED)]
+    rows = market_rows(cfg, from_date, to_date) + company_rows(con, cfg, set(tickers), from_date, to_date,
                                                                cutoff.isoformat())
     return sorted(rows, key=lambda r: (r["date"], not r["major"], r["ticker"] is not None, r["type"], r["name"]))

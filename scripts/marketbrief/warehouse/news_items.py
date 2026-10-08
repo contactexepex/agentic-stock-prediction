@@ -6,8 +6,8 @@ design/mockups/09-news/notes.md). Every read is as of the cut-off: the item list
 and Home's selection.
 
 The rules are W1's of the catalogue build (design/catalogue/catalogue_newsfeed.py, data request 8): `scope`, the
-`summary` line and the `market_moving` flag. The item's status is the one of its first primary ticker; a
-market-wide item has none, because verification is per company."""
+`summary` line and the `market_moving` flag. The item's status is the one of its first primary ticker (or of the
+ticker the caller names); a market-wide item has none, because verification is per company."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ SELECT w.id, w.title, w.url, w.source, w.source_domain, w.published_at, w.first_
        e.urgency, e.priced_in, e.geopolitical, e.summary AS analyst_summary, s.status, s.cluster_id,
        s.as_of AS status_as_of, v.independent_origins, v.primary_ids, a.access, a.extract
 FROM w JOIN e USING (id)
-LEFT JOIN s ON s.news_id = w.id AND s.ticker = w.primary_tickers[1]
+LEFT JOIN s ON s.news_id = w.id AND s.ticker = coalesce($status_ticker, w.primary_tickers[1])
 LEFT JOIN v ON v.cluster_id = s.cluster_id
 LEFT JOIN a ON a.id = w.id
 ORDER BY w.first_seen_at DESC, w.id"""
@@ -182,12 +182,14 @@ def capped(records: list[dict], max_items: int) -> list[dict]:
 EARLIEST = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
-def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = None,
-               since: datetime | None = None) -> list[dict]:
+def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = None, since: datetime | None = None,
+               status_ticker: str | None = None) -> list[dict]:
     """Every News item record first seen in (since, cutoff] (since None: from the first stored item) that the
     analyst scored by the cut-off, about a collected company or market-wide and relevant (`shown`); with `tickers`,
-    only items tagged with one of them. Newest first, uncapped."""
-    params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat()}
+    only items tagged with one of them. `status`, `status_as_of`, `cluster_id`, `independent_origins` and
+    `primary_ids` are those of `status_ticker` (a company page's own company) when given, else of the item's first
+    primary ticker. Newest first, uncapped."""
+    params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat(), "status_ticker": status_ticker}
     collected = set(cfg["tickers"])
     rows = [row for row in con.execute(ITEMS_SQL, params).df().to_dict("records") if shown(row, collected)]
     if tickers is not None:
@@ -206,7 +208,8 @@ def news_window(cfg: dict, con, cutoff: datetime, days: int, max_items: int) -> 
     (`capped`), newest first; `window` is the selection's record (from, to, counts)."""
     start = cutoff - timedelta(days=days)
     records = news_items(cfg, con, cutoff, since=start)
-    older = con.execute(COUNT_BEFORE_SQL, {"cutoff": cutoff.isoformat(), "start": start.isoformat()}).fetchone()[0]
+    params = {"cutoff": cutoff.isoformat(), "start": start.isoformat()}
+    older = con.execute(COUNT_BEFORE_SQL, params).fetchone()[0]
     window = {
         "days": days,
         "from": iso(start),

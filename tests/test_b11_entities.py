@@ -46,9 +46,9 @@ def enriched(news_id: str, analyzed_at: str, materiality: str = "medium", releva
             "priced_in": False, "summary": f"Product item on AAPL: {news_id}"}
 
 
-def verified(row_id: str, as_of: str, status: str, news_id: str) -> dict:
-    return {"id": row_id, "as_of": as_of, "inputs_until": as_of, "cluster_id": "c-aapl", "level": "cluster",
-            "ticker": "AAPL", "status": status, "status_ids": [news_id], "id_statuses": [status],
+def verified(row_id: str, as_of: str, status: str, news_id: str, ticker: str = "AAPL") -> dict:
+    return {"id": row_id, "as_of": as_of, "inputs_until": as_of, "cluster_id": f"c-{ticker}", "level": "cluster",
+            "ticker": ticker, "status": status, "status_ids": [news_id], "id_statuses": [status],
             "independent_origins": 1, "primary_ids": []}
 
 
@@ -68,7 +68,8 @@ def store(root: Path) -> None:
         enriched("macro-offtopic", BEFORE, relevance=0.2), enriched("aapl-old", "2026-09-20T09:00:00+00:00"),
     ])
     append(root, "news_verified", day, [verified("v1", BEFORE, "single_source", "aapl-ok"),
-                                        verified("v2", AFTER, "contradicted", "aapl-ok")])
+                                        verified("v2", AFTER, "contradicted", "aapl-ok"),
+                                        verified("v3", BEFORE, "rumour", "aapl-ok", ticker="JPM")])
     append(root, "news_updates", day, [
         {"id": "u1", "news_id": "aapl-ok", "title": "Earlier headline", "seen_at": BEFORE},
         {"id": "u2", "news_id": "aapl-ok", "title": "Later headline", "seen_at": AFTER},
@@ -145,6 +146,13 @@ def test_news_items_filters_by_ticker_and_since(market):
     assert [i["id"] for i in news_items.news_items(cfg, con, CUTOFF, tickers=["AAPL"], since=since)] == ["aapl-ok"]
 
 
+def test_news_items_status_of_a_named_ticker(market):
+    cfg, con = market
+    items = {i["id"]: i for i in news_items.news_items(cfg, con, CUTOFF, status_ticker="JPM")}
+    assert (items["aapl-ok"]["status"], items["aapl-ok"]["cluster_id"]) == ("rumour", "c-JPM")
+    assert items["aapl-old"]["status"] is None
+
+
 def test_news_window_counts_and_record(market):
     cfg, con = market
     items, window = news_items.news_window(cfg, con, CUTOFF, 3, 50)
@@ -170,9 +178,12 @@ def test_cap_splits_company_and_market_items():
     assert news_items.capped(mixed, 2)[-1]["id"] in ("m0", "m1")          # movers before high materiality
 
 
-def test_calendar_events_as_of_cutoff_active_only(market):
+def test_calendar_events_as_of_cutoff(market):
     cfg, con = market
-    rows = calendar_events.calendar_events(cfg, con, CUTOFF, date(2026, 10, 7), date(2026, 11, 6))
+    every = calendar_events.calendar_events(cfg, con, CUTOFF, date(2026, 10, 7), date(2026, 11, 6))
+    assert [(r["ticker"], r["date"]) for r in every if r["ticker"]] == [("DAL", "2026-10-09"), ("AAPL", "2026-10-29")]
+    active = [r["ticker"] for r in company_records.shown_companies("us", CUTOFF)[0] if r["state"] == "active"]
+    rows = calendar_events.calendar_events(cfg, con, CUTOFF, date(2026, 10, 7), date(2026, 11, 6), tickers=active)
     company = [r for r in rows if r["ticker"]]
     assert [(r["ticker"], r["date"]) for r in company] == [("AAPL", "2026-10-29")]
     assert company[0]["reaction_sessions"] == ["2026-10-29", "2026-10-30"]
