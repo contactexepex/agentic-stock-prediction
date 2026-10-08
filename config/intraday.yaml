@@ -63,7 +63,7 @@ attribution:
 
 explainer:
   max_words: 60
-  prompt_version: deviation-v1
+  prompt_version: deviation-v2
 
 outcome:
   # Learning loop (outcomes.py): by the close the deviation `held` when the close-vs-open return has the
