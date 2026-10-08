@@ -23,6 +23,14 @@ export function mockupPayload(mockup, market) {
   return Object.fromEntries(Object.entries(data).filter(([k]) => !k.startsWith("_")));
 }
 
+/** The 03-company mockup keeps one payload per company under `pages[ticker]`; the endpoint serves the market's shared
+ *  keys plus that company's payload (B12), so does the fixture. Null for a company the mockup does not have. */
+export function companyPayload(marketPayload, ticker) {
+  const { pages, default_ticker: _defaultTicker, ...shared } = marketPayload;
+  const one = pages?.[ticker];
+  return one ? { ...shared, ...one } : null;
+}
+
 export function envelope(market, pageKey, payload) {
   const text = JSON.stringify(payload);
   return {
@@ -68,8 +76,12 @@ export async function apiFixture(url, c) {
   for (const { page, pattern } of ROUTES) {
     const hit = pattern.exec(rest);
     if (!hit) continue;
-    const payload = mockupPayload(page.mockup, market);
+    let payload = mockupPayload(page.mockup, market);
     if (!payload) return problem(404, "Not found", "No mockup data for " + market);
+    if (page.key === "company") {
+      payload = companyPayload(payload, hit[1]);
+      if (!payload) return problem(404, "Not found", `No mockup company ${hit[1]} in ${market}`);
+    }
     const env = envelope(market, hit[1] ?? "_", payload);
     return json(200, env, { ETag: `"${env.payload_sha256}"` });
   }

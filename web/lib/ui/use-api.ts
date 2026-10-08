@@ -17,7 +17,11 @@ export type ApiState<P> =
 export function useApi<P>(url: string | null): ApiState<P> {
   const [result, setResult] = useState<{ url: string; envelope: Envelope<P> | null; problem: Problem | null } | null>(null);
   const [nonce, setNonce] = useState(0);
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  // A reload shows the loading state again, so a retry is visibly doing something.
+  const reload = useCallback(() => {
+    setResult(null);
+    setNonce((n) => n + 1);
+  }, []);
   const live = useRef(true);
   useEffect(() => {
     live.current = true;
