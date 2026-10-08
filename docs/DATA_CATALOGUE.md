@@ -625,9 +625,11 @@ cut-off: a page reading as of 7 Oct must not show them (`written_at` is the time
 
 How well the forecaster's calls and the published ranges did (SPEC page 8). Status: **exists** as the read model
 `rm.track_record` (contract 2.0, `TrackRecordPage` in `api/schemas/track-record.yaml`, B13: the shared page header,
-`status` and `go_live`, plus `track` and `weekly`). Example file: `track_record.json`, per market the `track` block
-(`presentation/dashboard/track.py`, `model_info.py`; `as_of` = the data's as-of date, `2026-10-06`) with the
-`weekly` series beside it (`warehouse/rm_track_record.weekly_series`). Everything is the stored data at
+`status` and `go_live`, plus `track` and `weekly`). Example file: `track_record.json`, one record per market shaped
+`{market, track, weekly}` as in the contract, without the page header, `status` and `go_live` (shown on the
+[Market status](#market-status) and [Scoreboard row](#scoreboard-row) entities): `track` is the dashboard block
+(`presentation/dashboard/track.py`, `model_info.py`; `as_of` = the data's as-of date, `2026-10-06`) and `weekly` its
+sibling (`warehouse/rm_track_record.weekly_series`). Everything is the stored data at
 `2026-10-07T12:00:00Z` except `calls` and `weekly` (listed in `example_parts`): no call is scored in the stored data
 yet, so both are computed by the same code from the example calls of `ai.combined.opus.v1` (the forecaster's
 trader id), each scored close-to-close as `score_predictions` scores it (the as-of close to the close h sessions
@@ -656,14 +658,31 @@ are never pooled.
 <a id="assistant-answer"></a>
 ## Assistant answer
 
-One answer of the assistant chat (F11; the `explain` tool of `mcp/tools.yaml`, output `answer` with `text`,
-`cited_ids`, `as_of` and `not_in_data`). Status: session **B8** builds it; conversations are kept 90 days in the
-MotherDuck schema `app` (an operational log, not a fact store). Example file: `assistant_answer.json`: three answers
-per market, each text composed from the catalogue's own records, so every word and number is backed by a cited
-record.
+One answer of the assistant chat (F11; the `explain` tool of `mcp/tools.yaml`, which takes an optional
+`conversation_id` to continue a conversation). Status: **B8 builds it**: the record is `AnswerRecord` in
+`web/lib/assistant/types.ts`; questions and answers are kept 90 days in the MotherDuck schema `app` (an operational
+log, not a fact store). Example file: `assistant_answer.json`: three answers per market, each text composed from the
+catalogue's own records, so every word and number is backed by a cited record. In each market the second answer
+continues the first one's conversation. The ids are hashes of the example's fields in B8's form, and `cost_usd` holds
+example values.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
+| id | The question's id: `ask-<market>-<date>-<10 lowercase hex>` | chat log | text | `ask-us-2026-10-07-ada9ee3c1c` |
+| market, channel, asked_at | Market, where it was asked (`dashboard`, `slack` or `claude_app`) and when; the examples are asked between 11:40 and 11:55 UTC, before the cut-off | chat log | | `us`, `dashboard`, `2026-10-07T11:40:00Z` |
+| question | What the owner asked (at most 500 characters) | chat | text | "Rule or AI: who did better on 2026-10-06?" |
+| text | The answer in plain words (no internal codes; a proper minus sign); never advice; numbers only from cited records | `explain` | text | "Paper trades settled on 2026-10-06 ..." |
+| cited_ids | The records the answer rests on | `explain` | ids | `["eod-us-2026-10-06"]` |
+| cited | The same ids with their `kind` (one of B8's `CITED_KINDS`), the read model and page key each was found in (`source`) and that read model's `as_of` (the data's as-of date), so the side panel can open them | `explain` | | `{"id": "eod-us-2026-10-06", "kind": "eod_analyses", "as_of": "2026-10-06", "source": "rm.compare _"}` |
+| sources | Every read-model lookup the read tools made: `read_model`, `page_key`, `found`, `as_of` | `explain` | list | `rm.compare _`, `rm.review _` |
+| as_of | The data time the answer reads up to: the moment it was asked; nothing later is used | `explain` | time | `2026-10-07T11:42:00Z` |
+| not_in_data | True when the data cannot answer (e.g. a date after `as_of`) | `explain` | yes/no | "What did Reliance close at on 8 Oct?": `true` |
+| declined | `advice` when the question asks for advice or a real trade (the assistant never gives it); `refused` when the model declined; else empty | `explain` | text or empty | "Should I buy NVDA tomorrow with real money?": `advice` |
+| status | `answered`, `not_in_data`, `declined`, `stopped` (out of time), `failed` or `pending` (no answer logged) | chat log | text | `answered` |
+| cost_usd | What the question cost (model calls), logged and shown; no budget in code (owner decision of 2026-10-08). An advice question costs 0: B8 declines it with its fixed text (`ADVICE_DECLINE`) before calling the model | chat log | $ | `0.0142` (example); advice refusal `0` |
+| conversation_id, history_turns | The conversation (the id of its first question) and how many earlier turns (0-4) the answer was given | chat log | id, count | second US answer: the first answer's id, `1` |
+
+---|---|---|---|---|
 | id, market, channel, asked_at | The question's id, market, where it was asked (`dashboard` or `slack`) and when; the examples are asked between 11:40 and 11:55 UTC, before the cut-off | chat log | | `ask-us-2026-10-07-1`, `dashboard`, `2026-10-07T11:40:00Z` |
 | question | What the owner asked | chat | text | "Rule or AI: who did better on 2026-10-06?" |
 | text | The answer in plain words (no internal codes; a proper minus sign); never advice; numbers only from cited records | `explain` | text | "Paper trades settled on 2026-10-06 ..." |

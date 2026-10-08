@@ -7,7 +7,9 @@ example ai.combined.opus.v1 calls, scored close-to-close as config/settings.yaml
 before 2026-10-08."""
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -60,10 +62,11 @@ def track_records(settled: list[dict]) -> list[dict]:
         con = duckdb.connect()
         con.register("calls", example_calls(settled, market))
         con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
-        out.append({"market": market, "as_of": str(data["as_of"]), "skill": data["skill"],
-                    "calls": track.calls_by_basis(con, CUTOFF), "ranges": data["track"]["ranges"],
-                    "replay": data["track"]["replay"], "min_sample": data["track"]["min_sample"],
-                    "backtest": data["backtest"], "example_parts": ["calls", "weekly"],
+        out.append({"market": market,
+                    "track": {"market": market, "as_of": str(data["as_of"]), "skill": data["skill"],
+                              "calls": track.calls_by_basis(con, CUTOFF), "ranges": data["track"]["ranges"],
+                              "replay": data["track"]["replay"], "min_sample": data["track"]["min_sample"],
+                              "backtest": data["backtest"], "example_parts": ["calls", "weekly"]},
                     "weekly": rm_track_record.weekly_series(con, CUTOFF)})
     return out
 
@@ -85,11 +88,20 @@ def money(market: str, value: float) -> str:
     return f"{MINUS if value < 0 else ''}{CURRENCY[market]}{abs(value):,.2f}"
 
 
-def cite(record: dict, kind: str, at: str) -> dict:
-    return {"id": record["id"], "kind": kind, "as_of": record[at]}
+DATA_AS_OF = "2026-10-06"   # a read model row's as_of: the data's as-of date (warehouse read_models, a DATE)
 
 
-def trade_answer(market: str, ticker: str, horizon: int) -> tuple[str, str, list[dict]]:
+def cite(record: dict, kind: str, source: str) -> dict:
+    """A citation as B8's guard keeps it: the id, its kind (CITED_KINDS) and the read model and page key it was
+    found in, with that read model's as-of (web/lib/assistant/guard.ts)."""
+    return {"id": record["id"], "kind": kind, "as_of": DATA_AS_OF, "source": source}
+
+
+def lookup(read_model: str, page_key: str) -> dict:
+    return {"read_model": read_model, "page_key": page_key, "found": True, "as_of": DATA_AS_OF}
+
+
+def trade_answer(market: str, ticker: str, horizon: int) -> tuple:
     trade = next(t for t in records("paper_trade.json")
                  if (t["market"], t["ticker"], t["horizon_days"], t["strategy_id"], t["view"])
                  == (market, ticker, horizon, "rule.model_news.v1", "accuracy"))
@@ -101,10 +113,12 @@ def trade_answer(market: str, ticker: str, horizon: int) -> tuple[str, str, list
             f"{signed(trade['market_pct'])}, the sector {signed(trade['sector_pct'])}, verified news "
             f"{signed(trade['news_pct'])} (\"{news['title']}\", {STATUS_WORDS[news['status']]}) and the company itself "
             f"{signed(trade['company_pct'])}. Main reason: {REASON_WORDS[trade['reason_code']]}. Paper trade only.")
-    return question, text, [cite(trade, "paper_trades_settled", "settled_at"), cite(news, "news", "first_seen_at")]
+    source = f"rm.trades {ticker}"   # get_trades(ticker): the trade and its news ids come from the same page
+    return question, text, [cite(trade, "paper_trades_settled", source), cite(news, "news", source)], [
+        lookup("rm.trades", ticker)]
 
 
-def rule_vs_ai_answer(market: str) -> tuple[str, str, list[dict]]:
+def rule_vs_ai_answer(market: str) -> tuple:
     eod = next(e for e in records("eod_analysis.json") if e["market"] == market)
     results = eod["results"]
     parts = [f"{FAMILY_WORDS[family]}: {results[family]['trades']} trades, {results[family]['wins']} won, "
@@ -112,32 +126,57 @@ def rule_vs_ai_answer(market: str) -> tuple[str, str, list[dict]]:
     question = f"Rule or AI: who did better on {eod['session_date']}?"
     text = (f"Paper trades settled on {eod['session_date']}, after market costs. " + "; ".join(parts) +
             ". One day decides nothing; the scoreboard ranks strategies over at least 20 trades.")
-    return question, text, [cite(eod, "eod_analyses", "created_at")]
+    return question, text, [cite(eod, "eod_analyses", "rm.compare _")], [lookup("rm.compare", "_"),
+                                                                          lookup("rm.review", "_")]
 
 
-def answer(market: str, number: int, asked_at: str, content: tuple[str, str, list[dict]],
-           flags: dict | None = None) -> dict:
-    """One answer of the `explain` tool, reading the data as of the moment it was asked (as_of = asked_at, both
-    before the examples' cut-off); flags: not_in_data (default false), declined (default none)."""
-    question, text, cited = content
+GUARD = Path(__file__).resolve().parents[2] / "web" / "lib" / "assistant" / "guard.ts"
+
+
+def advice_decline() -> str:
+    """B8's fixed advice refusal (guard.ts ADVICE_DECLINE): returned before any model call, so it costs nothing."""
+    body = GUARD.read_text(encoding="utf-8").split("export const ADVICE_DECLINE =", 1)[1].split(";", 1)[0]
+    return "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', body))
+
+
+
+
+def answer_id(market: str, asked_at: str, question: str) -> str:
+    """B8's id form: ask-<market>-<date>-<10 lowercase hex>; here a stable hash of the example's fields."""
+    digest = hashlib.sha256(f"{market}|{asked_at}|{question}".encode()).hexdigest()[:10]
+    return f"ask-{market}-{asked_at[:10]}-{digest}"
+
+
+def answer(market: str, asked_at: str, content: tuple, cost_usd: float, flags: dict | None = None,
+           conversation: dict | None = None) -> dict:
+    """One answer of the `explain` tool in B8's record form (web/lib/assistant/types.ts AnswerRecord), reading the
+    data as of the moment it was asked (as_of = asked_at, before the examples' cut-off). flags: not_in_data,
+    declined; conversation: the answer this question follows (its conversation and turn count). cost_usd: an example
+    value (B8 logs the real one); 0 for an advice question, which B8 declines before calling the model."""
+    question, text, cited, sources = content
     flags = flags or {}
-    return {"id": f"ask-{market}-{asked_at[:10]}-{number}", "market": market, "channel": "dashboard",
-            "asked_at": asked_at, "question": question, "text": text, "cited_ids": [c["id"] for c in cited],
-            "cited": cited, "as_of": asked_at, "not_in_data": flags.get("not_in_data", False),
-            "declined": flags.get("declined")}
+    status = "declined" if flags.get("declined") else "not_in_data" if flags.get("not_in_data") else "answered"
+    own_id = answer_id(market, asked_at, question)
+    return {"id": own_id, "market": market, "channel": "dashboard", "asked_at": asked_at, "question": question,
+            "text": text, "cited_ids": [c["id"] for c in cited], "cited": cited, "as_of": asked_at,
+            "not_in_data": flags.get("not_in_data", False), "declined": flags.get("declined"), "status": status,
+            "sources": sources, "cost_usd": cost_usd,
+            "conversation_id": conversation["conversation_id"] if conversation else own_id,
+            "history_turns": conversation["history_turns"] + 1 if conversation else 0}
 
 
 def assistant_answers() -> list[dict]:
-    advice = ("Should I buy NVDA tomorrow with real money?",
-              "I can't advise real trades: this is a research tool and every signal here is a paper record. I can "
-              "show NVDA's paper predictions and how its strategies have done.", [])
+    advice = ("Should I buy NVDA tomorrow with real money?", advice_decline(), [], [])
     past = ("What did Reliance close at on 8 Oct?",
-            "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 11:55 UTC.", [])
+            "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 11:55 UTC.", [],
+            [lookup("rm.stock", "RELIANCE"), lookup("rm.stock_strategies", "RELIANCE")])
+    us_first = answer("us", "2026-10-07T11:40:00Z", trade_answer("us", "NVDA", 3), 0.0142)
+    india_first = answer("india", "2026-10-07T11:50:00Z", trade_answer("india", "RELIANCE", 3), 0.0156)
     return [
-        answer("us", 1, "2026-10-07T11:40:00Z", trade_answer("us", "NVDA", 3)),
-        answer("us", 2, "2026-10-07T11:42:00Z", rule_vs_ai_answer("us")),
-        answer("us", 3, "2026-10-07T11:45:00Z", advice, {"declined": "advice"}),
-        answer("india", 1, "2026-10-07T11:50:00Z", trade_answer("india", "RELIANCE", 3)),
-        answer("india", 2, "2026-10-07T11:52:00Z", rule_vs_ai_answer("india")),
-        answer("india", 3, "2026-10-07T11:55:00Z", past, {"not_in_data": True}),
+        us_first,
+        answer("us", "2026-10-07T11:42:00Z", rule_vs_ai_answer("us"), 0.0119, conversation=us_first),
+        answer("us", "2026-10-07T11:45:00Z", advice, 0.0, {"declined": "advice"}),
+        india_first,
+        answer("india", "2026-10-07T11:52:00Z", rule_vs_ai_answer("india"), 0.0127, conversation=india_first),
+        answer("india", "2026-10-07T11:55:00Z", past, 0.0087, {"not_in_data": True}),
     ]
