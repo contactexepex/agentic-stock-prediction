@@ -234,7 +234,9 @@ def build_rest(write, settled, opens, eurusd, r2) -> None:
     ai_reasons, eods = reasons(settled)
     write("reason_ai.json", "ai_reason", "trade_reasons_ai", ai_reasons)
     write("eod_analysis.json", "eod_analysis", "eod_analyses", eods)
-    write("news_item.json", "news_item", None, news_items())
+    from catalogue_newsfeed import news_page_items
+
+    write("news_item.json", "news_item", None, news_page_items(news_items()))
     write("news_impact.json", "news_impact_row", "news_impact", news_impact(row))
     write("results_digest.json", "results_digest", "results_digests", results_digests(row))
     write("market_status.json", "market_status", None, market_status())

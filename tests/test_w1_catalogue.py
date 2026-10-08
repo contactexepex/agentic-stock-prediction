@@ -625,3 +625,24 @@ def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():
             for family, word in words.items():
                 assert f"{word}: {record['results'][family]['trades']} trades" in answer["text"]
         assert "_" not in answer["text"].replace("rule.model_news.v1", "")   # plain words, no raw codes
+
+
+def test_catalogue_news_page_items_are_stored_news_as_of_the_cut_off():
+    body = json.loads((CATALOGUE / "news_item.json").read_text(encoding="utf-8"))
+    items, cut_off = body["records"], body["as_of"]
+    assert [i["origin"] for i in items[:6]] == ["invented"] * 6
+    stored = [i for i in items if i["origin"] == "stored"]
+    for market in ("india", "us"):
+        mine = [i for i in stored if i["market"] == market]
+        assert len(mine) == 28 and {i["scope"] for i in mine} == {"company", "market"}
+        assert sum("2026-10-06T12:00:00Z" <= i["first_seen_at"] for i in mine) >= 12
+    for news in stored:
+        assert "2026-10-04T12:00:00Z" <= news["first_seen_at"] <= cut_off
+        assert news["enrichment"]["analyzed_at"] <= cut_off
+        assert news["status_as_of"] is None or news["status_as_of"] <= cut_off
+        assert news["scope"] == ("company" if news["primary_tickers"] else "market")
+        assert news["summary_source"] in ("article", "analyst", "none") and (news["summary"] is None) == (
+            news["summary_source"] == "none")
+    for news in items:
+        materiality, kind = news["enrichment"]["materiality"], news["enrichment"]["event_type"]
+        assert news["market_moving"] == (materiality == "high" and (news["scope"] == "market" or kind == "earnings"))
