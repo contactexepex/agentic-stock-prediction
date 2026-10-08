@@ -307,7 +307,8 @@ def test_catalogue_has_every_entity():
     assert {"company", "prediction", "paper_trade", "head_to_head_pick", "strategy", "scoreboard_row", "reason_ai",
             "news_item", "results_digest", "trade_check", "lifecycle_event", "market_status", "portfolio",
             "agreement", "open_trade", "abstention", "command_log", "eod_analysis", "news_impact",
-            "research_review", "calendar_event", "bar"} <= names
+            "research_review", "calendar_event", "bar", "scoreboard_backtest_row", "heatmap_cell",
+            "cumulative_line", "track_record", "assistant_answer"} <= names
 
 
 @pytest.mark.parametrize("path", catalogue_files(), ids=lambda p: p.name)
@@ -525,3 +526,97 @@ def test_catalogue_bars_are_60_consecutive_sessions_ending_at_the_as_of_close():
         assert all(calendar.next_session(cfg, a, include=False) == b for a, b in zip(days, days[1:]))
         assert mine[-1]["close"] == last_close[ticker]
         assert all(b["low"] <= min(b["open"], b["close"]) <= max(b["open"], b["close"]) <= b["high"] for b in mine)
+
+
+def test_catalogue_backtest_rows_are_apart_from_forward_rows():
+    backtest = load("scoreboard_backtest_row.json")
+    assert {r["basis"] for r in backtest} == {"backtest"} and {r["view"] for r in backtest} == {"accuracy"}
+    assert {r["strategy_id"] for r in backtest} == {"base.always_up.v1", "base.momentum.v1"}
+    assert {r["market"] for r in backtest} == {"india", "us"}
+    assert {r["horizon_days"] for r in backtest} == {1, 2, 3, 4, 5, "all"}
+    assert {r["basis"] for r in load("scoreboard_row.json")} == {"forward"}
+    for market in ("india", "us"):
+        for sid in ("base.always_up.v1", "base.momentum.v1"):
+            mine = {r["horizon_days"]: r for r in backtest if r["market"] == market and r["strategy_id"] == sid}
+            assert mine["all"]["trades"] == sum(mine[k]["trades"] for k in range(1, 6))
+
+
+def test_catalogue_heatmap_cells_and_lines_add_up_to_the_scoreboard():
+    cells, lines = load("heatmap_cell.json"), load("cumulative_line.json")
+    board = {(r["market"], r["view"], r["strategy_id"]): r for r in load("scoreboard_row.json")
+             if r["scope"] == "strategy" and r["horizon_days"] == "all"}
+    for (market, view, sid), row in board.items():
+        for dimension in ("horizon", "company", "reason_code"):
+            mine = [c for c in cells if (c["market"], c["view"], c["strategy_id"], c["dimension"], c["week"])
+                    == (market, view, sid, dimension, "all")]
+            assert sum(c["trades"] for c in mine) == row["trades"]
+            assert round(sum(c["net_pnl"] for c in mine), 2) == round(row["net_pnl"], 2)
+        weekly = [c for c in cells if (c["market"], c["view"], c["strategy_id"], c["dimension"]) == (market, view, sid,
+                  "horizon") and c["week"] != "all"]
+        assert sum(c["trades"] for c in weekly) == row["trades"]
+        if view == "accuracy":
+            assert [p for p in lines if (p["market"], p["view"], p["series"]) == (market, view, sid)][-1][
+                "cumulative_net_pnl"] == round(row["net_pnl"], 2)
+
+
+def test_catalogue_w40_reviews_are_written_before_the_cut_off_from_trades_settled_by_then():
+    body = json.loads((CATALOGUE / "research_review.json").read_text(encoding="utf-8"))
+    trades = load("paper_trade.json")
+    w40 = [r for r in body["records"] if r["iso_week"] == "2026-W40"]
+    assert {r["market"] for r in w40} == {"india", "us"}
+    for review in w40:
+        assert review["written_at"] < body["as_of"]
+        for leader in review["leaders"]:
+            known = [t for t in trades if t["market"] == review["market"] and t["strategy_id"] == leader["strategy_id"]
+                     and t["view"] == "accuracy" and t["status"] == "settled"
+                     and t["settled_at"] <= review["written_at"]]
+            assert leader["trades"] == len(known)
+            assert leader["net_pnl"] == round(sum(t["net_pnl"] for t in known), 2)
+        for leader in review["leaders"]:   # the top of B3's director order (net_pnl desc, trades desc, strategy_id)
+            settled = [t for t in trades if t["market"] == review["market"] and t["family"] == leader["scope"]
+                       and t["view"] == "accuracy" and t["status"] == "settled"
+                       and t["settled_at"] <= review["written_at"]]
+            totals = {}
+            for t in settled:
+                count, net = totals.get(t["strategy_id"], (0, 0.0))
+                totals[t["strategy_id"]] = (count + 1, net + t["net_pnl"])
+            ranked = sorted(totals, key=lambda sid: (-round(totals[sid][1], 2), -totals[sid][0], sid))
+            assert leader["strategy_id"] == ranked[0]
+
+
+def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_close():
+    trades = load("paper_trade.json")
+    for payload in load("track_record.json"):
+        assert payload["example_parts"] == ["calls"] and payload["skill"]["state"] == "paper"
+        mine = [t for t in trades if t["market"] == payload["market"] and t["strategy_id"] == "ai.combined.opus.v1"
+                and t["view"] == "accuracy" and t["status"] == "settled"]
+        (block,) = payload["calls"]
+        assert block["basis"] == "close_to_close" and block["all"]["n"] == len(mine)
+        assert sum(r["n"] for r in block["all"]["reliability"]) == len(mine)
+        assert sum(b["n"] for b in block["by_horizon"].values()) == len(mine)
+        assert all(key.endswith("legacy_cc") for key in block["by_horizon"])
+        hits = 0   # the engine's close-to-close window: the as-of close to the close h stored bars later
+        bars = {b["ticker"]: {x["date"]: x["close"] for x in load("bar.json") if x["ticker"] == b["ticker"]}
+                for b in load("bar.json") if b["market"] == payload["market"]}
+        for trade in mine:
+            closes = bars[trade["ticker"]]
+            later = sorted(day for day in closes if day > "2026-09-29")
+            hits += closes[later[trade["horizon_days"] - 1]] > closes["2026-09-29"]
+        assert block["all"]["hits"] == hits
+
+
+def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():
+    by_id = {r["id"]: r for name in ("paper_trade.json", "eod_analysis.json", "news_item.json") for r in load(name)}
+    for answer in load("assistant_answer.json"):
+        assert answer["cited_ids"] == [c["id"] for c in answer["cited"]]
+        for cited in answer["cited"]:
+            assert cited["as_of"] <= answer["as_of"] and cited["id"] in by_id
+        if answer["declined"] or answer["not_in_data"]:
+            assert answer["cited"] == []
+            continue
+        record = by_id[answer["cited_ids"][0]]
+        if "return_pct" in record:
+            assert f"{record['return_pct']:+.2f} %" in answer["text"]
+        else:
+            for family in ("rule", "ai", "baseline"):
+                assert f"{family} {record['results'][family]['trades']} trades" in answer["text"]
