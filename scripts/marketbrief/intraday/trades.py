@@ -4,7 +4,8 @@ prediction (accuracy view, trade id acc:<prediction_id>) and every head-to-head 
 paper_trades_settled row (issue #93; note unsettled_past_exit; at most max_past_exit sessions), with the stored bars
 and split/bonus factors behind its measures. A trade is a record of the F1 protocol (docs/SPEC.md F1); nothing is
 ever traded. Only rows stored by check_at are read (no look-ahead), and a prediction or pick made after D's open is
-refused as the settlement refuses it (F1.8)."""
+refused as the settlement refuses it (F1.8). A strategy not live on D (B2's go-live switch, config/strategies.yaml
+`live_from`, lab.registry.is_live) has no trade: settle never writes one for it."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ import pandas as pd
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.intraday.constants import PICK_PICKED, VIEW_ACCURACY, VIEW_HEAD_TO_HEAD
 from marketbrief.intraday.inputs import ADJUSTMENTS_ASOF, CALENDAR_DAYS_PER_SESSION, records, sessions_between
+from marketbrief.lab.registry import is_live, registry
 
 PREDICTION_COLUMNS = (
     "id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction, "
@@ -26,7 +28,9 @@ PREDICTION_COLUMNS = (
 def open_trades(
     con, cfg: dict, session_date: date, check_at: datetime, max_past_exit: int = 0
 ) -> tuple[dict[str, list[dict]], dict]:
-    """({ticker: trades sorted by trade_id}, {"not_locked": n, "delayed_too_long": [trade ids]}). A prediction id's
+    """({ticker: trades sorted by trade_id}, {"not_locked": n, "not_live": n, "delayed_too_long": [trade ids]}). A
+    prediction or pick counts only when its strategy is live on D (registry.is_live of the current config, as settle
+    reads it); the others are counted as not_live (one per would-be trade id). A prediction id's
     first stored row wins (ids are skipped once they exist), as does a pick id's. A trade with a paper_trades_settled
     row stored by check_at is closed, whatever its status (B2: no_entry and skipped trades get a row too). Issue #93:
     a trade past its exit date without such a row (no exit close stored yet, the settle step not run, or refused)
@@ -67,8 +71,12 @@ def open_trades(
             made_at = max(pd.Timestamp(pick["made_at"]), pd.Timestamp(pred["made_at"]))
             candidates.append((pred, VIEW_HEAD_TO_HEAD, pick, made_at))
     out: dict[str, list[dict]] = {}
-    refused, too_long = 0, []
+    refused, not_live, too_long = 0, 0, []
+    reg = registry() if candidates else None   # read only when there is a row to check
     for pred, view, pick, made_at in candidates:
+        if not is_live(pred["strategy_id"], pred["session_date"], reg):
+            not_live += 1
+            continue
         trade = _trade(cfg, pred, view, pick, made_at, session_date)
         if trade is None:
             refused += _day(pred["exit_date"]) >= session_date  # counted while it would still be open
@@ -84,6 +92,7 @@ def open_trades(
         out.setdefault(trade["ticker"], []).append(trade)
     return {ticker: sorted(trades, key=lambda t: t["trade_id"]) for ticker, trades in sorted(out.items())}, {
         "not_locked": refused,
+        "not_live": not_live,
         "delayed_too_long": sorted(too_long),
     }
 

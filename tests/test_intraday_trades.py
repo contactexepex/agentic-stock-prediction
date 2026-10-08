@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
@@ -177,6 +178,25 @@ CUSTOM = [
 ]
 
 
+LIVE_FROM = "2026-09-01"   # B2's go-live switch: every strategy of the fixture trades from this session on
+TEST_STRATEGIES = ("rule.b9_reached.v1", "rule.b9_far.v1", "rule.b9_edge_in.v1", "rule.b9_edge_out.v1",
+                   "base.b9_against.v1", "rule.b9_unlocked.v1", "rule.b9_late.v1", "rule.b9_unwatched.v1",
+                   "rule.b9_delayed.v1", "rule.b9_settled.v1", "rule.b9_late_settle.v1", "rule.b9_ancient.v1")
+
+
+def live_registry(config: Path, live_from: dict[str, str | None] | None = None) -> None:
+    """The config copy's strategies.yaml with every strategy live from LIVE_FROM, plus the test strategies; then
+    `live_from` overrides per id."""
+    path = config / "strategies.yaml"
+    reg = yaml.safe_load(path.read_text())
+    family = {"rule": "rule", "base": "baseline"}
+    reg["strategies"] = [s for s in reg["strategies"] if s["id"] not in TEST_STRATEGIES] + [
+        {"id": ident, "family": family[ident.split(".")[0]]} for ident in TEST_STRATEGIES]
+    for spec in reg["strategies"]:
+        spec["live_from"] = (live_from or {}).get(spec["id"], LIVE_FROM)
+    path.write_text(yaml.safe_dump(reg, sort_keys=False))
+
+
 def ranges_for(ticker: str, horizon: int, band: tuple) -> dict:
     lo80, lo50, hi50, hi80 = band
     return {"id": f"2026-10-06-{ticker}-{horizon}d", "made_at": "2026-10-07T11:40:00+00:00",
@@ -192,6 +212,7 @@ def market(tmp_path, monkeypatch):
     (config / "markets" / f"{MARKET}.yaml").write_text(MARKET_YAML)
     for name in ("intraday.yaml", "events.yaml", "settings.yaml", "strategies.yaml"):
         shutil.copy(REPO / "config" / name, config / name)
+    live_registry(config)
     monkeypatch.setattr(paths, "ROOT", root)
     monkeypatch.setattr(paths, "CONFIG", config)
     monkeypatch.delenv("MB_NOW", raising=False)
@@ -689,3 +710,30 @@ def test_explainer_instructions_pass_the_gate_and_share_its_version():
     version = load_intraday_config()["explainer"]["prompt_version"]
     assert f'"prompt_version": "{version}"' in agent
 
+
+
+def test_only_strategies_live_on_d_are_open_trades(market):
+    """B2's go-live switch: a prediction or pick of a strategy not live on its D (live_from null, or after D) is no
+    open trade, as settle never writes one; it is counted under skipped_trades.not_live. live_from == D is live."""
+    from marketbrief.intraday.trades import open_trades
+    from marketbrief.lab import registry
+
+    root, cfg, settings = market
+    day = datetime.fromisoformat(SESSION).date()
+    every, before = open_trades(connect(MARKET), cfg, day, CHECK)
+    assert before["not_live"] == 0
+    live_registry(paths.CONFIG, {"ai.combined.opus.v1": None, "rule.b9_far.v1": "2026-10-06",
+                                 "rule.b9_reached.v1": "2026-10-05"})   # b9_far and b9_reached: D = 2026-10-05
+    registry._cached.cache_clear()
+    trades, skipped = open_trades(connect(MARKET), cfg, day, CHECK)
+    ids = {t["trade_id"] for group in trades.values() for t in group}
+    gone = {t["trade_id"] for group in every.values() for t in group} - ids
+    assert "acc:rule.b9_reached.v1:2026-10-02-NVDA-3d" in ids                      # live_from == D
+    assert "acc:rule.b9_far.v1:2026-10-02-NVDA-3d" in gone                         # live from the day after D
+    assert "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-NVDA-5d" in gone   # a pick of a pre-live call
+    assert {trade_id.split(":")[-2] for trade_id in gone} == {"ai.combined.opus.v1", "rule.b9_far.v1"}
+    assert skipped["not_live"] == len(gone) and skipped["not_locked"] == before["not_locked"]
+    summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
+    assert summary["skipped_trades"]["not_live"] == len(gone)
+    assert not gone & {row["trade_id"] for row in stored(root, "trade_checks")}
+    registry._cached.cache_clear()
