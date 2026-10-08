@@ -29,6 +29,7 @@ HomePayload:
         agreement: {$ref: '#/components/schemas/AgreementMap'}
         head_to_head:
           type: array
+          description: The picks of the session being predicted made by the cut-off, of strategies live on that session (a rehearsal pick is never shown), active companies
           items: {$ref: '#/components/schemas/HeadToHeadPick'}
         open_trades:
           type: array

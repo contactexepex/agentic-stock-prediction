@@ -155,6 +155,10 @@ def stored(tmp_path_factory):
                 "market": "us",
                 "ticker": "NVDA",
                 "view": "accuracy",
+                "strategy_id": extra["strategy_id"],
+                "family": extra["family"],
+                "horizon_days": extra["horizon_days"],
+                "entry_date": extra["session_date"],
                 "settled_at": "2026-10-06T22:15:00Z",
             }
         ],
@@ -389,14 +393,94 @@ def test_a_pick_without_a_strategy_follows_its_family(monkeypatch):
 
 
 def test_live_reads_the_registry_switch(monkeypatch):
-    """live() asks B2's registry.is_live with the day as YYYY-MM-DD; nothing is live before Wave 5 sets live_from."""
+    """live() asks B2's registry.is_live with the day as YYYY-MM-DD; a strategy without live_from is never live and
+    one with it is live from that day on (the registry's entries stand in, whatever config the module patched)."""
     asked = []
     monkeypatch.setattr(rm_entities.registry, "is_live", lambda strategy, day, **_kwargs: asked.append((strategy, day)))
     rm_entities.live("rule.model_news.v1", pd.Timestamp("2026-10-08 00:00"))
     assert asked == [("rule.model_news.v1", "2026-10-08")]
     monkeypatch.undo()
-    assert not any(
-        rm_entities.live(spec["id"], "2026-10-08")
-        for spec in rm_entities.registry.strategies()
-        if spec.get("live_from") is None
+    specs = {"off": {"id": "off", "live_from": None}, "on": {"id": "on", "live_from": "2026-10-09"}}
+    monkeypatch.setattr(rm_entities.registry, "by_id", lambda _reg=None: specs)
+    assert [rm_entities.live("off", day) for day in ("2026-10-08", "2026-10-09")] == [False, False]
+    assert [rm_entities.live("on", day) for day in ("2026-10-08", "2026-10-09")] == [False, True]
+
+
+# ---------- go-live filters of the shared records (step 2) ----------
+def fresh(market: str) -> BuildContext:
+    """A new build context on the fixture root (BuildContext.shared memoises per context)."""
+    return BuildContext(load_market(market), connect(market), CUTOFF)
+
+
+def strategy_of(strategy) -> str:
+    """The id of an is_live argument (a registry id or an entry)."""
+    return strategy["id"] if isinstance(strategy, dict) else strategy
+
+
+def test_nothing_live_shows_no_predictions_trades_or_settlements(stored, monkeypatch):
+    """Before Wave 5 sets live_from, the stored (rehearsal) predictions, open trades and settlements are never shown:
+    every company is predicted by none, nothing is open or settled, no strategy is live."""
+    assert rm_common.open_trades(stored["us"]) and rm_common.settled_trades(stored["us"])  # shown when live
+    monkeypatch.setattr(rm_entities.registry, "is_live", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(rm_entities, "earliest_live_from", lambda: None)
+    for market in MARKETS:
+        ctx = fresh(market)
+        rows = rm_common.agreement(ctx)
+        assert sorted(rows) == ["1", "2", "3", "4", "5"]
+        assert all(row["buy"] == 0 and row["of"] == 0 for by_rank in rows.values() for row in by_rank)
+        assert {row["ticker"] for row in rows["1"]} == ctx.active
+        assert rm_common.open_trades(ctx) == []
+        assert rm_common.settled_trades(ctx) == []
+        assert not any(entry["live"] or entry["settled_trades"] for entry in rm_common.strategies(ctx).values())
+        assert rm_common.go_live(ctx)["proven"] is False
+        for company in rm_common.companies(ctx):
+            assert company["open_trades"] == 0
+            if company["state"] == "active":
+                assert company["agreement_n1"] == {"buy": 0, "of": 0}
+
+
+def test_agreement_reads_the_newest_live_batch_not_a_newer_rehearsal(stored, monkeypatch):
+    """When the newest stored batch is a rehearsal (no strategy live on its D), the agreement shows the newest batch
+    of live predictions before it, every prediction of that batch."""
+    con = stored["us"].con
+    days = con.execute(
+        "SELECT DISTINCT session_date FROM strategy_predictions WHERE made_at <= ?::TIMESTAMPTZ ORDER BY 1 DESC",
+        [CUTOFF],
+    ).fetchall()
+    newest, previous = rm_entities.iso_day(days[0][0]), rm_entities.iso_day(days[1][0])
+    monkeypatch.setattr(
+        rm_entities.registry, "is_live", lambda _strategy, day, *_args, **_kwargs: rm_entities.iso_day(day) != newest
     )
+    ctx = fresh("us")
+    rows = rm_common.agreement(ctx)
+    assert {row["session_date"] for by_rank in rows.values() for row in by_rank} == {previous}
+    expected = con.execute(
+        "SELECT ticker, horizon_days, count(DISTINCT id) FROM strategy_predictions WHERE made_at <= ?::TIMESTAMPTZ"
+        " AND session_date = ?::DATE GROUP BY ALL",
+        [CUTOFF, previous],
+    ).fetchall()
+    of = {(row["ticker"], int(k)): row["of"] for k, by_rank in rows.items() for row in by_rank}
+    assert expected and all(of[(ticker, int(k))] == n for ticker, k, n in expected if ticker in ctx.active)
+
+
+def test_open_trades_and_settlements_of_a_strategy_not_live_are_dropped(stored, monkeypatch):
+    """A strategy not live on a trade's D loses that open trade and its settlements (and their counts); the other
+    strategies' records are unchanged."""
+    before_open = rm_common.open_trades(stored["us"])
+    before_settled = rm_common.settled_trades(stored["us"])
+    dropped = {before_open[0]["strategy_id"], before_settled[0]["strategy_id"]}  # one with a trade, one settled
+    kept_settled = [t["id"] for t in before_settled if t["strategy_id"] not in dropped]
+    monkeypatch.setattr(
+        rm_entities.registry, "is_live", lambda strategy, _day, *_args, **_kwargs: strategy_of(strategy) not in dropped
+    )
+    ctx = fresh("us")
+    after_open = rm_common.open_trades(ctx)
+    assert after_open == [t for t in before_open if t["strategy_id"] not in dropped]
+    assert len(after_open) < len(before_open)
+    assert [t["id"] for t in rm_common.settled_trades(ctx)] == kept_settled
+    assert len(kept_settled) < len(before_settled)
+    entries = rm_common.strategies(ctx)
+    assert all(entries[key]["live"] is False and entries[key]["settled_trades"] == 0 for key in dropped)
+    assert all(entry["live"] for key, entry in entries.items() if key not in dropped)
+    counts = {c["ticker"]: c["open_trades"] for c in rm_common.companies(ctx)}
+    assert sum(counts.values()) == len(after_open)

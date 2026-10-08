@@ -295,7 +295,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   10-Q/10-K, `pending_report` until then), the consensus collected before the release (context only) and the
   reaction, and writes the results-analyst's input; `validate|add` is the gate (ids, verbatim quotes, numbers from
   the quote or the release, enums, no advice) and appends to `results_digests` (views `results_digests_asof(ts)`,
-  `results_digests_latest`, `results_digest_ticker_latest`). The context pack does not show digests yet.
+  `results_digests_latest`, `results_digest_ticker_latest`). The context pack shows the active companies' digests of
+  the last 10 days after "Fundamentals" (`results/context_section.py`, as of now; omitted when there is none).
 - Signal model (DESIGN.md section 15; `scripts/marketbrief/model/`, settings `config/model.yaml`, costs
   `config/costs.yaml`): `model_scores` (routine step 5a, again after the news append) appends per ticker and
   horizon P(up) of the open-to-close label (N+k, decision 37: buy at the open of D, the first session after the
@@ -434,7 +435,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   the close (held / reversed / faded); `intraday/payload.py` is the cockpit's read model.
   B9 (docs/ws/b9.md): every open paper trade (a qualifying `strategy_predictions` row or a picked
   `head_to_head_picks` row whose window D..exit_date contains the session, made before D's open; every
-  strategy, horizon N+1..N+5 and view; past exit_date while it has no `paper_trades_settled` row, at most
+  strategy live on D (B2's `live_from`; others counted as `skipped_trades.not_live`), horizon N+1..N+5
+  and view; past exit_date while it has no `paper_trades_settled` row, at most
   `trades.max_sessions_past_exit` sessions, note `unsettled_past_exit`) gets a `trade_checks` row per check (W1's format:
   price vs entry, target and its own range, band, target_z; flags outside_range | far_from_target |
   against_prediction; with its detail columns: quality, today's price basis, target reached so far, issue #78;

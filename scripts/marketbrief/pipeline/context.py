@@ -22,6 +22,7 @@ from marketbrief.pipeline import estimate_sections, macro_sections, nse_sections
 from marketbrief.pipeline.lessons import context_section
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation import news_events
+from marketbrief.results import context_section as results_context  # WS6
 from marketbrief.utils.markdown import cursor_markdown_table
 
 PCT = "round({} * 100, 2)"
@@ -298,6 +299,9 @@ def main() -> None:
     print(f"## {title}\n\n{body}")
     print(smart_money.markdown(cfg, con))
     print(fundamentals.markdown(cfg, con))  # US: last reported quarter from SEC XBRL (consensus: estimate_sections)
+    results = results_context.context_section(cfg, con)  # WS6: results digests of the window; omitted when none
+    if results:
+        print("## {}\n\n{}".format(*results))
     print(
         "## Judge FAILs from the previous run not yet in a report (copy each into data_quality)\n\n"
         f"{judge_fails(con, utc_today())}"

@@ -3,21 +3,25 @@ computed once per build through BuildContext.shared, as of the cut-off. rm_commo
 
   agreement(ctx)    {"1".."5": Agreement rows by rank}: per horizon and active company, how many strategies' newest
                     predictions qualify as a trade (`buy`) of those that predicted it (`of`), by family, with the
-                    buyers' average P(up). The predictions are the newest batch made by the cut-off (the newest
-                    `session_date` among the strategy_predictions rows with made_at at or before it; each id's first
-                    stored row). Rank: most buyers, then the higher average probability, then the ticker.
+                    buyers' average P(up). The predictions are the newest batch of live predictions made by the
+                    cut-off (strategy_predictions rows with made_at at or before it, each id's first stored row, of
+                    a strategy live on their session_date; the newest session_date among them). No strategy live:
+                    every company predicted by none. Rank: most buyers, then the higher average probability, then
+                    the ticker.
   open_trades(ctx)  the Open-trade records: B9's open trades as of the cut-off (intraday/trades.open_trades: every
-                    qualifying prediction and picked head-to-head pick of a strategy live on D (B2's live_from), made
-                    before D's open, without a settlement
-                    row by the cut-off, for at most `trades.max_sessions_past_exit` sessions past its exit), that have
-                    entered (D's open stored by the cut-off) and buy at least one share (F1.4), valued at the newest
-                    stored close: unrealised profit before costs on today's price basis (splits and bonuses since D).
+                    qualifying prediction and picked head-to-head pick made before D's open, without a settlement row
+                    by the cut-off, for at most `trades.max_sessions_past_exit` sessions past its exit) of a strategy
+                    live on D (B2's live_from), that have entered (D's open stored by the cut-off) and buy at least
+                    one share (F1.4), valued at the newest stored close: unrealised profit before costs on today's
+                    price basis (splits and bonuses since D).
   companies(ctx)    the Company records, active and inactive (never deleted), active first, then by ticker: B1's
                     accessor, the newest two raw closes collected by the cut-off, agreement_n1 (active companies) and
                     the open-trade count (exactly the records of open_trades).
 
-live_rows(rows, day_key) (Wave 5 go-live) keeps the rows of strategies live on their D (lab/registry.is_live); the
-page modules apply it to the predictions, picks and trade checks they read themselves.
+live_rows(rows, day_key) (Wave 5 go-live) keeps the rows of strategies live on their D (lab/registry.is_live); these
+readers apply it, and the page modules apply it to the predictions, picks and trade checks they read themselves.
+rm_common.settled_trades applies B2's scoreboard.live_settlements, so the lab summary, go_live and the strategies'
+settled counts see live trades only.
 
 Drafted from session B11's agreement.py and company_records.latest_closes (build/b11-market-pages 3f6b4df)."""
 
@@ -41,7 +45,7 @@ MONEY, PCT, PROB = 2, 2, 4
 PREDICTIONS_SQL = """
 WITH p AS (SELECT DISTINCT ON (id) * FROM strategy_predictions WHERE made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at)
 SELECT id, strategy_id, family, ticker, as_of_date, session_date, horizon_days, prob_up, qualifies FROM p
-WHERE session_date = (SELECT max(session_date) FROM p) ORDER BY ticker, horizon_days, strategy_id"""
+WHERE session_date >= ?::DATE ORDER BY session_date, ticker, horizon_days, strategy_id"""
 # each ticker's raw bars collected by the cut-off, newest collection per day, sessions of the market only
 RAW_BARS = """WITH p AS (SELECT DISTINCT ON (ticker, date) ticker, date, open, close FROM prices
 WHERE collected_at <= ?::TIMESTAMPTZ AND date <= ?::DATE AND list_contains(?, ticker)
@@ -174,8 +178,11 @@ def agreement(ctx: BuildContext) -> dict[str, list[dict]]:
     """The market's Agreement records per horizon (active companies), from the newest predictions by the cut-off."""
 
     def compute() -> dict[str, list[dict]]:
-        frame = ctx.con.execute(PREDICTIONS_SQL, [ctx.cutoff]).df()
-        predictions = [row for row in frame.to_dict("records") if row["ticker"] in ctx.active]
+        first_live = earliest_live_from()
+        rows = []
+        if first_live is not None:
+            rows = ctx.con.execute(PREDICTIONS_SQL, [ctx.cutoff, first_live]).df().to_dict("records")
+        predictions = [row for row in newest_batch(live_rows(rows, "session_date")) if row["ticker"] in ctx.active]
         active = [company for company in ctx.companies if company["state"] == STATE_ACTIVE]
         return agreement_rows(predictions, sorted(active, key=lambda c: c["ticker"]), ctx.market)
 
@@ -228,6 +235,7 @@ def open_trades(ctx: BuildContext) -> list[dict]:
         past_exit = int(load_intraday_config().get("trades", {}).get("max_sessions_past_exit", 0))
         by_ticker, _skipped = intraday_trades.open_trades(ctx.con, ctx.cfg, session, ctx.cutoff_time, past_exit)
         trades = [trade for ticker, rows in by_ticker.items() if ticker in ctx.collected for trade in rows]
+        trades = live_rows(trades, "entry_date")  # B9's reader filters too; kept so this record never depends on it
         tickers = sorted({trade["ticker"] for trade in trades})
         opens = {(ticker, iso_day(day)): value for ticker, day, value in raw_bars(ctx, OPENS_SQL, tickers)}
         closes: dict[str, tuple] = {}

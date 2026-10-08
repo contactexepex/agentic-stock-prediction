@@ -24,6 +24,15 @@ from marketbrief.warehouse import openapi_spec, rm_compare, rm_strategies, rm_tr
 from test_api_contract import CUTOFF, catalogue, example_context  # noqa: E402
 
 MARKETS = ("india", "us")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _all_strategies_live(all_strategies_live):  # noqa: ARG001 - requested for its effect
+    """The catalogue's example picks and trades are of strategies without live_from: make every strategy live here
+    (tests/conftest.py all_strategies_live); test_picks_of_non_live_strategies_are_dropped undoes it for one."""
+    yield
+
+
 REPO = Path(__file__).resolve().parents[1]
 EXAMPLE_AS_OF = "2026-10-06"  # the catalogue's scoreboard rows carry the examples' as-of date
 
@@ -485,3 +494,17 @@ def test_owner_portfolio_shows_collected_companies_only(monkeypatch):
     assert [t["ticker"] for t in owner["trades"]] == ["AAPL"]
     assert [p["ticker"] for p in owner["positions"]] == ["AAPL"]
     assert owner["positions"][0]["eur_view"] == {"ticker": "AAPL"}
+
+
+def test_picks_of_non_live_strategies_are_dropped(monkeypatch):
+    from marketbrief.lab import registry
+
+    every = rm_compare.picks(compare_context("us"))
+    dropped = "ai.combined.opus.v1"
+    assert any(p["strategy_id"] == dropped for p in every)
+    monkeypatch.setattr(registry, "is_live", lambda strategy_id, _day, *_a, **_k: strategy_id != dropped)
+    kept = rm_compare.picks(compare_context("us"))
+    assert kept and all(p["strategy_id"] != dropped for p in kept)
+    assert len(kept) == len([p for p in every if p["strategy_id"] != dropped])
+    monkeypatch.setattr(registry, "is_live", lambda *_a, **_k: False)  # before go-live: no pick is shown
+    assert rm_compare.picks(compare_context("us")) == []
