@@ -1,12 +1,14 @@
-"""The Strategy lab page (B13; docs/ws/b13.md): rm.strategies, page_key `_`, served by
-GET /api/v1/markets/{market}/strategies. Payload StrategyLab = design/mockups/05-strategy-lab/data.json per market
-(notes.md there names every key and its selection rule): the shared blocks of rm_common, every scoreboard row of the
-market (forward basis from B2's scoreboard over the settled trades stored by the cut-off, backtest basis from B2's
-back-test on the stored bars), the heatmap cells and cumulative lines (forward basis) and the back-test run's facts.
-The two bases are never pooled: every row carries its `basis` and the page filters on it.
+"""The Strategy lab page (B13; docs/ws/b13.md): rm.strategies, page_key `_` served by GET
+/api/v1/markets/{market}/strategies, plus one page per registry strategy id (StrategyDetail, B5's get_scoreboard).
+Payload StrategyLab = design/mockups/05-strategy-lab/data.json per market (notes.md there names every key and its
+selection rule): the shared blocks of rm_common, every scoreboard row of the market (forward basis from B2's
+scoreboard over the settled trades stored by the cut-off, backtest basis from B2's newest stored lab_backtests run,
+else B2's back-test computed in the build on the stored bars), the heatmap cells and cumulative lines (forward
+basis) and the back-test run's facts. The two bases are never pooled: every row carries its `basis` and the page
+filters on it.
 
-Also the scoreboard-row shaping the other strategy pages reuse (Rule vs AI, Paper portfolios): `scoreboard_rows(ctx)`
-gives the forward rows in the catalogue's fields, computed once per build."""
+Also the scoreboard-row shaping the other strategy pages reuse (Rule vs AI, Paper portfolios):
+`scoreboard_rows(ctx)` gives the forward rows in the catalogue's fields, computed once per build."""
 
 from __future__ import annotations
 

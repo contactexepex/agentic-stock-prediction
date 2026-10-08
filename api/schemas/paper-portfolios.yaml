@@ -27,3 +27,140 @@ PaperTradeReceipt:
       items: {type: string}
     budget_left: {type: ['integer', 'null']}
     paper: {type: boolean, const: true}
+PaperPortfoliosResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/PaperPortfolios'}
+PaperPortfolios:
+  x-source: warehouse/rm_portfolio.portfolio_pages
+  description: >-
+    One market's Paper portfolios page as of the cut-off: the head-to-head portfolios (scoreboard rows of scopes
+    strategy and pick_rule, forward basis), every open paper trade (B4's open-trade derivation) and the rows of the
+    latest intraday trade check (B12's), and the owner's own paper trades and FIFO positions with the EUR view of US
+    positions. Research only: a paper trade is a record, never an order. Paper only.
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, strategies, companies, h2h_rows, open_trades, trade_checks, owner]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+        companies:
+          type: array
+          items: {$ref: '#/components/schemas/CompanyBrief'}
+        h2h_rows:
+          type: array
+          description: Scoreboard rows of the head-to-head view, scopes strategy and pick_rule (without ticker, regime, median_reached_session and go_live)
+          items: {$ref: '#/components/schemas/H2hPortfolioRow'}
+        open_trades:
+          type: array
+          items: {$ref: '#/components/schemas/OpenTrade'}
+        trade_checks:
+          type: array
+          items: {$ref: '#/components/schemas/TradeCheck'}
+        owner: {$ref: '#/components/schemas/OwnerPortfolio'}
+H2hPortfolioRow:
+  type: object
+  x-source: warehouse/rm_portfolio.h2h_rows
+  required: [scope, market, view, basis, strategy_id, family, pick_rule, horizon_days, trades, net_pnl, luck_test, your_cost]
+  properties:
+    scope: {type: string, enum: [strategy, pick_rule]}
+    market: {$ref: '#/components/schemas/Market'}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    basis: {$ref: '#/components/schemas/ScoreBasis'}
+    strategy_id: {type: ['string', 'null']}
+    family: {type: ['string', 'null'], enum: [rule, baseline, ai, null]}
+    pick_rule: {type: ['string', 'null']}
+    horizon_days: {$ref: '#/components/schemas/HorizonOrAll'}
+    trades: {type: integer}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    mean_return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    win_rate: {$ref: '#/components/schemas/NullableNumber'}
+    target_reached_rate: {$ref: '#/components/schemas/NullableNumber'}
+    avg_target_error_pct: {$ref: '#/components/schemas/NullableNumber'}
+    range_hit_rate: {$ref: '#/components/schemas/NullableNumber'}
+    worst_losing_streak: {type: ['integer', 'null']}
+    max_drawdown: {$ref: '#/components/schemas/NullableNumber'}
+    sample_badge: {type: ['string', 'null']}
+    first_entry: {type: ['string', 'null'], format: date}
+    last_exit: {type: ['string', 'null'], format: date}
+    as_of: {type: ['string', 'null'], format: date}
+    luck_test:
+      oneOf: [{$ref: '#/components/schemas/LuckTest'}, {type: 'null'}]
+    your_cost:
+      oneOf: [{$ref: '#/components/schemas/YourCostView'}, {type: 'null'}]
+OwnerPortfolio:
+  type: object
+  x-source: warehouse/rm_portfolio.owner
+  required: [trades, positions, default_amount, paper]
+  properties:
+    trades:
+      type: array
+      items: {$ref: '#/components/schemas/OwnerTrade'}
+    positions:
+      type: array
+      items: {$ref: '#/components/schemas/OwnerPosition'}
+    default_amount: {type: number, description: 'The default paper amount per trade (₹1,00,000 / $1,000)'}
+    paper: {type: boolean, const: true}
+OwnerTrade:
+  type: object
+  x-source: warehouse/rm_portfolio.owner_trades
+  description: One stored row of the owner's paper trades (kind portfolio_trades; active, cancel or correcting rows), without the channel identity
+  required: [id, market, ticker, side, quantity, price_basis, trade_date, source, entered_at]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    side: {type: string}
+    quantity: {$ref: '#/components/schemas/NullableNumber'}
+    price: {$ref: '#/components/schemas/NullableNumber'}
+    price_basis: {type: ['string', 'null']}
+    trade_date: {type: ['string', 'null'], format: date}
+    source: {type: string}
+    idempotency_key: {type: ['string', 'null']}
+    entered_at: {$ref: '#/components/schemas/IsoTime'}
+    note: {type: ['string', 'null']}
+    supersedes: {type: ['string', 'null']}
+OwnerPosition:
+  type: object
+  x-source: warehouse/rm_portfolio.owner_positions
+  description: An open position (FIFO), marked to the latest stored close by the cut-off, before costs
+  required: [market, ticker, quantity, avg_price, last_close, last_close_date, currency, cost, value, pnl, pnl_pct, eur_view]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    quantity: {type: number}
+    avg_price: {type: number}
+    last_close: {$ref: '#/components/schemas/NullableNumber'}
+    last_close_date: {type: ['string', 'null'], format: date}
+    currency: {type: string, enum: [INR, USD]}
+    cost: {type: number}
+    value: {$ref: '#/components/schemas/NullableNumber'}
+    pnl: {$ref: '#/components/schemas/NullableNumber'}
+    pnl_pct: {$ref: '#/components/schemas/NullableNumber'}
+    eur_view:
+      oneOf: [{$ref: '#/components/schemas/EurView'}, {type: 'null'}]
+EurView:
+  type: object
+  x-source: portfolio/eur_view.eur_view
+  description: The EUR view of a US position (rate change and BUX's FX fee, F1.11)
+  required: [ticker, quantity, mark_date, eurusd_at_buy, eurusd_now, fx_fee_rate, cost_usd, value_usd, cost_eur, value_eur, fx_effect_eur, pnl_eur]
+  properties:
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    quantity: {type: number}
+    mark_date: {$ref: '#/components/schemas/IsoDate'}
+    eurusd_at_buy: {type: number}
+    eurusd_now: {type: number}
+    fx_fee_rate: {type: number}
+    cost_usd: {type: number}
+    value_usd: {type: number}
+    cost_eur: {type: number}
+    value_eur: {type: number}
+    fx_effect_eur: {type: number}
+    pnl_eur: {type: number}
+    note: {type: ['string', 'null']}

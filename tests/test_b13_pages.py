@@ -385,3 +385,87 @@ def test_without_a_stored_run_the_backtest_runs_in_the_build(monkeypatch):
     ctx = lab_context("india")
     ctx.con = stored_runs_connection([])
     assert rm_strategies.backtest(ctx)["run"]["note"] == "live"
+
+
+# ---------- batch 3: Paper portfolios (rm.portfolio) ----------
+MOCKUP_07 = REPO / "design/mockups/07-paper-portfolios/data.json"
+
+
+def owner_example(market: str) -> dict:
+    record = catalogue("portfolio.json")[0]
+    return {
+        "trades": [t for t in record["owner_trades"] if t["market"] == market],
+        "positions": [p for p in record["positions"] if p["market"] == market],
+    }
+
+
+@pytest.mark.parametrize("market", MARKETS)
+def test_head_to_head_portfolio_rows_are_the_mockups(market):
+    from marketbrief.warehouse import rm_portfolio
+
+    rows = rm_portfolio.h2h_rows(lab_context(market))
+    assert canonical(rows) == canonical(json.loads(MOCKUP_07.read_text())["markets"][market]["h2h_rows"])
+    assert schema_errors(rows, "H2hPortfolioRow") == []
+
+
+def test_owner_trades_leave_out_the_channel_identity():
+    from marketbrief.warehouse import rm_portfolio
+
+    columns = SCHEMAS["portfolio_trades"][1]
+    con = duckdb.connect()
+    con.execute(f"CREATE TABLE portfolio_trades ({', '.join(f'{c} {t}' for c, t in columns.items())})")
+    trades = owner_example("us")["trades"]
+    for trade in trades:
+        row = {**dict.fromkeys(columns), **trade, "submitted_by": "dashboard:owner", "command_id": "cmd-1"}
+        con.execute(f"INSERT INTO portfolio_trades VALUES ({', '.join('?' * len(columns))})", [row[c] for c in columns])
+    later = {**trades[0], "id": "pt-later", "entered_at": "2026-10-08T09:00:00Z"}  # entered after the cut-off
+    con.execute(
+        f"INSERT INTO portfolio_trades VALUES ({', '.join('?' * len(columns))})",
+        [{**dict.fromkeys(columns), **later}[c] for c in columns],
+    )
+    context = rm_portfolio.PortfolioContext("us", {}, con, datetime.fromisoformat(CUTOFF), {}, {})
+    got = rm_portfolio.owner_trades(context)
+    assert got == trades
+    assert schema_errors(got, "OwnerTrade") == []
+
+
+def test_owner_positions_in_the_catalogues_fields(monkeypatch):
+    from marketbrief.warehouse import rm_portfolio
+
+    expected = owner_example("us")["positions"]
+    position = expected[0]
+    report = {
+        "positions": [
+            {
+                "ticker": position["ticker"],
+                "quantity": position["quantity"],
+                "avg_price": position["avg_price"],
+                "cost_value": position["cost"],
+                "mark_date": position["last_close_date"],
+                "mark": position["last_close"],
+                "market_value": position["value"],
+                "lots": 1,
+            }
+        ],
+        "eur_view": [position["eur_view"]],
+    }
+    monkeypatch.setattr(rm_portfolio.portfolio_service, "positions_report", lambda _context: report)
+    context = rm_portfolio.PortfolioContext("us", {"currency": "USD"}, None, datetime.fromisoformat(CUTOFF), {}, {})
+    got = rm_portfolio.owner_positions(context)
+    assert got == expected
+    assert schema_errors(got, "OwnerPosition") == []
+
+
+def test_review_keeps_only_the_newest_news_impact_week_by_the_cut_off():
+    ctx = compare_context("us")
+    columns = SCHEMAS["news_impact"][1]
+    row = next(r for r in catalogue("news_impact.json") if r["market"] == "us")
+    older = {**row, "id": "ni-us-2026-W40-x", "iso_week": "2026-W40", "computed_at": "2026-10-03T14:00:00Z"}
+    ctx.con.execute(
+        f"INSERT INTO news_impact VALUES ({', '.join('?' * len(columns))})",
+        [json.dumps(older[c]) if t == "JSON" and older[c] is not None else older[c] for c, t in columns.items()],
+    )
+    assert {r["iso_week"] for r in rm_compare.news_impact(ctx)} == {"2026-W40"}  # W41 not computed by 7 Oct
+    ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")
+    rows = rm_compare.news_impact(ctx)
+    assert rows and {r["iso_week"] for r in rows} == {"2026-W41"}  # both stored: only the newest week

@@ -1,12 +1,13 @@
-"""The Rule vs AI page (B13; docs/ws/b13.md): rm.compare, page_key `_`, served by
-GET /api/v1/markets/{market}/compare. Payload RuleVsAi = design/mockups/06-rule-vs-ai/data.json per market (notes.md
+"""The Rule vs AI page (B13; docs/ws/b13.md): rm.compare, page_key `_` served by GET /api/v1/markets/{market}/compare,
+plus one page per collected ticker (CompanyCompare, B5's compare_rule_vs_ai with a ticker); and rm.review (`_`, GET
+/api/v1/markets/{market}/review). Payload RuleVsAi = design/mockups/06-rule-vs-ai/data.json per market (notes.md
 there names every key and its selection rule): the shared blocks of rm_common, the head-to-head scoreboard rows, the
 settled head-to-head trades with their your-cost settlement rows, the head-to-head picks, the AI reasons of kind
 head_to_head, the end-of-day analyses and the weekly research reviews, each read as of the cut-off by its own
-storage time and kept to the market's collected companies. The research reviews (the handover's rm.review) ride in
-this one page, since a route reads one table.
+storage time and kept to the market's collected companies. The research reviews are in this page and in rm.review
+(the same memoised list), with the newest news-impact week in rm.review.
 
-Also the ctx-first reads Home needs (B11): `eod_analyses(ctx)` (newest first) and `head_to_head_trades(ctx)`."""
+Also the ctx-first reads Home needs (B11), memoised: `picks(ctx)` and `eod_analyses(ctx)` (newest first)."""
 
 from __future__ import annotations
 

@@ -1,5 +1,23 @@
 # B13: the Paper portfolios page (design/mockups/07-paper-portfolios; docs/ws/b13.md). Research only: a paper trade is
 # a record, never an order.
+/api/v1/markets/{market}/portfolios:
+  get:
+    tags: [portfolio]
+    operationId: getPaperPortfolios
+    summary: The head-to-head portfolios, the open paper trades with their latest intraday check, and the owner's own paper portfolio
+    x-read-model: rm.portfolio
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The Paper portfolios read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperPortfoliosResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
 /api/v1/markets/{market}/paper-trades:
   post:
     tags: [portfolio]
@@ -33,6 +51,11 @@
             schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
       '403':
         description: Refused for this caller (a cross-site Origin, before the tool layer and not logged; or the channel)
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
       '404': {$ref: '#/components/responses/NotFound'}
       '409':
         description: The Idempotency-Key was already used for another request; nothing was written
