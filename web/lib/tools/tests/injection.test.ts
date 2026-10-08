@@ -41,7 +41,7 @@ test("instructions in news titles are returned as quoted data and trigger nothin
   assertNoWrite(r);
   assert.equal(r.inbox.commands.length, 1);
   assert.equal(r.inbox.commands[0].tool, "get_news");
-  assert.deepEqual(r.reads.calls, ["news|us|_", "review|us|_"]);
+  assert.deepEqual(r.reads.calls, ["stock|us|AAPL", "news|us|_", "review|us|_"]);
   assertNoSecret(reply, r.inbox.commands, r.notifier.reports);
 });
 

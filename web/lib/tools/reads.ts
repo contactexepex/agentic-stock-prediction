@@ -26,6 +26,19 @@ export const NEWS_TICKER_NOTE =
   "those whose tickers include the company (about_ticker: true when it is a primary ticker). An item's status and " +
   "cluster_id are those of its first primary ticker, not necessarily this company's.";
 
+/** get_news with a ticker also reads the company page's own news list (B12, rm.stock `<ticker>` field `news`). */
+export const COMPANY_NEWS_NOTE =
+  "rm.stock news: the company page's news items (same item schema as rm.news), first seen in the 30 days before the " +
+  "cut-off, newest 50, newest first, each with its verification status as of this company. Only the news field is " +
+  "returned here; get_company returns the whole company page.";
+
+/** The company page reduced to its news list. */
+export function companyNews(payload: unknown): unknown {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  const page = payload as Record<string, unknown>;
+  return { news: Array.isArray(page.news) ? page.news : [] };
+}
+
 interface Lookup {
   table: ReadModelTable;
   key: string;
@@ -76,9 +89,10 @@ export function readLookups(tool: string, args: ToolArgs): Lookup[] {
         { table: "review", key: "_" },
       ];
     case "get_news":
+      if (ticker === null) return [{ table: "news", key: "_" }, { table: "review", key: "_" }];
       return [
-        ticker === null ? { table: "news", key: "_" }
-          : { table: "news", key: "_", select: { apply: (payload) => newsForTicker(payload, ticker), note: NEWS_TICKER_NOTE } },
+        { table: "stock", key: ticker, select: { apply: companyNews, note: COMPANY_NEWS_NOTE } },
+        { table: "news", key: "_", select: { apply: (payload) => newsForTicker(payload, ticker), note: NEWS_TICKER_NOTE } },
         { table: "review", key: "_" },
       ];
     case "get_trades":
