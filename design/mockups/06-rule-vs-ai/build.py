@@ -106,9 +106,12 @@ def compose() -> dict:
                     "GET /api/v1/markets/{market}/compare", "rm.compare + rm.review", NAMES, cutoff, markets)
     data["_data_requests"] = [
         "head-to-head scoreboard rows per company (scope strategy_company with view head_to_head) so the per-company "
-        "comparison reads from the scoreboard instead of being summed from the settled trades",
-        "a research review written before the catalogue's as_of (e.g. 2026-W40, written Saturday 3 Oct) for both markets: "
-        "both stored reviews are written on 10 Oct, after the cut-off, so the weekly-review card is an empty state",
+        "comparison reads from the scoreboard instead of being summed from the settled trades. W1's answer: the "
+        "scoreboard has no per-company head-to-head rows; the heatmap cells (heatmap_cell.json, view head_to_head, "
+        "dimension company, market cost only) hold that cut. The page keeps its own sums, which also give the "
+        "your-cost view; reading the cells is a follow-up",
+        "a research review written before the catalogue's as_of for both markets: answered by W1 (the 2026-W40 "
+        "reviews, written Saturday 3 Oct, are before the cut-off and shown; the W41 reviews of 10 Oct stay hidden)",
     ]
     return data
 

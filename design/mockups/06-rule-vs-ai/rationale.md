@@ -42,10 +42,10 @@ director say about why. The page answers top-down in that order and never turns 
 7. **Why: the end-of-day analyst** (F6.1): the latest session's results per family (rule, baselines, AI: net, trades,
    wins) and per pick rule, the analyst's summary, and the head-to-head reasons (at most 60 words each, citing ids).
 8. **The week's research review** (F6.2): who leads per family, findings with cited ids, and proposals as config
-   diffs with their status ("proposed" until the owner approves; nothing is applied). In the example data both
-   stored reviews are written on 10 Oct, after the cut-off, so the card shows its honest empty state and names the
-   next due Saturday (computed from the cut-off date, not from the stored reviews); a review before the cut-off is
-   requested from W1.
+   diffs with their status ("proposed" until the owner approves; nothing is applied). The example data holds two
+   reviews per market: the 2026-W40 ones, written Saturday 3 Oct before the cut-off, are shown; the W41 ones,
+   written 10 Oct, are after the cut-off and never read. Without a review before the cut-off the card shows an
+   honest empty state naming the next due Saturday (computed from the cut-off date, not from the stored reviews).
 9. **Legend** and **footer**.
 
 ## Data and contract
@@ -53,8 +53,10 @@ director say about why. The page answers top-down in that order and never turns 
   the page computes who leads, the matches, the per-company sums and the cumulative sums.
 - No look-ahead: picks by `made_at`, trades by `settled_at`, reasons and analyses by `created_at`, reviews by
   `written_at`, all at or before the cut-off.
-- Data requests to W1 (both in `data.json` `_data_requests`, sent 2026-10-08): per-company head-to-head scoreboard
-  rows; a research review before the cut-off.
+- Data requests to W1 (both in `data.json` `_data_requests`, sent 2026-10-08, both answered the same day): per-company
+  head-to-head scoreboard rows (answered with the heatmap cells of `heatmap_cell.json`, market cost only; the page
+  keeps its own per-company sums, which also give the your-cost view; reading the cells is a follow-up); a research
+  review before the cut-off (answered: the 2026-W40 reviews of 3 Oct, now shown).
 
 ## Design rules kept
 Design system v2 only; light theme; phone and desktop (the scorecard is one column up to 1000 px; the tables fit their
@@ -82,5 +84,5 @@ found the matches' help text silent on "no pick stored" and this item naming the
   the question is "who is ahead and does it mean anything".
 - Matches are listed per company-day and pick rule with a draw when both families made the same trade, so identical
   picks are not counted as wins.
-- The weekly review is shown as an empty state rather than with a review written after the cut-off: no look-ahead,
-  even in a mockup.
+- The weekly review card reads only reviews written by the cut-off (the W40 ones), never a review written after it:
+  no look-ahead, even in a mockup; without one it shows an empty state naming the next due Saturday.

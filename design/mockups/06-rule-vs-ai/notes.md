@@ -32,8 +32,10 @@ Spec constants in the shared shell (`design/mockups/_shared/shell.js`): the go-l
 two intraday checks per session (SPEC section 7), 20 settled trades to rank (SPEC section 6). The legend shows
 sample values and says so.
 
-Data requests to W1 (`_data_requests` in data.json): head-to-head scoreboard rows per company; a research review
-written before the cut-off (both sent to W1 on 2026-10-08).
+Data requests to W1 (`_data_requests` in data.json), both sent and answered on 2026-10-08: head-to-head scoreboard
+rows per company (answered with the heatmap cells of `heatmap_cell.json`, not read by this page yet); a research
+review written before the cut-off (answered: the 2026-W40 reviews, written 3 Oct, are shown; the W41 ones of
+10 Oct are after the cut-off and never read).
 
 Build: `python design/mockups/06-rule-vs-ai/build.py` (deterministic). Checks: `node design/system/check_page.js
 design/mockups/06-rule-vs-ai/page.html design/mockups/06-rule-vs-ai shot` and `node design/system/check_text.js
