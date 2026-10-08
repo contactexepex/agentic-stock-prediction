@@ -40,11 +40,14 @@ LATE_NEWS = "feedfacefeedface"
 
 
 def own_kind(root: Path, kind: str) -> None:
-    """Replace a kind linked to the repo's data/us (data_tree) by a copy before anything is written to it."""
+    """Replace the kind's files linked to the repo's data/us (data_tree) by copies before anything is written to it."""
     folder = root / "data" / "us" / kind
-    if folder.is_symlink():
-        folder.unlink()
-        shutil.copytree(REPO / "data" / "us" / kind, folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    for path in sorted(folder.rglob("*")):
+        if path.is_symlink():
+            content = path.read_bytes()
+            path.unlink()
+            path.write_bytes(content)
 
 
 def append(root: Path, kind: str, day: str, rows: list[dict]) -> None:
@@ -310,13 +313,21 @@ def later_rows(root: Path) -> None:
     append(root, "events", "2026-10-14", [next_quarter])
 
 
+# The stored data the checks were written against: day files named after this date are left out, so a later
+# routine commit to data/us never changes what the fixture sees (every stored file is named <YYYY-MM-DD>.<ext>)
+DATA_SNAPSHOT_DAY = "2026-10-07"
+
+
 def data_tree(root: Path) -> None:
-    """root/data/us with every kind linked to the repo's folder, read only; a kind is copied the first time the
-    fixture writes to it (own_kind). Issue #48: the fixture copied all of data/us, about 12 MB, at every run."""
-    target = root / "data" / "us"
-    target.mkdir(parents=True)
-    for kind in sorted((REPO / "data" / "us").iterdir()):
-        (target / kind.name).symlink_to(kind, target_is_directory=True)
+    """root/data/us with every stored day file up to DATA_SNAPSHOT_DAY linked to the repo's file, read only; a kind's
+    files are copied the first time the fixture writes to it (own_kind). Issue #48: the fixture copied all of
+    data/us, about 12 MB, at every run."""
+    source = REPO / "data" / "us"
+    for path in sorted(source.rglob("*")):
+        if path.is_file() and path.stem <= DATA_SNAPSHOT_DAY:
+            link = root / "data" / "us" / path.relative_to(source)
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(path)
 
 
 def repo_data_status() -> str:
