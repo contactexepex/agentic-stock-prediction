@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Rule vs AI</title>
+<meta name="description" content="Rule vs AI page of the personal stock cockpit: the head-to-head paper trades of the strongest rule strategy against the strongest AI trader on identical company-days, per market and per company, with profit after costs, win rate and target error, today's picks, gain-pick vs probability-pick, and the why from the end-of-day analyst and the weekly research review. Research only, every signal Paper.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Rule vs AI mockup (design track, SPEC section 6 page 6). Page-local layout only; every colour is a token. */
+.ctrls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.ctrls .c{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+/* scorecard */
+.vs{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:16px;align-items:stretch}
+.vs .side{border-radius:12px;padding:16px 18px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:10px;align-content:start}
+.vs .side.lead{outline:2px solid var(--md-sys-color-primary);outline-offset:-2px}
+.vs .fh{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .vs .fh b{font-size:15px}
+.vs .fh small{color:var(--md-sys-color-on-surface-variant);font-size:12px;min-width:0;overflow-wrap:anywhere}
+.vs .side *{min-width:0} .vs .net small{white-space:normal}
+.vs .net{font:700 28px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.5px}
+.vs .net small{display:block;font:500 12px/1.3 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);letter-spacing:0;margin-top:3px}
+.vs .st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.vs .st div{font-size:12px;color:var(--md-sys-color-on-surface-variant)} .vs .st b{display:block;font-size:15px;color:var(--md-sys-color-on-surface)}
+.vs .mid{display:grid;align-content:center;justify-items:center;gap:8px;padding:0 6px;text-align:center;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);min-width:96px}
+.vs .mid .who{font:700 14px/1.2 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface)}
+.luck{display:inline-flex;align-items:center;gap:6px} .luck svg{width:96px;height:16px;display:block;flex:none}
+.luck .z{stroke:var(--mb-chart-axis)} .luck .raw{stroke:var(--mb-chart-1);stroke-width:2;opacity:.45} .luck .cor{stroke:var(--mb-chart-1);stroke-width:5;stroke-linecap:round} .luck .mean{fill:var(--md-sys-color-on-surface)} .luck .cor.edge{stroke:var(--mb-color-up)}
+/* today's picks */
+.pks{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pkbox{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.pkbox .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px} .pkbox .h b{font-size:13.5px}
+.pk{display:grid;gap:3px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px;min-width:0}
+.pk .l1,.pk .l2{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0} .pk .l1 small{color:var(--md-sys-color-on-surface-variant)} .pk .mb-label{font-size:11px;padding:1px 6px}
+.pk .g{font-weight:700}
+/* matches */
+.mt td{vertical-align:middle} .mt .res b{display:block;font-weight:700} .mt .res small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.mt .win{font-weight:700} .mt .mb-label{font-size:11px;padding:1px 6px}
+/* why */
+.fam3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0 12px}
+.fam3 .f{border-radius:10px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:3px}
+.fam3 .f .l{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;align-items:center;gap:6px} .fam3 .f .v{font-weight:700;font-size:16px} .fam3 .f .s{font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.summ{font-size:13.5px;line-height:1.55;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);display:flex;gap:10px;align-items:flex-start}
+.summ .ms{flex:none;width:20px;height:20px;color:var(--md-sys-color-primary);margin-top:2px}
+.rl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}
+.rl li{padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;display:grid;gap:5px}
+.rl li:first-child{border-top:0}
+.rl .rh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--md-sys-color-on-surface-variant)} .rl .rh b{color:var(--md-sys-color-on-surface)}
+.rl .ids{display:flex;gap:4px;flex-wrap:wrap} .rl .ids code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere}
+/* review */
+.rev h3{font:600 13px/1.3 var(--md-ref-typeface-plain);margin:14px 0 6px;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase;letter-spacing:.04em}
+.rev pre{margin:6px 0 0;padding:10px 12px;border-radius:8px;background:var(--md-sys-color-surface-container);font:12px/1.5 var(--md-ref-typeface-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.rev .prop{border:1px solid var(--md-sys-color-outline-variant);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px}
+.rev .prop .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .rev .prop .ph b{font-weight:600}
+.lead-row{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:13px}
+.cum{position:relative} .cum svg{display:block;width:100%;height:auto;overflow:visible}
+.cum .grid line{stroke:var(--mb-chart-grid)} .cum .ax text{font-size:11px;fill:var(--mb-chart-label)}
+.cum .ln{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round} .cum .ln.r{stroke:var(--mb-chart-1)} .cum .ln.a{stroke:var(--mb-chart-3)}
+.cum .pt{stroke:var(--md-sys-color-surface-container-lowest);stroke-width:1.5} .cum .pt.r{fill:var(--mb-chart-1)} .cum .pt.a{fill:var(--mb-chart-3)}
+.cum .zero{stroke:var(--mb-chart-ink);stroke-dasharray:2 3}
+.cum text.lab{font-size:11px;font-weight:600;fill:var(--md-sys-color-on-surface);paint-order:stroke;stroke:var(--md-sys-color-surface-container-lowest);stroke-width:3px}
+@media (max-width:1199px){ .mt .cw{display:none} }
+@media (max-width:1000px){ .mt .cm{display:none} .luck svg{display:none} .vs{grid-template-columns:1fr} .vs .mid{min-width:0;padding:4px 0} }
+@media (max-width:760px){ .mt th,.mt td,.mt td.num,.mt th.num{padding:8px 4px;white-space:normal} .pks{grid-template-columns:1fr} .fam3{grid-template-columns:1fr} .mt th,.mt td{padding:8px 6px;white-space:normal} .mt .mb-label{white-space:normal} .vs .st{grid-template-columns:repeat(3,minmax(0,1fr))} .mt .res small{white-space:normal} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Rule vs AI</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let cost = 'market';
+shell(PAGES.compare, 'Rule vs AI');
+onMarketChange = () => render();
+const REGIME_WORDS = {CALM: 'calm', TRENDING: 'trending', EVENT_HEAVY: 'event-heavy', UNSTABLE: 'unstable'};
+const val = (r, k) => cost === 'your' && r.your_cost && k in r.your_cost ? r.your_cost[k] : r[k];
+const luckOf = r => cost === 'your' && r.your_cost ? r.your_cost.luck_test : r.luck_test;
+const famRow = (p, f) => p.rows.find(r => r.scope === 'strategy' && r.family === f && r.horizon_days === 'all' && r.basis === 'forward') || null;
+function luckBar(r) {
+  const t = luckOf(r); if (!t || t.low_pct == null) return el('span', {class:'muted', 'data-tip':'Fewer than 2 trades: no luck interval yet.'}, 'none yet');
+  const lo = Math.min(t.corrected_low_pct ?? t.low_pct, t.low_pct, 0), hi = Math.max(t.corrected_high_pct ?? t.high_pct, t.high_pct, 0), X = v => 4 + (v - lo) / ((hi - lo) || 1) * 88;
+  const s = svgEl('svg', {viewBox:'0 0 96 16', role:'img', 'aria-label': `luck interval ${sgn(t.low_pct)} to ${sgn(t.high_pct)}, corrected ${sgn(t.corrected_low_pct)} to ${sgn(t.corrected_high_pct)}`});
+  s.append(svgEl('line', {class:'z', x1: X(0), x2: X(0), y1: 1, y2: 15}), svgEl('line', {class:'raw', x1: X(t.low_pct), x2: X(t.high_pct), y1: 8, y2: 8}));
+  if (t.corrected_low_pct != null) s.append(svgEl('line', {class:'cor' + (t.corrected ? ' edge' : ''), x1: X(t.corrected_low_pct), x2: X(t.corrected_high_pct), y1: 8, y2: 8}));
+  s.append(svgEl('circle', {class:'mean', cx: X(val(r, 'mean_return_pct')), cy: 8, r: 2.5}));
+  return el('span', {class:'luck', 'data-tip': `Luck test (${t.n} trades): mean return per trade ${sgn(val(r, 'mean_return_pct'))}; 95% interval ${sgn(t.low_pct)} to ${sgn(t.high_pct)} (thin), corrected for the ${t.m} rows compared ${sgn(t.corrected_low_pct)} to ${sgn(t.corrected_high_pct)} (thick). ${t.corrected ? 'Excludes zero: an edge may be real.' : 'Includes zero: could be luck; no edge claimed.'}`}, s, el('span', {class:'mb-label ' + (t.corrected ? 'success' : 'neutral')}, t.corrected ? 'edge' : 'luck?'));
+}
+
+/* ---------- scorecard ---------- */
+function scorecard(p) {
+  const cur = p.currency, R = famRow(p, 'rule'), A = famRow(p, 'ai');
+  const card = el('section', {class:'card', 'aria-label':'Head-to-head scorecard'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Head-to-head: the strongest rule strategy vs the strongest AI trader'), help('The head-to-head view (F1, decisions 41-42): every session, for each company, the family’s strongest strategy picks one horizon under each of two pick rules (best expected gain, highest probability); each pick is one paper trade of the company’s amount. Rule and AI trade on identical company-days, so their results compare fairly. Figures after the selected costs; the luck test says whether the gap could be chance.'), el('div', {class:'end'}, el('span', {class:'mb-tag paper'}, 'paper'), `forward · as of the ${fmtD(p.as_of, false)} close`)));
+  const side = (f, r) => { const s = el('div', {class:'side' + (r && R && A && val(r, 'net_pnl') > Math.max(val(R, 'net_pnl'), val(A, 'net_pnl')) - 1e-9 && val(R, 'net_pnl') !== val(A, 'net_pnl') ? ' lead' : '')});
+    s.append(el('div', {class:'fh'}, avatar(FAMILY[f][1], f === 'ai' ? 'info' : '', 'sm'), el('b', {}, FAMILY[f][0]), r ? el('small', {}, `· ${stratOf(market, r.strategy_id).name}`) : el('small', {}, '· no settled head-to-head trade yet')));
+    if (!r) { s.append(el('div', {class:'quiet'}, 'Nothing settled yet in the head-to-head view.')); return s; }
+    s.append(el('div', {class:'net'}, moneyDelta(cur, val(r, 'net_pnl'), dec(cur)), el('small', {}, `profit after ${cost} cost on ${r.trades} trade${r.trades === 1 ? '' : 's'} · ${r.sample_badge === 'too_few_to_rank' ? `too few to rank (under ${MIN_TRADES_TO_RANK})` : 'enough to rank'}`)));
+    s.append(el('div', {class:'st'}, el('div', {'data-tip': `${pct(val(r, 'win_rate'))} of trades made money after ${cost} cost.`}, 'Win rate', el('b', {}, pct(val(r, 'win_rate')))), el('div', {'data-tip':'Average distance of the exit close from the predicted target, in percent (F1.9).'}, 'Target error', el('b', {}, sgn(r.avg_target_error_pct))), el('div', {'data-tip': `Mean return per trade after ${cost} cost; drawdown ${money(cur, val(r, 'max_drawdown'), dec(cur), true)}, worst streak ${val(r, 'worst_losing_streak')}.`}, 'Per trade', el('b', {}, sgn(val(r, 'mean_return_pct'))))));
+    s.append(luckBar(r)); return s; };
+  const mid = el('div', {class:'mid'});
+  if (R && A) { const d = val(R, 'net_pnl') - val(A, 'net_pnl'); mid.append(icon('ms-layers'), el('div', {class:'who'}, Math.abs(d) < 1e-9 ? 'Level' : d > 0 ? 'Rule ahead' : 'AI ahead'), el('div', {}, Math.abs(d) < 1e-9 ? 'identical results so far' : `by ${money(cur, Math.abs(d), dec(cur))} after ${cost} cost`), el('div', {class:'muted'}, `${R.trades + A.trades} trades in all · ${p.status.paper_label}`)); }
+  else mid.append(icon('ms-layers'), el('div', {class:'who'}, 'No verdict yet'));
+  card.append(el('div', {class:'vs'}, side('rule', R), mid, side('ai', A)));
+  card.append(el('p', {class:'note'}, 'A lead on a handful of trades is mostly luck (SPEC section 6): the luck bar must clear zero after correction before anyone is called better. Nothing here is advice.'));
+  return card;
+}
+
+/* ---------- today's picks ---------- */
+function picksCard(p) {
+  const cur = p.currency, picked = p.picks.filter(k => k.status === 'picked');
+  const card = el('section', {class:'card', 'aria-label':'Today’s head-to-head picks'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Today’s picks for ${fmtD(p.status.session.session_date)}`), help('The paper trades both families will make at the open of the session being predicted: for each company, the strongest rule strategy and the strongest AI trader each pick one horizon per pick rule. "Clears market costs" is the ranking view; "viable at your cost" adds your broker’s charges (decision 51).'), el('div', {class:'end'}, picked.length ? viableLine(picked) : 'no pick today')));
+  if (!p.picks.length) { card.append(el('div', {class:'quiet'}, 'No head-to-head picks stored for the session.')); return card; }
+  const g = el('div', {class:'pks'});
+  for (const f of ['rule', 'ai']) {
+    const fk = picked.filter(k => k.family === f), box = el('div', {class:'pkbox'});
+    const any = fk[0], st = any ? stratOf(market, any.strategy_id) : null;
+    box.append(el('div', {class:'h'}, avatar(FAMILY[f][1], f === 'ai' ? 'info' : '', 'sm'), el('b', {}, FAMILY[f][0]), st ? el('span', {class:'muted'}, `· ${st.name} · ${fk.length} pick${fk.length === 1 ? '' : 's'}`) : el('span', {class:'muted'}, '· no candidate today')));
+    for (const k of fk) box.append(el('div', {class:'pk'}, el('span', {class:'l1'}, el('a', {class:'tk', href: companyPage(k.ticker)}, k.ticker), el('small', {}, `${companyOf(market, k.ticker).name} · ${PICK[k.pick_rule]}`), el('span', {class:'h-lab'}, `N+${k.horizon_days}`)), el('span', {class:'l2'}, odds(k.prob_up, `${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close.`), el('span', {class:'g'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, dec(cur))), ...costLabels(cur, k))));
+    if (!fk.length) box.append(el('div', {class:'quiet'}, `No ${f === 'rule' ? 'rule strategy' : 'AI trader'} buys any company at any horizon today.`));
+    g.append(box);
+  }
+  card.append(g);
+  return card;
+}
+
+/* ---------- matches on identical company-days ---------- */
+function matches(p) {
+  const cur = p.currency, groups = {};
+  for (const t of p.trades) { const k = `${t.entry_date}|${t.ticker}|${t.pick_rule}`; (groups[k] = groups[k] || {entry_date: t.entry_date, ticker: t.ticker, pick_rule: t.pick_rule, rule: null, ai: null})[t.family] = t; }
+  const list = Object.values(groups).sort((a, b) => b.entry_date.localeCompare(a.entry_date) || a.ticker.localeCompare(b.ticker) || a.pick_rule.localeCompare(b.pick_rule));
+  const card = el('section', {class:'card', 'aria-label':'Matches'});
+  const both = list.filter(g => g.rule && g.ai), ruleW = both.filter(g => g.rule.net_pnl > g.ai.net_pnl).length, aiW = both.filter(g => g.ai.net_pnl > g.rule.net_pnl).length;
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Match by match: identical company-days'), help('One row per company, entry session and pick rule in the head-to-head view (the entry session under the company name). Where both families traded, the row says who made more after market cost (a draw when the picks were the same horizon, so the same trade). Where only one family had a candidate there is no match, only a result.'), el('div', {class:'end'}, both.length ? `${both.length} match${both.length === 1 ? '' : 'es'}: rule ${ruleW}, AI ${aiW}, draw ${both.length - ruleW - aiW}` : 'no completed match yet')));
+  if (!list.length) { card.append(el('div', {class:'quiet'}, 'No settled head-to-head trade yet.')); return card; }
+  const tb = el('table', {class:'md-table tbl mt'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company · entry'), el('th', {class:'cm'}, 'Pick rule'), el('th', {}, 'Rule'), el('th', {}, 'AI'), el('th', {}, 'Who won'))));
+  const body = el('tbody');
+  const res = t => t ? el('span', {class:'res'}, el('b', {}, moneyDelta(cur, t.net_pnl, dec(cur))), el('small', {}, `${stratOf(market, t.strategy_id).name} · N+${t.horizon_days} · ${sgn(t.return_pct)}`, el('span', {class:'cw'}, ` · target ${t.target_reached ? 'reached' : 'missed'}, error ${sgn(t.target_error_pct)}`))) : el('span', {class:'muted', 'data-tip':'This family had no candidate for this company-day under this pick rule.'}, 'no candidate');
+  for (const g of list) {
+    let who;
+    if (g.rule && g.ai) who = g.rule.net_pnl === g.ai.net_pnl ? el('span', {class:'mb-label neutral', 'data-tip':'Both families picked the same horizon, so the same trade: a draw.'}, 'draw') : g.rule.net_pnl > g.ai.net_pnl ? el('span', {class:'mb-label'}, icon('ms-settings'), 'rule') : el('span', {class:'mb-label info'}, icon('ms-bolt'), 'AI');
+    else who = el('span', {class:'muted'}, 'no match');
+    body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(g.ticker)}, g.ticker), el('small', {class:'muted', style:'display:block;font-size:11px'}, `${companyOf(market, g.ticker).name} · entered ${fmtD(g.entry_date, false)}`)), el('td', {class:'cm'}, PICK[g.pick_rule] || g.pick_rule), el('td', {}, res(g.rule)), el('td', {}, res(g.ai)), el('td', {class:'win'}, who)));
+  }
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+/* ---------- pick rules and regimes ---------- */
+function slices(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'By pick rule and regime'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Gain-pick vs probability-pick, and by regime'), help('The same head-to-head trades cut two ways (F7.1): by the pick rule that chose the horizon (best expected gain vs highest probability) and by the market regime at prediction time (F2.6).')));
+  const pr = p.rows.filter(r => r.scope === 'pick_rule' && r.horizon_days === 'all').sort((a, b) => a.family.localeCompare(b.family) || a.pick_rule.localeCompare(b.pick_rule));
+  const rg = p.rows.filter(r => r.scope === 'strategy_regime').sort((a, b) => a.family.localeCompare(b.family) || String(a.regime).localeCompare(String(b.regime)));
+  const tbl = (rows, firstLabel, firstOf) => { const t = el('table', {class:'md-table tbl mt'}); t.append(el('thead', {}, el('tr', {}, el('th', {}, firstLabel), el('th', {class:'num'}, 'Trades'), el('th', {class:'num'}, `Profit after ${cost} cost`), el('th', {class:'num'}, 'Win rate'), el('th', {class:'num cm'}, 'Target error'), el('th', {}, 'Luck test')))); const b = el('tbody'); for (const r of rows) b.append(el('tr', {}, el('td', {}, famLabel(r.family, FAMILY_SHORT[r.family]), ' ', firstOf(r)), el('td', {class:'num'}, String(r.trades)), el('td', {class:'num'}, moneyDelta(cur, val(r, 'net_pnl'), dec(cur))), el('td', {class:'num'}, pct(val(r, 'win_rate'))), el('td', {class:'num cm'}, sgn(r.avg_target_error_pct)), el('td', {}, luckBar(r)))); t.append(b); return el('div', {class:'md-table-wrap'}, t); };
+  card.append(el('div', {class:'sub2', style:'margin:0 0 8px'}, 'By pick rule'), pr.length ? tbl(pr, 'Family × pick rule', r => PICK[r.pick_rule] || r.pick_rule) : el('div', {class:'quiet'}, 'No pick-rule row yet.'));
+  card.append(el('div', {class:'sub2', style:'margin:14px 0 8px'}, 'By market regime at prediction time'), rg.length ? tbl(rg, 'Family × regime', r => el('span', {}, REGIME_WORDS[r.regime] || r.regime, el('small', {class:'muted', style:'display:block;font-size:11px'}, stratOf(market, r.strategy_id).name))) : el('div', {class:'quiet'}, 'No regime row yet.'));
+  return card;
+}
+
+/* ---------- per company ---------- */
+function perCompany(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Per company'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Per company'), help('Rule vs AI on each company, head-to-head view: settled trades, profit after market cost and win rate per family, summed from the settled head-to-head trades (a per-company scoreboard row is requested from W1). A per-company lead on a few trades is mostly luck.'), el('div', {class:'end'}, el('a', {class:'go', href: PAGES.watchlist}, 'Watchlist', icon('ms-chevron_right')))));
+  const tickers = [...new Set(p.trades.map(t => t.ticker))].sort();
+  if (!tickers.length) { card.append(el('div', {class:'quiet'}, 'No settled head-to-head trade on any company yet.')); return card; }
+  const tb = el('table', {class:'md-table tbl mt'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Rule'), el('th', {}, 'AI'), el('th', {}, 'Ahead'))));
+  const body = el('tbody');
+  const agg = ts => ts.length ? {n: ts.length, net: ts.reduce((s, t) => s + t.net_pnl, 0), win: ts.filter(t => t.net_pnl > 0).length} : null;
+  const cell = a => a ? el('span', {class:'res'}, el('b', {}, moneyDelta(cur, a.net, dec(cur))), el('small', {}, `${a.n} trade${a.n === 1 ? '' : 's'} · ${a.win} won`)) : el('span', {class:'muted'}, 'no trade');
+  for (const t of tickers) { const r = agg(p.trades.filter(x => x.ticker === t && x.family === 'rule')), a = agg(p.trades.filter(x => x.ticker === t && x.family === 'ai')); let who = el('span', {class:'muted'}, '—'); if (r && a) who = r.net === a.net ? el('span', {class:'mb-label neutral'}, 'level') : r.net > a.net ? el('span', {class:'mb-label'}, 'rule') : el('span', {class:'mb-label info'}, 'AI'); else if (r || a) who = el('span', {class:'muted'}, 'one side only');
+    body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(t), 'data-tip': `${companyOf(market, t).name}: open the company page.`}, t), el('small', {class:'muted', style:'display:block;font-size:11px'}, companyOf(market, t).name)), el('td', {}, cell(r)), el('td', {}, cell(a)), el('td', {}, who))); }
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+/* ---------- cumulative lines rule vs ai ---------- */
+let cumHost;
+function cumCard(p) { const card = el('section', {class:'card', 'aria-label':'Cumulative profit'}); card.append(el('div', {class:'head'}, el('h2', {}, 'Cumulative profit after market cost, head-to-head'), help('Each family’s settled head-to-head trades added up by exit date (F2.8), starting at zero on the first entry date. Dotted line = zero.'), el('div', {class:'end'}, el('span', {class:'mb-tag paper'}, 'paper')))); cumHost = el('div', {class:'cum'}); card.append(cumHost); return card; }
+function drawCum(p) {
+  const host = cumHost; if (!host || !host.isConnected) return; host.innerHTML = '';
+  const cur = p.currency, exits = [...new Set(p.trades.map(t => t.exit_date_actual || t.exit_date))].sort();
+  if (!exits.length) { host.append(el('div', {class:'quiet'}, 'No settled head-to-head trade yet.')); return; }
+  const start = p.trades.map(t => t.entry_date).sort()[0], dates = [start, ...exits.filter(d => d !== start)];
+  const lines = ['rule', 'ai'].map(f => { let c = 0; return {f, pts: dates.map(d => { for (const t of p.trades) if (t.family === f && (t.exit_date_actual || t.exit_date) === d) c += t.net_pnl; return c; })}; });
+  const W = Math.max(280, host.clientWidth), phone = W < 560, H = 200, L = phone ? 52 : 64, R = phone ? 12 : 60, T = 12, B = 26;
+  let lo = Math.min(0, ...lines.flatMap(l => l.pts)), hi = Math.max(0, ...lines.flatMap(l => l.pts)); const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
+  const X = i => L + (dates.length === 1 ? (W - L - R) / 2 : i / (dates.length - 1) * (W - L - R)), Y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, width: W, height: H, role:'img', 'aria-label': `Cumulative head-to-head profit by exit date: rule ${money(cur, lines[0].pts.at(-1), dec(cur), true)}, AI ${money(cur, lines[1].pts.at(-1), dec(cur), true)}.`});
+  const grid = svgEl('g', {class:'grid'}), ax = svgEl('g', {class:'ax'});
+  for (const v of niceTicks(lo, hi, 4)) { grid.append(svgEl('line', {x1: L, x2: W - R, y1: Y(v), y2: Y(v)})); const t = svgEl('text', {x: L - 6, y: Y(v) + 4, 'text-anchor':'end'}); t.textContent = money(cur, v, 0, true); ax.append(t); }
+  dates.forEach((d, i) => { const t = svgEl('text', {x: X(i), y: H - 8, 'text-anchor':'middle'}); t.textContent = fmtD(d, false); ax.append(t); });
+  svg.append(grid, svgEl('line', {class:'zero', x1: L, x2: W - R, y1: Y(0), y2: Y(0)}));
+  for (const l of lines) { const k = l.f === 'rule' ? 'r' : 'a'; svg.append(svgEl('polyline', {class:`ln ${k}`, points: l.pts.map((v, i) => `${X(i)},${Y(v)}`).join(' ')})); l.pts.forEach((v, i) => { const c = svgEl('circle', {class:`pt ${k}`, cx: X(i), cy: Y(v), r: 4}); c.append(svgEl('title')); c.lastChild.textContent = `${FAMILY[l.f][0]} through ${fmtD(dates[i])}: ${money(cur, v, dec(cur), true)}`; c.setAttribute('tabindex', '0'); c.setAttribute('data-tip', c.lastChild.textContent); svg.append(c); }); if (!phone) { const t = svgEl('text', {class:'lab', x: W - R + 8, y: Y(l.pts.at(-1)) + 4 + (l.f === 'ai' && Math.abs(Y(lines[0].pts.at(-1)) - Y(l.pts.at(-1))) < 13 ? 13 : 0)}); t.textContent = FAMILY_SHORT[l.f]; svg.append(t); } }
+  svg.append(ax); host.append(svg);
+  host.append(el('div', {class:'legend2', style:'margin-top:6px'}, el('span', {}, el('i', {class:'sw r'}), 'rule'), el('span', {}, el('i', {class:'sw a'}), 'AI'), el('span', {class:'muted'}, 'identical picks add the same trade to both lines')));
+}
+function niceTicks(lo, hi, n) { const span = hi - lo, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag, stepv = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = []; for (let v = Math.ceil(lo / stepv) * stepv; v <= hi; v += stepv) out.push(+v.toFixed(6)); return out; }
+
+/* ---------- why: EOD analyst ---------- */
+function why(p) {
+  const cur = p.currency, e = p.eod[0], card = el('section', {class:'card', 'aria-label':'Why: the end-of-day analyst'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Why: the end-of-day analyst'), help('After each close the EOD analyst (Sonnet, F6.1) sums the day per family and per pick rule, writes a summary of at most 150 words citing ids, and a reason of at most 60 words for every head-to-head trade settled that day, grounded in the trade’s automatic reason split (market, sector, news, company). A deterministic gate checks every id and number. It explains; it never predicts.'), el('div', {class:'end'}, e ? `session ${fmtD(e.session_date)} · ${e.settled_trades} trades settled` : '')));
+  if (!e) { card.append(el('div', {class:'quiet'}, 'No end-of-day analysis stored by the cut-off.')); return card; }
+  const f3 = el('div', {class:'fam3'});
+  for (const f of ['rule', 'baseline', 'ai']) { const x = e.results[f]; f3.append(el('div', {class:'f'}, el('div', {class:'l'}, el('i', {class:'sw ' + FAMILY[f][2]}), FAMILY[f][0]), el('div', {class:'v'}, moneyDelta(cur, x.net_pnl, dec(cur))), el('div', {class:'s'}, x.trades ? `${x.wins} of ${x.trades} trade${x.trades === 1 ? '' : 's'} made money (accuracy view, market cost)` : 'no trade settled'))); }
+  card.append(f3);
+  card.append(el('div', {class:'lead-row'}, ...['best_expected_gain', 'highest_probability'].map(k => el('span', {'data-tip': `Head-to-head trades chosen by the ${PICK[k].toLowerCase()} rule that settled this session.`}, `${PICK[k]}: `, el('b', {}, e.results[k].trades ? `${money(cur, e.results[k].net_pnl, dec(cur), true)} on ${e.results[k].trades}` : 'no trade')))));
+  card.append(el('div', {class:'summ', style:'margin-top:12px'}, icon('ms-description'), el('div', {}, e.summary)));
+  if (p.reasons.length) { const ul = el('ul', {class:'rl'}); for (const r of p.reasons) ul.append(el('li', {}, el('div', {class:'rh'}, famLabel(stratOf(market, r.strategy_id).family, FAMILY_SHORT[stratOf(market, r.strategy_id).family]), el('b', {}, stratOf(market, r.strategy_id).name), el('a', {class:'tk', href: companyPage(r.ticker)}, r.ticker), el('span', {}, `· settled ${fmtD(r.session_date)}`)), el('div', {}, r.text), el('div', {class:'ids'}, ...r.cited_ids.map(id => el('code', {}, id))))); card.append(ul); }
+  else card.append(el('div', {class:'quiet', style:'margin-top:10px'}, 'No head-to-head reason stored yet.'));
+  return card;
+}
+
+/* ---------- weekly research review ---------- */
+function review(p) {
+  const cur = p.currency, r = p.reviews[0], card = el('section', {class:'card rev', 'aria-label':'Weekly research review'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'The week’s research review'), help('Every Saturday the research director (Opus, F6.2) reads the scoreboard, the news-impact study, the week’s EOD analyses and lessons, and writes who is ahead and why, which information helped, and proposals as config diffs. It changes nothing itself: every proposal stays "proposed" until the owner approves it.'), el('div', {class:'end'}, r ? `${r.iso_week} · ${fmtD(r.period_start, false)}–${fmtD(r.period_end, false)}` : '')));
+  if (!r) { card.append(el('div', {class:'quiet'}, `No weekly review written by the cut-off${p.reviews_pending.length ? ` (${p.reviews_pending.join(', ')} is written on Saturday, after it)` : ''}. The first review arrives the Saturday after the first forward week.`)); return card; }
+  card.append(el('h3', {}, 'Who leads'), el('div', {class:'lead-row'}, ...r.leaders.map(l => el('span', {}, famLabel(l.scope, FAMILY_SHORT[l.scope] || l.scope), ' ', el('b', {}, stratOf(market, l.strategy_id).name), ` ${money(cur, l.net_pnl, dec(cur), true)} on ${l.trades}`))));
+  card.append(el('h3', {}, 'Findings')); const ul = el('ul', {class:'rl'}); for (const f of r.findings) ul.append(el('li', {}, el('div', {}, f.text), el('div', {class:'ids'}, ...f.cited_ids.map(id => el('code', {}, id))))); card.append(ul);
+  card.append(el('h3', {}, 'Proposals (nothing applied until the owner approves)'));
+  for (const q of r.proposals) card.append(el('div', {class:'prop'}, el('div', {class:'ph'}, el('b', {}, `${q.kind} · ${q.file}`), el('span', {class:'mb-label ' + (q.status === 'proposed' ? 'warn' : 'neutral')}, q.status), el('code', {}, q.proposal_id)), el('div', {style:'margin-top:4px'}, q.rationale), el('pre', {}, q.diff), el('div', {class:'ids', style:'margin-top:6px'}, ...q.cited_ids.map(id => el('code', {}, id)))));
+  card.append(el('p', {class:'note'}, `Full report: ${r.report_path}`));
+  return card;
+}
+
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('i', {class:'sw r'}), 'rule ', el('i', {class:'sw b'}), 'baselines ', el('i', {class:'sw a'}), 'AI'),
+    el('span', {}, el('span', {class:'mb-label success'}, 'edge'), ' the corrected luck interval excludes zero; ', el('span', {class:'mb-label neutral'}, 'luck?'), ' it does not'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every signal and trade until proven; nothing here is advice'));
+}
+
+let ro;
+function render() {
+  const p = P(market);
+  document.title = `Market brief · Rule vs AI · ${LABEL[market]}`; $('#title').textContent = `Rule vs AI · ${p.name}`;
+  sideFoot(market); marketSeg(() => render());
+  const page = $('#page'); page.innerHTML = '';
+  const bar = el('div', {class:'ctrls'}); const sg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Costs'}); for (const [k, t] of [['market', 'Market cost'], ['your', 'Your cost']]) sg.append(el('button', {type:'button', 'aria-pressed': String(k === cost), onclick: () => { cost = k; render(); }}, t)); bar.append(el('span', {class:'c'}, 'Costs', help('Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50).'), sg));
+  page.append(pageHead(market, 'Rule vs AI', `head-to-head paper trades on identical company-days · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only`), paperBand(market, p.go_live, Object.keys(p.strategies).length), bar);
+  page.append(el('div', {style:'margin-top:16px'}, scorecard(p)), el('div', {style:'margin-top:16px'}, picksCard(p)), el('div', {style:'margin-top:16px'}, matches(p)));
+  page.append(el('div', {style:'margin-top:16px'}, slices(p)));
+  const grid = el('div', {class:'grid even'}); grid.append(perCompany(p), cumCard(p)); page.append(grid);
+  page.append(el('div', {style:'margin-top:16px'}, why(p)), el('div', {style:'margin-top:16px'}, review(p)), legend(), footer(market, D.endpoint));
+  makeFocusable(page); drawCum(p);
+  if (ro) ro.disconnect(); ro = new ResizeObserver(() => { const svg = cumHost && cumHost.querySelector('svg'); if (cumHost && cumHost.isConnected && (!svg || Math.abs(cumHost.clientWidth - svg.clientWidth) > 2)) drawCum(P(market)); }); ro.observe(cumHost);
+}
+render();
+</script>
+</body>
+</html>
