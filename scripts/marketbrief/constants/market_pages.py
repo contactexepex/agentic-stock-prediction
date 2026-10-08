@@ -17,6 +17,8 @@ NEWS_MAX_ITEMS = 50
 NEWS_MIN_MARKET_RELEVANCE = 0.4
 # Home's news card: the same window as the News page (design/mockups/01-home/notes.md)
 HOME_NEWS_WINDOW_DAYS = NEWS_WINDOW_DAYS
+# Home's agreement card: the active companies' top 5 per horizon (design/mockups/01-home/notes.md)
+HOME_AGREEMENT_TOP = 5
 # the News page's calendar: the session being predicted to 7 days after it
 NEWS_CALENDAR_DAYS = 7
 SCOPE_COMPANY = "company"
@@ -41,6 +43,8 @@ COMPANY_EVENT_LABEL = {"earnings": "results", "ex_dividend": "ex-dividend"}
 # the Companies page's commands (design/mockups/10-companies/notes.md); masking a deleted company (decision 12)
 COMPANY_COMMAND_TOOLS = ("add_company", "deactivate_company", "reactivate_company", "set_paper_amount",
                          "delete_company")
+# the command arguments the Companies page carries (design/mockups/10-companies/notes.md)
+COMMAND_ARGUMENT_FIELDS = ("market", "symbol", "ticker")
 MASKED = "(masked)"
 MASKED_COMPANY = "(deleted company)"
 MASKED_MESSAGE = "(this company was deleted later; its records are excluded on read)"
