@@ -1,0 +1,95 @@
+# The Home page (B11; design/mockups/01-home/notes.md). Builder: scripts/marketbrief/warehouse/rm_home.py.
+HomeResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/HomePayload'}
+HomePayload:
+  x-source: warehouse/rm_home.home_pages
+  description: >-
+    The Home page: the page shell, the Company records, the Agreement (the active companies' top 5 per horizon), the
+    head-to-head picks of the session being predicted, the open trades, the latest trade checks by the cut-off, the
+    newest end-of-day analysis, the head-to-head results to date per family and pick rule, the strategies, the News
+    window (the News page's items, with headline history) and the settled trades. Every signal is Paper until
+    `go_live.proven`
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, companies, agreement, head_to_head, open_trades, trade_checks, eod, to_date,
+                 strategies, news, settled_trades]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        companies:
+          type: array
+          items: {$ref: '#/components/schemas/CompanyRecord'}
+        agreement: {$ref: '#/components/schemas/AgreementMap'}
+        head_to_head:
+          type: array
+          items: {$ref: '#/components/schemas/HeadToHeadPick'}
+        open_trades:
+          type: array
+          items: {$ref: '#/components/schemas/OpenTrade'}
+        trade_checks:
+          type: array
+          items: {$ref: '#/components/schemas/TradeCheck'}
+        eod:
+          oneOf: [{$ref: '#/components/schemas/EodAnalysis'}, {type: 'null'}]
+        to_date:
+          type: array
+          items: {$ref: '#/components/schemas/HomeToDateRow'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+        news:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/NewsItemRecord'}
+        settled_trades:
+          type: array
+          items: {$ref: '#/components/schemas/HomeSettledTrade'}
+HomeToDateRow:
+  type: object
+  x-source: warehouse/rm_home.to_date (B13's rm_strategies.scoreboard_rows)
+  description: A Scoreboard row of the head-to-head view, scope pick_rule, all horizons (the fields Home uses)
+  required: [scope, market, view, family, pick_rule, horizon_days, trades, net_pnl, mean_return_pct, win_rate,
+             sample_badge, basis, as_of]
+  properties:
+    scope: {type: string, const: pick_rule}
+    market: {$ref: '#/components/schemas/Market'}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    family: {type: string, enum: [rule, baseline, ai]}
+    pick_rule: {type: string}
+    horizon_days: {$ref: '#/components/schemas/HorizonOrAll'}
+    trades: {type: integer, minimum: 0}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    mean_return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    win_rate: {$ref: '#/components/schemas/NullableNumber'}
+    sample_badge: {type: string, enum: [ok, too_few_to_rank]}
+    basis: {$ref: '#/components/schemas/ScoreBasis'}
+    as_of: {type: ['string', 'null'], format: date}
+HomeSettledTrade:
+  type: object
+  x-source: warehouse/rm_home.home_pages (B4's rm_common.settled_trades)
+  description: A settled paper trade (newest settlement of its trade by the cut-off) with the fields Home uses
+  required: [trade_id, view, pick_rule, strategy_id, family, ticker, horizon_days, entry_date, exit_date,
+             exit_date_actual, status, amount, currency, net_pnl, return_pct, reason_code, settled_at]
+  properties:
+    trade_id: {type: string}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    pick_rule: {type: ['string', 'null']}
+    strategy_id: {type: string}
+    family: {type: string, enum: [rule, baseline, ai]}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    entry_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date_actual: {type: ['string', 'null'], format: date}
+    status: {type: string, enum: [settled, no_entry, skipped_price_above_amount]}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    currency: {type: ['string', 'null'], enum: [INR, USD, null]}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    reason_code: {type: ['string', 'null']}
+    settled_at: {$ref: '#/components/schemas/IsoTime'}

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 
 import pandas as pd
@@ -18,7 +18,7 @@ from marketbrief.core.database import connect
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.pipeline.forecast_gate import evidence_times
 from marketbrief.traders import track_record
-from marketbrief.traders.constants import MSG_INPUTS
+from marketbrief.traders.constants import FUTURE_TOLERANCE_MINUTES, MSG_INPUTS
 
 # The newest snapshot known by the clock, with the time its as-of date was first computed: a snapshot recomputed
 # between a record's made_at and the gate existed by made_at (the LOOK_AHEAD check of gate_evidence reads that time).
@@ -138,6 +138,15 @@ def stored_regimes(con, now: datetime) -> dict[date, tuple[str, datetime | None]
             for as_of, regime, computed in con.execute(REGIME_SQL, [now.isoformat()]).fetchall()}
 
 
+def stored_ids(con, table: str, now: datetime) -> set[str]:
+    """The ids of one of the lab tables stored by `now` (a replay's clock does not see later rows). The limit adds the
+    gate's future tolerance: a trader with a clock (the forecaster) may store a made_at up to that far after the gate's
+    clock, and a rerun inside that window must still see it as stored."""
+    until = now + timedelta(minutes=FUTURE_TOLERANCE_MINUTES)
+    return {row[0] for row in con.execute(f"SELECT id FROM {table} WHERE made_at <= ?::TIMESTAMPTZ",
+                                          [until.isoformat()]).fetchall()}
+
+
 def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
     """GateInputs from stored data as of `now` (raises InputsUnavailableError without B10's per-horizon records)."""
     market = cfg["market"]
@@ -148,8 +157,8 @@ def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
         cfg=cfg, now=now, active=set(tickers), features=stored_features(con, now), regimes=stored_regimes(con, now),
         evidence=evidence_times(con), statuses=EvidenceStatuses(con), ranges=ranges, scores=scores,
         track=track_record.load(con, now),
-        stored_predictions={row[0] for row in con.execute("SELECT id FROM strategy_predictions").fetchall()},
-        stored_abstentions={row[0] for row in con.execute("SELECT id FROM strategy_abstentions").fetchall()},
+        stored_predictions=stored_ids(con, "strategy_predictions", now),
+        stored_abstentions=stored_ids(con, "strategy_abstentions", now),
         amounts={ticker: amount_of(market, ticker, now) for ticker in tickers},
         ranges_at=as_of_lookup(market, horizons.ranges_asof), scores_at=as_of_lookup(market, horizons.scores_asof),
     )
