@@ -39,17 +39,20 @@ their causes, and every signal carries the Paper label until a strategy meets th
    hollow when the close is above the open and filled when below, so direction is not colour alone; volume under
    them; the last close as the dark dotted line with its price tag on the right axis; to the right of the last bar
    the session being predicted (D) and the exit slots +1..+5: the reference strategy's targets as dots on a dashed
-   line, its 50% and 80% ranges as the shaded fan, the selected horizon's exit as the vertical line with the target's
-   price label, and at that exit the spread of every strategy's target (the thin bar). Paper trades are triangles:
+   line, its 50% and 80% ranges as the shaded fan, the selected horizon's exit as the vertical line and its target as
+   a second tag on the price axis (the chart's own colour, next to the last-close tag, nudged apart when they would
+   touch; the axis ticks they cover are dropped), and at that exit the spread of every strategy's target (the thin
+   bar). Paper trades are triangles:
    entries below the low, exits above the high, hollow for still-open trades, with a count when several share a
    date and the list in the tooltip. Hover or the arrow keys read each day (open, high, low, close, the day's move,
    volume, entries and exits); Escape clears. The chart is drawn at its container's width and redrawn on resize, so
    text keeps its size on a phone. Legend under the chart. Companies without a prediction today show the candles
    alone and say so in the decision card.
 5. **Today's path: open paper trades** (F5): one row per open trade on the company with the strategy, view, horizon
-   and window, entry, last (the price at the latest intraday check when there is one), unrealised before costs, the
-   trade's own predicted range with the entry dotted and the last price as the dark line, distance to the target,
-   and the check's verdict (band, flags, best and worst since entry in the tooltip). The head names the check time
+   and window, entry, last (the latest stored close, the basis of unrealised and the distance to the target), the
+   trade's own predicted range with the entry dotted and the last close as the dark line, and the check's verdict at
+   its own price (band, flags, the check price and the move since entry under it; best and worst since entry in the
+   tooltip). The head names the check time
    and the session of the holding window.
 6. **Settled results and why each moved** (F1.9-F1.10, decision 43): a summary strip (trades, how many made money
    after costs, net, target reached, exited inside the 80% range), then one row per settlement, newest first, both
@@ -108,10 +111,17 @@ research only; horizon selector N+1..N+5 opening on N+1.
 `check_page.js`: no console errors, no overflow, no external requests at 1280 and 390 px. `check_text.js` (twelve
 widths, both markets) on the page and on copies opened on each of the other four companies: no clipped, overflowing
 or overlapping text. A sweep of 390-1700 px in steps of 10 for all six companies: neither table is ever wider than
-its wrapper. A script loaded each of the six companies: no script error, all eleven sections present. Keyboard
-script: the arrow keys read the chart, Escape clears, every tooltip element is focusable, the amount dialog opens,
-records a pending request and the horizon tabs move the chart's exit line and the range cell together. Rebuild is
-byte-identical.
+its wrapper. A script loaded each market at 390 and 1280 px and switched through every company with the picker:
+no script error, all eleven sections present, no chart text clipped by the chart or overlapping another chart text,
+the price tag never narrower than its text, no "null" in the dialogs. Keyboard script: the arrow keys read the chart,
+Escape clears, every tooltip element is focusable, the amount dialog opens, records a pending request and the horizon
+tabs move the chart's exit line and the range cell together. Rebuild is byte-identical.
+
+Judge round 1 (2026-10-08) found six blockers, all fixed before round 2: a script error when switching to a company
+without predictions (stale spread state), "null" text in the deactivate dialog, chart labels clipped (the price tag
+was a fixed width) and overlapping (ticks under the tag, the target label over the trade-mark counts), open-trade
+rows mixing the check price with close-based figures, three nested keys missing from notes.md and agreement rows
+copied unpicked, and a hard-coded "two companies".
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - The page opens with a decision card, not the chart: the spec's "decision card" is read as "what the strategies say

@@ -28,6 +28,8 @@ STRATEGY_FIELDS = ("id", "family", "name", "threshold", "horizons", "live", "set
 PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_date", "session_date", "exit_date",
                      "horizon_days", "direction", "prob_up", "qualifies", "base_close", "target_price", "lo50", "hi50",
                      "lo80", "hi80", "range_widen", "regime", "quality")
+AGREEMENT_FIELDS = ("market", "as_of_date", "session_date", "rank", "ticker", "name", "horizon_days", "buy", "of", "by_family",
+                    "avg_prob_up", "label", "paper")
 PICK_FIELDS = ("id", "market", "ticker", "made_at", "as_of_date", "session_date", "family", "pick_rule", "status",
                "strategy_id", "strongest_basis", "ranking", "horizon_days", "prediction_id", "base_close", "prob_up",
                "move_pct", "loss_pct", "costs_pct", "expected_gain_pct", "candidates", "amount", "currency")
@@ -68,7 +70,7 @@ def company_payload(market: str, ticker: str, files: dict, status: dict, cutoff:
     company = pick(next(r for r in mine("company")), COMPANY_FIELDS)
     lifecycle = sorted((pick(r, LIFECYCLE_FIELDS) for r in mine("lifecycle_event") if r["recorded_at"] <= cutoff),
                        key=lambda r: (r["recorded_at"], r["id"]))
-    agreement = {str(k): [r for r in mine("agreement") if r["horizon_days"] == k] for k in HORIZONS}
+    agreement = {str(k): [pick(r, AGREEMENT_FIELDS) for r in mine("agreement") if r["horizon_days"] == k] for k in HORIZONS}
     picks = sorted((pick(r, PICK_FIELDS) for r in mine("head_to_head_pick") if r["session_date"] == session_date and r["made_at"] <= cutoff),
                    key=lambda r: (r["family"], r["pick_rule"]))
     predictions = sorted((pick(r, PREDICTION_FIELDS) for r in mine("prediction")
