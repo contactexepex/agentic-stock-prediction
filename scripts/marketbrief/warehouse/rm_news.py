@@ -2,9 +2,10 @@
 GET /api/v1/markets/{market}/news (schema NewsPayload in api/schemas/news.yaml).
 
 Payload: the page shell (header, horizons, status, go-live), the News window of the 3 days before the cut-off (at most
-50 items, 25 company and 25 market-wide by the owner's rule of 2026-10-08; news_items.capped), the calendar from the
-session being predicted to 7 days after it (active companies' dates) and the companies of the rail (B4's Company
-records, by ticker). Everything is as of the cut-off; no build time is in the payload."""
+50 items: up to 25 company and 25 market-wide, a share one scope leaves unused going to the other, by the owner's rule
+of 2026-10-08; news_items.capped), the calendar from the session being predicted to 7 days after it (active
+companies' dates) and the companies of the rail (B4's Company records, by ticker). Everything is as of the cut-off;
+no build time is in the payload."""
 
 from __future__ import annotations
 

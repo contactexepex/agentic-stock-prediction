@@ -10,9 +10,10 @@ NewsResponse:
 NewsPayload:
   x-source: warehouse/rm_news.news_pages
   description: >-
-    The News page: the page shell, the news items first seen in the 3 days before the cut-off (at most 50: 25 company
-    and 25 market-wide, each half by market movers, high materiality, then newest; listed newest first), the calendar
-    from the session being predicted to 7 days after it and the companies of the rail
+    The News page: the page shell, the news items first seen in the 3 days before the cut-off (at most 50: up to 25
+    company and 25 market-wide, a share one scope leaves unused going to the other, each kept by market movers, high
+    materiality, then newest; listed newest first), the calendar from the session being predicted to 7 days after it
+    and the companies of the rail
   allOf:
     - $ref: '#/components/schemas/PageHeader'
     - $ref: '#/components/schemas/HorizonChoice'
