@@ -50,7 +50,7 @@ every figure carries Paper until a strategy is proven.
    head-to-head view, by exit date (flat between a line's own dates), the selected one thick, the selected and the three highest coloured and named at the
    line end (names cut at 22 characters, the legend has them in full; colours follow the registry order), the rest
    grey; the zero line dotted; hover or arrow keys list every line's value at a date. On the Back-test basis the
-   chart, the reason map and the regime and company splits show an empty state: the settled trades are forward
+   chart and the regime and company splits show an empty state and the reason map is left out: the settled trades are forward
    trades and are never pooled, and the back-test stores no split by regime or company.
 7. **Where each strategy wins and loses** (F2.8, decision 42): four heatmaps for the selected view, by horizon, by
    company and by the reason the price moved from W1's heatmap cells of the selected week (a week picker: all weeks
@@ -120,6 +120,9 @@ the settled trades left the payload. Checks rerun clean: page and text checks, n
 2 markets x 2 bases x 2 costs x 2 metrics, tooltips focusable, no chart label clipped or overlapping, every table
 inside its wrapper in every state; a render of both views in both markets shows the week picker, the four maps and
 the lines with their legend; rebuild byte-identical.
+Judge round 1 of this batch found two blockers, fixed before round 2: the all-weeks regime map took its rows from the
+week-filtered strategies (India W40 lost Model without news; it now lists every strategy with a regime row), and the
+heatmap help text still said one stored week and no picker.
 
 Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
 lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;
