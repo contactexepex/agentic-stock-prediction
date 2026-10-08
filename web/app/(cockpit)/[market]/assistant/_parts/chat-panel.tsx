@@ -88,7 +88,7 @@ function OpenPanel({ market, close }: { market: Market; close: () => void }) {
               : "A new conversation. The answer reads only the stored data, cites its records and never advises."}
           />
         )}
-        {a.notice ? <div className="mb-label warn notice" role="alert"><Icon name="warning" />{a.notice}</div> : null}
+        {a.notice ? <div className="mb-label warn notice wrap" role="alert"><Icon name="warning" />{a.notice}</div> : null}
       </div>
       <div className="pf">
         <Composer
