@@ -116,7 +116,9 @@ part already does it, the feature says "exists" and what changes.
    missing bar): no trade, recorded as `no_entry`. No exit close: settled on the next stored close and
    flagged `exit_delayed`. Sessions come from the market calendar (special sessions count).
 2. **Buy-only.** Only `direction = up` with probability >= the strategy's threshold creates a trade.
-   Down predictions are scored as predictions only.
+   Down predictions are scored as predictions only. The baselines (always-up, momentum) carry no probability and
+   a null threshold (`config/strategies.yaml`), so every `up` prediction of theirs trades (`lab/sizing.qualifies`);
+   no ranking by probability applies to them, as they are left out of the head-to-head view (F1.7) (issue #59).
 3. **Amount.** Per company: the override if one is active at `made_at`, else the market default
    (₹1,00,000 India, $1,000 US). Overrides are watchlist events (F8) and may be higher or lower than
    the default (decisions 4, 26 and 44: e.g. raised for a stock whose single share costs more than
@@ -429,7 +431,8 @@ states each strategy's position against the bar.
    reading `cfg["tickers"]` unchanged. Existing code that predicts, publishes ranges or picks, trades,
    or displays the watchlist (reports, dashboard, warehouse read models, Slack digest) must show active
    companies only (decision 13; inactive ones appear only in the Companies page's Inactive section), so
-   those call sites switch to `active_tickers` and active sector membership. W1 lists every
+   those call sites switch to `active_tickers` and active sector membership (not a config key:
+   `lifecycle.loader.active_sectors(cfg)` derives it from `cfg["sectors"]` and `cfg["active_tickers"]`). W1 lists every
    existing reader of `cfg` tickers and sector lists, classifies each as collect, predict or display,
    and assigns each predict or display call site to exactly one session: the session that owns the file
    (B2 `portfolio/`, B4 `warehouse/`, B9 `intraday/`), else B1. The accessor
