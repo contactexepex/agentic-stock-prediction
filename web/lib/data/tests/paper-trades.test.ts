@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { dashboardContext } from "../../tools/identity.ts";
-import type { CallContext, ToolOutcome } from "../../tools/types.ts";
+import type { CallContext, RefusalCode, ToolOutcome } from "../../tools/types.ts";
 import { statusOf, submitPaperTrade } from "../paper-trades.ts";
 
 const OUTCOME: ToolOutcome = {
@@ -13,6 +13,7 @@ const OUTCOME: ToolOutcome = {
 
 class FakeLayer {
   calls: { ctx: CallContext; tool: string; raw: unknown }[] = [];
+  recorded: { message: string; code: string | null; tool: string | null }[] = [];
   readonly outcome: ToolOutcome;
   constructor(outcome: ToolOutcome = OUTCOME) {
     this.outcome = outcome;
@@ -20,6 +21,10 @@ class FakeLayer {
   async execute(ctx: CallContext, tool: string, raw: unknown): Promise<ToolOutcome> {
     this.calls.push({ ctx, tool, raw });
     return this.outcome;
+  }
+  async record(_ctx: CallContext, fields: { tool: string | null; code: RefusalCode | null; message: string }): Promise<ToolOutcome> {
+    this.recorded.push({ message: fields.message, code: fields.code, tool: fields.tool });
+    return { ...OUTCOME, result: "refused", refusal_code: fields.code, message: fields.message, inbox_id: null };
   }
 }
 
@@ -62,6 +67,9 @@ test("refused before the tool layer: unknown market, cross-site, not JSON, no ke
     assert.equal((await submitPaperTrade(request, market, layer, dashboardContext())).status, status);
   }
   assert.equal(layer.calls.length, 0);
+  // the body refusals (no key, not JSON, not an object, unknown fields) are logged; the probes before them are not
+  assert.equal(layer.recorded.length, 5);
+  assert.ok(layer.recorded.every((r) => r.code === "validation_failed" && r.tool === "add_paper_trade"));
   const same = await submitPaperTrade(post(BODY, { origin: "https://omenix.vercel.app" }), "us", layer, dashboardContext());
   assert.equal(same.status, 202);
 });
@@ -75,6 +83,6 @@ test("outcomes map to statuses", () => {
   assert.equal(of("refused", "duplicate_key"), 409);
   assert.equal(of("refused", "validation_failed"), 422);
   assert.equal(of("refused", "budget_exceeded"), 429);
-  assert.equal(of("refused", "kill_switch"), 403);
+  assert.equal(of("refused", "kill_switch"), 503);
   assert.equal(of("refused", "unknown_actor"), 403);
 });

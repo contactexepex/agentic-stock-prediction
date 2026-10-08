@@ -10,7 +10,7 @@
       mcp/tools.yaml; agent `dashboard`, identity from Vercel Authentication, never from the body), which appends one
       row to the append-only inbox (`inbox.requests`) and logs the call; `scripts/portfolio.py import-inbox` validates
       it with the same checks as `add-trade` and appends it to data/<market>/portfolio_trades/. Nothing is sent to any
-      broker. JSON only; a cross-site Origin is refused. Repeating a request with the same Idempotency-Key and body
+      broker. Pending means in the inbox, not yet recorded. JSON only; a cross-site Origin is refused. Repeating a request with the same Idempotency-Key and body
       returns the first receipt; the same key with another body is a conflict. Refused in gateway mode.
     parameters:
       - $ref: '#/components/parameters/Market'
@@ -32,7 +32,7 @@
           application/json:
             schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
       '403':
-        description: Refused for this caller (cross-site, channel, kill switch); a JSON receipt from the tool layer, or a problem before it
+        description: Refused for this caller (a cross-site Origin, before the tool layer and not logged; or the channel)
       '404': {$ref: '#/components/responses/NotFound'}
       '409':
         description: The Idempotency-Key was already used for another request; nothing was written
@@ -45,14 +45,17 @@
           application/problem+json:
             schema: {$ref: '#/components/schemas/Problem'}
       '422':
-        description: The body failed validation (here or in the tool layer)
+        description: The body failed validation (no Idempotency-Key, not a JSON object, unknown fields, or the tool layer's checks); logged in the command log
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
       '429':
         description: The dashboard agent's daily write budget is used up
         content:
           application/json:
             schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
       '503':
-        description: The inbox or command log is unavailable; nothing was written
+        description: The inbox or command log is unavailable, or the dashboard agent is switched off; nothing was written
         content:
           application/json:
             schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
