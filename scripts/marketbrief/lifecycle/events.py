@@ -6,8 +6,10 @@ already used, so they count from their effective_from (the start of stored histo
 without it a replay dated before the seeding would see an empty watchlist once Wave 5 removes `tickers:`.
 A row whose id a visible row `supersedes` is dropped. Per company the events apply in order of effective_from,
 then recorded_at, then id (contracts/watchlist.py); an event the state does not allow is skipped (the validator
-refuses those before they are stored). Config tickers without any stored add event act as adds from the start of
-time (implicit seed: test fixtures and markets not yet seeded keep working unchanged)."""
+refuses those before they are stored). Implicit seed (test fixtures and markets not yet seeded keep working
+unchanged): companies of a legacy `tickers:` config without any stored add event act as adds from the start of time;
+`company_meta:` entries (Wave 5) do so only while the market has no stored watchlist event at all, so in a seeded
+market membership comes from the events alone and a company_meta entry never adds a company."""
 from __future__ import annotations
 
 import json
@@ -104,8 +106,12 @@ def fold(rows: list[dict], as_of: datetime) -> dict[str, dict]:
     return dict(sorted(companies.items(), key=lambda item: item[1]["first_order"]))
 
 
-def implicit_adds(market: str, config_tickers: dict, config_sectors: dict, stored: list[dict]) -> list[dict]:
-    """Add rows for the config tickers that have no stored add event (they act from the start of time)."""
+def implicit_adds(market: str, config_tickers: dict, config_sectors: dict, stored: list[dict],
+                  meta_only: bool = False) -> list[dict]:
+    """Add rows for the config companies that have no stored add event (they act from the start of time); for
+    `company_meta:` (meta_only) none once the market has any stored event (see the module docstring)."""
+    if meta_only and stored:
+        return []
     added = {row["ticker"] for row in stored if row.get("event") == EVENT_ADD}
     sector_of = {ticker: sector for sector, members in (config_sectors or {}).items() for ticker in members or []}
     rows = []
