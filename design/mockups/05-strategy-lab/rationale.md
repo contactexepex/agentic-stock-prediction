@@ -101,6 +101,11 @@ said "no forward row" for a strategy that has one (now always the forward accura
 "week to 6 Oct" on the back-test and the company and regime maps were blank (now the run's span, and each map says
 the back-test stores no such split); and "edge" was shown on a corrected interval wholly below zero (now "loss", in
 red with words, and "edge" only when the corrected interval lies above zero; the legend has all three).
+Round 2 verified all six and found one more blocker, fixed before round 3: the back-test's large rupee profits
+clipped in the heatmap cells ("−₹20025.6k" cut to "−₹2002" on a phone). Cells now show a compact figure of at most
+three significant digits with a unit (k, and lakh / crore for rupees, M for dollars) and no currency symbol (the
+metric switch reads "Profit (₹)" / "Profit ($)"), at 10 px on phones; a sweep of every cell at 8 widths x 2 markets
+x 2 bases x 2 costs x 2 metrics finds none wider than its cell.
 
 Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
 lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;

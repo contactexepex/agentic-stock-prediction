@@ -22,7 +22,7 @@ Shown but computed by the page (presentation only): the ranking order (profit af
 without trades follow by family, then id); the KPI picks (leader, best baseline, how many beat it, nearest to
 go-live); the luck bar geometry; the per-horizon, per-regime and per-company bars of the detail card; the cumulative
 sums per strategy by exit date; the heatmap cells by horizon, company and regime (scoreboard rows) and by reason code
-(counts and sums of the settled trades' `reason_code`); the colour scale (largest absolute cell = darkest).
+(counts and sums of the settled trades' `reason_code`); the colour scale (largest absolute cell = darkest). Heatmap cells show a compact profit: at most three significant digits with a unit (k; lakh L and crore Cr for rupees, M for dollars), the sign always, no currency symbol (the metric switch names the currency).
 
 Spec constants in the shared shell (`design/mockups/_shared/shell.js`): the go-live bar's 2 months (SPEC F7.2),
 two intraday checks per session (SPEC section 7), 20 settled trades to rank (SPEC section 6). The legend shows
