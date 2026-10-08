@@ -316,6 +316,35 @@ def test_fetch_market_writes_only_under_work(tmp_path, monkeypatch):
     assert again == manifest and list(cached["KOSPI"].columns) == ["open", "high", "low", "close", "volume"]
 
 
+def test_a_failed_fetch_keeps_the_previous_cache(tmp_path, monkeypatch):
+    """A Yahoo outage never empties the cache: a symbol whose fetch errs, returns nothing or keeps no bar after
+    cleaning keeps its previous rows and manifest entry (kept_from), reported in `failed` (B2's finding)."""
+    monkeypatch.setattr(paths, "ROOT", tmp_path)
+    cfg = {**CFGS["india"], "tickers": {"INFY": CFGS["india"]["tickers"]["INFY"]},
+           "symbols": {k: CFGS["india"]["symbols"][k] for k in ("NIFTY50", "KOSPI")}}
+    days = ["2026-09-30", "2026-10-01", "2026-10-05", "2026-10-06"]
+    good = {"INFY.NS": yahoo_frame(days, [10, 11, 12, 13]), "^NSEI": yahoo_frame(days, [1, 2, 3, 4]),
+            "^KS11": yahoo_frame(days, [5, 6, 7, 8])}
+    first = history_cache.fetch_market(cfg, date(2026, 8, 1), FakeYfinance(good),
+                                       datetime(2026, 10, 7, 11, 0, tzinfo=timezone.utc))
+    before, _ = history_cache.load_cache("india")
+    outage = {"^NSEI": yahoo_frame(days, [1, 2, 3, 4]).iloc[:0],                      # no data
+              "^KS11": yahoo_frame(["2026-10-08"], [9])}                              # only today's bar: none left
+    later = datetime(2026, 10, 8, 11, 0, tzinfo=timezone.utc)
+    second = history_cache.fetch_market(cfg, date(2026, 8, 1), FakeYfinance(outage), later)   # INFY raises
+    after, manifest = history_cache.load_cache("india")
+    assert manifest == second and second["rows"] == first["rows"] == 4 + 4 + 4
+    for key in ("INFY", "NIFTY50", "KOSPI"):
+        pd.testing.assert_frame_equal(after[key], before[key])
+        assert second["symbols"][key] == {**first["symbols"][key], "kept_from": "2026-10-07T11:00:00Z"}
+    assert {f["ticker"]: (f["error"], f["kept_previous_rows"]) for f in second["failed"]} == {
+        "INFY": ("no such symbol", 4), "NIFTY50": ("no data", 4), "KOSPI": ("no bar after cleaning", 4)}
+    fresh = tmp_path / "other"                                       # no previous cache: nothing to keep
+    monkeypatch.setattr(paths, "ROOT", fresh)
+    empty = history_cache.fetch_market(cfg, date(2026, 8, 1), FakeYfinance({}), later)
+    assert empty["rows"] == 0 and all("kept_previous_rows" not in f for f in empty["failed"])
+
+
 def test_merged_bars_keep_stored_bars_and_rebase_the_cache():
     days = pd.bdate_range("2020-01-01", periods=60)
     cached = frame(3, days)

@@ -796,7 +796,8 @@ stored before the field read as close_to_close (`track_record` view). A call who
 no open is not scored (summary `no_entry_open`). An open-to-close call is scored only when its
 entry bar is the calendar's first session after the as-of date and its exit bar the exit session
 (as `model/labels.py`); when a session of the window has no bar the call stays open, never scored
-on the next stored bars (summary `session_gap_open`, issue #45.3). Hit rates, bands, proper scores and reliability
+on the next stored bars (summary `session_gap_open`, ids in `session_gap_ids`, issues #45.3 and
+#146). Hit rates, bands, proper scores and reliability
 are shown per basis and never pooled: `score_predictions.py`'s summary, the context pack, the
 weekly review (keys and rows labelled `· close→close` / `· open→close`, `call_basis_all`), the
 Slack line, the report and the HTML track record. Ranges are unchanged (still scored on the
@@ -1059,7 +1060,7 @@ always show the same numbers.
    skill only when some horizon has n >= `min_n`, Brier skill > `min_brier_skill` and the AUC
    interval's low end > `min_auc_low` (`model_skill:` in `config/review.yaml`: 500, 0.0, 0.5). A
    failed backtest is noted and never stops the review; the record stores `model_skill`. The
-   backtest reads only the inputs stored by the reviewed week's end (bars, flows and shorts dated
+   backtest reads only the inputs dated or first seen by the reviewed week's end (bars, flows and shorts dated
    by then, events and insider trades first seen by then; `panel_inputs.inputs_until`, issue
    #45.2), and runs with its native thread pools capped at one thread when threadpoolctl is
    installed (issue #45.1).
@@ -1785,7 +1786,10 @@ see different bars). The India groups see the same bars live: the India routine 
 bars from 2011-01-01 of every watchlist ticker and config symbol (yfinance, auto_adjust=False: the basis
 collect_prices stores) in `work/model_history/<market>/bars.csv.gz` with `manifest.json` (Yahoo symbol,
 rows, first and last date, dropped holiday and flat bars per symbol, fetched_at, bytes, SHA-256);
-gitignored, never written to data/. Fetched 2026-10-07T09:02Z: India 167,288 rows (2,871,664 bytes),
+gitignored, never written to data/. A symbol whose fetch fails (error, no data, or no bar left after
+cleaning, e.g. a Yahoo outage) keeps its previous rows and manifest entry (`kept_from`), listed in `failed`
+with `kept_previous_rows`, so a failed fetch never empties the cache.
+Fetched 2026-10-07T09:02Z: India 167,288 rows (2,871,664 bytes),
 US 179,013 rows (2,830,901 bytes), no symbol failed. Holiday bars are dropped as the collector drops
 them (the exchange calendar from the start date). `model_backtest.py --history` reads data/ plus the
 cache: data/'s bars win on their dates, the cache adds only earlier dates, rebased by the median

@@ -77,7 +77,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
-  reruns the signal-model backtest on the inputs stored by the reviewed week's end and says plainly
+  reruns the signal-model backtest on the inputs dated (or first seen) by the reviewed week's end and says plainly
   whether the model shows skill (`model_skill`).
   Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
   open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`); an open-to-close
@@ -277,7 +277,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   final before the open of D) are switched per market and group under `cross_market:` in `config/model.yaml` (all off: no tradable skill
   in the 15-year test, DESIGN.md section 15.1).
   `model_history` fetches Yahoo daily bars from 2011 (`--start`) into `work/model_history/<market>/` (gitignored, manifest;
-  never data/). Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
+  never data/; a symbol whose fetch fails keeps its previous rows, `kept_previous_rows` in `failed`).
+  Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score:
+  `model_prob`, `agent_adjustment` (|x| <= 0.10) and
   `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
   stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
 - Horizons N+1..N+5 (B10, docs/SPEC.md F2.7, decision 37; docs/ws/b10.md; `core/horizons.py`): horizon k means buy
