@@ -162,11 +162,12 @@ def owner_positions(context: PortfolioContext) -> list[dict]:
 
 
 def owner(ctx: BuildContext) -> dict:
-    """The owner's paper portfolio of the market as of the cut-off."""
+    """The owner's paper portfolio of the market as of the cut-off, collected companies only (a deleted company's
+    trades and position, with its EUR view, are never shown)."""
     context = portfolio_context(ctx)
     return {
-        "trades": owner_trades(context),
-        "positions": owner_positions(context),
+        "trades": [trade for trade in owner_trades(context) if trade["ticker"] in ctx.collected],
+        "positions": [position for position in owner_positions(context) if position["ticker"] in ctx.collected],
         "default_amount": DEFAULT_AMOUNT[ctx.market],
         "paper": True,
     }

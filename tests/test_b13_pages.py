@@ -469,3 +469,19 @@ def test_review_keeps_only_the_newest_news_impact_week_by_the_cut_off():
     ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")
     rows = rm_compare.news_impact(ctx)
     assert rows and {r["iso_week"] for r in rows} == {"2026-W41"}  # both stored: only the newest week
+
+
+def test_owner_portfolio_shows_collected_companies_only(monkeypatch):
+    from marketbrief.warehouse import rm_portfolio
+
+    trades = [{"id": "t1", "ticker": "AAPL"}, {"id": "t2", "ticker": "GONE"}]
+    positions = [{"ticker": "AAPL", "eur_view": {"ticker": "AAPL"}}, {"ticker": "GONE", "eur_view": {"ticker": "GONE"}}]
+    monkeypatch.setattr(rm_portfolio, "portfolio_context", lambda _ctx: None)
+    monkeypatch.setattr(rm_portfolio, "owner_trades", lambda _context: trades)
+    monkeypatch.setattr(rm_portfolio, "owner_positions", lambda _context: positions)
+    ctx = lab_context("us")
+    ctx.__dict__["collected"] = frozenset({"AAPL"})  # GONE was deleted
+    owner = rm_portfolio.owner(ctx)
+    assert [t["ticker"] for t in owner["trades"]] == ["AAPL"]
+    assert [p["ticker"] for p in owner["positions"]] == ["AAPL"]
+    assert owner["positions"][0]["eur_view"] == {"ticker": "AAPL"}
