@@ -30,7 +30,7 @@ export function OpenTradesTable({ p, ctx }: { p: CompanyPayload; ctx: PageCtx })
   const cur = ctx.currency;
   const columns: Column<OpenTrade>[] = [
     { key: "strategy", header: "Strategy", render: (r) => <StrategyCell id={r.strategy_id} ctx={ctx} sub={r.view === "head_to_head" ? "head-to-head pick" : "accuracy view"} /> },
-    { key: "horizon", header: "Horizon", render: (r) => (<><span className="h-lab">N+{r.horizon_days}</span><small className="muted cw" style={{ whiteSpace: "nowrap" }}> {fmtDate(r.entry_date, false)} → {fmtDate(r.exit_date, false)}</small></>) },
+    { key: "horizon", header: "Horizon", render: (r) => (<><span className="h-lab">N+{r.horizon_days}</span><small className="muted cw dates"> {fmtDate(r.entry_date, false)} → {fmtDate(r.exit_date, false)}</small></>) },
     { key: "entry", header: "Entry", numeric: true, className: "cw", render: (r) => price(cur, r.entry_price) },
     { key: "last", header: "Last", numeric: true, className: "cw", render: (r) => <span data-tip={`Latest stored close (${fmtDate(r.last_price_date)}); unrealised and the distance to the target are measured at it.`}>{price(cur, r.last_price)}</span> },
     { key: "unrealised", header: "Unrealised", numeric: true, render: (r) => (<><MoneyDelta currency={cur} value={r.unrealised_pnl} decimals={ctx.decimals} /><span className="cw"> <Delta value={r.unrealised_pct} /></span></>) },

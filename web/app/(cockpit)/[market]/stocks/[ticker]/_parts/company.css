@@ -107,3 +107,9 @@ dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
 @media (max-width:1000px){ .why svg{width:80px} }
 @media (max-width:760px){ .ot .cm,.sd .cm{display:none} .nums{grid-template-columns:1fr 1fr} .ot th,.ot td,.sd th,.sd td{padding:8px 6px;white-space:normal} .ot .nm b,.sd .nm b{white-space:normal} .ot .st{white-space:normal;display:inline} .ot .mb-label,.sd .mb-label{white-space:normal} .ot .nm small,.sd .nm small{white-space:normal} }
 @media (max-width:599px){ .dec{grid-template-columns:1fr} .cohead .acts{margin-left:0;width:100%} .cohead .px{font-size:22px} .lc .row .l{width:100%} }
+/* B15: the two trade tables fit their wrapper whatever font the browser falls back to (the mockup was sized on
+   Inter): number headers may wrap, the entry → exit dates take their own line where they show (>= 1280 px), and
+   phones get narrower cell padding. After the mockup's media rules so these win. */
+.ot th.num,.sd th.num{white-space:normal}
+@media (min-width:1280px){ .ot small.dates{display:block;white-space:nowrap} }
+@media (max-width:760px){ .ot th,.ot td,.sd th,.sd td{padding-left:4px;padding-right:4px} }
