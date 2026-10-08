@@ -47,6 +47,12 @@ class Trader:
     prompt_version: str
     enabled: bool
     budget: dict
+    agent_tools: tuple[str, ...] = ()   # the frontmatter tools
+
+    @property
+    def has_clock(self) -> bool:
+        """True when the agent can read the time itself (Bash); a clockless trader's made_at is stamped by the gate."""
+        return "Bash" in self.agent_tools
 
     @property
     def horizons(self) -> tuple[int, ...]:
@@ -101,7 +107,8 @@ def load_traders(root: Path | None = None) -> dict[str, Trader]:
         path = root / AGENTS_DIR / TRADER_FILES[strategy_id]
         front, block = agent_settings(path)
         out[strategy_id] = Trader(strategy_id, entry, path, str(front.get("model", "")), str(block["prompt_version"]),
-                                  bool(block["enabled"]), dict(block.get("budget") or {}))
+                                  bool(block["enabled"]), dict(block.get("budget") or {}),
+                                  tuple(t.strip() for t in str(front.get("tools", "")).split(",") if t.strip()))
     return out
 
 
