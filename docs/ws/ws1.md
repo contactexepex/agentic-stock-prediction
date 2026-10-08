@@ -147,7 +147,7 @@ each page type now belongs to the session named below, and WS1 keeps two builder
   included.
 - Kill switch: `enabled: false` skips before connecting. A sync also skips when this UTC month's recorded
   MotherDuck time in `meta.sync_runs` (both markets) reaches `monthly_hours_ceiling` (7). Each run counts its
-  `connected_s` (from the connect to the close; the local staging is not counted), and a run recorded before
+  `connected_s` (from the connect until the run is recorded; the local staging is not counted), and a run recorded before
   that column existed counts its whole wall time (follow-up of 2026-10-08 below). This guard is
   self-measured, because Lite offers no usage query (see below).
 
@@ -231,7 +231,11 @@ shows B-like billing:
 - let `--kind news` rebuild only the news tables and news-dependent pages;
 - fold the 9 schema and table `CREATE ... IF NOT EXISTS` statements of the ensure step into a once-per-schema-version check;
 - sync both markets on one connection.
-The kill switch's ceiling (7 h of recorded wall time) stops syncs before the cap in either case.
+Since 2026-10-08 the ceiling counts connected time (`connected_s`), not wall time. It stops syncs before the
+10 h cap under scenario A (billing per active second), but not under scenario B: 7 h of connected time is
+about 1,000 syncs, which B would bill at about 14 h. The plan's usage page (ARCHITECTURE.md U1) has to
+confirm in the first weeks that billing is A-like; if it is B-like, lower the ceiling or apply the
+reductions above.
 
 ## Tests
 Pasted from command output.
@@ -373,10 +377,12 @@ sync_market wall   base: 4.62 new: 4.87
   page); `scripts/api_contract.py` against the live warehouse gave `"problems": [], "ok": true` for both.
   `meta.sync_runs` kept its history. Both runs got HTTP 404 from the app's revalidate endpoint.
 - Ceiling. Owner decision (this session, 2026-10-08): count only the time a run holds the MotherDuck
-  connection. Reason: since the 2.0 read models a sync took 52-64 s of wall time (12:09Z-18:20Z runs),
-  of which about 40 s is local staging that MotherDuck never sees. With B17's added intraday, post-close and
-  weekly syncs (about 485 a month) the wall-time measure reached about 8.1 h and would have skipped every
-  sync from about day 26; the connected time of the same runs is about 23-27 s each (about 3.3-3.6 h).
+  connection. Reason: since the 2.0 read models a sync took 52-64 s of wall time (12:09Z-18:20Z runs); in
+  the two `--full` runs the local staging, which MotherDuck never sees, took 42-45 s and connect + write
+  23-27 s. With B17's added intraday, post-close and weekly syncs (about 485 a month) the wall-time measure
+  reached about 8.1 h and would have skipped every sync from about day 26; at 23-27 s of connected time
+  each, the same runs come to about 3.1-3.6 h. This bounds MotherDuck compute only if it is billed per
+  active second (scenario A of the compute estimate above); see the note there.
 - Change: `meta.sync_runs.connected_s` (DOUBLE; `ensure_sync_runs_table` adds it to an existing table with
   `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`; older rows keep NULL and count their wall time); the summary
   shows `connected_s`. Test: `tests/test_warehouse_ceiling.py`, plus a check in `test_sync_runs_are_recorded`.

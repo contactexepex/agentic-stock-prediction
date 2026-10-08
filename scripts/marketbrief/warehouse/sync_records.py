@@ -114,7 +114,8 @@ def ensure_sync_runs_table(warehouse) -> None:
     """The meta.sync_runs table; a table created before connected_s existed gets the column (NULL in old rows)."""
     warehouse.execute(f"CREATE SCHEMA IF NOT EXISTS {META_SCHEMA}")
     warehouse.execute(f"CREATE TABLE IF NOT EXISTS {SYNC_RUNS} ({column_definitions(SYNC_RUNS_COLUMNS)})")
-    warehouse.execute(f"ALTER TABLE {SYNC_RUNS} ADD COLUMN IF NOT EXISTS connected_s DOUBLE")
+    connected = "connected_s"
+    warehouse.execute(f"ALTER TABLE {SYNC_RUNS} ADD COLUMN IF NOT EXISTS {connected} {SYNC_RUNS_COLUMNS[connected]}")
 
 
 def record_sync_run(warehouse, run: dict) -> None:
