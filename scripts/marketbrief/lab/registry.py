@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -62,3 +63,19 @@ def config_hash(spec: dict) -> str:
     """sha256 of the entry's canonical JSON (stored with each prediction)."""
     text = json.dumps(spec, sort_keys=True, separators=(",", ":"), default=str)
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def as_session_date(value) -> date:
+    """A date from a date, datetime or ISO text (its first 10 characters)."""
+    if isinstance(value, datetime):
+        return value.date()
+    return value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+
+
+def is_live(strategy: str | dict, session_date, reg: dict | None = None) -> bool:
+    """The go-live switch: True only when the strategy (a registry id or an entry) has `live_from` set and
+    live_from <= session_date (D, the entry session). An unknown id is not live."""
+    spec = strategy if isinstance(strategy, dict) else by_id(reg).get(strategy)
+    if spec is None or spec.get("live_from") is None:
+        return False
+    return as_session_date(spec["live_from"]) <= as_session_date(session_date)
