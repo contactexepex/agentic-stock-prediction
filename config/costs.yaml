@@ -49,34 +49,34 @@ us:
 # stamp duty, GST; us: SEC fee, FINRA TAF). The model's backtest keeps the sections above unchanged.
 # Owner decisions 49-52 (2026-10-07): the values marked "owner-provided" come from the brokers' published
 # schedules as the owner researched them (Axis Direct NRI, Normal tier, Non-PIS account; BUX Basic, investor in the
-# Netherlands with a EUR account); they are NOT yet checked against a contract note. Two cost views (decision 50):
+# Netherlands with a EUR account); the owner confirmed them as final for paper trading on 2026-10-08 (docs/SPEC.md
+# decision 53). Two cost views (decision 50):
 #   market: brokerage, statutory taxes, exchange and regulatory fees (what any investor pays; strategies are
 #           ranked on it);
 #   your:   market + the owner-specific items marked `your_view` below (the go-live bar and the owner's money
 #           decisions use it).
-# Wave 5 switches on live paper trading only after the owner confirms them.
 broker:
   india:
     name: Axis Direct (NRI, Normal tier, Non-PIS)
-    brokerage_each_side: 0.0075        # verify. owner-provided; verify with a contract note: 0.75% of trade value per side
-    brokerage_min_per_order: 50.0      # verify. owner-provided; verify with a contract note: minimum Rs 50 per order
+    brokerage_each_side: 0.0075        # owner-provided, confirmed final: 0.75% of trade value per side
+    brokerage_min_per_order: 50.0      # owner-provided, confirmed final: minimum Rs 50 per order
     # GST 18% applies to brokerage + exchange transaction charge + SEBI fee (`gst_rate` above, owner-provided).
     # STT 0.1% each side and stamp duty 0.015% on the buy side: as above (owner-provided figures agree).
-    nri_reporting_per_trade_date: 200.0   # your_view. verify. owner-provided; verify with a contract note: NRO
+    nri_reporting_per_trade_date: 200.0   # your_view. owner-provided, confirmed final: NRO
                                           # Non-PIS reporting charge Rs 200 per trade date, on the purchase date and
                                           # again on the sale date
-    # your_view. verify. SECONDARY SOURCE (unchanged provisional value): DP charge per scrip sold, Rs 30 or 0.04% of
-    # the sale value, the higher (docs/SPEC.md F1.6: a source quoted it for NRI accounts).
+    # your_view. Confirmed final by the owner (first from a secondary source): DP charge per scrip sold, Rs 30 or
+    # 0.04% of the sale value, the higher (docs/SPEC.md F1.6: a source quoted it for NRI accounts).
     dp_charge_min: 30.0
     dp_charge_rate: 0.0004
-    demat_amc_per_year: 885.0          # verify. owner-provided; verify with a contract note: about Rs 885 a year;
+    demat_amc_per_year: 885.0          # owner-provided, confirmed final: about Rs 885 a year;
                                        # not per trade, so in no trade's cost
   us:
     name: BUX Basic
-    order_fee_eur: 0.99                # verify. owner-provided; verify with a contract note: EUR 0.99 per order,
+    order_fee_eur: 0.99                # owner-provided, confirmed final: EUR 0.99 per order,
                                        # converted to USD at the EUR/USD close (symbol below) of that side's session
-    fx_fee_rate: 0.0075                # your_view. verify. owner-provided; verify with a contract note (BUX Basic): FX markup 0.75% of the
+    fx_fee_rate: 0.0075                # your_view. owner-provided, confirmed final (BUX Basic): FX markup 0.75% of the
                                        # transaction value on each EUR<->USD conversion, on the buy and again on the sale
-    portfolio_fee_per_year: 0.002      # your_view. verify. owner-provided; verify with a contract note: 0.20% a year, pro-rated over the holding
+    portfolio_fee_per_year: 0.002      # your_view. owner-provided, confirmed final: 0.20% a year, pro-rated over the holding
                                        # days (calendar days from D to the exit session) on the entry value
     eurusd_symbol: EURUSD              # config/markets/us.yaml symbols key (Yahoo EURUSD=X, role fx)

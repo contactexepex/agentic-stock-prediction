@@ -230,7 +230,11 @@ def build_rest(write, settled, opens, eurusd, r2) -> None:
     write("lifecycle_event.json", "lifecycle_event", "watchlist_events", lifecycle_events())
     write("command_log.json", "command", "command_log", commands())
     write("abstention.json", "abstention", "strategy_abstentions", abstentions())
-    write("trade_check.json", "trade_check", "trade_checks", trade_checks(opens))
+    checks = trade_checks(opens)
+    write("trade_check.json", "trade_check", "trade_checks", checks)
+    from catalogue_alerts import intraday_alerts
+
+    write("intraday_alert.json", "intraday_alert", "intraday_alerts", intraday_alerts(checks))
     ai_reasons, eods = reasons(settled)
     write("reason_ai.json", "ai_reason", "trade_reasons_ai", ai_reasons)
     write("eod_analysis.json", "eod_analysis", "eod_analyses", eods)

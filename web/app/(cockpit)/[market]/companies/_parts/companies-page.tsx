@@ -1,8 +1,9 @@
 "use client";
 // Page 10, Companies (design/mockups/10-companies/): the watchlist as data. The active and inactive companies with
-// their amounts and identifiers, every company command with its result, the lifecycle history, and the request
-// dialogs (command-dialog.tsx on B11's routes). A request is pending until the next run imports it; the page lists the
-// ones sent from this tab until the read model shows them. Research only: nothing here trades.
+// their amounts and identifiers, every company command with its result, the lifecycle history, and the request dialogs
+// (B7's shared CommandDialog, components/blocks/company-command-dialog.tsx, on B11's routes). A request is pending
+// until the next run imports it; the page lists the ones sent from this tab for as long as the tab is open (#287).
+// Research only: nothing here trades.
 import Link from "next/link";
 import { useState } from "react";
 import { PageFooter, PageHead } from "../../../../../components/blocks/page-head.tsx";
@@ -19,7 +20,7 @@ import { fmtDate, fmtDateYear, fmtLocal, money, price } from "../../../../../lib
 import { companyPath } from "../../../../../lib/ui/routes.ts";
 import type { CompanyRecord, GoLive, PageBase } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
-import { CommandDialog, type Intent, type Recorded } from "./command-dialog.tsx";
+import { CommandDialog, type Intent, type Recorded } from "../../../../../components/blocks/company-command-dialog.tsx";
 import "./companies.css";
 
 export interface InactiveNewsItem { id: string; tickers: string[]; title: string; status: string | null; first_seen_at: string }

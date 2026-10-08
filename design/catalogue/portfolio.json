@@ -65,7 +65,7 @@
             "value_eur": 849.05,
             "fx_effect_eur": -3.67,
             "pnl_eur": -10.19,
-            "note": "BUX FX fee provisional (config/costs.yaml broker.us, verify)"
+            "note": "BUX FX fee (config/costs.yaml broker.us, owner-confirmed 2026-10-08)"
           }
         },
         {

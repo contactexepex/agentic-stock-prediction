@@ -143,7 +143,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
   per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`, `status`; key `(market, page_key)`,
   payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
-  `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
+  `enabled` and `monthly_hours_ceiling` in the config. The MotherDuck extension is installed by
+  `marketbrief/warehouse/extension.py` over HTTPS only (both signed files downloaded through the proxy, DuckDB checks
+  the signatures; never `INSTALL motherduck`, whose downloads are plain HTTP); `duckdb` is pinned in requirements.txt
+  and the matching extension build under `extension:` in `config/warehouse.yaml`. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Read-model framework (B4, docs/ws/b4.md): each `rm.<table>` is a
   `PageBuilder` declared in a `warehouse/rm_<page>.py` module (found by name; shared page blocks in `rm_common.py`,
   as of the clock, collected companies only via B1's `watchlist(market, cutoff, "collected")`), checked against its
@@ -214,7 +217,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `strategy_abstentions` (gate_failed, timeout 15 minutes before the open, killed, blocked_quality, earnings_window,
   abstained). Post-close (`routine/POSTCLOSE_PROMPT.md`): B2's `scripts/lab.py settle`, the `eod-analyst` agent and
   its gate `eod-validate|add` -> `trade_reasons_ai`, `eod_analyses` (market-cost view), B6's close alerts. Weekly
-  (`routine/WEEKLY_PROMPT.md`, Saturday 10:00 local): the `research-director` agent and its gate
+  (`routine/WEEKLY_PROMPT.md`, Saturday 09:51 local): the `research-director` agent and its gate
   `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
   `reports/<market>/research-<week>.md`.
 - Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
@@ -360,8 +363,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   momentum and, on B10's walk-forward probabilities as of the clock, the model strategies without news; stored bars,
   `--history` adds the cache; basis backtest; `backtest --store` -> `lab_backtests`, once per run_id), `pick-study`. Costs (`lab/costs.py`): the statutory
   rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
-  owner-provided, marked verify; the owner confirms them with a contract note before Wave 5 switches paper trading
-  on); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
+  owner-provided, confirmed final for paper trading by the owner on 2026-10-08, SPEC decision 53); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
   reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
   pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'

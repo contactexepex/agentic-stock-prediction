@@ -480,8 +480,8 @@ def test_sample_dates_cli():
             s = date.fromisoformat(x["session_date"])
             assert datetime.fromisoformat(x["cutoff_utc"]) < ev.session_open_utc(cfg, s)
             assert s == ev.next_session(cfg, date.fromisoformat(x["as_of_date"]), include=False)
-    assert cutoff.cutoff_for(load_market("us"), date(2026, 7, 1)).isoformat() == "2026-07-02T12:15:00+00:00"
-    assert cutoff.cutoff_for(load_market("india"), date(2026, 7, 1)).isoformat() == "2026-07-02T02:40:00+00:00"
+    assert cutoff.cutoff_for(load_market("us"), date(2026, 7, 1)).isoformat() == "2026-07-02T11:45:00+00:00"
+    assert cutoff.cutoff_for(load_market("india"), date(2026, 7, 1)).isoformat() == "2026-07-02T02:10:00+00:00"
 
 
 def test_frozen_clock_sql(monkeypatch):
