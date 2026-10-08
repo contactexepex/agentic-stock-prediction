@@ -1,7 +1,10 @@
 # Watchlist mockup: catalogue entities and fields used
 
 Source files: `design/catalogue/<entity>.json` (W1). Payload per market, `data.json` key `markets.<market>`.
-Top level: `as_of`, `cutoff`, `built_at`, `endpoint`, `read_model`, `sources`, `_example`, `_note`.
+Top level: `as_of`, `cutoff`, `built_at`, `endpoint`, `read_model`, `sources`, `_example`, `_note`. Per market:
+`market`, `name`, `currency`, `as_of` (Market status `market`, `name`, `currency`, `as_of`), `cutoff` (the catalogue
+files' shared `as_of`), `built_at` (Market status `freshness.built_at`), then the keys below. `build.py` copies only
+the listed fields of every record (`pick`).
 
 | Payload key | Catalogue entity | Fields used | Selection |
 |---|---|---|---|
@@ -11,12 +14,13 @@ Top level: `as_of`, `cutoff`, `built_at`, `endpoint`, `read_model`, `sources`, `
 | `open_trades` | Open trade | `trade_id`, `view`, `prediction_id`, `strategy_id`, `family`, `market`, `ticker`, `horizon_days`, `entry_date`, `exit_date`, `entry_price`, `quantity`, `amount`, `currency`, `target_price`, `lo80`, `lo50`, `hi50`, `hi80`, `last_price`, `last_price_date`, `unrealised_pnl`, `unrealised_pct`, `to_target_pct`, `paper` | the market's open trades (counted and summed per company by the page) |
 | `trade_checks` | Intraday trade check | `id`, `check_id`, `check_row_id`, `check_at`, `session_date`, `market`, `ticker`, `trade_id`, `prediction_id`, `strategy_id`, `view`, `horizon_days`, `entry_date`, `exit_date`, `session_number`, `entry_price`, `last_price`, `ret_since_entry_pct`, `target_price`, `to_target_pct`, `lo80`, `lo50`, `hi50`, `hi80`, `band`, `target_z`, `flags`, `flagged`, `method_version`, `computed_at` | the latest check with `check_at` at or before `cutoff` |
 | `ranges` | Prediction | `id`, `strategy_id`, `family`, `ticker`, `made_at`, `as_of_date`, `session_date`, `exit_date`, `horizon_days`, `direction`, `prob_up`, `qualifies`, `base_close`, `target_price`, `lo50`, `hi50`, `lo80`, `hi80`, `range_widen`, `regime`, `quality` | the reference rule strategy's (`rule.model_news.v1`) predictions for the as-of date, `made_at` at or before `cutoff` (the range column) |
-| `go_live` | Scoreboard row | `go_live.{proven, months_forward, trades_needed, beats_best_baseline}` | of the reference strategy's accuracy row, all horizons |
+| `go_live` | Scoreboard row | `go_live.{proven, months_forward, trades_needed, beats_best_baseline}` (these four keys only) | of the reference strategy's accuracy row, all horizons |
 | `strategies` | Strategy | `id`, `family`, `name`, `threshold`, `horizons`, `live`, `settled_trades` | all 15, keyed by id |
 | `horizons`, `default_horizon` | (setting) | `config/strategies.yaml` horizons 1-5; N+1 opens (decision 39) | |
 
 Shown but computed by the page (presentation only): per company the open-trade count and the unrealised sum, the
-flagged-check count; the KPI counts and sums; sorting and filtering; the geometry of the bars and meters.
+flagged-check count; the KPI counts and sums; sorting (agreement, last, day move, name, open) and filtering (sector
+chips, text); the geometry of the bars and meters.
 
 Spec constants in the shared shell (`design/mockups/_shared/shell.js`, named once with their source): the go-live
 bar's 2 months (SPEC F7.2), two intraday checks per session (SPEC section 7), 20 settled trades to rank (SPEC

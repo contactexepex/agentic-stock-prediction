@@ -18,14 +18,16 @@
 .wl .ag .bar i{display:block;height:100%}
 .wl .ot b{font-weight:600} .wl .ot small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px}
 .wl .open{text-align:right} .wl .open a{display:inline-flex;align-items:center;gap:2px;font-weight:600;font-size:13px;text-decoration:none;white-space:nowrap}
-.wl th[data-k]{cursor:pointer;user-select:none} .wl th[data-k]:hover{color:var(--md-sys-color-on-surface)} .wl th .ms{width:14px;height:14px;vertical-align:-2px;margin-left:2px}
+.wl th .sort{all:unset;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:2px;font:inherit;color:inherit;border-radius:4px} .wl th .sort:hover{color:var(--md-sys-color-on-surface)} .wl th .sort:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:2px} .wl th .ms{width:14px;height:14px;vertical-align:-2px}
+.wl th .sep{color:var(--md-sys-color-outline-variant);margin:0 4px}
 .wl tr.row:hover td{background:color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent)}
 .wl tr.row td{cursor:pointer}
 .inactive{display:flex;align-items:center;gap:10px;font-size:13px;margin-top:12px;color:var(--md-sys-color-on-surface-variant)}
-@media (max-width:1359px){ .wl th.c3,.wl td.c3{display:none} .wl th{padding:8px 8px} .wl td{padding:8px 8px} }
+@media (max-width:1439px){ .wl th{padding:8px 8px} .wl td{padding:8px 8px} }
+@media (max-width:1359px){ .wl th.c3,.wl td.c3{display:none} }
 @media (max-width:1279px){ .wl th.c2,.wl td.c2{display:none} }
 @media (max-width:1199px){ .wl th.cw,.wl td.cw{display:none} }
-@media (max-width:760px){ .wl th.cm,.wl td.cm{display:none} .wl .ag .bar{width:90px} .wl .co .nm small{white-space:normal} .wl th{padding:8px 6px} .wl td{padding:8px 6px} }
+@media (max-width:760px){ .wl th.cm,.wl td.cm{display:none} .wl .ag .bar{width:72px} .wl .co .nm small{white-space:normal} .wl th{padding:8px 6px;white-space:normal;line-height:1.25} .wl th .sort{display:inline;white-space:normal} .wl td{padding:8px 6px} .wl .co{gap:6px} .wl .co .mb-avatar{display:none} }
 </style>
 </head>
 <body>
@@ -85,7 +87,8 @@ function toolbar(m, rows) {
   const bar = el('div', {class:'toolbar', role:'search'});
   const inp = el('input', {type:'search', placeholder:'Filter by symbol or name', 'aria-label':'Filter by symbol or name', value: query, oninput: e => { query = e.target.value; renderTable(); }});
   bar.append(el('span', {class:'search'}, icon('ms-search'), inp));
-  const chip = (label, val, n) => el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(sector === val), onclick: () => { sector = val; renderTable(); }}, label, n != null ? el('span', {class:'muted'}, ` ${n}`) : null);
+  const chips = [];
+  const chip = (label, val, n) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(sector === val), onclick: () => { sector = val; for (const x of chips) x.setAttribute('aria-pressed', String(x._val === sector)); renderTable(); }}, label, n != null ? el('span', {class:'muted'}, ` ${n}`) : null); b._val = val; chips.push(b); return b; };
   bar.append(chip('All sectors', null), ...sectors.map(s => chip(s, s, rows.filter(r => r.c.sector === s).length)));
   bar.append(el('span', {style:'margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap'}, el('span', {class:'muted', style:'font-size:12.5px'}, 'Horizon', help('N+k: buy at the open of the session being predicted, sell at the close of the k-th market session after it. The selector sets the agreement, chance and range columns; it opens on N+1 (decision 39).')), horizonTabs(P(m).horizons, horizon, k => { horizon = k; render(); })));
   return bar;
@@ -98,9 +101,10 @@ function table(m, rows) {
   list.sort((x, y) => sortDir * cmp(SORT[sortKey](x), SORT[sortKey](y)) || x.c.ticker.localeCompare(y.c.ticker));
   const card = el('section', {class:'card', 'aria-label':'Companies'});
   card.append(el('div', {class:'head'}, el('h2', {}, `${list.length} of ${rows.length} companies`), help('One row per active company. Agreement = how many of the strategies that predict it at this horizon would buy (rule, baselines and AI count alike), with the buyers’ average chance of a rise. Range = the reference rule strategy’s published range for the horizon (target as the triangle, last close as the dark line). Open = this company’s open paper trades and their unrealised profit. Click a row for the company page.'), el('div', {class:'end'}, `N+${horizon} = ${horizonWords(horizon)} · as of the ${fmtD(p.as_of, false)} close · Paper`)));
-  const th = (label, key, cls='', tipText=null) => { const h = el('th', {class: cls, 'data-k': key || null, 'data-tip': tipText, scope:'col', 'aria-sort': key && sortKey === key ? (sortDir < 0 ? 'descending' : 'ascending') : null, onclick: key ? () => { if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = key === 'name' ? 1 : -1; } renderTable(); } : null}, label); if (key && sortKey === key) h.append(icon(sortDir < 0 ? 'ms-arrow_downward' : 'ms-arrow_upward')); return h; };
+  const sortBtn = (label, key) => { const b = el('button', {type:'button', class:'sort', 'aria-label': `Sort by ${label.toLowerCase()}`, onclick: () => { if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = key === 'name' ? 1 : -1; } renderTable(); }}, label); if (sortKey === key) b.append(icon(sortDir < 0 ? 'ms-arrow_downward' : 'ms-arrow_upward')); return b; };
+  const th = (label, key, cls='', tipText=null) => el('th', {class: cls, 'data-k': key || null, 'data-tip': tipText, scope:'col', 'aria-sort': key && sortKey === key ? (sortDir < 0 ? 'descending' : 'ascending') : null}, key ? sortBtn(label, key) : label);
   const tb = el('table', {class:'md-table tbl wl'});
-  tb.append(el('thead', {}, el('tr', {}, th('Company', 'name'), th('Last', 'last', 'num'), th(`Agreement at N+${horizon}`, 'agreement'), th('Chance', null, 'cw', 'Average probability of a rise given by the buyers that give one; 50% is a coin flip.'), th('Buyers N+1…5', null, 'c2', 'Buyers at each horizon; the selected one is dark.'), th(`Range at N+${horizon}`, null, 'cw', 'The reference rule strategy’s published 50% and 80% ranges for the horizon, drawn around the last close; the triangle is its target.'), th('Open', 'open', 'num cm'), th('', null, 'c3'))));
+  tb.append(el('thead', {}, el('tr', {}, th('Company', 'name'), el('th', {class:'num', scope:'col', 'aria-sort': sortKey === 'last' || sortKey === 'change' ? (sortDir < 0 ? 'descending' : 'ascending') : null}, sortBtn('Last', 'last'), el('span', {class:'sep', 'aria-hidden':'true'}, '·'), sortBtn('Move', 'change')), th(`Agreement at N+${horizon}`, 'agreement'), th('Chance', null, 'cw', 'Average probability of a rise given by the buyers that give one; 50% is a coin flip.'), th('Buyers N+1…5', null, 'c2', 'Buyers at each horizon; the selected one is dark.'), th(`Range at N+${horizon}`, null, 'cw', 'The reference rule strategy’s published 50% and 80% ranges for the horizon, drawn around the last close; the triangle is its target.'), th('Open', 'open', 'num cm'), th('', null, 'c3'))));
   const body = el('tbody');
   for (const r of list) {
     const c = r.c, a = r.a;

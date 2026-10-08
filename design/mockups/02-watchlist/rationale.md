@@ -27,7 +27,7 @@ strategies expect the price, and the Paper band says nothing is proven.
    intraday check (or "no check yet").
 5. **Toolbar**: a filter box (symbol or name), sector chips with counts, the **horizon selector** N+1..N+5 opening
    on N+1 (decision 39): it sets the agreement, chance and range columns.
-6. **Table**, sortable by the column heads (agreement by default: buyers, then average chance; day move; name;
+6. **Table**, sortable by the buttons in the column heads (agreement by default: buyers, then average chance; last; day move ("Move" in the Last head); name;
    open trades; last): company (icon tile, ticker as the link, name and sector), last close and day move (sign and
    colour), **agreement** "n of N buy" with a stacked bar by family (rule, baselines, AI), the buyers' average
    **chance** as an odds meter, **buyers by horizon** mini bars (the selected horizon dark), the **range** at the
@@ -53,7 +53,7 @@ strategies expect the price, and the Paper band says nothing is proven.
 
 ## Design rules kept
 Design system v2 only (no page-local colour); light theme; phone and desktop; never colour alone (signs, glyphs,
-words); keyboard: links, buttons, sortable heads (`aria-sort`), every tooltip focusable, Escape closes the drawer;
+words); keyboard: links, buttons, the sort buttons in the column heads (Tab, Enter or Space; `aria-sort` on the sorted head), the sector chips (`aria-pressed` follows the selection), every tooltip focusable, Escape closes the drawer;
 plain language; Paper on every signal; "No proven strong signals today"; research only (no buy/sell instruction);
 horizon selector N+1..N+5 opening on N+1.
 
