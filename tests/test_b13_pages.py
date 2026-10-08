@@ -23,6 +23,13 @@ from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.warehouse import openapi_spec, rm_compare, rm_strategies, rm_track_record, schema_check  # noqa: E402
 from test_api_contract import CUTOFF, catalogue, example_context  # noqa: E402
 
+@pytest.fixture(scope="module", autouse=True)
+def _all_strategies_live(all_strategies_live):
+    """B4 (go-live): pages show live strategies' rows only; the catalogue's example strategies have no live_from yet,
+    so every strategy is live in this module (tests/conftest.py all_strategies_live)."""
+    yield
+
+
 MARKETS = ("india", "us")
 REPO = Path(__file__).resolve().parents[1]
 EXAMPLE_AS_OF = "2026-10-06"  # the catalogue's scoreboard rows carry the examples' as-of date

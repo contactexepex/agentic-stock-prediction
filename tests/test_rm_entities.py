@@ -92,6 +92,9 @@ def stored(tmp_path_factory):
                 "pick_rule": t["trade_id"].split(":")[1],
                 "status": "picked",
                 "prediction_id": t["prediction_id"],
+                "strategy_id": t["strategy_id"],
+                "session_date": t["entry_date"],
+                "horizon_days": t["horizon_days"],
             }
             for t in mine
             if t["view"] == "head_to_head"
@@ -430,3 +433,63 @@ def test_a_pick_without_a_strategy_follows_its_family(monkeypatch):
         {"strategy_id": None, "family": "ai", "session_date": "2026-10-09", "status": "no_candidate"},
     ]
     assert rm_entities.live_rows(picks, "session_date") == [picks[0], picks[2]]
+
+
+def fresh_context(stored, market: str) -> BuildContext:
+    """A new context (empty memo) on the module's stored data, sharing its companies and status block."""
+    ctx = BuildContext(load_market(market), stored[market].con, CUTOFF)
+    ctx.__dict__["companies"] = stored[market].companies
+    ctx.memo["status_block"] = rm_common.status_block(stored[market])
+    return ctx
+
+
+def test_company_sources_and_compare_picks_keep_live_rows_only(stored, monkeypatch):
+    """B12's company_sources (today's predictions, picks, trade checks) and B13's rm_compare.picks show only rows
+    of strategies live on their D (consented go-live edits, B4)."""
+    from marketbrief.warehouse import company_sources, rm_compare
+
+    late = ("ai.combined.opus.v1",)
+    ctx = fresh_context(stored, "us")
+    before = company_sources.read_sources(ctx, "2026-10-06", "2026-10-07")
+    picks_before = rm_compare.picks(ctx)
+    monkeypatch.setattr(rm_entities, "live", live_from(ALL_LIVE_FROM, late, late_day="2026-12-01"))
+    ctx = fresh_context(stored, "us")
+    after = company_sources.read_sources(ctx, "2026-10-06", "2026-10-07")
+    picks_after = rm_compare.picks(ctx)
+
+    def ids(by_ticker):
+        return {row["id"] for rows in by_ticker.values() for row in rows}
+
+    dropped = {row["id"] for rows in before.all_predictions.values() for row in rows if row["strategy_id"] in late}
+    assert dropped and ids(after.all_predictions) == ids(before.all_predictions) - dropped
+    assert ids(after.predictions) == ids(before.predictions) - dropped
+    late_picks = [p for rows in before.all_picks.values() for p in rows if p["strategy_id"] in late]
+    assert late_picks and not any(p["strategy_id"] in late for rows in after.all_picks.values() for p in rows)
+    assert sum(map(len, after.all_picks.values())) == sum(map(len, before.all_picks.values())) - len(late_picks)
+    assert any(p["strategy_id"] in late for p in picks_before)
+    assert picks_after == [p for p in picks_before if p["strategy_id"] not in late]
+    late_checks = [c for rows in before.all_checks.values() for c in rows if c["strategy_id"] in late]
+    assert not any(c["strategy_id"] in late for rows in after.all_checks.values() for c in rows)
+    assert sum(map(len, after.all_checks.values())) == sum(map(len, before.all_checks.values())) - len(late_checks)
+
+
+def test_settled_trades_and_the_scoreboard_keep_live_strategies_only(stored, monkeypatch):
+    """rm_common.settled_trades (and so lab_summary, go_live and strategies' settled_trades) applies B2's
+    lab/scoreboard.live_settlements: a trade of a strategy not live on its D is never shown or scored."""
+    from marketbrief.lab import registry
+
+    def settlement(strategy_id: str, entry: str) -> dict:
+        return {"id": f"acc:{strategy_id}:{entry}@1", "trade_id": f"acc:{strategy_id}:{entry}", "status": "settled",
+                "view": "accuracy", "strategy_id": strategy_id, "ticker": "NVDA", "entry_date": entry,
+                "settled_at": "2026-10-06T22:15:00Z"}
+
+    rows = [settlement("rule.model_news.v1", "2026-10-01"), settlement("rule.model_news.v1", "2026-09-25"),
+            settlement("base.always_up.v1", "2026-10-01")]
+    monkeypatch.setattr(rm_common.lab_reads, "settlements", lambda _con, _now: rows)
+    monkeypatch.setattr(registry, "is_live", lambda strategy, day, reg=None: (
+        (strategy["id"] if isinstance(strategy, dict) else strategy) == "rule.model_news.v1"
+        and str(day)[:10] >= "2026-09-30"))
+    ctx = fresh_context(stored, "us")
+    assert [row["id"] for row in rm_common.settled_trades(ctx)] == [rows[0]["id"]]
+    counts = {key: entry["settled_trades"] for key, entry in rm_common.strategies(ctx).items()}
+    assert counts["rule.model_news.v1"] == 1 and counts["base.always_up.v1"] == 0

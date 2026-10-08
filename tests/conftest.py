@@ -154,7 +154,11 @@ SLOW = {
         "test_open_trade_factors_come_from_the_stored_splits",
         "test_open_trades_match_the_catalogue",
         "test_records_validate_against_their_shared_schemas",
+        "test_company_sources_and_compare_picks_keep_live_rows_only",
+        "test_no_live_strategy_means_no_agreement_counts_and_no_open_trades",
+        "test_rehearsal_rows_are_never_agreement_or_open_trades",
         "test_settled_late_and_future_predictions_are_not_open",
+        "test_settled_trades_and_the_scoreboard_keep_live_strategies_only",
     },
     "tests/test_sec_times.py": {
         "test_stored_shifted_rows_are_corrected_on_read",
@@ -260,14 +264,16 @@ def _no_network(request, _netguard_session_log):
 
 @pytest.fixture(scope="module")
 def all_strategies_live():
-    """B4 (go-live): the read models show only live strategies' rows (warehouse/rm_entities.live_rows on
-    lab/registry.is_live). No registry strategy has live_from set before Wave 5's switch, so a test that builds pages
-    from example predictions, picks or trades makes every strategy live for the module: request it from a
-    module-scoped autouse fixture (it must run before the module's own fixtures build pages)."""
+    """B4 (go-live): the read models show only live strategies' rows (lab/registry.is_live, through
+    warehouse/rm_entities.live_rows and lab/scoreboard.live_settlements). No registry strategy has live_from set before
+    Wave 5's switch, so a test that builds pages from example predictions, picks or trades makes every strategy live
+    for the module: request it from a module-scoped autouse fixture (it must run before the module's own fixtures
+    build pages)."""
     sys.path.insert(0, str(TESTS.parent / "scripts"))
+    from marketbrief.lab import registry
     from marketbrief.warehouse import rm_entities
 
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(rm_entities, "live", lambda _strategy_id, _session_date: True)
+        patch.setattr(registry, "is_live", lambda _strategy, _session_date, reg=None: True)
         patch.setattr(rm_entities, "earliest_live_from", lambda: "0001-01-01")
         yield

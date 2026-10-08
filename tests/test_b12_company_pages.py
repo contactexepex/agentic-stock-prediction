@@ -21,6 +21,13 @@ from marketbrief.warehouse import company_payloads, rm_company  # noqa: E402
 from marketbrief.warehouse.company_sources import read_sources  # noqa: E402
 from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
+@pytest.fixture(scope="module", autouse=True)
+def _all_strategies_live(all_strategies_live):
+    """B4 (go-live): pages show live strategies' rows only; the catalogue's example strategies have no live_from yet,
+    so every strategy is live in this module (tests/conftest.py all_strategies_live)."""
+    yield
+
+
 REPO = Path(__file__).resolve().parents[1]
 CATALOGUE = REPO / "design" / "catalogue"
 MOCKUPS = REPO / "design" / "mockups"

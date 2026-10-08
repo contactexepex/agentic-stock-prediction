@@ -177,19 +177,20 @@ def lab_summary(ctx: BuildContext) -> dict:
 
 
 def settled_trades(ctx: BuildContext) -> list[dict]:
-    """The newest settlement of every trade stored by the cut-off (with its your-cost view), collected companies
-    only."""
+    """The newest settlement of every trade stored by the cut-off (with its your-cost view), of strategies live on
+    the trade's D (lab/scoreboard.live_settlements), collected companies only."""
 
     def compute() -> list[dict]:
         rows = latest_settlements(lab_reads.settlements(ctx.con, ctx.cutoff_time))
+        rows = scoreboard.live_settlements(rows)  # go-live: a rehearsal trade is never shown or scored
         return [row for row in rows if row["ticker"] in ctx.collected]
 
     return ctx.shared("settled_trades", compute)
 
 
 def strategies(ctx: BuildContext, fields: tuple[str, ...] = STRATEGY_FIELDS) -> dict[str, dict]:
-    """The registry's strategies keyed by id with `fields`: `live` = live_from set and on or before the session
-    being predicted; `settled_trades` = its settled accuracy-view trades stored by the cut-off."""
+    """The registry's strategies keyed by id with `fields`: `live` = lab/registry.is_live on the session being
+    predicted; `settled_trades` = its settled accuracy-view trades stored by the cut-off (live ones only)."""
 
     def compute() -> dict[str, dict]:
         session_date = status_block(ctx)["session"]["session_date"]
@@ -203,7 +204,7 @@ def strategies(ctx: BuildContext, fields: tuple[str, ...] = STRATEGY_FIELDS) -> 
             out[spec["id"]] = {
                 **{key: spec.get(key) for key in STRATEGY_FIELDS if key not in ("live", "settled_trades")},
                 "live_from": live_from,
-                "live": live_from is not None and live_from <= session_date,
+                "live": registry.is_live(spec, session_date),
                 "settled_trades": counts.get(spec["id"], 0),
             }
         return out
