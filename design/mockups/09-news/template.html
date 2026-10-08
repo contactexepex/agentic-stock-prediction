@@ -82,22 +82,24 @@ onMarketChange = () => { filter = 'all'; ticker = null; pageNo = 1; render(); };
 /* words for the news analyst's event types (News item enrichment.event_type) */
 const KIND = {earnings: 'results', macro: 'rates & macro', product: 'product', legal: 'legal', sector: 'sector', analyst: 'analyst', ma: 'deal', flows: 'flows', commodity: 'commodities', geopolitics: 'geopolitics', index: 'index move', regulation: 'regulation', other: 'other'};
 const MAT = {high: 3, medium: 2, low: 1};
-const scopeOf = n => n.tickers.length ? 'company' : 'market';          /* no ticker = a market-wide story */
+const scopeOf = n => n.scope;          /* the catalogue's scope: market-wide when the tagger found no primary watchlist company */
 const hoursBefore = (p, iso) => (dt2(p.cutoff) - dt2(iso)) / 36e5;
 const dt2 = iso => new Date(iso).getTime();
 const ago = (p, iso) => { const h = hoursBefore(p, iso); return h < 1 ? 'under an hour before the cut-off' : h < 24 ? `${Math.floor(h)} h before the cut-off` : `${Math.floor(h / 24)} day${h < 48 ? '' : 's'} before the cut-off`; };
 const dayKey = (iso, m) => fmtLocal(iso, m, true).replace(/\s\d{1,2}:\d{2}.*$/, '');   /* the local date part of the shell's local time */
 const canCarry = n => CAN_CARRY.includes(n.status);
 
-/* the market movers: the engine's flag when the catalogue carries one; else market-wide first, watchlist results next, then materiality, then newest */
+/* the market movers: the engine's market_moving flag first (W1's rule: high materiality and market-wide or results), then the page's own order to fill the band: market-wide first, watchlist results next, then materiality, then newest */
 function movers(p) {
-  const score = n => (scopeOf(n) === 'market' ? 100 : 0) + (n.enrichment.event_type === 'earnings' ? 50 : 0) + (MAT[n.enrichment.materiality] || 0) * 10 + (canCarry(n) ? 5 : 0);
-  return p.news.filter(n => n.enrichment.materiality === 'high' || scopeOf(n) === 'market' || n.enrichment.event_type === 'earnings')
-    .sort((a, b) => score(b) - score(a) || b.first_seen_at.localeCompare(a.first_seen_at)).slice(0, NEWS_MOVERS_MAX);
+  const score = n => (n.market_moving ? 1000 : 0) + (scopeOf(n) === 'market' ? 100 : 0) + (n.enrichment.event_type === 'earnings' ? 50 : 0) + (MAT[n.enrichment.materiality] || 0) * 10 + (canCarry(n) ? 5 : 0);
+  return p.news.filter(n => n.market_moving || n.enrichment.materiality === 'high' || scopeOf(n) === 'market' || n.enrichment.event_type === 'earnings')
+    .sort((a, b) => score(b) - score(a) || b.first_seen_at.localeCompare(a.first_seen_at))
+    .filter((n, i, arr) => arr.findIndex(x => x.title === n.title) === i)   /* the same headline stored twice (two feeds) shows once in the band */
+    .slice(0, NEWS_MOVERS_MAX);
 }
 
 function itemBody(p, n, opts = {}) {
-  const m = market, kind = KIND[n.enrichment.event_type] || n.enrichment.event_type, mkt = scopeOf(n) === 'market';
+  const m = market, mkt = scopeOf(n) === 'market', kind = mkt && n.category && n.category !== 'company' && n.category !== 'general' ? n.category : (KIND[n.enrichment.event_type] || n.enrichment.event_type);
   const body = el('div', {class:'ni'});
   const head = el('div', {}, el('span', {class:'kind' + (mkt ? ' mkt' : ''), 'data-tip': mkt ? 'A market-wide story: no single company, it moves the whole market.' : `A company story (${n.tickers.join(', ')}).`}, icon(mkt ? 'ms-public' : 'ms-apartment'), mkt ? 'market · ' + kind : kind));
   if (opts.time) head.append(el('span', {class:'muted', style:'font-size:12px'}, `${n.source} · ${fmtLocal(n.first_seen_at, m, true)}`));
@@ -105,7 +107,9 @@ function itemBody(p, n, opts = {}) {
   if (n.summary) body.append(el('p', {class:'sum'}, n.summary));
   const meta = el('div', {class:'meta'});
   if (!opts.time) meta.append(el('span', {}, `${n.source} · ${ago(p, n.first_seen_at)}`));
-  meta.append(statusBadge(n.status), el('span', {'data-tip': 'The news analyst’s materiality: how much the story can move the price.'}, `${n.enrichment.materiality} materiality`));
+  meta.append(n.status ? statusBadge(n.status) : el('span', {class:'mb-label neutral', 'data-tip':'Market-wide stories carry no verification status: verification is per company (DESIGN 3b).'}, 'not verified per company'), el('span', {'data-tip': 'The news analyst’s materiality: how much the story can move the price.'}, `${n.enrichment.materiality} materiality`));
+  if (n.market_moving) meta.append(el('span', {class:'mb-label warn', 'data-tip':'The engine’s market-moving flag: high materiality and market-wide or a results item.'}, icon('ms-warning'), 'market moving'));
+  if (n.enrichment.geopolitical) meta.append(el('span', {class:'mb-label neutral', 'data-tip':'The news analyst marked it geopolitical.'}, 'geopolitical'));
   if (n.independent_origins > 1) meta.append(el('span', {'data-tip':'Independent vetted outlets carrying the same story (copies of one agency story count once).'}, `${n.independent_origins} outlets`));
   for (const t of n.primary_tickers) meta.append(el('a', {class:'tk', href: companyPage(t), 'data-tip': `${(companyOf(m, t) || {name: t}).name}: open the company page`}, t));
   meta.append(el('a', {class:'go', href: n.url, rel:'noopener', target:'_blank'}, 'Open article', icon('ms-open_in_new')));
@@ -115,8 +119,8 @@ function itemBody(p, n, opts = {}) {
 
 function moversCard(p) {
   const list = movers(p), card = el('section', {class:'card', 'aria-label':'Market movers'});
-  card.append(el('div', {class:'head'}, el('h2', {}, `Market movers · last ${p.window.days} days`, help(`At most ${NEWS_MOVERS_MAX} stories that can move the whole market or a watchlist company's price: market-wide stories (rates, inflation and jobs, commodities, geopolitics, an index moving sharply anywhere), the watchlist's results, and anything the news analyst scores high materiality; ranked market-wide first, results next, then materiality, then newest. The verification status says how far a story can be trusted; the Help page explains each status.`)), el('span', {class:'mb-tag paper end'}, 'paper')));
-  if (!list.length) { card.append(el('div', {class:'empty'}, `No market-moving story in the last ${p.window.days} days of the example data: ${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} stored in the window, none market-wide, none results, none scored high materiality. Market-wide items are requested from W1 (data request 8).`)); return card; }
+  card.append(el('div', {class:'head'}, el('h2', {}, `Market movers · last ${p.window.days} days`, help(`At most ${NEWS_MOVERS_MAX} stories that can move the whole market or a watchlist company's price. First the stories the engine flags as market moving (high materiality and market-wide or a results item), then, to fill the band, market-wide stories (rates, inflation and jobs, commodities, geopolitics, an index moving sharply anywhere), the watchlist's results and anything scored high materiality, newest first within each rank. The verification status says how far a story can be trusted; the Help page explains each status.`)), el('span', {class:'mb-tag paper end'}, 'paper')));
+  if (!list.length) { card.append(el('div', {class:'empty'}, `No market-moving story in the last ${p.window.days} days: ${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} stored in the window, none flagged, market-wide, results or high materiality.`)); return card; }
   const g = el('div', {class:'mv'});
   list.forEach((n, i) => g.append(el('div', {class:'it'}, el('span', {class:'rk', 'aria-label': `rank ${i + 1}`}, String(i + 1)), itemBody(p, n))));
   card.append(g);
@@ -129,13 +133,14 @@ function feedCard(p) {
   card.append(el('div', {class:'head'}, el('h2', {}, `Last ${p.window.days} days`, help(`Every story first seen in the ${p.window.days} days before the cut-off, newest first, ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: the last 24 hours, market-wide, one company, or only stories that can carry a call (confirmed or corroborated).`)), el('span', {class:'end muted'}, `${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} · ${last24} in the last 24 h`)));
   const bar = el('div', {class:'toolbar'});
   const chip = (key, label, tipText) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(filter === key && !ticker), 'data-tip': tipText}, label); b.addEventListener('click', () => { filter = key; ticker = null; pageNo = 1; render(); }); return b; };
-  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', 'Last 24 h', 'First seen in the 24 hours before the cut-off.'), chip('market', 'Market-wide', 'Stories about no single company.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
+  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', 'Last 24 h', 'First seen in the 24 hours before the cut-off.'), chip('market', 'Market-wide', 'Stories about no single company.'), chip('moving', 'Market moving', 'The engine’s flag: high materiality and market-wide or a results item.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
   const withNews = p.companies.filter(c => p.news.some(n => n.tickers.includes(c.ticker)));
   if (withNews.length) { const sel = el('select', {'aria-label':'Company'}); sel.append(el('option', {value:''}, 'Company…')); for (const c of withNews) sel.append(el('option', {value: c.ticker, selected: ticker === c.ticker ? 'selected' : null}, `${c.ticker} · ${c.name}`)); sel.addEventListener('change', () => { ticker = sel.value || null; filter = ticker ? 'company' : 'all'; pageNo = 1; render(); }); bar.append(sel); }
   card.append(bar);
   let items = p.news;
   if (filter === '24h') items = items.filter(n => hoursBefore(p, n.first_seen_at) < 24);
   else if (filter === 'market') items = items.filter(n => scopeOf(n) === 'market');
+  else if (filter === 'moving') items = items.filter(n => n.market_moving);
   else if (filter === 'carry') items = items.filter(canCarry);
   else if (filter === 'company' && ticker) items = items.filter(n => n.tickers.includes(ticker));
   if (!items.length) { card.append(el('div', {class:'empty', style:'margin-top:12px'}, p.news.length ? 'No story matches this filter in the window.' : `No story first seen in the last ${p.window.days} days in the example data (${p.window.older_hidden} older stor${p.window.older_hidden === 1 ? 'y is' : 'ies are'} hidden by the window; the Company page shows them).`)); return card; }

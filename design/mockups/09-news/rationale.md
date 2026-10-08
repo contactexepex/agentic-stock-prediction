@@ -2,9 +2,9 @@
 
 Page 9 of docs/SPEC.md section 6 ("news by company with verification status and impact category", read model
 `rm.news`), designed in the design track on the owner's rules of 2026-10-08, which replace the earlier decision to
-fold the news into Home and the Company page. Status: **built on the owner's instructions**; the example data holds
-one story per market in the 3-day window, so the page is also waiting for W1's data request 8 (market-wide items,
-summaries, volume) before it can be judged and landed as a filled page.
+fold the news into Home and the Company page. Status: **built on the owner's instructions** (2026-10-08) and rebuilt the same day on W1's data request 8 (56
+real stored stories, 28 per market, with scope, category, summary and an engine-side market-moving flag); judged and
+landed by the track; the owner reviews it.
 
 Files: `build.py` (catalogue -> `data.json` -> `template.html` -> `page.html` through `design/mockups/_shared/mockup.py`),
 `data.json` (the example payload of `GET /api/v1/markets/{market}/news`), `page.html`, `notes.md`, screenshots
@@ -32,10 +32,13 @@ from any site, only the conventions.
 2. **Market movers · last 3 days**: up to 10 ranked cards in two columns: rank, the kind of story (market-wide
    stories carry a globe and the word "market"), the headline as the link, the summary line when the data has one,
    the source and "n hours before the cut-off", the status badge, the materiality, how many outlets carry it, the
-   companies as links to their pages, and "Open article". Ranking (until W1's engine-side flag): market-wide first,
-   the watchlist's results next, then materiality, then newest; only market-wide, results or high-materiality
-   stories qualify. An honest empty state when the window has none.
-3. **Last 3 days** (the feed): filter chips (All, Last 24 h, Market-wide, Can carry a call) and a company select;
+   companies as links to their pages, and "Open article". Ranking: the engine's market-moving flag first (W1's rule:
+   high materiality and market-wide or a results item, shown as an amber "market moving" label), then market-wide
+   stories, the watchlist's results and high materiality, newest first within each rank; the same headline stored
+   twice shows once. A market-wide story carries "not verified per company" instead of a status, because
+   verification is per company. An honest empty state when the window has none.
+3. **Last 3 days** (the feed): filter chips (All, Last 24 h, Market-wide, Market moving, Can carry a call) and a
+   company select;
    stories grouped by the local day with a sticky header ("Today · n stories"), each row with the local time (its
    tooltip has the first-stored and published times), the sentiment arrow, the same item body as the band; a pager
    (10 a page, at most 50 in the window) that scrolls the feed into view.
@@ -55,10 +58,12 @@ from any site, only the conventions.
 - No look-ahead: a story counts when its `first_seen_at` is at or before the cut-off, and the window is the 3 days
   before the cut-off; "n hours before the cut-off" is measured against the cut-off, never the viewer's clock. The
   calendar starts at the session being predicted.
-- Data request 8 to W1 (recorded in `_data_requests`): market-wide items with a scope and region, a one-or-two-line
-  summary per item, about 30 items per market in the window with at least 12 in the last 24 hours and every status,
-  and if cheap an engine-side market-moving flag. The page is written for those fields (a summary line renders when
-  present; the scope is derived from the tickers until a `scope` field exists) and will be rebuilt and judged on them.
+- Data request 8 to W1 (recorded in `_data_requests`), answered the same day: 56 real stored stories with `scope`,
+  `category`, `feed`, `summary` (`summary_source` article or analyst), `market_moving` and `origin`. What the stored
+  data cannot supply is not invented: no region; the stored statuses are unverified, single source, rumour and
+  promotional only (confirmed and corroborated exist on the six invented items, so "can carry a call" finds one India
+  story and no US story); no cluster with more than one origin; most US items have no summary (the analyst's are
+  templated), so they show the headline alone. The page says each of these where it shows.
 
 ## Design rules kept
 Design system v2 only; light theme; phone and desktop (the band's two columns and the rail collapse; the feed row
@@ -70,15 +75,21 @@ other page.
 
 ## Checked
 `check_page.js`: no console errors, no overflow, no external requests at 1280 and 390 px. `check_text.js` (twelve
-widths, both markets): no clipped, overflowing or overlapping text. Rebuild is byte-identical. The filters, the pager
-and the volume of the band and the feed can only be exercised once W1's items arrive; that check and the judge's
-review follow then.
+widths, both markets): no clipped, overflowing or overlapping text. Rebuild is byte-identical. A script in both
+markets: the band holds 10 stories (India: 5 flagged first; US: 5 flagged first), the feed 29 stories on 3 pages
+(India 14 in the last 24 h, US 29), the filters give India 14 / 12 / 5 / 1 stories and the US 29 / 12 / 5 / none for
+last 24 h / market-wide / market moving / can carry a call, page 2 adds the 5 Oct day group in India, the company
+rail counts RELIANCE 8 and HDFCBANK 4 (India) and NVDA 4, AAPL 2, JPM 1 (US), no page error.
 
-## Decisions taken for the owner (to confirm)
+## Decisions taken for the owner (reported to the orchestrator; to confirm)
 - The movers are a ranked band of cards above the feed, not a separate tab, so the first screen answers "what
   moves the market" and the feed is one scroll away.
 - The feed is grouped by day with sticky headers and filtered by chips rather than split into "today" and "older"
   cards: one list, newest first, the owner's filters on top.
 - The rail holds the calendar (the week ahead) and the news per company; "big news" lives in the band, so the rail
   does not repeat it.
-- Market-wide stories are the ones without a company; they appear in every market's page where W1 stores them.
+- Market-wide stories are the catalogue's `scope` market (the tagger found no primary watchlist company); each
+  market's page shows the stories its own feeds carried, so a Fed story appears in India only when India's feeds had
+  it.
+- The band uses the engine's market-moving flag first and fills up to 10 with the page's own order, so it is never
+  empty while the window has market-wide or results stories; the owner may prefer the flagged stories alone.

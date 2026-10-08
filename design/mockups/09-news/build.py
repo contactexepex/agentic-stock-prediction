@@ -24,8 +24,10 @@ NEWS_WINDOW_DAYS = 3          # owner decision 2026-10-08: nothing older than 3 
 NEWS_MAX_ITEMS = 50           # owner decision: at most 50 items in the feed
 CALENDAR_DAYS = 7             # the rail: the coming week
 NEWS_FIELDS = ("id", "market", "tickers", "primary_tickers", "title", "source", "source_domain", "url", "published_at",
-               "first_seen_at", "status", "status_as_of", "independent_origins", "primary_ids", "cluster_id")
+               "first_seen_at", "status", "status_as_of", "independent_origins", "primary_ids", "cluster_id",
+               "scope", "category", "feed", "summary", "summary_source", "market_moving", "origin")
 ENRICHMENT_FIELDS = ("event_type", "materiality", "sentiment", "relevance", "novelty", "urgency", "priced_in", "analyzed_at")
+# `geopolitical` exists on the stored items only (the six invented ones predate it): copied when present, else null
 EVENT_FIELDS = ("market", "date", "type", "name", "ticker", "timing", "reaction_sessions", "major", "widens", "provisional",
                 "release", "source", "event_id")
 COMPANY_FIELDS = ("market", "ticker", "name", "sector", "state", "open_trades")
@@ -50,7 +52,7 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
     news = []
     for r in sorted(in_window, key=lambda r: (r["first_seen_at"], r["id"]), reverse=True)[:NEWS_MAX_ITEMS]:
         rec = pick(r, NEWS_FIELDS)
-        rec["enrichment"] = pick(r["enrichment"], ENRICHMENT_FIELDS)
+        rec["enrichment"] = {**pick(r["enrichment"], ENRICHMENT_FIELDS), "geopolitical": r["enrichment"].get("geopolitical")}
         news.append(rec)
     session_date = status["session"]["session_date"]
     calendar_end = (datetime.fromisoformat(session_date) + timedelta(days=CALENDAR_DAYS)).date().isoformat()
@@ -78,12 +80,11 @@ def compose() -> dict:
     data = envelope("news", "docs/SPEC.md section 6, page 9; owner's rules of 2026-10-08", "GET /api/v1/markets/{market}/news",
                     "rm.news", NAMES, cutoff, markets)
     data["_data_requests"] = [
-        "market-wide news items (no ticker; scope market; rates, CPI/jobs, commodities, geopolitics, index moves anywhere) "
-        "with a region, a one-or-two-line summary per item (the stored key sentences where the page was read), about 30 "
-        "items per market in the 3-day window with at least 12 in the last 24 hours and the full mix of statuses, and if "
-        "cheap an engine-side market_moving flag: sent to W1 as data request 8 on 2026-10-08; until then the page ranks "
-        "the movers itself (market-wide first, then watchlist results, then high materiality, then newest) and shows "
-        "the headline without a summary line",
+        "market-wide items, a summary line per item, volume and an engine-side market_moving flag: answered by W1 on "
+        "2026-10-08 (data request 8: 56 real stored items, 28 per market, with scope, category, feed, summary, "
+        "market_moving and origin). Not in the stored data and not invented: a region, confirmed or corroborated statuses "
+        "on the stored items (only the six invented items carry them), clusters with more than one origin, and "
+        "summaries for most US items (the analyst's are templated)",
     ]
     return data
 
