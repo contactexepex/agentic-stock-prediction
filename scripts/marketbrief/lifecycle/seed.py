@@ -34,7 +34,7 @@ def history_start(market: str) -> datetime | None:
 
 def seed_requests(market: str, sources) -> tuple[list[dict], list[str]]:
     """(one add request per config ticker, problems)."""
-    config = accessor.config_lists(market)
+    config = accessor.config_company_keys(market)
     tickers, sectors = config_companies(market, config)[0], config.get(CFG_SECTORS) or {}
     sector_of = {ticker: sector for sector, members in sectors.items() for ticker in members or []}
     exchanges = (load_lifecycle_config().get("exchanges") or {}).get(market, {})

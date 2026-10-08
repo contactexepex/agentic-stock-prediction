@@ -1,12 +1,13 @@
 """The watchlist accessor (docs/SPEC.md F8.2; W1 interface, session B1 builds it in `marketbrief/lifecycle/`).
 
-The company list moves from config/markets/<market>.yaml `tickers:` into the append-only kind
-`watchlist_events` (schema in core/schema_lifecycle.py). A company's state as of a time is the newest event with
-effective_from <= as_of among those recorded by as_of (recorded_at <= as_of), so a replay with MB_NOW sees only
-what was known then. "Newest" orders by effective_from, then recorded_at, then id; the validator refuses an event whose
-effective_from is before the company's newest stored event, so a later request can never take effect earlier.
-One exception (B1): the seed's add events (channel `seed`) count from their effective_from even before their
-recorded_at, because they restate the config list every earlier run used (marketbrief/lifecycle/events.py):
+The company list lives in the append-only kind `watchlist_events` (schema in core/schema_lifecycle.py);
+config/markets/<market>.yaml keeps only per-company metadata under `company_meta:` (formerly `tickers:`). A
+company's state as of a time is the newest event with effective_from <= as_of among those recorded by as_of
+(recorded_at <= as_of), so a replay with MB_NOW sees only what was known then. "Newest" orders by effective_from,
+then recorded_at, then id; the validator refuses an event whose effective_from is before the company's newest stored
+event, so a later request can never take effect earlier. One exception (B1): the seed's add events (channel `seed`)
+count from their effective_from even before their recorded_at, because they restate the config list every earlier
+run used (marketbrief/lifecycle/events.py):
 
 - add, reactivate -> active (collected, predicted, traded)
 - deactivate      -> inactive (collected, not predicted or traded; shown only in the Companies page's Inactive part)

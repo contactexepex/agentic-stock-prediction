@@ -25,7 +25,7 @@ STATES_OF = {STATE_COLLECTED: (STATE_ACTIVE, STATE_INACTIVE), STATE_ACTIVE: (STA
              STATE_INACTIVE: (STATE_INACTIVE,), STATE_DELETED: (STATE_DELETED,)}
 
 
-def config_lists(market: str) -> dict:
+def config_company_keys(market: str) -> dict:
     """The market config's raw company keys (`company_meta:` or the legacy `tickers:`) and `sectors:`, the implicit
     seed of markets not yet seeded (loader.config_companies)."""
     path = paths.CONFIG / DIR_CONFIG_MARKETS / f"{market}{YAML_SUFFIX}"
@@ -37,7 +37,7 @@ def records(market: str, as_of: datetime | None = None) -> list[dict]:
     """The Company record of every company ever added (deleted included) as of `as_of` (default: the clock)."""
     as_of = parse_time(as_of) if as_of is not None else clock()
     out = []
-    for company in companies_as_of(market, config_lists(market), as_of).values():
+    for company in companies_as_of(market, config_company_keys(market), as_of).values():
         record = company_record(company)
         if record["exchange"] is None and len(EXCHANGES.get(market, ())) == 1:
             record["exchange"] = EXCHANGES[market][0]   # India: every config company is NSE-listed
