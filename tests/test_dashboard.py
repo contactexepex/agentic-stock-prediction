@@ -600,7 +600,8 @@ const { chromium } = require('playwright');
       try { return Array.isArray(JSON.parse(document.getElementById('mb-data').textContent).companies); }
       catch (e) { return false; }
     });
-    out.switch = await p.evaluate(() => Array.from(document.querySelectorAll('#markets a')).map(a => a.getAttribute('href')));
+    out.switch = await p.evaluate(
+      () => Array.from(document.querySelectorAll('#markets a')).map(a => a.getAttribute('href')));
     const rows = await p.locator('#wl-body tr').count();
     await p.click('#wl-body button.tick[data-t="JPM"]'); await p.waitForTimeout(500);
     const canvases = await p.locator('#chart-box canvas').count();
