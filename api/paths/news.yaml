@@ -1,0 +1,19 @@
+# The News page (B11). Builder: scripts/marketbrief/warehouse/rm_news.py; route web/app/api/v1/markets/[market]/news.
+/api/v1/markets/{market}/news:
+  get:
+    tags: [markets]
+    operationId: getNews
+    summary: The News page (09-news) - the market's news of the last 3 days with status, the calendar, the companies
+    x-read-model: rm.news
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The News page read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NewsResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}

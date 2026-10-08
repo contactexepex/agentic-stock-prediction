@@ -186,31 +186,6 @@ paths:
               schema: {$ref: '#/components/schemas/TrackRecordResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/news:
-    get:
-      tags: [markets]
-      operationId: getNews
-      summary: Newest headlines with verification status and enrichment, market-wide or for one ticker
-      x-status: planned
-      x-read-model: rm.news
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - name: ticker
-          in: query
-          required: false
-          description: A watchlist ticker (page_key = ticker); omitted = the market-wide feed (page_key `_`)
-          schema: {$ref: '#/components/schemas/Ticker'}
-      responses:
-        '200':
-          description: The news read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/NewsFeedResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/runs:
     get:
       tags: [markets]
@@ -521,13 +496,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/TrackRecord'}
-    NewsFeedResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/NewsFeed'}
     RunListResponse:
       allOf:
         - $ref: '#/components/schemas/ReadModelMeta'
@@ -961,17 +929,6 @@ components:
         backtest:
           oneOf: [{$ref: '#/components/schemas/BacktestView'}, {type: 'null'}]
         min_sample: {type: integer, description: 'view_data.MIN_SAMPLE: below it, "not enough history yet"'}
-
-    NewsFeed:
-      type: object
-      x-source: presentation/dashboard/reads.news + EvidenceStatuses + news_enriched (analyzed_at <= cutoff)
-      required: [market, ticker, items]
-      properties:
-        market: {$ref: '#/components/schemas/Market'}
-        ticker: {type: ['string', 'null'], description: null for the market-wide feed}
-        items:
-          type: array
-          items: {$ref: '#/components/schemas/NewsItem'}
 
     RunList:
       type: object
