@@ -49,7 +49,8 @@ def weekly_series(con, cutoff: str) -> list[dict]:
     if calls.empty:
         return []
     calls["basis_key"] = [
-        scoring.basis_key(basis, label) for basis, label in zip(calls["label_basis"], calls["horizon_label"], strict=True)
+        scoring.basis_key(basis, label)
+        for basis, label in zip(calls["label_basis"], calls["horizon_label"], strict=True)
     ]
     calls["week"] = [iso_week(day) for day in calls[WEEK_OF]]
     out = []

@@ -70,8 +70,19 @@ GO_LIVE_ROW_FIELDS = (
     "cost_view",
 )
 BACKTEST_RUN_FIELDS = ("history", "first_date", "last_date", "eurusd", "note")
-CELL_FIELDS = ("market", "view", "basis", "strategy_id", "dimension", "column", "week", "trades", "wins", "win_rate",
-               "net_pnl")
+CELL_FIELDS = (
+    "market",
+    "view",
+    "basis",
+    "strategy_id",
+    "dimension",
+    "column",
+    "week",
+    "trades",
+    "wins",
+    "win_rate",
+    "net_pnl",
+)
 LINE_FIELDS = ("market", "view", "basis", "series", "date", "net_pnl", "cumulative_net_pnl")
 COMPANY_FIELDS = ("market", "ticker", "name", "sector", "state")
 # B2's back-test refuses US without stored EUR/USD closes (lab/reports.MSG_BACKTEST_NO_EURUSD); its message is the note
@@ -111,7 +122,9 @@ def forward_row(row: dict, as_of: str | None) -> dict:
         **pick(row, ROW_FIELDS),
         "as_of": as_of,
         "luck_test": luck(row.get("luck_test")),
-        "your_cost": None if your is None else {**pick(your, YOUR_COST_FIELDS), "luck_test": luck(your.get("luck_test"))},
+        "your_cost": None
+        if your is None
+        else {**pick(your, YOUR_COST_FIELDS), "luck_test": luck(your.get("luck_test"))},
     }
     if row["scope"] == SCOPE_STRATEGY and row.get("go_live") is not None:
         out["go_live"] = pick(row["go_live"], GO_LIVE_ROW_FIELDS)
@@ -149,8 +162,13 @@ def backtest(ctx: BuildContext) -> dict:
         result = lab_reports.run_backtest(ctx.con, ctx.cfg, ctx.cutoff_time, history=False)
         if result.get("ok") is False:
             return {
-                "run": {"history": False, "first_date": None, "last_date": None, "eurusd": None,
-                        "note": result["message"]},
+                "run": {
+                    "history": False,
+                    "first_date": None,
+                    "last_date": None,
+                    "eurusd": None,
+                    "note": result["message"],
+                },
                 "rows": [],
             }
         return {

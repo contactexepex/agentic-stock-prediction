@@ -1,7 +1,7 @@
 """The 1.0 pages (WS1, docs/ws/ws1.md): rm.overview, rm.watchlist, rm.stock and rm.bars, sliced
 from the dashboard's data as of the cut-off (warehouse/read_models.page_payloads) and served verbatim. Their
-payload schemas are the 1.0 components of api/openapi.yaml (Overview, Watchlist, StockDetail, Bars). rm.track_record moved
-to B13's rm_track_record.py (contract 2.0)."""
+payload schemas are the 1.0 components of api/openapi.yaml (Overview, Watchlist, StockDetail, Bars).
+rm.track_record moved to B13's rm_track_record.py (contract 2.0)."""
 
 from __future__ import annotations
 

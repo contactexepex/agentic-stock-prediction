@@ -189,7 +189,10 @@ def test_sync_runs_are_recorded(synced):
         "FROM rm.builds ORDER BY started_at",
     )
     assert [b[0] for b in builds[:2]] == [r[0] for r in rows[:2]]
-    assert [b[1:7] for b in builds[:2]] == [("us", "daily", True, TOTAL_PAGES, 0, None), ("us", "daily", True, 0, TOTAL_PAGES, None)]
+    assert [b[1:7] for b in builds[:2]] == [
+        ("us", "daily", True, TOTAL_PAGES, 0, None),
+        ("us", "daily", True, 0, TOTAL_PAGES, None),
+    ]
     assert builds[0][7] == "unknown"  # the copied root is no git checkout
     assert builds[0][8] == datetime.fromisoformat(CUTOFF)
 
@@ -283,9 +286,9 @@ def test_invalid_page_keeps_its_old_row(synced, monkeypatch):
     monkeypatch.setattr(
         read_models,
         "page_problems",
-        lambda builder, payload, document: ["$: missing 'not_built_yet'"]
-        if builder.table == "track_record"
-        else real(builder, payload, document),
+        lambda builder, payload, document: (
+            ["$: missing 'not_built_yet'"] if builder.table == "track_record" else real(builder, payload, document)
+        ),
     )
     res = sync.sync_market(cfg, force_local=True)
     assert res["ok"] and not res["build_ok"]
