@@ -233,6 +233,6 @@ def go_live(ctx: BuildContext) -> dict:
 
 # The shared derived records (Company, Agreement, Open trade) live in rm_entities.py; re-exported here so every page
 # finds every shared block in one place.
-from marketbrief.warehouse.rm_entities import agreement, companies, open_trades  # noqa: E402
+from marketbrief.warehouse.rm_entities import agreement, companies, live_rows, open_trades  # noqa: E402
 
-__all__ = ["agreement", "companies", "open_trades"]
+__all__ = ["agreement", "companies", "live_rows", "open_trades"]

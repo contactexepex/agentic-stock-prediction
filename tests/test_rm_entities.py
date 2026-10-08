@@ -11,6 +11,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -344,3 +345,50 @@ def test_open_trade_factors_come_from_the_stored_splits(stored):
     assert record["unrealised_pnl"] == round(shares * (last / 0.5 - entry), 2)  # entry factor: only 5 Oct
     assert record["unrealised_pct"] == round((last / (entry * 0.5) - 1) * 100, 2)
     assert record["to_target_pct"] == round((1000.0 * 0.25 / last - 1) * 100, 2)  # target factor: both splits
+
+
+def rule_live_from(day: str, late: tuple[str, ...] = (), late_day: str = "2026-10-08"):
+    """A stand-in for lab/registry.is_live: every strategy live from `day`, those in `late` only from `late_day`."""
+    return lambda strategy_id, session_date: str(session_date)[:10] >= (late_day if strategy_id in late else day)
+
+
+def test_live_rows_keep_live_strategies_on_their_day_only(monkeypatch):
+    monkeypatch.setattr(rm_entities, "live", rule_live_from("2026-10-07", late=("b",), late_day="2026-10-08"))
+    rows = [
+        {"strategy_id": "a", "session_date": "2026-10-07"},
+        {"strategy_id": "b", "session_date": "2026-10-07"},
+        {"strategy_id": "a", "session_date": "2026-10-08"},
+        {"strategy_id": "a", "session_date": None},
+        {"strategy_id": "a", "session_date": pd.NaT},
+        {"strategy_id": "a", "session_date": "2026-10-06"},
+    ]
+    kept = rm_entities.live_rows(rows, "session_date")
+    assert kept == [rows[0], rows[2]]
+    assert rm_entities.newest_batch(kept) == [rows[2]]
+    assert rm_common.live_rows is rm_entities.live_rows
+
+
+def test_a_pick_without_a_strategy_follows_its_family(monkeypatch):
+    """A no_candidate pick (no strategy) stays when some strategy of its family is live on its D, else it goes."""
+    ai = tuple(spec["id"] for spec in rm_entities.registry.strategies(family="ai"))
+    monkeypatch.setattr(rm_entities, "live", rule_live_from("2026-10-07", late=ai, late_day="2026-10-09"))
+    picks = [
+        {"strategy_id": None, "family": "rule", "session_date": "2026-10-08", "status": "no_candidate"},
+        {"strategy_id": None, "family": "ai", "session_date": "2026-10-08", "status": "no_candidate"},
+        {"strategy_id": None, "family": "ai", "session_date": "2026-10-09", "status": "no_candidate"},
+    ]
+    assert rm_entities.live_rows(picks, "session_date") == [picks[0], picks[2]]
+
+
+def test_live_reads_the_registry_switch(monkeypatch):
+    """live() asks B2's registry.is_live with the day as YYYY-MM-DD; nothing is live before Wave 5 sets live_from."""
+    asked = []
+    monkeypatch.setattr(rm_entities.registry, "is_live", lambda strategy, day, **_kwargs: asked.append((strategy, day)))
+    rm_entities.live("rule.model_news.v1", pd.Timestamp("2026-10-08 00:00"))
+    assert asked == [("rule.model_news.v1", "2026-10-08")]
+    monkeypatch.undo()
+    assert not any(
+        rm_entities.live(spec["id"], "2026-10-08")
+        for spec in rm_entities.registry.strategies()
+        if spec.get("live_from") is None
+    )
