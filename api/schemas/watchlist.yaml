@@ -40,7 +40,8 @@ PredictionRange:
   type: object
   x-source: warehouse/rm_watchlist.ranges (kind strategy_predictions)
   description: >-
-    One prediction of the reference rule strategy (rule.model_news.v1) of its newest as-of date made by the cut-off,
+    One prediction of the reference rule strategy (rule.model_news.v1) of its newest as-of date made by the cut-off
+    while the strategy was live on its session (rehearsal predictions are never shown),
     with the fields of the range column (catalogue entity Prediction)
   required: [id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction,
              prob_up, qualifies, base_close, target_price, lo50, hi50, lo80, hi80, range_widen, regime, quality]

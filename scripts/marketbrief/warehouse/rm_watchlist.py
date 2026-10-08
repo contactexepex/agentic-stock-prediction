@@ -4,7 +4,8 @@ Watchlist payload of the dashboard slice (WS1) under contract 2.0.
 
 Payload: the page shell, B4's Company records (active and inactive; the page shows the active ones and names the
 inactive under the table, decision 13), B4's Agreement per horizon and open trades, B12's latest trade checks by the
-cut-off, the reference rule strategy's ranges (its newest predictions made by the cut-off) and the strategies.
+cut-off, the reference rule strategy's ranges (its newest predictions made by the cut-off while it was live on their
+session; Wave 5 go-live) and the strategies.
 Everything is as of the cut-off; no build time is in the payload."""
 
 from __future__ import annotations
@@ -29,11 +30,10 @@ STRATEGY_FIELDS = ("id", "family", "name", "threshold", "horizons", "live", "set
 RANGE_TEXT = ("id", "strategy_id", "family", "ticker", "direction", "regime", "quality")
 RANGE_NUMBERS = ("prob_up", "base_close", "target_price", "lo50", "hi50", "lo80", "hi80", "range_widen")
 RANGE_DATES = ("as_of_date", "session_date", "exit_date")
-# the reference strategy's newest predictions made by the cut-off (each id's first stored row)
+# the reference strategy's predictions made by the cut-off (each id's first stored row)
 RANGES_SQL = """
-WITH p AS (SELECT DISTINCT ON (id) * FROM strategy_predictions
-           WHERE made_at <= $cutoff::TIMESTAMPTZ AND strategy_id = $strategy ORDER BY id, made_at)
-SELECT * FROM p WHERE as_of_date = (SELECT max(as_of_date) FROM p) ORDER BY ticker, horizon_days, id"""
+SELECT DISTINCT ON (id) * FROM strategy_predictions
+WHERE made_at <= $cutoff::TIMESTAMPTZ AND strategy_id = $strategy ORDER BY id, made_at"""
 
 
 def range_record(row: dict) -> dict:
@@ -48,9 +48,14 @@ def range_record(row: dict) -> dict:
 
 
 def ranges(ctx: BuildContext) -> list[dict]:
-    """The reference rule strategy's newest predictions made by the cut-off, of the active companies."""
+    """The reference rule strategy's predictions of its newest as-of date among those made by the cut-off while it
+    was live on their session (B4's live_rows: rehearsal predictions are never shown), of the active companies."""
     frame = ctx.con.execute(RANGES_SQL, {"cutoff": ctx.cutoff, "strategy": REFERENCE_STRATEGY}).df()
-    return [range_record(row) for row in frame.to_dict("records") if row["ticker"] in ctx.active]
+    rows = rm_common.live_rows(frame.to_dict("records"), "session_date")
+    newest = max((row["as_of_date"] for row in rows), default=None)
+    rows = sorted((row for row in rows if row["as_of_date"] == newest),
+                  key=lambda row: (row["ticker"], int(row["horizon_days"]), row["id"]))
+    return [range_record(row) for row in rows if row["ticker"] in ctx.active]
 
 
 def watchlist_pages(ctx: BuildContext) -> dict[str, dict]:

@@ -60,11 +60,12 @@ def top_agreement(ctx: BuildContext) -> dict[str, list[dict]]:
 
 def head_to_head(ctx: BuildContext) -> list[dict]:
     """The head-to-head picks made by the cut-off (B2's lab/reads.picks: first row per id) of the session being
-    predicted, active companies, by company, family and pick rule; with the ranking they came from and every
-    candidate horizon (B13's candidate fields)."""
+    predicted, of strategies live on that session (B4's live_rows: a rehearsal pick is never shown), active companies,
+    by company, family and pick rule; with the ranking they came from and every candidate horizon (B13's candidate
+    fields)."""
     day = session_date(ctx)
     out = []
-    for row in lab_reads.picks(ctx.con, ctx.cutoff_time):
+    for row in rm_common.live_rows(lab_reads.picks(ctx.con, ctx.cutoff_time), "session_date"):
         if row["session_date"] != day or row["ticker"] not in ctx.active:
             continue
         item = pick(row, PICK_FIELDS)
