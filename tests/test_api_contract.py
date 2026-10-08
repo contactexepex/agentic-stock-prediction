@@ -187,11 +187,13 @@ def example_context(market: str) -> rm_registry.BuildContext:
     ]
     ctx = rm_registry.BuildContext(load_market(market), None, datetime.fromisoformat(CUTOFF))
     ctx.memo.update(settled_trades=trades, status_block={"session": {"session_date": "2026-10-07"}})
+    ctx.__dict__["dashboard"] = {"as_of": "2026-10-06"}  # the examples' newest stored close
     return ctx
 
 
 @pytest.mark.parametrize("market", MARKETS)
 def test_go_live_is_the_reference_strategys_accuracy_row(market):
+    assert all(row["as_of"] == "2026-10-06" for row in rm_common.lab_summary(example_context(market))["scoreboard"])
     expected = next(
         r["go_live"]
         for r in catalogue("scoreboard_row.json")
@@ -207,6 +209,7 @@ def test_go_live_is_the_reference_strategys_accuracy_row(market):
 def test_go_live_without_a_settled_trade():
     ctx = rm_registry.BuildContext(load_market("us"), None, datetime.fromisoformat(CUTOFF))
     ctx.memo.update(settled_trades=[])
+    ctx.__dict__["dashboard"] = {"as_of": "2026-10-06"}
     assert rm_common.go_live(ctx) == {
         "proven": False,
         "months_forward": 0.0,
@@ -333,7 +336,7 @@ def test_a_sync_revalidates_written_and_deleted_pages_in_both_modes(warehouse, m
     after an incremental sync and after a --full rebuild (which deletes the rows before rebuilding them)."""
     posted = []
     monkeypatch.setattr(sync, "PROVIDER_MOTHERDUCK", "local")  # the local file stands in for MotherDuck here
-    monkeypatch.setattr(sync, "revalidate", lambda url, build_id, keys: posted.append((url, keys)) or "ok")
+    monkeypatch.setattr(sync, "revalidate", lambda url, _build_id, keys: posted.append((url, keys)) or "ok")
     mp = pytest.MonkeyPatch()
     saved_root = common.ROOT
     common.ROOT = warehouse["root"]
