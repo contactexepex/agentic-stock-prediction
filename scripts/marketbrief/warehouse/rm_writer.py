@@ -68,16 +68,23 @@ def insert_staged_pages(warehouse, table: str, pages: list[dict], folder: Path) 
     )
 
 
-def write_read_models(warehouse, market: str, rows: dict, keep: set[tuple[str, str]], folder: Path) -> dict:
+def write_read_models(
+    warehouse, market: str, rows: dict, keep: set[tuple[str, str]], folder: Path, wiped: dict | None = None
+) -> dict:
     """Upsert the market's pages by hash; `keep` = (table, page_key) of pages that failed validation (their
-    stored rows are neither replaced nor deleted). Returns pages_written, pages_unchanged, pages_deleted and
-    changed_keys (table, market, page_key of every written or deleted page: the app's cache tags to revalidate)."""
+    stored rows are neither replaced nor deleted). `wiped` = the stored hashes read before a --full rebuild deleted
+    every row of the market: a page in it that is no longer built counts as deleted. Returns pages_written,
+    pages_unchanged, pages_deleted and changed_keys (table, market, page_key of every written or deleted page: the
+    app's cache tags to revalidate)."""
     stored = stored_hashes(warehouse, market)
     counts = {"pages_written": 0, "pages_unchanged": 0, "pages_deleted": 0, "changed_keys": []}
     for table in tables():
         built = rows.get(table, {})
         changed = [key for key, row in built.items() if stored[table].get(key) != row["payload_sha256"]]
         departed = [key for key in stored[table] if key not in built and (table, key) not in keep]
+        gone = [key for key in sorted((wiped or {}).get(table, {})) if key not in built and key not in departed]
+        counts["pages_deleted"] += len(gone)
+        counts["changed_keys"] += [{"table": table, "market": market, "page_key": key} for key in gone]
         counts["pages_written"] += len(changed)
         counts["pages_unchanged"] += len(built) - len(changed)
         counts["pages_deleted"] += len(departed)

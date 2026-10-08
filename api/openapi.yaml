@@ -64,7 +64,7 @@ paths:
       description: |
         Composed by the route from the `rm.status` page of each market (two keyed reads, each cached): the envelope
         has market `_all`, page_key `_`, the newest as_of, cutoff and built_at of the two, and the SHA-256 of the
-        composed payload. A market whose status page is missing is left out.
+        composed payload (also its ETag). A market whose status page is missing is left out; none at all is a 404.
       x-read-model: rm.status
       responses:
         '200':
@@ -74,6 +74,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/MarketListResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/status:
     get:
@@ -812,7 +813,7 @@ components:
         h: {$ref: '#/components/schemas/Horizon'}
         tier: {type: string, enum: [strong_buy, strong_sell, paper_up, paper_down]}
         model_prob: {type: number, description: model_scores.prob_up of the call's id}
-        prediction_id: {type: ['string', 'null'], description: The stored call (predictions.id), if the forecaster made one}
+        prediction_id: {type: ['string', 'null'], description: 'The stored call (predictions.id), if the forecaster made one'}
         direction: {type: ['string', 'null'], enum: [up, down, null]}
         confidence: {type: ['number', 'null']}
         entry: {$ref: '#/components/schemas/IsoDate'}
@@ -843,7 +844,7 @@ components:
           oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
         ret_1d: {$ref: '#/components/schemas/NullableNumber'}
         ret_5d: {$ref: '#/components/schemas/NullableNumber'}
-        quality: {type: ['string', 'null'], description: features.quality (OK, PARTIAL or BLOCKED; constants/indicators.py)}
+        quality: {type: ['string', 'null'], description: 'features.quality (OK, PARTIAL or BLOCKED; constants/indicators.py)'}
         days_to_earnings: {type: ['integer', 'null']}
         earnings: {type: ['string', 'null'], format: date}
         model:
@@ -1528,7 +1529,7 @@ components:
             type: object
             required: [table, market, page_key]
             properties:
-              table: {type: string, pattern: '^[a-z_]{1,40}$', description: 'An rm table the route map serves (web/lib/data/routes.ts); others are refused'}
+              table: {type: string, pattern: '^[a-z_]{1,40}$', description: 'An rm table name; the route invalidates the tag rm:<table>:<market>:<page_key> (a name no page uses invalidates nothing)'}
               market: {type: string, enum: [india, us, _all]}
               page_key: {type: string}
     RevalidateResult:
