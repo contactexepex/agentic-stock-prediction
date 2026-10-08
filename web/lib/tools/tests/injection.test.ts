@@ -54,16 +54,19 @@ test("instructions in filings and reasons inside a company read model trigger no
   assertNoSecret(outcome, r.inbox.commands);
 });
 
-test("instructions in Slack text: /ask stays a stub and writes nothing", async () => {
+test("instructions in Slack text: an /ask question is only a question to the assistant and writes nothing", async () => {
   const s = slackRig();
   for (const text of INJECTED) {
-    const reply = await handleCommand(commandParams("/ask", text), s.deps);
-    assert.match(JSON.stringify(reply.body), /coming soon/);
+    const reply = await handleCommand(commandParams("/ask", `us ${text}`), s.deps);
+    assert.match(JSON.stringify(reply.body), /Looking that up/);
     assertNoSecret(reply);
   }
+  await s.settle();
   assertNoWrite(s);
-  assert.equal(s.slack.opened.length + s.slack.responses.length, 0);
-  assertNoSecret(s.inbox.commands, s.notifier.reports);
+  assert.equal(s.slack.opened.length, 0);
+  assert.equal(s.slack.responses.length, INJECTED.length, "one answer per question, to the command's response_url");
+  for (const response of s.slack.responses) assert.match(JSON.stringify(response.body), /coming soon|Not done/);
+  assertNoSecret(s.slack.responses, s.inbox.commands, s.notifier.reports);
 });
 
 test("instructions in a /company reason only become the reason of the summary the user confirms", async () => {

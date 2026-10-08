@@ -14,6 +14,7 @@
     "test": "node --test \"lib/**/tests/**/*.test.ts\" \"app/api/**/*.test.ts\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.128.0",
     "next": "15.5.26",
     "pg": "8.23.0",
     "react": "19.3.0",
@@ -24,5 +25,8 @@
     "@types/pg": "8.23.0",
     "@types/react": "19.3.0",
     "typescript": "6.0.3"
+  },
+  "overrides": {
+    "@babel/runtime": "7.29.7"
   }
 }

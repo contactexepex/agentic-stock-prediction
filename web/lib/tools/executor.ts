@@ -9,6 +9,7 @@ import type {
   CallContext,
   CompanyPreview,
   CommandLogRow,
+  ExplainAnswer,
   CommandResult,
   ExecuteOptions,
   PreviewOutcome,
@@ -19,17 +20,19 @@ import type {
   ToolKind,
   ToolOutcome,
 } from "./types.ts";
-import { agentTools, allowedInChannel, getAgent, getTool, writeKind } from "./registry.ts";
+import { ALL_REFUSAL_CODES, agentTools, allowedInChannel, getAgent, getTool, writeKind } from "./registry.ts";
 import { actorMatchesChannel } from "./identity.ts";
 import { validateArguments } from "./validate.ts";
 import { commandId, utcDayStart } from "./ids.ts";
 import { sha256Hex, stableJson } from "./crypto.ts";
-import { loggableArguments, redact } from "./text.ts";
+import { loggableArguments, redact, redactDeep } from "./text.ts";
 import { runRead } from "./reads.ts";
 import { writeSummary } from "./summaries.ts";
 
 const MARKETS = new Set(["india", "us"]);
 export const COMING_SOON = "The assistant is coming soon (session B8); nothing was looked up.";
+const ASSISTANT_UNAVAILABLE: ExplainAnswer = { result: "failed", refusal_code: null, message: "The assistant is unavailable now", data: null };
+const EXPLAIN_RESULTS = new Set(["accepted", "refused", "failed"]);
 
 interface Passed {
   ok: true;
@@ -148,11 +151,7 @@ export class ToolLayer {
     if (!gate.ok) return this.stopped(ctx, now, toolName, raw, gate);
     const { tool, args } = gate;
     if (tool.kind === "write") return this.write(ctx, now, gate, opts);
-    if (tool.kind === "read_ai") {
-      const data = { text: COMING_SOON, cited_ids: [], as_of: null, not_in_data: true };
-      return this.finish(ctx, now, { tool: tool.name, kind: tool.kind, market: marketOf(args), args, key: null,
-        result: "accepted", code: null, message: "coming soon", data, budgetLeft: null });
-    }
+    if (tool.kind === "read_ai") return this.explain(ctx, now, gate);
     try {
       const data = await runRead(this.deps.readStore, tool.name, args);
       const found = data.sources.some((source) => source.found);
@@ -162,6 +161,39 @@ export class ToolLayer {
       return this.finish(ctx, now, { tool: tool.name, kind: tool.kind, market: marketOf(args), args, key: null,
         result: "failed", code: null, message: "The data service is unavailable", budgetLeft: null });
     }
+  }
+
+  /** `explain` (read_ai): the assistant (deps.explainer, B8) answers from read tools it runs through this layer with the
+   * caller's own context, so each read is gated, logged and counted on the caller's read budget. Only read tools the
+   * caller's agent lists can be run that way (no write, no nested explain). Without an assistant: "coming soon". */
+  private async explain(ctx: CallContext, now: Date, gate: Passed): Promise<ToolOutcome> {
+    const { tool, agent, args } = gate;
+    const base = { tool: tool.name, kind: tool.kind, market: marketOf(args), args, key: null, budgetLeft: null };
+    const explainer = this.deps.explainer;
+    if (!explainer) {
+      const data = { text: COMING_SOON, cited_ids: [], as_of: null, not_in_data: true };
+      return this.finish(ctx, now, { ...base, result: "accepted", code: null, message: "coming soon", data });
+    }
+    const read = (name: string, readArgs: ToolArgs): Promise<ToolOutcome> => {
+      const target = getTool(name);
+      if (!target || target.kind !== "read" || !agent.tools.includes(target.name)) {
+        return this.record(ctx, { tool: name, kind: target?.kind ?? null, market: marketOf(readArgs), args: readArgs,
+          result: "refused", code: "not_allowed_in_channel", message: `${safeToolName(name) ?? "This tool"} is not a read tool of the ${agent.agent} agent` });
+      }
+      return this.execute(ctx, target.name, readArgs);
+    };
+    let answer: ExplainAnswer;
+    try {
+      answer = await explainer.explain(ctx, args, read);
+    } catch {
+      answer = ASSISTANT_UNAVAILABLE;
+    }
+    if (!answer || !EXPLAIN_RESULTS.has(answer.result)) answer = ASSISTANT_UNAVAILABLE;
+    const code = answer.result === "refused" && answer.refusal_code !== null && ALL_REFUSAL_CODES.includes(answer.refusal_code)
+      ? answer.refusal_code : null;
+    return this.finish(ctx, now, { ...base, result: answer.result, code,
+      message: typeof answer.message === "string" ? answer.message : null,
+      data: redactDeep(answer.data ?? null, this.deps.settings.secrets) });
   }
 
   /** The summary a caller confirms before a `confirm: summary` write. Nothing is written; a refusal is logged and

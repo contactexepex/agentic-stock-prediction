@@ -1,5 +1,6 @@
 # The Companies page (B11). Builder: scripts/marketbrief/warehouse/rm_companies.py; route
-# web/app/api/v1/markets/[market]/companies. Company commands are written through B5's tool layer, not here.
+# web/app/api/v1/markets/[market]/companies. The page's commands (preview, commands) are thin calls into B5's tool
+# layer (web/lib/data/company-commands.ts), which appends them to the inbox; nothing here writes data/.
 /api/v1/markets/{market}/companies:
   get:
     tags: [markets]
@@ -18,3 +19,127 @@
             schema: {$ref: '#/components/schemas/CompaniesResponse'}
       '404': {$ref: '#/components/responses/NotFound'}
       '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/companies/preview:
+  post:
+    tags: [markets]
+    operationId: previewCompanyCommand
+    summary: The summary the owner confirms before a company command (add, deactivate, reactivate, change amount, delete); nothing is written
+    description: |
+      The first step of every action of the Companies page. A thin call into the governed tool layer's preview
+      (mcp/tools.yaml company tools; agent `dashboard`, identity from Vercel Authentication, never from the body): the
+      arguments are validated and, for add_company, the identifiers resolved (name, exchange, sector, Yahoo symbol, NSE
+      symbol or CIK, amount). Nothing is written and no workflow starts; a refusal (e.g. an ETF) is logged in the command
+      log and reported to the owner. Send the same Idempotency-Key the confirming command will use. JSON only; a
+      cross-site Origin is refused. Refused in gateway mode.
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CompanyCommandPreviewRequest'}
+    responses:
+      '200':
+        description: The summary to confirm (and the resolved identifiers for add_company)
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandPreview'}
+      '403':
+        description: Refused for this caller (a cross-site Origin, before the tool layer and not logged; or the channel, e.g. gateway mode)
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '415':
+        description: The body is not application/json
+        content:
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
+      '422':
+        description: The body or the arguments failed validation (no Idempotency-Key, not a JSON object, unknown fields, a tool that is not a company command, market or idempotency_key in the arguments, the tool layer's checks, or an unresolvable or refused symbol such as an ETF); logged in the command log
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '429':
+        description: The dashboard agent's daily write budget is used up
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '503':
+        description: The inbox or command log is unavailable, or the dashboard agent is switched off; nothing was written
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
+/api/v1/markets/{market}/companies/commands:
+  post:
+    tags: [markets]
+    operationId: createCompanyCommand
+    summary: Submit a confirmed company command (pending until the next import validates and appends it)
+    description: |
+      The Confirm step of the Companies page's actions. The server runs the preview again and appends the command to
+      the inbox (`inbox.company_commands`, through the tool layer, which logs the call and starts onboard.yml) only when
+      `confirmed_summary` is exactly the summary that preview gives now, so what is written is what the owner saw;
+      add_company's identifiers are resolved again on the server, never sent by the browser. delete_company also needs
+      the ticker typed in `arguments.confirm` (decision 20; dashboard only). `scripts/company.py import-inbox`
+      validates it (F8) and appends the watchlist event; pending means in the inbox, not yet recorded. Repeating a
+      request with the same Idempotency-Key and body returns the first receipt; the same key with another body is a
+      conflict. JSON only; a cross-site Origin is refused. Refused in gateway mode.
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CompanyCommandSubmission'}
+    responses:
+      '202':
+        description: Pending in the inbox until the import writes it to the record
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '200':
+        description: The receipt of an earlier request with the same key and body
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '409':
+        description: The Idempotency-Key was already used for another request; nothing was written
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '403':
+        description: Refused for this caller (a cross-site Origin, before the tool layer and not logged; or the channel, e.g. gateway mode)
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '415':
+        description: The body is not application/json
+        content:
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
+      '422':
+        description: The body or the arguments failed validation (as for the preview, plus a missing confirmed_summary or one that is not the summary the preview gives now, so preview again); logged in the command log
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '429':
+        description: The dashboard agent's daily write budget is used up
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+      '503':
+        description: The inbox or command log is unavailable, or the dashboard agent is switched off; nothing was written
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyCommandReceipt'}
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MSFT, SECRET_VALUES, observable, rig } from "./fakes.ts";
 import { dashboardContext, githubContext, slackContext } from "../identity.ts";
+import { ToolLayer } from "../executor.ts";
 import { commandId } from "../ids.ts";
 import type { CallContext } from "../types.ts";
 
@@ -303,4 +304,82 @@ test("get_news with a ticker cuts the company's part out of the market News page
   const whole = (all.data as { sources: { selection?: string; payload: { news: unknown[] } }[] }).sources[0];
   assert.equal(whole.selection, undefined);
   assert.equal(whole.payload.news.length, 4);
+});
+
+test("explain runs the assistant: its reads go through the layer with the caller's context; writes and nested explain are refused", async () => {
+  const r = rig();
+  r.reads.put("news", "us", "_", { news: [] });
+  const seen: { tool: string; result: string; code: string | null }[] = [];
+  const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async (_ctx, args, read) => {
+    for (const [tool, toolArgs] of [["get_news", { market: "us" }], ["add_company", { market: "us", symbol: "MSFT", idempotency_key: "nested-key-01" }],
+      ["explain", { market: "us", question: "again" }], ["no_such_tool", {}]] as const) {
+      const outcome = await read(tool, { ...toolArgs });
+      seen.push({ tool, result: outcome.result, code: outcome.refusal_code });
+    }
+    return { result: "accepted", refusal_code: null, message: null,
+      data: { text: `asked: ${String(args.question)} ${SECRET_VALUES[0]}`, cited_ids: ["news-1"], as_of: null, not_in_data: false } };
+  } } });
+  const assistant = slackContext("U07ABCD123", "assistant");
+  const outcome = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.equal(outcome.result, "accepted");
+  assert.deepEqual(seen, [
+    { tool: "get_news", result: "accepted", code: null },
+    { tool: "add_company", result: "refused", code: "not_allowed_in_channel" },
+    { tool: "explain", result: "refused", code: "not_allowed_in_channel" },
+    { tool: "no_such_tool", result: "refused", code: "not_allowed_in_channel" },
+  ]);
+  assert.deepEqual(r.reads.calls, ["news|us|_", "review|us|_"], "only the read tool reached the read store");
+  assert.equal(r.inbox.requests.length, 0, "no write");
+  assert.equal(r.dispatcher.calls, 0);
+  assert.deepEqual(r.inbox.commands.map((row) => [row.tool, row.agent, row.result]), [
+    ["get_news", "assistant", "accepted"], ["add_company", "assistant", "refused"], ["explain", "assistant", "refused"],
+    ["no_such_tool", "assistant", "refused"], ["explain", "assistant", "accepted"]]);
+  assert.match(String((outcome.data as { text: string }).text), /^asked: why\? \[redacted\]$/, "secrets in the answer are redacted");
+});
+
+test("explain: a throw or an impossible result is a failure; a refusal keeps a known code; the kill switch stops it first", async () => {
+  const r = rig();
+  const answers: unknown[] = [];
+  let calls = 0;
+  const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async () => {
+    calls += 1;
+    const next = answers.shift();
+    if (next instanceof Error) throw next;
+    return next as never;
+  } } });
+  const assistant = slackContext("U07ABCD123", "assistant");
+  answers.push(new Error(`model down ${SECRET_VALUES[0]}`));
+  const thrown = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([thrown.result, thrown.message], ["failed", "The assistant is unavailable now"]);
+  answers.push({ result: "pending", refusal_code: null, message: "queued", data: null });
+  assert.equal((await layer.execute(assistant, "explain", { market: "us", question: "why?" })).result, "failed");
+  answers.push({ result: "refused", refusal_code: "budget_exceeded", message: "The assistant's budget for today is used", data: null });
+  const refused = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([refused.result, refused.refusal_code], ["refused", "budget_exceeded"]);
+  answers.push({ result: "refused", refusal_code: "made_up", message: "no", data: null });
+  assert.equal((await layer.execute(assistant, "explain", { market: "us", question: "why?" })).refusal_code, null);
+  assert.equal(calls, 4);
+  r.inbox.controls.push({ agent: "assistant", enabled: false });
+  const killed = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([killed.result, killed.refusal_code, calls], ["refused", "kill_switch", 4], "the assistant is not called");
+  assert.doesNotMatch(observable(r.inbox.commands, r.notifier.reports), /SECRET/);
+});
+
+test("explain's reads refuse writes even for agents that list write tools (claude-app, slack-gateway): nothing is written", async () => {
+  for (const ctx of [app, slackContext("U07ABCD123")]) {
+    const r = rig();
+    const seen: string[] = [];
+    const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async (_ctx, _args, read) => {
+      const trade = await read("add_paper_trade", { market: "india", ticker: "HDFCBANK", side: "buy", quantity: 10,
+        trade_date: "2026-10-06", price_basis: "close", idempotency_key: "trade-hdfc-0001" });
+      const deactivate = await read("deactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "deact-aapl-0001" });
+      seen.push(`${trade.result}:${trade.refusal_code}`, `${deactivate.result}:${deactivate.refusal_code}`);
+      return { result: "accepted", refusal_code: null, message: null, data: { text: "done", cited_ids: [], as_of: null, not_in_data: true } };
+    } } });
+    const outcome = await layer.execute(ctx, "explain", { market: "us", question: "buy it for me" });
+    assert.equal(outcome.result, "accepted", ctx.agent);
+    assert.deepEqual(seen, ["refused:not_allowed_in_channel", "refused:not_allowed_in_channel"], ctx.agent);
+    assert.equal(r.inbox.requests.length, 0, `${ctx.agent}: no inbox write`);
+    assert.equal(r.dispatcher.calls, 0, `${ctx.agent}: no dispatch`);
+  }
 });

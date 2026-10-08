@@ -3,11 +3,10 @@
 // commands (decision 15): commands are accepted only in that channel (its id is unique across workspaces, so it also
 // pins the workspace). Only Confirm writes.
 import type { ToolLayer } from "../../../lib/tools/executor.ts";
-import { COMING_SOON } from "../../../lib/tools/executor.ts";
-import type { CallContext, RefusalCode } from "../../../lib/tools/types.ts";
+import type { CallContext, RefusalCode, ToolOutcome } from "../../../lib/tools/types.ts";
 import { slackContext } from "../../../lib/tools/identity.ts";
 import type { SlackApi } from "./api.ts";
-import { USAGE, companyAddModal, confirmMessage, ephemeral, tradeModal } from "./views.ts";
+import { RESULT_HEADINGS, USAGE, companyAddModal, confirmMessage, ephemeral, tradeModal } from "./views.ts";
 
 export interface SlackDeps {
   tools: ToolLayer;
@@ -15,6 +14,27 @@ export interface SlackDeps {
   defer: (task: () => Promise<void>) => void;
   channelId: string;
   newKey: () => string;
+  /** The Slack message body of an /ask answer; B8's formatter when wired, else `plainAnswer`. */
+  formatAnswer?: (outcome: ToolOutcome) => unknown;
+}
+
+export const ASK_USAGE = "Usage: /ask india|us <question>. Answers come from the stored data only; never advice.";
+export const ASK_WAIT = "Looking that up in the stored data…";
+
+/** An /ask answer as plain text (no mrkdwn, so nothing in it can ping or link): the answer text with its cited ids and
+ * as-of time, or the refusal or failure. */
+export function plainAnswer(outcome: ToolOutcome): unknown {
+  const data = outcome.data && typeof outcome.data === "object" ? outcome.data as Record<string, unknown> : null;
+  if (outcome.result !== "accepted" || typeof data?.text !== "string") {
+    const heading = RESULT_HEADINGS[outcome.result] ?? outcome.result;
+    return ephemeral(`${heading}: ${outcome.message ?? "no answer"}`);
+  }
+  const cited = Array.isArray(data.cited_ids) ? data.cited_ids.filter((id) => typeof id === "string") : [];
+  const lines = [data.text];
+  if (cited.length) lines.push(`Sources: ${cited.join(", ")}`);
+  if (typeof data.as_of === "string") lines.push(`As of ${data.as_of}`);
+  lines.push("Research only, not advice.");
+  return ephemeral(lines.join("\n"));
 }
 
 export interface SlackReply {
@@ -117,10 +137,24 @@ export async function handleCommand(params: URLSearchParams, deps: SlackDeps): P
       await logStep(ctx, deps, params, "add_paper_trade", opened, "trade form opened");
       return opened ? ok() : ok(ephemeral("The trade form could not be opened; please try again."));
     }
-    case "/ask":
-      await deps.tools.record(ctx, { tool: "explain", kind: "read_ai", market: null,
-        args: { question: (params.get("text") ?? "").slice(0, 500) }, result: "accepted", code: null, message: "coming soon" });
-      return ok(ephemeral(COMING_SOON));
+    case "/ask": {
+      const text = (params.get("text") ?? "").trim();
+      const first = text.split(/\s+/)[0] ?? "";
+      const askMarket = market(first);
+      const question = text.slice(first.length).trim();
+      if (askMarket === null || question === "") {
+        await deps.tools.record(ctx, { tool: "explain", kind: "read_ai", market: askMarket, args: { text: text.slice(0, 500) },
+          result: "refused", code: "validation_failed", message: ASK_USAGE });
+        return ok(ephemeral(ASK_USAGE));
+      }
+      const assistant = slackContext(params.get("user_id") ?? "", "assistant");
+      const responseUrl = params.get("response_url") ?? "";
+      deps.defer(async () => {
+        const outcome = await deps.tools.execute(assistant, "explain", { market: askMarket, question });
+        await deps.slack.respond(responseUrl, (deps.formatAnswer ?? plainAnswer)(outcome));
+      });
+      return ok(ephemeral(ASK_WAIT));
+    }
     default:
       await deps.tools.record(ctx, { tool: null, kind: null, market: null, args: { command: (command ?? "").slice(0, 40) },
         result: "refused", code: "validation_failed", message: "Unknown command" });
