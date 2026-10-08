@@ -7,8 +7,8 @@ catalogue's own records). Status: **built on the owner's delegated authority** (
 your recommendation, notify the orchestrator"); judged and landed by the track; the owner reviews it in the morning.
 
 Files: `build.py` (catalogue -> `data.json` -> `template.html` -> `page.html` through `design/mockups/_shared/mockup.py`),
-`data.json` (the conversation per market as the `explain` tool answers it; empty in the example until W1 supplies
-answers asked before the cut-off), `page.html`, `notes.md`,
+`data.json` (the conversation per market as the `explain` tool answers it: three answers per market, asked before
+the cut-off since W1's data request 7), `page.html`, `notes.md`,
 screenshots `shot-1280-full.png`, `shot-390-full.png`, `shot-390-viewport.png`.
 
 ## Who reads it and how
@@ -42,14 +42,15 @@ the head, in the rules and in the declined answer itself.
   but presentation.
 - No look-ahead: an answer is a record written when the question was asked, so it is shown only when `asked_at` is
   at or before the cut-off, as every page of the track filters on a record's write time; its `as_of` (the data it
-  read up to) must be at or before `asked_at`, and every cited record stored by then (asserted at build time). The
-  catalogue's example answers are all asked 12:10-12:25Z, after the noon cut-off, so the example payload holds none:
-  the page shows its empty state and generic starter questions, and example answers asked before the cut-off are
-  requested from W1. The states, chips and records panel were exercised on the catalogue's answers before this
-  filter (judge round 1), so the layout of a filled conversation is designed and checked, not shown in the example.
-- New data requests: example answers asked at or before the cut-off, and the budget state (today's and the month's
-  spend), both recorded in `_data_requests`. The budget caps, the question length and the retention period are the
-  shell's named constants with their sources (F11, `mcp/tools.yaml`).
+  read up to) must be at or before `asked_at`, and every cited record stored by then (asserted at build time). W1's
+  first examples were asked 12:10-12:25Z, after the noon cut-off, and were never shown (judge round 1); since data
+  request 7 (2026-10-08) the six answers are asked 11:40-11:55Z, each reading data as of its asking time, and all pass
+  the filter, so the example shows three answers per market. Without any answer the page shows an empty state and
+  generic starter questions.
+- Data requests, both recorded in `_data_requests`: example answers asked at or before the cut-off (answered by W1,
+  data request 7, now shown) and the budget state (today's and the month's spend; open). The budget caps, the
+  question length and the retention period are the shell's named constants with their sources (F11,
+  `mcp/tools.yaml`).
 
 ## Design rules kept
 Design system v2 only; light theme; phone and desktop (the columns stack at 1000 px; long record ids wrap, never
@@ -61,16 +62,18 @@ declined answer.
 ## Checked
 `check_page.js`: no console errors, no overflow, no external requests at 1280 and 390 px. `check_text.js` (twelve
 widths, both markets): no clipped, overflowing or overlapping text. A script at 390 and 1280 px in both markets: a
-starter chip fills the box, the counter counts, the box keeps at most 500 characters, Ask records a pending question
-and nothing else changes, every tooltip element is focusable, the market switch re-renders, no page error. Before the
-cut-off filter (round 1, on the catalogue's six answers) the same script also verified the three answer states, the
-cited chips and the records panel; with the example payload empty they render nothing, and the judge of round 1
-verified them on that build. Rebuild is byte-identical.
+question chip fills the box, the counter counts, the box keeps at most 500 characters, Ask records a pending
+question and nothing else changes, the three answer states render (India: answered, answered, not in the data; US:
+answered, answered, declined), the cited chips and the records panel show the three records per market, every
+tooltip element is focusable, the market switch re-renders, no page error; nothing asked after the cut-off is in
+data.json. Rebuild is byte-identical.
 
 Judge round 1 (2026-10-08) found one blocker, fixed before round 2: the answers were filtered on `as_of` instead of
 `asked_at`, so the page showed six questions asked 10-25 minutes after the cut-off; the filter now uses `asked_at`
-(the record's write time), the example payload is empty, and answers asked before the cut-off are requested from
-W1. Cosmetics fixed with it: the question avatar no longer reuses the confirmed-news shield (a "You" mark).
+(the record's write time). Round 2 passed on an empty example payload (every stored answer was asked after the
+cut-off) with the answers requested from W1; W1's data request 7 re-dated them before the cut-off the same day, and
+round 3 covers the page rebuilt on them. Cosmetics fixed on the way: the question avatar no longer reuses the
+confirmed-news shield (a "You" mark); the chip row's label and the rationale follow the page.
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - The page shows the conversation as a chat with the sources under each answer rather than a table of answers, since

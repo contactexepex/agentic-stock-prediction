@@ -31,8 +31,8 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
     answers = []
     # An answer is a record written when the question was asked: it is shown only when `asked_at` is at or before
     # the cut-off (the record's write time, as every page of the track filters), and the data it read (`as_of`) is
-    # at or before `asked_at`. The catalogue's example answers are all asked 10-25 minutes after the noon cut-off,
-    # so the example payload holds none (judge round 1); answers asked before the cut-off are requested from W1.
+    # at or before `asked_at`. W1's first examples were asked after the noon cut-off and were never shown (judge
+    # round 1); since data request 7 (2026-10-08) they are asked 11:40-11:55Z and all six pass the filter.
     for r in sorted((r for r in files["assistant_answer"]["records"] if r["market"] == market), key=lambda r: r["asked_at"]):
         if r["asked_at"] > cutoff:
             continue
@@ -58,9 +58,8 @@ def compose() -> dict:
                     "(none: conversations are an operational log in MotherDuck schema app, kept 90 days)", NAMES, cutoff, markets)
     data["_data_requests"] = [
         "example answers asked at or before the catalogue's as_of (asked_at <= 2026-10-07T12:00:00Z) with as_of at or "
-        "before asked_at and every cited record stored by then: the stored examples are asked 12:10-12:25Z, after the "
-        "cut-off, so a page at the cut-off's clock shows none of them (judge round 1); the page shows its empty state "
-        "and generic starter questions until then",
+        "before asked_at and every cited record stored by then: answered by W1 on 2026-10-08 (data request 7; the six "
+        "answers are now asked 11:40-11:55Z, in plain words, with a proper minus sign) and shown",
         "the assistant's budget state (today's spend against the daily budget and the month's against the cap, F11) "
         "so the panel can say when it is over budget: not in the catalogue; the page shows the caps as spec constants "
         "and says the spend is not stored in the example data",

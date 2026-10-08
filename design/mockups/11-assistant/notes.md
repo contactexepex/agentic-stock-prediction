@@ -13,7 +13,7 @@ with `{...}` are copied with the keys named.
 |---|---|---|---|
 | `status` | Market status | `market`, `name`, `as_of`, `currency`, `session.{local_time, trading_day, session_date, previous_session, calendar_covered, session_open_utc, session_close_utc, in_session, late_run}`, `regime`, `runs.{pre_open, intraday[], post_close, news}.{at, ok, next_at, new_items}`, `freshness.{state, built_at, age_minutes}`, `paper_label`, `benchmark.{symbol, name, close, close_date, change_pct, change_5d_pct}`, `vol_index.{the same}` (ride along; not shown) | the market's record, whole (the shell's chips and footer) |
 | `go_live` | Scoreboard row | `go_live.{proven, months_forward, trades_needed, beats_best_baseline}` (these four keys only) | of the reference strategy's accuracy row, all horizons (carried for the shared shell; this page shows no signal band) |
-| `answers` | Assistant answer | `id`, `market`, `channel`, `asked_at`, `question`, `text`, `cited_ids`, `cited[].{id, kind, as_of}`, `as_of`, `not_in_data`, `declined` | the market's answers asked at or before `cutoff` (`asked_at`, the record's write time), oldest first; each answer's `as_of` is checked to be at or before its `asked_at` and each cited record's `as_of` at or before the answer's. The catalogue's example answers are all asked 12:10-12:25Z, after the noon cut-off, so the example payload holds none (judge round 1); answers asked before the cut-off are requested from W1 (`_data_requests`) |
+| `answers` | Assistant answer | `id`, `market`, `channel`, `asked_at`, `question`, `text`, `cited_ids`, `cited[].{id, kind, as_of}`, `as_of`, `not_in_data`, `declined` | the market's answers asked at or before `cutoff` (`asked_at`, the record's write time), oldest first; each answer's `as_of` is checked to be at or before its `asked_at` and each cited record's `as_of` at or before the answer's. W1's first examples were asked after the noon cut-off and were never shown (judge round 1); since data request 7 the six answers are asked 11:40-11:55Z and all pass the filter (three per market) |
 
 Shown but computed by the page (presentation only): the state of each answer (answered from the data / not in the
 data / declined, from `not_in_data` and `declined`), the kind words and page links of the cited records
@@ -29,8 +29,8 @@ Spec constants in the shared shell (`design/mockups/_shared/shell.js`), used her
 intraday constants are not used on this page.
 
 Data requests (`_data_requests` in data.json): example answers asked at or before the cut-off (with `as_of` at or
-before `asked_at` and every cited record stored by then), since the stored examples are asked after it; and the
-budget state (today's and the month's spend against the daily budget and the cap), so the panel can say "over
+before `asked_at` and every cited record stored by then), answered by W1 on 2026-10-08 (data request 7) and shown;
+and the budget state (today's and the month's spend against the daily budget and the cap), so the panel can say "over
 budget" as F11 requires; the page shows the caps and says the spend is not in the example data.
 
 Build: `python design/mockups/11-assistant/build.py` (deterministic). Checks: `node design/system/check_page.js
