@@ -126,7 +126,9 @@ def debate(rec: dict) -> str:
         if hasattr(value, "tolist"):
             value = value.tolist()
         return None if value is None or (isinstance(value, float) and value != value) else value
-    return json.dumps({c: plain(rec.get(c)) for c in columns}, sort_keys=True, default=str)
+    content = {c: plain(rec.get(c)) for c in columns}
+    content["as_of_date"] = str(content["as_of_date"])[:10]   # a DATE read back by pandas is a Timestamp
+    return json.dumps(content, sort_keys=True, default=str)
 
 
 def stored_id_errors(rec: dict, ctx: dict, made) -> list[str]:

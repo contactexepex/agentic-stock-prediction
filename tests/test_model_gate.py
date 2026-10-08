@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from marketbrief.constants.model import KIND_AGENT_REASONING, KIND_MODEL_SCORES  # noqa: E402
+from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.model import reasoning  # noqa: E402
 from marketbrief.model.forecast_rules import anchor_errors  # noqa: E402
@@ -167,7 +168,7 @@ def test_reasoning_rerun_supersedes_the_stored_debate(root, monkeypatch, capsys)
     assert reasoning.main() == 0 and json.loads(capsys.readouterr().out)["added"] == 1
     rerun = debate(made_at="2026-10-06T11:55:00+00:00", verdict="Rerun: the collect gate passed this time.")
     assert errors_of(root, [rerun]) == []
-    assert any("same debate" in e for e in errors_of(root, [debate(made_at="2026-10-06T11:55:00+00:00")]))
+    assert any("already stored" in e for e in errors_of(root, [debate(made_at="2026-10-06T11:55:00+00:00")]))
     assert any("must be made later" in e for e in errors_of(root, [{**rerun, "made_at": "2026-10-06T11:46:00+00:00"}]))
     monkeypatch.setenv("MB_NOW", "2026-10-06T12:30:00+00:00")
     monkeypatch.setattr(sys, "argv", ["agent_reasoning.py", "--market", "us", "add", str(write_debate(root, [rerun]))])
