@@ -275,12 +275,13 @@ requests), each its own data kind with a schema in `core/schema_*.py` (WS4 for p
    validates (schema, ticker on the watchlist, price from stored bars, idempotency key not seen
    before) and appends via `work/` + `cat >>` as Data rule 2 requires; the session commits and pushes.
 2. **Later: dashboard form -> `inbox.<kind>` in MotherDuck** (append-only, `inbox_id` = the client's
-   Idempotency-Key, `submitted_at`, `submitted_by` injected from the Vercel Authentication identity,
-   never from the body). The next run imports: same CLI validation, append to `data/`, and a
-   `command_log` row per inbox id (result accepted, refused, duplicate or failed, with the reason); company
-   commands are read from `market_brief_inbox`, table `inbox.company_commands` (docs/ws/b1.md, "Contract"). The
-   import is idempotent because an inbox id with a settled `command_log` row (accepted, refused, duplicate) is
-   skipped and an all-`failed` one is retried; a rebuild never replays the inbox.
+   Idempotency-Key, `submitted_at`, `submitted_by` injected from the Vercel Authentication identity, never
+   from the body). `onboard.yml` (dispatched by the web tier) or else the next routine run imports: same CLI
+   validation, append to `data/`, and a `command_log` row per inbox id (result accepted, refused, duplicate
+   or failed, with the reason); company commands are read from `market_brief_inbox`, table
+   `inbox.company_commands` (docs/ws/b1.md, "Contract"). The import is idempotent because an inbox id with a
+   settled `command_log` row (accepted, refused, duplicate) is skipped and an all-`failed` one is retried; a
+   rebuild never replays the inbox.
 3. Until imported, the app shows the entry as "pending (not yet in the record)", never as a fact.
 
 Why not alternatives: writing straight to git from Vercel needs a repo-write token in the web tier
@@ -336,8 +337,11 @@ import) is bounded to entries since the last run and visible as pending.
 | 2 | WS2 API | `api/` (spec changes via minor version bump), `app/api/` (route handlers), its tests, `docs/ws/ws2.md` | sections 6-8, the spec |
 | 2 | WS7 MCP + governance | `mcp/` (server, agent definitions, evals, injection suite), `docs/ws/ws7.md` | section 10 |
 | 2 | WS8 alerts | `scripts/marketbrief/alerts/`, `scripts/alerts.py`, `config/alerts.yaml`, `tests/test_alerts*.py`, `docs/ws/ws8.md` | read models + Slack; never trade signals beyond the paper label |
+| 1 (waves of SPEC section 10) | W1 catalogue | `docs/DATA_CATALOGUE.md`, `design/catalogue/`, `mcp/tools.yaml`, `core/schema_lab.py`, `core/schema_lifecycle.py`, `config/strategies.yaml`, `marketbrief/contracts/`, `docs/ws/w1.md` | SPEC sections 3-4 |
 | 2 (waves of SPEC section 10) | B3 AI traders | `marketbrief/traders/`, `.claude/agents/trader-*.md`, `forecaster.md`, `eod-analyst.md`, `research-director.md`, `routine/POSTCLOSE_PROMPT.md`, `routine/WEEKLY_PROMPT.md`, `docs/ws/b3.md` | SPEC F4, F6 |
-| 2 (waves of SPEC section 10) | B9 monitoring | `marketbrief/intraday/` (`trades.py`, `trade_rows.py`, `alerts.py`), `core/schema_intraday.py` (`trade_check_details`, `intraday_alerts`), `sql/views.sql` B9 block, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | SPEC F5; docs/ws/b9.md |
+| 2 (waves of SPEC section 10) | B2 engine and lab | `marketbrief/lab/`, `scripts/lab.py`, `core/schema_b2.py` (`cost_views`), `marketbrief/portfolio/` (EUR view, horizons, inbox import), `config/costs.yaml` `broker:`, `EURUSD` in `config/markets/us.yaml`, `tests/test_lab_*.py`, `docs/ws/b2.md` | SPEC F1-F3, F7, decisions 49-52 |
+| 2 (waves of SPEC section 10) | B10 horizons | `marketbrief/model/`, `config/model.yaml`, `config/ranges.yaml`, `core/horizons.py`, `constants/horizons.py`, `analytics/horizon_records.py` (`contracts/horizons.py` built), the range/scoring/calibration/prediction-rule modules and the `presentation/`, `replay/` and `pipeline/` horizon files of W1's list, `sql/views.sql` B10 block, `docs/ws/b10.md` | SPEC F2.7, decision 37 |
+| 2 (waves of SPEC section 10) | B9 monitoring | `marketbrief/intraday/` (`trades.py`, `trade_rows.py`, `alerts.py`), `core/schema_intraday.py` (`trade_check_details`, rows before #78 only; `intraday_alerts`), `sql/views.sql` B9 block, `config/intraday.yaml`, `routine/INTRADAY_PROMPT.md` | SPEC F5; docs/ws/b9.md |
 | 3 | WS3 frontend | `app/` except `app/api/`, frontend tests, `docs/ws/ws3.md` | the spec only (never MotherDuck directly) |
 | 3 | consolidation | shared docs, routine prompts, wiring steps into the routine, end-to-end run of both markets | everything |
 

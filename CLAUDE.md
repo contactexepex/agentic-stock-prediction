@@ -59,7 +59,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
   range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
-  each past day's 1d/5d ranges as `ranges.py` builds them, the regime, and direction baselines
+  each past day's N+k ranges (every horizon of `config/strategies.yaml`) as `ranges.py` builds them, the regime, and direction baselines
   (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
   and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
   Adaptive Conformal Inference (`adaptive_conformal.py`: per horizon x band x regime miss rate alpha_t updated from
@@ -77,8 +77,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
   reruns the signal-model backtest and says plainly whether the model shows skill (`model_skill`).
   Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
-  open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`);
-  every summary shows the two bases apart, never pooled.
+  open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`); an open-to-close
+  call of horizon k sells at the close of D+k (N+k), a 5-day call made before `call_scoring.n_plus_k_from` at D+4
+  (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled.
   `validate` is the daily run's deterministic gate (`--stage collect|news|features|context|forecast|report|all`,
   settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
@@ -141,21 +142,35 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Planned, not built: the API under `/api/v1` (WS2) and the Next.js app on
   Vercel (WS3) reading only `rm`; contract in `api/openapi.yaml` (checked by `tests/test_openapi.py`).
+- Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
+  example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
+  `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
+  `horizons: [1, 2, 3, 4, 5]` (N+k = sell at the close of the k-th session after the entry session D), `ai_horizons`
+  and the 8 rule strategies, 3 baselines and 4 AI traders, each differing from its `compared_to` in one parameter.
+  The new append-only kinds are in `core/schema_lab.py` (`strategy_predictions`, `strategy_abstentions`,
+  `paper_trades_settled`, `head_to_head_picks`, `trade_reasons_ai`, `trade_checks`, `eod_analyses`,
+  `research_reviews`, `news_impact`) and `core/schema_lifecycle.py` (`watchlist_events`, `command_log`); B2's
+  `cost_views` (`core/schema_b2.py`) is documented in the catalogue. Interfaces in `marketbrief/contracts/`:
+  `protocol` (F1, delegates to `marketbrief/lab/protocol.py`), `watchlist` (delegates to `marketbrief/lifecycle/`),
+  `horizons` (per-horizon score and range records, B10) and `strategies` (the registry's allowed values). Governed
+  tools per channel: `mcp/tools.yaml`. A field the pages need and the catalogue lacks is a data request to W1.
 - Company lifecycle (F8, B1; docs/ws/b1.md; code `marketbrief/lifecycle/`, settings `config/lifecycle.yaml`): the
-  watchlist is data. `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox`
-  validates and appends `data/<market>/watchlist_events/` (every command also gets a `command_log` row; delete needs
-  `--confirm <ticker>` and is never allowed from Slack). `load_market` rebuilds the company lists from the events as of
-  the run's clock (MB_NOW-aware): `cfg["tickers"]` = every collected company (active and inactive, never deleted;
-  collectors keep reading it), `cfg["sectors"]` rebuilt, `cfg["active_tickers"]` = active only; code that predicts or
-  displays uses `lifecycle.loader.active_tickers(cfg)` / `active_sectors(cfg)`; replays and new code use
-  `contracts.watchlist.watchlist(market, as_of, state)`. An event counts once both effective_from and recorded_at have
-  passed, except the seed's add events (channel `seed`, the 40 config companies, effective from the start of stored
-  history), which restate the config list and count from effective_from. Without events the config's `tickers:` act
-  as adds. Add runs the deterministic onboarding (identifiers from NSE's equity list or SEC's ticker/exchange file plus
-  Yahoo; no ETFs, BSE-only or unknown symbols; sector from `sector_rules`; backfill of prices from the first stored day,
-  15 years of daily history into the long-history cache `work/model_history/`, news, filings or announcements; the
-  candidate's collect gate) before its event is appended.
-  `.github/workflows/onboard.yml` imports the MotherDuck inbox (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
+  watchlist is data.
+  `scripts/company.py --market M add|deactivate|reactivate|set-amount|delete|list|seed|import-inbox` validates and
+  appends `data/<market>/watchlist_events/` (each add, deactivate, reactivate, set-amount, delete and imported inbox
+  command also gets a `command_log` row; delete needs `--confirm <ticker>` and is never allowed from Slack).
+  `load_market` rebuilds the company lists from the events as of the run's clock (MB_NOW-aware): `cfg["tickers"]` =
+  every collected company (active and inactive, never deleted; collectors keep reading it), `cfg["sectors"]` rebuilt,
+  `cfg["active_tickers"]` = active only; code that predicts or displays uses `lifecycle.loader.active_tickers(cfg)` /
+  `active_sectors(cfg)`; replays and new code use `contracts.watchlist.watchlist(market, as_of, state)`. An event
+  counts once both effective_from and recorded_at have passed, except the seed's add events (channel `seed`, the 20
+  config companies per market, effective from the start of stored history), which restate the config list and count
+  from effective_from. Without events the config's `tickers:` act as adds. Add runs the deterministic onboarding
+  (identifiers from NSE's equity list or SEC's ticker/exchange file plus Yahoo; no ETFs, BSE-only or unknown symbols;
+  sector from `sector_rules`; backfill of prices from the first stored day, daily history into the long-history cache
+  `work/model_history/` from its start, else 15 years back, news, filings or announcements; the candidate's collect
+  gate) before its event is appended. `.github/workflows/onboard.yml` imports the MotherDuck inbox
+  (`market_brief_inbox`, `MOTHERDUCK_INBOX_TOKEN`).
 - AI traders, EOD analyst, research director (B3, docs/SPEC.md F4 and F6, notes `docs/ws/b3.md`; code
   `marketbrief/traders/`, run as `PYTHONPATH=scripts python -m marketbrief.traders <command>`). Four traders
   (`.claude/agents/trader-news-results.md`, `trader-pattern-mood.md`, `trader-combined.md`, and `forecaster.md` as
@@ -236,9 +251,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `results_digests_latest`, `results_digest_ticker_latest`). The context pack does not show digests yet.
 - Signal model (DESIGN.md section 15; `scripts/marketbrief/model/`, settings `config/model.yaml`, costs
   `config/costs.yaml`): `model_scores` (routine step 5a, again after the news append) appends per ticker and
-  horizon P(up) of the open-to-close label (buy at the open of D, the first session after the as-of close; sell
-  at the close of D+1 for 1d, D+4 for 5d) with its explanation (points per feature group, top 3 drivers each
-  way) to `data/<market>/model_scores/` (view `model_scores_latest`); the month's model (L2 logistic, monthly
+  horizon P(up) of the open-to-close label (N+k, decision 37: buy at the open of D, the first session after the
+  as-of close; sell at the close of the k-th session after D, k in `config/strategies.yaml` `horizons`;
+  `core/horizons.py`) with its explanation (points per feature group, top 3 drivers each
+  way) to `data/<market>/model_scores/` (view `model_scores_latest`), plus a `cross_market` variant (every
+  cross-market group on, for strategies with `cross_market: true`) in `model_variant_scores|versions`; the month's model (L2 logistic, monthly
   expanding-window refit on labels resolved by the refit date, Platt calibration on past out-of-sample rows,
   JSON coefficients) to `data/<market>/model_versions/`. News enters as a fixed prior (not trainable yet; no
   news archive); `model_news_update` reports the re-estimation and the rows it needs. `model_backtest --out DIR`
@@ -252,6 +269,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   never data/). Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
   `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
   stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
+- Horizons N+1..N+5 (B10, docs/SPEC.md F2.7, decision 37; docs/ws/b10.md; `core/horizons.py`): horizon k means buy
+  at the open of D, sell at the close of the k-th market session after D (weekends and holidays skipped). The list is
+  `config/strategies.yaml` `horizons` (`config/ranges.yaml` follows it). Model labels, ranges (target = the exit
+  session, width over k + 1 sessions), calibration, call scoring and the prediction rules use it. New
+  `model_scores`, `ranges`, `outcomes`, `calibration` and `model_versions` rows carry `horizon_label` (`n_plus_k`),
+  ranges and scores also `entry_date` and `exit_date`; older rows are labelled on read (B10 block of
+  `sql/views.sql`): `legacy_cc` (old ranges, close-to-close calls), `legacy_5d_d4` (open-to-close 5-day rows sold at
+  D+4), open-to-close 1-day = N+1. Legacy rows are never pooled with N+k. `contracts/horizons.py` `scores_asof`
+  (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of a time (no look-ahead).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
@@ -260,8 +286,36 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `data/<market>/watchlist_requests/` (config stays a human change); `positions` / `pnl` (FIFO, marked to the latest
   stored close, before and after `config/costs.yaml` costs, split basis of `adjustments`); `signals` (tiers Strong Buy
   .. Strong Sell; Strong only in a proven horizon x confidence band: review `model_skill` true and >= 50 open_to_close
-  calls with Wilson low >= 0.55; else "No proven strong signals today" + Paper candidates); `paper-follow` (SIMULATED).
+  calls with Wilson low >= 0.55; else "No proven strong signals today" + Paper candidates); `paper-follow` (SIMULATED);
+  `import-inbox [--inbox FILE]` (issue #112, `marketbrief/portfolio/inbox_import.py`, docs/ws/ws4.md) imports the
+  web tier's `add_paper_trade` requests from `market_brief_inbox.inbox.requests` (`MOTHERDUCK_INBOX_TOKEN`, read
+  only) through the same checks as `add-trade`; identity and channel come from the inbox row (stored in the
+  `portfolio_trades` columns `submitted_by` and `command_id`, null for CLI trades; sources `dashboard` and
+  `claude_app` only through the import), the key is its `inbox_id`, and each row gets one `command_log` row (a
+  request not decidable yet is logged `failed` and tried again).
   Every read is as of the clock (MB_NOW-aware).
+- Strategy lab and paper-trading engine (B2; docs/SPEC.md F1-F3, F7; DESIGN.md section 17; notes `docs/ws/b2.md`;
+  code `marketbrief/lab/`, entry `scripts/lab.py`): `predict` (pre-open, rule strategies and baselines from B10's
+  per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
+  of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
+  refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
+  and the cost-viable rows of every pick and of each qualifying prediction without one yet -> `cost_views`; "best expected gain" = the horizon with the highest
+  expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in
+  the market-cost view and its your-cost view -> `cost_views`; F1.9 measures, F1.10 automatic reason; a prediction
+  or pick made or first committed at or after D's open is refused; a split correction re-settles as a new row),
+  `news-impact` (weekly -> `news_impact`), `summary` (scoreboard ranked on market cost with the bootstrap luck test
+  and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up
+  and momentum on stored bars, basis backtest, never in data/), `pick-study`. Costs (`lab/costs.py`): the statutory
+  rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
+  owner-provided, marked verify; the owner confirms them with a contract note before Wave 5 switches paper trading
+  on); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
+  reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
+  pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
+  gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
+  conditional move and loss of `lab/gain.py`; null without a probability or 80% range, or when the amount buys no
+  whole share); the flag never blocks a
+  prediction or pick. The owner's paper portfolio uses the your-cost charges (the US portfolio fee pro-rated per lot over
+  the calendar days held, owner decision of 2026-10-08) and shows a EUR view of US positions.
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
@@ -321,14 +375,16 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   B9 (docs/ws/b9.md): every open paper trade (a qualifying `strategy_predictions` row or a picked
   `head_to_head_picks` row whose window D..exit_date contains the session, made before D's open; every
   strategy, horizon N+1..N+5 and view; past exit_date while it has no `paper_trades_settled` row, at most
-  `trades.max_sessions_past_exit` sessions, note `exit_delayed`) gets a `trade_checks` row per check (W1's format:
+  `trades.max_sessions_past_exit` sessions, note `unsettled_past_exit`) gets a `trade_checks` row per check (W1's format:
   price vs entry, target and its own range, band, target_z; flags outside_range | far_from_target |
-  against_prediction) and a `trade_check_details` row (quality, today's price basis, target reached so far);
+  against_prediction; with its detail columns: quality, today's price basis, target reached so far, issue #78;
+  rows written before #78 keep those in `trade_check_details`);
   views `trade_check_rows`, `trade_checks_latest`; a ticker with a flagged open trade is flagged
   `open_trade_flagged`, and the explainer's input carries its flagged trades. Band flags exist for every published
-  horizon (`outside_<k>d_80`; `bands` JSON on each check row). The intraday alerts feed (`intraday_alerts`, view `intraday_alerts_feed`,
-  `intraday_check.py alerts`): flagged open trades per ticker and material news on a company with an open trade,
-  once per session; read by B6's `alerts.py intraday`. Monitoring only, nothing is traded.
+  horizon (`outside_<k>d_80`; `bands` JSON on each check row). The intraday alerts feed (`intraday_alerts`, view
+  `intraday_alerts_feed`, `intraday_check.py alerts`): one row per ticker with flagged open trades per check (`repeat`
+  when already alerted with the same flags that session) and material news on a company with an open trade, once
+  per session and item; read by B6's `alerts.py intraday`. Monitoring only, nothing is traded.
 - Slack notifications (B6, SPEC F9; `scripts/alerts.py`, code `marketbrief/alerts/`, notes `docs/ws/b6.md`): one
   thread per market per day in #market-brief: `morning` (top 5 by agreement at N+1 with the strongest other horizon,
   the day's head-to-head picks and whether each is viable at the owner's cost: expected gain after your cost > 0),
@@ -424,7 +480,11 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 
 ## Prediction rules
 - One record per call: `id` = `<as_of_date>-<ticker>-<horizon>d`; skip if the id already exists.
-- `direction` is `up` or `down`; `horizon_days` is 1 or 5 (trading days); `confidence` 0.50-0.90.
+- `direction` is `up` or `down`; `horizon_days` is one of `config/strategies.yaml` `horizons` (1-5; N+k = sell at
+  the close of the k-th session after D); `confidence` 0.50-0.90.
+- Strategy predictions (`strategy_predictions`) follow docs/SPEC.md F2.6: horizons N+1..N+5 (the k-th session
+  after D); rule strategies cite their model score and feature snapshot ids, baselines their feature snapshot id; a
+  prediction made at or after D's open is refused by the settlement (F1.8).
 - `as_of_date` = the latest price date in the context pack for that ticker.
 - `evidence_ids` must reference news/filing ids. Abstaining is always allowed and often right.
 - News verification (DESIGN.md 3b): the first evidence id (the main evidence) must be

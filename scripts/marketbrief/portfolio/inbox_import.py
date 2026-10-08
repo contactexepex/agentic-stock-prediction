@@ -8,7 +8,8 @@ data/<market>/portfolio_trades/. Research only: a paper trade is a record, never
   idempotency key is the row's `inbox_id`. A channel other than dashboard, slack, claude_code or claude_app is
   refused (`not_allowed_in_channel`).
 - Every imported row gets one command_log row (B1's format and helper, lifecycle/store.py): accepted, refused
-  (validation_failed, not_allowed_in_channel), duplicate (its key is already a stored trade's or request's) or
+  (validation_failed, not_allowed_in_channel; also a key already used by a watchlist request), duplicate (its key
+  is already a stored trade's; record_ids names that trade) or
   failed: not decidable yet (its trade date is after the clock's date, or its session's bar is not stored yet,
   e.g. a "today at the close" trade sent before the close); a failed row is tried again by the next import.
 - As of the clock: only rows submitted by the run's clock (MB_NOW-aware) are read.
@@ -27,6 +28,7 @@ from marketbrief.lifecycle.constants import (REFUSE_VALIDATION, RESULT_ACCEPTED,
 from marketbrief.lifecycle.inbox import INBOX_CHANNELS, open_inbox
 from marketbrief.lifecycle.store import command_row, log_command, stored_rows
 from marketbrief.core.calendar import is_session
+from marketbrief.portfolio import constants as text
 from marketbrief.portfolio import reads, trades
 from marketbrief.portfolio.context import Context, TradeInput
 from marketbrief.portfolio.horizons import active_tickers
@@ -40,6 +42,9 @@ ERR_CHANNEL = "channel {channel!r} may not record paper trades through the inbox
 ERR_FIELDS = "the request needs {missing}"
 ERR_NOT_YET = "trade_date {day} is after today ({today}); tried again by the next import"
 ERR_NO_BAR_YET = "no stored bar for {ticker} on {day} yet; tried again by the next import once it is collected"
+ERR_NO_BAR_GAP = ("no stored bar for {ticker} on {day}, and later sessions are stored (a data gap or a date before "
+                  "the stored history); not tried again")
+ERR_KEY_REQUEST = "inbox_id {key!r} is already the idempotency key of watchlist request {existing}, not of a trade"
 NEEDED = ("ticker", "side", "quantity", "trade_date", "price_basis")
 
 
@@ -103,10 +108,22 @@ def precheck(ctx: Context, row: dict, args: dict) -> dict | None:
     if missing:
         return {"result": RESULT_REFUSED, "refusal_code": REFUSE_VALIDATION,
                 "errors": [ERR_FIELDS.format(missing=", ".join(missing))]}
-    existing = trades.used_keys(ctx.con, ctx.clock).get(row["inbox_id"])
+    existing = trades.trade_keys(ctx.con, ctx.clock).get(row["inbox_id"])
     if existing:
         return {"result": RESULT_DUPLICATE, "record_ids": [existing]}
+    other = trades.used_keys(ctx.con, ctx.clock).get(row["inbox_id"])
+    if other:                                  # a watchlist request's key: never a paper-trade duplicate
+        return {"result": RESULT_REFUSED, "refusal_code": REFUSE_VALIDATION,
+                "errors": [ERR_KEY_REQUEST.format(key=row["inbox_id"], existing=other)]}
     return None
+
+
+def own_errors(ctx: Context, entry: TradeInput, errors: list[str]) -> list[str]:
+    """add_trade's errors, with its "record it once the session's bar is collected" (meant for a CLI user) replaced
+    by the importer's own text: not_yet found a later bar, so this session's bar will not arrive."""
+    no_bar = text.ERR_NO_BAR.format(ticker=entry.ticker, day=entry.trade_date, clock=ctx.clock.isoformat())
+    return [ERR_NO_BAR_GAP.format(ticker=entry.ticker, day=entry.trade_date) if error == no_bar else error
+            for error in errors]
 
 
 def import_one(ctx: Context, row: dict, add_trade) -> dict:
@@ -125,7 +142,8 @@ def import_one(ctx: Context, row: dict, add_trade) -> dict:
         if outcome is None:
             stored = add_trade(ctx, replace(entry, command_id=row.get("command_id")))
             outcome = ({"result": RESULT_ACCEPTED, "record_ids": [stored["trade"]["id"]]} if stored.get("ok") else
-                       {"result": RESULT_REFUSED, "refusal_code": REFUSE_VALIDATION, "errors": stored["errors"]})
+                       {"result": RESULT_REFUSED, "refusal_code": REFUSE_VALIDATION,
+                        "errors": own_errors(ctx, entry, stored["errors"])})
     command = log_request(ctx, row, args, outcome)
     return {"inbox_id": row["inbox_id"], "ok": outcome["result"] not in (RESULT_REFUSED, RESULT_FAILED),
             "result": outcome["result"], "refusal_code": outcome.get("refusal_code"),

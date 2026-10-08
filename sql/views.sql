@@ -802,11 +802,35 @@ ORDER BY ticker, release_kind, release_at DESC, id;
 -- B9: checks of open paper trades and the intraday alerts feed (scripts/intraday_check.py; docs/ws/b9.md).
 -- Monitoring only. Rows are written once per check time; the first stored row per id wins. Each trade check
 -- (W1's trade_checks columns) with its trade_check_details row (same id): quality, today's basis, target reached.
+-- Issue #78 (W1): trade_checks now holds these columns itself; a row written before that keeps them in
+-- trade_check_details, so each is taken from trade_checks when set, else from the details row.
 CREATE OR REPLACE VIEW trade_check_rows AS
-SELECT t.*, d.family, d.pick_rule, d.quality, d.entry_source, d.basis_factor, d.entry_adj, d.target_adj,
-       d.lo80_adj, d.lo50_adj, d.hi50_adj, d.hi80_adj, d.last_time, d.sigma_1d, d.elapsed_fraction,
-       d.sessions_held, d.sessions_left, d.z_since_entry, d.target_reached, d.target_reached_session,
-       d.high_since_entry_pct, d.low_since_entry_pct, d.notes
+SELECT t.* EXCLUDE (family, pick_rule, quality, entry_source, basis_factor, entry_adj, target_adj, lo80_adj,
+                   lo50_adj, hi50_adj, hi80_adj, last_time, sigma_1d, elapsed_fraction, sessions_held, sessions_left,
+                   z_since_entry, target_reached, target_reached_session, high_since_entry_pct, low_since_entry_pct,
+                   notes),
+       COALESCE(t.family, d.family) AS family,
+       COALESCE(t.pick_rule, d.pick_rule) AS pick_rule,
+       COALESCE(t.quality, d.quality) AS quality,
+       COALESCE(t.entry_source, d.entry_source) AS entry_source,
+       COALESCE(t.basis_factor, d.basis_factor) AS basis_factor,
+       COALESCE(t.entry_adj, d.entry_adj) AS entry_adj,
+       COALESCE(t.target_adj, d.target_adj) AS target_adj,
+       COALESCE(t.lo80_adj, d.lo80_adj) AS lo80_adj,
+       COALESCE(t.lo50_adj, d.lo50_adj) AS lo50_adj,
+       COALESCE(t.hi50_adj, d.hi50_adj) AS hi50_adj,
+       COALESCE(t.hi80_adj, d.hi80_adj) AS hi80_adj,
+       COALESCE(t.last_time, d.last_time) AS last_time,
+       COALESCE(t.sigma_1d, d.sigma_1d) AS sigma_1d,
+       COALESCE(t.elapsed_fraction, d.elapsed_fraction) AS elapsed_fraction,
+       COALESCE(t.sessions_held, d.sessions_held) AS sessions_held,
+       COALESCE(t.sessions_left, d.sessions_left) AS sessions_left,
+       COALESCE(t.z_since_entry, d.z_since_entry) AS z_since_entry,
+       COALESCE(t.target_reached, d.target_reached) AS target_reached,
+       COALESCE(t.target_reached_session, d.target_reached_session) AS target_reached_session,
+       COALESCE(t.high_since_entry_pct, d.high_since_entry_pct) AS high_since_entry_pct,
+       COALESCE(t.low_since_entry_pct, d.low_since_entry_pct) AS low_since_entry_pct,
+       COALESCE(t.notes, d.notes) AS notes
 FROM (SELECT DISTINCT ON (id) * FROM trade_checks ORDER BY id, computed_at) t
 LEFT JOIN (SELECT DISTINCT ON (id) * FROM trade_check_details ORDER BY id, computed_at) d USING (id);
 

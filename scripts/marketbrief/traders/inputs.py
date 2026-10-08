@@ -5,8 +5,10 @@ horizon (session B10's `contracts.horizons.ranges_asof` / `scores_asof`), the tr
 already stored. Tests build a GateInputs by hand from W1's example records; `load_inputs` reads stored data."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from functools import lru_cache
 
 import pandas as pd
 
@@ -18,11 +20,15 @@ from marketbrief.pipeline.forecast_gate import evidence_times
 from marketbrief.traders import track_record
 from marketbrief.traders.constants import MSG_INPUTS
 
+# The newest snapshot known by the clock, with the time its as-of date was first computed: a snapshot recomputed
+# between a record's made_at and the gate existed by made_at (the LOOK_AHEAD check of gate_evidence reads that time).
 FEATURES_SQL = """
-SELECT DISTINCT ON (ticker) ticker, as_of_date, quality, days_to_earnings FROM features
+SELECT DISTINCT ON (ticker) ticker, as_of_date, quality, days_to_earnings,
+       min(computed_at) OVER (PARTITION BY ticker, as_of_date) AS first_computed FROM features
 WHERE computed_at <= ?::TIMESTAMPTZ ORDER BY ticker, as_of_date DESC, computed_at DESC"""
 REGIME_SQL = """
-SELECT DISTINCT ON (as_of_date) as_of_date, regime, computed_at FROM regime
+SELECT DISTINCT ON (as_of_date) as_of_date, regime,
+       min(computed_at) OVER (PARTITION BY as_of_date) AS first_computed FROM regime
 WHERE computed_at <= ?::TIMESTAMPTZ ORDER BY as_of_date, computed_at DESC"""
 
 
@@ -45,7 +51,7 @@ class AllUnverified:
 @dataclass
 class GateInputs:
     """Everything the gate reads. features: ticker -> {as_of_date (date), quality, days_to_earnings (int or None)};
-    regimes: as_of_date -> (regime, computed_at); evidence: citable id -> when it became public (None = unknown);
+    regimes: as_of_date -> (regime, first computed_at); evidence: citable id -> when it became public (None = unknown);
     statuses: EvidenceStatuses-like (`active(when)`, `of(id, ticker, when)`); ranges / scores: id
     (<as_of_date>-<ticker>-<k>d) -> HorizonRange / HorizonScore dict; track: strategy -> band -> cell;
     amounts: ticker -> the paper amount of a trade made now."""
@@ -57,12 +63,24 @@ class GateInputs:
     regimes: dict[date, tuple[str, datetime | None]]
     evidence: dict[str, datetime | None]
     statuses: object = field(default_factory=AllUnverified)
-    ranges: dict[str, dict] = field(default_factory=dict)
-    scores: dict[str, dict] = field(default_factory=dict)
+    ranges: dict[str, dict] = field(default_factory=dict)   # read at the clock: what `prepare` shows; the gate
+    scores: dict[str, dict] = field(default_factory=dict)   # uses them only without ranges_at / scores_at (tests)
     track: dict[str, dict] = field(default_factory=dict)
     stored_predictions: set[str] = field(default_factory=set)
     stored_abstentions: set[str] = field(default_factory=set)
     amounts: dict[str, float | None] = field(default_factory=dict)
+    ranges_at: Callable[[datetime], dict[str, dict]] | None = None   # ranges as of a time (load_inputs: B10's
+    scores_at: Callable[[datetime], dict[str, dict]] | None = None   # ranges_asof / scores_asof at made_at)
+
+    def range_for(self, range_id: str, made: datetime) -> dict | None:
+        """The published range of the id as of made_at (a range published later does not exist yet), never read
+        after the gate's clock (a made_at inside the future tolerance)."""
+        return (self.ranges_at(min(made, self.now)) if self.ranges_at else self.ranges).get(range_id)
+
+    def score_for(self, score_id: str, made: datetime) -> dict | None:
+        """The newest model score of the id computed by made_at (a later rescore is not used), never read after the
+        gate's clock."""
+        return (self.scores_at(min(made, self.now)) if self.scores_at else self.scores).get(score_id)
 
     @property
     def market(self) -> str:
@@ -105,16 +123,17 @@ def as_date(value) -> date:
 
 
 def stored_features(con, now: datetime) -> dict[str, dict]:
-    """Each ticker's newest indicator snapshot computed by `now`."""
+    """Each ticker's newest indicator snapshot computed by `now` (computed_at: its as-of date's first computation)."""
     out = {}
-    for ticker, as_of, quality, days in con.execute(FEATURES_SQL, [now.isoformat()]).fetchall():
+    for ticker, as_of, quality, days, computed in con.execute(FEATURES_SQL, [now.isoformat()]).fetchall():
         out[ticker] = {"as_of_date": as_date(as_of), "quality": quality,
-                       "days_to_earnings": None if days is None or pd.isna(days) else int(days)}
+                       "days_to_earnings": None if days is None or pd.isna(days) else int(days),
+                       "computed_at": pd.Timestamp(computed).to_pydatetime()}
     return out
 
 
 def stored_regimes(con, now: datetime) -> dict[date, tuple[str, datetime | None]]:
-    """The regime of each as-of date known by `now`."""
+    """The regime of each as-of date known by `now`, with the time that date's regime was first computed."""
     return {as_date(as_of): (regime, pd.Timestamp(computed).to_pydatetime())
             for as_of, regime, computed in con.execute(REGIME_SQL, [now.isoformat()]).fetchall()}
 
@@ -132,4 +151,13 @@ def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
         stored_predictions={row[0] for row in con.execute("SELECT id FROM strategy_predictions").fetchall()},
         stored_abstentions={row[0] for row in con.execute("SELECT id FROM strategy_abstentions").fetchall()},
         amounts={ticker: amount_of(market, ticker, now) for ticker in tickers},
+        ranges_at=as_of_lookup(market, horizons.ranges_asof), scores_at=as_of_lookup(market, horizons.scores_asof),
     )
+
+
+def as_of_lookup(market: str, read) -> Callable[[datetime], dict[str, dict]]:
+    """id -> record as of a time from one of B10's contract readers, cached per time (records share a made_at)."""
+    @lru_cache(maxsize=16)
+    def at(when: datetime) -> dict[str, dict]:
+        return {row["id"]: dict(row) for row in read(market, when)}
+    return at

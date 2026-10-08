@@ -53,14 +53,19 @@
           "pnl": 8.49,
           "pnl_pct": 0.86,
           "eur_view": {
+            "ticker": "AAPL",
+            "quantity": 3.0,
+            "mark_date": "2026-10-06",
             "eurusd_at_buy": 1.165,
             "eurusd_now": 1.17,
-            "fx_fee_rate": 0.0025,
-            "cost_eur": 853.98,
-            "value_eur": 855.46,
-            "pnl_eur": 1.49,
+            "fx_fee_rate": 0.0075,
+            "cost_usd": 993.55,
+            "value_usd": 1000.89,
+            "cost_eur": 859.23,
+            "value_eur": 849.05,
             "fx_effect_eur": -3.67,
-            "note": "rate change and BUX FX fee included; fee provisional"
+            "pnl_eur": -10.19,
+            "note": "BUX FX fee provisional (config/costs.yaml broker.us, verify)"
           }
         },
         {

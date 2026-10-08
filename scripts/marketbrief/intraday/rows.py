@@ -30,7 +30,7 @@ from marketbrief.intraday.measures import (
 )
 from marketbrief.intraday.quotes import SessionQuote
 from marketbrief.intraday.settings import configured_horizons, row_id
-from marketbrief.intraday.trade_rows import trade_pair
+from marketbrief.intraday.trade_rows import trade_row
 
 LEGACY_HORIZONS = {1: ("lo80", "lo50", "hi50", "hi80"), 5: ("lo80", "hi80")}   # WS5's _1d / _5d columns
 BAND_FIELDS = ("range_id", "lo80", "lo50", "hi50", "hi80", "sigma_h")
@@ -62,7 +62,6 @@ class CheckContext:
     trade_bars: dict = field(default_factory=dict)    # B9: (ticker, date) -> raw daily bar of a holding window
     adjustments: dict = field(default_factory=dict)   # B9: ticker -> [(ex_date, factor)] detected by check_at
     trade_checks: list = field(default_factory=list)  # B9: the trade_checks rows written by this check
-    trade_details: list = field(default_factory=list)  # B9: their trade_check_details rows
     skipped_trades: list = field(default_factory=list)  # B9: trade ids skipped (India: a share above the amount)
     unwatched: set = field(default_factory=set)       # B9: tickers with open trades but no ticker row (no check row)
 
@@ -140,13 +139,12 @@ def add_trade_rows(ctx: CheckContext, row: dict, ticker: str, quote, sigma, elap
     """Check the ticker's open trades (B9); True when at least one of them is flagged."""
     flagged = False
     for trade in ctx.trades.get(ticker, []):
-        pair = trade_pair(ctx, trade, quote, sigma, elapsed)
-        if pair is None:
+        check = trade_row(ctx, trade, quote, sigma, elapsed)
+        if check is None:
             ctx.skipped_trades.append(trade["trade_id"])
             continue
-        ctx.trade_checks.append(pair[0])
-        ctx.trade_details.append(pair[1])
-        flagged = flagged or pair[0]["flagged"]
+        ctx.trade_checks.append(check)
+        flagged = flagged or check["flagged"]
     row["open_trades"] = len(ctx.trades.get(ticker, [])) - sum(
         trade["trade_id"] in ctx.skipped_trades for trade in ctx.trades.get(ticker, []))
     return flagged

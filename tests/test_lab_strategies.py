@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from marketbrief.lab import registry  # noqa: E402
+from marketbrief.lab.constants import MSG_NO_CROSS_SCORE, MSG_NO_CROSS_SCORE_OR_RANGE  # noqa: E402
 from marketbrief.lab.strategies import TickerInputs, company_rows, logit  # noqa: E402
 from marketbrief.model.settings import load_model_config  # noqa: E402
 
@@ -106,3 +107,16 @@ def test_blocked_quality_and_earnings_abstain_for_every_strategy():
         preds, skipped = company_rows(registry.rule_and_baselines(), inputs_from_examples("NVDA", **extra), NEWS_CFG)
         assert preds == [] and len(skipped) == 11 and {s["reason_code"] for s in skipped} == {code}
         assert skipped[0]["id"] == "rule.model_news.v1:2026-10-06-NVDA" and skipped[0]["horizons"] == [1, 2, 3, 4, 5]
+
+
+def test_global_abstention_names_a_missing_range_too():
+    # issue #136: the cross-market strategy says "... or range" when a missing horizon has no range either
+    base = inputs_from_examples("NVDA", prev_close=238.9)
+    cross = {k: base.scores[k] for k in (1, 2)}
+    glob = [s for s in registry.rule_and_baselines() if s["id"] == "rule.model_news_global.v1"]
+    _, skipped = company_rows(glob, inputs_from_examples("NVDA", prev_close=238.9, cross_scores=cross), NEWS_CFG)
+    assert [(s["horizons"], s["reason"]) for s in skipped] == [([3, 4, 5], MSG_NO_CROSS_SCORE)]
+    no_range = {k: r for k, r in base.ranges.items() if k != 5}
+    _, skipped = company_rows(glob, inputs_from_examples("NVDA", prev_close=238.9, cross_scores=cross,
+                                                         ranges=no_range), NEWS_CFG)
+    assert [(s["horizons"], s["reason"]) for s in skipped] == [([3, 4, 5], MSG_NO_CROSS_SCORE_OR_RANGE)]

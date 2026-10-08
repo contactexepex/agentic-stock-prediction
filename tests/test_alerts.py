@@ -126,8 +126,9 @@ def test_morning_picks_from_examples():
     assert lines[3] == "   Strongest other horizon: N+3 (14 of 15, average P(up) 0.581)."
     trades = [line for line in lines if line.startswith("   • ")]
     assert len(trades) == 4
-    assert trades[0].startswith("   • Rule, best expected gain: Model + news (rule.model_news.v1) at N+1, P(up) 0.566")
-    assert "target $239.54" in trades[0] and "expected gain -1.16%" in trades[0]
+    # W1 follow-up: the example picks come from B2's engine (gain per session held), so the gain pick is N+5
+    assert trades[0].startswith("   • Rule, best expected gain: Model + news (rule.model_news.v1) at N+5, P(up) 0.585")
+    assert "target $240.11" in trades[0] and "expected gain +0.48%" in trades[0]
     assert trades[3].startswith("   • AI, highest probability: ai.combined.opus.v1 at N+5, P(up) 0.615")
     assert all(PAPER in line for line in signal_lines(msg))
     assert not ADVICE.search(msg)
@@ -175,9 +176,9 @@ def feed_rows(checks: list[dict], computed_at: str | None = None) -> list[dict]:
     return list(rows.values())
 
 
-NEWS = {"id": "ic-us-202610071627-NVDA-news-a41c9e07b2d35f18", "check_id": "ic-us-202610071627",
+NEWS = {"id": "ic-us-2026-10-07T16:27Z-NVDA-news-a41c9e07b2d35f18", "check_id": "ic-us-2026-10-07T16:27Z",
         "check_at": "2026-10-07T16:27:00Z", "session_date": "2026-10-07", "market": "us", "ticker": "NVDA",
-        "alert_type": "material_news_open_trade", "check_row_id": "ic-us-202610071627-NVDA",
+        "alert_type": "material_news_open_trade", "check_row_id": "ic-us-2026-10-07T16:27Z-NVDA",
         "trade_ids": ["acc:rule.model_news.v1:2026-09-29-NVDA-5d"], "trades": None, "flags": [], "repeat": False,
         "news_id": "a41c9e07b2d35f18", "news_title": "Nvidia unveils new chip", "news_source": "Reuters",
         "news_status": "corroborated", "news_materiality": "high", "news_first_seen_at": "2026-10-07T15:00:00Z",
@@ -188,7 +189,8 @@ def test_intraday_trade_alerts_from_b9_feed():
     checks = of_market(examples("trade_check"), "us")
     feed = feed_rows(checks)
     msg = build_alerts("us", feed, {"rule.model_news.v1": "Model + news"})
-    head = f"*US — intraday check at 16:27 UTC: {len(feed)} companies with newly flagged open paper trades*"
+    companies = f"{len(feed)} compan{'y' if len(feed) == 1 else 'ies'}"   # W1 examples: only NVDA flagged (B9 rules)
+    head = f"*US — intraday check at 16:27 UTC: {companies} with newly flagged open paper trades*"
     assert msg.splitlines()[0].startswith(head) and msg.splitlines()[1] == "Paper only — no proven edge yet."
     nvda = next(line for line in msg.splitlines() if "Model + news" in line)
     assert nvda == ("   – N+5 Model + news (rule.model_news.v1), accuracy view: +5.16% since entry, above its 80%"
@@ -371,7 +373,7 @@ def test_cli_dry_run_writes_work_file_and_reruns_post_nothing(scratch, monkeypat
     assert run(["--market", "us", "--dry-run", "intraday"], capsys)[1]["reason"] == "nothing to post"
     monkeypatch.setenv("MB_NOW", "2026-10-07T17:00:00+00:00")
     code, out = run(["--market", "us", "--dry-run", "intraday"], capsys)
-    assert code == 0 and out["post_key"] == "alerts:us:ic-us-202610071627" and out["thread_ts"] == sent[0]["ts"]
+    assert code == 0 and out["post_key"] == "alerts:us:ic-us-2026-10-07T16:27Z" and out["thread_ts"] == sent[0]["ts"]
 
 
 def test_cli_reads_as_of_the_clock(scratch, monkeypatch, capsys):
@@ -437,15 +439,16 @@ def test_alerts_computed_after_the_clock_are_not_used(scratch, monkeypatch, caps
 def test_explainer_note_written_after_the_clock_is_not_quoted(scratch, monkeypatch, capsys):
     store(scratch, "us", "intraday_alerts", feed_rows(of_market(examples("trade_check"), "us")), "check_at")
     store(scratch, "us", "intraday_explanations", [
-        {"id": "ix-ic-us-202610071627-NVDA", "check_row_id": "ic-us-202610071627-NVDA", "attribution": "sector",
-         "text": "NVDA rose with its sector.", "cited_ids": ["XLK"], "created_at": "2026-10-07T16:40:00Z"}],
+        {"id": "ix-ic-us-2026-10-07T16:27Z-NVDA", "check_row_id": "ic-us-2026-10-07T16:27Z-NVDA",
+         "attribution": "sector", "text": "NVDA rose with its sector.", "cited_ids": ["XLK"],
+         "created_at": "2026-10-07T16:40:00Z"}],
         "created_at")
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:30:00+00:00")
     run(["--market", "us", "--dry-run", "intraday"], capsys)
     first = (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text()
     assert "Note (" not in first
     monkeypatch.setenv("MB_NOW", "2026-10-07T16:45:00+00:00")
-    run(["--market", "us", "--dry-run", "intraday", "--check-id", "ic-us-202610071627"], capsys)
+    run(["--market", "us", "--dry-run", "intraday", "--check-id", "ic-us-2026-10-07T16:27Z"], capsys)
     assert "Note (" not in (scratch / "work/alerts_dryrun/us/messages.jsonl").read_text()   # posted once already
     shutil.rmtree(scratch / "work")   # a fresh ledger: the run posts at 16:45 with the note, read through the view
     run(["--market", "us", "--dry-run", "intraday"], capsys)

@@ -61,17 +61,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": -0.32,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -133,17 +129,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 0.42,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -198,8 +190,8 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
@@ -207,7 +199,7 @@
         "range_missed"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -215,7 +207,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -278,17 +270,13 @@
         "market_up",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.65,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -479,21 +467,25 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.0,
-      "company_pct": 0.45,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
         "target_reached",
         "range_missed"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "d93b1f5e7c2a4b60"
+      ],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.09,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {}
+        "news_statuses": {
+          "d93b1f5e7c2a4b60": "corroborated"
+        }
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -753,21 +745,25 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.0,
-      "company_pct": 0.45,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
         "target_reached",
         "range_missed"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "d93b1f5e7c2a4b60"
+      ],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.09,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {}
+        "news_statuses": {
+          "d93b1f5e7c2a4b60": "corroborated"
+        }
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -880,8 +876,8 @@
       "prob_up": 0.581,
       "target_price": 227.56,
       "target_error_pct": 1.45,
-      "lo80": 221.42,
-      "hi80": 233.7,
+      "lo80": 221.51,
+      "hi80": 233.78,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -897,17 +893,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": -0.32,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -952,8 +944,8 @@
       "prob_up": 0.593,
       "target_price": 227.91,
       "target_error_pct": 4.82,
-      "lo80": 217.26,
-      "hi80": 238.56,
+      "lo80": 217.51,
+      "hi80": 238.81,
       "range_hit": false,
       "target_reached": true,
       "target_reached_session": 1,
@@ -962,8 +954,8 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
@@ -971,7 +963,7 @@
         "range_missed"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -979,7 +971,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -1025,8 +1017,8 @@
       "prob_up": 0.601,
       "target_price": 227.65,
       "target_error_pct": 1.41,
-      "lo80": 221.51,
-      "hi80": 233.79,
+      "lo80": 221.59,
+      "hi80": 233.87,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1042,17 +1034,13 @@
         "sector_lift",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": -0.32,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -1097,9 +1085,9 @@
       "prob_up": 0.613,
       "target_price": 228.06,
       "target_error_pct": 4.75,
-      "lo80": 217.41,
-      "hi80": 238.71,
-      "range_hit": false,
+      "lo80": 217.65,
+      "hi80": 238.97,
+      "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
       "max_favourable_pct": 4.72,
@@ -1107,16 +1095,15 @@
       "move_pct": 4.2,
       "market_pct": 2.05,
       "sector_pct": 1.7,
-      "news_pct": 0.23,
-      "company_pct": 0.22,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
       "reason_code": "market_up",
       "reason_codes": [
         "market_up",
-        "target_reached",
-        "range_missed"
+        "target_reached"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
@@ -1124,7 +1111,7 @@
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
@@ -1782,8 +1769,8 @@
       "prob_up": 0.563,
       "target_price": 329.68,
       "target_error_pct": 0.19,
-      "lo80": 323.4,
-      "hi80": 335.96,
+      "lo80": 323.46,
+      "hi80": 336.03,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1850,8 +1837,8 @@
       "prob_up": 0.566,
       "target_price": 329.91,
       "target_error_pct": 0.9,
-      "lo80": 319.01,
-      "hi80": 340.81,
+      "lo80": 319.19,
+      "hi80": 340.99,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1918,8 +1905,8 @@
       "prob_up": 0.583,
       "target_price": 329.77,
       "target_error_pct": 0.17,
-      "lo80": 323.48,
-      "hi80": 336.06,
+      "lo80": 323.54,
+      "hi80": 336.12,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -1986,8 +1973,8 @@
       "prob_up": 0.586,
       "target_price": 330.06,
       "target_error_pct": 0.86,
-      "lo80": 319.16,
-      "hi80": 340.96,
+      "lo80": 319.34,
+      "hi80": 341.14,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2462,8 +2449,8 @@
       "prob_up": 0.567,
       "target_price": 335.23,
       "target_error_pct": -0.61,
-      "lo80": 330.03,
-      "hi80": 340.43,
+      "lo80": 330.07,
+      "hi80": 340.47,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2530,8 +2517,8 @@
       "prob_up": 0.559,
       "target_price": 335.36,
       "target_error_pct": -0.89,
-      "lo80": 326.35,
-      "hi80": 344.37,
+      "lo80": 326.47,
+      "hi80": 344.49,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2598,8 +2585,8 @@
       "prob_up": 0.587,
       "target_price": 335.3,
       "target_error_pct": -0.63,
-      "lo80": 330.1,
-      "hi80": 340.5,
+      "lo80": 330.14,
+      "hi80": 340.54,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2666,8 +2653,8 @@
       "prob_up": 0.579,
       "target_price": 335.48,
       "target_error_pct": -0.92,
-      "lo80": 326.47,
-      "hi80": 344.49,
+      "lo80": 326.59,
+      "hi80": 344.62,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -2724,18 +2711,17 @@
       "entry_value": 99288.0,
       "exit_value": 98086.8,
       "gross_pnl": -1201.2,
-      "costs": 848.2,
+      "costs": 1966.41,
       "cost_lines": {
-        "brokerage": 493.44,
+        "brokerage": 1480.31,
         "stt": 197.37,
         "exchange": 6.06,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 39.23,
-        "gst": 97.01
+        "gst": 267.58
       },
-      "net_pnl": -2049.4,
-      "return_pct": -2.05,
+      "net_pnl": -3167.61,
+      "return_pct": -3.17,
       "prob_up": 0.558,
       "target_price": 1183.23,
       "target_error_pct": -1.31,
@@ -2749,24 +2735,20 @@
       "move_pct": -1.21,
       "market_pct": -1.01,
       "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
+      "news_pct": 0.0,
+      "company_pct": 2.13,
       "reason_code": "sector_drag",
       "reason_codes": [
         "sector_drag",
         "target_reached"
       ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -1.07,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
+        "news_statuses": {}
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -2801,18 +2783,17 @@
       "entry_value": 99288.0,
       "exit_value": 99657.6,
       "gross_pnl": 369.6,
-      "costs": 855.21,
+      "costs": 1981.95,
       "cost_lines": {
-        "brokerage": 497.36,
+        "brokerage": 1492.09,
         "stt": 198.95,
         "exchange": 6.11,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 39.86,
-        "gst": 97.84
+        "gst": 269.71
       },
-      "net_pnl": -485.61,
-      "return_pct": -0.49,
+      "net_pnl": -1612.35,
+      "return_pct": -1.61,
       "prob_up": 0.561,
       "target_price": 1183.84,
       "target_error_pct": 0.22,
@@ -2826,15 +2807,15 @@
       "move_pct": 0.37,
       "market_pct": -0.45,
       "sector_pct": -1.82,
-      "news_pct": 1.32,
-      "company_pct": 1.32,
-      "reason_code": "sector_drag",
+      "news_pct": 2.65,
+      "company_pct": -0.01,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -2842,7 +2823,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -2878,18 +2859,17 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": 0.569,
       "target_price": 1184.54,
       "target_error_pct": 2.82,
@@ -2903,15 +2883,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -2919,7 +2899,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -2955,18 +2935,17 @@
       "entry_value": 99288.0,
       "exit_value": 98086.8,
       "gross_pnl": -1201.2,
-      "costs": 848.2,
+      "costs": 1966.41,
       "cost_lines": {
-        "brokerage": 493.44,
+        "brokerage": 1480.31,
         "stt": 197.37,
         "exchange": 6.06,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 39.23,
-        "gst": 97.01
+        "gst": 267.58
       },
-      "net_pnl": -2049.4,
-      "return_pct": -2.05,
+      "net_pnl": -3167.61,
+      "return_pct": -3.17,
       "prob_up": null,
       "target_price": 1182.0,
       "target_error_pct": -1.21,
@@ -3028,18 +3007,17 @@
       "entry_value": 99288.0,
       "exit_value": 99657.6,
       "gross_pnl": 369.6,
-      "costs": 855.21,
+      "costs": 1981.95,
       "cost_lines": {
-        "brokerage": 497.36,
+        "brokerage": 1492.09,
         "stt": 198.95,
         "exchange": 6.11,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 39.86,
-        "gst": 97.84
+        "gst": 269.71
       },
-      "net_pnl": -485.61,
-      "return_pct": -0.49,
+      "net_pnl": -1612.35,
+      "return_pct": -1.61,
       "prob_up": null,
       "target_price": 1182.0,
       "target_error_pct": 0.37,
@@ -3053,20 +3031,24 @@
       "move_pct": 0.37,
       "market_pct": -0.45,
       "sector_pct": -1.82,
-      "news_pct": 0.0,
-      "company_pct": 2.64,
-      "reason_code": "company_specific",
+      "news_pct": 2.65,
+      "company_pct": -0.01,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "company_specific",
+        "news_positive",
         "target_reached"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "nse-ann-7790412"
+      ],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -0.48,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {}
+        "news_statuses": {
+          "nse-ann-7790412": "confirmed_primary"
+        }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3101,18 +3083,17 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": null,
       "target_price": 1182.0,
       "target_error_pct": 3.05,
@@ -3126,20 +3107,24 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 0.0,
-      "company_pct": 5.69,
-      "reason_code": "company_specific",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "company_specific",
+        "news_positive",
         "target_reached"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "nse-ann-7790412"
+      ],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": 0.49,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {}
+        "news_statuses": {
+          "nse-ann-7790412": "confirmed_primary"
+        }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3174,18 +3159,17 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": 0.557,
       "target_price": 1184.1,
       "target_error_pct": 2.86,
@@ -3199,20 +3183,24 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 0.0,
-      "company_pct": 5.69,
-      "reason_code": "company_specific",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "company_specific",
+        "news_positive",
         "target_reached"
       ],
-      "news_ids": [],
+      "news_ids": [
+        "nse-ann-7790412"
+      ],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": 0.49,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {}
+        "news_statuses": {
+          "nse-ann-7790412": "confirmed_primary"
+        }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3247,23 +3235,22 @@
       "entry_value": 99288.0,
       "exit_value": 98086.8,
       "gross_pnl": -1201.2,
-      "costs": 848.2,
+      "costs": 1966.41,
       "cost_lines": {
-        "brokerage": 493.44,
+        "brokerage": 1480.31,
         "stt": 197.37,
         "exchange": 6.06,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 39.23,
-        "gst": 97.01
+        "gst": 267.58
       },
-      "net_pnl": -2049.4,
-      "return_pct": -2.05,
+      "net_pnl": -3167.61,
+      "return_pct": -3.17,
       "prob_up": 0.568,
       "target_price": 1183.45,
       "target_error_pct": -1.33,
-      "lo80": 1153.44,
-      "hi80": 1213.46,
+      "lo80": 1153.81,
+      "hi80": 1213.84,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3272,24 +3259,20 @@
       "move_pct": -1.21,
       "market_pct": -1.01,
       "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
+      "news_pct": 0.0,
+      "company_pct": 2.13,
       "reason_code": "sector_drag",
       "reason_codes": [
         "sector_drag",
         "target_reached"
       ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -1.07,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
+        "news_statuses": {}
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3324,23 +3307,22 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": 0.579,
       "target_price": 1184.91,
       "target_error_pct": 2.79,
-      "lo80": 1132.85,
-      "hi80": 1236.97,
+      "lo80": 1134.0,
+      "hi80": 1238.12,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3349,15 +3331,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -3365,7 +3347,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -3401,23 +3383,22 @@
       "entry_value": 99288.0,
       "exit_value": 98086.8,
       "gross_pnl": -1201.2,
-      "costs": 848.2,
+      "costs": 1966.41,
       "cost_lines": {
-        "brokerage": 493.44,
+        "brokerage": 1480.31,
         "stt": 197.37,
         "exchange": 6.06,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 39.23,
-        "gst": 97.01
+        "gst": 267.58
       },
-      "net_pnl": -2049.4,
-      "return_pct": -2.05,
+      "net_pnl": -3167.61,
+      "return_pct": -3.17,
       "prob_up": 0.588,
       "target_price": 1183.87,
       "target_error_pct": -1.37,
-      "lo80": 1153.85,
-      "hi80": 1213.89,
+      "lo80": 1154.23,
+      "hi80": 1214.28,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3426,24 +3407,20 @@
       "move_pct": -1.21,
       "market_pct": -1.01,
       "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
+      "news_pct": 0.0,
+      "company_pct": 2.13,
       "reason_code": "sector_drag",
       "reason_codes": [
         "sector_drag",
         "target_reached"
       ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "NIFTY50",
         "benchmark_pct": -1.07,
         "beta": 0.94,
         "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
+        "news_statuses": {}
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
@@ -3478,23 +3455,22 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": 0.599,
       "target_price": 1185.65,
       "target_error_pct": 2.73,
-      "lo80": 1133.56,
-      "hi80": 1237.74,
+      "lo80": 1134.7,
+      "hi80": 1238.89,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -3503,15 +3479,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -3519,7 +3495,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
@@ -3555,18 +3531,17 @@
       "entry_value": 99610.0,
       "exit_value": 100968.0,
       "gross_pnl": 1358.0,
-      "costs": 862.38,
+      "costs": 1998.14,
       "cost_lines": {
-        "brokerage": 501.44,
+        "brokerage": 1504.34,
         "stt": 200.58,
         "exchange": 6.16,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 40.39,
-        "gst": 98.67
+        "gst": 271.92
       },
-      "net_pnl": 495.62,
-      "return_pct": 0.5,
+      "net_pnl": -640.14,
+      "return_pct": -0.64,
       "prob_up": 0.552,
       "target_price": 723.37,
       "target_error_pct": -0.3,
@@ -3627,18 +3602,17 @@
       "entry_value": 99610.0,
       "exit_value": 98672.0,
       "gross_pnl": -938.0,
-      "costs": 852.14,
+      "costs": 1975.43,
       "cost_lines": {
-        "brokerage": 495.7,
+        "brokerage": 1487.11,
         "stt": 198.28,
         "exchange": 6.09,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 39.47,
-        "gst": 97.46
+        "gst": 268.81
       },
-      "net_pnl": -1790.14,
-      "return_pct": -1.79,
+      "net_pnl": -2913.43,
+      "return_pct": -2.91,
       "prob_up": 0.558,
       "target_price": 723.75,
       "target_error_pct": -2.62,
@@ -3700,18 +3674,17 @@
       "entry_value": 99610.0,
       "exit_value": 99603.0,
       "gross_pnl": -7.0,
-      "costs": 856.29,
+      "costs": 1984.64,
       "cost_lines": {
-        "brokerage": 498.03,
+        "brokerage": 1494.1,
         "stt": 199.21,
         "exchange": 6.12,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 39.84,
-        "gst": 97.95
+        "gst": 270.07
       },
-      "net_pnl": -863.29,
-      "return_pct": -0.86,
+      "net_pnl": -1991.64,
+      "return_pct": -1.99,
       "prob_up": 0.551,
       "target_price": 723.83,
       "target_error_pct": -1.71,
@@ -3773,18 +3746,17 @@
       "entry_value": 99610.0,
       "exit_value": 100968.0,
       "gross_pnl": 1358.0,
-      "costs": 862.38,
+      "costs": 1998.14,
       "cost_lines": {
-        "brokerage": 501.44,
+        "brokerage": 1504.34,
         "stt": 200.58,
         "exchange": 6.16,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 40.39,
-        "gst": 98.67
+        "gst": 271.92
       },
-      "net_pnl": 495.62,
-      "return_pct": 0.5,
+      "net_pnl": -640.14,
+      "return_pct": -0.64,
       "prob_up": null,
       "target_price": 722.7,
       "target_error_pct": -0.21,
@@ -3845,18 +3817,17 @@
       "entry_value": 99610.0,
       "exit_value": 98672.0,
       "gross_pnl": -938.0,
-      "costs": 852.14,
+      "costs": 1975.43,
       "cost_lines": {
-        "brokerage": 495.7,
+        "brokerage": 1487.11,
         "stt": 198.28,
         "exchange": 6.09,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 39.47,
-        "gst": 97.46
+        "gst": 268.81
       },
-      "net_pnl": -1790.14,
-      "return_pct": -1.79,
+      "net_pnl": -2913.43,
+      "return_pct": -2.91,
       "prob_up": null,
       "target_price": 722.7,
       "target_error_pct": -2.48,
@@ -3918,18 +3889,17 @@
       "entry_value": 99610.0,
       "exit_value": 99603.0,
       "gross_pnl": -7.0,
-      "costs": 856.29,
+      "costs": 1984.64,
       "cost_lines": {
-        "brokerage": 498.03,
+        "brokerage": 1494.1,
         "stt": 199.21,
         "exchange": 6.12,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 39.84,
-        "gst": 97.95
+        "gst": 270.07
       },
-      "net_pnl": -863.29,
-      "return_pct": -0.86,
+      "net_pnl": -1991.64,
+      "return_pct": -1.99,
       "prob_up": null,
       "target_price": 722.7,
       "target_error_pct": -1.56,
@@ -3991,23 +3961,22 @@
       "entry_value": 99610.0,
       "exit_value": 100968.0,
       "gross_pnl": 1358.0,
-      "costs": 862.38,
+      "costs": 1998.14,
       "cost_lines": {
-        "brokerage": 501.44,
+        "brokerage": 1504.34,
         "stt": 200.58,
         "exchange": 6.16,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 40.39,
-        "gst": 98.67
+        "gst": 271.92
       },
-      "net_pnl": 495.62,
-      "return_pct": 0.5,
+      "net_pnl": -640.14,
+      "return_pct": -0.64,
       "prob_up": 0.562,
       "target_price": 723.5,
       "target_error_pct": -0.32,
-      "lo80": 705.39,
-      "hi80": 741.61,
+      "lo80": 705.61,
+      "hi80": 741.84,
       "range_hit": true,
       "target_reached": false,
       "target_reached_session": null,
@@ -4063,23 +4032,22 @@
       "entry_value": 99610.0,
       "exit_value": 99603.0,
       "gross_pnl": -7.0,
-      "costs": 856.29,
+      "costs": 1984.64,
       "cost_lines": {
-        "brokerage": 498.03,
+        "brokerage": 1494.1,
         "stt": 199.21,
         "exchange": 6.12,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 39.84,
-        "gst": 97.95
+        "gst": 270.07
       },
-      "net_pnl": -863.29,
-      "return_pct": -0.86,
+      "net_pnl": -1991.64,
+      "return_pct": -1.99,
       "prob_up": 0.561,
       "target_price": 724.06,
       "target_error_pct": -1.74,
-      "lo80": 692.65,
-      "hi80": 755.46,
+      "lo80": 693.34,
+      "hi80": 756.14,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 3,
@@ -4136,23 +4104,22 @@
       "entry_value": 99610.0,
       "exit_value": 100968.0,
       "gross_pnl": 1358.0,
-      "costs": 862.38,
+      "costs": 1998.14,
       "cost_lines": {
-        "brokerage": 501.44,
+        "brokerage": 1504.34,
         "stt": 200.58,
         "exchange": 6.16,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 40.39,
-        "gst": 98.67
+        "gst": 271.92
       },
-      "net_pnl": 495.62,
-      "return_pct": 0.5,
+      "net_pnl": -640.14,
+      "return_pct": -0.64,
       "prob_up": 0.582,
       "target_price": 723.75,
       "target_error_pct": -0.35,
-      "lo80": 705.63,
-      "hi80": 741.87,
+      "lo80": 705.86,
+      "hi80": 742.1,
       "range_hit": true,
       "target_reached": false,
       "target_reached_session": null,
@@ -4208,23 +4175,22 @@
       "entry_value": 99610.0,
       "exit_value": 99603.0,
       "gross_pnl": -7.0,
-      "costs": 856.29,
+      "costs": 1984.64,
       "cost_lines": {
-        "brokerage": 498.03,
+        "brokerage": 1494.1,
         "stt": 199.21,
         "exchange": 6.12,
         "sebi": 0.2,
         "stamp_duty": 14.94,
-        "dp_charge": 39.84,
-        "gst": 97.95
+        "gst": 270.07
       },
-      "net_pnl": -863.29,
-      "return_pct": -0.86,
+      "net_pnl": -1991.64,
+      "return_pct": -1.99,
       "prob_up": 0.581,
       "target_price": 724.5,
       "target_error_pct": -1.8,
-      "lo80": 693.08,
-      "hi80": 755.92,
+      "lo80": 693.76,
+      "hi80": 756.61,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 3,
@@ -4636,8 +4602,8 @@
       "prob_up": 0.566,
       "target_price": 11893.0,
       "target_error_pct": null,
-      "lo80": 11550.87,
-      "hi80": 12235.13,
+      "lo80": 11555.78,
+      "hi80": 12240.07,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4694,8 +4660,8 @@
       "prob_up": 0.561,
       "target_price": 11902.63,
       "target_error_pct": null,
-      "lo80": 11309.42,
-      "hi80": 12495.84,
+      "lo80": 11324.16,
+      "hi80": 12510.66,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4752,8 +4718,8 @@
       "prob_up": 0.586,
       "target_price": 11897.86,
       "target_error_pct": null,
-      "lo80": 11555.59,
-      "hi80": 12240.13,
+      "lo80": 11560.5,
+      "hi80": 12245.06,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4810,8 +4776,8 @@
       "prob_up": 0.581,
       "target_price": 11911.05,
       "target_error_pct": null,
-      "lo80": 11317.42,
-      "hi80": 12504.68,
+      "lo80": 11332.16,
+      "hi80": 12519.5,
       "range_hit": null,
       "target_reached": null,
       "target_reached_session": null,
@@ -4834,9 +4800,9 @@
       "method_version": "engine-v1"
     },
     {
-      "id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-1d@20261001T221500Z",
-      "trade_id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-1d",
-      "prediction_id": "rule.model_news.v1:2026-09-29-NVDA-1d",
+      "id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-4d@20261006T221500Z",
+      "trade_id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-NVDA-4d",
+      "prediction_id": "rule.model_news.v1:2026-09-29-NVDA-4d",
       "strategy_id": "rule.model_news.v1",
       "family": "rule",
       "view": "head_to_head",
@@ -4844,65 +4810,61 @@
       "pick_id": "h2h:2026-09-29-NVDA-rule-best_expected_gain",
       "market": "us",
       "ticker": "NVDA",
-      "horizon_days": 1,
+      "horizon_days": 4,
       "made_at": "2026-09-30T11:45:00Z",
       "entry_date": "2026-09-30",
-      "exit_date": "2026-10-01",
-      "exit_date_actual": "2026-10-01",
+      "exit_date": "2026-10-06",
+      "exit_date_actual": "2026-10-06",
       "status": "settled",
       "flags": [],
       "amount": 1000.0,
       "currency": "USD",
       "entry_price": 229.27,
-      "exit_price": 230.86,
+      "exit_price": 239.24,
       "quantity": 4.36167,
       "exit_quantity": 4.36167,
       "adjustment_ids": [],
       "entry_value": 1000.0,
-      "exit_value": 1006.94,
-      "gross_pnl": 6.94,
+      "exit_value": 1043.49,
+      "gross_pnl": 43.49,
       "costs": 2.34,
       "cost_lines": {
         "order_fee": 2.32,
         "sec_fee": 0.02
       },
-      "net_pnl": 4.6,
-      "return_pct": 0.46,
-      "prob_up": 0.571,
-      "target_price": 227.52,
-      "target_error_pct": 1.47,
-      "lo80": 222.01,
-      "hi80": 233.17,
+      "net_pnl": 41.15,
+      "return_pct": 4.12,
+      "prob_up": 0.586,
+      "target_price": 227.96,
+      "target_error_pct": 4.95,
+      "lo80": 217.05,
+      "hi80": 239.41,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
-      "max_favourable_pct": 1.35,
+      "max_favourable_pct": 6.15,
       "max_adverse_pct": -0.48,
-      "move_pct": 0.69,
-      "market_pct": -0.6,
-      "sector_pct": 1.52,
+      "move_pct": 4.35,
+      "market_pct": 3.09,
+      "sector_pct": 1.69,
       "news_pct": 0.0,
-      "company_pct": -0.23,
-      "reason_code": "sector_lift",
+      "company_pct": -0.43,
+      "reason_code": "market_up",
       "reason_codes": [
-        "sector_lift",
+        "market_up",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
-        "benchmark_pct": -0.32,
+        "benchmark_pct": 1.65,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
-      "settled_at": "2026-10-01T22:15:00Z",
+      "settled_at": "2026-10-06T22:15:00Z",
       "method_version": "engine-v1"
     },
     {
@@ -4960,17 +4922,13 @@
         "market_up",
         "target_reached"
       ],
-      "news_ids": [
-        "a41c9e07b2d35f18"
-      ],
+      "news_ids": [],
       "reason_detail": {
         "benchmark": "SPY",
         "benchmark_pct": 1.65,
         "beta": 1.874,
         "sector_source": "XLK",
-        "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
-        }
+        "news_statuses": {}
       },
       "regime": "TRENDING",
       "supersedes": null,
@@ -4978,9 +4936,9 @@
       "method_version": "engine-v1"
     },
     {
-      "id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-NVDA-1d@20261001T221500Z",
-      "trade_id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-NVDA-1d",
-      "prediction_id": "ai.combined.opus.v1:2026-09-29-NVDA-1d",
+      "id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-NVDA-3d@20261005T221500Z",
+      "trade_id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-NVDA-3d",
+      "prediction_id": "ai.combined.opus.v1:2026-09-29-NVDA-3d",
       "strategy_id": "ai.combined.opus.v1",
       "family": "ai",
       "view": "head_to_head",
@@ -4988,142 +4946,65 @@
       "pick_id": "h2h:2026-09-29-NVDA-ai-best_expected_gain",
       "market": "us",
       "ticker": "NVDA",
-      "horizon_days": 1,
+      "horizon_days": 3,
       "made_at": "2026-09-30T11:45:00Z",
       "entry_date": "2026-09-30",
-      "exit_date": "2026-10-01",
-      "exit_date_actual": "2026-10-01",
+      "exit_date": "2026-10-05",
+      "exit_date_actual": "2026-10-05",
       "status": "settled",
       "flags": [],
       "amount": 1000.0,
       "currency": "USD",
       "entry_price": 229.27,
-      "exit_price": 230.86,
+      "exit_price": 238.9,
       "quantity": 4.36167,
       "exit_quantity": 4.36167,
       "adjustment_ids": [],
       "entry_value": 1000.0,
-      "exit_value": 1006.94,
-      "gross_pnl": 6.94,
+      "exit_value": 1042.0,
+      "gross_pnl": 42.0,
       "costs": 2.34,
       "cost_lines": {
         "order_fee": 2.32,
         "sec_fee": 0.02
       },
-      "net_pnl": 4.6,
-      "return_pct": 0.46,
-      "prob_up": 0.601,
-      "target_price": 227.65,
-      "target_error_pct": 1.41,
-      "lo80": 221.51,
-      "hi80": 233.79,
+      "net_pnl": 39.66,
+      "return_pct": 3.97,
+      "prob_up": 0.613,
+      "target_price": 228.06,
+      "target_error_pct": 4.75,
+      "lo80": 217.65,
+      "hi80": 238.97,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
-      "max_favourable_pct": 1.35,
+      "max_favourable_pct": 4.72,
       "max_adverse_pct": -0.48,
-      "move_pct": 0.69,
-      "market_pct": -0.6,
-      "sector_pct": 1.52,
-      "news_pct": 0.0,
-      "company_pct": -0.23,
-      "reason_code": "sector_lift",
+      "move_pct": 4.2,
+      "market_pct": 2.05,
+      "sector_pct": 1.7,
+      "news_pct": 0.45,
+      "company_pct": 0.0,
+      "reason_code": "market_up",
       "reason_codes": [
-        "sector_lift",
+        "market_up",
         "target_reached"
       ],
       "news_ids": [
-        "a41c9e07b2d35f18"
+        "d93b1f5e7c2a4b60"
       ],
       "reason_detail": {
         "benchmark": "SPY",
-        "benchmark_pct": -0.32,
+        "benchmark_pct": 1.09,
         "beta": 1.874,
         "sector_source": "XLK",
         "news_statuses": {
-          "a41c9e07b2d35f18": "corroborated"
+          "d93b1f5e7c2a4b60": "corroborated"
         }
       },
       "regime": "TRENDING",
       "supersedes": null,
-      "settled_at": "2026-10-01T22:15:00Z",
-      "method_version": "engine-v1"
-    },
-    {
-      "id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-RELIANCE-1d@20261001T121500Z",
-      "trade_id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-RELIANCE-1d",
-      "prediction_id": "rule.model_news.v1:2026-09-29-RELIANCE-1d",
-      "strategy_id": "rule.model_news.v1",
-      "family": "rule",
-      "view": "head_to_head",
-      "pick_rule": "best_expected_gain",
-      "pick_id": "h2h:2026-09-29-RELIANCE-rule-best_expected_gain",
-      "market": "india",
-      "ticker": "RELIANCE",
-      "horizon_days": 1,
-      "made_at": "2026-09-30T02:10:00Z",
-      "entry_date": "2026-09-30",
-      "exit_date": "2026-10-01",
-      "exit_date_actual": "2026-10-01",
-      "status": "settled",
-      "flags": [],
-      "amount": 100000.0,
-      "currency": "INR",
-      "entry_price": 1182.0,
-      "exit_price": 1167.7,
-      "quantity": 84.0,
-      "exit_quantity": 84.0,
-      "adjustment_ids": [],
-      "entry_value": 99288.0,
-      "exit_value": 98086.8,
-      "gross_pnl": -1201.2,
-      "costs": 848.2,
-      "cost_lines": {
-        "brokerage": 493.44,
-        "stt": 197.37,
-        "exchange": 6.06,
-        "sebi": 0.2,
-        "stamp_duty": 14.89,
-        "dp_charge": 39.23,
-        "gst": 97.01
-      },
-      "net_pnl": -2049.4,
-      "return_pct": -2.05,
-      "prob_up": 0.558,
-      "target_price": 1183.23,
-      "target_error_pct": -1.31,
-      "lo80": 1156.27,
-      "hi80": 1210.83,
-      "range_hit": true,
-      "target_reached": true,
-      "target_reached_session": 1,
-      "max_favourable_pct": 1.23,
-      "max_adverse_pct": -1.79,
-      "move_pct": -1.21,
-      "market_pct": -1.01,
-      "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
-      "reason_code": "sector_drag",
-      "reason_codes": [
-        "sector_drag",
-        "target_reached"
-      ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
-      "reason_detail": {
-        "benchmark": "NIFTY50",
-        "benchmark_pct": -1.07,
-        "beta": 0.94,
-        "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
-      },
-      "regime": "EVENT_HEAVY",
-      "supersedes": null,
-      "settled_at": "2026-10-01T12:15:00Z",
+      "settled_at": "2026-10-05T22:15:00Z",
       "method_version": "engine-v1"
     },
     {
@@ -5154,18 +5035,17 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": 0.569,
       "target_price": 1184.54,
       "target_error_pct": 2.82,
@@ -5179,15 +5059,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -5195,89 +5075,12 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",
       "supersedes": null,
       "settled_at": "2026-10-06T12:15:00Z",
-      "method_version": "engine-v1"
-    },
-    {
-      "id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-RELIANCE-1d@20261001T121500Z",
-      "trade_id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-RELIANCE-1d",
-      "prediction_id": "ai.combined.opus.v1:2026-09-29-RELIANCE-1d",
-      "strategy_id": "ai.combined.opus.v1",
-      "family": "ai",
-      "view": "head_to_head",
-      "pick_rule": "best_expected_gain",
-      "pick_id": "h2h:2026-09-29-RELIANCE-ai-best_expected_gain",
-      "market": "india",
-      "ticker": "RELIANCE",
-      "horizon_days": 1,
-      "made_at": "2026-09-30T02:10:00Z",
-      "entry_date": "2026-09-30",
-      "exit_date": "2026-10-01",
-      "exit_date_actual": "2026-10-01",
-      "status": "settled",
-      "flags": [],
-      "amount": 100000.0,
-      "currency": "INR",
-      "entry_price": 1182.0,
-      "exit_price": 1167.7,
-      "quantity": 84.0,
-      "exit_quantity": 84.0,
-      "adjustment_ids": [],
-      "entry_value": 99288.0,
-      "exit_value": 98086.8,
-      "gross_pnl": -1201.2,
-      "costs": 848.2,
-      "cost_lines": {
-        "brokerage": 493.44,
-        "stt": 197.37,
-        "exchange": 6.06,
-        "sebi": 0.2,
-        "stamp_duty": 14.89,
-        "dp_charge": 39.23,
-        "gst": 97.01
-      },
-      "net_pnl": -2049.4,
-      "return_pct": -2.05,
-      "prob_up": 0.588,
-      "target_price": 1183.87,
-      "target_error_pct": -1.37,
-      "lo80": 1153.85,
-      "hi80": 1213.89,
-      "range_hit": true,
-      "target_reached": true,
-      "target_reached_session": 1,
-      "max_favourable_pct": 1.23,
-      "max_adverse_pct": -1.79,
-      "move_pct": -1.21,
-      "market_pct": -1.01,
-      "sector_pct": -2.33,
-      "news_pct": 1.07,
-      "company_pct": 1.06,
-      "reason_code": "sector_drag",
-      "reason_codes": [
-        "sector_drag",
-        "target_reached"
-      ],
-      "news_ids": [
-        "nse-ann-7781203"
-      ],
-      "reason_detail": {
-        "benchmark": "NIFTY50",
-        "benchmark_pct": -1.07,
-        "beta": 0.94,
-        "sector_source": "ONGC",
-        "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
-        }
-      },
-      "regime": "EVENT_HEAVY",
-      "supersedes": null,
-      "settled_at": "2026-10-01T12:15:00Z",
       "method_version": "engine-v1"
     },
     {
@@ -5308,23 +5111,22 @@
       "entry_value": 99288.0,
       "exit_value": 102312.0,
       "gross_pnl": 3024.0,
-      "costs": 867.04,
+      "costs": 2008.19,
       "cost_lines": {
-        "brokerage": 504.0,
+        "brokerage": 1512.0,
         "stt": 201.6,
         "exchange": 6.19,
         "sebi": 0.2,
         "stamp_duty": 14.89,
-        "dp_charge": 40.92,
-        "gst": 99.24
+        "gst": 273.31
       },
-      "net_pnl": 2156.96,
-      "return_pct": 2.16,
+      "net_pnl": 1015.81,
+      "return_pct": 1.02,
       "prob_up": 0.599,
       "target_price": 1185.65,
       "target_error_pct": 2.73,
-      "lo80": 1133.56,
-      "hi80": 1237.74,
+      "lo80": 1134.7,
+      "hi80": 1238.89,
       "range_hit": true,
       "target_reached": true,
       "target_reached_session": 1,
@@ -5333,15 +5135,15 @@
       "move_pct": 3.05,
       "market_pct": 0.46,
       "sector_pct": -3.1,
-      "news_pct": 2.84,
-      "company_pct": 2.85,
-      "reason_code": "sector_drag",
+      "news_pct": 5.69,
+      "company_pct": 0.0,
+      "reason_code": "news_positive",
       "reason_codes": [
-        "sector_drag",
+        "news_positive",
         "target_reached"
       ],
       "news_ids": [
-        "nse-ann-7781203"
+        "nse-ann-7790412"
       ],
       "reason_detail": {
         "benchmark": "NIFTY50",
@@ -5349,7 +5151,7 @@
         "beta": 0.94,
         "sector_source": "ONGC",
         "news_statuses": {
-          "nse-ann-7781203": "confirmed_primary"
+          "nse-ann-7790412": "confirmed_primary"
         }
       },
       "regime": "EVENT_HEAVY",

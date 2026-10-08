@@ -125,6 +125,9 @@ def comparison_problems(spec: dict, by_id: dict) -> list[str]:
         return [f"{sid}: compares to an unknown strategy"]
     params = spec["parameters"]
     diff = {key for key in params if params[key] != other["parameters"].get(key)}
+    # The threshold counts as a parameter only when both sides have one. A signal without a probability
+    # (always_up, momentum) has no threshold by construction (checked in parameter_problems), so its null
+    # threshold is part of its `signal` difference, not a second one.
     if spec["threshold"] is not None and other["threshold"] is not None and spec["threshold"] != other["threshold"]:
         diff.add("threshold")
     if diff != {spec["differs_in"]}:
@@ -262,15 +265,22 @@ def test_no_tool_mentions_orders_or_brokers():
 
 # ---------------- contracts ----------------
 
-# watchlist: built by B1 (tests/test_lifecycle.py); horizons: built by B10 (tests/test_horizons.py)
-@pytest.mark.parametrize("module", [protocol])
-def test_contract_functions_are_stubs(module):
-    functions = [f for name, f in inspect.getmembers(module, inspect.isfunction) if f.__module__ == module.__name__]
-    assert functions
+# All three contracts are built: watchlist by B1 (tests/test_lifecycle.py), horizons by B10 (tests/test_horizons.py),
+# protocol by B2 (delegation checked below), so no stub test remains.
+
+
+def test_protocol_contract_delegates_to_the_lab_with_the_same_signatures():
+    """B2 built the F1 engine: each contract function forwards to marketbrief/lab/protocol.py unchanged."""
+    from marketbrief.lab import protocol as lab_protocol
+
+    functions = [f for _, f in inspect.getmembers(protocol, inspect.isfunction) if f.__module__ == protocol.__name__]
+    assert len(functions) == 9
     for function in functions:
         assert function.__doc__, function.__name__
         source = inspect.getsource(function)
-        assert "raise NotImplementedError" in source, function.__name__
+        assert "NotImplementedError" not in source and f"lab_protocol.{function.__name__}(" in source
+        target = getattr(lab_protocol, function.__name__)
+        assert list(inspect.signature(function).parameters) == list(inspect.signature(target).parameters)
 
 
 def test_horizon_records_extend_todays_kinds():
@@ -391,21 +401,66 @@ def test_catalogue_lifecycle_events_match_their_market():
 
 
 def test_catalogue_scoreboard_has_every_slice():
+    """scoreboard_row.json is built by B2's lab/scoreboard.py; each slice's counts and profit match paper_trade.json."""
     rows = load("scoreboard_row.json")
-    assert {r["scope"] for r in rows} == {"strategy", "strategy_company", "pick_rule"}
+    assert {r["scope"] for r in rows} == {"strategy", "strategy_company", "pick_rule", "strategy_regime"}
     for r in rows:
         assert (r["ticker"] is not None) == (r["scope"] == "strategy_company")
         assert (r["pick_rule"] is not None) == (r["scope"] == "pick_rule")
         assert (r["strategy_id"] is None) == (r["scope"] == "pick_rule")
+        assert (r["regime"] is not None) == (r["scope"] == "strategy_regime")
     trades = [t for t in load("paper_trade.json") if t["status"] == "settled"]
     for r in rows:
-        if r["scope"] == "strategy_company":
-            mine = [t for t in trades if t["view"] == "accuracy" and t["strategy_id"] == r["strategy_id"]
-                    and t["ticker"] == r["ticker"]]
-        elif r["scope"] == "pick_rule":
-            mine = [t for t in trades if t["view"] == "head_to_head" and t["family"] == r["family"]
-                    and t["pick_rule"] == r["pick_rule"] and t["market"] == r["market"]]
-        else:
-            continue
-        assert r["trades"] == len(mine)
+        mine = [t for t in trades if t["market"] == r["market"] and t["view"] == r["view"]
+                and r["horizon_days"] in ("all", t["horizon_days"])
+                and r["strategy_id"] in (None, t["strategy_id"]) and r["family"] == t["family"]
+                and r["ticker"] in (None, t["ticker"]) and r["pick_rule"] in (None, t["pick_rule"])
+                and r["regime"] in (None, t["regime"])]
+        assert r["trades"] == len(mine), r
         assert r["net_pnl"] == pytest.approx(sum(t["net_pnl"] for t in mine), abs=0.011)
+        assert r["luck_test"]["n"] == len(mine)
+
+
+def test_catalogue_cost_views_agree_with_the_trades():
+    """cost_view.json (B2's kind): settlement rows repeat the trade's market costs; your cost = market + own lines."""
+    trades = {t["id"]: t for t in load("paper_trade.json")}
+    rows = load("cost_view.json")
+    assert {r["record_kind"] for r in rows} == {"prediction", "pick", "settlement"}
+    for r in rows:
+        assert r["your_costs"] == pytest.approx(sum(r["your_cost_lines"].values()), abs=0.011)
+        assert set(r["market_cost_lines"].items()) <= set(r["your_cost_lines"].items())
+        if r["record_kind"] == "settlement":
+            trade = trades[r["record_id"]]
+            assert r["market_costs"] == trade["costs"] and r["market_cost_lines"] == trade["cost_lines"]
+            assert r["net_pnl_market"] == pytest.approx(trade["net_pnl"], abs=0.011)
+            assert r["cost_viable"] is None
+        else:
+            gain = r["expected_gain_your_pct"]   # owner decision 2026-10-07 (B2): viable = gain after your cost > 0
+            assert r["cost_viable"] == (None if gain is None else gain > 0)   # no probability (baselines): null
+
+
+def test_catalogue_trade_checks_use_the_real_check_ids_and_carry_the_b9_columns():
+    for r in load("trade_check.json"):
+        assert re.fullmatch(r"ic-(india|us)-\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z", r["check_id"])
+        assert r["id"] == f"{r['check_id']}-{r['trade_id']}" and r["check_row_id"] == f"{r['check_id']}-{r['ticker']}"
+        assert r["quality"] == "ok" and r["entry_adj"] == r["entry_price"] * r["basis_factor"]
+        assert r["sessions_held"] == pytest.approx(r["session_number"] - 1 + r["elapsed_fraction"], abs=0.0002)
+
+
+def test_trade_check_rows_view_reads_old_split_rows_and_new_single_rows():
+    """Issue #78: the B9 view takes each moved column from trade_checks when set, else from trade_check_details."""
+    views = (REPO / "sql" / "views.sql").read_text(encoding="utf-8")
+    statement = views[views.index("CREATE OR REPLACE VIEW trade_check_rows"):]
+    statement = statement[:statement.index(";") + 1]
+    con = duckdb.connect()
+    for kind in (kinds.KIND_TRADE_CHECKS, "trade_check_details"):
+        con.execute(f"CREATE TABLE {kind} ({', '.join(f'{c} {t}' for c, t in SCHEMAS[kind][1].items())})")
+    con.execute("INSERT INTO trade_checks (id, computed_at, quality, target_reached) VALUES "
+                "('new', '2026-10-08T00:00:00Z', 'ok', true), ('old', '2026-10-07T00:00:00Z', NULL, NULL)")
+    con.execute("INSERT INTO trade_check_details (id, computed_at, quality, target_reached) VALUES "
+                "('old', '2026-10-07T00:00:00Z', 'stale_quote', false)")
+    con.execute(statement)
+    got = con.execute("SELECT id, quality, target_reached FROM trade_check_rows ORDER BY id").fetchall()
+    assert got == [("new", "ok", True), ("old", "stale_quote", False)]
+    columns = [row[0] for row in con.execute("DESCRIBE trade_check_rows").fetchall()]
+    assert len(columns) == len(set(columns)) and set(columns) == set(SCHEMAS[kinds.KIND_TRADE_CHECKS][1])

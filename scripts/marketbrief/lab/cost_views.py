@@ -2,8 +2,9 @@
 pick that would trade, as `cost_views` rows (core/schema_b2.py). Costs from lab/costs.py.
 
 - prediction / pick (pre-open): the round trip of the company's amount bought and sold at the reference price
-  C = base_close (India whole shares at C; none affordable: no cost, not viable), the US order fee at the EUR/USD
-  close on or before D, the portfolio fee over the calendar days from D to the planned exit.
+  C = base_close (India whole shares at C; none affordable: no costs and cost_viable null), the US order fee at the
+  EUR/USD close on or before D (none stored that early: the oldest stored close, a later rate; MarketData.eurusd_on),
+  the portfolio fee over the calendar days from D to the planned exit.
   expected_move_pct = (target / C - 1) x 100. Viable (owner decision of 2026-10-07, made in session B6 for every
   session; it replaces decision 51's "move > cost"): the expected gain after your cost is above 0,
       expected_gain_your_pct = p x move - (1 - p) x loss - your_cost_pct > 0,
@@ -62,9 +63,9 @@ def viability(pred: dict, rate: dict, eurusd: float | None) -> dict:
     move = None if target is None else (float(target) / close - 1) * PERCENT
     days = holding_days(pred["session_date"], pred["exit_date"])
     shares = quantity(pred["market"], amount, close)
-    if shares <= 0:
+    if shares <= 0:   # one share costs more than the amount: no trade, no costs, no gain, so no verdict (null)
         return {"expected_move_pct": move, "market_cost_pct": None, "your_cost_pct": None,
-                "expected_gain_your_pct": None, "cost_viable": False, "views": None, "holding_days": days}
+                "expected_gain_your_pct": None, "cost_viable": None, "views": None, "holding_days": days}
     value = shares * close
     views = lab_costs.cost_views(pred["market"], rate, (value, value), shares,
                                  {"eurusd": (eurusd, eurusd), "holding_days": days})

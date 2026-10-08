@@ -58,6 +58,17 @@ MODE_DRY_RUN = "dry_run"
 
 REDACTED = "***"
 
+# The MotherDuck extension, installed over HTTPS only (marketbrief/warehouse/extension.py)
+EXTENSION_HOSTS = ("extensions.duckdb.org", "ext.motherduck.com")
+LOADER_URL = "https://extensions.duckdb.org/{duckdb_version}/{platform}/motherduck.duckdb_extension.gz"
+IMPLEMENTATION_URL = "https://ext.motherduck.com/{duckdb_version}/{platform}/motherduck_impl.{implementation_version}.duckdb_extension.gz"
+IMPLEMENTATION_FILE = "motherduck_impl.{implementation_version}.duckdb_extension"
+LOADER_FILE = "motherduck.duckdb_extension"
+ENV_IMPLEMENTATION_VERSION = "MOTHERDUCK_EXT_VERSION"  # read by the loader: use this implementation, fetch nothing
+EXTENSION_USER_AGENT = "market-brief/1.0 (personal research; warehouse sync)"
+EXTENSION_TIMEOUT_SECONDS = 120
+EXTENSION_ATTEMPTS = 2
+
 MSG_TOKEN_MISSING = (
     "warehouse: the environment variable {env} is not set; set it to sync to MotherDuck, "
     "or pass --local to write the local DuckDB file instead"
@@ -69,4 +80,10 @@ MSG_INVALID_PAGE = "{table}/{page_key}: missing {missing}"
 MSG_DISABLED = "skipped: warehouse disabled in config/warehouse.yaml (enabled: false)"
 MSG_OVER_CEILING = (
     "skipped: this month's sync wall time {hours:.2f} h in meta.sync_runs reached monthly_hours_ceiling {ceiling} h"
+)
+MSG_EXTENSION_URL_REFUSED = "warehouse: refused extension URL {url}: HTTPS on " + ", ".join(EXTENSION_HOSTS) + " only"
+MSG_EXTENSION_DOWNLOAD_FAILED = "warehouse: downloading {url} failed: {reason}"
+MSG_DUCKDB_VERSION_MISMATCH = (
+    "warehouse: DuckDB is {installed} but config/warehouse.yaml pins the MotherDuck extension for {pinned}; "
+    "install the duckdb version pinned in requirements.txt"
 )

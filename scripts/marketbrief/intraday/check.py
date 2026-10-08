@@ -1,7 +1,7 @@
 """One intraday check of a market's watchlist (scripts/intraday_check.py run): fetch the session so far, compare
 each ticker with the session's published ranges and open calls as of the check time, flag deviations, list
 attribution candidates, and append one row per ticker plus one run row. B9: every open paper trade of every
-strategy and horizon gets a trade_checks row (and its trade_check_details row), and the intraday alerts feed
+strategy and horizon gets one trade_checks row (detail columns included, issue #78), and the intraday alerts feed
 gets the check's alerts. Market closed: only the run row. A check time already stored (same minute) writes
 nothing (idempotent). Monitoring only: nothing is ever traded."""
 
@@ -33,7 +33,6 @@ from marketbrief.intraday.constants import (
     KIND_INTRADAY_ALERTS,
     KIND_INTRADAY_CHECKS,
     KIND_INTRADAY_RUNS,
-    KIND_TRADE_CHECK_DETAILS,
     METHOD_VERSION,
     MSG_ALREADY_CHECKED,
     MSG_MARKET_CLOSED,
@@ -160,15 +159,14 @@ def run_check(cfg: dict, settings: dict, con, fetcher, now: datetime, out_root: 
     ctx.unwatched = set(unwatched)
     rows = [ticker_row(ctx, ticker, meta) for ticker, meta in cfg[CFG_TICKERS].items()]
     rows_unwatched = [ticker_row(ctx, ticker, {}) for ticker in unwatched]   # trades only, no ticker row
-    for details in ctx.trade_details:
-        if details["ticker"] in unwatched:
-            details["notes"].append("not_on_watchlist")
+    for check in ctx.trade_checks:
+        if check["ticker"] in unwatched:
+            check["notes"].append("not_on_watchlist")
     stale = sorted(row["ticker"] for row in rows if row["quality"] != "ok")
     status = RUN_STALE if rows and len(stale) >= settings["quotes"]["stale_run_share"] * len(rows) else RUN_OK
     alerts = build_alerts(ctx, session_alerts(con, session_date.isoformat(), check_at, out_root))
     written = write_rows(market, KIND_INTRADAY_CHECKS, check_at.date(), rows, out_root)
     write_rows(market, KIND_TRADE_CHECKS, check_at.date(), ctx.trade_checks, out_root)
-    write_rows(market, KIND_TRADE_CHECK_DETAILS, check_at.date(), ctx.trade_details, out_root)
     write_rows(market, KIND_INTRADAY_ALERTS, check_at.date(), alerts, out_root)
     trades_flagged = sum(check["flagged"] for check in ctx.trade_checks)
     counts = {"tickers": len(rows), "written": written, "flagged": sum(row["flagged"] for row in rows),

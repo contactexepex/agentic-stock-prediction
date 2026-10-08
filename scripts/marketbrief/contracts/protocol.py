@@ -1,7 +1,7 @@
-"""The F1 paper-trading protocol: one engine for every strategy (docs/SPEC.md F1; W1 interface, session B2 builds
-it in `marketbrief/lab/`). Research only: a paper trade is a record, never an order. The engine is the only place
-P&L is computed. Stored rows: `strategy_predictions`, `head_to_head_picks`, `paper_trades_settled`
-(core/schema_lab.py)."""
+"""The F1 paper-trading protocol: one engine for every strategy (docs/SPEC.md F1; W1 interface). Session B2 built
+it: each function delegates to `marketbrief/lab/protocol.py`, which has the same signatures. Research only: a paper
+trade is a record, never an order. The engine is the only place P&L is computed. Stored rows:
+`strategy_predictions`, `head_to_head_picks`, `paper_trades_settled` (core/schema_lab.py)."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -40,7 +40,8 @@ class Costs(TypedDict):
 
 class Candidate(TypedDict):
     """One candidate horizon of a head-to-head pick, computed pre-open from the latest stored close C (F1.7.3),
-    all in percent of the amount: move_pct = (target / C - 1) x 100; loss_pct = (1 - lo80 / C) x 100; costs_pct =
+    all in percent of the amount: move_pct = E[X / C - 1 | X > C] x 100 and loss_pct = E[1 - X / C | X < C] x 100, X
+    the exit close of a normal fitted to the 80% range (lab/gain.py); costs_pct =
     the round trip at C; expected_gain_pct = p x move - (1 - p) x loss - costs."""
 
     horizon_days: int
@@ -54,52 +55,70 @@ class Candidate(TypedDict):
 
 def entry_session(cfg: dict, made_at: datetime) -> date:
     """D: the first session of the market calendar whose open is after `made_at` (special sessions count)."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.entry_session(cfg, made_at)
 
 
 def exit_session(cfg: dict, entry_date: date, horizon_days: int) -> date:
     """The k-th session after D for horizon N+k, skipping weekends and the market's holidays (decision 37):
     a Friday entry with k = 1 exits at Monday's close."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.exit_session(cfg, entry_date, horizon_days)
 
 
 def is_locked(prediction: dict, cfg: dict, first_committed_at: datetime | None) -> bool:
     """F1.8: True when made_at and the commit that first stored the row (when git can tell) are before D's open;
     a prediction that is not locked is refused by the settlement."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.is_locked(prediction, cfg, first_committed_at)
 
 
 def qualifies(prediction: dict) -> bool:
     """F1.2: direction up and prob_up >= threshold (baselines without a probability: direction up)."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.qualifies(prediction)
 
 
 def quantity(market: str, amount: float, entry_open: float) -> float:
     """F1.4, from D's raw open: India floor(amount / open) whole shares (0 = skipped_price_above_amount); US
     amount / open rounded to QUANTITY_DECIMALS. Stored with the trade and never recomputed."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.quantity(market, amount, entry_open)
 
 
 def round_trip_costs(market: str, entry_value: float, exit_value: float, quantity: float,
                      on_date: date) -> Costs:
     """F1.6: the buy and sell charges of one trade in the market currency."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.round_trip_costs(market, entry_value, exit_value, quantity, on_date)
 
 
 def settle(prediction: dict, view: View, pick: dict | None, cfg: dict, settled_at: datetime) -> dict:
     """F1.9-F1.10: one `paper_trades_settled` row from stored bars and adjustments as of `settled_at`
     (deterministic: the same stored bars give the same row). pick: the head_to_head_picks row (head-to-head view)."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.settle(prediction, view, pick, cfg, settled_at)
 
 
 def strongest(market: str, family: str, ticker: str, as_of: datetime) -> list[dict]:
     """Decision 41 / F1.7.2: the family's strategies ranked for this company (per_company from
     MIN_TRADES_PER_COMPANY settled accuracy-view trades on it, then all_companies; ties: more settled trades, then
     the lower id), as stored in head_to_head_picks.ranking."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.strongest(market, family, ticker, as_of)
 
 
 def pick(candidates: list[Candidate], rule: PickRule) -> Candidate | None:
     """F1.7.3: best_expected_gain = the highest expected_gain_pct, highest_probability = the highest prob_up;
     ties: the shorter horizon. None when there is no candidate (status no_candidate)."""
-    raise NotImplementedError("session B2 (marketbrief/lab/)")
+    from marketbrief.lab import protocol as lab_protocol  # imported here: the lab imports this module
+
+    return lab_protocol.pick(candidates, rule)

@@ -2,8 +2,9 @@
 
 The trader writes work/traders/<strategy_id>.jsonl: one prediction per active company x horizon it calls, and one
 abstain line `{"strategy_id", "ticker", "abstain": true, "horizons", "reason", "prompt_version"}` for what
-it skips. A line without made_at gets the file's write time, capped at the gate's clock (file_stamp): the Sonnet
-traders have no clock, so the gate stamps their time deterministically. `validate` checks every line
+it skips. The file's write time, capped at the gate's clock (file_stamp), is the made_at of every line of a trader
+without a clock (the Sonnet traders: any made_at they state is replaced) and of every line of the forecaster that
+states none (stamped). `validate` checks every line
 (gate.check_record) and that every active company is covered. `add`:
 
 - kill switch off (`enabled: false` in the agent file): nothing is read; every active company gets `killed`;
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from marketbrief.traders import constants as c
@@ -27,7 +28,7 @@ from marketbrief.traders.inputs import GateInputs
 from marketbrief.traders.records import prediction_id
 from marketbrief.traders.registry import Trader
 from marketbrief.traders.sessions import deadline, entry_session
-from marketbrief.utils.timefmt import ISO_UTC
+from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 
 PRECEDENCE = (c.AB_KILLED, c.AB_TIMEOUT, c.AB_BLOCKED, c.AB_EARNINGS, c.AB_GATE_FAILED, c.AB_ABSTAINED)
 
@@ -76,8 +77,11 @@ def abstain_errors(rec: dict, one: Trader, gi: GateInputs) -> list[tuple[str, st
     words = len(rec["reason"].split()) if isinstance(rec.get("reason"), str) else 0
     if not 1 <= words <= c.REASON_WORDS:
         errors.append((c.CODE_REASON, c.MSG_REASON.format(words=c.REASON_WORDS, count=words)))
-    if not ISO_UTC.match(str(rec.get("made_at"))):
+    made = as_utc_timestamp(rec.get("made_at")) if ISO_UTC.match(str(rec.get("made_at"))) else None
+    if made is None:
         errors.append((c.CODE_TIME, c.MSG_MADE_AT.format(made_at=rec.get("made_at"))))
+    elif made > as_utc_timestamp(gi.now + timedelta(minutes=c.FUTURE_TOLERANCE_MINUTES)):
+        errors.append((c.CODE_TIME, c.MSG_FUTURE.format(made_at=made.isoformat(), now=gi.now.isoformat())))
     return errors
 
 
@@ -88,45 +92,75 @@ def file_stamp(path: Path, gi: GateInputs) -> str:
     return min(written, gi.now).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def stamped(lines: list, stamp: str) -> list:
-    """The lines with made_at set to `stamp` where the trader wrote none."""
-    return [{**rec, "made_at": stamp} if isinstance(rec, dict) and rec.get("made_at") in (None, "") else rec
-            for rec in lines]
+def stamped(lines: list, stamp: str, one: Trader) -> tuple[list, list[int]]:
+    """(the lines with made_at = `stamp`, the line numbers whose own made_at was replaced). A trader without a clock
+    (no Bash) always gets the stamp: a made_at it states could only be invented. A trader with a clock keeps its own
+    and gets the stamp only where it wrote none."""
+    out, replaced = [], []
+    for number, rec in enumerate(lines, 1):
+        if isinstance(rec, dict) and (not one.has_clock or rec.get("made_at") in (None, "")):
+            if rec.get("made_at") not in (None, "", stamp):
+                replaced.append(number)
+            rec = {**rec, "made_at": stamp}
+        out.append(rec)
+    return out, replaced
+
+
+def gate_abstain(rec: dict, one: Trader, gi: GateInputs, out: dict, covered: dict) -> list[tuple[str, str]]:
+    """An abstain line: its errors; records the skip and its horizons; a horizon already covered is a repeat."""
+    ticker = rec.get("ticker")
+    errors = abstain_errors(rec, one, gi)
+    horizons = rec.get("horizons", list(one.horizons)) if not errors else []
+    if not errors:
+        out["skipped"][ticker] = (sorted(set(out["skipped"].get(ticker, ([], ""))[0]) | set(horizons)),
+                                  rec["reason"].strip())
+    twice = covered[ticker] & set(horizons)
+    errors += [(c.CODE_DUPLICATE, c.MSG_HORIZON_TWICE.format(ticker=ticker, horizon=h)) for h in sorted(twice)]
+    covered[ticker] |= set(horizons)
+    return errors
+
+
+def gate_prediction(rec, one: Trader, gi: GateInputs, out: dict, state: dict, number: int) -> list[tuple[str, str]]:
+    """A prediction line: its errors; a horizon the trader already abstained on is refused as a repeat."""
+    ticker = rec.get("ticker") if isinstance(rec, dict) else None
+    horizon = rec.get("horizon_days") if isinstance(rec, dict) else None
+    if isinstance(horizon, int) and horizon in state["covered"][ticker] and horizon in state["skipped_h"][ticker]:
+        errors = [(c.CODE_DUPLICATE, c.MSG_HORIZON_TWICE.format(ticker=ticker, horizon=horizon))]
+    else:
+        verdict = check_record(rec, one, gi, state["seen"])
+        errors = verdict.errors
+        out["warnings"] += [{"line": number, "code": code, "detail": msg} for code, msg in verdict.warnings]
+        if verdict.row is not None:
+            out["rows"].append(verdict.row)
+    if errors and ticker in gi.active and isinstance(horizon, int):
+        out["failed"][ticker][horizon] = sorted({code for code, _ in errors})
+    if isinstance(horizon, int):
+        state["covered"][ticker].add(horizon)
+    return errors
 
 
 def gate_lines(lines: list, one: Trader, gi: GateInputs, stamp: str | None = None) -> dict:
     """Every line gated, plus coverage: {rows, errors, warnings, skipped: {ticker: (horizons, reason)},
-    failed: {ticker: {horizon: codes}}}. stamp: the made_at of lines without one (file_stamp)."""
-    lines = stamped(lines, stamp) if stamp else lines
+    failed: {ticker: {horizon: codes}}}. stamp: the made_at of lines without one, and of every line of a clockless
+    trader (file_stamp)."""
     out = {"rows": [], "errors": [], "warnings": [], "skipped": {}, "failed": defaultdict(dict)}
-    seen: set[str] = set()
-    covered: dict[str, set[int]] = defaultdict(set)
+    if stamp:
+        lines, replaced = stamped(lines, stamp, one)
+        out["warnings"] += [{"line": n, "code": c.CODE_STAMPED, "detail": c.MSG_STAMPED.format(stamp=stamp)}
+                            for n in replaced]
+    state = {"seen": set(), "covered": defaultdict(set), "skipped_h": defaultdict(set)}
     for number, rec in enumerate(lines, 1):
         ticker = rec.get("ticker") if isinstance(rec, dict) else None
         if isinstance(rec, dict) and rec.get("abstain") is True:
-            errors = abstain_errors(rec, one, gi)
-            horizons = rec.get("horizons", list(one.horizons)) if not errors else []
+            errors = gate_abstain(rec, one, gi, out, state["covered"])
             if not errors:
-                out["skipped"][ticker] = (sorted(set(out["skipped"].get(ticker, ([], ""))[0]) | set(horizons)),
-                                          rec["reason"].strip())
-            twice = covered[ticker] & set(horizons)
-            errors += [(c.CODE_DUPLICATE, c.MSG_HORIZON_TWICE.format(ticker=ticker, horizon=h)) for h in sorted(twice)]
-            covered[ticker] |= set(horizons)
+                state["skipped_h"][ticker] |= set(rec.get("horizons", list(one.horizons)))
         else:
-            verdict = check_record(rec, one, gi, seen)
-            errors = verdict.errors
-            out["warnings"] += [{"line": number, "code": code, "detail": msg} for code, msg in verdict.warnings]
-            horizon = rec.get("horizon_days") if isinstance(rec, dict) else None
-            if verdict.row is not None:
-                out["rows"].append(verdict.row)
-            elif errors and ticker in gi.active and isinstance(horizon, int):
-                out["failed"][ticker][horizon] = sorted({code for code, _ in errors})
-            if isinstance(horizon, int):
-                covered[ticker].add(horizon)
+            errors = gate_prediction(rec, one, gi, out, state, number)
         for code, message in errors:
             out["errors"].append({"line": number, "ticker": ticker, "code": code, "detail": message})
     for ticker in sorted(gi.active):
-        missing = [h for h in one.horizons if h not in covered[ticker] and not stored(one, gi, ticker, h)]
+        missing = [h for h in one.horizons if h not in state["covered"][ticker] and not stored(one, gi, ticker, h)]
         if missing and not automatic_code(gi, ticker):
             out["errors"].append({"line": None, "ticker": ticker, "code": c.CODE_NO_RECORD,
                                   "detail": c.MSG_NO_RECORD.format(ticker=ticker) + f" (N+{missing})"})

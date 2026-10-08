@@ -9,7 +9,9 @@ advice. Every signal stays "Paper" until it is proven (SPEC F7).
 marked `"_example": true`). Prices, index moves and range widths in them are real stored bars and ranges of
 29 Sep - 6 Oct 2026. Predictions, trades, reasons, news, commands and the portfolio are invented, but they are
 computed from one set of inputs, so the files agree with each other: quantities, costs, profit, agreement counts and
-scoreboard sums. `design/catalogue/make_examples.py` rebuilds them. The examples use the six companies NVDA, AAPL and JPM
+scoreboard sums. Costs, head-to-head picks and cost views are computed with session B2's engine code
+(`marketbrief/lab/`) and the rates in `config/costs.yaml`, at an example EUR/USD of 1.17.
+`design/catalogue/make_examples.py` rebuilds them. The examples use the six companies NVDA, AAPL and JPM
 (US, in $) and RELIANCE, HDFCBANK and MARUTI (India, in ₹), plus INDIGO and DAL as inactive companies.
 
 **Status of each entity.**
@@ -46,13 +48,13 @@ Contents:
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
-  [automatic reason](#automatic-reason)), [Open trade](#open-trade), [Intraday trade check](#trade-check)
+  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Research review](#research-review)
 - News and results: [News item](#news-item), [News-impact row](#news-impact-row),
   [Results digest](#results-digest)
 - The owner's money: [Owner's paper portfolio](#portfolio)
-- [What a page can combine](#combinations) and [How to ask for a new field](#requests)
+- [What a page can combine](#combinations), [Technical fields](#technical-fields) and [How to ask for a new field](#requests)
 
 ---
 
@@ -81,7 +83,7 @@ through the watchlist accessor (`marketbrief/contracts/watchlist.py`). The price
 | last_close, last_close_date | Latest stored close | `ohlc_raw` (exists) | ₹ / $, date | `239.24` on `2026-10-06` |
 | change_pct | Last session's move | `ohlc_raw` | % | `2.66` |
 | agreement_n1 | How many strategies buy it at N+1 today | [Agreement](#agreement) | count of count | `12 of 15` |
-| open_trades | Its open paper trades, all strategies and horizons | [Open trade](#open-trade) | count | `8` |
+| open_trades | Its open paper trades, all strategies, horizons and both views | [Open trade](#open-trade) | count | `10` |
 
 <a id="lifecycle-event"></a>
 ## Lifecycle event
@@ -251,8 +253,9 @@ count; on a tie, the shorter one wins.
 
 Each day and for each company, the strongest rule strategy and the strongest AI trader each choose one horizon,
 under two pick rules: "best expected gain" and "highest probability". That makes up to four head-to-head trades
-(F1.7, decisions 41-42). Status: kind `head_to_head_picks`; session **B2** writes it. Example file:
-`head_to_head_pick.json` (RELIANCE, NVDA, and HDFCBANK with no candidate).
+(F1.7, decisions 41-42, with B2's two corrections: see docs/ws/b2.md). Status: kind `head_to_head_picks`; session
+**B2** writes it. Example file: `head_to_head_pick.json` (RELIANCE, NVDA, and HDFCBANK with no candidate), built by
+B2's own pick code.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -260,13 +263,13 @@ under two pick rules: "best expected gain" and "highest probability". That makes
 | pick_rule | How the horizon was chosen | F1.7.3 | `best_expected_gain` / `highest_probability` | `highest_probability` |
 | status | Whether a pick was possible | engine | `picked` / `no_candidate` | `no_candidate` (HDFCBANK: nobody buys) |
 | strategy_id | The family's strongest strategy with at least one buyable horizon | ranking | id | `ai.combined.opus.v1` |
-| strongest_basis | Ranked on this company (from 20 settled trades on it) or on all companies | decision 41 | `per_company` / `all_companies` | `all_companies` |
+| strongest_basis | Ranked on this company (from 20 settled trades on it) or on all companies of the market; a strategy with no settled trade ranks last | decision 41 (corrected) | `per_company` / `all_companies` | `all_companies` |
 | ranking | The full ranking it came from, within the market: rank, settled trades and profit after costs | settled trades | list | 1. `rule.model_news.v1`, 10 trades, $99.00 |
 | horizon_days, prediction_id | The chosen horizon and the prediction behind it | engine | k, id | `5` |
 | prob_up | That prediction's probability | prediction | 0-1 | `0.615` |
-| move_pct, loss_pct, costs_pct | Expected rise to target, drop to the 80 % range's low, and round-trip costs, all as a % of the amount, from the latest close | F1.7.3 | % | `0.49`, `5.57`, `0.23` |
-| expected_gain_pct | `p × move − (1 − p) × loss − costs` | F1.7.3 | % | `-2.08` (NVDA, AI, N+5) |
-| candidates | The same numbers for every buyable horizon, so a page can show why | engine | list | N+1, N+3, N+5 |
+| move_pct, loss_pct, costs_pct | Expected rise when the stock ends above the latest close C; expected shortfall when it ends below C (both from the strategy's own 80 % range); round-trip costs of the amount at C. All as a % of the amount | F1.7.3 (corrected) | % | `3.9597`, `3.601`, `0.234` |
+| expected_gain_pct | `p × move − (1 − p) × loss − costs`, per trade | F1.7.3 | % | `0.8148` (NVDA, AI, N+5) |
+| candidates | Every horizon the strongest strategy predicted, each with the numbers above plus: `gain_per_session_pct` (expected gain ÷ k, what "best expected gain" ranks, owner decision); `eligible` (the prediction qualifies; only eligible horizons can be picked); `expected_move_pct`, `your_cost_pct`, `expected_gain_your_pct`, `cost_viable` (see [Cost view](#cost-view)) | engine | list | N+5: gain per session `0.163`, `eligible: true`, expected move `0.4932`, your cost `1.738`, gain after your cost `-0.6892`, `cost_viable: false` |
 | amount, currency | Money per head-to-head trade | company | ₹ / $ | `1000`, `USD` |
 
 <a id="paper-trade"></a>
@@ -279,7 +282,7 @@ same predictions:
 
 Settlement is deterministic: the same stored bars always give the same numbers. A corrected split or bonus gives a
 new settlement row, not an edit. Status: kind `paper_trades_settled`; session **B2** (the engine) writes it. Example
-file: `paper_trade.json` (77 rows from the predictions of 29 Sep, settled on 1-6 Oct, including skipped MARUTI
+file: `paper_trade.json` (75 rows from the predictions of 29 Sep, settled on 1-6 Oct, including 10 skipped MARUTI
 trades).
 
 | Field | Meaning | Source | Unit | Example |
@@ -296,7 +299,7 @@ trades).
 | exit_quantity, adjustment_ids | Shares after a split or bonus in the window, and that adjustment | `adjustments` (exists) | shares, ids | `4.36167`, empty |
 | entry_value, exit_value | Quantity × price | engine | ₹ / $ | `1000.00` -> `1042.00` |
 | gross_pnl | Profit before costs | engine | ₹ / $ | `42.00` |
-| costs, cost_lines | Round-trip charges with their parts (provisional rates, F1.6). India: brokerage, STT, exchange, SEBI, stamp duty, DP charge, GST. US: BUX order fee converted to $, SEC fee | `config/costs.yaml` (B2) | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
+| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`, marked verify). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
 | net_pnl | Profit after costs (the headline number) | engine | ₹ / $ | `39.66` |
 | return_pct | Net profit as % of the amount (compares across amounts, decision 44) | engine | % | `3.97` |
 | prob_up, target_price, lo80, hi80 | What was predicted | prediction | 0-1, ₹ / $ | `0.583`, `227.84`, `218.36`-`237.72` |
@@ -317,13 +320,59 @@ move. These parts feed the reason-code heatmaps.
 | move_pct | Exit vs entry | % | `4.20` |
 | market_pct | The part the market explains (beta × benchmark move) | % | `2.05` (SPY +1.09 %, beta 1.874) |
 | sector_pct | The sector's move beyond the market (sector index, ETF or peer) | % | `1.70` (XLK) |
-| news_pct | The part credited to verified news on the company inside the window | % | `0.23` |
-| company_pct | The rest: company-specific | % | `0.22` |
+| news_pct | The rest of the move after market and sector, credited to news only when verified news (confirmed_primary or corroborated) was published (else first seen) from D's open to the exit close and its summed sentiment has the same sign; else 0 (B2's `lab/reasons.py`) | % | `0.45` |
+| company_pct | What is left: company-specific | % | `0.0` |
 | reason_code, reason_codes | The main cause, and all codes that apply | `market_up`, `market_down`, `sector_lift`, `sector_drag`, `news_positive`, `news_negative`, `company_specific`, `target_reached`, `range_missed` | `market_up`; `[market_up, target_reached, range_missed]` |
-| news_ids | Verified news used | ids | `["a41c9e07b2d35f18"]` |
+| news_ids | Verified news published (else first seen) inside the window | ids | `["d93b1f5e7c2a4b60"]` (published 2 Oct) |
 | reason_detail | Benchmark, beta, sector source, news statuses | JSON | `{"benchmark": "SPY", "beta": 1.874, "sector_source": "XLK"}` |
 
-The exact split method is session B2's; the fields above are fixed.
+The examples follow B2's split (`marketbrief/lab/reasons.py`).
+
+<a id="cost-view"></a>
+## Cost view
+
+The two cost views of one record (owner decisions 50-51):
+- **market cost**: the costs strategies are ranked on, the same as the [paper trade](#paper-trade)'s `costs`;
+- **your cost**: market cost plus the owner's own charges. India: the NRI reporting charge ₹200 on the buy date and
+  ₹200 on the sell date, and the DP charge. US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
+  pro-rated.
+
+It also holds the **cost-viable** flag: whether the expected gain after your cost is above zero (owner decision of
+2026-10-07, built by B2). That is `expected_gain_your_pct = p × move − (1 − p) × loss − your_cost_pct > 0`, with
+the same conditional move and loss as the [head-to-head pick](#head-to-head-pick) (`marketbrief/lab/gain.py`). The
+Slack morning picks (session B6) use the same rule. A prediction is made, traded and scored either way; the flag is
+shown, and a non-viable head-to-head candidate can still be picked. A prediction without a probability (the
+always-up and momentum baselines) has no expected gain, so its flag is empty.
+
+Status: kind `cost_views`. Session **B2** writes it (`core/schema_b2.py`, `marketbrief/lab/cost_views.py`) and owns
+it; it is joined to the other records on `record_id`. W1 keeps it as B2's kind rather than folding it into
+`paper_trades_settled`, because the your-cost view is an owner-specific layer on top of the market view the
+strategies compete on.
+
+Example file: `cost_view.json` (199 rows, built with B2's own row functions):
+- 118 prediction rows: every qualifying prediction of NVDA and RELIANCE on 7 Oct (20 of them baselines without a
+  probability, so with an empty flag);
+- 16 pick rows;
+- 65 settlement rows.
+
+None of the example predictions or picks is cost-viable: a round trip at your cost is about 1.7 % (US) and 2.4 %
+(India), and every example's expected gain after your cost is below zero (at best -0.69 %).
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| id, record_kind, record_id | `cv:<kind>:<record id>`; which record it describes: a prediction or pick before the open, a settled trade after the close | B2 | text | `cv:settlement:acc:rule.model_news.v1:2026-09-29-NVDA-3d@20261005T221500Z` |
+| trade_id, prediction_id, strategy_id, ticker, horizon_days, session_date, exit_date, amount, currency | The record's keys | the record | text, date, ₹ / $ | `NVDA`, `3`, `1000`, `USD` |
+| reference_price, target_price | C (the latest close; for a settlement, the entry price) and the target | prediction | ₹ / $ | `229.27`, `227.84` |
+| expected_move_pct | `(target / C − 1) × 100` (predictions and picks only) | B2 | % | RELIANCE N+3: `0.225` |
+| market_cost_pct, your_cost_pct | The round trip in each view as a % of the amount | B2 | % | `1.99`, `2.4299` |
+| expected_gain_your_pct | `p × move − (1 − p) × loss − your_cost_pct` (predictions and picks only) | B2, `lab/gain.py` | % | `-1.9891` |
+| cost_viable | Expected gain after your cost is above zero (predictions and picks only; empty without a probability) | B2, decision 51, owner decision of 2026-10-07 | yes/no | `false` |
+| market_costs, market_cost_lines | The market view, total and per charge | B2 | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
+| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` `200` each and `dp_charge` |
+| net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | Profit after costs in each view (settlements only) | B2 | ₹ / $, % | `39.66` / `3.966`; `24.32` / `2.432` |
+| holding_days | Calendar days from D to the exit (the US portfolio fee) | calendar | days | `5` |
+| eurusd_entry, eurusd_exit | The EUR/USD closes used for the US order fee and FX markup | `EURUSD=X` (B2) | rate | `1.17` (example rate) |
+| computed_at, method_version | When it was computed; engine version | B2 | time, text | `engine-v1` |
 
 <a id="open-trade"></a>
 ## Open trade
@@ -344,19 +393,34 @@ qualifying [predictions](#prediction), the entry bar and the latest close. Examp
 ## Intraday trade check
 
 Twice per session, every open paper trade is compared with its prediction (F5; monitoring only, never a trade).
-Status: kind `trade_checks`. Session **B9** builds it on top of the existing per-company `intraday_checks`, which
-**exist** (WS5) and hold the market, sector and news candidates. Example file: `trade_check.json`.
+Status: kind `trade_checks`. Session **B9** writes it, on top of the existing per-company `intraday_checks`, which
+**exist** (WS5) and hold the market, sector and news candidates. The prices of the prediction are stored as
+predicted; every measure is on today's price basis (after a split or bonus in the window). Rows written before issue
+#78 keep the measures from `quality` on in B9's `trade_check_details`; the view `trade_check_rows` joins both.
+Example file: `trade_check.json` (the RELIANCE N+4 trade checked at 11:13 IST is the example below).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
 | check_at, session_date | When the check ran | intraday run | time | `2026-10-07T05:43:00Z` (11:13 IST) |
 | trade_id, strategy_id, ticker, horizon_days | Which open trade | trades | text | `acc:rule.model_news.v1:2026-09-29-RELIANCE-4d` |
 | session_number | Which session of the holding window today is (1 = D) | calendar | number | `5` |
-| entry_price, last_price, ret_since_entry_pct | Entry, latest 5-minute price, move since entry | Yahoo 5-min bars | ₹ / $, % | `1182.0`, `1224.6`, `3.6` |
-| target_price, to_target_pct | Target and the distance left (negative: already past it) | prediction | ₹ / $, % | `1184.81`, `-3.25` |
+| entry_price, last_price, ret_since_entry_pct | Entry, latest 5-minute price, move since entry | Yahoo 5-min bars | ₹ / $, % | `1182.0`, `1224.6`, `3.6041` |
+| target_price, to_target_pct | Target and the distance left (negative: already past it) | prediction | ₹ / $, % | `1184.81`, `-3.2492` |
 | band | Where the price sits in the trade's own range | derived | `below80`, `below50`, `inside50`, `above50`, `above80` | `above50` (NVDA: `above80`) |
 | flags, flagged | Warnings | F5 | `outside_range`, `far_from_target`, `against_prediction` | NVDA `["outside_range"]` |
-| check_row_id | The company's intraday check row (market, sector and news causes; the explainer's note) | `intraday_checks`, `intraday_explanations` (exist) | id | `ic-us-202610071627-NVDA` |
+| check_id, check_row_id | The check (`ic-<market>-<time to the minute>`), and the company's intraday check row (market, sector and news causes; the explainer's note); empty for a company not on the watchlist | `intraday_checks`, `intraday_explanations` (exist) | id | `ic-india-2026-10-07T05:43Z`, `ic-us-2026-10-07T16:27Z-NVDA` |
+| target_z | Distance to the target in 1-day volatility units, scaled to the sessions left | B9 | number | `-2.182` (past the target) |
+| family, pick_rule | The trade's family; the pick rule for a head-to-head trade | trade | text | `rule`, empty |
+| quality | Whether the price could be measured; anything but `ok` means no measures and no flags | B9 | `ok`, `stale_quote`, `no_quote`, `no_entry_price` | `ok` |
+| entry_source | Where the entry price came from | B9 | `intraday_open` (D is today), `stored_open` | `stored_open` |
+| basis_factor, entry_adj, target_adj, lo80_adj..hi80_adj | The split/bonus factor since the prediction, and the trade's prices on today's basis | `adjustments` (exists) | factor, ₹ / $ | `1.0`, `1182.0`, `1184.81`, 80 %: `1131.42`-`1240.71` |
+| last_time | Start of the 5-minute bar the last price is from | Yahoo 5-min bars | time | `2026-10-07T05:35:00Z` |
+| sigma_1d, elapsed_fraction | 1-day volatility; share of today's session already past | features, calendar | fraction | `0.017987`, `0.3147` |
+| sessions_held, sessions_left | Sessions held so far (today's part included) and sessions to the exit close | calendar | sessions | `4.3147`, `0.6853` |
+| z_since_entry | Move since entry in volatility units (`against_prediction` at -1 or below) | B9 | number | `0.965` |
+| target_reached, target_reached_session | Whether a high since D reached the target so far, and the first such session (1 = D); empty when unknown | bars | yes/no, number | `true`, `1` |
+| high_since_entry_pct, low_since_entry_pct | Best high and worst low since entry | bars | % | `3.6041`, `-1.7936` |
+| notes | Data notes | B9 | `no_bar_<date>`, `no_sigma`, `not_on_watchlist` | empty |
 
 A day's path for one prediction (made -> checks -> settled -> explained) combines a [prediction](#prediction),
 its trade checks, its [settled trade](#paper-trade) and any [AI reason](#ai-reason) (read model `rm.lifecycle`,
@@ -376,8 +440,8 @@ kind `trade_reasons_ai`; session **B3** writes it. Example file: `reason_ai.json
 |---|---|---|---|---|
 | trade_id, ticker, strategy_id, session_date | Which trade, on which day | settlement | text | `h2h:highest_probability:rule.model_news.v1:2026-09-29-RELIANCE-3d` |
 | kind, rank | Why it got a reason | F6.1 | `head_to_head`, `biggest_win`, `biggest_miss`; rank 1-5 | `biggest_win`, `1` |
-| text | The reason | EOD analyst (gated) | ≤ 60 words | "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7781203 added about +2.84 points..." |
-| cited_ids, reason_codes | What it cites | gate | ids, codes | trade id + `nse-ann-7781203` |
+| text | The reason | EOD analyst (gated) | ≤ 60 words | "RELIANCE moved +3.05% from entry: the market explains +0.46 points and the sector -3.10. Verified news nse-ann-7790412 added about +5.69 points..." |
+| cited_ids, reason_codes | What it cites | gate | ids, codes | trade id + `nse-ann-7790412` |
 
 <a id="eod-analysis"></a>
 ## End-of-day analysis
@@ -388,37 +452,48 @@ Status: kind `eod_analyses`; session **B3** writes it. Example file: `eod_analys
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
 | session_date, settled_trades | The day, and the trades settled that day | settlement | date, count | `2026-10-06`, `11` (India) |
-| results | Per family (accuracy view): trades, wins, net profit; per pick rule: trades, net profit | deterministic | JSON | `{"rule": {"trades": 2, "wins": 1, "net_pnl": 1293.67}}` |
+| results | Per family (accuracy view): trades, wins, net profit; per pick rule: trades, net profit | deterministic | JSON | `{"rule": {"trades": 2, "wins": 1, "net_pnl": -975.83}}` |
 | summary | The analyst's text, citing ids | EOD analyst (gated) | ≤ 150 words | "11 paper trades settled today..." |
 | reason_ids | The [AI reasons](#ai-reason) written with it | analyst | ids | `tra:...` |
 
 <a id="scoreboard-row"></a>
 ## Scoreboard row
 
-How a strategy is doing (F7). There is one row per market × view × strategy × horizon, plus a row with every
-horizon pooled. Rows per company and per pick rule are cut the same way. Status: **derived for pages** (B2
-computes, B4 serves `rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (78 rows computed from the
-example trades, so every count matches `paper_trade.json`).
+How a strategy is doing (F7). Status: **derived for pages**. B2 computes the rows (`marketbrief/lab/scoreboard.py`)
+and B4 serves them (`rm.strategies`, `rm.compare`). Example file: `scoreboard_row.json` (152 rows, built with B2's
+own scoreboard code from the example trades and their your-cost numbers, so every count matches `paper_trade.json`).
+
+There is one row per market × view × basis × slice:
+- per strategy, with every horizon pooled ("all") and for each horizon;
+- per strategy and company (the stock strategies page), all horizons and each horizon;
+- per family and pick rule (head-to-head portfolios), all horizons and each horizon;
+- per strategy and regime at prediction time, all horizons (F2.6: the effect of regimes is measured).
+
+Money and returns are in the market-cost view (strategies are ranked on it). The `your_cost` block repeats them in
+the your-cost view, which the go-live bar uses.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
-| scope | Which cut: per strategy (all horizons and each horizon), per strategy and company (the stock strategies page), or per family and pick rule (head-to-head portfolios) | F7.1 | `strategy`, `strategy_company`, `pick_rule` | `strategy` |
-| view, strategy_id, family, horizon_days | Which slice (examples below: US, accuracy, `rule.model_news.v1`, all horizons) | settled trades | text; `all` or k | `accuracy`, `rule.model_news.v1`, `all` |
+| scope | Which cut | F7.1 | `strategy`, `strategy_company`, `pick_rule`, `strategy_regime` | `strategy` |
+| view, basis, strategy_id, family, horizon_days | Which slice (examples below: US, accuracy, forward, `rule.model_news.v1`, all horizons) | settled trades | text; `all` or k | `accuracy`, `forward`, `rule.model_news.v1`, `all` |
 | ticker | The company, for `strategy_company` rows (else empty) | settled trades | text | `NVDA`: 4 trades, $103.48 |
 | pick_rule | The pick rule, for `pick_rule` rows (head-to-head view; strategy_id empty, family set) | settled trades | text | rule family, `highest_probability`: 1 trade, $41.15 |
+| regime | The regime at prediction time, for `strategy_regime` rows | `regime` | text | `EVENT_HEAVY` (India) |
 | trades | Settled trades in the slice | count | count | `10` |
+| first_entry, last_exit | First entry and last exit of the slice's trades | trades | date | `2026-09-30`, `2026-10-06` |
 | net_pnl | Profit after costs: the headline | sum | ₹ / $ | `99.00` ($) |
-| mean_return_pct | Average return per trade | mean | % | `0.99` |
+| mean_return_pct | Average return per trade | mean | % | `0.992` |
 | win_rate | Share of trades with a profit after costs | count | 0-1 | `0.7` |
 | target_reached_rate, median_reached_session | Share that touched the target, and the typical session it happened | F1.9 | 0-1, number | `1.0`, `1` |
-| avg_target_error_pct | Average miss of the target | F1.9 | % | `1.6` |
+| avg_target_error_pct | Average miss of the target | F1.9 | % | `1.604` |
 | range_hit_rate | Share of exit closes inside the 80 % range | F1.9 | 0-1 | `0.9` |
 | worst_losing_streak | Most losses in a row | sequence | count | `2` |
 | max_drawdown | Deepest fall of cumulative profit from its peak | sequence | ₹ / $ | `-11.24` |
-| luck_test | 95 % bootstrap interval of the mean return, with a correction across all strategies. Only "excludes zero" after correction counts as an edge | F7.1 | %, yes/no | `0.00` to `2.12` (low end just above 0), excludes zero `true` but `corrected: false` (no edge claimed) |
+| luck_test | Bootstrap interval of the mean return per trade (`n` trades), and the same interval corrected for the `m` rows compared with it (Bonferroni). Only `corrected: true` counts as an edge; fewer than 2 trades give no interval | F7.1, `lab/luck.py` | %, yes/no | n `10`, m `5`: `0.006` to `2.076` (excludes zero), corrected `-0.1701` to `2.467`, `corrected: false` |
+| your_cost | The same row in the your-cost view: net_pnl, mean_return_pct, win_rate, worst_losing_streak, max_drawdown, luck_test | B2 | mixed | net `-52.09`, win rate `0.3` |
 | sample_badge | Fewer than 20 trades: "too few trades to rank" (greyed out, SPEC section 6) | rule | `ok` / `too_few_to_rank` | `too_few_to_rank` |
-| go_live | Position against the go-live bar: proven, months forward, trades needed, beats the best baseline | F7.2 | mixed | `proven: false`, 300 trades needed |
-| basis | Forward or back-test; the two are never pooled (F2.3) | label | `forward` / `backtest` | `forward` |
+| go_live | Strategy rows: position against the go-live bar on the your-cost view: `proven`, `months_forward`, `trades_needed`, `beats_best_baseline`, `best_baseline_net_pnl`, `drawdown_limit`, `drawdown_within_limit`, `holds_in_calm_and_volatile`, `cost_view` | F7.2 | mixed | not proven; `0.2` months; `290` trades needed; best baseline `33.88` not beaten; limit `10000.0` |
+| as_of | The newest close the rows are computed to | settlement | date | `2026-10-06` |
 
 Heatmaps (F2.8) use the same numbers by strategy × horizon, × company and × reason code, each week.
 
@@ -427,7 +502,7 @@ Heatmaps (F2.8) use the same numbers by strategy × horizon, × company and × r
 
 The weekly research director's report (F6.2). It covers who is ahead and why, which information helped, and
 proposals as config diffs for the owner to approve; it changes nothing itself. Status: kind `research_reviews`;
-session **B3** writes it. Example file: `research_review.json`.
+session **B3** writes it. Example file: `research_review.json` (one review per market).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -445,8 +520,8 @@ session **B3** writes it. Example file: `research_review.json`.
 One article or announcement, with its verification status. Status:
 - Stored news, the analyst's scores (`news_enriched`), clusters and verification status (`news_verified`)
   **exist**.
-- The headline history is new from the **Wave 0** news fix (one item per link, a later headline change kept as a
-  note; decisions 45-46). It is shown "planned" until that fix merges.
+- The headline history **exists** since the Wave 0 news fix (one item per link and market, a later headline at the
+  same link kept as a `news_updates` row; decisions 45-46; the `news` view shows the latest headline by now).
 - The combined record is **derived for pages** (B4, `rm.news`).
 
 Example file: `news_item.json`.
@@ -455,7 +530,7 @@ Example file: `news_item.json`.
 |---|---|---|---|---|
 | id | News id | `news` (exists) | text | `a41c9e07b2d35f18` |
 | tickers, primary_tickers | Companies it is about | news tagger (exists) | list | `["NVDA"]` |
-| title | Latest headline as of now | `news` + headline notes | text | "Nvidia wins multi-year data-centre order..." |
+| title | Latest headline as of now | `news` view (latest `news_updates` title) | text | "Nvidia wins multi-year data-centre order..." |
 | source, source_domain, url | Outlet and link | `news` | text | `Reuters`, `reuters.com` |
 | published_at, first_seen_at | When the outlet published it, and when we first stored it (calls may use it only after this) | `news` | time | `2026-09-29T21:10:00Z`, `2026-09-29T22:47:05Z` |
 | enrichment.event_type | Category | news analyst (`news_enriched`) | `earnings`, `macro`, `product`, `legal`, `sector`, `analyst`, `ma`, `flows`, `other` | `product` |
@@ -463,7 +538,7 @@ Example file: `news_item.json`.
 | status | Verification status (DESIGN 3b) | `news_status.py` (exists) | `confirmed_primary`, `corroborated`, `single_source`, `unverified`, `rumour`, `promotional`, `contradicted` | `corroborated` |
 | status_as_of | Time the status refers to | `news_verified_asof` | time | `2026-09-30T11:15:00Z` |
 | independent_origins, primary_ids, cluster_id | Independent outlets confirming it; filings or exchange announcements behind it; its same-event group | `news_clusters` (exists) | count, ids | `2`, `[]` |
-| headline_history | Earlier headlines at the same link, with when each was seen | Wave 0 (`news_updates`, planned) | list | "Nvidia said to win data-centre order" at `2026-09-29T22:47:05Z` |
+| headline_history | Earlier headlines at the same link, with when each was seen | `news_updates` (exists) | list | "Nvidia said to win data-centre order" at `2026-09-29T22:47:05Z` |
 
 Rumour and promotional items never support a call. A single-source or unverified item lowers the confidence of
 any call that cites it.
@@ -473,7 +548,7 @@ any call that cites it.
 
 "Which news moves prices, and how much" (F3). It gives the average move beyond the market and sector after news
 of one category, status and materiality, for each horizon. It is refreshed weekly. Status: kind `news_impact`;
-session **B2** writes it. Example file: `news_impact.json`.
+session **B2** writes it. Example file: `news_impact.json` (both markets).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -489,7 +564,8 @@ session **B2** writes it. Example file: `news_impact.json`.
 
 Quarterly results and earnings-call texts of a watchlist company. The numbers are as reported at the release and
 there are at most 5 quoted bullets (WS6). Status: kind `results_digests` **exists**; the context pack does not
-show it yet. Example file: `results_digest.json` (JPM Q2 2026; the numbers are illustrative).
+show it yet. Example file: `results_digest.json` (JPM Q2 2026 and HDFC Bank Q1 FY27, the India one with numbers only because
+no PDF parser reads NSE attachments yet: `status` `text_unavailable`; the numbers are illustrative).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
@@ -518,9 +594,13 @@ and positions **exist**; the € view is **B2**. Example file: `portfolio.json`.
 | owner_trades | Each recorded trade: side, quantity, price and its basis (open, close or manual), date, channel | `portfolio_trades` (exists) | rows | buy 3 AAPL at the open of 30 Sep, `330.80` |
 | positions.quantity, avg_price, last_close | Holding and its marks | FIFO (exists) | shares, ₹ / $ | `3`, `330.80`, `333.63` |
 | positions.cost, value, pnl, pnl_pct | In the trade currency | exists | ₹ / $, % | `992.40`, `1000.89`, `8.49`, `0.86` |
-| eur_view.eurusd_at_buy, eurusd_now | EUR/USD then and now (`EURUSD=X`, added by B2) | Yahoo | rate | `1.1650`, `1.1700` |
-| eur_view.cost_eur, value_eur, pnl_eur | The same position in €, including the FX fee (provisional 0.25 %) | B2 | € | `853.98`, `855.46`, `1.49` |
-| eur_view.fx_effect_eur | How much of the € result is the rate change | B2 | € | `-3.67` |
+| eur_view.eurusd_at_buy, eurusd_now, mark_date | EUR/USD on the buy date and now (`EURUSD=X`, added by B2); the date of the mark | Yahoo | rate, date | `1.165`, `1.17`, `2026-10-06` |
+| eur_view.fx_fee_rate | BUX's FX markup on each EUR/USD conversion (`config/costs.yaml`, verify) | config | fraction | `0.0075` |
+| eur_view.cost_usd, value_usd | Dollars paid, including the buy order's cost, and dollars held now | B2 | $ | `993.55`, `1000.89` |
+| eur_view.cost_eur | Euros needed to buy those dollars: `cost_usd / eurusd_at_buy × (1 + fx_fee_rate)` | B2 (`portfolio/eur_view.py`) | € | `859.23` |
+| eur_view.value_eur | Euros back if converted now: `value_usd / eurusd_now × (1 − fx_fee_rate)` | B2 | € | `849.05` |
+| eur_view.pnl_eur | `value_eur − cost_eur` | B2 | € | `-10.19` |
+| eur_view.fx_effect_eur | The part due to the rate change alone: `value_usd / eurusd_now − value_usd / eurusd_at_buy` | B2 | € | `-3.67` |
 
 The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
 
@@ -550,6 +630,25 @@ The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
 - **Strategy lab, Rule vs AI, Paper portfolios, Track record, News, Companies.** These use the
   [Scoreboard](#scoreboard-row), [Research review](#research-review), [News-impact](#news-impact-row),
   [Portfolio](#portfolio), [Lifecycle events](#lifecycle-event) and [Commands](#command) (pending requests).
+
+<a id="technical-fields"></a>
+## Technical fields (bookkeeping, not usually shown)
+
+These columns appear on several records. A page rarely shows them; they link records, record when something was
+written, and say which version of a method or prompt wrote it.
+
+| Field | On | Meaning | Example |
+|---|---|---|---|
+| range_id | prediction | The `ranges` row the prediction's band was copied from (`<as-of date>-<ticker>-<k>d`) | `2026-10-06-RELIANCE-3d` |
+| model_score_id | prediction | The `model_scores` row the probability came from (empty for strategies that do not use the model) | `2026-10-06-RELIANCE-3d` |
+| config_hash | prediction | A fingerprint of the strategy's registry entry, so a changed entry is detectable | `sha256:e36a2f3d91456272` |
+| pick_id | paper trade | The head-to-head pick a head-to-head trade came from (empty in the accuracy view) | `h2h:2026-09-29-NVDA-rule-best_expected_gain` |
+| settlement_id | AI reason | The settled-trade row the reason was written for | `h2h:highest_probability:rule.model_news.v1:2026-09-29-RELIANCE-3d@20261006T121500Z` |
+| check_id, check_row_id | trade check | The intraday check (`ic-<market>-<time to the minute>`) and the company's row in it | `ic-us-2026-10-07T16:27Z` |
+| target_z | trade check | Distance to the target in 1-day volatility units over the sessions left; `far_from_target` at 2 or more | `-2.182` |
+| method_version, validator_version | most records | Which version of the deterministic code wrote the row | `engine-v1`, `lab-v1`, `tc-v1` |
+| prompt_version | AI-written records | Which version of the agent's instructions was used | `trader-v1`, `eod-v1` |
+| made_at, created_at, computed_at, written_at, settled_at, recorded_at, received_at, completed_at | all records | When the row was written (UTC). Every page reads data only up to its own "as of" time by these columns, so nothing from later leaks into an earlier view | `2026-10-07T11:45:00Z` |
 
 <a id="requests"></a>
 ## How to ask for a new field

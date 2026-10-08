@@ -47,9 +47,9 @@ today's price basis (splits and bonus issues detected by the check applied to th
 whether the target has been reached so far (stored highs from D, then today's complete 5-minute bars), and
 three flags: outside_range (outside its 80% range), far_from_target (not reached and at least 2 sigma_1d
 scaled to the sessions left away) and against_prediction (the move since entry at least 1 sigma_1d scaled to
-the sessions held against the direction). A trade whose exit close is missing stays checked until it is settled
-(at most 5 sessions past its exit date). The checks feed the deviation explainer and an alerts feed
-(`intraday_alerts`) that the Slack alerts read. The schedules are unchanged.
+the sessions held against the direction). A trade with no settlement row after its exit date (for example, its
+exit close is missing) stays checked until it is settled (at most 5 sessions past its exit date). The checks feed
+the deviation explainer and an alerts feed (`intraday_alerts`) that the Slack alerts read. The schedules are unchanged.
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Session cut-off (issue #20): a session's bar counts as final 120 minutes after its close
@@ -60,9 +60,10 @@ the sessions held against the direction). A trade whose exit close is missing st
 - Late runs (`market_status.py` `late_run`: started after the session's close, before its bar
   is final): no calls; `ranges.py` skips ranges whose target session has closed, labels the
   others late (never scored) and ignores cues quoted after that session's open.
-- Mid-session runs (`in_session`: started after the session's open, before its close): no calls
-  and no 1-day ranges; 5-day ranges are published for the record, noted late, never scored (the
-  day is partly known, and every horizon covers it). Any range or call made at or after the open
+- Mid-session runs (`in_session`: started after the session's open, before its close): no calls;
+  every N+k range is published for the record, noted late, never scored (the day is partly known,
+  and every horizon's window covers it; no N+k range exits at that session's close, so since B10
+  there is no 1-day exception). Any range or call made at or after the open
   of the first session it covers is never scored, and cues and option snapshots quoted after
   that open are ignored for every horizon (an intraday quote is not an overnight cue).
 - US macro data at 08:30 ET (CPI, jobs): on those days the brief states "call made before release".
@@ -685,7 +686,9 @@ stored before a refusal stay (append-only) and are reused when the add is retrie
 ## 4. How a range is built (deterministic Python)
 1. **Width:** current volatility estimate = blend of exponentially weighted realized vol and,
    where available, implied vol. Range = quantiles of recent standardized returns scaled by that
-   volatility, for T+1 and T+5. Two bands: 50% and 80%.
+   volatility, for every horizon N+k of `config/strategies.yaml` (B10): the band of the close of the
+   k-th session after D, from the as-of close, so the window spans k + 1 sessions (sigma x sqrt(k + 1);
+   the calibration pool holds z over the same k + 1 sessions). Two bands: 50% and 80%.
 2. **Market + stock split:** predict the index range first; stock = beta x index move + its own
    residual (beta from the last year of daily returns).
 3. **Centre:** last close adjusted by the overnight cue (futures, ADRs, pre-market gap), minus any
@@ -777,8 +780,10 @@ exact values):
 **Call basis (owner-approved change A, from 2026-10-08).** Direction calls made at or after
 `call_scoring.from` in `config/settings.yaml` (`label_basis: open_to_close`) are scored open to
 close, the signal model's label convention (`model/labels.py`, same offsets): entry at the open of
-D, the first session after the as-of close, exit at the close of D+1 for 1-day calls and D+4 for
-5-day calls, hit = the move from that open has the called sign. Older calls stay close-to-close
+D, the first session after the as-of close, exit at the close of D+k for a call of horizon k (N+k,
+decision 37; B10), hit = the move from that open has the called sign. A 5-day call made before
+`call_scoring.n_plus_k_from` keeps the old exit at D+4; its outcome is labelled `legacy_5d_d4` and
+summarised apart (outcomes carry `horizon_label`). Older calls stay close-to-close
 (as-of close to the close 1 or 5 sessions later); stored outcomes are never rescored. Each new
 outcome row carries `label_basis` (with `entry_date` and `entry_open` for open_to_close); rows
 stored before the field read as close_to_close (`track_record` view). A call whose entry bar has
@@ -799,10 +804,10 @@ target-session close). Code: `marketbrief/analytics/call_basis.py`.
 everything rule-based is replayed walk-forward over all stored bars, one as-of day d at a time,
 with only what `ranges.py` would know pre-open the next session (bars up to d's close; earnings
 versions by the 10-Q/10-K reports accepted by that session date; dividends; major events).
-- Ranges: 1d and 5d 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles at
+- Ranges: every horizon N+k's 50%/80% bands built as `ranges.py` builds them (calibrate.py's pool quantiles at
   d, EWMA sigma, earnings/regime/major-event widening, the inputs `config/ranges.yaml` switches on,
   centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and
-  `backtest` helpers. Scored on the close h bars later: coverage overall and by regime, sector,
+  `backtest` helpers. Scored on the exit close of N+k (k + 1 bars after d; before B10 the close h bars later): coverage overall and by regime, sector,
   ticker, month, year, earnings and major event in horizon; interval score and width vs the naive
   range; calibration (stated vs actual coverage, the two published bands plus other levels of the
   same pool).
@@ -1530,8 +1535,8 @@ forecast-v10, news-v8 and claims-v3 with news verification phase B; forecast-v11
 signal-model anchor and the debate record (section 15); forecast-v12 when calls are scored
 open-to-close from the `call_scoring` switch (section 6); reflect-v1 started with the Sonnet 5.5 /
 medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate; forecast-v13 with
-the Opus trader protocol (B3); trader-news-v1, trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1
-start with B3), and a
+the Opus trader protocol (B3); forecast-v14 with the N+k window wording (B10, decision 37); trader-news-v1,
+trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1 start with B3), and a
 per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
@@ -1557,10 +1562,11 @@ this with a stated formula, learned weights, a walk-forward test and a per-score
 forecaster now starts from it. Research only: the model never trades and never connects to a broker.
 
 **Trade convention (owner's decision; the primary label).** D is the first session after the as-of
-close. 1-day: buy at the open of D, sell at the close of D+1 (two sessions held). 5-day: buy at the
-open of D, sell at the close of D+4 (five sessions). Up = return > 0. A cost-aware label (return >
-round-trip cost) is reported too. Secondary label: close-to-close, from the as-of close to the close
-of D (1-day) or D+4 (5-day), the convention `score_predictions.py` uses for calls. A label is
+close. Horizon N+k (decision 37, B10; section 15.2): buy at the open of D, sell at the close of D+k
+(N+1: D+1, two sessions held; N+5: D+5). Before B10 the 5-day label sold at D+4 (now `legacy_5d_d4`).
+Up = return > 0. A cost-aware label (return > round-trip cost) is reported too. Secondary label:
+close-to-close, from the as-of close to the same exit close of D+k (before B10: to the close of D for
+1-day, D+4 for 5-day). A label is
 missing when the ticker has no bar on a benchmark session it spans (`marketbrief/model/labels.py`).
 
 **Features at the as-of date (no look-ahead; `technical_panel.py`, `market_panel.py`, `panel.py`).**
@@ -1857,6 +1863,42 @@ information the open already prices. The long history alone (b) shows no skill e
 `cross_market` group stays switched off in `config/model.yaml`. A confirmation should use only data
 after 2026-10-07 (a held-out period), with the India `asia` and `adr` groups fixed in advance.
 
+### 15.2 Horizons N+1..N+5 (B10, built 2026-10-07)
+Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the k-th market session after D
+(weekends and holidays skipped through the market calendar). The list is `config/strategies.yaml` `horizons`
+(`core/horizons.py`; `config/ranges.yaml` follows it); adding N+10 is a config change and a refit.
+- **Labels and model.** `model/labels.end_offset` = k + 1 sessions after the as-of session, for both conventions.
+  The panel, the monthly refit, Platt calibration and the backtest run per horizon. N+1 keeps its model id
+  (`<market>-1d-open_to_close-...`, same label as before); N+2..N+5 use `-n_plus_k-` ids, so a stored D+4 fit is
+  never reused for N+5. A `cross_market` variant (every cross-market group on) is written beside the base model in
+  `model_variant_scores|versions` for strategies with `cross_market: true`.
+- **Ranges and calibration.** Target = the exit session (`target_date = exit_date`, `entry_date` = D), width
+  sigma x sqrt(k + 1), calibration pool z over k + 1 sessions; live pools and ACI use N+k ranges only.
+- **Legacy labels.** Rows written before B10 keep their window and are labelled on read: `legacy_cc` (old ranges,
+  close-to-close calls), `legacy_5d_d4` (open-to-close 5-day scores and calls sold at D+4); open-to-close 1-day
+  rows are N+1 (same window) and the only legacy rows that may pool with N+k. `call_scoring.n_plus_k_from` in
+  `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls.
+- **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
+  p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
+
+| market | horizon | n | AUC [95%] | Brier skill | long p>=0.55: positions, mean % after costs [95%] | vs always-up | vs momentum | vs RSI | vs benchmark |
+|---|---|---|---|---|---|---|---|---|---|
+| india | N+1 | 6640 | 0.4853 [0.4563, 0.5174] | -0.0069 | 25, -0.473 [-1.4, 0.38] | -0.4369 [-0.92, 0.01] | -0.2335 [-0.78, 0.03] | -0.5443 [-1.1, -0.05] | -0.4929 [-1.05, 0.0] |
+| india | N+2 | 6620 | 0.4929 [0.46, 0.5262] | -0.0157 | 1062, -0.4429 [-0.87, -0.06] | -0.0427 [-0.26, 0.16] | -0.1539 [-0.5, 0.22] | -0.1345 [-0.47, 0.28] | -0.0444 [-0.27, 0.18] |
+| india | N+3 | 6180 | 0.497 [0.4553, 0.537] | -0.0165 | 1409, -0.639 [-1.16, -0.23] | -0.1486 [-0.48, 0.02] | -0.2707 [-0.74, 0.09] | -0.2088 [-0.62, 0.2] | -0.1241 [-0.44, 0.08] |
+| india | N+4 | 6160 | 0.5023 [0.4529, 0.5469] | -0.0186 | 1592, -0.6947 [-1.4, -0.2] | -0.1706 [-0.6, 0.1] | -0.2491 [-0.8, 0.12] | -0.2357 [-0.62, 0.19] | -0.1492 [-0.55, 0.14] |
+| india | N+5 | 6140 | 0.5095 [0.4555, 0.553] | -0.0237 | 1699, -0.5426 [-1.36, 0.08] | 0.0204 [-0.3, 0.22] | -0.0444 [-0.52, 0.31] | -0.133 [-0.69, 0.55] | 0.0514 [-0.31, 0.27] |
+| us | N+1 | 6740 | 0.4826 [0.4591, 0.5061] | -0.0024 | 173, 0.2753 [-0.74, 1.06] | -0.1874 [-1.06, 0.56] | 0.1341 [-0.87, 0.89] | -2.5052 [-4.1, 0.85] | 0.0026 [-0.89, 0.82] |
+| us | N+2 | 6720 | 0.4841 [0.4613, 0.5072] | -0.0059 | 2110, 0.1668 [-0.07, 0.47] | -0.0601 [-0.14, 0.01] | 0.0568 [-0.11, 0.23] | 0.017 [-0.83, 1.37] | 0.1013 [-0.08, 0.41] |
+| us | N+3 | 6700 | 0.4769 [0.4551, 0.5058] | -0.0062 | 2655, 0.3127 [0.01, 0.71] | 0.055 [-0.05, 0.29] | 0.0993 [-0.09, 0.39] | -1.1236 [-2.32, 0.57] | 0.2972 [0.05, 0.66] |
+| us | N+4 | 6280 | 0.4845 [0.4563, 0.5134] | -0.0049 | 1970, 0.4036 [-0.08, 0.91] | 0.0113 [-0.18, 0.27] | 0.0849 [-0.24, 0.43] | -0.9116 [-2.12, 0.63] | 0.2638 [-0.15, 0.77] |
+| us | N+5 | 6260 | 0.4835 [0.4539, 0.5111] | -0.0056 | 3634, 0.5359 [0.15, 0.95] | -0.0041 [-0.17, 0.18] | 0.103 [-0.15, 0.4] | -1.1852 [-2.68, 0.39] | 0.4494 [0.16, 0.77] |
+
+  No horizon shows skill in either market: every AUC interval contains 0.5, every Brier skill is negative, and the
+  long never beats always-up (every interval contains 0). US N+3 and N+5 beat the benchmark-per-date baseline, as
+  always-up does: drift, not skill. The open-to-close N+1 numbers are equal to the pre-B10 1-day ones; the old 5-day
+  (D+4) numbers reappear as N+4. The daily refit takes about 7-10 s per market (docs/ws/b10.md).
+
 ## 16. The app around the pipeline (contract 2026-10-07)
 The app (API, frontend, paper portfolio, governed actions) is specified in `docs/ARCHITECTURE.md` and
 `api/openapi.yaml`. It changes no daily-run step: MotherDuck `market_brief` is a derived copy of
@@ -1879,3 +1921,155 @@ Strong only in a proven (horizon, confidence band) cell: the latest weekly revie
 forecaster's open-to-close calls in that cell number >= `proof.min_count` with a Wilson 95% lower bound >=
 `proof.min_wilson_low` (`config/portfolio.yaml`); a row is labelled proven only when it carries a forecaster call in
 such a cell, and every other row is labelled "Paper only — no proven edge yet".
+
+## 17. Strategy lab and paper-trading engine (B2)
+The engine and lab of docs/SPEC.md F1-F3 and F7 (code `scripts/marketbrief/lab/`, entry `scripts/lab.py`, notes
+`docs/ws/b2.md`). Research only: a paper trade is a record, never an order; nothing connects to a broker. Every read
+is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars by `collected_at`, splits by
+`detected_at`.
+
+### 17.1 Engine rules as built
+- **Timing.** D = the first session whose open is after `made_at`. N+k exits at the close of the k-th session after
+  D. A trade is settled only once the planned exit bar is final (close + `BAR_SETTLE_MINUTES`). No open on D:
+  `no_entry`. No close on the exit session: settled on the next stored final close, flag `exit_delayed`.
+- **Locked (F1.8).** The prediction and, for the head-to-head view, its pick must be made before D's open. When the
+  data root is a git repository, the commit that first added each row must be before the open too; a row that no
+  commit added is refused; a row first seen in a shallow clone's boundary commit is undated, so only its `made_at` is
+  checked. Refused ids are listed in the settle summary (`refused_not_locked`) and never settled. `pick` refuses to
+  run at or after D's open.
+- **Amount.** `contracts.watchlist.trade_amount` (B1): the `set_amount` override in force (higher or lower,
+  decision 44), else the default (₹1,00,000 / $1,000), copied into each prediction at `made_at`.
+- **Quantity.** India `floor(amount / open)`; 0 gives `skipped_price_above_amount`. US `round(amount / open, 6)`.
+- **Splits.** Adjustments with D < ex-date <= the exit: `exit_quantity = quantity / factor`, flag
+  `split_in_window`; the target, range and price-reached measures use the window's bars on D's basis. When the set
+  of split records in the window changes later (a correction with `supersedes`), the next settle run writes a new
+  row with `supersedes` and flag `resettled`. Scoreboards and the strongest-strategy ranking use the newest
+  settlement of each trade.
+- **Costs** (`lab/costs.py`, owner decisions 49, 50 and 52; `config/costs.yaml` statutory rates plus its `broker:`
+  section, owner-provided and marked verify). Each line is rounded to cents; a view's total is the sum of its
+  rounded lines.
+  - **Market cost** (`paper_trades_settled.costs`, `net_pnl`, `return_pct`; strategies are ranked on it). India:
+    Axis brokerage 0.75% per side, at least ₹50 per order; STT 0.1% each side; exchange and SEBI fees; stamp duty
+    0.015% on the buy; GST 18% on brokerage + exchange + SEBI. US: BUX's €0.99 per order at the EUR/USD close on or
+    before each side's session (when none is stored that early, the oldest stored close, a later rate known by the
+    run's clock: `MarketData.eurusd_on`); SEC fee; FINRA TAF.
+  - **Your cost** (`cost_views`; the go-live bar and the owner's money use it) = market cost plus, in India, the NRI
+    reporting charge ₹200 on the purchase date and ₹200 on the sale date and the DP charge (provisional: ₹30 or
+    0.04% of the sale value, the higher); in the US, BUX Basic's FX markup 0.75% of the value on the buy and on the
+    sale and the 0.20% a year portfolio fee on the entry value, pro-rated over the calendar days from D to the exit.
+  - A US trade whose fee cannot be converted yet (no EUR/USD stored at all) waits (`waiting_for_eurusd`).
+- **Cost-viable flag** (decision 51, `lab/cost_views.py`). At `predict` time for each new qualifying rule or
+  baseline prediction, and at `pick` time for every qualifying prediction of D without a row yet (all families) and
+  every pick: the round trip of the company's amount bought and sold at C = base_close, in both
+  views, and `expected_move_pct = (target / C − 1) × 100`. Viable (owner decision of 2026-10-07, made in session B6;
+  it replaces the first wording "move > cost"): `expected_gain_your_pct = p × move − (1 − p) × loss −
+  your_cost_pct` and `cost_viable = expected_gain_your_pct > 0`, with move and loss those of the head-to-head picks
+  (`lab/gain.py`, 17.2), so the flag and the picks agree. Without a probability or a range (always-up, momentum)
+  `cost_viable` is null, and so it is when the amount buys no whole share at C (no trade, no costs, no gain). Stored as a `cost_views` row
+  (`record_kind` prediction or pick) and on each head-to-head candidate (`expected_move_pct`, `your_cost_pct`,
+  `expected_gain_your_pct`, `cost_viable`). Predictions are made and scored either way, and a non-viable candidate
+  can still be picked; the flag is shown (owner decision, open question 9 of b2.md).
+- **Automatic reason** (F1.10, `reasons.py`): `market_pct` = beta (`beta_1y` as of the prediction, 1 when missing) ×
+  the benchmark's open-of-D-to-exit-close move; `sector_pct` = the sector index or ETF move minus the benchmark (no
+  index: the other same-sector watchlist stocks' mean move minus the benchmark; else 0); `news_pct` = the rest
+  (move − market − sector), credited only when verified news (confirmed_primary or corroborated as of settlement,
+  timed from D's open to the exit close) exists and its summed sentiment has the rest's sign, else 0; `company_pct`
+  = what is left. `reason_code` is the largest part by size; `reason_codes` add `target_reached` and
+  `range_missed`.
+
+**Record format: `cost_views`** (B2 kind, `core/schema_b2.py`): one row per lab record, in the day file of
+`computed_at`.
+
+| Column | Meaning |
+|---|---|
+| id | `cv:<record_kind>:<record_id>` |
+| record_kind, record_id | `prediction` (strategy_predictions id), `pick` (head_to_head_picks id) or `settlement` (paper_trades_settled id) |
+| trade_id, prediction_id, strategy_id, market, ticker, horizon_days, session_date, exit_date, amount, currency | the record's keys (exit_date: the planned exit, or the one used for a settlement) |
+| reference_price, target_price, expected_move_pct | C (base_close; for a settlement the entry price), the prediction's target (copied on every row), `(target / C − 1) × 100` (null on settlement rows, and without a target) |
+| market_cost_pct, your_cost_pct | the round trip in each view as % of the amount |
+| expected_gain_your_pct, cost_viable | `p × move − (1 − p) × loss − your_cost_pct` with the picks' move and loss; viable when above 0 (pre-open rows; null without a probability or range, and on settlements) |
+| market_costs, market_cost_lines, your_costs, your_cost_lines | totals and `{charge: amount}` per view |
+| net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | settlements only |
+| holding_days, eurusd_entry, eurusd_exit | calendar days from D to the exit; the EUR/USD closes used (US) |
+| computed_at, method_version | when; `engine-v1` |
+
+### 17.2 The two corrections to F1.7
+**Expected gain.** The first draft, `p × (target / C − 1) − (1 − p) × (1 − lo80 / C) − costs`, compared a centre
+with a tail and picked N+1 for every group of W1's example data, always at a negative value; ranking a per-trade
+gain instead (`loss` = the expected shortfall below C) grows like √k at equal p, so N+5 always wins. As built
+(`lab/gain.py`, `lab/picks.py`):
+- From C and the strategy's own 80% range for the horizon, the exit close X is read as normal with mean = target
+  and sigma = (hi80 − lo80) / (2 × 1.2816).
+- `move = E[X / C − 1 | X > C]` and `loss = E[1 − X / C | X < C]`, in % of C.
+- `expected_gain = p × move − (1 − p) × loss − costs` (`expected_gain_pct`; costs = the market-cost round trip of the
+  amount at C).
+- "Best expected gain" = the horizon with the highest expected gain per session held, `expected_gain / k`
+  (`gain_per_session_pct` in the candidates JSON; owner decision of 2026-10-07). Ties: the shorter horizon.
+- A prediction whose amount buys no whole share at C is no candidate.
+- The pick's `candidates` JSON lists the strongest strategy's expected gain at every horizon it predicted for the
+  company (the horizon list of config/strategies.yaml); `eligible` marks the qualifying ones, and only those can be
+  picked.
+
+`python scripts/lab.py pick-study` is the evidence (docs/ws/b2.md pastes it): the corrected rule picks several
+horizons on W1's example data and on back-test samples of both markets. With the owner-provided Axis costs (about
+2% per round trip in the market view) no India candidate in the study has a positive expected gain; when every gain
+is negative, dividing by k shrinks the long horizons' losses most, so India picks lean to N+5.
+
+**Strongest strategy** (decision 41). Strategies of the family with at least 20 settled accuracy trades on the
+company rank first, by profit after costs on it; the rest follow by profit after costs on all the market's
+companies; strategies with no settled trade rank last. Ties: more settled trades, then the lower id. A re-settled
+trade counts once (its newest row).
+
+### 17.3 F2 strategies as built
+- **Probability of the model signal:** `p = sigmoid(logit(prob_model) + news_weight × coefficient × clip(sum of item
+  weights, ±score_cap))`. The item weights are the signal model's (`model/news_score.py`), keeping only the
+  strategy's `news_statuses` and `news_materiality`; rumour, promotional, unverified and contradicted items always
+  weigh 0. News weight 0 is model-only.
+- **Evidence.** Rule strategies cite the model score id, then the feature snapshot id; baselines (always-up,
+  momentum) the feature snapshot id only. News ids are cited only when the first (after sorting confirmed,
+  corroborated, single-source) is verified (DESIGN.md 3b).
+- **Blocks.** BLOCKED quality or `days_to_earnings <= 1`: an abstention row per strategy (`blocked_quality`,
+  `earnings_window`).
+- **Regime filter.** Written with `qualifies: false` in UNSTABLE / EVENT_HEAVY.
+- **Cross-market strategy** (`rule.model_news_global.v1`) reads B10's cross_market model variant (`scores_asof(..., variant="cross_market")`, rows in
+  `model_variant_scores`, ids ending `-cross_market`) instead of the base scores; a horizon without a variant score
+  is an abstention (`abstained`, "no cross-market model score").
+- **Momentum** compares the as-of close with the previous close put on the same split basis.
+- **Target and range** come from the B10 range of the horizon (its bands, never narrowed). B10's `center` is a log
+  shift, so the target price is `base_close × exp(center)` (`lab/strategies.py` `target_price`; the row's
+  `base_close`, else the as-of close).
+- **Live inputs.** `predict` reads `contracts.horizons.scores_asof` / `ranges_asof`; until B10 builds them it
+  refuses with a message and writes nothing.
+- **Back-test** (`backtest`, F2.3): always-up and momentum on adjusted bars stored by the clock (plus the history
+  cache with `--history`), basis `backtest`, written only to `--out`, never to data/. Both cost views come from
+  `lab/costs.py`. Model-only needs B10's per-horizon walk-forward probabilities and is not run yet. Without stored
+  EURUSD bars the US order fee needs `--eurusd` (an ASSUMED constant, labelled in the output). Limits: today's
+  watchlist (survivorship), split adjustment as of the fetch, no stored past ranges (no target or range measures),
+  and overlapping trades, so the bootstrap intervals are too narrow.
+
+### 17.4 Scoreboard (F7) as built
+- `scoreboard.py` rows per market × view × basis, with `scope` `strategy`, `strategy_company`, `pick_rule`
+  (head-to-head) and `strategy_regime` (F2.6), each for "all" and each horizon.
+- Each row (market-cost view, the ranking): trades, net_pnl, mean_return_pct, win_rate; target_reached_rate and
+  median_reached_session (over trades with a target); avg_target_error_pct, range_hit_rate, worst_losing_streak,
+  max_drawdown, sample_badge; the luck test. `your_cost` (decision 50) repeats net_pnl, mean_return_pct, win_rate,
+  worst_losing_streak, max_drawdown and the luck test on `return_pct_your` from the `cost_views` settlement rows.
+- **Luck test** (`luck.py`): percentile bootstrap (2000 resamples, seed from the slice key) of the mean net return %;
+  Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon;
+  `corrected` is true only when the corrected interval excludes zero.
+- **Go-live** (F7.2, on the your-cost view; `cost_view` names the view used, market only while a your-cost row is
+  missing): at least 2 months and 300 trades (accuracy view, forward); beats the best baseline's net profit with
+  `corrected` true; max drawdown within 10 × the default amount; net profit positive in both calm and volatile
+  (UNSTABLE / EVENT_HEAVY) regimes.
+- **Comparisons** (`compare.py`), each with pairs, net profit of each side, wins and the mean difference with a
+  bootstrap interval: rule vs AI on identical company-days per pick rule; gain-pick vs probability-pick per family;
+  each strategy vs its `compared_to` on identical predictions.
+- **Heatmaps** (`heatmaps.py`): win rate and net profit by strategy × horizon, × company and × reason code, per ISO
+  week and "all"; cumulative profit lines per strategy (accuracy) and per family:pick rule (head-to-head).
+
+### 17.5 News-impact study (F3) as built
+`news_impact.py` and `reports.write_news_impact`: events are enriched news on their primary tickers, first seen and
+enriched by the run time, with their status as of then; one event per company and same-event cluster. D is the
+first session whose open is after the item's time; only windows whose exit bar is final count. `abnormal = stock −
+beta × benchmark − (sector index − benchmark)` (sector part 0 without an index). Mean and a normal 95% interval;
+`enough` from 10 events, below that no mean is stored ("not enough events yet").

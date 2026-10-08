@@ -61,13 +61,15 @@ function outcomeText(outcome: ToolOutcome): string {
 
 /** A confirmed company command: post a visible "request received" message in #market-brief first, so B6's onboarding
  * confirmation can reply in its thread (its channel and ts go into the inbox with the request); a request that is not
- * accepted edits that message to say why. Without the message (Slack refused it) the request is still sent. */
+ * accepted edits that message to say why. A key already in the inbox (a second Confirm click) posts no message: the
+ * answer goes to the clicker only. Without the message (Slack refused it) the request is still sent. */
 async function confirmedWrite(deps: SlackDeps, ctx: CallContext, userId: string, tool: string, args: ToolArgs,
   opts: ExecuteOptions): Promise<ToolOutcome> {
   const summary = writeSummary(tool, args, opts.preview ?? null);
   const asked = `<@${userId}> asked: ${slackEscape(summary)}`;
-  const ts = await deps.slack.postMessage(deps.channelId, `:inbox_tray: ${asked}. Pending until the onboarding imports it.`)
-    .catch(() => null);
+  const ts = await deps.tools.isStored(args) ? null
+    : await deps.slack.postMessage(deps.channelId, `:inbox_tray: ${asked}. Pending until the onboarding imports it.`)
+      .catch(() => null);
   const outcome = await deps.tools.execute(ctx, tool, args, { ...opts, slackThread: ts ? { channel: deps.channelId, ts } : null });
   if (ts && outcome.result !== "pending") {
     await deps.slack.updateMessage(deps.channelId, ts, `${asked}. ${slackEscape(outcomeText(outcome))}`).catch(() => false);

@@ -49,12 +49,14 @@ NEWS_SQL = """WITH n AS (SELECT DISTINCT ON (id) * FROM news_asof(?::TIMESTAMPTZ
 NEWS_BY_ID_SQL = """SELECT DISTINCT ON (id) id, title, url, source, coalesce(published_at, first_seen_at) AS ts
                     FROM news_lookup_asof(?::TIMESTAMPTZ) ORDER BY id, first_seen_at"""
 # the company_events view (latest known date per ticker and type, "_history" sources left out) built from the
-# event rows first seen by the cut-off; the next earnings date is that date when it is after the as-of date
-EARNINGS_SQL = """
-SELECT ticker, date FROM (
+# event rows first seen by the cut-off
+COMPANY_EVENTS_ASOF_SQL = """
   SELECT DISTINCT ON (ticker, type) * FROM events
   WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history') AND first_seen_at <= $cutoff::TIMESTAMPTZ
-  ORDER BY ticker, type, first_seen_at DESC, date)
+  ORDER BY ticker, type, first_seen_at DESC, date"""
+# the next earnings date is that date when it is after the as-of date
+EARNINGS_SQL = f"""
+SELECT ticker, date FROM ({COMPANY_EVENTS_ASOF_SQL})
 WHERE type = $kind AND date > $as_of ORDER BY ticker"""
 REGIME_SQL = """SELECT * FROM regime WHERE as_of_date <= ? AND computed_at <= ?::TIMESTAMPTZ
                 ORDER BY as_of_date DESC, computed_at DESC LIMIT 1"""

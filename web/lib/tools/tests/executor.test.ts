@@ -195,7 +195,7 @@ test("the add preview resolves identifiers and logs a refused symbol (W1 example
   assert.equal(r.inbox.requests.length, 0);
 });
 
-test("a failed dispatch still answers pending, says the next run imports it, and tells the owner", async () => {
+test("a failed dispatch still answers pending, says it waits in the inbox for the next import run, and tells the owner", async () => {
   const r = rig();
   r.dispatcher.fail = true;
   const outcome = await r.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "react-dispatch1" }, { confirmedSummary: true });
@@ -251,4 +251,17 @@ test("nothing observable carries a secret value", async () => {
   assert.equal(read.result, "failed");
   const all = observable(read, r.inbox.commands, r.notifier.reports);
   for (const secret of SECRET_VALUES) assert.equal(all.includes(secret), false, secret);
+});
+
+test("isStored answers whether a key is in the inbox, logs nothing, and answers false when the inbox is down (issue #123)", async () => {
+  const r = rig();
+  const args = { market: "us", ticker: "AAPL", idempotency_key: "react-stored01" };
+  assert.equal(await r.layer.isStored(args), false);
+  await r.layer.execute(app, "reactivate_company", args, { confirmedSummary: true });
+  const logged = r.inbox.commands.length;
+  assert.equal(await r.layer.isStored(args), true);
+  assert.equal(await r.layer.isStored({ idempotency_key: "bad key" }), false);
+  assert.equal(r.inbox.commands.length, logged, "a lookup is not a command");
+  r.inbox.down = true;
+  assert.equal(await r.layer.isStored(args), false);
 });

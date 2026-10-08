@@ -2,7 +2,10 @@
 checks, AI reasons, EOD analyses, news, news impact, results digests, market status, research review, portfolio."""
 from __future__ import annotations
 
-from make_examples import BARS, COMPANIES, DEFAULT_AMOUNT, SCHEMAS
+import math
+from datetime import date, timedelta
+
+from make_examples import BARS, COMPANIES, DEFAULT_AMOUNT, SCHEMAS, SIGMA_1D, calendar, load_market
 
 
 def row(kind_name: str, /, **values) -> dict:
@@ -102,38 +105,74 @@ def abstentions() -> list[dict]:
     ]
 
 
+CHECKS = {"india": ("ic-india-2026-10-07T05:43Z", "2026-10-07T05:43:00Z", "2026-10-07T05:35:00Z", 118 / 375),
+          "us": ("ic-us-2026-10-07T16:27Z", "2026-10-07T16:27:00Z", "2026-10-07T16:20:00Z", 177 / 390)}
+# check_id as B9 writes it (intraday/settings.check_id); last_time = the newest complete 5-minute bar's start;
+# elapsed share of today's session: India 09:15-15:30 IST (05:43 UTC = 118 of 375 min), US 09:30-16:00 New York
+# (16:27 UTC = 177 of 390 min). B9's thresholds (config/intraday.yaml): target_z 2.0, against_call_z 1.0.
+TARGET_Z, AGAINST_Z = 2.0, 1.0
+
+
+def trade_check(trade: dict, last: float) -> dict:
+    """One trade_checks row (B9's rules, docs/ws/b9.md Contract) for an open trade; no split, so basis_factor 1."""
+    check_id, check_at, last_time, elapsed = CHECKS[trade["market"]]
+    ticker, entry = trade["ticker"], trade["entry_price"]
+    held_bars = [BARS[ticker][d] for d in BARS[ticker] if d >= trade["entry_date"]]
+    session_number = len(held_bars) + 1
+    cfg = load_market(trade["market"])
+    left = sum(1 for d in sessions_from(cfg, "2026-10-07", trade["exit_date"])) - elapsed
+    held = session_number - 1 + elapsed
+    sigma = SIGMA_1D[ticker]
+    ret = last / entry - 1
+    z_since = ret / (sigma * math.sqrt(held))
+    target_z = (trade["target_price"] / last - 1) / (sigma * math.sqrt(left))
+    highs = [bar[1] for bar in held_bars] + [last]
+    reached = [i + 1 for i, high in enumerate(highs) if high >= trade["target_price"]]
+    lo80, lo50, hi50, hi80 = trade["lo80"], trade["lo50"], trade["hi50"], trade["hi80"]
+    band = ("below80" if last < lo80 else "below50" if last < lo50 else "inside50" if last <= hi50
+            else "above50" if last <= hi80 else "above80")
+    flags = ["outside_range"] if band in ("below80", "above80") else []
+    flags += ["far_from_target"] if not reached and target_z >= TARGET_Z else []
+    flags += ["against_prediction"] if z_since <= -AGAINST_Z else []
+    return row("trade_checks", id=f"{check_id}-{trade['trade_id']}", check_id=check_id,
+               check_row_id=f"{check_id}-{ticker}", check_at=check_at, session_date="2026-10-07",
+               market=trade["market"], ticker=ticker, trade_id=trade["trade_id"],
+               prediction_id=trade["prediction_id"], strategy_id=trade["strategy_id"], view=trade["view"],
+               horizon_days=trade["horizon_days"], entry_date=trade["entry_date"], exit_date=trade["exit_date"],
+               session_number=session_number, entry_price=entry, last_price=last,
+               ret_since_entry_pct=round(ret * 100, 4), target_price=trade["target_price"],
+               to_target_pct=round((trade["target_price"] / last - 1) * 100, 4), lo80=lo80, lo50=lo50, hi50=hi50,
+               hi80=hi80, band=band, target_z=round(target_z, 3), flags=flags, flagged=bool(flags),
+               method_version="tc-v1", computed_at=check_at, family=trade["family"],
+               pick_rule=trade["trade_id"].split(":")[1] if trade["view"] == "head_to_head" else None,
+               quality="ok", entry_source="stored_open", basis_factor=1.0, entry_adj=entry,
+               target_adj=trade["target_price"], lo80_adj=lo80, lo50_adj=lo50, hi50_adj=hi50, hi80_adj=hi80,
+               last_time=last_time, sigma_1d=round(sigma, 6), elapsed_fraction=round(elapsed, 4),
+               sessions_held=round(held, 4), sessions_left=round(left, 4), z_since_entry=round(z_since, 3),
+               target_reached=bool(reached), target_reached_session=reached[0] if reached else None,
+               high_since_entry_pct=round((max(highs) / entry - 1) * 100, 4),
+               low_since_entry_pct=round((min([bar[2] for bar in held_bars] + [last]) / entry - 1) * 100, 4),
+               notes=[])
+
+
+def sessions_from(cfg: dict, first: str, last: str) -> list[date]:
+    """The market's sessions from first to last, both included."""
+    day, out = date.fromisoformat(first), []
+    while day <= date.fromisoformat(last):
+        if calendar.is_session(cfg, day):
+            out.append(day)
+        day += timedelta(days=1)
+    return out
+
+
 def trade_checks(opens: list[dict]) -> list[dict]:
-    rows = []
     prices = {"NVDA": 241.10, "RELIANCE": 1224.6, "HDFCBANK": 708.9, "JPM": 330.20, "AAPL": 334.95}
-    checks = {"india": ("ic-india-202610070543", "2026-10-07T05:43:00Z"),
-              "us": ("ic-us-202610071627", "2026-10-07T16:27:00Z")}
     seen: dict[str, int] = {}
-    chosen = []
+    rows = []
     for trade in opens:
         if trade["ticker"] in prices and seen.get(trade["ticker"], 0) < 2:
             seen[trade["ticker"]] = seen.get(trade["ticker"], 0) + 1
-            chosen.append(trade)
-    for trade in chosen:
-        check_id, check_at = checks[trade["market"]]
-        last = prices[trade["ticker"]]
-        ret = (last / trade["entry_price"] - 1) * 100
-        lo80, lo50, hi50, hi80 = trade["lo80"], trade["lo50"], trade["hi50"], trade["hi80"]
-        band = ("below80" if last < lo80 else "below50" if last < lo50 else "inside50" if last <= hi50
-                else "above50" if last <= hi80 else "above80")
-        flags = ["outside_range"] if band in ("below80", "above80") else []
-        flags += ["against_prediction"] if ret < 0 else []
-        rows.append(row("trade_checks", id=f"{check_id}-{trade['trade_id']}", check_id=check_id,
-                        check_row_id=f"{check_id}-{trade['ticker']}", check_at=check_at, session_date="2026-10-07",
-                        market=trade["market"], ticker=trade["ticker"], trade_id=trade["trade_id"],
-                        prediction_id=trade["prediction_id"], strategy_id=trade["strategy_id"], view=trade["view"],
-                        horizon_days=trade["horizon_days"], entry_date=trade["entry_date"],
-                        exit_date=trade["exit_date"],
-                        session_number=sum(d >= trade["entry_date"] for d in BARS[trade["ticker"]]) + 1,
-                        entry_price=trade["entry_price"], last_price=last,
-                        ret_since_entry_pct=round(ret, 2), target_price=trade["target_price"],
-                        to_target_pct=round((trade["target_price"] / last - 1) * 100, 2), lo80=lo80, lo50=lo50,
-                        hi50=hi50, hi80=hi80, band=band, target_z=None, flags=flags, flagged=bool(flags),
-                        method_version="tc-v1", computed_at=check_at))
+            rows.append(trade_check(trade, prices[trade["ticker"]]))
     return rows
 
 
@@ -142,8 +181,9 @@ def reasons(settled: list[dict]) -> tuple[list[dict], list[dict]]:
     for market in ("india", "us"):
         day = "2026-10-06"
         today = [t for t in settled if t["market"] == market and t["exit_date"] == day and t["status"] == "settled"]
-        wins = sorted((t for t in today if t["net_pnl"] > 0), key=lambda t: -t["return_pct"])[:5]
-        misses = sorted((t for t in today if t["net_pnl"] <= 0), key=lambda t: t["return_pct"])[:5]
+        accuracy = [t for t in today if t["view"] == "accuracy"]   # a head-to-head trade repeats an accuracy trade
+        wins = sorted((t for t in accuracy if t["net_pnl"] > 0), key=lambda t: -t["return_pct"])[:5]
+        misses = sorted((t for t in accuracy if t["net_pnl"] <= 0), key=lambda t: t["return_pct"])[:5]
         chosen = [("head_to_head", None, t) for t in today if t["view"] == "head_to_head"]
         chosen += [("biggest_win", n + 1, t) for n, t in enumerate(wins)]
         chosen += [("biggest_miss", n + 1, t) for n, t in enumerate(misses)]

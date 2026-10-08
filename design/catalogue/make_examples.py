@@ -4,7 +4,7 @@ Every file is marked `"_example": true`. Prices, benchmark and sector moves are 
 (`ohlc_raw`, 2026-09-29 .. 2026-10-06, read on 2026-10-07) and today's ranges' widths from the stored 1d/5d ranges;
 everything else (strategy probabilities, trades, reasons, news, commands, the owner's portfolio) is INVENTED to show
 the shape and is computed here from those inputs so the files agree with each other (quantities, costs, P&L,
-agreement counts, scoreboard sums). Cost rates are the provisional ones of docs/SPEC.md F1.6, not confirmed.
+agreement counts, scoreboard sums). Costs come from B2's engine with config/costs.yaml's rates (marked verify).
 Sessions come from the real market calendar (India 2026-10-02 is a holiday). Rerun after a change:
 
     python design/catalogue/make_examples.py
@@ -25,6 +25,7 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
 from marketbrief.core import calendar  # noqa: E402
+from marketbrief.lab import costs as lab_costs  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 
@@ -34,10 +35,8 @@ CURRENCY = {"india": "INR", "us": "USD"}
 DEFAULT_AMOUNT = {"india": 100000.0, "us": 1000.0}
 MADE_AT = {"india": "T02:10:00Z", "us": "T11:45:00Z"}   # pre-open runs: 07:40 IST, 07:45 New York (EDT)
 EURUSD = 1.1700   # example rate; B2 collects EURUSD=X
-# Provisional cost rates (docs/SPEC.md F1.6; owner to confirm): India Axis Direct, US BUX.
-INDIA_RATES = {"brokerage": 0.0025, "stt": 0.001, "exchange": 0.0000307, "sebi": 0.000001, "stamp_buy": 0.00015,
-               "gst": 0.18, "dp_min": 30.0, "dp_rate": 0.0004}
-US_RATES = {"order_fee_eur": 0.99, "sec_fee_sell": 0.0000206}
+# Cost rates: config/costs.yaml (statutory rates and the owner's `broker:` charges, all marked verify), applied by
+# B2's engine (marketbrief/lab/costs.py).
 
 # Stored bars (ohlc_raw): ticker -> date -> (open, high, low, close).
 BARS = {
@@ -81,7 +80,12 @@ CIK = {"NVDA": "0001045810", "AAPL": "0000320193", "JPM": "0000019617"}
 TODAY_CLOSE = {"NVDA": 239.24, "AAPL": 333.63, "JPM": 331.28, "RELIANCE": 1218.0, "HDFCBANK": 711.45, "MARUTI": 11625.0}
 SIGMA_1D = {"NVDA": 0.019129, "AAPL": 0.013523, "JPM": 0.011005,   # stored 1d ranges, as_of 2026-10-06
             "RELIANCE": 0.040221 / math.sqrt(5), "HDFCBANK": 0.039704 / math.sqrt(5), "MARUTI": 0.045624 / math.sqrt(5)}
-NEWS_STATUS = {"a41c9e07b2d35f18": "corroborated", "nse-ann-7781203": "confirmed_primary"}   # news_item.json
+NEWS_STATUS = {"a41c9e07b2d35f18": "corroborated", "nse-ann-7781203": "confirmed_primary",   # news_item.json
+               "d93b1f5e7c2a4b60": "corroborated", "nse-ann-7790412": "confirmed_primary"}
+# Verified news inside the example trades' windows (id, published_at, sentiment): news_item.json. Timed by
+# published_at, else first_seen_at, as B2's lab/reads.py does.
+WINDOW_NEWS = {"NVDA": [("d93b1f5e7c2a4b60", "2026-10-02T13:40:00Z", 0.5)],
+               "RELIANCE": [("nse-ann-7790412", "2026-10-05T09:05:00Z", 0.4)]}
 REGIME = {"india": "EVENT_HEAVY", "us": "TRENDING"}   # stored regime, as_of 2026-10-06
 # Invented reference probabilities P(up) per horizon N+1..N+5 (today: as_of 2026-10-06; past: as_of 2026-09-29).
 P_TODAY = {"NVDA": [0.566, 0.571, 0.578, 0.582, 0.585], "AAPL": [0.522, 0.528, 0.531, 0.533, 0.534],
@@ -121,29 +125,28 @@ def strategies() -> list[dict]:
     return yaml.safe_load((REPO / "config" / "strategies.yaml").read_text())["strategies"]
 
 
-def costs(market: str, entry_value: float, exit_value: float) -> tuple[float, dict]:
-    if market == "india":
-        rate = INDIA_RATES
-        brokerage = rate["brokerage"] * (entry_value + exit_value)
-        exchange = rate["exchange"] * (entry_value + exit_value)
-        sebi = rate["sebi"] * (entry_value + exit_value)
-        dp = max(rate["dp_min"], rate["dp_rate"] * exit_value)
-        lines = {"brokerage": brokerage, "stt": rate["stt"] * (entry_value + exit_value), "exchange": exchange,
-                 "sebi": sebi, "stamp_duty": rate["stamp_buy"] * entry_value, "dp_charge": dp,
-                 "gst": rate["gst"] * (brokerage + exchange + sebi + dp)}
-    else:
-        fee = US_RATES["order_fee_eur"] * EURUSD
-        lines = {"order_fee": 2 * fee, "sec_fee": US_RATES["sec_fee_sell"] * exit_value}
-    lines = {key: r2(value) for key, value in lines.items()}
-    return r2(sum(lines.values())), lines
+def cost_views(market: str, entry_value: float, exit_value: float, quantity: float) -> dict:
+    """Both views of one round trip with B2's engine (marketbrief/lab/costs.py, config/costs.yaml `broker:` rates);
+    US orders converted at the example EUR/USD."""
+    return lab_costs.cost_views(market, lab_costs.rates(market), (entry_value, exit_value), quantity,
+                                {"eurusd": (EURUSD, EURUSD)})
 
 
-def band(ticker: str, base: float, k: int, p: float) -> dict:
+def costs(market: str, entry_value: float, exit_value: float, quantity: float) -> tuple[float, dict]:
+    """The market view (F1.6): what paper_trades_settled `costs` and `cost_lines` hold."""
+    view = cost_views(market, entry_value, exit_value, quantity)["market"]
+    return view["total"], view["lines"]
+
+
+def band(ticker: str, base: float, k: int, p: float, widen: float = 0.0) -> dict:
+    """Target and 50/80% bands around the log centre; an AI widening multiplies sigma by (1 + widen), as
+    analytics/range_row.py does (the centre is not moved by it)."""
     sigma = SIGMA_1D[ticker] * math.sqrt(k)
     center = (p - 0.5) * sigma
-    return {"target_price": r2(base * math.exp(center)), "lo50": r2(base * math.exp(center - 0.6745 * sigma)),
-            "hi50": r2(base * math.exp(center + 0.6745 * sigma)), "lo80": r2(base * math.exp(center - 1.2816 * sigma)),
-            "hi80": r2(base * math.exp(center + 1.2816 * sigma))}
+    wide = sigma * (1 + widen)
+    return {"target_price": r2(base * math.exp(center)), "lo50": r2(base * math.exp(center - 0.6745 * wide)),
+            "hi50": r2(base * math.exp(center + 0.6745 * wide)), "lo80": r2(base * math.exp(center - 1.2816 * wide)),
+            "hi80": r2(base * math.exp(center + 1.2816 * wide))}
 
 
 def prediction(spec: dict, ticker: str, as_of: str, base: float, k: int, p_ref: float,  # noqa: PLR0913
@@ -163,13 +166,8 @@ def prediction(spec: dict, ticker: str, as_of: str, base: float, k: int, p_ref: 
     if spec["parameters"].get("regime_filter") and REGIME[market] in ("UNSTABLE", "EVENT_HEAVY"):
         qualifies = False
     family, is_ai = spec["family"], spec["family"] == "ai"
-    rng = band(ticker, base, k, prob if prob is not None else 0.5)
     widen = 0.1 if is_ai else 0.0
-    if widen:
-        half80, half50 = (rng["hi80"] - rng["lo80"]) / 2, (rng["hi50"] - rng["lo50"]) / 2
-        mid = rng["target_price"]
-        rng.update(lo80=r2(mid - half80 * 1.1), hi80=r2(mid + half80 * 1.1), lo50=r2(mid - half50 * 1.1),
-                   hi50=r2(mid + half50 * 1.1))
+    rng = band(ticker, base, k, prob if prob is not None else 0.5, widen)
     sid = f"{as_of}-{ticker}-{k}d"
     anchored = spec["id"].startswith("ai.combined")
     uses_model = signal == "model" or anchored
@@ -242,7 +240,7 @@ def settle(pred: dict, view: str, pick_rule: str | None, pick_id: str | None) ->
     window = [d for d in BARS[ticker] if entry_date <= d <= exit_date]
     exit_price = BARS[ticker][exit_date][3]
     entry_value, exit_value = r2(quantity * entry_price), r2(quantity * exit_price)
-    total, lines = costs(market, entry_value, exit_value)
+    total, lines = costs(market, entry_value, exit_value, quantity)
     gross = r2(exit_value - entry_value)
     net = r2(gross - total)
     highs, lows = [BARS[ticker][d][1] for d in window], [BARS[ticker][d][2] for d in window]
@@ -253,15 +251,14 @@ def settle(pred: dict, view: str, pick_rule: str | None, pick_id: str | None) ->
     market_part = beta * bench_move
     sector_part = ((INDEX[sector_symbol][1][exit_date] / INDEX[sector_symbol][0] - 1) * 100 - bench_move
                    if sector_symbol else 0.0)
-    news_ids = [i for i in pred["evidence_ids"] if not i.startswith(("model_scores:", "features:"))]
     rest = move - market_part - sector_part
-    news_part = 0.5 * rest if news_ids and rest > 0 else 0.0
+    news_ids, news_part = window_news(market, ticker, entry_date, exit_date, rest)
     company_part = move - market_part - sector_part - news_part
     parts = {"market": market_part, "sector": sector_part, "news": news_part, "company": company_part}
     main = max(parts, key=lambda key: abs(parts[key]))
     code = {"market": "market_up" if market_part > 0 else "market_down",
             "sector": "sector_lift" if sector_part > 0 else "sector_drag",
-            "news": "news_positive", "company": "company_specific"}[main]
+            "news": "news_positive" if news_part > 0 else "news_negative", "company": "company_specific"}[main]
     codes = [code] + (["target_reached"] if reached else []) + (
         [] if pred["lo80"] <= exit_price <= pred["hi80"] else ["range_missed"])
     row.update(status="settled", exit_date_actual=exit_date, entry_price=entry_price, exit_price=exit_price,
@@ -278,8 +275,24 @@ def settle(pred: dict, view: str, pick_rule: str | None, pick_id: str | None) ->
                reason_detail={"benchmark": bench, "benchmark_pct": r2(bench_move), "beta": beta,
                               "sector_source": sector_symbol or "none",
                               "news_statuses": {i: NEWS_STATUS[i] for i in news_ids}})
-    row["company_pct"] = r2(row["company_pct"])
+    row["company_pct"] = r2(row["company_pct"]) + 0.0   # + 0.0: no "-0.0" in the files
     return row
+
+
+def window_news(market: str, ticker: str, entry_date: str, exit_date: str, rest: float) -> tuple[list[str], float]:
+    """B2's rule (lab/reasons.py): the rest of the move (after market and sector) goes to news only when verified
+    news (confirmed_primary or corroborated) was published (else first seen) from D's open to the exit close and
+    its summed sentiment has the rest's sign; else 0. The same for every strategy holding that company over that
+    window."""
+    cfg = load_market(market)
+    start = calendar.session_open_utc(cfg, date.fromisoformat(entry_date)).isoformat().replace("+00:00", "Z")
+    end = calendar.session_close_utc(cfg, date.fromisoformat(exit_date)).isoformat().replace("+00:00", "Z")
+    inside = [n for n in WINDOW_NEWS.get(ticker, []) if start <= n[1] <= end
+              and NEWS_STATUS[n[0]] in ("confirmed_primary", "corroborated")]
+    mood = sum(n[2] for n in inside)
+    if not inside or mood == 0 or (mood > 0) != (rest > 0):
+        return [], 0.0
+    return [n[0] for n in inside], rest
 
 
 def write(name: str, entity: str, kind: str | None, records: list, extra: dict | None = None) -> None:

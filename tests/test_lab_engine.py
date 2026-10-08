@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+import pandas as pd
 import pytest
 from lab_fixtures import INDIA_MADE, INDIA_RATES, NOW, SPLIT, US_MADE, US_RATES, india_data, prediction, us_data
 
@@ -16,7 +17,9 @@ from marketbrief.lab.cost_views import settlement_row, viability, viability_row
 from marketbrief.lab.settle import settle
 from marketbrief.lab.sizing import qualifies, quantity
 from marketbrief.lab.timing import entry_session, exit_session, is_locked
-from marketbrief.portfolio.horizons import resolved_label, sessions_after_d
+from marketbrief.lab.predict_inputs import active_tickers as lab_active_tickers
+from marketbrief.lab.predict_inputs import previous_close
+from marketbrief.portfolio.horizons import active_tickers, resolved_label, score_label, sessions_after_d
 
 H2H = {"id": "h2h:2026-10-01-AAPL-rule-highest_probability", "pick_rule": "highest_probability"}
 
@@ -39,6 +42,34 @@ def test_timing_friday_holiday_and_lock():
     assert resolved_label(5, None, "2026-10-08T11:45:00+00:00") == "n_plus_k"
     assert resolved_label(1, None, "2026-10-07T11:45:00+00:00") == "n_plus_k"
     assert resolved_label(5, "n_plus_k", "2026-10-07T11:45:00+00:00") == "n_plus_k"
+    # a model score (issue #127, B10's model_scores_latest rule): unlabelled 1-day = n_plus_k, unlabelled 5-day =
+    # legacy_5d_d4 whatever its computed_at; a stored label wins
+    assert (score_label(1, None), score_label(5, None), score_label(5, "n_plus_k")) == (
+        "n_plus_k", "legacy_5d_d4", "n_plus_k")
+
+
+def test_previous_close_is_put_on_the_as_of_close_split_basis():
+    # momentum compares the as-of close with the one before, on the as-of close's basis (lab/predict_inputs.py)
+    own = pd.DataFrame({"date": [date(2026, 10, 1), date(2026, 10, 2)], "close": [200.0, 101.0]})
+    split = pd.DataFrame([{"id": "adj-AAPL", "ticker": "AAPL", "ex_date": "2026-10-02", "factor": 0.5}])
+    assert previous_close(own, split, "AAPL") == 100.0                       # 2:1 from 2 Oct: 200 x 0.5
+    assert previous_close(own, split, "MSFT") == 200.0                       # another ticker's split: unchanged
+    assert previous_close(own, split.iloc[0:0], "AAPL") == 200.0             # no adjustment stored
+    assert previous_close(own.iloc[1:], split, "AAPL") is None               # one close only
+
+
+def test_an_empty_active_list_means_no_active_company(monkeypatch):
+    # issue #110: cfg active_tickers [] (B1: every company deactivated) is no company, not every config ticker
+    cfg = {"market": "us", "tickers": {"AAPL": {}, "MSFT": {}}}
+    assert active_tickers({**cfg, "active_tickers": []}) == []
+    assert active_tickers({**cfg, "active_tickers": ["MSFT"]}) == ["MSFT"]
+    assert active_tickers(cfg) == ["AAPL", "MSFT"]                           # no loader key: every config ticker
+
+    def not_built(*_args):
+        raise NotImplementedError
+
+    monkeypatch.setattr("marketbrief.contracts.watchlist.watchlist", not_built)
+    assert lab_active_tickers({**cfg, "active_tickers": []}, NOW) == []
 
 
 def test_qualifies_and_quantity():
@@ -203,21 +234,27 @@ def test_cost_viable_flag():
     # market 2.18 + 0.02 = 2.20; your + FX .0075 x 2000 = 15.00 + fee .002 x 1000 x 3 / 365 = 0.02 -> 17.22 = 1.722%
     # Viable = expected gain after your cost > 0 (owner decision 2026-10-07, via B6), with the picks' move and loss:
     # 80% band 99.4369..104.5631 around the target 102 -> sigma 2, z = (100 - 102) / 2 = -1: P(X > C) = 0.841345,
-    # E[(X - C)+] = 2 x 0.841345 + 2 x phi(1) 0.241971 = 2.166631 -> move 2.575205%; E[(C - X)+] = -2 x 0.158655 +
-    # 0.483941 = 0.166631 -> loss 1.050272%. p 0.6: 1.545123 - 0.420109 - 1.722 = -0.596986 (not viable);
-    # p 0.9: 2.317685 - 0.105027 - 1.722 = 0.490658 (viable). The 2% move alone would have beaten 1.722% (old rule).
+    # E[(X - C)+] = 2 x 0.841345 + 2 x phi(1) 0.241971 = 2.166631 -> move 2.575200%; E[(C - X)+] = -2 x 0.158655 +
+    # 0.483941 = 0.166631 -> loss 1.050271%. p 0.6: 1.545120 - 0.420108 - 1.722 = -0.596988 (not viable);
+    # p 0.9: 2.317680 - 0.105027 - 1.722 = 0.490653 (viable). The 2% move alone would have beaten 1.722% (old rule).
     pred = prediction("us", "AAPL", 1, base_close=100.0, target_price=102.0, lo80=102.0 - Z80 * 2,
                       hi80=102.0 + Z80 * 2, prob_up=0.6)
     found = viability(pred, US_RATES, 1.10)
     assert (round(found["market_cost_pct"], 4), round(found["your_cost_pct"], 4)) == (0.22, 1.722)
     assert found["expected_move_pct"] == pytest.approx(2.0)
-    assert found["expected_gain_your_pct"] == pytest.approx(-0.596986, abs=1e-5) and found["cost_viable"] is False
+    assert found["expected_gain_your_pct"] == pytest.approx(-0.596988, abs=1e-5) and found["cost_viable"] is False
     sure = viability({**pred, "prob_up": 0.9}, US_RATES, 1.10)
-    assert sure["expected_gain_your_pct"] == pytest.approx(0.490658, abs=1e-5) and sure["cost_viable"] is True
+    assert sure["expected_gain_your_pct"] == pytest.approx(0.490653, abs=1e-5) and sure["cost_viable"] is True
     assert viability({**pred, "prob_up": None}, US_RATES, 1.10)["cost_viable"] is None   # always-up, momentum
     row = viability_row("prediction", pred["id"], pred, US_RATES, 1.10, NOW)
     assert row["id"] == f"cv:prediction:{pred['id']}" and row["cost_viable"] is False and row["your_costs"] == 17.22
     assert row["expected_gain_your_pct"] == -0.597
+    no_range = viability({**pred, "lo80": None, "hi80": None}, US_RATES, 1.10)   # a probability but no 80% range
+    assert (no_range["expected_gain_your_pct"], no_range["cost_viable"]) == (None, None)
+    # India, whole shares: Rs 500 cannot buy one share at 1000 -> no trade, no costs, no verdict
+    tiny = viability(prediction("india", "ITC", 1, amount=500.0, base_close=1000.0, target_price=1020.0,
+                                lo80=1000.0, hi80=1040.0, prob_up=0.9), INDIA_RATES, None)
+    assert (tiny["your_cost_pct"], tiny["expected_gain_your_pct"], tiny["cost_viable"]) == (None, None, None)
 
 
 def test_deterministic_and_resettle_on_a_split_correction():
