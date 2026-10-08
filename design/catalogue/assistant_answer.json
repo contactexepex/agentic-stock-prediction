@@ -7,7 +7,7 @@
   "as_of": "2026-10-07T12:00:00Z",
   "records": [
     {
-      "id": "ask-us-2026-10-07-1",
+      "id": "ask-us-2026-10-07-ada9ee3c1c",
       "market": "us",
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:40:00Z",
@@ -21,20 +21,34 @@
         {
           "id": "acc:rule.model_news.v1:2026-09-29-NVDA-3d@20261005T221500Z",
           "kind": "paper_trades_settled",
-          "as_of": "2026-10-05T22:15:00Z"
+          "as_of": "2026-10-06",
+          "source": "rm.trades NVDA"
         },
         {
           "id": "d93b1f5e7c2a4b60",
           "kind": "news",
-          "as_of": "2026-10-02T14:10:00Z"
+          "as_of": "2026-10-06",
+          "source": "rm.trades NVDA"
         }
       ],
       "as_of": "2026-10-07T11:40:00Z",
       "not_in_data": false,
-      "declined": null
+      "declined": null,
+      "status": "answered",
+      "sources": [
+        {
+          "read_model": "rm.trades",
+          "page_key": "NVDA",
+          "found": true,
+          "as_of": "2026-10-06"
+        }
+      ],
+      "cost_usd": 0.0142,
+      "conversation_id": "ask-us-2026-10-07-ada9ee3c1c",
+      "history_turns": 0
     },
     {
-      "id": "ask-us-2026-10-07-2",
+      "id": "ask-us-2026-10-07-7806926c6c",
       "market": "us",
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:42:00Z",
@@ -47,15 +61,34 @@
         {
           "id": "eod-us-2026-10-06",
           "kind": "eod_analyses",
-          "as_of": "2026-10-06T22:40:00Z"
+          "as_of": "2026-10-06",
+          "source": "rm.compare _"
         }
       ],
       "as_of": "2026-10-07T11:42:00Z",
       "not_in_data": false,
-      "declined": null
+      "declined": null,
+      "status": "answered",
+      "sources": [
+        {
+          "read_model": "rm.compare",
+          "page_key": "_",
+          "found": true,
+          "as_of": "2026-10-06"
+        },
+        {
+          "read_model": "rm.review",
+          "page_key": "_",
+          "found": true,
+          "as_of": "2026-10-06"
+        }
+      ],
+      "cost_usd": 0.0142,
+      "conversation_id": "ask-us-2026-10-07-ada9ee3c1c",
+      "history_turns": 1
     },
     {
-      "id": "ask-us-2026-10-07-3",
+      "id": "ask-us-2026-10-07-6fc7406e32",
       "market": "us",
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:45:00Z",
@@ -65,10 +98,15 @@
       "cited": [],
       "as_of": "2026-10-07T11:45:00Z",
       "not_in_data": false,
-      "declined": "advice"
+      "declined": "advice",
+      "status": "declined",
+      "sources": [],
+      "cost_usd": 0.0031,
+      "conversation_id": "ask-us-2026-10-07-6fc7406e32",
+      "history_turns": 0
     },
     {
-      "id": "ask-india-2026-10-07-1",
+      "id": "ask-india-2026-10-07-d83d39a599",
       "market": "india",
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:50:00Z",
@@ -82,20 +120,34 @@
         {
           "id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-3d@20261006T121500Z",
           "kind": "paper_trades_settled",
-          "as_of": "2026-10-06T12:15:00Z"
+          "as_of": "2026-10-06",
+          "source": "rm.trades RELIANCE"
         },
         {
           "id": "nse-ann-7790412",
           "kind": "news",
-          "as_of": "2026-10-05T09:20:00Z"
+          "as_of": "2026-10-06",
+          "source": "rm.trades RELIANCE"
         }
       ],
       "as_of": "2026-10-07T11:50:00Z",
       "not_in_data": false,
-      "declined": null
+      "declined": null,
+      "status": "answered",
+      "sources": [
+        {
+          "read_model": "rm.trades",
+          "page_key": "RELIANCE",
+          "found": true,
+          "as_of": "2026-10-06"
+        }
+      ],
+      "cost_usd": 0.0142,
+      "conversation_id": "ask-india-2026-10-07-d83d39a599",
+      "history_turns": 0
     },
     {
-      "id": "ask-india-2026-10-07-2",
+      "id": "ask-india-2026-10-07-4a95617172",
       "market": "india",
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:52:00Z",
@@ -108,15 +160,34 @@
         {
           "id": "eod-india-2026-10-06",
           "kind": "eod_analyses",
-          "as_of": "2026-10-06T12:40:00Z"
+          "as_of": "2026-10-06",
+          "source": "rm.compare _"
         }
       ],
       "as_of": "2026-10-07T11:52:00Z",
       "not_in_data": false,
-      "declined": null
+      "declined": null,
+      "status": "answered",
+      "sources": [
+        {
+          "read_model": "rm.compare",
+          "page_key": "_",
+          "found": true,
+          "as_of": "2026-10-06"
+        },
+        {
+          "read_model": "rm.review",
+          "page_key": "_",
+          "found": true,
+          "as_of": "2026-10-06"
+        }
+      ],
+      "cost_usd": 0.0142,
+      "conversation_id": "ask-india-2026-10-07-d83d39a599",
+      "history_turns": 1
     },
     {
-      "id": "ask-india-2026-10-07-3",
+      "id": "ask-india-2026-10-07-e7c0290e6f",
       "market": "india",
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:55:00Z",
@@ -126,7 +197,25 @@
       "cited": [],
       "as_of": "2026-10-07T11:55:00Z",
       "not_in_data": true,
-      "declined": null
+      "declined": null,
+      "status": "not_in_data",
+      "sources": [
+        {
+          "read_model": "rm.stock",
+          "page_key": "RELIANCE",
+          "found": true,
+          "as_of": "2026-10-06"
+        },
+        {
+          "read_model": "rm.stock_strategies",
+          "page_key": "RELIANCE",
+          "found": true,
+          "as_of": "2026-10-06"
+        }
+      ],
+      "cost_usd": 0.0087,
+      "conversation_id": "ask-india-2026-10-07-e7c0290e6f",
+      "history_turns": 0
     }
   ]
 }

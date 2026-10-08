@@ -586,7 +586,9 @@ def test_catalogue_w40_reviews_are_written_before_the_cut_off_from_trades_settle
 
 def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_close():
     trades = load("paper_trade.json")
-    for payload in load("track_record.json"):
+    for page in load("track_record.json"):   # contract 2.0: {market, track, weekly}
+        payload = page["track"]
+        assert page["market"] == payload["market"] and payload["as_of"] == "2026-10-06"
         assert payload["example_parts"] == ["calls", "weekly"] and payload["skill"]["state"] == "paper"
         mine = [t for t in trades if t["market"] == payload["market"] and t["strategy_id"] == "ai.combined.opus.v1"
                 and t["view"] == "accuracy" and t["status"] == "settled"]
@@ -595,7 +597,7 @@ def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_
         assert sum(r["n"] for r in block["all"]["reliability"]) == len(mine)
         assert sum(b["n"] for b in block["by_horizon"].values()) == len(mine)
         assert all(key.endswith("legacy_cc") for key in block["by_horizon"])
-        (series,) = payload["weekly"]   # the same calls per ISO week of their target date
+        (series,) = page["weekly"]   # the same calls per ISO week of their target date
         assert series["key"] == block["key"] and sum(w["n"] for w in series["weeks"]) == len(mine)
         assert sum(w["hits"] for w in series["weeks"]) == block["all"]["hits"]
         hits = 0   # the engine's close-to-close window: the as-of close to the close h stored bars later
@@ -612,8 +614,18 @@ def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():
     by_id = {r["id"]: r for name in ("paper_trade.json", "eod_analysis.json", "news_item.json") for r in load(name)}
     cut_off = json.loads((CATALOGUE / "assistant_answer.json").read_text(encoding="utf-8"))["as_of"]
     words = {"rule": "Rule strategies", "ai": "AI traders", "baseline": "Baselines"}
-    for answer in load("assistant_answer.json"):
+    answers = load("assistant_answer.json")
+    ids = {a["id"] for a in answers}
+    for answer in answers:
         assert answer["as_of"] <= answer["asked_at"] <= cut_off   # a page at the cut-off can show every answer
+        # B8's record (web/lib/assistant/types.ts AnswerRecord): id form, conversation, status
+        assert re.fullmatch(r"ask-(india|us)-\d{4}-\d{2}-\d{2}-[0-9a-f]{10}", answer["id"])
+        assert answer["conversation_id"] in ids and 0 <= answer["history_turns"] <= 4
+        assert (answer["conversation_id"] == answer["id"]) == (answer["history_turns"] == 0)
+        assert answer["status"] == ("declined" if answer["declined"] else
+                                    "not_in_data" if answer["not_in_data"] else "answered")
+        assert all(c["source"] in {f"{s['read_model']} {s['page_key']}" for s in answer["sources"]}
+                   for c in answer["cited"])
         assert answer["cited_ids"] == [c["id"] for c in answer["cited"]]
         for cited in answer["cited"]:
             assert cited["as_of"] <= answer["as_of"] and cited["id"] in by_id
