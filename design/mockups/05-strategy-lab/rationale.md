@@ -106,6 +106,10 @@ clipped in the heatmap cells ("−₹20025.6k" cut to "−₹2002" on a phone). 
 three significant digits with a unit (k, and lakh / crore for rupees, M for dollars) and no currency symbol (the
 metric switch reads "Profit (₹)" / "Profit ($)"), at 10 px on phones; a sweep of every cell at 8 widths x 2 markets
 x 2 bases x 2 costs x 2 metrics finds none wider than its cell.
+Round 3 found the clipping fixed and two claims false, both corrected before round 4: the 10 px phone rule was
+written before the older 760 px rule for the same selector and never took effect (it now follows that block and
+renders 10 px at 390-599 px), and the formatter rounded after picking the unit, so 99,999 could read "+100.0k"
+(it now rounds to three significant digits first: "+1.00L"); a value that rounds to zero reads "0", unsigned.
 
 Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
 lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;

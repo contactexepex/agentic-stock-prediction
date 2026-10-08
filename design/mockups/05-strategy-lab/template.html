@@ -72,7 +72,6 @@
 .hm td{text-align:center;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:6px;padding:0;height:30px;background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface);overflow:hidden;white-space:nowrap}
 .hm td.e{color:var(--md-sys-color-outline)}
 .hm td span{display:block;padding:0 2px}
-@media (max-width:599px){ .hm td{font-size:10px} .hm td span{padding:0 1px} }
 .hm td[tabindex]:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:-2px}
 .hmleg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:12px;flex-wrap:wrap}
 .hmleg .sc{display:inline-flex;gap:2px} .hmleg .sc i{width:18px;height:12px;border-radius:3px;display:inline-block}
@@ -82,6 +81,7 @@
 @media (max-width:1000px){ .luck svg{display:none} .lb .nm{min-width:120px} .lb .nm small{max-width:200px} .lb .pn small{white-space:normal} .hms{grid-template-columns:1fr} }
 @media (max-width:900px){ .lb .cm{display:none} }
 @media (max-width:760px){ .lb .cm{display:none} .lb th,.lb td,.lb td.num,.lb th.num{padding:8px 6px;white-space:normal} .lb .pn small{max-width:120px;margin-left:auto} .lb .nm{min-width:0} .lb .nm small{white-space:normal;max-width:none} .lb .nm .t{white-space:normal} .lb .mb-label{white-space:normal} .lb .pn small{white-space:normal} .hm th.r{width:92px;font-size:10.5px} .hm td{font-size:10.5px;height:28px} .luck svg{display:none} }
+@media (max-width:599px){ .hm td{font-size:10px} .hm td span{padding:0 1px} }   /* after the 760 px block: the later rule wins */
 @media (max-width:599px){ .ctrls{gap:8px} .ctrls .c{width:100%} .co-tbl td:last-child,.co-tbl th:last-child{display:none} .lb th,.lb td{padding:8px 4px} .lb .pn .alt{display:none} }
 </style>
 </head>
@@ -301,8 +301,9 @@ function drawCum(p) {
 function niceTicks(lo, hi, n) { const span = hi - lo, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag, stepv = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = []; for (let v = Math.ceil(lo / stepv) * stepv; v <= hi; v += stepv) out.push(+v.toFixed(6)); return out; }
 
 /* ---------- heatmaps ---------- */
-/* a heatmap cell's compact profit: at most 3 significant digits and a unit (k; and lakh L / crore Cr for rupees, M for dollars), the sign always, no currency symbol (the metric switch names it), so a cell never clips */
-const kfmt = (cur, v) => { const a = Math.abs(v), sign = v > 0 ? '+' : v < 0 ? '−' : '', units = cur === 'INR' ? [[1e7, 'Cr'], [1e5, 'L'], [1e3, 'k']] : [[1e6, 'M'], [1e3, 'k']];
+/* a heatmap cell's compact profit: rounded to three significant digits first, then a unit (k; lakh L / crore Cr for rupees, M for dollars), the sign always, no currency symbol (the metric switch names it), so a cell never clips and never shows four digits */
+const kfmt = (cur, v) => { const units = cur === 'INR' ? [[1e7, 'Cr'], [1e5, 'L'], [1e3, 'k']] : [[1e6, 'M'], [1e3, 'k']];
+  const a0 = Math.abs(v), a = a0 >= 1 ? Number(a0.toPrecision(3)) : Math.round(a0); if (a === 0) return '0'; const sign = v > 0 ? '+' : '−';
   const u = units.find(([n]) => a >= n); if (!u) return sign + a.toFixed(0); const d = a / u[0]; return sign + (d >= 100 ? d.toFixed(0) : d >= 10 ? d.toFixed(1) : d.toFixed(2)) + u[1]; };
 function heat(title, tipText, rowIds, cols, cellOf, p) {
   const cur = p.currency, box = el('div', {class:'hm'});
