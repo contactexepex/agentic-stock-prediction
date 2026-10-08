@@ -101,8 +101,8 @@ Primary key `(market, page_key)`. One current row per key. Each `rm` table is sm
 
 | Table | page_key | Payload schema (`api/openapi.yaml`) | Serves | Built from (existing code) |
 |---|---|---|---|---|
-| `rm.markets` | `_` (market `_all`) | `MarketList` | `GET /api/v1/markets` | market configs + `rm.status` rows |
-| `rm.status` | `_` | `MarketStatus` | `GET /api/v1/markets/{market}/status` | `market_status.status`, `news_runs`, `rm.builds`, features `computed_at` |
+| (none; B4) | | `MarketList` | `GET /api/v1/markets` | composed by the route from both markets' `rm.status` rows |
+| `rm.status` | `_` | `MarketStatus` | `GET /api/v1/markets/{market}/status` | `warehouse/rm_platform.py` (B4): the shared status block (`rm_common.status_block`: `market_status.status`, runs, benchmark, vol index, regime, paper label) plus plan, newest features and news run |
 | `rm.overview` | `_` | `Overview` | `GET /api/v1/markets/{market}/overview` | `dashboard/assemble.gather_dashboard` head + `market.overview` + `model_info.skill_status`; signal tiers from WS4 (planned) |
 | `rm.watchlist` | `_` | `Watchlist` | `GET /api/v1/markets/{market}/watchlist` | per-company slices of `assemble.company` |
 | `rm.stock` | ticker | `StockDetail` | `GET /api/v1/markets/{market}/stocks/{ticker}` | `assemble.company` minus `bars`, plus events |
@@ -111,6 +111,11 @@ Primary key `(market, page_key)`. One current row per key. Each `rm` table is sm
 | `rm.news` | `_` and ticker | `NewsFeed` | `GET /api/v1/markets/{market}/news[?ticker=]` | `reads.news` + `EvidenceStatuses` + `news_enriched` as of the cut-off |
 | `rm.runs` | `_` | `RunList` | `GET /api/v1/markets/{market}/runs` | `news_runs`, `rm.builds` |
 | `rm.portfolio` (planned, WS4) | `_` | `PaperPortfolio` | `GET /api/v1/markets/{market}/portfolio` | WS4's paper-portfolio data kinds |
+
+Wave 3 (B4, docs/ws/b4.md): every table is a `PageBuilder` of a `warehouse/rm_<page>.py` module, found by name;
+the 1.1 page tables of SPEC section 4 are added by the page sessions B11-B13 with their schemas in
+`api/schemas/<page>.yaml`. The sync checks each payload against its schema (`warehouse/schema_check.py`) before
+writing.
 
 Plus one bookkeeping table (not a page): `rm.builds` (`build_id`, `market`, `kind` = daily|news|full,
 `cutoff`, `source_commit`, `started_at`, `finished_at`, `ok`, `pages_written`, `pages_unchanged`,
@@ -235,6 +240,9 @@ So the design holds under per-second billing and fails under a long per-wake coo
 
 ## 7. Caching and auth
 
+- **Built (B4)**: `web/lib/data/` (handler, cache, store, serve) and `warehouse/revalidate.py` (the sync's call after
+  its commit, MotherDuck only, non-blocking). 1.1 pages are served with `cutoff` and `built_at` at the top and
+  `freshness` in their `status` block, added by the route (docs/ws/b4.md "Serve modes").
 - **Cache**: each handler fetches through Next's data cache with tag `rm:<table>:<market>:<page_key>`
   and `revalidate: 86400` (a daily safety net only). After a build commits, the sync calls
   `POST /api/v1/internal/revalidate` with the keys whose `payload_sha256` changed; the handler calls

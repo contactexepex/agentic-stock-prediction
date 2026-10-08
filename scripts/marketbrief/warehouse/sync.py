@@ -28,9 +28,10 @@ from marketbrief.constants.warehouse import (
     MSG_BAD_NAME,
     MSG_DISABLED,
     MSG_OVER_CEILING,
+    MSG_REVALIDATE_LOCAL,
+    PROVIDER_MOTHERDUCK,
     MSG_SYNC_FAILED,
     READ_MODEL_SCHEMA,
-    READ_MODEL_TABLES,
     SUMMARY_DIR,
     WAREHOUSE_STEP,
 )
@@ -46,6 +47,8 @@ from marketbrief.warehouse.connection import (
 )
 from marketbrief.warehouse.errors import WarehouseError, redact
 from marketbrief.warehouse.read_models import build_rows
+from marketbrief.warehouse.revalidate import revalidate
+from marketbrief.warehouse.rm_registry import tables
 from marketbrief.warehouse.sql_statements import quoted
 from marketbrief.warehouse.sync_records import (
     build_row,
@@ -92,7 +95,7 @@ def write_market(warehouse, market: str, staged: Staged, full: bool) -> dict:
     try:
         if full:
             warehouse.execute(f"DROP SCHEMA IF EXISTS {market} CASCADE")
-            for table in READ_MODEL_TABLES:
+            for table in tables():
                 warehouse.execute(f"DELETE FROM {READ_MODEL_SCHEMA}.{table} WHERE market = ?", [market])
         warehouse.execute(f"CREATE SCHEMA IF NOT EXISTS {market}")
         for name in staged.counts:
@@ -126,6 +129,9 @@ class SyncRun:
         self.facts: dict = {}
         self.page_counts: dict = {}
         self.skipped: str | None = None
+        self.app_url = warehouse_cfg.get("app_url")
+        self.changed_keys: list[dict] = []
+        self.revalidated: str | None = None
 
     def stage(self, con, folder: Path) -> Staged:
         """Write the mirrored tables as Parquet and build the pages; counts go into the run's row."""
@@ -152,6 +158,12 @@ class SyncRun:
         hours = month_hours(self.warehouse, self.row["started_at"])
         return MSG_OVER_CEILING.format(hours=hours, ceiling=self.ceiling) if hours >= float(self.ceiling) else None
 
+    def revalidate(self) -> str:
+        """After the commit: invalidate the app's cache of the changed pages (MotherDuck only; non-blocking)."""
+        if self.target.kind != PROVIDER_MOTHERDUCK or not self.app_url:
+            return MSG_REVALIDATE_LOCAL
+        return revalidate(self.app_url, self.row["run_id"], self.changed_keys)
+
     def run(self, con) -> None:
         """Stage, connect and write (unless over the ceiling). A failure becomes the run's redacted error."""
         staging = paths.ROOT / SUMMARY_DIR
@@ -164,6 +176,8 @@ class SyncRun:
                 if not self.skipped:
                     with self.timer.phase("write"):
                         self.page_counts = write_market(self.warehouse, self.market, staged, self.full)
+                    self.changed_keys = self.page_counts.pop("changed_keys", [])
+                    self.revalidated = self.revalidate()
             self.row["ok"], self.row["error"] = not self.skipped, self.skipped
         except Exception as exc:  # recorded in sync_runs, rm.builds and the summary; sync_market raises it
             self.row["error"] = redact(f"{type(exc).__name__}: {exc}")
@@ -193,6 +207,8 @@ class SyncRun:
         fields.update(self.page_counts)
         if "write_s" in self.timer.seconds:
             fields["write_s"] = self.timer.seconds["write_s"]
+        if self.revalidated is not None:
+            fields["revalidate"] = self.revalidated
         fields["build_ok"] = build["ok"]
         if self.skipped:
             fields["ok"] = True
