@@ -383,3 +383,59 @@ test("explain's reads refuse writes even for agents that list write tools (claud
     assert.equal(r.dispatcher.calls, 0, `${ctx.agent}: no dispatch`);
   }
 });
+
+function usedReads(r: ReturnType<typeof rig>, agent: string, count: number) {
+  for (let index = 0; index < count; index += 1) {
+    r.inbox.commands.push({ id: `cmd-used-${index}`, market: "us", received_at: "2026-10-07T09:00:00.000Z", channel: "slack",
+      actor: "slack:U07ABCD123", agent, tool: "get_overview", kind: "read", arguments: {}, idempotency_key: null,
+      result: "accepted", refusal_code: null, message: null, record_ids: [], budget_left: null, completed_at: "2026-10-07T09:00:00.000Z" });
+  }
+}
+
+test("budget refusals of assistant questions are logged but not reported to the owner (owner, 2026-10-08); others still are", async () => {
+  const assistant = slackContext("U07ABCD123", "assistant");
+  // 1. the assistant's own budget refusal (B8's $ budget)
+  const r = rig();
+  const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async () => ({ result: "refused",
+    refusal_code: "budget_exceeded", message: "The assistant's budget for today is used", data: null }) } });
+  const own = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([own.result, own.refusal_code], ["refused", "budget_exceeded"]);
+  assert.equal(r.inbox.commands.at(-1)?.refusal_code, "budget_exceeded", "still logged");
+  assert.equal(r.notifier.reports.length, 0, "not reported");
+  // 2. the gate's read-budget refusal of explain itself (500 reads used)
+  const g = rig();
+  usedReads(g, "assistant", 500);
+  let asked = 0;
+  const gated = new ToolLayer({ ...g.layer.deps, explainer: { explain: async () => { asked += 1; return { result: "accepted", refusal_code: null, message: null, data: null }; } } });
+  const refused = await gated.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([refused.result, refused.refusal_code, asked, g.notifier.reports.length], ["refused", "budget_exceeded", 0, 0]);
+  // 3. a read the assistant runs for the question, refused for budget: not reported
+  const n = rig();
+  usedReads(n, "assistant", 499);
+  n.reads.put("home", "us", "_", {});
+  const codes: (string | null)[] = [];
+  const nested = new ToolLayer({ ...n.layer.deps, explainer: { explain: async (_ctx, _args, read) => {
+    for (let index = 0; index < 2; index += 1) codes.push((await read("get_overview", { market: "us" })).refusal_code);
+    return { result: "accepted", refusal_code: null, message: null, data: null };
+  } } });
+  await nested.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual(codes, [null, "budget_exceeded"]);
+  assert.equal(n.notifier.reports.length, 0, "the nested budget refusal is not reported");
+  // 4. still reported: a direct read over budget, a write over budget, and any other refusal of a question
+  const d = rig();
+  usedReads(d, "assistant", 500);
+  await d.layer.execute(assistant, "get_overview", { market: "us" });
+  assert.deepEqual(d.notifier.reports.map((report) => report.refusal_code), ["budget_exceeded"]);
+  const k = rig();
+  k.inbox.controls.push({ agent: "assistant", enabled: false });
+  await new ToolLayer({ ...k.layer.deps, explainer: { explain: async () => ({ result: "accepted", refusal_code: null, message: null, data: null }) } })
+    .execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual(k.notifier.reports.map((report) => report.refusal_code), ["kill_switch"]);
+  const w = rig();
+  for (let index = 0; index < 20; index += 1) {
+    await w.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: `react-budget-${String(index).padStart(3, "0")}` }, { confirmedSummary: true });
+  }
+  const over = await w.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "react-budget-over" }, { confirmedSummary: true });
+  assert.equal(over.refusal_code, "budget_exceeded");
+  assert.equal(w.notifier.reports.at(-1)?.refusal_code, "budget_exceeded", "a write over budget is still reported");
+});

@@ -64,6 +64,8 @@ interface LogFields {
   inboxId?: string | null;
   recordIds?: string[];
   budgetLeft: number | null;
+  /** A budget refusal of an assistant question (explain, or a read explain runs): logged, not reported (owner, 2026-10-08). */
+  quietBudget?: boolean;
 }
 
 function marketOf(raw: unknown): string | null {
@@ -146,9 +148,14 @@ export class ToolLayer {
 
   /** Runs one tool call for a caller whose identity the channel adapter verified. */
   async execute(ctx: CallContext, toolName: string, raw: unknown, opts: ExecuteOptions = {}): Promise<ToolOutcome> {
+    return this.run(ctx, toolName, raw, opts, false);
+  }
+
+  /** `forQuestion`: a read the assistant runs while answering an explain call (its budget refusals are not reported). */
+  private async run(ctx: CallContext, toolName: string, raw: unknown, opts: ExecuteOptions, forQuestion: boolean): Promise<ToolOutcome> {
     const now = this.deps.clock();
     const gate = await this.gate(ctx, toolName, raw, now);
-    if (!gate.ok) return this.stopped(ctx, now, toolName, raw, gate);
+    if (!gate.ok) return this.stopped(ctx, now, toolName, raw, gate, forQuestion || gate.tool?.kind === "read_ai");
     const { tool, args } = gate;
     if (tool.kind === "write") return this.write(ctx, now, gate, opts);
     if (tool.kind === "read_ai") return this.explain(ctx, now, gate);
@@ -180,7 +187,7 @@ export class ToolLayer {
         return this.record(ctx, { tool: name, kind: target?.kind ?? null, market: marketOf(readArgs), args: readArgs,
           result: "refused", code: "not_allowed_in_channel", message: `${safeToolName(name) ?? "This tool"} is not a read tool of the ${agent.agent} agent` });
       }
-      return this.execute(ctx, target.name, readArgs);
+      return this.run(ctx, target.name, readArgs, {}, true);
     };
     let answer: ExplainAnswer;
     try {
@@ -193,7 +200,7 @@ export class ToolLayer {
       ? answer.refusal_code : null;
     return this.finish(ctx, now, { ...base, result: answer.result, code,
       message: typeof answer.message === "string" ? answer.message : null,
-      data: redactDeep(answer.data ?? null, this.deps.settings.secrets) });
+      data: redactDeep(answer.data ?? null, this.deps.settings.secrets), quietBudget: true });
   }
 
   /** The summary a caller confirms before a `confirm: summary` write. Nothing is written; a refusal is logged and
@@ -241,11 +248,12 @@ export class ToolLayer {
     return this.finish(ctx, this.deps.clock(), { ...fields, tool: safeToolName(fields.tool), key: null, budgetLeft: null });
   }
 
-  private stopped(ctx: CallContext, now: Date, toolName: string, raw: unknown, gate: Stopped): Promise<ToolOutcome> {
+  private stopped(ctx: CallContext, now: Date, toolName: string, raw: unknown, gate: Stopped, quietBudget = false): Promise<ToolOutcome> {
     const kind = gate.tool?.kind ?? null;
     return this.finish(ctx, now, {
       tool: gate.tool?.name ?? safeToolName(toolName), kind, market: marketOf(raw), args: raw, key: keyOf(raw),
       result: gate.result, code: gate.code, message: gate.message, budgetLeft: this.budgetLeft(gate.agent, gate.usage, kind),
+      quietBudget,
     });
   }
 
@@ -345,7 +353,8 @@ export class ToolLayer {
     } catch {
       logged = false;
     }
-    if (fields.result === "refused" || fields.result === "failed") await this.report(outcome, ctx);
+    const quiet = fields.quietBudget === true && fields.result === "refused" && fields.code === "budget_exceeded";
+    if ((fields.result === "refused" || fields.result === "failed") && !quiet) await this.report(outcome, ctx);
     if (!logged) await this.report({ ...outcome, message: `The command log write failed for ${commandIdValue}` }, ctx);
     return outcome;
   }
