@@ -2,7 +2,7 @@
 // summary and refusals told apart.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newIdempotencyKey, previewCommand, refusalWords, STALE_SUMMARY, submitCommand, type CommandPreview } from "./company-commands-client.ts";
+import { newIdempotencyKey, previewCommand, refusalWords, STALE_SUMMARY, submitCommand, type CommandPreview } from "../company-commands-client.ts";
 
 type Call = { url: string; init: RequestInit };
 function fakeFetch(replies: [number, unknown][]): { fetcher: typeof fetch; calls: Call[] } {

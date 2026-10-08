@@ -2,11 +2,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { filterRows, mostAgreed, sectorsOf, sortRows, watchlistRows, horizonWords, distinctFlags } from "./watchlist-logic.ts";
-import { cumulativeProfit, eodLeaders, expectedGainMoney, groupBy, niceStep, pickSummary, runsOk, viableLine, type HeadToHeadPick } from "./home-logic.ts";
-import { cleanReason, commandArguments, companiesCounts, deactivation, deleteConfirmed, onboardingWords, parseAmount } from "./companies-logic.ts";
+import { filterRows, mostAgreed, sectorsOf, sortRows, watchlistRows, horizonWords, distinctFlags } from "../watchlist.ts";
+import { cumulativeProfit, eodLeaders, expectedGainMoney, groupBy, niceStep, pickSummary, runsOk, viableLine, type HeadToHeadPick } from "../home.ts";
+import { cleanReason, commandArguments, companiesCounts, deactivation, deleteConfirmed, onboardingWords, parseAmount } from "../companies.ts";
 
-const mockup = (page: string) => JSON.parse(readFileSync(new URL(`../../../design/mockups/${page}/data.json`, import.meta.url), "utf8").replace(/\bNaN\b/g, "null"));
+const mockup = (page: string) => JSON.parse(readFileSync(new URL(`../../../../design/mockups/${page}/data.json`, import.meta.url), "utf8").replace(/\bNaN\b/g, "null"));
 
 const fam = (buy: number, of: number) => ({ buy, of });
 const agree = (ticker: string, buy: number, prob: number | null) => ({ ticker, rank: 1, horizon_days: 1, buy, of: 15, by_family: { rule: fam(buy, 8), baseline: fam(0, 3), ai: fam(0, 4) }, avg_prob_up: prob });

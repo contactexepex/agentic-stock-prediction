@@ -5,10 +5,10 @@ import { readFileSync } from "node:fs";
 import {
   agoWords, companiesWithNews, companyRail, dayGroups, filterNews, kindWord, missingSummaries, movers, NEWS_MOVERS_MAX,
   offsetMinutes, paginate, tone, type NewsItem,
-} from "./news-logic.ts";
+} from "../news.ts";
 
 // The mockup file carries a bare NaN (Python json.dump) where the API serves null.
-const data = JSON.parse(readFileSync(new URL("../../../design/mockups/09-news/data.json", import.meta.url), "utf8").replace(/\bNaN\b/g, "null"));
+const data = JSON.parse(readFileSync(new URL("../../../../design/mockups/09-news/data.json", import.meta.url), "utf8").replace(/\bNaN\b/g, "null"));
 
 const item = (over: Partial<NewsItem> & { id: string }): NewsItem => ({
   tickers: [], primary_tickers: [], title: over.id, source: "s", source_domain: "s.example", url: "https://s.example/",
