@@ -2,16 +2,12 @@
 // movers, the filters, the pages, the day groups and the per-company rail. Presentation only: the server selects the
 // window (rm.news, B11); nothing here reads a clock other than the payload's cut-off.
 
-/** The owner's rules of 2026-10-08 (design/mockups/_shared/shell.js). */
-export const NEWS_MOVERS_MAX = 10;
-export const NEWS_PAGE_SIZE = 10;
-export const NEWS_RECENT_HOURS = 24;
-/** The sentiment words: positive above +0.05, negative below -0.05, flat between (shell.js). */
-export const SENTIMENT_FLAT_BAND = 0.05;
+import { CAN_CARRY, NEWS_MOVERS_MAX, NEWS_PAGE_SIZE, NEWS_RECENT_HOURS, SENTIMENT_FLAT_BAND } from "../ui/constants.ts";
+import { offsetMinutes } from "../ui/format.ts";
+
+export { CAN_CARRY, NEWS_MOVERS_MAX, NEWS_PAGE_SIZE, NEWS_RECENT_HOURS, SENTIMENT_FLAT_BAND, offsetMinutes };
 /** Owner decision 2026-10-08: Home shows the top 5 market movers; the News page the rest (01-home template). */
 export const HOME_NEWS_MAX = 5;
-/** The statuses that may be the main evidence of a call (DESIGN.md 3b). */
-export const CAN_CARRY = ["confirmed_primary", "corroborated"] as const;
 
 export interface NewsEnrichment {
   event_type: string | null;
@@ -130,12 +126,6 @@ export function paginate<T>(items: readonly T[], page: number, size: number = NE
   const pages = Math.max(1, Math.ceil(items.length / size));
   const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
   return { page: current, pages, items: items.slice((current - 1) * size, current * size) };
-}
-
-/** Minutes east of UTC from the market's `session.local_time` ("...+05:30"). */
-export function offsetMinutes(localTime: string | null | undefined): number {
-  const m = /([+-])(\d\d):(\d\d)$/.exec(localTime ?? "");
-  return m ? (m[1] === "-" ? -1 : 1) * (60 * Number(m[2]) + Number(m[3])) : 0;
 }
 
 /** The market-local calendar date (YYYY-MM-DD) of an ISO time. */
