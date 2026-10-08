@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { LIGHTWEIGHT_CHARTS } from "../vendor.ts";
+import { INTER_FONT, LIGHTWEIGHT_CHARTS } from "../vendor.ts";
 
 const web = join(import.meta.dirname, "..", "..", "..");
 
@@ -25,8 +25,20 @@ test("the vendored chart library matches its pin, its NOTICE and the dashboard's
 });
 
 test("no stylesheet or component loads anything from another origin", () => {
-  for (const f of ["styles/tokens.css", "styles/components.css", "styles/page.css", "styles/app.css", "app/layout.tsx", "components/charts/candles.tsx"]) {
+  for (const f of ["styles/fonts.css", "styles/tokens.css", "styles/components.css", "styles/page.css", "styles/app.css", "app/layout.tsx", "components/charts/candles.tsx"]) {
     const text = readFileSync(join(web, f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     assert.ok(!/@import|url\(\s*["']?https?:|src=["']https?:/.test(text), f);
   }
+});
+
+test("the self-hosted Inter files match their pins, the NOTICE and fonts.css", () => {
+  const notice = readFileSync(join(web, "public", INTER_FONT.dir, "NOTICE"), "utf8");
+  const css = readFileSync(join(web, "styles", "fonts.css"), "utf8");
+  for (const [file, sha] of Object.entries(INTER_FONT.files)) {
+    const hex = createHash("sha256").update(readFileSync(join(web, "public", INTER_FONT.dir, file))).digest("hex");
+    assert.equal(hex, sha, file);
+    assert.ok(notice.includes(hex), `NOTICE names ${file}`);
+    assert.ok(css.includes(`${INTER_FONT.dir}/${file}`), `fonts.css loads ${file}`);
+  }
+  assert.ok(readFileSync(join(web, "public", INTER_FONT.dir, "OFL.txt"), "utf8").includes("SIL OPEN FONT LICENSE Version 1.1"));
 });

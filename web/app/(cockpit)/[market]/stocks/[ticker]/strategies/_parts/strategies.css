@@ -1,0 +1,50 @@
+/* Stock strategies page (design/mockups/04-stock-strategies/template.html page CSS). Tokens only. */
+.cohead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.cohead .px{font:700 22px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.4px}
+.cohead .mb-delta{font-size:14px}
+/* agreement by horizon: grouped stacked bars */
+.agc svg{display:block;width:100%;height:auto}
+.agc .grid line{stroke:var(--mb-chart-grid)} .agc .axis text{font-size:11px;fill:var(--mb-chart-label)}
+.agc .axis text.on{fill:var(--md-sys-color-primary);font-weight:700}
+.agc rect.r{fill:var(--mb-chart-1)} .agc rect.b{fill:var(--mb-chart-2)} .agc rect.a{fill:var(--mb-chart-3)}
+.agc rect.dim{opacity:.45} .agc rect.hit{fill:transparent}
+.agc text.tot{font-size:12px;font-weight:700;fill:var(--md-sys-color-on-surface)}
+.agl{display:grid;gap:8px;margin-top:10px}
+.agl .row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-size:13px}
+.agl .row .l{color:var(--md-sys-color-on-surface-variant);width:70px}
+.agl .bar{height:8px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);overflow:hidden;display:flex}
+.agl .bar i{display:block;height:100%}
+/* head-to-head (as on Home) */
+.fams{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fam-box{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.fam-box .fh{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;flex-wrap:wrap}
+.fam-box .fh b{font-weight:700;font-size:13px}
+.fam-box .fh small{color:var(--md-sys-color-on-surface-variant);min-width:0;overflow-wrap:anywhere}
+.pk{display:grid;grid-template-columns:1fr;gap:3px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px;min-width:0}
+.pk .rule{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.pk .line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.pk .det{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);overflow-wrap:anywhere}
+.pk .gain{font-weight:700;font-size:14px;margin-left:auto;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pk .gain .mb-label{font-size:11px;padding:1px 6px}
+.cand{margin-top:8px;font-size:12px} .cand summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12.5px}
+.cand table{margin-top:6px} .cand td,.cand th{padding:5px 6px;font-size:12px}
+.sumline{display:flex;align-items:center;gap:10px;font-size:13px;padding:10px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);margin-bottom:12px}
+/* ranked strategies table */
+.rk td{vertical-align:middle}
+.rk .nm b{display:block;font-size:13.5px} .rk .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;max-width:220px}
+.rk .pn b{font-size:14px;font-weight:700} .rk .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+.rk tr.few td{color:var(--md-sys-color-on-surface-variant)} .rk tr.few .pn b{color:var(--md-sys-color-on-surface-variant)}
+.rk tr.none td{color:var(--md-sys-color-on-surface-variant)}
+.rk .call{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rk .rank{font-weight:700;color:var(--md-sys-color-primary);text-align:center;width:28px}
+.rk tr.best td{background:color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent)}
+.pick-co{display:inline-flex;align-items:center;gap:8px}
+.head .end{min-width:0;max-width:100%} .md-segmented{max-width:100%;flex-wrap:wrap}
+.rk .ov b{font-size:13px;font-weight:600} .rk .ov small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+@media (max-width:1599px){ .rk th.c4,.rk td.c4{display:none} }
+@media (max-width:1439px){ .rk th{padding:8px 8px} .rk td{padding:8px 8px} }
+@media (max-width:1359px){ .rk th.cw,.rk td.cw{display:none} }
+@media (max-width:1199px){ .rk th.c2,.rk td.c2{display:none} .rk .call{display:grid;gap:4px;justify-items:start} }
+@media (max-width:760px){ .rk th.cm,.rk td.cm{display:none} .fams{grid-template-columns:1fr} .rk .nm small{white-space:normal;max-width:none} .rk th,.rk th.num{padding:8px 6px;white-space:normal;line-height:1.25} .rk td{padding:8px 6px} .rk .pn small{white-space:normal} .rk .nm b{white-space:normal} .rk .call .mb-odds svg{width:40px} .rk .call > .muted{white-space:normal} .rk .call .mb-label{white-space:normal} .rk .pn > span{white-space:normal;display:inline-block;max-width:112px} .rk .pn small .sep{display:block;height:0;overflow:hidden} }
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+@media (max-width:599px){ .mb-kpi .labs .mb-label{white-space:normal;text-align:left} }

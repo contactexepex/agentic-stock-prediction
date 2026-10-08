@@ -1022,10 +1022,11 @@ always show the same numbers.
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
   bot token the summary is posted alone through the webhook. `notify_slack.py` posts nothing else.
-- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** `alerts.py` keeps its own
-  thread per market and day (its first post of the day starts it) with the morning paper picks, the intraday
-  alerts of each check run (B9's feed), the close results and correction replies. From Wave 5 the morning picks
-  open that thread and the brief above replies in it (`post_brief`), so each market has one thread a day. The
+- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** one thread per market and day,
+  started by the day's first post: the morning paper picks (`alerts.py morning`, run before `notify_slack.py`), the
+  brief above with its charts, report and dashboard (`notify_slack.py` posts its summary through `post_brief`, a
+  reply in that thread, once per day), the intraday alerts of each check run (B9's feed), the close results and
+  correction replies. A `--text` message (market closed) is posted on its own. The
   weekly research report is its own post and onboarding confirmations reply to the command that asked. Every signal is
   labelled Paper and every number comes from stored data as of the run's clock. The ledger
   `data/<market>/slack_posts/` makes every post idempotent.

@@ -1,0 +1,13 @@
+/* A company's call history for one session (B15; built from the 03 mockup's parts). Page-local layout only; tokens. */
+.daynav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 2px}
+.lcy td{vertical-align:middle}
+.lcy .nm b{display:block;font-size:13px;font-weight:600} .lcy .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.lcy .call{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lcy .call .mb-label{font-size:11px;padding:1px 6px}
+.lcy .tgt{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.lcy .tgt .rng svg{width:100px}
+.path{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px}
+.path .step{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:var(--md-sys-shape-corner-full);border:1px dashed var(--md-sys-color-outline-variant);color:var(--md-sys-color-on-surface-variant);white-space:nowrap}
+.path .step.on{border-style:solid;color:var(--md-sys-color-on-surface)}
+.path .step .ms{width:14px;height:14px}
+@media (max-width:760px){ .lcy .cm{display:none} .lcy th,.lcy td{padding:8px 6px;white-space:normal} .lcy .nm b{white-space:normal} .lcy .call{display:grid;gap:4px;justify-items:start} .lcy .call .mb-odds svg{width:40px} .path{display:grid;justify-items:start} .path .step{white-space:normal} }

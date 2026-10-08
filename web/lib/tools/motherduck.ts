@@ -1,5 +1,6 @@
 // MotherDuck through its Postgres endpoint (ARCHITECTURE.md section 6): the read models in market_brief with
-// MOTHERDUCK_READ_TOKEN, the inbox in market_brief_inbox with MOTHERDUCK_INBOX_TOKEN (its own service account).
+// MOTHERDUCK_READ_TOKEN, the inbox in market_brief_inbox with MOTHERDUCK_INBOX_TOKEN (the owner's all-privileges token,
+// owner decision 2026-10-08; docs/ws/b5.md).
 // Pool size 1, statement timeout 5 s, TLS verified, no retries inside a request. Errors never carry driver text out.
 import pg from "pg";
 import type { AgentUsage, CommandLogRow, InboxRequest, InboxStore, ReadModelRow, ReadStore, StoredRequest } from "./types.ts";

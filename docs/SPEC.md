@@ -525,11 +525,12 @@ inbox (same validators), runs the deterministic onboarding for adds, commits to 
 and retry so it never races a routine's push), and replies in Slack. If the dispatch fails, or if a
 source refuses GitHub's runners (to be verified in session B1 for NSE, Yahoo and SEC), the next
 scheduled run imports the inbox. The inbox lives in its own MotherDuck database `market_brief_inbox`
-written by a separate service account (the Lite plan has 2), because MotherDuck tokens are not
-scoped per schema: a leaked inbox token cannot touch `market_brief`. This changes ARCHITECTURE.md
+written with `MOTHERDUCK_INBOX_TOKEN`. Owner decision 2026-10-08: that token is the owner's all-privileges token, the
+same account as `market_brief` (first planned as a separate service account, since MotherDuck tokens are not scoped
+per schema), so a leaked inbox or gateway token reaches `market_brief` too (docs/ws/b5.md). This changes ARCHITECTURE.md
 sections 1, 2, 3, 8 and 9 (schema `inbox` inside `market_brief`); session B4 proposes the edits in
 `docs/ws/b4.md` and the orchestrator applies them. The importer
-(`onboard.yml` and the routine runs) reads the inbox with that account's token
+(`onboard.yml` and the routine runs) reads the inbox with that token
 (`MOTHERDUCK_INBOX_TOKEN`, stored in the cloud environment and as a GitHub Actions secret). The UI shows the request as
 "pending" until the import is in `data/`.
 
@@ -651,7 +652,7 @@ trades to rank"), and keeps the best strategy overall beside the per-company bes
 |---|---|---|
 | Claude Code routines | all computation and agents (schedules below); builds in cloud sessions | none |
 | GitHub | source of truth (`data/`), CI, Actions workflow `onboard.yml` for writes from the web tier | a fine-grained token (Actions read and write, this repo only) for Vercel |
-| MotherDuck | `market_brief` (`base`, `rm`, `meta`, `app`) and `market_brief_inbox` | a read-only token for the dashboard; a second service account with its token for the inbox |
+| MotherDuck | `market_brief` (`base`, `rm`, `meta`, `app`) and `market_brief_inbox` | a read-only token for the dashboard; the owner's all-privileges token for the inbox (owner decision 2026-10-08) |
 | Vercel | the `web/` app as two projects: the dashboard (Vercel Authentication) and the gateway (`MB_GATEWAY=1`, no Vercel Authentication, only `/slack/*`, `/mcp` and its OAuth routes); the existing `reports/` site until retired | create the two projects; add environment variables |
 | Slack | existing app gains `/company`, `/trade`, `/ask` and interactivity pointing at the gateway | add the commands and the request URL in the Slack app settings (exact steps provided) |
 | Claude app | custom connector to the gateway's `/mcp` with GitHub sign-in | add the connector once `/mcp` is live |
@@ -820,7 +821,7 @@ review at 2 months (decision 23).
 | When | Action |
 |---|---|
 | Before Wave 5 switches on paper trading (B2 merges with the owner-provided values) | Confirm the broker charges of decisions 49 and 52 (F1.6): from an Axis Direct contract note, the 0.75% brokerage and its ₹50 minimum, GST, STT, stamp duty, the ₹200 NRO Non-PIS reporting charge per trade date and the DP charge per sale (still provisional); from the BUX app or site, the €0.99 order fee, the 0.75% FX markup and the 0.20% a year portfolio fee |
-| Before B4/B5 go live (Waves 2-3) | Create the two Vercel projects; MotherDuck read token and inbox service account; GitHub fine-grained token |
+| Before B4/B5 go live (Waves 2-3) | Create the two Vercel projects; MotherDuck read token and the inbox token (the owner's all-privileges token, decision 2026-10-08); GitHub fine-grained token |
 | Before B5 Slack | Add `/company`, `/trade`, `/ask` and the interactivity URL to the Slack app |
 | Before B8 | Anthropic workspace with a $20 monthly limit and a key in it |
 | After B5 | Add the Claude app connector |

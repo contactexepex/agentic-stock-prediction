@@ -1,0 +1,115 @@
+/* Company page (design/mockups/03-company/template.html page CSS, unchanged except the mockup-only example picker). Tokens only. */
+.cohead{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-top:14px}
+.cohead .px{font:700 26px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.5px}
+.cohead .px small{font:500 12.5px/1.2 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);display:block;margin-top:3px;letter-spacing:0}
+.cohead .mb-delta{font-size:15px}
+.cohead .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.cohead .md-btn{height:34px}
+/* decision card */
+.dec{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.dec .cell{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;align-content:start;gap:6px}
+.dec .cell .l{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;align-items:center;gap:6px}
+.dec .cell .v{font:700 22px/1.15 var(--md-ref-typeface-plain);letter-spacing:-.3px;overflow-wrap:anywhere}
+.dec .cell .v small{font:500 13px/1.2 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);letter-spacing:0}
+.dec .cell .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);overflow-wrap:anywhere}
+.fb{display:grid;gap:4px;margin-top:2px}
+.fb .r{display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;font-size:12px}
+.fb .r .l{color:var(--md-sys-color-on-surface-variant)}
+.fb .bar{height:7px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);overflow:hidden;display:flex}
+.fb .bar i{display:block;height:100%}
+.pkl{display:grid;gap:8px} .pkl .p{display:grid;gap:3px;font-size:12.5px;min-width:0;padding-top:6px;border-top:1px solid var(--md-sys-color-surface-container-high)} .pkl .p1,.pkl .p2{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0} .pkl .p1 small{font-size:11.5px}
+.pkl .p .g{font-weight:700} .pkl .p .mb-label{font-size:11px;padding:1px 6px}
+.plain{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);margin-top:14px;line-height:1.5}
+.plain .ms{flex:none;width:20px;height:20px;color:var(--md-sys-color-primary);margin-top:2px}
+/* price chart */
+.chart{position:relative;margin-top:4px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart svg:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:4px;border-radius:6px}
+.chart .grid line{stroke:var(--mb-chart-grid)} .chart .ax text{font-size:11px;fill:var(--mb-chart-label)} .chart .ax text.on{fill:var(--md-sys-color-primary);font-weight:700}
+.chart .ax line{stroke:var(--mb-chart-axis)}
+.chart .c .w{stroke:var(--mb-chart-ink);stroke-width:1} .chart .c.up .b{fill:var(--md-sys-color-surface-container-lowest);stroke:var(--mb-color-up);stroke-width:1.2} .chart .c.dn .b{fill:var(--mb-color-down);stroke:var(--mb-color-down);stroke-width:1.2}
+.chart .c.up .w{stroke:var(--mb-color-up)} .chart .c.dn .w{stroke:var(--mb-color-down)}
+.chart .vol rect{fill:var(--mb-chart-axis);opacity:.35}
+.chart .fan .b80{fill:var(--mb-chart-band-80)} .chart .fan .b50{fill:var(--mb-chart-band-50)}
+.chart .fan .tl{stroke:var(--mb-chart-1);stroke-width:1.5;stroke-dasharray:4 3;fill:none}
+.chart .fan .tg{fill:var(--mb-chart-1);stroke:var(--md-sys-color-surface-container-lowest);stroke-width:1.5}
+.chart .fan .tg.on{r:5}
+.chart .fan .spread{stroke:var(--mb-chart-3);stroke-width:3;stroke-linecap:round}
+.chart .fan text{font-size:11px;fill:var(--md-sys-color-on-surface);font-weight:600;paint-order:stroke;stroke:var(--md-sys-color-surface-container-lowest);stroke-width:3px;stroke-linejoin:round}
+.chart .mk text{paint-order:stroke;stroke:var(--md-sys-color-surface-container-lowest);stroke-width:3px}
+.chart .vl{stroke:var(--mb-chart-axis);stroke-dasharray:3 3} .chart .vl.on{stroke:var(--md-sys-color-primary)}
+.chart .last line{stroke:var(--mb-chart-ink);stroke-dasharray:2 3} .chart .last rect{fill:var(--mb-chart-ink)} .chart .last text{fill:var(--md-sys-color-surface-container-lowest);font-size:11px;font-weight:700}
+.chart .ttag line{stroke:var(--mb-chart-1);stroke-dasharray:2 2} .chart .ttag rect{fill:var(--mb-chart-1)} .chart .ttag text{fill:var(--md-sys-color-on-primary);font-size:11px;font-weight:700}
+.chart .mk .en{fill:var(--mb-chart-1)} .chart .mk .ex{fill:var(--mb-chart-4)} .chart .mk .op{fill:var(--md-sys-color-surface-container-lowest);stroke:var(--mb-chart-1);stroke-width:1.5}
+.chart .mk text{font-size:9.5px;fill:var(--md-sys-color-on-surface-variant)}
+.chart .hover line{stroke:var(--md-sys-color-on-surface);stroke-dasharray:2 2;opacity:.6}
+.chart .hover circle{fill:var(--md-sys-color-primary);stroke:var(--md-sys-color-surface-container-lowest);stroke-width:2}
+.chart .hit{fill:transparent;cursor:crosshair}
+.ctip{position:absolute;pointer-events:none;background:var(--md-sys-color-inverse-surface);color:var(--md-sys-color-inverse-on-surface);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.4;box-shadow:var(--mb-card-shadow);display:none;z-index:2;max-width:230px}
+.ctip.on{display:block} .ctip b{font-weight:700} .ctip .mono{font-variant-numeric:tabular-nums}
+.chleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:8px;align-items:center}
+.chleg i{display:inline-block;vertical-align:-2px;margin-right:4px}
+.chleg .cu{width:8px;height:12px;border:1.5px solid var(--mb-color-up);border-radius:2px} .chleg .cd{width:8px;height:12px;background:var(--mb-color-down);border-radius:2px}
+.chleg .b8{width:14px;height:10px;background:var(--mb-chart-band-80);border-radius:3px} .chleg .b5{width:14px;height:10px;background:var(--mb-chart-band-50);border-radius:3px}
+.chleg .tg{width:9px;height:9px;border-radius:50%;background:var(--mb-chart-1)} .chleg .sp{width:3px;height:12px;background:var(--mb-chart-3);border-radius:2px}
+.chleg .tri{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent}
+.chleg .tri.en{border-bottom:9px solid var(--mb-chart-1)} .chleg .tri.ex{border-top:9px solid var(--mb-chart-4)}
+.ctl{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* tables */
+.ot td,.sd td{vertical-align:middle}
+.ot .h-lab,.sd .h-lab{font-size:11.5px}
+.ot .nm b,.sd .nm b{display:block;font-size:13px;font-weight:600} .ot .nm small,.sd .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.sd .pn b{font-weight:700} .sd .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.why{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.why svg{width:110px;height:14px;display:block;flex:none}
+.why .z{stroke:var(--mb-chart-axis)} .why .m{fill:var(--mb-chart-1)} .why .s{fill:var(--mb-chart-2)} .why .n{fill:var(--mb-chart-3)} .why .co{fill:var(--mb-chart-4)}
+.why .mb-label{font-size:11px;padding:1px 6px}
+.sumrow{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:13px;margin-bottom:12px}
+.sumrow b{font-size:16px;display:block} .sumrow span{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+/* reasons, news, results, events, lifecycle */
+.rl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.rl li{padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;display:grid;gap:5px}
+.rl li:first-child{border-top:0}
+.rl .rh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.rl .rh b{color:var(--md-sys-color-on-surface)}
+.rl .ids{display:flex;gap:4px;flex-wrap:wrap} .rl .ids code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere}
+.nl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.nl li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;min-width:0}
+.nl li:first-child{border-top:0}
+.nl .hd{min-width:0;overflow-wrap:anywhere} .nl .hd a.t{display:block;color:inherit;text-decoration:none;font-weight:600} .nl .hd a.t:hover{text-decoration:underline}
+.nl .hd small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:3px}
+.nl .hd .md-badge{display:inline-flex;margin:3px 0 0;vertical-align:middle}
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px}
+.nums .n{border-radius:8px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.nums .n .l{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)} .nums .n .v{font-weight:700;font-size:15px;overflow-wrap:anywhere} .nums .n .d{font-size:12px;display:flex;flex-wrap:wrap;gap:0 4px;align-items:center;line-height:1.5}
+.rline{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:12.5px;margin-top:10px;color:var(--md-sys-color-on-surface-variant)}
+.rline b{color:var(--md-sys-color-on-surface)}
+.bul{margin:8px 0 0;padding-left:18px;font-size:13px} .bul li{margin:4px 0}
+.ev{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.ev li{display:grid;grid-template-columns:54px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.ev li:first-child{border-top:0}
+.ev .d{font-weight:700;font-size:12.5px;line-height:1.25} .ev .d small{display:block;font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.ev .t{min-width:0;overflow-wrap:anywhere} .ev .t small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:2px}
+.ev li.me .d{color:var(--md-sys-color-primary)}
+.lc{display:grid;gap:8px;font-size:13px}
+.lc .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .lc .row .l{color:var(--md-sys-color-on-surface-variant);width:118px;font-size:12.5px}
+.lc .hist{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.pend{display:grid;gap:6px;margin-top:10px}
+dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(460px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog .dbody input{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:inherit;background:var(--md-sys-color-surface)}
+dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+@media (max-width:1279px){ .ot .cw{display:none} }
+@media (max-width:1199px){ .dec{grid-template-columns:repeat(2,minmax(0,1fr))} .sd .cw{display:none} }
+@media (max-width:1000px){ .why svg{width:80px} }
+@media (max-width:760px){ .ot .cm,.sd .cm{display:none} .nums{grid-template-columns:1fr 1fr} .ot th,.ot td,.sd th,.sd td{padding:8px 6px;white-space:normal} .ot .nm b,.sd .nm b{white-space:normal} .ot .st{white-space:normal;display:inline} .ot .mb-label,.sd .mb-label{white-space:normal} .ot .nm small,.sd .nm small{white-space:normal} }
+@media (max-width:599px){ .dec{grid-template-columns:1fr} .cohead .acts{margin-left:0;width:100%} .cohead .px{font-size:22px} .lc .row .l{width:100%} }
+/* B15: the two trade tables fit their wrapper whatever font the browser falls back to (the mockup was sized on
+   Inter): number headers may wrap, the entry → exit dates take their own line where they show (>= 1280 px), and
+   phones get narrower cell padding. After the mockup's media rules so these win. */
+.ot th.num,.sd th.num{white-space:normal}
+@media (min-width:1280px){ .ot small.dates{display:block;white-space:nowrap} }
+@media (max-width:760px){ .ot th,.ot td,.sd th,.sd td{padding-left:4px;padding-right:4px} }
