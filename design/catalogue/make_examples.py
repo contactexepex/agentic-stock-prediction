@@ -4,7 +4,8 @@ Every file is marked `"_example": true`. Prices, benchmark and sector moves are 
 (`ohlc_raw`, 2026-09-29 .. 2026-10-06, read on 2026-10-07) and today's ranges' widths from the stored 1d/5d ranges;
 everything else (strategy probabilities, trades, reasons, news, commands, the owner's portfolio) is INVENTED to show
 the shape and is computed here from those inputs so the files agree with each other (quantities, costs, P&L,
-agreement counts, scoreboard sums). Costs come from B2's engine with config/costs.yaml's rates (marked verify).
+agreement counts, scoreboard sums). Costs come from B2's engine with config/costs.yaml's rates
+(statutory ones marked verify, the `broker:` charges owner-confirmed 2026-10-08).
 Sessions come from the real market calendar (India 2026-10-02 is a holiday). Rerun after a change:
 
     python design/catalogue/make_examples.py   # about a minute: the back-test examples run B2's back-test
@@ -35,7 +36,8 @@ CURRENCY = {"india": "INR", "us": "USD"}
 DEFAULT_AMOUNT = {"india": 100000.0, "us": 1000.0}
 MADE_AT = {"india": "T02:10:00Z", "us": "T11:45:00Z"}   # pre-open runs: 07:40 IST, 07:45 New York (EDT)
 EURUSD = 1.1700   # example rate; B2 collects EURUSD=X
-# Cost rates: config/costs.yaml (statutory rates and the owner's `broker:` charges, all marked verify), applied by
+# Cost rates: config/costs.yaml (statutory rates marked verify; the owner's `broker:` charges,
+# owner-confirmed 2026-10-08), applied by
 # B2's engine (marketbrief/lab/costs.py).
 
 # Stored bars (ohlc_raw): ticker -> date -> (open, high, low, close).

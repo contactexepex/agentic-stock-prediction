@@ -935,8 +935,9 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   deals backfill. Rows keep their real publication/acceptance times (`first_seen_at` = the
   backfill time), which is what `prepare` filters on. Summary in `S/backfill-<M>.json`.
 - `prepare --market M --date D --root R [--source S]`: cutoff = the routine's start on the session
-  after D (08:15 ET, 08:10 IST: the start times until 2026-10-07; `CUTOFF_LOCAL` in
-  `constants/ai_replay.py` moves to the new times of section 2 in the app roadmap's Wave 5, docs/SPEC.md section 10). R gets copies of `config/`, `sql/`, `templates/` and
+  after D (07:45 ET, 07:40 IST: the start times of section 2 since 2026-10-07, SPEC decision 31; `CUTOFF_LOCAL` in
+  `constants/ai_replay.py`; every as-of date uses them, also those before the change, when the routine started
+  30 minutes later, so a replay's cutoff is never later than that day's real start). R gets copies of `config/`, `sql/`, `templates/` and
   `data/<M>/` with only rows public by the cutoff: bars dated <= D; SEC rows by acceptance time
   (else the end of the filing date, as the `fundamentals_*_asof` macros), NSE rows by publication
   time; events first seen by the cutoff plus backfilled past events dated <= D; predictions, ranges,

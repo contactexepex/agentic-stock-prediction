@@ -10,7 +10,7 @@ SAMPLE_START, SAMPLE_END, SAMPLE_STEP = date(2026, 7, 1), date(2026, 9, 25), 5
 
 # The data cutoff (and made_at) is the routine's scheduled start on the next session, exchange time
 # (docs/DESIGN.md section 2); other markets: REGULAR_LEAD before the open.
-CUTOFF_LOCAL = {"india": time(8, 10), "us": time(8, 15)}
+CUTOFF_LOCAL = {"india": time(7, 40), "us": time(7, 45)}
 
 REGULAR_LEAD = timedelta(minutes=75)
 
