@@ -7,6 +7,7 @@ export const ALLOWED_HOSTS = new Set([
   "query1.finance.yahoo.com",  // symbol search for the add summary
   "query2.finance.yahoo.com",
   "www.sec.gov",               // ticker -> CIK map for the add summary
+  "api.anthropic.com",         // Claude API: the assistant's explain tool (B8)
 ]);
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;

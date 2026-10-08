@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CHANNEL, MSFT, SECRETS, USER, commandParams, slackRig } from "./fakes.ts";
+import { ToolLayer } from "../executor.ts";
 import { hmacHex } from "../crypto.ts";
 import { SLACK_CHANNEL_ID } from "../constants.ts";
 import { MAX_AGE_SECONDS, verifiedBody, verifySlackRequest } from "../../../app/slack/_lib/verify.ts";
@@ -187,13 +188,45 @@ test("/trade opens the form and its submission records a pending paper trade", a
   assert.equal(s.slack.updated.at(-1)?.view.title.text, "Pending");
 });
 
-test("/ask answers coming soon, is logged, and writes nothing", async () => {
+test("/ask market question: replies at once, then the explain answer goes to the response_url (assistant agent)", async () => {
   const s = slackRig();
-  const reply = await handleCommand(commandParams("/ask", "why did AAPL fall?"), s.deps);
-  assert.match(JSON.stringify(reply.body), /coming soon/);
-  assert.equal(s.inbox.commands.at(-1)?.tool, "explain");
-  assert.equal(s.inbox.commands.at(-1)?.result, "accepted");
+  const reply = await handleCommand(commandParams("/ask", "us why did AAPL fall?"), s.deps);
+  assert.match(JSON.stringify(reply.body), /Looking that up in the stored data/);
+  await s.settle();
+  assert.equal(s.slack.responses.length, 1);
+  assert.equal(s.slack.responses[0].url, "https://hooks.slack.com/commands/T0/1/abc");
+  assert.match(s.slack.responses[0].body.text, /coming soon/, "no assistant wired: the coming-soon answer");
+  assert.equal(s.slack.responses[0].body.response_type, "ephemeral");
+  const logged = s.inbox.commands.at(-1)!;
+  assert.deepEqual([logged.tool, logged.agent, logged.actor, logged.result, logged.market], ["explain", "assistant", `slack:${USER}`, "accepted", "us"]);
   assert.equal(s.inbox.requests.length, 0);
+});
+
+test("/ask without a market word gets the usage line, logged as refused; nothing is asked", async () => {
+  const s = slackRig();
+  for (const text of ["why did AAPL fall?", "us", ""]) {
+    const reply = await handleCommand(commandParams("/ask", text), s.deps);
+    assert.match(JSON.stringify(reply.body), /Usage: \/ask india\|us/);
+    assert.equal(s.inbox.commands.at(-1)?.result, "refused");
+    assert.equal(s.inbox.commands.at(-1)?.refusal_code, "validation_failed");
+  }
+  await s.settle();
+  assert.equal(s.slack.responses.length, 0);
+});
+
+test("/ask: a question over 500 characters is refused by the gate; an answer shows its text, sources and as-of", async () => {
+  const s = slackRig();
+  await handleCommand(commandParams("/ask", `india ${"x".repeat(501)}`), s.deps);
+  await s.settle();
+  assert.match(s.slack.responses[0].body.text, /^Not done: /);
+  assert.equal(s.inbox.commands.at(-1)?.refusal_code, "validation_failed");
+  s.deps.tools = new ToolLayer({ ...s.layer.deps, explainer: { explain: async () => ({ result: "accepted", refusal_code: null,
+    message: null, data: { text: "AAPL fell with the market <!channel>", cited_ids: ["news-1"], as_of: "2026-10-07T01:00:00Z", not_in_data: false } }) } });
+  await handleCommand(commandParams("/ask", "us why did AAPL fall?"), s.deps);
+  await s.settle();
+  const body = s.slack.responses.at(-1)!.body;
+  assert.equal(body.text, "AAPL fell with the market <!channel>\nSources: news-1\nAs of 2026-10-07T01:00:00Z\nResearch only, not advice.");
+  assert.equal(body.blocks[0].text.type, "plain_text", "plain text: nothing in an answer can ping or link");
 });
 
 test("an unknown slash command is refused, logged and reported (issue #109)", async () => {

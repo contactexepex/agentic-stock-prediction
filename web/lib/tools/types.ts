@@ -210,6 +210,21 @@ export interface ToolSettings {
   secrets: string[];
 }
 
+/** The assistant's answer to an `explain` call (B8, docs/SPEC.md F11). `data` is the answer record (text, cited_ids,
+ * as_of, not_in_data). */
+export interface ExplainAnswer {
+  result: CommandResult;
+  refusal_code: RefusalCode | null;
+  message: string | null;
+  data: unknown;
+}
+
+/** The assistant (B8). `read(tool, args)` runs one read tool through ToolLayer.execute with the caller's own context
+ * (gated, logged and budgeted like any call); it refuses anything that is not a read tool. */
+export interface Explainer {
+  explain(ctx: CallContext, args: ToolArgs, read: (tool: string, args: ToolArgs) => Promise<ToolOutcome>): Promise<ExplainAnswer>;
+}
+
 export interface ToolDeps {
   readStore: ReadStore;
   inbox: InboxStore;
@@ -218,6 +233,8 @@ export interface ToolDeps {
   resolver: CompanyResolver;
   clock: () => Date;
   settings: ToolSettings;
+  /** The assistant behind `explain`; without it, explain answers that the assistant is coming soon. */
+  explainer?: Explainer;
 }
 
 export interface ExecuteOptions {
