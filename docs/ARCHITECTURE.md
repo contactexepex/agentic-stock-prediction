@@ -275,12 +275,13 @@ requests), each its own data kind with a schema in `core/schema_*.py` (WS4 for p
    validates (schema, ticker on the watchlist, price from stored bars, idempotency key not seen
    before) and appends via `work/` + `cat >>` as Data rule 2 requires; the session commits and pushes.
 2. **Later: dashboard form -> `inbox.<kind>` in MotherDuck** (append-only, `inbox_id` = the client's
-   Idempotency-Key, `submitted_at`, `submitted_by` injected from the Vercel Authentication identity,
-   never from the body). The next run imports: same CLI validation, append to `data/`, and a
-   `command_log` row per inbox id (result accepted, refused, duplicate or failed, with the reason); company
-   commands are read from `market_brief_inbox`, table `inbox.company_commands` (docs/ws/b1.md, "Contract"). The
-   import is idempotent because an inbox id with a settled `command_log` row (accepted, refused, duplicate) is
-   skipped and an all-`failed` one is retried; a rebuild never replays the inbox.
+   Idempotency-Key, `submitted_at`, `submitted_by` injected from the Vercel Authentication identity, never
+   from the body). `onboard.yml` (dispatched by the web tier) or else the next routine run imports: same CLI
+   validation, append to `data/`, and a `command_log` row per inbox id (result accepted, refused, duplicate
+   or failed, with the reason); company commands are read from `market_brief_inbox`, table
+   `inbox.company_commands` (docs/ws/b1.md, "Contract"). The import is idempotent because an inbox id with a
+   settled `command_log` row (accepted, refused, duplicate) is skipped and an all-`failed` one is retried; a
+   rebuild never replays the inbox.
 3. Until imported, the app shows the entry as "pending (not yet in the record)", never as a fact.
 
 Why not alternatives: writing straight to git from Vercel needs a repo-write token in the web tier
