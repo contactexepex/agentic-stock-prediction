@@ -167,7 +167,8 @@ def lab_summary(ctx: BuildContext) -> dict:
         settled = settled_trades(ctx)
         return {  # no cut-off inside (lab/reports.lab_summary adds one): the envelope carries it
             "basis": BASIS_FORWARD,
-            "scoreboard": scoreboard.scoreboard(settled, BASIS_FORWARD, ctx.cutoff_time.isoformat()),
+            # as_of = the as-of date, as the catalogue's rows (a cut-off would rewrite every page each sync)
+            "scoreboard": scoreboard.scoreboard(settled, BASIS_FORWARD, ctx.as_of),
             "comparisons": compare.comparisons(settled, registry.strategies()),
             "heatmaps": heatmaps.heatmap_data(settled, BASIS_FORWARD),
         }
@@ -228,3 +229,10 @@ def go_live(ctx: BuildContext) -> dict:
         return {"proven": False, "months_forward": 0.0, "trades_needed": GO_LIVE_TRADES, "beats_best_baseline": None}
 
     return ctx.shared("go_live", compute)
+
+
+# The shared derived records (Company, Agreement, Open trade) live in rm_entities.py; re-exported here so every page
+# finds every shared block in one place.
+from marketbrief.warehouse.rm_entities import agreement, companies, open_trades  # noqa: E402
+
+__all__ = ["agreement", "companies", "open_trades"]
