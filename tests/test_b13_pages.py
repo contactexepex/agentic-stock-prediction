@@ -69,7 +69,9 @@ def test_backtest_rows_and_run_in_the_catalogues_fields(monkeypatch):
         **{k: run[k] for k in ("history", "first_date", "last_date", "eurusd", "note")},
     }
     monkeypatch.setattr(rm_strategies.lab_reports, "run_backtest", lambda *_a, **_k: result)
-    tested = rm_strategies.backtest(lab_context("india"))
+    ctx = lab_context("india")
+    ctx.con = stored_runs_connection([])  # no stored run: computed in the build
+    tested = rm_strategies.backtest(ctx)
     # no as_of, no go_live; pick rule, company and regime null (05-strategy-lab notes.md)
     expected = [{**r, "pick_rule": None, "ticker": None, "regime": None} for r in records]
     assert canonical(tested["rows"]) == canonical(expected)
@@ -79,7 +81,9 @@ def test_backtest_rows_and_run_in_the_catalogues_fields(monkeypatch):
 def test_a_refused_backtest_has_no_rows_and_says_why(monkeypatch):
     message = "no stored EURUSD bars to convert the BUX order fee"
     monkeypatch.setattr(rm_strategies.lab_reports, "run_backtest", lambda *_a, **_k: {"ok": False, "message": message})
-    tested = rm_strategies.backtest(lab_context("us"))
+    ctx = lab_context("us")
+    ctx.con = stored_runs_connection([])
+    tested = rm_strategies.backtest(ctx)
     assert tested == {
         "rows": [],
         "run": {"history": False, "first_date": None, "last_date": None, "eurusd": None, "note": message},
@@ -320,3 +324,64 @@ def test_review_page_reads_reviews_and_the_newest_news_impact_week_by_the_cut_of
     assert rows and {r["iso_week"] for r in rows} == {"2026-W41"}
     assert schema_errors(rows, "NewsImpactRow") == []
     assert schema_errors(page["reviews"], "ResearchReview") == []
+
+
+# ---------- stored back-test runs (B2's lab_backtests) ----------
+def stored_runs_connection(runs: list[tuple[dict, str]]):
+    """An in-memory lab_backtests table holding B2's rows (lab/backtest_store.backtest_rows) of each (result, time)."""
+    from marketbrief.lab.backtest_store import backtest_rows
+
+    columns = SCHEMAS["lab_backtests"][1]
+    con = duckdb.connect()
+    con.execute(f"CREATE TABLE lab_backtests ({', '.join(f'{c} {t}' for c, t in columns.items())})")
+    for result, at in runs:
+        for row in backtest_rows(result, datetime.fromisoformat(at)):
+            values = [json.dumps(row[c]) if t == "JSON" and row[c] is not None else row[c] for c, t in columns.items()]
+            con.execute(f"INSERT INTO lab_backtests VALUES ({', '.join('?' * len(columns))})", values)
+    return con
+
+
+def backtest_result(history: bool, note: str) -> dict:
+    body = json.loads((REPO / "design/catalogue/scoreboard_backtest_row.json").read_text())
+    run = body["runs"]["india"]
+    return {
+        "market": "india",
+        "as_of_date": "2026-10-06",
+        "history": history,
+        "splice": None,
+        "eurusd": None,
+        "probs_source": None,
+        "note": note,
+        "first_date": run["first_date"],
+        "last_date": run["last_date"],
+        "rows": [r for r in body["records"] if r["market"] == "india"],
+    }
+
+
+def test_stored_backtest_rows_equal_the_live_shape_and_prefer_the_history_run(monkeypatch):
+    monkeypatch.setattr(rm_strategies.lab_reports, "run_backtest", lambda *_a, **_k: pytest.fail("ran live"))
+    stored, history = backtest_result(False, "stored run"), backtest_result(True, "history run")
+    con = stored_runs_connection([(stored, "2026-10-03T10:00:00+00:00"), (history, "2026-10-08T10:00:00+00:00")])
+    ctx = lab_context("india")
+    ctx.con = con
+    tested = rm_strategies.backtest(ctx)  # the cut-off (7 Oct) is before the history run: the stored-bars run
+    assert tested["run"]["note"] == "stored run" and tested["run"]["history"] is False
+    assert tested["run"]["first_date"] == stored["first_date"]
+    assert canonical(tested["rows"]) == canonical([rm_strategies.backtest_row(r) for r in stored["rows"]])
+    later = lab_context("india")
+    later.con, later.cutoff_time = con, datetime.fromisoformat("2026-10-09T00:00:00+00:00")
+    assert rm_strategies.backtest(later)["run"] == {
+        "history": True,
+        "first_date": history["first_date"],
+        "last_date": history["last_date"],
+        "eurusd": None,
+        "note": "history run",
+    }
+
+
+def test_without_a_stored_run_the_backtest_runs_in_the_build(monkeypatch):
+    result = {**backtest_result(False, "live"), "basis": "backtest"}
+    monkeypatch.setattr(rm_strategies.lab_reports, "run_backtest", lambda *_a, **_k: result)
+    ctx = lab_context("india")
+    ctx.con = stored_runs_connection([])
+    assert rm_strategies.backtest(ctx)["run"]["note"] == "live"

@@ -10,7 +10,11 @@ gives the forward rows in the catalogue's fields, computed once per build."""
 
 from __future__ import annotations
 
+import json
+
+from marketbrief.constants.kinds import KIND_LAB_BACKTESTS
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY
+from marketbrief.lab import reads as lab_reads
 from marketbrief.lab import reports as lab_reports
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
@@ -156,11 +160,57 @@ def backtest_row(row: dict) -> dict:
     }
 
 
+def stored_row(row: dict) -> dict:
+    """One stored lab_backtests row as a back-test scoreboard row (the same fields as backtest_row)."""
+    horizon = row["horizon"]
+    luck_test = json.loads(row["luck_test"]) if isinstance(row["luck_test"], str) else row["luck_test"]
+    return backtest_row(
+        {
+            **row,
+            "scope": SCOPE_STRATEGY,
+            "view": VIEW_ACCURACY,
+            "basis": BASIS_BACKTEST,
+            "horizon_days": horizon if horizon == ALL_HORIZONS else int(horizon),
+            "luck_test": luck_test,
+            "your_cost": {"net_pnl": row["your_net_pnl"], "mean_return_pct": row["your_mean_return_pct"]},
+        }
+    )
+
+
+def stored_backtest(ctx: BuildContext) -> dict | None:
+    """{run, rows} of the newest back-test run B2 stored by the cut-off (kind lab_backtests, `lab.py backtest
+    --store`): the newest run on the 15-year history cache when one exists, else the newest on the stored bars; None
+    when nothing is stored yet."""
+    rows = lab_reads.stored(ctx.con, KIND_LAB_BACKTESTS, "computed_at", ctx.cutoff_time)
+    if not rows:
+        return None
+    newest = {}
+    for row in rows:  # time then id order: the last run of each history flag wins
+        newest[bool(row["history"])] = row["run_id"]
+    chosen = newest.get(True, newest.get(False))
+    run_rows = [row for row in rows if row["run_id"] == chosen]
+    head = run_rows[0]
+    return {
+        "run": {
+            "history": bool(head["history"]),
+            "first_date": head["data_first_date"],
+            "last_date": head["data_last_date"],
+            "eurusd": head["eurusd_source"],
+            "note": head["note"],
+        },
+        "rows": sorted((stored_row(row) for row in run_rows), key=row_order),
+    }
+
+
 def backtest(ctx: BuildContext) -> dict:
-    """{run, rows} of B2's back-test (lab/reports.run_backtest, no history cache) on the bars stored by the cut-off;
-    a refused run (US without stored EUR/USD closes) has no rows and its message as the run's note."""
+    """{run, rows} of the back-test basis: B2's newest stored run (stored_backtest) when one exists by the cut-off,
+    else B2's back-test computed in the build (lab/reports.run_backtest, no history cache) on the bars stored by the
+    cut-off; a refused run (US without stored EUR/USD closes) has no rows and its message as the run's note."""
 
     def compute() -> dict:
+        stored = stored_backtest(ctx)
+        if stored is not None:
+            return stored
         result = lab_reports.run_backtest(ctx.con, ctx.cfg, ctx.cutoff_time, history=False)
         if result.get("ok") is False:
             return {
