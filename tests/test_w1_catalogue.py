@@ -626,6 +626,11 @@ def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():
                                     "not_in_data" if answer["not_in_data"] else "answered")
         assert all(c["source"] in {f"{s['read_model']} {s['page_key']}" for s in answer["sources"]}
                    for c in answer["cited"])
+        if answer["declined"] == "advice":   # B8 declines advice before any model call: fixed text, no cost
+            guard = (REPO / "web" / "lib" / "assistant" / "guard.ts").read_text(encoding="utf-8")
+            body = guard.split("export const ADVICE_DECLINE =", 1)[1].split(";", 1)[0]
+            assert answer["text"] == "".join(re.findall(r'"([^"]*)"', body))
+            assert answer["cost_usd"] == 0 and answer["sources"] == []
         assert answer["cited_ids"] == [c["id"] for c in answer["cited"]]
         for cited in answer["cited"]:
             assert cited["as_of"] <= answer["as_of"] and cited["id"] in by_id

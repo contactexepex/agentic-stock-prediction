@@ -83,7 +83,7 @@
           "as_of": "2026-10-06"
         }
       ],
-      "cost_usd": 0.0142,
+      "cost_usd": 0.0119,
       "conversation_id": "ask-us-2026-10-07-ada9ee3c1c",
       "history_turns": 1
     },
@@ -93,7 +93,7 @@
       "channel": "dashboard",
       "asked_at": "2026-10-07T11:45:00Z",
       "question": "Should I buy NVDA tomorrow with real money?",
-      "text": "I can't advise real trades: this is a research tool and every signal here is a paper record. I can show NVDA's paper predictions and how its strategies have done.",
+      "text": "I can't advise real trades: this is a research tool and every signal here is a paper record. I can show what the stored data says: paper predictions, paper trades and how the strategies have done.",
       "cited_ids": [],
       "cited": [],
       "as_of": "2026-10-07T11:45:00Z",
@@ -101,7 +101,7 @@
       "declined": "advice",
       "status": "declined",
       "sources": [],
-      "cost_usd": 0.0031,
+      "cost_usd": 0.0,
       "conversation_id": "ask-us-2026-10-07-6fc7406e32",
       "history_turns": 0
     },
@@ -142,7 +142,7 @@
           "as_of": "2026-10-06"
         }
       ],
-      "cost_usd": 0.0142,
+      "cost_usd": 0.0156,
       "conversation_id": "ask-india-2026-10-07-d83d39a599",
       "history_turns": 0
     },
@@ -182,7 +182,7 @@
           "as_of": "2026-10-06"
         }
       ],
-      "cost_usd": 0.0142,
+      "cost_usd": 0.0127,
       "conversation_id": "ask-india-2026-10-07-d83d39a599",
       "history_turns": 1
     },

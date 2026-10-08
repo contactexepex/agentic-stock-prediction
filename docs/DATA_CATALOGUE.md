@@ -679,7 +679,7 @@ example values.
 | not_in_data | True when the data cannot answer (e.g. a date after `as_of`) | `explain` | yes/no | "What did Reliance close at on 8 Oct?": `true` |
 | declined | `advice` when the question asks for advice or a real trade (the assistant never gives it); `refused` when the model declined; else empty | `explain` | text or empty | "Should I buy NVDA tomorrow with real money?": `advice` |
 | status | `answered`, `not_in_data`, `declined`, `stopped` (out of time), `failed` or `pending` (no answer logged) | chat log | text | `answered` |
-| cost_usd | What the question cost (model calls), logged and shown; no budget in code (owner decision of 2026-10-08) | chat log | $ | `0.0142` (example) |
+| cost_usd | What the question cost (model calls), logged and shown; no budget in code (owner decision of 2026-10-08). An advice question costs 0: B8 declines it with its fixed text (`ADVICE_DECLINE`) before calling the model | chat log | $ | `0.0142` (example); advice refusal `0` |
 | conversation_id, history_turns | The conversation (the id of its first question) and how many earlier turns (0-4) the answer was given | chat log | id, count | second US answer: the first answer's id, `1` |
 
 ---|---|---|---|---|

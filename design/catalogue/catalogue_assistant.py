@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -129,7 +130,15 @@ def rule_vs_ai_answer(market: str) -> tuple:
                                                                           lookup("rm.review", "_")]
 
 
-COST_USD = {"answered": 0.0142, "declined": 0.0031, "not_in_data": 0.0087}   # example values (B8 logs real ones)
+GUARD = Path(__file__).resolve().parents[2] / "web" / "lib" / "assistant" / "guard.ts"
+
+
+def advice_decline() -> str:
+    """B8's fixed advice refusal (guard.ts ADVICE_DECLINE): returned before any model call, so it costs nothing."""
+    body = GUARD.read_text(encoding="utf-8").split("export const ADVICE_DECLINE =", 1)[1].split(";", 1)[0]
+    return "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', body))
+
+
 
 
 def answer_id(market: str, asked_at: str, question: str) -> str:
@@ -138,11 +147,12 @@ def answer_id(market: str, asked_at: str, question: str) -> str:
     return f"ask-{market}-{asked_at[:10]}-{digest}"
 
 
-def answer(market: str, asked_at: str, content: tuple, flags: dict | None = None,
+def answer(market: str, asked_at: str, content: tuple, cost_usd: float, flags: dict | None = None,
            conversation: dict | None = None) -> dict:
     """One answer of the `explain` tool in B8's record form (web/lib/assistant/types.ts AnswerRecord), reading the
     data as of the moment it was asked (as_of = asked_at, before the examples' cut-off). flags: not_in_data,
-    declined; conversation: the answer this question follows (its conversation and turn count)."""
+    declined; conversation: the answer this question follows (its conversation and turn count). cost_usd: an example
+    value (B8 logs the real one); 0 for an advice question, which B8 declines before calling the model."""
     question, text, cited, sources = content
     flags = flags or {}
     status = "declined" if flags.get("declined") else "not_in_data" if flags.get("not_in_data") else "answered"
@@ -150,25 +160,23 @@ def answer(market: str, asked_at: str, content: tuple, flags: dict | None = None
     return {"id": own_id, "market": market, "channel": "dashboard", "asked_at": asked_at, "question": question,
             "text": text, "cited_ids": [c["id"] for c in cited], "cited": cited, "as_of": asked_at,
             "not_in_data": flags.get("not_in_data", False), "declined": flags.get("declined"), "status": status,
-            "sources": sources, "cost_usd": COST_USD[status],
+            "sources": sources, "cost_usd": cost_usd,
             "conversation_id": conversation["conversation_id"] if conversation else own_id,
             "history_turns": conversation["history_turns"] + 1 if conversation else 0}
 
 
 def assistant_answers() -> list[dict]:
-    advice = ("Should I buy NVDA tomorrow with real money?",
-              "I can't advise real trades: this is a research tool and every signal here is a paper record. I can "
-              "show NVDA's paper predictions and how its strategies have done.", [], [])
+    advice = ("Should I buy NVDA tomorrow with real money?", advice_decline(), [], [])
     past = ("What did Reliance close at on 8 Oct?",
             "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 11:55 UTC.", [],
             [lookup("rm.stock", "RELIANCE"), lookup("rm.stock_strategies", "RELIANCE")])
-    us_first = answer("us", "2026-10-07T11:40:00Z", trade_answer("us", "NVDA", 3))
-    india_first = answer("india", "2026-10-07T11:50:00Z", trade_answer("india", "RELIANCE", 3))
+    us_first = answer("us", "2026-10-07T11:40:00Z", trade_answer("us", "NVDA", 3), 0.0142)
+    india_first = answer("india", "2026-10-07T11:50:00Z", trade_answer("india", "RELIANCE", 3), 0.0156)
     return [
         us_first,
-        answer("us", "2026-10-07T11:42:00Z", rule_vs_ai_answer("us"), conversation=us_first),
-        answer("us", "2026-10-07T11:45:00Z", advice, {"declined": "advice"}),
+        answer("us", "2026-10-07T11:42:00Z", rule_vs_ai_answer("us"), 0.0119, conversation=us_first),
+        answer("us", "2026-10-07T11:45:00Z", advice, 0.0, {"declined": "advice"}),
         india_first,
-        answer("india", "2026-10-07T11:52:00Z", rule_vs_ai_answer("india"), conversation=india_first),
-        answer("india", "2026-10-07T11:55:00Z", past, {"not_in_data": True}),
+        answer("india", "2026-10-07T11:52:00Z", rule_vs_ai_answer("india"), 0.0127, conversation=india_first),
+        answer("india", "2026-10-07T11:55:00Z", past, 0.0087, {"not_in_data": True}),
     ]
