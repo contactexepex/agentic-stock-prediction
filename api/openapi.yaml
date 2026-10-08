@@ -162,24 +162,6 @@ paths:
               schema: {$ref: '#/components/schemas/BarsResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/track-record:
-    get:
-      tags: [record]
-      operationId: getTrackRecord
-      summary: Live calls per scoring basis (never pooled), ranges with Wilson intervals, backtest and replay
-      x-read-model: rm.track_record
-      parameters:
-        - $ref: '#/components/parameters/Market'
-      responses:
-        '200':
-          description: The track-record read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/TrackRecordResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/news:
     get:
       tags: [markets]
@@ -508,13 +490,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/Bars'}
-    TrackRecordResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/TrackRecord'}
     NewsFeedResponse:
       allOf:
         - $ref: '#/components/schemas/ReadModelMeta'
@@ -936,25 +911,6 @@ components:
               label: {type: string}
               days: {type: integer}
         default_span: {type: string}
-
-    TrackRecord:
-      type: object
-      x-source: presentation/dashboard/track.track_record + presentation/dashboard/model_info.backtest_view + presentation/dashboard/model_info.skill_status
-      required: [skill, calls, ranges, replay, min_sample]
-      description: Live calls per scoring basis; there is deliberately no pooled block.
-      properties:
-        skill: {$ref: '#/components/schemas/SkillStatus'}
-        calls:
-          type: array
-          items: {$ref: '#/components/schemas/CallBasisBlock'}
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeBlock'}
-        replay:
-          oneOf: [{$ref: '#/components/schemas/ReplayView'}, {type: 'null'}]
-        backtest:
-          oneOf: [{$ref: '#/components/schemas/BacktestView'}, {type: 'null'}]
-        min_sample: {type: integer, description: 'view_data.MIN_SAMPLE: below it, "not enough history yet"'}
 
     NewsFeed:
       type: object
