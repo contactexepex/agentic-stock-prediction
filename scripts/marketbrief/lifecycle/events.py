@@ -8,8 +8,9 @@ A row whose id a visible row `supersedes` is dropped. Per company the events app
 then recorded_at, then id (contracts/watchlist.py); an event the state does not allow is skipped (the validator
 refuses those before they are stored). Implicit seed (test fixtures and markets not yet seeded keep working
 unchanged): companies of a legacy `tickers:` config without any stored add event act as adds from the start of time;
-`company_meta:` entries (Wave 5) do so only while the market has no stored watchlist event at all, so in a seeded
-market membership comes from the events alone and a company_meta entry never adds a company."""
+`company_meta:` entries (Wave 5) do so only while the market has no stored seed event (channel `seed`, whatever its
+visibility as of T), so in a seeded market membership comes from the events alone and a company_meta entry never
+adds a company."""
 from __future__ import annotations
 
 import json
@@ -109,8 +110,8 @@ def fold(rows: list[dict], as_of: datetime) -> dict[str, dict]:
 def implicit_adds(market: str, config_tickers: dict, config_sectors: dict, stored: list[dict],
                   meta_only: bool = False) -> list[dict]:
     """Add rows for the config companies that have no stored add event (they act from the start of time); for
-    `company_meta:` (meta_only) none once the market has any stored event (see the module docstring)."""
-    if meta_only and stored:
+    `company_meta:` (meta_only) none once the market has a stored seed event (see the module docstring)."""
+    if meta_only and any(row.get("channel") == CHANNEL_SEED for row in stored):
         return []
     added = {row["ticker"] for row in stored if row.get("event") == EVENT_ADD}
     sector_of = {ticker: sector for sector, members in (config_sectors or {}).items() for ticker in members or []}

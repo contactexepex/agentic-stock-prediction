@@ -41,20 +41,22 @@ CLOCKS = (
 UNKNOWN = "ZZZZ"
 
 
-def renamed_config(target: Path, extra: dict | None = None, keep_tickers: bool = False) -> Path:
-    """A copy of the real config with `tickers:` renamed to `company_meta:` (plus `extra` entries in it)."""
+def renamed_config(target: Path, extra: dict | None = None, keep_tickers: bool = False,
+                   key: str = "company_meta") -> Path:
+    """A copy of the real config whose company key (`tickers:` or `company_meta:`, whichever the repo has) is `key`,
+    plus `extra` entries in it; `keep_tickers` adds a second, legacy `tickers:` key."""
     shutil.copytree(REPO / "config", target)
     for market in MARKETS:
         path = target / "markets" / f"{market}.yaml"
         text = path.read_text()
-        assert len(re.findall(r"^tickers:", text, flags=re.M)) == 1
-        text = re.sub(r"^tickers:", "company_meta:", text, flags=re.M)
+        assert len(re.findall(r"^(?:tickers|company_meta):", text, flags=re.M)) == 1
+        text = re.sub(r"^(?:tickers|company_meta):", f"{key}:", text, flags=re.M)
         if keep_tickers:
             text += "\ntickers:\n  AAPL: {}\n"
         if extra:
             entries = "".join(f"  {ticker}: {json.dumps(meta)}\n" for ticker, meta in extra.items())
-            text = re.sub(r"^company_meta:\n", "company_meta:\n" + entries, text, flags=re.M)
-            assert {**yaml.safe_load(text)["company_meta"], **extra} == yaml.safe_load(text)["company_meta"]
+            text = re.sub(rf"^{key}:\n", f"{key}:\n" + entries, text, flags=re.M)
+            assert {**yaml.safe_load(text)[key], **extra} == yaml.safe_load(text)[key]
         path.write_text(text)
     return target
 
@@ -88,10 +90,11 @@ def root(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("market", MARKETS)
 def test_company_meta_gives_byte_identical_lifecycle_outputs(market, tmp_path, monkeypatch):
+    legacy = renamed_config(tmp_path / "config_legacy", key="tickers")
     renamed = renamed_config(tmp_path / "config_renamed")
     for when in CLOCKS:
         monkeypatch.setenv("MB_NOW", when)
-        monkeypatch.setattr(common, "CONFIG", REPO / "config")
+        monkeypatch.setattr(common, "CONFIG", legacy)
         before = snapshot(market)
         monkeypatch.setattr(common, "CONFIG", renamed)
         after = snapshot(market)
@@ -111,19 +114,26 @@ def test_company_meta_entry_without_an_add_never_adds_a_company(market, tmp_path
         assert commands.pending_company(market, UNKNOWN, stored_events(market), clock()) is None, when
 
 
-def test_company_meta_seeds_only_a_market_without_any_stored_event(tmp_path, monkeypatch):
+def test_company_meta_seeds_only_a_market_without_a_stored_seed_event(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "CONFIG", renamed_config(tmp_path / "config_renamed"))
-    monkeypatch.setattr(common, "ROOT", tmp_path / "empty_root")
+    monkeypatch.setattr(common, "ROOT", tmp_path / "unseeded_root")
     monkeypatch.setenv("MB_NOW", "2026-10-08T21:00:00+00:00")
     every = list(yaml.safe_load((tmp_path / "config_renamed" / "markets" / "us.yaml").read_text())["company_meta"])
     assert list(load_market("us")["tickers"]) == every          # no stored event: the implicit seed
-    one = next(json.loads(line) for line in (REPO / "data" / "us" / "watchlist_events" / "2026" / "10" /
-                                             "2026-10-07.jsonl").read_text().splitlines() if line.strip())
-    path = tmp_path / "empty_root" / "data" / "us" / "watchlist_events" / "2026" / "10" / "2026-10-07.jsonl"
+    seed_rows = [json.loads(line) for line in (REPO / "data" / "us" / "watchlist_events" / "2026" / "10" /
+                                               "2026-10-07.jsonl").read_text().splitlines() if line.strip()]
+    path = tmp_path / "unseeded_root" / "data" / "us" / "watchlist_events" / "2026" / "10" / "2026-10-07.jsonl"
     path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(one) + "\n")
-    assert list(load_market("us")["tickers"]) == [one["ticker"]]   # one stored event: membership from events only
-    assert [record["ticker"] for record in watchlist("us", clock(), "collected")] == [one["ticker"]]
+    other = {**seed_rows[0], "id": "wle-test-set-amount", "event": "set_amount", "channel": "cli", "amount": 500,
+             "effective_from": "2026-10-08T11:45:00+00:00", "recorded_at": "2026-10-07T21:00:00+00:00",
+             "idempotency_key": "test-set-amount"}
+    path.write_text(json.dumps(other) + "\n")               # a non-seed event: still unseeded, every entry counts
+    assert list(load_market("us")["tickers"]) == every
+    path.write_text(json.dumps(other) + "\n" + json.dumps(seed_rows[1]) + "\n")   # one seed row: events only
+    assert list(load_market("us")["tickers"]) == [seed_rows[1]["ticker"]]
+    assert [record["ticker"] for record in watchlist("us", clock(), "collected")] == [seed_rows[1]["ticker"]]
+    monkeypatch.setenv("MB_NOW", "2024-01-01T00:00:00+00:00")   # stored, not yet in effect: still no implicit seed
+    assert list(load_market("us")["tickers"]) == []
 
 
 def test_a_config_with_both_company_keys_is_refused(tmp_path, monkeypatch):
@@ -138,7 +148,8 @@ def test_a_config_with_both_company_keys_is_refused(tmp_path, monkeypatch):
 def test_seed_from_company_meta_writes_the_same_rows_as_from_tickers(tmp_path, monkeypatch):
     monkeypatch.setenv("MB_NOW", "2026-10-08T21:00:00+00:00")
     seeded = {}
-    for name, config in (("tickers", REPO / "config"), ("company_meta", renamed_config(tmp_path / "config_renamed"))):
+    for name in ("tickers", "company_meta"):
+        config = renamed_config(tmp_path / f"config_{name}", key=name)
         data_root = tmp_path / f"root_{name}"
         price_day = data_root / "data" / "india" / "prices" / "2024" / "10" / f"{date(2024, 10, 7)}.csv"
         price_day.parent.mkdir(parents=True)

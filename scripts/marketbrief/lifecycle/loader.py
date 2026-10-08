@@ -34,7 +34,7 @@ ROLE_ADR, META_ADR_OF = "adr", "adr_of"
 
 def config_companies(market: str, config: dict) -> tuple[dict, bool]:
     """(per-company metadata, meta_only) of a market config: its `company_meta:` (meta_only: an entry seeds only a
-    market without any stored event) or the legacy `tickers:`; a config with both is refused."""
+    market without a stored seed event) or the legacy `tickers:`; a config with both is refused."""
     meta, legacy = config.get(CFG_COMPANY_META), config.get(CFG_TICKERS)
     if meta is not None and legacy is not None:
         raise ValueError(ERR_BOTH_COMPANY_KEYS.format(market=market))

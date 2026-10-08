@@ -198,7 +198,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   counts once both effective_from and recorded_at have passed, except the seed's add events (channel `seed`, the 20
   config companies per market, effective from the start of stored history), which restate the config list and count
   from effective_from. The config's `company_meta:` (legacy `tickers:`) holds per-company metadata; its entries act
-  as adds only while a market has no stored watchlist event (test roots, unseeded markets). Add runs the deterministic onboarding
+  as adds only while a market has no stored seed event (test roots, unseeded markets). Add runs the deterministic onboarding
   (identifiers from NSE's equity list or SEC's ticker/exchange file plus Yahoo; no ETFs, BSE-only or unknown symbols;
   sector from `sector_rules`; backfill of prices from the first stored day, daily history into the long-history cache
   `work/model_history/` from its start, else 15 years back, news, filings or announcements; the candidate's collect
