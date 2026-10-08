@@ -293,7 +293,7 @@ export function NewsView({ p, market }: { p: NewsPayload; market: Market }) {
   const c: Ctx = { p, market, lt: p.status.session.local_time, names: new Map(p.companies.map((co) => [co.ticker, co.name])) };
   const toFeed = () => document.getElementById(FEED_ID)?.scrollIntoView({ block: "start" });
   return (
-    <>
+    <div className="mb-news">
       <PageHead page={p} title="News" subtitle={`${p.name} · the last ${p.window.days} days, the market movers first, the newest first · every story links to its article · research only`} />
       <MoversCard c={c} />
       <div className="grid news">
@@ -309,7 +309,7 @@ export function NewsView({ p, market }: { p: NewsPayload; market: Market }) {
       </div>
       <Legend c={c} />
       <PageFooter page={p} endpoint="news" />
-    </>
+    </div>
   );
 }
 
