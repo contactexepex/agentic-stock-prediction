@@ -4,7 +4,7 @@ US (XNYS): predictions made Friday 2026-10-02 11:45Z, so D = Friday 2 Oct; N+1 =
 India (XNSE): made Wednesday 2026-09-30 02:10Z, so D = Wednesday 30 Sep; N+1 = Thursday 1 Oct; 2 Oct is a holiday,
 so N+2 = Monday 5 Oct ... N+5 = Thursday 8 Oct.
 Bars are (open, high, low, close). Rates are the owner-provided ones of decisions 49-52 (Axis Direct NRI Normal
-tier, BUX Basic; the DP charge stays the provisional SPEC F1.6 value), fixed here so a config change does not move
+tier, BUX Basic; confirmed final by the owner on 2026-10-08), fixed here so a config change does not move
 the hand-checked numbers."""
 from __future__ import annotations
 

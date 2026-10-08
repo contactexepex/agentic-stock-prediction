@@ -10,7 +10,13 @@ from marketbrief.constants.files import DIR_CONFIG_MARKETS, YAML_SUFFIX
 from marketbrief.contracts.watchlist import DEFAULT_AMOUNT, EXCHANGES
 from marketbrief.core import paths
 from marketbrief.core.clock import clock
-from marketbrief.lifecycle.constants import STATE_ACTIVE, STATE_COLLECTED, STATE_DELETED, STATE_INACTIVE
+from marketbrief.lifecycle.constants import (
+    CFG_COMPANY_META,
+    STATE_ACTIVE,
+    STATE_COLLECTED,
+    STATE_DELETED,
+    STATE_INACTIVE,
+)
 from marketbrief.lifecycle.events import parse_time
 from marketbrief.lifecycle.identity import company_record
 from marketbrief.lifecycle.loader import companies_as_of
@@ -19,19 +25,19 @@ STATES_OF = {STATE_COLLECTED: (STATE_ACTIVE, STATE_INACTIVE), STATE_ACTIVE: (STA
              STATE_INACTIVE: (STATE_INACTIVE,), STATE_DELETED: (STATE_DELETED,)}
 
 
-def config_lists(market: str) -> tuple[dict, dict]:
-    """The market config's raw `tickers:` and `sectors:` (the implicit seed of markets not yet seeded)."""
+def config_company_keys(market: str) -> dict:
+    """The market config's raw company keys (`company_meta:` or the legacy `tickers:`) and `sectors:`, the implicit
+    seed of markets not yet seeded (loader.config_companies)."""
     path = paths.CONFIG / DIR_CONFIG_MARKETS / f"{market}{YAML_SUFFIX}"
-    raw = yaml.safe_load(path.read_text()) if path.exists() else {}
-    return raw.get(CFG_TICKERS) or {}, raw.get(CFG_SECTORS) or {}
+    raw = (yaml.safe_load(path.read_text()) if path.exists() else None) or {}
+    return {key: raw[key] for key in (CFG_COMPANY_META, CFG_TICKERS, CFG_SECTORS) if key in raw}
 
 
 def records(market: str, as_of: datetime | None = None) -> list[dict]:
     """The Company record of every company ever added (deleted included) as of `as_of` (default: the clock)."""
     as_of = parse_time(as_of) if as_of is not None else clock()
-    tickers, sectors = config_lists(market)
     out = []
-    for company in companies_as_of(market, tickers, sectors, as_of).values():
+    for company in companies_as_of(market, config_company_keys(market), as_of).values():
         record = company_record(company)
         if record["exchange"] is None and len(EXCHANGES.get(market, ())) == 1:
             record["exchange"] = EXCHANGES[market][0]   # India: every config company is NSE-listed

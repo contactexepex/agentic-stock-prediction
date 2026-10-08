@@ -94,7 +94,7 @@ MSG_SYNC_FAILED = "warehouse sync failed for {market}: {error}"
 MSG_INVALID_PAGE = "{table}/{page_key}: {problems}"
 MSG_DISABLED = "skipped: warehouse disabled in config/warehouse.yaml (enabled: false)"
 MSG_OVER_CEILING = (
-    "skipped: this month's sync wall time {hours:.2f} h in meta.sync_runs reached monthly_hours_ceiling {ceiling} h"
+    "skipped: this month's MotherDuck time {hours:.2f} h in meta.sync_runs reached monthly_hours_ceiling {ceiling} h"
 )
 MSG_EXTENSION_URL_REFUSED = "warehouse: refused extension URL {url}: HTTPS on " + ", ".join(EXTENSION_HOSTS) + " only"
 MSG_EXTENSION_DOWNLOAD_FAILED = "warehouse: downloading {url} failed: {reason}"

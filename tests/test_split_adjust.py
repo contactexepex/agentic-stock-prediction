@@ -95,7 +95,7 @@ def us(tmp_path, monkeypatch):
     (cfg / "markets").mkdir(parents=True)
     doc = yaml.safe_load((REPO / "config" / "markets" / "us.yaml").read_text())
     doc["symbols"] = {"SPY": doc["symbols"]["SPY"]}
-    doc["tickers"] = {t: doc["tickers"][t] for t in ("NVDA", "JPM")}
+    doc["company_meta"] = {t: doc["company_meta"][t] for t in ("NVDA", "JPM")}
     doc["sectors"] = {"All": ["NVDA", "JPM"]}
     (cfg / "markets" / "us.yaml").write_text(yaml.safe_dump(doc))
     for name in ("events.yaml", "settings.yaml", "ranges.yaml"):

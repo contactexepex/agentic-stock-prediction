@@ -18,6 +18,18 @@ def load_intraday_config() -> dict:
     return yaml.safe_load((paths.CONFIG / FILE_INTRADAY_CONFIG).read_text(encoding="utf-8"))
 
 
+DEFAULT_OUTCOME_SETTINGS = {"outcome": {"hold_fraction": 0.5}}   # config/intraday.yaml's value
+
+
+def intraday_config_or_default() -> dict:
+    """config/intraday.yaml, or only its outcome setting when the file is absent (readers of stored notes such as
+    the weekly review and lessons.py prepare run in config folders without it)."""
+    try:
+        return load_intraday_config()
+    except FileNotFoundError:
+        return {key: dict(value) for key, value in DEFAULT_OUTCOME_SETTINGS.items()}
+
+
 def check_time(now: datetime) -> datetime:
     """The check time: the clock truncated to the minute (a rerun in the same minute is the same check)."""
     return now.replace(second=0, microsecond=0)

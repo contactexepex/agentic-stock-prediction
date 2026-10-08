@@ -21,8 +21,9 @@ MSG_BACKTEST_NO_EURUSD = ("no stored EURUSD bars to convert the BUX order fee; c
 
 
 def lab_summary(con, now: datetime) -> dict:
-    """{scoreboard, comparisons, heatmaps} of the forward settled trades stored by `now`."""
-    settled = reads.settlements(con, now)
+    """{scoreboard, comparisons, heatmaps} of the forward settled trades stored by `now`, of strategies live on
+    each trade's D only (scoreboard.live_settlements)."""
+    settled = scoreboard.live_settlements(reads.settlements(con, now))
     return {"as_of": now.isoformat(), "basis": "forward",
             "scoreboard": scoreboard.scoreboard(settled, "forward", now.isoformat()),
             "comparisons": compare.comparisons(settled, registry.strategies()),
