@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS app.assistant_questions (
     conversation_id VARCHAR NOT NULL -- the id of the conversation's first question (its own id for a new one)
 );
 
+-- A table created by batch 1's version of this file (on main before 2026-10-08's owner decisions) is brought to this
+-- shape: it gains conversation_id (null on old rows; the statements read coalesce(conversation_id, id)) and loses the
+-- per-question reservation of the removed money budget, whose NOT NULL would refuse the new inserts.
+ALTER TABLE app.assistant_questions ADD COLUMN IF NOT EXISTS conversation_id VARCHAR;
+ALTER TABLE app.assistant_questions DROP COLUMN IF EXISTS reserved_usd;
+
 -- One row per finished question (answered, not in the data, declined, stopped or failed) with its real cost.
 CREATE TABLE IF NOT EXISTS app.assistant_answers (
     id VARCHAR PRIMARY KEY,          -- the question's id

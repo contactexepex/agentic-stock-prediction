@@ -126,3 +126,21 @@ def test_conversation_statements():
     assert latest == [("c1",)]
     assert con.execute(sql["latestConversation"], ["dashboard:owner", "us", "2026-10-07T09:26:00Z"]).fetchall() == []
     assert con.execute(sql["latestConversation"], ["slack:U1", "us", "2026-10-07T09:00:00Z"]).fetchall() == [("x1",)]
+
+
+def test_app_sql_upgrades_the_batch_1_tables():
+    """main's batch-1 app.sql (with the reservation column, without conversation_id) run first, then this one."""
+    con = duckdb.connect()
+    con.execute(INBOX_SQL.read_text(encoding="utf-8"))
+    con.execute("CREATE SCHEMA app; CREATE TABLE app.assistant_questions (id VARCHAR PRIMARY KEY, market VARCHAR NOT NULL, "
+                "channel VARCHAR NOT NULL, actor VARCHAR NOT NULL, agent VARCHAR NOT NULL, question VARCHAR NOT NULL, "
+                "ticker VARCHAR, strategy_id VARCHAR, asked_at TIMESTAMPTZ NOT NULL, reserved_usd DOUBLE NOT NULL)")
+    con.execute("INSERT INTO app.assistant_questions VALUES ('old', 'us', 'slack', 'slack:U1', 'assistant', 'q', NULL, NULL, "
+                "'2026-10-07T09:00:00Z', 0.1)")
+    con.execute(APP_SQL.read_text(encoding="utf-8"))
+    columns = [row[0] for row in con.execute("DESCRIBE app.assistant_questions").fetchall()]
+    assert "reserved_usd" not in columns and columns[-1] == "conversation_id"
+    ask(con, "new", "2026-10-07T10:00:00Z")
+    sql = statements()
+    assert con.execute(sql["latestConversation"], ["slack:U1", "us", "2026-10-07T00:00:00Z"]).fetchall() == [("old",)]
+    assert [r[0] for r in con.execute(sql["list"], ["us", "2026-07-01T00:00:00Z", 10]).fetchall()] == ["new", "old"]
