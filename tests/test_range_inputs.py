@@ -453,7 +453,7 @@ NSE_FIX = Path(__file__).resolve().parent / "fixtures" / "nse" / "earnings"
 XBOM = {"market": "x", "calendar": "XBOM", "timezone": "Asia/Kolkata"}
 IST_TZ = "Asia/Kolkata"
 INDIA = {("tickers" if key == "company_meta" else key): value for key, value in   # the raw config as a cfg
-         yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "markets" / "india.yaml").read_text()).items()}
+         yaml.safe_load((Path(__file__).resolve().parents[1] / "config/markets/india.yaml").read_text()).items()}
 INFY_DATES = [(date(2023, 10, 12), "after_close"), (date(2024, 1, 11), "after_close"), (date(2024, 4, 19), "during"),
               (date(2024, 7, 18), "after_close"), (date(2024, 10, 17), "after_close"),
               (date(2025, 1, 16), "after_close"), (date(2025, 4, 17), "after_close"),
