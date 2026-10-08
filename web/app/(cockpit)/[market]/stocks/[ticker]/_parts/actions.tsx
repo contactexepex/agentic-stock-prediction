@@ -17,7 +17,7 @@ type Step =
   | { at: "checking" }
   | { at: "confirm"; summary: string }
   | { at: "sending"; summary: string }
-  | { at: "error"; message: string; summary: string | null };
+  | { at: "error"; message: string; summary: string | null; unknown: boolean };
 
 const TOOL = { amount: "set_paper_amount", deactivate: "deactivate_company", reactivate: "reactivate_company" } as const;
 
@@ -40,7 +40,7 @@ export function useWatchlistActions(company: CompanyRecord, ctx: PageCtx) {
   const preview = async (k: ActionKind, useKey: string) => {
     setStep({ at: "checking" });
     const out = await previewCommand(ctx.market, command(k), useKey);
-    setStep(out.ok ? { at: "confirm", summary: out.summary } : { at: "error", message: out.message, summary: null });
+    setStep(out.ok ? { at: "confirm", summary: out.summary } : { at: "error", message: out.message, summary: null, unknown: false });
   };
 
   const open = (k: ActionKind) => {
@@ -61,7 +61,9 @@ export function useWatchlistActions(company: CompanyRecord, ctx: PageCtx) {
       setPending((p) => [...p, pendingWords(cmd, out.receipt, (x) => money(ctx.currency, x))]);
       dialog.current?.close();
     } else {
-      setStep({ at: "error", message: out.message, summary });
+      // no answer: the outcome is unknown, so Confirm again sends the same request with the same key; a refusal
+      // (e.g. the summary changed) is reviewed again, still with the dialog's one key (B5: one key per dialog)
+      setStep({ at: "error", message: out.message, summary, unknown: out.unknown });
     }
   };
 
@@ -103,7 +105,7 @@ export function useWatchlistActions(company: CompanyRecord, ctx: PageCtx) {
           {step.at === "error" ? (
             <div className="mb-alert danger" role="alert" style={{ padding: "10px 14px" }}>
               <Icon name="warning" />
-              <div><b className="t">Nothing was recorded</b><div className="s">{step.message}</div></div>
+              <div><b className="t">{step.unknown ? "Not confirmed yet" : "Nothing was recorded"}</b><div className="s">{step.message}</div></div>
             </div>
           ) : null}
           <div className="muted" style={{ fontSize: 12.5 }}>This records a request with your sign-in and an idempotency key; the next run imports it. Nothing is bought or sold.</div>
@@ -112,8 +114,10 @@ export function useWatchlistActions(company: CompanyRecord, ctx: PageCtx) {
           <button className="md-btn text" type="button" onClick={() => dialog.current?.close()}>Cancel</button>
           {step.at === "confirm" || step.at === "sending" ? (
             <button className="md-btn filled" type="button" disabled={busy} onClick={() => confirm(step.summary)}>{label}</button>
+          ) : step.at === "error" && step.summary && step.unknown ? (
+            <button className="md-btn filled" type="button" onClick={() => void confirm(step.summary as string)}>Confirm again</button>
           ) : step.at === "error" && step.summary ? (
-            <button className="md-btn filled" type="button" onClick={() => { const fresh = newKey(); setKey(fresh); void preview(kind, fresh); }}>Review again</button>
+            <button className="md-btn filled" type="button" onClick={() => void preview(kind, key)}>Review again</button>
           ) : (
             <button className="md-btn filled" type="button" disabled={busy || (kind === "amount" && !amountValid)} onClick={() => void preview(kind, key)}>Review</button>
           )}

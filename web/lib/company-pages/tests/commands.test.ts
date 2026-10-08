@@ -46,7 +46,11 @@ test("refusals and failures carry the API's message; nothing pretends to be reco
   assert.match((notJson as { message: string }).message, /HTTP 500/);
   const offline = await submitCommand("india", deactivate, "s", "k", async () => { throw new TypeError("network"); });
   assert.equal(offline.ok, false);
-  assert.match((offline as { message: string }).message, /did not answer/);
+  assert.match((offline as { message: string }).message, /not known whether the request was recorded/);
+  assert.equal((offline as { unknown: boolean }).unknown, true);
+  const gateway = await submitCommand("india", deactivate, "s", "k", fake(502, "<html>bad gateway</html>", []));
+  assert.equal((gateway as { unknown: boolean }).unknown, true, "an unreadable answer leaves the outcome unknown");
+  assert.equal((stale as { unknown: boolean }).unknown, false);
 });
 
 test("pending words name the change and the request", () => {

@@ -257,3 +257,24 @@ cases.push(
     },
   },
 );
+
+// An ex-dividend date shifts the ranges' centre down; only results widen them and block a new call.
+cases.push({
+  name: "company-ex-dividend",
+  path: "/india/stocks/RELIANCE",
+  widths: [1280],
+  waitFor: ".chart svg",
+  api: companyApi((p) => ({
+    ...p,
+    events: [{ market: "india", date: "2026-10-09", type: "ex_dividend", name: "RELIANCE ex-dividend", ticker: "RELIANCE", timing: null, reaction_sessions: null, major: false, widens: false, provisional: false, release: null, source: "fixture", event_id: "x1" }, ...p.events.filter((e) => e.ticker !== "RELIANCE")],
+  })),
+  expectText: ["shifts ranges", "Ex-dividend due"],
+  check: async (page) => {
+    const problems = [];
+    const plain = await page.textContent(".plain");
+    if (/no new call/.test(plain)) problems.push("the plain line says no new call for an ex-dividend date");
+    if (!/centred lower by the dividend/.test(plain)) problems.push("the plain line does not say the ranges are centred lower");
+    if ((await page.textContent(".ev")).includes("widens ranges")) problems.push("an ex-dividend date is labelled as widening ranges");
+    return problems;
+  },
+});

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chartGeometry, barAt } from "../chart-geometry.ts";
 import {
-  horizonOfId, lifecycleDates, nextCompanyEvent, predictionPaths, openSummary, referencePrediction, settledSummary, tradeMarks, whyScale, whySegments,
+  companyEventEffect, horizonOfId, lifecycleDates, nextCompanyEvent, predictionPaths, openSummary, referencePrediction, settledSummary, tradeMarks, whyScale, whySegments,
 } from "../company-logic.ts";
 import { agreementAt, bestOf, expectedGainMoney, pooledRows, rankedIds } from "../strategies-logic.ts";
 import type { ScoreRow, SettledTrade } from "../types.ts";
@@ -126,4 +126,12 @@ test("prediction paths match checks and settlements by prediction id and reasons
   }
   assert.ok(paths.every((p, i) => i === 0 || paths[i - 1].prediction.horizon_days <= p.prediction.horizon_days));
   assert.ok(paths.some((p) => p.reasons.length), "the example's reasons attach to their trades");
+});
+
+test("a company event's effect: results widen and block calls, an ex-dividend date only shifts the ranges", () => {
+  const results = companyEventEffect("earnings"), exDiv = companyEventEffect("ex_dividend");
+  assert.ok(results && results.label === "widens ranges" && /no new call/.test(results.plain));
+  assert.ok(exDiv && exDiv.label === "shifts ranges");
+  assert.doesNotMatch(exDiv.tip + exDiv.plain, /widen|no new call/);
+  assert.equal(companyEventEffect("holiday"), null);
 });

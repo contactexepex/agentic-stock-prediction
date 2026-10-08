@@ -1,7 +1,7 @@
 "use client";
 // The company page's narrative cards (design/mockups/03-company reasons, news, results, events, lifecycle): the EOD
 // analyst's notes (F6.1), news with its verification status (DESIGN 3b), the latest results digest (WS6), what is
-// coming in the next 8 weeks, and the company's watchlist settings (F8) with the call history by day.
+// coming in the next 60 days, and the company's watchlist settings (F8) with the call history by day.
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { strategyOf } from "../../../../../../components/blocks/records.tsx";
@@ -9,7 +9,7 @@ import { Card, CardHead, Delta, GoLink, Label, Quiet, SentimentSquare, StatusBad
 import { CURRENCY_SYMBOL, LOCALE } from "../../../../../../lib/ui/constants.ts";
 import { DOW, fmtDate, fmtDateYear, money, signed } from "../../../../../../lib/ui/format.ts";
 import { lifecyclePath, pagePath } from "../../../../../../lib/ui/routes.ts";
-import { horizonOfId, nextCompanyEvent } from "../../../../../../lib/company-pages/company-logic.ts";
+import { companyEventEffect, horizonOfId, nextCompanyEvent } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { AiReason, CompanyPayload, NewsItem, ResultsDigest } from "../../../../../../lib/company-pages/types.ts";
 import type { PageCtx } from "./context.ts";
 import { eventWords, NOTE_KIND, plural } from "./labels.ts";
@@ -180,8 +180,8 @@ export function EventsCard({ p }: { p: CompanyPayload }) {
     <Card label="Coming events">
       <CardHead
         title="Coming up"
-        help="What is scheduled from the session being predicted to 8 weeks after it, as known at the as-of time: this company’s results and ex-dividend dates, the market’s major events (they raise the regime to EVENT_HEAVY two days before and widen every range whose window contains them) and closed days. A company with results within a day gets no new call."
-        end={`${p.events.length} in 8 weeks`}
+        help="What is scheduled from the session being predicted to 60 days after it, as known at the as-of time: this company’s results (they widen its ranges; no new call within a day of them) and ex-dividend dates (the ranges are centred lower by the dividend), the market’s major events (they raise the regime to EVENT_HEAVY two days before and widen every range whose window contains them) and closed days."
+        end={`${p.events.length} in 60 days`}
       />
       {p.events.length ? (
         <ul className="ev">
@@ -199,7 +199,7 @@ export function EventsCard({ p }: { p: CompanyPayload }) {
                   <span>
                     {e.name}
                     {e.provisional ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="The date is not confirmed yet.">provisional</Label></span> : null}
-                    {mine ? <span style={{ marginLeft: 6 }}><Label tone="warn" tip="Results widen this company’s ranges (earnings_vol_multiple) and no new call is made within a day of them.">widens ranges</Label></span>
+                    {mine && companyEventEffect(e.type) ? <span style={{ marginLeft: 6 }}><Label tone={companyEventEffect(e.type)!.tone} tip={companyEventEffect(e.type)!.tip}>{companyEventEffect(e.type)!.label}</Label></span>
                       : e.major ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="A major market event: the regime becomes EVENT_HEAVY within 2 days before it and every range whose window contains it is widened.">major</Label></span> : null}
                   </span>
                   <small>{detail}</small>

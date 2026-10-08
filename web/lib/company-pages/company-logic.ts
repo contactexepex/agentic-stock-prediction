@@ -122,3 +122,21 @@ export function predictionPaths(day: { predictions: Prediction[]; trade_checks: 
       return { prediction, checks, settled, reasons };
     });
 }
+
+export interface EventEffect { label: string; tone: "warn" | "neutral"; tip: string; plain: string }
+/** What a company's own event does to its ranges and calls: results widen the ranges (earnings_vol_multiple) and
+ *  block a new call within a day (prediction_rules: days_to_earnings <= 1); an ex-dividend date only centres the ranges
+ *  whose window contains it lower by the dividend (config/ranges.yaml ex_dividend), calls go on. Other types: null. */
+export function companyEventEffect(type: string): EventEffect | null {
+  if (type === "earnings") return {
+    label: "widens ranges", tone: "warn",
+    tip: "Results widen this company’s ranges (earnings_vol_multiple) and no new call is made within a day of them.",
+    plain: "ranges widen and no new call is made within a day of it",
+  };
+  if (type === "ex_dividend") return {
+    label: "shifts ranges", tone: "neutral",
+    tip: "On the ex-dividend date the price drops by the dividend: the ranges whose window contains it are centred lower by it (ex_dividend in config/ranges.yaml). Calls are made as usual.",
+    plain: "the ranges whose window contains it are centred lower by the dividend; calls go on as usual",
+  };
+  return null;
+}

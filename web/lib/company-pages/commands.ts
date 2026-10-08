@@ -20,7 +20,8 @@ export interface CommandReceipt {
 }
 
 export type PreviewResult = { ok: true; summary: string } | { ok: false; message: string };
-export type SubmitResult = { ok: true; receipt: CommandReceipt } | { ok: false; message: string; receipt: CommandReceipt | null };
+/** `unknown`: no readable answer, so whether the command was recorded is not known (retry with the same key). */
+export type SubmitResult = { ok: true; receipt: CommandReceipt } | { ok: false; message: string; receipt: CommandReceipt | null; unknown: boolean };
 
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -46,6 +47,9 @@ async function readJson(res: Response): Promise<Record<string, unknown> | null> 
     return null;
   }
 }
+
+/** A submit without an answer: whether it was recorded is not known; a retry with the same key never records twice. */
+export const NO_ANSWER_ON_SUBMIT = "The data service did not answer, so it is not known whether the request was recorded. Confirm again: the same request key never records it twice.";
 
 /** Why a request failed, in plain words: the receipt's or problem's message, else the HTTP status. */
 function failure(res: Response | null, body: Record<string, unknown> | null): string {
@@ -74,12 +78,13 @@ export async function submitCommand(market: Market, command: CompanyCommand, sum
   try {
     res = await post(fetchFn, commandUrl(market, "commands"), key, { ...command, confirmed_summary: summary });
   } catch {
-    return { ok: false, message: failure(null, null), receipt: null };
+    return { ok: false, message: NO_ANSWER_ON_SUBMIT, receipt: null, unknown: true };
   }
   const body = await readJson(res);
   const receipt = body && typeof body.result === "string" ? (body as unknown as CommandReceipt) : null;
   if (res.ok && receipt && (receipt.result === "pending" || receipt.result === "accepted" || receipt.result === "duplicate")) return { ok: true, receipt };
-  return { ok: false, message: failure(res, body), receipt };
+  if (!body) return { ok: false, message: NO_ANSWER_ON_SUBMIT, receipt: null, unknown: true };
+  return { ok: false, message: failure(res, body), receipt, unknown: false };
 }
 
 /** The pending line a confirmed command leaves on the card. */

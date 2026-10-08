@@ -14,7 +14,7 @@ import { Card, CardHead, Delta, FamilyLabel, Label, MoneyDelta, Odds } from "../
 import { FAMILY, FAMILY_SHORT, PICK_RULE, type Family } from "../../../../../../lib/ui/constants.ts";
 import { fmtDate, fmtDateYear, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
 import { stockStrategiesPath } from "../../../../../../lib/ui/routes.ts";
-import { bandsOf, nextCompanyEvent, openSummary, referencePrediction } from "../../../../../../lib/company-pages/company-logic.ts";
+import { bandsOf, companyEventEffect, nextCompanyEvent, openSummary, referencePrediction } from "../../../../../../lib/company-pages/company-logic.ts";
 import { agreementAt, buyShare, expectedGainMoney } from "../../../../../../lib/company-pages/strategies-logic.ts";
 import type { CompanyPayload, HeadToHeadPick } from "../../../../../../lib/company-pages/types.ts";
 import type { PageCtx } from "./context.ts";
@@ -83,6 +83,7 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
   const picked = p.head_to_head.filter((x) => x.status === "picked");
   const open = openSummary(p.open_trades, p.trade_checks);
   const next = nextCompanyEvent(p.events, co.ticker);
+  const effect = next ? companyEventEffect(next.type) : null;
   const check0 = p.trade_checks[0];
   const withPredictions = p.predictions.length > 0;
   const bands = pr ? bandsOf(pr) : null;
@@ -185,12 +186,12 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
           {next ? (
             <div
               className="s"
-              data-tip={`${next.name} on ${fmtDateYear(next.date)}${next.timing ? ` (${next.timing.replace("_", " ")})` : " (timing unknown)"}: results widen this company’s ranges and no new call is made within a day of them${next.reaction_sessions?.length ? `; the reaction lands in the session${next.reaction_sessions.length > 1 ? "s" : ""} ${next.reaction_sessions.map((d) => fmtDate(d, false)).join(" and ")}` : ""}.`}
+              data-tip={`${next.name} on ${fmtDateYear(next.date)}${next.timing ? ` (${next.timing.replace("_", " ")})` : " (timing unknown)"}: ${effect ? effect.tip.replace(/\.$/, "") : "a scheduled company event"}${next.reaction_sessions?.length ? `; the reaction lands in the session${next.reaction_sessions.length > 1 ? "s" : ""} ${next.reaction_sessions.map((d) => fmtDate(d, false)).join(" and ")}` : ""}.`}
             >
               <Icon name="event" /> {eventWords(next.type)} {fmtDate(next.date)}{next.provisional ? " (date not confirmed)" : ""}
             </div>
           ) : (
-            <div className="s">No company event in the next 8 weeks.</div>
+            <div className="s">No company event in the next 60 days.</div>
           )}
         </div>
       </div>
@@ -199,7 +200,7 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
         <div>
           {a ? `${a.buy} of ${a.of} strategies would buy ${co.name} at N+${horizon}${a.avg_prob_up != null ? ` with an average chance of ${pct(a.avg_prob_up)}` : ""}. ` : ""}
           {picked.length ? `Of today’s ${picked.length} head-to-head picks, ${viableLine(picked)}. ` : "No head-to-head pick today. "}
-          {next ? `${eventWords(next.type).replace(/^./, (c) => c.toUpperCase())} due ${fmtDate(next.date)}: ranges widen and no new call is made within a day of it. ` : ""}
+          {next ? `${eventWords(next.type).replace(/^./, (c) => c.toUpperCase())} due ${fmtDate(next.date)}${effect ? `: ${effect.plain}` : ""}. ` : ""}
           <b>
             {p.status.paper_label}: {a && a.buy > a.of / 2 ? "a majority says the strategies lean the same way, not that they are right" : "agreement says how the strategies lean, not whether they are right"}; nothing here is advice.
           </b>
