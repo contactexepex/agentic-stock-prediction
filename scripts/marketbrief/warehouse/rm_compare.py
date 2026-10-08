@@ -90,6 +90,7 @@ def picks(ctx: BuildContext) -> list[dict]:
 
     def compute() -> list[dict]:
         rows = [row for row in lab_reads.picks(ctx.con, ctx.cutoff_time) if row["ticker"] in ctx.collected]
+        rows = rm_common.live_rows(rows, "session_date")  # B4, go-live: live pick runs only
         out = []
         for row in rows:
             item = pick(row, PICK_FIELDS)

@@ -256,3 +256,18 @@ def _no_network(request, _netguard_session_log):
         _netguard_session_log.unlink()
     if hits:
         pytest.fail("the test reached for the network (tests must run offline):\n" + hits, pytrace=False)
+
+
+@pytest.fixture(scope="module")
+def all_strategies_live():
+    """B4 (go-live): the read models show only live strategies' rows (warehouse/rm_entities.live_rows on
+    lab/registry.is_live). No registry strategy has live_from set before Wave 5's switch, so a test that builds pages
+    from example predictions, picks or trades makes every strategy live for the module: request it from a
+    module-scoped autouse fixture (it must run before the module's own fixtures build pages)."""
+    sys.path.insert(0, str(TESTS.parent / "scripts"))
+    from marketbrief.warehouse import rm_entities
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(rm_entities, "live", lambda _strategy_id, _session_date: True)
+        patch.setattr(rm_entities, "earliest_live_from", lambda: "0001-01-01")
+        yield

@@ -5,6 +5,7 @@ stored by the cut-off (no look-ahead) and only the collected companies' rows; no
 or a shared block already computes (B2's lab readers, the settled trades and scoreboard of rm_common, B11's
 lifecycle-event rows, WS6's results macro, the dashboard's as-of bar rule). Times are ISO UTC `YYYY-MM-DDTHH:MM:SSZ`,
 as in B11's and B4's records."""
+
 from __future__ import annotations
 
 import json
@@ -67,6 +68,7 @@ def latest_checks(rows: list[dict]) -> list[dict]:
 @dataclass
 class CompanySources:
     """One market's stored records as of the cut-off, grouped per ticker."""
+
     market: str
     as_of: str | None
     session_date: str | None
@@ -91,9 +93,17 @@ def bar_rows(con, as_of: str, cutoff: datetime) -> dict[str, list[dict]]:
     frame = dashboard_reads.frame(con, BARS_SQL, {"as_of": as_of, "start": start, "cutoff": cutoff.isoformat()})
     grouped: dict[str, list[dict]] = {}
     for row in lab_reads.records(frame):
-        grouped.setdefault(row["ticker"], []).append({
-            "date": str(row["date"])[:10], "open": row["open"], "high": row["high"], "low": row["low"],
-            "close": row["close"], "volume": row["volume"], "adjusted": bool(row["adjusted"])})
+        grouped.setdefault(row["ticker"], []).append(
+            {
+                "date": str(row["date"])[:10],
+                "open": row["open"],
+                "high": row["high"],
+                "low": row["low"],
+                "close": row["close"],
+                "volume": row["volume"],
+                "adjusted": bool(row["adjusted"]),
+            }
+        )
     return {ticker: rows[-BAR_SESSIONS:] for ticker, rows in grouped.items()}
 
 
@@ -108,8 +118,12 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     events = lifecycle_rows(con, cutoff, set(collected))
     sources.lifecycle = by_ticker(sorted(events, key=lambda row: (row["recorded_at"], row["id"])))
     params = {"cutoff": cutoff.isoformat()}
-    checks = zulu(mine(lab_reads.records(con.execute(CHECKS_SQL, params).df(), "trade_checks")), "trade_checks",
-                  "trade_check_details")
+    checks = zulu(
+        mine(lab_reads.records(con.execute(CHECKS_SQL, params).df(), "trade_checks")),
+        "trade_checks",
+        "trade_check_details",
+    )
+    checks = rm_common.live_rows(checks, "entry_date")  # B4, go-live: live strategies' trades only
     sources.all_checks = by_ticker(checks)
     sources.checks = {ticker: latest_checks(rows) for ticker, rows in sources.all_checks.items()}
     sources.market_checks = latest_checks(checks)
@@ -119,8 +133,10 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     sources.digests = by_ticker(zulu(parsed(digests, DIGEST_JSON_COLUMNS), "results_digests"))
     sources.settled = by_ticker(zulu(rm_common.settled_trades(ctx), "paper_trades_settled"))
     sources.scoreboard = rm_common.lab_summary(ctx)["scoreboard"]
-    picks = zulu(mine(lab_reads.picks(con, cutoff)), "head_to_head_picks")
-    predictions = zulu(mine(lab_reads.predictions(con, cutoff)), "strategy_predictions")
+    picks = rm_common.live_rows(zulu(mine(lab_reads.picks(con, cutoff)), "head_to_head_picks"), "session_date")
+    predictions = rm_common.live_rows(
+        zulu(mine(lab_reads.predictions(con, cutoff)), "strategy_predictions"), "session_date"
+    )  # B4, go-live: rehearsal rows are never shown
     sources.all_picks, sources.all_predictions = by_ticker(picks), by_ticker(predictions)
     if as_of:
         sources.picks = by_ticker([row for row in picks if row["session_date"] == session_date])
