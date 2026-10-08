@@ -60,7 +60,7 @@ export function StrategyList({ strategies }: { strategies: StrategyMap }) {
 /** A company cell: icon tile, the ticker linking to its company page, name and sector below. */
 export function CompanyCell({ company }: { company: Pick<CompanyRecord, "market" | "ticker" | "name" | "sector"> }) {
   return (
-    <span className="co">
+    <span className="mb-co">
       <Avatar icon="apartment" tone="neutral" size="sm" />
       <span className="nm">
         <Link className="tk" href={companyPath(company.market, company.ticker)} data-tip={`${company.name}: open its company page.`}>
@@ -90,7 +90,7 @@ export function CompanyState({ company }: { company: CompanyRecord }) {
 export function AgreementCell({ row, subject }: { row: Pick<AgreementRow, "buy" | "of" | "by_family"> | null | undefined; subject?: string }) {
   if (!row) return <span className="muted" data-tip="No agreement row for this company at this horizon.">{DASH}</span>;
   return (
-    <span className="ag">
+    <span className="mb-ag">
       <b>
         {row.buy} of {row.of}
       </b>
@@ -262,7 +262,7 @@ export function OpenTradesCard({
           </>
         }
       />
-      {trades.length ? <DataTable columns={columns} groups={groups} rowKey={(r) => r.trade_id} label={title} className="ot" /> : <Quiet>No open paper trade.</Quiet>}
+      {trades.length ? <DataTable columns={columns} groups={groups} rowKey={(r) => r.trade_id} label={title} className="mb-ot" /> : <Quiet>No open paper trade.</Quiet>}
     </Card>
   );
 }
