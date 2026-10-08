@@ -95,8 +95,21 @@ def earliest_live_from() -> str | None:
 
 def live_rows(rows: list[dict], day_key: str) -> list[dict]:
     """The rows of live strategies on their D (`day_key`: session_date of a prediction or pick, entry_date of a
-    trade or check); rows of a strategy before its live_from (rehearsal runs) are never shown."""
-    return [row for row in rows if row.get(day_key) is not None and live(row["strategy_id"], row[day_key])]
+    trade or check); rows of a strategy before its live_from (rehearsal runs) are never shown. A row without a
+    strategy (a head-to-head pick with status no_candidate: no strategy of its family qualified) is kept when some
+    strategy of its family is live on its D (a live pick run's answer), and dropped otherwise (a rehearsal run)."""
+    kept = []
+    for row in rows:
+        day = row.get(day_key)
+        if day is None or (isinstance(day, float) and pd.isna(day)):
+            continue
+        if row.get("strategy_id"):
+            keep = live(row["strategy_id"], day)
+        else:
+            keep = any(live(spec["id"], day) for spec in registry.strategies(family=row.get("family")))
+        if keep:
+            kept.append(row)
+    return kept
 
 
 def newest_batch(rows: list[dict]) -> list[dict]:

@@ -414,3 +414,19 @@ def test_live_rows_and_newest_batch():
         module.live = saved
     assert kept == rows[0:1] + rows[2:3]
     assert module.newest_batch(kept) == rows[2:3]
+
+
+def test_a_pick_without_a_strategy_follows_its_family(monkeypatch):
+    """A no_candidate pick (no strategy) stays when some strategy of its family is live on its D, else it goes."""
+    rule = live_from(
+        "2026-10-07",
+        late=("ai.combined.opus.v1", "ai.combined.sonnet.v1", "ai.news_results.sonnet.v1", "ai.pattern_mood.sonnet.v1"),
+        late_day="2026-10-09",
+    )
+    monkeypatch.setattr(rm_entities, "live", rule)
+    picks = [
+        {"strategy_id": None, "family": "rule", "session_date": "2026-10-08", "status": "no_candidate"},
+        {"strategy_id": None, "family": "ai", "session_date": "2026-10-08", "status": "no_candidate"},
+        {"strategy_id": None, "family": "ai", "session_date": "2026-10-09", "status": "no_candidate"},
+    ]
+    assert rm_entities.live_rows(picks, "session_date") == [picks[0], picks[2]]
