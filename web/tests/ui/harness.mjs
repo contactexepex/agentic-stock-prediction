@@ -10,11 +10,15 @@
 // Usage (from web/): node tests/ui/harness.mjs [--only <case-name-substring>] [--port 3123] [--out ../work/ui]
 // Cases live in tests/ui/cases/*.mjs (one file per page session; each exports `cases`, an array, see cases/shell.mjs).
 // Playwright is the machine's global 1.56.1 (CI installs it the same way), launched on the preinstalled Chromium.
+// Fonts: the design system's first face is Inter (no web font is loaded), so text widths, and with them overflow, depend
+// on the fonts installed. The harness requires Inter (Debian/Ubuntu package fonts-inter) and stops otherwise, so a
+// result does not depend on the machine. `--fallback-fonts` hides Inter from the browser instead (it falls back to
+// the next installed face, e.g. DejaVu Sans) to check the pages also hold without it; that mode is advisory.
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { apiFixture } from "./fixtures.mjs";
 
@@ -25,8 +29,9 @@ const arg = (name, fallback) => {
   return i > 0 ? process.argv[i + 1] : fallback;
 };
 const port = Number(arg("--port", "3123"));
-const out = arg("--out", join(repo, "work", "ui"));
+const out = resolve(arg("--out", join(repo, "work", "ui")));
 const only = arg("--only", "");
+const fallbackFonts = process.argv.includes("--fallback-fonts");
 const origin = `http://127.0.0.1:${port}`;
 
 function loadPlaywright() {
@@ -39,10 +44,34 @@ function loadPlaywright() {
   }
 }
 
-async function launch(chromium) {
+/** The face fontconfig gives for Inter ("" when fc-match is missing). */
+function interFace(env = process.env) {
+  try {
+    return execSync("fc-match -f '%{family}' Inter", { env }).toString();
+  } catch {
+    return "";
+  }
+}
+
+/** The browser's environment: as is, or (--fallback-fonts) with a fontconfig file that rejects every Inter face. */
+function browserEnv() {
+  if (!fallbackFonts) return process.env;
+  const dir = join(out, "_fontconfig");
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, "fonts.conf");
+  writeFileSync(
+    file,
+    `<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>\n` +
+      `  <selectfont><rejectfont><pattern><patelt name="family"><string>Inter</string></patelt></pattern>` +
+      `<pattern><patelt name="family"><string>Inter Display</string></patelt></pattern></rejectfont></selectfont>\n</fontconfig>\n`,
+  );
+  return { ...process.env, FONTCONFIG_FILE: file };
+}
+
+async function launch(chromium, env) {
   const candidates = ["/opt/pw-browsers/chromium-1194/chrome-linux/chrome", "/opt/pw-browsers/chromium"];
-  for (const executablePath of candidates) if (existsSync(executablePath)) return chromium.launch({ executablePath });
-  return chromium.launch();
+  for (const executablePath of candidates) if (existsSync(executablePath)) return chromium.launch({ executablePath, env });
+  return chromium.launch({ env });
 }
 
 async function loadCases() {
@@ -194,11 +223,18 @@ if (!existsSync(join(web, ".next", "BUILD_ID"))) {
   console.error("run `npm run build` first");
   process.exit(1);
 }
+const env = browserEnv();
+const face = interFace(env);
+if (!fallbackFonts && !face.startsWith("Inter")) {
+  console.error(`The font Inter is not installed (fontconfig gives "${face || "nothing"}" for it). Install it (apt-get install fonts-inter) so text widths match the design, or pass --fallback-fonts for the advisory run without it.`);
+  process.exit(2);
+}
+console.log(fallbackFonts ? `fallback fonts: Inter hidden, the browser uses "${face}" (advisory)` : `font: ${face.split(",")[0]}`);
 const { chromium } = loadPlaywright();
 const server = await startServer();
 process.on("exit", () => server.kill());
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => process.exit(130));
-const browser = await launch(chromium);
+const browser = await launch(chromium, env);
 const results = [];
 try {
   for (const c of cases) {
@@ -221,4 +257,5 @@ for (const r of results) {
   for (const e of r.errors) console.log("     " + e);
 }
 console.log(`${results.length} cases, ${failed} failed; screenshots and comparisons in ${out}`);
-process.exit(failed ? 1 : 0);
+if (fallbackFonts && failed) console.log("advisory run without Inter: the failures above do not fail the harness");
+process.exit(failed && !fallbackFonts ? 1 : 0);
