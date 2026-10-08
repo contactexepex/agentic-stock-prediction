@@ -570,17 +570,17 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 .chart .hit{fill:transparent}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-top:4px}
 .legend b{font-weight:600}
-.lastclose{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
-.lastclose .t{border-radius:var(--mb-panel-radius);padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.lastclose{display:grid;gap:6px;margin-top:14px}
+.lastclose .t{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;border-radius:var(--mb-panel-radius);padding:8px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
 .lastclose .t.lead{background:var(--md-sys-color-primary-container)}
 .lastclose .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);letter-spacing:.04em;text-transform:uppercase;font-weight:600}
-.lastclose .v{font:700 16px/1.2 var(--md-ref-typeface-plain);margin-top:2px;letter-spacing:-.3px;white-space:nowrap}
-.lastclose .s{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.lastclose .v{font:700 16px/1.2 var(--md-ref-typeface-plain);letter-spacing:-.3px;white-space:nowrap;grid-column:2;grid-row:1 / span 2;text-align:right}
+.lastclose .s{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
 .grid22{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;font-size:12.5px;align-items:stretch;margin-top:10px}
 .grid22 .hd{font-size:10.5px;color:var(--md-sys-color-on-surface-variant);letter-spacing:.05em;text-transform:uppercase;font-weight:600;padding:4px 8px;align-self:end}
 .grid22 .rh{font-weight:600;padding:8px 6px;display:flex;align-items:center;gap:6px} .grid22 .rh .ms{width:15px;height:15px;color:var(--md-sys-color-primary)}
 .grid22 .cell{border-radius:8px;padding:8px 10px;background:var(--md-sys-color-surface-container-low);min-width:0}
-.grid22 .cell .v{font-weight:700;font-size:14.5px} .grid22 .cell .s{font-size:11px;color:var(--md-sys-color-on-surface-variant)}
+.grid22 .cell .v{font-weight:700;font-size:14.5px} .grid22 .cell .s{font-size:11px;color:var(--md-sys-color-on-surface-variant);display:flex;flex-wrap:wrap;gap:2px 4px;align-items:center} .grid22 .cell .mb-label{white-space:normal;line-height:14px}
 .grid22 .cell.none{border:1px dashed var(--md-sys-color-outline-variant);background:transparent;color:var(--md-sys-color-on-surface-variant);font-size:12px}
 
 /* head-to-head */
@@ -593,12 +593,13 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 .fam-box{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-lowest);box-shadow:var(--mb-card-shadow);min-width:0}
 .fam-box .fh{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px}
 .fam-box .fh b{font-weight:700;font-size:13px}
-.fam-box .fh small{color:var(--md-sys-color-on-surface-variant);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pk{display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px}
-.pk .rule{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);grid-column:1 / span 3}
-.pk .det{grid-column:1 / span 3;font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
-.pk .gain{font-weight:700;text-align:right;white-space:nowrap;grid-column:3;grid-row:2 / span 2;font-size:14px}
-.pk .gain .mb-label{font-size:11px;padding:1px 6px;margin-top:2px}
+.fam-box .fh{flex-wrap:wrap} .fam-box .fh small{color:var(--md-sys-color-on-surface-variant);min-width:0;overflow-wrap:anywhere}
+.pk{display:grid;grid-template-columns:1fr;gap:3px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px;min-width:0}
+.pk .rule{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.pk .line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.pk .det{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);overflow-wrap:anywhere}
+.pk .gain{font-weight:700;font-size:14px;margin-left:auto;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pk .gain .mb-label{font-size:11px;padding:1px 6px}
 .cand{margin-top:8px;font-size:12px} .cand summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12.5px}
 .cand table{margin-top:6px} .cand td,.cand th{padding:5px 6px;font-size:12px}
 .sumline{display:flex;align-items:center;gap:10px;font-size:13px;padding:10px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);margin-bottom:12px}
@@ -642,6 +643,7 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
 
 @media (max-width: 1199px){ .kpis{grid-template-columns:repeat(2,1fr)} }
 @media (max-width: 1000px){ .grid{grid-template-columns:1fr} }
+@media (max-width: 760px){ .fams{grid-template-columns:1fr} .agl li{grid-template-columns:auto auto minmax(0,1fr) auto;padding:12px} .agl .hz{grid-column:2 / span 3;text-align:left} }
 @media (max-width: 599px){
   .card{padding:16px}
   .phead{margin-top:16px} .phead h1{font-size:21px} .phead .chips{margin-left:0}
@@ -649,8 +651,7 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
   .mb-alert{grid-template-columns:auto 1fr} .mb-alert .act{grid-column:1 / span 2}
   .fams{grid-template-columns:1fr}
   .ot th.v1,.ot td.v1,.ot span.v1{display:none} .ot small.v1{display:none} .ot .v2{display:table-cell} .ot td:first-child{white-space:normal} .ot .st{white-space:normal;align-items:start} .ot tr.grp td small{display:block;margin-left:0} .ot th{padding:8px 6px} .ot td{padding:8px 6px} .ot td.num{white-space:normal}
-  .agl li{grid-template-columns:auto auto minmax(0,1fr) auto;padding:12px} .agl .hz{grid-column:2 / span 3;text-align:left}
-  .lastclose{grid-template-columns:1fr 1fr 1fr;gap:6px} .lastclose .v{font-size:15px}
+  .agl li{grid-template-columns:auto auto minmax(0,1fr);padding:12px} .agl .hz{grid-column:1 / span 3;display:flex;align-items:center;gap:12px;text-align:left} .agl .hz small{margin:0} .agl .right{grid-column:1 / span 3;text-align:left;display:flex;align-items:center;gap:8px} .agl .right .l{margin:0}
 }
 </style>
 </head>
@@ -957,9 +958,9 @@ function headToHead(m) {
       for (const k of fk) {
         const row = el('div', {class:'pk'});
         row.append(el('span', {class:'rule'}, PICK[k.pick_rule]));
-        if (k.status !== 'picked') { row.append(el('span', {class:'muted'}, '—'), el('span', {class:'muted'}, 'no candidate'), el('span')); fb.append(row); continue; }
-        row.append(el('span', {class:'h-lab'}, `N+${k.horizon_days}`), odds(k.prob_up, `${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close (the prediction ${k.prediction_id}).`),
-          el('span', {class:'gain'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, dec(cur)), el('br'), el('span', {class:'mb-label ' + (k.expected_gain_pct > 0 ? 'success' : 'danger'), 'data-tip': `Expected gain after costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up,1)} × ${sgn(k.move_pct)} − ${pct(1-k.prob_up,1)} × ${k.loss_pct}% − ${k.costs_pct}%.`}, icon(k.expected_gain_pct > 0 ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${k.expected_gain_pct > 0 ? 'clears costs' : 'below costs'}`)));
+        if (k.status !== 'picked') { row.append(el('span', {class:'line muted'}, 'no candidate')); fb.append(row); continue; }
+        row.append(el('span', {class:'line'}, el('span', {class:'h-lab'}, `N+${k.horizon_days}`), odds(k.prob_up, `${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close (the prediction ${k.prediction_id}).`),
+          el('span', {class:'gain'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, dec(cur)), el('span', {class:'mb-label ' + (k.expected_gain_pct > 0 ? 'success' : 'danger'), 'data-tip': `Expected gain after costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up,1)} × ${sgn(k.move_pct)} − ${pct(1-k.prob_up,1)} × ${k.loss_pct}% − ${k.costs_pct}%.`}, icon(k.expected_gain_pct > 0 ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${k.expected_gain_pct > 0 ? 'clears costs' : 'below costs'}`))));
         row.append(el('span', {class:'det'}, `to target ${sgn(k.move_pct)} · downside ${sgn(-k.loss_pct)} · costs ${k.costs_pct}%`));
         fb.append(row);
       }
