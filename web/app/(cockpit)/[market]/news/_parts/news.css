@@ -1,0 +1,40 @@
+/* News page (design/mockups/09-news/template.html page CSS, unchanged rules; tokens only). The pager and toolbar rules are global (styles/). Scoped under .mb-news: page CSS is global in Next. */
+.mb-news .mv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mb-news .mv .it{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:10px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.mb-news .mv .rk{font:700 13px/1 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);width:22px;height:22px;border-radius:50%;background:var(--md-sys-color-surface-container-highest);display:flex;align-items:center;justify-content:center}
+.mb-news .ni{min-width:0}
+.mb-news .ni .kind{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);margin-right:6px}
+.mb-news .ni .kind.mkt{color:var(--md-sys-color-primary)}
+.mb-news .ni h3{font-size:14.5px;line-height:1.35;margin:2px 0 3px;font-weight:600}
+.mb-news .ni h3 a{color:inherit;text-decoration:none} .mb-news .ni h3 a:hover,.mb-news .ni h3 a:focus-visible{text-decoration:underline}
+.mb-news .ni .sum{font-size:13px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);margin:0 0 4px}
+.mb-news .ni .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.mb-news .ni .meta .tk{display:inline-block}
+.mb-news .ni .go{display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--md-sys-color-primary);text-decoration:none;white-space:nowrap}
+.mb-news .ni .go:hover,.mb-news .ni .go:focus-visible{text-decoration:underline}
+/* the feed */
+.mb-news .feed{display:grid;gap:0}
+.mb-news .day{position:sticky;top:0;z-index:1;background:var(--md-sys-color-surface);padding:10px 0 6px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.mb-news .day b{color:var(--md-sys-color-on-surface)}
+.mb-news .row{display:grid;grid-template-columns:58px auto 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);align-items:start;min-width:0}
+.mb-news .row .tm{font-size:12px;color:var(--md-sys-color-on-surface-variant);font-variant-numeric:tabular-nums;padding-top:2px}
+.mb-news .row .mb-dir{margin-top:1px}
+/* the rail */
+.mb-news .cal{display:grid;gap:8px}
+.mb-news .cal .ev{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:start;min-width:0}
+.mb-news .cal .d{font-size:12px;line-height:1.2;color:var(--md-sys-color-on-surface-variant);text-align:center;background:var(--md-sys-color-surface-container-low);border-radius:8px;padding:5px 0}
+.mb-news .cal .d b{display:block;font-size:15px;color:var(--md-sys-color-on-surface)}
+.mb-news .cal .ev.major .d{background:var(--mb-color-warn-container)}
+.mb-news .cal .nm{font-size:13.5px;line-height:1.35} .mb-news .cal .sub{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
+.mb-news .cos{display:grid;gap:6px}
+.mb-news .cos .co{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.mb-news .cos .co:last-child{border-bottom:0}
+.mb-news .cos .co .nm{font-size:13px;min-width:0} .mb-news .cos .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;line-height:1.35;margin-top:2px}
+.mb-news .cos .mix{display:flex;height:8px;width:64px;border-radius:4px;overflow:hidden;background:var(--md-sys-color-surface-container-highest)}
+.mb-news .cos .mix i{display:block;height:100%} .mb-news .cos .mix i.up{background:var(--mb-color-up)} .mb-news .cos .mix i.dn{background:var(--mb-color-down)} .mb-news .cos .mix i.flat{background:var(--mb-chart-axis)}
+.mb-news .cos .ct{font-weight:700;font-variant-numeric:tabular-nums;font-size:13px}
+.mb-news .empty{font-size:13.5px;color:var(--md-sys-color-on-surface-variant);line-height:1.5}
+.mb-news .grid.news{grid-template-columns:minmax(0,8fr) minmax(0,4fr)}
+@media (max-width:1000px){ .mb-news .grid.news{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){ .mb-news .mv{grid-template-columns:1fr} }
+@media (max-width:599px){ .mb-news .row{grid-template-columns:auto 1fr} .mb-news .row .tm{grid-column:1 / -1;padding-top:0} }
