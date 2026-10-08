@@ -219,7 +219,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   the Vercel project at `omenix-gateway.vercel.app`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
   `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
   `/slack/commands` and `/slack/interactions`). Slack:
-  `/company`, `/trade`, `/ask` (stub until B8), in #market-brief only; Confirm posts a visible request message whose
+  `/company`, `/trade`, `/ask india|us QUESTION` (the `explain` tool, answered by B8's assistant through the tool
+  layer's explain hook; "coming soon" until it is wired), in #market-brief only; Confirm posts a visible request message whose
   `slack_channel`/`slack_ts` go into the inbox row for B6's onboarding reply. Web tests: `npm test` in `web/` (node test
   runner, offline, with the prompt-injection suite), CI `.github/workflows/web-tests.yml`.
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,

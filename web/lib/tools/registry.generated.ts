@@ -671,7 +671,8 @@ export const AGENT_DEFINITIONS: readonly unknown[] = [
       "get_scoreboard",
       "compare_rule_vs_ai",
       "get_news",
-      "get_trades"
+      "get_trades",
+      "explain"
     ],
     "daily_write_budget": 0,
     "daily_read_budget": 500,

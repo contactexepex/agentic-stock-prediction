@@ -54,7 +54,7 @@ export function LineChart({
   const half = (W - L - R) / Math.max(1, n - 1) / 2;
   return (
     <div className="chart mb-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} style={{ height }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="group" aria-label={label} style={{ height }}>
         <defs>
           {series.map((s) => (
             <linearGradient key={s.key} id={`${gradientId}-${s.key}`} x1={0} y1={0} x2={0} y2={1}>
@@ -109,6 +109,7 @@ export function LineChart({
               width={Math.max(1, x1 - x0)}
               height={H - T - B}
               tabIndex={0}
+              role="img"
               data-tip={tip}
               aria-label={tip}
               onPointerEnter={() => setCursor(i)}

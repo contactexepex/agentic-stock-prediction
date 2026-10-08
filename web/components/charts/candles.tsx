@@ -39,6 +39,7 @@ interface Lwc {
 }
 
 let loading: Promise<Lwc> | null = null;
+const NO_LINES: readonly PriceLine[] = [];
 
 /** Load the vendored library once (script tag with Subresource Integrity). */
 export function loadLightweightCharts(): Promise<Lwc> {
@@ -67,7 +68,7 @@ export function loadLightweightCharts(): Promise<Lwc> {
 
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-export function Candles({ candles, lines = [], label, summary, height = 300 }: { candles: readonly Candle[]; lines?: readonly PriceLine[]; label: string; summary?: string; height?: number }) {
+export function Candles({ candles, lines = NO_LINES, label, summary, height = 300 }: { candles: readonly Candle[]; lines?: readonly PriceLine[]; label: string; summary?: string; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {

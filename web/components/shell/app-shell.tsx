@@ -16,7 +16,7 @@ import { TooltipLayer } from "./tooltip-layer.tsx";
 
 function NavItem({ page, market, current, onNavigate }: { page: PageRoute; market: Market; current: boolean; onNavigate?: () => void }) {
   return (
-    <Link className="mb-nav-item" href={pagePath(market, page.key)} aria-current={current ? "page" : undefined} onClick={onNavigate}>
+    <Link className="mb-nav-item" href={pagePath(market, page.key)} aria-label={page.label} aria-current={current ? "page" : undefined} onClick={onNavigate}>
       <span className="mb-nav-ind">
         <Icon name={page.icon} />
       </span>
@@ -70,6 +70,15 @@ function Shell({ market, children, chat }: { market: Market; children: ReactNode
   const current = pageOfPath(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  // On phones the sidebar is a drawer: while it is closed it is off screen, so it leaves the Tab order (inert).
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 599px)");
+    const update = () => setPhone(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const chatState = useChatPanel();
   useEffect(() => setMenuOpen(false), [pathname]);
   useEffect(() => {
@@ -82,15 +91,15 @@ function Shell({ market, children, chat }: { market: Market; children: ReactNode
       document.removeEventListener("keydown", onKey);
     };
   }, []);
-  // The sidebar marks the page a per-stock page belongs to (the company pages hang off the Watchlist).
-  const navKey = current.nav ? current.key : "watchlist";
+  // The sidebar marks the page a per-stock page belongs to (the company pages hang off the Watchlist); the gallery none.
+  const navKey = current.nav ? current.key : current.key === "company" || current.key === "strategies" ? "watchlist" : null;
   return (
     <div className={`mb-app${chatState.open ? " chat-open" : ""}`}>
       <a className="mb-skip" href="#mb-main">
         Skip to the page
       </a>
       <TooltipLayer />
-      <nav className={`mb-sidebar${menuOpen ? " open" : ""}`} aria-label="Pages" id="sidebar">
+      <nav className={`mb-sidebar${menuOpen ? " open" : ""}`} aria-label="Pages" id="sidebar" inert={phone && !menuOpen}>
         <div className="mb-sidebar-brand">
           <span className="mb-brand-mark" aria-hidden="true">
             MB
@@ -130,7 +139,7 @@ function Shell({ market, children, chat }: { market: Market; children: ReactNode
         {PHONE_BAR.map((key) => (
           <NavItem key={key} page={pageByKey(key)} market={market} current={key === navKey} />
         ))}
-        <button className="mb-nav-item" type="button" aria-controls="sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
+        <button className="mb-nav-item" type="button" aria-label="More pages" aria-controls="sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
           <span className="mb-nav-ind">
             <Icon name="menu" />
           </span>

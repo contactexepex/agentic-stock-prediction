@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MSFT, SECRET_VALUES, observable, rig } from "./fakes.ts";
 import { dashboardContext, githubContext, slackContext } from "../identity.ts";
+import { ToolLayer } from "../executor.ts";
 import { commandId } from "../ids.ts";
 import type { CallContext } from "../types.ts";
 
@@ -303,4 +304,138 @@ test("get_news with a ticker cuts the company's part out of the market News page
   const whole = (all.data as { sources: { selection?: string; payload: { news: unknown[] } }[] }).sources[0];
   assert.equal(whole.selection, undefined);
   assert.equal(whole.payload.news.length, 4);
+});
+
+test("explain runs the assistant: its reads go through the layer with the caller's context; writes and nested explain are refused", async () => {
+  const r = rig();
+  r.reads.put("news", "us", "_", { news: [] });
+  const seen: { tool: string; result: string; code: string | null }[] = [];
+  const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async (_ctx, args, read) => {
+    for (const [tool, toolArgs] of [["get_news", { market: "us" }], ["add_company", { market: "us", symbol: "MSFT", idempotency_key: "nested-key-01" }],
+      ["explain", { market: "us", question: "again" }], ["no_such_tool", {}]] as const) {
+      const outcome = await read(tool, { ...toolArgs });
+      seen.push({ tool, result: outcome.result, code: outcome.refusal_code });
+    }
+    return { result: "accepted", refusal_code: null, message: null,
+      data: { text: `asked: ${String(args.question)} ${SECRET_VALUES[0]}`, cited_ids: ["news-1"], as_of: null, not_in_data: false } };
+  } } });
+  const assistant = slackContext("U07ABCD123", "assistant");
+  const outcome = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.equal(outcome.result, "accepted");
+  assert.deepEqual(seen, [
+    { tool: "get_news", result: "accepted", code: null },
+    { tool: "add_company", result: "refused", code: "not_allowed_in_channel" },
+    { tool: "explain", result: "refused", code: "not_allowed_in_channel" },
+    { tool: "no_such_tool", result: "refused", code: "not_allowed_in_channel" },
+  ]);
+  assert.deepEqual(r.reads.calls, ["news|us|_", "review|us|_"], "only the read tool reached the read store");
+  assert.equal(r.inbox.requests.length, 0, "no write");
+  assert.equal(r.dispatcher.calls, 0);
+  assert.deepEqual(r.inbox.commands.map((row) => [row.tool, row.agent, row.result]), [
+    ["get_news", "assistant", "accepted"], ["add_company", "assistant", "refused"], ["explain", "assistant", "refused"],
+    ["no_such_tool", "assistant", "refused"], ["explain", "assistant", "accepted"]]);
+  assert.match(String((outcome.data as { text: string }).text), /^asked: why\? \[redacted\]$/, "secrets in the answer are redacted");
+});
+
+test("explain: a throw or an impossible result is a failure; a refusal keeps a known code; the kill switch stops it first", async () => {
+  const r = rig();
+  const answers: unknown[] = [];
+  let calls = 0;
+  const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async () => {
+    calls += 1;
+    const next = answers.shift();
+    if (next instanceof Error) throw next;
+    return next as never;
+  } } });
+  const assistant = slackContext("U07ABCD123", "assistant");
+  answers.push(new Error(`model down ${SECRET_VALUES[0]}`));
+  const thrown = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([thrown.result, thrown.message], ["failed", "The assistant is unavailable now"]);
+  answers.push({ result: "pending", refusal_code: null, message: "queued", data: null });
+  assert.equal((await layer.execute(assistant, "explain", { market: "us", question: "why?" })).result, "failed");
+  answers.push({ result: "refused", refusal_code: "budget_exceeded", message: "The assistant's budget for today is used", data: null });
+  const refused = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([refused.result, refused.refusal_code], ["refused", "budget_exceeded"]);
+  answers.push({ result: "refused", refusal_code: "made_up", message: "no", data: null });
+  assert.equal((await layer.execute(assistant, "explain", { market: "us", question: "why?" })).refusal_code, null);
+  assert.equal(calls, 4);
+  r.inbox.controls.push({ agent: "assistant", enabled: false });
+  const killed = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([killed.result, killed.refusal_code, calls], ["refused", "kill_switch", 4], "the assistant is not called");
+  assert.doesNotMatch(observable(r.inbox.commands, r.notifier.reports), /SECRET/);
+});
+
+test("explain's reads refuse writes even for agents that list write tools (claude-app, slack-gateway): nothing is written", async () => {
+  for (const ctx of [app, slackContext("U07ABCD123")]) {
+    const r = rig();
+    const seen: string[] = [];
+    const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async (_ctx, _args, read) => {
+      const trade = await read("add_paper_trade", { market: "india", ticker: "HDFCBANK", side: "buy", quantity: 10,
+        trade_date: "2026-10-06", price_basis: "close", idempotency_key: "trade-hdfc-0001" });
+      const deactivate = await read("deactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "deact-aapl-0001" });
+      seen.push(`${trade.result}:${trade.refusal_code}`, `${deactivate.result}:${deactivate.refusal_code}`);
+      return { result: "accepted", refusal_code: null, message: null, data: { text: "done", cited_ids: [], as_of: null, not_in_data: true } };
+    } } });
+    const outcome = await layer.execute(ctx, "explain", { market: "us", question: "buy it for me" });
+    assert.equal(outcome.result, "accepted", ctx.agent);
+    assert.deepEqual(seen, ["refused:not_allowed_in_channel", "refused:not_allowed_in_channel"], ctx.agent);
+    assert.equal(r.inbox.requests.length, 0, `${ctx.agent}: no inbox write`);
+    assert.equal(r.dispatcher.calls, 0, `${ctx.agent}: no dispatch`);
+  }
+});
+
+function usedReads(r: ReturnType<typeof rig>, agent: string, count: number) {
+  for (let index = 0; index < count; index += 1) {
+    r.inbox.commands.push({ id: `cmd-used-${index}`, market: "us", received_at: "2026-10-07T09:00:00.000Z", channel: "slack",
+      actor: "slack:U07ABCD123", agent, tool: "get_overview", kind: "read", arguments: {}, idempotency_key: null,
+      result: "accepted", refusal_code: null, message: null, record_ids: [], budget_left: null, completed_at: "2026-10-07T09:00:00.000Z" });
+  }
+}
+
+test("budget refusals of assistant questions are logged but not reported to the owner (owner, 2026-10-08); others still are", async () => {
+  const assistant = slackContext("U07ABCD123", "assistant");
+  // 1. the assistant's own budget refusal (B8's $ budget)
+  const r = rig();
+  const layer = new ToolLayer({ ...r.layer.deps, explainer: { explain: async () => ({ result: "refused",
+    refusal_code: "budget_exceeded", message: "The assistant's budget for today is used", data: null }) } });
+  const own = await layer.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([own.result, own.refusal_code], ["refused", "budget_exceeded"]);
+  assert.equal(r.inbox.commands.at(-1)?.refusal_code, "budget_exceeded", "still logged");
+  assert.equal(r.notifier.reports.length, 0, "not reported");
+  // 2. the gate's read-budget refusal of explain itself (500 reads used)
+  const g = rig();
+  usedReads(g, "assistant", 500);
+  let asked = 0;
+  const gated = new ToolLayer({ ...g.layer.deps, explainer: { explain: async () => { asked += 1; return { result: "accepted", refusal_code: null, message: null, data: null }; } } });
+  const refused = await gated.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual([refused.result, refused.refusal_code, asked, g.notifier.reports.length], ["refused", "budget_exceeded", 0, 0]);
+  // 3. a read the assistant runs for the question, refused for budget: not reported
+  const n = rig();
+  usedReads(n, "assistant", 499);
+  n.reads.put("home", "us", "_", {});
+  const codes: (string | null)[] = [];
+  const nested = new ToolLayer({ ...n.layer.deps, explainer: { explain: async (_ctx, _args, read) => {
+    for (let index = 0; index < 2; index += 1) codes.push((await read("get_overview", { market: "us" })).refusal_code);
+    return { result: "accepted", refusal_code: null, message: null, data: null };
+  } } });
+  await nested.execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual(codes, [null, "budget_exceeded"]);
+  assert.equal(n.notifier.reports.length, 0, "the nested budget refusal is not reported");
+  // 4. still reported: a direct read over budget, a write over budget, and any other refusal of a question
+  const d = rig();
+  usedReads(d, "assistant", 500);
+  await d.layer.execute(assistant, "get_overview", { market: "us" });
+  assert.deepEqual(d.notifier.reports.map((report) => report.refusal_code), ["budget_exceeded"]);
+  const k = rig();
+  k.inbox.controls.push({ agent: "assistant", enabled: false });
+  await new ToolLayer({ ...k.layer.deps, explainer: { explain: async () => ({ result: "accepted", refusal_code: null, message: null, data: null }) } })
+    .execute(assistant, "explain", { market: "us", question: "why?" });
+  assert.deepEqual(k.notifier.reports.map((report) => report.refusal_code), ["kill_switch"]);
+  const w = rig();
+  for (let index = 0; index < 20; index += 1) {
+    await w.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: `react-budget-${String(index).padStart(3, "0")}` }, { confirmedSummary: true });
+  }
+  const over = await w.layer.execute(app, "reactivate_company", { market: "us", ticker: "AAPL", idempotency_key: "react-budget-over" }, { confirmedSummary: true });
+  assert.equal(over.refusal_code, "budget_exceeded");
+  assert.equal(w.notifier.reports.at(-1)?.refusal_code, "budget_exceeded", "a write over budget is still reported");
 });
