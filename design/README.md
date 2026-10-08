@@ -31,9 +31,9 @@ implements the mockups as React components on the design system.
 |---|---|---|---|
 | 1 | Home | `mockups/01-home/` | approved by the owner (2026-10-08, with "fix the clipped and overlapping text"); judge PASS round 3 at a0467b2; on main |
 | 2 | Watchlist | `mockups/02-watchlist/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at b1c9127; on main; cosmetic issues #152-#155 |
-| 3 | Company | | waiting on W1's daily bars and calendar/benchmark-vol tiles (data requests sent 2026-10-08) |
-| 4 | Stock strategies | `mockups/04-stock-strategies/` | in progress |
-| 5 | Strategy lab | | |
+| 3 | Company | `mockups/03-company/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 8912657; on main |
+| 4 | Stock strategies | `mockups/04-stock-strategies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at ca019cd; on main |
+| 5 | Strategy lab | `mockups/05-strategy-lab/` | built; with the judge |
 | 6 | Rule vs AI | | |
 | 7 | Paper portfolios | | |
 | 8 | Track record | | |

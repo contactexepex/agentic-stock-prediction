@@ -247,7 +247,9 @@ Warnings never block: list them in `data_quality`.
     as-of dates, word limits, every cited id stored and public by `made_at`, every prediction id stored and
     matching its decision); on exit 1 send the errors back to the forecaster once and validate again. Then
     `python scripts/agent_reasoning.py add work/reasoning.jsonl` (or with `--valid-only` after the retry,
-    listing the dropped lines in `data_quality`) and delete the work file.
+    listing the dropped lines in `data_quality`) and delete the work file. On a same-day rerun the ids already
+    exist: a record made later whose debate differs is stored as a superseding row (the newest one is shown);
+    an identical one is refused as already stored (issue #50).
 
 9b. AI traders (docs/SPEC.md F4; never blocks the brief; needs session B10's per-horizon ranges and scores).
     Export `PYTHONPATH=scripts`.
@@ -308,8 +310,9 @@ Warnings never block: list them in `data_quality`.
     `data_quality`, list every validate.py failure and warning of this run, and copy every row of the context pack's "Judge FAILs from the previous run not yet in a report"
     section (e.g. a failed monthly graph-builder run or weekly spot-check) as one line. If report.py
     prints `"report_kept": true` (today's report was already filled by an earlier run from the
-    same data), keep that report and fill only the Slack draft. If it prints a `warning` with
-    `previous_report`, the data changed: fill the rebuilt report, reusing the previous narrative
+    same data and forecast outcome: the same calls and gate failures, issue #50), keep that report and fill only
+    the Slack draft. If it prints a `warning` with `previous_report`, the data or the forecast outcome changed:
+    fill the rebuilt report, reusing the previous narrative
     only where it still holds. Gate:
     `python scripts/validate.py --stage report > work/steps/validate_report.json` (no AGENT
     markers; each number in the agent-written lines of the report, the Slack draft and
@@ -338,7 +341,15 @@ Warnings never block: list them in `data_quality`.
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
     `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main`
-    and push again. Pushing to main is intended: the next run must see today's data.
+    and push again. If that rebase stops on a conflict in an append-only data file (a news-only light run
+    appended to the same day file meanwhile), never keep both sides by hand: a plain union can store one news id
+    twice, and `DUPLICATE_ID` then blocks later runs. For each conflicted `data/` file, write main's version
+    unchanged (`git show origin/main:<path>`), then append only this run's added lines whose `id` is not already
+    in it (every kind a light run writes has an `id`). An item both runs collected with the same headline and
+    outlet has one id (`news_tags.item_id`), so the run's enrichment and evidence still point at a stored row;
+    other same-link copies keep their own ids and are hidden on read (`news_id_map`). Then `git add` the file and
+    `git rebase --continue`. A conflict outside `data/`, or a second failed push: stop, and say so in the Slack
+    draft's failures line (issue #51). Pushing to main is intended: the next run must see today's data.
 
 12a. Warehouse (optional, never blocks the run): `python scripts/warehouse_sync.py`. It copies the
     market's stored data as of the run's clock into MotherDuck `market_brief` (schema `<market>`) and

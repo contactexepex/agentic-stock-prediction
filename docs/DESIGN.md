@@ -147,7 +147,9 @@ excludes those rows. India's Diwali Muhurat sessions are closed days in the cale
 `special_sessions` in `config/markets/india.yaml` (2024-11-01 and 2025-10-21, each with 25 stored
 non-flat own-market bars) makes them sessions of the market calendar (`calendar.is_session`), so
 their bars are kept and read (issue #41); a new Muhurat date must be added there by hand, and a
-listed date also counts as a session for scheduling. Without the `exchange_calendars` package the
+listed date also counts as a session for scheduling. Its open and close are its `special_session_hours`
+(2024-11-01 18:00-19:00 and 2025-10-21 13:45-14:45 IST, NSE circulars; issue #45), so the bar cut-off and
+market_status follow the real one-hour slot. Without the `exchange_calendars` package the
 calendar now fails loudly (`CalendarUnavailableError`, issue #43) instead of treating every
 weekday as a session. Known limit: stored flat zero-volume stock bars on real sessions are not
 removed on read.
@@ -265,7 +267,7 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   per query: `when:3d` returned 100 items, and asking the days one by one (`after:2026-10-04
   before:2026-10-05` returned 25 items, of which 15 were in the `when:3d` answer; the next day 59, 40)
   found more. So a query that fills the 100 over a window longer than a day is asked again per day,
-  `<query> after:D before:D+1` without `when:`, from the day before the window's start to today
+  `<query> after:D before:D+1` without `when:`, for each Pacific day from the window's start through now
   (Google's days end at midnight Pacific time: the slice `after:2026-10-03 before:2026-10-04` held items
   from 07:00 UTC to 07:00 UTC), at most 200 such re-asks per run (`sliced_queries`, `slices_skipped`);
   items older than the window are dropped as usual and duplicates are stored once.
@@ -282,13 +284,17 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   back over it. The light runs are scheduled away from the pre-open runs (section 2).
 - The pre-open run covers everything stored since its last run (`marketbrief/pipeline/news_pending.py`).
   `scripts/news_pending.py` writes the news analyst's input `work/news_pending.jsonl`: every news and
-  announcement id first seen in (since, now] without a `news_enriched` row, since = the earlier of the
+  announcement id first seen in [since, now] (closed at since: one collector run stamps one `first_seen_at`, issue
+  #51) without a `news_enriched` row, since = the earlier of the
   start of today (UTC; today's items, the window used before) and the newest `first_seen_at` among the
   items already enriched (items a light run stored after the last enriched one, even while the previous
   pre-open run was working, stay pending), at most 7 days back, plus items whose headline changed in the
   window after their enrichment ("News de-duplication" below). `validate.py --stage news` checks the
   analyst's file against the same window (an id outside it blocks as `ENRICH_UNKNOWN_ID`; a pending id
-  left out is the warning `ENRICH_MISSING`). `claims.py` considers clusters reported in the last 72 h or
+  left out is the warning `ENRICH_MISSING`). Each line carries `priority` (`watchlist`: an announcement or a news
+  item tagged with a watchlist ticker, listed first; else `background`); the analyst may score background items in
+  groups, and the gate warns `ENRICH_TEMPLATED` when more than 30% of at least 20 watchlist records repeat another
+  record's summary (issue #46). `claims.py` considers clusters reported in the last 72 h or
   since that same `since` (+1 h) when longer, at most the clusters' 144 h lookback (`window_hours` in its
   summary); `news_status.py` already reads 144 h. `collect_articles` keeps items up to the widest
   `window_hours` of the news runs in its 24 h lookback when that is wider than `max_age_hours` (48), so
