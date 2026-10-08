@@ -259,7 +259,7 @@ host only (as `neo4j_sync` does).
 | `GITHUB_DISPATCH_TOKEN` | Vercel | fine-grained, this repo only, Actions read and write: dispatches `onboard.yml` |
 | `SLACK_SIGNING_SECRET` | Vercel gateway | Slack request verification (`SLACK_BOT_TOKEN` unchanged) |
 | `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `MCP_ALLOWED_GITHUB_LOGIN`, `MB_OWNER_GITHUB_ID`, `SESSION_SECRET` | Vercel gateway | `/mcp` sign-in (GitHub OAuth, the owner's login and numeric id) and its signed tokens |
-| `MB_GATEWAY` | Vercel gateway | gateway mode (`market-brief-gateway`); unset in `market-brief-app` |
+| `MB_GATEWAY` | Vercel gateway | gateway mode (the project at `omenix-gateway.vercel.app`); unset in the app project (`omenix.vercel.app`) |
 | `REVALIDATE_SECRET` | both | the revalidate endpoint |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | cloud sessions | pass Vercel Authentication for the revalidate call |
 | `SLACK_*`, `NEO4J_*` | unchanged | unchanged |
