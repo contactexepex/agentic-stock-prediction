@@ -9,6 +9,8 @@
 .mb-home .agl .who .sent{font-size:13px;margin-top:2px} .mb-home .agl .who .sent b{font-weight:700;font-size:15px}
 .mb-home .agl .bar{height:8px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);margin-top:8px;overflow:hidden;display:flex}
 .mb-home .agl .bar i{display:block;height:100%}
+/* the shared AgreementBar (.mb-agbar, 120 px in the tables) spans the row here, as the mockup's .agl .bar */
+.mb-home .agl .mb-agbar{height:8px;margin-top:8px;width:auto;max-width:none}
 .mb-home .agl .fam{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .mb-home .agl .hz{text-align:center} .mb-home .agl .hz svg{width:96px;height:40px;display:block} .mb-home .agl .hz small{display:block;font-size:10.5px;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
 .mb-home .agl .hz rect.on{fill:var(--md-sys-color-primary)} .mb-home .agl .hz rect.off{fill:var(--md-sys-color-surface-container-highest)} .mb-home .agl .hz text{font-size:9px;fill:var(--md-sys-color-on-surface-variant)} .mb-home .agl .hz text.on{fill:var(--md-sys-color-primary);font-weight:700}
@@ -16,6 +18,8 @@
 .mb-home .agl .right{text-align:right;min-width:0}
 .mb-home .agl .right .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:3px;white-space:nowrap}
 
+.mb-home .lastclose{display:grid;gap:6px;margin-top:14px}
+.mb-home .lastclose .t{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;border-radius:var(--mb-panel-radius);padding:8px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
 .mb-home .lastclose .t.lead{background:var(--md-sys-color-primary-container)}
 .mb-home .lastclose .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);letter-spacing:.04em;text-transform:uppercase;font-weight:600}
 .mb-home .lastclose .v{font:700 16px/1.2 var(--md-ref-typeface-plain);letter-spacing:-.3px;white-space:nowrap;grid-column:2;grid-row:1 / span 2;text-align:right}

@@ -43,3 +43,8 @@ test("a duplicate is recorded; a stale summary and refusals are told apart", asy
   assert.deepEqual(p.ok ? null : [p.status, refusalWords(p.status, p.receipt)], [429, "Today's budget for changes is used up."]);
   assert.equal(refusalWords(500, null), "The request failed (HTTP 500); nothing was confirmed.");
 });
+
+test("the stale-summary message is B11's route message, word for word (#288)", async () => {
+  const route = await import("../../data/company-commands.ts");
+  assert.equal(STALE_SUMMARY, route.STALE_SUMMARY);
+});

@@ -14,6 +14,9 @@ async function feedChecks(page) {
   if (!(await page.getByText("Page 1 of 3 · 29 stories, 10 a page").count())) problems.push("pager summary missing");
   await page.locator(`${FEED} .pager button`, { hasText: "3" }).click();
   if ((await rows()) !== 9) problems.push(`page 3 shows ${await rows()} rows, expected 9`);
+  await page.locator(`${FEED} button.md-chip`, { hasText: "Last 24 h" }).click();
+  const recent = Number(/(\d+) in the last 24 h/.exec((await page.locator(`${FEED} .head`).textContent()) ?? "")?.[1] ?? -1);
+  if ((await rows()) !== recent || recent < 1) problems.push(`last-24 h filter shows ${await rows()} rows, the head says ${recent}`);
   await page.locator(`${FEED} button.md-chip`, { hasText: "Market-wide" }).click();
   const shown = await rows();
   const marketKinds = await page.locator(`${FEED} .feed .row .kind.mkt`).count();

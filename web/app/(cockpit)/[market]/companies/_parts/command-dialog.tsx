@@ -22,6 +22,9 @@ export interface Recorded { tool: CompanyTool; summary: string; message: string 
 
 type Stage = "form" | "checking" | "confirm" | "sending";
 
+const NO_ANSWER_PREVIEW = "No answer from the server; nothing was checked or written. Try again.";
+const NO_ANSWER_CONFIRM = "No answer from the server, so it is not known whether the request was recorded. Press Confirm again: this dialog sends the same request key, so it is never recorded twice.";
+
 const TOOL_OF: Record<Exclude<Intent["kind"], "manage">, CompanyTool> = {
   add: "add_company", amount: "set_paper_amount", deactivate: "deactivate_company", reactivate: "reactivate_company", delete: "delete_company",
 };
@@ -85,28 +88,39 @@ export function CommandDialog({ intent, market, currency, defaultAmount, onClose
     const args = argumentsOf();
     if (typeof args === "string") { setError(args); return; }
     setStage("checking"); setError(null); setNote(null);
-    const res = await previewCommand(market, key, TOOL_OF[intent.kind], args);
-    if (res.ok) { setPreview(res.preview); setStage("confirm"); }
-    else { setError(refusalWords(res.status, res.receipt)); setStage("form"); }
+    try {
+      const res = await previewCommand(market, key, TOOL_OF[intent.kind], args);
+      if (res.ok) { setPreview(res.preview); setStage("confirm"); }
+      else { setError(refusalWords(res.status, res.receipt)); setStage("form"); }
+    } catch {
+      setError(NO_ANSWER_PREVIEW); setStage("form");
+    }
   }
 
   async function confirm() {
     if (!preview) return;
     setStage("sending"); setError(null);
-    const res = await submitCommand(market, key, preview);
-    if (res.kind === "recorded") {
-      onRecorded({ tool: preview.tool, summary: preview.summary, message: res.receipt.message, result: res.receipt.result });
-      ref.current?.close();
-      return;
+    try {
+      const res = await submitCommand(market, key, preview);
+      if (res.kind === "recorded") {
+        onRecorded({ tool: preview.tool, summary: preview.summary, message: res.receipt.message, result: res.receipt.result });
+        ref.current?.close();
+        return;
+      }
+      if (res.kind === "stale") {
+        const again = await previewCommand(market, key, preview.tool, preview.arguments);
+        if (again.ok) { setPreview(again.preview); setNote("The summary changed since you checked it, so nothing was written. Read the new summary and confirm again."); setStage("confirm"); }
+        else { setError(refusalWords(again.status, again.receipt)); setStage("form"); }
+        return;
+      }
+      setError(refusalWords(res.status, res.receipt));
+      setStage("confirm");
+    } catch {
+      // The server may have recorded it before the answer was lost: Confirm again sends the same key, so it is never
+      // recorded twice (the route answers the stored receipt). The key lives as long as this dialog.
+      setError(NO_ANSWER_CONFIRM);
+      setStage("confirm");
     }
-    if (res.kind === "stale") {
-      const again = await previewCommand(market, key, preview.tool, preview.arguments);
-      if (again.ok) { setPreview(again.preview); setNote("The summary changed since you checked it, so nothing was written. Read the new summary and confirm again."); setStage("confirm"); }
-      else { setError(refusalWords(again.status, again.receipt)); setStage("form"); }
-      return;
-    }
-    setError(refusalWords(res.status, res.receipt));
-    setStage("confirm");
   }
 
   const title = (() => {

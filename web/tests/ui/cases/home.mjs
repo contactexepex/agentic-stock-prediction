@@ -44,7 +44,7 @@ export const cases = [
     widths: [1280],
     waitFor: ".agl",
     expectText: ["Wednesday 7 Oct 2026", "No proven strong signals today", "Who agrees at N+1", "12 of 15", "Today’s head-to-head trades", "Rule vs AI", "Last close", "Head-to-head to date", "Market movers · last 3 days", "Runs today", "Open paper trades", "clears market costs"],
-    expectSelector: [".agl li.top", ".h2h .cmp", ".fam-box .pk", ".lastclose .t", ".grid22 .cell", ".nl li", ".runs li", "table.ot"],
+    expectSelector: [".agl li.top", ".h2h .cmp", ".fam-box .pk", ".lastclose .t", ".grid22 .cell", ".nl li", ".runs li", "table.mb-ot"],
   },
   { name: "home-india-narrow", path: "/india", mockup: "01-home", widths: [1024, 768, 390], waitFor: ".agl", expectText: ["Who agrees at N+1", "Runs today"] },
   { name: "home-india-interactions", path: "/india", mockup: "01-home", widths: [1280], waitFor: ".agl", check: homeChecks },
