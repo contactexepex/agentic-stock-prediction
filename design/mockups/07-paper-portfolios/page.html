@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Paper portfolios</title>
+<meta name="description" content="Paper portfolios of the personal stock cockpit: the head-to-head portfolios per family and pick rule, every open paper trade by strategy with its latest intraday check, and the owner's own paper trades and positions with a euro view of US holdings; add an own paper trade as a request. Research only, every figure Paper, nothing is an order.">
+<style>
+/* market-brief cockpit: design tokens, scheme v2 "modern admin light" (2026-10-08).
+   The owner asked for the look of modern admin templates (Pixinvent Materialize with its semi-dark vertical
+   menu, Aurora) applied to a broker-style cockpit: a soft light-grey page, white cards lifted by a faint shadow
+   (no hairline borders), one periwinkle-indigo accent, a dark navy sidebar with labels, icon tiles on the KPI
+   cards, gradient area charts, generous spacing. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and every page need no renaming; the previous scheme ("terminal
+   light") used the same names with other values.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an okay
+   one. Up/down/hit/miss always carry a glyph and a word. Text tones are AA on white (figures in the comments);
+   the vivid template tones live on fills and tints with a dark ink on them.
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- Colour roles --------------------------------------------------------------------- */
+  --md-sys-color-primary: #5a5ee6;                 /* periwinkle indigo (5.0:1 on white) */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #e9eaff;       /* accent tint: selected segment, icon tiles */
+  --md-sys-color-on-primary-container: #3a3db8;    /* 7.0:1 on the tint */
+  --md-sys-color-secondary: #65708a;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #eef0f5;
+  --md-sys-color-on-secondary-container: #3f4756;
+  --md-sys-color-tertiary: #7c3aed;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f1ebff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #fde8e8;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #4b465c;              /* ink, 9.0:1 on white */
+  --md-sys-color-surface-variant: #f3f4f8;
+  --md-sys-color-on-surface-variant: #65708a;      /* muted labels, 5.0:1 on white */
+  --md-sys-color-surface-dim: #e4e6ee;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f7f7f9;    /* the page */
+  --md-sys-color-surface-container: #f3f4f8;        /* tiles, table heads, inputs */
+  --md-sys-color-surface-container-high: #eceef3;   /* table rules, dividers */
+  --md-sys-color-surface-container-highest: #e4e6ee;
+  --md-sys-color-outline: #a3a9b8;
+  --md-sys-color-outline-variant: #e7e9ef;          /* control borders */
+  --md-sys-color-inverse-surface: #2f3349;          /* tooltips, the sidebar */
+  --md-sys-color-inverse-on-surface: #f4f5fa;
+  --md-sys-color-inverse-primary: #b4b6ff;
+  --md-sys-color-surface-tint: #5a5ee6;
+  --md-sys-color-background: #f7f7f9;
+  --md-sys-color-on-background: #4b465c;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #2f3349;
+
+  /* ---- Sidebar (semi-dark vertical menu) -------------------------------------------------- */
+  --mb-sidebar-bg: #2f3349;
+  --mb-sidebar-ink: #d7d8e5;         /* 8.8:1 on the sidebar */
+  --mb-sidebar-muted: #9fa2b7;       /* 4.9:1 */
+  --mb-sidebar-active: linear-gradient(72deg, #5a5ee6 0%, #7a7df0 100%);
+  --mb-sidebar-active-shadow: 0 4px 12px rgba(90, 94, 230, .45);
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white. The tints are fresher than
+     before (template "label" badges): ink on tint 6.4:1 / 7.1:1 / 4.6:1. */
+  --mb-color-up: #15803d;
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #e3f8e9;
+  --mb-color-on-up-container: #166534;
+  --mb-color-down: #dc2626;
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #fde8e8;
+  --mb-color-on-down-container: #991b1b;
+  --mb-color-neutral: #65708a;
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #eef0f5;
+  --mb-color-on-neutral-container: #3f4756;
+  --mb-color-warn: #e07b00;               /* "direction unclear", flags (icons and fills) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fff3e0;
+  --mb-color-on-warn-container: #b45309;  /* 4.6:1 on the tint, 5.0:1 on white */
+  --mb-color-info: #0b8fa6;
+  --mb-color-info-container: #e0f7fb;
+  --mb-color-on-info-container: #0c5d6b;
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fde8e8;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;
+  --mb-verdict-strong-bg: #bff0cf;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d;
+  --mb-verdict-ok-bg: #e3f8e9;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;
+  /* Provenance labels: Live (green tint), Back-test (hatched accent tint), Mock (dashed), Paper (violet tint).
+     Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(90,94,230,.14) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill) ------------------------------------------------------- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #5a5ee6;   /* series 1 = the accent: ranges, model, rule strategies, everything "ours" */
+  --mb-chart-2: #e07b00;   /* series 2 (orange; 3.0:1 on white: shapes with direct labels) */
+  --mb-chart-3: #0b8fa6;   /* series 3 (teal, 3.8:1) */
+  --mb-chart-4: #d6338f;   /* series 4 (pink, 4.4:1) */
+  --mb-chart-1-fill: rgba(90,94,230,.28);     /* gradient top of an area chart, fades to 0 */
+  --mb-chart-2-fill: rgba(224,123,0,.22);
+  --mb-chart-3-fill: rgba(11,143,166,.22);
+  --mb-chart-band-50: rgba(90,94,230,.30);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(90,94,230,.12);   /* outer band */
+  --mb-chart-fan: rgba(90,94,230,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: "Inter", "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 600 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 600 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 600 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 600 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 600 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 600 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/22px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12.5px/18px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12.5px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.3px;
+  --md-sys-typescale-label-small-tracking: 0.4px;
+  --md-sys-typescale-title-medium-tracking: 0.1px;
+  --md-sys-typescale-body-medium-tracking: 0.15px;
+  --md-sys-typescale-body-small-tracking: 0.3px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 6px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 10px;       /* tiles and columns inside a card */
+  --mb-card-border: 1px solid transparent;   /* cards are lifted by a shadow, not a hairline */
+  --mb-card-shadow: 0 2px 8px rgba(47, 51, 73, .08), 0 0 1px rgba(47, 51, 73, .14);
+  --mb-card-shadow-hover: 0 6px 18px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .14);
+
+  /* ---- Elevation (soft, template-like) --------------------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: var(--mb-card-shadow);
+  --md-sys-elevation-2: 0 4px 14px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .16);
+  --md-sys-elevation-3: 0 8px 24px rgba(47, 51, 73, .16), 0 0 1px rgba(47, 51, 73, .18);
+  --md-sys-elevation-4: 0 12px 32px rgba(47, 51, 73, .18);
+  --md-sys-elevation-5: 0 16px 40px rgba(47, 51, 73, .22);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1240px;
+  --mb-sidebar-width: 256px;    /* vertical menu with labels (>= 1200px) */
+  --mb-rail-width: 76px;        /* collapsed menu, icons only (600-1199px) */
+  --mb-navbar-height: 72px;     /* navigation bar (phone) */
+  --mb-topbar-height: 64px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 120ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.3px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* market-brief cockpit: components on tokens.css, scheme v2 "modern admin light". Plain CSS, no JS
+   required (the tooltip and the phone drawer need the page's own small script, see README).
+   Prefix: md- for M3 components, mb- for the cockpit's own (app shell, provenance tags, odds meter,
+   KPI card, labels). Load after tokens.css. */
+
+/* ---- Base ----------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); -webkit-text-size-adjust: 100%; }
+body { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); font-family: var(--md-ref-typeface-plain); }
+a { color: var(--md-sys-color-primary); }
+button { font: inherit; color: inherit; letter-spacing: inherit; }
+:focus-visible { outline: none; box-shadow: var(--mb-focus-ring); border-radius: var(--md-sys-shape-corner-extra-small); }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- Icons (Material Symbols Outlined, inlined from icons.svg) ------------------------- */
+.ms { width: 1em; height: 1em; display: inline-block; vertical-align: -0.15em; fill: currentColor; flex: none; }
+.ms-20 { width: 20px; height: 20px; } .ms-24 { width: 24px; height: 24px; } .ms-40 { width: 40px; height: 40px; }
+
+/* ---- App shell: semi-dark sidebar (>= 1200px), collapsed rail (600-1199px), phone bar + drawer ---- */
+.mb-app { min-height: 100vh; display: grid; grid-template-columns: var(--mb-sidebar-width) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.mb-sidebar, .mb-rail { grid-row: 1 / span 2; background: var(--mb-sidebar-bg); color: var(--mb-sidebar-ink); display: flex; flex-direction: column; gap: 2px; padding: var(--mb-space-4) var(--mb-space-3); position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.mb-sidebar-brand, .mb-rail-brand { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 var(--mb-space-2); margin-bottom: var(--mb-space-4); color: #fff; font: var(--md-sys-typescale-title-medium); letter-spacing: .2px; }
+.mb-sidebar-brand .mb-brand-mark, .mb-rail-brand .mb-brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--mb-sidebar-active); box-shadow: var(--mb-sidebar-active-shadow); display: grid; place-items: center; font: 700 13px/1 var(--md-ref-typeface-plain); color: #fff; flex: none; }
+.mb-sidebar-brand small { display: block; font: var(--md-sys-typescale-label-small); color: var(--mb-sidebar-muted); letter-spacing: .3px; }
+.mb-sidebar-section { font: var(--md-sys-typescale-label-small); letter-spacing: .08em; text-transform: uppercase; color: var(--mb-sidebar-muted); padding: var(--mb-space-4) var(--mb-space-3) var(--mb-space-1); }
+.mb-nav-item { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 var(--mb-space-3); border: 0; border-radius: var(--md-sys-shape-corner-small); background: none; color: var(--mb-sidebar-ink); text-decoration: none; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); white-space: nowrap; transition: background var(--md-sys-motion-duration-short); }
+.mb-nav-item .mb-nav-ind { width: 24px; height: 24px; display: grid; place-items: center; flex: none; }
+.mb-nav-item .ms { width: 22px; height: 22px; }
+.mb-nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+.mb-nav-item[aria-current="page"] { background: var(--mb-sidebar-active); color: #fff; box-shadow: var(--mb-sidebar-active-shadow); }
+.mb-nav-item.coming { color: var(--mb-sidebar-muted); cursor: help; }
+.mb-nav-item.coming::after { content: "soon"; margin-left: auto; font: var(--md-sys-typescale-label-small); letter-spacing: 0; padding: 0 6px; border-radius: var(--md-sys-shape-corner-full); background: rgba(255,255,255,.1); color: var(--mb-sidebar-muted); }
+.mb-sidebar-foot { margin-top: auto; padding: var(--mb-space-3); border-radius: var(--md-sys-shape-corner-small); background: rgba(255,255,255,.06); color: var(--mb-sidebar-muted); font: var(--md-sys-typescale-body-small); }
+.mb-sidebar-foot b { color: var(--mb-sidebar-ink); }
+.mb-navbar { display: none; }
+.mb-menu-btn { display: none; }
+.mb-scrim { display: none; position: fixed; inset: 0; background: rgba(47,51,73,.45); z-index: 29; }
+.mb-topbar { grid-column: 2; position: sticky; top: 0; z-index: 20; height: var(--mb-topbar-height); background: var(--md-sys-color-surface); box-shadow: 0 1px 0 var(--md-sys-color-surface-container-high); display: flex; align-items: center; gap: var(--mb-space-3); padding: 0 var(--mb-gutter-desktop); }
+.mb-topbar.scrolled { box-shadow: var(--md-sys-elevation-2); }
+.mb-topbar .mb-topbar-title { font: var(--md-sys-typescale-title-medium); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-topbar .mb-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--mb-space-3); }
+.mb-search { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-body-small); text-decoration: none; min-width: 200px; }
+.mb-search .ms { width: 18px; height: 18px; }
+.mb-content { grid-column: 2; min-width: 0; padding: 0 var(--mb-gutter-desktop) var(--mb-space-12); }
+.mb-content-inner { max-width: var(--mb-content-max); margin: 0 auto; }
+@media (max-width: 1199px) {
+  .mb-app { grid-template-columns: var(--mb-rail-width) minmax(0, 1fr); }
+  .mb-sidebar, .mb-rail { padding: var(--mb-space-4) var(--mb-space-2); align-items: center; }
+  .mb-sidebar-brand span, .mb-sidebar-section, .mb-sidebar-foot, .mb-nav-item .mb-nav-label { display: none; }
+  .mb-sidebar-brand { padding: 0; justify-content: center; }
+  .mb-nav-item { width: 56px; justify-content: center; padding: 0; }
+  .mb-nav-item.coming::after { display: none; }
+}
+@media (max-width: 599px) {
+  .mb-app { grid-template-columns: minmax(0, 1fr); }
+  .mb-sidebar, .mb-rail { position: fixed; left: 0; top: 0; bottom: 0; width: var(--mb-sidebar-width); z-index: 30; transform: translateX(-100%); transition: transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard); padding: var(--mb-space-4) var(--mb-space-3); align-items: stretch; box-shadow: var(--md-sys-elevation-3); }
+  .mb-sidebar.open, .mb-rail.open { transform: none; }
+  .mb-sidebar.open ~ .mb-scrim { display: block; }
+  .mb-sidebar-brand span, .mb-sidebar-section, .mb-sidebar-foot, .mb-nav-item .mb-nav-label { display: revert; }
+  .mb-sidebar .mb-nav-item { width: auto; justify-content: flex-start; padding: 0 var(--mb-space-3); }
+  .mb-sidebar-brand { padding: 0 var(--mb-space-2); justify-content: flex-start; }
+  .mb-menu-btn { display: inline-grid; }
+  .mb-topbar, .mb-content { grid-column: 1; }
+  .mb-topbar { padding: 0 var(--mb-gutter); gap: var(--mb-space-2); }
+  .mb-search { min-width: 0; width: 38px; padding: 0; justify-content: center; }
+  .mb-search span { display: none; }
+  .mb-content { padding: 0 var(--mb-gutter) calc(var(--mb-navbar-height) + var(--mb-space-6)); }
+  .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface); box-shadow: 0 -1px 0 var(--md-sys-color-surface-container-high), var(--md-sys-elevation-2); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
+  .mb-navbar .mb-nav-item { flex-direction: column; gap: 2px; height: auto; width: auto; flex: 1 1 0; min-width: 0; padding: 6px 0; color: var(--md-sys-color-on-surface-variant); background: none; box-shadow: none; font: var(--md-sys-typescale-label-small); }
+  .mb-navbar .mb-nav-item .mb-nav-ind { width: 48px; height: 28px; border-radius: var(--md-sys-shape-corner-full); }
+  .mb-navbar .mb-nav-item[aria-current="page"] { color: var(--md-sys-color-primary); }
+  .mb-navbar .mb-nav-item[aria-current="page"] .mb-nav-ind { background: var(--md-sys-color-primary-container); }
+}
+
+/* ---- Cards ---------------------------------------------------------------------------- */
+.md-card { border-radius: var(--mb-card-radius); padding: var(--mb-space-5) var(--mb-space-6); background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); color: var(--md-sys-color-on-surface); }
+.md-card.elevated { box-shadow: var(--md-sys-elevation-2); }
+.md-card.filled { background: var(--md-sys-color-surface-container); box-shadow: none; }
+.md-card.outlined { background: var(--md-sys-color-surface-container-lowest); box-shadow: none; border: 1px solid var(--md-sys-color-outline-variant); }
+.md-card > h2:first-child, .md-card > h3:first-child { margin-top: 0; }
+.mb-card-head { display: flex; align-items: center; gap: var(--mb-space-2); flex-wrap: wrap; margin-bottom: var(--mb-space-4); }
+.mb-card-head h2 { font: var(--md-sys-typescale-title-medium); margin: 0; }
+.mb-card-head .mb-card-sub { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); width: 100%; margin-top: -4px; }
+.mb-card-head .mb-card-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--mb-space-2); font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+/* Icon tile (avatar): a tinted rounded square with an icon, the admin-template KPI signature */
+.mb-avatar { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-avatar .ms { width: 22px; height: 22px; }
+.mb-avatar.success { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-avatar.danger { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-avatar.warn { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-avatar.info { background: var(--mb-color-info-container); color: var(--mb-color-on-info-container); }
+.mb-avatar.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-avatar.paper { background: var(--mb-color-paper-container); color: var(--mb-color-on-paper-container); }
+.mb-avatar.sm { width: 34px; height: 34px; border-radius: 8px; } .mb-avatar.sm .ms { width: 18px; height: 18px; }
+.mb-avatar.lg { width: 52px; height: 52px; border-radius: 12px; } .mb-avatar.lg .ms { width: 28px; height: 28px; }
+
+/* ---- Buttons -------------------------------------------------------------------------- */
+.md-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--mb-space-2); height: 38px; padding: 0 var(--mb-space-4); border-radius: var(--md-sys-shape-corner-small); border: 0; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); text-decoration: none; white-space: nowrap; position: relative; background: transparent; color: var(--md-sys-color-primary); }
+.md-btn .ms { width: 18px; height: 18px; margin-left: -6px; }
+.md-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
+.md-btn.filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 2px 6px rgba(90,94,230,.35); }
+.md-btn.tonal { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.md-btn.outlined { border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface); }
+.md-btn.text { padding: 0 var(--mb-space-3); }
+.md-btn.small { height: 32px; padding: 0 var(--mb-space-3); font: var(--md-sys-typescale-label-medium); }
+.md-btn:disabled, .md-btn[aria-disabled="true"] { cursor: not-allowed; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); border-color: transparent; box-shadow: none; }
+.md-btn.text:disabled { background: transparent; }
+.md-icon-btn { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-full); border: 0; background: transparent; color: var(--md-sys-color-on-surface-variant); display: inline-grid; place-items: center; cursor: pointer; position: relative; padding: 0; }
+.md-icon-btn .ms { width: 24px; height: 24px; }
+.md-icon-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; }
+.md-icon-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-icon-btn.small { width: 28px; height: 28px; } .md-icon-btn.small .ms { width: 18px; height: 18px; }
+.md-icon-btn.outlined { border: 1px solid var(--md-sys-color-outline-variant); }
+.md-icon-btn.tonal { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+
+/* Help affordance: a small outlined icon button that opens a tooltip (hover, focus or tap) */
+.md-help { appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-small); letter-spacing: 0; display: inline-grid; place-items: center; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px; line-height: 1; }
+.md-help:hover, .md-help:focus-visible { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
+
+/* ---- Segmented buttons (pill tabs) ------------------------------------------------------ */
+.md-segmented { display: inline-flex; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container); padding: 3px; gap: 2px; }
+.md-segmented > button, .md-segmented > a { border: 0; border-radius: var(--md-sys-shape-corner-full); background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: 0; height: 32px; padding: 0 var(--mb-space-4); cursor: pointer; display: inline-flex; align-items: center; gap: var(--mb-space-2); text-decoration: none; white-space: nowrap; transition: background var(--md-sys-motion-duration-short), color var(--md-sys-motion-duration-short); }
+.md-segmented > [aria-pressed="true"], .md-segmented > [aria-current="true"] { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 2px 6px rgba(90,94,230,.35); font-weight: 600; }
+.md-segmented > :disabled, .md-segmented > [aria-disabled="true"] { color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); cursor: not-allowed; }
+.md-segmented.dense > button, .md-segmented.dense > a { height: 28px; padding: 0 12px; font: var(--md-sys-typescale-label-medium); }
+.md-segmented.light > [aria-pressed="true"] { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); box-shadow: var(--mb-card-shadow); }
+
+/* ---- Chips ---------------------------------------------------------------------------- */
+.md-chip { display: inline-flex; align-items: center; gap: var(--mb-space-2); height: 30px; padding: 0 var(--mb-space-3); border-radius: var(--md-sys-shape-corner-full); border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); white-space: nowrap; cursor: default; }
+.md-chip .ms { width: 16px; height: 16px; margin-left: -4px; color: var(--md-sys-color-primary); }
+.md-chip.assist { cursor: pointer; }
+.md-chip.filter { cursor: pointer; }
+.md-chip.filter[aria-pressed="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: transparent; }
+.md-chip.small { height: 24px; padding: 0 var(--mb-space-2); font: var(--md-sys-typescale-label-small); } .md-chip.small .ms { width: 14px; height: 14px; margin-left: -2px; }
+.md-chip .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+
+/* ---- Labels (template "label" badges: a tint with its ink, rounded) --------------------- */
+.mb-label { display: inline-flex; align-items: center; gap: 4px; font: 600 12px/18px var(--md-ref-typeface-plain); letter-spacing: .1px; border-radius: 6px; padding: 2px 8px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); white-space: nowrap; vertical-align: middle; }
+.mb-label .ms { width: 14px; height: 14px; }
+.mb-label.success, .mb-label.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-label.danger, .mb-label.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-label.warn { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-label.info { background: var(--mb-color-info-container); color: var(--mb-color-on-info-container); }
+.mb-label.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-label.paper { background: var(--mb-color-paper-container); color: var(--mb-color-on-paper-container); }
+
+/* ---- Provenance tags: Live / Back-test / Mock / Paper / Derived (texture + colour) ------ */
+.mb-tag { display: inline-flex; align-items: center; gap: 4px; font: 600 10.5px/1 var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; border-radius: 6px; padding: 4px 7px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); white-space: nowrap; vertical-align: middle; }
+.mb-tag .ms { width: 12px; height: 12px; }
+.mb-tag.live { border-color: transparent; color: var(--mb-color-on-live-container); background: var(--mb-color-live-container); }
+.mb-tag.bt, .mb-tag.backtest { background: var(--mb-color-backtest-container), var(--md-sys-color-surface-container-lowest); border-color: var(--mb-color-backtest); color: var(--mb-color-on-backtest-container); }
+.mb-tag.mock { border-style: dashed; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.derived { border-style: dotted; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.paper { border-color: transparent; color: var(--mb-color-on-paper-container); background: var(--mb-color-paper-container); }
+.mb-tag.coming { border-style: dashed; color: var(--md-sys-color-on-surface-variant); }
+.md-chip.live .sw { background: var(--mb-color-live); }
+.md-chip.bt .sw { background: repeating-linear-gradient(135deg, var(--mb-color-backtest) 0 2px, #fff 2px 4px); border: 1px solid var(--mb-color-backtest); }
+.md-chip.mock .sw { border: 1.5px dashed var(--mb-color-mock); background: transparent; }
+
+/* ---- Status badges (never colour alone: always an icon or glyph plus the word) ---------- */
+.md-badge { display: inline-flex; align-items: center; gap: 4px; font: 500 11.5px/16px var(--md-ref-typeface-plain); letter-spacing: .02em; border-radius: 6px; padding: 2px 7px; border: 1px solid transparent; color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container); white-space: nowrap; vertical-align: middle; }
+.md-badge .ms { width: 13px; height: 13px; }
+.md-badge.dot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--md-sys-color-error); }
+.md-badge.count { min-width: 16px; height: 16px; padding: 0 4px; border: 0; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); justify-content: center; }
+.mb-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.mb-status.up, .mb-status.hit { color: var(--mb-color-up); }
+.mb-status.down, .mb-status.miss { color: var(--mb-color-down); }
+.mb-status.neutral { color: var(--mb-color-neutral); }
+.mb-status.unknown { color: var(--mb-color-on-warn-container); }
+.md-badge.up, .md-badge.hit, .md-badge.confirmed_primary, .md-badge.corroborated { color: var(--mb-color-on-up-container); background: var(--mb-color-up-container); }
+.md-badge.down, .md-badge.miss, .md-badge.rumour, .md-badge.contradicted, .md-badge.promotional { color: var(--mb-color-on-down-container); background: var(--mb-color-down-container); }
+.md-badge.warn, .md-badge.single_source { color: var(--mb-color-on-warn-container); background: var(--mb-color-warn-container); }
+.md-badge.neutral, .md-badge.unverified { color: var(--mb-color-on-neutral-container); background: var(--mb-color-neutral-container); }
+/* Square direction / sentiment markers: container tone with an on-container glyph */
+.mb-dir { width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; flex: none; }
+.mb-dir .ms { width: 15px; height: 15px; }
+.mb-dir.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-dir.dn, .mb-dir.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-dir.flat, .mb-dir.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-dir.unk { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+/* Round outcome markers: solid tone with a white glyph (strong, for ticks and crosses) */
+.mb-mark { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; flex: none; }
+.mb-mark .ms { width: 14px; height: 14px; }
+.mb-mark.ok, .mb-mark.hit { background: var(--mb-color-hit); }
+.mb-mark.no, .mb-mark.miss { background: var(--mb-color-miss); }
+.mb-mark.na { background: var(--mb-color-neutral); }
+
+/* ---- Tooltip (plain, M3: inverse surface) --------------------------------------------- */
+.md-tooltip { position: fixed; z-index: 50; max-width: min(320px, calc(100vw - 24px)); background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); padding: 8px 12px; border-radius: var(--md-sys-shape-corner-small); box-shadow: var(--md-sys-elevation-3); pointer-events: none; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-tooltip.on { opacity: 1; }
+.md-tooltip b { color: var(--md-sys-color-inverse-on-surface); }
+.md-tooltip .row { display: flex; justify-content: space-between; gap: 14px; }
+.md-tooltip .row span:last-child { font-weight: 600; }
+.md-tooltip .dim { color: var(--mb-sidebar-muted); margin-top: 4px; }
+.md-tooltip-rich { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); border-radius: var(--md-sys-shape-corner-medium); padding: var(--mb-space-3) var(--mb-space-4); box-shadow: var(--md-sys-elevation-2); max-width: 320px; font: var(--md-sys-typescale-body-medium); }
+.md-tooltip-rich .subhead { font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; }
+
+/* ---- Data tables ---------------------------------------------------------------------- */
+.md-table { width: 100%; border-collapse: collapse; font: var(--md-sys-typescale-body-medium); font-variant-numeric: tabular-nums; }
+.md-table th { font: 600 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); text-align: left; padding: 10px 12px; background: var(--md-sys-color-surface-container); white-space: nowrap; }
+.md-table th:first-child { border-radius: 8px 0 0 8px; } .md-table th:last-child { border-radius: 0 8px 8px 0; }
+.md-table td { padding: 10px 12px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); vertical-align: middle; }
+.md-table tr:last-child td { border-bottom: 0; }
+.md-table tr:hover td { background: color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent); }
+.md-table td.num, .md-table th.num { text-align: right; }
+.md-table tr.muted td { color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-low); }
+.md-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---- Lists, key-value, dividers -------------------------------------------------------- */
+.md-divider { border: 0; border-top: 1px solid var(--md-sys-color-surface-container-high); margin: var(--mb-space-4) 0; }
+.md-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font: var(--md-sys-typescale-body-medium); margin: 0; }
+.md-kv dt { color: var(--md-sys-color-on-surface-variant); } .md-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+code { font-family: var(--md-ref-typeface-mono); font-size: .92em; overflow-wrap: anywhere; }
+.md-list { list-style: none; margin: 0; padding: 0; }
+.md-list > li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--mb-space-3); align-items: center; padding: var(--mb-space-3) 0; border-top: 1px solid var(--md-sys-color-surface-container-high); }
+.md-list > li:first-child { border-top: 0; }
+
+/* ---- Progress and the odds meter ------------------------------------------------------- */
+.md-progress { height: 6px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container-high); overflow: hidden; }
+.md-progress > i { display: block; height: 100%; background: var(--md-sys-color-primary); border-radius: inherit; }
+.mb-odds { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.mb-odds svg { width: 64px; height: 14px; display: block; }
+.mb-odds b { font-weight: 600; min-width: 30px; }
+.mb-odds .track { fill: var(--md-sys-color-surface-container-high); }
+.mb-odds .mid { stroke: var(--md-sys-color-outline); }
+.mb-odds .dot { stroke: #fff; stroke-width: 1.5; } .mb-odds .dot.up { fill: var(--mb-color-up); } .mb-odds .dot.dn { fill: var(--mb-color-down); }
+.mb-bar { height: 8px; background: var(--md-sys-color-surface-container-high); border-radius: 4px; position: relative; overflow: hidden; }
+.mb-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.mb-bar i.up { background: var(--mb-color-up); left: 50%; } .mb-bar i.dn { background: var(--mb-color-down); right: 50%; } .mb-bar i.unk { background: var(--mb-color-warn); left: 50%; transform: translateX(-50%); }
+.mb-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--md-sys-color-outline-variant); }
+
+/* ---- KPI card (stat card with an icon tile, label, big number and a trend label) --------- */
+.mb-kpi { border-radius: var(--mb-card-radius); padding: var(--mb-space-5); background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: start; min-width: 0; }
+.mb-kpi .l { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.mb-kpi .v { font: 700 26px/1.15 var(--md-ref-typeface-plain); letter-spacing: -.5px; color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.mb-kpi .s { grid-column: 1 / span 2; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mb-kpi .mb-avatar { grid-row: 1 / span 2; }
+.mb-kpi.accent { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 6px 18px rgba(90,94,230,.35); }
+.mb-kpi.accent .l, .mb-kpi.accent .s, .mb-kpi.accent .v { color: inherit; } .mb-kpi.accent .l { opacity: .85; }
+.mb-kpi.accent .mb-avatar { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ---- Details / expansion -------------------------------------------------------------- */
+details.md-expansion { background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); border-radius: var(--mb-card-radius); padding: 0 var(--mb-space-6); }
+details.md-expansion summary { cursor: pointer; padding: 16px 0; font: var(--md-sys-typescale-title-small); list-style: none; display: flex; align-items: center; gap: var(--mb-space-2); }
+details.md-expansion summary::-webkit-details-marker { display: none; }
+details.md-expansion summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--md-sys-color-on-surface-variant); border-bottom: 2px solid var(--md-sys-color-on-surface-variant); transform: rotate(-45deg); transition: transform .15s; margin-right: 4px; flex: none; }
+details.md-expansion[open] summary::before { transform: rotate(45deg); }
+details.md-expansion .inner { padding: 0 0 18px; }
+
+/* ---- Code / preformatted ---------------------------------------------------------------- */
+.md-pre { background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-small); padding: 10px; font: 11.5px/1.45 var(--md-ref-typeface-mono); overflow: auto; max-height: 320px; margin: 0; }
+
+/* ---- Verdict header (decision pages): NO red; YES green, darker when strong, lighter when okay ---- */
+.mb-verdict { display: grid; grid-template-columns: auto 1fr; gap: 18px 22px; padding: 20px 22px; align-items: center; border-radius: var(--mb-card-radius); }
+.mb-verdict .mb-verdict-box { width: 64px; height: 64px; border-radius: var(--md-sys-shape-corner-medium); color: #fff; display: grid; place-items: center; }
+.mb-verdict .mb-verdict-box .ms { width: 40px; height: 40px; }
+.mb-verdict .mb-verdict-word { font-size: 52px; font-weight: 800; line-height: .95; letter-spacing: -1.5px; }
+.mb-verdict .mb-verdict-word small { display: block; font-size: 13px; font-weight: 600; letter-spacing: .02em; margin-top: 6px; }
+.mb-verdict.no { background: var(--mb-verdict-no-bg); color: var(--mb-verdict-no-ink); } .mb-verdict.no .mb-verdict-box { background: var(--mb-verdict-no-box); }
+.mb-verdict.yes-strong { background: var(--mb-verdict-strong-bg); color: var(--mb-verdict-strong-ink); } .mb-verdict.yes-strong .mb-verdict-box { background: var(--mb-verdict-strong-box); }
+.mb-verdict.yes-ok { background: var(--mb-verdict-ok-bg); color: var(--mb-verdict-ok-ink); } .mb-verdict.yes-ok .mb-verdict-box { background: var(--mb-verdict-ok-box); }
+/* Signed number: green/red with its sign (the sign is the glyph) */
+.mb-delta { font-variant-numeric: tabular-nums; font-weight: 600; } .mb-delta.up { color: var(--mb-color-up); } .mb-delta.down { color: var(--mb-color-down); } .mb-delta.flat { color: var(--md-sys-color-on-surface-variant); }
+/* Uppercase micro label (section eyebrows, table headers, stat labels) */
+.mb-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* ---- Alert band (template "alert": a tint with an icon, a title and a line of text) ------ */
+.mb-alert { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-radius: var(--mb-card-radius); background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-alert.info { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-alert.success { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-alert.danger { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-alert b.t { display: block; font: var(--md-sys-typescale-title-small); }
+.mb-alert .s { font: var(--md-sys-typescale-body-small); margin-top: 2px; opacity: .92; }
+.mb-alert .ms { width: 24px; height: 24px; }
+
+</style>
+<style>
+/* Shared page CSS of the design-track mockups (scheme v2 "modern admin light"): cards, card heads, labels, page
+   head, KPI row, two-column grid, legend, footer. Every colour is a token of design/system/tokens.css. */
+body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+.card{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--mb-card-radius);box-shadow:var(--mb-card-shadow);padding:20px 22px;min-width:0}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.note{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:12px 0 0;overflow-wrap:anywhere}
+.tk{font-weight:700;color:var(--md-sys-color-primary);text-decoration:none} .tk:hover{text-decoration:underline}
+.quiet{font-size:13px;color:var(--md-sys-color-on-surface-variant);padding:12px 14px;border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low)}
+.h-lab{font-weight:700;color:var(--md-sys-color-on-primary-container);background:var(--md-sys-color-primary-container);border-radius:6px;padding:1px 7px;font-size:12px;white-space:nowrap}
+.mb-odds svg{width:60px} .mb-odds b{min-width:0}
+.sw{width:9px;height:9px;border-radius:3px;display:inline-block;vertical-align:0;margin-right:4px}
+.sw.r,.ser-r{background:var(--mb-chart-1)} .sw.b,.ser-b{background:var(--mb-chart-2)} .sw.a,.ser-a{background:var(--mb-chart-3)} .sw.k,.ser-k{background:var(--mb-chart-4)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mb-color-down);display:inline-block;flex:none} .dot.open{background:var(--mb-color-up)}
+
+/* page head: title, subtitle, chips */
+.phead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-top:22px}
+.phead h1{font:700 24px/1.2 var(--md-ref-typeface-plain);letter-spacing:-.4px;margin:0;overflow-wrap:anywhere}
+.phead .sub{font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.phead .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.phead .chips .md-chip b{color:var(--md-sys-color-on-surface);font-weight:600}
+.band{margin-top:16px}
+.band .ms{color:var(--mb-color-on-warn-container)}
+
+/* KPI row and layout */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+.mb-kpi .v .tk{font-size:inherit}
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.grid{display:grid;grid-template-columns:minmax(0,8fr) minmax(0,4fr);gap:16px;margin-top:16px;align-items:start}
+.grid.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.col{display:grid;gap:16px;min-width:0}
+.head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.head h2{font:600 16px/1.3 var(--md-ref-typeface-plain);margin:0}
+.head .end{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);flex-wrap:wrap}
+.head .go{font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:2px;text-decoration:none}
+.head .go .ms{width:16px;height:16px}
+.sub2{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:-8px 0 12px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 0}
+.toolbar .md-chip.filter{cursor:pointer}
+.toolbar input{height:36px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 14px 0 36px;font:inherit;color:inherit;background:var(--md-sys-color-surface) no-repeat 12px center;min-width:200px}
+.toolbar .search{position:relative} .toolbar .search .ms{position:absolute;left:12px;top:9px;width:18px;height:18px;color:var(--md-sys-color-on-surface-variant)}
+.toolbar select{height:36px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:inherit;background:var(--md-sys-color-surface)}
+
+/* tables (page tables build on .md-table) */
+.tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
+.tbl tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.tbl tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.tbl .st{display:inline-flex;align-items:center;gap:4px} .tbl .st .ms{width:14px;height:14px}
+.tbl .st.flag{color:var(--mb-color-on-warn-container);font-weight:600} .tbl .st.ok{color:var(--mb-color-up)}
+.rng{display:inline-flex;align-items:center;gap:8px} .rng svg{width:100px;height:18px;display:block} .rng small{color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+.hzb svg{width:96px;height:40px;display:block}
+.hzb rect.on{fill:var(--md-sys-color-primary)} .hzb rect.off{fill:var(--md-sys-color-surface-container-highest)} .hzb text{font-size:9px;fill:var(--md-sys-color-on-surface-variant)} .hzb text.on{fill:var(--md-sys-color-primary);font-weight:700}
+
+/* legend and footer */
+.legend2{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:18px;align-items:center}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:28px 0 8px} footer code{font-family:var(--md-ref-typeface-mono)}
+
+@media (max-width: 1199px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 1000px){ .grid,.grid.even{grid-template-columns:1fr} }
+@media (max-width: 599px){
+  .card{padding:16px}
+  .phead{margin-top:16px} .phead h1{font-size:21px} .phead .chips{margin-left:0}
+  .kpis{gap:12px} .mb-kpi{padding:14px;grid-template-columns:1fr} .mb-kpi .mb-avatar{grid-row:auto} .mb-kpi .s{grid-column:1} .mb-kpi .v{font-size:22px}
+  .mb-alert{grid-template-columns:auto 1fr} .mb-alert .act{grid-column:1 / span 2}
+  .mb-kpi .labs .mb-label{white-space:normal;text-align:left}
+  .toolbar input{min-width:0;width:100%}
+}
+
+</style>
+<style>
+/* Paper portfolios mockup (design track, SPEC section 6 page 7). Page-local layout only; every colour is a token. */
+.ctrls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.ctrls .c{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+/* head-to-head portfolios */
+.h2h{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fbox{border-radius:12px;padding:14px 16px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:8px;align-content:start}
+.fbox .fh{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .fbox .fh b{font-size:14px} .fbox .fh small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.fbox .tot{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap} .fbox .tot .n{font:700 24px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.4px} .fbox .tot small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.pr{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:12.5px;padding:7px 0;border-top:1px solid var(--md-sys-color-surface-container-high)}
+.pr .l{color:var(--md-sys-color-on-surface-variant)} .pr .st{display:flex;gap:10px;flex-wrap:wrap;color:var(--md-sys-color-on-surface-variant)} .pr b{white-space:nowrap}
+.luck{display:inline-flex;align-items:center;gap:6px} .luck svg{width:80px;height:16px;display:block;flex:none}
+.luck .z{stroke:var(--mb-chart-axis)} .luck .raw{stroke:var(--mb-chart-1);stroke-width:2;opacity:.45} .luck .cor{stroke:var(--mb-chart-1);stroke-width:5;stroke-linecap:round} .luck .mean{fill:var(--md-sys-color-on-surface)} .luck .cor.edge{stroke:var(--mb-color-up)}
+/* open trades grouped by strategy */
+.ot td{vertical-align:middle} .ot .h-lab{font-size:11.5px}
+.ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.ot tr.grp td .tk,.ot tr.grp td .mb-label,.ot tr.grp td .mb-delta,.ot tr.grp td small{display:inline-block;vertical-align:middle}
+.ot .nm b{display:block;font-size:13px;font-weight:600} .ot .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+/* owner */
+.own td{vertical-align:middle} .own .pn b{font-weight:700} .own .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.eur{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
+.eur .n{border-radius:8px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.eur .n .l{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)} .eur .n .v{font-weight:700;font-size:15px} .eur .n .s{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px}
+.tl li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.tl li:first-child{border-top:0} .tl li small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.pend{display:grid;gap:6px;margin-top:10px}
+dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(480px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog .dbody input,dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+@media (max-width:1359px){ .ot .c3{display:none} }
+@media (max-width:1199px){ .ot .cw{display:none} .eur{grid-template-columns:1fr 1fr} }
+@media (max-width:1000px){ .own .cw{display:none} }
+@media (max-width:760px){ .h2h{grid-template-columns:1fr} .ot .cm,.own .cm{display:none} .ot th,.ot td,.own th,.own td{padding:8px 6px;white-space:normal} .ot .st{white-space:normal;display:inline} .ot .mb-label{white-space:normal} .luck svg{display:none} .pr{grid-template-columns:1fr auto} .pr .st{grid-column:1 / span 2} }
+@media (max-width:599px){ .eur{grid-template-columns:1fr} dialog .row2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <!-- Material Symbols Outlined (weight 400, fill 0, grade 0, optical size 24), Apache License 2.0, Google LLC; see LICENSE-material-symbols.txt.
+       Use: <svg class="ms"><use href="#ms-NAME"/></svg>. The symbols are the 24px outlined glyphs copied unchanged from
+       github.com/google/material-design-icons (symbols/web/NAME/materialsymbolsoutlined/NAME_24px.svg). -->
+  <symbol id="ms-account_balance" viewBox="0 -960 960 960"><path d="M200-280v-280h80v280h-80Zm240 0v-280h80v280h-80ZM80-120v-80h800v80H80Zm600-160v-280h80v280h-80ZM80-640v-80l400-200 400 200v80H80Zm178-80h444-444Zm0 0h444L480-830 258-720Z"/></symbol>
+  <symbol id="ms-account_balance_wallet" viewBox="0 -960 960 960"><path d="M200-200v-560 560Zm0 80q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v100h-80v-100H200v560h560v-100h80v100q0 33-23.5 56.5T760-120H200Zm320-160q-33 0-56.5-23.5T440-360v-240q0-33 23.5-56.5T520-680h280q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H520Zm280-80v-240H520v240h280Zm-160-60q25 0 42.5-17.5T700-480q0-25-17.5-42.5T640-540q-25 0-42.5 17.5T580-480q0 25 17.5 42.5T640-420Z"/></symbol>
+  <symbol id="ms-apartment" viewBox="0 -960 960 960"><path d="M120-120v-560h160v-160h400v320h160v400H520v-160h-80v160H120Zm80-80h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 320h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 480h80v-80h-80v80Zm0-160h80v-80h-80v80Z"/></symbol>
+  <symbol id="ms-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
+  <symbol id="ms-arrow_upward" viewBox="0 -960 960 960"><path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"/></symbol>
+  <symbol id="ms-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
+  <symbol id="ms-bolt" viewBox="0 -960 960 960"><path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z"/></symbol>
+  <symbol id="ms-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
+  <symbol id="ms-check" viewBox="0 -960 960 960"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></symbol>
+  <symbol id="ms-chevron_right" viewBox="0 -960 960 960"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></symbol>
+  <symbol id="ms-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="ms-construction" viewBox="0 -960 960 960"><path d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"/></symbol>
+  <symbol id="ms-description" viewBox="0 -960 960 960"><path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ms-event" viewBox="0 -960 960 960"><path d="M580-240q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Z"/></symbol>
+  <symbol id="ms-expand_more" viewBox="0 -960 960 960"><path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/></symbol>
+  <symbol id="ms-format_list_bulleted" viewBox="0 -960 960 960"><path d="M360-200v-80h480v80H360Zm0-240v-80h480v80H360Zm0-240v-80h480v80H360ZM200-160q-33 0-56.5-23.5T120-240q0-33 23.5-56.5T200-320q33 0 56.5 23.5T280-240q0 33-23.5 56.5T200-160Zm0-240q-33 0-56.5-23.5T120-480q0-33 23.5-56.5T200-560q33 0 56.5 23.5T280-480q0 33-23.5 56.5T200-400Zm0-240q-33 0-56.5-23.5T120-720q0-33 23.5-56.5T200-800q33 0 56.5 23.5T280-720q0 33-23.5 56.5T200-640Z"/></symbol>
+  <symbol id="ms-gavel" viewBox="0 -960 960 960"><path d="M160-120v-80h480v80H160Zm226-194L160-540l84-86 228 226-86 86Zm254-254L414-796l86-84 226 226-86 86Zm184 408L302-682l56-56 522 522-56 56Z"/></symbol>
+  <symbol id="ms-help" viewBox="0 -960 960 960"><path d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-history" viewBox="0 -960 960 960"><path d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
+  <symbol id="ms-home" viewBox="0 -960 960 960"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/></symbol>
+  <symbol id="ms-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-layers" viewBox="0 -960 960 960"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></symbol>
+  <symbol id="ms-menu" viewBox="0 -960 960 960"><path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></symbol>
+  <symbol id="ms-newspaper" viewBox="0 -960 960 960"><path d="M160-120q-33 0-56.5-23.5T80-200v-640l67 67 66-67 67 67 67-67 66 67 67-67 67 67 66-67 67 67 67-67 66 67 67-67v640q0 33-23.5 56.5T800-120H160Zm0-80h280v-240H160v240Zm360 0h280v-80H520v80Zm0-160h280v-80H520v80ZM160-520h640v-120H160v120Z"/></symbol>
+  <symbol id="ms-open_in_new" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></symbol>
+  <symbol id="ms-pending" viewBox="0 -960 960 960"><path d="M280-420q25 0 42.5-17.5T340-480q0-25-17.5-42.5T280-540q-25 0-42.5 17.5T220-480q0 25 17.5 42.5T280-420Zm200 0q25 0 42.5-17.5T540-480q0-25-17.5-42.5T480-540q-25 0-42.5 17.5T420-480q0 25 17.5 42.5T480-420Zm200 0q25 0 42.5-17.5T740-480q0-25-17.5-42.5T680-540q-25 0-42.5 17.5T620-480q0 25 17.5 42.5T680-420ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-public" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm-40-82v-78q-33 0-56.5-23.5T360-320v-40L168-552q-3 18-5.5 36t-2.5 36q0 121 79.5 212T440-162Zm276-102q20-22 36-47.5t26.5-53q10.5-27.5 16-56.5t5.5-59q0-98-54.5-179T600-776v16q0 33-23.5 56.5T520-680h-80v80q0 17-11.5 28.5T400-560h-80v80h240q17 0 28.5 11.5T600-440v120h40q26 0 47 15.5t29 40.5Z"/></symbol>
+  <symbol id="ms-query_stats" viewBox="0 -960 960 960"><path d="m105-233-65-47 200-320 120 140 160-260 109 163q-23 1-43.5 5.5T545-539l-22-33-152 247-121-141-145 233ZM863-40 738-165q-20 14-44.5 21t-50.5 7q-75 0-127.5-52.5T463-317q0-75 52.5-127.5T643-497q75 0 127.5 52.5T823-317q0 26-7 50.5T795-221L920-97l-57 57ZM643-217q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm89-320q-19-8-39.5-13t-42.5-6l205-324 65 47-188 296Z"/></symbol>
+  <symbol id="ms-receipt_long" viewBox="0 -960 960 960"><path d="M240-80q-50 0-85-35t-35-85v-120h120v-560l60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60v680q0 50-35 85t-85 35H240Zm480-80q17 0 28.5-11.5T760-200v-560H320v440h360v120q0 17 11.5 28.5T720-160ZM360-600v-80h240v80H360Zm0 120v-80h240v80H360Zm320-120q-17 0-28.5-11.5T640-640q0-17 11.5-28.5T680-680q17 0 28.5 11.5T720-640q0 17-11.5 28.5T680-600Zm0 120q-17 0-28.5-11.5T640-520q0-17 11.5-28.5T680-560q17 0 28.5 11.5T720-520q0 17-11.5 28.5T680-480ZM240-160h360v-80H200v40q0 17 11.5 28.5T240-160Zm-40 0v-80 80Z"/></symbol>
+  <symbol id="ms-remove" viewBox="0 -960 960 960"><path d="M200-440v-80h560v80H200Z"/></symbol>
+  <symbol id="ms-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
+  <symbol id="ms-science" viewBox="0 -960 960 960"><path d="M200-120q-51 0-72.5-45.5T138-250l222-270v-240h-40q-17 0-28.5-11.5T280-800q0-17 11.5-28.5T320-840h320q17 0 28.5 11.5T680-800q0 17-11.5 28.5T640-760h-40v240l222 270q32 39 10.5 84.5T760-120H200Zm0-80h560L520-492v-268h-80v268L200-200Zm280-280Z"/></symbol>
+  <symbol id="ms-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="ms-sensors" viewBox="0 -960 960 960"><path d="M197-197q-54-55-85.5-127.5T80-480q0-84 31.5-156.5T197-763l57 57q-44 44-69 102t-25 124q0 67 25 125t69 101l-57 57Zm113-113q-32-33-51-76.5T240-480q0-51 19-94.5t51-75.5l57 57q-22 22-34.5 51T320-480q0 33 12.5 62t34.5 51l-57 57Zm170-90q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm170 90-57-57q22-22 34.5-51t12.5-62q0-33-12.5-62T593-593l57-57q32 32 51 75.5t19 94.5q0 50-19 93.5T650-310Zm113 113-57-57q44-44 69-102t25-124q0-67-25-125t-69-101l57-57q54 54 85.5 126.5T880-480q0 83-31.5 155.5T763-197Z"/></symbol>
+  <symbol id="ms-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
+  <symbol id="ms-trending_down" viewBox="0 -960 960 960"><path d="M640-240v-80h104L536-526 376-366 80-664l56-56 240 240 160-160 264 264v-104h80v240H640Z"/></symbol>
+  <symbol id="ms-trending_flat" viewBox="0 -960 960 960"><path d="m700-300-57-56 84-84H120v-80h607l-83-84 57-56 179 180-180 180Z"/></symbol>
+  <symbol id="ms-trending_up" viewBox="0 -960 960 960"><path d="m136-240-56-56 296-298 160 160 208-206H640v-80h240v240h-80v-104L536-320 376-480 136-240Z"/></symbol>
+  <symbol id="ms-verified_user" viewBox="0 -960 960 960"><path d="m438-338 226-226-57-57-169 169-84-84-57 57 141 141Zm42 258q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
+  <symbol id="ms-warning" viewBox="0 -960 960 960"><path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z"/></symbol>
+</svg>
+
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Paper portfolios</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+<dialog class="md-dialog" id="dlg"></dialog>
+
+<script>const D = {"_example": true, "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.", "page": "paper-portfolios", "spec": "docs/SPEC.md section 6, page 7; F1.11, F7.1, F10; decisions 11, 26, 41-42, 44, 50", "endpoint": "GET /api/v1/markets/{market}/portfolios", "read_model": "rm.portfolio + rm.trades", "sources": ["design/catalogue/market_status.json", "design/catalogue/strategy.json", "design/catalogue/scoreboard_row.json", "design/catalogue/open_trade.json", "design/catalogue/trade_check.json", "design/catalogue/portfolio.json", "design/catalogue/company.json"], "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "markets": {"india": {"market": "india", "name": "India (NSE)", "currency": "INR", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T10:31:00Z", "status": {"market": "india", "name": "India (NSE)", "as_of": "2026-10-06", "currency": "INR", "session": {"local_time": "2026-10-07T17:30+05:30", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00", "in_session": false, "late_run": true}, "benchmark": {"symbol": "NIFTY50", "name": "Nifty 50", "close": 22776.0996, "close_date": "2026-10-06", "change_pct": 0.98, "change_5d_pct": -0.02}, "vol_index": {"symbol": "INDIAVIX", "name": "India VIX", "close": 13.61, "close_date": "2026-10-06", "change_pct": -7.92, "change_5d_pct": -0.22}, "regime": "EVENT_HEAVY", "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": true}, "intraday": [{"at": "2026-10-07T05:43:00Z", "ok": true}], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T12:15:00Z"}, "news": {"at": "2026-10-07T10:17:00Z", "ok": true, "new_items": 37}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T10:31:00Z", "age_minutes": 29}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 294, "beats_best_baseline": false}, "strategies": {"rule.model_news.v1": {"id": "rule.model_news.v1", "family": "rule", "name": "Model + news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 16}, "rule.model_news_half.v1": {"id": "rule.model_news_half.v1", "family": "rule", "name": "Model + half news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_double.v1": {"id": "rule.model_news_double.v1", "family": "rule", "name": "Model + double news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_confirmed.v1": {"id": "rule.model_news_confirmed.v1", "family": "rule", "name": "Model + confirmed news only", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_high.v1": {"id": "rule.model_news_high.v1", "family": "rule", "name": "Model + major news only", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_global.v1": {"id": "rule.model_news_global.v1", "family": "rule", "name": "Model + news + global cues", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_calm.v1": {"id": "rule.model_news_calm.v1", "family": "rule", "name": "Model + news, calm markets only", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_strict.v1": {"id": "rule.model_news_strict.v1", "family": "rule", "name": "Model + news, 60% bar", "threshold": 0.6, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "base.always_up.v1": {"id": "base.always_up.v1", "family": "baseline", "name": "Always buy", "threshold": null, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 18}, "base.momentum.v1": {"id": "base.momentum.v1", "family": "baseline", "name": "Follow yesterday", "threshold": null, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "base.model_only.v1": {"id": "base.model_only.v1", "family": "baseline", "name": "Model without news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 6}, "ai.news_results.sonnet.v1": {"id": "ai.news_results.sonnet.v1", "family": "ai", "name": "AI news & results (Sonnet)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 10}, "ai.pattern_mood.sonnet.v1": {"id": "ai.pattern_mood.sonnet.v1", "family": "ai", "name": "AI price pattern & mood (Sonnet)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 0}, "ai.combined.sonnet.v1": {"id": "ai.combined.sonnet.v1", "family": "ai", "name": "AI combined (Sonnet)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 0}, "ai.combined.opus.v1": {"id": "ai.combined.opus.v1", "family": "ai", "name": "AI combined (Opus)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 10}}, "companies": [{"market": "india", "ticker": "HDFCBANK", "name": "HDFC Bank", "sector": "Banks", "state": "active", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "last_close": 711.45, "last_close_date": "2026-10-06"}, {"market": "india", "ticker": "INDIGO", "name": "InterGlobe Aviation (IndiGo)", "sector": "Transport", "state": "inactive", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "last_close": 5050.5, "last_close_date": "2026-10-06"}, {"market": "india", "ticker": "MARUTI", "name": "Maruti Suzuki", "sector": "Autos", "state": "active", "amount": 10000.0, "amount_overridden": true, "currency": "INR", "last_close": 11625.0, "last_close_date": "2026-10-06"}, {"market": "india", "ticker": "RELIANCE", "name": "Reliance Industries", "sector": "Energy", "state": "active", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "last_close": 1218.0, "last_close_date": "2026-10-06"}], "h2h_rows": [{"scope": "pick_rule", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "ai", "pick_rule": "highest_probability", "horizon_days": 3, "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.73, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "ai", "pick_rule": "highest_probability", "horizon_days": "all", "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.73, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "rule", "pick_rule": "highest_probability", "horizon_days": 3, "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.82, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "rule", "pick_rule": "highest_probability", "horizon_days": "all", "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.82, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": "ai.combined.opus.v1", "family": "ai", "pick_rule": null, "horizon_days": 3, "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.73, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": "ai.combined.opus.v1", "family": "ai", "pick_rule": null, "horizon_days": "all", "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.73, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": "rule.model_news.v1", "family": "rule", "pick_rule": null, "horizon_days": 3, "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.82, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "india", "view": "head_to_head", "basis": "forward", "strategy_id": "rule.model_news.v1", "family": "rule", "pick_rule": null, "horizon_days": "all", "trades": 1, "net_pnl": 1015.81, "mean_return_pct": 1.02, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 2.82, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 574.89, "mean_return_pct": 0.5749, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}], "open_trades": [{"trade_id": "acc:ai.combined.opus.v1:2026-09-29-HDFCBANK-5d", "view": "accuracy", "prediction_id": "ai.combined.opus.v1:2026-09-29-HDFCBANK-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "india", "ticker": "HDFCBANK", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 711.5, "quantity": 140.0, "amount": 100000.0, "currency": "INR", "target_price": 724.94, "lo80": 685.48, "lo50": 703.9, "hi50": 746.61, "hi80": 766.68, "last_price": 711.45, "last_price_date": "2026-10-06", "unrealised_pnl": -7.0, "unrealised_pct": -0.01, "to_target_pct": 1.9, "paper": true}, {"trade_id": "acc:ai.combined.opus.v1:2026-09-29-RELIANCE-5d", "view": "accuracy", "prediction_id": "ai.combined.opus.v1:2026-09-29-RELIANCE-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1186.53, "lo80": 1121.12, "lo50": 1151.64, "hi50": 1222.47, "hi80": 1255.75, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.58, "paper": true}, {"trade_id": "h2h:best_expected_gain:ai.combined.opus.v1:2026-09-29-RELIANCE-5d", "view": "head_to_head", "prediction_id": "ai.combined.opus.v1:2026-09-29-RELIANCE-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1186.53, "lo80": 1121.12, "lo50": 1151.64, "hi50": 1222.47, "hi80": 1255.75, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.58, "paper": true}, {"trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-HDFCBANK-5d", "view": "accuracy", "prediction_id": "ai.news_results.sonnet.v1:2026-09-29-HDFCBANK-5d", "strategy_id": "ai.news_results.sonnet.v1", "family": "ai", "market": "india", "ticker": "HDFCBANK", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 711.5, "quantity": 140.0, "amount": 100000.0, "currency": "INR", "target_price": 724.37, "lo80": 684.93, "lo50": 703.34, "hi50": 746.02, "hi80": 766.07, "last_price": 711.45, "last_price_date": "2026-10-06", "unrealised_pnl": -7.0, "unrealised_pct": -0.01, "to_target_pct": 1.82, "paper": true}, {"trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-RELIANCE-5d", "view": "accuracy", "prediction_id": "ai.news_results.sonnet.v1:2026-09-29-RELIANCE-5d", "strategy_id": "ai.news_results.sonnet.v1", "family": "ai", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1185.57, "lo80": 1120.22, "lo50": 1150.71, "hi50": 1221.48, "hi80": 1254.74, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.66, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-HDFCBANK-4d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-HDFCBANK-4d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "india", "ticker": "HDFCBANK", "horizon_days": 4, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 711.5, "quantity": 140.0, "amount": 100000.0, "currency": "INR", "target_price": 722.7, "lo80": 690.55, "lo50": 705.59, "hi50": 740.22, "hi80": 756.35, "last_price": 711.45, "last_price_date": "2026-10-06", "unrealised_pnl": -7.0, "unrealised_pct": -0.01, "to_target_pct": 1.58, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-HDFCBANK-5d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-HDFCBANK-5d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "india", "ticker": "HDFCBANK", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 711.5, "quantity": 140.0, "amount": 100000.0, "currency": "INR", "target_price": 722.7, "lo80": 686.85, "lo50": 703.6, "hi50": 742.32, "hi80": 760.43, "last_price": 711.45, "last_price_date": "2026-10-06", "unrealised_pnl": -7.0, "unrealised_pct": -0.01, "to_target_pct": 1.58, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-RELIANCE-4d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-RELIANCE-4d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "india", "ticker": "RELIANCE", "horizon_days": 4, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1182.0, "lo80": 1128.74, "lo50": 1153.66, "hi50": 1211.03, "hi80": 1237.77, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.96, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-RELIANCE-5d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-RELIANCE-5d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1182.0, "lo80": 1122.61, "lo50": 1150.36, "hi50": 1214.51, "hi80": 1244.53, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.96, "paper": true}, {"trade_id": "acc:base.model_only.v1:2026-09-29-RELIANCE-4d", "view": "accuracy", "prediction_id": "base.model_only.v1:2026-09-29-RELIANCE-4d", "strategy_id": "base.model_only.v1", "family": "baseline", "market": "india", "ticker": "RELIANCE", "horizon_days": 4, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1184.3, "lo80": 1130.94, "lo50": 1155.91, "hi50": 1213.39, "hi80": 1240.18, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.77, "paper": true}, {"trade_id": "acc:base.model_only.v1:2026-09-29-RELIANCE-5d", "view": "accuracy", "prediction_id": "base.model_only.v1:2026-09-29-RELIANCE-5d", "strategy_id": "base.model_only.v1", "family": "baseline", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1184.52, "lo80": 1125.01, "lo50": 1152.82, "hi50": 1217.1, "hi80": 1247.18, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.75, "paper": true}, {"trade_id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-4d", "view": "accuracy", "prediction_id": "rule.model_news.v1:2026-09-29-RELIANCE-4d", "strategy_id": "rule.model_news.v1", "family": "rule", "market": "india", "ticker": "RELIANCE", "horizon_days": 4, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1184.81, "lo80": 1131.42, "lo50": 1156.41, "hi50": 1213.91, "hi80": 1240.71, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.72, "paper": true}, {"trade_id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-5d", "view": "accuracy", "prediction_id": "rule.model_news.v1:2026-09-29-RELIANCE-5d", "strategy_id": "rule.model_news.v1", "family": "rule", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1185.09, "lo80": 1125.55, "lo50": 1153.38, "hi50": 1217.68, "hi80": 1247.78, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.7, "paper": true}, {"trade_id": "h2h:best_expected_gain:rule.model_news.v1:2026-09-29-RELIANCE-5d", "view": "head_to_head", "prediction_id": "rule.model_news.v1:2026-09-29-RELIANCE-5d", "strategy_id": "rule.model_news.v1", "family": "rule", "market": "india", "ticker": "RELIANCE", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-08", "entry_price": 1182.0, "quantity": 84.0, "amount": 100000.0, "currency": "INR", "target_price": 1185.09, "lo80": 1125.55, "lo50": 1153.38, "hi50": 1217.68, "hi80": 1247.78, "last_price": 1218.0, "last_price_date": "2026-10-06", "unrealised_pnl": 3024.0, "unrealised_pct": 3.05, "to_target_pct": -2.7, "paper": true}], "trade_checks": [{"id": "ic-india-2026-10-07T05:43Z-acc:base.always_up.v1:2026-09-29-HDFCBANK-4d", "check_at": "2026-10-07T05:43:00Z", "session_date": "2026-10-07", "market": "india", "ticker": "HDFCBANK", "trade_id": "acc:base.always_up.v1:2026-09-29-HDFCBANK-4d", "strategy_id": "base.always_up.v1", "view": "accuracy", "horizon_days": 4, "session_number": 5, "entry_price": 711.5, "last_price": 708.9, "ret_since_entry_pct": -0.3654, "target_price": 722.7, "to_target_pct": 1.9467, "band": "inside50", "flags": [], "flagged": false, "quality": "ok", "high_since_entry_pct": 3.1904, "low_since_entry_pct": -1.4758}, {"id": "ic-india-2026-10-07T05:43Z-acc:base.always_up.v1:2026-09-29-HDFCBANK-5d", "check_at": "2026-10-07T05:43:00Z", "session_date": "2026-10-07", "market": "india", "ticker": "HDFCBANK", "trade_id": "acc:base.always_up.v1:2026-09-29-HDFCBANK-5d", "strategy_id": "base.always_up.v1", "view": "accuracy", "horizon_days": 5, "session_number": 5, "entry_price": 711.5, "last_price": 708.9, "ret_since_entry_pct": -0.3654, "target_price": 722.7, "to_target_pct": 1.9467, "band": "inside50", "flags": [], "flagged": false, "quality": "ok", "high_since_entry_pct": 3.1904, "low_since_entry_pct": -1.4758}, {"id": "ic-india-2026-10-07T05:43Z-acc:rule.model_news.v1:2026-09-29-RELIANCE-4d", "check_at": "2026-10-07T05:43:00Z", "session_date": "2026-10-07", "market": "india", "ticker": "RELIANCE", "trade_id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-4d", "strategy_id": "rule.model_news.v1", "view": "accuracy", "horizon_days": 4, "session_number": 5, "entry_price": 1182.0, "last_price": 1224.6, "ret_since_entry_pct": 3.6041, "target_price": 1184.81, "to_target_pct": -3.2492, "band": "above50", "flags": [], "flagged": false, "quality": "ok", "high_since_entry_pct": 3.6041, "low_since_entry_pct": -1.7936}, {"id": "ic-india-2026-10-07T05:43Z-acc:rule.model_news.v1:2026-09-29-RELIANCE-5d", "check_at": "2026-10-07T05:43:00Z", "session_date": "2026-10-07", "market": "india", "ticker": "RELIANCE", "trade_id": "acc:rule.model_news.v1:2026-09-29-RELIANCE-5d", "strategy_id": "rule.model_news.v1", "view": "accuracy", "horizon_days": 5, "session_number": 5, "entry_price": 1182.0, "last_price": 1224.6, "ret_since_entry_pct": 3.6041, "target_price": 1185.09, "to_target_pct": -3.2264, "band": "above50", "flags": [], "flagged": false, "quality": "ok", "high_since_entry_pct": 3.6041, "low_since_entry_pct": -1.7936}], "owner": {"trades": [{"id": "pt-india-20260930-RELIANCE-1", "market": "india", "ticker": "RELIANCE", "side": "buy", "quantity": 50.0, "price": 1182.0, "price_basis": "open", "trade_date": "2026-09-30", "source": "slack", "idempotency_key": "own-rel-0930", "entered_at": "2026-09-30T11:00:00Z", "note": null, "supersedes": null}], "positions": [{"market": "india", "ticker": "RELIANCE", "quantity": 50.0, "avg_price": 1182.0, "last_close": 1218.0, "last_close_date": "2026-10-06", "currency": "INR", "cost": 59100.0, "value": 60900.0, "pnl": 1800.0, "pnl_pct": 3.05, "eur_view": null}], "default_amount": 100000.0, "paper": true}}, "us": {"market": "us", "name": "US (NYSE/Nasdaq)", "currency": "USD", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "status": {"market": "us", "name": "US (NYSE/Nasdaq)", "as_of": "2026-10-06", "currency": "USD", "session": {"local_time": "2026-10-07T08:00-04:00", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00", "in_session": false, "late_run": false}, "benchmark": {"symbol": "SPY", "name": "S&P 500 ETF", "close": 779.09, "close_date": "2026-10-06", "change_pct": 0.55, "change_5d_pct": 1.95}, "vol_index": {"symbol": "VIX", "name": "VIX", "close": 15.01, "close_date": "2026-10-06", "change_pct": -3.29, "change_5d_pct": -6.42}, "regime": "TRENDING", "runs": {"pre_open": {"at": "2026-10-07T11:45:00Z", "ok": true}, "intraday": [], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T22:15:00Z"}, "news": {"at": "2026-10-07T08:47:00Z", "ok": true, "new_items": 52}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T11:58:00Z", "age_minutes": 2}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 290, "beats_best_baseline": false}, "strategies": {"rule.model_news.v1": {"id": "rule.model_news.v1", "family": "rule", "name": "Model + news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 16}, "rule.model_news_half.v1": {"id": "rule.model_news_half.v1", "family": "rule", "name": "Model + half news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_double.v1": {"id": "rule.model_news_double.v1", "family": "rule", "name": "Model + double news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_confirmed.v1": {"id": "rule.model_news_confirmed.v1", "family": "rule", "name": "Model + confirmed news only", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_high.v1": {"id": "rule.model_news_high.v1", "family": "rule", "name": "Model + major news only", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_global.v1": {"id": "rule.model_news_global.v1", "family": "rule", "name": "Model + news + global cues", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_calm.v1": {"id": "rule.model_news_calm.v1", "family": "rule", "name": "Model + news, calm markets only", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "rule.model_news_strict.v1": {"id": "rule.model_news_strict.v1", "family": "rule", "name": "Model + news, 60% bar", "threshold": 0.6, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "base.always_up.v1": {"id": "base.always_up.v1", "family": "baseline", "name": "Always buy", "threshold": null, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 18}, "base.momentum.v1": {"id": "base.momentum.v1", "family": "baseline", "name": "Follow yesterday", "threshold": null, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 0}, "base.model_only.v1": {"id": "base.model_only.v1", "family": "baseline", "name": "Model without news", "threshold": 0.55, "horizons": [1, 2, 3, 4, 5], "live": false, "settled_trades": 6}, "ai.news_results.sonnet.v1": {"id": "ai.news_results.sonnet.v1", "family": "ai", "name": "AI news & results (Sonnet)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 10}, "ai.pattern_mood.sonnet.v1": {"id": "ai.pattern_mood.sonnet.v1", "family": "ai", "name": "AI price pattern & mood (Sonnet)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 0}, "ai.combined.sonnet.v1": {"id": "ai.combined.sonnet.v1", "family": "ai", "name": "AI combined (Sonnet)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 0}, "ai.combined.opus.v1": {"id": "ai.combined.opus.v1", "family": "ai", "name": "AI combined (Opus)", "threshold": 0.55, "horizons": [1, 3, 5], "live": false, "settled_trades": 10}}, "companies": [{"market": "us", "ticker": "AAPL", "name": "Apple", "sector": "Tech", "state": "active", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "last_close": 333.63, "last_close_date": "2026-10-06"}, {"market": "us", "ticker": "DAL", "name": "Delta Air Lines", "sector": "Airlines", "state": "inactive", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "last_close": 83.66, "last_close_date": "2026-10-06"}, {"market": "us", "ticker": "JPM", "name": "JPMorgan", "sector": "Banks", "state": "active", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "last_close": 331.28, "last_close_date": "2026-10-06"}, {"market": "us", "ticker": "NVDA", "name": "Nvidia", "sector": "Tech", "state": "active", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "last_close": 239.24, "last_close_date": "2026-10-06"}], "h2h_rows": [{"scope": "pick_rule", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "ai", "pick_rule": "best_expected_gain", "horizon_days": 3, "trades": 1, "net_pnl": 39.66, "mean_return_pct": 3.97, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.75, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-05", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 1, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 24.32, "mean_return_pct": 2.432, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 1, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "ai", "pick_rule": "best_expected_gain", "horizon_days": "all", "trades": 1, "net_pnl": 39.66, "mean_return_pct": 3.97, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.75, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-05", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 3, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 24.32, "mean_return_pct": 2.432, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 3, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "rule", "pick_rule": "best_expected_gain", "horizon_days": 4, "trades": 1, "net_pnl": 41.15, "mean_return_pct": 4.12, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.95, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 25.79, "mean_return_pct": 2.579, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "rule", "pick_rule": "best_expected_gain", "horizon_days": "all", "trades": 1, "net_pnl": 41.15, "mean_return_pct": 4.12, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.95, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 3, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 25.79, "mean_return_pct": 2.579, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 3, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "rule", "pick_rule": "highest_probability", "horizon_days": 4, "trades": 1, "net_pnl": 41.15, "mean_return_pct": 4.12, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.95, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 25.79, "mean_return_pct": 2.579, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "pick_rule", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": null, "family": "rule", "pick_rule": "highest_probability", "horizon_days": "all", "trades": 1, "net_pnl": 41.15, "mean_return_pct": 4.12, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.95, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 3, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 25.79, "mean_return_pct": 2.579, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 3, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": "ai.combined.opus.v1", "family": "ai", "pick_rule": null, "horizon_days": 3, "trades": 1, "net_pnl": 39.66, "mean_return_pct": 3.97, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.75, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-05", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 1, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 24.32, "mean_return_pct": 2.432, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 1, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": "ai.combined.opus.v1", "family": "ai", "pick_rule": null, "horizon_days": "all", "trades": 1, "net_pnl": 39.66, "mean_return_pct": 3.97, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.75, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-05", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}, "your_cost": {"net_pnl": 24.32, "mean_return_pct": 2.432, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 1, "m": 2, "low_pct": null, "high_pct": null, "excludes_zero": false, "corrected_low_pct": null, "corrected_high_pct": null, "corrected": false}}}, {"scope": "strategy", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": "rule.model_news.v1", "family": "rule", "pick_rule": null, "horizon_days": 4, "trades": 2, "net_pnl": 82.3, "mean_return_pct": 4.12, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.95, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 2, "m": 1, "low_pct": 4.12, "high_pct": 4.12, "excludes_zero": true, "corrected_low_pct": 4.12, "corrected_high_pct": 4.12, "corrected": true}, "your_cost": {"net_pnl": 51.58, "mean_return_pct": 2.579, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 2, "m": 1, "low_pct": 2.579, "high_pct": 2.579, "excludes_zero": true, "corrected_low_pct": 2.579, "corrected_high_pct": 2.579, "corrected": true}}}, {"scope": "strategy", "market": "us", "view": "head_to_head", "basis": "forward", "strategy_id": "rule.model_news.v1", "family": "rule", "pick_rule": null, "horizon_days": "all", "trades": 2, "net_pnl": 82.3, "mean_return_pct": 4.12, "win_rate": 1.0, "target_reached_rate": 1.0, "avg_target_error_pct": 4.95, "range_hit_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "sample_badge": "too_few_to_rank", "first_entry": "2026-09-30", "last_exit": "2026-10-06", "as_of": "2026-10-06", "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 2, "m": 2, "low_pct": 4.12, "high_pct": 4.12, "excludes_zero": true, "corrected_low_pct": 4.12, "corrected_high_pct": 4.12, "corrected": true}, "your_cost": {"net_pnl": 51.58, "mean_return_pct": 2.579, "win_rate": 1.0, "worst_losing_streak": 0, "max_drawdown": 0.0, "luck_test": {"method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)", "n": 2, "m": 2, "low_pct": 2.579, "high_pct": 2.579, "excludes_zero": true, "corrected_low_pct": 2.579, "corrected_high_pct": 2.579, "corrected": true}}}], "open_trades": [{"trade_id": "acc:ai.combined.opus.v1:2026-09-29-AAPL-5d", "view": "accuracy", "prediction_id": "ai.combined.opus.v1:2026-09-29-AAPL-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "us", "ticker": "AAPL", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 330.8, "quantity": 3.022975, "amount": 1000.0, "currency": "USD", "target_price": 330.2, "lo80": 316.42, "lo50": 322.87, "hi50": 337.69, "hi80": 344.58, "last_price": 333.63, "last_price_date": "2026-10-06", "unrealised_pnl": 8.56, "unrealised_pct": 0.86, "to_target_pct": -1.03, "paper": true}, {"trade_id": "acc:ai.combined.opus.v1:2026-09-29-JPM-5d", "view": "accuracy", "prediction_id": "ai.combined.opus.v1:2026-09-29-JPM-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "us", "ticker": "JPM", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 334.89, "quantity": 2.986055, "amount": 1000.0, "currency": "USD", "target_price": 335.61, "lo80": 324.16, "lo50": 329.54, "hi50": 341.79, "hi80": 347.45, "last_price": 331.28, "last_price_date": "2026-10-06", "unrealised_pnl": -10.78, "unrealised_pct": -1.08, "to_target_pct": 1.31, "paper": true}, {"trade_id": "acc:ai.combined.opus.v1:2026-09-29-NVDA-5d", "view": "accuracy", "prediction_id": "ai.combined.opus.v1:2026-09-29-NVDA-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "us", "ticker": "NVDA", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 229.27, "quantity": 4.36167, "amount": 1000.0, "currency": "USD", "target_price": 228.32, "lo80": 214.96, "lo50": 221.19, "hi50": 235.68, "hi80": 242.51, "last_price": 239.24, "last_price_date": "2026-10-06", "unrealised_pnl": 43.49, "unrealised_pct": 4.35, "to_target_pct": -4.56, "paper": true}, {"trade_id": "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-NVDA-5d", "view": "head_to_head", "prediction_id": "ai.combined.opus.v1:2026-09-29-NVDA-5d", "strategy_id": "ai.combined.opus.v1", "family": "ai", "market": "us", "ticker": "NVDA", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 229.27, "quantity": 4.36167, "amount": 1000.0, "currency": "USD", "target_price": 228.32, "lo80": 214.96, "lo50": 221.19, "hi50": 235.68, "hi80": 242.51, "last_price": 239.24, "last_price_date": "2026-10-06", "unrealised_pnl": 43.49, "unrealised_pct": 4.35, "to_target_pct": -4.56, "paper": true}, {"trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-AAPL-5d", "view": "accuracy", "prediction_id": "ai.news_results.sonnet.v1:2026-09-29-AAPL-5d", "strategy_id": "ai.news_results.sonnet.v1", "family": "ai", "market": "us", "ticker": "AAPL", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 330.8, "quantity": 3.022975, "amount": 1000.0, "currency": "USD", "target_price": 330.0, "lo80": 316.23, "lo50": 322.68, "hi50": 337.49, "hi80": 344.37, "last_price": 333.63, "last_price_date": "2026-10-06", "unrealised_pnl": 8.56, "unrealised_pct": 0.86, "to_target_pct": -1.09, "paper": true}, {"trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-JPM-5d", "view": "accuracy", "prediction_id": "ai.news_results.sonnet.v1:2026-09-29-JPM-5d", "strategy_id": "ai.news_results.sonnet.v1", "family": "ai", "market": "us", "ticker": "JPM", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 334.89, "quantity": 2.986055, "amount": 1000.0, "currency": "USD", "target_price": 335.44, "lo80": 324.0, "lo50": 329.37, "hi50": 341.62, "hi80": 347.28, "last_price": 331.28, "last_price_date": "2026-10-06", "unrealised_pnl": -10.78, "unrealised_pct": -1.08, "to_target_pct": 1.26, "paper": true}, {"trade_id": "acc:ai.news_results.sonnet.v1:2026-09-29-NVDA-5d", "view": "accuracy", "prediction_id": "ai.news_results.sonnet.v1:2026-09-29-NVDA-5d", "strategy_id": "ai.news_results.sonnet.v1", "family": "ai", "market": "us", "ticker": "NVDA", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 229.27, "quantity": 4.36167, "amount": 1000.0, "currency": "USD", "target_price": 228.13, "lo80": 214.78, "lo50": 221.0, "hi50": 235.48, "hi80": 242.3, "last_price": 239.24, "last_price_date": "2026-10-06", "unrealised_pnl": 43.49, "unrealised_pct": 4.35, "to_target_pct": -4.64, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-AAPL-5d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-AAPL-5d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "us", "ticker": "AAPL", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 330.8, "quantity": 3.022975, "amount": 1000.0, "currency": "USD", "target_price": 329.4, "lo80": 316.88, "lo50": 322.75, "hi50": 336.19, "hi80": 342.42, "last_price": 333.63, "last_price_date": "2026-10-06", "unrealised_pnl": 8.56, "unrealised_pct": 0.86, "to_target_pct": -1.27, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-JPM-5d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-JPM-5d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "us", "ticker": "JPM", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 334.89, "quantity": 2.986055, "amount": 1000.0, "currency": "USD", "target_price": 334.98, "lo80": 324.58, "lo50": 329.47, "hi50": 340.59, "hi80": 345.71, "last_price": 331.28, "last_price_date": "2026-10-06", "unrealised_pnl": -10.78, "unrealised_pct": -1.08, "to_target_pct": 1.12, "paper": true}, {"trade_id": "acc:base.always_up.v1:2026-09-29-NVDA-5d", "view": "accuracy", "prediction_id": "base.always_up.v1:2026-09-29-NVDA-5d", "strategy_id": "base.always_up.v1", "family": "baseline", "market": "us", "ticker": "NVDA", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 229.27, "quantity": 4.36167, "amount": 1000.0, "currency": "USD", "target_price": 227.21, "lo80": 215.09, "lo50": 220.75, "hi50": 233.86, "hi80": 240.01, "last_price": 239.24, "last_price_date": "2026-10-06", "unrealised_pnl": 43.49, "unrealised_pct": 4.35, "to_target_pct": -5.03, "paper": true}, {"trade_id": "acc:base.model_only.v1:2026-09-29-NVDA-5d", "view": "accuracy", "prediction_id": "base.model_only.v1:2026-09-29-NVDA-5d", "strategy_id": "base.model_only.v1", "family": "baseline", "market": "us", "ticker": "NVDA", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 229.27, "quantity": 4.36167, "amount": 1000.0, "currency": "USD", "target_price": 227.91, "lo80": 215.75, "lo50": 221.43, "hi50": 234.58, "hi80": 240.75, "last_price": 239.24, "last_price_date": "2026-10-06", "unrealised_pnl": 43.49, "unrealised_pct": 4.35, "to_target_pct": -4.74, "paper": true}, {"trade_id": "acc:rule.model_news.v1:2026-09-29-AAPL-5d", "view": "accuracy", "prediction_id": "rule.model_news.v1:2026-09-29-AAPL-5d", "strategy_id": "rule.model_news.v1", "family": "rule", "market": "us", "ticker": "AAPL", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 330.8, "quantity": 3.022975, "amount": 1000.0, "currency": "USD", "target_price": 329.9, "lo80": 317.36, "lo50": 323.24, "hi50": 336.7, "hi80": 342.93, "last_price": 333.63, "last_price_date": "2026-10-06", "unrealised_pnl": 8.56, "unrealised_pct": 0.86, "to_target_pct": -1.12, "paper": true}, {"trade_id": "acc:rule.model_news.v1:2026-09-29-NVDA-5d", "view": "accuracy", "prediction_id": "rule.model_news.v1:2026-09-29-NVDA-5d", "strategy_id": "rule.model_news.v1", "family": "rule", "market": "us", "ticker": "NVDA", "horizon_days": 5, "entry_date": "2026-09-30", "exit_date": "2026-10-07", "entry_price": 229.27, "quantity": 4.36167, "amount": 1000.0, "currency": "USD", "target_price": 228.03, "lo80": 215.86, "lo50": 221.54, "hi50": 234.7, "hi80": 240.88, "last_price": 239.24, "last_price_date": "2026-10-06", "unrealised_pnl": 43.49, "unrealised_pct": 4.35, "to_target_pct": -4.69, "paper": true}], "trade_checks": [], "owner": {"trades": [{"id": "pt-us-20260930-AAPL-1", "market": "us", "ticker": "AAPL", "side": "buy", "quantity": 3.0, "price": 330.8, "price_basis": "open", "trade_date": "2026-09-30", "source": "dashboard", "idempotency_key": "own-aapl-0930", "entered_at": "2026-09-30T20:30:00Z", "note": "own test", "supersedes": null}], "positions": [{"market": "us", "ticker": "AAPL", "quantity": 3.0, "avg_price": 330.8, "last_close": 333.63, "last_close_date": "2026-10-06", "currency": "USD", "cost": 992.4, "value": 1000.89, "pnl": 8.49, "pnl_pct": 0.86, "eur_view": {"ticker": "AAPL", "quantity": 3.0, "mark_date": "2026-10-06", "eurusd_at_buy": 1.165, "eurusd_now": 1.17, "fx_fee_rate": 0.0075, "cost_usd": 993.55, "value_usd": 1000.89, "cost_eur": 859.23, "value_eur": 849.05, "fx_effect_eur": -3.67, "pnl_eur": -10.19, "note": "BUX FX fee provisional (config/costs.yaml broker.us, verify)"}}], "default_amount": 1000.0, "paper": true}}}};</script>
+<script>
+/* Shared script of the design-track mockups: DOM helpers, formatters, the app shell (sidebar, top bar, phone
+   drawer and bar), the tooltip, the page head and small visual parts (odds meter, icon tile, family label, range
+   bar, buyers-by-horizon bars). A page defines `const D = ...payload...` before this script and calls `shell(...)`
+   then builds its sections. Spec constants named once here with their source. */
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null || v === false) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? '' : v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls, 'aria-hidden': 'true'}); const u = svgEl('use'); u.setAttribute('href', '#' + (id.startsWith('ms-') ? id : 'ms-' + id)); s.append(u); return s; };
+const help = tip => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain', type:'button'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const ZONE = {india: 'IST', us: 'ET'};                      /* presentation only: the market's local clock label */
+const LOCALE = {INR: 'en-IN', USD: 'en-US'}, SYMBOL = {INR: '₹', USD: '$'};
+const FAMILY = {rule: ['Rule strategies', 'ms-settings', 'r'], baseline: ['Baselines', 'ms-trending_flat', 'b'], ai: ['AI traders', 'ms-bolt', 'a']};
+const FAMILY_SHORT = {rule: 'Rule', baseline: 'Baseline', ai: 'AI'};
+const PICK = {best_expected_gain: 'Best expected gain', highest_probability: 'Highest probability'};
+const BAND = {below80: ['below the 80% range', 'flag'], below50: ['below the 50% range', ''], inside50: ['inside the 50% range', 'ok'], above50: ['above the 50% range', ''], above80: ['above the 80% range', 'flag']};
+const BAND_SHORT = {below80: 'below 80%', below50: 'below 50%', inside50: 'inside 50%', above50: 'above 50%', above80: 'above 80%'};
+const FLAG = {outside_range: 'outside its range', far_from_target: 'far from its target', against_prediction: 'against the prediction'};
+const FLAG_SHORT = {outside_range: 'outside range', far_from_target: 'far from target', against_prediction: 'against prediction'};
+const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange filing, company release) confirms it. Can be the main evidence of a call.', 'ms-verified_user'],
+  corroborated: ['corroborated', 'Two or more independent outlets reported it on their own. Can be the main evidence of a call.', 'ms-check'],
+  single_source: ['single source', 'One independent origin so far. Lowers a call’s confidence; cannot be the main evidence.', 'ms-warning'],
+  unverified: ['unverified', 'No vetted outlet read yet. Lowers confidence; cannot be the main evidence.', null],
+  rumour: ['rumour', 'Reported as a rumour or from unnamed sources. Never supports a call.', 'ms-close'],
+  promotional: ['promotional', 'A paid, promotional or opinion item. Never supports a call.', 'ms-close'],
+  contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close']};
+const CAN_CARRY = ['confirmed_primary', 'corroborated'];
+/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading and about 300 settled trades per strategy; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank; F2.3 = the back-test runs on the 15-year history cache; F7.1 luck test = a 95% percentile bootstrap interval (marketbrief/lab/luck.py, alpha 0.05). */
+const GO_LIVE_MONTHS = 2, GO_LIVE_TRADES_ABOUT = 300, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20, BACKTEST_YEARS = 15, LUCK_INTERVAL_PCT = 95;
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const fmtDY = iso => fmtD(iso, false) + ' ' + iso.slice(0,4);
+const offsetMin = local => { const m = /([+-])(\d\d):(\d\d)$/.exec(local); return m ? (m[1]==='-'?-1:1) * (60*+m[2] + +m[3]) : 0; };
+const fmtLocal = (iso, m, withDate=false) => { if (!iso) return '—'; const t = new Date(new Date(iso).getTime() + offsetMin(P(m).status.session.local_time)*60000); const hm = `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`; return (withDate ? `${t.getUTCDate()} ${MON[t.getUTCMonth()]} ` : '') + `${hm} ${ZONE[m]}`; };
+const sgn = (x, dec=2, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = (x, dec=0) => x == null ? '—' : (x*100).toFixed(dec) + '%';
+const money = (cur, x, dec=0, sign=false) => { if (x == null) return '—'; const s = Math.abs(x).toLocaleString(LOCALE[cur], {minimumFractionDigits: dec, maximumFractionDigits: dec}); return (sign ? (x>0?'+':x<0?'−':'') : (x<0?'−':'')) + SYMBOL[cur] + s; };
+const price = (cur, x) => x == null ? '—' : x.toLocaleString(LOCALE[cur], {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const moneyDelta = (cur, x, dec=0) => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, money(cur, x, dec, true));
+const dec = cur => cur === 'INR' ? 0 : 2;
+const P = m => D.markets[m];
+const companyOf = (m, t) => (P(m).companies || []).find(c => c.ticker === t) || {ticker: t, name: t};
+const stratOf = (m, id) => (P(m).strategies || {})[id] || {id, name: id, family: '—'};
+const PAGES = {home: '../01-home/page.html', watchlist: '../02-watchlist/page.html', company: '../03-company/page.html', strategies: '../04-stock-strategies/page.html', lab: '../05-strategy-lab/page.html', compare: '../06-rule-vs-ai/page.html', portfolios: '../07-paper-portfolios/page.html', track: '../08-track-record/page.html', news: '../09-news/page.html', companies: '../10-companies/page.html', assistant: '../11-assistant/page.html', help: '../12-help/page.html'};
+const companyPage = t => `${PAGES.company}#${t}`, strategiesPage = t => `${PAGES.strategies}#${t}`;
+const odds = (p, tipText) => { if (p == null) return el('span', {class:'muted'}, '—'); const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13})); const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5})); return el('span', {class:'mb-odds', 'data-tip': tipText}, s, el('b', {}, pct(p))); };
+/* a pick's costs: the market-cost expected gain it was ranked on, and decision 51's viability at the owner's own cost */
+const pickCand = k => (k.candidates || []).find(c => c.horizon_days === k.horizon_days) || null;
+const yourViable = k => { const cd = pickCand(k); return cd && cd.cost_viable != null ? cd.cost_viable : null; };
+function costLabels(cur, k) {
+  const mk = k.expected_gain_pct > 0, cd = pickCand(k), out = [];
+  out.push(el('span', {class:'mb-label ' + (mk ? 'success' : 'neutral'), 'data-tip': `Expected gain after market costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} × ${sgn(k.move_pct)} − ${pct(1 - k.prob_up, 1)} × ${k.loss_pct}% − ${k.costs_pct}% (brokerage, taxes and fees of config/costs.yaml; strategies are ranked on this view).`}, icon(mk ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${mk ? 'clears market costs' : 'below market costs'}`));
+  if (cd && cd.cost_viable != null) out.push(el('span', {class:'mb-label ' + (cd.cost_viable ? 'success' : 'warn'), 'data-tip': `Decision 51, your own costs: with your broker’s extra charges the round trip is ${cd.your_cost_pct}% and the expected gain ${sgn(cd.expected_gain_your_pct)}, so this pick is ${cd.cost_viable ? 'viable' : 'not viable'} at your cost. The flag never blocks a paper trade.`}, icon(cd.cost_viable ? 'ms-check' : 'ms-warning'), cd.cost_viable ? 'viable at your cost' : 'not viable at your cost'));
+  return out;
+}
+const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_pct > 0).length, yv = picked.filter(k => yourViable(k) === true).length, known = picked.filter(k => yourViable(k) != null).length; return `${mk ? `${mk} clear${mk === 1 ? 's' : ''} market costs` : 'none clears market costs'} · ${known ? (yv ? `${yv} viable at your cost` : 'none viable at your cost') : 'your-cost view not stored'}`; };
+const avatar = (ico, kind='', size='') => el('span', {class:`mb-avatar ${kind} ${size}`, 'aria-hidden':'true'}, icon(ico));
+const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
+const statusBadge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
+const sentSquare = v => { const s = v == null ? 'flat' : v > 0.05 ? 'up' : v < -0.05 ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+/* range bar: the trade's or prediction's 50% and 80% bands, the entry dotted, the target as a triangle, the last price as the dark line */
+function rangeBar(cur, r, last, entry) {
+  const lo = Math.min(r.lo80, entry ?? r.lo80, last ?? r.lo80) * 0.997, hi = Math.max(r.hi80, entry ?? r.hi80, last ?? r.hi80, r.target_price) * 1.003, X = v => (v - lo) / (hi - lo) * 96 + 2;
+  const s = svgEl('svg', {viewBox:'0 0 100 18', role:'img', 'aria-label':`80% range ${price(cur, r.lo80)} to ${price(cur, r.hi80)}${last != null ? ', last ' + price(cur, last) : ''}`});
+  s.append(svgEl('rect', {x: X(r.lo80), y: 5, width: X(r.hi80) - X(r.lo80), height: 8, rx: 4, fill: 'var(--mb-chart-band-80)'}));
+  s.append(svgEl('rect', {x: X(r.lo50), y: 5, width: X(r.hi50) - X(r.lo50), height: 8, rx: 4, fill: 'var(--mb-chart-band-50)'}));
+  if (entry != null) s.append(svgEl('line', {x1: X(entry), x2: X(entry), y1: 3, y2: 15, stroke: 'var(--md-sys-color-outline)', 'stroke-width': 1.5, 'stroke-dasharray': '2 1.5'}));
+  s.append(svgEl('path', {d: `M${X(r.target_price)-3},1 L${X(r.target_price)+3},1 L${X(r.target_price)},5 Z`, fill: 'var(--mb-chart-1)'}));
+  if (last != null) s.append(svgEl('line', {x1: X(last), x2: X(last), y1: 2, y2: 16, stroke: 'var(--md-sys-color-on-surface)', 'stroke-width': 2}));
+  return el('span', {class:'rng', 'data-tip': `Predicted 50% range ${price(cur, r.lo50)}–${price(cur, r.hi50)}, 80% range ${price(cur, r.lo80)}–${price(cur, r.hi80)}; target ${price(cur, r.target_price)} (the triangle)${entry != null ? `; entry ${price(cur, entry)} (dotted)` : ''}${last != null ? `; last ${price(cur, last)} (the dark line)` : ''}.`}, s);
+}
+/* buyers by horizon: five small bars, the selected horizon dark */
+function horizonBars(m, ticker, horizon) {
+  const p = P(m), s = svgEl('svg', {viewBox:'0 0 96 40', role:'img', 'aria-label':'buyers by horizon'});
+  const rows = p.horizons.map(k => (p.agreement[String(k)] || []).find(x => x.ticker === ticker));
+  const max = Math.max(1, ...rows.map(a => a ? a.of : 0));
+  rows.forEach((a, i) => { const x = i * 19 + 1, h = a ? Math.max(2, a.buy / max * 26) : 2, on = p.horizons[i] === horizon;
+    s.append(svgEl('rect', {class: on ? 'on' : 'off', x, y: 28 - h, width: 15, height: h, rx: 3}));
+    const tx = svgEl('text', {class: on ? 'on' : '', x: x + 7.5, y: 38, 'text-anchor':'middle'}); tx.textContent = a ? a.buy : '–'; s.append(tx); });
+  const wrap = el('span', {class:'hzb', 'data-tip': `Buyers at each horizon: ${p.horizons.map(k => { const a = (p.agreement[String(k)] || []).find(x => x.ticker === ticker); return `N+${k} ${a ? a.buy + ' of ' + a.of : 'no prediction'}`; }).join(' · ')}. The strongest other horizon is the one with the most buyers (ties: the shorter).`}, s);
+  return wrap;
+}
+function horizonTabs(horizons, current, onPick) {
+  const seg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Horizon'});
+  for (const k of horizons) seg.append(el('button', {type:'button', 'aria-pressed': String(k === current), onclick: () => onPick(k)}, `N+${k}`));
+  return seg;
+}
+const horizonWords = k => k === 1 ? 'the next session’s close' : `the close of the ${['','1st','2nd','3rd','4th','5th'][k]} session after the open`;
+
+/* ---------- state: the market from the hash ---------- */
+let market = (location.hash.slice(1).split('/')[0] in D.markets) ? location.hash.slice(1).split('/')[0] : 'india';
+
+/* ---------- shell ---------- */
+const NAV = [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['science','Strategy lab',PAGES.lab], ['layers','Rule vs AI',PAGES.compare], ['account_balance_wallet','Paper portfolios',PAGES.portfolios], ['query_stats','Track record',PAGES.track], ['newspaper','News',PAGES.news], ['apartment','Companies',PAGES.companies], ['bolt','Assistant',PAGES.assistant], ['help','Help',PAGES.help]];
+let onMarketChange = () => {};
+function shell(current, title, opts={}) {
+  const navItem = ([ico, label, href]) => el('a', {class:'mb-nav-item', href: href === current ? '#' : href, 'aria-current': href === current ? 'page' : null}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), el('span', {class:'mb-nav-label'}, label));
+  const sidebar = $('#sidebar');
+  sidebar.append(el('div', {class:'mb-sidebar-brand'}, el('span', {class:'mb-brand-mark', 'aria-hidden':'true'}, 'MB'), el('span', {}, 'Market brief', el('small', {}, 'research cockpit'))), el('div', {class:'mb-sidebar-section'}, 'Pages'), ...NAV.map(navItem), el('div', {class:'mb-sidebar-foot', id:'side-foot'}));
+  const menuBtn = $('#menu-btn'), scrim = $('#scrim');
+  const toggleMenu = on => { sidebar.classList.toggle('open', on); menuBtn.setAttribute('aria-expanded', String(on)); };
+  menuBtn.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
+  scrim.addEventListener('click', () => toggleMenu(false));
+  const barItems = (opts.bar || [NAV[0], NAV[1], NAV[2], NAV[3]]).map(navItem);
+  $('#navbar').append(...barItems, el('button', {class:'mb-nav-item', type:'button', 'aria-controls':'sidebar', onclick: () => toggleMenu(true)}, el('span', {class:'mb-nav-ind'}, icon('ms-menu')), el('span', {class:'mb-nav-label'}, 'More')));
+  window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+  /* tooltip (hover, focus, tap; Escape closes) */
+  const tip = $('#tip'); let tipPinned = null;
+  const showTip = (target, html) => { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; };
+  const hideTip = () => { if (tipPinned) return; tip.classList.remove('on'); };
+  document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+  document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+  document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+  document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+  document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A' && !t.classList.contains('md-btn') && t.closest('.md-segmented') == null && !t.closest('.md-chip.filter') && !t.closest('th')) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); toggleMenu(false); } });
+  window.addEventListener('hashchange', () => { const h = location.hash.slice(1).split('/')[0]; if (h in D.markets && h !== market) { market = h; onMarketChange(); } });
+}
+function marketSeg(onPick) { const seg = $('#market-seg'); seg.innerHTML = ''; for (const m of Object.keys(D.markets)) seg.append(el('button', {type:'button', 'aria-pressed': String(m === market), 'data-tip': `Switch to the ${LABEL[m]} ${document.title.split(' · ')[1] || 'page'} (${P(m).name})`, onclick: () => { market = m; history.replaceState(null, '', '#'+m); onPick(m); }}, LABEL[m])); }
+function sideFoot(m) { const p = P(m), f = $('#side-foot'); f.innerHTML = ''; f.append(el('b', {}, p.status.paper_label), el('br'), `${LABEL[m]} · data as of ${fmtD(p.as_of, false)}`); }
+function makeFocusable(root) { for (const n of root.querySelectorAll('[data-tip]')) if (!n.matches('a[href], button, input, select, [tabindex]')) n.setAttribute('tabindex', '0'); }
+function pageHead(m, title, subtitle) {
+  const p = P(m), s = p.status.session, open = !!s.in_session, fr = p.status.freshness;
+  const h = el('section', {class:'phead', 'aria-label':'Session and freshness'});
+  h.append(el('div', {}, el('h1', {}, title), el('div', {class:'sub'}, subtitle)));
+  const chips = el('div', {class:'chips'});
+  chips.append(el('span', {class:'md-chip', 'data-tip': `Session ${fmtLocal(s.session_open_utc, m)}–${fmtLocal(s.session_close_utc, m)}.`}, el('span', {class:'dot'+(open?' open':'')}), s.trading_day ? (open ? el('b', {}, 'Open now') : (s.late_run ? 'Closed for today' : el('span', {}, 'Opens ', el('b', {}, fmtLocal(s.session_open_utc, m))))) : 'No session today'));
+  chips.append(el('span', {class:'md-chip', 'data-tip':'Market mood stored by the daily run: CALM / TRENDING / EVENT_HEAVY / UNSTABLE. AI traders lower their probability in EVENT_HEAVY and UNSTABLE; rule strategies either filter those days or not.'}, 'Regime ', el('b', {}, p.status.regime)));
+  chips.append(el('span', {class:'md-chip', 'data-tip': `Page data built ${fmtLocal(fr.built_at, m, true)} (${fr.age_minutes} min before the cut-off ${fmtLocal(p.cutoff, m, true)}). Nothing stored after the cut-off is used.`}, icon(fr.state === 'fresh' ? 'ms-check' : 'ms-warning'), el('b', {}, fr.state), ` · built ${fmtLocal(fr.built_at, m)}`));
+  chips.append(el('span', {class:'mb-tag paper', 'data-tip': p.status.paper_label}, 'paper'));
+  h.append(chips);
+  return h;
+}
+function paperBand(m, g, n) {
+  const p = P(m);
+  if (g && g.proven) return el('section', {class:'mb-alert band success', 'aria-label':'Signals'}, icon('ms-check'), el('div', {}, el('b', {class:'t'}, 'A strategy has met the go-live bar'), el('div', {class:'s'}, `${p.status.paper_label}. Strong signals may now appear on the strategy pages; the rankings still say who agrees, not what to do.`)), el('a', {class:'md-btn text act', href: PAGES.track, style:'color:inherit'}, 'Track record', icon('ms-chevron_right')));
+  return el('section', {class:'mb-alert band', 'aria-label':'Signals'}, icon('ms-block'), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'),
+    el('div', {class:'s'}, `${p.status.paper_label}.` + (g ? ` None of the ${n} strategies has met the go-live bar (${g.trades_needed} settled trades, ${g.months_forward} of ${GO_LIVE_MONTHS} months forward so far, beating the best baseline after costs).` : '') + ' Nothing here is advice.')),
+    el('a', {class:'md-btn text act', href: PAGES.track, style:'color:inherit'}, 'Track record', icon('ms-chevron_right')));
+}
+function footer(m, endpoint) { const p = P(m); return el('footer', {}, `Personal research project. Example data from the data catalogue; nothing here is investment advice and nothing trades. as_of ${p.as_of} · cutoff ${p.cutoff} · built_at ${p.built_at} · `, el('code', {}, endpoint.replace('{market}', m))); }
+
+</script>
+<script>
+let cost = 'market', famFilter = null, viewFilter = null, pending = {};
+shell(PAGES.portfolios, 'Paper portfolios');
+onMarketChange = () => { famFilter = null; viewFilter = null; render(); };
+const val = (r, k) => cost === 'your' && r.your_cost && k in r.your_cost ? r.your_cost[k] : r[k];
+const luckOf = r => cost === 'your' && r.your_cost ? r.your_cost.luck_test : r.luck_test;
+const SOURCE = {dashboard: 'the dashboard', slack: 'Slack', cli: 'the command line', claude_app: 'the Claude app', claude_code: 'Claude Code'};
+function luckBar(r) {
+  const t = luckOf(r); if (!t || t.low_pct == null) return el('span', {class:'muted', 'data-tip':'Fewer than 2 trades: no luck interval yet.'}, 'none yet');
+  const lo = Math.min(t.corrected_low_pct ?? t.low_pct, t.low_pct, 0), hi = Math.max(t.corrected_high_pct ?? t.high_pct, t.high_pct, 0), X = v => 4 + (v - lo) / ((hi - lo) || 1) * 72;
+  const s = svgEl('svg', {viewBox:'0 0 80 16', role:'img', 'aria-label': `luck interval ${sgn(t.low_pct)} to ${sgn(t.high_pct)}, corrected ${sgn(t.corrected_low_pct)} to ${sgn(t.corrected_high_pct)}`});
+  s.append(svgEl('line', {class:'z', x1: X(0), x2: X(0), y1: 1, y2: 15}), svgEl('line', {class:'raw', x1: X(t.low_pct), x2: X(t.high_pct), y1: 8, y2: 8}));
+  if (t.corrected_low_pct != null) s.append(svgEl('line', {class:'cor' + (t.corrected ? ' edge' : ''), x1: X(t.corrected_low_pct), x2: X(t.corrected_high_pct), y1: 8, y2: 8}));
+  s.append(svgEl('circle', {class:'mean', cx: X(val(r, 'mean_return_pct')), cy: 8, r: 2.5}));
+  return el('span', {class:'luck', 'data-tip': `Luck test (${t.n} trades): mean return per trade ${sgn(val(r, 'mean_return_pct'))}; 95% interval ${sgn(t.low_pct)} to ${sgn(t.high_pct)} (thin), corrected for the ${t.m} rows compared ${sgn(t.corrected_low_pct)} to ${sgn(t.corrected_high_pct)} (thick). ${t.corrected ? 'Excludes zero: an edge may be real.' : 'Includes zero: could be luck; no edge claimed.'}`}, s, el('span', {class:'mb-label ' + (t.corrected ? 'success' : 'neutral')}, t.corrected ? 'edge' : 'luck?'));
+}
+
+/* ---------- KPIs ---------- */
+function kpis(p) {
+  const cur = p.currency, open = p.open_trades, unreal = open.reduce((s, t) => s + t.unrealised_pnl, 0), flagged = p.trade_checks.filter(c => c.flagged).length;
+  const fam = f => p.h2h_rows.find(r => r.scope === 'strategy' && r.family === f && r.horizon_days === 'all');
+  const R = fam('rule'), A = fam('ai'), pos = p.owner.positions, val_ = pos.reduce((s, x) => s + x.value, 0), pnl = pos.reduce((s, x) => s + x.pnl, 0);
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('account_balance_wallet', 'paper', 'Open paper trades', String(open.length), el('span', {}, 'unrealised ', moneyDelta(cur, unreal, dec(cur)), ' before costs', p.trade_checks.length ? ` · ${flagged} flagged` : ''), 'Every paper trade that has entered and not yet exited, all strategies and horizons, both views; unrealised against the latest stored close.'));
+  K.append(card('layers', 'info', `Head-to-head rule portfolio`, R ? moneyDelta(cur, val(R, 'net_pnl'), dec(cur)) : 'No trades yet', el('span', {}, 'AI portfolio ', A ? moneyDelta(cur, val(A, 'net_pnl'), dec(cur)) : '—', ` · after ${cost} cost · ${(R ? R.trades : 0) + (A ? A.trades : 0)} settled`), 'The two family portfolios of the head-to-head view: the strongest rule strategy vs the strongest AI trader on identical company-days (decisions 41-42).'));
+  K.append(card('apartment', '', 'Your own paper positions', pos.length ? money(cur, val_, dec(cur)) : 'None', pos.length ? el('span', {}, moneyDelta(cur, pnl, dec(cur)), ` on ${pos.length} position${pos.length === 1 ? '' : 's'}, before costs`) : 'no own paper trade recorded', 'Your manual paper trades (WS4), marked to the latest stored close. A paper trade is a record, never an order.'));
+  const pend = (pending[market] || []).length;
+  K.append(card('pending', pend ? 'warn' : 'neutral', 'Pending requests', String(pend), pend ? 'own paper trades waiting for the next import' : 'nothing waiting', 'An own paper trade typed here is appended to the inbox with your sign-in and an idempotency key; the next run imports it (F10). Mockup: nothing is sent.'));
+  return K;
+}
+
+/* ---------- head-to-head portfolios ---------- */
+function h2hCard(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Head-to-head portfolios'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Head-to-head portfolios'), help('The portfolios of the head-to-head view (F1, F7.1): per family (the strongest rule strategy and the strongest AI trader) and per pick rule (best expected gain, highest probability). Each pick is one paper trade of the company’s amount. Profit after the selected costs; the luck test says whether a lead could be chance.'), el('div', {class:'end'}, el('a', {class:'go', href: PAGES.compare}, 'Rule vs AI', icon('ms-chevron_right')))));
+  const g = el('div', {class:'h2h'});
+  for (const f of ['rule', 'ai']) {
+    const fr = p.h2h_rows.find(r => r.scope === 'strategy' && r.family === f && r.horizon_days === 'all'), box = el('div', {class:'fbox'});
+    box.append(el('div', {class:'fh'}, avatar(FAMILY[f][1], f === 'ai' ? 'info' : '', 'sm'), el('b', {}, FAMILY[f][0]), fr ? el('small', {}, `· ${stratOf(market, fr.strategy_id).name}`) : el('small', {}, '· nothing settled yet')));
+    if (fr) { box.append(el('div', {class:'tot'}, el('span', {class:'n'}, moneyDelta(cur, val(fr, 'net_pnl'), dec(cur))), el('small', {}, `after ${cost} cost on ${fr.trades} trade${fr.trades === 1 ? '' : 's'} · ${pct(val(fr, 'win_rate'))} won · drawdown ${money(cur, val(fr, 'max_drawdown'), dec(cur), true)}`), luckBar(fr)));
+      for (const k of ['best_expected_gain', 'highest_probability']) { const r = p.h2h_rows.find(x => x.scope === 'pick_rule' && x.family === f && x.pick_rule === k && x.horizon_days === 'all'); box.append(el('div', {class:'pr'}, el('span', {class:'l'}, PICK[k]), r ? el('span', {class:'st'}, `${r.trades} trade${r.trades === 1 ? '' : 's'}`, `${pct(val(r, 'win_rate'))} won`, luckBar(r)) : el('span', {class:'st muted'}, 'no trade yet'), r ? el('b', {}, moneyDelta(cur, val(r, 'net_pnl'), dec(cur))) : el('b', {class:'muted'}, '—'))); } }
+    else box.append(el('div', {class:'quiet'}, 'No settled head-to-head trade for this family yet.'));
+    g.append(box);
+  }
+  card.append(g);
+  card.append(el('p', {class:'note'}, `Ranked on market cost (decision 50); your cost adds your broker’s charges. ${p.status.paper_label}: a paper trade is a record, never an order.`));
+  return card;
+}
+
+/* ---------- open trades by strategy ---------- */
+function openTrades(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Open paper trades by strategy'});
+  const checks = {}; for (const c of p.trade_checks) checks[c.trade_id] = c;
+  let rows = p.open_trades.filter(r => (!famFilter || r.family === famFilter) && (!viewFilter || r.view === viewFilter));
+  const ck0 = p.trade_checks[0];
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Open paper trades by strategy'), el('span', {class:'mb-tag paper'}, 'paper'), help('Every paper trade that has entered (bought at the open of its entry session) and not yet exited, grouped by strategy: the accuracy view (one trade per qualifying prediction) and the head-to-head view (the daily picks, H2H). Unrealised = the latest stored close against the entry, before costs. Range = where the last close sits in the trade’s own predicted range. Check = the latest intraday check at its own price.'), el('div', {class:'end'}, `${rows.length} of ${p.open_trades.length} open`, ck0 ? ` · checked ${fmtLocal(ck0.check_at, market)}` : ' · no intraday check yet')));
+  const bar = el('div', {class:'toolbar', style:'margin:0 0 12px'});
+  const chips = [];
+  const chip = (label, kind, v) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String((kind === 'fam' ? famFilter : viewFilter) === v), onclick: () => { if (kind === 'fam') famFilter = v; else viewFilter = v; for (const x of chips) x.setAttribute('aria-pressed', String((x._kind === 'fam' ? famFilter : viewFilter) === x._v)); rerenderTable(); }}, label); b._kind = kind; b._v = v; chips.push(b); return b; };
+  bar.append(chip('All families', 'fam', null), ...['rule', 'baseline', 'ai'].map(f => chip(FAMILY[f][0], 'fam', f)), el('span', {class:'muted', style:'margin:0 4px'}, '·'), chip('Both views', 'view', null), chip('Accuracy', 'view', 'accuracy'), chip('Head-to-head', 'view', 'head_to_head'));
+  card.append(bar);
+  const host = el('div'); card.append(host);
+  const draw = () => {
+    host.innerHTML = ''; rows = p.open_trades.filter(r => (!famFilter || r.family === famFilter) && (!viewFilter || r.view === viewFilter));
+    card.querySelector('.head .end').textContent = `${rows.length} of ${p.open_trades.length} open${ck0 ? ` · checked ${fmtLocal(ck0.check_at, market)}` : ' · no intraday check yet'}`;
+    if (!rows.length) { host.append(el('div', {class:'quiet'}, 'No open paper trade matches the filter.')); return; }
+    const tb = el('table', {class:'md-table tbl ot'});
+    tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Horizon'), el('th', {class:'num cw'}, 'Entry'), el('th', {class:'num cw'}, 'Last'), el('th', {class:'num'}, 'Unrealised'), el('th', {class:'cm'}, 'Predicted range'), el('th', {class:'num c3'}, 'To target'), el('th', {}, 'Check'))));
+    const body = el('tbody'); const byS = {}; for (const r of rows) (byS[r.strategy_id] = byS[r.strategy_id] || []).push(r);
+    for (const id of Object.keys(byS).sort((a, b) => ({rule: 0, baseline: 1, ai: 2}[stratOf(market, a).family] - {rule: 0, baseline: 1, ai: 2}[stratOf(market, b).family]) || a.localeCompare(b))) {
+      const st = stratOf(market, id), trs = byS[id], sum = trs.reduce((s, r) => s + r.unrealised_pnl, 0);
+      body.append(el('tr', {class:'grp'}, el('td', {colspan: 8}, el('a', {class:'tk', href: `${PAGES.lab}#${market}/${id}`, 'data-tip': `${st.name}: open it in the Strategy lab.`}, st.name), ' ', famLabel(st.family, FAMILY_SHORT[st.family]), el('small', {}, `${trs.length} open · unrealised `), moneyDelta(cur, sum, dec(cur)))));
+      for (const r of trs) { const ck = checks[r.trade_id]; let status;
+        if (!ck) status = el('span', {class:'st muted', 'data-tip':'No intraday check stored for this trade by the cut-off.'}, '—');
+        else { const b = BAND[ck.band] || [ck.band, '']; const fl = ck.flags.map(f => FLAG[f] || f); status = el('span', {class:'st ' + (ck.flagged ? 'flag' : b[1]), 'data-tip': `${fmtLocal(ck.check_at, market)}: ${price(cur, ck.last_price)}, ${sgn(ck.ret_since_entry_pct)} since entry, ${b[0]}${fl.length ? '; ' + fl.join(', ') : ''}. Best so far ${sgn(ck.high_since_entry_pct)}, worst ${sgn(ck.low_since_entry_pct)}.`}, icon(ck.flagged ? 'ms-warning' : 'ms-check'), ck.flagged ? ck.flags.map(f => FLAG_SHORT[f] || f).join(', ') : (BAND_SHORT[ck.band] || ck.band)); }
+        body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, el('b', {}, el('a', {class:'tk', href: companyPage(r.ticker)}, r.ticker), r.view === 'head_to_head' ? el('span', {class:'mb-label neutral', style:'margin-left:6px;font-size:10.5px;padding:0 5px', 'data-tip':'Head-to-head view: one of the daily picks for this company.'}, 'H2H') : null), el('small', {}, companyOf(market, r.ticker).name))), el('td', {}, el('span', {class:'h-lab'}, `N+${r.horizon_days}`), el('small', {class:'muted cw', style:'white-space:nowrap'}, ` ${fmtD(r.entry_date, false)} → ${fmtD(r.exit_date, false)}`)), el('td', {class:'num cw'}, price(cur, r.entry_price)), el('td', {class:'num cw', 'data-tip': `Latest stored close (${fmtD(r.last_price_date)}).`}, price(cur, r.last_price)), el('td', {class:'num'}, moneyDelta(cur, r.unrealised_pnl, dec(cur)), el('span', {class:'cw'}, ' ', delta(r.unrealised_pct))), el('td', {class:'cm'}, rangeBar(cur, r, r.last_price, r.entry_price)), el('td', {class:'num c3'}, el('span', {'data-tip': r.to_target_pct < 0 ? `Already past the target ${price(cur, r.target_price)}.` : `${sgn(r.to_target_pct)} to the target ${price(cur, r.target_price)}.`}, r.to_target_pct < 0 ? 'past target' : sgn(r.to_target_pct))), el('td', {}, status))); }
+    }
+    tb.append(body); host.append(el('div', {class:'md-table-wrap'}, tb)); makeFocusable(host);
+  };
+  card._draw = draw; draw();
+  return card;
+}
+let otCard; const rerenderTable = () => otCard && otCard._draw();
+
+/* ---------- the owner's own paper portfolio ---------- */
+function owner(p) {
+  const cur = p.currency, o = p.owner, card = el('section', {class:'card', 'aria-label':'Your own paper portfolio'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Your own paper portfolio'), el('span', {class:'mb-tag paper'}, 'paper'), help('Your manual paper trades (WS4): each a record with its side, quantity, the price and its basis (the session’s open or close, or a manual price inside the day’s range), the date and the channel it came from. Positions are first-in-first-out, marked to the latest stored close, before costs. US positions carry a euro view (F1.11, decision 11): the EUR/USD rate on the buy date and now, and BUX’s FX markup each way.'), el('div', {class:'end'}, el('button', {class:'md-btn filled small', type:'button', onclick: () => openDialog(p)}, icon('ms-receipt_long'), 'Add own paper trade'))));
+  if (!o.positions.length && !o.trades.length) { card.append(el('div', {class:'quiet'}, `No own paper trade in ${p.name} yet. Add one above; the default amount per paper trade is ${money(cur, o.default_amount)}.`)); const ph = el('div', {class:'pend'}); card.append(ph); renderPending(ph); return card; }
+  const tb = el('table', {class:'md-table tbl own'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Position'), el('th', {class:'num'}, 'Shares'), el('th', {class:'num cw'}, 'Average price'), el('th', {class:'num cw'}, 'Last close'), el('th', {class:'num cm'}, 'Cost'), el('th', {class:'num'}, 'Value'), el('th', {class:'num'}, 'Profit'))));
+  const body = el('tbody');
+  for (const x of o.positions) body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(x.ticker)}, x.ticker), el('small', {class:'muted', style:'display:block;font-size:11px'}, companyOf(market, x.ticker).name)), el('td', {class:'num'}, String(x.quantity)), el('td', {class:'num cw'}, price(cur, x.avg_price)), el('td', {class:'num cw', 'data-tip': `Latest stored close, ${fmtD(x.last_close_date)}.`}, price(cur, x.last_close)), el('td', {class:'num cm'}, money(cur, x.cost, dec(cur))), el('td', {class:'num'}, money(cur, x.value, dec(cur))), el('td', {class:'num pn'}, el('b', {}, moneyDelta(cur, x.pnl, dec(cur))), el('small', {}, sgn(x.pnl_pct)))));
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  const eurPos = o.positions.filter(x => x.eur_view);
+  for (const x of eurPos) { const e = x.eur_view; card.append(el('div', {class:'sub2', style:'margin:14px 0 0'}, `Euro view of ${x.ticker} (${e.quantity} share${e.quantity === 1 ? '' : 's'}, marked ${fmtD(e.mark_date, false)})`, help(`What the position cost in euros and what it would give back if converted now: EUR/USD ${e.eurusd_at_buy} on the buy date, ${e.eurusd_now} now, FX markup ${(e.fx_fee_rate * 100).toFixed(2)}% each way. ${e.note}`)));
+    const g = el('div', {class:'eur'}); const euro = v => (v < 0 ? '−' : '') + '€' + Math.abs(v).toLocaleString('en-IE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    g.append(el('div', {class:'n', 'data-tip': `Dollars paid including the buy order’s cost: $${e.cost_usd.toFixed(2)} ÷ ${e.eurusd_at_buy} × (1 + ${e.fx_fee_rate}).`}, el('div', {class:'l'}, 'Euros paid'), el('div', {class:'v'}, euro(e.cost_eur)), el('div', {class:'s'}, `at EUR/USD ${e.eurusd_at_buy} + markup`)), el('div', {class:'n', 'data-tip': `Dollars held now $${e.value_usd.toFixed(2)} ÷ ${e.eurusd_now} × (1 − ${e.fx_fee_rate}).`}, el('div', {class:'l'}, 'Euros back if sold now'), el('div', {class:'v'}, euro(e.value_eur)), el('div', {class:'s'}, `at EUR/USD ${e.eurusd_now} − markup`)), el('div', {class:'n', 'data-tip':'Euros back minus euros paid.'}, el('div', {class:'l'}, 'Profit in euros'), el('div', {class:'v'}, el('span', {class:'mb-delta ' + (e.pnl_eur > 0 ? 'up' : e.pnl_eur < 0 ? 'down' : 'flat')}, euro(e.pnl_eur).replace(/^(?!−)/, e.pnl_eur > 0 ? '+' : ''))), el('div', {class:'s'}, `vs ${money(cur, x.pnl, 2, true)} in dollars`)), el('div', {class:'n', 'data-tip':'The part of the euro result due to the exchange rate alone, before any fee.'}, el('div', {class:'l'}, 'Of which the rate'), el('div', {class:'v'}, el('span', {class:'mb-delta ' + (e.fx_effect_eur > 0 ? 'up' : e.fx_effect_eur < 0 ? 'down' : 'flat')}, euro(e.fx_effect_eur).replace(/^(?!−)/, e.fx_effect_eur > 0 ? '+' : ''))), el('div', {class:'s'}, 'rate change only')));
+    card.append(g); }
+  card.append(el('div', {class:'sub2', style:'margin:14px 0 0'}, `${o.trades.length} recorded trade${o.trades.length === 1 ? '' : 's'}`));
+  const ul = el('ul', {class:'tl'});
+  for (const t of o.trades) ul.append(el('li', {}, el('span', {class:'mb-label ' + (t.side === 'buy' ? 'success' : 'warn')}, t.side), el('span', {}, `${t.quantity} ${t.ticker} at ${price(cur, t.price)} (${t.price_basis === 'manual' ? 'manual price' : `the ${t.price_basis}`}) on ${fmtD(t.trade_date)}`, el('small', {}, `from ${SOURCE[t.source] || t.source} · entered ${fmtLocal(t.entered_at, market, true)}${t.note ? ` · “${t.note}”` : ''}${t.supersedes ? ' · corrects an earlier record' : ''}`))));
+  card.append(ul);
+  const ph = el('div', {class:'pend'}); card.append(ph); renderPending(ph);
+  return card;
+}
+function renderPending(host) {
+  host.innerHTML = '';
+  for (const r of (pending[market] || [])) host.append(el('div', {class:'mb-alert', style:'padding:10px 14px'}, icon('ms-pending'), el('div', {}, el('b', {class:'t'}, `Pending: ${r}`), el('div', {class:'s'}, 'Appended to the inbox with your sign-in and an idempotency key; the next run imports it and checks the price against the stored bar (F10, WS4). Mockup: nothing was sent.'))));
+}
+function openDialog(p) {
+  const cur = p.currency, dlg = $('#dlg'); dlg.innerHTML = '';
+  const sel = el('select', {'aria-label':'Company'}); for (const c of p.companies.filter(c => c.state === 'active')) sel.append(el('option', {value: c.ticker}, `${c.ticker} · ${c.name}`));
+  const side = el('select', {'aria-label':'Side'}, el('option', {value:'buy'}, 'Buy'), el('option', {value:'sell'}, 'Sell'));
+  const qty = el('input', {type:'number', min:'1', step: cur === 'INR' ? '1' : '0.000001', value: '1', 'aria-label':'Shares'});
+  const basis = el('select', {'aria-label':'Price basis'}, el('option', {value:'open'}, 'The session’s open'), el('option', {value:'close'}, 'The session’s close'), el('option', {value:'manual'}, 'A price I type (inside the day’s range)'));
+  const px = el('input', {type:'number', step:'0.01', placeholder:'only for a typed price', 'aria-label':'Price'});
+  const date = el('input', {type:'date', value: p.as_of, 'aria-label':'Session date'});
+  const body = el('div', {class:'dbody'}, el('h3', {}, 'Add an own paper trade'), el('div', {}, `A paper trade is a record of what you would have done, never an order. The price must be the stored bar’s open or close, or a typed price inside that day’s low-high; the import checks it (WS4). Whole shares in India, fractions in the US.`), el('label', {}, 'Company', sel), el('div', {class:'row2'}, el('label', {}, 'Side', side), el('label', {}, 'Shares', qty)), el('div', {class:'row2'}, el('label', {}, 'Price basis', basis), el('label', {}, `Price (${cur})`, px)), el('label', {}, 'Session date', date), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it. Nothing is bought or sold.'));
+  const acts = el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { (pending[market] = pending[market] || []).push(`${side.value} ${qty.value} ${sel.value} at ${basis.value === 'manual' ? (px.value ? price(cur, +px.value) : 'a typed price') : `the ${basis.value}`} of ${fmtD(date.value)}`); dlg.close(); render(); }}, 'Record paper trade'));
+  dlg.append(body, acts); dlg.showModal();
+}
+
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('i', {class:'sw r'}), 'rule ', el('i', {class:'sw b'}), 'baselines ', el('i', {class:'sw a'}), 'AI'),
+    el('span', {}, el('span', {class:'mb-label neutral', style:'font-size:10.5px;padding:0 5px'}, 'H2H'), ' a head-to-head pick; ', el('span', {class:'mb-label success'}, 'edge'), ' / ', el('span', {class:'mb-label neutral'}, 'luck?'), ' the corrected luck interval excludes zero or not'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every figure until proven; a paper trade is a record, never an order'));
+}
+
+function render() {
+  const p = P(market);
+  document.title = `Market brief · Paper portfolios · ${LABEL[market]}`; $('#title').textContent = `Paper portfolios · ${p.name}`;
+  sideFoot(market); marketSeg(() => { famFilter = null; viewFilter = null; render(); });
+  const page = $('#page'); page.innerHTML = '';
+  const bar = el('div', {class:'ctrls'}); const sg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Costs'}); for (const [k, t] of [['market', 'Market cost'], ['your', 'Your cost']]) sg.append(el('button', {type:'button', 'aria-pressed': String(k === cost), onclick: () => { cost = k; render(); }}, t)); bar.append(el('span', {class:'c'}, 'Costs', help('Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50). Open trades are before costs.'), sg));
+  page.append(pageHead(market, 'Paper portfolios', `head-to-head portfolios, open paper trades by strategy, and your own · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only, nothing is an order`), paperBand(market, p.go_live, Object.keys(p.strategies).length), bar, kpis(p));
+  page.append(el('div', {style:'margin-top:16px'}, h2hCard(p)));
+  otCard = openTrades(p); page.append(el('div', {style:'margin-top:16px'}, otCard));
+  page.append(el('div', {style:'margin-top:16px'}, owner(p)), legend(), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>
