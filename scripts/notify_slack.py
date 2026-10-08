@@ -3,8 +3,10 @@
 
 With SLACK_BOT_TOKEN set (bot scopes chat:write and files:write; the bot must be a member of
 the channel `slack_channel_id` in config/settings.yaml), it posts:
-  1. the filled summary draft work/slack_<market>.md as the thread's first message
-     (chat.postMessage);
+  1. the filled summary draft work/slack_<market>.md into the day's #market-brief thread through B6's
+     marketbrief.alerts.publish.post_brief: a reply when alerts.py morning started the thread, else the thread's
+     first message; once per market and session (data/<market>/slack_posts/); a --text message (market closed) is
+     posted on its own;
   2. the chart images as one reply, then 3. the HTML report as a file reply, then 4. the
      dashboard (reports/<market>/dashboard.html) as a file reply when dashboard.py listed it, each
      through files.getUploadURLExternal -> upload to the returned URL -> files.completeUploadExternal
@@ -29,6 +31,10 @@ from pathlib import Path
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core import paths
 from marketbrief.core.settings import load_settings
+from marketbrief.alerts.client import SlackError as AlertsSlackError
+from marketbrief.alerts.publish import NotConfiguredError, post_brief
+from marketbrief.pipeline.market_status import status as market_status
+from marketbrief.core.clock import clock
 from marketbrief.sources.slack_client import SlackHttp
 
 API = "https://slack.com/api/"
@@ -119,8 +125,17 @@ def title_of(p: Path) -> str:
     return {"ranges": "Price ranges", "sectors": "Sector moves", "track_record": "Track record"}.get(p.stem, p.stem)
 
 
-def post_thread(slack: Slack, channel: str, steps: list[dict], root: Path = paths.ROOT) -> dict:
-    ts = slack.post_message(channel, steps[0]["text"])
+def post_thread(slack: Slack, channel: str, steps: list[dict], root: Path = paths.ROOT,
+                market: str | None = None, session_date: str | None = None) -> dict:
+    """Post the summary, then the files as replies. With a market and session the summary goes into the day's
+    #market-brief thread through B6's post_brief (a reply when alerts.py morning posted first, else the thread's
+    first message; once per market and day, recorded in data/<market>/slack_posts/)."""
+    if market and session_date:
+        brief = post_brief(market, session_date, steps[0]["text"], http=slack.http)
+        slack.calls += ["chat.postMessage"] * len(brief["posted"])
+        ts = brief["thread_ts"]
+    else:
+        ts = slack.post_message(channel, steps[0]["text"])
     done = ["summary"]
     for s in steps[1:]:
         ids = [(slack.upload(root / f["path"], f["title"]), f["title"]) for f in s["files"]]
@@ -193,9 +208,12 @@ def main(argv: list[str] | None = None, http=urllib_http) -> int:
             print(json.dumps({**out, "posted": False, "error": "slack_channel_id missing in config/settings.yaml"}))
             return 1
         slack = Slack(token, http)
+        # the day's thread: the report's session (the files manifest), else the session being predicted
+        session_date = None if args.text else ((files or {}).get("session")
+                                                or market_status(cfg, clock())["session_date"])
         try:
-            res = post_thread(slack, channel, steps, paths.ROOT)
-        except (SlackError, OSError) as exc:
+            res = post_thread(slack, channel, steps, paths.ROOT, market if session_date else None, session_date)
+        except (SlackError, AlertsSlackError, NotConfiguredError, OSError) as exc:
             print(json.dumps({**out, "posted": False, "mode": "thread", "error": str(exc)[:300],
                               "calls": slack.calls}))
             return 1

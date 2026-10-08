@@ -540,3 +540,23 @@ def test_report_parts_keep_old_windows_apart_and_cover_every_horizon():
     jpm = next(r for r in rows if r[0] == "JPM")
     assert jpm[3] == "$91.00–$111.00" and jpm[5] == "$95.00–$115.00"          # N+1 80% and N+5 80%
     assert jpm[6] == "3d ▲ up 60%" and jpm[8] == "note 1; note 2; note 3; note 4; note 5"
+
+
+@pytest.mark.usefixtures("slack_root")
+def test_brief_joins_the_days_thread_started_by_the_morning_picks(monkeypatch, capsys):
+    """One thread per market per day (owner, 2026-10-07): the brief replies to the thread alerts.py morning started,
+    and its files go into the same thread; a rerun posts the brief text once."""
+    from marketbrief.alerts.publish import Message, publisher
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
+    http = FakeHTTP()
+    picks = publisher("us", dry_run=False, http=http).publish(
+        Message("morning", "morning:us:2026-10-05", "picks", "us:2026-10-05"))
+    assert ns.main(["--market", "us"], http=http) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["thread_ts"] == picks["thread_ts"]
+    posts = [form(d) for u, d, _ in http.requests if u.endswith("chat.postMessage")]
+    assert len(posts) == 2 and posts[1]["thread_ts"] == picks["thread_ts"] and posts[1]["text"].startswith("*Market")
+    shares = [form(d) for u, d, _ in http.requests if u.endswith("files.completeUploadExternal")]
+    assert shares and all(s["thread_ts"] == picks["thread_ts"] for s in shares)
+    assert ns.main(["--market", "us"], http=http) == 0                                  # rerun: no second brief
+    assert len([u for u, _, _ in http.requests if u.endswith("chat.postMessage")]) == 2
