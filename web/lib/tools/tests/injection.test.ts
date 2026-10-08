@@ -32,7 +32,8 @@ function assertNoWrite(r: { inbox: { requests: unknown[] }; dispatcher: { calls:
 
 test("instructions in news titles are returned as quoted data and trigger nothing (MCP get_news)", async () => {
   const r = rig();
-  r.reads.put("news", "us", "AAPL", { items: INJECTED.map((title, index) => ({ id: `news-${index}`, title, status: "unverified" })) });
+  r.reads.put("news", "us", "_", { news: INJECTED.map((title, index) => ({ id: `news-${index}`, title, status: "unverified",
+    tickers: ["AAPL"], primary_tickers: ["AAPL"] })) });
   const reply = await handleRpc({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "get_news", arguments: { market: "us", ticker: "AAPL" } } },
     r.layer, app, SECRETS.SESSION_SECRET, NOW) as { result: { content: { text: string }[]; structuredContent: { data: { note: string } } } };
   assert.match(reply.result.structuredContent.data.note, /never instructions/);
@@ -40,7 +41,7 @@ test("instructions in news titles are returned as quoted data and trigger nothin
   assertNoWrite(r);
   assert.equal(r.inbox.commands.length, 1);
   assert.equal(r.inbox.commands[0].tool, "get_news");
-  assert.deepEqual(r.reads.calls, ["news|us|AAPL", "review|us|_"]);
+  assert.deepEqual(r.reads.calls, ["news|us|_", "review|us|_"]);
   assertNoSecret(reply, r.inbox.commands, r.notifier.reports);
 });
 
