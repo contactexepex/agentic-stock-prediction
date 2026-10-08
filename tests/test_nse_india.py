@@ -33,7 +33,7 @@ def setup(tmp: Path, tickers: dict | None = None) -> tuple[Path, Path]:
     if tickers:
         import yaml
         doc = yaml.safe_load(text)
-        doc["tickers"], doc["sectors"] = tickers, {"All": list(tickers)}
+        doc["company_meta"], doc["sectors"] = tickers, {"All": list(tickers)}
         text = yaml.safe_dump(doc)
     (cfg / "markets" / "india.yaml").write_text(text)
     for name in ("events.yaml", "settings.yaml", "ranges.yaml"):
@@ -157,7 +157,7 @@ def test_nse_primary_sources_on_real_responses(tmp_path):
     results = ctx.stdout.split("## Latest quarterly results")[1].split("\n## ")[0]
     with_results = sorted({x["ticker"] for x in rows(root, "financials")})
     assert f"y/y growth is blank for {len(with_results)} ticker(s)" in results
-    tickers = yaml.safe_load((cfg / "markets" / "india.yaml").read_text())["tickers"]
+    tickers = yaml.safe_load((cfg / "markets" / "india.yaml").read_text())["company_meta"]
     pending = [t for t in tickers if t not in with_results]
     assert f"Quarterly results not stored yet for {len(pending)} of" in results and ", ".join(pending) in results
     assert "Shareholding (promoter, public, pledges) not stored yet for" in results
