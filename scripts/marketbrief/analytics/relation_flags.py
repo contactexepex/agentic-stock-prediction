@@ -19,8 +19,8 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_today
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_ranges_config
-from marketbrief.utils.markdown import cursor_markdown_table
 from marketbrief.lifecycle.loader import active_tickers
+from marketbrief.utils.markdown import cursor_markdown_table
 
 CRORE = 1e7
 DEFAULT_FLAGS = {

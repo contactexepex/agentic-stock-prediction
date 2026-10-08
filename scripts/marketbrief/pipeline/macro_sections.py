@@ -5,8 +5,8 @@ market's config has the collector's section. Numbers come from the DuckDB views 
 
 from __future__ import annotations
 
-from marketbrief.utils.markdown import cursor_markdown_table
 from marketbrief.lifecycle.loader import active_tickers
+from marketbrief.utils.markdown import cursor_markdown_table
 
 # The order series are listed in; others follow alphabetically.
 US_ORDER = ["UST_3M", "UST_2Y", "UST_5Y", "UST_10Y", "UST_30Y", "UST_10Y_2Y", "UST_10Y_3M"]

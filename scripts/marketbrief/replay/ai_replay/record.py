@@ -16,6 +16,7 @@ from marketbrief.constants.ai_replay import (
     MSG_NOT_JSON,
     MSG_ROOT_PREPARED_FOR_OTHER_DAY,
 )
+from marketbrief.contracts.watchlist import watchlist
 from marketbrief.core.clock import utc_now
 from marketbrief.core.database import connect
 from marketbrief.core.storage import append_jsonl
@@ -23,7 +24,6 @@ from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.replay.ai_replay.cutoff import leakage_label, training_cutoff
 from marketbrief.replay.ai_replay.evidence import evidence
 from marketbrief.replay.ai_replay.roots import data_root
-from marketbrief.contracts.watchlist import watchlist
 
 
 def store_dir(results: Path, market: str) -> Path:
