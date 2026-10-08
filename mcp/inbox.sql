@@ -1,7 +1,8 @@
 -- The inbox of the web tier (docs/SPEC.md F10; ARCHITECTURE.md section 9; session B5).
--- Database market_brief_inbox in MotherDuck, written with MOTHERDUCK_INBOX_TOKEN. Owner decision 2026-10-08: that token is
--- the owner's own all-privileges MotherDuck token (the account that also holds market_brief), not a separate inbox
--- account, so a leaked inbox or gateway token reaches market_brief too (docs/ws/b5.md). The tool layer (web/lib/tools/) appends; the importer (session B1:
+-- Database market_brief_inbox in MotherDuck, written with MOTHERDUCK_INBOX_TOKEN. Owner decision 2026-10-08: that
+-- token is the owner's own all-privileges MotherDuck token (the account that also holds market_brief), not a separate
+-- inbox account, so a leaked inbox or gateway token reaches market_brief too (docs/ws/b5.md). The tool layer
+-- (web/lib/tools/) appends; the importer (session B1:
 -- `scripts/company.py import-inbox`, run by onboard.yml and the routines; scripts/marketbrief/lifecycle/inbox.py) reads
 -- inbox.company_commands, validates with the same Python validators as the CLI and appends to data/. Rows are never
 -- updated or deleted by the web tier. Idempotent: every statement is CREATE ... IF NOT EXISTS or ADD COLUMN IF NOT EXISTS.
