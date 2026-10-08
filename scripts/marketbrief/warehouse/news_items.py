@@ -163,6 +163,11 @@ def priority(record: dict) -> tuple:
     return (not record["market_moving"], not high, -pd.Timestamp(record["first_seen_at"]).timestamp(), record["id"])
 
 
+def newest_first(record: dict) -> tuple:
+    """The pages' order: newest first seen first, then by id (as ITEMS_SQL orders)."""
+    return -pd.Timestamp(record["first_seen_at"]).timestamp(), record["id"]
+
+
 def capped(records: list[dict], max_items: int) -> list[dict]:
     """At most `max_items`: half for company items and half for market-wide ones, each by `priority`, a share one
     scope leaves unused going to the other; newest first."""
@@ -171,7 +176,7 @@ def capped(records: list[dict], max_items: int) -> list[dict]:
     company_share = max(max_items // 2, max_items - len(market))
     kept = company[:company_share]
     kept += market[: max_items - len(kept)]
-    return sorted(kept, key=lambda r: (r["first_seen_at"], r["id"]), reverse=True)
+    return sorted(kept, key=newest_first)
 
 
 EARLIEST = datetime(1970, 1, 1, tzinfo=timezone.utc)
