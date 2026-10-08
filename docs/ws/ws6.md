@@ -338,7 +338,12 @@ plus one import in `scripts/marketbrief/pipeline/context.py`, and the `CLAUDE.md
 digests yet" now says it does. Differences from the proposal: only active companies (`lifecycle.loader.
 active_tickers`, like the other sections); the window is `detection.lookback_days`; the table adds the release
 `kind` and `numbers_status`; the section is omitted when no digest is in the window, so the pack is unchanged on such
-days. Test: `tests/test_results_context.py`.
+days; the title says "context only, not a range or forecast input"; rows also need `release_at <= now()`. Each bullet
+ends with `cite: <filing or NSE announcement id>` only when the forecast gate accepts that id as evidence
+(`forecast_gate.evidence_times`); a stored text's own id (`<id>:<document>`) is never shown as citable, and a source
+the gate does not know (e.g. an SEC filing found through the submissions fallback, not in `filings`) reads
+`context only`. The AI traders' inputs (`traders/prepare.py` `SECTION_INPUTS`, B3's) do not take this section: it
+appears in their `left_out` lists; adding it there is B3's call. Test: `tests/test_results_context.py`.
 
 **scripts/marketbrief/constants/ai_replay.py** `PUBLIC_AT` (so an as-of replay can copy digests):
 `"results_digests": ["created_at"],  # WS6: a digest once stored (every input <= inputs_until <= created_at)`.
