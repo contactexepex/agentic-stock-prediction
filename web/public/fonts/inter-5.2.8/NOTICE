@@ -1,0 +1,22 @@
+Inter (variable, weights 100-900, upright), vendored for the cockpit app (web/, session B7)
+
+Package:  @fontsource-variable/inter (npm), version 5.2.8 (published 2025-09-17), pinned; not a dependency of
+          web/package.json (the files were copied from the tarball, no install script run)
+Source:   https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.2.8.tgz, downloaded over HTTPS on 2026-10-08
+Tarball:  sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ== and
+          sha1 29b11476f5149f6a443b4df6516e26002d87941a, both equal to the registry's dist.integrity and dist.shasum
+Files:    files/inter-latin-wght-normal.woff2 and files/inter-latin-ext-wght-normal.woff2 of the package, copied unchanged
+          (latin: U+0000-00FF, punctuation U+2000-206F, the minus sign U+2212, the euro sign; latin-ext: the rupee
+          sign U+20B9 among others; the unicode ranges are the package's own, in web/styles/fonts.css)
+SHA-256:  inter-latin-wght-normal.woff2      3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62
+          inter-latin-ext-wght-normal.woff2  34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956
+License:  SIL Open Font License 1.1, full text in OFL.txt (the package's LICENSE, copied unchanged).
+          Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+
+Served by the app itself from /fonts/inter-5.2.8/ (Next.js public/); never from a CDN. Declared as the family "Inter"
+in web/styles/fonts.css, so the design system's font stack (tokens.css: "Inter", "Public Sans", system-ui, ...)
+renders Inter on every device instead of the device's fallback; characters outside the two subsets (e.g. arrows
+U+2190-21FF other than up and down) fall back per character. web/lib/ui/tests/design-sync.test.ts checks the files
+against web/lib/ui/vendor.ts and this NOTICE.
+To upgrade: take a newer @fontsource-variable/inter tarball from registry.npmjs.org only, check its dist.integrity,
+copy the same two files and the LICENSE into a new versioned folder, and update this NOTICE, vendor.ts and fonts.css.

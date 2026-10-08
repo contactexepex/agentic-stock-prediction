@@ -10,10 +10,10 @@
 // Usage (from web/): node tests/ui/harness.mjs [--only <case-name-substring>] [--port 3123] [--out ../work/ui]
 // Cases live in tests/ui/cases/*.mjs (one file per page session; each exports `cases`, an array, see cases/shell.mjs).
 // Playwright is the machine's global 1.56.1 (CI installs it the same way), launched on the preinstalled Chromium.
-// Fonts: the design system's first face is Inter (no web font is loaded), so text widths, and with them overflow, depend
-// on the fonts installed. The harness requires Inter (Debian/Ubuntu package fonts-inter) and stops otherwise, so a
-// result does not depend on the machine. `--fallback-fonts` hides Inter from the browser instead (it falls back to
-// the next installed face, e.g. DejaVu Sans) to check the pages also hold without it; that mode is advisory.
+// Fonts: the app self-hosts the design's face Inter (styles/fonts.css), so text widths do not depend on the machine;
+// every case checks that the self-hosted Inter loaded. `--fallback-fonts` blocks the font files and hides any
+// installed Inter from the browser (it falls back to the next installed face, e.g. DejaVu Sans) to check the pages
+// also hold when the font cannot load; that mode is advisory and never fails the run.
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -44,7 +44,7 @@ function loadPlaywright() {
   }
 }
 
-/** The face fontconfig gives for Inter ("" when fc-match is missing). */
+/** The face fontconfig gives for Inter ("" when fc-match is missing); reported in the fallback run. */
 function interFace(env = process.env) {
   try {
     return execSync("fc-match -f '%{family}' Inter", { env }).toString();
@@ -112,6 +112,9 @@ async function startServer() {
    seconds Chromium logs this warning. It is about a prefetch of our own origin, not an error of the page under test. */
 const BENIGN_CONSOLE = [/^The resource http:\/\/127\.0\.0\.1:\d+\/_next\/static\/css\/[0-9a-f]+\.css was preloaded using link preload but not used/];
 
+/* In the fallback run the font requests are aborted on purpose. */
+const FONT_BLOCKED = /^Failed to load resource: net::ERR_FAILED/;
+
 const MOCKUP_SHOT = (mockup, width, market) => join(repo, "design", "mockups", mockup, `shot-${market === "us" ? "us-" : ""}${width}-full.png`);
 
 async function compareImage(browser, mockupPng, appPng, target, title) {
@@ -139,7 +142,7 @@ async function runCase(browser, c) {
     const page = await ctx.newPage();
     const tag = `${c.name} @${width}`;
     page.on("console", (m) => {
-      if ((m.type() === "error" || m.type() === "warning") && ![...BENIGN_CONSOLE, ...(c.allowConsole ?? [])].some((re) => re.test(m.text()))) errors.push(`${tag} console.${m.type()}: ${m.text()}`);
+      if ((m.type() === "error" || m.type() === "warning") && ![...BENIGN_CONSOLE, ...(fallbackFonts ? [FONT_BLOCKED] : []), ...(c.allowConsole ?? [])].some((re) => re.test(m.text()))) errors.push(`${tag} console.${m.type()}: ${m.text()}`);
     });
     page.on("pageerror", (e) => errors.push(`${tag} pageerror: ${e.message}`));
     page.on("request", (r) => {
@@ -155,6 +158,7 @@ async function runCase(browser, c) {
       }
     });
     // Same-origin routes outside /api/v1 a case answers itself: routes = {"/api/assistant": async (request) => ({status, body})}.
+    if (fallbackFonts) await page.route((url) => url.origin === origin && url.pathname.startsWith("/fonts/"), (route) => route.abort());
     for (const [path, handler] of Object.entries(c.routes ?? {})) {
       await page.route((url) => url.origin === origin && url.pathname === path, async (route) => {
         try {
@@ -170,6 +174,11 @@ async function runCase(browser, c) {
     if (!response || response.status() !== (c.status ?? 200)) errors.push(`${tag} HTTP ${response?.status()} (expected ${c.status ?? 200})`);
     await page.waitForTimeout(300);
     if (c.waitFor) await page.waitForSelector(c.waitFor, { timeout: 5000 }).catch(() => errors.push(`${tag} never showed ${c.waitFor}`));
+    await page.evaluate(() => document.fonts.ready);
+    if (!fallbackFonts && (c.status ?? 200) === 200) {
+      const inter = await page.evaluate(() => [...document.fonts].some((f) => f.family.replace(/"/g, "") === "Inter" && f.status === "loaded"));
+      if (!inter) errors.push(`${tag} the self-hosted Inter font did not load`);
+    }
     const sw = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
     if (sw > width) errors.push(`${tag} horizontal overflow: ${sw} > ${width}`);
     const wide = await page.evaluate(
@@ -224,12 +233,7 @@ if (!existsSync(join(web, ".next", "BUILD_ID"))) {
   process.exit(1);
 }
 const env = browserEnv();
-const face = interFace(env);
-if (!fallbackFonts && !face.startsWith("Inter")) {
-  console.error(`The font Inter is not installed (fontconfig gives "${face || "nothing"}" for it). Install it (apt-get install fonts-inter) so text widths match the design, or pass --fallback-fonts for the advisory run without it.`);
-  process.exit(2);
-}
-console.log(fallbackFonts ? `fallback fonts: Inter hidden, the browser uses "${face}" (advisory)` : `font: ${face.split(",")[0]}`);
+if (fallbackFonts) console.log(`fallback fonts: the self-hosted Inter is blocked and any installed Inter hidden; the browser uses "${interFace(env)}" (advisory)`);
 const { chromium } = loadPlaywright();
 const server = await startServer();
 process.on("exit", () => server.kill());
