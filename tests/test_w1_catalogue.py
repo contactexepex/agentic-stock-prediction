@@ -531,12 +531,12 @@ def test_catalogue_bars_are_60_consecutive_sessions_ending_at_the_as_of_close():
 def test_catalogue_backtest_rows_are_apart_from_forward_rows():
     backtest = load("scoreboard_backtest_row.json")
     assert {r["basis"] for r in backtest} == {"backtest"} and {r["view"] for r in backtest} == {"accuracy"}
-    assert {r["strategy_id"] for r in backtest} == {"base.always_up.v1", "base.momentum.v1"}
+    assert {r["strategy_id"] for r in backtest} == {"base.always_up.v1", "base.momentum.v1", "base.model_only.v1"}
     assert {r["market"] for r in backtest} == {"india", "us"}
     assert {r["horizon_days"] for r in backtest} == {1, 2, 3, 4, 5, "all"}
     assert {r["basis"] for r in load("scoreboard_row.json")} == {"forward"}
     for market in ("india", "us"):
-        for sid in ("base.always_up.v1", "base.momentum.v1"):
+        for sid in ("base.always_up.v1", "base.momentum.v1", "base.model_only.v1"):
             mine = {r["horizon_days"]: r for r in backtest if r["market"] == market and r["strategy_id"] == sid}
             assert mine["all"]["trades"] == sum(mine[k]["trades"] for k in range(1, 6))
 
@@ -587,7 +587,7 @@ def test_catalogue_w40_reviews_are_written_before_the_cut_off_from_trades_settle
 def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_close():
     trades = load("paper_trade.json")
     for payload in load("track_record.json"):
-        assert payload["example_parts"] == ["calls"] and payload["skill"]["state"] == "paper"
+        assert payload["example_parts"] == ["calls", "weekly"] and payload["skill"]["state"] == "paper"
         mine = [t for t in trades if t["market"] == payload["market"] and t["strategy_id"] == "ai.combined.opus.v1"
                 and t["view"] == "accuracy" and t["status"] == "settled"]
         (block,) = payload["calls"]
@@ -595,6 +595,9 @@ def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_
         assert sum(r["n"] for r in block["all"]["reliability"]) == len(mine)
         assert sum(b["n"] for b in block["by_horizon"].values()) == len(mine)
         assert all(key.endswith("legacy_cc") for key in block["by_horizon"])
+        (series,) = payload["weekly"]   # the same calls per ISO week of their target date
+        assert series["key"] == block["key"] and sum(w["n"] for w in series["weeks"]) == len(mine)
+        assert sum(w["hits"] for w in series["weeks"]) == block["all"]["hits"]
         hits = 0   # the engine's close-to-close window: the as-of close to the close h stored bars later
         bars = {b["ticker"]: {x["date"]: x["close"] for x in load("bar.json") if x["ticker"] == b["ticker"]}
                 for b in load("bar.json") if b["market"] == payload["market"]}

@@ -1,8 +1,8 @@
 """Calendar events as the market pages show them (catalogue entity "Calendar event", docs/DATA_CATALOGUE.md): the
 market's scheduled events (`core/calendar.market_events`, config/events.yaml), the weekday holidays of the exchange
-calendar and the companies' results and ex-dividend dates (the stored `events` kind read as of the cut-off:
-per company and type, the newest date first seen by then, warehouse/read_models.upcoming_events' rule), from a first
-date to a last date. Rules as in W1's catalogue build (design/catalogue/catalogue_calendar.py)."""
+calendar and the companies' results and ex-dividend dates (the stored `events` kind read as of the cut-off: per
+company and type, the newest date first seen by then, presentation/dashboard/reads.COMPANY_EVENTS_ASOF_SQL), from a
+first date to a last date. Rules as in W1's catalogue build (design/catalogue/catalogue_calendar.py)."""
 
 from __future__ import annotations
 

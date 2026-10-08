@@ -1,0 +1,20 @@
+# The Companies page (B11). Builder: scripts/marketbrief/warehouse/rm_companies.py; route
+# web/app/api/v1/markets/[market]/companies. Company commands are written through B5's tool layer, not here.
+/api/v1/markets/{market}/companies:
+  get:
+    tags: [markets]
+    operationId: getCompanies
+    summary: The Companies page (10-companies) - every company, its lifecycle events, commands and inactive news
+    x-read-model: rm.companies
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The Companies page read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompaniesResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}

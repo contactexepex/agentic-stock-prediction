@@ -7,7 +7,7 @@ before call_scoring.n_plus_k_from, which keeps the old close of D+4 (label legac
 `entry_open`; no open, no score (counted under `no_entry_open`). An open-to-close call is scored only when its
 entry bar is the market calendar's first session after as_of_date and its exit bar the session of its offset
 (issue #45.3, as model/labels.py): a missing session's bar never shifts the window, the call stays open (counted
-under `session_gap_open`). Each outcome stores its `horizon_label`. A range is
+under `session_gap_open`, their ids under `session_gap_ids`). Each outcome stores its `horizon_label`. A range is
 scored on its target_date close (the exit session of N+k for ranges written by B10's ranges.py). Writes outcome
 records; never edits predictions, ranges or stored outcomes.
 Late records are never scored: a range or call made at or after the open of the first session
@@ -147,14 +147,14 @@ def missing(value) -> bool:
     return value is None or value != value or value <= 0
 
 
-def score_calls(cfg: dict, con, now: str) -> tuple[list[dict], int, int, int]:
-    """(outcome rows, late calls, calls whose entry session has no open, open-to-close calls left open because a
-    session of their window has no bar) of the open calls that matured on
+def score_calls(cfg: dict, con, now: str) -> tuple[list[dict], int, int, list[str]]:
+    """(outcome rows, late calls, calls whose entry session has no open, ids of the open-to-close calls left open
+    because a session of their window has no bar) of the open calls that matured on
     their basis (call_basis.basis_for: close_to_close, or open_to_close from the configured switch). Prices come
     from the bars view (one basis), so the return and the hit hold across a split; the stored prices are put
     back in the basis the call saw (record_basis)."""
     rule, since = call_basis.switch(), call_basis.n_plus_k_from()
-    rows, late, no_open, gaps = [], 0, 0, 0
+    rows, late, no_open, gaps = [], 0, 0, []
     adjs = load_adjustments(con)
     for row in con.execute(SQL, [since if since is not None else EARLIEST]).df().itertuples():
         basis = call_basis.basis_for(row.made_at, rule)
@@ -169,7 +169,7 @@ def score_calls(cfg: dict, con, now: str) -> tuple[list[dict], int, int, int]:
         if basis == LABEL_OPEN_TO_CLOSE and not on_calendar(
                 cfg, row.as_of_date, row.entry_date, target_date,
                 call_basis.target_offset(basis, row.horizon_days, horizon_label)):
-            gaps += 1  # a session of the window has no bar: stays open, never scored on a shifted window
+            gaps.append(row.id)  # a session of the window has no bar: stays open, never scored on a shifted window
             continue
         entry = row.entry_open if basis == LABEL_OPEN_TO_CLOSE else row.base_close
         if missing(entry):
@@ -210,7 +210,8 @@ def main() -> int:
                 "still_open": open_left,
                 "late_skipped": {"calls": late_calls, "ranges": late_ranges},
                 "no_entry_open": no_open,
-                "session_gap_open": gaps,
+                "session_gap_open": len(gaps),
+                "session_gap_ids": sorted(gaps),  # issue #146: a permanent gap stays visible by id
                 "ranges_scored": r_written,
                 "ranges_open": r_open,
                 "hit80": sum(row["hit80"] for row in ranges),

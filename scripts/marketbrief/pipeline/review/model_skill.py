@@ -4,9 +4,9 @@ its JSON goes to work/model_backtest/, never data/ or reports/) and summarise it
 label, n, Brier vs the base-rate Brier, AUC with its 95% interval, and the paper long strategy vs each baseline
 after costs (open_to_close only: that is the trade). It says plainly whether the model has shown skill, by the
 thresholds under `model_skill` in config/review.yaml. Nothing here changes the model or its settings.
-The backtest reads only what was stored by the reviewed week's end (issue #45.2), and runs with its native thread
-pools capped at one thread when threadpoolctl is installed (it comes with scikit-learn), so concurrent reviews do
-not oversubscribe the CPU (issue #45.1)."""
+The backtest reads only the inputs dated, or first seen, by the reviewed week's end (issue #45.2), and runs with
+its native thread pools capped at one thread when threadpoolctl is installed (it comes with scikit-learn), so
+concurrent reviews do not oversubscribe the CPU (issue #45.1)."""
 
 from __future__ import annotations
 
@@ -36,8 +36,8 @@ def one_thread():
 
 
 def rerun(market: str, end: date | None = None) -> tuple[dict, str]:
-    """(backtest result, repo-relative JSON path) of a fresh backtest of one market on the inputs stored by the
-    end of `end` (the reviewed week's last day; None: every stored input)."""
+    """(backtest result, repo-relative JSON path) of a fresh backtest of one market on the inputs dated (or first
+    seen) by the end of `end` (the reviewed week's last day; None: every stored input)."""
     with one_thread():
         result = run_backtest((market,), {"end": end})
     out = paths.ROOT / MODEL_BACKTEST_DIR

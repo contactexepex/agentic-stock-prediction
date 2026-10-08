@@ -8,7 +8,7 @@
   "records": [
     {
       "market": "india",
-      "as_of": "2026-10-07T12:00:00Z",
+      "as_of": "2026-10-06",
       "skill": {
         "state": "paper",
         "label": "Paper only — no proven edge yet",
@@ -520,12 +520,42 @@
         "reliability": {}
       },
       "example_parts": [
-        "calls"
+        "calls",
+        "weekly"
+      ],
+      "weekly": [
+        {
+          "basis": "close_to_close",
+          "key": "close_to_close",
+          "label": "close→close",
+          "weeks": [
+            {
+              "week": "2026-W40",
+              "n": 2,
+              "hits": 1,
+              "share": 0.5,
+              "wilson_lo": 0.09452865480086614,
+              "wilson_hi": 0.9054713451991339,
+              "brier": 0.2542,
+              "log_loss": 0.7017
+            },
+            {
+              "week": "2026-W41",
+              "n": 2,
+              "hits": 1,
+              "share": 0.5,
+              "wilson_lo": 0.09452865480086614,
+              "wilson_hi": 0.9054713451991339,
+              "brier": 0.2492,
+              "log_loss": 0.6912
+            }
+          ]
+        }
       ]
     },
     {
       "market": "us",
-      "as_of": "2026-10-07T12:00:00Z",
+      "as_of": "2026-10-06",
       "skill": {
         "state": "paper",
         "label": "Paper only — no proven edge yet",
@@ -1037,7 +1067,27 @@
         "reliability": {}
       },
       "example_parts": [
-        "calls"
+        "calls",
+        "weekly"
+      ],
+      "weekly": [
+        {
+          "basis": "close_to_close",
+          "key": "close_to_close",
+          "label": "close→close",
+          "weeks": [
+            {
+              "week": "2026-W40",
+              "n": 6,
+              "hits": 4,
+              "share": 0.6666666666666666,
+              "wilson_lo": 0.29998832134152864,
+              "wilson_hi": 0.9032306674407831,
+              "brier": 0.2223,
+              "log_loss": 0.637
+            }
+          ]
+        }
       ]
     }
   ]
