@@ -50,7 +50,8 @@ Contents:
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
   [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
-  [Scoreboard row](#scoreboard-row), [Research review](#research-review)
+  [Scoreboard row](#scoreboard-row), [Heatmap cell](#heatmap-cell), [Cumulative line](#cumulative-line),
+  [Research review](#research-review)
 - News and results: [News item](#news-item), [News-impact row](#news-impact-row),
   [Results digest](#results-digest)
 - The owner's money: [Owner's paper portfolio](#portfolio)
@@ -546,18 +547,70 @@ the your-cost view, which the go-live bar uses.
 | go_live | Strategy rows: position against the go-live bar on the your-cost view: `proven`, `months_forward`, `trades_needed`, `beats_best_baseline`, `best_baseline_net_pnl`, `drawdown_limit`, `drawdown_within_limit`, `holds_in_calm_and_volatile`, `cost_view` | F7.2 | mixed | not proven; `0.2` months; `290` trades needed; best baseline `33.88` not beaten; limit `10000.0` |
 | as_of | The newest close the rows are computed to | settlement | date | `2026-10-06` |
 
-Heatmaps (F2.8) use the same numbers by strategy × horizon, × company and × reason code, each week.
+**Back-test rows** (F2.3; `basis` `backtest`, never pooled with `forward`). Example file:
+`scoreboard_backtest_row.json` (24 rows), the output of B2's `lab.py backtest` code (`lab/reports.run_backtest`) on
+the bars stored up to 6 Oct 2026, without the 15-year history cache (it is not in the repository; `history` false):
+the strategies that need no news (`base.always_up.v1`, `base.momentum.v1`; model-only needs walk-forward
+probabilities and is not run), scope `strategy`, view `accuracy`, every horizon and `all`. Same fields as above,
+except: no `go_live`, no `as_of`; `target_reached_rate`, `median_reached_session`, `avg_target_error_pct` and
+`range_hit_rate` are empty (a back-test has no published targets or ranges); `your_cost` holds net_pnl and
+mean_return_pct only. The file's `runs` block gives, per market, the bars' first and last date and the EUR/USD
+used: the US has no stored EURUSD closes, so the BUX order fee is converted at an ASSUMED constant 1.17, as the
+engine labels it. Example: India `base.always_up.v1`, all horizons: 49100 trades, mean return `-2.0639` % a trade
+(the owner-provided brokerage of 0.75 % a side plus taxes); US: 49700 trades, `+0.0933` %.
+
+Heatmaps (F2.8) use the same numbers by strategy × horizon, × company and × reason code, each week: see
+[Heatmap cell](#heatmap-cell) and [Cumulative line](#cumulative-line). The scoreboard has no weekly or per-reason
+rows and no per-company rows in the head-to-head view; the heatmap cells hold those cuts.
+
+<a id="heatmap-cell"></a>
+## Heatmap cell
+
+One cell of an F2.8 heatmap (decision 42): win rate and profit after costs of one strategy's trades in one column
+(a horizon, a company or a reason code), for one ISO week of the exit or all weeks. Status: **derived for pages**;
+B2 computes them (`lab/heatmaps.py`, `lab.py summary`). Example file: `heatmap_cell.json`, built with that code from
+the example trades (`paper_trade.json`), so every count and sum matches them.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| market, view, basis, strategy_id | Which trades | settled trades | text | `india`, `accuracy`, `forward`, `ai.combined.opus.v1` |
+| dimension | The heatmap's columns: `horizon`, `company` or `reason_code` (the automatic reason's main code) | | text | `company` |
+| column | The column: k, a ticker or a reason code | settled trades | text | `HDFCBANK` |
+| week | ISO week of the trades' exit, or `all` | `exit_date_actual` | `YYYY-Www` | `2026-W40` |
+| trades, wins, win_rate | Trades in the cell, those with a profit after costs, and their share | count | count, 0-1 | `1`, `0`, `0.0` |
+| net_pnl | Profit after market costs | sum | ₹ / $ | `-640.14` |
+
+Head-to-head trades have cells too (`view` `head_to_head`, per strategy): the Rule vs AI page can compare
+companies from the `company` cells.
+
+<a id="cumulative-line"></a>
+## Cumulative line
+
+A point of the cumulative-profit chart (F2.8): per strategy (accuracy view) or per family and pick rule
+(head-to-head view), in exit-date order. Status: **derived for pages** (B2, `lab/heatmaps.py`). Example file:
+`cumulative_line.json`.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| market, view, basis | Which trades | settled trades | text | `india`, `accuracy`, `forward` |
+| series | A strategy id, or `family:pick_rule` in the head-to-head view | settled trades | text | `ai.combined.opus.v1`, `rule:highest_probability` |
+| date | Exit date | `exit_date_actual` | date | `2026-10-01` |
+| net_pnl, cumulative_net_pnl | That day's profit after costs, and the running total | sum | ₹ / $ | `-3807.75`, `-3807.75` |
 
 <a id="research-review"></a>
 ## Research review
 
 The weekly research director's report (F6.2). It covers who is ahead and why, which information helped, and
 proposals as config diffs for the owner to approve; it changes nothing itself. Status: kind `research_reviews`;
-session **B3** writes it. Example file: `research_review.json` (one review per market).
+session **B3** writes it. Example file: `research_review.json` (two reviews per market). The 2026-W40 reviews are
+written on Saturday 3 Oct, before the examples' cut-off, so a page may show them; their leaders come from B2's
+scoreboard code over the example trades settled by then. The 2026-W41 reviews are written on 10 Oct, after the
+cut-off: a page reading as of 7 Oct must not show them (`written_at` is the time to filter on).
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
 | iso_week, period_start, period_end | The week | run | text, dates | `2026-W41` |
+| written_at | When the review was written; a page shows a review only from then | run | time | `2026-10-03T14:20:00Z` (W40, US) |
 | leaders | Who leads in each family | scoreboard | list | `rule.model_news.v1`: $61.4 on 38 trades |
 | findings | Findings with ids | director | list | "Corroborated product news added about 0.6 points..." |
 | proposals | Suggested changes as diffs, each `proposed` until the owner approves | director | list | a new strategy version with threshold 0.57 |
