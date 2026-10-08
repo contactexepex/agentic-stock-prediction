@@ -1,28 +1,18 @@
 // Production wiring of the Slack handlers (route handlers only; tests pass their own deps).
 import { after } from "next/server";
-import { toolLayerFromEnv } from "../../../lib/tools/index.ts";
-import { randomKey } from "../../../lib/tools/crypto.ts";
-import { allowlistedFetch } from "../../../lib/tools/http.ts";
-import { type Env, value } from "../../../lib/tools/env.ts";
-import { SLACK_CHANNEL_ID } from "../../../lib/tools/constants.ts";
-import { SlackWebApi } from "./api.ts";
+import { type Env } from "../../../lib/tools/env.ts";
 import type { SlackDeps, SlackReply } from "./commands.ts";
 import { ephemeral } from "./views.ts";
+import { slackDeps } from "./wiring.ts";
 
 export function slackDepsFromEnv(env: Env = process.env): SlackDeps {
-  return {
-    tools: toolLayerFromEnv(env),
-    slack: new SlackWebApi(value(env, "SLACK_BOT_TOKEN"), allowlistedFetch()),
-    defer: (task) => after(async () => {
-      try {
-        await task();
-      } catch {
-        // the command log and the owner report already carry what happened; never echo errors to Slack
-      }
-    }),
-    channelId: SLACK_CHANNEL_ID,
-    newKey: () => randomKey("slk-"),
-  };
+  return slackDeps(env, (task) => after(async () => {
+    try {
+      await task();
+    } catch {
+      // the command log and the owner report already carry what happened; never echo errors to Slack
+    }
+  }));
 }
 
 export function toResponse(reply: SlackReply): Response {

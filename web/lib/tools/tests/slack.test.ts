@@ -289,3 +289,11 @@ test("names from the symbol search cannot ping or link in the request message", 
   assert.doesNotMatch(s.slack.posts[0].text, /<!channel>|<https/);
   assert.match(s.slack.posts[0].text, /&lt;!channel&gt;/);
 });
+
+test("production Slack wiring: /ask's layer has B8's assistant and the answer uses B8's Slack formatter", async () => {
+  const { slackDeps } = await import("../../../app/slack/_lib/wiring.ts");
+  const { formatSlackAnswer } = await import("../../assistant/index.ts");
+  const deps = slackDeps({ SLACK_BOT_TOKEN: "xoxb-test-not-real" }, () => {});
+  assert.ok(deps.tools.deps.explainer, "the explain hook is set (withAssistant)");
+  assert.equal(deps.formatAnswer, formatSlackAnswer);
+});
