@@ -50,8 +50,8 @@ session check. The weekly research run is separate from the weekly review (step 
 |---|---|---|
 | India post-close | `CRON_TZ=Asia/Kolkata 45 17 * * 1-5` | 12:15 |
 | US post-close | `CRON_TZ=America/New_York 15 18 * * 1-5` | 22:15 in EDT, 23:15 in EST |
-| India weekly research | `CRON_TZ=Asia/Kolkata 0 10 * * 6` | Saturday 04:30 |
-| US weekly research | `CRON_TZ=America/New_York 0 10 * * 6` | Saturday 14:00 in EDT, 15:00 in EST |
+| India weekly research | `CRON_TZ=Asia/Kolkata 51 9 * * 6` (SPEC's 10:00, moved off the hour) | Saturday 04:21 |
+| US weekly research | `CRON_TZ=America/New_York 51 9 * * 6` (SPEC's 10:00, moved off the hour) | Saturday 13:51 in EDT, 14:51 in EST |
 
 **Open paper trades (B9, docs/ws/b9.md).** Each check also covers every open paper trade (F1) of every
 strategy and horizon, in both views: the price against the trade's entry, its target and its own range, on
