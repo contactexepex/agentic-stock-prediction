@@ -51,7 +51,7 @@ Contents:
   [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Heatmap cell](#heatmap-cell), [Cumulative line](#cumulative-line),
-  [Research review](#research-review)
+  [Research review](#research-review), [Track record](#track-record), [Assistant answer](#assistant-answer)
 - News and results: [News item](#news-item), [News-impact row](#news-impact-row),
   [Results digest](#results-digest)
 - The owner's money: [Owner's paper portfolio](#portfolio)
@@ -615,6 +615,57 @@ cut-off: a page reading as of 7 Oct must not show them (`written_at` is the time
 | findings | Findings with ids | director | list | "Corroborated product news added about 0.6 points..." |
 | proposals | Suggested changes as diffs, each `proposed` until the owner approves | director | list | a new strategy version with threshold 0.57 |
 | report_path | The full markdown report | run | path | `reports/us/research-2026-W41.md` |
+
+---
+
+<a id="track-record"></a>
+## Track record
+
+How well the forecaster's calls and the published ranges did (SPEC page 8). Status: **exists** as the dashboard's
+read model `rm.track_record` (`presentation/dashboard/track.py`, `model_info.py`; contract `TrackRecord` in
+`api/openapi.yaml`). Example file: `track_record.json`, one payload per market as of `2026-10-07T12:00:00Z`.
+Everything in it is the stored data at that time except `calls` (listed in `example_parts`): no call is scored in
+the stored data yet, so `calls` is computed by the same code (`track.calls_by_basis`) from the example calls of
+`ai.combined.opus.v1` (the forecaster's trader id), each scored close-to-close from the as-of close to the exit close,
+because `config/settings.yaml` `call_scoring.from` (2026-10-08) puts every call made before then on that basis. An
+open-to-close block has the same shape with `basis` `open_to_close`; the two are never pooled.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| skill | Whether the signal model has shown skill (`state` `paper`/`shown`, `label`, `why`, `rule`, the review it comes from) | weekly review | text | `paper`, "Paper only — no proven edge yet" |
+| calls[].basis, key, label | The scoring basis (`close_to_close`, `open_to_close`; old D+4 5-day calls are their own key) and its label | `outcomes` | text | `close_to_close`, "close→close" |
+| calls[].all, calls[].by_horizon | The block for all horizons and per horizon key (`1d legacy_cc` = 1 session, old close-to-close window; `3d` = N+3) | `outcomes` | | US: 6 calls, 4 hits |
+| n, hits, share, wilson_lo, wilson_hi | Calls, hits, hit rate and its Wilson 95 % interval | scoring | count, 0-1 | `6`, `4`, `0.667` |
+| always_up, edge, mean_confidence | Share of calls whose stock went up (the always-up baseline), hit rate minus it, mean stated confidence | review summaries | 0-1 | |
+| scores | `n`, `brier`, `log_loss`, `brier_skill` (against the base rate) | `scoring.call_scores` | number | Brier `0.2223` (US) |
+| reliability[] | Per confidence band (`bin`, `lo`, `hi`): `n`, `mean_conf`, `hit_rate`, `wilson_lo`, `wilson_hi`; empty bands have `n` 0 | `scoring.reliability` | 0-1 | band 0.50-0.60: 4 calls, hit rate 0.5 |
+| ranges[] | Per horizon: how often the close landed inside the 50 % and 80 % ranges (with Wilson intervals) and the interval scores | `range_record` | 0-1 | empty: no range is scored yet |
+| replay | The newest rule-only historical replay's headline numbers (not live) | `replays` | | `null`: none stored by the cut-off |
+| backtest | The signal model's walk-forward back-test the dashboard shows | weekly review | mixed | weekly review `2026-W40`, computed 7 Oct |
+| min_sample | Below this many calls the page says "not enough history yet" | `view_data.MIN_SAMPLE` | count | `10` |
+
+A weekly series of hit rate and Brier is not in the read model; the weekly heatmap cells cover paper trades. A
+weekly call series for this page would be a request to the read model's owner (B4).
+
+<a id="assistant-answer"></a>
+## Assistant answer
+
+One answer of the assistant chat (F11; the `explain` tool of `mcp/tools.yaml`, output `answer` with `text`,
+`cited_ids`, `as_of` and `not_in_data`). Status: session **B8** builds it; conversations are kept 90 days in the
+MotherDuck schema `app` (an operational log, not a fact store). Example file: `assistant_answer.json`: three answers
+per market, each text composed from the catalogue's own records, so every word and number is backed by a cited
+record.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| id, market, channel, asked_at | The question's id, market, where it was asked (`dashboard` or `slack`) and when | chat log | | `ask-us-2026-10-07-1`, `dashboard` |
+| question | What the owner asked | chat | text | "Rule or AI: who did better on 2026-10-06?" |
+| text | The answer in plain words; never advice; numbers only from cited records | `explain` | text | "Paper trades settled on 2026-10-06 ..." |
+| cited_ids | The records the answer rests on | `explain` | ids | `["eod-us-2026-10-06"]` |
+| cited | The same ids with their kind and the time each was stored or written, so the side panel can open them (derived for pages from `cited_ids`; proposed for B8) | catalogue records | | `{"id": "eod-us-2026-10-06", "kind": "eod_analyses", "as_of": "2026-10-06T22:40:00Z"}` |
+| as_of | The data time the answer reads up to; nothing later is used | `explain` | time | `2026-10-07T12:00:00Z` |
+| not_in_data | True when the data cannot answer (e.g. a date after `as_of`) | `explain` | yes/no | "What did Reliance close at on 8 Oct?": `true` |
+| declined | `advice` when the question asks for advice or a real trade, which the assistant never gives (proposed for B8; not yet in `mcp/tools.yaml`) | | text or empty | "Should I buy NVDA tomorrow with real money?" |
 
 ---
 

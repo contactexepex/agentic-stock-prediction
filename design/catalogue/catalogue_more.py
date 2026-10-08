@@ -248,3 +248,8 @@ def build_rest(write, settled, opens, eurusd, r2) -> None:
     write("heatmap_cell.json", "heatmap_cell", None, maps["cells"])
     write("cumulative_line.json", "cumulative_line", None, maps["lines"])
     write("portfolio.json", "portfolio", None, [portfolio(eurusd, r2, DEFAULT_AMOUNT)])
+    from catalogue_assistant import assistant_answers, track_records
+    from make_examples import PREV_CLOSE_0929
+
+    write("track_record.json", "track_record", None, track_records(settled, PREV_CLOSE_0929))
+    write("assistant_answer.json", "assistant_answer", None, assistant_answers())
