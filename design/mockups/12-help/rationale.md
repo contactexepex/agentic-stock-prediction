@@ -73,6 +73,10 @@ the chips" (the chips hold session, regime and freshness; the as-of time is in t
 hand and nothing is estimated" (the owner's paper trades and the broker rates are hand-entered, the chances are
 estimates); figures typed inline (the opening horizon, the 55% bar, "12 of 15", "60 words", "N+3") now come from the
 data or a named shell constant; and notes.md and this file claimed the 15-year constant, which the page never used.
+Judge round 2 found two of them only partly fixed: the news sentence said vetted-outlet pages are "read in full"
+(DESIGN.md 3a: only where freely accessible; a paywalled page gives its summary, a vetted outlet that refuses
+automated reading is never fetched and its headlines count as unread), and the hand-entered list omitted the owner's
+company commands (the watchlist and each company's paper amount). Both reworded before round 3.
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - The Help page is one scrolling page with an anchor chip row rather than tabs, so a reader can search it and a link

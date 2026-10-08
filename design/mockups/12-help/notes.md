@@ -18,7 +18,7 @@ fields of every record (`pick`), except `status`, which is the market's record w
 | `go_live_detail` | Scoreboard row | `go_live.{proven, months_forward, trades_needed, beats_best_baseline, best_baseline_net_pnl, drawdown_limit, drawdown_within_limit, holds_in_calm_and_volatile, cost_view}` | the same row (the go-live checklist example) |
 | `default_amount` | Owner's paper portfolio | `default_amounts.<market>` | the market's default money per paper trade |
 | `strategies` | Strategy | `id`, `family`, `name`, `description`, `compared_to`, `differs_in`, `threshold`, `horizons`, `live` | all 15, keyed by id (the strategy lists; the description in each name's tooltip; the reference = the rule strategy without `compared_to`; the AI horizons = the union of the AI traders' `horizons`) |
-| `agreement_example` | Company | `ticker`, `name`, `agreement_n1.{buy, of}` | the market's first active company by ticker (the "Agreement" example) |
+| `agreement_example` | Company | `ticker`, `name`, `agreement_n1.{buy, of}` | the market's first active company by ticker (the "Agreement" example; the field is the N+1 count by definition, so the sentence says "at N+1") |
 
 Shown but static (written for the page, not data): every explanatory sentence; the sample odds meter (57%), the
 sample range bar (96-104 around 100) and the sample sentiment arrows are labelled "sample". The count of go-live
