@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Companies</title>
+<meta name="description" content="Companies page of the personal stock cockpit: the watchlist as data. Active companies with price, amount per paper trade and actions; inactive companies with their price and news since, and Reactivate; pending and recent requests; the lifecycle history. Add, deactivate, reactivate, change the amount, delete with a typed confirmation. Research only.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Companies mockup (design track, SPEC section 6 page 10). Page-local layout only; every colour is a token. */
+.co td{vertical-align:middle}
+.co .nm{display:flex;align-items:center;gap:10px;min-width:0} .co .nm .t{min-width:0} .co .nm b{display:block;font-size:14px} .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere} .co .nm small.ph{display:none}
+.co .last b{display:block;font-weight:600} .co .last .mb-delta{font-size:12.5px}
+.co .amt b{font-weight:600} .co .amt .mb-label{font-size:10.5px;padding:0 5px;margin-left:4px}
+.co .acts{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end} .co .acts .md-btn{height:30px;padding:0 10px;font-size:12px} .co .acts .md-btn .ms{width:16px;height:16px;margin-left:-2px}
+.co .acts .md-btn.danger{color:var(--mb-color-down)} .co .acts .md-btn.one{display:none}
+.ev{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.ev li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.ev li:first-child{border-top:0}
+.ev .when{font-size:12px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;padding-top:2px;width:92px}
+.ev .what{min-width:0;overflow-wrap:anywhere} .ev .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:2px}
+.ev .mb-label{font-size:11px;padding:1px 6px}
+.cmd code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere;display:inline-block;vertical-align:middle;max-width:100%}
+.pend{display:grid;gap:6px;margin-top:10px}
+.addbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(500px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog .dbody input,dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+dialog .summ{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);font-size:13px;display:grid;gap:4px}
+dialog .summ .r{display:grid;grid-template-columns:110px 1fr;gap:8px} dialog .summ .r span:first-child{color:var(--md-sys-color-on-surface-variant)}
+dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13px} dialog .warn .ms{flex:none;width:18px;height:18px;margin-top:1px}
+@media (max-width:1359px){ .co .c3{display:none} }
+@media (max-width:1439px){ .co th,.co td{padding:8px 8px} }
+@media (max-width:1199px){ .co .cw{display:none} .co .acts .md-btn span{display:none} .co .acts .md-btn{padding:0 8px} .co .acts .md-btn .ms{margin:0} .co .acts{flex-wrap:nowrap} }
+@media (max-width:900px){ .co .cm{display:none} .co .acts .md-btn.one{display:inline-flex} .co .acts .md-btn.many{display:none} }
+@media (max-width:760px){ .co .cm{display:none} .co th,.co td{padding:8px 6px;white-space:normal} .co .nm .mb-avatar{display:none} .co .acts{justify-content:flex-start} .ev li{grid-template-columns:1fr} .ev .when{width:auto} }
+@media (max-width:599px){ dialog .row2{grid-template-columns:1fr} .co .cp{display:none} .co .nm small.ph{display:block} .co th,.co td{padding:8px 4px} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Companies</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+<dialog class="md-dialog" id="dlg"></dialog>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let pending = {};
+shell(PAGES.companies, 'Companies', {bar: [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['apartment','Companies',PAGES.companies], ['science','Strategy lab',PAGES.lab]]});
+onMarketChange = () => render();
+const CHANNEL = {dashboard: 'the dashboard', slack: 'Slack', cli: 'the command line', claude_app: 'the Claude app', claude_code: 'Claude Code', seed: 'the seed (config)'};
+const EVENT_WORDS = {add: 'added', deactivate: 'deactivated', reactivate: 'reactivated', delete: 'deleted', set_amount: 'amount set'};
+const RESULT = {accepted: ['accepted', 'success'], pending: ['pending', 'warn'], refused: ['refused', 'danger'], duplicate: ['duplicate', 'neutral'], failed: ['failed', 'danger']};
+const TOOL = {add_company: 'add a company', deactivate_company: 'deactivate', reactivate_company: 'reactivate', set_amount: 'set the amount', delete_company: 'delete'};
+const pendingOf = () => pending[market] || [];
+
+function kpis(p) {
+  const cur = p.currency, active = p.companies.filter(c => c.state === 'active'), inactive = p.companies.filter(c => c.state === 'inactive');
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('apartment', 'success', 'Active', String(active.length), 'predicted and traded on paper every session', 'Active companies are collected, predicted and traded on paper (F8.2).'));
+  K.append(card('pending', inactive.length ? 'neutral' : '', 'Inactive', String(inactive.length), inactive.length ? `still collected, never predicted: ${inactive.map(c => c.ticker).join(', ')}` : 'none', 'Inactive companies stay collected (prices, news, filings) but get no prediction or paper trade; their open paper trades still settle (decision 13).'));
+  K.append(card('account_balance_wallet', 'paper', 'Default per paper trade', money(cur, p.default_amount), `${active.filter(c => c.amount_overridden).length} compan${active.filter(c => c.amount_overridden).length === 1 ? 'y has' : 'ies have'} a custom amount`, 'The market’s default money per paper trade (decision 26); a company can have its own amount (decision 44).'));
+  const pend = pendingOf().length + p.commands.filter(c => c.result === 'pending').length;
+  K.append(card('schedule', pend ? 'warn' : 'neutral', 'Pending requests', String(pend), pend ? 'waiting for the next import' : 'nothing waiting', 'Requests from any channel are appended to the inbox and imported by the next run (F10); until then they are pending.'));
+  return K;
+}
+
+function activeCard(p) {
+  const cur = p.currency, rows = p.companies.filter(c => c.state === 'active');
+  const card = el('section', {class:'card', 'aria-label':'Active companies'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Active companies (${rows.length})`), help('Every company that is predicted and traded on paper. Amount = money per paper trade (the market’s default unless set for the company). Actions record a request: deactivate (takes effect at the next pre-open run; open paper trades still settle), change the amount, or delete (dashboard only, with a typed confirmation; the company is then excluded everywhere, decision 12).'), el('div', {class:'end'}, el('button', {class:'md-btn filled small', type:'button', onclick: () => addDialog(p)}, icon('ms-apartment'), 'Add company'))));
+  const tb = el('table', {class:'md-table tbl co'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {class:'num'}, 'Last close'), el('th', {class:'num cp'}, 'Per paper trade'), el('th', {class:'num cw'}, 'Buy at N+1'), el('th', {class:'num cw'}, 'Open trades'), el('th', {class:'cm'}, 'On the list since'), el('th', {class:'c3'}, 'Identifiers'), el('th', {class:'num'}, 'Actions'))));
+  const body = el('tbody');
+  for (const c of rows) {
+    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': `${c.name}: open its company page.`}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`), el('small', {class:'ph'}, `${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (custom)' : ''}`)))),
+      el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
+      el('td', {class:'num amt cp'}, el('b', {}, money(cur, c.amount)), c.amount_overridden ? el('span', {class:'mb-label neutral', 'data-tip':'Set for this company; differs from the market’s default (decision 44).'}, 'custom') : null),
+      el('td', {class:'num cw'}, el('span', {'data-tip': `${c.agreement_n1.buy} of ${c.agreement_n1.of} strategies would buy ${c.name} at N+1 today (decision 30).`}, `${c.agreement_n1.buy} of ${c.agreement_n1.of}`)),
+      el('td', {class:'num cw'}, String(c.open_trades)),
+      el('td', {class:'cm'}, el('span', {'data-tip': `Added ${fmtDY(c.added_at)}${c.added_at.startsWith('2011') ? ' (the seed: the start of stored history)' : ''}; active since ${fmtDY(c.state_since)}.`}, fmtDY(c.added_at))),
+      el('td', {class:'c3'}, el('small', {class:'muted'}, [c.yahoo ? `Yahoo ${c.yahoo}` : null, c.nse_symbol ? `NSE ${c.nse_symbol}` : null, c.cik ? `CIK ${c.cik}` : null].filter(Boolean).join(' · '))),
+      el('td', {class:'num'}, el('span', {class:'acts'}, el('button', {class:'md-btn outlined many', type:'button', 'aria-label': `Change the amount for ${c.name}`, onclick: () => amountDialog(p, c)}, icon('ms-account_balance_wallet'), el('span', {}, 'Amount')), el('button', {class:'md-btn outlined many', type:'button', 'aria-label': `Deactivate ${c.name}`, onclick: () => stateDialog(p, c, 'deactivate')}, icon('ms-pending'), el('span', {}, 'Deactivate')), el('button', {class:'md-btn outlined danger many', type:'button', 'aria-label': `Delete ${c.name}`, onclick: () => deleteDialog(p, c)}, icon('ms-close'), el('span', {}, 'Delete')), el('button', {class:'md-btn outlined one', type:'button', 'aria-label': `Manage ${c.name}`, onclick: () => manageDialog(p, c)}, icon('ms-settings'), el('span', {}, 'Manage'))))));
+  }
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+function inactiveCard(p) {
+  const cur = p.currency, rows = p.companies.filter(c => c.state === 'inactive');
+  const card = el('section', {class:'card', 'aria-label':'Inactive companies'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Inactive companies (${rows.length})`), help('Still collected (prices, news, filings, announcements) but never predicted or traded; their open paper trades settle normally. Reactivate takes effect at the next pre-open run (F8.4). Only this page lists them (decision 13).')));
+  if (!rows.length) { card.append(el('div', {class:'quiet'}, 'No inactive company.')); return card; }
+  const tb = el('table', {class:'md-table tbl co'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Inactive since'), el('th', {class:'num'}, 'Last close'), el('th', {class:'cm'}, 'News since'), el('th', {class:'num cw'}, 'Open trades'), el('th', {class:'num'}, 'Actions'))));
+  const body = el('tbody');
+  for (const c of rows) {
+    const ev = p.lifecycle.find(e => e.ticker === c.ticker && e.event === 'deactivate'), news = p.news_inactive.filter(n => n.tickers.includes(c.ticker));
+    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker)}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`)))),
+      el('td', {}, el('span', {'data-tip': ev ? `Deactivated via ${CHANNEL[ev.channel] || ev.channel} by ${ev.requested_by}, recorded ${fmtLocal(ev.recorded_at, market, true)}, effective ${fmtLocal(ev.effective_from, market, true)}.` : 'The deactivation event is not in the example data.'}, fmtDY(c.state_since)), ev && ev.reason ? el('small', {class:'muted', style:'display:block;font-size:11.5px'}, `“${ev.reason}”`) : null),
+      el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
+      el('td', {class:'cm'}, news.length ? el('span', {'data-tip': news.map(n => `${n.title} (${(STATUS[n.status] || [n.status])[0]}, ${fmtD(n.first_seen_at, false)})`).join(' · ')}, `${news.length} stor${news.length === 1 ? 'y' : 'ies'}`) : el('span', {class:'muted'}, 'none stored')),
+      el('td', {class:'num cw'}, String(c.open_trades)),
+      el('td', {class:'num'}, el('span', {class:'acts'}, el('button', {class:'md-btn tonal many', type:'button', 'aria-label': `Reactivate ${c.name}`, onclick: () => stateDialog(p, c, 'reactivate')}, icon('ms-check'), el('span', {}, 'Reactivate')), el('button', {class:'md-btn outlined danger many', type:'button', 'aria-label': `Delete ${c.name}`, onclick: () => deleteDialog(p, c)}, icon('ms-close'), el('span', {}, 'Delete')), el('button', {class:'md-btn outlined one', type:'button', 'aria-label': `Manage ${c.name}`, onclick: () => manageDialog(p, c)}, icon('ms-settings'), el('span', {}, 'Manage'))))));
+  }
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+function requests(p) {
+  const card = el('section', {class:'card', 'aria-label':'Requests'});
+  const pend = pendingOf(), cmds = p.commands;
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Requests'), help('Every company command from any channel (the dashboard, Slack, the command line, the Claude app) is logged with who asked (from the channel’s sign-in, never typed in), its result and the reason when refused (F10). Accepted writes are pending until the next run imports them. A deleted company is masked here (decision 12).'), el('div', {class:'end'}, `${pend.length} pending · ${cmds.length} recent`)));
+  const host = el('div', {class:'pend'});
+  for (const r of pend) host.append(el('div', {class:'mb-alert', style:'padding:10px 14px'}, icon('ms-pending'), el('div', {}, el('b', {class:'t'}, `Pending: ${r}`), el('div', {class:'s'}, 'Appended to the inbox with your sign-in and an idempotency key; the next run imports it (F10). Mockup: nothing was sent.'))));
+  if (pend.length) card.append(host);
+  if (!cmds.length) { card.append(el('div', {class:'quiet', style: pend.length ? 'margin-top:10px' : ''}, 'No company command recorded for this market yet.')); return card; }
+  const ul = el('ul', {class:'ev cmd', style: pend.length ? 'margin-top:12px' : ''});
+  for (const c of cmds) { const r = RESULT[c.result] || [c.result, 'neutral']; ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(c.received_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + r[1]}, r[0]), ` ${TOOL[c.tool] || c.tool}: `, el('code', {}, Object.entries(c.arguments).filter(([k]) => k !== 'market').map(([k, v]) => `${k} ${v}`).join(', ') || c.tool), c.message ? el('small', {}, c.message) : null, el('small', {}, `via ${CHANNEL[c.channel] || c.channel} · ${c.actor}${c.refusal_code ? ` · ${c.refusal_code.replace(/_/g, ' ')}` : ''}${c.record_ids && c.record_ids.length ? ` · wrote ${c.record_ids.length} record${c.record_ids.length === 1 ? '' : 's'}` : ''}`)))); }
+  card.append(ul);
+  return card;
+}
+
+function history(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Lifecycle history'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Lifecycle history'), help('The watchlist is data (F8): every add, deactivate, reactivate and amount change is an append-only event with who asked, the channel, when it was recorded and when it counts (the next pre-open run; seeded adds count from the start of stored history). Events of a deleted company are excluded on read (decision 12).'), el('div', {class:'end'}, `${p.lifecycle.length} events${p.deleted_count ? ` · ${p.deleted_count} deleted compan${p.deleted_count === 1 ? 'y' : 'ies'} excluded` : ''}`)));
+  if (!p.lifecycle.length) { card.append(el('div', {class:'quiet'}, 'No event stored.')); return card; }
+  const ul = el('ul', {class:'ev'});
+  for (const e of p.lifecycle) ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(e.recorded_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + ({add: 'success', reactivate: 'success', deactivate: 'neutral', set_amount: 'info', delete: 'danger'}[e.event] || 'neutral')}, EVENT_WORDS[e.event] || e.event), ' ', el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker), e.event === 'set_amount' && e.amount != null ? ` to ${money(cur, e.amount)}` : '', e.reason ? ` · “${e.reason}”` : '', el('small', {}, `via ${CHANNEL[e.channel] || e.channel} · ${e.requested_by} · counts from ${fmtLocal(e.effective_from, market, true)}${e.onboarding && e.channel !== 'seed' ? ` · onboarding: ${Object.entries(e.onboarding).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ')}` : ''}`))));
+  card.append(ul);
+  return card;
+}
+
+/* ---------- dialogs (mockup: record a pending request) ---------- */
+const recordPending = text => { (pending[market] = pending[market] || []).push(text); $('#dlg').close(); render(); };
+const dbox = (title, ...kids) => { const dlg = $('#dlg'); dlg.innerHTML = ''; const body = el('div', {class:'dbody'}, el('h3', {id:'dlg-title'}, title), ...kids.filter(Boolean)); dlg.setAttribute('aria-labelledby', 'dlg-title'); dlg.append(body); return dlg; };
+function addDialog(p) {
+  const cur = p.currency, dlg = $('#dlg');
+  const sym = el('input', {type:'text', placeholder: market === 'india' ? 'NSE symbol, e.g. TCS' : 'NYSE or Nasdaq ticker, e.g. MSFT', 'aria-label':'Exchange symbol'}), nm = el('input', {type:'text', placeholder:'optional', 'aria-label':'Name'}), amt = el('input', {type:'number', min:'1', step:'1', placeholder: String(p.default_amount), 'aria-label':'Amount'});
+  dbox('Add a company', el('div', {}, `Takes the exchange symbol, an optional name and an optional amount (F8.3). The onboarding checks the identifiers (${market === 'india' ? 'NSE and Yahoo symbols' : 'ticker, Yahoo symbol and SEC CIK'}), refuses ETFs, ${market === 'india' ? 'BSE-only' : 'unlisted'} and unknown symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next pre-open run.`), el('label', {}, 'Exchange symbol', sym), el('div', {class:'row2'}, el('label', {}, 'Name (optional)', nm), el('label', {}, `Amount per paper trade (${cur}, optional)`, amt)), el('div', {class:'muted', style:'font-size:12.5px'}, 'Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding (F8.7).'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { const s = sym.value.trim().toUpperCase(); if (!s) { sym.focus(); return; } summaryStep(p, s, nm.value.trim(), amt.value ? +amt.value : null); }}, 'Check the symbol')));
+  dlg.showModal(); sym.focus();
+}
+function summaryStep(p, symbol, name, amount) {
+  const cur = p.currency, dlg = $('#dlg');
+  dbox(`Confirm: add ${symbol}?`, el('div', {class:'summ', 'aria-label':'Summary'}, el('div', {class:'r'}, el('span', {}, 'Symbol'), el('b', {}, symbol)), el('div', {class:'r'}, el('span', {}, 'Name'), el('span', {}, name || el('span', {class:'muted'}, 'resolved at onboarding'))), el('div', {class:'r'}, el('span', {}, 'Exchange · sector'), el('span', {class:'muted'}, 'resolved at onboarding')), el('div', {class:'r'}, el('span', {}, market === 'india' ? 'Yahoo · NSE' : 'Yahoo · CIK'), el('span', {class:'muted'}, 'resolved at onboarding')), el('div', {class:'r'}, el('span', {}, 'Amount'), el('b', {}, money(cur, amount ?? p.default_amount), amount == null ? el('span', {class:'muted'}, ' (default)') : null))), el('div', {class:'muted', style:'font-size:12.5px'}, 'Mockup: the real page fills this summary from the identifier check (name, exchange, sector, Yahoo symbol, CIK) before you confirm. Confirm records the request with your sign-in and an idempotency key; a double click never adds twice.'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`add ${symbol}${name ? ` (${name})` : ''} at ${money(cur, amount ?? p.default_amount)} per paper trade`)}, 'Confirm')));
+}
+function amountDialog(p, c) {
+  const cur = p.currency, dlg = $('#dlg'), input = el('input', {type:'number', min:'1', step:'1', value: String(c.amount), 'aria-label':'New amount'});
+  dbox(`Change the amount for ${c.name}`, el('div', {}, `Money per paper trade. Today ${money(cur, c.amount)}${c.amount_overridden ? ' (set for this company)' : ' (the default)'}. In India a trade is skipped when one share costs more than the amount. Takes effect at the next pre-open run.`), el('label', {}, `New amount (${cur})`, input));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`set the amount of ${c.ticker} to ${money(cur, +input.value || c.amount)}`)}, 'Record amount')));
+  dlg.showModal();
+}
+function stateDialog(p, c, kind) {
+  const dlg = $('#dlg');
+  dbox(kind === 'deactivate' ? `Deactivate ${c.name}?` : `Reactivate ${c.name}?`, el('div', {}, kind === 'deactivate' ? 'It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next pre-open run (F8.4).' : 'Predictions and paper trades resume from the next pre-open run (F8.4).'), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it.'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`${kind} ${c.ticker}`)}, kind === 'deactivate' ? 'Record deactivation' : 'Record reactivation')));
+  dlg.showModal();
+}
+function deleteDialog(p, c) {
+  const dlg = $('#dlg'), typed = el('input', {type:'text', placeholder: c.ticker, 'aria-label': `Type ${c.ticker} to confirm`, autocomplete:'off'});
+  const ok = el('button', {class:'md-btn filled', type:'button', disabled: true, onclick: () => recordPending(`delete ${c.ticker} (typed confirmation)`)}, 'Delete for good');
+  typed.addEventListener('input', () => { if (typed.value.trim().toUpperCase() === c.ticker) ok.removeAttribute('disabled'); else ok.setAttribute('disabled', ''); });
+  dbox(`Delete ${c.name}?`, el('div', {class:'warn'}, icon('ms-warning'), el('div', {}, el('b', {}, 'This cannot be undone from the cockpit.'), ' A delete appends a tombstone: the company is excluded on read everywhere, the warehouse and the graph drop it at the next sync, and every scoreboard and track record is computed without it from then on (F8.5, decision 12). Raw records stay in git history. Delete is available here only, never from Slack.')), el('label', {}, `Type ${c.ticker} to confirm`, typed));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), ok));
+  dlg.showModal(); typed.focus();
+}
+
+function manageDialog(p, c) {
+  const dlg = $('#dlg'), cur = p.currency;
+  const btn = (text, ico, fn, cls='outlined') => el('button', {class:'md-btn ' + cls, type:'button', style:'justify-content:flex-start', onclick: fn}, icon(ico), text);
+  dbox(`${c.ticker} · ${c.name}`, el('div', {class:'muted', style:'font-size:12.5px'}, `${c.sector} · ${c.exchange} · ${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (custom)' : ''} · ${c.state}${c.state === 'inactive' ? ` since ${fmtDY(c.state_since)}` : ''}`), el('div', {style:'display:grid;gap:8px'}, btn('Change the amount', 'ms-account_balance_wallet', () => amountDialog(p, c)), c.state === 'active' ? btn('Deactivate', 'ms-pending', () => stateDialog(p, c, 'deactivate')) : btn('Reactivate', 'ms-check', () => stateDialog(p, c, 'reactivate'), 'tonal'), btn('Delete (typed confirmation)', 'ms-close', () => deleteDialog(p, c), 'outlined danger')));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Close')));
+  dlg.showModal();
+}
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('span', {class:'mb-label neutral'}, 'custom'), ' an amount set for the company'),
+    el('span', {}, el('span', {class:'mb-label success'}, 'accepted'), ' ', el('span', {class:'mb-label warn'}, 'pending'), ' ', el('span', {class:'mb-label danger'}, 'refused'), ' a request’s result'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every trade is a paper record; nothing here is advice'));
+}
+
+function render() {
+  const p = P(market);
+  document.title = `Market brief · Companies · ${LABEL[market]}`; $('#title').textContent = `Companies · ${p.name}`;
+  sideFoot(market); marketSeg(() => render());
+  const page = $('#page'); page.innerHTML = '';
+  page.append(pageHead(market, 'Companies', `the watchlist as data: ${p.companies.length} compan${p.companies.length === 1 ? 'y' : 'ies'} · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only`), kpis(p));
+  page.append(el('div', {style:'margin-top:16px'}, activeCard(p)), el('div', {style:'margin-top:16px'}, inactiveCard(p)));
+  const grid = el('div', {class:'grid even'}); grid.append(requests(p), history(p)); page.append(grid);
+  page.append(legend(), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>

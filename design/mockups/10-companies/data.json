@@ -1,0 +1,695 @@
+{
+ "_example": true,
+ "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.",
+ "page": "companies",
+ "spec": "docs/SPEC.md section 6, page 10; F8, F10; decisions 12-15, 20, 26, 33, 44",
+ "endpoint": "GET /api/v1/markets/{market}/companies",
+ "read_model": "rm.companies",
+ "sources": [
+  "design/catalogue/market_status.json",
+  "design/catalogue/company.json",
+  "design/catalogue/lifecycle_event.json",
+  "design/catalogue/command_log.json",
+  "design/catalogue/news_item.json",
+  "design/catalogue/open_trade.json",
+  "design/catalogue/portfolio.json",
+  "design/catalogue/scoreboard_row.json"
+ ],
+ "as_of": "2026-10-06",
+ "cutoff": "2026-10-07T12:00:00Z",
+ "built_at": "2026-10-07T11:58:00Z",
+ "markets": {
+  "india": {
+   "market": "india",
+   "name": "India (NSE)",
+   "currency": "INR",
+   "as_of": "2026-10-06",
+   "cutoff": "2026-10-07T12:00:00Z",
+   "built_at": "2026-10-07T10:31:00Z",
+   "status": {
+    "market": "india",
+    "name": "India (NSE)",
+    "as_of": "2026-10-06",
+    "currency": "INR",
+    "session": {
+     "local_time": "2026-10-07T17:30+05:30",
+     "trading_day": true,
+     "session_date": "2026-10-07",
+     "previous_session": "2026-10-06",
+     "calendar_covered": true,
+     "session_open_utc": "2026-10-07T03:45:00+00:00",
+     "session_close_utc": "2026-10-07T10:00:00+00:00",
+     "in_session": false,
+     "late_run": true
+    },
+    "benchmark": {
+     "symbol": "NIFTY50",
+     "name": "Nifty 50",
+     "close": 22776.0996,
+     "close_date": "2026-10-06",
+     "change_pct": 0.98,
+     "change_5d_pct": -0.02
+    },
+    "vol_index": {
+     "symbol": "INDIAVIX",
+     "name": "India VIX",
+     "close": 13.61,
+     "close_date": "2026-10-06",
+     "change_pct": -7.92,
+     "change_5d_pct": -0.22
+    },
+    "regime": "EVENT_HEAVY",
+    "runs": {
+     "pre_open": {
+      "at": "2026-10-07T02:10:00Z",
+      "ok": true
+     },
+     "intraday": [
+      {
+       "at": "2026-10-07T05:43:00Z",
+       "ok": true
+      }
+     ],
+     "post_close": {
+      "at": null,
+      "ok": null,
+      "next_at": "2026-10-07T12:15:00Z"
+     },
+     "news": {
+      "at": "2026-10-07T10:17:00Z",
+      "ok": true,
+      "new_items": 37
+     }
+    },
+    "freshness": {
+     "state": "fresh",
+     "built_at": "2026-10-07T10:31:00Z",
+     "age_minutes": 29
+    },
+    "paper_label": "Paper only - no proven edge yet"
+   },
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "default_horizon": 1,
+   "go_live": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 294,
+    "beats_best_baseline": false
+   },
+   "default_amount": 100000.0,
+   "companies": [
+    {
+     "market": "india",
+     "ticker": "HDFCBANK",
+     "name": "HDFC Bank",
+     "exchange": "NSE",
+     "sector": "Banks",
+     "state": "active",
+     "state_since": "2011-01-03T00:00:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 100000.0,
+     "amount_overridden": false,
+     "currency": "INR",
+     "yahoo": "HDFCBANK.NS",
+     "nse_symbol": "HDFCBANK",
+     "cik": null,
+     "last_close": 711.45,
+     "last_close_date": "2026-10-06",
+     "change_pct": 0.94,
+     "agreement_n1": {
+      "buy": 2,
+      "of": 15
+     },
+     "open_trades": 4
+    },
+    {
+     "market": "india",
+     "ticker": "MARUTI",
+     "name": "Maruti Suzuki",
+     "exchange": "NSE",
+     "sector": "Autos",
+     "state": "active",
+     "state_since": "2011-01-03T00:00:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 10000.0,
+     "amount_overridden": true,
+     "currency": "INR",
+     "yahoo": "MARUTI.NS",
+     "nse_symbol": "MARUTI",
+     "cik": null,
+     "last_close": 11625.0,
+     "last_close_date": "2026-10-06",
+     "change_pct": 0.81,
+     "agreement_n1": {
+      "buy": 8,
+      "of": 15
+     },
+     "open_trades": 0
+    },
+    {
+     "market": "india",
+     "ticker": "RELIANCE",
+     "name": "Reliance Industries",
+     "exchange": "NSE",
+     "sector": "Energy",
+     "state": "active",
+     "state_since": "2011-01-03T00:00:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 100000.0,
+     "amount_overridden": false,
+     "currency": "INR",
+     "yahoo": "RELIANCE.NS",
+     "nse_symbol": "RELIANCE",
+     "cik": null,
+     "last_close": 1218.0,
+     "last_close_date": "2026-10-06",
+     "change_pct": 2.66,
+     "agreement_n1": {
+      "buy": 12,
+      "of": 15
+     },
+     "open_trades": 10
+    },
+    {
+     "market": "india",
+     "ticker": "INDIGO",
+     "name": "InterGlobe Aviation (IndiGo)",
+     "exchange": "NSE",
+     "sector": "Transport",
+     "state": "inactive",
+     "state_since": "2026-10-05T02:10:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 100000.0,
+     "amount_overridden": false,
+     "currency": "INR",
+     "yahoo": "INDIGO.NS",
+     "nse_symbol": "INDIGO",
+     "cik": null,
+     "last_close": 5050.5,
+     "last_close_date": "2026-10-06",
+     "change_pct": null,
+     "agreement_n1": null,
+     "open_trades": 0
+    }
+   ],
+   "lifecycle": [
+    {
+     "id": "we-india-INDIGO-deactivate-20261002T091800Z",
+     "event": "deactivate",
+     "ticker": "INDIGO",
+     "market": "india",
+     "effective_from": "2026-10-05T02:10:00Z",
+     "recorded_at": "2026-10-02T09:18:00Z",
+     "name": null,
+     "exchange": null,
+     "sector": null,
+     "amount": null,
+     "reason": "pause airlines",
+     "requested_by": "slack:U07ABCD123",
+     "channel": "slack",
+     "command_id": "cmd-20261002T091800Z-22018a94",
+     "idempotency_key": "deact-indigo-1",
+     "onboarding": null,
+     "supersedes": null
+    },
+    {
+     "id": "we-india-MARUTI-set_amount-20260925T091500Z",
+     "event": "set_amount",
+     "ticker": "MARUTI",
+     "market": "india",
+     "effective_from": "2026-09-28T02:10:00Z",
+     "recorded_at": "2026-09-25T09:15:00Z",
+     "name": null,
+     "exchange": null,
+     "sector": null,
+     "amount": 10000.0,
+     "reason": "smaller test amount",
+     "requested_by": "dashboard:owner",
+     "channel": "dashboard",
+     "command_id": "cmd-20260925T091500Z-4e92e724",
+     "idempotency_key": "amt-maruti-20260925",
+     "onboarding": null,
+     "supersedes": null
+    },
+    {
+     "id": "we-india-RELIANCE-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "RELIANCE",
+     "market": "india",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "Reliance Industries",
+     "exchange": "NSE",
+     "sector": "Energy",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-india-RELIANCE",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    },
+    {
+     "id": "we-india-MARUTI-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "MARUTI",
+     "market": "india",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "Maruti Suzuki",
+     "exchange": "NSE",
+     "sector": "Autos",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-india-MARUTI",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    },
+    {
+     "id": "we-india-INDIGO-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "INDIGO",
+     "market": "india",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "InterGlobe Aviation (IndiGo)",
+     "exchange": "NSE",
+     "sector": "Transport",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-india-INDIGO",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    },
+    {
+     "id": "we-india-HDFCBANK-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "HDFCBANK",
+     "market": "india",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "HDFC Bank",
+     "exchange": "NSE",
+     "sector": "Banks",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-india-HDFCBANK",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    }
+   ],
+   "commands": [],
+   "news_inactive": [],
+   "deleted_count": 0
+  },
+  "us": {
+   "market": "us",
+   "name": "US (NYSE/Nasdaq)",
+   "currency": "USD",
+   "as_of": "2026-10-06",
+   "cutoff": "2026-10-07T12:00:00Z",
+   "built_at": "2026-10-07T11:58:00Z",
+   "status": {
+    "market": "us",
+    "name": "US (NYSE/Nasdaq)",
+    "as_of": "2026-10-06",
+    "currency": "USD",
+    "session": {
+     "local_time": "2026-10-07T08:00-04:00",
+     "trading_day": true,
+     "session_date": "2026-10-07",
+     "previous_session": "2026-10-06",
+     "calendar_covered": true,
+     "session_open_utc": "2026-10-07T13:30:00+00:00",
+     "session_close_utc": "2026-10-07T20:00:00+00:00",
+     "in_session": false,
+     "late_run": false
+    },
+    "benchmark": {
+     "symbol": "SPY",
+     "name": "S&P 500 ETF",
+     "close": 779.09,
+     "close_date": "2026-10-06",
+     "change_pct": 0.55,
+     "change_5d_pct": 1.95
+    },
+    "vol_index": {
+     "symbol": "VIX",
+     "name": "VIX",
+     "close": 15.01,
+     "close_date": "2026-10-06",
+     "change_pct": -3.29,
+     "change_5d_pct": -6.42
+    },
+    "regime": "TRENDING",
+    "runs": {
+     "pre_open": {
+      "at": "2026-10-07T11:45:00Z",
+      "ok": true
+     },
+     "intraday": [],
+     "post_close": {
+      "at": null,
+      "ok": null,
+      "next_at": "2026-10-07T22:15:00Z"
+     },
+     "news": {
+      "at": "2026-10-07T08:47:00Z",
+      "ok": true,
+      "new_items": 52
+     }
+    },
+    "freshness": {
+     "state": "fresh",
+     "built_at": "2026-10-07T11:58:00Z",
+     "age_minutes": 2
+    },
+    "paper_label": "Paper only - no proven edge yet"
+   },
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "default_horizon": 1,
+   "go_live": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 290,
+    "beats_best_baseline": false
+   },
+   "default_amount": 1000.0,
+   "companies": [
+    {
+     "market": "us",
+     "ticker": "AAPL",
+     "name": "Apple",
+     "exchange": "NASDAQ",
+     "sector": "Tech",
+     "state": "active",
+     "state_since": "2011-01-03T00:00:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 1000.0,
+     "amount_overridden": false,
+     "currency": "USD",
+     "yahoo": "AAPL",
+     "nse_symbol": null,
+     "cik": "0000320193",
+     "last_close": 333.63,
+     "last_close_date": "2026-10-06",
+     "change_pct": 0.22,
+     "agreement_n1": {
+      "buy": 3,
+      "of": 15
+     },
+     "open_trades": 4
+    },
+    {
+     "market": "us",
+     "ticker": "JPM",
+     "name": "JPMorgan",
+     "exchange": "NYSE",
+     "sector": "Banks",
+     "state": "active",
+     "state_since": "2011-01-03T00:00:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 1000.0,
+     "amount_overridden": false,
+     "currency": "USD",
+     "yahoo": "JPM",
+     "nse_symbol": null,
+     "cik": "0000019617",
+     "last_close": 331.28,
+     "last_close_date": "2026-10-06",
+     "change_pct": -0.33,
+     "agreement_n1": {
+      "buy": 8,
+      "of": 15
+     },
+     "open_trades": 3
+    },
+    {
+     "market": "us",
+     "ticker": "NVDA",
+     "name": "Nvidia",
+     "exchange": "NASDAQ",
+     "sector": "Tech",
+     "state": "active",
+     "state_since": "2011-01-03T00:00:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 1000.0,
+     "amount_overridden": false,
+     "currency": "USD",
+     "yahoo": "NVDA",
+     "nse_symbol": null,
+     "cik": "0001045810",
+     "last_close": 239.24,
+     "last_close_date": "2026-10-06",
+     "change_pct": 0.14,
+     "agreement_n1": {
+      "buy": 14,
+      "of": 15
+     },
+     "open_trades": 6
+    },
+    {
+     "market": "us",
+     "ticker": "DAL",
+     "name": "Delta Air Lines",
+     "exchange": "NYSE",
+     "sector": "Airlines",
+     "state": "inactive",
+     "state_since": "2026-10-05T11:45:00Z",
+     "added_at": "2011-01-03T00:00:00Z",
+     "amount": 1000.0,
+     "amount_overridden": false,
+     "currency": "USD",
+     "yahoo": "DAL",
+     "nse_symbol": null,
+     "cik": "0000027904",
+     "last_close": 83.66,
+     "last_close_date": "2026-10-06",
+     "change_pct": null,
+     "agreement_n1": null,
+     "open_trades": 0
+    }
+   ],
+   "lifecycle": [
+    {
+     "id": "we-us-DAL-deactivate-20261002T200000Z",
+     "event": "deactivate",
+     "ticker": "DAL",
+     "market": "us",
+     "effective_from": "2026-10-05T11:45:00Z",
+     "recorded_at": "2026-10-02T20:00:00Z",
+     "name": null,
+     "exchange": null,
+     "sector": null,
+     "amount": null,
+     "reason": "pause airlines",
+     "requested_by": "dashboard:owner",
+     "channel": "dashboard",
+     "command_id": "cmd-20261002T200000Z-597d6a7f",
+     "idempotency_key": "deact-dal-1",
+     "onboarding": null,
+     "supersedes": null
+    },
+    {
+     "id": "we-us-NVDA-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "NVDA",
+     "market": "us",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "Nvidia",
+     "exchange": "NASDAQ",
+     "sector": "Tech",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-us-NVDA",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    },
+    {
+     "id": "we-us-JPM-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "JPM",
+     "market": "us",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "JPMorgan",
+     "exchange": "NYSE",
+     "sector": "Banks",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-us-JPM",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    },
+    {
+     "id": "we-us-DAL-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "DAL",
+     "market": "us",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "Delta Air Lines",
+     "exchange": "NYSE",
+     "sector": "Airlines",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-us-DAL",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    },
+    {
+     "id": "we-us-AAPL-add-20260924T060000Z",
+     "event": "add",
+     "ticker": "AAPL",
+     "market": "us",
+     "effective_from": "2011-01-03T00:00:00Z",
+     "recorded_at": "2026-09-24T06:00:00Z",
+     "name": "Apple",
+     "exchange": "NASDAQ",
+     "sector": "Tech",
+     "amount": null,
+     "reason": "seeded from config/markets",
+     "requested_by": "cli:session",
+     "channel": "seed",
+     "command_id": null,
+     "idempotency_key": "seed-us-AAPL",
+     "onboarding": {
+      "identifiers": "skipped",
+      "backfill": "skipped",
+      "collect_gate": "skipped"
+     },
+     "supersedes": null
+    }
+   ],
+   "commands": [
+    {
+     "id": "cmd-20261006T151000Z-3ffb1995",
+     "market": "us",
+     "received_at": "2026-10-06T15:10:00Z",
+     "channel": "slack",
+     "actor": "slack:U07ABCD123",
+     "agent": "slack-gateway",
+     "tool": "delete_company",
+     "kind": "write",
+     "arguments": {
+      "market": "us",
+      "ticker": "DAL"
+     },
+     "idempotency_key": "del-dal-x",
+     "result": "refused",
+     "refusal_code": "not_allowed_in_channel",
+     "message": "Delete is only available on the dashboard",
+     "record_ids": [],
+     "budget_left": 17,
+     "completed_at": "2026-10-06T15:10:00Z"
+    },
+    {
+     "id": "cmd-20261005T140500Z-73abce0f",
+     "market": "us",
+     "received_at": "2026-10-05T14:05:00Z",
+     "channel": "slack",
+     "actor": "slack:U07ABCD123",
+     "agent": "slack-gateway",
+     "tool": "add_company",
+     "kind": "write",
+     "arguments": {
+      "market": "us",
+      "symbol": "SPY"
+     },
+     "idempotency_key": "add-spy-1",
+     "result": "refused",
+     "refusal_code": "validation_failed",
+     "message": "SPY is an ETF; only common stocks can be added",
+     "record_ids": [],
+     "budget_left": 18,
+     "completed_at": "2026-10-05T14:05:02Z"
+    },
+    {
+     "id": "cmd-20261005T135500Z-052b8228",
+     "market": "us",
+     "received_at": "2026-10-05T13:55:00Z",
+     "channel": "slack",
+     "actor": "slack:U07ABCD123",
+     "agent": "slack-gateway",
+     "tool": "add_company",
+     "kind": "write",
+     "arguments": {
+      "market": "us",
+      "symbol": "(deleted company)"
+     },
+     "idempotency_key": "add-msft-7Hq2",
+     "result": "accepted",
+     "refusal_code": null,
+     "message": "(this company was deleted later; its records are excluded on read)",
+     "record_ids": [
+      "we-us-MSFT-add-20261005T140200Z"
+     ],
+     "budget_left": 19,
+     "completed_at": "2026-10-05T14:02:00Z"
+    }
+   ],
+   "news_inactive": [],
+   "deleted_count": 1
+  }
+ }
+}

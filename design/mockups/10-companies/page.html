@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Companies</title>
+<meta name="description" content="Companies page of the personal stock cockpit: the watchlist as data. Active companies with price, amount per paper trade and actions; inactive companies with their price and news since, and Reactivate; pending and recent requests; the lifecycle history. Add, deactivate, reactivate, change the amount, delete with a typed confirmation. Research only.">
+<style>
+/* market-brief cockpit: design tokens, scheme v2 "modern admin light" (2026-10-08).
+   The owner asked for the look of modern admin templates (Pixinvent Materialize with its semi-dark vertical
+   menu, Aurora) applied to a broker-style cockpit: a soft light-grey page, white cards lifted by a faint shadow
+   (no hairline borders), one periwinkle-indigo accent, a dark navy sidebar with labels, icon tiles on the KPI
+   cards, gradient area charts, generous spacing. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and every page need no renaming; the previous scheme ("terminal
+   light") used the same names with other values.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an okay
+   one. Up/down/hit/miss always carry a glyph and a word. Text tones are AA on white (figures in the comments);
+   the vivid template tones live on fills and tints with a dark ink on them.
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- Colour roles --------------------------------------------------------------------- */
+  --md-sys-color-primary: #5a5ee6;                 /* periwinkle indigo (5.0:1 on white) */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #e9eaff;       /* accent tint: selected segment, icon tiles */
+  --md-sys-color-on-primary-container: #3a3db8;    /* 7.0:1 on the tint */
+  --md-sys-color-secondary: #65708a;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #eef0f5;
+  --md-sys-color-on-secondary-container: #3f4756;
+  --md-sys-color-tertiary: #7c3aed;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f1ebff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #fde8e8;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #4b465c;              /* ink, 9.0:1 on white */
+  --md-sys-color-surface-variant: #f3f4f8;
+  --md-sys-color-on-surface-variant: #65708a;      /* muted labels, 5.0:1 on white */
+  --md-sys-color-surface-dim: #e4e6ee;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f7f7f9;    /* the page */
+  --md-sys-color-surface-container: #f3f4f8;        /* tiles, table heads, inputs */
+  --md-sys-color-surface-container-high: #eceef3;   /* table rules, dividers */
+  --md-sys-color-surface-container-highest: #e4e6ee;
+  --md-sys-color-outline: #a3a9b8;
+  --md-sys-color-outline-variant: #e7e9ef;          /* control borders */
+  --md-sys-color-inverse-surface: #2f3349;          /* tooltips, the sidebar */
+  --md-sys-color-inverse-on-surface: #f4f5fa;
+  --md-sys-color-inverse-primary: #b4b6ff;
+  --md-sys-color-surface-tint: #5a5ee6;
+  --md-sys-color-background: #f7f7f9;
+  --md-sys-color-on-background: #4b465c;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #2f3349;
+
+  /* ---- Sidebar (semi-dark vertical menu) -------------------------------------------------- */
+  --mb-sidebar-bg: #2f3349;
+  --mb-sidebar-ink: #d7d8e5;         /* 8.8:1 on the sidebar */
+  --mb-sidebar-muted: #9fa2b7;       /* 4.9:1 */
+  --mb-sidebar-active: linear-gradient(72deg, #5a5ee6 0%, #7a7df0 100%);
+  --mb-sidebar-active-shadow: 0 4px 12px rgba(90, 94, 230, .45);
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white. The tints are fresher than
+     before (template "label" badges): ink on tint 6.4:1 / 7.1:1 / 4.6:1. */
+  --mb-color-up: #15803d;
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #e3f8e9;
+  --mb-color-on-up-container: #166534;
+  --mb-color-down: #dc2626;
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #fde8e8;
+  --mb-color-on-down-container: #991b1b;
+  --mb-color-neutral: #65708a;
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #eef0f5;
+  --mb-color-on-neutral-container: #3f4756;
+  --mb-color-warn: #e07b00;               /* "direction unclear", flags (icons and fills) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fff3e0;
+  --mb-color-on-warn-container: #b45309;  /* 4.6:1 on the tint, 5.0:1 on white */
+  --mb-color-info: #0b8fa6;
+  --mb-color-info-container: #e0f7fb;
+  --mb-color-on-info-container: #0c5d6b;
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fde8e8;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;
+  --mb-verdict-strong-bg: #bff0cf;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d;
+  --mb-verdict-ok-bg: #e3f8e9;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;
+  /* Provenance labels: Live (green tint), Back-test (hatched accent tint), Mock (dashed), Paper (violet tint).
+     Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(90,94,230,.14) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill) ------------------------------------------------------- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #5a5ee6;   /* series 1 = the accent: ranges, model, rule strategies, everything "ours" */
+  --mb-chart-2: #e07b00;   /* series 2 (orange; 3.0:1 on white: shapes with direct labels) */
+  --mb-chart-3: #0b8fa6;   /* series 3 (teal, 3.8:1) */
+  --mb-chart-4: #d6338f;   /* series 4 (pink, 4.4:1) */
+  --mb-chart-1-fill: rgba(90,94,230,.28);     /* gradient top of an area chart, fades to 0 */
+  --mb-chart-2-fill: rgba(224,123,0,.22);
+  --mb-chart-3-fill: rgba(11,143,166,.22);
+  --mb-chart-band-50: rgba(90,94,230,.30);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(90,94,230,.12);   /* outer band */
+  --mb-chart-fan: rgba(90,94,230,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: "Inter", "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 600 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 600 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 600 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 600 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 600 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 600 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/22px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12.5px/18px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12.5px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.3px;
+  --md-sys-typescale-label-small-tracking: 0.4px;
+  --md-sys-typescale-title-medium-tracking: 0.1px;
+  --md-sys-typescale-body-medium-tracking: 0.15px;
+  --md-sys-typescale-body-small-tracking: 0.3px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 6px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 10px;       /* tiles and columns inside a card */
+  --mb-card-border: 1px solid transparent;   /* cards are lifted by a shadow, not a hairline */
+  --mb-card-shadow: 0 2px 8px rgba(47, 51, 73, .08), 0 0 1px rgba(47, 51, 73, .14);
+  --mb-card-shadow-hover: 0 6px 18px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .14);
+
+  /* ---- Elevation (soft, template-like) --------------------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: var(--mb-card-shadow);
+  --md-sys-elevation-2: 0 4px 14px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .16);
+  --md-sys-elevation-3: 0 8px 24px rgba(47, 51, 73, .16), 0 0 1px rgba(47, 51, 73, .18);
+  --md-sys-elevation-4: 0 12px 32px rgba(47, 51, 73, .18);
+  --md-sys-elevation-5: 0 16px 40px rgba(47, 51, 73, .22);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1240px;
+  --mb-sidebar-width: 256px;    /* vertical menu with labels (>= 1200px) */
+  --mb-rail-width: 76px;        /* collapsed menu, icons only (600-1199px) */
+  --mb-navbar-height: 72px;     /* navigation bar (phone) */
+  --mb-topbar-height: 64px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 120ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.3px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* market-brief cockpit: components on tokens.css, scheme v2 "modern admin light". Plain CSS, no JS
+   required (the tooltip and the phone drawer need the page's own small script, see README).
+   Prefix: md- for M3 components, mb- for the cockpit's own (app shell, provenance tags, odds meter,
+   KPI card, labels). Load after tokens.css. */
+
+/* ---- Base ----------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); -webkit-text-size-adjust: 100%; }
+body { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); font-family: var(--md-ref-typeface-plain); }
+a { color: var(--md-sys-color-primary); }
+button { font: inherit; color: inherit; letter-spacing: inherit; }
+:focus-visible { outline: none; box-shadow: var(--mb-focus-ring); border-radius: var(--md-sys-shape-corner-extra-small); }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- Icons (Material Symbols Outlined, inlined from icons.svg) ------------------------- */
+.ms { width: 1em; height: 1em; display: inline-block; vertical-align: -0.15em; fill: currentColor; flex: none; }
+.ms-20 { width: 20px; height: 20px; } .ms-24 { width: 24px; height: 24px; } .ms-40 { width: 40px; height: 40px; }
+
+/* ---- App shell: semi-dark sidebar (>= 1200px), collapsed rail (600-1199px), phone bar + drawer ---- */
+.mb-app { min-height: 100vh; display: grid; grid-template-columns: var(--mb-sidebar-width) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.mb-sidebar, .mb-rail { grid-row: 1 / span 2; background: var(--mb-sidebar-bg); color: var(--mb-sidebar-ink); display: flex; flex-direction: column; gap: 2px; padding: var(--mb-space-4) var(--mb-space-3); position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.mb-sidebar-brand, .mb-rail-brand { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 var(--mb-space-2); margin-bottom: var(--mb-space-4); color: #fff; font: var(--md-sys-typescale-title-medium); letter-spacing: .2px; }
+.mb-sidebar-brand .mb-brand-mark, .mb-rail-brand .mb-brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--mb-sidebar-active); box-shadow: var(--mb-sidebar-active-shadow); display: grid; place-items: center; font: 700 13px/1 var(--md-ref-typeface-plain); color: #fff; flex: none; }
+.mb-sidebar-brand small { display: block; font: var(--md-sys-typescale-label-small); color: var(--mb-sidebar-muted); letter-spacing: .3px; }
+.mb-sidebar-section { font: var(--md-sys-typescale-label-small); letter-spacing: .08em; text-transform: uppercase; color: var(--mb-sidebar-muted); padding: var(--mb-space-4) var(--mb-space-3) var(--mb-space-1); }
+.mb-nav-item { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 var(--mb-space-3); border: 0; border-radius: var(--md-sys-shape-corner-small); background: none; color: var(--mb-sidebar-ink); text-decoration: none; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); white-space: nowrap; transition: background var(--md-sys-motion-duration-short); }
+.mb-nav-item .mb-nav-ind { width: 24px; height: 24px; display: grid; place-items: center; flex: none; }
+.mb-nav-item .ms { width: 22px; height: 22px; }
+.mb-nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+.mb-nav-item[aria-current="page"] { background: var(--mb-sidebar-active); color: #fff; box-shadow: var(--mb-sidebar-active-shadow); }
+.mb-nav-item.coming { color: var(--mb-sidebar-muted); cursor: help; }
+.mb-nav-item.coming::after { content: "soon"; margin-left: auto; font: var(--md-sys-typescale-label-small); letter-spacing: 0; padding: 0 6px; border-radius: var(--md-sys-shape-corner-full); background: rgba(255,255,255,.1); color: var(--mb-sidebar-muted); }
+.mb-sidebar-foot { margin-top: auto; padding: var(--mb-space-3); border-radius: var(--md-sys-shape-corner-small); background: rgba(255,255,255,.06); color: var(--mb-sidebar-muted); font: var(--md-sys-typescale-body-small); }
+.mb-sidebar-foot b { color: var(--mb-sidebar-ink); }
+.mb-navbar { display: none; }
+.mb-menu-btn { display: none; }
+.mb-scrim { display: none; position: fixed; inset: 0; background: rgba(47,51,73,.45); z-index: 29; }
+.mb-topbar { grid-column: 2; position: sticky; top: 0; z-index: 20; height: var(--mb-topbar-height); background: var(--md-sys-color-surface); box-shadow: 0 1px 0 var(--md-sys-color-surface-container-high); display: flex; align-items: center; gap: var(--mb-space-3); padding: 0 var(--mb-gutter-desktop); }
+.mb-topbar.scrolled { box-shadow: var(--md-sys-elevation-2); }
+.mb-topbar .mb-topbar-title { font: var(--md-sys-typescale-title-medium); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-topbar .mb-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--mb-space-3); }
+.mb-search { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-body-small); text-decoration: none; min-width: 200px; }
+.mb-search .ms { width: 18px; height: 18px; }
+.mb-content { grid-column: 2; min-width: 0; padding: 0 var(--mb-gutter-desktop) var(--mb-space-12); }
+.mb-content-inner { max-width: var(--mb-content-max); margin: 0 auto; }
+@media (max-width: 1199px) {
+  .mb-app { grid-template-columns: var(--mb-rail-width) minmax(0, 1fr); }
+  .mb-sidebar, .mb-rail { padding: var(--mb-space-4) var(--mb-space-2); align-items: center; }
+  .mb-sidebar-brand span, .mb-sidebar-section, .mb-sidebar-foot, .mb-nav-item .mb-nav-label { display: none; }
+  .mb-sidebar-brand { padding: 0; justify-content: center; }
+  .mb-nav-item { width: 56px; justify-content: center; padding: 0; }
+  .mb-nav-item.coming::after { display: none; }
+}
+@media (max-width: 599px) {
+  .mb-app { grid-template-columns: minmax(0, 1fr); }
+  .mb-sidebar, .mb-rail { position: fixed; left: 0; top: 0; bottom: 0; width: var(--mb-sidebar-width); z-index: 30; transform: translateX(-100%); transition: transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard); padding: var(--mb-space-4) var(--mb-space-3); align-items: stretch; box-shadow: var(--md-sys-elevation-3); }
+  .mb-sidebar.open, .mb-rail.open { transform: none; }
+  .mb-sidebar.open ~ .mb-scrim { display: block; }
+  .mb-sidebar-brand span, .mb-sidebar-section, .mb-sidebar-foot, .mb-nav-item .mb-nav-label { display: revert; }
+  .mb-sidebar .mb-nav-item { width: auto; justify-content: flex-start; padding: 0 var(--mb-space-3); }
+  .mb-sidebar-brand { padding: 0 var(--mb-space-2); justify-content: flex-start; }
+  .mb-menu-btn { display: inline-grid; }
+  .mb-topbar, .mb-content { grid-column: 1; }
+  .mb-topbar { padding: 0 var(--mb-gutter); gap: var(--mb-space-2); }
+  .mb-search { min-width: 0; width: 38px; padding: 0; justify-content: center; }
+  .mb-search span { display: none; }
+  .mb-content { padding: 0 var(--mb-gutter) calc(var(--mb-navbar-height) + var(--mb-space-6)); }
+  .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface); box-shadow: 0 -1px 0 var(--md-sys-color-surface-container-high), var(--md-sys-elevation-2); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
+  .mb-navbar .mb-nav-item { flex-direction: column; gap: 2px; height: auto; width: auto; flex: 1 1 0; min-width: 0; padding: 6px 0; color: var(--md-sys-color-on-surface-variant); background: none; box-shadow: none; font: var(--md-sys-typescale-label-small); }
+  .mb-navbar .mb-nav-item .mb-nav-ind { width: 48px; height: 28px; border-radius: var(--md-sys-shape-corner-full); }
+  .mb-navbar .mb-nav-item[aria-current="page"] { color: var(--md-sys-color-primary); }
+  .mb-navbar .mb-nav-item[aria-current="page"] .mb-nav-ind { background: var(--md-sys-color-primary-container); }
+}
+
+/* ---- Cards ---------------------------------------------------------------------------- */
+.md-card { border-radius: var(--mb-card-radius); padding: var(--mb-space-5) var(--mb-space-6); background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); color: var(--md-sys-color-on-surface); }
+.md-card.elevated { box-shadow: var(--md-sys-elevation-2); }
+.md-card.filled { background: var(--md-sys-color-surface-container); box-shadow: none; }
+.md-card.outlined { background: var(--md-sys-color-surface-container-lowest); box-shadow: none; border: 1px solid var(--md-sys-color-outline-variant); }
+.md-card > h2:first-child, .md-card > h3:first-child { margin-top: 0; }
+.mb-card-head { display: flex; align-items: center; gap: var(--mb-space-2); flex-wrap: wrap; margin-bottom: var(--mb-space-4); }
+.mb-card-head h2 { font: var(--md-sys-typescale-title-medium); margin: 0; }
+.mb-card-head .mb-card-sub { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); width: 100%; margin-top: -4px; }
+.mb-card-head .mb-card-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--mb-space-2); font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+/* Icon tile (avatar): a tinted rounded square with an icon, the admin-template KPI signature */
+.mb-avatar { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-avatar .ms { width: 22px; height: 22px; }
+.mb-avatar.success { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-avatar.danger { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-avatar.warn { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-avatar.info { background: var(--mb-color-info-container); color: var(--mb-color-on-info-container); }
+.mb-avatar.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-avatar.paper { background: var(--mb-color-paper-container); color: var(--mb-color-on-paper-container); }
+.mb-avatar.sm { width: 34px; height: 34px; border-radius: 8px; } .mb-avatar.sm .ms { width: 18px; height: 18px; }
+.mb-avatar.lg { width: 52px; height: 52px; border-radius: 12px; } .mb-avatar.lg .ms { width: 28px; height: 28px; }
+
+/* ---- Buttons -------------------------------------------------------------------------- */
+.md-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--mb-space-2); height: 38px; padding: 0 var(--mb-space-4); border-radius: var(--md-sys-shape-corner-small); border: 0; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); text-decoration: none; white-space: nowrap; position: relative; background: transparent; color: var(--md-sys-color-primary); }
+.md-btn .ms { width: 18px; height: 18px; margin-left: -6px; }
+.md-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
+.md-btn.filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 2px 6px rgba(90,94,230,.35); }
+.md-btn.tonal { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.md-btn.outlined { border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface); }
+.md-btn.text { padding: 0 var(--mb-space-3); }
+.md-btn.small { height: 32px; padding: 0 var(--mb-space-3); font: var(--md-sys-typescale-label-medium); }
+.md-btn:disabled, .md-btn[aria-disabled="true"] { cursor: not-allowed; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); border-color: transparent; box-shadow: none; }
+.md-btn.text:disabled { background: transparent; }
+.md-icon-btn { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-full); border: 0; background: transparent; color: var(--md-sys-color-on-surface-variant); display: inline-grid; place-items: center; cursor: pointer; position: relative; padding: 0; }
+.md-icon-btn .ms { width: 24px; height: 24px; }
+.md-icon-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; }
+.md-icon-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-icon-btn.small { width: 28px; height: 28px; } .md-icon-btn.small .ms { width: 18px; height: 18px; }
+.md-icon-btn.outlined { border: 1px solid var(--md-sys-color-outline-variant); }
+.md-icon-btn.tonal { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+
+/* Help affordance: a small outlined icon button that opens a tooltip (hover, focus or tap) */
+.md-help { appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-small); letter-spacing: 0; display: inline-grid; place-items: center; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px; line-height: 1; }
+.md-help:hover, .md-help:focus-visible { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
+
+/* ---- Segmented buttons (pill tabs) ------------------------------------------------------ */
+.md-segmented { display: inline-flex; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container); padding: 3px; gap: 2px; }
+.md-segmented > button, .md-segmented > a { border: 0; border-radius: var(--md-sys-shape-corner-full); background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: 0; height: 32px; padding: 0 var(--mb-space-4); cursor: pointer; display: inline-flex; align-items: center; gap: var(--mb-space-2); text-decoration: none; white-space: nowrap; transition: background var(--md-sys-motion-duration-short), color var(--md-sys-motion-duration-short); }
+.md-segmented > [aria-pressed="true"], .md-segmented > [aria-current="true"] { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 2px 6px rgba(90,94,230,.35); font-weight: 600; }
+.md-segmented > :disabled, .md-segmented > [aria-disabled="true"] { color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); cursor: not-allowed; }
+.md-segmented.dense > button, .md-segmented.dense > a { height: 28px; padding: 0 12px; font: var(--md-sys-typescale-label-medium); }
+.md-segmented.light > [aria-pressed="true"] { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); box-shadow: var(--mb-card-shadow); }
+
+/* ---- Chips ---------------------------------------------------------------------------- */
+.md-chip { display: inline-flex; align-items: center; gap: var(--mb-space-2); height: 30px; padding: 0 var(--mb-space-3); border-radius: var(--md-sys-shape-corner-full); border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); white-space: nowrap; cursor: default; }
+.md-chip .ms { width: 16px; height: 16px; margin-left: -4px; color: var(--md-sys-color-primary); }
+.md-chip.assist { cursor: pointer; }
+.md-chip.filter { cursor: pointer; }
+.md-chip.filter[aria-pressed="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: transparent; }
+.md-chip.small { height: 24px; padding: 0 var(--mb-space-2); font: var(--md-sys-typescale-label-small); } .md-chip.small .ms { width: 14px; height: 14px; margin-left: -2px; }
+.md-chip .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+
+/* ---- Labels (template "label" badges: a tint with its ink, rounded) --------------------- */
+.mb-label { display: inline-flex; align-items: center; gap: 4px; font: 600 12px/18px var(--md-ref-typeface-plain); letter-spacing: .1px; border-radius: 6px; padding: 2px 8px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); white-space: nowrap; vertical-align: middle; }
+.mb-label .ms { width: 14px; height: 14px; }
+.mb-label.success, .mb-label.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-label.danger, .mb-label.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-label.warn { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-label.info { background: var(--mb-color-info-container); color: var(--mb-color-on-info-container); }
+.mb-label.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-label.paper { background: var(--mb-color-paper-container); color: var(--mb-color-on-paper-container); }
+
+/* ---- Provenance tags: Live / Back-test / Mock / Paper / Derived (texture + colour) ------ */
+.mb-tag { display: inline-flex; align-items: center; gap: 4px; font: 600 10.5px/1 var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; border-radius: 6px; padding: 4px 7px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); white-space: nowrap; vertical-align: middle; }
+.mb-tag .ms { width: 12px; height: 12px; }
+.mb-tag.live { border-color: transparent; color: var(--mb-color-on-live-container); background: var(--mb-color-live-container); }
+.mb-tag.bt, .mb-tag.backtest { background: var(--mb-color-backtest-container), var(--md-sys-color-surface-container-lowest); border-color: var(--mb-color-backtest); color: var(--mb-color-on-backtest-container); }
+.mb-tag.mock { border-style: dashed; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.derived { border-style: dotted; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.paper { border-color: transparent; color: var(--mb-color-on-paper-container); background: var(--mb-color-paper-container); }
+.mb-tag.coming { border-style: dashed; color: var(--md-sys-color-on-surface-variant); }
+.md-chip.live .sw { background: var(--mb-color-live); }
+.md-chip.bt .sw { background: repeating-linear-gradient(135deg, var(--mb-color-backtest) 0 2px, #fff 2px 4px); border: 1px solid var(--mb-color-backtest); }
+.md-chip.mock .sw { border: 1.5px dashed var(--mb-color-mock); background: transparent; }
+
+/* ---- Status badges (never colour alone: always an icon or glyph plus the word) ---------- */
+.md-badge { display: inline-flex; align-items: center; gap: 4px; font: 500 11.5px/16px var(--md-ref-typeface-plain); letter-spacing: .02em; border-radius: 6px; padding: 2px 7px; border: 1px solid transparent; color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container); white-space: nowrap; vertical-align: middle; }
+.md-badge .ms { width: 13px; height: 13px; }
+.md-badge.dot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--md-sys-color-error); }
+.md-badge.count { min-width: 16px; height: 16px; padding: 0 4px; border: 0; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); justify-content: center; }
+.mb-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.mb-status.up, .mb-status.hit { color: var(--mb-color-up); }
+.mb-status.down, .mb-status.miss { color: var(--mb-color-down); }
+.mb-status.neutral { color: var(--mb-color-neutral); }
+.mb-status.unknown { color: var(--mb-color-on-warn-container); }
+.md-badge.up, .md-badge.hit, .md-badge.confirmed_primary, .md-badge.corroborated { color: var(--mb-color-on-up-container); background: var(--mb-color-up-container); }
+.md-badge.down, .md-badge.miss, .md-badge.rumour, .md-badge.contradicted, .md-badge.promotional { color: var(--mb-color-on-down-container); background: var(--mb-color-down-container); }
+.md-badge.warn, .md-badge.single_source { color: var(--mb-color-on-warn-container); background: var(--mb-color-warn-container); }
+.md-badge.neutral, .md-badge.unverified { color: var(--mb-color-on-neutral-container); background: var(--mb-color-neutral-container); }
+/* Square direction / sentiment markers: container tone with an on-container glyph */
+.mb-dir { width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; flex: none; }
+.mb-dir .ms { width: 15px; height: 15px; }
+.mb-dir.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-dir.dn, .mb-dir.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-dir.flat, .mb-dir.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-dir.unk { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+/* Round outcome markers: solid tone with a white glyph (strong, for ticks and crosses) */
+.mb-mark { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; flex: none; }
+.mb-mark .ms { width: 14px; height: 14px; }
+.mb-mark.ok, .mb-mark.hit { background: var(--mb-color-hit); }
+.mb-mark.no, .mb-mark.miss { background: var(--mb-color-miss); }
+.mb-mark.na { background: var(--mb-color-neutral); }
+
+/* ---- Tooltip (plain, M3: inverse surface) --------------------------------------------- */
+.md-tooltip { position: fixed; z-index: 50; max-width: min(320px, calc(100vw - 24px)); background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); padding: 8px 12px; border-radius: var(--md-sys-shape-corner-small); box-shadow: var(--md-sys-elevation-3); pointer-events: none; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-tooltip.on { opacity: 1; }
+.md-tooltip b { color: var(--md-sys-color-inverse-on-surface); }
+.md-tooltip .row { display: flex; justify-content: space-between; gap: 14px; }
+.md-tooltip .row span:last-child { font-weight: 600; }
+.md-tooltip .dim { color: var(--mb-sidebar-muted); margin-top: 4px; }
+.md-tooltip-rich { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); border-radius: var(--md-sys-shape-corner-medium); padding: var(--mb-space-3) var(--mb-space-4); box-shadow: var(--md-sys-elevation-2); max-width: 320px; font: var(--md-sys-typescale-body-medium); }
+.md-tooltip-rich .subhead { font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; }
+
+/* ---- Data tables ---------------------------------------------------------------------- */
+.md-table { width: 100%; border-collapse: collapse; font: var(--md-sys-typescale-body-medium); font-variant-numeric: tabular-nums; }
+.md-table th { font: 600 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); text-align: left; padding: 10px 12px; background: var(--md-sys-color-surface-container); white-space: nowrap; }
+.md-table th:first-child { border-radius: 8px 0 0 8px; } .md-table th:last-child { border-radius: 0 8px 8px 0; }
+.md-table td { padding: 10px 12px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); vertical-align: middle; }
+.md-table tr:last-child td { border-bottom: 0; }
+.md-table tr:hover td { background: color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent); }
+.md-table td.num, .md-table th.num { text-align: right; }
+.md-table tr.muted td { color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-low); }
+.md-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---- Lists, key-value, dividers -------------------------------------------------------- */
+.md-divider { border: 0; border-top: 1px solid var(--md-sys-color-surface-container-high); margin: var(--mb-space-4) 0; }
+.md-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font: var(--md-sys-typescale-body-medium); margin: 0; }
+.md-kv dt { color: var(--md-sys-color-on-surface-variant); } .md-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+code { font-family: var(--md-ref-typeface-mono); font-size: .92em; overflow-wrap: anywhere; }
+.md-list { list-style: none; margin: 0; padding: 0; }
+.md-list > li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--mb-space-3); align-items: center; padding: var(--mb-space-3) 0; border-top: 1px solid var(--md-sys-color-surface-container-high); }
+.md-list > li:first-child { border-top: 0; }
+
+/* ---- Progress and the odds meter ------------------------------------------------------- */
+.md-progress { height: 6px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container-high); overflow: hidden; }
+.md-progress > i { display: block; height: 100%; background: var(--md-sys-color-primary); border-radius: inherit; }
+.mb-odds { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.mb-odds svg { width: 64px; height: 14px; display: block; }
+.mb-odds b { font-weight: 600; min-width: 30px; }
+.mb-odds .track { fill: var(--md-sys-color-surface-container-high); }
+.mb-odds .mid { stroke: var(--md-sys-color-outline); }
+.mb-odds .dot { stroke: #fff; stroke-width: 1.5; } .mb-odds .dot.up { fill: var(--mb-color-up); } .mb-odds .dot.dn { fill: var(--mb-color-down); }
+.mb-bar { height: 8px; background: var(--md-sys-color-surface-container-high); border-radius: 4px; position: relative; overflow: hidden; }
+.mb-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.mb-bar i.up { background: var(--mb-color-up); left: 50%; } .mb-bar i.dn { background: var(--mb-color-down); right: 50%; } .mb-bar i.unk { background: var(--mb-color-warn); left: 50%; transform: translateX(-50%); }
+.mb-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--md-sys-color-outline-variant); }
+
+/* ---- KPI card (stat card with an icon tile, label, big number and a trend label) --------- */
+.mb-kpi { border-radius: var(--mb-card-radius); padding: var(--mb-space-5); background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: start; min-width: 0; }
+.mb-kpi .l { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.mb-kpi .v { font: 700 26px/1.15 var(--md-ref-typeface-plain); letter-spacing: -.5px; color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.mb-kpi .s { grid-column: 1 / span 2; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mb-kpi .mb-avatar { grid-row: 1 / span 2; }
+.mb-kpi.accent { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 6px 18px rgba(90,94,230,.35); }
+.mb-kpi.accent .l, .mb-kpi.accent .s, .mb-kpi.accent .v { color: inherit; } .mb-kpi.accent .l { opacity: .85; }
+.mb-kpi.accent .mb-avatar { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ---- Details / expansion -------------------------------------------------------------- */
+details.md-expansion { background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); border-radius: var(--mb-card-radius); padding: 0 var(--mb-space-6); }
+details.md-expansion summary { cursor: pointer; padding: 16px 0; font: var(--md-sys-typescale-title-small); list-style: none; display: flex; align-items: center; gap: var(--mb-space-2); }
+details.md-expansion summary::-webkit-details-marker { display: none; }
+details.md-expansion summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--md-sys-color-on-surface-variant); border-bottom: 2px solid var(--md-sys-color-on-surface-variant); transform: rotate(-45deg); transition: transform .15s; margin-right: 4px; flex: none; }
+details.md-expansion[open] summary::before { transform: rotate(45deg); }
+details.md-expansion .inner { padding: 0 0 18px; }
+
+/* ---- Code / preformatted ---------------------------------------------------------------- */
+.md-pre { background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-small); padding: 10px; font: 11.5px/1.45 var(--md-ref-typeface-mono); overflow: auto; max-height: 320px; margin: 0; }
+
+/* ---- Verdict header (decision pages): NO red; YES green, darker when strong, lighter when okay ---- */
+.mb-verdict { display: grid; grid-template-columns: auto 1fr; gap: 18px 22px; padding: 20px 22px; align-items: center; border-radius: var(--mb-card-radius); }
+.mb-verdict .mb-verdict-box { width: 64px; height: 64px; border-radius: var(--md-sys-shape-corner-medium); color: #fff; display: grid; place-items: center; }
+.mb-verdict .mb-verdict-box .ms { width: 40px; height: 40px; }
+.mb-verdict .mb-verdict-word { font-size: 52px; font-weight: 800; line-height: .95; letter-spacing: -1.5px; }
+.mb-verdict .mb-verdict-word small { display: block; font-size: 13px; font-weight: 600; letter-spacing: .02em; margin-top: 6px; }
+.mb-verdict.no { background: var(--mb-verdict-no-bg); color: var(--mb-verdict-no-ink); } .mb-verdict.no .mb-verdict-box { background: var(--mb-verdict-no-box); }
+.mb-verdict.yes-strong { background: var(--mb-verdict-strong-bg); color: var(--mb-verdict-strong-ink); } .mb-verdict.yes-strong .mb-verdict-box { background: var(--mb-verdict-strong-box); }
+.mb-verdict.yes-ok { background: var(--mb-verdict-ok-bg); color: var(--mb-verdict-ok-ink); } .mb-verdict.yes-ok .mb-verdict-box { background: var(--mb-verdict-ok-box); }
+/* Signed number: green/red with its sign (the sign is the glyph) */
+.mb-delta { font-variant-numeric: tabular-nums; font-weight: 600; } .mb-delta.up { color: var(--mb-color-up); } .mb-delta.down { color: var(--mb-color-down); } .mb-delta.flat { color: var(--md-sys-color-on-surface-variant); }
+/* Uppercase micro label (section eyebrows, table headers, stat labels) */
+.mb-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* ---- Alert band (template "alert": a tint with an icon, a title and a line of text) ------ */
+.mb-alert { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-radius: var(--mb-card-radius); background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-alert.info { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-alert.success { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-alert.danger { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-alert b.t { display: block; font: var(--md-sys-typescale-title-small); }
+.mb-alert .s { font: var(--md-sys-typescale-body-small); margin-top: 2px; opacity: .92; }
+.mb-alert .ms { width: 24px; height: 24px; }
+
+</style>
+<style>
+/* Shared page CSS of the design-track mockups (scheme v2 "modern admin light"): cards, card heads, labels, page
+   head, KPI row, two-column grid, legend, footer. Every colour is a token of design/system/tokens.css. */
+body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+.card{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--mb-card-radius);box-shadow:var(--mb-card-shadow);padding:20px 22px;min-width:0}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.note{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:12px 0 0;overflow-wrap:anywhere}
+.tk{font-weight:700;color:var(--md-sys-color-primary);text-decoration:none} .tk:hover{text-decoration:underline}
+.quiet{font-size:13px;color:var(--md-sys-color-on-surface-variant);padding:12px 14px;border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low)}
+.h-lab{font-weight:700;color:var(--md-sys-color-on-primary-container);background:var(--md-sys-color-primary-container);border-radius:6px;padding:1px 7px;font-size:12px;white-space:nowrap}
+.mb-odds svg{width:60px} .mb-odds b{min-width:0}
+.sw{width:9px;height:9px;border-radius:3px;display:inline-block;vertical-align:0;margin-right:4px}
+.sw.r,.ser-r{background:var(--mb-chart-1)} .sw.b,.ser-b{background:var(--mb-chart-2)} .sw.a,.ser-a{background:var(--mb-chart-3)} .sw.k,.ser-k{background:var(--mb-chart-4)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mb-color-down);display:inline-block;flex:none} .dot.open{background:var(--mb-color-up)}
+
+/* page head: title, subtitle, chips */
+.phead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-top:22px}
+.phead h1{font:700 24px/1.2 var(--md-ref-typeface-plain);letter-spacing:-.4px;margin:0;overflow-wrap:anywhere}
+.phead .sub{font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.phead .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.phead .chips .md-chip b{color:var(--md-sys-color-on-surface);font-weight:600}
+.band{margin-top:16px}
+.band .ms{color:var(--mb-color-on-warn-container)}
+
+/* KPI row and layout */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+.mb-kpi .v .tk{font-size:inherit}
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.grid{display:grid;grid-template-columns:minmax(0,8fr) minmax(0,4fr);gap:16px;margin-top:16px;align-items:start}
+.grid.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.col{display:grid;gap:16px;min-width:0}
+.head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.head h2{font:600 16px/1.3 var(--md-ref-typeface-plain);margin:0}
+.head .end{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);flex-wrap:wrap}
+.head .go{font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:2px;text-decoration:none}
+.head .go .ms{width:16px;height:16px}
+.sub2{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:-8px 0 12px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 0}
+.toolbar .md-chip.filter{cursor:pointer}
+.toolbar input{height:36px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 14px 0 36px;font:inherit;color:inherit;background:var(--md-sys-color-surface) no-repeat 12px center;min-width:200px}
+.toolbar .search{position:relative} .toolbar .search .ms{position:absolute;left:12px;top:9px;width:18px;height:18px;color:var(--md-sys-color-on-surface-variant)}
+.toolbar select{height:36px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:inherit;background:var(--md-sys-color-surface)}
+
+/* tables (page tables build on .md-table) */
+.tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
+.tbl tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.tbl tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.tbl .st{display:inline-flex;align-items:center;gap:4px} .tbl .st .ms{width:14px;height:14px}
+.tbl .st.flag{color:var(--mb-color-on-warn-container);font-weight:600} .tbl .st.ok{color:var(--mb-color-up)}
+.rng{display:inline-flex;align-items:center;gap:8px} .rng svg{width:100px;height:18px;display:block} .rng small{color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+.hzb svg{width:96px;height:40px;display:block}
+.hzb rect.on{fill:var(--md-sys-color-primary)} .hzb rect.off{fill:var(--md-sys-color-surface-container-highest)} .hzb text{font-size:9px;fill:var(--md-sys-color-on-surface-variant)} .hzb text.on{fill:var(--md-sys-color-primary);font-weight:700}
+
+/* legend and footer */
+.legend2{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:18px;align-items:center}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:28px 0 8px} footer code{font-family:var(--md-ref-typeface-mono)}
+
+@media (max-width: 1199px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 1000px){ .grid,.grid.even{grid-template-columns:1fr} }
+@media (max-width: 599px){
+  .card{padding:16px}
+  .phead{margin-top:16px} .phead h1{font-size:21px} .phead .chips{margin-left:0}
+  .kpis{gap:12px} .mb-kpi{padding:14px;grid-template-columns:1fr} .mb-kpi .mb-avatar{grid-row:auto} .mb-kpi .s{grid-column:1} .mb-kpi .v{font-size:22px}
+  .mb-alert{grid-template-columns:auto 1fr} .mb-alert .act{grid-column:1 / span 2}
+  .mb-kpi .labs .mb-label{white-space:normal;text-align:left}
+  .toolbar input{min-width:0;width:100%}
+}
+
+</style>
+<style>
+/* Companies mockup (design track, SPEC section 6 page 10). Page-local layout only; every colour is a token. */
+.co td{vertical-align:middle}
+.co .nm{display:flex;align-items:center;gap:10px;min-width:0} .co .nm .t{min-width:0} .co .nm b{display:block;font-size:14px} .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere} .co .nm small.ph{display:none}
+.co .last b{display:block;font-weight:600} .co .last .mb-delta{font-size:12.5px}
+.co .amt b{font-weight:600} .co .amt .mb-label{font-size:10.5px;padding:0 5px;margin-left:4px}
+.co .acts{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end} .co .acts .md-btn{height:30px;padding:0 10px;font-size:12px} .co .acts .md-btn .ms{width:16px;height:16px;margin-left:-2px}
+.co .acts .md-btn.danger{color:var(--mb-color-down)} .co .acts .md-btn.one{display:none}
+.ev{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.ev li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.ev li:first-child{border-top:0}
+.ev .when{font-size:12px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;padding-top:2px;width:92px}
+.ev .what{min-width:0;overflow-wrap:anywhere} .ev .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:2px}
+.ev .mb-label{font-size:11px;padding:1px 6px}
+.cmd code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere;display:inline-block;vertical-align:middle;max-width:100%}
+.pend{display:grid;gap:6px;margin-top:10px}
+.addbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(500px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog .dbody input,dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+dialog .summ{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);font-size:13px;display:grid;gap:4px}
+dialog .summ .r{display:grid;grid-template-columns:110px 1fr;gap:8px} dialog .summ .r span:first-child{color:var(--md-sys-color-on-surface-variant)}
+dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13px} dialog .warn .ms{flex:none;width:18px;height:18px;margin-top:1px}
+@media (max-width:1359px){ .co .c3{display:none} }
+@media (max-width:1439px){ .co th,.co td{padding:8px 8px} }
+@media (max-width:1199px){ .co .cw{display:none} .co .acts .md-btn span{display:none} .co .acts .md-btn{padding:0 8px} .co .acts .md-btn .ms{margin:0} .co .acts{flex-wrap:nowrap} }
+@media (max-width:900px){ .co .cm{display:none} .co .acts .md-btn.one{display:inline-flex} .co .acts .md-btn.many{display:none} }
+@media (max-width:760px){ .co .cm{display:none} .co th,.co td{padding:8px 6px;white-space:normal} .co .nm .mb-avatar{display:none} .co .acts{justify-content:flex-start} .ev li{grid-template-columns:1fr} .ev .when{width:auto} }
+@media (max-width:599px){ dialog .row2{grid-template-columns:1fr} .co .cp{display:none} .co .nm small.ph{display:block} .co th,.co td{padding:8px 4px} }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <!-- Material Symbols Outlined (weight 400, fill 0, grade 0, optical size 24), Apache License 2.0, Google LLC; see LICENSE-material-symbols.txt.
+       Use: <svg class="ms"><use href="#ms-NAME"/></svg>. The symbols are the 24px outlined glyphs copied unchanged from
+       github.com/google/material-design-icons (symbols/web/NAME/materialsymbolsoutlined/NAME_24px.svg). -->
+  <symbol id="ms-account_balance" viewBox="0 -960 960 960"><path d="M200-280v-280h80v280h-80Zm240 0v-280h80v280h-80ZM80-120v-80h800v80H80Zm600-160v-280h80v280h-80ZM80-640v-80l400-200 400 200v80H80Zm178-80h444-444Zm0 0h444L480-830 258-720Z"/></symbol>
+  <symbol id="ms-account_balance_wallet" viewBox="0 -960 960 960"><path d="M200-200v-560 560Zm0 80q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v100h-80v-100H200v560h560v-100h80v100q0 33-23.5 56.5T760-120H200Zm320-160q-33 0-56.5-23.5T440-360v-240q0-33 23.5-56.5T520-680h280q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H520Zm280-80v-240H520v240h280Zm-160-60q25 0 42.5-17.5T700-480q0-25-17.5-42.5T640-540q-25 0-42.5 17.5T580-480q0 25 17.5 42.5T640-420Z"/></symbol>
+  <symbol id="ms-apartment" viewBox="0 -960 960 960"><path d="M120-120v-560h160v-160h400v320h160v400H520v-160h-80v160H120Zm80-80h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 320h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 480h80v-80h-80v80Zm0-160h80v-80h-80v80Z"/></symbol>
+  <symbol id="ms-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
+  <symbol id="ms-arrow_upward" viewBox="0 -960 960 960"><path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"/></symbol>
+  <symbol id="ms-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
+  <symbol id="ms-bolt" viewBox="0 -960 960 960"><path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z"/></symbol>
+  <symbol id="ms-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
+  <symbol id="ms-check" viewBox="0 -960 960 960"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></symbol>
+  <symbol id="ms-chevron_right" viewBox="0 -960 960 960"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></symbol>
+  <symbol id="ms-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="ms-construction" viewBox="0 -960 960 960"><path d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"/></symbol>
+  <symbol id="ms-description" viewBox="0 -960 960 960"><path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ms-event" viewBox="0 -960 960 960"><path d="M580-240q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Z"/></symbol>
+  <symbol id="ms-expand_more" viewBox="0 -960 960 960"><path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/></symbol>
+  <symbol id="ms-format_list_bulleted" viewBox="0 -960 960 960"><path d="M360-200v-80h480v80H360Zm0-240v-80h480v80H360Zm0-240v-80h480v80H360ZM200-160q-33 0-56.5-23.5T120-240q0-33 23.5-56.5T200-320q33 0 56.5 23.5T280-240q0 33-23.5 56.5T200-160Zm0-240q-33 0-56.5-23.5T120-480q0-33 23.5-56.5T200-560q33 0 56.5 23.5T280-480q0 33-23.5 56.5T200-400Zm0-240q-33 0-56.5-23.5T120-720q0-33 23.5-56.5T200-800q33 0 56.5 23.5T280-720q0 33-23.5 56.5T200-640Z"/></symbol>
+  <symbol id="ms-gavel" viewBox="0 -960 960 960"><path d="M160-120v-80h480v80H160Zm226-194L160-540l84-86 228 226-86 86Zm254-254L414-796l86-84 226 226-86 86Zm184 408L302-682l56-56 522 522-56 56Z"/></symbol>
+  <symbol id="ms-help" viewBox="0 -960 960 960"><path d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-history" viewBox="0 -960 960 960"><path d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
+  <symbol id="ms-home" viewBox="0 -960 960 960"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/></symbol>
+  <symbol id="ms-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-layers" viewBox="0 -960 960 960"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></symbol>
+  <symbol id="ms-menu" viewBox="0 -960 960 960"><path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></symbol>
+  <symbol id="ms-newspaper" viewBox="0 -960 960 960"><path d="M160-120q-33 0-56.5-23.5T80-200v-640l67 67 66-67 67 67 67-67 66 67 67-67 67 67 66-67 67 67 67-67 66 67 67-67v640q0 33-23.5 56.5T800-120H160Zm0-80h280v-240H160v240Zm360 0h280v-80H520v80Zm0-160h280v-80H520v80ZM160-520h640v-120H160v120Z"/></symbol>
+  <symbol id="ms-open_in_new" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></symbol>
+  <symbol id="ms-pending" viewBox="0 -960 960 960"><path d="M280-420q25 0 42.5-17.5T340-480q0-25-17.5-42.5T280-540q-25 0-42.5 17.5T220-480q0 25 17.5 42.5T280-420Zm200 0q25 0 42.5-17.5T540-480q0-25-17.5-42.5T480-540q-25 0-42.5 17.5T420-480q0 25 17.5 42.5T480-420Zm200 0q25 0 42.5-17.5T740-480q0-25-17.5-42.5T680-540q-25 0-42.5 17.5T620-480q0 25 17.5 42.5T680-420ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-public" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm-40-82v-78q-33 0-56.5-23.5T360-320v-40L168-552q-3 18-5.5 36t-2.5 36q0 121 79.5 212T440-162Zm276-102q20-22 36-47.5t26.5-53q10.5-27.5 16-56.5t5.5-59q0-98-54.5-179T600-776v16q0 33-23.5 56.5T520-680h-80v80q0 17-11.5 28.5T400-560h-80v80h240q17 0 28.5 11.5T600-440v120h40q26 0 47 15.5t29 40.5Z"/></symbol>
+  <symbol id="ms-query_stats" viewBox="0 -960 960 960"><path d="m105-233-65-47 200-320 120 140 160-260 109 163q-23 1-43.5 5.5T545-539l-22-33-152 247-121-141-145 233ZM863-40 738-165q-20 14-44.5 21t-50.5 7q-75 0-127.5-52.5T463-317q0-75 52.5-127.5T643-497q75 0 127.5 52.5T823-317q0 26-7 50.5T795-221L920-97l-57 57ZM643-217q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm89-320q-19-8-39.5-13t-42.5-6l205-324 65 47-188 296Z"/></symbol>
+  <symbol id="ms-receipt_long" viewBox="0 -960 960 960"><path d="M240-80q-50 0-85-35t-35-85v-120h120v-560l60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60v680q0 50-35 85t-85 35H240Zm480-80q17 0 28.5-11.5T760-200v-560H320v440h360v120q0 17 11.5 28.5T720-160ZM360-600v-80h240v80H360Zm0 120v-80h240v80H360Zm320-120q-17 0-28.5-11.5T640-640q0-17 11.5-28.5T680-680q17 0 28.5 11.5T720-640q0 17-11.5 28.5T680-600Zm0 120q-17 0-28.5-11.5T640-520q0-17 11.5-28.5T680-560q17 0 28.5 11.5T720-520q0 17-11.5 28.5T680-480ZM240-160h360v-80H200v40q0 17 11.5 28.5T240-160Zm-40 0v-80 80Z"/></symbol>
+  <symbol id="ms-remove" viewBox="0 -960 960 960"><path d="M200-440v-80h560v80H200Z"/></symbol>
+  <symbol id="ms-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
+  <symbol id="ms-science" viewBox="0 -960 960 960"><path d="M200-120q-51 0-72.5-45.5T138-250l222-270v-240h-40q-17 0-28.5-11.5T280-800q0-17 11.5-28.5T320-840h320q17 0 28.5 11.5T680-800q0 17-11.5 28.5T640-760h-40v240l222 270q32 39 10.5 84.5T760-120H200Zm0-80h560L520-492v-268h-80v268L200-200Zm280-280Z"/></symbol>
+  <symbol id="ms-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="ms-sensors" viewBox="0 -960 960 960"><path d="M197-197q-54-55-85.5-127.5T80-480q0-84 31.5-156.5T197-763l57 57q-44 44-69 102t-25 124q0 67 25 125t69 101l-57 57Zm113-113q-32-33-51-76.5T240-480q0-51 19-94.5t51-75.5l57 57q-22 22-34.5 51T320-480q0 33 12.5 62t34.5 51l-57 57Zm170-90q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm170 90-57-57q22-22 34.5-51t12.5-62q0-33-12.5-62T593-593l57-57q32 32 51 75.5t19 94.5q0 50-19 93.5T650-310Zm113 113-57-57q44-44 69-102t25-124q0-67-25-125t-69-101l57-57q54 54 85.5 126.5T880-480q0 83-31.5 155.5T763-197Z"/></symbol>
+  <symbol id="ms-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
+  <symbol id="ms-trending_down" viewBox="0 -960 960 960"><path d="M640-240v-80h104L536-526 376-366 80-664l56-56 240 240 160-160 264 264v-104h80v240H640Z"/></symbol>
+  <symbol id="ms-trending_flat" viewBox="0 -960 960 960"><path d="m700-300-57-56 84-84H120v-80h607l-83-84 57-56 179 180-180 180Z"/></symbol>
+  <symbol id="ms-trending_up" viewBox="0 -960 960 960"><path d="m136-240-56-56 296-298 160 160 208-206H640v-80h240v240h-80v-104L536-320 376-480 136-240Z"/></symbol>
+  <symbol id="ms-verified_user" viewBox="0 -960 960 960"><path d="m438-338 226-226-57-57-169 169-84-84-57 57 141 141Zm42 258q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
+  <symbol id="ms-warning" viewBox="0 -960 960 960"><path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z"/></symbol>
+</svg>
+
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Companies</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+<dialog class="md-dialog" id="dlg"></dialog>
+
+<script>const D = {"_example": true, "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.", "page": "companies", "spec": "docs/SPEC.md section 6, page 10; F8, F10; decisions 12-15, 20, 26, 33, 44", "endpoint": "GET /api/v1/markets/{market}/companies", "read_model": "rm.companies", "sources": ["design/catalogue/market_status.json", "design/catalogue/company.json", "design/catalogue/lifecycle_event.json", "design/catalogue/command_log.json", "design/catalogue/news_item.json", "design/catalogue/open_trade.json", "design/catalogue/portfolio.json", "design/catalogue/scoreboard_row.json"], "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "markets": {"india": {"market": "india", "name": "India (NSE)", "currency": "INR", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T10:31:00Z", "status": {"market": "india", "name": "India (NSE)", "as_of": "2026-10-06", "currency": "INR", "session": {"local_time": "2026-10-07T17:30+05:30", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00", "in_session": false, "late_run": true}, "benchmark": {"symbol": "NIFTY50", "name": "Nifty 50", "close": 22776.0996, "close_date": "2026-10-06", "change_pct": 0.98, "change_5d_pct": -0.02}, "vol_index": {"symbol": "INDIAVIX", "name": "India VIX", "close": 13.61, "close_date": "2026-10-06", "change_pct": -7.92, "change_5d_pct": -0.22}, "regime": "EVENT_HEAVY", "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": true}, "intraday": [{"at": "2026-10-07T05:43:00Z", "ok": true}], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T12:15:00Z"}, "news": {"at": "2026-10-07T10:17:00Z", "ok": true, "new_items": 37}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T10:31:00Z", "age_minutes": 29}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 294, "beats_best_baseline": false}, "default_amount": 100000.0, "companies": [{"market": "india", "ticker": "HDFCBANK", "name": "HDFC Bank", "exchange": "NSE", "sector": "Banks", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "yahoo": "HDFCBANK.NS", "nse_symbol": "HDFCBANK", "cik": null, "last_close": 711.45, "last_close_date": "2026-10-06", "change_pct": 0.94, "agreement_n1": {"buy": 2, "of": 15}, "open_trades": 4}, {"market": "india", "ticker": "MARUTI", "name": "Maruti Suzuki", "exchange": "NSE", "sector": "Autos", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 10000.0, "amount_overridden": true, "currency": "INR", "yahoo": "MARUTI.NS", "nse_symbol": "MARUTI", "cik": null, "last_close": 11625.0, "last_close_date": "2026-10-06", "change_pct": 0.81, "agreement_n1": {"buy": 8, "of": 15}, "open_trades": 0}, {"market": "india", "ticker": "RELIANCE", "name": "Reliance Industries", "exchange": "NSE", "sector": "Energy", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "yahoo": "RELIANCE.NS", "nse_symbol": "RELIANCE", "cik": null, "last_close": 1218.0, "last_close_date": "2026-10-06", "change_pct": 2.66, "agreement_n1": {"buy": 12, "of": 15}, "open_trades": 10}, {"market": "india", "ticker": "INDIGO", "name": "InterGlobe Aviation (IndiGo)", "exchange": "NSE", "sector": "Transport", "state": "inactive", "state_since": "2026-10-05T02:10:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "yahoo": "INDIGO.NS", "nse_symbol": "INDIGO", "cik": null, "last_close": 5050.5, "last_close_date": "2026-10-06", "change_pct": null, "agreement_n1": null, "open_trades": 0}], "lifecycle": [{"id": "we-india-INDIGO-deactivate-20261002T091800Z", "event": "deactivate", "ticker": "INDIGO", "market": "india", "effective_from": "2026-10-05T02:10:00Z", "recorded_at": "2026-10-02T09:18:00Z", "name": null, "exchange": null, "sector": null, "amount": null, "reason": "pause airlines", "requested_by": "slack:U07ABCD123", "channel": "slack", "command_id": "cmd-20261002T091800Z-22018a94", "idempotency_key": "deact-indigo-1", "onboarding": null, "supersedes": null}, {"id": "we-india-MARUTI-set_amount-20260925T091500Z", "event": "set_amount", "ticker": "MARUTI", "market": "india", "effective_from": "2026-09-28T02:10:00Z", "recorded_at": "2026-09-25T09:15:00Z", "name": null, "exchange": null, "sector": null, "amount": 10000.0, "reason": "smaller test amount", "requested_by": "dashboard:owner", "channel": "dashboard", "command_id": "cmd-20260925T091500Z-4e92e724", "idempotency_key": "amt-maruti-20260925", "onboarding": null, "supersedes": null}, {"id": "we-india-RELIANCE-add-20260924T060000Z", "event": "add", "ticker": "RELIANCE", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Reliance Industries", "exchange": "NSE", "sector": "Energy", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-RELIANCE", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-india-MARUTI-add-20260924T060000Z", "event": "add", "ticker": "MARUTI", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Maruti Suzuki", "exchange": "NSE", "sector": "Autos", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-MARUTI", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-india-INDIGO-add-20260924T060000Z", "event": "add", "ticker": "INDIGO", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "InterGlobe Aviation (IndiGo)", "exchange": "NSE", "sector": "Transport", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-INDIGO", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-india-HDFCBANK-add-20260924T060000Z", "event": "add", "ticker": "HDFCBANK", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "HDFC Bank", "exchange": "NSE", "sector": "Banks", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-HDFCBANK", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}], "commands": [], "news_inactive": [], "deleted_count": 0}, "us": {"market": "us", "name": "US (NYSE/Nasdaq)", "currency": "USD", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "status": {"market": "us", "name": "US (NYSE/Nasdaq)", "as_of": "2026-10-06", "currency": "USD", "session": {"local_time": "2026-10-07T08:00-04:00", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00", "in_session": false, "late_run": false}, "benchmark": {"symbol": "SPY", "name": "S&P 500 ETF", "close": 779.09, "close_date": "2026-10-06", "change_pct": 0.55, "change_5d_pct": 1.95}, "vol_index": {"symbol": "VIX", "name": "VIX", "close": 15.01, "close_date": "2026-10-06", "change_pct": -3.29, "change_5d_pct": -6.42}, "regime": "TRENDING", "runs": {"pre_open": {"at": "2026-10-07T11:45:00Z", "ok": true}, "intraday": [], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T22:15:00Z"}, "news": {"at": "2026-10-07T08:47:00Z", "ok": true, "new_items": 52}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T11:58:00Z", "age_minutes": 2}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 290, "beats_best_baseline": false}, "default_amount": 1000.0, "companies": [{"market": "us", "ticker": "AAPL", "name": "Apple", "exchange": "NASDAQ", "sector": "Tech", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "AAPL", "nse_symbol": null, "cik": "0000320193", "last_close": 333.63, "last_close_date": "2026-10-06", "change_pct": 0.22, "agreement_n1": {"buy": 3, "of": 15}, "open_trades": 4}, {"market": "us", "ticker": "JPM", "name": "JPMorgan", "exchange": "NYSE", "sector": "Banks", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "JPM", "nse_symbol": null, "cik": "0000019617", "last_close": 331.28, "last_close_date": "2026-10-06", "change_pct": -0.33, "agreement_n1": {"buy": 8, "of": 15}, "open_trades": 3}, {"market": "us", "ticker": "NVDA", "name": "Nvidia", "exchange": "NASDAQ", "sector": "Tech", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "NVDA", "nse_symbol": null, "cik": "0001045810", "last_close": 239.24, "last_close_date": "2026-10-06", "change_pct": 0.14, "agreement_n1": {"buy": 14, "of": 15}, "open_trades": 6}, {"market": "us", "ticker": "DAL", "name": "Delta Air Lines", "exchange": "NYSE", "sector": "Airlines", "state": "inactive", "state_since": "2026-10-05T11:45:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "DAL", "nse_symbol": null, "cik": "0000027904", "last_close": 83.66, "last_close_date": "2026-10-06", "change_pct": null, "agreement_n1": null, "open_trades": 0}], "lifecycle": [{"id": "we-us-DAL-deactivate-20261002T200000Z", "event": "deactivate", "ticker": "DAL", "market": "us", "effective_from": "2026-10-05T11:45:00Z", "recorded_at": "2026-10-02T20:00:00Z", "name": null, "exchange": null, "sector": null, "amount": null, "reason": "pause airlines", "requested_by": "dashboard:owner", "channel": "dashboard", "command_id": "cmd-20261002T200000Z-597d6a7f", "idempotency_key": "deact-dal-1", "onboarding": null, "supersedes": null}, {"id": "we-us-NVDA-add-20260924T060000Z", "event": "add", "ticker": "NVDA", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Nvidia", "exchange": "NASDAQ", "sector": "Tech", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-NVDA", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-us-JPM-add-20260924T060000Z", "event": "add", "ticker": "JPM", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "JPMorgan", "exchange": "NYSE", "sector": "Banks", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-JPM", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-us-DAL-add-20260924T060000Z", "event": "add", "ticker": "DAL", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Delta Air Lines", "exchange": "NYSE", "sector": "Airlines", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-DAL", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-us-AAPL-add-20260924T060000Z", "event": "add", "ticker": "AAPL", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Apple", "exchange": "NASDAQ", "sector": "Tech", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-AAPL", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}], "commands": [{"id": "cmd-20261006T151000Z-3ffb1995", "market": "us", "received_at": "2026-10-06T15:10:00Z", "channel": "slack", "actor": "slack:U07ABCD123", "agent": "slack-gateway", "tool": "delete_company", "kind": "write", "arguments": {"market": "us", "ticker": "DAL"}, "idempotency_key": "del-dal-x", "result": "refused", "refusal_code": "not_allowed_in_channel", "message": "Delete is only available on the dashboard", "record_ids": [], "budget_left": 17, "completed_at": "2026-10-06T15:10:00Z"}, {"id": "cmd-20261005T140500Z-73abce0f", "market": "us", "received_at": "2026-10-05T14:05:00Z", "channel": "slack", "actor": "slack:U07ABCD123", "agent": "slack-gateway", "tool": "add_company", "kind": "write", "arguments": {"market": "us", "symbol": "SPY"}, "idempotency_key": "add-spy-1", "result": "refused", "refusal_code": "validation_failed", "message": "SPY is an ETF; only common stocks can be added", "record_ids": [], "budget_left": 18, "completed_at": "2026-10-05T14:05:02Z"}, {"id": "cmd-20261005T135500Z-052b8228", "market": "us", "received_at": "2026-10-05T13:55:00Z", "channel": "slack", "actor": "slack:U07ABCD123", "agent": "slack-gateway", "tool": "add_company", "kind": "write", "arguments": {"market": "us", "symbol": "(deleted company)"}, "idempotency_key": "add-msft-7Hq2", "result": "accepted", "refusal_code": null, "message": "(this company was deleted later; its records are excluded on read)", "record_ids": ["we-us-MSFT-add-20261005T140200Z"], "budget_left": 19, "completed_at": "2026-10-05T14:02:00Z"}], "news_inactive": [], "deleted_count": 1}}};</script>
+<script>
+/* Shared script of the design-track mockups: DOM helpers, formatters, the app shell (sidebar, top bar, phone
+   drawer and bar), the tooltip, the page head and small visual parts (odds meter, icon tile, family label, range
+   bar, buyers-by-horizon bars). A page defines `const D = ...payload...` before this script and calls `shell(...)`
+   then builds its sections. Spec constants named once here with their source. */
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null || v === false) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? '' : v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls, 'aria-hidden': 'true'}); const u = svgEl('use'); u.setAttribute('href', '#' + (id.startsWith('ms-') ? id : 'ms-' + id)); s.append(u); return s; };
+const help = tip => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain', type:'button'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const ZONE = {india: 'IST', us: 'ET'};                      /* presentation only: the market's local clock label */
+const LOCALE = {INR: 'en-IN', USD: 'en-US'}, SYMBOL = {INR: '₹', USD: '$'};
+const FAMILY = {rule: ['Rule strategies', 'ms-settings', 'r'], baseline: ['Baselines', 'ms-trending_flat', 'b'], ai: ['AI traders', 'ms-bolt', 'a']};
+const FAMILY_SHORT = {rule: 'Rule', baseline: 'Baseline', ai: 'AI'};
+const PICK = {best_expected_gain: 'Best expected gain', highest_probability: 'Highest probability'};
+const BAND = {below80: ['below the 80% range', 'flag'], below50: ['below the 50% range', ''], inside50: ['inside the 50% range', 'ok'], above50: ['above the 50% range', ''], above80: ['above the 80% range', 'flag']};
+const BAND_SHORT = {below80: 'below 80%', below50: 'below 50%', inside50: 'inside 50%', above50: 'above 50%', above80: 'above 80%'};
+const FLAG = {outside_range: 'outside its range', far_from_target: 'far from its target', against_prediction: 'against the prediction'};
+const FLAG_SHORT = {outside_range: 'outside range', far_from_target: 'far from target', against_prediction: 'against prediction'};
+const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange filing, company release) confirms it. Can be the main evidence of a call.', 'ms-verified_user'],
+  corroborated: ['corroborated', 'Two or more independent outlets reported it on their own. Can be the main evidence of a call.', 'ms-check'],
+  single_source: ['single source', 'One independent origin so far. Lowers a call’s confidence; cannot be the main evidence.', 'ms-warning'],
+  unverified: ['unverified', 'No vetted outlet read yet. Lowers confidence; cannot be the main evidence.', null],
+  rumour: ['rumour', 'Reported as a rumour or from unnamed sources. Never supports a call.', 'ms-close'],
+  promotional: ['promotional', 'A paid, promotional or opinion item. Never supports a call.', 'ms-close'],
+  contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close']};
+const CAN_CARRY = ['confirmed_primary', 'corroborated'];
+/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading and about 300 settled trades per strategy; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank; F2.3 = the back-test runs on the 15-year history cache; F7.1 luck test = a 95% percentile bootstrap interval (marketbrief/lab/luck.py, alpha 0.05). */
+const GO_LIVE_MONTHS = 2, GO_LIVE_TRADES_ABOUT = 300, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20, BACKTEST_YEARS = 15, LUCK_INTERVAL_PCT = 95;
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const fmtDY = iso => fmtD(iso, false) + ' ' + iso.slice(0,4);
+const offsetMin = local => { const m = /([+-])(\d\d):(\d\d)$/.exec(local); return m ? (m[1]==='-'?-1:1) * (60*+m[2] + +m[3]) : 0; };
+const fmtLocal = (iso, m, withDate=false) => { if (!iso) return '—'; const t = new Date(new Date(iso).getTime() + offsetMin(P(m).status.session.local_time)*60000); const hm = `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`; return (withDate ? `${t.getUTCDate()} ${MON[t.getUTCMonth()]} ` : '') + `${hm} ${ZONE[m]}`; };
+const sgn = (x, dec=2, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = (x, dec=0) => x == null ? '—' : (x*100).toFixed(dec) + '%';
+const money = (cur, x, dec=0, sign=false) => { if (x == null) return '—'; const s = Math.abs(x).toLocaleString(LOCALE[cur], {minimumFractionDigits: dec, maximumFractionDigits: dec}); return (sign ? (x>0?'+':x<0?'−':'') : (x<0?'−':'')) + SYMBOL[cur] + s; };
+const price = (cur, x) => x == null ? '—' : x.toLocaleString(LOCALE[cur], {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const moneyDelta = (cur, x, dec=0) => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, money(cur, x, dec, true));
+const dec = cur => cur === 'INR' ? 0 : 2;
+const P = m => D.markets[m];
+const companyOf = (m, t) => (P(m).companies || []).find(c => c.ticker === t) || {ticker: t, name: t};
+const stratOf = (m, id) => (P(m).strategies || {})[id] || {id, name: id, family: '—'};
+const PAGES = {home: '../01-home/page.html', watchlist: '../02-watchlist/page.html', company: '../03-company/page.html', strategies: '../04-stock-strategies/page.html', lab: '../05-strategy-lab/page.html', compare: '../06-rule-vs-ai/page.html', portfolios: '../07-paper-portfolios/page.html', track: '../08-track-record/page.html', news: '../09-news/page.html', companies: '../10-companies/page.html', assistant: '../11-assistant/page.html', help: '../12-help/page.html'};
+const companyPage = t => `${PAGES.company}#${t}`, strategiesPage = t => `${PAGES.strategies}#${t}`;
+const odds = (p, tipText) => { if (p == null) return el('span', {class:'muted'}, '—'); const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13})); const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5})); return el('span', {class:'mb-odds', 'data-tip': tipText}, s, el('b', {}, pct(p))); };
+/* a pick's costs: the market-cost expected gain it was ranked on, and decision 51's viability at the owner's own cost */
+const pickCand = k => (k.candidates || []).find(c => c.horizon_days === k.horizon_days) || null;
+const yourViable = k => { const cd = pickCand(k); return cd && cd.cost_viable != null ? cd.cost_viable : null; };
+function costLabels(cur, k) {
+  const mk = k.expected_gain_pct > 0, cd = pickCand(k), out = [];
+  out.push(el('span', {class:'mb-label ' + (mk ? 'success' : 'neutral'), 'data-tip': `Expected gain after market costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} × ${sgn(k.move_pct)} − ${pct(1 - k.prob_up, 1)} × ${k.loss_pct}% − ${k.costs_pct}% (brokerage, taxes and fees of config/costs.yaml; strategies are ranked on this view).`}, icon(mk ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${mk ? 'clears market costs' : 'below market costs'}`));
+  if (cd && cd.cost_viable != null) out.push(el('span', {class:'mb-label ' + (cd.cost_viable ? 'success' : 'warn'), 'data-tip': `Decision 51, your own costs: with your broker’s extra charges the round trip is ${cd.your_cost_pct}% and the expected gain ${sgn(cd.expected_gain_your_pct)}, so this pick is ${cd.cost_viable ? 'viable' : 'not viable'} at your cost. The flag never blocks a paper trade.`}, icon(cd.cost_viable ? 'ms-check' : 'ms-warning'), cd.cost_viable ? 'viable at your cost' : 'not viable at your cost'));
+  return out;
+}
+const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_pct > 0).length, yv = picked.filter(k => yourViable(k) === true).length, known = picked.filter(k => yourViable(k) != null).length; return `${mk ? `${mk} clear${mk === 1 ? 's' : ''} market costs` : 'none clears market costs'} · ${known ? (yv ? `${yv} viable at your cost` : 'none viable at your cost') : 'your-cost view not stored'}`; };
+const avatar = (ico, kind='', size='') => el('span', {class:`mb-avatar ${kind} ${size}`, 'aria-hidden':'true'}, icon(ico));
+const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
+const statusBadge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
+const sentSquare = v => { const s = v == null ? 'flat' : v > 0.05 ? 'up' : v < -0.05 ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+/* range bar: the trade's or prediction's 50% and 80% bands, the entry dotted, the target as a triangle, the last price as the dark line */
+function rangeBar(cur, r, last, entry) {
+  const lo = Math.min(r.lo80, entry ?? r.lo80, last ?? r.lo80) * 0.997, hi = Math.max(r.hi80, entry ?? r.hi80, last ?? r.hi80, r.target_price) * 1.003, X = v => (v - lo) / (hi - lo) * 96 + 2;
+  const s = svgEl('svg', {viewBox:'0 0 100 18', role:'img', 'aria-label':`80% range ${price(cur, r.lo80)} to ${price(cur, r.hi80)}${last != null ? ', last ' + price(cur, last) : ''}`});
+  s.append(svgEl('rect', {x: X(r.lo80), y: 5, width: X(r.hi80) - X(r.lo80), height: 8, rx: 4, fill: 'var(--mb-chart-band-80)'}));
+  s.append(svgEl('rect', {x: X(r.lo50), y: 5, width: X(r.hi50) - X(r.lo50), height: 8, rx: 4, fill: 'var(--mb-chart-band-50)'}));
+  if (entry != null) s.append(svgEl('line', {x1: X(entry), x2: X(entry), y1: 3, y2: 15, stroke: 'var(--md-sys-color-outline)', 'stroke-width': 1.5, 'stroke-dasharray': '2 1.5'}));
+  s.append(svgEl('path', {d: `M${X(r.target_price)-3},1 L${X(r.target_price)+3},1 L${X(r.target_price)},5 Z`, fill: 'var(--mb-chart-1)'}));
+  if (last != null) s.append(svgEl('line', {x1: X(last), x2: X(last), y1: 2, y2: 16, stroke: 'var(--md-sys-color-on-surface)', 'stroke-width': 2}));
+  return el('span', {class:'rng', 'data-tip': `Predicted 50% range ${price(cur, r.lo50)}–${price(cur, r.hi50)}, 80% range ${price(cur, r.lo80)}–${price(cur, r.hi80)}; target ${price(cur, r.target_price)} (the triangle)${entry != null ? `; entry ${price(cur, entry)} (dotted)` : ''}${last != null ? `; last ${price(cur, last)} (the dark line)` : ''}.`}, s);
+}
+/* buyers by horizon: five small bars, the selected horizon dark */
+function horizonBars(m, ticker, horizon) {
+  const p = P(m), s = svgEl('svg', {viewBox:'0 0 96 40', role:'img', 'aria-label':'buyers by horizon'});
+  const rows = p.horizons.map(k => (p.agreement[String(k)] || []).find(x => x.ticker === ticker));
+  const max = Math.max(1, ...rows.map(a => a ? a.of : 0));
+  rows.forEach((a, i) => { const x = i * 19 + 1, h = a ? Math.max(2, a.buy / max * 26) : 2, on = p.horizons[i] === horizon;
+    s.append(svgEl('rect', {class: on ? 'on' : 'off', x, y: 28 - h, width: 15, height: h, rx: 3}));
+    const tx = svgEl('text', {class: on ? 'on' : '', x: x + 7.5, y: 38, 'text-anchor':'middle'}); tx.textContent = a ? a.buy : '–'; s.append(tx); });
+  const wrap = el('span', {class:'hzb', 'data-tip': `Buyers at each horizon: ${p.horizons.map(k => { const a = (p.agreement[String(k)] || []).find(x => x.ticker === ticker); return `N+${k} ${a ? a.buy + ' of ' + a.of : 'no prediction'}`; }).join(' · ')}. The strongest other horizon is the one with the most buyers (ties: the shorter).`}, s);
+  return wrap;
+}
+function horizonTabs(horizons, current, onPick) {
+  const seg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Horizon'});
+  for (const k of horizons) seg.append(el('button', {type:'button', 'aria-pressed': String(k === current), onclick: () => onPick(k)}, `N+${k}`));
+  return seg;
+}
+const horizonWords = k => k === 1 ? 'the next session’s close' : `the close of the ${['','1st','2nd','3rd','4th','5th'][k]} session after the open`;
+
+/* ---------- state: the market from the hash ---------- */
+let market = (location.hash.slice(1).split('/')[0] in D.markets) ? location.hash.slice(1).split('/')[0] : 'india';
+
+/* ---------- shell ---------- */
+const NAV = [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['science','Strategy lab',PAGES.lab], ['layers','Rule vs AI',PAGES.compare], ['account_balance_wallet','Paper portfolios',PAGES.portfolios], ['query_stats','Track record',PAGES.track], ['newspaper','News',PAGES.news], ['apartment','Companies',PAGES.companies], ['bolt','Assistant',PAGES.assistant], ['help','Help',PAGES.help]];
+let onMarketChange = () => {};
+function shell(current, title, opts={}) {
+  const navItem = ([ico, label, href]) => el('a', {class:'mb-nav-item', href: href === current ? '#' : href, 'aria-current': href === current ? 'page' : null}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), el('span', {class:'mb-nav-label'}, label));
+  const sidebar = $('#sidebar');
+  sidebar.append(el('div', {class:'mb-sidebar-brand'}, el('span', {class:'mb-brand-mark', 'aria-hidden':'true'}, 'MB'), el('span', {}, 'Market brief', el('small', {}, 'research cockpit'))), el('div', {class:'mb-sidebar-section'}, 'Pages'), ...NAV.map(navItem), el('div', {class:'mb-sidebar-foot', id:'side-foot'}));
+  const menuBtn = $('#menu-btn'), scrim = $('#scrim');
+  const toggleMenu = on => { sidebar.classList.toggle('open', on); menuBtn.setAttribute('aria-expanded', String(on)); };
+  menuBtn.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
+  scrim.addEventListener('click', () => toggleMenu(false));
+  const barItems = (opts.bar || [NAV[0], NAV[1], NAV[2], NAV[3]]).map(navItem);
+  $('#navbar').append(...barItems, el('button', {class:'mb-nav-item', type:'button', 'aria-controls':'sidebar', onclick: () => toggleMenu(true)}, el('span', {class:'mb-nav-ind'}, icon('ms-menu')), el('span', {class:'mb-nav-label'}, 'More')));
+  window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+  /* tooltip (hover, focus, tap; Escape closes) */
+  const tip = $('#tip'); let tipPinned = null;
+  const showTip = (target, html) => { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; };
+  const hideTip = () => { if (tipPinned) return; tip.classList.remove('on'); };
+  document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+  document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+  document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+  document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+  document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A' && !t.classList.contains('md-btn') && t.closest('.md-segmented') == null && !t.closest('.md-chip.filter') && !t.closest('th')) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); toggleMenu(false); } });
+  window.addEventListener('hashchange', () => { const h = location.hash.slice(1).split('/')[0]; if (h in D.markets && h !== market) { market = h; onMarketChange(); } });
+}
+function marketSeg(onPick) { const seg = $('#market-seg'); seg.innerHTML = ''; for (const m of Object.keys(D.markets)) seg.append(el('button', {type:'button', 'aria-pressed': String(m === market), 'data-tip': `Switch to the ${LABEL[m]} ${document.title.split(' · ')[1] || 'page'} (${P(m).name})`, onclick: () => { market = m; history.replaceState(null, '', '#'+m); onPick(m); }}, LABEL[m])); }
+function sideFoot(m) { const p = P(m), f = $('#side-foot'); f.innerHTML = ''; f.append(el('b', {}, p.status.paper_label), el('br'), `${LABEL[m]} · data as of ${fmtD(p.as_of, false)}`); }
+function makeFocusable(root) { for (const n of root.querySelectorAll('[data-tip]')) if (!n.matches('a[href], button, input, select, [tabindex]')) n.setAttribute('tabindex', '0'); }
+function pageHead(m, title, subtitle) {
+  const p = P(m), s = p.status.session, open = !!s.in_session, fr = p.status.freshness;
+  const h = el('section', {class:'phead', 'aria-label':'Session and freshness'});
+  h.append(el('div', {}, el('h1', {}, title), el('div', {class:'sub'}, subtitle)));
+  const chips = el('div', {class:'chips'});
+  chips.append(el('span', {class:'md-chip', 'data-tip': `Session ${fmtLocal(s.session_open_utc, m)}–${fmtLocal(s.session_close_utc, m)}.`}, el('span', {class:'dot'+(open?' open':'')}), s.trading_day ? (open ? el('b', {}, 'Open now') : (s.late_run ? 'Closed for today' : el('span', {}, 'Opens ', el('b', {}, fmtLocal(s.session_open_utc, m))))) : 'No session today'));
+  chips.append(el('span', {class:'md-chip', 'data-tip':'Market mood stored by the daily run: CALM / TRENDING / EVENT_HEAVY / UNSTABLE. AI traders lower their probability in EVENT_HEAVY and UNSTABLE; rule strategies either filter those days or not.'}, 'Regime ', el('b', {}, p.status.regime)));
+  chips.append(el('span', {class:'md-chip', 'data-tip': `Page data built ${fmtLocal(fr.built_at, m, true)} (${fr.age_minutes} min before the cut-off ${fmtLocal(p.cutoff, m, true)}). Nothing stored after the cut-off is used.`}, icon(fr.state === 'fresh' ? 'ms-check' : 'ms-warning'), el('b', {}, fr.state), ` · built ${fmtLocal(fr.built_at, m)}`));
+  chips.append(el('span', {class:'mb-tag paper', 'data-tip': p.status.paper_label}, 'paper'));
+  h.append(chips);
+  return h;
+}
+function paperBand(m, g, n) {
+  const p = P(m);
+  if (g && g.proven) return el('section', {class:'mb-alert band success', 'aria-label':'Signals'}, icon('ms-check'), el('div', {}, el('b', {class:'t'}, 'A strategy has met the go-live bar'), el('div', {class:'s'}, `${p.status.paper_label}. Strong signals may now appear on the strategy pages; the rankings still say who agrees, not what to do.`)), el('a', {class:'md-btn text act', href: PAGES.track, style:'color:inherit'}, 'Track record', icon('ms-chevron_right')));
+  return el('section', {class:'mb-alert band', 'aria-label':'Signals'}, icon('ms-block'), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'),
+    el('div', {class:'s'}, `${p.status.paper_label}.` + (g ? ` None of the ${n} strategies has met the go-live bar (${g.trades_needed} settled trades, ${g.months_forward} of ${GO_LIVE_MONTHS} months forward so far, beating the best baseline after costs).` : '') + ' Nothing here is advice.')),
+    el('a', {class:'md-btn text act', href: PAGES.track, style:'color:inherit'}, 'Track record', icon('ms-chevron_right')));
+}
+function footer(m, endpoint) { const p = P(m); return el('footer', {}, `Personal research project. Example data from the data catalogue; nothing here is investment advice and nothing trades. as_of ${p.as_of} · cutoff ${p.cutoff} · built_at ${p.built_at} · `, el('code', {}, endpoint.replace('{market}', m))); }
+
+</script>
+<script>
+let pending = {};
+shell(PAGES.companies, 'Companies', {bar: [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['apartment','Companies',PAGES.companies], ['science','Strategy lab',PAGES.lab]]});
+onMarketChange = () => render();
+const CHANNEL = {dashboard: 'the dashboard', slack: 'Slack', cli: 'the command line', claude_app: 'the Claude app', claude_code: 'Claude Code', seed: 'the seed (config)'};
+const EVENT_WORDS = {add: 'added', deactivate: 'deactivated', reactivate: 'reactivated', delete: 'deleted', set_amount: 'amount set'};
+const RESULT = {accepted: ['accepted', 'success'], pending: ['pending', 'warn'], refused: ['refused', 'danger'], duplicate: ['duplicate', 'neutral'], failed: ['failed', 'danger']};
+const TOOL = {add_company: 'add a company', deactivate_company: 'deactivate', reactivate_company: 'reactivate', set_amount: 'set the amount', delete_company: 'delete'};
+const pendingOf = () => pending[market] || [];
+
+function kpis(p) {
+  const cur = p.currency, active = p.companies.filter(c => c.state === 'active'), inactive = p.companies.filter(c => c.state === 'inactive');
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('apartment', 'success', 'Active', String(active.length), 'predicted and traded on paper every session', 'Active companies are collected, predicted and traded on paper (F8.2).'));
+  K.append(card('pending', inactive.length ? 'neutral' : '', 'Inactive', String(inactive.length), inactive.length ? `still collected, never predicted: ${inactive.map(c => c.ticker).join(', ')}` : 'none', 'Inactive companies stay collected (prices, news, filings) but get no prediction or paper trade; their open paper trades still settle (decision 13).'));
+  K.append(card('account_balance_wallet', 'paper', 'Default per paper trade', money(cur, p.default_amount), `${active.filter(c => c.amount_overridden).length} compan${active.filter(c => c.amount_overridden).length === 1 ? 'y has' : 'ies have'} a custom amount`, 'The market’s default money per paper trade (decision 26); a company can have its own amount (decision 44).'));
+  const pend = pendingOf().length + p.commands.filter(c => c.result === 'pending').length;
+  K.append(card('schedule', pend ? 'warn' : 'neutral', 'Pending requests', String(pend), pend ? 'waiting for the next import' : 'nothing waiting', 'Requests from any channel are appended to the inbox and imported by the next run (F10); until then they are pending.'));
+  return K;
+}
+
+function activeCard(p) {
+  const cur = p.currency, rows = p.companies.filter(c => c.state === 'active');
+  const card = el('section', {class:'card', 'aria-label':'Active companies'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Active companies (${rows.length})`), help('Every company that is predicted and traded on paper. Amount = money per paper trade (the market’s default unless set for the company). Actions record a request: deactivate (takes effect at the next pre-open run; open paper trades still settle), change the amount, or delete (dashboard only, with a typed confirmation; the company is then excluded everywhere, decision 12).'), el('div', {class:'end'}, el('button', {class:'md-btn filled small', type:'button', onclick: () => addDialog(p)}, icon('ms-apartment'), 'Add company'))));
+  const tb = el('table', {class:'md-table tbl co'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {class:'num'}, 'Last close'), el('th', {class:'num cp'}, 'Per paper trade'), el('th', {class:'num cw'}, 'Buy at N+1'), el('th', {class:'num cw'}, 'Open trades'), el('th', {class:'cm'}, 'On the list since'), el('th', {class:'c3'}, 'Identifiers'), el('th', {class:'num'}, 'Actions'))));
+  const body = el('tbody');
+  for (const c of rows) {
+    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': `${c.name}: open its company page.`}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`), el('small', {class:'ph'}, `${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (custom)' : ''}`)))),
+      el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
+      el('td', {class:'num amt cp'}, el('b', {}, money(cur, c.amount)), c.amount_overridden ? el('span', {class:'mb-label neutral', 'data-tip':'Set for this company; differs from the market’s default (decision 44).'}, 'custom') : null),
+      el('td', {class:'num cw'}, el('span', {'data-tip': `${c.agreement_n1.buy} of ${c.agreement_n1.of} strategies would buy ${c.name} at N+1 today (decision 30).`}, `${c.agreement_n1.buy} of ${c.agreement_n1.of}`)),
+      el('td', {class:'num cw'}, String(c.open_trades)),
+      el('td', {class:'cm'}, el('span', {'data-tip': `Added ${fmtDY(c.added_at)}${c.added_at.startsWith('2011') ? ' (the seed: the start of stored history)' : ''}; active since ${fmtDY(c.state_since)}.`}, fmtDY(c.added_at))),
+      el('td', {class:'c3'}, el('small', {class:'muted'}, [c.yahoo ? `Yahoo ${c.yahoo}` : null, c.nse_symbol ? `NSE ${c.nse_symbol}` : null, c.cik ? `CIK ${c.cik}` : null].filter(Boolean).join(' · '))),
+      el('td', {class:'num'}, el('span', {class:'acts'}, el('button', {class:'md-btn outlined many', type:'button', 'aria-label': `Change the amount for ${c.name}`, onclick: () => amountDialog(p, c)}, icon('ms-account_balance_wallet'), el('span', {}, 'Amount')), el('button', {class:'md-btn outlined many', type:'button', 'aria-label': `Deactivate ${c.name}`, onclick: () => stateDialog(p, c, 'deactivate')}, icon('ms-pending'), el('span', {}, 'Deactivate')), el('button', {class:'md-btn outlined danger many', type:'button', 'aria-label': `Delete ${c.name}`, onclick: () => deleteDialog(p, c)}, icon('ms-close'), el('span', {}, 'Delete')), el('button', {class:'md-btn outlined one', type:'button', 'aria-label': `Manage ${c.name}`, onclick: () => manageDialog(p, c)}, icon('ms-settings'), el('span', {}, 'Manage'))))));
+  }
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+function inactiveCard(p) {
+  const cur = p.currency, rows = p.companies.filter(c => c.state === 'inactive');
+  const card = el('section', {class:'card', 'aria-label':'Inactive companies'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Inactive companies (${rows.length})`), help('Still collected (prices, news, filings, announcements) but never predicted or traded; their open paper trades settle normally. Reactivate takes effect at the next pre-open run (F8.4). Only this page lists them (decision 13).')));
+  if (!rows.length) { card.append(el('div', {class:'quiet'}, 'No inactive company.')); return card; }
+  const tb = el('table', {class:'md-table tbl co'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Inactive since'), el('th', {class:'num'}, 'Last close'), el('th', {class:'cm'}, 'News since'), el('th', {class:'num cw'}, 'Open trades'), el('th', {class:'num'}, 'Actions'))));
+  const body = el('tbody');
+  for (const c of rows) {
+    const ev = p.lifecycle.find(e => e.ticker === c.ticker && e.event === 'deactivate'), news = p.news_inactive.filter(n => n.tickers.includes(c.ticker));
+    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker)}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`)))),
+      el('td', {}, el('span', {'data-tip': ev ? `Deactivated via ${CHANNEL[ev.channel] || ev.channel} by ${ev.requested_by}, recorded ${fmtLocal(ev.recorded_at, market, true)}, effective ${fmtLocal(ev.effective_from, market, true)}.` : 'The deactivation event is not in the example data.'}, fmtDY(c.state_since)), ev && ev.reason ? el('small', {class:'muted', style:'display:block;font-size:11.5px'}, `“${ev.reason}”`) : null),
+      el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
+      el('td', {class:'cm'}, news.length ? el('span', {'data-tip': news.map(n => `${n.title} (${(STATUS[n.status] || [n.status])[0]}, ${fmtD(n.first_seen_at, false)})`).join(' · ')}, `${news.length} stor${news.length === 1 ? 'y' : 'ies'}`) : el('span', {class:'muted'}, 'none stored')),
+      el('td', {class:'num cw'}, String(c.open_trades)),
+      el('td', {class:'num'}, el('span', {class:'acts'}, el('button', {class:'md-btn tonal many', type:'button', 'aria-label': `Reactivate ${c.name}`, onclick: () => stateDialog(p, c, 'reactivate')}, icon('ms-check'), el('span', {}, 'Reactivate')), el('button', {class:'md-btn outlined danger many', type:'button', 'aria-label': `Delete ${c.name}`, onclick: () => deleteDialog(p, c)}, icon('ms-close'), el('span', {}, 'Delete')), el('button', {class:'md-btn outlined one', type:'button', 'aria-label': `Manage ${c.name}`, onclick: () => manageDialog(p, c)}, icon('ms-settings'), el('span', {}, 'Manage'))))));
+  }
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+function requests(p) {
+  const card = el('section', {class:'card', 'aria-label':'Requests'});
+  const pend = pendingOf(), cmds = p.commands;
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Requests'), help('Every company command from any channel (the dashboard, Slack, the command line, the Claude app) is logged with who asked (from the channel’s sign-in, never typed in), its result and the reason when refused (F10). Accepted writes are pending until the next run imports them. A deleted company is masked here (decision 12).'), el('div', {class:'end'}, `${pend.length} pending · ${cmds.length} recent`)));
+  const host = el('div', {class:'pend'});
+  for (const r of pend) host.append(el('div', {class:'mb-alert', style:'padding:10px 14px'}, icon('ms-pending'), el('div', {}, el('b', {class:'t'}, `Pending: ${r}`), el('div', {class:'s'}, 'Appended to the inbox with your sign-in and an idempotency key; the next run imports it (F10). Mockup: nothing was sent.'))));
+  if (pend.length) card.append(host);
+  if (!cmds.length) { card.append(el('div', {class:'quiet', style: pend.length ? 'margin-top:10px' : ''}, 'No company command recorded for this market yet.')); return card; }
+  const ul = el('ul', {class:'ev cmd', style: pend.length ? 'margin-top:12px' : ''});
+  for (const c of cmds) { const r = RESULT[c.result] || [c.result, 'neutral']; ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(c.received_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + r[1]}, r[0]), ` ${TOOL[c.tool] || c.tool}: `, el('code', {}, Object.entries(c.arguments).filter(([k]) => k !== 'market').map(([k, v]) => `${k} ${v}`).join(', ') || c.tool), c.message ? el('small', {}, c.message) : null, el('small', {}, `via ${CHANNEL[c.channel] || c.channel} · ${c.actor}${c.refusal_code ? ` · ${c.refusal_code.replace(/_/g, ' ')}` : ''}${c.record_ids && c.record_ids.length ? ` · wrote ${c.record_ids.length} record${c.record_ids.length === 1 ? '' : 's'}` : ''}`)))); }
+  card.append(ul);
+  return card;
+}
+
+function history(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Lifecycle history'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Lifecycle history'), help('The watchlist is data (F8): every add, deactivate, reactivate and amount change is an append-only event with who asked, the channel, when it was recorded and when it counts (the next pre-open run; seeded adds count from the start of stored history). Events of a deleted company are excluded on read (decision 12).'), el('div', {class:'end'}, `${p.lifecycle.length} events${p.deleted_count ? ` · ${p.deleted_count} deleted compan${p.deleted_count === 1 ? 'y' : 'ies'} excluded` : ''}`)));
+  if (!p.lifecycle.length) { card.append(el('div', {class:'quiet'}, 'No event stored.')); return card; }
+  const ul = el('ul', {class:'ev'});
+  for (const e of p.lifecycle) ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(e.recorded_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + ({add: 'success', reactivate: 'success', deactivate: 'neutral', set_amount: 'info', delete: 'danger'}[e.event] || 'neutral')}, EVENT_WORDS[e.event] || e.event), ' ', el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker), e.event === 'set_amount' && e.amount != null ? ` to ${money(cur, e.amount)}` : '', e.reason ? ` · “${e.reason}”` : '', el('small', {}, `via ${CHANNEL[e.channel] || e.channel} · ${e.requested_by} · counts from ${fmtLocal(e.effective_from, market, true)}${e.onboarding && e.channel !== 'seed' ? ` · onboarding: ${Object.entries(e.onboarding).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ')}` : ''}`))));
+  card.append(ul);
+  return card;
+}
+
+/* ---------- dialogs (mockup: record a pending request) ---------- */
+const recordPending = text => { (pending[market] = pending[market] || []).push(text); $('#dlg').close(); render(); };
+const dbox = (title, ...kids) => { const dlg = $('#dlg'); dlg.innerHTML = ''; const body = el('div', {class:'dbody'}, el('h3', {id:'dlg-title'}, title), ...kids.filter(Boolean)); dlg.setAttribute('aria-labelledby', 'dlg-title'); dlg.append(body); return dlg; };
+function addDialog(p) {
+  const cur = p.currency, dlg = $('#dlg');
+  const sym = el('input', {type:'text', placeholder: market === 'india' ? 'NSE symbol, e.g. TCS' : 'NYSE or Nasdaq ticker, e.g. MSFT', 'aria-label':'Exchange symbol'}), nm = el('input', {type:'text', placeholder:'optional', 'aria-label':'Name'}), amt = el('input', {type:'number', min:'1', step:'1', placeholder: String(p.default_amount), 'aria-label':'Amount'});
+  dbox('Add a company', el('div', {}, `Takes the exchange symbol, an optional name and an optional amount (F8.3). The onboarding checks the identifiers (${market === 'india' ? 'NSE and Yahoo symbols' : 'ticker, Yahoo symbol and SEC CIK'}), refuses ETFs, ${market === 'india' ? 'BSE-only' : 'unlisted'} and unknown symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next pre-open run.`), el('label', {}, 'Exchange symbol', sym), el('div', {class:'row2'}, el('label', {}, 'Name (optional)', nm), el('label', {}, `Amount per paper trade (${cur}, optional)`, amt)), el('div', {class:'muted', style:'font-size:12.5px'}, 'Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding (F8.7).'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { const s = sym.value.trim().toUpperCase(); if (!s) { sym.focus(); return; } summaryStep(p, s, nm.value.trim(), amt.value ? +amt.value : null); }}, 'Check the symbol')));
+  dlg.showModal(); sym.focus();
+}
+function summaryStep(p, symbol, name, amount) {
+  const cur = p.currency, dlg = $('#dlg');
+  dbox(`Confirm: add ${symbol}?`, el('div', {class:'summ', 'aria-label':'Summary'}, el('div', {class:'r'}, el('span', {}, 'Symbol'), el('b', {}, symbol)), el('div', {class:'r'}, el('span', {}, 'Name'), el('span', {}, name || el('span', {class:'muted'}, 'resolved at onboarding'))), el('div', {class:'r'}, el('span', {}, 'Exchange · sector'), el('span', {class:'muted'}, 'resolved at onboarding')), el('div', {class:'r'}, el('span', {}, market === 'india' ? 'Yahoo · NSE' : 'Yahoo · CIK'), el('span', {class:'muted'}, 'resolved at onboarding')), el('div', {class:'r'}, el('span', {}, 'Amount'), el('b', {}, money(cur, amount ?? p.default_amount), amount == null ? el('span', {class:'muted'}, ' (default)') : null))), el('div', {class:'muted', style:'font-size:12.5px'}, 'Mockup: the real page fills this summary from the identifier check (name, exchange, sector, Yahoo symbol, CIK) before you confirm. Confirm records the request with your sign-in and an idempotency key; a double click never adds twice.'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`add ${symbol}${name ? ` (${name})` : ''} at ${money(cur, amount ?? p.default_amount)} per paper trade`)}, 'Confirm')));
+}
+function amountDialog(p, c) {
+  const cur = p.currency, dlg = $('#dlg'), input = el('input', {type:'number', min:'1', step:'1', value: String(c.amount), 'aria-label':'New amount'});
+  dbox(`Change the amount for ${c.name}`, el('div', {}, `Money per paper trade. Today ${money(cur, c.amount)}${c.amount_overridden ? ' (set for this company)' : ' (the default)'}. In India a trade is skipped when one share costs more than the amount. Takes effect at the next pre-open run.`), el('label', {}, `New amount (${cur})`, input));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`set the amount of ${c.ticker} to ${money(cur, +input.value || c.amount)}`)}, 'Record amount')));
+  dlg.showModal();
+}
+function stateDialog(p, c, kind) {
+  const dlg = $('#dlg');
+  dbox(kind === 'deactivate' ? `Deactivate ${c.name}?` : `Reactivate ${c.name}?`, el('div', {}, kind === 'deactivate' ? 'It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next pre-open run (F8.4).' : 'Predictions and paper trades resume from the next pre-open run (F8.4).'), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it.'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`${kind} ${c.ticker}`)}, kind === 'deactivate' ? 'Record deactivation' : 'Record reactivation')));
+  dlg.showModal();
+}
+function deleteDialog(p, c) {
+  const dlg = $('#dlg'), typed = el('input', {type:'text', placeholder: c.ticker, 'aria-label': `Type ${c.ticker} to confirm`, autocomplete:'off'});
+  const ok = el('button', {class:'md-btn filled', type:'button', disabled: true, onclick: () => recordPending(`delete ${c.ticker} (typed confirmation)`)}, 'Delete for good');
+  typed.addEventListener('input', () => { if (typed.value.trim().toUpperCase() === c.ticker) ok.removeAttribute('disabled'); else ok.setAttribute('disabled', ''); });
+  dbox(`Delete ${c.name}?`, el('div', {class:'warn'}, icon('ms-warning'), el('div', {}, el('b', {}, 'This cannot be undone from the cockpit.'), ' A delete appends a tombstone: the company is excluded on read everywhere, the warehouse and the graph drop it at the next sync, and every scoreboard and track record is computed without it from then on (F8.5, decision 12). Raw records stay in git history. Delete is available here only, never from Slack.')), el('label', {}, `Type ${c.ticker} to confirm`, typed));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), ok));
+  dlg.showModal(); typed.focus();
+}
+
+function manageDialog(p, c) {
+  const dlg = $('#dlg'), cur = p.currency;
+  const btn = (text, ico, fn, cls='outlined') => el('button', {class:'md-btn ' + cls, type:'button', style:'justify-content:flex-start', onclick: fn}, icon(ico), text);
+  dbox(`${c.ticker} · ${c.name}`, el('div', {class:'muted', style:'font-size:12.5px'}, `${c.sector} · ${c.exchange} · ${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (custom)' : ''} · ${c.state}${c.state === 'inactive' ? ` since ${fmtDY(c.state_since)}` : ''}`), el('div', {style:'display:grid;gap:8px'}, btn('Change the amount', 'ms-account_balance_wallet', () => amountDialog(p, c)), c.state === 'active' ? btn('Deactivate', 'ms-pending', () => stateDialog(p, c, 'deactivate')) : btn('Reactivate', 'ms-check', () => stateDialog(p, c, 'reactivate'), 'tonal'), btn('Delete (typed confirmation)', 'ms-close', () => deleteDialog(p, c), 'outlined danger')));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Close')));
+  dlg.showModal();
+}
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('span', {class:'mb-label neutral'}, 'custom'), ' an amount set for the company'),
+    el('span', {}, el('span', {class:'mb-label success'}, 'accepted'), ' ', el('span', {class:'mb-label warn'}, 'pending'), ' ', el('span', {class:'mb-label danger'}, 'refused'), ' a request’s result'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every trade is a paper record; nothing here is advice'));
+}
+
+function render() {
+  const p = P(market);
+  document.title = `Market brief · Companies · ${LABEL[market]}`; $('#title').textContent = `Companies · ${p.name}`;
+  sideFoot(market); marketSeg(() => render());
+  const page = $('#page'); page.innerHTML = '';
+  page.append(pageHead(market, 'Companies', `the watchlist as data: ${p.companies.length} compan${p.companies.length === 1 ? 'y' : 'ies'} · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only`), kpis(p));
+  page.append(el('div', {style:'margin-top:16px'}, activeCard(p)), el('div', {style:'margin-top:16px'}, inactiveCard(p)));
+  const grid = el('div', {class:'grid even'}); grid.append(requests(p), history(p)); page.append(grid);
+  page.append(legend(), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>
