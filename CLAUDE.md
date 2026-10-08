@@ -312,8 +312,8 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
   conditional move and loss of `lab/gain.py`; null without a probability or 80% range, or when the amount buys no
   whole share); the flag never blocks a
-  prediction or pick. The owner's paper portfolio uses the your-cost charges (except the US portfolio fee, an
-  open owner question in docs/ws/b2.md) and shows a EUR view of US positions.
+  prediction or pick. The owner's paper portfolio uses the your-cost charges (the US portfolio fee pro-rated per lot over
+  the calendar days held, owner decision of 2026-10-08) and shows a EUR view of US positions.
 - `scripts/marketbrief/` package of the refactor (docs/REFACTOR_PLAN.md): `constants/` (kinds, columns,
   statuses, sources, config keys, files, messages), `core/` (paths, clock, schemas, market config, storage,
   database, cli, settings), `utils/` (numbers, timestamps, text, markdown, money), `sources/` (one
