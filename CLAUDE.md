@@ -313,8 +313,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   the market-cost view and its your-cost view -> `cost_views`; F1.9 measures, F1.10 automatic reason; a prediction
   or pick made or first committed at or after D's open is refused; a split correction re-settles as a new row),
   `news-impact` (weekly -> `news_impact`), `summary` (scoreboard ranked on market cost with the bootstrap luck test
-  and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up
-  and momentum on stored bars, basis backtest, never in data/), `pick-study`. Costs (`lab/costs.py`): the statutory
+  and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up,
+  momentum and, on B10's walk-forward probabilities as of the clock, the model strategies without news; stored bars,
+  `--history` adds the cache; basis backtest; `backtest --store` -> `lab_backtests`, once per run_id), `pick-study`. Costs (`lab/costs.py`): the statutory
   rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
   owner-provided, marked verify; the owner confirms them with a contract note before Wave 5 switches paper trading
   on); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
