@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"lib/tools/tests/**/*.test.ts\""
+    "test": "node --test \"lib/**/tests/**/*.test.ts\" \"app/api/**/*.test.ts\""
   },
   "dependencies": {
     "next": "15.5.26",
