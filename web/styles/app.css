@@ -1,0 +1,72 @@
+/* The app's own additions to the design system (B7): only what the mockups' static pages did not need (skip link,
+   loading / error / empty states, the chat panel slot, shared cells that pages built inline). Every colour is a token
+   of tokens.css; no page-local colours. tokens.css, components.css and page.css are unchanged copies of design/
+   (tools/sync-design.mjs). */
+
+/* skip link: first focus stop of every page */
+.mb-skip{position:absolute;left:8px;top:-48px;z-index:60;padding:8px 14px;border-radius:var(--md-sys-shape-corner-small);background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);font-weight:600;text-decoration:none}
+.mb-skip:focus{top:8px;box-shadow:var(--mb-focus-ring)}
+.mb-content:focus{outline:none}
+.mb-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.nowrap{white-space:nowrap}
+
+/* the chat panel slot (B8's panel renders inside; empty = nothing on screen) */
+.mb-chat-slot{position:fixed;right:0;top:var(--mb-topbar-height);bottom:0;z-index:25;width:min(420px,100vw);display:flex;flex-direction:column}
+.mb-chat-slot:empty{display:none}
+@media (max-width: 599px){ .mb-chat-slot{top:0;bottom:var(--mb-navbar-height)} }
+
+/* states */
+.mb-state{margin-top:16px}
+.mb-state.loading{display:grid;gap:16px}
+.mb-skeleton{min-height:120px}
+.mb-skeleton-line{height:12px;border-radius:6px;background:var(--md-sys-color-surface-container-high);margin:10px 0;width:100%}
+.mb-skeleton-line.w40{width:40%;height:16px} .mb-skeleton-line.w70{width:70%}
+@media (prefers-reduced-motion: no-preference){ .mb-skeleton-line{animation:mb-pulse 1.4s ease-in-out infinite} }
+@keyframes mb-pulse{50%{opacity:.45}}
+.mb-alert.mb-state .act{white-space:nowrap}
+.mb-state-links{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+.mb-state-links a{color:inherit;font-weight:600;display:inline-flex;align-items:center;gap:4px;overflow-wrap:anywhere}
+.mb-state-links .ms{width:14px;height:14px}
+.mb-empty{display:flex;gap:12px;align-items:flex-start;padding:16px 18px;border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface-variant);font-size:13px}
+.mb-empty b{display:block;color:var(--md-sys-color-on-surface);font-weight:600;font-size:14px}
+.mb-empty .ms{flex:none;width:20px;height:20px}
+.mb-foot-stale{color:var(--mb-color-warn)}
+
+/* shared cells */
+.co{display:inline-flex;align-items:center;gap:10px;min-width:0}
+.co .nm{display:flex;flex-direction:column;min-width:0}
+.co .nm small{color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere}
+.ag b{font-weight:700;font-size:14px}
+.ag small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.mb-agbar{height:7px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);margin-top:5px;overflow:hidden;display:flex;width:120px;max-width:100%}
+.mb-agbar i{display:block;height:100%}
+.mb-strat{display:inline-flex;align-items:center;gap:2px}
+.mb-h2h{margin-left:6px;font-size:10.5px;padding:0 5px}
+.mb-stratlist{display:grid;gap:12px}
+.mb-stratlist ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:13px}
+.tbl tr.row{cursor:pointer}
+.md-table th .sort{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:2px;font:inherit}
+.md-table th .sort:focus-visible{box-shadow:var(--mb-focus-ring);border-radius:4px}
+.md-table th .sort .ms{width:14px;height:14px}
+
+/* charts */
+.chart{position:relative}
+.chart svg{width:100%;display:block}
+.chart .grid line{stroke:var(--mb-chart-grid)}
+.chart .axis text{font-size:11px;fill:var(--mb-chart-label)}
+.chart .ln{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.chart .ln.r{stroke:var(--mb-chart-1)} .chart .ln.b{stroke:var(--mb-chart-2)} .chart .ln.a{stroke:var(--mb-chart-3)} .chart .ln.k{stroke:var(--mb-chart-4)}
+.chart .pt{stroke:var(--md-sys-color-surface);stroke-width:2}
+.chart .pt.r{fill:var(--mb-chart-1)} .chart .pt.b{fill:var(--mb-chart-2)} .chart .pt.a{fill:var(--mb-chart-3)} .chart .pt.k{fill:var(--mb-chart-4)}
+.chart .cursor{stroke:var(--md-sys-color-outline);stroke-dasharray:3 3}
+.chart .hit{fill:transparent}
+.chart .hit:focus-visible{outline:none;stroke:var(--md-sys-color-primary);stroke-width:1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-top:4px}
+.legend b{font-weight:600}
+.mb-candles{margin:0}
+
+/* the 404 page (outside the shell) */
+.mb-notfound{min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--md-sys-color-surface-container-low)}
+.mb-notfound .card{max-width:480px}
+.mb-notfound h1{font:700 22px/1.2 var(--md-ref-typeface-plain);margin:0 0 8px}
+.mb-pending-h1{font:700 24px/1.2 var(--md-ref-typeface-plain);margin:0 0 14px}
