@@ -1,0 +1,15 @@
+/* The company-command dialog (design/mockups/10-companies/template.html dialog rules, unchanged except the scope): its own
+   root class, so it reads the same on the Companies page and on B15's company page. Tokens only. */
+dialog.mb-cmd-dialog{border:0;border-radius:16px;padding:0;max-width:min(500px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.mb-cmd-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog.mb-cmd-dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog.mb-cmd-dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog.mb-cmd-dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog.mb-cmd-dialog .dbody input,dialog.mb-cmd-dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
+dialog.mb-cmd-dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog.mb-cmd-dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+dialog.mb-cmd-dialog .summ{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);font-size:13px;display:grid;gap:4px}
+dialog.mb-cmd-dialog .summ .r{display:grid;grid-template-columns:110px 1fr;gap:8px} dialog.mb-cmd-dialog .summ .r span:first-child{color:var(--md-sys-color-on-surface-variant)}
+dialog.mb-cmd-dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13px} dialog.mb-cmd-dialog .warn .ms{flex:none;width:18px;height:18px;margin-top:1px}
+dialog.mb-cmd-dialog .dmsg{font-size:12.5px} dialog.mb-cmd-dialog .dmsg.err{padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container)}
+@media (max-width:599px){ dialog.mb-cmd-dialog .row2{grid-template-columns:1fr} }
