@@ -51,7 +51,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 25 | Old static pages | Retired 2 weeks after the new app is live; Slack then links to the new app. |
 | 26 | Amounts | Default ₹1,00,000 per trade (India) and $1,000 (US); override per company, either market. |
 | 27 | Growth | At most 50 companies within a year. |
-| 28 | Dashboard chat | Claude API, hard cap $20 per month. |
+| 28 | Dashboard chat | Claude API. No money cap in code: each answer's cost is logged per attempt and the spend shown; the Anthropic console's workspace limit ($20 a month) is the cap (owner decision 2026-10-08, F11). |
 | 29 | Intraday checks | Monitoring only (no trades). |
 | 30 | Home picks | Agreement ranking: companies ranked by how many strategies would buy them, then by average probability. Clicking a company opens a stock strategy page with the agreement ranking, the best strategy, and all strategies ranked by profit after costs. |
 | 31 | Pre-open run | Starts 30 minutes earlier: India 07:40 IST, US 07:45 New York time (schedules changed 2026-10-07). |

@@ -124,13 +124,18 @@ def date_problem(value) -> str | None:
 
 
 def text_boolean_or_list_problem(value, typ: str, csv_row: bool) -> str | None:
-    """Why a value is not text, true/false, an ISO UTC timestamp or a list of text (None = fits or JSON)."""
+    """Why a value is not text, true/false, an ISO UTC timestamp, a list of integers (INTEGER[]) or a list of text
+    (other list types) (None = fits or JSON)."""
     if typ == "VARCHAR":
         return None if isinstance(value, str) else "not text"
     if typ == "BOOLEAN":
         return None if isinstance(value, bool) or (csv_row and value in ("true", "false")) else "not true/false"
     if typ == "TIMESTAMPTZ":
         return None if isinstance(value, str) and ISO_UTC.match(value) else "not an ISO 8601 UTC timestamp"
+    if typ == "INTEGER[]":
+        is_int_list = isinstance(value, list) and all(
+            item is None or (isinstance(item, int) and not isinstance(item, bool)) for item in value)
+        return None if is_int_list else "not a list of integers"
     if typ.endswith("[]"):
         is_text_list = isinstance(value, list) and all(item is None or isinstance(item, str) for item in value)
         return None if is_text_list else "not a list of text"

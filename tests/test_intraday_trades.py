@@ -404,11 +404,11 @@ def test_explainer_input_and_gate_cover_the_trades(market, tmp_path):
     nvda = rows["NVDA"]
     flagged = {row["trade_id"] for row in trade_view(root).values() if row["ticker"] == "NVDA" and row["flagged"]}
     assert {trade["trade_id"] for trade in nvda["trades"]} == flagged and nvda["candidate_ids"]
-    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v1"}}
+    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v2"}}
     note = {"check_row_id": nvda["id"], "attribution": "idiosyncratic", "cited_ids": [],
             "text": "NVDA trade acc:rule.model_news.v1:2026-09-29-NVDA-5d is up 5.16% since entry, above its 80% "
                     "range at N+5 (session 6); the price is 0.09% over its upper edge.",
-            "prompt_version": "deviation-v1"}
+            "prompt_version": "deviation-v2"}
     good, bad = validate_records([note], explain.flagged_rows(con), set(), rules)
     assert bad == [] and len(good) == 1
     wrong = {**note, "text": "NVDA trade is up 7.7% since entry."}
@@ -467,9 +467,9 @@ def test_gate_allows_only_the_horizons_a_row_knows(market):
     con = connect(MARKET)
     rows = explain.flagged_rows(con)
     row = rows[f"{CHECK_ID}-NVDA"]
-    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v1"}}
+    rules = {"explainer": {"max_words": 60, "prompt_version": "deviation-v2"}}
     base = {"check_row_id": row["id"], "attribution": "idiosyncratic", "cited_ids": [],
-            "prompt_version": "deviation-v1"}
+            "prompt_version": "deviation-v2"}
     good, _ = validate_records([{**base, "text": "NVDA sits above its N+5 range."}], rows, set(), rules)
     assert len(good) == 1
     _, bad = validate_records([{**base, "text": "NVDA sits above its N+7 range."}], rows, set(), rules)
@@ -672,3 +672,20 @@ def test_missing_max_sessions_past_exit_keeps_trades_to_their_exit_date(market):
     summary = run_check(cfg, settings, connect(MARKET), FakeFetcher(spike=False), CHECK)
     assert "acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d" not in trade_view(root)
     assert summary["skipped_trades"]["delayed_too_long"] == ["acc:rule.b9_delayed.v1:2026-10-01-NVDA-1d"]
+
+
+def test_explainer_instructions_pass_the_gate_and_share_its_version():
+    """#76 (judge round 1): the agent file's example clause and its replacement for "target" pass the gate's word
+    and number rules, and the agent file names the prompt_version config/intraday.yaml requires."""
+    import re
+
+    from marketbrief.intraday.explain_gate import text_errors
+
+    agent = (REPO / ".claude" / "agents" / "deviation-explainer.md").read_text()
+    example = re.search(r'\(e\.g\. "([^"]+)"\)', agent).group(1)
+    replacement = re.search(r'write "([^"]+)" instead', agent).group(1)
+    assert example and replacement
+    assert text_errors(f"{example}; {replacement}.", 60) == []
+    version = load_intraday_config()["explainer"]["prompt_version"]
+    assert f'"prompt_version": "{version}"' in agent
+

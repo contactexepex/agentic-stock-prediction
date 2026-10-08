@@ -12,7 +12,10 @@ and median_reached_session (F1.9, over trades with a target), avg_target_error_p
 worst_losing_streak, max_drawdown, the
 luck test (lab/luck.py; m = the rows compared in the same scope, market, view, basis, company, regime and
 horizon), sample_badge and, for strategy rows, the go-live bar (F7.2, the spec's proposals until the owner
-sets them)."""
+sets them).
+The forward basis counts only trades of strategies live on their D (registry.is_live; `live_settlements`, applied
+by reports.lab_summary before the scoreboard, comparisons and heatmaps): defence in depth, as settle never writes a
+pre-live trade."""
 from __future__ import annotations
 
 import statistics
@@ -20,6 +23,7 @@ from collections import defaultdict
 from datetime import date
 
 from marketbrief.contracts.watchlist import DEFAULT_AMOUNT
+from marketbrief.lab import registry
 from marketbrief.lab.constants import (DAYS_PER_MONTH, DRAWDOWN_LIMIT_AMOUNTS, FAMILY_BASELINE, FILTERED_REGIMES,
                                        GO_LIVE_MONTHS, GO_LIVE_TRADES, MIN_RANKED_TRADES, MONEY_DIGITS, PCT_DIGITS,
                                        PROB_DIGITS, STATUS_SETTLED, VIEW_ACCURACY)
@@ -36,6 +40,13 @@ def latest_settlements(rows: list[dict]) -> list[dict]:
     for row in sorted(rows, key=lambda r: (str(r["settled_at"]), r["id"])):
         newest[row["trade_id"]] = row
     return [newest[key] for key in sorted(newest)]
+
+
+def live_settlements(rows: list[dict], reg: dict | None = None) -> list[dict]:
+    """The settlement rows whose strategy is live on the trade's D (entry_date; registry.is_live)."""
+    specs = registry.by_id(reg)
+    return [row for row in rows if row["strategy_id"] in specs
+            and registry.is_live(specs[row["strategy_id"]], row["entry_date"])]
 
 
 def sequence_stats(trades: list[dict], net: str = "net_pnl") -> tuple[int, float]:
