@@ -9,9 +9,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from marketbrief.constants.warehouse import BUILDS_TABLE, READ_MODEL_SCHEMA, READ_MODEL_TABLES
+from marketbrief.constants.warehouse import BUILDS_TABLE, READ_MODEL_SCHEMA
 from marketbrief.core.database import column_spec
 from marketbrief.warehouse.read_models import READ_MODEL_COLUMNS
+from marketbrief.warehouse.rm_registry import tables
 from marketbrief.warehouse.sql_statements import column_definitions, insert_row, quoted
 
 BUILDS_COLUMNS = {
@@ -33,7 +34,7 @@ STAGED_COLUMNS = {**READ_MODEL_COLUMNS, "payload": "VARCHAR"}
 def ensure_read_model_tables(warehouse) -> None:
     """Schema rm with one table per page type (primary key market, page_key) and rm.builds."""
     warehouse.execute(f"CREATE SCHEMA IF NOT EXISTS {READ_MODEL_SCHEMA}")
-    for table in READ_MODEL_TABLES:
+    for table in tables():
         warehouse.execute(
             f"CREATE TABLE IF NOT EXISTS {READ_MODEL_SCHEMA}.{table} "
             f"({column_definitions(READ_MODEL_COLUMNS)}, PRIMARY KEY (market, page_key))"
@@ -48,9 +49,9 @@ def stored_hashes(warehouse, market: str) -> dict[str, dict[str, str]]:
     union = " UNION ALL ".join(
         f"SELECT '{table}' AS page_table, page_key, payload_sha256 FROM {READ_MODEL_SCHEMA}.{table} "
         "WHERE market = $market"
-        for table in READ_MODEL_TABLES
+        for table in tables()
     )
-    hashes: dict[str, dict[str, str]] = {table: {} for table in READ_MODEL_TABLES}
+    hashes: dict[str, dict[str, str]] = {table: {} for table in tables()}
     for table, page_key, payload_sha256 in warehouse.execute(union, {"market": market}).fetchall():
         hashes[table][page_key] = payload_sha256
     return hashes
@@ -67,18 +68,27 @@ def insert_staged_pages(warehouse, table: str, pages: list[dict], folder: Path) 
     )
 
 
-def write_read_models(warehouse, market: str, rows: dict, keep: set[tuple[str, str]], folder: Path) -> dict:
+def write_read_models(
+    warehouse, market: str, rows: dict, keep: set[tuple[str, str]], folder: Path, wiped: dict | None = None
+) -> dict:
     """Upsert the market's pages by hash; `keep` = (table, page_key) of pages that failed validation (their
-    stored rows are neither replaced nor deleted). Returns pages_written, pages_unchanged and pages_deleted."""
+    stored rows are neither replaced nor deleted). `wiped` = the stored hashes read before a --full rebuild deleted
+    every row of the market: a page in it that is no longer built counts as deleted. Returns pages_written,
+    pages_unchanged, pages_deleted and changed_keys (table, market, page_key of every written or deleted page: the
+    app's cache tags to revalidate)."""
     stored = stored_hashes(warehouse, market)
-    counts = {"pages_written": 0, "pages_unchanged": 0, "pages_deleted": 0}
-    for table in READ_MODEL_TABLES:
+    counts = {"pages_written": 0, "pages_unchanged": 0, "pages_deleted": 0, "changed_keys": []}
+    for table in tables():
         built = rows.get(table, {})
         changed = [key for key, row in built.items() if stored[table].get(key) != row["payload_sha256"]]
         departed = [key for key in stored[table] if key not in built and (table, key) not in keep]
+        gone = [key for key in sorted((wiped or {}).get(table, {})) if key not in built and key not in departed]
+        counts["pages_deleted"] += len(gone)
+        counts["changed_keys"] += [{"table": table, "market": market, "page_key": key} for key in gone]
         counts["pages_written"] += len(changed)
         counts["pages_unchanged"] += len(built) - len(changed)
         counts["pages_deleted"] += len(departed)
+        counts["changed_keys"] += [{"table": table, "market": market, "page_key": key} for key in changed + departed]
         if changed or departed:
             warehouse.execute(
                 f"DELETE FROM {READ_MODEL_SCHEMA}.{table} WHERE market = ? AND list_contains(?, page_key)",

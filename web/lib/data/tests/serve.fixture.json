@@ -1,0 +1,74 @@
+{
+  "_note": "Shared by web/lib/data/tests/serve.test.ts and tests/test_api_contract.py: the route's serve rules (lib/data/serve.ts) and their Python mirror (scripts/marketbrief/warehouse/contract.py) must give these exact bodies.",
+  "now": "2026-10-07T12:00:30.500Z",
+  "cases": [
+    {
+      "name": "a 2.0 page payload gets cutoff and built_at at the top and freshness in its status block",
+      "mode": "page",
+      "row": {"market": "us", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:58:00.000Z",
+              "built_at": "2026-10-07T11:58:00+00:00", "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "payload": {"market": "us", "status": {"market": "us", "regime": "TRENDING"}, "rows": [1, 2]}},
+      "expected": {"market": "us", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:58:00Z",
+                   "built_at": "2026-10-07T11:58:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                   "payload": {"market": "us", "rows": [1, 2], "cutoff": "2026-10-07T11:58:00Z",
+                               "built_at": "2026-10-07T11:58:00Z",
+                               "status": {"market": "us", "regime": "TRENDING",
+                                          "freshness": {"state": "fresh", "built_at": "2026-10-07T11:58:00Z",
+                                                        "age_minutes": 2}}}}
+    },
+    {
+      "name": "the status page gets freshness at the top; older than 480 minutes is stale",
+      "mode": "status",
+      "row": {"market": "india", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T03:00:00Z",
+              "built_at": "2026-10-07T03:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "payload": {"market": "india", "name": "India (NSE)"}},
+      "expected": {"market": "india", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T03:00:00Z",
+                   "built_at": "2026-10-07T03:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                   "payload": {"market": "india", "name": "India (NSE)",
+                               "freshness": {"state": "stale", "built_at": "2026-10-07T03:00:00Z",
+                                             "age_minutes": 540}}}
+    },
+    {
+      "name": "exactly 480 minutes is still fresh",
+      "mode": "status",
+      "row": {"market": "us", "page_key": "_", "as_of": null, "cutoff": "2026-10-07T04:00:30Z",
+              "built_at": "2026-10-07T04:00:30Z", "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "payload": {"market": "us"}},
+      "expected": {"market": "us", "page_key": "_", "as_of": null, "cutoff": "2026-10-07T04:00:30Z",
+                   "built_at": "2026-10-07T04:00:30Z", "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                   "payload": {"market": "us", "freshness": {"state": "fresh", "built_at": "2026-10-07T04:00:30Z",
+                                                             "age_minutes": 480}}}
+    },
+    {
+      "name": "a 1.0 page is served verbatim (a page without a status block gets no freshness)",
+      "mode": "verbatim",
+      "row": {"market": "us", "page_key": "NVDA", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:58:00Z",
+              "built_at": null, "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "payload": {"ticker": "NVDA", "status": {"x": 1}}},
+      "expected": {"market": "us", "page_key": "NVDA", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:58:00Z",
+                   "built_at": null, "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+                   "payload": {"ticker": "NVDA", "status": {"x": 1}}}
+    },
+    {
+      "name": "no built_at: freshness unknown",
+      "mode": "page",
+      "row": {"market": "us", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:58:00Z",
+              "built_at": null, "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+              "payload": {"status": {}}},
+      "expected": {"market": "us", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:58:00Z",
+                   "built_at": null, "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+                   "payload": {"cutoff": "2026-10-07T11:58:00Z", "built_at": null,
+                               "status": {"freshness": {"state": "unknown", "built_at": null, "age_minutes": null}}}}
+    }
+  ]
+}
