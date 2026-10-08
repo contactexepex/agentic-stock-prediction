@@ -105,3 +105,83 @@ InactiveNewsItem:
     status:
       oneOf: [{$ref: '#/components/schemas/NewsStatus'}, {type: 'null'}]
     enrichment: {$ref: '#/components/schemas/NewsEnrichment'}
+CompanyCommandTool:
+  type: string
+  description: A company command of mcp/tools.yaml (delete_company only from the dashboard, typed)
+  enum: [add_company, deactivate_company, reactivate_company, set_paper_amount, delete_company]
+CompanyCommandArguments:
+  type: object
+  description: >-
+    The tool's inputs of mcp/tools.yaml without market (from the path) and idempotency_key (from the header):
+    add_company {symbol, amount?}; deactivate_company {ticker, reason?}; reactivate_company {ticker};
+    set_paper_amount {ticker, amount (null = the default)}; delete_company {ticker, confirm = the ticker typed}.
+    Validated again by the tool layer
+  additionalProperties: false
+  properties:
+    symbol: {type: string, pattern: '^[A-Z0-9.&-]{1,20}$'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    amount: {type: ['number', 'null'], minimum: 1}
+    reason: {type: string, maxLength: 200}
+    confirm: {type: string, description: delete_company only - must equal the ticker}
+CompanyCommandPreviewRequest:
+  type: object
+  description: The preview's body (web/lib/data/company-commands.ts)
+  additionalProperties: false
+  required: [tool, arguments]
+  properties:
+    tool: {$ref: '#/components/schemas/CompanyCommandTool'}
+    arguments: {$ref: '#/components/schemas/CompanyCommandArguments'}
+CompanyCommandSubmission:
+  type: object
+  description: The confirmed command's body (web/lib/data/company-commands.ts)
+  additionalProperties: false
+  required: [tool, arguments, confirmed_summary]
+  properties:
+    tool: {$ref: '#/components/schemas/CompanyCommandTool'}
+    arguments: {$ref: '#/components/schemas/CompanyCommandArguments'}
+    confirmed_summary: {type: string, minLength: 1, description: The summary the preview returned and the owner confirmed}
+CompanyCommandPreview:
+  type: object
+  description: The preview's answer (web/lib/data/company-commands.ts previewCompanyCommand); nothing was written
+  required: [tool, summary, preview, arguments, paper]
+  properties:
+    tool: {$ref: '#/components/schemas/CompanyCommandTool'}
+    summary: {type: string, description: The plain-words summary to show and send back as confirmed_summary}
+    preview:
+      description: add_company only, the resolved identifiers (CompanyPreview of web/lib/tools/types.ts); else null
+      oneOf:
+        - type: 'null'
+        - $ref: '#/components/schemas/ResolvedCompany'
+    arguments: {$ref: '#/components/schemas/CompanyCommandArguments'}
+    paper: {type: boolean, const: true}
+ResolvedCompany:
+  type: object
+  description: The identifiers the tool layer resolved for add_company (CompanyPreview of web/lib/tools/types.ts)
+  required: [market, symbol, name, exchange, sector, yahoo, nse_symbol, cik, amount, amount_is_default, currency]
+  properties:
+    market: {type: string, enum: [india, us]}
+    symbol: {type: string}
+    name: {type: string}
+    exchange: {type: string}
+    sector: {type: ['string', 'null']}
+    yahoo: {type: string}
+    nse_symbol: {type: ['string', 'null']}
+    cik: {type: ['string', 'null']}
+    amount: {type: number}
+    amount_is_default: {type: boolean}
+    currency: {type: string, enum: [INR, USD]}
+CompanyCommandReceipt:
+  type: object
+  description: The tool layer's outcome as the routes return it (web/lib/data/paper-trades.ts receipt; ToolOutcome of web/lib/tools/types.ts)
+  required: [command_id, result, refusal_code, message, inbox_id, record_ids, budget_left, paper]
+  properties:
+    command_id: {type: string}
+    result: {type: string, enum: [pending, accepted, duplicate, refused, failed]}
+    refusal_code: {type: ['string', 'null']}
+    message: {type: ['string', 'null']}
+    inbox_id: {type: ['string', 'null'], description: The Idempotency-Key, once the command is in the inbox}
+    record_ids:
+      type: array
+      items: {type: string}
+    budget_left: {type: ['integer', 'null']}
+    paper: {type: boolean, const: true}

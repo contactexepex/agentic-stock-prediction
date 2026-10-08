@@ -63,7 +63,7 @@ export function receipt(outcome: ToolOutcome): Record<string, unknown> {
 }
 
 /** A browser form of another site cannot post here: JSON only, and an Origin header (when sent) must be this host. */
-function crossSite(request: Request): boolean {
+export function crossSite(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
   try {

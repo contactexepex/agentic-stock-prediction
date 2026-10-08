@@ -108,6 +108,6 @@ export const USAGE = [
   "/company reactivate india|us TICKER",
   "/company amount india|us TICKER AMOUNT|default",
   "/trade - opens the paper-trade form (a record, never an order)",
-  "/ask QUESTION - the assistant (coming soon)",
+  "/ask india|us QUESTION - asks the assistant (stored data only, never advice)",
   "Delete is only on the dashboard, with a typed confirmation.",
 ].join("\n");
