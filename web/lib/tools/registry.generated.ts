@@ -341,9 +341,7 @@ export const TOOL_DEFINITIONS: readonly unknown[] = [
       "get_trades"
     ],
     "budget": {
-      "model": "sonnet",
-      "monthly_usd_cap": 20,
-      "daily_usd": 0.65
+      "model": "sonnet"
     },
     "channels": {
       "dashboard": "chat panel",
