@@ -9,7 +9,7 @@ import {
 } from "../../../app/mcp/_lib/oauth.ts";
 import { handleRpc } from "../../../app/mcp/_lib/server.ts";
 
-const BASE = "https://market-brief-gateway.vercel.app";
+const BASE = "https://omenix-gw.vercel.app";
 const env = {
   SESSION_SECRET: SECRETS.SESSION_SECRET, GITHUB_OAUTH_CLIENT_ID: "Iv1.client",
   GITHUB_OAUTH_CLIENT_SECRET: SECRETS.GITHUB_OAUTH_CLIENT_SECRET, MB_OWNER_GITHUB_ID: "4242", MCP_ALLOWED_GITHUB_LOGIN: "owner-login",
@@ -21,7 +21,7 @@ const VERIFIER = "v".repeat(20) + "-verifier-0123456789abcdefghijk";
 
 test("the config refuses missing or weak settings", () => {
   assert.ok(cfg);
-  assert.equal(cfg.baseUrl, "https://market-brief-gateway.vercel.app");
+  assert.equal(cfg.baseUrl, "https://omenix-gw.vercel.app");
   assert.equal(mcpConfig({ ...env, SESSION_SECRET: "short" }), null);
   assert.equal(mcpConfig({ ...env, MB_OWNER_GITHUB_ID: "owner" }), null);
   assert.equal(mcpConfig({ ...env, MCP_ALLOWED_GITHUB_LOGIN: undefined }), null);
@@ -160,7 +160,7 @@ test("/mcp accepts only a valid, unexpired access token for this resource", asyn
   assert.deepEqual(await call(`Bearer ${body.access_token}`), { login: "owner-login" });
   const missing = await call(null);
   assert.ok(missing instanceof Response && missing.status === 401);
-  assert.match((missing as Response).headers.get("www-authenticate") ?? "", /resource_metadata="https:\/\/market-brief-gateway\.vercel\.app\/\.well-known\/oauth-protected-resource\/mcp"/);
+  assert.match((missing as Response).headers.get("www-authenticate") ?? "", /resource_metadata="https:\/\/omenix-gw\.vercel\.app\/\.well-known\/oauth-protected-resource\/mcp"/);
   assert.ok((await call(`Bearer ${body.access_token}`, NOW + ACCESS_SECONDS + 1)) instanceof Response);
   assert.ok((await call(`Bearer ${body.refresh_token}`)) instanceof Response);
   const otherAudience = await signToken(SECRETS.SESSION_SECRET, { typ: "access", sub: "owner-login", gid: "4242", aud: "https://other.example/mcp", exp: NOW + 60 });

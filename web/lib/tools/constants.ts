@@ -1,6 +1,6 @@
-// Fixed names of the deployment (orchestrator, 2026-10-07; docs/ws/b5.md). Not secrets, so not environment variables.
-export const GATEWAY_URL = "https://market-brief-gateway.vercel.app";   // Vercel project market-brief-gateway (MB_GATEWAY=1)
-export const APP_URL = "https://market-brief-app.vercel.app";           // Vercel project market-brief-app (Vercel Authentication)
+// Fixed names of the deployment (orchestrator, 2026-10-07; domains 2026-10-08; docs/ws/b5.md). Not secrets, so not environment variables.
+export const GATEWAY_URL = "https://omenix-gw.vercel.app";              // the gateway's Vercel project (MB_GATEWAY=1)
+export const APP_URL = "https://omenix.vercel.app";                     // the app's Vercel project (Vercel Authentication)
 export const SLACK_CHANNEL_ID = "C0C6REB7QS2";                          // #market-brief (config/settings.yaml slack_channel_id)
 export const GITHUB_REPOSITORY = "contactexepex/agentic-stock-prediction";
 export const DISPATCH_WORKFLOW = "onboard.yml";
