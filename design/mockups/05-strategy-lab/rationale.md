@@ -24,7 +24,8 @@ every figure carries Paper until a strategy is proven.
    ranking view; your cost = the go-live view, decision 50; the ranking never changes with the switch, the numbers
    do) and **Horizon** (all pooled, or N+1..N+5).
 3. **KPIs**: the leader after market cost (with the trade count and "too few to rank"), the best baseline as the
-   yardstick, how many strategies beat it, and the strategy nearest to the go-live bar (trades and months to go).
+   yardstick, how many strategies beat it, and the rule strategy or AI trader nearest to the go-live bar (trades and
+   months to go; baselines are yardsticks, never candidates).
 4. **Scoreboard**: all 15 strategies of the registry, baselines in the same list marked "yardstick", ranked by profit
    after market cost (strategies without trades follow, by family). Columns: rank, strategy (name as the selector,
    family label, what it differs in), profit after the selected cost with the other cost view under it, trades, win
@@ -38,13 +39,16 @@ every figure carries Paper until a strategy is proven.
    of the Stock strategies page's links): name, family, live state, the registry's description, the one setting it
    changes against the strategy it is compared to with both values ("if its results differ, that setting is why",
    F2.5), its settings as chips, the probability bar, horizons and settled trades; then its numbers in the selected
-   view: profit per horizon as diverging bars, per market regime (F2.6: measured, not assumed), per company (linked
-   to the Stock strategies page, "too few" marked), and the **go-live checklist** on your cost: trades to go, months
+   view: profit per horizon as diverging bars, per market regime (F2.6: measured, not assumed; all horizons), per
+   company (linked to the Stock strategies page, "too few" marked; the selected horizon), the settled-trade count in
+   this market, and the **go-live checklist** on your cost: trades to go, months
    forward, beats the best baseline, drawdown within the limit, holds in calm and volatile regimes, each with a tick,
    a cross or "not enough data yet".
-6. **Cumulative profit after market cost** (F2.8): one line per strategy by exit date, the selected one thick, the
-   selected and the three highest coloured and named at the line end (colours follow the registry order), the rest
-   grey; the zero line dotted; hover or arrow keys list every line's value at a date.
+6. **Cumulative profit after market cost** (F2.8; always market cost, the view the settled trades carry): one line
+   per strategy by exit date, the selected one thick, the selected and the three highest coloured and named at the
+   line end (names cut at 22 characters, the legend has them in full; colours follow the registry order), the rest
+   grey; the zero line dotted; hover or arrow keys list every line's value at a date. On the Back-test basis the
+   chart and the reason map show an empty state: the settled trades are forward trades and are never pooled.
 7. **Where each strategy wins and loses** (F2.8, decision 42): four heatmaps for the selected view, by horizon, by
    company, by market regime and by the reason the price moved (the settled trades' automatic reason code), with a
    Profit / Win rate switch. Green for profit (or a win rate above half), red for loss, darker for larger, and the
@@ -73,11 +77,19 @@ horizon selector N+1..N+5 (plus All, since the lab compares horizons).
 
 ## Checked
 `check_page.js`: no console errors, no overflow, no external requests at 1280 and 390 px. `check_text.js` (twelve
-widths, both markets): no clipped, overflowing or overlapping text. A sweep of 390-1700 px in steps of 10, both
-markets: the scoreboard and the per-company table are never wider than their wrapper. A script switched every
-control (view, basis, cost, horizon, metric), selected a strategy from the keyboard (the detail card and the hash
-follow) and read the line chart with the arrow keys; no script error; every tooltip element is focusable. Rebuild is
-byte-identical.
+widths, both markets): no clipped, overflowing or overlapping text in the default state. A sweep of 390-1700 px in
+steps of 10, both markets, in every combination of view, basis and cost: the scoreboard, the pick-rule table and the
+per-company table are never wider than their wrapper. A chart-text check at 390, 768, 1024, 1280 and 1680 px in both
+views: no line-chart label clipped by the card or overlapping another. A script switched every control (view, basis,
+cost, horizon, metric), selected a strategy from the keyboard (the detail card and the hash follow) and read the line
+chart with the arrow keys; no script error; every tooltip element is focusable. Rebuild is byte-identical.
+
+Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
+lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;
+line-chart labels overflowed and overlapped; the pick-rule table and the your-cost scoreboard overflowed at some
+widths; a baseline was named nearest to go-live; the settled-trade chip counted both markets; "about 300", "95%" and
+"15-year" were literals; the notes' "registry order" and the rationale's "both values" were false for the sort and
+for the threshold strategy.
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - One scoreboard for all 15 strategies with the baselines in the same list (SPEC F7.1), ranked on market cost with

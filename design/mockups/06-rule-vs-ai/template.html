@@ -92,6 +92,9 @@ onMarketChange = () => render();
 const REGIME_WORDS = {CALM: 'calm', TRENDING: 'trending', EVENT_HEAVY: 'event-heavy', UNSTABLE: 'unstable'};
 const val = (r, k) => cost === 'your' && r.your_cost && k in r.your_cost ? r.your_cost[k] : r[k];
 const luckOf = r => cost === 'your' && r.your_cost ? r.your_cost.luck_test : r.luck_test;
+const yc = (p, t) => p.your_costs.find(x => x.trade_id === t.trade_id) || null;
+const tNet = (p, t) => cost === 'your' && yc(p, t) ? yc(p, t).net_pnl_your : t.net_pnl;
+const tRet = (p, t) => cost === 'your' && yc(p, t) ? yc(p, t).return_pct_your : t.return_pct;
 const famRow = (p, f) => p.rows.find(r => r.scope === 'strategy' && r.family === f && r.horizon_days === 'all' && r.basis === 'forward') || null;
 function luckBar(r) {
   const t = luckOf(r); if (!t || t.low_pct == null) return el('span', {class:'muted', 'data-tip':'Fewer than 2 trades: no luck interval yet.'}, 'none yet');
@@ -124,10 +127,10 @@ function scorecard(p) {
 
 /* ---------- today's picks ---------- */
 function picksCard(p) {
-  const cur = p.currency, picked = p.picks.filter(k => k.status === 'picked');
+  const cur = p.currency, today = p.picks.filter(k => k.session_date === p.session_date), picked = today.filter(k => k.status === 'picked');
   const card = el('section', {class:'card', 'aria-label':'Today’s head-to-head picks'});
-  card.append(el('div', {class:'head'}, el('h2', {}, `Today’s picks for ${fmtD(p.status.session.session_date)}`), help('The paper trades both families will make at the open of the session being predicted: for each company, the strongest rule strategy and the strongest AI trader each pick one horizon per pick rule. "Clears market costs" is the ranking view; "viable at your cost" adds your broker’s charges (decision 51).'), el('div', {class:'end'}, picked.length ? viableLine(picked) : 'no pick today')));
-  if (!p.picks.length) { card.append(el('div', {class:'quiet'}, 'No head-to-head picks stored for the session.')); return card; }
+  card.append(el('div', {class:'head'}, el('h2', {}, `Today’s picks for ${fmtD(p.session_date)}`), el('span', {class:'mb-tag paper'}, 'paper'), help('The paper trades both families will make at the open of the session being predicted: for each company, the strongest rule strategy and the strongest AI trader each pick one horizon per pick rule. "Clears market costs" is the ranking view; "viable at your cost" adds your broker’s charges (decision 51).'), el('div', {class:'end'}, picked.length ? viableLine(picked) : 'no pick today')));
+  if (!today.length) { card.append(el('div', {class:'quiet'}, 'No head-to-head picks stored for the session.')); return card; }
   const g = el('div', {class:'pks'});
   for (const f of ['rule', 'ai']) {
     const fk = picked.filter(k => k.family === f), box = el('div', {class:'pkbox'});
@@ -147,18 +150,20 @@ function matches(p) {
   for (const t of p.trades) { const k = `${t.entry_date}|${t.ticker}|${t.pick_rule}`; (groups[k] = groups[k] || {entry_date: t.entry_date, ticker: t.ticker, pick_rule: t.pick_rule, rule: null, ai: null})[t.family] = t; }
   const list = Object.values(groups).sort((a, b) => b.entry_date.localeCompare(a.entry_date) || a.ticker.localeCompare(b.ticker) || a.pick_rule.localeCompare(b.pick_rule));
   const card = el('section', {class:'card', 'aria-label':'Matches'});
-  const both = list.filter(g => g.rule && g.ai), ruleW = both.filter(g => g.rule.net_pnl > g.ai.net_pnl).length, aiW = both.filter(g => g.ai.net_pnl > g.rule.net_pnl).length;
-  card.append(el('div', {class:'head'}, el('h2', {}, 'Match by match: identical company-days'), help('One row per company, entry session and pick rule in the head-to-head view (the entry session under the company name). Where both families traded, the row says who made more after market cost (a draw when the picks were the same horizon, so the same trade). Where only one family had a candidate there is no match, only a result.'), el('div', {class:'end'}, both.length ? `${both.length} match${both.length === 1 ? '' : 'es'}: rule ${ruleW}, AI ${aiW}, draw ${both.length - ruleW - aiW}` : 'no completed match yet')));
+  const both = list.filter(g => g.rule && g.ai), ruleW = both.filter(g => tNet(p, g.rule) > tNet(p, g.ai)).length, aiW = both.filter(g => tNet(p, g.ai) > tNet(p, g.rule)).length;
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Match by match: identical company-days'), el('span', {class:'mb-tag paper'}, 'paper'), help(`One row per company, entry session and pick rule in the head-to-head view (the entry session under the company name). Where both families’ trades have settled, the row says who made more after ${cost} cost (a draw when the picks were the same horizon, so the same trade). A side whose pick is still running shows "open"; "no candidate" means that family had no strategy buying the company that day.`), el('div', {class:'end'}, `after ${cost} cost · `, both.length ? `${both.length} match${both.length === 1 ? '' : 'es'}: rule ${ruleW}, AI ${aiW}, draw ${both.length - ruleW - aiW}` : 'no completed match yet')));
   if (!list.length) { card.append(el('div', {class:'quiet'}, 'No settled head-to-head trade yet.')); return card; }
   const tb = el('table', {class:'md-table tbl mt'});
   tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company · entry'), el('th', {class:'cm'}, 'Pick rule'), el('th', {}, 'Rule'), el('th', {}, 'AI'), el('th', {}, 'Who won'))));
   const body = el('tbody');
-  const res = t => t ? el('span', {class:'res'}, el('b', {}, moneyDelta(cur, t.net_pnl, dec(cur))), el('small', {}, `${stratOf(market, t.strategy_id).name} · N+${t.horizon_days} · ${sgn(t.return_pct)}`, el('span', {class:'cw'}, ` · target ${t.target_reached ? 'reached' : 'missed'}, error ${sgn(t.target_error_pct)}`))) : el('span', {class:'muted', 'data-tip':'This family had no candidate for this company-day under this pick rule.'}, 'no candidate');
+  const other = (g, f) => p.picks.find(k => k.session_date === g.entry_date && k.ticker === g.ticker && k.pick_rule === g.pick_rule && k.family === f) || null;
+  const res = (g, f) => { const t = g[f]; if (t) return el('span', {class:'res'}, el('b', {}, moneyDelta(cur, tNet(p, t), dec(cur))), el('small', {}, `${stratOf(market, t.strategy_id).name} · N+${t.horizon_days} · ${sgn(tRet(p, t))}`, el('span', {class:'cw'}, ` · target ${t.target_reached ? 'reached' : 'missed'}, error ${Math.abs(t.target_error_pct).toFixed(2)}%`)));
+    const k = other(g, f); if (k && k.status === 'picked') return el('span', {class:'res'}, el('b', {class:'muted'}, 'open'), el('small', {}, `${stratOf(market, k.strategy_id).name} · N+${k.horizon_days} · not settled by the cut-off`)); return el('span', {class:'muted', 'data-tip': k ? 'This family had no strategy buying this company at any horizon that day.' : 'No head-to-head pick stored for this family and day.'}, k ? 'no candidate' : 'no pick stored'); };
   for (const g of list) {
     let who;
-    if (g.rule && g.ai) who = g.rule.net_pnl === g.ai.net_pnl ? el('span', {class:'mb-label neutral', 'data-tip':'Both families picked the same horizon, so the same trade: a draw.'}, 'draw') : g.rule.net_pnl > g.ai.net_pnl ? el('span', {class:'mb-label'}, icon('ms-settings'), 'rule') : el('span', {class:'mb-label info'}, icon('ms-bolt'), 'AI');
-    else who = el('span', {class:'muted'}, 'no match');
-    body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(g.ticker)}, g.ticker), el('small', {class:'muted', style:'display:block;font-size:11px'}, `${companyOf(market, g.ticker).name} · entered ${fmtD(g.entry_date, false)}`)), el('td', {class:'cm'}, PICK[g.pick_rule] || g.pick_rule), el('td', {}, res(g.rule)), el('td', {}, res(g.ai)), el('td', {class:'win'}, who)));
+    if (g.rule && g.ai) who = tNet(p, g.rule) === tNet(p, g.ai) ? el('span', {class:'mb-label neutral', 'data-tip':'Both families picked the same horizon, so the same trade: a draw.'}, 'draw') : tNet(p, g.rule) > tNet(p, g.ai) ? el('span', {class:'mb-label'}, icon('ms-settings'), 'rule') : el('span', {class:'mb-label info'}, icon('ms-bolt'), 'AI');
+    else { const k = other(g, g.rule ? 'ai' : 'rule'); who = el('span', {class:'muted'}, k && k.status === 'picked' ? 'waiting' : 'no match'); }
+    body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(g.ticker)}, g.ticker), el('small', {class:'muted', style:'display:block;font-size:11px'}, `${companyOf(market, g.ticker).name} · entered ${fmtD(g.entry_date, false)}`)), el('td', {class:'cm'}, PICK[g.pick_rule] || g.pick_rule), el('td', {}, res(g, 'rule')), el('td', {}, res(g, 'ai')), el('td', {class:'win'}, who)));
   }
   tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
   return card;
@@ -179,13 +184,13 @@ function slices(p) {
 /* ---------- per company ---------- */
 function perCompany(p) {
   const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Per company'});
-  card.append(el('div', {class:'head'}, el('h2', {}, 'Per company'), help('Rule vs AI on each company, head-to-head view: settled trades, profit after market cost and win rate per family, summed from the settled head-to-head trades (a per-company scoreboard row is requested from W1). A per-company lead on a few trades is mostly luck.'), el('div', {class:'end'}, el('a', {class:'go', href: PAGES.watchlist}, 'Watchlist', icon('ms-chevron_right')))));
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Per company'), el('span', {class:'mb-tag paper'}, 'paper'), help(`Rule vs AI on each company, head-to-head view: settled trades, profit after ${cost} cost and how many made money, summed from the settled head-to-head trades (a per-company scoreboard row is requested from W1). A per-company lead on a few trades is mostly luck.`), el('div', {class:'end'}, `after ${cost} cost`, el('a', {class:'go', href: PAGES.watchlist}, 'Watchlist', icon('ms-chevron_right')))));
   const tickers = [...new Set(p.trades.map(t => t.ticker))].sort();
   if (!tickers.length) { card.append(el('div', {class:'quiet'}, 'No settled head-to-head trade on any company yet.')); return card; }
   const tb = el('table', {class:'md-table tbl mt'});
   tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Rule'), el('th', {}, 'AI'), el('th', {}, 'Ahead'))));
   const body = el('tbody');
-  const agg = ts => ts.length ? {n: ts.length, net: ts.reduce((s, t) => s + t.net_pnl, 0), win: ts.filter(t => t.net_pnl > 0).length} : null;
+  const agg = ts => ts.length ? {n: ts.length, net: ts.reduce((s, t) => s + tNet(p, t), 0), win: ts.filter(t => tNet(p, t) > 0).length} : null;
   const cell = a => a ? el('span', {class:'res'}, el('b', {}, moneyDelta(cur, a.net, dec(cur))), el('small', {}, `${a.n} trade${a.n === 1 ? '' : 's'} · ${a.win} won`)) : el('span', {class:'muted'}, 'no trade');
   for (const t of tickers) { const r = agg(p.trades.filter(x => x.ticker === t && x.family === 'rule')), a = agg(p.trades.filter(x => x.ticker === t && x.family === 'ai')); let who = el('span', {class:'muted'}, '—'); if (r && a) who = r.net === a.net ? el('span', {class:'mb-label neutral'}, 'level') : r.net > a.net ? el('span', {class:'mb-label'}, 'rule') : el('span', {class:'mb-label info'}, 'AI'); else if (r || a) who = el('span', {class:'muted'}, 'one side only');
     body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(t), 'data-tip': `${companyOf(market, t).name}: open the company page.`}, t), el('small', {class:'muted', style:'display:block;font-size:11px'}, companyOf(market, t).name)), el('td', {}, cell(r)), el('td', {}, cell(a)), el('td', {}, who))); }
@@ -235,7 +240,7 @@ function why(p) {
 function review(p) {
   const cur = p.currency, r = p.reviews[0], card = el('section', {class:'card rev', 'aria-label':'Weekly research review'});
   card.append(el('div', {class:'head'}, el('h2', {}, 'The week’s research review'), help('Every Saturday the research director (Opus, F6.2) reads the scoreboard, the news-impact study, the week’s EOD analyses and lessons, and writes who is ahead and why, which information helped, and proposals as config diffs. It changes nothing itself: every proposal stays "proposed" until the owner approves it.'), el('div', {class:'end'}, r ? `${r.iso_week} · ${fmtD(r.period_start, false)}–${fmtD(r.period_end, false)}` : '')));
-  if (!r) { card.append(el('div', {class:'quiet'}, `No weekly review written by the cut-off${p.reviews_pending.length ? ` (${p.reviews_pending.join(', ')} is written on Saturday, after it)` : ''}. The first review arrives the Saturday after the first forward week.`)); return card; }
+  if (!r) { card.append(el('div', {class:'quiet'}, `No weekly review written by the cut-off. The next one (${p.review_due.iso_week}) is due on Saturday ${fmtDY(p.review_due.date)}, after the cut-off; a review from before it is requested from W1 for the example data.`)); return card; }
   card.append(el('h3', {}, 'Who leads'), el('div', {class:'lead-row'}, ...r.leaders.map(l => el('span', {}, famLabel(l.scope, FAMILY_SHORT[l.scope] || l.scope), ' ', el('b', {}, stratOf(market, l.strategy_id).name), ` ${money(cur, l.net_pnl, dec(cur), true)} on ${l.trades}`))));
   card.append(el('h3', {}, 'Findings')); const ul = el('ul', {class:'rl'}); for (const f of r.findings) ul.append(el('li', {}, el('div', {}, f.text), el('div', {class:'ids'}, ...f.cited_ids.map(id => el('code', {}, id))))); card.append(ul);
   card.append(el('h3', {}, 'Proposals (nothing applied until the owner approves)'));
@@ -257,7 +262,7 @@ function render() {
   document.title = `Market brief · Rule vs AI · ${LABEL[market]}`; $('#title').textContent = `Rule vs AI · ${p.name}`;
   sideFoot(market); marketSeg(() => render());
   const page = $('#page'); page.innerHTML = '';
-  const bar = el('div', {class:'ctrls'}); const sg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Costs'}); for (const [k, t] of [['market', 'Market cost'], ['your', 'Your cost']]) sg.append(el('button', {type:'button', 'aria-pressed': String(k === cost), onclick: () => { cost = k; render(); }}, t)); bar.append(el('span', {class:'c'}, 'Costs', help('Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50).'), sg));
+  const bar = el('div', {class:'ctrls'}); const sg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Costs'}); for (const [k, t] of [['market', 'Market cost'], ['your', 'Your cost']]) sg.append(el('button', {type:'button', 'aria-pressed': String(k === cost), onclick: () => { cost = k; render(); }}, t)); bar.append(el('span', {class:'c'}, 'Costs', help('Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50). The switch changes the scorecard, the slice tables, the matches and the per-company sums (per-trade your-cost figures from the cost views); the cumulative lines and the EOD analyst stay on market cost.'), sg));
   page.append(pageHead(market, 'Rule vs AI', `head-to-head paper trades on identical company-days · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only`), paperBand(market, p.go_live, Object.keys(p.strategies).length), bar);
   page.append(el('div', {style:'margin-top:16px'}, scorecard(p)), el('div', {style:'margin-top:16px'}, picksCard(p)), el('div', {style:'margin-top:16px'}, matches(p)));
   page.append(el('div', {style:'margin-top:16px'}, slices(p)));

@@ -688,8 +688,8 @@ const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange f
   promotional: ['promotional', 'A paid, promotional or opinion item. Never supports a call.', 'ms-close'],
   contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close']};
 const CAN_CARRY = ['confirmed_primary', 'corroborated'];
-/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank. */
-const GO_LIVE_MONTHS = 2, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20;
+/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading and about 300 settled trades per strategy; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank; F2.3 = the back-test runs on the 15-year history cache; F7.1 luck test = a 95% percentile bootstrap interval (marketbrief/lab/luck.py, alpha 0.05). */
+const GO_LIVE_MONTHS = 2, GO_LIVE_TRADES_ABOUT = 300, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20, BACKTEST_YEARS = 15, LUCK_INTERVAL_PCT = 95;
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
 const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
