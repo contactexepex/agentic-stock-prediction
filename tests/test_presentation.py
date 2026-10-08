@@ -356,7 +356,7 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
 
 class FakeHTTP:
     def __init__(self, fail: str | None = None):
-        self.requests, self.fail, self.n = [], fail, 0
+        self.requests, self.fail, self.n, self.posts = [], fail, 0, 0
 
     def __call__(self, url, data, headers):
         self.requests.append((url, data, headers))
@@ -365,8 +365,9 @@ class FakeHTTP:
             return 200, json.dumps({"ok": False, "error": "not_in_channel"}).encode()
         if url.startswith("https://hooks.slack.com/"):
             return 200, b"ok"
-        if method == "chat.postMessage":
-            return 200, json.dumps({"ok": True, "ts": "1700000000.000100", "channel": "C1"}).encode()
+        if method == "chat.postMessage":   # a distinct ts per message; the first is 1700000000.000100
+            self.posts += 1
+            return 200, json.dumps({"ok": True, "ts": f"1700000000.{99 + self.posts:06d}", "channel": "C1"}).encode()
         if method == "files.getUploadURLExternal":
             self.n += 1
             return 200, json.dumps({"ok": True, "upload_url": f"https://files.slack.com/upload/v1/F{self.n}",
@@ -558,5 +559,8 @@ def test_brief_joins_the_days_thread_started_by_the_morning_picks(monkeypatch, c
     assert len(posts) == 2 and posts[1]["thread_ts"] == picks["thread_ts"] and posts[1]["text"].startswith("*Market")
     shares = [form(d) for u, d, _ in http.requests if u.endswith("files.completeUploadExternal")]
     assert shares and all(s["thread_ts"] == picks["thread_ts"] for s in shares)
+    assert picks["thread_ts"] == "1700000000.000100" and out["posted"][0] == "summary"
     assert ns.main(["--market", "us"], http=http) == 0                                  # rerun: no second brief
     assert len([u for u, _, _ in http.requests if u.endswith("chat.postMessage")]) == 2
+    again = json.loads(capsys.readouterr().out)
+    assert again["skipped"] == ["summary"] and "summary" not in again["posted"]
