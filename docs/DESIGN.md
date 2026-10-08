@@ -41,6 +41,18 @@ conflict: the nearest news run is 34 and 94 min after the India checks, and 20 m
 | India | `CRON_TZ=Asia/Kolkata 13 11 * * 1-5` and `CRON_TZ=Asia/Kolkata 13 14 * * 1-5` | 05:43 and 08:43 (session 03:45-10:00) |
 | US | `CRON_TZ=America/New_York 27 12 * * 1-5` and `CRON_TZ=America/New_York 57 14 * * 1-5` | 16:27 and 18:57 in EDT, 17:27 and 19:57 in EST (session 13:30-20:00 EDT, 14:30-21:00 EST) |
 
+Post-close runs (`routine/POSTCLOSE_PROMPT.md`; docs/SPEC.md F6.1) and weekly research runs
+(`routine/WEEKLY_PROMPT.md`; F6.2), in exchange time (B17, Wave 5). The post-close run starts at least 120 minutes
+after the close (`BAR_SETTLE_MINUTES`), when the session's bar counts as final; on a holiday it stops at its
+session check. The weekly research run is separate from the weekly review (step 10a of the pre-open run).
+
+| Run | Cron | UTC |
+|---|---|---|
+| India post-close | `CRON_TZ=Asia/Kolkata 45 17 * * 1-5` | 12:15 |
+| US post-close | `CRON_TZ=America/New_York 15 18 * * 1-5` | 22:15 in EDT, 23:15 in EST |
+| India weekly research | `CRON_TZ=Asia/Kolkata 0 10 * * 6` | Saturday 04:30 |
+| US weekly research | `CRON_TZ=America/New_York 0 10 * * 6` | Saturday 14:00 in EDT, 15:00 in EST |
+
 **Open paper trades (B9, docs/ws/b9.md).** Each check also covers every open paper trade (F1) of every
 strategy and horizon, in both views: the price against the trade's entry, its target and its own range, on
 today's price basis (splits and bonus issues detected by the check applied to the stored prediction),
@@ -1022,10 +1034,11 @@ always show the same numbers.
   yesterday's score, link to the HTML), then the chart images as one reply and the HTML file as
   another (bot token, `files.getUploadURLExternal` / `files.completeUploadExternal`). Without a
   bot token the summary is posted alone through the webhook. `notify_slack.py` posts nothing else.
-- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** `alerts.py` keeps its own
-  thread per market and day (its first post of the day starts it) with the morning paper picks, the intraday
-  alerts of each check run (B9's feed), the close results and correction replies. From Wave 5 the morning picks
-  open that thread and the brief above replies in it (`post_brief`), so each market has one thread a day. The
+- **Slack notifications (F9, built by B6; `scripts/alerts.py`, docs/ws/b6.md):** one thread per market and day,
+  started by the day's first post: the morning paper picks (`alerts.py morning`, run before `notify_slack.py`), the
+  brief above with its charts, report and dashboard (`notify_slack.py` posts its summary through `post_brief`, a
+  reply in that thread, once per day), the intraday alerts of each check run (B9's feed), the close results and
+  correction replies. A `--text` message (market closed) is posted on its own. The
   weekly research report is its own post and onboarding confirmations reply to the command that asked. Every signal is
   labelled Paper and every number comes from stored data as of the run's clock. The ledger
   `data/<market>/slack_posts/` makes every post idempotent.
