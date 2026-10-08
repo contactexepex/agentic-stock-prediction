@@ -7,7 +7,8 @@ computed once per build through BuildContext.shared, as of the cut-off. rm_commo
                     `session_date` among the strategy_predictions rows with made_at at or before it; each id's first
                     stored row). Rank: most buyers, then the higher average probability, then the ticker.
   open_trades(ctx)  the Open-trade records: B9's open trades as of the cut-off (intraday/trades.open_trades: every
-                    qualifying prediction and picked head-to-head pick made before D's open, without a settlement
+                    qualifying prediction and picked head-to-head pick of a strategy live on D (B2's live_from), made
+                    before D's open, without a settlement
                     row by the cut-off, for at most `trades.max_sessions_past_exit` sessions past its exit), that have
                     entered (D's open stored by the cut-off) and buy at least one share (F1.4), valued at the newest
                     stored close: unrealised profit before costs on today's price basis (splits and bonuses since D).

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -71,8 +72,15 @@ def past_prediction(trade: dict) -> dict:
 def stored(tmp_path_factory):
     """Both markets' stored data plus: today's catalogue predictions (made 11:45Z), the predictions and picks
     behind the catalogue's open trades, a settled trade, a prediction made after D's open, and a prediction made
-    after the cut-off."""
+    after the cut-off. The config is a copy with every strategy live from 1 Sep (B2's live_from), so the go-live
+    filter keeps every row."""
     root = tmp_path_factory.mktemp("entities")
+    config = root / "config"
+    shutil.copytree(REPO / "config", config)
+    registry = yaml.safe_load((config / "strategies.yaml").read_text())
+    for spec in registry["strategies"]:
+        spec["live_from"] = "2026-09-01"
+    (config / "strategies.yaml").write_text(yaml.safe_dump(registry, sort_keys=False))
     for market in MARKETS:
         shutil.copytree(REPO / "data" / market, root / "data" / market)
     opens = catalogue("open_trade.json")
@@ -151,12 +159,12 @@ def stored(tmp_path_factory):
             }
         ],
     )
-    saved = common.ROOT
-    common.ROOT = root
+    saved, saved_config = common.ROOT, common.CONFIG
+    common.ROOT, common.CONFIG = root, config
     try:
         yield {market: BuildContext(load_market(market), connect(market), CUTOFF) for market in MARKETS}
     finally:
-        common.ROOT = saved
+        common.ROOT, common.CONFIG = saved, saved_config
 
 
 SPLIT_PREDICTION = {
