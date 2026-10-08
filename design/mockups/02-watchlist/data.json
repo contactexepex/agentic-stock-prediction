@@ -42,6 +42,22 @@
      "in_session": false,
      "late_run": true
     },
+    "benchmark": {
+     "symbol": "NIFTY50",
+     "name": "Nifty 50",
+     "close": 22776.0996,
+     "close_date": "2026-10-06",
+     "change_pct": 0.98,
+     "change_5d_pct": -0.02
+    },
+    "vol_index": {
+     "symbol": "INDIAVIX",
+     "name": "India VIX",
+     "close": 13.61,
+     "close_date": "2026-10-06",
+     "change_pct": -7.92,
+     "change_5d_pct": -0.22
+    },
     "regime": "EVENT_HEAVY",
     "runs": {
      "pre_open": {
@@ -1466,6 +1482,22 @@
      "session_close_utc": "2026-10-07T20:00:00+00:00",
      "in_session": false,
      "late_run": false
+    },
+    "benchmark": {
+     "symbol": "SPY",
+     "name": "S&P 500 ETF",
+     "close": 779.09,
+     "close_date": "2026-10-06",
+     "change_pct": 0.55,
+     "change_5d_pct": 1.95
+    },
+    "vol_index": {
+     "symbol": "VIX",
+     "name": "VIX",
+     "close": 15.01,
+     "close_date": "2026-10-06",
+     "change_pct": -3.29,
+     "change_5d_pct": -6.42
     },
     "regime": "TRENDING",
     "runs": {
