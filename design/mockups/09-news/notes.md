@@ -20,7 +20,7 @@ market's record whole; nested objects listed with `{...}` are copied with the ke
 Shown but computed by the page (presentation only): the market movers (the band: a story qualifies when the engine's
 `market_moving` flag is set, or it is market-wide, a results story or scored high materiality; ranked flagged first,
 then market-wide, results, materiality, newest; the same headline stored twice shows once; at most `NEWS_MOVERS_MAX`),
-the filters (last 24 h = first seen in the `NEWS_RECENT_HOURS` before the cut-off; market-wide = `scope` market; market moving =
+the filters (last 24 h = published in the `NEWS_RECENT_HOURS` before the cut-off, the owner's decision of 2026-10-08; market-wide = `scope` market; market moving =
 the flag; can carry a call = confirmed or corroborated; one company), the kind word (a market-wide story's `category`
 when it is not `company` or `general`, else the event type in words), the "not verified per company" badge for the
 empty status of a market-wide story, the day groups (the

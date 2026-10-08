@@ -38,7 +38,8 @@ from any site, only the conventions.
    twice shows once. A market-wide story carries "not verified per company" instead of a status, because
    verification is per company. An honest empty state when the window has none.
 3. **Last 3 days** (the feed): filter chips (All, Last 24 h, Market-wide, Market moving, Can carry a call) and a
-   company select; a note when most stories have no summary line;
+   company select ("Last 24 h" = published in the 24 hours before the cut-off); a note when most stories have no
+   summary line;
    stories grouped by the local day they were stored, with a sticky header ("Today · n stories"), each row with the
    outlet's publish time (with its date when it differs from the stored day; the tooltip has both times), the sentiment arrow, the same item body as the band; a pager
    (10 a page, at most 50 in the window) that scrolls the feed into view.
@@ -89,11 +90,15 @@ now explains its empty state and a note says when stories show the headline alon
 0.05 sentiment band were typed in the template (now the shell's `NEWS_RECENT_HOURS` and `SENTIMENT_FLAT_BAND`, the
 latter also used by the shell's sentiment arrow).
 
-## Decisions taken for the owner (reported to the orchestrator; confirmed in part, see the last bullet)
+Closing round (2026-10-08, the owner: "fix it and close the design"): the "Last 24 h" chip and the head's count now use
+the outlet's publish time, like the rows; the unused `opts.time` branch is gone; the stale bullets below are current.
+
+## Decisions taken for the owner (reported to the orchestrator; confirmed by the owner on 2026-10-08)
 - The movers are a ranked band of cards above the feed, not a separate tab, so the first screen answers "what
   moves the market" and the feed is one scroll away.
 - The feed is grouped by day with sticky headers and filtered by chips rather than split into "today" and "older"
-  cards: one list, newest first, the owner's filters on top.
+  cards: one list, the latest stored first, the owner's filters on top; "Last 24 h" counts by the outlet's publish
+  time, like the time shown on every row (the owner's decision after the first review).
 - The rail holds the calendar (the week ahead) and the news per company; "big news" lives in the band, so the rail
   does not repeat it.
 - Confirmed by the owner (2026-10-08, after the first review): the ranking rule stays, the band shows at most 10 (not
@@ -103,4 +108,4 @@ latter also used by the shell's sentiment arrow).
   market's page shows the stories its own feeds carried, so a Fed story appears in India only when India's feeds had
   it.
 - The band uses the engine's market-moving flag first and fills up to 10 with the page's own order, so it is never
-  empty while the window has market-wide or results stories; the owner may prefer the flagged stories alone.
+  empty while the window has market-wide or results stories (confirmed by the owner).

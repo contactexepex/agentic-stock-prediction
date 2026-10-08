@@ -67,6 +67,46 @@ The owner delegated the remaining pages ("go with your recommendation, notify th
 Shared: new named spec constants in `mockups/_shared/shell.js` (the 60-word reason limit; the assistant's 500
 characters, $0.65 a day, $20 a month, 90 days), each with its source.
 
+## Design closed (2026-10-08): handover to the API and app work
+
+The owner closed the design track on 2026-10-08 after reviewing every page through one hub: all twelve pages of
+SPEC section 6 are judged PASS and on main, with the News page built on the owner's rules of that morning. What the
+API work (WS2, `api/openapi.yaml`) and the app (WS3) take from here:
+
+- **The contract per page is its `data.json`** (the endpoint's example payload, catalogue fields only) and its
+  `notes.md` (every copied key, the selection rule per key, what the page computes itself). The endpoint and read
+  model each page assumes:
+
+| Page | Endpoint | Read model |
+|---|---|---|
+| 01-home | `GET /api/v1/markets/{market}/home` | `rm.home` |
+| 02-watchlist | `GET /api/v1/markets/{market}/watchlist` | `rm.watchlist` |
+| 03-company | `GET /api/v1/markets/{market}/stocks/{ticker}` | `rm.stock + rm.bars + rm.lifecycle + rm.trades` |
+| 04-stock-strategies | `GET /api/v1/markets/{market}/stocks/{ticker}/strategies` | `rm.stock_strategies` |
+| 05-strategy-lab | `GET /api/v1/markets/{market}/strategies` | `rm.strategies` |
+| 06-rule-vs-ai | `GET /api/v1/markets/{market}/compare` | `rm.compare + rm.review` |
+| 07-paper-portfolios | `GET /api/v1/markets/{market}/portfolios` | `rm.portfolio + rm.trades` |
+| 08-track-record | `GET /api/v1/markets/{market}/track-record` | `rm.track_record` |
+| 09-news | `GET /api/v1/markets/{market}/news` | `rm.news` |
+| 10-companies | `GET /api/v1/markets/{market}/companies` | `rm.companies` |
+| 11-assistant | `POST /api/assistant (the explain tool)` | `(none: conversations are an operational log in MotherDuck schema app, kept 90 days)` |
+| 12-help | `(static content; no endpoint)` | `(none)` |
+
+- **Open data requests** are the `_data_requests` lists in the pages' `data.json` files: the Assistant's budget
+  state (F11), a weekly call series for Track record (B4), and the News findings of issue #226 (events already past,
+  the per-company rail beyond the catalogue's four companies, the kind word, W1's market-moving rule on promotional
+  items). Everything else W1 answered (requests 1-8).
+- **Rules the pages encode as named constants** (`mockups/_shared/shell.js`, each with its source): the go-live bar
+  (2 months, about 300 trades), two intraday checks a session, 20 trades to rank, the 95% luck interval, the 60-word
+  reason limit, the assistant's 500 characters / $0.65 a day / $20 a month / 90 days, the News page's 10 movers,
+  10 a page and 24 hours; the News window (3 days) and cap (50) are in its build.
+- **Presentation rules** every page follows (the agreement above): the design system in `system/`, never colour
+  alone, keyboard usable, Paper labels, "No proven strong signals today" until the weekly review's `model_skill`,
+  research only. The React components of WS3 implement the mockups' layouts; the mockups' `template.html` files
+  show every state (filters, empty states, dialogs).
+- **Backlog**: the judge's cosmetic findings are GitHub issues #152-#155 and #174-#227 labelled `cosmetic`, held
+  for a round after the API and app work has started; none blocks the contract.
+
 ## Design system
 `system/`: scheme v2 "modern admin light" (2026-10-08; `system/README.md`): the look of modern admin templates the
 owner pointed at (Pixinvent Materialize with its semi-dark vertical menu, Aurora) on a broker-style cockpit, with
