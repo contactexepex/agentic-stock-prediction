@@ -1,9 +1,8 @@
-"""Company, lifecycle-event and command records as the market pages show them (catalogue entities "Company",
-"Lifecycle event" and "Command", docs/DATA_CATALOGUE.md; selection of design/mockups/10-companies/notes.md).
-Everything is as of the cut-off: B1's watchlist accessor folds the events recorded and effective by then, the
-latest close is the newest raw bar collected by then, and events and commands count from `recorded_at` /
-`received_at`. A deleted company is never shown (decision 12): its records are left out and every echo of it in a
-command is masked."""
+"""Lifecycle-event and command records as the Companies page shows them (catalogue entities "Lifecycle event" and
+"Command", docs/DATA_CATALOGUE.md; selection of design/mockups/10-companies/notes.md). Everything is as of the
+cut-off: B1's watchlist accessor folds the events recorded and effective by then, and events and commands count from
+`recorded_at` / `received_at`. The Company records themselves are B4's (warehouse/rm_common.py). A deleted company is
+never shown (decision 12): its records are left out and every echo of it in a command is masked."""
 
 from __future__ import annotations
 
@@ -12,24 +11,11 @@ from datetime import datetime
 
 import pandas as pd
 
+from marketbrief.constants.market_pages import COMPANY_COMMAND_TOOLS, MASKED, MASKED_COMPANY, MASKED_MESSAGE
 from marketbrief.lifecycle import accessor
 from marketbrief.lifecycle.constants import STATE_ACTIVE, STATE_DELETED
-from marketbrief.utils.numbers import json_safe_float
 from marketbrief.warehouse.news_items import iso
 
-COMPANY_COMMAND_TOOLS = ("add_company", "deactivate_company", "reactivate_company", "set_paper_amount",
-                         "delete_company")
-MASKED = "(masked)"
-MASKED_COMPANY = "(deleted company)"
-MASKED_MESSAGE = "(this company was deleted later; its records are excluded on read)"
-# each ticker's two newest raw closes collected by the cut-off, on sessions of the market (own_closed_days left out)
-CLOSES_SQL = """
-WITH p AS (SELECT DISTINCT ON (ticker, date) ticker, date, close FROM prices
-           WHERE collected_at <= $cutoff::TIMESTAMPTZ ORDER BY ticker, date, collected_at DESC),
-r AS (SELECT * FROM p WHERE NOT EXISTS (SELECT 1 FROM own_closed_days c WHERE c.ticker = p.ticker AND c.date = p.date)),
-k AS (SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS n FROM r
-      WHERE list_contains($tickers, ticker))
-SELECT ticker, date, close, n FROM k WHERE n <= 2 ORDER BY ticker, n"""
 EVENTS_SQL = """SELECT * FROM watchlist_events WHERE recorded_at <= $cutoff::TIMESTAMPTZ
                 ORDER BY recorded_at DESC, id"""
 COMMANDS_SQL = """SELECT * FROM command_log WHERE received_at <= $cutoff::TIMESTAMPTZ AND list_contains($tools, tool)
@@ -39,21 +25,6 @@ LIFECYCLE_FIELDS = ("id", "event", "ticker", "market", "effective_from", "record
                     "supersedes")
 COMMAND_FIELDS = ("id", "market", "received_at", "channel", "actor", "agent", "tool", "kind", "arguments",
                   "idempotency_key", "result", "refusal_code", "message", "record_ids", "budget_left", "completed_at")
-TIME_FIELDS = ("effective_from", "recorded_at", "received_at", "completed_at")
-
-
-def latest_closes(con, tickers: list[str], cutoff: str) -> dict[str, dict]:
-    """ticker -> {last_close, last_close_date, change_pct} from the newest two raw closes by the cut-off."""
-    closes: dict[str, list] = {}
-    for ticker, day, close, _rank in con.execute(CLOSES_SQL, {"cutoff": cutoff, "tickers": tickers}).fetchall():
-        closes.setdefault(ticker, []).append((day, close))
-    out = {}
-    for ticker, rows in closes.items():
-        (day, close), previous = rows[0], rows[1] if len(rows) > 1 else None
-        change = round((close / previous[1] - 1) * 100, 2) if previous and previous[1] else None
-        out[ticker] = {"last_close": json_safe_float(close), "last_close_date": str(pd.Timestamp(day).date()),
-                       "change_pct": change}
-    return out
 
 
 def shown_companies(market: str, cutoff: datetime) -> tuple[list[dict], set[str]]:
@@ -61,20 +32,6 @@ def shown_companies(market: str, cutoff: datetime) -> tuple[list[dict], set[str]
     records = accessor.records(market, cutoff)
     deleted = {record["ticker"] for record in records if record["state"] == STATE_DELETED}
     return [record for record in records if record["state"] != STATE_DELETED], deleted
-
-
-def company_rows(con, market: str, cutoff: datetime, agreement_n1: dict, open_counts: dict) -> list[dict]:
-    """The Company records of a market, active first, then by ticker. `agreement_n1` maps a ticker to its N+1
-    {buy, of} (absent: no prediction), `open_counts` to its open paper trades."""
-    identities, _deleted = shown_companies(market, cutoff)
-    closes = latest_closes(con, [record["ticker"] for record in identities], cutoff.isoformat())
-    rows = []
-    for record in identities:
-        ticker = record["ticker"]
-        price = closes.get(ticker, {"last_close": None, "last_close_date": None, "change_pct": None})
-        rows.append({**record, "added_at": iso(record["added_at"]), "state_since": iso(record["state_since"]),
-                     **price, "agreement_n1": agreement_n1.get(ticker), "open_trades": open_counts.get(ticker, 0)})
-    return sorted(rows, key=lambda row: (row["state"] != STATE_ACTIVE, row["ticker"]))
 
 
 def plain(value):

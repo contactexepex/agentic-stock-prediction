@@ -34,3 +34,9 @@ WIDENS_MARKET = "market"
 WIDENS_COMPANY = "company"
 EXCHANGE_CLOSED_NAME = {"india": "NSE", "us": "US exchanges"}
 COMPANY_EVENT_LABEL = {"earnings": "results", "ex_dividend": "ex-dividend"}
+# the Companies page's commands (design/mockups/10-companies/notes.md); masking a deleted company (decision 12)
+COMPANY_COMMAND_TOOLS = ("add_company", "deactivate_company", "reactivate_company", "set_paper_amount",
+                         "delete_company")
+MASKED = "(masked)"
+MASKED_COMPANY = "(deleted company)"
+MASKED_MESSAGE = "(this company was deleted later; its records are excluded on read)"
