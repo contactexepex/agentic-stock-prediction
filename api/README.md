@@ -14,5 +14,7 @@ prints it (for code generators). A path or schema name defined in two files is a
 checks the bundle; `tests/test_api_contract.py` checks every page's read models against it and against the page's
 approved mockup (`design/mockups/<page>/data.json`).
 
-Versioning: additions bump the minor version (1.1.0 is this wave's); a major version needs the owner. A page payload
+Versioning: 2.0.0 is this wave's (the owner approved the major bump on 2026-10-08: the mockups' payloads replace the
+never-built 1.0 payloads of watchlist, stocks/{ticker}, track-record and news); additions bump the minor version, and
+a major version needs the owner. A page payload
 uses catalogue fields only (`docs/DATA_CATALOGUE.md`); a missing field is a data request to W1.

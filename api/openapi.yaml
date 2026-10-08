@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: market-brief app API
-  version: 1.1.0
+  version: 2.0.0
   summary: Read API over the precomputed read models (docs/ARCHITECTURE.md section 4), plus planned governed writes.
   description: |
     Research only: nothing here places, routes or suggests a trade, and nothing is investment advice.
@@ -14,13 +14,18 @@ info:
     (`scripts/marketbrief/core/schema*.py`) and the views (`sql/views.sql`); `x-source` names where each comes
     from. Everything is as of the build's cut-off (`ReadModelMeta.cutoff`); nothing stored after it is used.
 
-    Layout (1.1, docs/ws/b4.md "Contract layout"): this file holds the shared parts (info, security, parameters,
+    Version 2.0 (owner's decision of 2026-10-08, option A): the approved mockups' page payloads replace the never-built
+    1.0 payloads on the handover paths watchlist, stocks/{ticker}, track-record and news (their page sessions B11-B13
+    replace the 1.0 schemas Watchlist, StockDetail, TrackRecord and NewsFeed); the other 1.0 endpoints stay, and the
+    1.0 write endpoints are replaced as docs/SPEC.md section 5 says.
+
+    Layout (2.0, docs/ws/b4.md "Contract layout"): this file holds the shared parts (info, security, parameters,
     responses, the schemas every page uses) and the platform paths; each page session adds `api/paths/<page>.yaml`
     (a map of path -> path item) and `api/schemas/<page>.yaml` (a map of schema name -> schema). The bundle
     (`python -m marketbrief.warehouse.openapi_spec`, from scripts/) merges them into one document; every `$ref` is
     written against that bundled document (`#/components/schemas/Market`).
 
-    Serve-time fields (1.1 pages): the stored payload carries no time of its build, so a rebuild of the same data
+    Serve-time fields (2.0 page payloads): the stored payload carries no time of its build, so a rebuild of the same data
     keeps its hash. The route adds `cutoff` and `built_at` (the row's envelope) at the top of a page payload and
     `freshness` (`Freshness`, from `built_at` and the request time) to its `status` block; the status page gets
     `freshness` at its top. Everything else is the stored payload verbatim (1.0 pages entirely).
@@ -564,12 +569,12 @@ components:
                 - {$ref: '#/components/schemas/Build'}
                 - {type: 'null'}
 
-    # ---------- shared page blocks (1.1; warehouse/rm_common.py, docs/DATA_CATALOGUE.md) ----------
+    # ---------- shared page blocks (2.0; warehouse/rm_common.py, docs/DATA_CATALOGUE.md) ----------
     PageHeader:
       type: object
       x-source: warehouse/rm_common.header
       description: >-
-        The top of every 1.1 page payload: the market, its name and currency, the newest indicator snapshot date;
+        The top of every 2.0 page payload: the market, its name and currency, the newest indicator snapshot date;
         `cutoff` and `built_at` are added when served (the row's envelope)
       required: [market, name, currency, as_of]
       properties:
@@ -652,7 +657,7 @@ components:
     StatusBlock:
       type: object
       x-source: warehouse/rm_common.status_block
-      description: The Market status record every 1.1 page carries as `status`; `freshness` is added when served
+      description: The Market status record every 2.0 page carries as `status`; `freshness` is added when served
       required: [market, name, currency, as_of, session, regime, benchmark, vol_index, runs, paper_label]
       properties:
         market: {$ref: '#/components/schemas/Market'}

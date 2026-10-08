@@ -20,7 +20,7 @@ export const CACHE_REVALIDATE_SECONDS = 86400;
 export const READ_MODEL_COLUMNS =
   "market, page_key, as_of, cutoff, built_at, schema_version, source_commit, payload_sha256, payload";
 /** The major version of api/openapi.yaml this app serves; a stored row of another major version is refused (503). */
-export const CONTRACT_MAJOR = "1";
+export const CONTRACT_MAJOR = "2";
 /** The static reports site (config/settings.yaml pages_url): its pages work without the warehouse. */
 export const REPORTS_URL = "https://agentic-stock-prediction-reports.vercel.app";
 /** Problem.fallback_links of a market: its static dashboard and its report index. */

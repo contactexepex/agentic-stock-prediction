@@ -149,7 +149,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   as of the clock, collected companies only via B1's `watchlist(market, cutoff, "collected")`), checked against its
   schema before writing; a MotherDuck sync then revalidates the app's cache of the changed keys (`app_url`,
   `REVALIDATE_SECRET`). The API under `/api/v1` (Next.js route handlers in `web/app/api/v1/`, shared helpers in
-  `web/lib/data/`) reads only `rm`; contract `api/openapi.yaml` 1.1 plus `api/paths/*.yaml` and `api/schemas/*.yaml`
+  `web/lib/data/`) reads only `rm`; contract `api/openapi.yaml` 2.0 plus `api/paths/*.yaml` and `api/schemas/*.yaml`
   (one file per page session; bundled by `warehouse/openapi_spec.py`), checked by `tests/test_openapi.py` and
   against the approved mockups by `tests/test_api_contract.py` (`scripts/api_contract.py` for the live warehouse).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,

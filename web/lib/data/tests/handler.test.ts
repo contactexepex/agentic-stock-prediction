@@ -69,7 +69,7 @@ test("the warehouse down is a 503 with the static reports as fallback links and 
 });
 
 test("a row of another major contract version is refused with 503", async () => {
-  const store = new MemoryRowStore().put("example", row({ schema_version: "2.0.0" }));
+  const store = new MemoryRowStore().put("example", row({ schema_version: "1.1.0" }));
   assert.equal((await readPage(request(), PAGE, "us", "_", deps(store))).status, 503);
 });
 
