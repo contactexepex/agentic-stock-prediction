@@ -32,6 +32,9 @@ NOTE = ("EXAMPLE DATA for page design only: every value is copied from W1's exam
 COMPANY_FIELDS = ("market", "ticker", "name", "exchange", "sector", "state", "amount", "amount_overridden",
                   "currency", "last_close", "last_close_date", "change_pct", "agreement_n1", "open_trades")
 STRATEGY_FIELDS = ("id", "family", "name", "threshold", "horizons", "live", "settled_trades")
+SETTLED_FIELDS = ("trade_id", "view", "pick_rule", "strategy_id", "family", "ticker", "horizon_days", "entry_date",
+                  "exit_date", "exit_date_actual", "status", "amount", "currency", "net_pnl", "return_pct",
+                  "reason_code", "settled_at")
 PICK_RULE_ROW_FIELDS = ("scope", "market", "view", "family", "pick_rule", "horizon_days", "trades", "net_pnl",
                         "currency", "mean_return_pct", "win_rate", "sample_badge", "basis", "as_of")
 
@@ -70,6 +73,10 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
                      if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy"
                      and r["strategy_id"] == "rule.model_news.v1" and r["horizon_days"] == "all")
     strategies = {r["id"]: pick(r, STRATEGY_FIELDS) for r in files["strategy"]["records"]}
+    # the last sessions' settled paper trades (rm.trades keeps the last 5 sessions): the cumulative profit chart
+    settled = sorted((pick(r, SETTLED_FIELDS) for r in files["paper_trade"]["records"]
+                      if r["market"] == market and r["status"] == "settled" and r["settled_at"] <= cutoff),
+                     key=lambda r: (r["exit_date_actual"], r["trade_id"]))
     # the Home news card (owner, earlier design round: "add the news card to Home and drop the News screen"):
     # this market's items first seen by the cut-off, newest first
     news = sorted((r for r in files["news_item"]["records"] if r["market"] == market and r["first_seen_at"] <= cutoff),
@@ -89,12 +96,13 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
         "go_live": reference["go_live"],
         "strategies": strategies,
         "news": news,
+        "settled_trades": settled,
     }
 
 
 def build() -> dict:
     names = ("market_status", "company", "agreement", "head_to_head_pick", "open_trade", "trade_check",
-             "eod_analysis", "scoreboard_row", "strategy", "news_item")
+             "eod_analysis", "scoreboard_row", "strategy", "news_item", "paper_trade")
     files = {name: catalogue(name) for name in names}
     cutoffs = {files[name]["as_of"] for name in names}
     assert len(cutoffs) == 1, cutoffs
@@ -131,7 +139,7 @@ def main() -> None:
         print(f"{market}: as of {p['as_of']}, session {p['status']['session']['session_date']}, "
               f"agreement N+1 {[(r['ticker'], r['buy'], r['of']) for r in p['agreement']['1']]}, "
               f"picks {len(p['head_to_head'])}, open trades {len(p['open_trades'])}, "
-              f"checks at cut-off {len(p['trade_checks'])}, to-date rows {len(p['to_date'])}, news {len(p['news'])}")
+              f"checks at cut-off {len(p['trade_checks'])}, to-date rows {len(p['to_date'])}, news {len(p['news'])}, settled {len(p['settled_trades'])}")
     print(out, len(html), "bytes")
 
 

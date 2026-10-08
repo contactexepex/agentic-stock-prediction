@@ -55,7 +55,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
   </header>
   <main class="mb-content"><div class="mb-content-inner">
     <h1 class="md-headline-medium" style="margin:var(--mb-space-4) 0 4px">Cockpit design system</h1>
-    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">One light scheme, "terminal light": a cool light-grey page, white hairline cards, one indigo accent (<code>#4f46e5</code>), green <code>#15803d</code> / red <code>#dc2626</code> for signals and signed numbers, uppercase micro-labels over big bold numerals. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
+    <p class="md-body-large" style="margin:0;color:var(--md-sys-color-on-surface-variant)">One light scheme, v2 "modern admin light" (the look of modern admin templates such as Pixinvent's Materialize, applied to a broker-style cockpit): a soft light-grey page, white cards lifted by a faint shadow, one periwinkle-indigo accent (<code>#5a5ee6</code>), a dark navy sidebar with labels, icon tiles on KPI cards, gradient area charts, green <code>#15803d</code> / red <code>#dc2626</code> for signals and signed numbers. System font stack, vendored Material Symbols. Everything on this page is rendered from <code>tokens.css</code> + <code>components.css</code> + <code>icons.svg</code>; contrast ratios are computed in the page.</p>
     <p class="sg-row" style="margin-top:var(--mb-space-3)"><span class="mb-tag live"><svg class="ms"><use href="#ms-sensors"/></svg>Live</span><span class="mb-tag bt"><svg class="ms"><use href="#ms-history"/></svg>Back-test</span><span class="mb-tag mock"><svg class="ms"><use href="#ms-construction"/></svg>Mock</span><span class="mb-tag paper"><svg class="ms"><use href="#ms-science"/></svg>Paper</span><span class="mb-tag derived">derived</span><span class="mb-tag coming">Coming</span><span class="sg-note">provenance tags: a texture or border style besides the colour (hatched, dashed, dotted)</span></p>
 
     <section class="sg-section" id="verdict">
@@ -231,7 +231,7 @@ code{font-family:var(--md-ref-typeface-mono);font-size:.92em;background:var(--md
 
     <section class="sg-section" id="shell">
       <h2>App shell</h2>
-      <p class="lede">This page sits in the shell: a white navigation rail with a hairline border on the left from 600px (40×40 active square in the accent tint), a navigation bar at the bottom on phones, and a white top bar with the page title and the India/US segmented control. Sections not built yet are marked "soon" and explain themselves on hover.</p>
+      <p class="lede">This page sits in the shell: a dark navy sidebar with labels from 1200px (the active page as a gradient pill), a collapsed icon rail between 600 and 1199px, a bottom navigation bar plus a drawer on phones, and a white top bar with the page title and the India/US segmented control. Sections not built yet are marked "soon" and explain themselves on hover.</p>
     </section>
     <footer class="sg-note" style="text-align:center;padding:var(--mb-space-6) 0 0">Personal research project · design system v1 · research only, nothing here trades.</footer>
   </div></main>
@@ -267,7 +267,7 @@ for (const [bg, fg, label] of [
   ['--md-sys-color-surface', '--md-sys-color-on-surface', 'surface'], ['--md-sys-color-surface-variant', '--md-sys-color-on-surface', 'surface variant'],
   ['--md-sys-color-surface-container-lowest', '--md-sys-color-on-surface', 'container lowest'], ['--md-sys-color-surface-container-low', '--md-sys-color-on-surface', 'container low'],
   ['--md-sys-color-surface-container', '--md-sys-color-on-surface', 'container'], ['--md-sys-color-surface-container-high', '--md-sys-color-on-surface', 'container high'],
-  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface', 'container highest (hairlines)'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
+  ['--md-sys-color-surface-container-highest', '--md-sys-color-on-surface', 'container highest (rules)'], ['--md-sys-color-inverse-surface', '--md-sys-color-inverse-on-surface', 'inverse surface'],
   ['--md-sys-color-outline', null, 'outline'], ['--md-sys-color-outline-variant', null, 'outline variant (decorative)'],
 ]) swatch(R, bg, fg, label);
 const S = document.getElementById('semantic');
