@@ -72,7 +72,7 @@ sources -> collectors -> data/ (git) -> pipeline -> reports/ + Slack          (u
 | MotherDuck schema `rm` | Read models: per-page JSON payloads as of a cut-off | `warehouse_sync --rebuild-rm` from `base` (or from the local DuckDB) | rebuild; app shows degraded mode meanwhile |
 | MotherDuck schema `inbox` (planned) | Unimported form entries only (not derived!) | not rebuildable | lose un-imported entries; UI tells the user they were pending (section 9) |
 | Neo4j | Graph copy (DESIGN.md section 12) | `neo4j_sync --full` | rebuild |
-| `reports/` | Static HTML reports and `dashboard.html`, served by the owner's private Vercel site | rerun the report steps | regenerate |
+| `reports/` | Static HTML reports and `dashboard.html`, served by the owner's private Vercel site (deployed only by hand: `reports/vercel.json`) | rerun the report steps | regenerate |
 
 Rule: no store but `data/` (and, transiently, `inbox`) holds a fact that is not derivable from `data/`
 plus `config/`. A read model never contains a number the pipeline did not store or compute

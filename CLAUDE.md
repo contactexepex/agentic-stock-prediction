@@ -343,8 +343,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/settings.yaml` holds the repo URL, optional `pages_url`, the Slack channel id and the AI
   model's `model_training_cutoff` (ai_replay's fair vs contaminated split). `pages_url` is the owner's
   private Vercel site serving `reports/` (Vercel Authentication on all deployments), so Slack links open
-  the rendered pages; `reports/index.html` is its hand-written landing page (the one file under
-  `reports/` that build work may change; no script writes it)
+  the rendered pages. It deploys only by hand from the Vercel dashboard (`reports/vercel.json`:
+  `git.deploymentEnabled` false, owner decision 2026-10-08), so a day's links open only after the owner deploys.
+  `reports/index.html` is its hand-written landing page and `reports/vercel.json` its deployment setting (the
+  only files under `reports/` that build work may change; no script writes them)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`
