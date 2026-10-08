@@ -37,7 +37,7 @@ LATE_NEWS = "feedfacefeedface"
 SECRET = "sync-secret/+="
 WAREHOUSE = Path("work/warehouse/market_brief.duckdb")
 MIRRORED = {"tickers", "bars", *(t.name for t in TABLES)}
-RM_TABLES = ("bars", "overview", "status", "stock", "track_record", "watchlist")
+RM_TABLES = ("bars", "overview", "status", "stock", "stock_strategies", "track_record", "trades", "watchlist")
 SPEC = REPO / "api" / "openapi.yaml"
 
 
@@ -207,6 +207,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
     as_of = datetime.fromisoformat(data["as_of"]).date()
     tickers = list(synced["cfg"]["tickers"])
     keys = {"overview": ["_"], "watchlist": ["_"], "stock": tickers, "bars": tickers, "track_record": ["_"]}
+    keys |= {"trades": ["_", *tickers], "stock_strategies": tickers}
     keys["status"] = ["_"]
     for table, expected in keys.items():
         pages = stored_pages(root, table)
@@ -215,16 +216,13 @@ def test_read_models_keys_envelope_and_payloads(synced):
             assert (market, page_as_of, version) == ("us", as_of, openapi_spec.version())
             assert hashlib.sha256(payload.encode()).hexdigest() == sha  # the ETag hashes the stored text
             assert "generated_at" not in payload  # no cut-off inside a payload (the envelope has it)
-    jpm = json.loads(stored_pages(root, "stock")["JPM"][4])
     company = next(c for c in data["companies"] if c["ticker"] == "JPM")
-    assert {k: v for k, v in jpm.items() if k in company} == json.loads(
-        json.dumps({k: v for k, v in company.items() if k != "bars"})
-    )  # exactly the dashboard's stock data, no bars
-    assert "bars" not in jpm and jpm["as_of"] == data["as_of"] and jpm["skill"] == data["skill"]
-    assert {m["id"] for m in jpm["models"]} <= {m["model_id"] for m in company["model"]}
-    assert all(e["date"] > data["as_of"] for e in jpm["events"])
+    # 2.0: the company page (B12, rm_company.py) carries its bars; rm.bars holds the same list
+    jpm = json.loads(stored_pages(root, "stock")["JPM"][4])
+    assert jpm["ticker"] == "JPM" and jpm["company"]["ticker"] == "JPM" and jpm["as_of"] == data["as_of"]
     bars = json.loads(stored_pages(root, "bars")["JPM"][4])
-    assert bars["bars"] == json.loads(json.dumps(company["bars"])) and bars["columns"][0] == "date"
+    assert bars["bars"] == jpm["bars"] and bars["bars"][-1]["date"] == company["last"]["date"]
+    assert all(e["date"] >= jpm["status"]["session"]["session_date"] for e in jpm["events"])
     overview = json.loads(stored_pages(root, "overview")["_"][4])
     assert overview["overview"] == json.loads(json.dumps(data["overview"]))
     assert overview["disclaimer"] == data["disclaimer"] and overview["plan"] == data["plan"]

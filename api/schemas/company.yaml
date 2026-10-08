@@ -65,7 +65,7 @@ CompanyPage:
           type: array
           description: The company's watchlist events recorded by the cut-off, oldest first
           items: {$ref: '#/components/schemas/LifecycleEventRecord'}
-        agreement: {$ref: '#/components/schemas/AgreementByHorizon'}
+        agreement: {$ref: '#/components/schemas/AgreementMap'}
         head_to_head:
           type: array
           description: The company's picks for the session being predicted, by family then pick rule
@@ -124,7 +124,7 @@ StockStrategiesPage:
         ticker: {$ref: '#/components/schemas/Ticker'}
         status: {$ref: '#/components/schemas/StatusBlock'}
         company: {$ref: '#/components/schemas/CompanyRecord'}
-        agreement: {$ref: '#/components/schemas/AgreementByHorizon'}
+        agreement: {$ref: '#/components/schemas/AgreementMap'}
         head_to_head:
           type: array
           items: {$ref: '#/components/schemas/HeadToHeadPick'}
@@ -291,40 +291,6 @@ StrategyPrediction:
     quality: {type: ['string', 'null']}
     amount: {$ref: '#/components/schemas/NullableNumber'}
     currency: {type: ['string', 'null']}
-OpenTrade:
-  type: object
-  description: >-
-    A paper trade still open after the newest stored close (catalogue "Open trade"; the shared derivation
-    rm_common.open_trades, which Company.open_trades counts). Monitoring only, nothing is traded
-  x-source: warehouse/rm_common.open_trades
-  required: [trade_id, view, prediction_id, strategy_id, family, market, ticker, horizon_days, entry_date, exit_date,
-             paper]
-  properties:
-    trade_id: {type: string}
-    view: {type: string, enum: [accuracy, head_to_head]}
-    prediction_id: {type: string}
-    strategy_id: {type: string}
-    family: {type: string, enum: [rule, baseline, ai]}
-    market: {$ref: '#/components/schemas/Market'}
-    ticker: {$ref: '#/components/schemas/Ticker'}
-    horizon_days: {$ref: '#/components/schemas/Horizon'}
-    entry_date: {$ref: '#/components/schemas/IsoDate'}
-    exit_date: {$ref: '#/components/schemas/IsoDate'}
-    entry_price: {$ref: '#/components/schemas/NullableNumber'}
-    quantity: {$ref: '#/components/schemas/NullableNumber'}
-    amount: {$ref: '#/components/schemas/NullableNumber'}
-    currency: {type: ['string', 'null']}
-    target_price: {$ref: '#/components/schemas/NullableNumber'}
-    lo80: {$ref: '#/components/schemas/NullableNumber'}
-    lo50: {$ref: '#/components/schemas/NullableNumber'}
-    hi50: {$ref: '#/components/schemas/NullableNumber'}
-    hi80: {$ref: '#/components/schemas/NullableNumber'}
-    last_price: {$ref: '#/components/schemas/NullableNumber'}
-    last_price_date: {type: ['string', 'null'], format: date}
-    unrealised_pnl: {$ref: '#/components/schemas/NullableNumber'}
-    unrealised_pct: {$ref: '#/components/schemas/NullableNumber'}
-    to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
-    paper: {type: boolean}
 TradeCheck:
   type: object
   description: One open paper trade's row of an intraday check (kind trade_checks, view trade_check_rows). Monitoring only
