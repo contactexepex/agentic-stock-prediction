@@ -33,14 +33,14 @@ implements the mockups as React components on the design system.
 | 2 | Watchlist | `mockups/02-watchlist/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at b1c9127; on main; cosmetic issues #152-#155 |
 | 3 | Company | `mockups/03-company/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 8912657; on main |
 | 4 | Stock strategies | `mockups/04-stock-strategies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at ca019cd; on main |
-| 5 | Strategy lab | `mockups/05-strategy-lab/` | built; with the judge |
-| 6 | Rule vs AI | | |
-| 7 | Paper portfolios | | |
-| 8 | Track record | | |
+| 5 | Strategy lab | `mockups/05-strategy-lab/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at a7c4ff3; on main; cosmetic issues #197-#207 |
+| 6 | Rule vs AI | `mockups/06-rule-vs-ai/` | built on the owner's delegated authority (2026-10-08); judge PASS round 4 at e0d2b7d and, rebuilt on W1's W40 research reviews, round 7 at 821298d; on main; cosmetic issues #179-#189 |
+| 7 | Paper portfolios | `mockups/07-paper-portfolios/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 5d22863; on main; cosmetic issues #190-#193 |
+| 8 | Track record | `mockups/08-track-record/` | built on W1's `track_record` entity (2026-10-08); with the judge |
 | 9 | News | | the owner decided in the earlier round to fold the news into Home (the news card) and the Company page; to be confirmed |
-| 10 | Companies | | |
-| 11 | Assistant | | |
-| 12 | Help | | |
+| 10 | Companies | `mockups/10-companies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 23c56a4; on main; cosmetic issues #194-#196 |
+| 11 | Assistant | `mockups/11-assistant/` | built on W1's `assistant_answer` entity (2026-10-08); being built |
+| 12 | Help | `mockups/12-help/` | built on the owner's delegated authority (2026-10-08); judge PASS round 3 at 962b8dc; on main; cosmetic issues #208-#212 |
 
 Order: the spec's, proposed to the owner with Home first.
 
