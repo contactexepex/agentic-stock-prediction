@@ -12,8 +12,9 @@ command and result; a Slack failure is reported in the import's result and never
 The import never deletes inbox rows: an inbox_id with a command_log row that settled it (accepted, refused or
 duplicate) is skipped, so a rerun imports nothing twice; an inbox_id whose rows are all `failed` (a source did not
 answer, nothing was stored) is tried again by the next import (onboard.yml or the routine's). Token: the env
-MOTHERDUCK_INBOX_TOKEN only, handed to DuckDB as a connection setting (never in SQL, a URL or the output); offline
-tests pass a local DuckDB file."""
+MOTHERDUCK_INBOX_TOKEN only, set as the bound parameter of `SET motherduck_token` once WS1's loader
+(warehouse/extension.py) has loaded the extension, which alone knows the setting (never in SQL text, a URL or the
+output); offline tests pass a local DuckDB file."""
 from __future__ import annotations
 
 import json
@@ -25,6 +26,9 @@ from marketbrief.constants.kinds import KIND_COMMAND_LOG
 from marketbrief.lifecycle import commands
 from marketbrief.lifecycle.constants import ENV_INBOX_TOKEN, EVENT_ADD, EVENT_OF_TOOL, INBOX_DATABASE, RESULT_FAILED
 from marketbrief.lifecycle.store import stored_rows
+from marketbrief.warehouse.connection import load_warehouse_config
+from marketbrief.warehouse.errors import WarehouseError
+from marketbrief.warehouse.extension import load_motherduck
 
 INBOX_TABLE = "inbox.company_commands"
 INBOX_COLUMNS = "inbox_id, market, tool, arguments, actor, channel, submitted_at, command_id"
@@ -54,13 +58,13 @@ def open_inbox(path: str | None):
     if not token:
         raise SystemExit(f"{ENV_INBOX_TOKEN} is not set and no --inbox file was given")
     try:
-        con = duckdb.connect(config={MOTHERDUCK_SETTING: token})
-        con.execute("INSTALL motherduck")
-        con.execute("LOAD motherduck")
+        con = duckdb.connect()
+        load_motherduck(con, load_warehouse_config())   # WS1's HTTPS-only install of the pinned signed extension
+        con.execute(f"SET {MOTHERDUCK_SETTING} = ?", [token])   # known only once the extension is loaded
         con.execute(f"ATTACH 'md:{INBOX_DATABASE}' AS {INBOX_DATABASE} (READ_ONLY)")
         con.execute(f"USE {INBOX_DATABASE}")
         return con
-    except duckdb.Error as exc:
+    except (duckdb.Error, WarehouseError) as exc:
         raise SystemExit(masked(f"inbox: {type(exc).__name__}: {exc}")) from None
 
 
