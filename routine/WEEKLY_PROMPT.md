@@ -4,9 +4,10 @@ schedules. It is separate from the existing weekly review (step 10a of the first
 stays as it is. Follow CLAUDE.md. Work from the repo root. Export `MB_MARKET=<market>` and `PYTHONPATH=scripts`.
 Research only: never place trades; the director's proposals change nothing until the owner applies them.
 
-Data rules: files under `data/` are append-only. Only the scripts below write there: B2's news-impact step and
-`lab.py backtest --store` (`data/<market>/lab_backtests/`), and `director-add` (one `research_reviews` row, plus
-`reports/<market>/research-<iso_week>.md`); you and the director write only under `work/`. Never apply a proposed diff:
+Data rules: files under `data/` are append-only. Only the scripts below write there: B2's news-impact step
+(`data/<market>/news_impact/`), `lab.py backtest --store` (`data/<market>/lab_backtests/`), `director-add` (one
+`research_reviews` row, plus `reports/<market>/research-<iso_week>.md`) and `alerts.py weekly`
+(`data/<market>/slack_posts/`); you and the director write only under `work/`. Never apply a proposed diff:
 a config change is the owner's, through a judged change. Delete `work/research_review.json` before the director runs
 and right after it is stored. Save every step's JSON summary under `work/steps/`.
 
@@ -19,10 +20,12 @@ and right after it is stored. Save every step's JSON summary under `work/steps/`
 
 2b. Stored back-tests (session B2, docs/ws/b2.md; read by the Strategy-lab page): optional, never blocking.
    `python scripts/model_history.py --market <market> > work/steps/model_history.json` (Yahoo daily history into the
-   gitignored cache `work/model_history/<market>/`; network; writes only under `work/`), then
-   `python scripts/lab.py --market <market> backtest --history --store > work/steps/lab_backtest.json` (appends the
-   back-test rows to `data/<market>/lab_backtests/`, skipping ids already stored). On a non-zero exit of either, note
-   it in your final message and go on to step 3.
+   gitignored cache `work/model_history/<market>/`; network; writes only under `work/`). If its summary's
+   `<market>.rows` is 0 (nothing fetched), skip the back-test: a stored run without the history would block a correct
+   rerun for that date. Otherwise run `python scripts/lab.py --market <market> backtest --history --store >
+   work/steps/lab_backtest.json` (appends the back-test rows to `data/<market>/lab_backtests/`, skipping ids already
+   stored; the US run needs EUR/USD bars, from data/ or the cache, and exits 2 without them). On a non-zero exit of
+   either, a skipped back-test or a non-empty `failed` list, note it in your final message and go on to step 3.
 
 3. Inputs: `python -m marketbrief.traders director-prepare > work/steps/director_prepare.json` writes
    `work/research_inputs.json` (the ISO week of the last completed session; leaders per family to date and this
