@@ -307,7 +307,7 @@ def test_catalogue_has_every_entity():
     assert {"company", "prediction", "paper_trade", "head_to_head_pick", "strategy", "scoreboard_row", "reason_ai",
             "news_item", "results_digest", "trade_check", "lifecycle_event", "market_status", "portfolio",
             "agreement", "open_trade", "abstention", "command_log", "eod_analysis", "news_impact",
-            "research_review", "calendar_event"} <= names
+            "research_review", "calendar_event", "bar"} <= names
 
 
 @pytest.mark.parametrize("path", catalogue_files(), ids=lambda p: p.name)
@@ -509,3 +509,19 @@ def test_catalogue_market_status_benchmark_and_vol_index():
     india = {s["market"]: s for s in load("market_status.json")}["india"]
     assert india["benchmark"]["change_pct"] == round((22776.0996 / 22555.75 - 1) * 100, 2)   # stored Nifty closes
     assert india["benchmark"]["change_5d_pct"] == round((22776.0996 / 22780.25 - 1) * 100, 2)
+
+
+def test_catalogue_bars_are_60_consecutive_sessions_ending_at_the_as_of_close():
+    from marketbrief.core import calendar
+    from marketbrief.core.market_config import load_market
+
+    bars = load("bar.json")
+    last_close = {c["ticker"]: c["last_close"] for c in load("company.json") if c["state"] == "active"}
+    for ticker in last_close:
+        mine = [b for b in bars if b["ticker"] == ticker]
+        cfg = load_market(mine[0]["market"])
+        days = [date.fromisoformat(b["date"]) for b in mine]
+        assert len(mine) == 60 and days[-1] == date(2026, 10, 6)
+        assert all(calendar.next_session(cfg, a, include=False) == b for a, b in zip(days, days[1:]))
+        assert mine[-1]["close"] == last_close[ticker]
+        assert all(b["low"] <= min(b["open"], b["close"]) <= max(b["open"], b["close"]) <= b["high"] for b in mine)

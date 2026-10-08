@@ -7,7 +7,7 @@ advice. Every signal stays "Paper" until it is proven (SPEC F7).
 
 **Example files.** Every entity below has an example file in `design/catalogue/` (JSON, one `records` list,
 marked `"_example": true`). Prices, index moves and range widths in them are real stored bars and ranges of
-29 Sep - 6 Oct 2026. Predictions, trades, reasons, news, commands and the portfolio are invented, but they are
+29 Sep - 6 Oct 2026 (the daily bars of `bar.json` reach back 60 sessions). Predictions, trades, reasons, news, commands and the portfolio are invented, but they are
 computed from one set of inputs, so the files agree with each other: quantities, costs, profit, agreement counts and
 scoreboard sums. Costs, head-to-head picks and cost views are computed with session B2's engine code
 (`marketbrief/lab/`) and the rates in `config/costs.yaml`, at an example EUR/USD of 1.17.
@@ -44,7 +44,7 @@ scoreboard sums. Costs, head-to-head picks and cost views are computed with sess
 
 Contents:
 - Companies and the market: [Company](#company), [Lifecycle event](#lifecycle-event),
-  [Command](#command), [Market status](#market-status), [Calendar event](#calendar-event)
+  [Command](#command), [Market status](#market-status), [Calendar event](#calendar-event), [Bar](#bar)
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
@@ -181,6 +181,23 @@ because the examples show them as inactive).
 | release | Publication time for data released before the open | `config/events.yaml` | text | `08:30 ET` |
 | source | Where the row comes from | | text | `config/events.yaml`, `events (yfinance)`, `market calendar` |
 | event_id | The stored `events` row (company events only) | `events.id` | id | `TCS-earnings-2026-10-08` |
+
+---
+
+<a id="bar"></a>
+## Bar
+
+One company's prices for one session: what the price chart draws, with the predictions' targets and ranges and the
+trades' entry and exit marks on it. Status: **exists** (the `ohlc` view over stored `prices`; read model `rm.bars`).
+Example file: `bar.json`: the six example companies, the last 60 sessions to 6 Oct 2026, real stored bars.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| market, ticker | The company | | | `india`, `HDFCBANK` |
+| date | The trading date (only sessions of the market calendar are stored) | `prices` | date | `2026-10-06` |
+| open, high, low, close | The session's official open, highest, lowest and closing price | `ohlc` view | ₹ or $ | `705.6`, `714.7`, `701.0`, `711.45` |
+| volume | Shares traded in the session | `ohlc` view | shares | `26568270` |
+| adjusted | Whether a recorded split or bonus changed this bar on read (`ohlc` is adjusted, `ohlc_raw` is as stored), so the line does not jump at the ex-date | `adjustments` | yes/no | `false` (no split or bonus is recorded for the six companies) |
 
 ---
 
@@ -658,7 +675,8 @@ The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
   - today's [predictions](#prediction) per strategy (target and range);
   - the best strategy overall beside the per-company best.
 - **Company.** Shows:
-  - [Company](#company) and its [predictions](#prediction) drawn on the price chart (target and 50/80 % bands);
+  - [Company](#company) and its [predictions](#prediction) drawn on the price chart of its [bars](#bar) (target and
+    50/80 % bands);
   - today's path from the [trade checks](#trade-check);
   - [settled trades](#paper-trade) with their [automatic](#automatic-reason) and [AI reasons](#ai-reason);
   - [news](#news-item) with status, the [results digest](#results-digest) and its
