@@ -112,17 +112,17 @@
         },
         {
           "scope": "ai",
-          "strategy_id": "ai.news_results.sonnet.v1",
+          "strategy_id": "ai.combined.opus.v1",
           "net_pnl": -6.64,
           "trades": 3
         }
       ],
       "findings": [
         {
-          "text": "First settled week: rule.model_news.v1 +7.99 USD on 6 trades, ai.news_results.sonnet.v1 -6.64 USD on 3; far too few trades to rank.",
+          "text": "First settled week: rule.model_news.v1 +7.99 USD on 6 trades, ai.combined.opus.v1 -6.64 USD on 3; far too few trades to rank.",
           "cited_ids": [
             "rule.model_news.v1",
-            "ai.news_results.sonnet.v1"
+            "ai.combined.opus.v1"
           ]
         }
       ],
@@ -146,17 +146,17 @@
         },
         {
           "scope": "ai",
-          "strategy_id": "ai.news_results.sonnet.v1",
+          "strategy_id": "ai.combined.opus.v1",
           "net_pnl": -3807.75,
           "trades": 2
         }
       ],
       "findings": [
         {
-          "text": "First settled week: rule.model_news.v1 -3,807.75 INR on 2 trades, ai.news_results.sonnet.v1 -3,807.75 INR on 2; far too few trades to rank.",
+          "text": "First settled week: rule.model_news.v1 -3,807.75 INR on 2 trades, ai.combined.opus.v1 -3,807.75 INR on 2; far too few trades to rank.",
           "cited_ids": [
             "rule.model_news.v1",
-            "ai.news_results.sonnet.v1"
+            "ai.combined.opus.v1"
           ]
         }
       ],

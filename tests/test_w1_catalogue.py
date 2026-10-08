@@ -572,3 +572,13 @@ def test_catalogue_w40_reviews_are_written_before_the_cut_off_from_trades_settle
                      and t["settled_at"] <= review["written_at"]]
             assert leader["trades"] == len(known)
             assert leader["net_pnl"] == round(sum(t["net_pnl"] for t in known), 2)
+        for leader in review["leaders"]:   # the top of B3's director order (net_pnl desc, trades desc, strategy_id)
+            settled = [t for t in trades if t["market"] == review["market"] and t["family"] == leader["scope"]
+                       and t["view"] == "accuracy" and t["status"] == "settled"
+                       and t["settled_at"] <= review["written_at"]]
+            totals = {}
+            for t in settled:
+                count, net = totals.get(t["strategy_id"], (0, 0.0))
+                totals[t["strategy_id"]] = (count + 1, net + t["net_pnl"])
+            ranked = sorted(totals, key=lambda sid: (-round(totals[sid][1], 2), -totals[sid][0], sid))
+            assert leader["strategy_id"] == ranked[0]

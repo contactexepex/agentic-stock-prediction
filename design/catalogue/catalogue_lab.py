@@ -34,14 +34,15 @@ def heatmap(settled: list[dict]) -> dict:
 
 
 def leaders_w40(settled: list[dict], market: str) -> list[dict]:
-    """The best rule and AI strategy (accuracy view, all horizons) over the trades settled by the W40 review."""
+    """The best rule and AI strategy (accuracy view, all horizons) over the trades settled by the W40 review, ranked as
+    B3's director facts rank them (traders/director_facts.py LEADERS_SQL): net_pnl desc, trades desc, strategy_id."""
     known = [t for t in settled if t["market"] == market and t["settled_at"] <= W40_WRITTEN[market]]
     rows = lab_scoreboard.scoreboard(known, "forward", "2026-10-02")
     out = []
     for family in ("rule", "ai"):
         mine = [r for r in rows if r["scope"] == "strategy" and r["view"] == "accuracy" and r["family"] == family
                 and r["horizon_days"] == "all"]
-        best = max(mine, key=lambda r: (r["net_pnl"], r["strategy_id"]))
+        best = min(mine, key=lambda r: (-r["net_pnl"], -r["trades"], r["strategy_id"]))   # B3 LEADERS_SQL order
         out.append({"scope": family, "strategy_id": best["strategy_id"], "net_pnl": best["net_pnl"],
                     "trades": best["trades"]})
     return out
