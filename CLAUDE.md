@@ -60,8 +60,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `backtest` evaluates the
   range formula walk-forward. `replay` is the historical replay of everything rule-based (no AI):
   each past day's N+k ranges (every horizon of `config/strategies.yaml`) as `ranges.py` builds
-  them, the regime, and direction baselines (always-up, momentum, RSI mean reversion), scored -> `reports/<market>/replay-<end>.html|json`
-  and `data/<market>/replays/` (DESIGN.md section 7); `replay --aci` compares fixed bands with
+  them, the regime, and direction baselines (always-up, momentum, RSI mean reversion), scored ->
+  `reports/<market>/replay-<end>.html|json` and `data/<market>/replays/` (DESIGN.md section 7);
+  `replay --aci` compares fixed bands with
   Adaptive Conformal Inference (`adaptive_conformal.py`: per horizon x band x regime miss rate alpha_t updated from
   outcomes scored before `calibrate` runs; `aci:` in `config/ranges.yaml`, off by default; the weekly
   review shows alpha_t and proposes switching it on from a replay with the same settings, marked
@@ -256,8 +257,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `core/horizons.py`) with its explanation (points per feature group, top 3 drivers each
   way) to `data/<market>/model_scores/` (view `model_scores_latest`), plus a `cross_market` variant (every
   cross-market group on, for strategies with `cross_market: true`) in `model_variant_scores|versions`;
-  the month's model (L2 logistic, monthly expanding-window refit on labels resolved by the refit date, Platt calibration on past out-of-sample rows,
-  JSON coefficients) to `data/<market>/model_versions/`. News enters as a fixed prior (not trainable yet; no
+  the month's model (L2 logistic, monthly expanding-window refit on labels resolved by the refit date,
+  Platt calibration on past out-of-sample rows, JSON coefficients) to `data/<market>/model_versions/`.
+  News enters as a fixed prior (not trainable yet; no
   news archive); `model_news_update` reports the re-estimation and the rows it needs. `model_backtest --out DIR`
   is the walk-forward test (both markets and horizons, open-to-close and close-to-close, baselines after costs;
   writes only to DIR; `--history` adds the long-history cache, `--cross-groups`/`--ablate` the cross-market

@@ -434,7 +434,10 @@ def test_calls_recorded_before_n_plus_k_keep_their_window():
     assert legacy["n_calls"] == 1 and legacy["overall"]["hits"] == 1 and legacy["by_horizon"]["1"]["n"] == 1
     assert sorted((c["horizon_label"], str(c["target_date"])) for c in s["calls"]) == [
         ("legacy_cc", str(days[11])), ("n_plus_k", str(days[12]))]
-    assert s["top"][-1].startswith("What about calls recorded before N+k? 1 calls recorded before 2026-10-07 22:41")
+    assert s["top"][-1].startswith("What about calls recorded before N+k? 1 call recorded before 2026-10-07 22:41 UTC")
+    assert [(d["calls"], d["legacy_calls"], d["scored"]) for d in s["per_day"]] == [(1, 1, 1)]
+    page = ai_html.group_html(s)                             # the legacy call never reads as N+1 on the page
+    assert "<td>1d legacy_cc</td>" in page and page.count("<td>N+1</td>") == 2      # the N+1 call and its tile row
     alone = summaries.summarize({"market": "syn"}, [new], rec, bars)["fair"]
     assert alone["legacy_cc"]["n_calls"] == 0 and len(alone["top"]) == 3
 

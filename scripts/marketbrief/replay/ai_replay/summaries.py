@@ -54,6 +54,9 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
     """The scores of one leakage group: overall, by horizon (every configured N+k), by band, abstention, per day,
     on the N+k calls; `legacy_cc` holds the calls recorded before B10 on their old window."""
     every = score_rows(cfg, calls, bars, n_plus_k_from())
+    if len(every):  # the page's horizon name: N+k, or "<h>d legacy_cc" (never shown as N+k)
+        every["horizon"] = [f"N+{h}" if lab == LABEL_N_PLUS_K else f"{h}d {lab}"
+                            for h, lab in zip(every["h"], every["horizon_label"], strict=True)]
     legacy = every[every["horizon_label"] == LABEL_LEGACY_CC] if len(every) else every
     frame = every[every["horizon_label"] == LABEL_N_PLUS_K] if len(every) else every
     horizon_list = horizons()
@@ -113,12 +116,14 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
     per_day = []
     for day in sorted(days, key=lambda day: day["date"]):
         band_rows = scored[scored["date"].astype(str) == day["date"]] if len(scored) else scored
+        on_day = lambda rows: int((rows["date"].astype(str) == day["date"]).sum()) if len(rows) else 0  # noqa: E731
         per_day.append(
             {
                 "date": day["date"],
                 "test": label,
-                "calls": day["n_calls"],
-                "rejected": day["n_rejected"],
+                "calls": on_day(frame),           # the day's N+k calls; legacy_calls apart (#96)
+                "legacy_calls": on_day(legacy),
+                "rejected": day["n_rejected"],    # every record of the day the gate rejected (no window yet)
                 "citable_ids": day.get("citable_ids"),
                 "scored": int(len(band_rows)),
                 "hits": int(band_rows["hit"].astype(bool).sum()) if len(band_rows) else 0,
@@ -130,6 +135,7 @@ def summarize_group(cfg: dict, calls: list[dict], days: list[dict], bars: dict, 
         "date",
         "ticker",
         "h",
+        "horizon",
         "horizon_label",
         "direction",
         "confidence",
@@ -170,9 +176,10 @@ def legacy_sentence(legacy: dict) -> list[str]:
     overall = legacy["overall"]
     result = (f"right {pct(overall['hit_rate'])} of {overall['n']} scored" if overall.get("n")
               else "none scored yet")
-    return [f"What about calls recorded before N+k? {legacy['n_calls']} calls recorded before "
-            f"{n_plus_k_from()} keep their old window, the as-of close to the close h sessions later "
-            f"({LABEL_LEGACY_CC}): {result}; never pooled with the N+k calls above."]
+    count = f"{legacy['n_calls']} call" + ("s" if legacy["n_calls"] != 1 else "")
+    return [f"What about calls recorded before N+k? {count} recorded before "
+            f"{n_plus_k_from():%Y-%m-%d %H:%M} UTC keep their old window, the as-of close to the close h "
+            f"sessions later ({LABEL_LEGACY_CC}): {result}; never pooled with the N+k calls above."]
 
 
 def pct(share, decimals: int = 1) -> str:

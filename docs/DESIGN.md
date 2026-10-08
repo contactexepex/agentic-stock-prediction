@@ -812,8 +812,8 @@ versions by the 10-Q/10-K reports accepted by that session date; dividends; majo
   centre cap, ex-dividend shift), reusing `range_math`, `range_switches`, `event_history` and
   `backtest` helpers. Scored on the exit close of N+k (k + 1 bars after d; before B10 the close
   h bars later): coverage overall and by regime, sector, ticker, month, year, earnings and major
-  event in horizon; interval score and width vs the naive range; calibration (stated vs actual coverage, the two published bands plus other levels of the
-  same pool).
+  event in horizon; interval score and width vs the naive range; calibration (stated vs actual
+  coverage, the two published bands plus other levels of the same pool).
 - Regime per day (`regime.classify` on the vol index and benchmark closes, as `features.py`).
 - Direction baselines, labelled as such (the forecaster must beat them live): always-up, 1d and
   5d momentum sign, RSI(14) mean reversion (below 30 up, above 70 down; `indicators.py` has no
@@ -942,7 +942,7 @@ script is deterministic and never runs an LLM; the orchestrating session runs th
   confidence band with Wilson 95% intervals and an exact binomial test, stated vs actual
   confidence, always-up and `replay.py`'s rule baselines on the same ticker-days, abstention rate;
   a novice-first HTML page (three sentences, four numbers, two charts, details collapsed) and JSON.
-  Calls are scored on the N+k exit close (k + 1 bars after D's as-of bar); calls recorded before
+  Calls are scored on the N+k exit close (k + 1 bars after the as-of bar); calls recorded before
   `call_scoring.n_plus_k_from` keep the window they had then (the close h bars later), are labelled
   `legacy_cc` and scored apart (`legacy_cc` block and a fourth sentence), never pooled (B10, #96).
 - Tests (`tests/test_ai_replay.py`): perturbing every row after the cutoff leaves the context pack,
