@@ -28,6 +28,9 @@ CUTOFF = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
 AS_OF, SESSION = "2026-10-06", "2026-10-07"
 STORED = ("lifecycle_event", "head_to_head_pick", "prediction", "paper_trade", "cost_view", "trade_check", "reason_ai",
           "results_digest")
+# the catalogue's strategies have no live_from yet (go-live sets it): every strategy is live for this module, so the
+# pages hold the example rows (tests/conftest.py all_strategies_live, module-scoped, set up before the page fixtures)
+pytestmark = pytest.mark.usefixtures("all_strategies_live")
 EMPTY_BLOCKS = {"company": {}, "agreement": {}, "open_trades": [], "news": [], "events": []}
 
 
@@ -268,3 +271,26 @@ def test_trades_windows_keep_recent_settlements_only():
     nvda = company_payloads.trades_payload(sources, "NVDA", [], first)
     assert all((r["exit_date_actual"] or r["exit_date"]) >= first for r in nvda["settled"])
     assert all(r["session_date"] >= first for r in nvda["reasons"])
+
+
+@pytest.mark.usefixtures("root")
+def test_a_strategy_not_live_on_its_day_is_left_out(monkeypatch):
+    """Go-live: a strategy's predictions and picks (by their session D) and its trades' checks (by entry D) show only
+    when it is live on that D (lab/registry.is_live): rehearsal rows never reach the company, lifecycle or trades
+    pages."""
+    from marketbrief.lab import registry
+
+    reference = "rule.model_news.v1"
+    before = sources_of("india")
+    assert any(p["strategy_id"] == reference for rows in before.all_predictions.values() for p in rows)
+    assert any(c["strategy_id"] == reference for rows in before.all_checks.values() for c in rows)
+    monkeypatch.setattr(registry, "is_live", lambda strategy, _day, **_options: strategy != reference)
+    after = sources_of("india")
+    lists = [after.all_predictions, after.all_picks, after.all_checks, after.predictions, after.picks, after.checks]
+    assert all(row.get("strategy_id") != reference for rows in lists for ticker_rows in rows.values()
+               for row in ticker_rows)
+    assert all(row["strategy_id"] != reference for row in after.market_checks)
+    assert after.market_checks and after.all_predictions  # the other strategies' rows stay
+    for ticker in company_mockup()["india"]["pages"]:
+        page = company_payloads.lifecycle_payload(after, ticker, SESSION)
+        assert all(row.get("strategy_id") != reference for row in page["predictions"] + page["trade_checks"])

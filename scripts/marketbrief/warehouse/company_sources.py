@@ -101,7 +101,9 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     """Every record the company pages need, as of the build's cut-off, of the collected companies only (a deleted
     company is never shown). `as_of` is the market's as-of date and `session_date` the session being predicted (the
     shared header's and status block's), both YYYY-MM-DD or None. Settled trades and the scoreboard are the shared
-    blocks' (rm_common.settled_trades, lab_summary), so every page shows the same rows."""
+    blocks' (rm_common.settled_trades, lab_summary), so every page shows the same rows. Picks, predictions (by their
+    session D) and trade checks (by the trade's entry D) are kept only for strategies live on that D
+    (rm_common.live_rows, lab/registry.is_live)."""
     con, cutoff, collected = ctx.con, ctx.cutoff_time, ctx.collected
     mine = lambda rows: [row for row in rows if row["ticker"] in collected]  # noqa: E731
     sources = CompanySources(market=ctx.market, as_of=as_of, session_date=session_date)
@@ -110,6 +112,7 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     params = {"cutoff": cutoff.isoformat()}
     checks = zulu(mine(lab_reads.records(con.execute(CHECKS_SQL, params).df(), "trade_checks")), "trade_checks",
                   "trade_check_details")
+    checks = rm_common.live_rows(checks, "entry_date")  # go-live: only live strategies' trades are monitored
     sources.all_checks = by_ticker(checks)
     sources.checks = {ticker: latest_checks(rows) for ticker, rows in sources.all_checks.items()}
     sources.market_checks = latest_checks(checks)
@@ -119,8 +122,10 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     sources.digests = by_ticker(zulu(parsed(digests, DIGEST_JSON_COLUMNS), "results_digests"))
     sources.settled = by_ticker(zulu(rm_common.settled_trades(ctx), "paper_trades_settled"))
     sources.scoreboard = rm_common.lab_summary(ctx)["scoreboard"]
-    picks = zulu(mine(lab_reads.picks(con, cutoff)), "head_to_head_picks")
-    predictions = zulu(mine(lab_reads.predictions(con, cutoff)), "strategy_predictions")
+    # go-live: a strategy's picks and predictions count from its live_from (rehearsal rows are never shown)
+    picks = rm_common.live_rows(zulu(mine(lab_reads.picks(con, cutoff)), "head_to_head_picks"), "session_date")
+    predictions = rm_common.live_rows(zulu(mine(lab_reads.predictions(con, cutoff)), "strategy_predictions"),
+                                      "session_date")
     sources.all_picks, sources.all_predictions = by_ticker(picks), by_ticker(predictions)
     if as_of:
         sources.picks = by_ticker([row for row in picks if row["session_date"] == session_date])
