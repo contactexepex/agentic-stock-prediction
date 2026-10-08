@@ -36,8 +36,9 @@ director say about why. The page answers top-down in that order and never turns 
 5. **Gain-pick vs probability-pick, and by regime** (F7.1, F2.6): the pick-rule rows and the regime rows of the
    head-to-head view, each with trades, profit, win rate, target error and the luck test.
 6. **Per company**: rule vs AI per company summed from the settled head-to-head trades after the selected cost (the
-   your-cost figures per trade come from the cost views; a per-company head-to-head scoreboard row is requested from
-   W1), with "ahead" per company, beside the **cumulative profit** lines of the two families by exit date (F2.8,
+   your-cost figures per trade come from the cost views; the scoreboard has no per-company head-to-head row, W1
+   answered that the weekly heatmap cells hold that cut at market cost, so the page sums the trades itself to give
+   both cost views), with "ahead" per company, beside the **cumulative profit** lines of the two families by exit date (F2.8,
    market cost), starting at zero on the first entry date.
 7. **Why: the end-of-day analyst** (F6.1): the latest session's results per family (rule, baselines, AI: net, trades,
    wins) and per pick rule, the analyst's summary, and the head-to-head reasons (at most 60 words each, citing ids).
