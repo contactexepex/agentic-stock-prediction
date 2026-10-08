@@ -7,7 +7,7 @@ advice. Every signal stays "Paper" until it is proven (SPEC F7).
 
 **Example files.** Every entity below has an example file in `design/catalogue/` (JSON, one `records` list,
 marked `"_example": true`). Prices, index moves and range widths in them are real stored bars and ranges of
-29 Sep - 6 Oct 2026. Predictions, trades, reasons, news, commands and the portfolio are invented, but they are
+29 Sep - 6 Oct 2026 (the daily bars of `bar.json` reach back 60 sessions). Predictions, trades, reasons, news, commands and the portfolio are invented, but they are
 computed from one set of inputs, so the files agree with each other: quantities, costs, profit, agreement counts and
 scoreboard sums. Costs, head-to-head picks and cost views are computed with session B2's engine code
 (`marketbrief/lab/`) and the rates in `config/costs.yaml`, at an example EUR/USD of 1.17.
@@ -44,7 +44,7 @@ scoreboard sums. Costs, head-to-head picks and cost views are computed with sess
 
 Contents:
 - Companies and the market: [Company](#company), [Lifecycle event](#lifecycle-event),
-  [Command](#command), [Market status](#market-status)
+  [Command](#command), [Market status](#market-status), [Calendar event](#calendar-event), [Bar](#bar)
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
@@ -134,7 +134,8 @@ Session **B5** writes it. Example file: `command_log.json`.
 
 Whether the market trades today, which session is being predicted, how fresh the data is, and the newest runs.
 Status: the `session` block **exists** (`pipeline/market_status.py`, the `MarketStatus` schema of
-`api/openapi.yaml`). The run list and freshness are **derived for pages** (B4); runs are in SPEC section 7.
+`api/openapi.yaml`). The run list, freshness and the `benchmark` and `vol_index` blocks are **derived for pages**
+(B4) from stored data; runs are in SPEC section 7.
 Example file: `market_status.json`.
 
 | Field | Meaning | Source | Unit | Example |
@@ -144,9 +145,59 @@ Example file: `market_status.json`.
 | session.trading_day, in_session, late_run | Whether the market trades today; whether it is open now; whether it is already past the close | market_status (exists) | yes/no | `true`, `false`, `true` |
 | session.session_open_utc, session_close_utc | Today's open and close | market calendar | time | `2026-10-07T13:30:00+00:00` |
 | regime | Market mood label | `regime` (exists) | `TRENDING`, `EVENT_HEAVY`, `UNSTABLE`, ... | `EVENT_HEAVY` |
+| benchmark.symbol, name | The index the stocks are measured against (role `benchmark` in `config/markets/<market>.yaml`) | market config | text | `NIFTY50`, "Nifty 50"; US `SPY`, "S&P 500 ETF" |
+| benchmark.close, close_date | Its last stored close and that close's trading date | stored bars (`ohlc`) | index points or $ | `22776.0996`, `2026-10-06` |
+| benchmark.change_pct, change_5d_pct | Change from the previous session's close, and from the close 5 sessions earlier (the indicators' `period_return`) | stored bars | % | `0.98`, `-0.02` |
+| vol_index.symbol, name, close, close_date, change_pct, change_5d_pct | The same for the market's volatility index (role `vol_index`): how much movement traders expect. The regime is derived from the benchmark and this index | market config, stored bars | points, % | `INDIAVIX`, 13.61, `-7.92`; US `VIX` 15.01 |
 | runs.pre_open, intraday, post_close, news | When each run last ran and whether it worked; the post-close run is new (B3) | run records | time, ok | pre-open `2026-10-07T02:10:00Z` ok |
 | freshness.state, built_at, age_minutes | How old the page data is | read model `built_at` (B4) | `fresh`/`stale`/`unknown`, minutes | `fresh`, 29 |
 | paper_label | The label every signal carries until proven | review `model_skill` / go-live bar (F7) | text | "Paper only - no proven edge yet" |
+
+---
+
+<a id="calendar-event"></a>
+## Calendar event
+
+What is coming that a reader should know before a horizon ends: the market's scheduled events and the active
+companies' results and ex-dividend dates, from the session being predicted to 8 weeks after it, as known at the
+page's "as of" time. Status: **derived for pages** (B4) from what **exists**: the rules and fixed dates of
+`config/events.yaml` (`core/calendar.market_events`), the stored `events` kind (read as of a time like the
+warehouse's `upcoming_events`: per company and type, the newest date first seen by then) and the market calendar.
+Example file: `calendar_event.json` (7 Oct to 2 Dec 2026, read at `2026-10-07T12:00:00Z`; INDIGO and DAL are left out
+because the examples show them as inactive).
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| market | The market whose calendar it is (India also lists the US FOMC decision and jobs report) | | `india`/`us` | `india` |
+| date | The trading date it falls on (a company date can fall on a weekend, see `reaction_sessions`) | config / `events` | date | `2026-10-08` |
+| type | What kind of event. Market: `rbi_policy`, `fomc`, `cpi`, `jobs_report`, `fno_expiry`, `weekly_expiry`, `opex`, `triple_witching`, `index_rebalance`, `budget` (as in `config/events.yaml`); company: `earnings`, `ex_dividend`; calendar: `holiday` | | text | `earnings` |
+| name | Plain words | config name; company name + "results" / "ex-dividend"; "NSE closed" or the holiday's name | text | "Tata Consultancy Services results" |
+| ticker | The company; empty for market-wide events | `events` | ticker | `TCS` |
+| timing | When the company reports, when the source says: `before_open`, `during`, `after_close`; empty when unknown (every stored upcoming date is empty today) | `events.timing` | text | empty |
+| reaction_sessions | The session(s) whose move contains the results: `before_open`/`during` = that day; `after_close` = the next session; unknown timing = that day and the next (the range engine's `earnings_reaction.affected_sessions`); a weekend date = the next session. Empty for other types | engine rule | dates | `["2026-10-08", "2026-10-09"]` |
+| major | A market-wide event: it raises the regime to EVENT_HEAVY within 2 days before it and widens every range of that market whose window (the day after the as-of close to the exit session) contains it (`major_event_factor` in `config/ranges.yaml`) | `config/events.yaml` | yes/no | RBI policy `true` |
+| widens | Which ranges it widens: `market` (major market event), `company` (results widen that company's ranges, `earnings_vol_multiple`; a company with results within 1 day gets no new call), empty = none | engine rules | text | `company` |
+| provisional | The date is not yet confirmed (the name says so too) | `config/events.yaml` | yes/no | US CPI 10 Nov `true` |
+| release | Publication time for data released before the open | `config/events.yaml` | text | `08:30 ET` |
+| source | Where the row comes from | | text | `config/events.yaml`, `events (yfinance)`, `market calendar` |
+| event_id | The stored `events` row (company events only) | `events.id` | id | `TCS-earnings-2026-10-08` |
+
+---
+
+<a id="bar"></a>
+## Bar
+
+One company's prices for one session: what the price chart draws, with the predictions' targets and ranges and the
+trades' entry and exit marks on it. Status: **exists** (the `ohlc` view over stored `prices`; read model `rm.bars`).
+Example file: `bar.json`: the six example companies, the last 60 sessions to 6 Oct 2026, real stored bars.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| market, ticker | The company | | | `india`, `HDFCBANK` |
+| date | The trading date (only sessions of the market calendar are stored) | `prices` | date | `2026-10-06` |
+| open, high, low, close | The session's official open, highest, lowest and closing price | `ohlc` view | ₹ or $ | `705.6`, `714.7`, `701.0`, `711.45` |
+| volume | Shares traded in the session | `ohlc` view | shares | `26568270` |
+| adjusted | Whether a recorded split or bonus changed this bar on read (`ohlc` is adjusted, `ohlc_raw` is as stored), so the line does not jump at the ex-date | `adjustments` | yes/no | `false` (no split or bonus is recorded for the six companies) |
 
 ---
 
@@ -615,7 +666,8 @@ The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
   - rule vs AI today, from the [EOD analysis](#eod-analysis) `results`, and to date, from the
     [Scoreboard](#scoreboard-row);
   - [open trades](#open-trade) and alerts (flagged [trade checks](#trade-check));
-  - [market status](#market-status).
+  - [market status](#market-status) with the benchmark and volatility index;
+  - the coming week of [calendar events](#calendar-event).
 - **Stock strategies (decision 30).** For one ticker:
   - [Agreement](#agreement) at every horizon;
   - the four [head-to-head picks](#head-to-head-pick) with their `candidates`;
@@ -623,10 +675,12 @@ The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
   - today's [predictions](#prediction) per strategy (target and range);
   - the best strategy overall beside the per-company best.
 - **Company.** Shows:
-  - [Company](#company) and its [predictions](#prediction) drawn on the price chart (target and 50/80 % bands);
+  - [Company](#company) and its [predictions](#prediction) drawn on the price chart of its [bars](#bar) (target and
+    50/80 % bands);
   - today's path from the [trade checks](#trade-check);
   - [settled trades](#paper-trade) with their [automatic](#automatic-reason) and [AI reasons](#ai-reason);
-  - [news](#news-item) with status, the [results digest](#results-digest) and events.
+  - [news](#news-item) with status, the [results digest](#results-digest) and its
+    [calendar events](#calendar-event).
 - **Strategy lab, Rule vs AI, Paper portfolios, Track record, News, Companies.** These use the
   [Scoreboard](#scoreboard-row), [Research review](#research-review), [News-impact](#news-impact-row),
   [Portfolio](#portfolio), [Lifecycle events](#lifecycle-event) and [Commands](#command) (pending requests).

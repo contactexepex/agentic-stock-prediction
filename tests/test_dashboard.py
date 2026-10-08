@@ -39,7 +39,16 @@ LATER = "2026-10-07T20:00:00+00:00"
 LATE_NEWS = "feedfacefeedface"
 
 
+def own_kind(root: Path, kind: str) -> None:
+    """Replace a kind linked to the repo's data/us (data_tree) by a copy before anything is written to it."""
+    folder = root / "data" / "us" / kind
+    if folder.is_symlink():
+        folder.unlink()
+        shutil.copytree(REPO / "data" / "us" / kind, folder)
+
+
 def append(root: Path, kind: str, day: str, rows: list[dict]) -> None:
+    own_kind(root, kind)
     path = root / "data" / "us" / kind / day[:4] / day[5:7] / f"{day}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as handle:
@@ -279,6 +288,7 @@ def later_rows(root: Path) -> None:
     )
     append(root, "reviews", "2026-10-07", [{"id": "2026-W41", "computed_at": LATER, "model_skill": True, "detail": {}}])
     append(root, "replays", "2026-10-07", [{"id": "later", "computed_at": LATER, "n_days": 5}])
+    own_kind(root, "prices")
     prices = root / "data" / "us" / "prices" / "2026" / "10" / "2026-10-07.csv"
     # CRLF line ends as collect_prices.py writes them (DuckDB's multi-file reader skips a file whose ends differ)
     prices.write_bytes(
@@ -300,10 +310,26 @@ def later_rows(root: Path) -> None:
     append(root, "events", "2026-10-14", [next_quarter])
 
 
+def data_tree(root: Path) -> None:
+    """root/data/us with every kind linked to the repo's folder, read only; a kind is copied the first time the
+    fixture writes to it (own_kind). Issue #48: the fixture copied all of data/us, about 12 MB, at every run."""
+    target = root / "data" / "us"
+    target.mkdir(parents=True)
+    for kind in sorted((REPO / "data" / "us").iterdir()):
+        (target / kind.name).symlink_to(kind, target_is_directory=True)
+
+
+def repo_data_status() -> str:
+    """`git status` of the repo's data/us: the linked tree must never write through to it."""
+    return subprocess.run(["git", "-C", str(REPO), "status", "--porcelain", "--", "data/us"],
+                          capture_output=True, text=True, check=True).stdout
+
+
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     root = tmp_path_factory.mktemp("dash")
-    shutil.copytree(REPO / "data" / "us", root / "data" / "us")
+    before = repo_data_status()
+    data_tree(root)
     scored_rows(root)
     earlier_adjustment(root)
     later_rows(root)
@@ -316,6 +342,7 @@ def built(tmp_path_factory):
         yield {"root": root, "con": con, "cfg": cfg, "data": gather_dashboard(cfg, con, CUTOFF)}
     finally:
         common.ROOT = saved
+    assert repo_data_status() == before, "the dashboard fixture wrote into the repo's data/us"
 
 
 def company(data: dict, ticker: str) -> dict:
@@ -573,6 +600,8 @@ const { chromium } = require('playwright');
       try { return Array.isArray(JSON.parse(document.getElementById('mb-data').textContent).companies); }
       catch (e) { return false; }
     });
+    out.switch = await p.evaluate(
+      () => Array.from(document.querySelectorAll('#markets a')).map(a => a.getAttribute('href')));
     const rows = await p.locator('#wl-body tr').count();
     await p.click('#wl-body button.tick[data-t="JPM"]'); await p.waitForTimeout(500);
     const canvases = await p.locator('#chart-box canvas').count();
@@ -605,6 +634,7 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
     for item, title in zip(jpm["news"], HOSTILE, strict=False):
         item["title"] = title
     jpm["reasoning"]["bull"] = HOSTILE[0] + " " + HOSTILE[1]
+    data["pages_url"] = "https://reports.example/"   # issue #48: the market switch is absolute on the owner's site
     f = tmp_path / "dashboard.html"
     f.write_text(page.build_page(data))
     js = tmp_path / "render.js"
@@ -616,6 +646,7 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
     out = json.loads(r.stdout.strip().split("\n")[-1])  # not splitlines(): the text holds U+2028
     banks = built["cfg"]["sectors"]["Banks"]
     assert out["parsed"] is True and out["dialogs"] == 0
+    assert out["switch"] == ["https://reports.example/india/dashboard.html"]
     assert all(text in out["stock_text"] for text in HOSTILE[:2])  # shown as plain text, never parsed as HTML
     for width in ("1280", "375"):
         o = out[width]
@@ -633,3 +664,25 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
         and "N+4: sell at the close of" in texts["overview"]
     )
     assert "N+1" in texts["track"] and "Next session" in texts["track"] and "open→close D+4 (legacy)" in texts["track"]
+
+
+def test_safe_url_encodes_quotes_and_brackets():
+    """Issue #48: a stored link keeps working, but a quote or angle bracket can never end an HTML attribute."""
+    from view_data import safe_url
+
+    assert safe_url(" https://a.example/x?y=1 ") == "https://a.example/x?y=1"
+    assert safe_url('https://a.example/"onmouseover=alert(1)') == "https://a.example/%22onmouseover=alert(1)"
+    assert safe_url("https://a.example/it's<b>`") == "https://a.example/it%27s%3Cb%3E%60"
+    assert safe_url("javascript:alert(1)") is None and safe_url("https://a b") is None and safe_url(None) is None
+
+
+def test_cli_page_carries_pages_url(built, monkeypatch):
+    """The page payload names config/settings.yaml's pages_url, which the market switch links to (issue #48)."""
+    from marketbrief.core.settings import load_settings
+
+    monkeypatch.setattr(common, "ROOT", built["root"])
+    monkeypatch.setenv("MB_NOW", CUTOFF.isoformat())
+    dash_cli.run(built["cfg"])
+    html = (built["root"] / "reports" / "us" / "dashboard.html").read_text()
+    payload = json.loads(re.search(r'<script id="mb-data" type="application/json">(.*?)</script>', html, re.S).group(1))
+    assert payload["pages_url"] == load_settings()["pages_url"]

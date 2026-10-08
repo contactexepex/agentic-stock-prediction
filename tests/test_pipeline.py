@@ -356,6 +356,21 @@ def check_report_rebuilds(root: Path, cfg: Path, out: dict, text: str) -> Path:
     again = run("report.py", root, cfg)
     assert again.returncode == 0 and json.loads(again.stdout)["report_kept"] is True
     assert rpath.read_text() == filled and (root / out["slack_draft"]).exists()
+    # issue #50: same as_of and regime, but this run's collect gate blocked: the forecast outcome changed
+    steps = root / "work" / "steps"
+    steps.mkdir(parents=True, exist_ok=True)
+    gate = {"step": "validate", "market": MARKET, "stage": "collect", "failures": [{"code": "SCHEMA"}]}
+    (steps / "validate_collect.json").write_text(json.dumps(gate))
+    (steps / "validate_report.json").write_text(json.dumps({**gate, "stage": "report"}))   # not an input
+    other = json.loads(run("report.py", root, cfg).stdout)
+    assert other["report_kept"] is False and "forecast outcome" in other["warning"]
+    assert (root / other["previous_report"]).read_text() == filled
+    stamp = re.search(r"<!-- report-data: as_of=\S+ regime=\S+ outcome=([0-9a-f]{12}) -->", rpath.read_text())
+    assert stamp and stamp.group(1) not in filled
+    filled = re.sub(r"<!-- AGENT:[^>]*-->", "narrative", rpath.read_text())
+    rpath.write_text(filled)
+    (steps / "validate_report.json").write_text(json.dumps({**gate, "stage": "report", "failures": []}))
+    assert json.loads(run("report.py", root, cfg).stdout)["report_kept"] is True   # the report gate never counts
     reg_file = sorted((root / "data" / MARKET / "regime").glob("**/*.jsonl"))[-1]
     last = json.loads(reg_file.read_text().splitlines()[-1])
     flipped = "UNSTABLE" if last["regime"] != "UNSTABLE" else "CALM"
@@ -365,7 +380,7 @@ def check_report_rebuilds(root: Path, cfg: Path, out: dict, text: str) -> Path:
     assert stale["report_kept"] is False and "warning" in stale
     assert (root / stale["previous_report"]).read_text() == filled
     rebuilt = rpath.read_text()
-    assert "<!-- AGENT:headline -->" in rebuilt and f"regime={flipped} -->" in rebuilt
+    assert "<!-- AGENT:headline -->" in rebuilt and f"regime={flipped} outcome=" in rebuilt
     forced = json.loads(run("report.py", root, cfg, "--force").stdout)
     assert forced["report_kept"] is False and "<!-- AGENT:headline -->" in rpath.read_text()
     return rpath

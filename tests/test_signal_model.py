@@ -343,6 +343,12 @@ def test_daily_scores_end_to_end(tmp_path, monkeypatch, inputs):
                 for x in f.read_text().splitlines()]
     assert set(versions[0]) == set(SCHEMAS[KIND_MODEL_VERSIONS][1])
     assert not math.isnan(versions[0]["model"]["intercept"])
+    fits = [json.loads(x) for f in (tmp_path / "data" / "us" / "model_variant_versions").rglob("*.jsonl")
+            for x in f.read_text().splitlines()]
+    base = {v["horizon_days"]: set(v["model"]["features"]) for v in versions}
+    cross = {v["horizon_days"]: set(v["model"]["features"]) for v in fits}
+    assert sorted(cross) == sorted(base) == list(horizons())                 # the variant's own fits (issue #124)
+    assert all(base[h] < cross[h] and all(x.startswith("x_") for x in cross[h] - base[h]) for h in base)
     second = daily_scores.run(CFG)                                        # same day again: stored model reused
     assert second["scores"] == 0 and second["unchanged"] == count * len(CFG["tickers"])
     assert second["new_model_versions"] == []

@@ -151,6 +151,29 @@ def test_a_five_day_call_before_n_plus_k_from_keeps_the_d_plus_4_close(market):
     assert summary["scores"]["calls"][LABEL_OPEN_TO_CLOSE]["all"]["n"] == 1
 
 
+def test_a_missing_session_bar_leaves_the_call_open(market):
+    """Issue #45.3: open-to-close scoring follows the market calendar as model/labels.py does. When a session of the
+    window has no bar, the call is never scored on the next stored bars (a shifted window); it stays open."""
+    root, cfg = market
+    write_ohlc(root, OPENS, CLOSES)
+    day = root / "data" / MARKET / "prices" / f"{DAYS[11]:%Y}" / f"{DAYS[11]:%m}" / f"{DAYS[11]}.csv"
+    day.write_text("".join(line for line in day.read_text().splitlines(keepends=True) if ",AAPL," not in line))
+    after = "2026-09-15T22:00:00+00:00"
+    preds = [call(9, 1, after), call(9, 3, after),          # exit and window over the missing session DAYS[11]
+             call(10, 1, after)]                             # D = DAYS[11] has no bar: no entry
+    p = root / "data" / MARKET / "predictions" / "2026" / "09" / "2026-09-30.jsonl"
+    p.parent.mkdir(parents=True)
+    p.write_text("".join(json.dumps(x) + "\n" for x in preds))
+    s = json.loads(run("score_predictions.py", root, cfg).stdout)
+    assert s["scored"] == 0 and outcomes(root) == {}       # never scored on a shifted window
+    assert (s["session_gap_open"], s["still_open"]) == (3, 3)
+    preds = [call(12, 1, after)]                             # a window after the gap is scored as usual
+    p.write_text("".join(json.dumps(x) + "\n" for x in preds))
+    s = json.loads(run("score_predictions.py", root, cfg).stdout)
+    assert (s["scored"], s["session_gap_open"]) == (1, 0)
+    assert outcomes(root)[f"{DAYS[12]}-AAPL-1d"]["target_date"] == str(DAYS[14])
+
+
 def test_no_entry_open_no_score_and_old_rows_read_as_close_to_close(market, monkeypatch):
     root, cfg = market
     opens = list(OPENS)

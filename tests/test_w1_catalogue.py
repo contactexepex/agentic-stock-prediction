@@ -307,7 +307,7 @@ def test_catalogue_has_every_entity():
     assert {"company", "prediction", "paper_trade", "head_to_head_pick", "strategy", "scoreboard_row", "reason_ai",
             "news_item", "results_digest", "trade_check", "lifecycle_event", "market_status", "portfolio",
             "agreement", "open_trade", "abstention", "command_log", "eod_analysis", "news_impact",
-            "research_review"} <= names
+            "research_review", "calendar_event", "bar"} <= names
 
 
 @pytest.mark.parametrize("path", catalogue_files(), ids=lambda p: p.name)
@@ -464,3 +464,64 @@ def test_trade_check_rows_view_reads_old_split_rows_and_new_single_rows():
     assert got == [("new", "ok", True), ("old", "stale_quote", False)]
     columns = [row[0] for row in con.execute("DESCRIBE trade_check_rows").fetchall()]
     assert len(columns) == len(set(columns)) and set(columns) == set(SCHEMAS[kinds.KIND_TRADE_CHECKS][1])
+
+
+def test_catalogue_calendar_follows_the_engine():
+    from marketbrief.analytics.earnings_reaction import affected_sessions
+    from marketbrief.core import calendar
+    from marketbrief.core.market_config import load_market
+
+    rows = load("calendar_event.json")
+    start, end = date(2026, 10, 7), date(2026, 12, 2)
+    for market in ("india", "us"):
+        cfg = load_market(market)
+        mine = [r for r in rows if r["market"] == market]
+        configured = sorted((str(e["date"]), e["type"], e["name"], e["major"])
+                            for e in calendar.market_events(cfg, start, end))
+        assert sorted((r["date"], r["type"], r["name"], r["major"]) for r in mine
+                      if r["source"] == "config/events.yaml") == configured
+        closed = [str(d) for d in (date.fromordinal(n) for n in range(start.toordinal(), end.toordinal() + 1))
+                  if d.weekday() < 5 and not calendar.is_session(cfg, d)]
+        assert [r["date"] for r in mine if r["type"] == "holiday"] == closed
+        for row in mine:
+            assert row["widens"] == ("market" if row["major"] else "company" if row["type"] == "earnings" else None)
+            if row["ticker"]:
+                assert row["ticker"] in cfg["active_tickers"] and row["ticker"] not in ("INDIGO", "DAL")
+                assert row["major"] is False and row["source"].startswith("events")
+            if row["type"] == "earnings":
+                day = date.fromisoformat(row["date"])
+                assert row["reaction_sessions"] == [str(s) for s in affected_sessions(cfg, day, row["timing"])]
+    by_ticker = {r["ticker"]: r for r in rows if r["type"] == "earnings"}
+    assert by_ticker["AAPL"]["date"] == "2026-10-29"        # the 2 Nov row was first seen after the cut-off
+    assert by_ticker["HDFCBANK"]["reaction_sessions"] == ["2026-10-19"]   # a Saturday date reacts on Monday
+    assert {"TCS", "NVDA", "JPM", "RELIANCE", "HDFCBANK", "MARUTI", "AAPL"} <= set(by_ticker)
+
+
+def test_catalogue_market_status_benchmark_and_vol_index():
+    from marketbrief.core.market_config import load_market
+
+    for status in load("market_status.json"):
+        symbols = load_market(status["market"])["symbols"]
+        for role in ("benchmark", "vol_index"):
+            block = status[role]
+            assert symbols[block["symbol"]]["role"] == role and symbols[block["symbol"]]["name"] == block["name"]
+            assert block["close_date"] == status["as_of"]
+    india = {s["market"]: s for s in load("market_status.json")}["india"]
+    assert india["benchmark"]["change_pct"] == round((22776.0996 / 22555.75 - 1) * 100, 2)   # stored Nifty closes
+    assert india["benchmark"]["change_5d_pct"] == round((22776.0996 / 22780.25 - 1) * 100, 2)
+
+
+def test_catalogue_bars_are_60_consecutive_sessions_ending_at_the_as_of_close():
+    from marketbrief.core import calendar
+    from marketbrief.core.market_config import load_market
+
+    bars = load("bar.json")
+    last_close = {c["ticker"]: c["last_close"] for c in load("company.json") if c["state"] == "active"}
+    for ticker in last_close:
+        mine = [b for b in bars if b["ticker"] == ticker]
+        cfg = load_market(mine[0]["market"])
+        days = [date.fromisoformat(b["date"]) for b in mine]
+        assert len(mine) == 60 and days[-1] == date(2026, 10, 6)
+        assert all(calendar.next_session(cfg, a, include=False) == b for a, b in zip(days, days[1:]))
+        assert mine[-1]["close"] == last_close[ticker]
+        assert all(b["low"] <= min(b["open"], b["close"]) <= max(b["open"], b["close"]) <= b["high"] for b in mine)

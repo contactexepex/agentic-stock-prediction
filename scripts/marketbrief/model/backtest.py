@@ -37,7 +37,7 @@ from marketbrief.model.history_cache import load_cache, merged_bars
 from marketbrief.model.labels import end_offset
 from marketbrief.model.metrics import probability_scores, threshold_hits
 from marketbrief.model.panel import build_panel
-from marketbrief.model.panel_inputs import read_inputs
+from marketbrief.model.panel_inputs import inputs_until, read_inputs
 from marketbrief.model.paper import nan_free, paper_results
 from marketbrief.model.settings import cross_groups, load_costs, load_model_config, round_trip_cost
 from marketbrief.model.walk_forward import walk_forward
@@ -137,13 +137,16 @@ def evaluate_market(panel: pd.DataFrame, market: str, settings: dict, gbm: bool)
 def run(markets: tuple[str, ...], options: dict | None = None) -> dict:
     """The backtest of the given markets. options: history (read the long-history cache too), cross
     ("config", "none", "all" or a comma list of groups: the reported variant), ablate (also every
-    ablation variant, backtest_variants.py), gbm (the gradient-boosted comparison, default true)."""
+    ablation variant, backtest_variants.py), gbm (the gradient-boosted comparison, default true), end (a date:
+    read the stored inputs only as known by its end, panel_inputs.inputs_until)."""
     options = options or {}
     settings = load_model_config()
     out = {"computed_at": utc_now(), "settings": settings, "results": {}, "data": {}}
     for market in markets:
         cfg = load_market(market)
         inputs, history = market_inputs(market, options.get("history", False))
+        if options.get("end") is not None:          # the weekly review: only what was known by its week end
+            inputs = inputs_until(inputs, options["end"])
         configured = cross_groups(settings, market)
         variants = (variants_for_ablation(market) if options.get("ablate") else
                     [(options.get("cross", CONFIG), parse_groups(options.get("cross", CONFIG), market, configured))])

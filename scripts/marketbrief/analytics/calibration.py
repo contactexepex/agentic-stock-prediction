@@ -31,9 +31,9 @@ from marketbrief.constants.calibration import (
     STEP_CALIBRATE,
     SWITCH_ACI,
 )
+from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now
-from marketbrief.constants.horizons import LABEL_N_PLUS_K
 from marketbrief.core.database import connect
 from marketbrief.core.horizons import window_sessions
 from marketbrief.core.market_config import benchmark_key, load_ranges_config

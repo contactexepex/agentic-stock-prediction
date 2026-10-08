@@ -3,11 +3,16 @@ backtest of the signal model for the market (marketbrief/model/backtest.py, as s
 its JSON goes to work/model_backtest/, never data/ or reports/) and summarise its headline numbers: per horizon and
 label, n, Brier vs the base-rate Brier, AUC with its 95% interval, and the paper long strategy vs each baseline
 after costs (open_to_close only: that is the trade). It says plainly whether the model has shown skill, by the
-thresholds under `model_skill` in config/review.yaml. Nothing here changes the model or its settings."""
+thresholds under `model_skill` in config/review.yaml. Nothing here changes the model or its settings.
+The backtest reads only what was stored by the reviewed week's end (issue #45.2), and runs with its native thread
+pools capped at one thread when threadpoolctl is installed (it comes with scikit-learn), so concurrent reviews do
+not oversubscribe the CPU (issue #45.1)."""
 
 from __future__ import annotations
 
+import contextlib
 import json
+from datetime import date
 
 from marketbrief.constants.model import LABEL_OPEN_TO_CLOSE, MIN_VERDICT_DATES
 from marketbrief.constants.review import (
@@ -21,9 +26,20 @@ from marketbrief.core import paths
 from marketbrief.model.backtest import run as run_backtest
 
 
-def rerun(market: str) -> tuple[dict, str]:
-    """(backtest result, repo-relative JSON path) of a fresh backtest of one market."""
-    result = run_backtest((market,))
+def one_thread():
+    """threadpoolctl's limit of the native thread pools (BLAS, OpenMP) to one thread, or no limit without it."""
+    try:
+        from threadpoolctl import threadpool_limits
+    except ImportError:  # optional: installed with scikit-learn (the gradient-boosted comparison)
+        return contextlib.nullcontext()
+    return threadpool_limits(1)
+
+
+def rerun(market: str, end: date | None = None) -> tuple[dict, str]:
+    """(backtest result, repo-relative JSON path) of a fresh backtest of one market on the inputs stored by the
+    end of `end` (the reviewed week's last day; None: every stored input)."""
+    with one_thread():
+        result = run_backtest((market,), {"end": end})
     out = paths.ROOT / MODEL_BACKTEST_DIR
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"model-backtest-{market}-{result['data'][market]['last_panel_date']}.json"
