@@ -37,10 +37,42 @@ export function stateWords(answer: Pick<AnswerRecord, "status" | "declined">): s
     case "declined":
       return answer.declined === "advice" ? "Declined: no advice on real trades" : "Declined";
     case "stopped":
-      return "Stopped: too much to read for one answer";
+      return "Stopped: out of time for one answer";
     case "pending":
       return "Not finished";
     default:
       return "Failed";
   }
+}
+
+/** The page a cited record's kind lives on (lib/ui/routes.ts page keys); the mockup's map, with news on the News page. */
+const KIND_PAGE: Record<string, string> = {
+  paper_trades_settled: "portfolios",
+  trade_reasons_ai: "compare",
+  eod_analyses: "compare",
+  head_to_head_picks: "compare",
+  research_reviews: "compare",
+  strategy_predictions: "lab",
+  scoreboard: "lab",
+  model_scores: "lab",
+  news: "news",
+  news_impact: "news",
+  announcements: "news",
+  filings: "news",
+  events: "news",
+  results_digests: "news",
+  trade_checks: "portfolios",
+  ranges: "watchlist",
+  market_status: "home",
+  company: "companies",
+};
+
+export function kindPage(kind: string): string {
+  return KIND_PAGE[kind] ?? "help";
+}
+
+/** The icon of a cited record's kind (design/system/icons.svg ids without ms-). */
+export function kindIcon(kind: string): string {
+  const page = kindPage(kind);
+  return ({ portfolios: "account_balance_wallet", compare: "layers", lab: "science", news: "newspaper", watchlist: "format_list_bulleted", home: "home", companies: "apartment" } as Record<string, string>)[page] ?? "description";
 }

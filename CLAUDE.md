@@ -223,6 +223,15 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   layer's explain hook; "coming soon" until it is wired), in #market-brief only; Confirm posts a visible request message whose
   `slack_channel`/`slack_ts` go into the inbox row for B6's onboarding reply. Web tests: `npm test` in `web/` (node test
   runner, offline, with the prompt-injection suite), CI `.github/workflows/web-tests.yml`.
+- Assistant (B8, SPEC F11; docs/ws/b8.md; code `web/lib/assistant/`, route `web/app/api/assistant/`, page 11 and the
+  chat panel in `web/app/(cockpit)/[market]/assistant/_parts/` and `@chat/`): the `explain` tool answers a question
+  (at most 500 characters) from the stored data only, through B5's read tools (gated, logged, read-budgeted), with
+  `claude-sonnet-5-5` and a pinned refusal fallback to `claude-sonnet-5`; every cited id must be in what the tools
+  returned, an answer that reads as advice is replaced by the decline, "not in the data" when it is not. A
+  conversation carries its last 4 turns (`conversation_id`; Slack /ask continues the asker's last 30 minutes). No
+  money budget in code (owner decision 2026-10-08): each answer's cost is logged per attempt and the spend shown;
+  the Anthropic console's limit is the cap. Conversation log `market_brief_inbox.app` (`web/lib/assistant/app.sql`,
+  90 days, operational, never imported). Kill switch: `inbox.controls` agent `assistant`.
 - Macro, flows and short selling (issue #9; HTTP client in `marketbrief/sources/free_source_client.py`, storage helpers in `marketbrief/collectors/collector_store.py`,
   context sections in `marketbrief/pipeline/macro_sections.py`): `collect_macro` (US `macro:` config: Treasury
   par yield curve, FRED series via fredgraph.csv, Cboe daily put/call ratios -> `data/us/macro/`),
