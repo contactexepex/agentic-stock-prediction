@@ -1,5 +1,5 @@
 """The EUR view of the owner's US paper positions (F1.11, decision 11): every open buy lot of a US position in
-euros, with BUX's FX fee (config/costs.yaml broker.us.fx_fee_rate, provisional) and the change of the EUR/USD rate.
+euros, with BUX's FX fee (config/costs.yaml broker.us.fx_fee_rate, confirmed final 2026-10-08) and the change of the EUR/USD rate.
 
 Per lot (rates in USD per EUR; cost_usd = quantity x buy price + the buy's cost; value_usd = quantity x the mark):
   cost_eur      = cost_usd / eurusd_at_buy x (1 + fx_fee_rate)     euros needed to buy the dollars
@@ -50,5 +50,5 @@ def eur_view(book, marks: dict, fx: EurUsd, fee: float) -> list[dict]:
                     **{key: round(total[key], MONEY) for key in ("cost_usd", "value_usd", "cost_eur", "value_eur",
                                                                  "fx_effect_eur")},
                     "pnl_eur": round(total["value_eur"] - total["cost_eur"], MONEY),
-                    "note": "BUX FX fee provisional (config/costs.yaml broker.us, verify)"})
+                    "note": "BUX FX fee (config/costs.yaml broker.us, owner-confirmed 2026-10-08)"})
     return out

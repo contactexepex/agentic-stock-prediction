@@ -1,6 +1,6 @@
 """Per-trade costs of the owner's paper portfolio in the market's currency: the same charges as the paper-trading
 engine (marketbrief/lab/costs.py, F1.11: "reads costs from the same place"): config/costs.yaml's statutory rates
-plus the broker charges under `broker` (provisional, marked verify). With the statutory rates alone (no `broker`
+plus the broker charges under `broker` (confirmed final by the owner, 2026-10-08). With the statutory rates alone (no `broker`
 keys) a buy and a sell of the same value add up to the signal model's round_trip_cost (tested).
 
 India ("your cost" view, owner decision 50): brokerage (at least the minimum per order), STT, exchange, SEBI, GST

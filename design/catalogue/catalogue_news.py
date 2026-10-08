@@ -223,7 +223,7 @@ def portfolio(eurusd: float, r2, default_amount) -> dict:
     cost_usd = qty * buy
     value_usd = qty * last
     rate = lab_costs.rates("us")
-    fx_fee_rate = rate["fx_fee_rate"]   # BUX FX markup (config/costs.yaml broker.us, verify)
+    fx_fee_rate = rate["fx_fee_rate"]   # BUX FX markup (config/costs.yaml broker.us, owner-confirmed 2026-10-08)
     buy_cost = lab_costs.side_cost("us", rate, "buy", qty, buy, {"eurusd": eur_at_buy})
     eur = lot_view({"price": buy, "cost": buy_cost, "quantity": qty}, qty, last, (eur_at_buy, eurusd), fx_fee_rate)
     return {
@@ -245,7 +245,7 @@ def portfolio(eurusd: float, r2, default_amount) -> dict:
                           **{key: r2(eur[key]) for key in ("cost_usd", "value_usd", "cost_eur", "value_eur",
                                                            "fx_effect_eur")},
                           "pnl_eur": r2(eur["value_eur"] - eur["cost_eur"]),
-                          "note": "BUX FX fee provisional (config/costs.yaml broker.us, verify)"}},
+                          "note": "BUX FX fee (config/costs.yaml broker.us, owner-confirmed 2026-10-08)"}},
             {"market": "india", "ticker": "RELIANCE", "quantity": 50.0, "avg_price": 1182.0, "last_close": 1218.0,
              "last_close_date": "2026-10-06", "currency": "INR", "cost": 59100.0, "value": 60900.0, "pnl": 1800.0,
              "pnl_pct": r2((1218.0 / 1182.0 - 1) * 100), "eur_view": None}],
