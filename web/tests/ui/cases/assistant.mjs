@@ -135,6 +135,8 @@ export const cases = [
       await page.waitForSelector(".chat-panel .msg.a", { timeout: 5000 }).catch(() => problems.push("no answer in the panel"));
       await page.keyboard.press("Escape");
       if (await page.$(".chat-panel")) problems.push("Escape did not close the panel");
+      await page.waitForTimeout(100);
+      if ((await page.evaluate(() => document.activeElement?.getAttribute("aria-controls"))) !== "mb-chat-slot") problems.push("focus did not return to Ask");
       return problems;
     },
   },

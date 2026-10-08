@@ -33,7 +33,12 @@ export function viewContext(pathname: string, hash: string): { ticker: string | 
 export function AssistantPanel({ market }: { market: Market }) {
   const panel = useRegisterChatPanel();
   if (!panel.open) return null;
-  return <OpenPanel market={market} close={() => panel.setOpen(false)} />;
+  const close = () => {
+    panel.setOpen(false);
+    // focus goes back to the top bar's Ask button that opened the panel
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('button[aria-controls="mb-chat-slot"]')?.focus());
+  };
+  return <OpenPanel market={market} close={close} />;
 }
 
 function OpenPanel({ market, close }: { market: Market; close: () => void }) {

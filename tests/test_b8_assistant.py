@@ -117,6 +117,8 @@ def test_conversation_statements():
     assert con.execute(sql["owns"], ["c1", "dashboard:owner", "us"]).fetchall() == [(1,)]
     assert con.execute(sql["owns"], ["c1", "slack:U1", "us"]).fetchall() == [(0,)]
     assert con.execute(sql["owns"], ["c1", "dashboard:owner", "india"]).fetchall() == [(0,)]
+    # a later question of a conversation is not a conversation id (no fork without history)
+    assert con.execute(sql["owns"], ["c3", "dashboard:owner", "us"]).fetchall() == [(0,)]
     # the newest 4 finished turns (the failed c6 is left out), newest first; the store reverses them
     rows = con.execute(sql["history"], ["c1", "dashboard:owner", "us", 4]).fetchall()
     assert [row[0] for row in rows] == ["c5", "c4", "c3", "c2"]

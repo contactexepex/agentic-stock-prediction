@@ -1,8 +1,9 @@
 "use client";
 // The client side of the assistant (F11): the market's conversation and spend from GET /api/assistant, and ask()
 // through POST /api/assistant (same origin, no-store; identity comes from the dashboard's Vercel Authentication, never
-// from here). Shared by page 11 and the chat panel. The current conversation is the newest answer's, until the reader
-// starts a new one.
+// from here). Shared by page 11 and the chat panel. The current conversation is the newest dashboard answer's (a
+// Slack or Claude-app conversation belongs to its own asker and cannot be continued here), until the reader starts a
+// new one.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Market } from "../../../../../lib/data/constants.ts";
 import type { AnswerRecord, SpendState } from "../../../../../lib/assistant/types.ts";
@@ -70,7 +71,7 @@ export function useAssistant(market: Market): AssistantState {
 
   const conversationId = useMemo(() => {
     if (fresh) return null;
-    const last = answers.at(-1);
+    const last = answers.filter((a) => a.channel === "dashboard").at(-1);
     return last && last.status !== "pending" ? last.conversation_id : null;
   }, [answers, fresh]);
 

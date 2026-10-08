@@ -54,7 +54,7 @@ export class FakeConversationStore implements ConversationStore {
 
   async owns(id: string, actor: string, market: string) {
     if (this.down) throw new Error("log down");
-    return this.questions.some((q) => q.id === id && q.actor === actor && q.market === market);
+    return this.questions.some((q) => q.id === id && q.conversation_id === id && q.actor === actor && q.market === market);
   }
 
   async latestConversation(actor: string, market: string, since: string) {

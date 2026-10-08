@@ -103,7 +103,7 @@ export interface ConversationStore {
   spend(dayStart: string, monthStart: string): Promise<{ day: number; month: number }>;
   /** The kill switch of the assistant agent in inbox.controls (newest row of `assistant` and of `*`). */
   enabled(): Promise<boolean | null>;
-  /** Whether conversation `id` exists and was asked by this actor in this market. */
+  /** Whether `id` is the first question of a conversation asked by this actor in this market. */
   owns(id: string, actor: string, market: string): Promise<boolean>;
   /** The conversation of the actor's newest question in the market asked at or after `since`, or null. */
   latestConversation(actor: string, market: string, since: string): Promise<string | null>;

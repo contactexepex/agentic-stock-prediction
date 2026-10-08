@@ -154,7 +154,7 @@ export class AssistantExplainer implements Explainer {
     const run: Run = advice
       ? { outcome: { status: "declined", text: ADVICE_DECLINE, cited: [], not_in_data: false, declined: "advice" },
         tokens: NO_TOKENS, cost: 0, model: MODEL, calls: 0, toolCalls: 0, sources: [], error: null }
-      : await this.run(model, read, market as "india" | "us", askedAt, question, ticker, strategyId, history);
+      : await this.run(model, read, market as "india" | "us", askedAt, question, ticker, strategyId, history, now.getTime());
     // A call that ended without an API answer (a timeout, a lost connection) has no usage to log; the Anthropic console
     // shows what it billed.
     const cost = run.cost;
@@ -201,8 +201,8 @@ export class AssistantExplainer implements Explainer {
   }
 
   private async run(model: ModelClient, read: ReadTool, market: "india" | "us", askedAt: string, question: string,
-    ticker: string | null, strategyId: string | null, history: HistoryTurn[]): Promise<Run> {
-    const started = this.deps.clock().getTime();
+    ticker: string | null, strategyId: string | null, history: HistoryTurn[], started: number): Promise<Run> {
+    // `started` is when the question arrived (before its log statements), so the deadline covers them too.
     const tools = readToolDefinitions();
     const messages: Anthropic.Beta.BetaMessageParam[] = [
       ...historyTurns(history, HISTORY_ANSWER_CHARS),

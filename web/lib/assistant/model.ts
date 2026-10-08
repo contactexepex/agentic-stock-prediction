@@ -1,6 +1,6 @@
 // The Claude API client of the assistant: the official SDK, its requests sent through B5's HTTPS host allowlist
-// (web/lib/tools/http.ts). No retry and CALL_TIMEOUT_MS per call, so a question fits the route's 60 s; non-streaming
-// (MAX_TOKENS is small).
+// (web/lib/tools/http.ts). No retry and CALL_TIMEOUT_MS per call (constants.ts says how that fits the route's 60 s);
+// non-streaming (MAX_TOKENS is small).
 import Anthropic from "@anthropic-ai/sdk";
 import type { FetchLike } from "../tools/http.ts";
 import type { ModelClient } from "./types.ts";

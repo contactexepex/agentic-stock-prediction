@@ -45,13 +45,17 @@ export const MAX_TOKENS = 1500;
 export const MAX_ROUNDS = 4;
 export const MAX_TOOL_CALLS = 6;
 
-/** No new model call starts after this long (the route's maxDuration is 60 s; one call has 25 s, no retry). */
-export const DEADLINE_MS = 30000;
-export const CALL_TIMEOUT_MS = 25000;
+/** Counted from the question's arrival: no model call starts and no read runs after DEADLINE_MS; one call has
+ * CALL_TIMEOUT_MS and no retry. So the model work ends within 25 + 20 = 45 s of arrival; the closing log statements
+ * (answer, spend; each under B5's 5 s statement timeout) and the tool layer's command-log row follow, against the
+ * route's 60 s maxDuration. A log slower than that can still be cut off: the question then stays "pending". */
+export const DEADLINE_MS = 25000;
+export const CALL_TIMEOUT_MS = 20000;
 
 /** Multi-turn (owner decision 2026-10-08): a question carries at most the last HISTORY_TURNS finished questions and
  * answers of its conversation, as plain text, each answer cut to HISTORY_ANSWER_CHARS (a question is at most
- * QUESTION_MAX). So the history adds at most 4 x (500 + 1000) = 6,000 characters to a request. */
+ * QUESTION_MAX). So the history adds at most 4 x (500 + 1000) = 6,000 characters of quoted text to a request, plus about
+ * 80 characters of framing per turn (about 6,400 in all). */
 export const HISTORY_TURNS = 4;
 export const HISTORY_ANSWER_CHARS = 1000;
 
