@@ -1,7 +1,9 @@
 // The company pages' reads (lib/data/company.ts): each page reads one row of its own table by the ticker (or `_`).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { COMPANY_BARS, COMPANY_PAGE, STOCK_STRATEGIES_PAGE, TRADES_PAGE, tradesResponse } from "../company.ts";
+import {
+  COMPANY_BARS, COMPANY_PAGE, LIFECYCLE_PAGE, lifecycleResponse, STOCK_STRATEGIES_PAGE, TRADES_PAGE, tradesResponse,
+} from "../company.ts";
 import { readTickerPage } from "../handler.ts";
 import { DownRowStore, MemoryRowStore, NOW, row } from "./fakes.ts";
 
@@ -49,4 +51,17 @@ test("the warehouse down is a 503 with the static reports as fallback", async ()
     { store: new DownRowStore(), now: () => NOW });
   assert.equal(response.status, 503);
   assert.ok((await response.json()).fallback_links.length > 0);
+});
+
+test("lifecycle: the page `<ticker>:<date>`; a bad date or ticker is a 404 without a read", async () => {
+  const store = new MemoryRowStore().put("lifecycle", page("NVDA:2026-10-07", { market: "us", ticker: "NVDA" }));
+  const deps = { store, now: () => NOW };
+  const ok = await lifecycleResponse(new Request("http://x"), "us", "NVDA", "2026-10-07", deps);
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).page_key, "NVDA:2026-10-07");
+  assert.equal((await lifecycleResponse(new Request("http://x"), "us", "NVDA", "2026-10-06", deps)).status, 404);
+  assert.equal((await lifecycleResponse(new Request("http://x"), "us", "NVDA", "7 Oct", deps)).status, 404);
+  assert.equal((await lifecycleResponse(new Request("http://x"), "us", "nv da", "2026-10-07", deps)).status, 404);
+  assert.deepEqual(store.reads, ["lifecycle|us|NVDA:2026-10-07", "lifecycle|us|NVDA:2026-10-06"]);
+  assert.equal(LIFECYCLE_PAGE.table, "lifecycle");
 });

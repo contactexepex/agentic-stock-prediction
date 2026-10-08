@@ -23,10 +23,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.constants.rm_company import LIFECYCLE_SESSIONS  # noqa: E402
 from marketbrief.lab import registry  # noqa: E402
+from marketbrief.pipeline import market_status  # noqa: E402
 from marketbrief.presentation.dashboard.assemble import gather_dashboard  # noqa: E402
 from marketbrief.warehouse import cli as wh_cli  # noqa: E402
-from marketbrief.warehouse import openapi_spec, read_models, rm_registry, sync  # noqa: E402
+from marketbrief.warehouse import openapi_spec, read_models, rm_company, rm_registry, sync  # noqa: E402
 from marketbrief.warehouse.connection import WarehouseError  # noqa: E402
 from marketbrief.warehouse.read_models import READ_MODEL_COLUMNS  # noqa: E402
 from marketbrief.warehouse.tables import TABLES  # noqa: E402
@@ -43,6 +45,10 @@ TICKER_TABLES = ("stock", "bars", "stock_strategies")  # one page per ticker (B1
 MARKET_AND_TICKER_TABLES = ("compare", "trades")  # the market's page `_` and one page per ticker (B13, B12)
 MARKET_AND_STRATEGY_TABLES = ("strategies",)  # the market's page `_` and one page per registry strategy (B13)
 STRATEGY_IDS = [spec["id"] for spec in registry.strategies()]
+TICKER_DAY_TABLES = ("lifecycle",)  # one page per ticker and session, `<ticker>:<date>` (B12)
+SESSION_DAYS = rm_company.sessions_back(
+    load_market("us"), market_status.status(load_market("us"), datetime.fromisoformat(CUTOFF))["session_date"],
+    LIFECYCLE_SESSIONS)
 
 
 def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
@@ -55,6 +61,8 @@ def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
             out[table] = ["_", *tickers]
         elif table in MARKET_AND_STRATEGY_TABLES:
             out[table] = ["_", *STRATEGY_IDS]
+        elif table in TICKER_DAY_TABLES:
+            out[table] = [f"{ticker}:{day}" for ticker in tickers for day in SESSION_DAYS]
         else:
             out[table] = ["_"]
     return out

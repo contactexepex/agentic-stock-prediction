@@ -5,6 +5,13 @@ objects (ranking, candidates, reason_detail, enrichment, luck_test, ...) are cop
 from __future__ import annotations
 
 RM_TRADES = "trades"
+RM_LIFECYCLE = "lifecycle"
+# rm.lifecycle: one page per company and session, the last LIFECYCLE_SESSIONS sessions (docs/SPEC.md sections 4-5)
+LIFECYCLE_SESSIONS = 30
+# rm.trades settled trades by exit session (docs/SPEC.md section 4): the market page the last 5 sessions, a
+# company's page the last 60
+TRADES_MARKET_SESSIONS = 5
+TRADES_TICKER_SESSIONS = 60
 RM_STOCK_STRATEGIES = "stock_strategies"
 OWNER = "B12"
 MOCKUP_COMPANY = "design/mockups/03-company/data.json"

@@ -73,6 +73,9 @@ class CompanySources:
     lifecycle: dict[str, list[dict]] = field(default_factory=dict)
     picks: dict[str, list[dict]] = field(default_factory=dict)
     predictions: dict[str, list[dict]] = field(default_factory=dict)
+    all_picks: dict[str, list[dict]] = field(default_factory=dict)
+    all_predictions: dict[str, list[dict]] = field(default_factory=dict)
+    all_checks: dict[str, list[dict]] = field(default_factory=dict)
     settled: dict[str, list[dict]] = field(default_factory=dict)
     checks: dict[str, list[dict]] = field(default_factory=dict)
     market_checks: list[dict] = field(default_factory=list)
@@ -107,7 +110,8 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     params = {"cutoff": cutoff.isoformat()}
     checks = zulu(mine(lab_reads.records(con.execute(CHECKS_SQL, params).df(), "trade_checks")), "trade_checks",
                   "trade_check_details")
-    sources.checks = {ticker: latest_checks(rows) for ticker, rows in by_ticker(checks).items()}
+    sources.all_checks = by_ticker(checks)
+    sources.checks = {ticker: latest_checks(rows) for ticker, rows in sources.all_checks.items()}
     sources.market_checks = latest_checks(checks)
     reasons = mine(lab_reads.records(con.execute(REASONS_SQL, params).df(), "trade_reasons_ai"))
     sources.reasons = by_ticker(zulu(reasons, "trade_reasons_ai"))
@@ -115,10 +119,11 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     sources.digests = by_ticker(zulu(parsed(digests, DIGEST_JSON_COLUMNS), "results_digests"))
     sources.settled = by_ticker(zulu(rm_common.settled_trades(ctx), "paper_trades_settled"))
     sources.scoreboard = rm_common.lab_summary(ctx)["scoreboard"]
+    picks = zulu(mine(lab_reads.picks(con, cutoff)), "head_to_head_picks")
+    predictions = zulu(mine(lab_reads.predictions(con, cutoff)), "strategy_predictions")
+    sources.all_picks, sources.all_predictions = by_ticker(picks), by_ticker(predictions)
     if as_of:
-        picks = [row for row in mine(lab_reads.picks(con, cutoff)) if row["session_date"] == session_date]
-        sources.picks = by_ticker(zulu(picks, "head_to_head_picks"))
-        predictions = [row for row in mine(lab_reads.predictions(con, cutoff)) if row["as_of_date"] == as_of]
-        sources.predictions = by_ticker(zulu(predictions, "strategy_predictions"))
+        sources.picks = by_ticker([row for row in picks if row["session_date"] == session_date])
+        sources.predictions = by_ticker([row for row in predictions if row["as_of_date"] == as_of])
         sources.bars = {ticker: rows for ticker, rows in bar_rows(con, as_of, cutoff).items() if ticker in collected}
     return sources

@@ -73,16 +73,53 @@ def trade_lists(sources: CompanySources, ticker: str, open_trades: list[dict]) -
             "reasons": reason_rows(sources.reasons.get(ticker, []))}
 
 
-def trades_payload(sources: CompanySources, ticker: str, open_trades: list[dict]) -> dict:
-    """rm.trades of one company."""
-    return {"market": sources.market, "ticker": ticker, "as_of": sources.as_of,
-            **trade_lists(sources, ticker, open_trades)}
+def exit_day(row: dict) -> str:
+    """The session a settled trade exited (its actual exit, else the planned one)."""
+    return row["exit_date_actual"] or row["exit_date"]
 
 
-def market_trades_payload(sources: CompanySources, open_trades: list[dict]) -> dict:
-    """rm.trades page_key _: every open trade of the market and the rows of the market's latest check."""
+def since(rows: list[dict], first_day: str | None, day_of) -> list[dict]:
+    """The rows whose day (`day_of`) is on or after `first_day` (all rows when None)."""
+    return rows if first_day is None else [row for row in rows if day_of(row) >= first_day]
+
+
+def trades_payload(sources: CompanySources, ticker: str, open_trades: list[dict], first_day: str | None) -> dict:
+    """rm.trades of one company: its open trades and latest checks, and the settled trades and AI reasons of the
+    sessions from `first_day` (docs/SPEC.md section 4: the last 60 sessions)."""
+    lists = trade_lists(sources, ticker, open_trades)
+    return {"market": sources.market, "ticker": ticker, "as_of": sources.as_of, **lists,
+            "settled": since(lists["settled"], first_day, exit_day),
+            "reasons": since(lists["reasons"], first_day, lambda row: row["session_date"])}
+
+
+def market_trades_payload(sources: CompanySources, open_trades: list[dict], first_day: str | None) -> dict:
+    """rm.trades page_key _: every open trade of the market, the rows of the market's latest check and the settled
+    trades that exited from `first_day` (docs/SPEC.md section 4: the last 5 sessions), newest exit first."""
+    settled = [row for rows in sources.settled.values() for row in rows]
     return {"market": sources.market, "as_of": sources.as_of, "open_trades": open_trade_rows(open_trades),
-            "trade_checks": check_rows(sources.market_checks)}
+            "trade_checks": check_rows(sources.market_checks),
+            "settled": since(settled_rows(settled), first_day, exit_day)}
+
+
+def lifecycle_payload(sources: CompanySources, ticker: str, day: str) -> dict:
+    """rm.lifecycle `<ticker>:<day>`: one session's path of the company (docs/SPEC.md sections 4-5): the strategy
+    predictions and head-to-head picks made for the session, every intraday trade check of the session, the trades
+    settled on it and the AI reasons written about it, as stored by the cut-off."""
+    checks = [row for row in sources.all_checks.get(ticker, []) if row["session_date"] == day]
+    return {
+        "market": sources.market,
+        "ticker": ticker,
+        "session_date": day,
+        "predictions": sorted((pick(row, PREDICTION_FIELDS) for row in sources.all_predictions.get(ticker, [])
+                               if row["session_date"] == day),
+                              key=lambda row: (row["strategy_id"], row["horizon_days"])),
+        "head_to_head": sorted((pick(row, PICK_FIELDS) for row in sources.all_picks.get(ticker, [])
+                                if row["session_date"] == day), key=lambda row: (row["family"], row["pick_rule"])),
+        "trade_checks": sorted((pick(row, CHECK_FIELDS) for row in checks),
+                               key=lambda row: (row["check_at"], row["trade_id"])),
+        "settled": [row for row in settled_rows(sources.settled.get(ticker, [])) if exit_day(row) == day],
+        "reasons": [row for row in reason_rows(sources.reasons.get(ticker, [])) if row["session_date"] == day],
+    }
 
 
 def pick_rows(sources: CompanySources, ticker: str, fields: tuple[str, ...]) -> list[dict]:

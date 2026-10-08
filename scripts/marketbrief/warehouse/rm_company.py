@@ -19,14 +19,18 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from marketbrief.constants.rm_company import (COMPANY_FIELDS, EVENT_DAYS, MOCKUP_COMPANY, MOCKUP_STOCK_STRATEGIES,
-                                              NEWS_DAYS, NEWS_MAX, OWNER, RM_STOCK_STRATEGIES, RM_TRADES,
-                                              STRATEGIES_COMPANY_FIELDS, STRATEGIES_STRATEGY_FIELDS, STRATEGY_FIELDS)
+from marketbrief.constants.rm_company import (COMPANY_FIELDS, EVENT_DAYS, LIFECYCLE_SESSIONS, MOCKUP_COMPANY,
+                                              MOCKUP_STOCK_STRATEGIES, NEWS_DAYS, NEWS_MAX, OWNER, RM_LIFECYCLE,
+                                              RM_STOCK_STRATEGIES, RM_TRADES, STRATEGIES_COMPANY_FIELDS,
+                                              STRATEGIES_STRATEGY_FIELDS, STRATEGY_FIELDS, TRADES_MARKET_SESSIONS,
+                                              TRADES_TICKER_SESSIONS)
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY, RM_BARS, RM_STOCK, SERVE_VERBATIM
+from marketbrief.core import calendar
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.calendar_events import calendar_events
-from marketbrief.warehouse.company_payloads import (bars_payload, check_rows, company_news, market_trades_payload,
-                                                    pick, stock_payload, stock_strategies_payload, trades_payload)
+from marketbrief.warehouse.company_payloads import (bars_payload, check_rows, company_news, lifecycle_payload,
+                                                    market_trades_payload, pick, stock_payload,
+                                                    stock_strategies_payload, trades_payload)
 from marketbrief.warehouse.company_sources import CompanySources, read_sources
 from marketbrief.warehouse.news_items import news_items
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
@@ -108,11 +112,42 @@ def bars_pages(ctx: BuildContext) -> dict[str, dict]:
     return {ticker: bars_payload(data, ticker) for ticker in tickers(ctx)}
 
 
+def sessions_back(cfg: dict, last_day: str | None, count: int) -> list[str]:
+    """The `count` market sessions ending at `last_day` (included when a session), oldest first; [] without a day."""
+    if last_day is None:
+        return []
+    days, day = [], calendar.prev_session(cfg, date.fromisoformat(last_day))
+    for _ in range(count):
+        days.append(day.isoformat())
+        day = calendar.prev_session(cfg, day, include=False)
+    return days[::-1]
+
+
+def first_of(days: list[str]) -> str | None:
+    return days[0] if days else None
+
+
 def trades_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.trades: the market's page and one page per collected company."""
+    """rm.trades: the market's page (settled trades of the last TRADES_MARKET_SESSIONS sessions to the as-of date)
+    and one page per collected company (the last TRADES_TICKER_SESSIONS)."""
     data, open_trades = sources(ctx), company_blocks(ctx)["open_trades"]
-    pages = {ticker: trades_payload(data, ticker, open_trades_of(open_trades, ticker)) for ticker in tickers(ctx)}
-    return {MARKET_PAGE_KEY: market_trades_payload(data, open_trades), **pages}
+    market_from = first_of(sessions_back(ctx.cfg, data.as_of, TRADES_MARKET_SESSIONS))
+    ticker_from = first_of(sessions_back(ctx.cfg, data.as_of, TRADES_TICKER_SESSIONS))
+    pages = {ticker: trades_payload(data, ticker, open_trades_of(open_trades, ticker), ticker_from)
+             for ticker in tickers(ctx)}
+    return {MARKET_PAGE_KEY: market_trades_payload(data, open_trades, market_from), **pages}
+
+
+def lifecycle_key(ticker: str, day: str) -> str:
+    return f"{ticker}:{day}"
+
+
+def lifecycle_pages(ctx: BuildContext) -> dict[str, dict]:
+    """rm.lifecycle: one page per collected company and session, the last LIFECYCLE_SESSIONS sessions ending at the
+    session being predicted (an older day has no page: the route answers 404)."""
+    data = sources(ctx)
+    days = sessions_back(ctx.cfg, rm_common.status_block(ctx)["session"]["session_date"], LIFECYCLE_SESSIONS)
+    return {lifecycle_key(ticker, day): lifecycle_payload(data, ticker, day) for ticker in tickers(ctx) for day in days}
 
 
 def trade_checks(ctx: BuildContext) -> list[dict]:
@@ -159,9 +194,18 @@ def strategies_mockup(mockup: dict, market: str, _page_key: str) -> dict:
 def trades_mockup(mockup: dict, market: str, page_key: str) -> dict:
     """rm.trades has no mockup of its own: its lists are the 03 mockup's (a company page's) and its header."""
     page = company_mockup(mockup, market, page_key)
-    keys = ("market", "as_of", "open_trades", "trade_checks") + (() if page_key == MARKET_PAGE_KEY else
-                                                                ("ticker", "settled", "reasons"))
+    keys = ("market", "as_of", "open_trades", "trade_checks", "settled") + (() if page_key == MARKET_PAGE_KEY else
+                                                                            ("ticker", "reasons"))
     return {key: page[key] for key in keys}
+
+
+def lifecycle_mockup(mockup: dict, market: str, page_key: str) -> dict:
+    """rm.lifecycle has no mockup of its own: its lists are the 03 mockup page's (same records and fields) under one
+    day's header."""
+    page = company_mockup(mockup, market, page_key.split(":")[0])
+    day = page["status"]["session"]["session_date"]
+    return {"market": page["market"], "ticker": page["ticker"], "session_date": day,
+            **{key: page[key] for key in ("predictions", "head_to_head", "trade_checks", "settled", "reasons")}}
 
 
 def bars_mockup(mockup: dict, market: str, page_key: str) -> dict:
@@ -174,6 +218,7 @@ BUILDERS = (
     PageBuilder(RM_BARS, "CompanyBars", bars_pages, owner=OWNER, serve=SERVE_VERBATIM),
     PageBuilder(RM_TRADES, "TradesPage", trades_pages, owner=OWNER, serve=SERVE_VERBATIM),
     PageBuilder(RM_STOCK_STRATEGIES, "StockStrategiesPage", stock_strategies_pages, owner=OWNER),
+    PageBuilder(RM_LIFECYCLE, "LifecyclePage", lifecycle_pages, owner=OWNER, serve=SERVE_VERBATIM),
 )
 CONTRACT_CASES = (
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}", table=RM_STOCK, mockup=MOCKUP_COMPANY,
@@ -185,4 +230,6 @@ CONTRACT_CASES = (
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}/strategies", table=RM_STOCK_STRATEGIES,
                  mockup=MOCKUP_STOCK_STRATEGIES, mockup_payload=strategies_mockup,
                  map_paths=("$.strategies", "$.agreement")),
+    ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}/lifecycle/{date}", table=RM_LIFECYCLE,
+                 mockup=MOCKUP_COMPANY, mockup_payload=lifecycle_mockup),
 )

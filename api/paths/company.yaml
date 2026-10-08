@@ -65,8 +65,9 @@
     tags: [portfolio]
     operationId: getTrades
     summary: >-
-      Open paper trades and the latest intraday check of the market, or with `ticker` of one company plus its settled
-      trades and AI reasons (docs/SPEC.md section 5). Paper only: nothing is traded
+      Open paper trades, the latest intraday check and the last 5 sessions' settled trades of the market, or with
+      `ticker` one company's open trades and checks plus its settled trades and AI reasons of the last 60 sessions
+      (docs/SPEC.md sections 4-5). Paper only: nothing is traded
     x-read-model: rm.trades
     parameters:
       - $ref: '#/components/parameters/Market'
@@ -83,5 +84,31 @@
         content:
           application/json:
             schema: {$ref: '#/components/schemas/TradesResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/stocks/{ticker}/lifecycle/{date}:
+  get:
+    tags: [stocks]
+    operationId: getCompanyLifecycle
+    summary: >-
+      One session's path of a company: predictions and picks made for it, its intraday trade checks, the trades
+      settled on it and the AI reasons (docs/SPEC.md sections 4-5; the last 30 sessions, older: 404)
+    x-read-model: rm.lifecycle
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/Ticker'
+      - name: date
+        in: path
+        required: true
+        description: The session date (YYYY-MM-DD); page_key = `<ticker>:<date>`
+        schema: {$ref: '#/components/schemas/IsoDate'}
+    responses:
+      '200':
+        description: The lifecycle read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LifecycleResponse'}
       '404': {$ref: '#/components/responses/NotFound'}
       '503': {$ref: '#/components/responses/Unavailable'}

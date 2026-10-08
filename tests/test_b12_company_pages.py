@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
-from marketbrief.warehouse import company_payloads  # noqa: E402
+from marketbrief.warehouse import company_payloads, rm_company  # noqa: E402
 from marketbrief.warehouse.company_sources import read_sources  # noqa: E402
 from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
@@ -93,7 +93,8 @@ def test_company_page_keys_equal_the_mockup(market):
     for ticker, page in pages.items():
         blocks = {key: page[key] for key in ("company", "agreement", "open_trades", "news", "events")}
         built = company_payloads.stock_payload(sources, ticker, {}, blocks)
-        assert company_payloads.trades_payload(sources, ticker, page["open_trades"])["settled"] == built["settled"]
+        trades = company_payloads.trades_payload(sources, ticker, page["open_trades"], None)
+        assert trades["settled"] == built["settled"]
         for key in ("lifecycle", "head_to_head", "predictions", "open_trades", "trade_checks", "settled", "reasons",
                     "results", "events", "on_company"):
             assert built[key] == page[key], f"{market} {ticker} {key}"
@@ -116,14 +117,15 @@ def test_stock_strategies_keys_equal_the_mockup(market):
 def test_market_trades_page_holds_every_open_trade_and_the_latest_check():
     for market in ("india", "us"):
         opened = [row for row in catalogue("open_trade")["records"] if row["market"] == market]
-        page = company_payloads.market_trades_payload(sources_of(market), opened)
+        page = company_payloads.market_trades_payload(sources_of(market), opened, None)
         assert len(page["open_trades"]) == len(opened)
         checks = [row for row in catalogue("trade_check")["records"]
                   if row["market"] == market and row["check_at"] <= "2026-10-07T12:00:00Z"]
         newest = max((row["check_at"] for row in checks), default=None)
         assert {row["id"] for row in page["trade_checks"]} == {r["id"] for r in checks if r["check_at"] == newest}
-    assert len(company_payloads.market_trades_payload(sources_of("india"), [])["trade_checks"]) > 0
-    assert company_payloads.market_trades_payload(sources_of("us"), [])["trade_checks"] == []   # US checked at 16:27Z
+    assert len(company_payloads.market_trades_payload(sources_of("india"), [], None)["trade_checks"]) > 0
+    us = company_payloads.market_trades_payload(sources_of("us"), [], None)
+    assert us["trade_checks"] == []  # the US check of 7 Oct ran at 16:27Z, after the cut-off
 
 
 @pytest.mark.usefixtures("root")
@@ -148,9 +150,11 @@ def test_nothing_stored_after_the_cutoff_is_read():
         path.write_text(json.dumps(record) + "\n")
     for market in ("india", "us"):
         sources, tickers = sources_of(market), load_market(market)["tickers"]
-        text = json.dumps([company_payloads.trades_payload(sources, t, []) for t in tickers], default=str)
+        text = json.dumps([company_payloads.trades_payload(sources, t, [], None) for t in tickers], default=str)
         stock = json.dumps([company_payloads.stock_payload(sources, t, {}, EMPTY_BLOCKS) for t in tickers], default=str)
-        life = json.dumps([company_payloads.bars_payload(sources, t) for t in tickers], default=str)
+        life = json.dumps([company_payloads.bars_payload(sources, t) for t in tickers]
+                          + [company_payloads.lifecycle_payload(sources, t, d) for t in tickers
+                             for d in ("2026-10-06", "2026-10-07", "2026-10-08")], default=str)
         for record_id in ("late-pick", "late-pred", "late-trade", "late-check", "late-reason", "late-digest",
                           "late-event"):
             assert record_id not in text + stock + life
@@ -194,3 +198,44 @@ def test_w1_catalogue_modules_still_import():
             importlib.import_module(name)
     finally:
         sys.path.remove(str(CATALOGUE))
+
+
+@pytest.mark.usefixtures("root")
+@pytest.mark.parametrize("market", ["india", "us"])
+def test_lifecycle_day_holds_that_sessions_records(market):
+    """A day's page: the predictions and picks made for the session, every check of the session, the trades that
+    exited on it and the reasons about it, the same records (and fields) the company page shows."""
+    sources = sources_of(market)
+    for ticker, page in company_mockup()[market]["pages"].items():
+        day = company_payloads.lifecycle_payload(sources, ticker, SESSION)
+        assert day["predictions"] == [p for p in page["predictions"] if p["session_date"] == SESSION]
+        assert day["head_to_head"] == sorted(page["head_to_head"], key=lambda r: (r["family"], r["pick_rule"]))
+        assert day["trade_checks"] == page["trade_checks"]          # one check per company by the cut-off
+        assert day["reasons"] == [r for r in page["reasons"] if r["session_date"] == SESSION]
+        for settled in page["settled"]:
+            exit_day = settled["exit_date_actual"] or settled["exit_date"]
+            assert settled in company_payloads.lifecycle_payload(sources, ticker, exit_day)["settled"]
+        assert company_payloads.lifecycle_payload(sources, ticker, "2026-09-01") == {
+            "market": market, "ticker": ticker, "session_date": "2026-09-01", "predictions": [], "head_to_head": [],
+            "trade_checks": [], "settled": [], "reasons": []}
+
+
+def test_sessions_back_skips_closed_days():
+    india = load_market("india")    # 2 Oct 2026 is an NSE holiday (Gandhi Jayanti)
+    assert rm_company.sessions_back(india, "2026-10-07", 5) == [
+        "2026-09-30", "2026-10-01", "2026-10-05", "2026-10-06", "2026-10-07"]
+    assert rm_company.sessions_back(india, "2026-10-04", 2) == ["2026-09-30", "2026-10-01"]  # a Sunday: back to Thu
+    assert rm_company.sessions_back(india, None, 5) == []
+
+
+@pytest.mark.usefixtures("root")
+def test_trades_windows_keep_recent_settlements_only():
+    sources = sources_of("us")
+    settled = [row for rows in sources.settled.values() for row in rows]
+    first = "2026-10-06"
+    page = company_payloads.market_trades_payload(sources, [], first)
+    assert page["settled"] and all((r["exit_date_actual"] or r["exit_date"]) >= first for r in page["settled"])
+    assert len(page["settled"]) == sum((r["exit_date_actual"] or r["exit_date"]) >= first for r in settled)
+    nvda = company_payloads.trades_payload(sources, "NVDA", [], first)
+    assert all((r["exit_date_actual"] or r["exit_date"]) >= first for r in nvda["settled"])
+    assert all(r["session_date"] >= first for r in nvda["reasons"])
