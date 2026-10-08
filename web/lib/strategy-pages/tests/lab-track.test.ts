@@ -56,12 +56,24 @@ test("ranking: by market-cost profit, then trades; rowless strategies follow by 
   const slice = { view: "accuracy" as const, basis: "forward" as const, horizon: "all" as const };
   const { ids, byId } = ranking(p, slice);
   assert.equal(ids.length, Object.keys(p.strategies).length);
-  const ranked = ids.filter((id) => byId.has(id)).map((id) => byId.get(id)!.net_pnl);
+  const ranked = ids.filter((id) => byId.has(id)).map((id) => byId.get(id)!.net_pnl as number);
   assert.deepEqual(ranked, ranked.slice().sort((a, b) => b - a));
   const rest = ids.filter((id) => !byId.has(id)).map((id) => p.strategies[id].family);
   const order = { rule: 0, baseline: 1, ai: 2 };
   assert.deepEqual(rest, rest.slice().sort((a, b) => order[a] - order[b]));
   assert.equal(defaultSelection(p, slice), ids[0]);
+});
+
+test("a missing profit ranks after every number and beats no baseline", () => {
+  const p = structuredClone(mockup<StrategyLabPayload>("05-strategy-lab"));
+  const slice = { view: "accuracy" as const, basis: "forward" as const, horizon: "all" as const };
+  const top = ranking(p, slice).ids[0];
+  const row = p.rows.find((r) => r.scope === "strategy" && r.view === "accuracy" && r.basis === "forward" && r.horizon_days === "all" && r.strategy_id === top)!;
+  row.net_pnl = null;
+  const { ids, byId } = ranking(p, slice);
+  const withRow = ids.filter((id) => byId.has(id));
+  assert.equal(withRow[withRow.length - 1], top);
+  assert.ok(kpiPicks(p, slice).beat >= 0);
 });
 
 test("forward and back-test rows are never pooled", () => {
