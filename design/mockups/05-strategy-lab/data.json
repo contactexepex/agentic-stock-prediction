@@ -894,8 +894,7 @@
      },
      "your_cost": {
       "net_pnl": -24358244.17,
-      "mean_return_pct": -2.4704,
-      "luck_test": null
+      "mean_return_pct": -2.4704
      }
     },
     {
@@ -935,8 +934,7 @@
      },
      "your_cost": {
       "net_pnl": -24480129.4,
-      "mean_return_pct": -2.4878,
-      "luck_test": null
+      "mean_return_pct": -2.4878
      }
     },
     {
@@ -976,8 +974,7 @@
      },
      "your_cost": {
       "net_pnl": -24590936.37,
-      "mean_return_pct": -2.5042,
-      "luck_test": null
+      "mean_return_pct": -2.5042
      }
     },
     {
@@ -1017,8 +1014,7 @@
      },
      "your_cost": {
       "net_pnl": -24692326.67,
-      "mean_return_pct": -2.5196,
-      "luck_test": null
+      "mean_return_pct": -2.5196
      }
     },
     {
@@ -1058,8 +1054,7 @@
      },
      "your_cost": {
       "net_pnl": -24792850.43,
-      "mean_return_pct": -2.5351,
-      "luck_test": null
+      "mean_return_pct": -2.5351
      }
     },
     {
@@ -1099,8 +1094,7 @@
      },
      "your_cost": {
       "net_pnl": -122914487.05,
-      "mean_return_pct": -2.5034,
-      "luck_test": null
+      "mean_return_pct": -2.5034
      }
     },
     {
@@ -1140,8 +1134,7 @@
      },
      "your_cost": {
       "net_pnl": -11953789.69,
-      "mean_return_pct": -2.5034,
-      "luck_test": null
+      "mean_return_pct": -2.5034
      }
     },
     {
@@ -1181,8 +1174,7 @@
      },
      "your_cost": {
       "net_pnl": -12003566.91,
-      "mean_return_pct": -2.517,
-      "luck_test": null
+      "mean_return_pct": -2.517
      }
     },
     {
@@ -1222,8 +1214,7 @@
      },
      "your_cost": {
       "net_pnl": -12037353.27,
-      "mean_return_pct": -2.5289,
-      "luck_test": null
+      "mean_return_pct": -2.5289
      }
     },
     {
@@ -1263,8 +1254,7 @@
      },
      "your_cost": {
       "net_pnl": -12092939.79,
-      "mean_return_pct": -2.5443,
-      "luck_test": null
+      "mean_return_pct": -2.5443
      }
     },
     {
@@ -1304,8 +1294,7 @@
      },
      "your_cost": {
       "net_pnl": -12128674.84,
-      "mean_return_pct": -2.5534,
-      "luck_test": null
+      "mean_return_pct": -2.5534
      }
     },
     {
@@ -1345,8 +1334,7 @@
      },
      "your_cost": {
       "net_pnl": -60216324.51,
-      "mean_return_pct": -2.5294,
-      "luck_test": null
+      "mean_return_pct": -2.5294
      }
     },
     {
@@ -6249,8 +6237,7 @@
      },
      "your_cost": {
       "net_pnl": -159715.43,
-      "mean_return_pct": -1.6004,
-      "luck_test": null
+      "mean_return_pct": -1.6004
      }
     },
     {
@@ -6290,8 +6277,7 @@
      },
      "your_cost": {
       "net_pnl": -149759.24,
-      "mean_return_pct": -1.5036,
-      "luck_test": null
+      "mean_return_pct": -1.5036
      }
     },
     {
@@ -6331,8 +6317,7 @@
      },
      "your_cost": {
       "net_pnl": -140056.89,
-      "mean_return_pct": -1.409,
-      "luck_test": null
+      "mean_return_pct": -1.409
      }
     },
     {
@@ -6372,8 +6357,7 @@
      },
      "your_cost": {
       "net_pnl": -130747.97,
-      "mean_return_pct": -1.318,
-      "luck_test": null
+      "mean_return_pct": -1.318
      }
     },
     {
@@ -6413,8 +6397,7 @@
      },
      "your_cost": {
       "net_pnl": -121299.5,
-      "mean_return_pct": -1.2252,
-      "luck_test": null
+      "mean_return_pct": -1.2252
      }
     },
     {
@@ -6454,8 +6437,7 @@
      },
      "your_cost": {
       "net_pnl": -701579.02,
-      "mean_return_pct": -1.4116,
-      "luck_test": null
+      "mean_return_pct": -1.4116
      }
     },
     {
@@ -6495,8 +6477,7 @@
      },
      "your_cost": {
       "net_pnl": -83923.2,
-      "mean_return_pct": -1.6252,
-      "luck_test": null
+      "mean_return_pct": -1.6252
      }
     },
     {
@@ -6536,8 +6517,7 @@
      },
      "your_cost": {
       "net_pnl": -80984.7,
-      "mean_return_pct": -1.5719,
-      "luck_test": null
+      "mean_return_pct": -1.5719
      }
     },
     {
@@ -6577,8 +6557,7 @@
      },
      "your_cost": {
       "net_pnl": -76906.51,
-      "mean_return_pct": -1.4965,
-      "luck_test": null
+      "mean_return_pct": -1.4965
      }
     },
     {
@@ -6618,8 +6597,7 @@
      },
      "your_cost": {
       "net_pnl": -72213.93,
-      "mean_return_pct": -1.4066,
-      "luck_test": null
+      "mean_return_pct": -1.4066
      }
     },
     {
@@ -6659,8 +6637,7 @@
      },
      "your_cost": {
       "net_pnl": -66507.83,
-      "mean_return_pct": -1.2972,
-      "luck_test": null
+      "mean_return_pct": -1.2972
      }
     },
     {
@@ -6700,8 +6677,7 @@
      },
      "your_cost": {
       "net_pnl": -380536.17,
-      "mean_return_pct": -1.4798,
-      "luck_test": null
+      "mean_return_pct": -1.4798
      }
     },
     {

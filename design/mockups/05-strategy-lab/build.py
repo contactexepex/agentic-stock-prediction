@@ -49,9 +49,13 @@ def row(r: dict) -> dict:
         out.update({"pick_rule": None, "ticker": None, "regime": None})
     out["luck_test"] = pick(r["luck_test"], LUCK_FIELDS) if r["luck_test"] else None
     yc = r.get("your_cost")
-    out["your_cost"] = ({**pick(yc, BACKTEST_YOUR_FIELDS if backtest else YOUR_FIELDS),
-                         "luck_test": pick(yc["luck_test"], LUCK_FIELDS) if yc.get("luck_test") else None}
-                        if yc else None)
+    if yc is None:
+        out["your_cost"] = None
+    elif backtest:
+        out["your_cost"] = pick(yc, BACKTEST_YOUR_FIELDS)            # no luck test stored for the your-cost view
+    else:
+        out["your_cost"] = {**pick(yc, YOUR_FIELDS),
+                            "luck_test": pick(yc["luck_test"], LUCK_FIELDS) if yc.get("luck_test") else None}
     if r.get("go_live"):
         out["go_live"] = pick(r["go_live"], GO_LIVE_FIELDS)
     return out

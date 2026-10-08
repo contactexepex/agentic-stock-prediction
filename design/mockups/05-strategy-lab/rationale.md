@@ -93,6 +93,15 @@ chart with the arrow keys; no script error; every tooltip element is focusable. 
 
 After W1's back-test rows (2026-10-08): the same checks rerun clean, and a render of the Back-test basis in both markets at 1280 and 390 px shows the run's facts above the table, the two back-tested baselines ranked with their market-cost and your-cost profit, every other strategy as "not run", the detail card's per-horizon figures for a back-tested strategy, and "not stored" for the luck test on the your-cost view (the back-test stores it for market cost only); no table wider than its wrapper, no page error.
 
+Judge round 1 of the back-test batch (2026-10-08) found six blockers, all fixed before round 2: the your-cost view
+fell back to the market figure where a back-test row stores none (win rate, drawdown, losing streak: now "not
+stored"); a null target miss printed 0.00% (now "—", and the tooltip says the basis has no targets or ranges); the
+cumulative card still said no back-test rows are stored; the go-live block looked up the row on the shown basis and
+said "no forward row" for a strategy that has one (now always the forward accuracy row); the heatmap header said
+"week to 6 Oct" on the back-test and the company and regime maps were blank (now the run's span, and each map says
+the back-test stores no such split); and "edge" was shown on a corrected interval wholly below zero (now "loss", in
+red with words, and "edge" only when the corrected interval lies above zero; the legend has all three).
+
 Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
 lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;
 line-chart labels overflowed and overlapped; the pick-rule table and the your-cost scoreboard overflowed at some
