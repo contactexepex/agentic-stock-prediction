@@ -13,11 +13,10 @@ export const MIN_TRADES_TO_RANK = 20;
 export const BACKTEST_YEARS = 15;
 export const LUCK_INTERVAL_PCT = 95;
 export const REASON_MAX_WORDS = 60;
-/* F11 and mcp/tools.yaml (explain): the assistant's question is at most 500 characters, its budget $0.65 a day under a
-   $20 monthly hard cap, conversations kept 90 days. */
+/* F11 and mcp/tools.yaml (explain): the assistant's question is at most 500 characters, conversations kept 90 days.
+   No money budget is enforced in code (owner, 2026-10-08: the Anthropic console limit is the only cap), so none is
+   named here. */
 export const ASSISTANT_QUESTION_MAX_CHARS = 500;
-export const ASSISTANT_DAILY_USD = 0.65;
-export const ASSISTANT_MONTHLY_USD_CAP = 20;
 export const ASSISTANT_LOG_DAYS = 90;
 /* News page rules (owner decision 2026-10-08, design/mockups/09-news/rationale.md). */
 export const NEWS_MOVERS_MAX = 10;
