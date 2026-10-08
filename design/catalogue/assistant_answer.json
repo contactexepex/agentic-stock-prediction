@@ -10,7 +10,7 @@
       "id": "ask-us-2026-10-07-1",
       "market": "us",
       "channel": "dashboard",
-      "asked_at": "2026-10-07T11:50:00Z",
+      "asked_at": "2026-10-07T12:10:00Z",
       "question": "Why did the N+3 paper trade in NVDA bought on 2026-09-30 end as it did?",
       "text": "rule.model_news.v1 bought NVDA at the 2026-09-30 open and sold at the 2026-10-05 close: +3.97 % after market costs ($39.66). Of the +4.20 % move, the market gave +2.05, the sector +1.70, verified news +0.45 (\"Nvidia supplier confirms record AI server shipments\", corroborated) and the company itself +0.00. Main reason: market_up. Paper trade only.",
       "cited_ids": [
@@ -37,7 +37,7 @@
       "id": "ask-us-2026-10-07-2",
       "market": "us",
       "channel": "dashboard",
-      "asked_at": "2026-10-07T11:52:00Z",
+      "asked_at": "2026-10-07T12:12:00Z",
       "question": "Rule or AI: who did better on 2026-10-06?",
       "text": "Paper trades settled on 2026-10-06, after market costs: rule 2 trades, 2 won, $47.37; ai 0 trades, 0 won, $0.00; baseline 4 trades, 3 won, $75.40. One day decides nothing; the scoreboard ranks strategies over at least 20 trades.",
       "cited_ids": [
@@ -58,7 +58,7 @@
       "id": "ask-us-2026-10-07-3",
       "market": "us",
       "channel": "dashboard",
-      "asked_at": "2026-10-07T11:55:00Z",
+      "asked_at": "2026-10-07T12:15:00Z",
       "question": "Should I buy NVDA tomorrow with real money?",
       "text": "I can't advise real trades: this is a research tool and every signal here is a paper record. I can show NVDA's paper predictions and how its strategies have done.",
       "cited_ids": [],
@@ -71,7 +71,7 @@
       "id": "ask-india-2026-10-07-1",
       "market": "india",
       "channel": "dashboard",
-      "asked_at": "2026-10-07T11:40:00Z",
+      "asked_at": "2026-10-07T12:20:00Z",
       "question": "Why did the N+3 paper trade in RELIANCE bought on 2026-09-30 end as it did?",
       "text": "rule.model_news.v1 bought RELIANCE at the 2026-09-30 open and sold at the 2026-10-06 close: +1.02 % after market costs (₹1,015.81). Of the +3.05 % move, the market gave +0.46, the sector -3.10, verified news +5.69 (\"Reliance Industries: retail subsidiary allots shares to investors (exchange filing)\", confirmed_primary) and the company itself +0.00. Main reason: news_positive. Paper trade only.",
       "cited_ids": [
@@ -98,7 +98,7 @@
       "id": "ask-india-2026-10-07-2",
       "market": "india",
       "channel": "dashboard",
-      "asked_at": "2026-10-07T11:42:00Z",
+      "asked_at": "2026-10-07T12:22:00Z",
       "question": "Rule or AI: who did better on 2026-10-06?",
       "text": "Paper trades settled on 2026-10-06, after market costs: rule 2 trades, 1 won, -₹975.83; ai 4 trades, 2 won, -₹1,951.66; baseline 3 trades, 2 won, ₹39.98. One day decides nothing; the scoreboard ranks strategies over at least 20 trades.",
       "cited_ids": [
@@ -119,7 +119,7 @@
       "id": "ask-india-2026-10-07-3",
       "market": "india",
       "channel": "dashboard",
-      "asked_at": "2026-10-07T11:45:00Z",
+      "asked_at": "2026-10-07T12:25:00Z",
       "question": "What did Reliance close at on 8 Oct?",
       "text": "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 12:00 UTC.",
       "cited_ids": [],

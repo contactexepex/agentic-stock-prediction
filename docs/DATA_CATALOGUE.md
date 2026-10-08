@@ -626,8 +626,8 @@ read model `rm.track_record` (`presentation/dashboard/track.py`, `model_info.py`
 `api/openapi.yaml`). Example file: `track_record.json`, one payload per market as of `2026-10-07T12:00:00Z`.
 Everything in it is the stored data at that time except `calls` (listed in `example_parts`): no call is scored in
 the stored data yet, so `calls` is computed by the same code (`track.calls_by_basis`) from the example calls of
-`ai.combined.opus.v1` (the forecaster's trader id), each scored close-to-close from the as-of close to the exit close,
-because `config/settings.yaml` `call_scoring.from` (2026-10-08) puts every call made before then on that basis. An
+`ai.combined.opus.v1` (the forecaster's trader id), each scored close-to-close as `score_predictions` scores it (the
+as-of close to the close h sessions later, scored at the next pre-open run), because `config/settings.yaml` `call_scoring.from` (2026-10-08) puts every call made before then on that basis. An
 open-to-close block has the same shape with `basis` `open_to_close`; the two are never pooled.
 
 | Field | Meaning | Source | Unit | Example |

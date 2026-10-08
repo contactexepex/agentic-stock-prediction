@@ -595,6 +595,14 @@ def test_catalogue_track_record_calls_are_the_forecaster_example_calls_close_to_
         assert sum(r["n"] for r in block["all"]["reliability"]) == len(mine)
         assert sum(b["n"] for b in block["by_horizon"].values()) == len(mine)
         assert all(key.endswith("legacy_cc") for key in block["by_horizon"])
+        hits = 0   # the engine's close-to-close window: the as-of close to the close h stored bars later
+        bars = {b["ticker"]: {x["date"]: x["close"] for x in load("bar.json") if x["ticker"] == b["ticker"]}
+                for b in load("bar.json") if b["market"] == payload["market"]}
+        for trade in mine:
+            closes = bars[trade["ticker"]]
+            later = sorted(day for day in closes if day > "2026-09-29")
+            hits += closes[later[trade["horizon_days"] - 1]] > closes["2026-09-29"]
+        assert block["all"]["hits"] == hits
 
 
 def test_catalogue_assistant_answers_cite_existing_records_before_their_as_of():

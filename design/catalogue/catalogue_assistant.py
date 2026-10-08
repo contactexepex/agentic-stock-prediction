@@ -8,7 +8,7 @@ before 2026-10-08."""
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import duckdb
@@ -30,26 +30,33 @@ def records(name: str) -> list[dict]:
     return json.loads((HERE / name).read_text(encoding="utf-8"))["records"]
 
 
-def example_calls(settled: list[dict], base_close: dict[str, float], market: str) -> pd.DataFrame:
-    """The forecaster's example calls (all up) scored close-to-close: the as-of close to the exit close."""
-    rows = []
+def example_calls(settled: list[dict], market: str) -> pd.DataFrame:
+    """The forecaster's example calls (all up) scored close-to-close as score_predictions scores them: the as-of
+    close to the close h stored bars later, scored at the next pre-open run after that session."""
+    from make_examples import BARS, MADE_AT, PREV_CLOSE_0929, calendar
+
+    cfg, rows = load_market(market), []
     for trade in settled:
         if (trade["market"], trade["strategy_id"], trade["view"], trade["status"]) != (market, FORECASTER, "accuracy",
                                                                                        "settled"):
             continue
-        actual = trade["exit_price"] / base_close[trade["ticker"]] - 1
-        rows.append({"id": trade["prediction_id"], "scored_at": pd.Timestamp(trade["settled_at"]), "hit": actual > 0,
-                     "label_basis": "close_to_close", "horizon_label": "legacy_cc",
-                     "horizon_days": trade["horizon_days"], "confidence": trade["prob_up"], "actual_return": actual})
+        ticker, horizon = trade["ticker"], trade["horizon_days"]
+        later = sorted(day for day in BARS[ticker] if day > "2026-09-29")
+        exit_day = later[horizon - 1]
+        actual = BARS[ticker][exit_day][3] / PREV_CLOSE_0929[ticker] - 1
+        scored = calendar.next_session(cfg, date.fromisoformat(exit_day), include=False)
+        rows.append({"id": trade["prediction_id"], "scored_at": pd.Timestamp(f"{scored}{MADE_AT[market]}"),
+                     "hit": actual > 0, "label_basis": "close_to_close", "horizon_label": "legacy_cc",
+                     "horizon_days": horizon, "confidence": trade["prob_up"], "actual_return": actual})
     return pd.DataFrame(rows)
 
 
-def track_records(settled: list[dict], base_close: dict[str, float]) -> list[dict]:
+def track_records(settled: list[dict]) -> list[dict]:
     out = []
     for market in ("india", "us"):
         data = gather_dashboard(load_market(market), connect(market), CUTOFF)
         con = duckdb.connect()
-        con.register("calls", example_calls(settled, base_close, market))
+        con.register("calls", example_calls(settled, market))
         con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
         out.append({"market": market, "as_of": AS_OF, "skill": data["skill"],
                     "calls": track.calls_by_basis(con, CUTOFF), "ranges": data["track"]["ranges"],
@@ -110,10 +117,10 @@ def assistant_answers() -> list[dict]:
     past = ("What did Reliance close at on 8 Oct?",
             "Not in the data: the stored prices end with the 6 Oct close, as of 7 Oct 12:00 UTC.", [])
     return [
-        answer("us", 1, "2026-10-07T11:50:00Z", trade_answer("us", "NVDA", 3)),
-        answer("us", 2, "2026-10-07T11:52:00Z", rule_vs_ai_answer("us")),
-        answer("us", 3, "2026-10-07T11:55:00Z", advice, {"declined": "advice"}),
-        answer("india", 1, "2026-10-07T11:40:00Z", trade_answer("india", "RELIANCE", 3)),
-        answer("india", 2, "2026-10-07T11:42:00Z", rule_vs_ai_answer("india")),
-        answer("india", 3, "2026-10-07T11:45:00Z", past, {"not_in_data": True}),
+        answer("us", 1, "2026-10-07T12:10:00Z", trade_answer("us", "NVDA", 3)),
+        answer("us", 2, "2026-10-07T12:12:00Z", rule_vs_ai_answer("us")),
+        answer("us", 3, "2026-10-07T12:15:00Z", advice, {"declined": "advice"}),
+        answer("india", 1, "2026-10-07T12:20:00Z", trade_answer("india", "RELIANCE", 3)),
+        answer("india", 2, "2026-10-07T12:22:00Z", rule_vs_ai_answer("india")),
+        answer("india", 3, "2026-10-07T12:25:00Z", past, {"not_in_data": True}),
     ]

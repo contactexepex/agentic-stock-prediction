@@ -26,18 +26,18 @@
           "label": "close→close",
           "all": {
             "n": 4,
-            "hits": 1,
-            "share": 0.25,
-            "wilson_lo": 0.045586062644636216,
-            "wilson_hi": 0.6993639475573634,
-            "always_up": 0.25,
+            "hits": 2,
+            "share": 0.5,
+            "wilson_lo": 0.15003570882017148,
+            "wilson_hi": 0.8499642911798285,
+            "always_up": 0.5,
             "edge": 0.0,
             "mean_confidence": 0.5875,
             "scores": {
               "n": 4,
-              "brier": 0.2957,
-              "log_loss": 0.7853,
-              "brier_skill": -0.1828
+              "brier": 0.2517,
+              "log_loss": 0.6964,
+              "brier_skill": -0.0068
             },
             "reliability": [
               {
@@ -46,9 +46,9 @@
                 "hi": 0.6,
                 "n": 4,
                 "mean_conf": 0.5874999999999999,
-                "hit_rate": 0.25,
-                "wilson_lo": 0.045586062644636216,
-                "wilson_hi": 0.6993639475573634
+                "hit_rate": 0.5,
+                "wilson_lo": 0.15003570882017148,
+                "wilson_hi": 0.8499642911798285
               },
               {
                 "bin": "0.60-0.70",
@@ -85,18 +85,18 @@
           "by_horizon": {
             "1d legacy_cc": {
               "n": 2,
-              "hits": 0,
-              "share": 0.0,
-              "wilson_lo": 0.0,
-              "wilson_hi": 0.6576280471103807,
-              "always_up": 0.0,
+              "hits": 1,
+              "share": 0.5,
+              "wilson_lo": 0.09452865480086614,
+              "wilson_hi": 0.9054713451991339,
+              "always_up": 0.5,
               "edge": 0.0,
               "mean_confidence": 0.585,
               "scores": {
                 "n": 2,
-                "brier": 0.3422,
-                "log_loss": 0.8795,
-                "brier_skill": -0.3689
+                "brier": 0.2542,
+                "log_loss": 0.7017,
+                "brier_skill": -0.0169
               },
               "reliability": [
                 {
@@ -105,9 +105,9 @@
                   "hi": 0.6,
                   "n": 2,
                   "mean_conf": 0.585,
-                  "hit_rate": 0.0,
-                  "wilson_lo": 0.0,
-                  "wilson_hi": 0.6576280471103807
+                  "hit_rate": 0.5,
+                  "wilson_lo": 0.09452865480086614,
+                  "wilson_hi": 0.9054713451991339
                 },
                 {
                   "bin": "0.60-0.70",
