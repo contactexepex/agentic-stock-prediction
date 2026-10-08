@@ -60,6 +60,10 @@ SLOW = {
         "test_score_cli_on_recorded_calls",
         "test_training_cutoff_comes_from_config",
     },
+    "tests/test_api_contract.py": {
+        "test_every_contract_case_passes_on_synced_read_models",
+        "test_status_page_values_come_from_the_stored_data",
+    },
     "tests/test_call_basis.py": {
         "test_no_entry_open_no_score_and_old_rows_read_as_close_to_close",
         "test_scoring_bases_match_the_model_labels",
