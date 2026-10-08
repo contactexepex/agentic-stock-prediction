@@ -1,0 +1,461 @@
+{
+ "_example": true,
+ "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.",
+ "page": "news",
+ "spec": "docs/SPEC.md section 6, page 9; owner's rules of 2026-10-08",
+ "endpoint": "GET /api/v1/markets/{market}/news",
+ "read_model": "rm.news",
+ "sources": [
+  "design/catalogue/market_status.json",
+  "design/catalogue/scoreboard_row.json",
+  "design/catalogue/news_item.json",
+  "design/catalogue/calendar_event.json",
+  "design/catalogue/company.json"
+ ],
+ "as_of": "2026-10-06",
+ "cutoff": "2026-10-07T12:00:00Z",
+ "built_at": "2026-10-07T11:58:00Z",
+ "markets": {
+  "india": {
+   "market": "india",
+   "name": "India (NSE)",
+   "currency": "INR",
+   "as_of": "2026-10-06",
+   "cutoff": "2026-10-07T12:00:00Z",
+   "built_at": "2026-10-07T10:31:00Z",
+   "status": {
+    "market": "india",
+    "name": "India (NSE)",
+    "as_of": "2026-10-06",
+    "currency": "INR",
+    "session": {
+     "local_time": "2026-10-07T17:30+05:30",
+     "trading_day": true,
+     "session_date": "2026-10-07",
+     "previous_session": "2026-10-06",
+     "calendar_covered": true,
+     "session_open_utc": "2026-10-07T03:45:00+00:00",
+     "session_close_utc": "2026-10-07T10:00:00+00:00",
+     "in_session": false,
+     "late_run": true
+    },
+    "benchmark": {
+     "symbol": "NIFTY50",
+     "name": "Nifty 50",
+     "close": 22776.0996,
+     "close_date": "2026-10-06",
+     "change_pct": 0.98,
+     "change_5d_pct": -0.02
+    },
+    "vol_index": {
+     "symbol": "INDIAVIX",
+     "name": "India VIX",
+     "close": 13.61,
+     "close_date": "2026-10-06",
+     "change_pct": -7.92,
+     "change_5d_pct": -0.22
+    },
+    "regime": "EVENT_HEAVY",
+    "runs": {
+     "pre_open": {
+      "at": "2026-10-07T02:10:00Z",
+      "ok": true
+     },
+     "intraday": [
+      {
+       "at": "2026-10-07T05:43:00Z",
+       "ok": true
+      }
+     ],
+     "post_close": {
+      "at": null,
+      "ok": null,
+      "next_at": "2026-10-07T12:15:00Z"
+     },
+     "news": {
+      "at": "2026-10-07T10:17:00Z",
+      "ok": true,
+      "new_items": 37
+     }
+    },
+    "freshness": {
+     "state": "fresh",
+     "built_at": "2026-10-07T10:31:00Z",
+     "age_minutes": 29
+    },
+    "paper_label": "Paper only - no proven edge yet"
+   },
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "default_horizon": 1,
+   "go_live": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 294,
+    "beats_best_baseline": false
+   },
+   "window": {
+    "days": 3,
+    "from": "2026-10-04T12:00:00Z",
+    "to": "2026-10-07T12:00:00Z",
+    "max_items": 50,
+    "stored_in_window": 1,
+    "older_hidden": 1
+   },
+   "news": [
+    {
+     "id": "nse-ann-7790412",
+     "market": "india",
+     "tickers": [
+      "RELIANCE"
+     ],
+     "primary_tickers": [
+      "RELIANCE"
+     ],
+     "title": "Reliance Industries: retail subsidiary allots shares to investors (exchange filing)",
+     "source": "NSE announcement",
+     "source_domain": "nseindia.com",
+     "url": "https://nsearchives.nseindia.com/example-2.pdf",
+     "published_at": "2026-10-05T09:05:00Z",
+     "first_seen_at": "2026-10-05T09:20:00Z",
+     "status": "confirmed_primary",
+     "status_as_of": "2026-10-05T09:30:00Z",
+     "independent_origins": 1,
+     "primary_ids": [
+      "nse-ann-7790412"
+     ],
+     "cluster_id": "reliance-20261005-allotment",
+     "enrichment": {
+      "event_type": "ma",
+      "materiality": "high",
+      "sentiment": 0.4,
+      "relevance": 0.95,
+      "novelty": 0.7,
+      "urgency": "medium",
+      "priced_in": false,
+      "analyzed_at": "2026-10-06T02:00:00Z"
+     }
+    }
+   ],
+   "calendar": [
+    {
+     "market": "india",
+     "date": "2026-10-07",
+     "type": "rbi_policy",
+     "name": "RBI policy decision",
+     "ticker": null,
+     "timing": null,
+     "reaction_sessions": null,
+     "major": true,
+     "widens": "market",
+     "provisional": false,
+     "release": null,
+     "source": "config/events.yaml",
+     "event_id": null
+    },
+    {
+     "market": "india",
+     "date": "2026-10-08",
+     "type": "earnings",
+     "name": "Tata Consultancy Services results",
+     "ticker": "TCS",
+     "timing": null,
+     "reaction_sessions": [
+      "2026-10-08",
+      "2026-10-09"
+     ],
+     "major": false,
+     "widens": "company",
+     "provisional": false,
+     "release": null,
+     "source": "events (yfinance)",
+     "event_id": "TCS-earnings-2026-10-08"
+    },
+    {
+     "market": "india",
+     "date": "2026-10-13",
+     "type": "weekly_expiry",
+     "name": "Nifty weekly options expiry (Tuesday)",
+     "ticker": null,
+     "timing": null,
+     "reaction_sessions": null,
+     "major": false,
+     "widens": null,
+     "provisional": false,
+     "release": null,
+     "source": "config/events.yaml",
+     "event_id": null
+    }
+   ],
+   "calendar_days": 7,
+   "companies": [
+    {
+     "market": "india",
+     "ticker": "HDFCBANK",
+     "name": "HDFC Bank",
+     "sector": "Banks",
+     "state": "active",
+     "open_trades": 4
+    },
+    {
+     "market": "india",
+     "ticker": "INDIGO",
+     "name": "InterGlobe Aviation (IndiGo)",
+     "sector": "Transport",
+     "state": "inactive",
+     "open_trades": 0
+    },
+    {
+     "market": "india",
+     "ticker": "MARUTI",
+     "name": "Maruti Suzuki",
+     "sector": "Autos",
+     "state": "active",
+     "open_trades": 0
+    },
+    {
+     "market": "india",
+     "ticker": "RELIANCE",
+     "name": "Reliance Industries",
+     "sector": "Energy",
+     "state": "active",
+     "open_trades": 10
+    }
+   ]
+  },
+  "us": {
+   "market": "us",
+   "name": "US (NYSE/Nasdaq)",
+   "currency": "USD",
+   "as_of": "2026-10-06",
+   "cutoff": "2026-10-07T12:00:00Z",
+   "built_at": "2026-10-07T11:58:00Z",
+   "status": {
+    "market": "us",
+    "name": "US (NYSE/Nasdaq)",
+    "as_of": "2026-10-06",
+    "currency": "USD",
+    "session": {
+     "local_time": "2026-10-07T08:00-04:00",
+     "trading_day": true,
+     "session_date": "2026-10-07",
+     "previous_session": "2026-10-06",
+     "calendar_covered": true,
+     "session_open_utc": "2026-10-07T13:30:00+00:00",
+     "session_close_utc": "2026-10-07T20:00:00+00:00",
+     "in_session": false,
+     "late_run": false
+    },
+    "benchmark": {
+     "symbol": "SPY",
+     "name": "S&P 500 ETF",
+     "close": 779.09,
+     "close_date": "2026-10-06",
+     "change_pct": 0.55,
+     "change_5d_pct": 1.95
+    },
+    "vol_index": {
+     "symbol": "VIX",
+     "name": "VIX",
+     "close": 15.01,
+     "close_date": "2026-10-06",
+     "change_pct": -3.29,
+     "change_5d_pct": -6.42
+    },
+    "regime": "TRENDING",
+    "runs": {
+     "pre_open": {
+      "at": "2026-10-07T11:45:00Z",
+      "ok": true
+     },
+     "intraday": [],
+     "post_close": {
+      "at": null,
+      "ok": null,
+      "next_at": "2026-10-07T22:15:00Z"
+     },
+     "news": {
+      "at": "2026-10-07T08:47:00Z",
+      "ok": true,
+      "new_items": 52
+     }
+    },
+    "freshness": {
+     "state": "fresh",
+     "built_at": "2026-10-07T11:58:00Z",
+     "age_minutes": 2
+    },
+    "paper_label": "Paper only - no proven edge yet"
+   },
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "default_horizon": 1,
+   "go_live": {
+    "proven": false,
+    "months_forward": 0.2,
+    "trades_needed": 290,
+    "beats_best_baseline": false
+   },
+   "window": {
+    "days": 3,
+    "from": "2026-10-04T12:00:00Z",
+    "to": "2026-10-07T12:00:00Z",
+    "max_items": 50,
+    "stored_in_window": 1,
+    "older_hidden": 2
+   },
+   "news": [
+    {
+     "id": "c0d2e4f6a8b1c3d5",
+     "market": "us",
+     "tickers": [
+      "JPM"
+     ],
+     "primary_tickers": [
+      "JPM"
+     ],
+     "title": "JPMorgan said to weigh sale of payments unit stake",
+     "source": "Example Business Wire Blog",
+     "source_domain": "example-blog.com",
+     "url": "https://example-blog.com/jpm",
+     "published_at": "2026-10-06T15:00:00Z",
+     "first_seen_at": "2026-10-06T16:47:00Z",
+     "status": "rumour",
+     "status_as_of": "2026-10-07T11:15:00Z",
+     "independent_origins": 0,
+     "primary_ids": [],
+     "cluster_id": "jpm-20261006-stake",
+     "enrichment": {
+      "event_type": "ma",
+      "materiality": "medium",
+      "sentiment": 0.2,
+      "relevance": 0.7,
+      "novelty": 0.7,
+      "urgency": "low",
+      "priced_in": false,
+      "analyzed_at": "2026-10-07T11:20:00Z"
+     }
+    }
+   ],
+   "calendar": [
+    {
+     "market": "us",
+     "date": "2026-10-13",
+     "type": "earnings",
+     "name": "JPMorgan results",
+     "ticker": "JPM",
+     "timing": null,
+     "reaction_sessions": [
+      "2026-10-13",
+      "2026-10-14"
+     ],
+     "major": false,
+     "widens": "company",
+     "provisional": false,
+     "release": null,
+     "source": "events (yfinance)",
+     "event_id": "JPM-earnings-2026-10-13"
+    },
+    {
+     "market": "us",
+     "date": "2026-10-14",
+     "type": "cpi",
+     "name": "US CPI (September)",
+     "ticker": null,
+     "timing": null,
+     "reaction_sessions": null,
+     "major": true,
+     "widens": "market",
+     "provisional": false,
+     "release": "08:30 ET",
+     "source": "config/events.yaml",
+     "event_id": null
+    },
+    {
+     "market": "us",
+     "date": "2026-10-14",
+     "type": "earnings",
+     "name": "Bank of America results",
+     "ticker": "BAC",
+     "timing": null,
+     "reaction_sessions": [
+      "2026-10-14",
+      "2026-10-15"
+     ],
+     "major": false,
+     "widens": "company",
+     "provisional": false,
+     "release": null,
+     "source": "events (yfinance)",
+     "event_id": "BAC-earnings-2026-10-14"
+    },
+    {
+     "market": "us",
+     "date": "2026-10-14",
+     "type": "earnings",
+     "name": "Progressive results",
+     "ticker": "PGR",
+     "timing": null,
+     "reaction_sessions": [
+      "2026-10-14",
+      "2026-10-15"
+     ],
+     "major": false,
+     "widens": "company",
+     "provisional": false,
+     "release": null,
+     "source": "events (yfinance)",
+     "event_id": "PGR-earnings-2026-10-14"
+    }
+   ],
+   "calendar_days": 7,
+   "companies": [
+    {
+     "market": "us",
+     "ticker": "AAPL",
+     "name": "Apple",
+     "sector": "Tech",
+     "state": "active",
+     "open_trades": 4
+    },
+    {
+     "market": "us",
+     "ticker": "DAL",
+     "name": "Delta Air Lines",
+     "sector": "Airlines",
+     "state": "inactive",
+     "open_trades": 0
+    },
+    {
+     "market": "us",
+     "ticker": "JPM",
+     "name": "JPMorgan",
+     "sector": "Banks",
+     "state": "active",
+     "open_trades": 3
+    },
+    {
+     "market": "us",
+     "ticker": "NVDA",
+     "name": "Nvidia",
+     "sector": "Tech",
+     "state": "active",
+     "open_trades": 6
+    }
+   ]
+  }
+ },
+ "_data_requests": [
+  "market-wide news items (no ticker; scope market; rates, CPI/jobs, commodities, geopolitics, index moves anywhere) with a region, a one-or-two-line summary per item (the stored key sentences where the page was read), about 30 items per market in the 3-day window with at least 12 in the last 24 hours and the full mix of statuses, and if cheap an engine-side market_moving flag: sent to W1 as data request 8 on 2026-10-08; until then the page ranks the movers itself (market-wide first, then watchlist results, then high materiality, then newest) and shows the headline without a summary line"
+ ]
+}

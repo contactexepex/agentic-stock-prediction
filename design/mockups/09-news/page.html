@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market brief · Companies</title>
-<meta name="description" content="Companies page of the personal stock cockpit: the watchlist as data. Active companies with price, amount per paper trade and actions; inactive companies with their price and news since, and Reactivate; pending and recent requests; the lifecycle history. Add, deactivate, reactivate, change the amount, delete with a typed confirmation. Research only.">
+<title>Market brief · News</title>
+<meta name="description" content="News page of the personal stock cockpit: the market movers of the last three days first, then every story of the window newest first with its verification status, each with a link to the original article; the coming week's calendar and the news per company beside it. Research only.">
 <style>
 /* market-brief cockpit: design tokens, scheme v2 "modern admin light" (2026-10-08).
    The owner asked for the look of modern admin templates (Pixinvent Materialize with its semi-dark vertical
@@ -573,39 +573,49 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
 
 </style>
 <style>
-/* Companies mockup (design track, SPEC section 6 page 10). Page-local layout only; every colour is a token. */
-.co td{vertical-align:middle}
-.co .nm{display:flex;align-items:center;gap:10px;min-width:0} .co .nm .t{min-width:0} .co .nm b{display:block;font-size:14px} .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere} .co .nm small.ph,.co .nm small.ph2{display:none}
-.co .last b{display:block;font-weight:600} .co .last .mb-delta{font-size:12.5px}
-.co .amt b{font-weight:600} .co .amt .mb-label{font-size:10.5px;padding:0 5px;margin-left:4px}
-.co .acts{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end} .co .acts .md-btn{height:30px;padding:0 10px;font-size:12px} .co .acts .md-btn .ms{width:16px;height:16px;margin-left:-2px}
-.co .acts .md-btn.danger{color:var(--mb-color-down)} .co .acts .md-btn.one{display:none}
-.ev{list-style:none;margin:0;padding:0;display:grid;gap:2px}
-.ev li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
-.ev li:first-child{border-top:0}
-.ev .when{font-size:12px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;padding-top:2px;width:92px}
-.ev .what{min-width:0;overflow-wrap:anywhere} .ev .what small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:2px}
-.ev .mb-label{font-size:11px;padding:1px 6px}
-.cmd code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere;display:inline-block;vertical-align:middle;max-width:100%}
-.pend{display:grid;gap:6px;margin-top:10px}
-.addbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
-dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(500px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
-dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
-dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
-dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
-dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
-dialog .dbody input,dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
-dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
-dialog .summ{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);font-size:13px;display:grid;gap:4px}
-dialog .summ .r{display:grid;grid-template-columns:110px 1fr;gap:8px} dialog .summ .r span:first-child{color:var(--md-sys-color-on-surface-variant)}
-dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13px} dialog .warn .ms{flex:none;width:18px;height:18px;margin-top:1px}
-@media (max-width:1359px){ .co .c3{display:none} }
-@media (max-width:1439px){ .co th,.co td{padding:8px 8px} }
-@media (max-width:1199px){ .co .cw{display:none} .co .acts .md-btn span{display:none} .co .acts .md-btn{padding:0 8px} .co .acts .md-btn .ms{margin:0} .co .acts{flex-wrap:nowrap} }
-@media (max-width:900px){ .co .cm{display:none} .co .acts .md-btn.one{display:inline-flex} .co .acts .md-btn.many{display:none} .co .nm small.ph2{display:block} }
-@media (max-width:760px){ .co th,.co td{padding:8px 6px;white-space:normal} .co .nm .mb-avatar{display:none} .co .acts{justify-content:flex-start} .ev li{grid-template-columns:1fr} .ev .when{width:auto} }
-@media (max-width:599px){ dialog .row2{grid-template-columns:1fr} .co .cp{display:none} .co .nm small.ph{display:block} .co th,.co td{padding:8px 4px} }
+/* News mockup (design track, SPEC section 6 page 9; the owner's rules of 2026-10-08). Page-local layout only; every colour is a token. */
+.mv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mv .it{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:10px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.mv .rk{font:700 13px/1 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);width:22px;height:22px;border-radius:50%;background:var(--md-sys-color-surface-container-highest);display:flex;align-items:center;justify-content:center}
+.ni{min-width:0}
+.ni .kind{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);margin-right:6px}
+.ni .kind.mkt{color:var(--md-sys-color-primary)}
+.ni h3{font-size:14.5px;line-height:1.35;margin:2px 0 3px;font-weight:600}
+.ni h3 a{color:inherit;text-decoration:none} .ni h3 a:hover,.ni h3 a:focus-visible{text-decoration:underline}
+.ni .sum{font-size:13px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);margin:0 0 4px}
+.ni .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.ni .meta .tk{display:inline-block}
+.ni .go{display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--md-sys-color-primary);text-decoration:none;white-space:nowrap}
+.ni .go:hover,.ni .go:focus-visible{text-decoration:underline}
+/* the feed */
+.feed{display:grid;gap:0}
+.day{position:sticky;top:0;z-index:1;background:var(--md-sys-color-surface);padding:10px 0 6px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.day b{color:var(--md-sys-color-on-surface)}
+.row{display:grid;grid-template-columns:58px auto 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);align-items:start;min-width:0}
+.row .tm{font-size:12px;color:var(--md-sys-color-on-surface-variant);font-variant-numeric:tabular-nums;padding-top:2px}
+.row .mb-dir{margin-top:1px}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant)}
+.pager .pg{display:flex;gap:4px;flex-wrap:wrap}
+.pager .pg button[aria-current="page"]{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent}
+/* the rail */
+.cal{display:grid;gap:8px}
+.cal .ev{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:start;min-width:0}
+.cal .d{font-size:12px;line-height:1.2;color:var(--md-sys-color-on-surface-variant);text-align:center;background:var(--md-sys-color-surface-container-low);border-radius:8px;padding:5px 0}
+.cal .d b{display:block;font-size:15px;color:var(--md-sys-color-on-surface)}
+.cal .ev.major .d{background:var(--mb-color-warn-container)}
+.cal .nm{font-size:13.5px;line-height:1.35} .cal .sub{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
+.cos{display:grid;gap:6px}
+.cos .co{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.cos .co:last-child{border-bottom:0}
+.cos .co .nm{font-size:13px;min-width:0} .cos .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;line-height:1.35;margin-top:2px}
+.cos .mix{display:flex;height:8px;width:64px;border-radius:4px;overflow:hidden;background:var(--md-sys-color-surface-container-highest)}
+.cos .mix i{display:block;height:100%} .cos .mix i.up{background:var(--mb-color-up)} .cos .mix i.dn{background:var(--mb-color-down)} .cos .mix i.flat{background:var(--mb-chart-axis)}
+.cos .ct{font-weight:700;font-variant-numeric:tabular-nums;font-size:13px}
+.empty{font-size:13.5px;color:var(--md-sys-color-on-surface-variant);line-height:1.5}
+.grid.news{grid-template-columns:minmax(0,8fr) minmax(0,4fr)}
+@media (max-width:1000px){ .grid.news{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){ .mv{grid-template-columns:1fr} }
+@media (max-width:599px){ .row{grid-template-columns:auto 1fr} .row .tm{grid-column:1 / -1;padding-top:0} }
 </style>
 </head>
 <body>
@@ -662,7 +672,7 @@ dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;borde
   <div class="mb-scrim" id="scrim"></div>
   <header class="mb-topbar" id="topbar">
     <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
-    <div class="mb-topbar-title" id="title">Companies</div>
+    <div class="mb-topbar-title" id="title">News</div>
     <div class="mb-topbar-actions">
       <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
       <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
@@ -671,9 +681,8 @@ dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;borde
   <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
   <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
 </div>
-<dialog class="md-dialog" id="dlg"></dialog>
 
-<script>const D = {"_example": true, "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.", "page": "companies", "spec": "docs/SPEC.md section 6, page 10; F8, F10; decisions 12-15, 20, 26, 33, 44", "endpoint": "GET /api/v1/markets/{market}/companies", "read_model": "rm.companies", "sources": ["design/catalogue/market_status.json", "design/catalogue/company.json", "design/catalogue/lifecycle_event.json", "design/catalogue/command_log.json", "design/catalogue/news_item.json", "design/catalogue/portfolio.json", "design/catalogue/scoreboard_row.json"], "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "markets": {"india": {"market": "india", "name": "India (NSE)", "currency": "INR", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T10:31:00Z", "status": {"market": "india", "name": "India (NSE)", "as_of": "2026-10-06", "currency": "INR", "session": {"local_time": "2026-10-07T17:30+05:30", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00", "in_session": false, "late_run": true}, "benchmark": {"symbol": "NIFTY50", "name": "Nifty 50", "close": 22776.0996, "close_date": "2026-10-06", "change_pct": 0.98, "change_5d_pct": -0.02}, "vol_index": {"symbol": "INDIAVIX", "name": "India VIX", "close": 13.61, "close_date": "2026-10-06", "change_pct": -7.92, "change_5d_pct": -0.22}, "regime": "EVENT_HEAVY", "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": true}, "intraday": [{"at": "2026-10-07T05:43:00Z", "ok": true}], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T12:15:00Z"}, "news": {"at": "2026-10-07T10:17:00Z", "ok": true, "new_items": 37}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T10:31:00Z", "age_minutes": 29}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 294, "beats_best_baseline": false}, "default_amount": 100000.0, "companies": [{"market": "india", "ticker": "HDFCBANK", "name": "HDFC Bank", "exchange": "NSE", "sector": "Banks", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "yahoo": "HDFCBANK.NS", "nse_symbol": "HDFCBANK", "cik": null, "last_close": 711.45, "last_close_date": "2026-10-06", "change_pct": 0.94, "agreement_n1": {"buy": 2, "of": 15}, "open_trades": 4}, {"market": "india", "ticker": "MARUTI", "name": "Maruti Suzuki", "exchange": "NSE", "sector": "Autos", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 10000.0, "amount_overridden": true, "currency": "INR", "yahoo": "MARUTI.NS", "nse_symbol": "MARUTI", "cik": null, "last_close": 11625.0, "last_close_date": "2026-10-06", "change_pct": 0.81, "agreement_n1": {"buy": 8, "of": 15}, "open_trades": 0}, {"market": "india", "ticker": "RELIANCE", "name": "Reliance Industries", "exchange": "NSE", "sector": "Energy", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "yahoo": "RELIANCE.NS", "nse_symbol": "RELIANCE", "cik": null, "last_close": 1218.0, "last_close_date": "2026-10-06", "change_pct": 2.66, "agreement_n1": {"buy": 12, "of": 15}, "open_trades": 10}, {"market": "india", "ticker": "INDIGO", "name": "InterGlobe Aviation (IndiGo)", "exchange": "NSE", "sector": "Transport", "state": "inactive", "state_since": "2026-10-05T02:10:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 100000.0, "amount_overridden": false, "currency": "INR", "yahoo": "INDIGO.NS", "nse_symbol": "INDIGO", "cik": null, "last_close": 5050.5, "last_close_date": "2026-10-06", "change_pct": null, "agreement_n1": null, "open_trades": 0}], "lifecycle": [{"id": "we-india-INDIGO-deactivate-20261002T091800Z", "event": "deactivate", "ticker": "INDIGO", "market": "india", "effective_from": "2026-10-05T02:10:00Z", "recorded_at": "2026-10-02T09:18:00Z", "name": null, "exchange": null, "sector": null, "amount": null, "reason": "pause airlines", "requested_by": "slack:U07ABCD123", "channel": "slack", "command_id": "cmd-20261002T091800Z-22018a94", "idempotency_key": "deact-indigo-1", "onboarding": null, "supersedes": null}, {"id": "we-india-MARUTI-set_amount-20260925T091500Z", "event": "set_amount", "ticker": "MARUTI", "market": "india", "effective_from": "2026-09-28T02:10:00Z", "recorded_at": "2026-09-25T09:15:00Z", "name": null, "exchange": null, "sector": null, "amount": 10000.0, "reason": "smaller test amount", "requested_by": "dashboard:owner", "channel": "dashboard", "command_id": "cmd-20260925T091500Z-4e92e724", "idempotency_key": "amt-maruti-20260925", "onboarding": null, "supersedes": null}, {"id": "we-india-RELIANCE-add-20260924T060000Z", "event": "add", "ticker": "RELIANCE", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Reliance Industries", "exchange": "NSE", "sector": "Energy", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-RELIANCE", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-india-MARUTI-add-20260924T060000Z", "event": "add", "ticker": "MARUTI", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Maruti Suzuki", "exchange": "NSE", "sector": "Autos", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-MARUTI", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-india-INDIGO-add-20260924T060000Z", "event": "add", "ticker": "INDIGO", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "InterGlobe Aviation (IndiGo)", "exchange": "NSE", "sector": "Transport", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-INDIGO", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-india-HDFCBANK-add-20260924T060000Z", "event": "add", "ticker": "HDFCBANK", "market": "india", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "HDFC Bank", "exchange": "NSE", "sector": "Banks", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-india-HDFCBANK", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}], "commands": [], "news_inactive": [], "deleted_count": 0}, "us": {"market": "us", "name": "US (NYSE/Nasdaq)", "currency": "USD", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "status": {"market": "us", "name": "US (NYSE/Nasdaq)", "as_of": "2026-10-06", "currency": "USD", "session": {"local_time": "2026-10-07T08:00-04:00", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00", "in_session": false, "late_run": false}, "benchmark": {"symbol": "SPY", "name": "S&P 500 ETF", "close": 779.09, "close_date": "2026-10-06", "change_pct": 0.55, "change_5d_pct": 1.95}, "vol_index": {"symbol": "VIX", "name": "VIX", "close": 15.01, "close_date": "2026-10-06", "change_pct": -3.29, "change_5d_pct": -6.42}, "regime": "TRENDING", "runs": {"pre_open": {"at": "2026-10-07T11:45:00Z", "ok": true}, "intraday": [], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T22:15:00Z"}, "news": {"at": "2026-10-07T08:47:00Z", "ok": true, "new_items": 52}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T11:58:00Z", "age_minutes": 2}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 290, "beats_best_baseline": false}, "default_amount": 1000.0, "companies": [{"market": "us", "ticker": "AAPL", "name": "Apple", "exchange": "NASDAQ", "sector": "Tech", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "AAPL", "nse_symbol": null, "cik": "0000320193", "last_close": 333.63, "last_close_date": "2026-10-06", "change_pct": 0.22, "agreement_n1": {"buy": 3, "of": 15}, "open_trades": 4}, {"market": "us", "ticker": "JPM", "name": "JPMorgan", "exchange": "NYSE", "sector": "Banks", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "JPM", "nse_symbol": null, "cik": "0000019617", "last_close": 331.28, "last_close_date": "2026-10-06", "change_pct": -0.33, "agreement_n1": {"buy": 8, "of": 15}, "open_trades": 3}, {"market": "us", "ticker": "NVDA", "name": "Nvidia", "exchange": "NASDAQ", "sector": "Tech", "state": "active", "state_since": "2011-01-03T00:00:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "NVDA", "nse_symbol": null, "cik": "0001045810", "last_close": 239.24, "last_close_date": "2026-10-06", "change_pct": 0.14, "agreement_n1": {"buy": 14, "of": 15}, "open_trades": 6}, {"market": "us", "ticker": "DAL", "name": "Delta Air Lines", "exchange": "NYSE", "sector": "Airlines", "state": "inactive", "state_since": "2026-10-05T11:45:00Z", "added_at": "2011-01-03T00:00:00Z", "amount": 1000.0, "amount_overridden": false, "currency": "USD", "yahoo": "DAL", "nse_symbol": null, "cik": "0000027904", "last_close": 83.66, "last_close_date": "2026-10-06", "change_pct": null, "agreement_n1": null, "open_trades": 0}], "lifecycle": [{"id": "we-us-DAL-deactivate-20261002T200000Z", "event": "deactivate", "ticker": "DAL", "market": "us", "effective_from": "2026-10-05T11:45:00Z", "recorded_at": "2026-10-02T20:00:00Z", "name": null, "exchange": null, "sector": null, "amount": null, "reason": "pause airlines", "requested_by": "dashboard:owner", "channel": "dashboard", "command_id": "cmd-20261002T200000Z-597d6a7f", "idempotency_key": "deact-dal-1", "onboarding": null, "supersedes": null}, {"id": "we-us-NVDA-add-20260924T060000Z", "event": "add", "ticker": "NVDA", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Nvidia", "exchange": "NASDAQ", "sector": "Tech", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-NVDA", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-us-JPM-add-20260924T060000Z", "event": "add", "ticker": "JPM", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "JPMorgan", "exchange": "NYSE", "sector": "Banks", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-JPM", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-us-DAL-add-20260924T060000Z", "event": "add", "ticker": "DAL", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Delta Air Lines", "exchange": "NYSE", "sector": "Airlines", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-DAL", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}, {"id": "we-us-AAPL-add-20260924T060000Z", "event": "add", "ticker": "AAPL", "market": "us", "effective_from": "2011-01-03T00:00:00Z", "recorded_at": "2026-09-24T06:00:00Z", "name": "Apple", "exchange": "NASDAQ", "sector": "Tech", "amount": null, "reason": "seeded from config/markets", "requested_by": "cli:session", "channel": "seed", "command_id": null, "idempotency_key": "seed-us-AAPL", "onboarding": {"identifiers": "skipped", "backfill": "skipped", "collect_gate": "skipped"}, "supersedes": null}], "commands": [{"id": "cmd-20261006T151000Z-3ffb1995", "market": "us", "received_at": "2026-10-06T15:10:00Z", "channel": "slack", "actor": "slack:U07ABCD123", "agent": "slack-gateway", "tool": "delete_company", "kind": "write", "arguments": {"market": "us", "ticker": "DAL"}, "idempotency_key": "del-dal-x", "result": "refused", "refusal_code": "not_allowed_in_channel", "message": "Delete is only available on the dashboard", "record_ids": [], "budget_left": 17, "completed_at": "2026-10-06T15:10:00Z"}, {"id": "cmd-20261005T140500Z-73abce0f", "market": "us", "received_at": "2026-10-05T14:05:00Z", "channel": "slack", "actor": "slack:U07ABCD123", "agent": "slack-gateway", "tool": "add_company", "kind": "write", "arguments": {"market": "us", "symbol": "SPY"}, "idempotency_key": "add-spy-1", "result": "refused", "refusal_code": "validation_failed", "message": "SPY is an ETF; only common stocks can be added", "record_ids": [], "budget_left": 18, "completed_at": "2026-10-05T14:05:02Z"}, {"id": "cmd-20261005T135500Z-052b8228", "market": "us", "received_at": "2026-10-05T13:55:00Z", "channel": "slack", "actor": "slack:U07ABCD123", "agent": "slack-gateway", "tool": "add_company", "kind": "write", "arguments": {"market": "us", "symbol": "(deleted company)"}, "idempotency_key": "(masked)", "result": "accepted", "refusal_code": null, "message": "(this company was deleted later; its records are excluded on read)", "record_ids": ["(masked)"], "budget_left": 19, "completed_at": "2026-10-05T14:02:00Z"}], "news_inactive": [], "deleted_count": 1}}};</script>
+<script>const D = {"_example": true, "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.", "page": "news", "spec": "docs/SPEC.md section 6, page 9; owner's rules of 2026-10-08", "endpoint": "GET /api/v1/markets/{market}/news", "read_model": "rm.news", "sources": ["design/catalogue/market_status.json", "design/catalogue/scoreboard_row.json", "design/catalogue/news_item.json", "design/catalogue/calendar_event.json", "design/catalogue/company.json"], "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "markets": {"india": {"market": "india", "name": "India (NSE)", "currency": "INR", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T10:31:00Z", "status": {"market": "india", "name": "India (NSE)", "as_of": "2026-10-06", "currency": "INR", "session": {"local_time": "2026-10-07T17:30+05:30", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00", "in_session": false, "late_run": true}, "benchmark": {"symbol": "NIFTY50", "name": "Nifty 50", "close": 22776.0996, "close_date": "2026-10-06", "change_pct": 0.98, "change_5d_pct": -0.02}, "vol_index": {"symbol": "INDIAVIX", "name": "India VIX", "close": 13.61, "close_date": "2026-10-06", "change_pct": -7.92, "change_5d_pct": -0.22}, "regime": "EVENT_HEAVY", "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": true}, "intraday": [{"at": "2026-10-07T05:43:00Z", "ok": true}], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T12:15:00Z"}, "news": {"at": "2026-10-07T10:17:00Z", "ok": true, "new_items": 37}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T10:31:00Z", "age_minutes": 29}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 294, "beats_best_baseline": false}, "window": {"days": 3, "from": "2026-10-04T12:00:00Z", "to": "2026-10-07T12:00:00Z", "max_items": 50, "stored_in_window": 1, "older_hidden": 1}, "news": [{"id": "nse-ann-7790412", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Reliance Industries: retail subsidiary allots shares to investors (exchange filing)", "source": "NSE announcement", "source_domain": "nseindia.com", "url": "https://nsearchives.nseindia.com/example-2.pdf", "published_at": "2026-10-05T09:05:00Z", "first_seen_at": "2026-10-05T09:20:00Z", "status": "confirmed_primary", "status_as_of": "2026-10-05T09:30:00Z", "independent_origins": 1, "primary_ids": ["nse-ann-7790412"], "cluster_id": "reliance-20261005-allotment", "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.4, "relevance": 0.95, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-06T02:00:00Z"}}], "calendar": [{"market": "india", "date": "2026-10-07", "type": "rbi_policy", "name": "RBI policy decision", "ticker": null, "timing": null, "reaction_sessions": null, "major": true, "widens": "market", "provisional": false, "release": null, "source": "config/events.yaml", "event_id": null}, {"market": "india", "date": "2026-10-08", "type": "earnings", "name": "Tata Consultancy Services results", "ticker": "TCS", "timing": null, "reaction_sessions": ["2026-10-08", "2026-10-09"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "TCS-earnings-2026-10-08"}, {"market": "india", "date": "2026-10-13", "type": "weekly_expiry", "name": "Nifty weekly options expiry (Tuesday)", "ticker": null, "timing": null, "reaction_sessions": null, "major": false, "widens": null, "provisional": false, "release": null, "source": "config/events.yaml", "event_id": null}], "calendar_days": 7, "companies": [{"market": "india", "ticker": "HDFCBANK", "name": "HDFC Bank", "sector": "Banks", "state": "active", "open_trades": 4}, {"market": "india", "ticker": "INDIGO", "name": "InterGlobe Aviation (IndiGo)", "sector": "Transport", "state": "inactive", "open_trades": 0}, {"market": "india", "ticker": "MARUTI", "name": "Maruti Suzuki", "sector": "Autos", "state": "active", "open_trades": 0}, {"market": "india", "ticker": "RELIANCE", "name": "Reliance Industries", "sector": "Energy", "state": "active", "open_trades": 10}]}, "us": {"market": "us", "name": "US (NYSE/Nasdaq)", "currency": "USD", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "status": {"market": "us", "name": "US (NYSE/Nasdaq)", "as_of": "2026-10-06", "currency": "USD", "session": {"local_time": "2026-10-07T08:00-04:00", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00", "in_session": false, "late_run": false}, "benchmark": {"symbol": "SPY", "name": "S&P 500 ETF", "close": 779.09, "close_date": "2026-10-06", "change_pct": 0.55, "change_5d_pct": 1.95}, "vol_index": {"symbol": "VIX", "name": "VIX", "close": 15.01, "close_date": "2026-10-06", "change_pct": -3.29, "change_5d_pct": -6.42}, "regime": "TRENDING", "runs": {"pre_open": {"at": "2026-10-07T11:45:00Z", "ok": true}, "intraday": [], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T22:15:00Z"}, "news": {"at": "2026-10-07T08:47:00Z", "ok": true, "new_items": 52}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T11:58:00Z", "age_minutes": 2}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 290, "beats_best_baseline": false}, "window": {"days": 3, "from": "2026-10-04T12:00:00Z", "to": "2026-10-07T12:00:00Z", "max_items": 50, "stored_in_window": 1, "older_hidden": 2}, "news": [{"id": "c0d2e4f6a8b1c3d5", "market": "us", "tickers": ["JPM"], "primary_tickers": ["JPM"], "title": "JPMorgan said to weigh sale of payments unit stake", "source": "Example Business Wire Blog", "source_domain": "example-blog.com", "url": "https://example-blog.com/jpm", "published_at": "2026-10-06T15:00:00Z", "first_seen_at": "2026-10-06T16:47:00Z", "status": "rumour", "status_as_of": "2026-10-07T11:15:00Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "jpm-20261006-stake", "enrichment": {"event_type": "ma", "materiality": "medium", "sentiment": 0.2, "relevance": 0.7, "novelty": 0.7, "urgency": "low", "priced_in": false, "analyzed_at": "2026-10-07T11:20:00Z"}}], "calendar": [{"market": "us", "date": "2026-10-13", "type": "earnings", "name": "JPMorgan results", "ticker": "JPM", "timing": null, "reaction_sessions": ["2026-10-13", "2026-10-14"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "JPM-earnings-2026-10-13"}, {"market": "us", "date": "2026-10-14", "type": "cpi", "name": "US CPI (September)", "ticker": null, "timing": null, "reaction_sessions": null, "major": true, "widens": "market", "provisional": false, "release": "08:30 ET", "source": "config/events.yaml", "event_id": null}, {"market": "us", "date": "2026-10-14", "type": "earnings", "name": "Bank of America results", "ticker": "BAC", "timing": null, "reaction_sessions": ["2026-10-14", "2026-10-15"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "BAC-earnings-2026-10-14"}, {"market": "us", "date": "2026-10-14", "type": "earnings", "name": "Progressive results", "ticker": "PGR", "timing": null, "reaction_sessions": ["2026-10-14", "2026-10-15"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "PGR-earnings-2026-10-14"}], "calendar_days": 7, "companies": [{"market": "us", "ticker": "AAPL", "name": "Apple", "sector": "Tech", "state": "active", "open_trades": 4}, {"market": "us", "ticker": "DAL", "name": "Delta Air Lines", "sector": "Airlines", "state": "inactive", "open_trades": 0}, {"market": "us", "ticker": "JPM", "name": "JPMorgan", "sector": "Banks", "state": "active", "open_trades": 3}, {"market": "us", "ticker": "NVDA", "name": "Nvidia", "sector": "Tech", "state": "active", "open_trades": 6}]}}, "_data_requests": ["market-wide news items (no ticker; scope market; rates, CPI/jobs, commodities, geopolitics, index moves anywhere) with a region, a one-or-two-line summary per item (the stored key sentences where the page was read), about 30 items per market in the 3-day window with at least 12 in the last 24 hours and the full mix of statuses, and if cheap an engine-side market_moving flag: sent to W1 as data request 8 on 2026-10-08; until then the page ranks the movers itself (market-wide first, then watchlist results, then high materiality, then newest) and shows the headline without a summary line"]};</script>
 <script>
 /* Shared script of the design-track mockups: DOM helpers, formatters, the app shell (sidebar, top bar, phone
    drawer and bar), the tooltip, the page head and small visual parts (odds meter, icon tile, family label, range
@@ -824,152 +833,140 @@ function footer(m, endpoint) { const p = P(m); return el('footer', {}, `Personal
 
 </script>
 <script>
-let pending = {};
-shell(PAGES.companies, 'Companies', {bar: [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['apartment','Companies',PAGES.companies], ['science','Strategy lab',PAGES.lab]]});
-onMarketChange = () => render();
-const CHANNEL = {dashboard: 'the dashboard', slack: 'Slack', cli: 'the command line', claude_app: 'the Claude app', claude_code: 'Claude Code', seed: 'the seed (config)'};
-const EVENT_WORDS = {add: 'added', deactivate: 'deactivated', reactivate: 'reactivated', delete: 'deleted', set_amount: 'amount set'};
-const RESULT = {accepted: ['accepted', 'success'], pending: ['pending', 'warn'], refused: ['refused', 'danger'], duplicate: ['duplicate', 'neutral'], failed: ['failed', 'danger']};
-const TOOL = {add_company: 'add a company', deactivate_company: 'deactivate', reactivate_company: 'reactivate', set_paper_amount: 'set the paper amount', delete_company: 'delete'};
-const pendingOf = () => pending[market] || [];
+let filter = 'all', ticker = null, pageNo = 1;
+shell(PAGES.news, 'News', {bar: [NAV[0], NAV[1], NAV[6], NAV[9]]});
+onMarketChange = () => { filter = 'all'; ticker = null; pageNo = 1; render(); };
 
-function kpis(p) {
-  const cur = p.currency, active = p.companies.filter(c => c.state === 'active'), inactive = p.companies.filter(c => c.state === 'inactive');
-  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
-  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
-  K.append(card('apartment', 'success', 'Active', String(active.length), 'predicted and traded on paper every session', 'Active companies are collected, predicted and traded on paper (F8.2).'));
-  K.append(card('pending', inactive.length ? 'neutral' : '', 'Inactive', String(inactive.length), inactive.length ? `still collected, never predicted: ${inactive.map(c => c.ticker).join(', ')}` : 'none', 'Inactive companies stay collected (prices, news, filings) but get no prediction or paper trade; their open paper trades still settle (decision 13).'));
-  K.append(card('account_balance_wallet', 'paper', 'Default per paper trade', money(cur, p.default_amount), `${active.filter(c => c.amount_overridden).length} compan${active.filter(c => c.amount_overridden).length === 1 ? 'y has' : 'ies have'} a custom amount`, 'The market’s default money per paper trade (decision 26); a company can have its own amount (decision 44).'));
-  const pend = pendingOf().length + p.commands.filter(c => c.result === 'pending').length;
-  K.append(card('schedule', pend ? 'warn' : 'neutral', 'Pending requests', String(pend), pend ? 'waiting for the next import' : 'nothing waiting', 'Requests from any channel are appended to the inbox and imported by the next run (F10); until then they are pending.'));
-  return K;
+/* words for the news analyst's event types (News item enrichment.event_type) */
+const KIND = {earnings: 'results', macro: 'rates & macro', product: 'product', legal: 'legal', sector: 'sector', analyst: 'analyst', ma: 'deal', flows: 'flows', commodity: 'commodities', geopolitics: 'geopolitics', index: 'index move', regulation: 'regulation', other: 'other'};
+const MAT = {high: 3, medium: 2, low: 1};
+const scopeOf = n => n.tickers.length ? 'company' : 'market';          /* no ticker = a market-wide story */
+const hoursBefore = (p, iso) => (dt2(p.cutoff) - dt2(iso)) / 36e5;
+const dt2 = iso => new Date(iso).getTime();
+const ago = (p, iso) => { const h = hoursBefore(p, iso); return h < 1 ? 'under an hour before the cut-off' : h < 24 ? `${Math.floor(h)} h before the cut-off` : `${Math.floor(h / 24)} day${h < 48 ? '' : 's'} before the cut-off`; };
+const dayKey = (iso, m) => fmtLocal(iso, m, true).replace(/\s\d{1,2}:\d{2}.*$/, '');   /* the local date part of the shell's local time */
+const canCarry = n => CAN_CARRY.includes(n.status);
+
+/* the market movers: the engine's flag when the catalogue carries one; else market-wide first, watchlist results next, then materiality, then newest */
+function movers(p) {
+  const score = n => (scopeOf(n) === 'market' ? 100 : 0) + (n.enrichment.event_type === 'earnings' ? 50 : 0) + (MAT[n.enrichment.materiality] || 0) * 10 + (canCarry(n) ? 5 : 0);
+  return p.news.filter(n => n.enrichment.materiality === 'high' || scopeOf(n) === 'market' || n.enrichment.event_type === 'earnings')
+    .sort((a, b) => score(b) - score(a) || b.first_seen_at.localeCompare(a.first_seen_at)).slice(0, NEWS_MOVERS_MAX);
 }
 
-function activeCard(p) {
-  const cur = p.currency, rows = p.companies.filter(c => c.state === 'active');
-  const card = el('section', {class:'card', 'aria-label':'Active companies'});
-  card.append(el('div', {class:'head'}, el('h2', {}, `Active companies (${rows.length})`), help('Every company that is predicted and traded on paper. Amount = money per paper trade (the market’s default unless set for the company). Actions record a request: deactivate (takes effect at the next pre-open run; open paper trades still settle), change the amount, or delete (dashboard only, with a typed confirmation; the company is then excluded everywhere, decision 12).'), el('div', {class:'end'}, el('button', {class:'md-btn filled small', type:'button', onclick: () => addDialog(p)}, icon('ms-apartment'), 'Add company'))));
-  const tb = el('table', {class:'md-table tbl co'});
-  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {class:'num'}, 'Last close'), el('th', {class:'num cp'}, 'Per paper trade'), el('th', {class:'num cw'}, 'Buy at N+1'), el('th', {class:'num cw'}, 'Open trades'), el('th', {class:'cm'}, 'On the list since'), el('th', {class:'c3'}, 'Identifiers'), el('th', {class:'num'}, 'Actions'))));
-  const body = el('tbody');
-  for (const c of rows) {
-    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': `${c.name}: open its company page.`}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`), el('small', {class:'ph'}, `${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (custom)' : ''}`)))),
-      el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
-      el('td', {class:'num amt cp'}, el('b', {}, money(cur, c.amount)), c.amount_overridden ? el('span', {class:'mb-label neutral', 'data-tip':'Set for this company; differs from the market’s default (decision 44).'}, 'custom') : null),
-      el('td', {class:'num cw'}, el('span', {'data-tip': `${c.agreement_n1.buy} of ${c.agreement_n1.of} strategies would buy ${c.name} at N+1 today (decision 30).`}, `${c.agreement_n1.buy} of ${c.agreement_n1.of}`)),
-      el('td', {class:'num cw'}, String(c.open_trades)),
-      el('td', {class:'cm'}, el('span', {'data-tip': `Added ${fmtDY(c.added_at)}${c.added_at.startsWith('2011') ? ' (the seed: the start of stored history)' : ''}; active since ${fmtDY(c.state_since)}.`}, fmtDY(c.added_at))),
-      el('td', {class:'c3'}, el('small', {class:'muted'}, [c.yahoo ? `Yahoo ${c.yahoo}` : null, c.nse_symbol ? `NSE ${c.nse_symbol}` : null, c.cik ? `CIK ${c.cik}` : null].filter(Boolean).join(' · '))),
-      el('td', {class:'num'}, el('span', {class:'acts'}, el('button', {class:'md-btn outlined many', type:'button', 'aria-label': `Change the amount for ${c.name}`, onclick: () => amountDialog(p, c)}, icon('ms-account_balance_wallet'), el('span', {}, 'Amount')), el('button', {class:'md-btn outlined many', type:'button', 'aria-label': `Deactivate ${c.name}`, onclick: () => stateDialog(p, c, 'deactivate')}, icon('ms-pending'), el('span', {}, 'Deactivate')), el('button', {class:'md-btn outlined danger many', type:'button', 'aria-label': `Delete ${c.name}`, onclick: () => deleteDialog(p, c)}, icon('ms-close'), el('span', {}, 'Delete')), el('button', {class:'md-btn outlined one', type:'button', 'aria-label': `Manage ${c.name}`, onclick: () => manageDialog(p, c)}, icon('ms-settings'), el('span', {}, 'Manage'))))));
+function itemBody(p, n, opts = {}) {
+  const m = market, kind = KIND[n.enrichment.event_type] || n.enrichment.event_type, mkt = scopeOf(n) === 'market';
+  const body = el('div', {class:'ni'});
+  const head = el('div', {}, el('span', {class:'kind' + (mkt ? ' mkt' : ''), 'data-tip': mkt ? 'A market-wide story: no single company, it moves the whole market.' : `A company story (${n.tickers.join(', ')}).`}, icon(mkt ? 'ms-public' : 'ms-apartment'), mkt ? 'market · ' + kind : kind));
+  if (opts.time) head.append(el('span', {class:'muted', style:'font-size:12px'}, `${n.source} · ${fmtLocal(n.first_seen_at, m, true)}`));
+  body.append(head, el('h3', {}, el('a', {href: n.url, rel:'noopener', target:'_blank', 'data-tip': `Opens the article at ${n.source_domain} in a new tab. Stored here: the headline, its scores and status, never the text.`}, n.title)));
+  if (n.summary) body.append(el('p', {class:'sum'}, n.summary));
+  const meta = el('div', {class:'meta'});
+  if (!opts.time) meta.append(el('span', {}, `${n.source} · ${ago(p, n.first_seen_at)}`));
+  meta.append(statusBadge(n.status), el('span', {'data-tip': 'The news analyst’s materiality: how much the story can move the price.'}, `${n.enrichment.materiality} materiality`));
+  if (n.independent_origins > 1) meta.append(el('span', {'data-tip':'Independent vetted outlets carrying the same story (copies of one agency story count once).'}, `${n.independent_origins} outlets`));
+  for (const t of n.primary_tickers) meta.append(el('a', {class:'tk', href: companyPage(t), 'data-tip': `${(companyOf(m, t) || {name: t}).name}: open the company page`}, t));
+  meta.append(el('a', {class:'go', href: n.url, rel:'noopener', target:'_blank'}, 'Open article', icon('ms-open_in_new')));
+  body.append(meta);
+  return body;
+}
+
+function moversCard(p) {
+  const list = movers(p), card = el('section', {class:'card', 'aria-label':'Market movers'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Market movers · last ${p.window.days} days`, help(`At most ${NEWS_MOVERS_MAX} stories that can move the whole market or a watchlist company's price: market-wide stories (rates, inflation and jobs, commodities, geopolitics, an index moving sharply anywhere), the watchlist's results, and anything the news analyst scores high materiality; ranked market-wide first, results next, then materiality, then newest. The verification status says how far a story can be trusted; the Help page explains each status.`)), el('span', {class:'mb-tag paper end'}, 'paper')));
+  if (!list.length) { card.append(el('div', {class:'empty'}, `No market-moving story in the last ${p.window.days} days of the example data: ${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} stored in the window, none market-wide, none results, none scored high materiality. Market-wide items are requested from W1 (data request 8).`)); return card; }
+  const g = el('div', {class:'mv'});
+  list.forEach((n, i) => g.append(el('div', {class:'it'}, el('span', {class:'rk', 'aria-label': `rank ${i + 1}`}, String(i + 1)), itemBody(p, n))));
+  card.append(g);
+  return card;
+}
+
+function feedCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'All stories of the window'});
+  const last24 = p.news.filter(n => hoursBefore(p, n.first_seen_at) < 24).length;
+  card.append(el('div', {class:'head'}, el('h2', {}, `Last ${p.window.days} days`, help(`Every story first seen in the ${p.window.days} days before the cut-off, newest first, ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: the last 24 hours, market-wide, one company, or only stories that can carry a call (confirmed or corroborated).`)), el('span', {class:'end muted'}, `${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} · ${last24} in the last 24 h`)));
+  const bar = el('div', {class:'toolbar'});
+  const chip = (key, label, tipText) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(filter === key && !ticker), 'data-tip': tipText}, label); b.addEventListener('click', () => { filter = key; ticker = null; pageNo = 1; render(); }); return b; };
+  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', 'Last 24 h', 'First seen in the 24 hours before the cut-off.'), chip('market', 'Market-wide', 'Stories about no single company.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
+  const withNews = p.companies.filter(c => p.news.some(n => n.tickers.includes(c.ticker)));
+  if (withNews.length) { const sel = el('select', {'aria-label':'Company'}); sel.append(el('option', {value:''}, 'Company…')); for (const c of withNews) sel.append(el('option', {value: c.ticker, selected: ticker === c.ticker ? 'selected' : null}, `${c.ticker} · ${c.name}`)); sel.addEventListener('change', () => { ticker = sel.value || null; filter = ticker ? 'company' : 'all'; pageNo = 1; render(); }); bar.append(sel); }
+  card.append(bar);
+  let items = p.news;
+  if (filter === '24h') items = items.filter(n => hoursBefore(p, n.first_seen_at) < 24);
+  else if (filter === 'market') items = items.filter(n => scopeOf(n) === 'market');
+  else if (filter === 'carry') items = items.filter(canCarry);
+  else if (filter === 'company' && ticker) items = items.filter(n => n.tickers.includes(ticker));
+  if (!items.length) { card.append(el('div', {class:'empty', style:'margin-top:12px'}, p.news.length ? 'No story matches this filter in the window.' : `No story first seen in the last ${p.window.days} days in the example data (${p.window.older_hidden} older stor${p.window.older_hidden === 1 ? 'y is' : 'ies are'} hidden by the window; the Company page shows them).`)); return card; }
+  const pages = Math.ceil(items.length / NEWS_PAGE_SIZE); if (pageNo > pages) pageNo = pages;
+  const slice = items.slice((pageNo - 1) * NEWS_PAGE_SIZE, pageNo * NEWS_PAGE_SIZE);
+  const feed = el('div', {class:'feed'}); let lastDay = null;
+  const sessionDay = dayKey(p.cutoff, m);
+  for (const n of slice) {
+    const dk = dayKey(n.first_seen_at, m);
+    if (dk !== lastDay) { lastDay = dk; const count = items.filter(x => dayKey(x.first_seen_at, m) === dk).length; feed.append(el('div', {class:'day'}, el('b', {}, dk === sessionDay ? 'Today' : dk), ` · ${count} stor${count === 1 ? 'y' : 'ies'}`)); }
+    feed.append(el('div', {class:'row'}, el('span', {class:'tm', 'data-tip': `First stored ${fmtLocal(n.first_seen_at, m, true)}; the outlet published it ${fmtLocal(n.published_at, m, true)}.`}, fmtLocal(n.first_seen_at, m, false)), sentSquare(n.enrichment.sentiment), itemBody(p, n)));
   }
-  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  card.append(feed);
+  const pager = el('div', {class:'pager'}); pager.append(el('span', {}, `Page ${pageNo} of ${pages} · ${items.length} stor${items.length === 1 ? 'y' : 'ies'}, ${NEWS_PAGE_SIZE} a page`));
+  const pg = el('div', {class:'pg', role:'group', 'aria-label':'Pages'});
+  const btn = (label, to, cur) => { const b = el('button', {type:'button', class:'md-btn outlined small', 'aria-current': cur ? 'page' : null, disabled: to == null ? 'disabled' : null}, label); if (to != null) b.addEventListener('click', () => { pageNo = to; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); }); return b; };
+  pg.append(btn('Previous', pageNo > 1 ? pageNo - 1 : null)); for (let i = 1; i <= pages; i++) pg.append(btn(String(i), i, i === pageNo)); pg.append(btn('Next', pageNo < pages ? pageNo + 1 : null));
+  pager.append(pg); card.append(pager);
   return card;
 }
 
-function inactiveCard(p) {
-  const cur = p.currency, rows = p.companies.filter(c => c.state === 'inactive');
-  const card = el('section', {class:'card', 'aria-label':'Inactive companies'});
-  card.append(el('div', {class:'head'}, el('h2', {}, `Inactive companies (${rows.length})`), help('Still collected (prices, news, filings, announcements) but never predicted or traded; their open paper trades settle normally. Reactivate takes effect at the next pre-open run (F8.4). Only this page lists them (decision 13).')));
-  if (!rows.length) { card.append(el('div', {class:'quiet'}, 'No inactive company.')); return card; }
-  const tb = el('table', {class:'md-table tbl co'});
-  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Inactive since'), el('th', {class:'num'}, 'Last close'), el('th', {class:'cm'}, 'News since'), el('th', {class:'num cw'}, 'Open trades'), el('th', {class:'num'}, 'Actions'))));
-  const body = el('tbody');
-  for (const c of rows) {
-    const ev = p.lifecycle.find(e => e.ticker === c.ticker && e.event === 'deactivate'), news = p.news_inactive.filter(n => n.tickers.includes(c.ticker));
-    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker)}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`), el('small', {class:'ph2'}, `news since: ${news.length ? `${news.length} stor${news.length === 1 ? 'y' : 'ies'}` : 'none stored'} · open trades ${c.open_trades}`)))),
-      el('td', {}, el('span', {'data-tip': ev ? `Deactivated via ${CHANNEL[ev.channel] || ev.channel} by ${ev.requested_by}, recorded ${fmtLocal(ev.recorded_at, market, true)}, effective ${fmtLocal(ev.effective_from, market, true)}.` : 'The deactivation event is not in the example data.'}, fmtDY(c.state_since)), ev && ev.reason ? el('small', {class:'muted', style:'display:block;font-size:11.5px'}, `“${ev.reason}”`) : null),
-      el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
-      el('td', {class:'cm'}, news.length ? el('span', {'data-tip': news.map(n => `${n.title} (${(STATUS[n.status] || [n.status])[0]}, ${fmtD(n.first_seen_at, false)})`).join(' · ')}, `${news.length} stor${news.length === 1 ? 'y' : 'ies'}`) : el('span', {class:'muted'}, 'none stored')),
-      el('td', {class:'num cw'}, String(c.open_trades)),
-      el('td', {class:'num'}, el('span', {class:'acts'}, el('button', {class:'md-btn tonal many', type:'button', 'aria-label': `Reactivate ${c.name}`, onclick: () => stateDialog(p, c, 'reactivate')}, icon('ms-check'), el('span', {}, 'Reactivate')), el('button', {class:'md-btn outlined danger many', type:'button', 'aria-label': `Delete ${c.name}`, onclick: () => deleteDialog(p, c)}, icon('ms-close'), el('span', {}, 'Delete')), el('button', {class:'md-btn outlined one', type:'button', 'aria-label': `Manage ${c.name}`, onclick: () => manageDialog(p, c)}, icon('ms-settings'), el('span', {}, 'Manage'))))));
+function calendarCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'Coming up'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Coming up · ${p.calendar_days} days`, help('Scheduled events from the session being predicted: the market’s own (policy decisions, inflation and jobs prints, expiries, holidays) and the active companies’ results and ex-dividend dates. A major market event raises the regime to EVENT_HEAVY within two days before it and widens every range whose window contains it; a company’s results widen its own ranges and block a new call within a day.'))));
+  if (!p.calendar.length) { card.append(el('div', {class:'empty'}, `Nothing scheduled in the next ${p.calendar_days} days.`)); return card; }
+  const list = el('div', {class:'cal'});
+  for (const e of p.calendar) {
+    const d = dt(e.date);
+    const sub = el('div', {class:'sub'});
+    if (e.major) sub.append(el('span', {class:'mb-label warn', 'data-tip':'Major: widens every range of this market whose window contains it (F2, major_event_factor).'}, icon('ms-warning'), 'major'));
+    if (e.widens === 'company') sub.append(el('span', {class:'mb-label neutral', 'data-tip':'Widens this company’s ranges; no new call within a day of it.'}, 'widens its ranges'));
+    if (e.ticker) sub.append(el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker));
+    if (e.release) sub.append(el('span', {}, `release ${e.release}`));
+    if (e.provisional) sub.append(el('span', {class:'mb-label neutral'}, 'date provisional'));
+    sub.append(el('span', {class:'muted', 'data-tip': `Source: ${e.source}.`}, e.type.replace(/_/g, ' ')));
+    list.append(el('div', {class:'ev' + (e.major ? ' major' : '')}, el('div', {class:'d'}, DOW[d.getUTCDay()], el('b', {}, String(d.getUTCDate())), MON[d.getUTCMonth()]), el('div', {}, el('div', {class:'nm'}, e.name), sub)));
   }
-  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  card.append(list);
   return card;
 }
 
-function requests(p) {
-  const card = el('section', {class:'card', 'aria-label':'Requests'});
-  const pend = pendingOf(), cmds = p.commands;
-  card.append(el('div', {class:'head'}, el('h2', {}, 'Requests'), help('Every company command from any channel (the dashboard, Slack, the command line, the Claude app) is logged with who asked (from the channel’s sign-in, never typed in), its result and the reason when refused (F10). Accepted writes are pending until the next run imports them. A deleted company is masked here (decision 12).'), el('div', {class:'end'}, `${pend.length} pending · ${cmds.length} recent`)));
-  const host = el('div', {class:'pend'});
-  for (const r of pend) host.append(el('div', {class:'mb-alert', style:'padding:10px 14px'}, icon('ms-pending'), el('div', {}, el('b', {class:'t'}, `Pending: ${r}`), el('div', {class:'s'}, 'Appended to the inbox with your sign-in and an idempotency key; the next run imports it (F10). Mockup: nothing was sent.'))));
-  if (pend.length) card.append(host);
-  if (!cmds.length) { card.append(el('div', {class:'quiet', style: pend.length ? 'margin-top:10px' : ''}, 'No company command recorded for this market yet.')); return card; }
-  const ul = el('ul', {class:'ev cmd', style: pend.length ? 'margin-top:12px' : ''});
-  for (const c of cmds) { const r = RESULT[c.result] || [c.result, 'neutral']; ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(c.received_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + r[1]}, r[0]), ` ${TOOL[c.tool] || c.tool}: `, el('code', {}, Object.entries(c.arguments).filter(([k]) => k !== 'market').map(([k, v]) => `${k} ${v}`).join(', ') || c.tool), c.message ? el('small', {}, c.message) : null, el('small', {}, `via ${CHANNEL[c.channel] || c.channel} · ${c.actor}${c.refusal_code ? ` · ${c.refusal_code.replace(/_/g, ' ')}` : ''}${c.record_ids && c.record_ids.length ? ` · wrote ${c.record_ids.length} record${c.record_ids.length === 1 ? '' : 's'}` : ''}`)))); }
-  card.append(ul);
+function companiesCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'By company'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `By company · ${p.window.days} days`, help('Each watchlist company with a story in the window: how many, the tone mix of the news analyst’s sentiment (green up, red down, grey flat), its open paper trades, and the latest headline. Click the ticker for the company page, the count to filter the feed.'))));
+  const rows = p.companies.map(c => ({c, items: p.news.filter(n => n.tickers.includes(c.ticker))})).filter(x => x.items.length).sort((a, b) => b.items.length - a.items.length || a.c.ticker.localeCompare(b.c.ticker));
+  if (!rows.length) { card.append(el('div', {class:'empty'}, 'No watchlist company has a story in the window.')); return card; }
+  const list = el('div', {class:'cos'});
+  for (const {c, items} of rows) {
+    const up = items.filter(n => n.enrichment.sentiment > 0.05).length, dn = items.filter(n => n.enrichment.sentiment < -0.05).length, flat = items.length - up - dn;
+    const mix = el('span', {class:'mix', 'data-tip': `${up} positive, ${flat} neutral, ${dn} negative by the news analyst’s sentiment.`, role:'img', 'aria-label': `${up} positive, ${flat} neutral, ${dn} negative`});
+    for (const [k, v] of [['up', up], ['flat', flat], ['dn', dn]]) if (v) mix.append(el('i', {class: k, style: `width:${v / items.length * 100}%`}));
+    const b = el('button', {type:'button', class:'md-btn text small ct', 'data-tip': 'Show only this company in the feed.'}, String(items.length)); b.addEventListener('click', () => { ticker = c.ticker; filter = 'company'; pageNo = 1; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); });
+    list.append(el('div', {class:'co'}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': c.name}, c.ticker), el('div', {class:'nm'}, el('div', {style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'}, mix, c.open_trades ? el('span', {class:'mb-label paper', 'data-tip': `${c.open_trades} open paper trade${c.open_trades === 1 ? '' : 's'} on this company.`}, `${c.open_trades} open`) : null, c.state !== 'active' ? el('span', {class:'mb-label neutral'}, c.state) : null), el('small', {}, items[0].title)), b));
+  }
+  card.append(list);
   return card;
 }
 
-function history(p) {
-  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Lifecycle history'});
-  card.append(el('div', {class:'head'}, el('h2', {}, 'Lifecycle history'), help('The watchlist is data (F8): every add, deactivate, reactivate and amount change is an append-only event with who asked, the channel, when it was recorded and when it counts (the next pre-open run; seeded adds count from the start of stored history). Events of a deleted company are excluded on read (decision 12).'), el('div', {class:'end'}, `${p.lifecycle.length} events${p.deleted_count ? ` · ${p.deleted_count} deleted compan${p.deleted_count === 1 ? 'y' : 'ies'} excluded` : ''}`)));
-  if (!p.lifecycle.length) { card.append(el('div', {class:'quiet'}, 'No event stored.')); return card; }
-  const ul = el('ul', {class:'ev'});
-  for (const e of p.lifecycle) ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(e.recorded_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + ({add: 'success', reactivate: 'success', deactivate: 'neutral', set_amount: 'info', delete: 'danger'}[e.event] || 'neutral')}, EVENT_WORDS[e.event] || e.event), ' ', el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker), e.event === 'set_amount' && e.amount != null ? ` to ${money(cur, e.amount)}` : '', e.reason ? ` · “${e.reason}”` : '', el('small', {}, `via ${CHANNEL[e.channel] || e.channel} · ${e.requested_by} · counts from ${e.channel === 'seed' ? `the start of stored history (${fmtDY(e.effective_from)})` : fmtDY(e.effective_from)}${e.onboarding && e.channel !== 'seed' ? ` · onboarding: ${Object.entries(e.onboarding).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ')}` : ''}`))));
-  card.append(ul);
-  return card;
-}
-
-/* ---------- dialogs (mockup: record a pending request) ---------- */
-const recordPending = text => { (pending[market] = pending[market] || []).push(text); $('#dlg').close(); render(); };
-const dbox = (title, ...kids) => { const dlg = $('#dlg'); dlg.innerHTML = ''; const body = el('div', {class:'dbody'}, el('h3', {id:'dlg-title'}, title), ...kids.filter(Boolean)); dlg.setAttribute('aria-labelledby', 'dlg-title'); dlg.append(body); return dlg; };
-function addDialog(p) {
-  const cur = p.currency, dlg = $('#dlg');
-  const sym = el('input', {type:'text', placeholder: market === 'india' ? 'NSE symbol, e.g. TCS' : 'NYSE or Nasdaq ticker, e.g. AMZN', 'aria-label':'Exchange symbol'}), nm = el('input', {type:'text', placeholder:'optional', 'aria-label':'Name'}), amt = el('input', {type:'number', min:'1', step:'1', placeholder: String(p.default_amount), 'aria-label':'Amount'});
-  dbox('Add a company', el('div', {}, `Takes the exchange symbol, an optional name and an optional amount (F8.3). The onboarding checks the identifiers (${market === 'india' ? 'NSE and Yahoo symbols' : 'ticker, Yahoo symbol and SEC CIK'}), refuses ETFs, ${market === 'india' ? 'BSE-only and unknown' : 'unknown'} symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next pre-open run.`), el('label', {}, 'Exchange symbol', sym), el('div', {class:'row2'}, el('label', {}, 'Name (optional)', nm), el('label', {}, `Amount per paper trade (${cur}, optional)`, amt)), el('div', {class:'muted', style:'font-size:12.5px'}, 'Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding (F8.7).'));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { const s = sym.value.trim().toUpperCase(); if (!s) { sym.focus(); return; } summaryStep(p, s, nm.value.trim(), amt.value ? +amt.value : null); }}, 'Check the symbol')));
-  dlg.showModal(); sym.focus();
-}
-function summaryStep(p, symbol, name, amount) {
-  const cur = p.currency, dlg = $('#dlg');
-  dbox(`Confirm: add ${symbol}?`, el('div', {class:'summ', 'aria-label':'Summary'}, el('div', {class:'r'}, el('span', {}, 'Symbol'), el('b', {}, symbol)), el('div', {class:'r'}, el('span', {}, 'Name'), el('span', {}, name || el('span', {class:'muted'}, 'resolved at onboarding'))), el('div', {class:'r'}, el('span', {}, 'Exchange · sector'), el('span', {class:'muted'}, 'resolved at onboarding')), el('div', {class:'r'}, el('span', {}, market === 'india' ? 'Yahoo · NSE' : 'Yahoo · CIK'), el('span', {class:'muted'}, 'resolved at onboarding')), el('div', {class:'r'}, el('span', {}, 'Amount'), el('b', {}, money(cur, amount ?? p.default_amount), amount == null ? el('span', {class:'muted'}, ' (default)') : null))), el('div', {class:'muted', style:'font-size:12.5px'}, 'Mockup: the real page fills this summary from the identifier check (name, exchange, sector, Yahoo symbol, CIK) before you confirm. Confirm records the request with your sign-in and an idempotency key; a double click never adds twice.'));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`add ${symbol}${name ? ` (${name})` : ''} at ${money(cur, amount ?? p.default_amount)} per paper trade`)}, 'Confirm')));
-}
-function amountDialog(p, c) {
-  const cur = p.currency, dlg = $('#dlg'), input = el('input', {type:'number', min:'1', step:'1', value: String(c.amount), 'aria-label':'New amount'});
-  dbox(`Change the amount for ${c.name}`, el('div', {}, `Money per paper trade. Today ${money(cur, c.amount)}${c.amount_overridden ? ' (set for this company)' : ' (the default)'}. In India a trade is skipped when one share costs more than the amount. Takes effect at the next pre-open run.`), el('label', {}, `New amount (${cur})`, input));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`set the amount of ${c.ticker} to ${money(cur, +input.value || c.amount)}`)}, 'Record amount')));
-  dlg.showModal();
-}
-function stateDialog(p, c, kind) {
-  const dlg = $('#dlg'), reason = el('input', {type:'text', maxlength:'200', placeholder:'optional, in your words (at most 200 characters)', 'aria-label':'Reason'});
-  dbox(kind === 'deactivate' ? `Deactivate ${c.name}?` : `Reactivate ${c.name}?`, el('div', {}, kind === 'deactivate' ? 'It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next pre-open run (F8.4).' : 'Predictions and paper trades resume from the next pre-open run (F8.4).'), el('label', {}, 'Reason', reason), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it. The reason is kept on the event, in your words.'));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`${kind} ${c.ticker}${reason.value.trim() ? ` (“${reason.value.trim().slice(0, 200)}”)` : ''}`)}, kind === 'deactivate' ? 'Record deactivation' : 'Record reactivation')));
-  dlg.showModal();
-}
-function deleteDialog(p, c) {
-  const dlg = $('#dlg'), typed = el('input', {type:'text', placeholder: c.ticker, 'aria-label': `Type ${c.ticker} to confirm`, autocomplete:'off'});
-  const ok = el('button', {class:'md-btn filled', type:'button', disabled: true, onclick: () => recordPending(`delete ${c.ticker} (typed confirmation)`)}, 'Delete for good');
-  typed.addEventListener('input', () => { if (typed.value.trim().toUpperCase() === c.ticker) ok.removeAttribute('disabled'); else ok.setAttribute('disabled', ''); });
-  dbox(`Delete ${c.name}?`, el('div', {class:'warn'}, icon('ms-warning'), el('div', {}, el('b', {}, 'This cannot be undone from the cockpit.'), ' A delete appends a tombstone: the company is excluded on read everywhere, the warehouse and the graph drop it at the next sync, and every scoreboard and track record is computed without it from then on (F8.5, decision 12). Raw records stay in git history. Delete is available here only, never from Slack.')), el('label', {}, `Type ${c.ticker} to confirm`, typed));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), ok));
-  dlg.showModal(); typed.focus();
-}
-
-function manageDialog(p, c) {
-  const dlg = $('#dlg'), cur = p.currency;
-  const btn = (text, ico, fn, cls='outlined') => el('button', {class:'md-btn ' + cls, type:'button', style:'justify-content:flex-start', onclick: fn}, icon(ico), text);
-  dbox(`${c.ticker} · ${c.name}`, el('div', {class:'muted', style:'font-size:12.5px'}, `${c.sector} · ${c.exchange} · ${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (custom)' : ''} · ${c.state}${c.state === 'inactive' ? ` since ${fmtDY(c.state_since)}` : ''}`), el('div', {style:'display:grid;gap:8px'}, btn('Change the amount', 'ms-account_balance_wallet', () => amountDialog(p, c)), c.state === 'active' ? btn('Deactivate', 'ms-pending', () => stateDialog(p, c, 'deactivate')) : btn('Reactivate', 'ms-check', () => stateDialog(p, c, 'reactivate'), 'tonal'), btn('Delete (typed confirmation)', 'ms-close', () => deleteDialog(p, c), 'outlined danger')));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Close')));
-  dlg.showModal();
-}
-function legend() {
-  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
-    el('span', {}, el('span', {class:'mb-label neutral'}, 'custom'), ' an amount set for the company'),
-    el('span', {}, el('span', {class:'mb-label success'}, 'accepted'), ' ', el('span', {class:'mb-label warn'}, 'pending'), ' ', el('span', {class:'mb-label danger'}, 'refused'), ' a request’s result'),
-    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every trade is a paper record; nothing here is advice'));
+function legend(p) {
+  return el('div', {class:'legend2'}, el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' news informs paper calls; nothing here is advice'),
+    el('span', {}, 'Statuses: ', ...CAN_CARRY.map(s => statusBadge(s)), ' can carry a call; the others (single source, unverified, rumour, promotional, contradicted) cannot (', el('a', {href: PAGES.help + '#news'}, 'Help'), ')'),
+    el('span', {}, el('b', {}, 'Open article'), ' opens the outlet’s page in a new tab; the cockpit stores headlines, scores and statuses, never the text'),
+    el('span', {}, `Window: ${fmtLocal(p.window.from, market, true)} to ${fmtLocal(p.window.to, market, true)}`));
 }
 
 function render() {
-  const p = P(market);
-  document.title = `Market brief · Companies · ${LABEL[market]}`; $('#title').textContent = `Companies · ${p.name}`;
-  sideFoot(market); marketSeg(() => render());
-  const page = $('#page'); page.innerHTML = '';
-  page.append(pageHead(market, 'Companies', `the watchlist as data: ${p.companies.length} compan${p.companies.length === 1 ? 'y' : 'ies'} · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only`), kpis(p));
-  page.append(el('div', {style:'margin-top:16px'}, activeCard(p)), el('div', {style:'margin-top:16px'}, inactiveCard(p)));
-  const grid = el('div', {class:'grid even'}); grid.append(requests(p), history(p)); page.append(grid);
-  page.append(legend(), footer(market, D.endpoint));
+  const p = P(market), page = $('#page'); page.innerHTML = '';
+  document.title = `Market brief · News · ${LABEL[market]}`; $('#title').textContent = 'News';
+  sideFoot(market); marketSeg(() => { filter = 'all'; ticker = null; pageNo = 1; render(); });
+  page.append(pageHead(market, 'News', `${p.name} · the last ${p.window.days} days, the market movers first, the newest first · every story links to its article · research only`));
+  page.append(moversCard(p));
+  const g = el('div', {class:'grid news'}); g.append(feedCard(p), el('div', {class:'col'}, calendarCard(p), companiesCard(p))); page.append(g);
+  page.append(legend(p), footer(market, D.endpoint));
   makeFocusable(page);
 }
 render();
