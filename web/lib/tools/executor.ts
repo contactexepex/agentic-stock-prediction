@@ -195,6 +195,14 @@ export class ToolLayer {
     return { ok: true, summary: writeSummary(tool.name, args, preview), preview, args };
   }
 
+  /** Whether a write with this idempotency key is already in the inbox, so the Slack confirm step posts its request
+   * message only for a new key. Nothing is logged; an unavailable inbox answers false and the write itself decides. */
+  async isStored(raw: unknown): Promise<boolean> {
+    const key = keyOf(raw);
+    if (key === null) return false;
+    return this.deps.inbox.findRequest(key).then((stored) => stored !== null, () => false);
+  }
+
   /** Logs a command that maps to no tool call (a malformed Slack command, the /ask stub) and reports refusals. */
   async record(ctx: CallContext, fields: { tool: string | null; kind: ToolKind | null; market: string | null;
     args: unknown; result: CommandResult; code: RefusalCode | null; message: string }): Promise<ToolOutcome> {
@@ -247,9 +255,8 @@ export class ToolLayer {
     }
     if (!claim.claimed) return this.duplicate(ctx, now, gate, base, claim.existing, argsSha);
     const summary = writeSummary(tool.name, args, preview);
-    // Both kinds have an importer: company commands `company.py import-inbox` (B1), paper trades
-    // `portfolio.py import-inbox` (B2, marketbrief/portfolio/inbox_import.py). onboard.yml runs B1's import; the step
-    // for B2's import is B1's (onboard.yml) and the orchestrator's (routines, Wave 5). Until then a trade waits.
+    // Both kinds have an importer, and onboard.yml and routine step 3 run both (954d34d): company commands
+    // `company.py import-inbox` (B1), paper trades `portfolio.py import-inbox` (B2, marketbrief/portfolio/inbox_import.py).
     let dispatched: { ok: boolean; reason: string | null };
     try {
       dispatched = await this.deps.dispatcher.dispatch();
