@@ -286,9 +286,12 @@ test("get_news with a ticker cuts the company's part out of the market News page
   const own = data.sources[0];
   assert.deepEqual(own.payload, { news: [{ id: "n1" }, { id: "n0", title: "older" }] }, "only the company page's news field");
   assert.match(own.selection ?? "", /30 days before the cut-off/);
+  const none = await r.layer.execute(app, "get_news", { market: "us", ticker: "MSFT" });
+  const missing = (none.data as { sources: { found: boolean; selection?: string; payload: unknown }[] }).sources[0];
+  assert.deepEqual([missing.found, missing.selection, missing.payload], [false, undefined, null], "no note on a missing page");
   const page = data.sources[1];
   assert.equal(page.page_key, "_");
-  assert.match(page.selection ?? "", /at most 25 company items/);
+  assert.match(page.selection ?? "", /at most 50 items, half for company items/);
   assert.deepEqual((page.payload.news as { id: string; about_ticker: boolean }[]).map((item) => [item.id, item.about_ticker]),
     [["n1", true], ["n2", false]]);
   assert.deepEqual((page.payload.calendar as { ticker: string | null }[]).map((row) => row.ticker), ["AAPL", null]);

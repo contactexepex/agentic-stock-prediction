@@ -21,22 +21,23 @@ export const UNTRUSTED_NOTE =
 
 /** get_news with a ticker: rm.news is one market page (`_`, B11), so the company's part is cut out of it here. */
 export const NEWS_TICKER_NOTE =
-  "rm.news is the market's News page: items first seen in the 3 days before the cut-off, at most 25 company items " +
-  "across all companies (market movers first), so a missing item does not mean the company had no news. Items are " +
-  "those whose tickers include the company (about_ticker: true when it is a primary ticker). An item's status and " +
-  "cluster_id are those of its first primary ticker, not necessarily this company's.";
+  "rm.news is the market's News page: items first seen in the 3 days before the cut-off, at most 50 items, half for " +
+  "company items across all companies (more when market-wide items leave part of their half unused), market movers " +
+  "first, so a missing item does not mean the company had no news. Items are those whose tickers include the " +
+  "company (about_ticker: true when it is a primary ticker). An item's status and cluster_id are those of its first " +
+  "primary ticker, not necessarily this company's. Calendar rows without a ticker are market-wide and are kept.";
 
 /** get_news with a ticker also reads the company page's own news list (B12, rm.stock `<ticker>` field `news`). */
 export const COMPANY_NEWS_NOTE =
-  "rm.stock news: the company page's news items (same item schema as rm.news), first seen in the 30 days before the " +
-  "cut-off, newest 50, newest first, each with its verification status as of this company. Only the news field is " +
-  "returned here; get_company returns the whole company page.";
+  "rm.stock news: the company page's own news list. By B12's company-page contract (api/schemas/company.yaml) these " +
+  "are rm.news items first seen in the 30 days before the cut-off, newest 50, each with its status as of this " +
+  "company. Only the news field is returned here (null when the page has none); get_company returns the whole page.";
 
 /** The company page reduced to its news list. */
 export function companyNews(payload: unknown): unknown {
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return payload;
   const page = payload as Record<string, unknown>;
-  return { news: Array.isArray(page.news) ? page.news : [] };
+  return { news: page.news ?? null };
 }
 
 interface Lookup {
@@ -135,7 +136,7 @@ export async function runRead(store: ReadStore, tool: string, args: ToolArgs): P
       built_at: row?.built_at ?? null,
       payload: row && lookup.select ? lookup.select.apply(row.payload) : row?.payload ?? null,
     };
-    if (lookup.select) source.selection = lookup.select.note;
+    if (lookup.select && row !== null) source.selection = lookup.select.note;
     sources.push(source);
   }
   const requested = { ...args };
