@@ -163,6 +163,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `POST .../companies/preview` (summary, add_company's resolved identifiers; nothing written) and
   `.../companies/commands` (written through B5's tool layer only when `confirmed_summary` equals the server's own
   preview; delete typed; `web/lib/data/company-commands.ts`).
+- Company pages (B12, docs/ws/b12.md; contract 2.0): `scripts/marketbrief/warehouse/rm_company.py` (builders),
+  `company_payloads.py` (per-company slicing in the mockups' fields) and `company_sources.py` (the stored records read
+  once per build as of the cut-off, collected companies only) build rm.stock (the whole 03-company page: the shared
+  blocks, lifecycle events, agreement, picks, predictions, open trades, latest trade checks, settled trades, AI
+  reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08),
+  rm.bars, rm.stock_strategies (04 page), rm.trades (`_`: every open trade, the latest check, the last 5 sessions'
+  settlements; per ticker: the last 60 sessions) and rm.lifecycle (`<ticker>:<date>`, the last 30 sessions: the
+  predictions and picks made for that session followed to their checks, settlements and AI reasons), served by
+  `/api/v1/markets/{market}/stocks/{ticker}[/bars|/strategies|/lifecycle/{date}]` and `/trades[?ticker=]`
+  (`api/paths|schemas/company.yaml`). `rm_company.trade_checks(ctx)` / `market_trade_checks(ctx)` give the latest
+  check's rows to the market and portfolio pages.
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
