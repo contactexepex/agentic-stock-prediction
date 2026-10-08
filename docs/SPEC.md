@@ -537,10 +537,12 @@ sections 1, 2, 3, 8 and 9 (schema `inbox` inside `market_brief`); session B4 pro
 
 A chat panel on every page and the Slack `/ask` command, served by a Vercel route calling the Claude
 API (Sonnet) with the read tools of F10 only (writes stay buttons and forms). Answers cite ids and
-"as of" times, never advise real trades, and say "not in the data" when it is not. Budget: a hard cap
-of $20 per month set in the Anthropic console (spend limits apply per workspace, so the key lives in
-a dedicated workspace with that limit) plus a code-side daily budget (about $0.65 per day);
-over budget the panel says so. Conversations are kept 90 days in MotherDuck schema `app` (operational
+"as of" times, never advise real trades, and say "not in the data" when it is not. Cost: the only
+money limit is the spend limit of the Anthropic console's workspace (the key lives in a dedicated
+workspace); no budget is enforced in code (owner decision 2026-10-08). Every answer's cost is logged
+and the panel shows the day's and the month's spend. A refused answer is retried once on a pinned
+fallback model at the same price, and a conversation remembers its last 4 turns (owner decisions
+2026-10-08; docs/ws/b8.md). Conversations are kept 90 days in MotherDuck schema `app` (operational
 log, not a fact store).
 
 ### F12 Dashboard: 12 pages (section 6)
