@@ -15,6 +15,9 @@ computed once per build through BuildContext.shared, as of the cut-off. rm_commo
                     accessor, the newest two raw closes collected by the cut-off, agreement_n1 (active companies) and
                     the open-trade count (exactly the records of open_trades).
 
+live_rows(rows, day_key) (Wave 5 go-live) keeps the rows of strategies live on their D (lab/registry.is_live); the
+page modules apply it to the predictions, picks and trade checks they read themselves.
+
 Drafted from session B11's agreement.py and company_records.latest_closes (build/b11-market-pages 3f6b4df)."""
 
 from __future__ import annotations
@@ -78,6 +81,44 @@ def iso_time(value) -> str | None:
         if value is None or pd.isna(value)
         else pd.Timestamp(value).tz_convert("UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
     )
+
+
+# ---------- live strategies (Wave 5 go-live; lab/registry.is_live) ----------
+def live(strategy_id: str, session_date) -> bool:
+    """Whether a strategy trades for real on D = session_date: its live_from is set and on or before D."""
+    return registry.is_live(strategy_id, iso_day(session_date))
+
+
+def earliest_live_from() -> str | None:
+    """The earliest live_from of the registry, or None while no strategy is live."""
+    days = [str(spec["live_from"]) for spec in registry.strategies() if spec.get("live_from") is not None]
+    return min(days) if days else None
+
+
+def live_rows(rows: list[dict], day_key: str) -> list[dict]:
+    """The rows of live strategies on their D (`day_key`: session_date of a prediction or pick, entry_date of a
+    trade or check); rows of a strategy before its live_from (rehearsal runs) are never shown, nor rows without a
+    day. A row without a strategy (a head-to-head pick with status no_candidate: no strategy of its family
+    qualified) is kept when some strategy of its family is live on its D (a live pick run's answer), and dropped
+    otherwise (a rehearsal run)."""
+    kept = []
+    for row in rows:
+        day = row.get(day_key)
+        if day is None or pd.isna(day):
+            continue
+        if row.get("strategy_id"):
+            keep = live(row["strategy_id"], day)
+        else:
+            keep = any(live(spec["id"], day) for spec in registry.strategies(family=row.get("family")))
+        if keep:
+            kept.append(row)
+    return kept
+
+
+def newest_batch(rows: list[dict]) -> list[dict]:
+    """The rows of the newest session_date among them."""
+    newest = max((iso_day(row["session_date"]) for row in rows), default=None)
+    return [row for row in rows if iso_day(row["session_date"]) == newest]
 
 
 # ---------- agreement ----------
