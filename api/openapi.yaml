@@ -213,56 +213,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '501': {$ref: '#/components/responses/NotImplemented'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/portfolio:
-    get:
-      tags: [portfolio]
-      operationId: getPaperPortfolio
-      summary: The paper portfolio (records only, never orders)
-      x-status: planned
-      x-owner: WS4
-      x-read-model: rm.portfolio
-      parameters:
-        - $ref: '#/components/parameters/Market'
-      responses:
-        '200':
-          description: The paper-portfolio read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/PaperPortfolioResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/portfolio/paper-trades:
-    post:
-      tags: [portfolio]
-      operationId: createPaperTrade
-      summary: Submit a paper trade record (pending until the next run validates and imports it into data/)
-      description: |
-        Writes one row to the append-only inbox (docs/ARCHITECTURE.md section 9). Never an order: nothing is
-        sent to any broker. The submitter is injected from the authenticated identity, never from the body.
-        Repeating a request with the same Idempotency-Key returns the first receipt.
-      x-status: planned
-      x-owner: WS2 (endpoint), WS4 (validation and import)
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/PaperTradeRequest'}
-      responses:
-        '200':
-          description: Accepted into the inbox (or the receipt of an earlier request with the same key)
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/InboxReceipt'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Invalid'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/company-requests:
     post:
       tags: [requests]
@@ -510,14 +460,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/RunList'}
-    PaperPortfolioResponse:
-      x-status: planned
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/PaperPortfolio'}
 
     # ---------- payloads ----------
     MarketList:
@@ -955,47 +897,6 @@ components:
           x-owner: WS1
           items: {$ref: '#/components/schemas/Build'}
 
-    PaperPortfolio:
-      type: object
-      x-status: planned
-      x-owner: WS4
-      description: Shape fixed here; WS4's data kinds supply it. Records only, never orders.
-      required: [market, as_of, label, positions, trades]
-      properties:
-        market: {$ref: '#/components/schemas/Market'}
-        as_of: {type: ['string', 'null'], format: date}
-        label: {type: string, description: 'skill.label ("Paper only — no proven edge yet" until model_skill)'}
-        positions:
-          type: array
-          items:
-            type: object
-            required: [ticker, quantity, entry_date, entry_price]
-            properties:
-              ticker: {$ref: '#/components/schemas/Ticker'}
-              quantity: {type: number}
-              entry_date: {$ref: '#/components/schemas/IsoDate'}
-              entry_price: {type: number, description: The open of entry_date from stored bars}
-              h: {$ref: '#/components/schemas/Horizon'}
-              exit_date: {type: ['string', 'null'], format: date}
-              mark_close: {$ref: '#/components/schemas/NullableNumber'}
-              unrealized_return: {$ref: '#/components/schemas/NullableNumber'}
-        trades:
-          type: array
-          items:
-            type: object
-            properties:
-              id: {type: string}
-              ticker: {$ref: '#/components/schemas/Ticker'}
-              side: {type: string, enum: [buy, sell]}
-              quantity: {type: number}
-              price: {type: number}
-              date: {$ref: '#/components/schemas/IsoDate'}
-              source: {type: string, enum: [slack, claude_code, dashboard]}
-              recorded_at: {$ref: '#/components/schemas/IsoTime'}
-        pending:
-          type: array
-          description: Inbox entries not yet imported (shown as pending, never as facts)
-          items: {$ref: '#/components/schemas/InboxReceipt'}
 
     # ---------- building blocks (dashboard payload) ----------
     SessionPlan:
@@ -1440,17 +1341,6 @@ components:
         error: {type: ['string', 'null']}
 
     # ---------- planned writes ----------
-    PaperTradeRequest:
-      type: object
-      x-status: planned
-      additionalProperties: false
-      required: [ticker, side, quantity]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        side: {type: string, enum: [buy, sell]}
-        quantity: {type: number, exclusiveMinimum: 0}
-        horizon_days: {$ref: '#/components/schemas/Horizon'}
-        note: {type: string, maxLength: 280}
     CompanyRequest:
       type: object
       x-status: planned
