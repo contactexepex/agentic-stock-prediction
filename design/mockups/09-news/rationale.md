@@ -31,7 +31,7 @@ from any site, only the conventions.
 1. **Page head** (the shell's chips).
 2. **Market movers · last 3 days**: up to 10 ranked cards in two columns: rank, the kind of story (market-wide
    stories carry a globe and the word "market"), the headline as the link, the summary line when the data has one,
-   the source and "n hours before the cut-off", the status badge, the materiality, how many outlets carry it, the
+   the source and "published n hours before the cut-off", the status badge, the materiality, how many outlets carry it, the
    companies as links to their pages, and "Open article". Ranking: the engine's market-moving flag first (W1's rule:
    high materiality and market-wide or a results item, shown as an amber "market moving" label), then market-wide
    stories, the watchlist's results and high materiality, newest first within each rank; the same headline stored
@@ -39,8 +39,8 @@ from any site, only the conventions.
    verification is per company. An honest empty state when the window has none.
 3. **Last 3 days** (the feed): filter chips (All, Last 24 h, Market-wide, Market moving, Can carry a call) and a
    company select; a note when most stories have no summary line;
-   stories grouped by the local day with a sticky header ("Today · n stories"), each row with the local time (its
-   tooltip has the first-stored and published times), the sentiment arrow, the same item body as the band; a pager
+   stories grouped by the local day they were stored, with a sticky header ("Today · n stories"), each row with the
+   outlet's publish time (with its date when it differs from the stored day; the tooltip has both times), the sentiment arrow, the same item body as the band; a pager
    (10 a page, at most 50 in the window) that scrolls the feed into view.
 4. **Rail: Coming up · 7 days**: the market's scheduled events and the active companies' results and ex-dividend
    dates from the session being predicted, a date tile each, "major" (widens every range) in amber, "widens its
@@ -89,13 +89,16 @@ now explains its empty state and a note says when stories show the headline alon
 0.05 sentiment band were typed in the template (now the shell's `NEWS_RECENT_HOURS` and `SENTIMENT_FLAT_BAND`, the
 latter also used by the shell's sentiment arrow).
 
-## Decisions taken for the owner (reported to the orchestrator; to confirm)
+## Decisions taken for the owner (reported to the orchestrator; confirmed in part, see the last bullet)
 - The movers are a ranked band of cards above the feed, not a separate tab, so the first screen answers "what
   moves the market" and the feed is one scroll away.
 - The feed is grouped by day with sticky headers and filtered by chips rather than split into "today" and "older"
   cards: one list, newest first, the owner's filters on top.
 - The rail holds the calendar (the week ahead) and the news per company; "big news" lives in the band, so the rail
   does not repeat it.
+- Confirmed by the owner (2026-10-08, after the first review): the ranking rule stays, the band shows at most 10 (not
+  always 10), and every story shows the outlet's publish time rather than the collection time (the order of the
+  feed stays "latest stored first", the owner's earlier rule).
 - Market-wide stories are the catalogue's `scope` market (the tagger found no primary watchlist company); each
   market's page shows the stories its own feeds carried, so a Fed story appears in India only when India's feeds had
   it.

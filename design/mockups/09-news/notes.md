@@ -24,8 +24,9 @@ the filters (last 24 h = first seen in the `NEWS_RECENT_HOURS` before the cut-of
 the flag; can carry a call = confirmed or corroborated; one company), the kind word (a market-wide story's `category`
 when it is not `company` or `general`, else the event type in words), the "not verified per company" badge for the
 empty status of a market-wide story, the day groups (the
-local date of `first_seen_at`), the pagination (`NEWS_PAGE_SIZE` a page), "n h/days before the cut-off" (from
-`first_seen_at` against the cut-off, never the viewer's clock), the per-company counts and the sentiment mix (positive
+local date of `first_seen_at`; the time shown on a row and in the band is the outlet's `published_at`, with the
+stored time in the tooltip, the owner's decision of 2026-10-08), the pagination (`NEWS_PAGE_SIZE` a page), "n h/days before the cut-off" (from
+`published_at` against the cut-off, never the viewer's clock), the per-company counts and the sentiment mix (positive
 above `SENTIMENT_FLAT_BAND`, negative below its negative), and a note under the filters when more than half of the
 stories have no summary line. The page never shows the stored text: the headline links to the outlet's article (`url`) and the `summary` is the
 catalogue's one-or-two-line summary (`summary_source` article or analyst; empty for most US items, whose analyst
