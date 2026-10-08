@@ -1,0 +1,19 @@
+# B13: the Track record page (design/mockups/08-track-record; docs/ws/b13.md). Contract 2.0 replaces the 1.0 payload.
+/api/v1/markets/{market}/track-record:
+  get:
+    tags: [record]
+    operationId: getTrackRecord
+    summary: Live calls per scoring basis (never pooled), their weekly series, ranges with Wilson intervals, backtest and replay
+    x-read-model: rm.track_record
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The track-record read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TrackRecordPageResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
