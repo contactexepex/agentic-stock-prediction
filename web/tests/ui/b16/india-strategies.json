@@ -1,0 +1,1454 @@
+{
+ "market": "india",
+ "name": "India (NSE)",
+ "currency": "INR",
+ "as_of": "2026-10-07",
+ "status": {
+  "market": "india",
+  "name": "India (NSE)",
+  "currency": "INR",
+  "as_of": "2026-10-07",
+  "session": {
+   "local_time": "2026-10-08T19:31+05:30",
+   "trading_day": true,
+   "session_date": "2026-10-09",
+   "previous_session": "2026-10-08",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-09T03:45:00+00:00",
+   "session_close_utc": "2026-10-09T10:00:00+00:00",
+   "in_session": false,
+   "late_run": false
+  },
+  "regime": "CALM",
+  "benchmark": {
+   "symbol": "NIFTY50",
+   "name": "Nifty 50",
+   "close": 22603.0508,
+   "close_date": "2026-10-07",
+   "change_pct": -0.76,
+   "change_5d_pct": -0.5
+  },
+  "vol_index": {
+   "symbol": "INDIAVIX",
+   "name": "India VIX",
+   "close": 13.89,
+   "close_date": "2026-10-07",
+   "change_pct": 2.06,
+   "change_5d_pct": 3.58
+  },
+  "runs": {
+   "pre_open": {
+    "at": "2026-10-08T02:17:36Z",
+    "ok": true
+   },
+   "intraday": [],
+   "post_close": {
+    "at": null,
+    "ok": null,
+    "next_at": "2026-10-09T12:15:00Z"
+   },
+   "news": {
+    "at": "2026-10-08T10:19:00Z",
+    "ok": true,
+    "new_items": 378
+   }
+  },
+  "paper_label": "Paper only \u2014 no proven edge yet"
+ },
+ "horizons": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "default_horizon": "all",
+ "reference_strategy": "rule.model_news.v1",
+ "go_live": {
+  "proven": false,
+  "months_forward": 0.0,
+  "trades_needed": 300,
+  "beats_best_baseline": null
+ },
+ "strategies": {
+  "rule.model_news.v1": {
+   "id": "rule.model_news.v1",
+   "family": "rule",
+   "name": "Model + news",
+   "description": "The signal model's probability with verified news counted at normal weight. Buys when the model gives at least 55% for a rise. This is the reference the other rule strategies are compared against.",
+   "compared_to": null,
+   "differs_in": null,
+   "parameters": {
+    "signal": "model",
+    "news_weight": 1.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_half.v1": {
+   "id": "rule.model_news_half.v1",
+   "family": "rule",
+   "name": "Model + half news",
+   "description": "Like the reference, but news counts half as much. Tests whether news is over-weighted.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_weight",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 0.5,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_double.v1": {
+   "id": "rule.model_news_double.v1",
+   "family": "rule",
+   "name": "Model + double news",
+   "description": "Like the reference, but news counts twice as much. Tests whether news deserves more weight.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_weight",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 2.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_confirmed.v1": {
+   "id": "rule.model_news_confirmed.v1",
+   "family": "rule",
+   "name": "Model + confirmed news only",
+   "description": "Like the reference, but only news confirmed by a filing or by two independent outlets counts; single-source stories are ignored. Tests whether unconfirmed news adds noise.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_statuses",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 1.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_high.v1": {
+   "id": "rule.model_news_high.v1",
+   "family": "rule",
+   "name": "Model + major news only",
+   "description": "Like the reference, but only news rated high materiality counts. Tests whether small news matters.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_materiality",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 1.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_global.v1": {
+   "id": "rule.model_news_global.v1",
+   "family": "rule",
+   "name": "Model + news + global cues",
+   "description": "Like the reference, plus the other markets' overnight moves, currencies, rates and commodities as model inputs. Tests whether global cues help (they showed no edge in the 15-year back-test).",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "cross_market",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 1.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": true,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_calm.v1": {
+   "id": "rule.model_news_calm.v1",
+   "family": "rule",
+   "name": "Model + news, calm markets only",
+   "description": "Like the reference, but makes no trades when the market regime is unstable or event-heavy. Tests whether sitting out turbulent days helps.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "regime_filter",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 1.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": true
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_strict.v1": {
+   "id": "rule.model_news_strict.v1",
+   "family": "rule",
+   "name": "Model + news, 60% bar",
+   "description": "Like the reference, but buys only when the probability of a rise is at least 60%. Fewer trades; tests whether being pickier pays.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "threshold",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 1.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.6,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.always_up.v1": {
+   "id": "base.always_up.v1",
+   "family": "baseline",
+   "name": "Always buy",
+   "description": "Buys every active company every day at every horizon. Any strategy worth having must beat it after costs.",
+   "compared_to": "base.model_only.v1",
+   "differs_in": "signal",
+   "parameters": {
+    "signal": "always_up",
+    "news_weight": 0.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.momentum.v1": {
+   "id": "base.momentum.v1",
+   "family": "baseline",
+   "name": "Follow yesterday",
+   "description": "Buys a company when its last session closed higher than the one before; predicts down otherwise.",
+   "compared_to": "base.model_only.v1",
+   "differs_in": "signal",
+   "parameters": {
+    "signal": "momentum",
+    "news_weight": 0.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.model_only.v1": {
+   "id": "base.model_only.v1",
+   "family": "baseline",
+   "name": "Model without news",
+   "description": "The signal model alone with news switched off (weight 0). Shows what news adds to the reference.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_weight",
+   "parameters": {
+    "signal": "model",
+    "news_weight": 0.0,
+    "news_statuses": [
+     "confirmed_primary",
+     "corroborated",
+     "single_source"
+    ],
+    "news_materiality": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "cross_market": false,
+    "regime_filter": false
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.news_results.sonnet.v1": {
+   "id": "ai.news_results.sonnet.v1",
+   "family": "ai",
+   "name": "AI news & results (Sonnet)",
+   "description": "A Sonnet trader that reads the company's news with its verification status, results digests, filings and events, without the model score. Decides on what happened to the company.",
+   "compared_to": null,
+   "differs_in": null,
+   "parameters": {
+    "model": "sonnet",
+    "sees_model_score": false,
+    "inputs": [
+     "news",
+     "results",
+     "filings",
+     "events"
+    ]
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.pattern_mood.sonnet.v1": {
+   "id": "ai.pattern_mood.sonnet.v1",
+   "family": "ai",
+   "name": "AI price pattern & mood (Sonnet)",
+   "description": "A Sonnet trader that reads prices, indicators, the market regime, global cues and sector moves, without news or the model score. Decides on how the stock and the market behave.",
+   "compared_to": null,
+   "differs_in": null,
+   "parameters": {
+    "model": "sonnet",
+    "sees_model_score": false,
+    "inputs": [
+     "prices",
+     "indicators",
+     "regime",
+     "cues",
+     "sectors"
+    ]
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.sonnet.v1": {
+   "id": "ai.combined.sonnet.v1",
+   "family": "ai",
+   "name": "AI combined (Sonnet)",
+   "description": "A Sonnet trader that sees everything the other two see plus the signal model's score and explanation; it may move the model's probability by at most 10 points, with a reason.",
+   "compared_to": null,
+   "differs_in": null,
+   "parameters": {
+    "model": "sonnet",
+    "sees_model_score": true,
+    "inputs": [
+     "news",
+     "results",
+     "filings",
+     "events",
+     "prices",
+     "indicators",
+     "regime",
+     "cues",
+     "sectors",
+     "model_score"
+    ]
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.opus.v1": {
+   "id": "ai.combined.opus.v1",
+   "family": "ai",
+   "name": "AI combined (Opus)",
+   "description": "The same as the combined Sonnet trader on the stronger Opus model (the existing forecaster, extended). Tests whether the stronger model helps.",
+   "compared_to": "ai.combined.sonnet.v1",
+   "differs_in": "model",
+   "parameters": {
+    "model": "opus",
+    "sees_model_score": true,
+    "inputs": [
+     "news",
+     "results",
+     "filings",
+     "events",
+     "prices",
+     "indicators",
+     "regime",
+     "cues",
+     "sectors",
+     "model_score"
+    ]
+   },
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live_from": null,
+   "live": false,
+   "settled_trades": 0
+  }
+ },
+ "companies": [
+  {
+   "market": "india",
+   "ticker": "ADANIPORTS",
+   "name": "Adani Ports",
+   "sector": "Transport",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "DRREDDY",
+   "name": "Dr Reddy's",
+   "sector": "Pharma",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "HDFCBANK",
+   "name": "HDFC Bank",
+   "sector": "Banks",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "HDFCLIFE",
+   "name": "HDFC Life",
+   "sector": "Insurance",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "HINDALCO",
+   "name": "Hindalco",
+   "sector": "Metals",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "HINDUNILVR",
+   "name": "Hindustan Unilever",
+   "sector": "Consumer goods",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "ICICIBANK",
+   "name": "ICICI Bank",
+   "sector": "Banks",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "INDIGO",
+   "name": "InterGlobe Aviation",
+   "sector": "Transport",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "INFY",
+   "name": "Infosys",
+   "sector": "IT",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "ITC",
+   "name": "ITC",
+   "sector": "Consumer goods",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "LT",
+   "name": "Larsen & Toubro",
+   "sector": "Construction",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "M&M",
+   "name": "Mahindra & Mahindra",
+   "sector": "Autos",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "MARUTI",
+   "name": "Maruti Suzuki",
+   "sector": "Autos",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "ONGC",
+   "name": "ONGC",
+   "sector": "Energy",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "RELIANCE",
+   "name": "Reliance Industries",
+   "sector": "Energy",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "SBILIFE",
+   "name": "SBI Life Insurance",
+   "sector": "Insurance",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "SUNPHARMA",
+   "name": "Sun Pharma",
+   "sector": "Pharma",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "TATASTEEL",
+   "name": "Tata Steel",
+   "sector": "Metals",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "TCS",
+   "name": "Tata Consultancy Services",
+   "sector": "IT",
+   "state": "active"
+  },
+  {
+   "market": "india",
+   "ticker": "ULTRACEMCO",
+   "name": "UltraTech Cement",
+   "sector": "Construction",
+   "state": "active"
+  }
+ ],
+ "rows": [
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.always_up.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": "all",
+   "trades": 49200,
+   "net_pnl": -101615295.13,
+   "mean_return_pct": -2.0654,
+   "win_rate": 0.1905,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 294,
+   "max_drawdown": -101618163.14,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-08",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 49200,
+    "m": 3,
+    "low_pct": -2.0907,
+    "high_pct": -2.0412,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.098,
+    "corrected_high_pct": -2.0342,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -123233910.33,
+    "mean_return_pct": -2.5048
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.always_up.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 1,
+   "trades": 9880,
+   "net_pnl": -20074319.83,
+   "mean_return_pct": -2.0318,
+   "win_rate": 0.124,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 128,
+   "max_drawdown": -20077187.84,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-08",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 9880,
+    "m": 3,
+    "low_pct": -2.0712,
+    "high_pct": -1.9923,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.0798,
+    "corrected_high_pct": -1.985,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -24415757.21,
+    "mean_return_pct": -2.4712
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.always_up.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 2,
+   "trades": 9860,
+   "net_pnl": -20204384.24,
+   "mean_return_pct": -2.0491,
+   "win_rate": 0.1686,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 121,
+   "max_drawdown": -20207915.32,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-08",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 9860,
+    "m": 3,
+    "low_pct": -2.0978,
+    "high_pct": -1.9979,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.111,
+    "corrected_high_pct": -1.9869,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -24536961.81,
+    "mean_return_pct": -2.4885
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.always_up.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 3,
+   "trades": 9840,
+   "net_pnl": -20325478.89,
+   "mean_return_pct": -2.0656,
+   "win_rate": 0.1999,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 101,
+   "max_drawdown": -20328354.22,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-08",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 9840,
+    "m": 3,
+    "low_pct": -2.1219,
+    "high_pct": -2.0101,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.1367,
+    "corrected_high_pct": -1.9983,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -24649201.8,
+    "mean_return_pct": -2.505
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.always_up.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 4,
+   "trades": 9820,
+   "net_pnl": -20448507.71,
+   "mean_return_pct": -2.0823,
+   "win_rate": 0.221,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 65,
+   "max_drawdown": -20456158.5,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-08",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 9820,
+    "m": 3,
+    "low_pct": -2.1466,
+    "high_pct": -2.0153,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.1578,
+    "corrected_high_pct": -1.9974,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -24763373.46,
+    "mean_return_pct": -2.5217
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.always_up.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 5,
+   "trades": 9800,
+   "net_pnl": -20562604.46,
+   "mean_return_pct": -2.0982,
+   "win_rate": 0.2396,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 114,
+   "max_drawdown": -20566362.67,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-08",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 9800,
+    "m": 3,
+    "low_pct": -2.1675,
+    "high_pct": -2.0272,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.1832,
+    "corrected_high_pct": -2.0139,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -24868616.05,
+    "mean_return_pct": -2.5376
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.model_only.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": "all",
+   "trades": 5787,
+   "net_pnl": -12656326.4,
+   "mean_return_pct": -2.187,
+   "win_rate": 0.1961,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 98,
+   "max_drawdown": -12787895.15,
+   "sample_badge": "ok",
+   "first_entry": "2025-06-04",
+   "last_exit": "2026-04-09",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 5787,
+    "m": 3,
+    "low_pct": -2.2668,
+    "high_pct": -2.1062,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.2832,
+    "corrected_high_pct": -2.0887,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -15198902.47,
+    "mean_return_pct": -2.6264
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.model_only.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 1,
+   "trades": 25,
+   "net_pnl": -40702.26,
+   "mean_return_pct": -1.6281,
+   "win_rate": 0.2,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 13,
+   "max_drawdown": -40702.26,
+   "sample_badge": "ok",
+   "first_entry": "2025-06-04",
+   "last_exit": "2026-01-28",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 25,
+    "m": 3,
+    "low_pct": -2.2962,
+    "high_pct": -0.9493,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.4377,
+    "corrected_high_pct": -0.8459,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -51688.46,
+    "mean_return_pct": -2.0675
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.model_only.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 2,
+   "trades": 1062,
+   "net_pnl": -2202855.51,
+   "mean_return_pct": -2.0743,
+   "win_rate": 0.1751,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 51,
+   "max_drawdown": -2202855.51,
+   "sample_badge": "ok",
+   "first_entry": "2025-06-04",
+   "last_exit": "2026-04-06",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 1062,
+    "m": 3,
+    "low_pct": -2.244,
+    "high_pct": -1.9094,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.2794,
+    "corrected_high_pct": -1.8878,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -2669488.11,
+    "mean_return_pct": -2.5136
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.model_only.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 3,
+   "trades": 1409,
+   "net_pnl": -3129617.0,
+   "mean_return_pct": -2.2212,
+   "win_rate": 0.1725,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 59,
+   "max_drawdown": -3134728.31,
+   "sample_badge": "ok",
+   "first_entry": "2025-10-03",
+   "last_exit": "2026-04-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 1409,
+    "m": 3,
+    "low_pct": -2.3631,
+    "high_pct": -2.0696,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.399,
+    "corrected_high_pct": -2.0366,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -3748655.63,
+    "mean_return_pct": -2.6605
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.model_only.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 4,
+   "trades": 1592,
+   "net_pnl": -3523491.45,
+   "mean_return_pct": -2.2132,
+   "win_rate": 0.2023,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 62,
+   "max_drawdown": -3571958.43,
+   "sample_badge": "ok",
+   "first_entry": "2025-09-03",
+   "last_exit": "2026-04-08",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 1592,
+    "m": 3,
+    "low_pct": -2.3725,
+    "high_pct": -2.0593,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.4077,
+    "corrected_high_pct": -2.0249,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -4222952.21,
+    "mean_return_pct": -2.6526
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.model_only.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 5,
+   "trades": 1699,
+   "net_pnl": -3759660.18,
+   "mean_return_pct": -2.2129,
+   "win_rate": 0.2231,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 114,
+   "max_drawdown": -3854483.45,
+   "sample_badge": "ok",
+   "first_entry": "2025-08-04",
+   "last_exit": "2026-04-09",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 1699,
+    "m": 3,
+    "low_pct": -2.3821,
+    "high_pct": -2.0418,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.4198,
+    "corrected_high_pct": -2.0123,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -4506118.06,
+    "mean_return_pct": -2.6522
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.momentum.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": "all",
+   "trades": 23844,
+   "net_pnl": -49867780.44,
+   "mean_return_pct": -2.0914,
+   "win_rate": 0.1871,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 171,
+   "max_drawdown": -49867780.44,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-09",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 23844,
+    "m": 3,
+    "low_pct": -2.1274,
+    "high_pct": -2.0547,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.1329,
+    "corrected_high_pct": -2.0478,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -60344265.64,
+    "mean_return_pct": -2.5308
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.momentum.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 1,
+   "trades": 4787,
+   "net_pnl": -9883115.96,
+   "mean_return_pct": -2.0646,
+   "win_rate": 0.1199,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 83,
+   "max_drawdown": -9883115.96,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-09",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 4787,
+    "m": 3,
+    "low_pct": -2.1201,
+    "high_pct": -2.0073,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.136,
+    "corrected_high_pct": -1.9976,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -11986462.87,
+    "mean_return_pct": -2.504
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.momentum.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 2,
+   "trades": 4775,
+   "net_pnl": -9933457.05,
+   "mean_return_pct": -2.0803,
+   "win_rate": 0.1657,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 128,
+   "max_drawdown": -9933457.05,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-09",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 4775,
+    "m": 3,
+    "low_pct": -2.1512,
+    "high_pct": -2.0102,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.165,
+    "corrected_high_pct": -1.9967,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -12031500.79,
+    "mean_return_pct": -2.5197
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.momentum.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 3,
+   "trades": 4769,
+   "net_pnl": -9965787.84,
+   "mean_return_pct": -2.0897,
+   "win_rate": 0.1988,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 50,
+   "max_drawdown": -9965787.84,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-09",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 4769,
+    "m": 3,
+    "low_pct": -2.1707,
+    "high_pct": -2.0042,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.1871,
+    "corrected_high_pct": -1.9906,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -12061174.82,
+    "mean_return_pct": -2.5291
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.momentum.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 4,
+   "trades": 4760,
+   "net_pnl": -10037358.1,
+   "mean_return_pct": -2.1087,
+   "win_rate": 0.2176,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 69,
+   "max_drawdown": -10037358.1,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-09",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 4760,
+    "m": 3,
+    "low_pct": -2.1958,
+    "high_pct": -2.0162,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.2122,
+    "corrected_high_pct": -1.9933,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -12128755.99,
+    "mean_return_pct": -2.5481
+   }
+  },
+  {
+   "scope": "strategy",
+   "market": "india",
+   "view": "accuracy",
+   "basis": "backtest",
+   "strategy_id": "base.momentum.v1",
+   "family": "baseline",
+   "pick_rule": null,
+   "ticker": null,
+   "regime": null,
+   "horizon_days": 5,
+   "trades": 4753,
+   "net_pnl": -10048061.49,
+   "mean_return_pct": -2.114,
+   "win_rate": 0.2342,
+   "target_reached_rate": null,
+   "median_reached_session": null,
+   "avg_target_error_pct": null,
+   "range_hit_rate": null,
+   "worst_losing_streak": 60,
+   "max_drawdown": -10048061.49,
+   "sample_badge": "ok",
+   "first_entry": "2024-10-09",
+   "last_exit": "2026-10-07",
+   "luck_test": {
+    "method": "percentile bootstrap of the mean net return per trade (%), 2000 resamples; corrected: Bonferroni over the m rows compared in the same scope, market, view, basis, company, regime and horizon (scoreboard.peer_key)",
+    "n": 4753,
+    "m": 3,
+    "low_pct": -2.2128,
+    "high_pct": -2.011,
+    "excludes_zero": true,
+    "corrected_low_pct": -2.23,
+    "corrected_high_pct": -1.9886,
+    "corrected": true
+   },
+   "your_cost": {
+    "net_pnl": -12136371.17,
+    "mean_return_pct": -2.5534
+   }
+  }
+ ],
+ "cells": [],
+ "lines": [],
+ "bases": [
+  "backtest"
+ ],
+ "backtest_run": {
+  "history": false,
+  "first_date": "2024-10-07",
+  "last_date": "2026-10-07",
+  "eurusd": null,
+  "note": null
+ }
+}

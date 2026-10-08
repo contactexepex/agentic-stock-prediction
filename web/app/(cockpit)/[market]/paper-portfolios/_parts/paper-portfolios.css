@@ -1,0 +1,75 @@
+/* Paper portfolios page styles (B16), ported from the mockup's template.html <style> block and scoped under .p-portfolios
+   so they never reach another page. Page-local layout only; every colour is a design-system token. */
+.p-portfolios .ctrls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.p-portfolios .ctrls .c{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .h2h{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.p-portfolios .fbox{border-radius:12px;padding:14px 16px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:8px;align-content:start}
+.p-portfolios .fbox .fh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.p-portfolios .fbox .fh b{font-size:14px}
+.p-portfolios .fbox .fh small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.p-portfolios .fbox .tot{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.p-portfolios .fbox .tot .n{font:700 24px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.4px}
+.p-portfolios .fbox .tot small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.p-portfolios .pr{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:12.5px;padding:7px 0;border-top:1px solid var(--md-sys-color-surface-container-high)}
+.p-portfolios .pr .l{color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pr .st{display:flex;gap:10px;flex-wrap:wrap;color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pr b{white-space:nowrap}
+.p-portfolios .luck{display:inline-flex;align-items:center;gap:6px}
+.p-portfolios .luck svg{width:80px;height:16px;display:block;flex:none}
+.p-portfolios .luck .z{stroke:var(--mb-chart-axis)}
+.p-portfolios .luck .raw{stroke:var(--mb-chart-1);stroke-width:2;opacity:.45}
+.p-portfolios .luck .cor{stroke:var(--mb-chart-1);stroke-width:5;stroke-linecap:round}
+.p-portfolios .luck .mean{fill:var(--md-sys-color-on-surface)}
+.p-portfolios .luck .cor.edge{stroke:var(--mb-color-up)}
+.p-portfolios .ot td{vertical-align:middle}
+.p-portfolios .ot .h-lab{font-size:11.5px}
+.p-portfolios .ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.p-portfolios .ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.p-portfolios .ot tr.grp td .tk,.p-portfolios .ot tr.grp td .mb-label,.p-portfolios .ot tr.grp td .mb-delta,.p-portfolios .ot tr.grp td small{display:inline-block;vertical-align:middle}
+.p-portfolios .ot .nm b{display:block;font-size:13px;font-weight:600}
+.p-portfolios .ot .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.p-portfolios .own td{vertical-align:middle}
+.p-portfolios .own .pn b{font-weight:700}
+.p-portfolios .own .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.p-portfolios .eur{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
+.p-portfolios .eur .n{border-radius:8px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.p-portfolios .eur .n .l{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .eur .n .v{font-weight:700;font-size:15px}
+.p-portfolios .eur .n .s{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px}
+.p-portfolios .tl li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.p-portfolios .tl li:first-child{border-top:0}
+.p-portfolios .tl li small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.p-portfolios .pend{display:grid;gap:6px;margin-top:10px}
+.p-portfolios dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(480px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+.p-portfolios dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+.p-portfolios dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+.p-portfolios dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+.p-portfolios dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios dialog .dbody input,.p-portfolios dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
+.p-portfolios dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.p-portfolios dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+@media (max-width:1359px){
+  .p-portfolios .ot .c3{display:none}
+}
+@media (max-width:1199px){
+  .p-portfolios .ot .cw{display:none}
+  .p-portfolios .eur{grid-template-columns:1fr 1fr}
+}
+@media (max-width:1000px){
+  .p-portfolios .own .cw{display:none}
+}
+@media (max-width:760px){
+  .p-portfolios .h2h{grid-template-columns:1fr}
+  .p-portfolios .ot .cm,.p-portfolios .own .cm{display:none}
+  .p-portfolios .ot th,.p-portfolios .ot td,.p-portfolios .own th,.p-portfolios .own td{padding:8px 6px;white-space:normal}
+  .p-portfolios .ot .st{white-space:normal;display:inline}
+  .p-portfolios .ot .mb-label{white-space:normal}
+  .p-portfolios .luck svg{display:none}
+  .p-portfolios .pr{grid-template-columns:1fr auto}
+  .p-portfolios .pr .st{grid-column:1 / span 2}
+}
+@media (max-width:599px){
+  .p-portfolios .eur{grid-template-columns:1fr}
+  .p-portfolios dialog .row2{grid-template-columns:1fr}
+}

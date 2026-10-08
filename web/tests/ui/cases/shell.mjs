@@ -29,6 +29,45 @@ export const cases = [
   { name: "state-bad-ticker", path: "/india/stocks/not-a-ticker", widths: [1280], waitFor: '[role="alert"]', expectText: ["Not found"] },
   { name: "unknown-market-404", path: "/mars", status: 404, allowConsole: [HTTP_ERROR_LINE], widths: [1280], keyboard: false, expectText: ["Page not found"] },
   {
+    name: "gallery",
+    path: "/india/gallery",
+    widths: [1280, 390],
+    waitFor: ".mb-candles canvas",
+    expectText: ["Component gallery", "viable at your cost"],
+    check: async (page) => {
+      const problems = [];
+      if (await page.$('.mb-sidebar [aria-current="page"]')) problems.push("the gallery marks a sidebar page as current");
+      const failed = await page.$(".mb-candles .quiet");
+      if (failed) problems.push("the vendored chart did not draw");
+      const hit = page.locator(".mb-chart rect.hit").first();
+      await hit.focus();
+      if (!(await page.$eval("#tip", (t) => t.classList.contains("on") && t.textContent.includes("Rule")))) problems.push("focusing a line-chart column did not show its values");
+      await page.click('th button.sort:has-text("Move")');
+      const sort = await page.getAttribute('th:has(button:has-text("Move"))', "aria-sort");
+      if (sort !== "descending") problems.push(`sort by Move gave aria-sort=${sort}`);
+      const first = await page.locator("table[aria-label='Sample table'] tbody tr td").first().textContent();
+      if (first !== "Alpha") problems.push(`descending sort put ${first} first`);
+      await page.click('.pager button:has-text("Next")');
+      if (!(await page.$('.pager button[aria-current="page"]:has-text("2")'))) problems.push("Next did not move the pager to page 2");
+      return problems;
+    },
+  },
+  {
+    name: "phone-tab-order",
+    path: "/india",
+    widths: [390],
+    waitFor: ".phead",
+    keyboard: false,
+    check: async (page) => {
+      const problems = [];
+      for (let i = 0; i < 4; i++) {
+        await page.keyboard.press("Tab");
+        if (await page.evaluate(() => !!document.activeElement?.closest(".mb-sidebar"))) problems.push(`Tab stop ${i + 1} is inside the closed drawer`);
+      }
+      return problems;
+    },
+  },
+  {
     name: "market-switch",
     path: "/india/watchlist",
     widths: [1280],

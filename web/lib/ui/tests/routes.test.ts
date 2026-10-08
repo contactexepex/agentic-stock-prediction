@@ -3,9 +3,10 @@ import { test } from "node:test";
 import { apiPath, companyPath, isMarket, lifecyclePath, marketOfPath, pageOfPath, pagePath, PAGES, switchMarketPath } from "../routes.ts";
 
 test("every page of SPEC section 6 has one route and a mockup", () => {
-  assert.equal(PAGES.length, 12);
-  assert.equal(new Set(PAGES.map((p) => p.segment)).size, 12);
-  assert.deepEqual(PAGES.map((p) => p.mockup.slice(0, 2)), ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]);
+  const spec = PAGES.filter((p) => p.mockup);
+  assert.equal(spec.length, 12);
+  assert.equal(new Set(PAGES.map((p) => p.segment)).size, PAGES.length);
+  assert.deepEqual(spec.map((p) => p.mockup.slice(0, 2)), ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]);
 });
 
 test("page paths", () => {
@@ -23,6 +24,7 @@ test("the page of a path", () => {
   assert.equal(pageOfPath("/us/stocks/AAPL/strategies").key, "strategies");
   assert.equal(pageOfPath("/us/stocks/AAPL/lifecycle/2026-10-07").key, "company");
   assert.equal(pageOfPath("/us/help").key, "help");
+  assert.equal(pageOfPath("/us/gallery").key, "gallery");
   assert.equal(marketOfPath("/us/news"), "us");
   assert.equal(marketOfPath("/mars"), null);
   assert.ok(isMarket("india") && !isMarket("IN"));

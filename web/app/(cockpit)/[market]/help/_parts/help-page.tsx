@@ -63,7 +63,8 @@ const NA = <span className="muted">not available right now</span>;
 function Paper({ market, lab }: { market: Market; lab: LabForHelp | null }) {
   const g = lab ? referenceGoLive(lab) : null;
   const cur = lab?.currency ?? "INR";
-  const signalPages: [string, string][] = [["Home", "home"], ["Watchlist", "watchlist"], ["Company", "watchlist"], ["Stock strategies", "watchlist"], ["Strategy lab", "lab"], ["Rule vs AI", "compare"], ["Paper portfolios", "portfolios"]];
+  // Company and Stock strategies need a ticker, so they are named without a link (they open from the watchlist).
+  const signalPages: [string, string | null][] = [["Home", "home"], ["Watchlist", "watchlist"], ["Company", null], ["Stock strategies", null], ["Strategy lab", "lab"], ["Rule vs AI", "compare"], ["Paper portfolios", "portfolios"]];
   const words: Record<string, string> = {
     trades: `About ${GO_LIVE_TRADES_ABOUT} settled trades per strategy`,
     months: `${GO_LIVE_MONTHS} months of forward paper trading`,
@@ -90,7 +91,7 @@ function Paper({ market, lab }: { market: Market; lab: LabForHelp | null }) {
         {signalPages.map(([t, key], i) => (
           <span key={t}>
             {i ? (i === signalPages.length - 1 ? " and " : ", ") : ""}
-            <Link href={pagePath(market, key)}>{t}</Link>
+            {key ? <Link href={pagePath(market, key)}>{t}</Link> : <span data-tip="Opens from a company on the watchlist.">{t}</span>}
           </span>
         ))}
         ) say &quot;No proven strong signals today&quot;. The bar has {checks.length} checks; here is where the reference strategy stands in {lab?.name ?? MARKET_LABEL[market]}:

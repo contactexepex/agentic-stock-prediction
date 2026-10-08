@@ -1,0 +1,550 @@
+{
+ "market": "india",
+ "name": "India (NSE)",
+ "currency": "INR",
+ "as_of": "2026-10-07",
+ "status": {
+  "market": "india",
+  "name": "India (NSE)",
+  "currency": "INR",
+  "as_of": "2026-10-07",
+  "session": {
+   "local_time": "2026-10-08T19:31+05:30",
+   "trading_day": true,
+   "session_date": "2026-10-09",
+   "previous_session": "2026-10-08",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-09T03:45:00+00:00",
+   "session_close_utc": "2026-10-09T10:00:00+00:00",
+   "in_session": false,
+   "late_run": false
+  },
+  "regime": "CALM",
+  "benchmark": {
+   "symbol": "NIFTY50",
+   "name": "Nifty 50",
+   "close": 22603.0508,
+   "close_date": "2026-10-07",
+   "change_pct": -0.76,
+   "change_5d_pct": -0.5
+  },
+  "vol_index": {
+   "symbol": "INDIAVIX",
+   "name": "India VIX",
+   "close": 13.89,
+   "close_date": "2026-10-07",
+   "change_pct": 2.06,
+   "change_5d_pct": 3.58
+  },
+  "runs": {
+   "pre_open": {
+    "at": "2026-10-08T02:17:36Z",
+    "ok": true
+   },
+   "intraday": [],
+   "post_close": {
+    "at": null,
+    "ok": null,
+    "next_at": "2026-10-09T12:15:00Z"
+   },
+   "news": {
+    "at": "2026-10-08T10:19:00Z",
+    "ok": true,
+    "new_items": 378
+   }
+  },
+  "paper_label": "Paper only \u2014 no proven edge yet"
+ },
+ "horizons": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "default_horizon": "all",
+ "go_live": {
+  "proven": false,
+  "months_forward": 0.0,
+  "trades_needed": 300,
+  "beats_best_baseline": null
+ },
+ "strategies": {
+  "rule.model_news.v1": {
+   "id": "rule.model_news.v1",
+   "family": "rule",
+   "name": "Model + news",
+   "description": "The signal model's probability with verified news counted at normal weight. Buys when the model gives at least 55% for a rise. This is the reference the other rule strategies are compared against.",
+   "compared_to": null,
+   "differs_in": null,
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_half.v1": {
+   "id": "rule.model_news_half.v1",
+   "family": "rule",
+   "name": "Model + half news",
+   "description": "Like the reference, but news counts half as much. Tests whether news is over-weighted.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_weight",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_double.v1": {
+   "id": "rule.model_news_double.v1",
+   "family": "rule",
+   "name": "Model + double news",
+   "description": "Like the reference, but news counts twice as much. Tests whether news deserves more weight.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_weight",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_confirmed.v1": {
+   "id": "rule.model_news_confirmed.v1",
+   "family": "rule",
+   "name": "Model + confirmed news only",
+   "description": "Like the reference, but only news confirmed by a filing or by two independent outlets counts; single-source stories are ignored. Tests whether unconfirmed news adds noise.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_statuses",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_high.v1": {
+   "id": "rule.model_news_high.v1",
+   "family": "rule",
+   "name": "Model + major news only",
+   "description": "Like the reference, but only news rated high materiality counts. Tests whether small news matters.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_materiality",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_global.v1": {
+   "id": "rule.model_news_global.v1",
+   "family": "rule",
+   "name": "Model + news + global cues",
+   "description": "Like the reference, plus the other markets' overnight moves, currencies, rates and commodities as model inputs. Tests whether global cues help (they showed no edge in the 15-year back-test).",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "cross_market",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_calm.v1": {
+   "id": "rule.model_news_calm.v1",
+   "family": "rule",
+   "name": "Model + news, calm markets only",
+   "description": "Like the reference, but makes no trades when the market regime is unstable or event-heavy. Tests whether sitting out turbulent days helps.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "regime_filter",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "rule.model_news_strict.v1": {
+   "id": "rule.model_news_strict.v1",
+   "family": "rule",
+   "name": "Model + news, 60% bar",
+   "description": "Like the reference, but buys only when the probability of a rise is at least 60%. Fewer trades; tests whether being pickier pays.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "threshold",
+   "threshold": 0.6,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.always_up.v1": {
+   "id": "base.always_up.v1",
+   "family": "baseline",
+   "name": "Always buy",
+   "description": "Buys every active company every day at every horizon. Any strategy worth having must beat it after costs.",
+   "compared_to": "base.model_only.v1",
+   "differs_in": "signal",
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.momentum.v1": {
+   "id": "base.momentum.v1",
+   "family": "baseline",
+   "name": "Follow yesterday",
+   "description": "Buys a company when its last session closed higher than the one before; predicts down otherwise.",
+   "compared_to": "base.model_only.v1",
+   "differs_in": "signal",
+   "threshold": null,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "base.model_only.v1": {
+   "id": "base.model_only.v1",
+   "family": "baseline",
+   "name": "Model without news",
+   "description": "The signal model alone with news switched off (weight 0). Shows what news adds to the reference.",
+   "compared_to": "rule.model_news.v1",
+   "differs_in": "news_weight",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.news_results.sonnet.v1": {
+   "id": "ai.news_results.sonnet.v1",
+   "family": "ai",
+   "name": "AI news & results (Sonnet)",
+   "description": "A Sonnet trader that reads the company's news with its verification status, results digests, filings and events, without the model score. Decides on what happened to the company.",
+   "compared_to": null,
+   "differs_in": null,
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.pattern_mood.sonnet.v1": {
+   "id": "ai.pattern_mood.sonnet.v1",
+   "family": "ai",
+   "name": "AI price pattern & mood (Sonnet)",
+   "description": "A Sonnet trader that reads prices, indicators, the market regime, global cues and sector moves, without news or the model score. Decides on how the stock and the market behave.",
+   "compared_to": null,
+   "differs_in": null,
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.sonnet.v1": {
+   "id": "ai.combined.sonnet.v1",
+   "family": "ai",
+   "name": "AI combined (Sonnet)",
+   "description": "A Sonnet trader that sees everything the other two see plus the signal model's score and explanation; it may move the model's probability by at most 10 points, with a reason.",
+   "compared_to": null,
+   "differs_in": null,
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  },
+  "ai.combined.opus.v1": {
+   "id": "ai.combined.opus.v1",
+   "family": "ai",
+   "name": "AI combined (Opus)",
+   "description": "The same as the combined Sonnet trader on the stronger Opus model (the existing forecaster, extended). Tests whether the stronger model helps.",
+   "compared_to": "ai.combined.sonnet.v1",
+   "differs_in": "model",
+   "threshold": 0.55,
+   "horizons": [
+    1,
+    3,
+    5
+   ],
+   "live": false,
+   "settled_trades": 0
+  }
+ },
+ "companies": [
+  {
+   "market": "india",
+   "ticker": "ADANIPORTS",
+   "name": "Adani Ports",
+   "sector": "Transport",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "DRREDDY",
+   "name": "Dr Reddy's",
+   "sector": "Pharma",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "HDFCBANK",
+   "name": "HDFC Bank",
+   "sector": "Banks",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "HDFCLIFE",
+   "name": "HDFC Life",
+   "sector": "Insurance",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "HINDALCO",
+   "name": "Hindalco",
+   "sector": "Metals",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "HINDUNILVR",
+   "name": "Hindustan Unilever",
+   "sector": "Consumer goods",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "ICICIBANK",
+   "name": "ICICI Bank",
+   "sector": "Banks",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "INDIGO",
+   "name": "InterGlobe Aviation",
+   "sector": "Transport",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "INFY",
+   "name": "Infosys",
+   "sector": "IT",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "ITC",
+   "name": "ITC",
+   "sector": "Consumer goods",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "LT",
+   "name": "Larsen & Toubro",
+   "sector": "Construction",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "M&M",
+   "name": "Mahindra & Mahindra",
+   "sector": "Autos",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "MARUTI",
+   "name": "Maruti Suzuki",
+   "sector": "Autos",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "ONGC",
+   "name": "ONGC",
+   "sector": "Energy",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "RELIANCE",
+   "name": "Reliance Industries",
+   "sector": "Energy",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "SBILIFE",
+   "name": "SBI Life Insurance",
+   "sector": "Insurance",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "SUNPHARMA",
+   "name": "Sun Pharma",
+   "sector": "Pharma",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "TATASTEEL",
+   "name": "Tata Steel",
+   "sector": "Metals",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "TCS",
+   "name": "Tata Consultancy Services",
+   "sector": "IT",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  },
+  {
+   "market": "india",
+   "ticker": "ULTRACEMCO",
+   "name": "UltraTech Cement",
+   "sector": "Construction",
+   "state": "active",
+   "amount": 100000.0,
+   "amount_overridden": false,
+   "currency": "INR"
+  }
+ ],
+ "session_date": "2026-10-09",
+ "rows": [],
+ "trades": [],
+ "your_costs": [],
+ "picks": [],
+ "reasons": [],
+ "eod": [],
+ "reviews": [],
+ "review_due": {
+  "date": "2026-10-10",
+  "iso_week": "2026-W41"
+ }
+}
