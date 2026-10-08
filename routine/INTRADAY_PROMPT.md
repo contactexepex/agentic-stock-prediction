@@ -21,7 +21,7 @@ to `data/`; you write nothing there yourself.
    model scores as of the check time, and appends one row per ticker to
    `data/<market>/intraday_checks/` and one run row to `data/<market>/intraday_runs/`. Every open paper
    trade (a qualifying strategy prediction, or a head-to-head pick, whose holding window contains
-   today) gets one row in `data/<market>/trade_checks/` and one in `data/<market>/trade_check_details/`
+   today, or one past its exit date that is not settled yet) gets one row in `data/<market>/trade_checks/`
    (price vs entry, target and its own range; flags `outside_range`, `far_from_target`,
    `against_prediction`; whether the target was reached so far), and the check's alerts (flagged open
    trades, material news on a company with an open trade) go to `data/<market>/intraday_alerts/`. A
@@ -47,8 +47,7 @@ to `data/`; you write nothing there yourself.
      remain) and list the dropped check row ids in your final message. No second retry.
 
 5. Save: `git add data/<market>/intraday_checks data/<market>/intraday_runs
-   data/<market>/intraday_explanations data/<market>/trade_checks data/<market>/trade_check_details
-   data/<market>/intraday_alerts` (only those that exist), then
+   data/<market>/intraday_explanations data/<market>/trade_checks data/<market>/intraday_alerts` (only those that exist), then
    `git diff --cached --quiet || git commit -m "<market> intraday TODAY HH:MM UTC"` (TODAY and the
    time from `date -u`) and `git push origin HEAD:main`. Never add `work/`, `reports/`, `summaries/`
    or any other path. If the push is rejected, `git pull --rebase origin main` and push again. If
