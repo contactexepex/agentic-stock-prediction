@@ -224,6 +224,7 @@ def reasons(settled: list[dict]) -> tuple[list[dict], list[dict]]:
 def build_rest(write, settled, opens, eurusd, r2) -> None:
     from catalogue_bars import bar_rows
     from catalogue_calendar import calendar_events
+    from catalogue_lab import backtest, heatmap, reviews_w40
     from catalogue_news import market_status, news_impact, news_items, portfolio, research_review, results_digests
 
     write("lifecycle_event.json", "lifecycle_event", "watchlist_events", lifecycle_events())
@@ -239,5 +240,11 @@ def build_rest(write, settled, opens, eurusd, r2) -> None:
     write("market_status.json", "market_status", None, market_status())
     write("calendar_event.json", "calendar_event", None, calendar_events())
     write("bar.json", "bar", None, bar_rows())
-    write("research_review.json", "research_review", "research_reviews", research_review(row))
+    write("research_review.json", "research_review", "research_reviews",
+          research_review(row) + reviews_w40(row, settled))
+    backtest_rows, backtest_runs = backtest(eurusd)
+    write("scoreboard_backtest_row.json", "scoreboard_row", None, backtest_rows, backtest_runs)
+    maps = heatmap(settled)
+    write("heatmap_cell.json", "heatmap_cell", None, maps["cells"])
+    write("cumulative_line.json", "cumulative_line", None, maps["lines"])
     write("portfolio.json", "portfolio", None, [portfolio(eurusd, r2, DEFAULT_AMOUNT)])
