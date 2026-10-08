@@ -2,16 +2,17 @@
 GET /api/v1/markets/{market}/home (schema HomePayload in api/schemas/home.yaml).
 
 Payload: the page shell; B4's Company records, Agreement (top 5 active companies per horizon), open trades and
-settled trades; B12's latest trade checks by the cut-off; B13's head-to-head picks of the session being predicted,
-newest end-of-day analysis and the head-to-head scoreboard rows per family and pick rule (all horizons: "to date");
-the strategies; and the News window (the same items as the News page). Every signal stays Paper: the shell's
-`status.paper_label` and `go_live` say whether anything is proven. Everything is as of the cut-off; no build time is
-in the payload."""
+settled trades; B12's latest trade checks by the cut-off; the head-to-head picks of the session being predicted
+(B2's stored picks); B13's newest end-of-day analysis and the head-to-head scoreboard rows per family and pick rule
+(all horizons: "to date"); the strategies; and the News window (the same items as the News page). Every signal
+stays Paper: the shell's `status.paper_label` and `go_live` say whether anything is proven. Everything is as of the
+cut-off; no build time is in the payload."""
 
 from __future__ import annotations
 
 from marketbrief.constants.market_pages import HOME_AGREEMENT_TOP, RM_HOME
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY
+from marketbrief.lab import reads as lab_reads
 from marketbrief.warehouse import rm_common, rm_compare, rm_strategies
 from marketbrief.warehouse.market_page_parts import companies, news_selection, pick, session_date, shell, trade_checks
 from marketbrief.warehouse.rm_news import market_mockup
@@ -22,9 +23,10 @@ COMPANY_FIELDS = ("market", "ticker", "name", "exchange", "sector", "state", "am
                   "currency", "last_close", "last_close_date", "change_pct", ("agreement_n1", ("buy", "of")),
                   "open_trades")
 PICK_FIELDS = ("id", "market", "ticker", "made_at", "as_of_date", "session_date", "family", "pick_rule", "status",
-               "strategy_id", "strongest_basis", "ranking", "horizon_days", "prediction_id", "base_close", "prob_up",
-               "move_pct", "loss_pct", "costs_pct", "expected_gain_pct", "candidates", "amount", "currency",
-               "method_version")
+               "strategy_id", "strongest_basis", "horizon_days", "prediction_id", "base_close", "prob_up", "move_pct",
+               "loss_pct", "costs_pct", "expected_gain_pct", "amount", "currency", "method_version")
+RANKING_FIELDS = ("strategy_id", "rank", "basis", "settled_trades", "net_pnl")
+EOD_PROMPT_SQL = "SELECT prompt_version FROM eod_analyses WHERE id = ? AND created_at <= ?::TIMESTAMPTZ LIMIT 1"
 EOD_FIELDS = ("id", "market", "session_date", "settled_trades", "results", "summary", "cited_ids", "reason_ids",
               "prompt_version", "created_at")
 TO_DATE_FIELDS = ("scope", "market", "view", "family", "pick_rule", "horizon_days", "trades", "net_pnl",
@@ -50,16 +52,31 @@ def top_agreement(ctx: BuildContext) -> dict[str, list[dict]]:
 
 
 def head_to_head(ctx: BuildContext) -> list[dict]:
-    """B13's head-to-head picks (rm_compare.picks) of the session being predicted, active companies."""
+    """The head-to-head picks made by the cut-off (B2's lab/reads.picks: first row per id) of the session being
+    predicted, active companies, by company, family and pick rule; with the ranking they came from and every
+    candidate horizon (B13's candidate fields)."""
     day = session_date(ctx)
-    return [pick(row, PICK_FIELDS) for row in rm_compare.picks(ctx)
-            if row["session_date"] == day and row["ticker"] in ctx.active]
+    out = []
+    for row in lab_reads.picks(ctx.con, ctx.cutoff_time):
+        if row["session_date"] != day or row["ticker"] not in ctx.active:
+            continue
+        item = pick(row, PICK_FIELDS)
+        item["made_at"] = rm_common.iso_z(item["made_at"])
+        item["ranking"] = [pick(entry, RANKING_FIELDS) for entry in row.get("ranking") or []]
+        item["candidates"] = [pick(entry, rm_compare.CANDIDATE_FIELDS) for entry in row.get("candidates") or []]
+        out.append(item)
+    return sorted(out, key=lambda p: (p["ticker"], p["family"], p["pick_rule"], p["id"]))
 
 
 def newest_eod(ctx: BuildContext) -> dict | None:
     """B13's newest end-of-day analysis written by the cut-off, or None."""
-    analyses = rm_compare.eod_analyses(ctx)
-    return pick(analyses[0], EOD_FIELDS) if analyses else None
+    analyses = rm_compare.eod_analyses(ctx)  # newest first, B13's record (results shaped per family and pick rule)
+    if not analyses:
+        return None
+    newest = pick(analyses[0], EOD_FIELDS)
+    found = ctx.con.execute(EOD_PROMPT_SQL, [newest["id"], ctx.cutoff]).fetchone()
+    newest["prompt_version"] = found[0] if found else None
+    return newest
 
 
 def to_date(ctx: BuildContext) -> list[dict]:
