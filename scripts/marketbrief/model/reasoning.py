@@ -7,8 +7,10 @@ its decision per horizon (up | down | abstain) and the evidence ids cited. The g
 as-of date, the word limits, every cited id exists and was public by made_at (the forecast gate's
 evidence_times), made_at not in the future, every prediction id is stored for this ticker and as-of date
 and matches the decision of its horizon (and every up/down decision has its stored call), no id stored
-twice. `add` validates again and appends all records (or only the valid ones with --valid-only) with
-written_at = now to data/<market>/agent_reasoning/."""
+twice, except a superseding record (issue #50): a same-day rerun may store the same id again when its made_at is
+later than the stored record's and its debate differs; readers take the newest written_at per ticker and as-of date
+(dashboard reads, warehouse), so the rerun's debate is the one shown. `add` validates again and appends all records
+(or only the valid ones with --valid-only) with written_at = now to data/<market>/agent_reasoning/."""
 from __future__ import annotations
 
 import argparse
@@ -26,6 +28,7 @@ from marketbrief.constants.model import (KIND_AGENT_REASONING, MSG_REASONING_ABS
                                          MSG_REASONING_TICKER, MSG_REASONING_UNKNOWN_EVIDENCE,
                                          MSG_REASONING_UNKNOWN_FIELD, REASONING_CASE_WORDS, REASONING_DECISIONS,
                                          REASONING_VERDICT_WORDS)
+from marketbrief.constants.agent_reasoning import MSG_REASONING_NOT_LATER
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_now, utc_today
 from marketbrief.core.database import connect
@@ -42,6 +45,8 @@ REQUIRED = ("id", "as_of_date", "ticker", "made_at", "bull_case", "bear_case", "
 WRITTEN_AT = "written_at"
 REQUIRED_DECISION_HORIZONS = (1, 5)   # decision_1d and decision_5d are required; decision_<k>d of the other horizons
 ABSTAIN = "abstain"                   # of config/strategies.yaml is optional (absent = abstain)
+# the newest stored record per id (issue #50: a rerun may supersede it)
+STORED_SQL = """SELECT DISTINCT ON (id) * FROM agent_reasoning ORDER BY id, written_at DESC, made_at DESC"""
 
 
 def decision(rec: dict, horizon: int):
@@ -64,7 +69,7 @@ def gate_context(cfg: dict, con) -> dict:
     return {"tickers": set(cfg["tickers"]), "as_of": {t: str(d) for t, d in feats},
             "predictions": {p[0]: {"ticker": p[1], "as_of": str(p[2]), "horizon": p[3], "direction": p[4]}
                             for p in predictions},
-            "stored": {r[0] for r in con.execute("SELECT id FROM agent_reasoning").fetchall()},
+            "stored": {rec["id"]: rec for rec in con.execute(STORED_SQL).df().to_dict("records")},
             "evidence": evidence_times(con), "now": pd.Timestamp(clock())}
 
 
@@ -114,6 +119,29 @@ def prediction_errors(rec: dict, ctx: dict) -> list[str]:
     return errors
 
 
+def debate(rec: dict) -> str:
+    """The record's content without its id, times and written_at, comparable between a file and a stored row."""
+    columns = [c for c in SCHEMAS[KIND_AGENT_REASONING][1] if c not in ("id", "made_at", WRITTEN_AT)]
+    def plain(value):
+        if hasattr(value, "tolist"):
+            value = value.tolist()
+        return None if value is None or (isinstance(value, float) and value != value) else value
+    return json.dumps({c: plain(rec.get(c)) for c in columns}, sort_keys=True, default=str)
+
+
+def stored_id_errors(rec: dict, ctx: dict, made) -> list[str]:
+    """An id already stored: allowed only as a superseding record, made later with a different debate (issue #50)."""
+    stored = ctx["stored"].get(rec["id"])
+    if stored is None:
+        return []
+    if debate(rec) == debate(stored):
+        return [MSG_REASONING_DUPLICATE.format(id=rec["id"])]
+    stored_made = as_utc_timestamp(stored.get("made_at"))
+    if made is None or stored_made is None or made <= stored_made:
+        return [MSG_REASONING_NOT_LATER.format(id=rec["id"], stored=stored.get("made_at"))]
+    return []
+
+
 def check_record(rec, ctx: dict, seen: set[str]) -> list[str]:
     """Reasons one record fails the gate (empty = valid)."""
     if not isinstance(rec, dict):
@@ -130,9 +158,11 @@ def check_record(rec, ctx: dict, seen: set[str]) -> list[str]:
         errors.append(MSG_REASONING_AS_OF.format(given=rec["as_of_date"], want=ctx["as_of"].get(ticker)))
     if rec["id"] != f"{rec['as_of_date']}-{ticker}":
         errors.append(MSG_REASONING_ID.format(want=f"{rec['as_of_date']}-{ticker}"))
-    if rec["id"] in ctx["stored"] or rec["id"] in seen:
-        errors.append(MSG_REASONING_DUPLICATE.format(id=rec["id"]))
     made = as_utc_timestamp(rec["made_at"])
+    if rec["id"] in seen:
+        errors.append(MSG_REASONING_DUPLICATE.format(id=rec["id"]))
+    else:
+        errors += stored_id_errors(rec, ctx, made)
     if made is None or made > ctx["now"]:
         errors.append(MSG_REASONING_MADE_AT.format(given=rec["made_at"]))
     return errors + text_errors(rec) + evidence_errors(rec, ctx, made) + prediction_errors(rec, ctx)

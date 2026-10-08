@@ -16,9 +16,11 @@ def mark(value) -> str:
 
 
 def data_stamp(report_data: dict) -> str:
-    """Hidden line recording which data a report was built from (kept when the agent fills it)."""
+    """Hidden line recording which data a report was built from (kept when the agent fills it): as-of date, regime
+    and, when report.py set it, the forecast outcome (outcome_stamp.py, issue #50)."""
     reg = report_data["regime"].iloc[0]["regime"] if not report_data["regime"].empty else "?"
-    return f"<!-- report-data: as_of={report_data['as_of']} regime={reg} -->"
+    outcome = f" outcome={report_data['outcome']}" if report_data.get("outcome") else ""
+    return f"<!-- report-data: as_of={report_data['as_of']} regime={reg}{outcome} -->"
 
 
 def review_line(review_row: dict, link: str) -> str:

@@ -1,6 +1,6 @@
 """Deterministic gates for the daily run (routine/PROMPT.md; settings in config/validate.yaml).
 
-    python scripts/validate.py --market M --stage collect|news|features|context|forecast|report|all
+    python scripts/validate.py --market M --stage collect|news_collect|news|features|context|forecast|report|all
 
 Prints one JSON summary: `ok`, `failures` and `warnings` (each with `code`, `detail` and the affected `tickers`), plus
 `info`. Exit 1 when any blocking failure is found, else 0.

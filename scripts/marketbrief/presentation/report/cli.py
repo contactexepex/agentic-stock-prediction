@@ -6,7 +6,8 @@ reports/<market>/<session_date>.md and work/slack_<market>.md, and prints their 
 The filled report is the agent-editable source; once the report gate (validate.py) has passed it, html_report.py
 builds reports/<market>/<session_date>.html (the reader's view, linked from Slack) from it.
 A report that was already filled in (no markers left) is kept unless --force, but only while
-its `report-data` line (as_of, regime) matches the data; otherwise it is rebuilt and the old
+its `report-data` line (as_of, regime and the forecast outcome: the as-of date's call ids and this run's gate
+failures, outcome_stamp.py, issue #50) matches the data; otherwise it is rebuilt and the old
 copy is saved to work/report_<market>_<session>.previous.md.
 Run after charts.py (the report embeds the single-purpose charts it wrote)."""
 
@@ -21,6 +22,7 @@ from marketbrief.core.settings import load_settings
 from marketbrief.presentation.report.build import build
 from marketbrief.presentation.report.formatting import data_stamp
 from marketbrief.presentation.report.gather import gather
+from marketbrief.presentation.report.outcome_stamp import forecast_outcome
 
 
 def main() -> int:
@@ -32,12 +34,14 @@ def main() -> int:
     args = parser.parse_args()
     cfg = require_market(args)
     settings = load_settings()
-    report_data = gather(cfg, connect(cfg["market"]))
+    con = connect(cfg["market"])
+    report_data = gather(cfg, con)
+    report_data["outcome"] = forecast_outcome(con, cfg["market"], report_data["as_of"])
     report, slack, url = build(cfg, report_data, settings)
     rpath = paths.ROOT / "reports" / cfg["market"] / f"{report_data['session']}.md"
     rpath.parent.mkdir(parents=True, exist_ok=True)
     # A report without AGENT markers was already filled by an earlier run. Keep its narrative
-    # only while it still describes the same data (as_of and regime in its report-data line), so
+    # only while it still describes the same data (as_of, regime and forecast outcome in its report-data line), so
     # the report and the new Slack draft agree. A stale filled report is rebuilt, and the old
     # one is saved to work/ so its narrative can be reused where it still holds.
     old = rpath.read_text() if rpath.exists() else None
@@ -51,7 +55,7 @@ def main() -> int:
         out["previous_report"] = str(backup.relative_to(paths.ROOT))
         if not args.force:
             why = (
-                "was built from other data (as_of or regime changed)"
+                "was built from other data (as_of, regime or the forecast outcome changed)"
                 if "<!-- report-data:" in old
                 else "has no report-data line (written before that check existed), so it cannot be shown current"
             )

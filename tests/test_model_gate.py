@@ -155,3 +155,26 @@ def test_reasoning_add_appends_schema_rows_once(root, monkeypatch, capsys):
     assert {r["id"] for r in stored} == {"2026-10-05-AAPL", "2026-10-05-BAC"}
     assert set(stored[0]) == set(SCHEMAS[KIND_AGENT_REASONING][1])
     assert any("already stored" in e for e in errors_of(root, [debate()]))
+
+
+def test_reasoning_rerun_supersedes_the_stored_debate(root, monkeypatch, capsys):
+    """Issue #50: a same-day rerun stores its own debate under the same id when it is made later and differs; the
+    newest written_at is the one read (dashboard and warehouse order by written_at). An identical repeat or an
+    earlier one is still refused, and the data stays append-only."""
+    write_jsonl(root, "predictions", date(2026, 10, 6), [call()])
+    path = write_debate(root, [debate()])
+    monkeypatch.setattr(sys, "argv", ["agent_reasoning.py", "--market", "us", "add", str(path)])
+    assert reasoning.main() == 0 and json.loads(capsys.readouterr().out)["added"] == 1
+    rerun = debate(made_at="2026-10-06T11:55:00+00:00", verdict="Rerun: the collect gate passed this time.")
+    assert errors_of(root, [rerun]) == []
+    assert any("same debate" in e for e in errors_of(root, [debate(made_at="2026-10-06T11:55:00+00:00")]))
+    assert any("must be made later" in e for e in errors_of(root, [{**rerun, "made_at": "2026-10-06T11:46:00+00:00"}]))
+    monkeypatch.setenv("MB_NOW", "2026-10-06T12:30:00+00:00")
+    monkeypatch.setattr(sys, "argv", ["agent_reasoning.py", "--market", "us", "add", str(write_debate(root, [rerun]))])
+    assert reasoning.main() == 0 and json.loads(capsys.readouterr().out)["added"] == 1
+    stored = [json.loads(x) for f in (root / "data" / "us" / KIND_AGENT_REASONING).rglob("*.jsonl")
+              for x in f.read_text().splitlines()]
+    assert [r["verdict"] for r in stored] == [debate()["verdict"], rerun["verdict"]]       # both kept
+    newest = connect("us").execute("SELECT DISTINCT ON (ticker) verdict FROM agent_reasoning WHERE as_of_date = "
+                                   "'2026-10-05' ORDER BY ticker, written_at DESC, id").fetchone()[0]
+    assert newest == rerun["verdict"]
