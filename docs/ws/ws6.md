@@ -332,6 +332,14 @@ ORDER BY release_at DESC, id
 `consensus->>'surprise_pct'`, `reaction->>'move_pct'`). The forecast gate need not change: digests cite filing and
 announcement ids, not news ids.
 
+Applied by WS6 on 2026-10-08 (owner's rule: each session applies its own proposals; requested by the B18 shared-doc
+audit): the section is `scripts/marketbrief/results/context_section.py`, printed after "Fundamentals" by a 3-line hook
+plus one import in `scripts/marketbrief/pipeline/context.py`, and the `CLAUDE.md` line "The context pack does not show
+digests yet" now says it does. Differences from the proposal: only active companies (`lifecycle.loader.
+active_tickers`, like the other sections); the window is `detection.lookback_days`; the table adds the release
+`kind` and `numbers_status`; the section is omitted when no digest is in the window, so the pack is unchanged on such
+days. Test: `tests/test_results_context.py`.
+
 **scripts/marketbrief/constants/ai_replay.py** `PUBLIC_AT` (so an as-of replay can copy digests):
 `"results_digests": ["created_at"],  # WS6: a digest once stored (every input <= inputs_until <= created_at)`.
 Until then `ai_replay` lists the kind as "no known publication-time rule" and leaves it out (safe).
