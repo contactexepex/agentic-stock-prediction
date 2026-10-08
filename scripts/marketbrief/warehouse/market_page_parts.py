@@ -1,7 +1,7 @@
 """Parts the market pages (B11: Home, Watchlist, News, Companies; docs/ws/b11.md) share: the page shell every
 payload starts with (rm_common's header, horizons, status block and go-live bar), the News window as of the cut-off
-(computed once per build, Home and News show the same items) and field projections, so each page carries exactly
-the keys its mockup's notes.md lists."""
+(computed once per build, so every page that shows it shows the same items) and field projections, so each page
+carries exactly the keys its mockup's notes.md lists."""
 
 from __future__ import annotations
 
@@ -51,10 +51,3 @@ def companies(ctx: BuildContext, fields: tuple) -> list[dict]:
     `fields`."""
     return [pick(company, fields) for company in rm_common.companies(ctx)]
 
-
-def trade_checks(ctx: BuildContext, fields: tuple[str, ...]) -> list[dict]:
-    """B12's rows of the market's latest intraday trade check by the cut-off (rm_company.trade_checks: every column of
-    the view trade_check_rows, collected companies, by ticker and trade) with `fields`."""
-    from marketbrief.warehouse import rm_company
-
-    return [pick(check, fields) for check in rm_company.trade_checks(ctx)]

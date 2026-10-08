@@ -227,9 +227,10 @@ def test_read_models_keys_envelope_and_payloads(synced):
     overview = json.loads(stored_pages(root, "overview")["_"][4])
     assert overview["overview"] == json.loads(json.dumps(data["overview"]))
     assert overview["disclaimer"] == data["disclaimer"] and overview["plan"] == data["plan"]
-    watch = json.loads(stored_pages(root, "watchlist")["_"][4])  # B11's 2.0 page (warehouse/rm_watchlist.py)
-    assert sorted(c["ticker"] for c in watch["companies"]) == sorted(tickers)
-    assert watch["status"]["market"] == "us" and set(watch["agreement"]) == {"1", "2", "3", "4", "5"}
+    watch = json.loads(stored_pages(root, "watchlist")["_"][4])
+    assert [r["ticker"] for r in watch["rows"]] == [c["ticker"] for c in data["companies"]]
+    row = next(r for r in watch["rows"] if r["ticker"] == "JPM")
+    assert row["last"] == json.loads(json.dumps(company["last"])) and row["ret_1d"] == company["indicators"]["ret_1d"]
     track = json.loads(stored_pages(root, "track_record")["_"][4])
     assert {k: track["track"][k] for k in data["track"]} == json.loads(json.dumps(data["track"]))  # B13's page
 
