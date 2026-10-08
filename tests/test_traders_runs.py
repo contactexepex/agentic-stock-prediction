@@ -48,7 +48,10 @@ def root(tmp_path, monkeypatch):
 
 def test_clean_file_is_stored_with_explicit_abstention(root):
     lines = [agent_record(NEWS, h) for h in (1, 3, 5)] + [ABSTAIN]
-    code, summary = outcome.add(trader(NEWS), two_companies(), write(root / "f.jsonl", lines), 1)
+    path = write(root / "f.jsonl", lines)
+    written = datetime(2026, 10, 7, 11, 45, tzinfo=timezone.utc).timestamp()
+    os.utime(path, (written, written))            # a clockless trader's made_at is the file's write time
+    code, summary = outcome.add(trader(NEWS), two_companies(), path, 1)
     assert code == 0 and summary["predictions"] == 3 and summary["abstentions"] == 1
     rows = stored(root, "strategy_predictions")
     assert [r["id"] for r in rows] == [f"{NEWS}:{AS_OF}-NVDA-{h}d" for h in (1, 3, 5)]
@@ -176,3 +179,28 @@ def test_gate_stamps_made_at_from_the_file_time(root):
     os.utime(path, (early, early))
     errors = outcome.add(trader(NEWS), inputs(stored_predictions=set()), path, 1)[1]["errors"]
     assert {e["code"] for e in errors} == {"LOOK_AHEAD"}
+
+
+def test_clockless_trader_made_at_is_always_the_stamp_and_a_clock_trader_keeps_its_own():
+    """#88: a trader without Bash cannot know the time, so a made_at it states is replaced (warning); the Opus
+    forecaster (Bash) keeps its own."""
+    from marketbrief.traders.run import gate_lines
+    assert trader(NEWS).has_clock is False and trader(OPUS).has_clock is True
+    invented = agent_record(NEWS, 1, made_at="2026-10-07T09:00:00Z")
+    gated = gate_lines([invented], trader(NEWS), inputs(), "2026-10-07T11:45:00Z")
+    assert gated["rows"][0]["made_at"] == "2026-10-07T11:45:00Z"
+    assert [w["code"] for w in gated["warnings"]] == ["MADE_AT_STAMPED"]
+    own = agent_record(OPUS, 1, made_at="2026-10-07T11:44:00Z")
+    kept = gate_lines([own], trader(OPUS), inputs(), "2026-10-07T11:46:00Z")
+    assert kept["rows"][0]["made_at"] == "2026-10-07T11:44:00Z" and kept["warnings"] == []
+
+
+def test_abstain_then_prediction_for_one_horizon_is_refused_and_abstain_time_is_checked():
+    """#84: an abstain line before a prediction of the same horizon is a repeat; an abstain made after the gate's
+    clock is refused."""
+    from marketbrief.traders.run import abstain_errors, gate_lines
+    skip = {**ABSTAIN, "ticker": "NVDA", "horizons": [1]}
+    gated = gate_lines([skip, agent_record(NEWS, 1)], trader(NEWS), inputs(), None)
+    assert gated["rows"] == [] and "TRADER_DUPLICATE" in {e["code"] for e in gated["errors"]}
+    late = {**skip, "made_at": "2026-10-07T12:30:00Z"}          # the gate's clock is 11:50
+    assert [code for code, _ in abstain_errors(late, trader(NEWS), inputs())] == ["TRADER_TIME"]
