@@ -80,8 +80,8 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
     unrealised in money and percent, a **range bar** (the trade's own 50% and 80% bands, the entry dotted, the
     target as a triangle, the last price as the dark line; the numbers in the tooltip), distance to target ("past
     target" once reached), and **today's check** from the latest intraday trade check stored by the cut-off (band
-    position, flags; tooltip with the check's numbers). Below 1360 px the entry, last and to-target columns and the
-    dates go (the tooltips keep them); below 761 px the range bar goes too: strategy, horizon, unrealised, check.
+    position, flags; tooltip with the check's numbers). Below 1360 px the entry, last and to-target columns, the dates
+    and the unrealised percent go (the tooltips keep them); below 761 px the range bar goes too: strategy, horizon, unrealised, check.
 13. **Legend** (signs, tags, badges) and the **footer**: research-only line, `as_of`, `cutoff`, `built_at` and the
     endpoint.
 
