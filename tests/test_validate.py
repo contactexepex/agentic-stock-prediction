@@ -614,3 +614,16 @@ def test_report_stage_lists_skipped_source_queries(root, monkeypatch):
     (root / "work" / "slack_us.skeleton.md").write_text("*Brief*\n")
     out = run("report")
     assert any("no_such_view" in n for n in out["info"]["number_sources"])
+
+
+def test_list_column_types():
+    """INTEGER[] holds integers (strategy_abstentions.horizons as the AI traders store them); other lists hold text."""
+    assert row_checks.type_problem([1, 3, 5], "INTEGER[]", False) is None
+    assert row_checks.type_problem([], "INTEGER[]", False) is None
+    assert row_checks.type_problem(["1"], "INTEGER[]", False) == "not a list of integers"
+    assert row_checks.type_problem([True], "INTEGER[]", False) == "not a list of integers"
+    assert row_checks.type_problem([1.5], "INTEGER[]", False) == "not a list of integers"
+    assert row_checks.type_problem("[1, 3, 5]", "INTEGER[]", False) == "not a list of integers"
+    assert row_checks.type_problem(["a", None], "VARCHAR[]", False) is None
+    assert row_checks.type_problem([1], "VARCHAR[]", False) == "not a list of text"
+    assert SCHEMAS["strategy_abstentions"][1]["horizons"] == "INTEGER[]"
