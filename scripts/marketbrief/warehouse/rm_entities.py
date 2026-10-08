@@ -34,10 +34,11 @@ from marketbrief.warehouse.rm_registry import BuildContext
 
 STATE_ACTIVE = "active"
 MONEY, PCT, PROB = 2, 2, 4
+# each id's first stored row made by the cut-off, from the earliest live_from on (live rows are chosen in Python)
 PREDICTIONS_SQL = """
 WITH p AS (SELECT DISTINCT ON (id) * FROM strategy_predictions WHERE made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at)
 SELECT id, strategy_id, family, ticker, as_of_date, session_date, horizon_days, prob_up, qualifies FROM p
-WHERE session_date = (SELECT max(session_date) FROM p) ORDER BY ticker, horizon_days, strategy_id"""
+WHERE session_date >= ?::DATE ORDER BY ticker, horizon_days, strategy_id"""
 # each ticker's raw bars collected by the cut-off, newest collection per day, sessions of the market only
 RAW_BARS = """WITH p AS (SELECT DISTINCT ON (ticker, date) ticker, date, open, close FROM prices
 WHERE collected_at <= ?::TIMESTAMPTZ AND date <= ?::DATE AND list_contains(?, ticker)
@@ -78,6 +79,30 @@ def iso_time(value) -> str | None:
         if value is None or pd.isna(value)
         else pd.Timestamp(value).tz_convert("UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
     )
+
+
+# ---------- live strategies (Wave 5 go-live; lab/registry.is_live) ----------
+def live(strategy_id: str, session_date) -> bool:
+    """Whether a strategy trades for real on D = session_date: its live_from is set and on or before D."""
+    return registry.is_live(strategy_id, iso_day(session_date))
+
+
+def earliest_live_from() -> str | None:
+    """The earliest live_from of the registry, or None while no strategy is live."""
+    days = [str(spec["live_from"]) for spec in registry.strategies() if spec.get("live_from") is not None]
+    return min(days) if days else None
+
+
+def live_rows(rows: list[dict], day_key: str) -> list[dict]:
+    """The rows of live strategies on their D (`day_key`: session_date of a prediction or pick, entry_date of a
+    trade or check); rows of a strategy before its live_from (rehearsal runs) are never shown."""
+    return [row for row in rows if row.get(day_key) is not None and live(row["strategy_id"], row[day_key])]
+
+
+def newest_batch(rows: list[dict]) -> list[dict]:
+    """The rows of the newest session_date among them."""
+    newest = max((iso_day(row["session_date"]) for row in rows), default=None)
+    return [row for row in rows if iso_day(row["session_date"]) == newest]
 
 
 # ---------- agreement ----------
@@ -129,11 +154,13 @@ def agreement_rows(predictions: list[dict], companies: list[dict], market: str) 
 
 
 def agreement(ctx: BuildContext) -> dict[str, list[dict]]:
-    """The market's Agreement records per horizon (active companies), from the newest predictions by the cut-off."""
+    """The market's Agreement records per horizon (active companies), from the newest live predictions by the
+    cut-off (a strategy's rows count only from its live_from on)."""
 
     def compute() -> dict[str, list[dict]]:
-        frame = ctx.con.execute(PREDICTIONS_SQL, [ctx.cutoff]).df()
-        predictions = [row for row in frame.to_dict("records") if row["ticker"] in ctx.active]
+        since = earliest_live_from()
+        rows = [] if since is None else ctx.con.execute(PREDICTIONS_SQL, [ctx.cutoff, since]).df().to_dict("records")
+        predictions = newest_batch(live_rows([row for row in rows if row["ticker"] in ctx.active], "session_date"))
         active = [company for company in ctx.companies if company["state"] == STATE_ACTIVE]
         return agreement_rows(predictions, sorted(active, key=lambda c: c["ticker"]), ctx.market)
 
@@ -186,6 +213,7 @@ def open_trades(ctx: BuildContext) -> list[dict]:
         past_exit = int(load_intraday_config().get("trades", {}).get("max_sessions_past_exit", 0))
         by_ticker, _skipped = intraday_trades.open_trades(ctx.con, ctx.cfg, session, ctx.cutoff_time, past_exit)
         trades = [trade for ticker, rows in by_ticker.items() if ticker in ctx.collected for trade in rows]
+        trades = live_rows(trades, "entry_date")  # a rehearsal prediction or pick is never an open trade
         tickers = sorted({trade["ticker"] for trade in trades})
         opens = {(ticker, iso_day(day)): value for ticker, day, value in raw_bars(ctx, OPENS_SQL, tickers)}
         closes: dict[str, tuple] = {}

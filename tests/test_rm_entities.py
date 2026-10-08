@@ -150,12 +150,15 @@ def stored(tmp_path_factory):
             }
         ],
     )
-    saved = common.ROOT
+    saved, patch = common.ROOT, pytest.MonkeyPatch()
     common.ROOT = root
+    patch.setattr(rm_entities, "live", live_from(ALL_LIVE_FROM))  # every strategy live before the examples' trades
+    patch.setattr(rm_entities, "earliest_live_from", lambda: ALL_LIVE_FROM)
     try:
         yield {market: BuildContext(load_market(market), connect(market), CUTOFF) for market in MARKETS}
     finally:
         common.ROOT = saved
+        patch.undo()
 
 
 SPLIT_PREDICTION = {
@@ -180,6 +183,14 @@ SPLIT_PREDICTION = {
     "amount": 1000.0,
     "currency": "USD",
 }
+ALL_LIVE_FROM = "2026-09-01"
+
+
+def live_from(day: str, late: tuple[str, ...] = (), late_day: str = "2026-10-08"):
+    """A stand-in for lab/registry.is_live: every strategy live from `day`, those in `late` only from `late_day`."""
+    return lambda strategy_id, session_date: str(session_date)[:10] >= (late_day if strategy_id in late else day)
+
+
 AGREEMENT_KEYS = (
     "market",
     "as_of_date",
@@ -344,3 +355,62 @@ def test_open_trade_factors_come_from_the_stored_splits(stored):
     assert record["unrealised_pnl"] == round(shares * (last / 0.5 - entry), 2)  # entry factor: only 5 Oct
     assert record["unrealised_pct"] == round((last / (entry * 0.5) - 1) * 100, 2)
     assert record["to_target_pct"] == round((1000.0 * 0.25 / last - 1) * 100, 2)  # target factor: both splits
+
+
+def test_rehearsal_rows_are_never_agreement_or_open_trades(stored, monkeypatch):
+    """A strategy counts only from its live_from on (Wave 5): the AI combined trader goes live on 8 Oct, so its
+    7 Oct calls leave the agreement counts, and its trades entered before 8 Oct are not open trades."""
+    late = ("ai.combined.opus.v1",)
+    monkeypatch.setattr(rm_entities, "live", live_from(ALL_LIVE_FROM, late))
+    for market in MARKETS:
+        before = rm_common.agreement(stored[market])
+        before_trades = rm_common.open_trades(stored[market])
+        ctx = BuildContext(load_market(market), stored[market].con, CUTOFF)
+        ctx.__dict__["companies"] = stored[market].companies
+        ctx.memo["status_block"] = rm_common.status_block(stored[market])
+        after = rm_common.agreement(ctx)
+        ticker = "NVDA" if market == "us" else "RELIANCE"
+        for k, rows in after.items():
+            mine = [p for p in catalogue("prediction.json") if p["ticker"] == ticker and p["horizon_days"] == int(k)]
+            kept = [p for p in mine if p["strategy_id"] not in late]
+            row = next(r for r in rows if r["ticker"] == ticker)
+            was = next(r for r in before[k] if r["ticker"] == ticker)
+            assert (row["of"], row["buy"]) == (len(kept), sum(p["qualifies"] for p in kept))
+            assert was["of"] - row["of"] == len(mine) - len(kept)
+        trades = rm_common.open_trades(ctx)
+        assert not any(t["strategy_id"] in late for t in trades)
+        assert {t["trade_id"] for t in trades} == {t["trade_id"] for t in before_trades if t["strategy_id"] not in late}
+
+
+def test_no_live_strategy_means_no_agreement_counts_and_no_open_trades(stored, monkeypatch):
+    monkeypatch.setattr(rm_entities, "live", lambda _strategy_id, _day: False)
+    monkeypatch.setattr(rm_entities, "earliest_live_from", lambda: None)
+    for market in MARKETS:
+        ctx = BuildContext(load_market(market), stored[market].con, CUTOFF)
+        ctx.__dict__["companies"] = stored[market].companies
+        ctx.memo["status_block"] = rm_common.status_block(stored[market])
+        assert rm_common.open_trades(ctx) == []
+        assert all(
+            row["of"] == 0 and row["as_of_date"] is None for rows in rm_common.agreement(ctx).values() for row in rows
+        )
+        assert all(company["open_trades"] == 0 for company in rm_common.companies(ctx))
+
+
+def test_live_rows_and_newest_batch():
+    rows = [
+        {"strategy_id": "a", "session_date": "2026-10-07"},
+        {"strategy_id": "b", "session_date": "2026-10-07"},
+        {"strategy_id": "a", "session_date": "2026-10-08"},
+        {"strategy_id": "a", "session_date": None},
+    ]
+    rule = live_from("2026-10-07", late=("b",), late_day="2026-10-08")
+    import marketbrief.warehouse.rm_entities as module
+
+    saved = module.live
+    module.live = rule
+    try:
+        kept = module.live_rows(rows, "session_date")
+    finally:
+        module.live = saved
+    assert kept == rows[0:1] + rows[2:3]
+    assert module.newest_batch(kept) == rows[2:3]
