@@ -263,7 +263,7 @@ host only (as `neo4j_sync` does).
 |---|---|---|
 | `MOTHERDUCK_TOKEN` | cloud routine sessions | read-write: sync, inbox import |
 | `MOTHERDUCK_READ_TOKEN` | Vercel (server env, not `NEXT_PUBLIC_`) | read-only where available |
-| `MOTHERDUCK_INBOX_TOKEN` | Vercel (both projects), cloud sessions, GitHub Actions secret | writes `market_brief_inbox` only (separate service account; `mcp/inbox.sql`) |
+| `MOTHERDUCK_INBOX_TOKEN` | Vercel (both projects), cloud sessions, GitHub Actions secret | the inbox `market_brief_inbox` (`mcp/inbox.sql`); owner decision 2026-10-08: the owner's all-privileges token, the same account as `market_brief`, so a leaked gateway token reaches `market_brief` too (docs/ws/b5.md) |
 | `GITHUB_DISPATCH_TOKEN` | Vercel | fine-grained, this repo only, Actions read and write: dispatches `onboard.yml` |
 | `SLACK_SIGNING_SECRET` | Vercel gateway | Slack request verification (`SLACK_BOT_TOKEN` unchanged) |
 | `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `MCP_ALLOWED_GITHUB_LOGIN`, `MB_OWNER_GITHUB_ID`, `SESSION_SECRET` | Vercel gateway | `/mcp` sign-in (GitHub OAuth, the owner's login and numeric id) and its signed tokens |
