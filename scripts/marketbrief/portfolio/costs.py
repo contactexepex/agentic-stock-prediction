@@ -6,7 +6,8 @@ keys) a buy and a sell of the same value add up to the signal model's round_trip
 India ("your cost" view, owner decision 50): brokerage (at least the minimum per order), STT, exchange, SEBI, GST
 on (brokerage + exchange + SEBI), slippage, the NRI reporting charge of the trade date; the buy adds stamp duty,
 the sell the DP charge. US: the BUX order fee in EUR converted at `eurusd` (USD per EUR), commission and slippage;
-the sell adds the SEC fee and the FINRA TAF; the FX markup is applied in the EUR view."""
+the sell adds the SEC fee and the FINRA TAF; the FX markup is applied in the EUR view; the portfolio fee (per lot
+and day held) is charged in ledger.py."""
 from __future__ import annotations
 
 from marketbrief.lab.costs import VIEW_YOUR, side_cost

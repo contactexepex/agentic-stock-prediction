@@ -14,7 +14,8 @@ B2_SCHEMAS: Schemas = {
     # expected_move_pct = (target / C - 1) x 100; your_cost_pct / market_cost_pct = the round trip in that view
     # as % of the amount; expected_gain_your_pct = p x move - (1 - p) x loss - your_cost_pct with the picks' move
     # and loss (lab/gain.py); cost_viable = expected_gain_your_pct > 0 (owner decision 2026-10-07; null without a
-    # probability or range; null on settlement rows). market_costs = the paper_trades_settled
+    # probability or range, when the amount buys no whole share at C (no trade, no costs: the cost columns are
+    # null too), and on settlement rows). market_costs = the paper_trades_settled
     # `costs` (strategies are ranked on it); your_costs = market + owner-specific items (India NRI reporting
     # charge per trade date and DP charge; US BUX FX markup each way and the pro-rated portfolio fee); the
     # *_lines are JSON {charge: amount}. net_pnl_* and return_pct_* for settlements only (return = net / amount).

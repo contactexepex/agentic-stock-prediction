@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+import pandas as pd
 import pytest
 from lab_fixtures import INDIA_MADE, INDIA_RATES, NOW, SPLIT, US_MADE, US_RATES, india_data, prediction, us_data
 
@@ -16,7 +17,9 @@ from marketbrief.lab.cost_views import settlement_row, viability, viability_row
 from marketbrief.lab.settle import settle
 from marketbrief.lab.sizing import qualifies, quantity
 from marketbrief.lab.timing import entry_session, exit_session, is_locked
-from marketbrief.portfolio.horizons import resolved_label, sessions_after_d
+from marketbrief.lab.predict_inputs import active_tickers as lab_active_tickers
+from marketbrief.lab.predict_inputs import previous_close
+from marketbrief.portfolio.horizons import active_tickers, resolved_label, score_label, sessions_after_d
 
 H2H = {"id": "h2h:2026-10-01-AAPL-rule-highest_probability", "pick_rule": "highest_probability"}
 
@@ -39,6 +42,34 @@ def test_timing_friday_holiday_and_lock():
     assert resolved_label(5, None, "2026-10-08T11:45:00+00:00") == "n_plus_k"
     assert resolved_label(1, None, "2026-10-07T11:45:00+00:00") == "n_plus_k"
     assert resolved_label(5, "n_plus_k", "2026-10-07T11:45:00+00:00") == "n_plus_k"
+    # a model score (issue #127, B10's model_scores_latest rule): unlabelled 1-day = n_plus_k, unlabelled 5-day =
+    # legacy_5d_d4 whatever its computed_at; a stored label wins
+    assert (score_label(1, None), score_label(5, None), score_label(5, "n_plus_k")) == (
+        "n_plus_k", "legacy_5d_d4", "n_plus_k")
+
+
+def test_previous_close_is_put_on_the_as_of_close_split_basis():
+    # momentum compares the as-of close with the one before, on the as-of close's basis (lab/predict_inputs.py)
+    own = pd.DataFrame({"date": [date(2026, 10, 1), date(2026, 10, 2)], "close": [200.0, 101.0]})
+    split = pd.DataFrame([{"id": "adj-AAPL", "ticker": "AAPL", "ex_date": "2026-10-02", "factor": 0.5}])
+    assert previous_close(own, split, "AAPL") == 100.0                       # 2:1 from 2 Oct: 200 x 0.5
+    assert previous_close(own, split, "MSFT") == 200.0                       # another ticker's split: unchanged
+    assert previous_close(own, split.iloc[0:0], "AAPL") == 200.0             # no adjustment stored
+    assert previous_close(own.iloc[1:], split, "AAPL") is None               # one close only
+
+
+def test_an_empty_active_list_means_no_active_company(monkeypatch):
+    # issue #110: cfg active_tickers [] (B1: every company deactivated) is no company, not every config ticker
+    cfg = {"market": "us", "tickers": {"AAPL": {}, "MSFT": {}}}
+    assert active_tickers({**cfg, "active_tickers": []}) == []
+    assert active_tickers({**cfg, "active_tickers": ["MSFT"]}) == ["MSFT"]
+    assert active_tickers(cfg) == ["AAPL", "MSFT"]                           # no loader key: every config ticker
+
+    def not_built(*_args):
+        raise NotImplementedError
+
+    monkeypatch.setattr("marketbrief.contracts.watchlist.watchlist", not_built)
+    assert lab_active_tickers({**cfg, "active_tickers": []}, NOW) == []
 
 
 def test_qualifies_and_quantity():

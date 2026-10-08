@@ -210,6 +210,27 @@ def test_pnl_us_sell_side_fees():
     assert totals["unrealised_gross"] == 0.0 and service.positions_report(ctx)["positions"] == []
 
 
+
+@pytest.mark.usefixtures("root")
+def test_pnl_us_charges_the_portfolio_fee_per_day_held():
+    # owner decision 2026-10-08: BUX's 0.20%/yr portfolio fee on the lot's buy value x calendar days held / 365
+    ctx = ctx_for()
+    ctx.costs = {**US_COSTS, "portfolio_fee_per_year": 0.002}
+    buy(ctx, quantity=100)                                                   # 100 @ 200 on Thu 1 Oct
+    buy(ctx, side="sell", quantity=40, day=D3, basis="close")                # 40 @ 210 on Mon 5 Oct: 4 days
+    out = service.pnl_report(ctx)
+    realised_fee = 0.002 * 200 * 40 * 4 / 365                                # 0.175342
+    accrued = 0.002 * 200 * 60 * 5 / 365                                     # 60 open to the 6 Oct mark: 0.328767
+    sell_fee = 8400 * 0.0000206 + 40 * 0.000195                              # SEC fee + FINRA TAF
+    totals = out["totals"]
+    assert (totals["portfolio_fee"], totals["accrued_portfolio_fee"]) == (0.18, 0.33)
+    assert totals["realised_net"] == round(400 - sell_fee - realised_fee, 2)
+    exit_cost = 12840 * 0.0000206 + 60 * 0.000195                            # 60 sold at the 214 mark: 0.276204
+    assert totals["unrealised_gross"] == 840.0                               # (214 - 200) x 60
+    assert totals["unrealised_net"] == round(840 - exit_cost - accrued, 2) == 839.4
+    plain = ctx_for()                                                        # no fee configured: unchanged
+    assert service.pnl_report(plain)["totals"]["realised_net"] == round(400 - sell_fee, 2)
+
 @pytest.mark.usefixtures("root")
 def test_same_day_open_before_close():
     ctx = ctx_for()

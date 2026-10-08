@@ -2,8 +2,9 @@
 pick that would trade, as `cost_views` rows (core/schema_b2.py). Costs from lab/costs.py.
 
 - prediction / pick (pre-open): the round trip of the company's amount bought and sold at the reference price
-  C = base_close (India whole shares at C; none affordable: no cost, not viable), the US order fee at the EUR/USD
-  close on or before D, the portfolio fee over the calendar days from D to the planned exit.
+  C = base_close (India whole shares at C; none affordable: no costs and cost_viable null), the US order fee at the
+  EUR/USD close on or before D (none stored that early: the oldest stored close, a later rate; MarketData.eurusd_on),
+  the portfolio fee over the calendar days from D to the planned exit.
   expected_move_pct = (target / C - 1) x 100. Viable (owner decision of 2026-10-07, made in session B6 for every
   session; it replaces decision 51's "move > cost"): the expected gain after your cost is above 0,
       expected_gain_your_pct = p x move - (1 - p) x loss - your_cost_pct > 0,

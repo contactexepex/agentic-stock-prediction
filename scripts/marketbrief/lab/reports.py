@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from marketbrief.constants.kinds import KIND_NEWS_IMPACT
+from marketbrief.core.calendar import last_complete_session
 from marketbrief.lab import backtest, compare, heatmaps, news_impact, reads, registry, scoreboard
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.run import append_new
@@ -64,6 +65,13 @@ def adjusted_bars(con, cfg: dict, now: datetime, symbols: list[str]) -> dict[str
     return out
 
 
+def cache_asof(cached: dict[str, pd.DataFrame], cfg: dict, now: datetime) -> dict[str, pd.DataFrame]:
+    """The history cache's bars dated on or before the newest session final at `now` (a symbol without stored
+    bars takes the cache whole, so its later dates would otherwise look ahead of the run's clock)."""
+    last = pd.Timestamp(last_complete_session(cfg, now))
+    return {key: frame[frame.index <= last] for key, frame in cached.items()}
+
+
 def run_backtest(con, cfg: dict, now: datetime, history: bool, assumed_eurusd: float | None = None) -> dict:
     """F2.3 back-test rows of the no-news strategies on stored bars (plus the history cache with `history`). US:
     the BUX order fee is converted at the stored (or cached) EURUSD closes; without any, only at an explicitly
@@ -75,7 +83,7 @@ def run_backtest(con, cfg: dict, now: datetime, history: bool, assumed_eurusd: f
     if history:
         cached, _ = load_cache(cfg["market"])
         keep = set(cfg["tickers"]) | {fx_key}
-        bars, splice = merged_bars(bars, {k: v for k, v in cached.items() if k in keep})
+        bars, splice = merged_bars(bars, cache_asof({k: v for k, v in cached.items() if k in keep}, cfg, now))
     eurusd = bars.pop(fx_key)["close"] if fx_key and fx_key in bars else None
     fx_source = "stored EURUSD closes" if eurusd is not None else None
     if cfg["market"] == "us" and eurusd is None:

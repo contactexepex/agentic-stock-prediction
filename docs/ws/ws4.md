@@ -202,9 +202,9 @@ differences, for the orchestrator or owner to settle:
    trades carry no horizon. Extra fields: price_basis, mark_date, trade_id. There is also an extra `totals`
    object.
 5. **`CompanyRequest`:** the contract requires `ticker`; `request-company` accepts a ticker or a name.
-6. **Inbox import (ARCHITECTURE.md §9):** `add_trade(..., idempotency_key=<inbox_id>)` already gives the
-   idempotent import. A repeated key is rejected with the earlier row id. `inbox_imports` rows are not
-   built: they belong with the inbox.
+6. **Inbox import (ARCHITECTURE.md §9):** `add_trade(..., idempotency_key=<inbox_id>)` gives the idempotent
+   import. A repeated key is rejected with the earlier row id. Each imported inbox id gets a `command_log` row
+   (ARCHITECTURE.md section 9; `portfolio/inbox_import.py`), not a separate kind.
 
 ### Slack and Claude Code entry
 A message like "bought 10 HDFCBANK at open today" becomes a validated `add-trade` call, run by a Claude Code
@@ -369,12 +369,16 @@ The web tier (B5) writes the owner's paper trades from Slack `/trade`, the Claud
   - the idempotency key is unused (the key is the row's `inbox_id`);
   - the sell is no larger than the quantity held.
 - **Identity:** `source` is the row's `channel`; `config/portfolio.yaml` `trades.sources` gains `dashboard` and
-  `claude_app`. `submitted_by` is the row's identity and `command_id` is the web tier's command id; both are new
-  columns of `portfolio_trades`, null for CLI trades. Nothing is taken from the arguments.
+  `claude_app`. Only the import sets those two: the command line (`add-trade`, `cancel-trade`,
+  `request-company`) refuses `--source dashboard|claude_app` (issue #119). `submitted_by` is the row's identity
+  and `command_id` is the web tier's command id; both are new columns of `portfolio_trades`, null for CLI trades.
+  Nothing is taken from the arguments.
 - **Refusals:**
   - a channel other than dashboard, slack, claude_code or claude_app: `not_allowed_in_channel`;
   - missing fields or a failed check: `validation_failed`;
-  - a key already used by a stored trade: `duplicate`.
+  - a key already used by a stored trade: `duplicate`, with `record_ids` = that trade's id;
+  - a key already used by a watchlist request: `validation_failed` (issue #119), so a duplicate never points at a
+    request.
 - **Logging:** every imported row gets one `command_log` row (B1's format and helper): accepted, refused,
   duplicate or failed.
 - **Not decidable yet:** some requests are logged `failed`, and B1's design retries `failed` rows, so the next
@@ -383,10 +387,21 @@ The web tier (B5) writes the owner's paper trades from Slack `/trade`, the Claud
   - a session bar that can still arrive: no bar of the ticker is stored for that session or any later one, e.g. a
     "today at the close" trade sent before the close.
   - The retry is bounded: once a later bar is stored, a session still without a bar (a data gap, or a date before
-    the stored history) is refused (`validation_failed`, "no stored bar") and never retried.
+    the stored history) is refused (`validation_failed`, the importer's own text "no stored bar for ...; later
+    sessions are stored", issue #125) and never retried.
+  - Not bounded by time: a watchlist ticker whose bars stop for good keeps a same-session request `failed`, with
+    one more `command_log` row per import, until its bars resume or the ticker is deactivated (then the request
+    is refused as not on the watchlist).
 - **As of the clock:** only rows `submitted_at` by the run's clock (MB_NOW-aware) are read.
 - **Idempotent:** an `inbox_id` that a `command_log` row already settled is skipped, so a rerun imports nothing
   twice. A `failed` row is tried again. The inbox is never written.
+- **Concurrent imports (issue #119):** `onboard.yml` (B1) and the routines both run `import-inbox`. The
+  workflow's `concurrency: group: onboard` serialises workflow runs only; a routine is a Claude Code session, not
+  a workflow run, so the two can import the same pending row before either pushes, and the git rebase then keeps
+  both appended lines. Both carry the same trade id (`pt-<market>-<digest of the key>`), so the readers count it
+  once: `portfolio/reads.trade_rows` and `request_rows` keep the first entry of each id. Two `command_log` rows
+  remain for that inbox id. Proposed for B1 / Wave 5 (not built here): the routines dispatch `onboard.yml`
+  instead of importing themselves, so every import shares the workflow's concurrency group.
 - **Numbers as sent:** quantity and price go to `add_trade` unconverted, so its number checks apply (e.g.
   `quantity: true` is refused).
 - **Tests:** `tests/test_portfolio_inbox.py`, on an inbox built from `mcp/inbox.sql`. It covers accepted, refused,
