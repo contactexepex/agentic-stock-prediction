@@ -17,7 +17,7 @@ import pandas as pd
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.intraday.constants import PICK_PICKED, VIEW_ACCURACY, VIEW_HEAD_TO_HEAD
 from marketbrief.intraday.inputs import ADJUSTMENTS_ASOF, CALENDAR_DAYS_PER_SESSION, records, sessions_between
-from marketbrief.lab.registry import by_id, is_live, registry
+from marketbrief.lab import registry as lab_registry
 
 PREDICTION_COLUMNS = (
     "id, strategy_id, family, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, direction, "
@@ -73,10 +73,12 @@ def open_trades(
             candidates.append((pred, VIEW_HEAD_TO_HEAD, pick, made_at))
     out: dict[str, list[dict]] = {}
     refused, not_live, too_long = 0, 0, []
-    specs = by_id(registry()) if candidates else {}   # read only when there is a row to check
+    reg = lab_registry.registry() if candidates else None   # read only when there is a row to check
+    specs = lab_registry.by_id(reg) if candidates else {}
     for pred, view, pick, made_at in candidates:
-        spec = specs.get(pred["strategy_id"])
-        if spec is None or not is_live(spec, pred["session_date"]):   # an unknown id is not live (as is_live)
+        # called through the module, so a test may patch registry.is_live; an unknown id is passed bare (not live)
+        strategy = specs.get(pred["strategy_id"], pred["strategy_id"])
+        if not lab_registry.is_live(strategy, pred["session_date"], reg):
             not_live += 1
             continue
         trade = _trade(cfg, pred, view, pick, made_at, session_date)

@@ -12,7 +12,6 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pytest
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -151,20 +150,12 @@ def stored(tmp_path_factory):
             }
         ],
     )
-    # B2's go-live switch: only strategies live on D have open trades (B9's open_trades), so the config copy makes
-    # every strategy live from the oldest D here
-    config = root / "config"
-    shutil.copytree(REPO / "config", config)
-    reg = yaml.safe_load((config / "strategies.yaml").read_text())
-    for spec in reg["strategies"]:
-        spec["live_from"] = "2026-09-01"
-    (config / "strategies.yaml").write_text(yaml.safe_dump(reg, sort_keys=False))
-    saved, saved_config = common.ROOT, common.CONFIG
-    common.ROOT, common.CONFIG = root, config
+    saved = common.ROOT
+    common.ROOT = root
     try:
         yield {market: BuildContext(load_market(market), connect(market), CUTOFF) for market in MARKETS}
     finally:
-        common.ROOT, common.CONFIG = saved, saved_config
+        common.ROOT = saved
 
 
 SPLIT_PREDICTION = {

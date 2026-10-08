@@ -739,3 +739,24 @@ def test_only_strategies_live_on_d_are_open_trades(market):
     assert skipped["not_live"] == len(gone) and skipped["not_locked"] == before["not_locked"]
     assert summary["skipped_trades"]["not_live"] == len(gone)
     assert not gone & {row["trade_id"] for row in stored(root, "trade_checks")}
+
+
+def test_a_patched_is_live_reaches_open_trades(market, monkeypatch):
+    """open_trades calls registry.is_live through its module, so B4's conftest fixture (registry.is_live patched true)
+    covers it, unknown strategy ids included."""
+    from marketbrief.intraday.trades import open_trades
+    from marketbrief.lab import registry
+
+    root, cfg, _ = market
+    day = datetime.fromisoformat(SESSION).date()
+    every, _ = open_trades(connect(MARKET), cfg, day, CHECK)
+    live_registry(paths.CONFIG, {ident: None for ident in TEST_STRATEGIES})
+    registry._cached.cache_clear()
+    try:
+        _, none_live = open_trades(connect(MARKET), cfg, day, CHECK)
+        monkeypatch.setattr(registry, "is_live", lambda _strategy, _session_date, _reg=None: True)
+        patched, skipped = open_trades(connect(MARKET), cfg, day, CHECK)
+    finally:
+        registry._cached.cache_clear()
+    assert none_live["not_live"] > 0 and skipped["not_live"] == 0
+    assert {t["trade_id"] for g in patched.values() for t in g} == {t["trade_id"] for g in every.values() for t in g}
