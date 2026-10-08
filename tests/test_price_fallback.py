@@ -80,7 +80,7 @@ def make_env(tmp_path, monkeypatch, keep: list[str], today: date, sessions: int 
     (cfg / "markets").mkdir(parents=True)
     doc = yaml.safe_load((REPO / "config" / "markets" / "india.yaml").read_text())
     doc["symbols"] = {"NIFTY50": doc["symbols"]["NIFTY50"]}
-    doc["tickers"] = {t: doc["tickers"][t] for t in keep}
+    doc["company_meta"] = {t: doc["company_meta"][t] for t in keep}
     doc["sectors"] = {"All": keep}
     doc["price_fallback"]["sessions"] = sessions
     (cfg / "markets" / "india.yaml").write_text(yaml.safe_dump(doc))

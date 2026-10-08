@@ -790,8 +790,9 @@ step 3.
 Sessions that need another session's data (B2, B3, B6, B9) build and test against W1's example
 records; real data flows once all of Wave 2 has merged. B1 changes only the loader and the files W1
 assigns to it; every other reader of `cfg` tickers keeps working through the loader.
-`config/markets/<market>.yaml` `tickers:` and the ticker lists under `sectors:` stay until Wave 5
-removes them. Shared files keep the additive rules of the earlier WS waves 0-1 (docs/ws) (one import + one spread line in
+`config/markets/<market>.yaml` `tickers:` stayed until Wave 5: B18 renamed it to `company_meta:` (per-company
+metadata only; membership from the watchlist events). The ticker lists under `sectors:` stay: they give the sector
+order and, in a root without a stored seed event (tests, an unseeded market), the implicit seed's sectors. Shared files keep the additive rules of the earlier WS waves 0-1 (docs/ws) (one import + one spread line in
 `core/schemas.py`, WS-marked constant blocks, `sql/views.sql` blocks at the end). Optional, in parallel:
 a cleanup session for the older open GitHub issues and #59 (files not owned by another session).
 
