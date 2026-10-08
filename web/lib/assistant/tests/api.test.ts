@@ -156,3 +156,20 @@ test("end to end through B5's real executor: the dashboard's assistant asks, rea
   const long = await postQuestion(post(JSON.stringify({ market: "us", question: "x".repeat(501) })), deps);
   assert.equal(long.status, 422, "the 500-character limit is the tools.yaml max_length, checked by the gate");
 });
+
+test("end to end: the panel continues a conversation through the gate with conversation_id; a bad id is refused", async () => {
+  const r = assistantRig();
+  const tools = new ToolLayer({ ...r.layer.deps, explainer: r.explainer });
+  const deps: AssistantApiDeps = { tools, store: r.store, clock: () => r.now.value, gatewayMode: false, origins: [] };
+  r.model.script = [finalAnswer({ text: "First answer.", not_in_data: true })];
+  const first = await (await postQuestion(post(JSON.stringify({ market: "us", question: "First?" })), deps)).json();
+  r.model.script = [finalAnswer({ text: "Second answer.", not_in_data: true })];
+  const res = await postQuestion(post(JSON.stringify({ market: "us", question: "And then?", conversation_id: first.answer.id })), deps);
+  const second = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(second));
+  assert.equal(second.answer.conversation_id, first.answer.id);
+  assert.equal(second.answer.history_turns, 1);
+  assert.equal(r.model.calls[1].messages[1].content, "First answer.");
+  const bad = await postQuestion(post(JSON.stringify({ market: "us", question: "x", conversation_id: "../etc" })), deps);
+  assert.equal(bad.status, 422, "the tools.yaml pattern is checked by the gate");
+});
