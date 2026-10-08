@@ -27,7 +27,7 @@ export class DownRowStore implements RowStore {
 export function row(overrides: Partial<StoredRow> = {}): StoredRow {
   return {
     market: "us", page_key: "_", as_of: "2026-10-06", cutoff: "2026-10-07T11:58:00Z", built_at: "2026-10-07T11:58:00Z",
-    schema_version: "1.1.0", source_commit: "abc",
+    schema_version: "2.0.0", source_commit: "abc",
     payload_sha256: "a".repeat(64), payload: { market: "us", status: { market: "us" } }, ...overrides,
   };
 }

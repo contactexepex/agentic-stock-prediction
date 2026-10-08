@@ -238,7 +238,7 @@ def test_read_models_keys_envelope_and_payloads(synced):
 
 def test_version_and_envelope_match_the_spec():
     spec = openapi_spec.spec()
-    assert spec["info"]["version"] == "1.1.0"
+    assert spec["info"]["version"] == "2.0.0"
     meta = spec["components"]["schemas"]["ReadModelMeta"]["required"]
     assert set(meta) | {"payload"} == set(READ_MODEL_COLUMNS)
 

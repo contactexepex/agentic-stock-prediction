@@ -2,7 +2,7 @@
 // freshness age). The same rules as scripts/marketbrief/warehouse/contract.py `serve`; the shared fixture
 // tests/serve.fixture.json keeps the two equal.
 //   verbatim  the payload as stored (1.0 pages)
-//   page      plus `cutoff` and `built_at` at the top and `freshness` in the `status` block (1.1 pages)
+//   page      plus `cutoff` and `built_at` at the top and `freshness` in the `status` block (2.0 page payloads)
 //   status    plus `freshness` at the top (the status page)
 import { FRESH_MINUTES, type ServeMode } from "./constants.ts";
 

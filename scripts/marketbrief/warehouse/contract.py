@@ -4,7 +4,7 @@ operation's 200 schema in api/openapi.yaml, and its payload matches the approved
 serve(row, mode, now) is what the route returns for a stored rm row (web/lib/data/serve.ts does the same; the shared
 fixture web/lib/data/tests/serve.fixture.json keeps the two equal):
   verbatim  the payload as stored (1.0 pages)
-  page      plus `cutoff` and `built_at` at the top and `freshness` in the `status` block (1.1 pages)
+  page      plus `cutoff` and `built_at` at the top and `freshness` in the `status` block (2.0 page payloads)
   status    plus `freshness` at the top (the status page)
 freshness = {state, built_at, age_minutes}: age = whole minutes from built_at to the request time (never below 0);
 state fresh up to FRESH_MINUTES, stale after, unknown without built_at. Times are ISO UTC with a Z, to the second.

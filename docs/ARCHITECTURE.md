@@ -113,7 +113,7 @@ Primary key `(market, page_key)`. One current row per key. Each `rm` table is sm
 | `rm.portfolio` (planned, WS4) | `_` | `PaperPortfolio` | `GET /api/v1/markets/{market}/portfolio` | WS4's paper-portfolio data kinds |
 
 Wave 3 (B4, docs/ws/b4.md): every table is a `PageBuilder` of a `warehouse/rm_<page>.py` module, found by name;
-the 1.1 page tables of SPEC section 4 are added by the page sessions B11-B13 with their schemas in
+the 2.0 page tables of SPEC section 4 are added by the page sessions B11-B13 with their schemas in
 `api/schemas/<page>.yaml`. The sync checks each payload against its schema (`warehouse/schema_check.py`) before
 writing.
 
@@ -241,7 +241,7 @@ So the design holds under per-second billing and fails under a long per-wake coo
 ## 7. Caching and auth
 
 - **Built (B4)**: `web/lib/data/` (handler, cache, store, serve) and `warehouse/revalidate.py` (the sync's call after
-  its commit, MotherDuck only, non-blocking). 1.1 pages are served with `cutoff` and `built_at` at the top and
+  its commit, MotherDuck only, non-blocking). 2.0 page payloads are served with `cutoff` and `built_at` at the top and
   `freshness` in their `status` block, added by the route (docs/ws/b4.md "Serve modes").
 - **Cache**: each handler fetches through Next's data cache with tag `rm:<table>:<market>:<page_key>`
   and `revalidate: 86400` (a daily safety net only). After a build commits, the sync calls
