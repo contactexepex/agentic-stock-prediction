@@ -1,0 +1,90 @@
+/* Rule vs AI page styles (B16), ported from the mockup's template.html <style> block and scoped under .p-compare
+   so they never reach another page. Page-local layout only; every colour is a design-system token. */
+.p-compare .ctrls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.p-compare .ctrls .c{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+.p-compare .vs{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:16px;align-items:stretch}
+.p-compare .vs .side{border-radius:12px;padding:16px 18px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:10px;align-content:start}
+.p-compare .vs .side.lead{outline:2px solid var(--md-sys-color-primary);outline-offset:-2px}
+.p-compare .vs .fh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.p-compare .vs .fh b{font-size:15px}
+.p-compare .vs .fh small{color:var(--md-sys-color-on-surface-variant);font-size:12px;min-width:0;overflow-wrap:anywhere}
+.p-compare .vs .side *{min-width:0}
+.p-compare .vs .net small{white-space:normal}
+.p-compare .vs .net{font:700 28px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.5px}
+.p-compare .vs .net small{display:block;font:500 12px/1.3 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);letter-spacing:0;margin-top:3px}
+.p-compare .vs .st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.p-compare .vs .st div{font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.p-compare .vs .st b{display:block;font-size:15px;color:var(--md-sys-color-on-surface)}
+.p-compare .vs .mid{display:grid;align-content:center;justify-items:center;gap:8px;padding:0 6px;text-align:center;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);min-width:96px}
+.p-compare .vs .mid .who{font:700 14px/1.2 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface)}
+.p-compare .luck{display:inline-flex;align-items:center;gap:6px}
+.p-compare .luck svg{width:96px;height:16px;display:block;flex:none}
+.p-compare .luck .z{stroke:var(--mb-chart-axis)}
+.p-compare .luck .raw{stroke:var(--mb-chart-1);stroke-width:2;opacity:.45}
+.p-compare .luck .cor{stroke:var(--mb-chart-1);stroke-width:5;stroke-linecap:round}
+.p-compare .luck .mean{fill:var(--md-sys-color-on-surface)}
+.p-compare .luck .cor.edge{stroke:var(--mb-color-up)}
+.p-compare .pks{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.p-compare .pkbox{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.p-compare .pkbox .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px}
+.p-compare .pkbox .h b{font-size:13.5px}
+.p-compare .pk{display:grid;gap:3px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px;min-width:0}
+.p-compare .pk .l1,.p-compare .pk .l2{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.p-compare .pk .l1 small{color:var(--md-sys-color-on-surface-variant)}
+.p-compare .pk .mb-label{font-size:11px;padding:1px 6px}
+.p-compare .pk .g{font-weight:700}
+.p-compare .mt td{vertical-align:middle}
+.p-compare .mt .res b{display:block;font-weight:700}
+.p-compare .mt .res small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.p-compare .mt .win{font-weight:700}
+.p-compare .mt .mb-label{font-size:11px;padding:1px 6px}
+.p-compare .fam3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0 12px}
+.p-compare .fam3 .f{border-radius:10px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:3px}
+.p-compare .fam3 .f .l{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;align-items:center;gap:6px}
+.p-compare .fam3 .f .v{font-weight:700;font-size:16px}
+.p-compare .fam3 .f .s{font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.p-compare .summ{font-size:13.5px;line-height:1.55;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);display:flex;gap:10px;align-items:flex-start}
+.p-compare .summ .ms{flex:none;width:20px;height:20px;color:var(--md-sys-color-primary);margin-top:2px}
+.p-compare .rl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}
+.p-compare .rl li{padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;display:grid;gap:5px}
+.p-compare .rl li:first-child{border-top:0}
+.p-compare .rl .rh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.p-compare .rl .rh b{color:var(--md-sys-color-on-surface)}
+.p-compare .rl .ids{display:flex;gap:4px;flex-wrap:wrap}
+.p-compare .rl .ids code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere}
+.p-compare .rev h3{font:600 13px/1.3 var(--md-ref-typeface-plain);margin:14px 0 6px;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase;letter-spacing:.04em}
+.p-compare .rev pre{margin:6px 0 0;padding:10px 12px;border-radius:8px;background:var(--md-sys-color-surface-container);font:12px/1.5 var(--md-ref-typeface-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.p-compare .rev .prop{border:1px solid var(--md-sys-color-outline-variant);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px}
+.p-compare .rev .prop .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.p-compare .rev .prop .ph b{font-weight:600}
+.p-compare .lead-row{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:13px}
+.p-compare .cum{position:relative}
+.p-compare .cum svg{display:block;width:100%;height:auto;overflow:visible}
+.p-compare .cum .grid line{stroke:var(--mb-chart-grid)}
+.p-compare .cum .ax text{font-size:11px;fill:var(--mb-chart-label)}
+.p-compare .cum .ln{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.p-compare .cum .ln.r{stroke:var(--mb-chart-1)}
+.p-compare .cum .ln.a{stroke:var(--mb-chart-3)}
+.p-compare .cum .pt{stroke:var(--md-sys-color-surface-container-lowest);stroke-width:1.5}
+.p-compare .cum .pt.r{fill:var(--mb-chart-1)}
+.p-compare .cum .pt.a{fill:var(--mb-chart-3)}
+.p-compare .cum .zero{stroke:var(--mb-chart-ink);stroke-dasharray:2 3}
+.p-compare .cum text.lab{font-size:11px;font-weight:600;fill:var(--md-sys-color-on-surface);paint-order:stroke;stroke:var(--md-sys-color-surface-container-lowest);stroke-width:3px}
+@media (max-width:1199px){
+  .p-compare .mt .cw{display:none}
+}
+@media (max-width:1000px){
+  .p-compare .mt .cm{display:none}
+  .p-compare .luck svg{display:none}
+  .p-compare .vs{grid-template-columns:1fr}
+  .p-compare .vs .mid{min-width:0;padding:4px 0}
+}
+@media (max-width:760px){
+  .p-compare .mt th,.p-compare .mt td,.p-compare .mt td.num,.p-compare .mt th.num{padding:8px 4px;white-space:normal}
+  .p-compare .pks{grid-template-columns:1fr}
+  .p-compare .fam3{grid-template-columns:1fr}
+  .p-compare .mt th,.p-compare .mt td{padding:8px 6px;white-space:normal}
+  .p-compare .mt .mb-label{white-space:normal}
+  .p-compare .vs .st{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .p-compare .mt .res small{white-space:normal}
+}
