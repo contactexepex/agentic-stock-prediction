@@ -19,26 +19,28 @@ against luck as the spec demands: the trade count and the luck test sit next to 
 fewer than 20 trades on the company are greyed "too few to rank", and the best strategy overall is shown beside the
 per-company best.
 
-## Layout (desktop: KPI row, two cards side by side, one table; phone: one column)
+## Layout (desktop: KPI row, two cards side by side, one table; phone and widths up to 1000 px: one column)
 1. **Page head**: ticker and name, last close with the day move, sector, the amount per paper trade, a link to the
    company page; chips (session, regime, freshness, Paper).
 2. **Paper band** (shared).
 3. **KPI cards**: agreement at the selected horizon (n of N, average chance); **best on this company** (profit after
    costs on it, trades, "too few to rank"); **best overall** (the market's best across all companies, the luck guard);
-   head-to-head trades today and whether any clears costs.
+   head-to-head trades today, how many clear market costs and how many are viable at the owner's own cost (decision 51).
 4. **Who agrees, by horizon**: a grouped stacked bar chart, one bar per horizon N+1..N+5, stacked by family (rule,
    baselines, AI) with "n/N" on top; the selected horizon is full colour, the others dimmed; clicking a bar or a tab
    selects the horizon (opens on N+1, decision 39). Under it, three family bars for the selected horizon and the
    catalogue's own sentence ("Reliance Industries: 12 of 15 strategies buy at N+1").
 5. **Today's head-to-head picks** (decisions 41-42): Rule and AI boxes naming the family's strongest strategy and
    the basis it was ranked on (this company from 20 trades, else all companies; the full ranking in the tooltip),
-   one row per pick rule with the horizon chip, the chance as an odds meter, the expected gain after costs in money
-   and percent with "clears costs / below costs", the three inputs, and "Why these horizons" (every buyable horizon).
+   one row per pick rule with the horizon chip, the chance as an odds meter, the expected gain after market costs in
+   money and percent with "clears / below market costs" and decision 51's "viable / not viable at your cost", the three
+   inputs, and "Why these horizons" (every buyable horizon with both cost views).
    The no-candidate state says so.
 6. **Every strategy on the company**: all 15 strategies, baselines included, ranked by profit after costs on this
    company (accuracy view, all horizons pooled); rows with no settled trade follow, greyed. Columns: rank, strategy
    (name with its family label and the one setting it differs in, linked to the Strategy lab), profit after costs
-   (with the per-trade mean and the luck test in the tooltip), trades, win rate, average target error, the same
+   (with the trade count under it on every width, the per-trade mean, and in the tooltip the luck test's uncorrected and
+   corrected intervals), trades, win rate, average target error, the same
    strategy overall (all companies), **today at N+k** (the chance as an odds meter with the model probability and
    the trader's adjustment and reason in the tooltip, "would buy" or "no trade" or "down, no trade", the target),
    and the range bar (50% and 80% bands, the target as the triangle, the last close as the dark line). The best
@@ -55,7 +57,8 @@ per-company best.
 - No look-ahead: predictions with `made_at` at or before the cut-off only.
 
 ## Design rules kept
-Design system v2 only; light theme; phone and desktop; never colour alone; keyboard: tabs, links, the chart's bars
+Design system v2 only; light theme; phone and desktop (the agreement chart is drawn at its container's width, so its
+text keeps its size on a phone); never colour alone; keyboard: tabs, links, the chart's bars
 (focusable, Enter selects), every tooltip focusable, Escape closes the drawer; plain language; Paper on every
 signal and trade; "No proven strong signals today"; research only ("would buy" describes the strategy's paper
 rule, never an instruction); horizon selector N+1..N+5 opening on N+1.

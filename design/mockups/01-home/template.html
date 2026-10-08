@@ -159,6 +159,8 @@ footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:ce
   .ot tr.grp td small{display:block;margin-left:0} .ot td.num{white-space:normal}
   .agl li{grid-template-columns:auto auto minmax(0,1fr);padding:12px} .agl .hz{grid-column:1 / span 3;display:flex;align-items:center;gap:12px;text-align:left} .agl .hz small{margin:0} .agl .right{grid-column:1 / span 3;text-align:left;display:flex;align-items:center;gap:8px} .agl .right .l{margin:0}
 }
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+@media (max-width:599px){ .mb-kpi .labs .mb-label{white-space:normal;text-align:left} }
 </style>
 </head>
 <body>
@@ -224,6 +226,15 @@ const stratOf = (m, id) => P(m).strategies[id] || {id, name: id, family: '—'};
 const companyPage = t => `../03-company/page.html#${t}`, strategiesPage = t => `../04-stock-strategies/page.html#${t}`;
 const odds = (p, tipText) => { if (p == null) return el('span', {class:'muted'}, '—'); const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13})); const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5})); return el('span', {class:'mb-odds', 'data-tip': tipText}, s, el('b', {}, pct(p))); };
 const avatar = (ico, kind='', size='') => el('span', {class:`mb-avatar ${kind} ${size}`, 'aria-hidden':'true'}, icon(ico.startsWith('ms-') ? ico : 'ms-' + ico));
+const pickCand = k => (k.candidates || []).find(c => c.horizon_days === k.horizon_days) || null;
+const yourViable = k => { const cd = pickCand(k); return cd && cd.cost_viable != null ? cd.cost_viable : null; };
+function costLabels(cur, k) {
+  const mk = k.expected_gain_pct > 0, cd = pickCand(k), out = [];
+  out.push(el('span', {class:'mb-label ' + (mk ? 'success' : 'neutral'), 'data-tip': `Expected gain after market costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} × ${sgn(k.move_pct)} − ${pct(1 - k.prob_up, 1)} × ${k.loss_pct}% − ${k.costs_pct}% (brokerage, taxes and fees of config/costs.yaml; strategies are ranked on this view).`}, icon(mk ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${mk ? 'clears market costs' : 'below market costs'}`));
+  if (cd && cd.cost_viable != null) out.push(el('span', {class:'mb-label ' + (cd.cost_viable ? 'success' : 'warn'), 'data-tip': `Decision 51, your own costs: with your broker’s extra charges the round trip is ${cd.your_cost_pct}% and the expected gain ${sgn(cd.expected_gain_your_pct)}, so this pick is ${cd.cost_viable ? 'viable' : 'not viable'} at your cost. The flag never blocks a paper trade.`}, icon(cd.cost_viable ? 'ms-check' : 'ms-warning'), cd.cost_viable ? 'viable at your cost' : 'not viable at your cost'));
+  return out;
+}
+const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_pct > 0).length, yv = picked.filter(k => yourViable(k) === true).length, known = picked.filter(k => yourViable(k) != null).length; return `${mk ? `${mk} clear${mk === 1 ? 's' : ''} market costs` : 'none clears market costs'} · ${known ? (yv ? `${yv} viable at your cost` : 'none viable at your cost') : 'your-cost view not stored'}`; };
 const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
 
 /* ---------- state: market from the hash; the horizon opens on N+1 (decision 39) ---------- */
@@ -282,7 +293,8 @@ function kpis(m) {
   const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
   const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
   K.append(card('trending_up', '', `Most agreed at N+${horizon}`, lead && lead.buy ? el('span', {}, el('a', {class:'tk', href: strategiesPage(lead.ticker)}, lead.ticker)) : 'None', lead && lead.buy ? el('span', {}, el('span', {class:'mb-label success'}, `${lead.buy} of ${lead.of} buy`), lead.avg_prob_up != null ? ` avg chance ${pct(lead.avg_prob_up)}` : ' no probability') : 'no strategy buys', 'The company most strategies would buy at the selected horizon (decision 30).'));
-  K.append(card('layers', 'info', 'Head-to-head today', `${picks.length} trades`, el('span', {}, el('span', {class:'mb-label ' + (viable ? 'success' : 'danger')}, icon(viable ? 'ms-check' : 'ms-close'), viable ? `${viable} clear costs` : 'none clears costs'), ' Paper'), 'Up to four paper trades per company: strongest rule strategy and strongest AI trader × two pick rules. "Clears costs" = expected gain after costs above zero.'));
+  const yours = picks.filter(k => yourViable(k) === true).length;
+  K.append(card('layers', 'info', 'Head-to-head today', `${picks.length} trades`, el('span', {class:'labs'}, el('span', {class:'mb-label ' + (viable ? 'success' : 'neutral')}, icon(viable ? 'ms-check' : 'ms-close'), viable ? `${viable} clear market costs` : 'none clears market costs'), el('span', {class:'mb-label ' + (yours ? 'success' : 'warn')}, icon(yours ? 'ms-check' : 'ms-warning'), yours ? `${yours} viable at your cost` : 'none viable at your cost'), el('span', {class:'mb-tag paper'}, 'paper')), 'Up to four paper trades per company: strongest rule strategy and strongest AI trader × two pick rules. "Clears market costs" = expected gain after the market charges above zero (the ranking view); "viable at your cost" adds your own broker’s charges (decision 51).'));
   K.append(card('account_balance_wallet', 'paper', 'Open paper trades', String(p.open_trades.length), el('span', {}, 'unrealised ', moneyDelta(cur, unreal, dec(cur)), ' before costs'), 'Paper trades entered and not yet exited, every strategy and horizon; unrealised against the latest stored close, before costs.'));
   K.append(card('warning', flagged ? 'warn' : 'neutral', 'Alerts', p.trade_checks.length ? `${flagged} flagged` : 'No check yet', p.trade_checks.length ? `of ${p.trade_checks.length} open trades checked at ${fmtLocal(p.trade_checks[0].check_at, m)}` : 'first intraday check pending', 'Open trades flagged by the latest intraday check: outside their range, far from the target, or against the prediction.'));
   return K;
@@ -403,12 +415,12 @@ function ruleVsAi(m) {
 function headToHead(m) {
   const p = P(m), cur = p.currency, picks = p.head_to_head;
   const card = el('section', {class:'card', 'aria-label':'Today’s head-to-head paper trades'});
-  card.append(el('div', {class:'head'}, el('h2', {}, 'Today’s head-to-head trades'), el('span', {class:'mb-tag paper'}, 'paper'), help('Decisions 41-42: for each company, the strongest rule strategy and the strongest AI trader each choose one horizon under two pick rules: best expected gain (the horizon with the highest p × move − (1 − p) × loss − costs) and highest probability. Up to four paper trades of the company’s amount per company per day. A pick clears costs when its expected gain after costs is above zero.'), el('div', {class:'end'}, el('a', {class:'go', href:'../06-rule-vs-ai/page.html'}, 'Rule vs AI', icon('ms-chevron_right')))));
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Today’s head-to-head trades'), el('span', {class:'mb-tag paper'}, 'paper'), help('Decisions 41-42: for each company, the strongest rule strategy and the strongest AI trader each choose one horizon under two pick rules: best expected gain (the horizon with the highest p × move − (1 − p) × loss − costs) and highest probability. Up to four paper trades of the company’s amount per company per day. A pick clears market costs when its expected gain after the market charges is above zero; "viable at your cost" (decision 51) adds your own broker’s charges and is the flag the owner acts on.'), el('div', {class:'end'}, el('a', {class:'go', href:'../06-rule-vs-ai/page.html'}, 'Rule vs AI', icon('ms-chevron_right')))));
   const byTicker = {};
   for (const k of picks) (byTicker[k.ticker] = byTicker[k.ticker] || []).push(k);
   const picked = picks.filter(k => k.status === 'picked'), viable = picked.filter(k => k.expected_gain_pct > 0);
   if (!picks.length) { card.append(el('div', {class:'quiet'}, 'No head-to-head picks stored for today’s session yet.')); return card; }
-  card.append(el('div', {class:'sumline'}, avatar(viable.length ? 'check' : 'info', viable.length ? 'success' : 'neutral', 'sm'), el('span', {}, `${picked.length} paper trades today across ${Object.keys(byTicker).length} compan${Object.keys(byTicker).length === 1 ? 'y' : 'ies'} · `, el('b', {}, viable.length ? `${viable.length} clear costs` : 'No pick clears costs today'), ' (expected gain after costs above zero)')));
+  card.append(el('div', {class:'sumline'}, avatar(viable.length ? 'check' : 'info', viable.length ? 'success' : 'neutral', 'sm'), el('span', {}, `${picked.length} paper trades today across ${Object.keys(byTicker).length} compan${Object.keys(byTicker).length === 1 ? 'y' : 'ies'} · `, el('b', {}, viableLine(picked)), ' (expected gain after costs above zero; your cost = decision 51)')));
   const list = el('div', {class:'h2h'});
   for (const [t, ks] of Object.entries(byTicker)) {
     const c = companyOf(m, t), box = el('div', {class:'cmp'});
@@ -424,7 +436,7 @@ function headToHead(m) {
         row.append(el('span', {class:'rule'}, PICK[k.pick_rule]));
         if (k.status !== 'picked') { row.append(el('span', {class:'line muted'}, 'no candidate')); fb.append(row); continue; }
         row.append(el('span', {class:'line'}, el('span', {class:'h-lab'}, `N+${k.horizon_days}`), odds(k.prob_up, `${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close (the prediction ${k.prediction_id}).`),
-          el('span', {class:'gain'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, dec(cur)), el('span', {class:'mb-label ' + (k.expected_gain_pct > 0 ? 'success' : 'danger'), 'data-tip': `Expected gain after costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up,1)} × ${sgn(k.move_pct)} − ${pct(1-k.prob_up,1)} × ${k.loss_pct}% − ${k.costs_pct}%.`}, icon(k.expected_gain_pct > 0 ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${k.expected_gain_pct > 0 ? 'clears costs' : 'below costs'}`))));
+          el('span', {class:'gain'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, dec(cur)), ...costLabels(cur, k))));
         row.append(el('span', {class:'det'}, `to target ${sgn(k.move_pct)} · downside ${sgn(-k.loss_pct)} · costs ${k.costs_pct}%`));
         fb.append(row);
       }

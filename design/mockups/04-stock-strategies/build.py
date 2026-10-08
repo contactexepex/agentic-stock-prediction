@@ -38,7 +38,8 @@ def payload(market: str, ticker: str, files: dict, cutoff: str) -> dict:
     agreement = {str(k): [r for r in files["agreement"]["records"] if r["market"] == market and r["ticker"] == ticker and r["horizon_days"] == k]
                  for k in HORIZONS}
     picks = [r for r in files["head_to_head_pick"]["records"]
-             if r["market"] == market and r["ticker"] == ticker and r["session_date"] == status["session"]["session_date"]]
+             if r["market"] == market and r["ticker"] == ticker and r["session_date"] == status["session"]["session_date"]
+             and r["made_at"] <= cutoff]
     predictions = sorted((pick(r, PREDICTION_FIELDS) for r in files["prediction"]["records"]
                           if r["market"] == market and r["ticker"] == ticker and r["as_of_date"] == status["as_of"] and r["made_at"] <= cutoff),
                          key=lambda r: (r["strategy_id"], r["horizon_days"]))
@@ -46,7 +47,6 @@ def payload(market: str, ticker: str, files: dict, cutoff: str) -> dict:
                   if r["market"] == market and r["scope"] == "strategy_company" and r["ticker"] == ticker and r["view"] == "accuracy"]
     overall = [pick(r, ROW_FIELDS) for r in files["scoreboard_row"]["records"]
                if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy" and r["horizon_days"] == "all"]
-    reference = next(r for r in overall if r["strategy_id"] == REFERENCE_STRATEGY)
     reference_full = next(r for r in files["scoreboard_row"]["records"]
                           if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy"
                           and r["strategy_id"] == REFERENCE_STRATEGY and r["horizon_days"] == "all")
@@ -59,7 +59,7 @@ def payload(market: str, ticker: str, files: dict, cutoff: str) -> dict:
         "agreement": agreement, "head_to_head": picks, "predictions": predictions,
         "on_company": sorted(on_company, key=lambda r: (r["strategy_id"], str(r["horizon_days"]))),
         "overall": sorted(overall, key=lambda r: r["strategy_id"]),
-        "go_live": reference_full["go_live"], "strategies": strategies,
+        "go_live": pick(reference_full["go_live"], ("proven", "months_forward", "trades_needed", "beats_best_baseline")), "strategies": strategies,
     }
 
 

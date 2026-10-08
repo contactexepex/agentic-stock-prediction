@@ -530,6 +530,7 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 /* KPI row and layout */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
 .mb-kpi .v .tk{font-size:inherit}
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
 .grid{display:grid;grid-template-columns:minmax(0,8fr) minmax(0,4fr);gap:16px;margin-top:16px;align-items:start}
 .grid.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .col{display:grid;gap:16px;min-width:0}
@@ -560,12 +561,13 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:28px 0 8px} footer code{font-family:var(--md-ref-typeface-mono)}
 
 @media (max-width: 1199px){ .kpis{grid-template-columns:repeat(2,1fr)} }
-@media (max-width: 1000px){ .grid{grid-template-columns:1fr} }
+@media (max-width: 1000px){ .grid,.grid.even{grid-template-columns:1fr} }
 @media (max-width: 599px){
   .card{padding:16px}
   .phead{margin-top:16px} .phead h1{font-size:21px} .phead .chips{margin-left:0}
   .kpis{gap:12px} .mb-kpi{padding:14px;grid-template-columns:1fr} .mb-kpi .mb-avatar{grid-row:auto} .mb-kpi .s{grid-column:1} .mb-kpi .v{font-size:22px}
   .mb-alert{grid-template-columns:auto 1fr} .mb-alert .act{grid-column:1 / span 2}
+  .mb-kpi .labs .mb-label{white-space:normal;text-align:left}
   .toolbar input{min-width:0;width:100%}
 }
 
@@ -707,6 +709,16 @@ const stratOf = (m, id) => (P(m).strategies || {})[id] || {id, name: id, family:
 const PAGES = {home: '../01-home/page.html', watchlist: '../02-watchlist/page.html', company: '../03-company/page.html', strategies: '../04-stock-strategies/page.html', lab: '../05-strategy-lab/page.html', compare: '../06-rule-vs-ai/page.html', portfolios: '../07-paper-portfolios/page.html', track: '../08-track-record/page.html', news: '../09-news/page.html', companies: '../10-companies/page.html', assistant: '../11-assistant/page.html', help: '../12-help/page.html'};
 const companyPage = t => `${PAGES.company}#${t}`, strategiesPage = t => `${PAGES.strategies}#${t}`;
 const odds = (p, tipText) => { if (p == null) return el('span', {class:'muted'}, '—'); const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13})); const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5})); return el('span', {class:'mb-odds', 'data-tip': tipText}, s, el('b', {}, pct(p))); };
+/* a pick's costs: the market-cost expected gain it was ranked on, and decision 51's viability at the owner's own cost */
+const pickCand = k => (k.candidates || []).find(c => c.horizon_days === k.horizon_days) || null;
+const yourViable = k => { const cd = pickCand(k); return cd && cd.cost_viable != null ? cd.cost_viable : null; };
+function costLabels(cur, k) {
+  const mk = k.expected_gain_pct > 0, cd = pickCand(k), out = [];
+  out.push(el('span', {class:'mb-label ' + (mk ? 'success' : 'neutral'), 'data-tip': `Expected gain after market costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} × ${sgn(k.move_pct)} − ${pct(1 - k.prob_up, 1)} × ${k.loss_pct}% − ${k.costs_pct}% (brokerage, taxes and fees of config/costs.yaml; strategies are ranked on this view).`}, icon(mk ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${mk ? 'clears market costs' : 'below market costs'}`));
+  if (cd && cd.cost_viable != null) out.push(el('span', {class:'mb-label ' + (cd.cost_viable ? 'success' : 'warn'), 'data-tip': `Decision 51, your own costs: with your broker’s extra charges the round trip is ${cd.your_cost_pct}% and the expected gain ${sgn(cd.expected_gain_your_pct)}, so this pick is ${cd.cost_viable ? 'viable' : 'not viable'} at your cost. The flag never blocks a paper trade.`}, icon(cd.cost_viable ? 'ms-check' : 'ms-warning'), cd.cost_viable ? 'viable at your cost' : 'not viable at your cost'));
+  return out;
+}
+const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_pct > 0).length, yv = picked.filter(k => yourViable(k) === true).length, known = picked.filter(k => yourViable(k) != null).length; return `${mk ? `${mk} clear${mk === 1 ? 's' : ''} market costs` : 'none clears market costs'} · ${known ? (yv ? `${yv} viable at your cost` : 'none viable at your cost') : 'your-cost view not stored'}`; };
 const avatar = (ico, kind='', size='') => el('span', {class:`mb-avatar ${kind} ${size}`, 'aria-hidden':'true'}, icon(ico));
 const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
 const statusBadge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };

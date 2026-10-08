@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Company</title>
+<meta name="description" content="Company page of the personal stock cockpit: what the strategies say today, the price chart with the predicted targets and ranges and the paper trades on it, today's path of the open trades, settled results and why each moved, news with verification status, the results digest, coming events, and the company's watchlist settings. Research only, every signal Paper.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Company mockup (design track, SPEC section 6 page 3). Page-local layout only; every colour is a token. */
+.cohead{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-top:14px}
+.cohead .px{font:700 26px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.5px}
+.cohead .px small{font:500 12.5px/1.2 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);display:block;margin-top:3px;letter-spacing:0}
+.cohead .mb-delta{font-size:15px}
+.cohead .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.cohead .md-btn{height:34px}
+.pickco{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+.pickco select{height:30px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 10px;font:inherit;color:inherit;background:var(--md-sys-color-surface)}
+/* decision card */
+.dec{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.dec .cell{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;align-content:start;gap:6px}
+.dec .cell .l{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;align-items:center;gap:6px}
+.dec .cell .v{font:700 22px/1.15 var(--md-ref-typeface-plain);letter-spacing:-.3px;overflow-wrap:anywhere}
+.dec .cell .v small{font:500 13px/1.2 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);letter-spacing:0}
+.dec .cell .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);overflow-wrap:anywhere}
+.fb{display:grid;gap:4px;margin-top:2px}
+.fb .r{display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;font-size:12px}
+.fb .r .l{color:var(--md-sys-color-on-surface-variant)}
+.fb .bar{height:7px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);overflow:hidden;display:flex}
+.fb .bar i{display:block;height:100%}
+.pkl{display:grid;gap:8px} .pkl .p{display:grid;gap:3px;font-size:12.5px;min-width:0;padding-top:6px;border-top:1px solid var(--md-sys-color-surface-container-high)} .pkl .p1,.pkl .p2{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0} .pkl .p1 small{font-size:11.5px}
+.pkl .p .g{font-weight:700} .pkl .p .mb-label{font-size:11px;padding:1px 6px}
+.plain{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);margin-top:14px;line-height:1.5}
+.plain .ms{flex:none;width:20px;height:20px;color:var(--md-sys-color-primary);margin-top:2px}
+/* price chart */
+.chart{position:relative;margin-top:4px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart svg:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:4px;border-radius:6px}
+.chart .grid line{stroke:var(--mb-chart-grid)} .chart .ax text{font-size:11px;fill:var(--mb-chart-label)} .chart .ax text.on{fill:var(--md-sys-color-primary);font-weight:700}
+.chart .ax line{stroke:var(--mb-chart-axis)}
+.chart .c .w{stroke:var(--mb-chart-ink);stroke-width:1} .chart .c.up .b{fill:var(--md-sys-color-surface-container-lowest);stroke:var(--mb-color-up);stroke-width:1.2} .chart .c.dn .b{fill:var(--mb-color-down);stroke:var(--mb-color-down);stroke-width:1.2}
+.chart .c.up .w{stroke:var(--mb-color-up)} .chart .c.dn .w{stroke:var(--mb-color-down)}
+.chart .vol rect{fill:var(--mb-chart-axis);opacity:.35}
+.chart .fan .b80{fill:var(--mb-chart-band-80)} .chart .fan .b50{fill:var(--mb-chart-band-50)}
+.chart .fan .tl{stroke:var(--mb-chart-1);stroke-width:1.5;stroke-dasharray:4 3;fill:none}
+.chart .fan .tg{fill:var(--mb-chart-1);stroke:var(--md-sys-color-surface-container-lowest);stroke-width:1.5}
+.chart .fan .tg.on{r:5}
+.chart .fan .spread{stroke:var(--mb-chart-3);stroke-width:3;stroke-linecap:round}
+.chart .fan text{font-size:11px;fill:var(--md-sys-color-on-surface);font-weight:600;paint-order:stroke;stroke:var(--md-sys-color-surface-container-lowest);stroke-width:3px;stroke-linejoin:round}
+.chart .mk text{paint-order:stroke;stroke:var(--md-sys-color-surface-container-lowest);stroke-width:3px}
+.chart .vl{stroke:var(--mb-chart-axis);stroke-dasharray:3 3} .chart .vl.on{stroke:var(--md-sys-color-primary)}
+.chart .last line{stroke:var(--mb-chart-ink);stroke-dasharray:2 3} .chart .last rect{fill:var(--mb-chart-ink)} .chart .last text{fill:var(--md-sys-color-surface-container-lowest);font-size:11px;font-weight:700}
+.chart .mk .en{fill:var(--mb-chart-1)} .chart .mk .ex{fill:var(--mb-chart-4)} .chart .mk .op{fill:var(--md-sys-color-surface-container-lowest);stroke:var(--mb-chart-1);stroke-width:1.5}
+.chart .mk text{font-size:9.5px;fill:var(--md-sys-color-on-surface-variant)}
+.chart .hover line{stroke:var(--md-sys-color-on-surface);stroke-dasharray:2 2;opacity:.6}
+.chart .hover circle{fill:var(--md-sys-color-primary);stroke:var(--md-sys-color-surface-container-lowest);stroke-width:2}
+.chart .hit{fill:transparent;cursor:crosshair}
+.ctip{position:absolute;pointer-events:none;background:var(--md-sys-color-inverse-surface);color:var(--md-sys-color-inverse-on-surface);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.4;box-shadow:var(--mb-card-shadow);display:none;z-index:2;max-width:230px}
+.ctip.on{display:block} .ctip b{font-weight:700} .ctip .mono{font-variant-numeric:tabular-nums}
+.chleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:8px;align-items:center}
+.chleg i{display:inline-block;vertical-align:-2px;margin-right:4px}
+.chleg .cu{width:8px;height:12px;border:1.5px solid var(--mb-color-up);border-radius:2px} .chleg .cd{width:8px;height:12px;background:var(--mb-color-down);border-radius:2px}
+.chleg .b8{width:14px;height:10px;background:var(--mb-chart-band-80);border-radius:3px} .chleg .b5{width:14px;height:10px;background:var(--mb-chart-band-50);border-radius:3px}
+.chleg .tg{width:9px;height:9px;border-radius:50%;background:var(--mb-chart-1)} .chleg .sp{width:3px;height:12px;background:var(--mb-chart-3);border-radius:2px}
+.chleg .tri{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent}
+.chleg .tri.en{border-bottom:9px solid var(--mb-chart-1)} .chleg .tri.ex{border-top:9px solid var(--mb-chart-4)}
+.ctl{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* tables */
+.ot td,.sd td{vertical-align:middle}
+.ot .h-lab,.sd .h-lab{font-size:11.5px}
+.ot .nm b,.sd .nm b{display:block;font-size:13px;font-weight:600} .ot .nm small,.sd .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.sd .pn b{font-weight:700} .sd .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.why{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.why svg{width:110px;height:14px;display:block;flex:none}
+.why .z{stroke:var(--mb-chart-axis)} .why .m{fill:var(--mb-chart-1)} .why .s{fill:var(--mb-chart-2)} .why .n{fill:var(--mb-chart-3)} .why .co{fill:var(--mb-chart-4)}
+.why .mb-label{font-size:11px;padding:1px 6px}
+.sumrow{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:13px;margin-bottom:12px}
+.sumrow b{font-size:16px;display:block} .sumrow span{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+/* reasons, news, results, events, lifecycle */
+.rl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.rl li{padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;display:grid;gap:5px}
+.rl li:first-child{border-top:0}
+.rl .rh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.rl .rh b{color:var(--md-sys-color-on-surface)}
+.rl .ids{display:flex;gap:4px;flex-wrap:wrap} .rl .ids code{font:11px/1.6 var(--md-ref-typeface-mono);background:var(--md-sys-color-surface-container);border-radius:4px;padding:0 5px;overflow-wrap:anywhere}
+.nl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.nl li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;min-width:0}
+.nl li:first-child{border-top:0}
+.nl .hd{min-width:0;overflow-wrap:anywhere} .nl .hd a.t{color:inherit;text-decoration:none;font-weight:600} .nl .hd a.t:hover{text-decoration:underline}
+.nl .hd small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:3px}
+.nl .hd .md-badge{margin-left:4px;vertical-align:1px}
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px}
+.nums .n{border-radius:8px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.nums .n .l{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)} .nums .n .v{font-weight:700;font-size:15px;overflow-wrap:anywhere} .nums .n .d{font-size:12px;display:flex;flex-wrap:wrap;gap:0 4px;align-items:center;line-height:1.5}
+.rline{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:12.5px;margin-top:10px;color:var(--md-sys-color-on-surface-variant)}
+.rline b{color:var(--md-sys-color-on-surface)}
+.bul{margin:8px 0 0;padding-left:18px;font-size:13px} .bul li{margin:4px 0}
+.ev{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.ev li{display:grid;grid-template-columns:54px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.ev li:first-child{border-top:0}
+.ev .d{font-weight:700;font-size:12.5px;line-height:1.25} .ev .d small{display:block;font-weight:500;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.ev .t{min-width:0;overflow-wrap:anywhere} .ev .t small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:2px}
+.ev li.me .d{color:var(--md-sys-color-primary)}
+.lc{display:grid;gap:8px;font-size:13px}
+.lc .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .lc .row .l{color:var(--md-sys-color-on-surface-variant);width:118px;font-size:12.5px}
+.lc .hist{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.pend{display:grid;gap:6px;margin-top:10px}
+dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(460px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog .dbody input{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:inherit;background:var(--md-sys-color-surface)}
+dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+@media (max-width:1279px){ .ot .cw{display:none} }
+@media (max-width:1199px){ .dec{grid-template-columns:repeat(2,minmax(0,1fr))} .sd .cw{display:none} }
+@media (max-width:1000px){ .why svg{width:80px} }
+@media (max-width:760px){ .ot .cm,.sd .cm{display:none} .nums{grid-template-columns:1fr 1fr} .ot th,.ot td,.sd th,.sd td{padding:8px 6px;white-space:normal} .ot .nm b,.sd .nm b{white-space:normal} .ot .st{white-space:normal;display:inline} .ot .mb-label,.sd .mb-label{white-space:normal} .ot .nm small,.sd .nm small{white-space:normal} }
+@media (max-width:599px){ .dec{grid-template-columns:1fr} .cohead .acts{margin-left:0;width:100%} .cohead .px{font-size:22px} .lc .row .l{width:100%} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Company</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" id="ask" href="../11-assistant/page.html" data-tip="Ask the assistant about this company (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+<dialog class="md-dialog" id="dlg"></dialog>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let ticker = null, horizon = null, pending = {};
+const hashParts = () => location.hash.slice(1).split('/');
+if (hashParts()[1]) ticker = hashParts()[1];
+shell(PAGES.company, 'Company');
+onMarketChange = () => { ticker = null; horizon = null; render(); };
+window.addEventListener('hashchange', () => { const t = hashParts()[1]; if (t && t !== ticker && P(market).pages[t]) { ticker = t; horizon = null; render(); } });
+const CP = m => { const p = P(m); if (!ticker || !p.pages[ticker]) ticker = p.default_ticker; return p.pages[ticker]; };
+const REASON = {market_up: ['market lift', 'The market explains most of the move (beta × benchmark move).'], market_down: ['market drag', 'The market explains most of the move (beta × benchmark move).'], sector_lift: ['sector lift', 'The sector moved beyond the market.'], sector_drag: ['sector drag', 'The sector moved beyond the market.'], news_positive: ['news', 'Verified news inside the window with the same sign as the rest of the move.'], news_negative: ['news', 'Verified news inside the window with the same sign as the rest of the move.'], company_specific: ['company specific', 'What is left after market, sector and news.'], target_reached: ['target reached', 'A high in the window reached the target.'], range_missed: ['range missed', 'The exit close fell outside the 80% range.']};
+const EVT = {rbi_policy: 'RBI policy', fomc: 'Fed decision', cpi: 'US inflation (CPI)', jobs_report: 'US jobs report', fno_expiry: 'F&O expiry', weekly_expiry: 'weekly expiry', opex: 'options expiry', triple_witching: 'triple witching', index_rebalance: 'index rebalance', budget: 'budget', earnings: 'results', ex_dividend: 'ex-dividend', holiday: 'market closed'};
+const KIND = {head_to_head: ['Head-to-head', 'info'], biggest_win: ['Biggest win', 'success'], biggest_miss: ['Biggest miss', 'warn']};
+const horizonOf = id => { const m = /-(\d)d(@|$)/.exec(id); return m ? +m[1] : null; };
+const refPred = (c, k) => c.predictions.find(r => r.strategy_id === P(market).reference_strategy && r.horizon_days === k) || null;
+const sessionsAhead = (c, date) => { const s = P(market).status.session.session_date; return date === s ? 'the session being predicted' : date > s ? 'after today’s session' : 'past'; };
+
+/* ---------- head ---------- */
+function coHead(m, c) {
+  const p = P(m), co = c.company, cur = p.currency;
+  const h = el('div', {class:'cohead'});
+  h.append(el('div', {class:'px'}, price(cur, co.last_close), el('small', {}, `last close, ${fmtD(co.last_close_date)}`)), delta(co.change_pct));
+  h.append(el('span', {class:'md-chip', 'data-tip':'Sector set at onboarding; exchange where it is listed.'}, `${co.sector} · ${co.exchange}`));
+  h.append(el('span', {class:'md-chip', 'data-tip': co.amount_overridden ? 'Money per paper trade, set by the owner for this company (differs from the default).' : 'Money per paper trade (the market’s default amount).'}, icon('ms-account_balance_wallet'), `${money(cur, co.amount)} per paper trade`, co.amount_overridden ? el('b', {}, ' · custom') : null));
+  h.append(co.state === 'active' ? el('span', {class:'mb-label success', 'data-tip':'Active: predicted every session and traded on paper.'}, icon('ms-check'), 'active') : el('span', {class:'mb-label neutral', 'data-tip': `Inactive since ${fmtDY(co.state_since)}: still collected, never predicted or traded (decision 13).`}, icon('ms-pending'), `inactive since ${fmtD(co.state_since, false)}`));
+  const acts = el('div', {class:'acts'});
+  acts.append(el('a', {class:'md-btn tonal small', href: strategiesPage(co.ticker), 'data-tip':'Every strategy on this company, ranked by profit after costs (page 4).'}, icon('ms-science'), 'Strategies'));
+  acts.append(el('button', {class:'md-btn outlined small', type:'button', onclick: () => openDialog(m, c, 'amount')}, icon('ms-account_balance_wallet'), 'Change amount'));
+  acts.append(co.state === 'active' ? el('button', {class:'md-btn outlined small', type:'button', onclick: () => openDialog(m, c, 'deactivate')}, icon('ms-pending'), 'Deactivate') : el('button', {class:'md-btn outlined small', type:'button', onclick: () => openDialog(m, c, 'reactivate')}, icon('ms-check'), 'Reactivate'));
+  const sel = el('select', {'aria-label':'Example company', onchange: e => { ticker = e.target.value; horizon = null; history.replaceState(null, '', `#${m}/${ticker}`); render(); }});
+  for (const t of Object.keys(p.pages)) sel.append(el('option', {value: t, selected: t === c.ticker}, `${t} · ${companyOf(m, t).name}`));
+  acts.append(el('span', {class:'pickco', 'data-tip':'Mockup only: the real page is one company per address; this picker shows every company the example data holds.'}, 'example', sel));
+  h.append(acts);
+  return h;
+}
+
+/* ---------- decision card ---------- */
+function decision(m, c) {
+  const p = P(m), co = c.company, cur = p.currency, a = (c.agreement[String(horizon)] || [])[0] || null, pr = refPred(c, horizon);
+  const card = el('section', {class:'card', 'aria-label':'At a glance'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `${co.name} at a glance`), help('What the strategies say about this company for the selected horizon, today’s head-to-head picks, the reference strategy’s published range, and what is coming. It helps you judge the company; it never tells you to buy or sell. Every signal is Paper until a strategy meets the go-live bar.'), el('div', {class:'end'}, el('span', {class:'muted'}, 'Horizon', help('N+k: buy at the open of the session being predicted, sell at the close of the k-th market session after it. Opens on N+1 (decision 39).')), horizonTabs(p.horizons, horizon, k => { horizon = k; render(); }))));
+  const g = el('div', {class:'dec'});
+  /* 1 agreement */
+  const c1 = el('div', {class:'cell'}); c1.append(el('div', {class:'l'}, icon('ms-trending_up'), `Who would buy at N+${horizon}`));
+  if (a) { c1.append(el('div', {class:'v'}, `${a.buy} of ${a.of}`, el('small', {}, ' strategies')), el('div', {class:'s'}, a.avg_prob_up != null ? el('span', {}, 'buyers’ average chance ', odds(a.avg_prob_up, `Average probability of a rise given by the buyers that give one: ${pct(a.avg_prob_up, 1)}. 50% is a coin flip.`)) : 'buyers give a direction, not a probability'));
+    const fb = el('div', {class:'fb'}); for (const f of ['rule','baseline','ai']) { const x = a.by_family[f]; fb.append(el('div', {class:'r'}, el('span', {class:'l'}, FAMILY_SHORT[f]), el('div', {class:'bar', role:'img', 'aria-label': `${FAMILY[f][0]}: ${x.buy} of ${x.of} buy`}, el('i', {class:'ser-' + FAMILY[f][2], style:`width:${x.of ? (100 * x.buy / x.of).toFixed(1) : 0}%`})), el('b', {}, `${x.buy}/${x.of}`))); } c1.append(fb); }
+  else c1.append(el('div', {class:'v muted'}, '—'), el('div', {class:'s'}, 'No agreement row at this horizon.'));
+  /* 2 reference range */
+  const c2 = el('div', {class:'cell'}); c2.append(el('div', {class:'l'}, icon('ms-query_stats'), `Published range at N+${horizon}`, help(`The reference rule strategy’s (${stratOf(m, p.reference_strategy).name}) prediction for this horizon, computed by ranges.py: the target is the expected exit close; the 50% and 80% ranges are where the close is expected to land that often. Drawn on the chart.`)));
+  if (pr) c2.append(el('div', {class:'v'}, price(cur, pr.target_price), el('small', {}, ' target')), rangeBar(cur, pr, co.last_close, null), el('div', {class:'s'}, `80% range ${price(cur, pr.lo80)}–${price(cur, pr.hi80)} · exit ${fmtD(pr.exit_date)} · chance of a rise ${pct(pr.prob_up)}${pr.qualifies ? ' · would buy' : ' · no trade'}`));
+  else c2.append(el('div', {class:'v muted'}, '—'), el('div', {class:'s'}, 'No prediction stored for this company today (the example data holds today’s predictions for two companies).'));
+  /* 3 picks */
+  const c3 = el('div', {class:'cell'}); c3.append(el('div', {class:'l'}, icon('ms-layers'), 'Today’s head-to-head picks', help('Up to four paper trades a day per company: the strongest rule strategy and the strongest AI trader, each by two pick rules (best expected gain, highest probability). Expected gain = chance × move − (1 − chance) × loss − costs; "clears costs" when it is above zero (decisions 41-42, 51).')));
+  const picked = c.head_to_head.filter(x => x.status === 'picked');
+  if (picked.length) { c3.append(el('div', {class:'v'}, `${picked.length}`, el('small', {}, ` paper trade${picked.length === 1 ? '' : 's'}`)), el('div', {class:'s'}, viableLine(picked)));
+    const l = el('div', {class:'pkl'}); for (const x of picked) l.append(el('div', {class:'p'}, el('span', {class:'p1', 'data-tip': `${PICK[x.pick_rule]}: ${stratOf(m, x.strategy_id).name} (${FAMILY[x.family][0]}, ranked on ${x.strongest_basis === 'all_companies' ? 'all companies' : 'this company'}) picks N+${x.horizon_days}: chance ${pct(x.prob_up, 1)}, move if up ${sgn(x.move_pct)}, loss if down ${sgn(-x.loss_pct)}, market costs ${x.costs_pct.toFixed(2)}%.`}, famLabel(x.family, FAMILY_SHORT[x.family]), el('small', {class:'muted'}, PICK[x.pick_rule]), el('span', {class:'h-lab'}, `N+${x.horizon_days}`)), el('span', {class:'p2'}, odds(x.prob_up), el('span', {class:'g'}, moneyDelta(cur, x.expected_gain_pct * x.amount / 100, dec(cur))), ...costLabels(cur, x)))); c3.append(l); }
+  else c3.append(el('div', {class:'v muted'}, 'None'), el('div', {class:'s'}, co.state !== 'active' ? 'Inactive companies get no picks.' : c.head_to_head.length ? `No candidate: no rule strategy and no AI trader buys ${co.name} at any horizon today.` : 'No head-to-head pick stored for this session.'));
+  /* 4 coming up / open */
+  const c4 = el('div', {class:'cell'}); c4.append(el('div', {class:'l'}, icon('ms-event'), 'Open trades and what is coming'));
+  const unreal = c.open_trades.reduce((s, t) => s + t.unrealised_pnl, 0), flagged = c.trade_checks.filter(x => x.flagged).length;
+  c4.append(el('div', {class:'v'}, String(c.open_trades.length), el('small', {}, ` open paper trade${c.open_trades.length === 1 ? '' : 's'}`)), el('div', {class:'s'}, c.open_trades.length ? el('span', {}, 'unrealised ', moneyDelta(cur, unreal, dec(cur)), ' before costs', c.trade_checks.length ? ` · ${flagged ? `${flagged} flagged` : 'none flagged'} at the ${fmtLocal(c.trade_checks[0].check_at, m)} check` : ' · no intraday check yet') : 'nothing open'));
+  const next = c.events.find(e => e.ticker === co.ticker);
+  c4.append(next ? el('div', {class:'s', 'data-tip': `${next.name} on ${fmtDY(next.date)}${next.timing ? ` (${next.timing.replace('_', ' ')})` : ' (timing unknown)'}: results widen this company’s ranges and no new call is made within a day of them; the reaction lands in the session${next.reaction_sessions && next.reaction_sessions.length > 1 ? 's' : ''} ${(next.reaction_sessions || []).map(d => fmtD(d, false)).join(' and ')}.`}, icon('ms-event'), ` ${EVT[next.type] || next.type} ${fmtD(next.date)}`, next.provisional ? ' (date not confirmed)' : '') : el('div', {class:'s'}, 'No company event in the next 8 weeks.'));
+  g.append(c1, c2, c3, c4); card.append(g);
+  card.append(el('div', {class:'plain'}, icon('ms-info'), el('div', {}, a ? `${a.buy} of ${a.of} strategies would buy ${co.name} at N+${horizon}${a.avg_prob_up != null ? ` with an average chance of ${pct(a.avg_prob_up)}` : ''}. ` : '', picked.length ? `Of today’s ${picked.length} head-to-head picks, ${viableLine(picked)}. ` : 'No head-to-head pick today. ', next ? `${(EVT[next.type] || next.type).replace(/^./, ch => ch.toUpperCase())} due ${fmtD(next.date)}: ranges widen and no new call is made within a day of it. ` : '', el('b', {}, `${p.status.paper_label}: a majority says the strategies lean the same way, not that they are right; nothing here is advice.`))));
+  return card;
+}
+
+/* ---------- price chart ---------- */
+let chartHost, chartState = {i: null};
+function chartCard(m, c) {
+  const p = P(m), cur = p.currency;
+  const card = el('section', {class:'card', 'aria-label':'Price chart'});
+  const n = c.bars.length;
+  card.append(el('div', {class:'head'}, el('h2', {}, `Price with today’s targets and ranges`), help('Daily candles of the stored sessions (hollow = closed above the open, filled = below). To the right of the last close: the reference strategy’s published targets for N+1..N+5 (dots on a dashed line), its 50% and 80% ranges as the shaded fan, and at the selected horizon the spread of every strategy’s target (the thin bar). Triangles mark the paper trades: entries below, exits above, hollow = still open. Hover or use the arrow keys for each day’s prices.'), el('div', {class:'end'}, el('span', {class:'ctl'}, `${n} sessions to ${fmtD(c.bars[n-1].date)}`, el('span', {class:'muted'}, '·'), el('span', {class:'mb-tag paper'}, 'paper')))));
+  chartHost = el('div', {class:'chart', tabindex:'-1'});
+  card.append(chartHost);
+  card.append(el('div', {class:'chleg', 'aria-label':'Chart legend'}, el('span', {}, el('i', {class:'cu'}), 'closed up'), el('span', {}, el('i', {class:'cd'}), 'closed down'), el('span', {}, el('i', {class:'b8'}), '80% range'), el('span', {}, el('i', {class:'b5'}), '50% range'), el('span', {}, el('i', {class:'tg'}), 'reference target per horizon'), el('span', {}, el('i', {class:'sp'}), 'all strategies’ targets at the selected horizon'), el('span', {}, el('i', {class:'tri en'}), 'trade entry'), el('span', {}, el('i', {class:'tri ex'}), 'trade exit'), el('span', {class:'muted'}, 'D = the session being predicted, +k = the N+k exit session. Volume below the candles. Research only.')));
+  return card;
+}
+function drawChart(m, c) {
+  const host = chartHost; if (!host || !host.isConnected) return;
+  host.innerHTML = '';
+  const p = P(m), cur = p.currency, W = Math.max(280, host.clientWidth), phone = W < 560;
+  const bars = phone ? c.bars.slice(-30) : c.bars, n = bars.length, H = phone ? 300 : 360, L = 6, R = phone ? 50 : 62, T = 14, AX = 22, VH = phone ? 36 : 48, PB = H - AX - VH - 8, FUT = 5;
+  const FS = phone ? 2.4 : 2.2, step = (W - L - R) / (n + FUT * FS + 0.5), X = i => L + (i < n ? (i + 0.5) * step : (n - 0.5) * step + (i - n + 1) * step * FS), bw = Math.max(2, Math.min(12, step * 0.62)), labelAll = step * FS >= 22;
+  const preds = p.horizons.map(k => refPred(c, k)).filter(Boolean);
+  const allAt = c.predictions.filter(r => r.horizon_days === horizon && r.target_price != null);
+  let lo = Math.min(...bars.map(b => b.low)), hi = Math.max(...bars.map(b => b.high));
+  for (const r of preds) { lo = Math.min(lo, r.lo80); hi = Math.max(hi, r.hi80); } for (const r of allAt) { lo = Math.min(lo, r.target_price); hi = Math.max(hi, r.target_price); }
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const Y = v => T + (hi - v) / (hi - lo) * (PB - T);
+  const vmax = Math.max(...bars.map(b => b.volume)), VY = v => H - AX - (v / vmax) * VH;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, width: W, height: H, role:'img', tabindex:'0', 'aria-label': `${c.company.name} daily prices, ${n} sessions, with today’s targets and ranges. Use the left and right arrow keys to read each day.`});
+  /* grid + price axis (right) */
+  const grid = svgEl('g', {class:'grid'}), ax = svgEl('g', {class:'ax'});
+  const ticks = niceTicks(lo, hi, 5);
+  for (const v of ticks) { grid.append(svgEl('line', {x1: L, x2: W - R, y1: Y(v), y2: Y(v)})); const t = svgEl('text', {x: W - R + 6, y: Y(v) + 4}); t.textContent = price(cur, v); ax.append(t); }
+  /* time axis: month starts, D and the exit slots */
+  let lastMon = '';
+  bars.forEach((b, i) => { const mo = b.date.slice(0, 7); if (mo !== lastMon) { lastMon = mo; if (i > 0 || !phone) { const t = svgEl('text', {x: X(i), y: H - 6, 'text-anchor':'middle'}); t.textContent = MON[+b.date.slice(5, 7) - 1] + (i === 0 || b.date.slice(5, 7) === '01' ? ' ' + b.date.slice(0, 4) : ''); ax.append(t); } } });
+  svg.append(grid);
+  /* volume */
+  const vol = svgEl('g', {class:'vol'});
+  bars.forEach((b, i) => vol.append(svgEl('rect', {x: X(i) - bw / 2, y: VY(b.volume), width: bw, height: H - AX - VY(b.volume)})));
+  svg.append(vol);
+  /* fan */
+  const last = bars[n - 1], fan = svgEl('g', {class:'fan'});
+  const dLine = svgEl('line', {class:'vl', x1: X(n), x2: X(n), y1: T, y2: PB}); svg.append(dLine);
+  const dT = svgEl('text', {x: X(n), y: H - 6, 'text-anchor':'middle'}); dT.textContent = 'D'; ax.append(dT);
+  if (preds.length) {
+    const pts = preds.map(r => [X(n + r.horizon_days), r]);
+    const poly = (loK, hiK, cls) => { const d = [`${X(n - 1)},${Y(last.close)}`, ...pts.map(([x, r]) => `${x},${Y(r[hiK])}`), ...pts.slice().reverse().map(([x, r]) => `${x},${Y(r[loK])}`)].join(' '); return svgEl('polygon', {class: cls, points: d}); };
+    fan.append(poly('lo80', 'hi80', 'b80'), poly('lo50', 'hi50', 'b50'));
+    fan.append(svgEl('polyline', {class:'tl', points: [`${X(n - 1)},${Y(last.close)}`, ...pts.map(([x, r]) => `${x},${Y(r.target_price)}`)].join(' ')}));
+    if (allAt.length) { const tmin = Math.min(...allAt.map(r => r.target_price)), tmax = Math.max(...allAt.map(r => r.target_price)); const sp = svgEl('line', {class:'spread', x1: X(n + horizon), x2: X(n + horizon), y1: Y(tmax), y2: Y(tmin)}); sp.append(svgEl('title')); fan.append(sp); chartState.spread = [tmin, tmax, allAt.length]; } else chartState.spread = null;
+    for (const [x, r] of pts) { const on = r.horizon_days === horizon; fan.append(svgEl('circle', {class: 'tg' + (on ? ' on' : ''), cx: x, cy: Y(r.target_price), r: on ? 5 : 3.5})); if (labelAll || on) { const t = svgEl('text', {class: on ? 'on' : '', x, y: H - 6, 'text-anchor':'middle'}); t.textContent = `+${r.horizon_days}`; ax.append(t); } if (on) { const lab = svgEl('text', {class:'tlab', x: Math.min(x, W - R - 28), y: Y(r.target_price) - 10, 'text-anchor': 'middle'}); lab.textContent = price(cur, r.target_price); fan.append(lab); svg.append(svgEl('line', {class:'vl on', x1: x, x2: x, y1: T, y2: PB})); } }
+  }
+  svg.append(fan);
+  /* candles */
+  const cg = svgEl('g');
+  bars.forEach((b, i) => { const up = b.close >= b.open, g = svgEl('g', {class: 'c ' + (up ? 'up' : 'dn')}); g.append(svgEl('line', {class:'w', x1: X(i), x2: X(i), y1: Y(b.high), y2: Y(b.low)})); const y1 = Y(Math.max(b.open, b.close)), y2 = Y(Math.min(b.open, b.close)); g.append(svgEl('rect', {class:'b', x: X(i) - bw / 2, y: y1, width: bw, height: Math.max(1, y2 - y1), rx: 1})); cg.append(g); });
+  svg.append(cg);
+  /* last close marker */
+  const lg = svgEl('g', {class:'last'}); lg.append(svgEl('line', {x1: L, x2: W - R, y1: Y(last.close), y2: Y(last.close)})); lg.append(svgEl('rect', {x: W - R + 2, y: Y(last.close) - 9, width: R - 4, height: 18, rx: 4})); const lt = svgEl('text', {x: W - R + 2 + (R - 4) / 2, y: Y(last.close) + 4, 'text-anchor':'middle'}); lt.textContent = price(cur, last.close); lg.append(lt); svg.append(lg);
+  /* trade marks */
+  const idx = {}; bars.forEach((b, i) => idx[b.date] = i);
+  const en = {}, ex = {}, op = {};
+  for (const t of c.settled) if (t.status === 'settled') { (en[t.entry_date] = en[t.entry_date] || []).push(t); const d = t.exit_date_actual || t.exit_date; (ex[d] = ex[d] || []).push(t); }
+  for (const t of c.open_trades) (op[t.entry_date] = op[t.entry_date] || []).push(t);
+  const mk = svgEl('g', {class:'mk'});
+  const tri = (x, y, dirUp, cls, tipText, count) => { const g = svgEl('g'); g.append(svgEl('path', {class: cls, d: dirUp ? `M${x},${y} l-5,8 h10 z` : `M${x},${y} l-5,-8 h10 z`})); if (count > 1) { const t = svgEl('text', {x: x + 7, y: dirUp ? y + 9 : y - 1}); t.textContent = count; g.append(t); } g.append(svgEl('title')); g.lastChild.textContent = tipText; g.setAttribute('tabindex', '0'); g.setAttribute('data-tip', tipText); mk.append(g); };
+  for (const [d, ts] of Object.entries(en)) if (d in idx) tri(X(idx[d]), Y(bars[idx[d]].low) + 4, true, 'en', `${ts.length} paper trade${ts.length === 1 ? '' : 's'} entered ${fmtD(d)} at ${price(cur, ts[0].entry_price)} (the open): ${[...new Set(ts.map(t => `N+${t.horizon_days}`))].sort().join(', ')}.`, ts.length);
+  for (const [d, ts] of Object.entries(ex)) if (d in idx) { const net = ts.reduce((s, t) => s + t.net_pnl, 0); tri(X(idx[d]), Y(bars[idx[d]].high) - 4, false, 'ex', `${ts.length} paper trade${ts.length === 1 ? '' : 's'} exited ${fmtD(d)} at ${price(cur, ts[0].exit_price)} (the close): net ${money(cur, net, dec(cur), true)} after costs.`, ts.length); }
+  for (const [d, ts] of Object.entries(op)) if (d in idx) tri(X(idx[d]), Y(bars[idx[d]].low) + 16, true, 'op', `${ts.length} open paper trade${ts.length === 1 ? '' : 's'} entered ${fmtD(d)} at ${price(cur, ts[0].entry_price)}: ${[...new Set(ts.map(t => `N+${t.horizon_days}`))].sort().join(', ')}; still running.`, ts.length);
+  svg.append(mk);
+  svg.append(ax);
+  /* hover */
+  const hv = svgEl('g', {class:'hover'}); const hl = svgEl('line', {y1: T, y2: H - AX}); const hc = svgEl('circle', {r: 4}); hv.append(hl, hc); hv.style.display = 'none'; svg.append(hv);
+  const hit = svgEl('rect', {class:'hit', x: L, y: T, width: W - L - R, height: H - T - AX}); svg.append(hit);
+  const tipBox = el('div', {class:'ctip', role:'status', 'aria-live':'polite'}); host.append(svg, tipBox);
+  const show = i => { if (i == null || i < 0 || i >= n) { hv.style.display = 'none'; tipBox.classList.remove('on'); chartState.i = null; return; } chartState.i = i; const b = bars[i], prev = bars[i - 1]; hv.style.display = ''; hl.setAttribute('x1', X(i)); hl.setAttribute('x2', X(i)); hc.setAttribute('cx', X(i)); hc.setAttribute('cy', Y(b.close));
+    tipBox.innerHTML = ''; tipBox.append(el('b', {}, fmtDY(b.date)), el('br'), el('span', {class:'mono'}, `O ${price(cur, b.open)} · H ${price(cur, b.high)} · L ${price(cur, b.low)} · C ${price(cur, b.close)}`), el('br'), el('span', {}, prev ? `${sgn((b.close / prev.close - 1) * 100)} on the day · ` : '', `volume ${b.volume.toLocaleString(LOCALE[cur])}`), (en[b.date] || ex[b.date] || op[b.date]) ? el('span', {}, el('br'), `${(en[b.date] || []).length + (op[b.date] || []).length} entr${((en[b.date] || []).length + (op[b.date] || []).length) === 1 ? 'y' : 'ies'}, ${(ex[b.date] || []).length} exit${(ex[b.date] || []).length === 1 ? '' : 's'}`) : null);
+    tipBox.classList.add('on'); const bx = X(i) > W * 0.6 ? X(i) - tipBox.offsetWidth - 14 : X(i) + 14; tipBox.style.left = Math.max(0, bx) + 'px'; tipBox.style.top = Math.max(0, Y(b.close) - 40) + 'px'; };
+  hit.addEventListener('pointermove', e => { const r = svg.getBoundingClientRect(); const x = (e.clientX - r.left) * (W / r.width); show(Math.max(0, Math.min(n - 1, Math.round((x - L) / step - 0.5)))); });
+  hit.addEventListener('pointerleave', () => show(null));
+  svg.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); show(chartState.i == null ? n - 1 : Math.max(0, Math.min(n - 1, chartState.i + (e.key === 'ArrowRight' ? 1 : -1)))); } else if (e.key === 'Escape' || e.key === 'Home') show(null); });
+  svg.addEventListener('blur', () => show(null));
+  if (chartState.spread) { const sp = svg.querySelector('.spread'); sp.setAttribute('data-tip', `${chartState.spread[2]} strategies’ targets at N+${horizon}: ${price(cur, chartState.spread[0])} to ${price(cur, chartState.spread[1])}.`); sp.setAttribute('tabindex', '0'); }
+}
+function niceTicks(lo, hi, n) { const span = hi - lo, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag, stepv = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = []; for (let v = Math.ceil(lo / stepv) * stepv; v <= hi; v += stepv) out.push(+v.toFixed(6)); return out; }
+
+/* ---------- today's path: open trades with the latest check ---------- */
+function openTrades(m, c) {
+  const p = P(m), cur = p.currency, rows = c.open_trades;
+  const card = el('section', {class:'card', 'aria-label':'Today’s path'});
+  const ck0 = c.trade_checks[0];
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Today’s path: open paper trades'), el('span', {class:'mb-tag paper'}, 'paper'), help('Every paper trade on this company that has entered and not yet exited (bought at the open of its entry session), with the latest intraday check: where the price sits in the trade’s own predicted range and whether it is flagged (outside the range, far from the target, against the prediction). Monitoring only; nothing is traded.'), el('div', {class:'end'}, ck0 ? `checked ${fmtLocal(ck0.check_at, m)} · session ${ck0.session_number} of the window` : (rows.length ? 'no intraday check yet today' : ''))));
+  if (!rows.length) { card.append(el('div', {class:'quiet'}, c.company.state === 'active' ? 'No open paper trade on this company.' : 'No open paper trade; inactive companies get no new ones.')); return card; }
+  const checks = {}; for (const x of c.trade_checks) checks[x.trade_id] = x;
+  const tb = el('table', {class:'md-table tbl ot'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Strategy'), el('th', {}, 'Horizon'), el('th', {class:'num cw'}, 'Entry'), el('th', {class:'num cw'}, 'Last'), el('th', {class:'num'}, 'Unrealised'), el('th', {class:'cm'}, 'Predicted range'), el('th', {class:'num cw'}, 'To target'), el('th', {}, 'Check'))));
+  const tbody = el('tbody');
+  for (const r of rows) {
+    const st = stratOf(m, r.strategy_id), ck = checks[r.trade_id];
+    let status;
+    if (!ck) status = el('span', {class:'st muted', 'data-tip':'No intraday check stored for this trade by the cut-off.'}, '—');
+    else { const b = BAND[ck.band] || [ck.band, '']; const fl = ck.flags.map(f => FLAG[f] || f); status = el('span', {class:'st ' + (ck.flagged ? 'flag' : b[1]), 'data-tip': `${fmtLocal(ck.check_at, m)}: ${price(cur, ck.last_price)}, ${sgn(ck.ret_since_entry_pct)} since entry, ${b[0]}${fl.length ? '; ' + fl.join(', ') : ''}. Best so far ${sgn(ck.high_since_entry_pct)}, worst ${sgn(ck.low_since_entry_pct)}${ck.target_reached ? `; target reached in session ${ck.target_reached_session}` : ''}.`}, icon(ck.flagged ? 'ms-warning' : 'ms-check'), ck.flagged ? ck.flags.map(f => FLAG_SHORT[f] || f).join(', ') : (BAND_SHORT[ck.band] || ck.band)); }
+    const lastP = ck ? ck.last_price : r.last_price;
+    tbody.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, el('b', {}, st.name, ' ', famLabel(st.family, FAMILY_SHORT[st.family])), el('small', {}, r.view === 'head_to_head' ? 'head-to-head pick' : 'accuracy view'))), el('td', {}, el('span', {class:'h-lab'}, `N+${r.horizon_days}`), el('small', {class:'muted cw', style:'white-space:nowrap'}, ` ${fmtD(r.entry_date, false)} → ${fmtD(r.exit_date, false)}`)), el('td', {class:'num cw'}, price(cur, r.entry_price)), el('td', {class:'num cw', 'data-tip': ck ? 'Price at the latest intraday check.' : 'Latest stored close.'}, price(cur, lastP)), el('td', {class:'num'}, moneyDelta(cur, r.unrealised_pnl, dec(cur)), el('span', {class:'cw'}, ' ', delta(r.unrealised_pct))), el('td', {class:'cm'}, rangeBar(cur, r, lastP, r.entry_price)), el('td', {class:'num cw'}, el('span', {'data-tip': r.to_target_pct < 0 ? `Already past the target ${price(cur, r.target_price)}.` : `${sgn(r.to_target_pct)} to the target ${price(cur, r.target_price)}.`}, r.to_target_pct < 0 ? 'past target' : sgn(r.to_target_pct))), el('td', {}, status)));
+  }
+  tb.append(tbody); card.append(el('div', {class:'md-table-wrap'}, tb));
+  return card;
+}
+
+/* ---------- settled results with the reason split ---------- */
+function whyBar(t, scale) {
+  const parts = [['m', t.market_pct, 'market'], ['s', t.sector_pct, 'sector'], ['n', t.news_pct, 'news'], ['co', t.company_pct, 'company']];
+  const s = svgEl('svg', {viewBox:'0 0 110 14', role:'img', 'aria-label': `move ${sgn(t.move_pct)}: ` + parts.map(x => `${x[2]} ${sgn(x[1])}`).join(', ')});
+  s.append(svgEl('line', {class:'z', x1: 55, x2: 55, y1: 1, y2: 13}));
+  let posX = 55, negX = 55; const k = 50 / scale;
+  for (const [cls, v] of parts) { if (!v) continue; const w = Math.max(1, Math.abs(v) * k); if (v > 0) { s.append(svgEl('rect', {class: cls, x: posX, y: 3, width: w, height: 8, rx: 1})); posX += w + 1; } else { negX -= w; s.append(svgEl('rect', {class: cls, x: negX, y: 3, width: w, height: 8, rx: 1})); negX -= 1; } }
+  return s;
+}
+function settled(m, c) {
+  const p = P(m), cur = p.currency, rows = c.settled.filter(t => t.status === 'settled'), skipped = c.settled.filter(t => t.status !== 'settled');
+  const card = el('section', {class:'card', 'aria-label':'Settled paper trades'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Settled results and why each moved'), el('span', {class:'mb-tag paper'}, 'paper'), help('Every paper trade on this company that has exited, newest first, both views (accuracy: one trade per qualifying prediction; head-to-head: the daily picks). Net = profit after the market-cost charges of config/costs.yaml. "Why" splits the move into what the market explains (beta × benchmark), the sector beyond the market, verified news inside the window, and what is left for the company (F1.10, decision 43): bars to the right of the centre line pushed the price up, to the left down.'), el('div', {class:'end'}, el('a', {class:'go', href: strategiesPage(c.ticker)}, 'By strategy', icon('ms-chevron_right')))));
+  if (!rows.length) { card.append(el('div', {class:'quiet'}, skipped.length ? `No settled trade yet. ${skipped.length} predictions could not become trades: ${[...new Set(skipped.map(t => t.status))].map(s => s === 'skipped_price_above_amount' ? `one share (${price(cur, skipped[0].entry_price)}) costs more than the ${money(cur, skipped[0].amount)} amount; raise the amount with "Change amount"` : s.replace(/_/g, ' ')).join('; ')}.` : 'No settled paper trade yet.')); return card; }
+  const won = rows.filter(t => t.net_pnl > 0).length, net = rows.reduce((s, t) => s + t.net_pnl, 0), reached = rows.filter(t => t.target_reached).length, inRange = rows.filter(t => t.range_hit).length;
+  card.append(el('div', {class:'sumrow'}, el('div', {}, el('b', {}, String(rows.length)), el('span', {}, 'settled trades')), el('div', {}, el('b', {}, `${won} of ${rows.length}`), el('span', {}, 'made money after costs')), el('div', {}, el('b', {}, moneyDelta(cur, net, dec(cur))), el('span', {}, 'net after costs, all strategies')), el('div', {}, el('b', {}, `${reached} of ${rows.length}`), el('span', {}, 'reached the target')), el('div', {}, el('b', {}, `${inRange} of ${rows.length}`), el('span', {}, 'exited inside the 80% range'))));
+  const scale = Math.max(1, ...rows.map(t => Math.abs(t.market_pct) + Math.abs(t.sector_pct) + Math.abs(t.news_pct) + Math.abs(t.company_pct)));
+  const tb = el('table', {class:'md-table tbl sd'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Exit'), el('th', {}, 'Strategy'), el('th', {}, 'Horizon'), el('th', {class:'num cw'}, 'Entry → exit'), el('th', {class:'num'}, 'Net after costs'), el('th', {class:'cm'}, 'Why it moved'))));
+  const tbody = el('tbody');
+  for (const t of rows) {
+    const st = stratOf(m, t.strategy_id), main = REASON[t.reason_code] || [t.reason_code.replace(/_/g, ' '), ''];
+    const codes = t.reason_codes.filter(x => x !== t.reason_code).map(x => (REASON[x] || [x])[0]).join(', ');
+    tbody.append(el('tr', {}, el('td', {}, fmtD(t.exit_date_actual || t.exit_date, false), t.flags.length ? el('small', {class:'muted', 'data-tip': t.flags.join(', ')}, ' *') : null),
+      el('td', {}, el('span', {class:'nm'}, el('b', {}, st.name, ' ', famLabel(st.family, FAMILY_SHORT[st.family])), el('small', {}, t.view === 'head_to_head' ? `head-to-head · ${PICK[t.pick_rule] || t.pick_rule}` : 'accuracy view'))),
+      el('td', {}, el('span', {class:'h-lab'}, `N+${t.horizon_days}`)),
+      el('td', {class:'num cw', 'data-tip': `Bought ${t.quantity} share${t.quantity === 1 ? '' : 's'} at the open of ${fmtD(t.entry_date)}, sold at the close of ${fmtD(t.exit_date_actual || t.exit_date)}; chance given ${pct(t.prob_up, 1)}, target ${price(cur, t.target_price)} (${t.target_reached ? `reached in session ${t.target_reached_session}` : 'not reached'}), best ${sgn(t.max_favourable_pct)}, worst ${sgn(t.max_adverse_pct)}.`}, `${price(cur, t.entry_price)} → ${price(cur, t.exit_price)}`),
+      el('td', {class:'num pn'}, el('span', {'data-tip': `Gross ${money(cur, t.gross_pnl, dec(cur), true)}, costs ${money(cur, t.costs, dec(cur))} → net ${money(cur, t.net_pnl, dec(cur), true)} on ${money(cur, t.amount)} (${sgn(t.return_pct)}). Move ${sgn(t.move_pct)}.`}, el('b', {}, moneyDelta(cur, t.net_pnl, dec(cur))), el('small', {}, sgn(t.return_pct)))),
+      el('td', {class:'cm'}, el('span', {class:'why', 'data-tip': `Move ${sgn(t.move_pct)} = market ${sgn(t.market_pct)} (${t.reason_detail.benchmark} × beta ${t.reason_detail.beta}) + sector ${sgn(t.sector_pct)} (${t.reason_detail.sector_source}) + news ${sgn(t.news_pct)} + company ${sgn(t.company_pct)}. Main cause: ${main[0]}${codes ? `; also ${codes}` : ''}. ${main[1]}`}, whyBar(t, scale), el('span', {class:'mb-label neutral'}, main[0])))));
+  }
+  tb.append(tbody); card.append(el('div', {class:'md-table-wrap'}, tb));
+  card.append(el('div', {class:'chleg'}, el('span', {}, 'Why bars: '), el('span', {}, el('i', {class:'sw r'}), 'market'), el('span', {}, el('i', {class:'sw b'}), 'sector'), el('span', {}, el('i', {class:'sw a'}), 'news'), el('span', {}, el('i', {class:'sw k'}), 'company'), el('span', {class:'muted'}, 'right of the centre = pushed up, left = pushed down; the parts add up to the move'), skipped.length ? el('span', {class:'muted'}, `· ${skipped.length} prediction${skipped.length === 1 ? '' : 's'} skipped (${[...new Set(skipped.map(t => t.status.replace(/_/g, ' ')))].join(', ')})`) : null));
+  return card;
+}
+
+/* ---------- AI reasons ---------- */
+function reasons(m, c) {
+  const p = P(m), card = el('section', {class:'card', 'aria-label':'Why it moved, in words'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'In words: the end-of-day analyst'), help('After the close, the EOD analyst writes at most 60 words for every head-to-head trade settled that day and for the day’s 5 biggest wins and misses (F6.1). Each note rests on the trade’s automatic reason split and cites ids; a deterministic gate checks it. It explains, it never predicts.')));
+  if (!c.reasons.length) { card.append(el('div', {class:'quiet'}, 'No analyst note on this company yet: notes are written for settled head-to-head trades and the day’s biggest wins and misses.')); return card; }
+  const ul = el('ul', {class:'rl'});
+  for (const r of c.reasons) { const k = KIND[r.kind] || [r.kind, 'neutral'], h = horizonOf(r.trade_id); ul.append(el('li', {}, el('div', {class:'rh'}, el('span', {class:'mb-label ' + k[1]}, k[0] + (r.rank ? ` #${r.rank}` : '')), el('b', {}, stratOf(m, r.strategy_id).name), h ? el('span', {class:'h-lab'}, `N+${h}`) : null, el('span', {}, `· settled ${fmtD(r.session_date)}`)), el('div', {}, r.text), el('div', {class:'ids', 'aria-label':'Cited ids'}, ...r.cited_ids.map(id => el('code', {'data-tip': c.news.some(n => n.id === id) ? `News item ${id}: ${c.news.find(n => n.id === id).title}` : `Cited id ${id} (a trade or news record).`}, id))))); }
+  card.append(ul);
+  return card;
+}
+
+/* ---------- news ---------- */
+function news(m, c) {
+  const card = el('section', {class:'card', 'aria-label':'News'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'News with its status'), help('Every stored story about this company, newest first, with its verification status (DESIGN 3b): confirmed by a filing, corroborated by independent outlets, single source, unverified, rumour, promotional or contradicted. Only confirmed or corroborated items can be the main evidence of a call. The arrow is the news analyst’s sentiment.'), el('div', {class:'end'}, `${c.news.length} by the cut-off`)));
+  if (!c.news.length) { card.append(el('div', {class:'quiet'}, 'No stored story about this company in the example data.')); return card; }
+  const ul = el('ul', {class:'nl'});
+  for (const n of c.news) ul.append(el('li', {}, sentSquare(n.enrichment.sentiment), el('div', {class:'hd'}, el('a', {class:'t', href: n.url, rel:'noopener', target:'_blank'}, n.title), statusBadge(n.status), el('small', {}, `${n.source} · ${n.enrichment.materiality} materiality · ${n.enrichment.event_type} · ${n.independent_origins} independent origin${n.independent_origins === 1 ? '' : 's'}${n.primary_ids.length ? `, ${n.primary_ids.length} filing` : ''} · published ${fmtLocal(n.published_at, m, true)}, first seen ${fmtLocal(n.first_seen_at, m, true)}${n.enrichment.priced_in ? ' · priced in' : ''}`), n.headline_history.length ? el('small', {'data-tip': n.headline_history.map(h => `“${h.title}” seen ${fmtLocal(h.seen_at, m, true)}`).join(' · ')}, `${n.headline_history.length} earlier headline${n.headline_history.length === 1 ? '' : 's'} at this link`) : null)));
+  card.append(ul);
+  return card;
+}
+
+/* ---------- results digest ---------- */
+function results(m, c) {
+  const p = P(m), cur = p.currency, card = el('section', {class:'card', 'aria-label':'Results'});
+  const d = c.results[0];
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Latest results'), help('The company’s latest quarterly results as reported at the release (never later restatements), with the consensus collected before the release (context only), the stock’s reaction against the market, and at most 5 quoted bullets from the filing text (WS6). India filings have numbers only until a PDF reader is added.'), el('div', {class:'end'}, d ? `${d.fiscal_label} · released ${fmtD(d.release_date)}${d.release_timing ? ` ${d.release_timing.replace('_', ' ')}` : ''}` : '')));
+  if (!d) { const next = c.events.find(e => e.ticker === c.ticker && e.type === 'earnings'); card.append(el('div', {class:'quiet'}, `No results digest stored for this company yet.${next ? ` Next results ${fmtDY(next.date)}.` : ''}`)); return card; }
+  const N = d.numbers, big = v => v == null ? '—' : Math.abs(v) >= 1e9 ? `${SYMBOL[d.currency]}${(v / 1e9).toLocaleString(LOCALE[d.currency], {maximumFractionDigits: 1})} bn` : Math.abs(v) >= 1e6 ? `${SYMBOL[d.currency]}${(v / 1e6).toLocaleString(LOCALE[d.currency], {maximumFractionDigits: 1})} mn` : money(d.currency, v, 2);
+  const cell = (l, v, yoy, tipText) => el('div', {class:'n', 'data-tip': tipText}, el('div', {class:'l'}, l), el('div', {class:'v'}, v), yoy != null ? el('div', {class:'d'}, delta(yoy), el('span', {class:'muted'}, ' vs a year ago')) : null);
+  const g = el('div', {class:'nums'});
+  g.append(cell('Revenue', big(N.revenue), N.revenue_yoy_pct, `Revenue ${big(N.revenue)} for the period to ${fmtDY(d.period_end)} (${d.basis}).`), cell('Net profit', big(N.net_profit), N.net_profit_yoy_pct, `Net profit ${big(N.net_profit)}; margin ${N.net_margin_pct != null ? N.net_margin_pct.toFixed(1) + '%' : '—'}.`), cell('EPS (diluted)', N.eps_diluted != null ? money(d.currency, N.eps_diluted, 2) : '—', N.eps_yoy_pct, 'Earnings per share, diluted, as reported.'));
+  card.append(g);
+  const rl = el('div', {class:'rline'});
+  if (N.net_margin_pct != null) rl.append(el('span', {}, 'net margin ', el('b', {}, `${N.net_margin_pct.toFixed(1)}%`)));
+  if (N.revenue_qoq_pct != null) rl.append(el('span', {}, 'revenue vs last quarter ', el('b', {}, sgn(N.revenue_qoq_pct))));
+  if (d.consensus && d.consensus.eps_estimate != null) rl.append(el('span', {'data-tip':'Yahoo’s consensus EPS collected before the release; context only, no call is scored on it.'}, 'consensus EPS ', el('b', {}, money(d.currency, d.consensus.eps_estimate, 2)), ' → reported ', el('b', {}, money(d.currency, d.consensus.eps_reported, 2)), ' (', delta(d.consensus.surprise_pct), ' surprise)'));
+  else rl.append(el('span', {}, 'consensus: ', el('b', {}, 'none collected before the release')));
+  if (d.reaction) rl.append(el('span', {'data-tip': `Close of ${fmtD(d.reaction.from, false)} to close of ${fmtD(d.reaction.to, false)}: stock ${sgn(d.reaction.stock_pct)}, benchmark ${sgn(d.reaction.benchmark_pct)}, beyond the market ${sgn(d.reaction.excess_pct)}.`}, 'reaction ', el('b', {}, sgn(d.reaction.stock_pct)), ' stock, ', el('b', {}, sgn(d.reaction.excess_pct)), ' beyond the market'));
+  card.append(rl);
+  if (d.bullets.length) { const ul = el('ul', {class:'bul'}); for (const b of d.bullets) ul.append(el('li', {}, b.text || b.quote || String(b))); card.append(ul); }
+  else card.append(el('div', {class:'note'}, d.status === 'text_unavailable' ? 'Numbers only: the filing text could not be read (no PDF reader for NSE attachments yet), so there are no quoted bullets.' : `No quoted bullets (status ${d.status.replace(/_/g, ' ')}).`));
+  card.append(el('div', {class:'note'}, 'Sources: ', ...d.sources.map((s, i) => el('span', {}, i ? ', ' : '', el('a', {href: s.url, rel:'noopener', target:'_blank'}, `${s.kind.replace(/_/g, ' ')} ${s.doc || ''}`.trim()))), ` · numbers as of ${fmtLocal(d.numbers_as_of, m, true)}`));
+  return card;
+}
+
+/* ---------- events ---------- */
+function events(m, c) {
+  const card = el('section', {class:'card', 'aria-label':'Coming events'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Coming up'), help('What is scheduled from the session being predicted to 8 weeks after it, as known at the as-of time: this company’s results and ex-dividend dates, the market’s major events (they raise the regime to EVENT_HEAVY two days before and widen every range whose window contains them) and closed days. A company with results within a day gets no new call.'), el('div', {class:'end'}, `${c.events.length} in 8 weeks`)));
+  if (!c.events.length) { card.append(el('div', {class:'quiet'}, 'Nothing scheduled.')); return card; }
+  const ul = el('ul', {class:'ev'});
+  for (const e of c.events) { const mine = e.ticker === c.ticker; ul.append(el('li', {class: mine ? 'me' : ''}, el('div', {class:'d'}, fmtD(e.date, false), el('small', {}, DOW[dt(e.date).getUTCDay()])), el('div', {class:'t'}, el('span', {}, e.name, e.provisional ? el('span', {class:'mb-label neutral', style:'margin-left:6px', 'data-tip':'The date is not confirmed yet.'}, 'provisional') : null, mine ? el('span', {class:'mb-label warn', style:'margin-left:6px', 'data-tip':'Results widen this company’s ranges (earnings_vol_multiple) and no new call is made within a day of them.'}, 'widens ranges') : (e.major ? el('span', {class:'mb-label neutral', style:'margin-left:6px', 'data-tip':'A major market event: the regime becomes EVENT_HEAVY within 2 days before it and every range whose window contains it is widened.'}, 'major') : null)), el('small', {}, `${EVT[e.type] || e.type}${e.timing ? ` · ${e.timing.replace('_', ' ')}` : (mine && e.type === 'earnings' ? ' · timing not known yet' : '')}${e.reaction_sessions ? ` · reaction in ${e.reaction_sessions.map(d => fmtD(d, false)).join(' and ')}` : ''}${e.release ? ` · ${e.release}` : ''}`)))); }
+  card.append(ul);
+  return card;
+}
+
+/* ---------- lifecycle and actions ---------- */
+function lifecycle(m, c) {
+  const p = P(m), cur = p.currency, co = c.company, card = el('section', {class:'card', 'aria-label':'Watchlist settings'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'On the watchlist'), help('The company’s lifecycle (F8): when it was added, its state, the money per paper trade and every change, each an append-only event with who asked and from which channel. Changing the amount or the state here records a request; the next run imports it. Nothing here places an order.'), el('div', {class:'end'}, el('a', {class:'go', href: PAGES.companies}, 'All companies', icon('ms-chevron_right')))));
+  const g = el('div', {class:'lc'});
+  g.append(el('div', {class:'row'}, el('span', {class:'l'}, 'State'), co.state === 'active' ? el('span', {class:'mb-label success'}, icon('ms-check'), 'active') : el('span', {class:'mb-label neutral'}, 'inactive'), el('span', {class:'muted'}, `since ${fmtDY(co.state_since)}`)));
+  g.append(el('div', {class:'row'}, el('span', {class:'l'}, 'Added'), el('span', {}, fmtDY(co.added_at)), el('span', {class:'muted'}, c.lifecycle[0] ? `· ${c.lifecycle[0].channel === 'seed' ? 'seeded from the config' : `by ${c.lifecycle[0].requested_by} via ${c.lifecycle[0].channel}`}` : '')));
+  g.append(el('div', {class:'row'}, el('span', {class:'l'}, 'Per paper trade'), el('b', {}, money(cur, co.amount)), el('span', {class:'muted'}, co.amount_overridden ? '· set for this company' : '· the market’s default'), el('button', {class:'md-btn text small', type:'button', onclick: () => openDialog(m, c, 'amount')}, 'Change')));
+  g.append(el('div', {class:'row'}, el('span', {class:'l'}, 'Identifiers'), el('span', {class:'muted'}, [co.yahoo ? `Yahoo ${co.yahoo}` : null, co.nse_symbol ? `NSE ${co.nse_symbol}` : null, co.cik ? `SEC CIK ${co.cik}` : null].filter(Boolean).join(' · '))));
+  const hist = c.lifecycle.slice().reverse().map(e => `${fmtD(e.recorded_at, false)}: ${e.event.replace('_', ' ')}${e.amount != null ? ` to ${money(cur, e.amount)}` : ''}${e.reason ? ` (“${e.reason}”)` : ''} · ${e.channel}`);
+  g.append(el('div', {class:'hist'}, `History: ${hist.join(' · ')}.`));
+  card.append(g);
+  const pend = el('div', {class:'pend', id:'pend'}); card.append(pend); renderPending(m);
+  return card;
+}
+function renderPending(m) {
+  const host = $('#pend'); if (!host) return; host.innerHTML = '';
+  for (const r of (pending[m + '/' + ticker] || [])) host.append(el('div', {class:'mb-alert', style:'padding:10px 14px'}, icon('ms-pending'), el('div', {}, el('b', {class:'t'}, 'Pending: ' + r), el('div', {class:'s'}, 'Recorded as a request; the next run imports it (F10). Mockup: nothing was sent.'))));
+}
+function openDialog(m, c, kind) {
+  const p = P(m), cur = p.currency, co = c.company, dlg = $('#dlg'); dlg.innerHTML = '';
+  const body = el('div', {class:'dbody'}), acts = el('div', {class:'dact'});
+  let input = null, title, text, label;
+  if (kind === 'amount') { title = `Change the amount for ${co.name}`; text = `Money per paper trade. Today ${money(cur, co.amount)}${co.amount_overridden ? ' (set for this company)' : ' (the default)'}. In India a trade is skipped when one share costs more than the amount.`; input = el('input', {type:'number', min:'1', step:'1', value: String(co.amount), 'aria-label':'New amount'}); label = 'Record amount'; }
+  else if (kind === 'deactivate') { title = `Deactivate ${co.name}?`; text = 'It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Reactivate any time from the Companies page.'; label = 'Record deactivation'; }
+  else { title = `Reactivate ${co.name}?`; text = 'Predictions and paper trades resume from the next pre-open run.'; label = 'Record reactivation'; }
+  body.append(el('h3', {}, title), el('div', {}, text), input ? el('label', {}, `New amount (${cur})`, input) : null, el('div', {class:'muted', style:'font-size:12.5px'}, 'This records a request with your sign-in and an idempotency key; the next run imports it. Nothing is bought or sold.'));
+  acts.append(el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { const k = m + '/' + ticker; (pending[k] = pending[k] || []).push(kind === 'amount' ? `set amount to ${money(cur, +input.value || co.amount)}` : kind); dlg.close(); renderPending(m); }}, label));
+  dlg.append(body, acts); dlg.showModal();
+}
+
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('i', {class:'sw r'}), 'rule ', el('i', {class:'sw b'}), 'baselines ', el('i', {class:'sw a'}), 'AI'),
+    el('span', {}, el('span', {class:'h-lab'}, 'N+3'), ' horizon: sell at the close of the 3rd session after the entry session'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every signal and trade until proven'),
+    el('span', {}, el('span', {class:'mb-label success'}, 'clears costs'), ' expected gain after costs above zero; nothing here is advice'));
+}
+
+let ro;
+function render() {
+  const p = P(market), c = CP(market), co = c.company; if (horizon == null) horizon = p.default_horizon;
+  document.title = `Market brief · ${co.ticker} · ${LABEL[market]}`; $('#title').textContent = `${co.ticker} · ${co.name}`;
+  $('#ask').href = `${PAGES.assistant}#${market}/${co.ticker}`;
+  sideFoot(market); marketSeg(() => { ticker = null; horizon = null; render(); });
+  if (!hashParts()[1] || hashParts()[1] !== co.ticker) history.replaceState(null, '', `#${market}/${co.ticker}`);
+  const page = $('#page'); page.innerHTML = '';
+  page.append(pageHead(market, `${co.ticker} · ${co.name}`, `${co.sector} · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only, nothing here trades`), coHead(market, c), paperBand(market, p.go_live, Object.keys(p.strategies).length), decision(market, c), chartCard(market, c));
+  page.append(el('div', {style:'margin-top:16px'}, openTrades(market, c)), el('div', {style:'margin-top:16px'}, settled(market, c)));
+  const grid = el('div', {class:'grid even'}), left = el('div', {class:'col'}), right = el('div', {class:'col'});
+  left.append(reasons(market, c), results(market, c), lifecycle(market, c));
+  right.append(news(market, c), events(market, c));
+  grid.append(left, right); page.append(grid, legend(), footer(market, D.endpoint.replace('{ticker}', co.ticker)));
+  makeFocusable(page);
+  drawChart(market, c);
+  if (ro) ro.disconnect(); ro = new ResizeObserver(() => { if (chartHost && chartHost.isConnected && Math.abs(chartHost.clientWidth - (chartHost.querySelector('svg') || {}).clientWidth || 0) > 2) drawChart(market, CP(market)); }); ro.observe(chartHost);
+}
+render();
+</script>
+</body>
+</html>

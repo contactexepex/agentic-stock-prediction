@@ -42,7 +42,7 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
    go-live bar's position (`go_live` of the scoreboard). It stays until a strategy is proven (F7); only then may a
    Strong signal appear (owner's direction, SPEC section 6).
 4. **KPI cards** (four, icon tiles): most agreed company at the selected horizon with its "n of N buy" label and the
-   buyers' average chance; head-to-head trades today with "clears costs / none clears costs"; open paper trades
+   buyers' average chance; head-to-head trades today with how many clear market costs and are viable at your cost; open paper trades
    with their unrealised total; alerts (flagged of checked, or "no check yet"). Counts and sums of the payload.
 5. **Horizon selector** N+1..N+5, pill tabs in the agreement card's head, opening on N+1 (decision 39); a
    plain-language reading of the selected horizon sits under the title. It drives the ranking and the first KPI.
@@ -56,11 +56,13 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
 7. **Today's head-to-head trades** (decisions 41-42): per company, the amount per trade (override marked), then
    Rule | AI boxes naming the family's strongest strategy and its ranking basis (tooltip), one row per pick rule
    (best expected gain, highest probability): horizon chip, the chance of a rise as an odds meter, the expected gain
-   after costs in money and in percent with a tick/cross **clears costs / below costs** (F9's viability rule:
-   expected gain after costs above zero), and the three inputs (to target, downside to the 80% range's low, costs).
-   "Why these horizons" opens the candidate table (every buyable horizon with the same numbers). The summary line
-   counts the trades and says "No pick clears costs today" when none does. A company with no candidate says so
-   (HDFC Bank in the example).
+   after market costs in money and in percent with a tick/cross **clears / below market costs** (the ranking view:
+   expected gain after the market charges above zero) and decision 51's **viable / not viable at your cost** (the
+   candidate's `cost_viable`, which adds the owner's own broker charges), and the three inputs (to target, downside to
+   the 80% range's low, costs). "Why these horizons" opens the candidate table (every buyable horizon with the same
+   numbers). The summary line counts the trades and says how many clear market costs and how many are viable at your
+   cost. A company with no candidate says so (HDFC Bank in the example). Added 2026-10-08 after the Stock strategies
+   judge found the your-cost flag missing (the same defect here).
 8. **Alerts** (side column, first): the flagged rows of the latest intraday check, grouped by company: what is
    flagged, price and move since entry at the check time, the trades concerned. Empty states: no check stored yet
    today (US in the example: the cut-off is before the first US check), or nothing flagged.

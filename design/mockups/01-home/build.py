@@ -93,7 +93,7 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
         "trade_checks": checks,
         "eod": eod,
         "to_date": to_date,
-        "go_live": reference["go_live"],
+        "go_live": {k: reference["go_live"][k] for k in ("proven", "months_forward", "trades_needed", "beats_best_baseline")},
         "strategies": strategies,
         "news": news,
         "settled_trades": settled,

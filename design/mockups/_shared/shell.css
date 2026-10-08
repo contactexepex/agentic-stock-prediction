@@ -24,6 +24,7 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 /* KPI row and layout */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
 .mb-kpi .v .tk{font-size:inherit}
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
 .grid{display:grid;grid-template-columns:minmax(0,8fr) minmax(0,4fr);gap:16px;margin-top:16px;align-items:start}
 .grid.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .col{display:grid;gap:16px;min-width:0}
@@ -54,11 +55,12 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:28px 0 8px} footer code{font-family:var(--md-ref-typeface-mono)}
 
 @media (max-width: 1199px){ .kpis{grid-template-columns:repeat(2,1fr)} }
-@media (max-width: 1000px){ .grid{grid-template-columns:1fr} }
+@media (max-width: 1000px){ .grid,.grid.even{grid-template-columns:1fr} }
 @media (max-width: 599px){
   .card{padding:16px}
   .phead{margin-top:16px} .phead h1{font-size:21px} .phead .chips{margin-left:0}
   .kpis{gap:12px} .mb-kpi{padding:14px;grid-template-columns:1fr} .mb-kpi .mb-avatar{grid-row:auto} .mb-kpi .s{grid-column:1} .mb-kpi .v{font-size:22px}
   .mb-alert{grid-template-columns:auto 1fr} .mb-alert .act{grid-column:1 / span 2}
+  .mb-kpi .labs .mb-label{white-space:normal;text-align:left}
   .toolbar input{min-width:0;width:100%}
 }

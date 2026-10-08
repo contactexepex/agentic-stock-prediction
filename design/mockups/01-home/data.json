@@ -2092,12 +2092,7 @@
     "proven": false,
     "months_forward": 0.2,
     "trades_needed": 294,
-    "beats_best_baseline": false,
-    "best_baseline_net_pnl": 574.89,
-    "drawdown_limit": 1000000.0,
-    "drawdown_within_limit": true,
-    "holds_in_calm_and_volatile": null,
-    "cost_view": "your"
+    "beats_best_baseline": false
    },
    "strategies": {
     "rule.model_news.v1": {
@@ -4387,12 +4382,7 @@
     "proven": false,
     "months_forward": 0.2,
     "trades_needed": 290,
-    "beats_best_baseline": false,
-    "best_baseline_net_pnl": 33.88,
-    "drawdown_limit": 10000.0,
-    "drawdown_within_limit": true,
-    "holds_in_calm_and_volatile": null,
-    "cost_view": "your"
+    "beats_best_baseline": false
    },
    "strategies": {
     "rule.model_news.v1": {
