@@ -686,7 +686,9 @@ first seen in the 3 days before it (16 about a watchlist company, 12 market-wide
 stored data:
 - Statuses: the stored statuses at that time are `unverified`, `single_source`, `rumour` and `promotional` only, and
   no stored cluster has more than one independent origin. `contradicted` occurs nowhere yet.
-- First-seen times: the collectors started on 5 Oct, and every US item was first stored in one run (7 Oct 04:32 UTC).
+- First-seen times: the collectors started on 5 Oct. Only items the news analyst had scored by the cut-off are
+  used, and for the US it had scored only the 7 Oct batch by then. So every US item here was first stored at 04:32 UTC
+  on 7 Oct, and the 978 US items first stored on 5 Oct, which have no score by the cut-off, are left out.
   The invented items first seen on 29 Sep are older than 3 days.
 - Region: there is no `region` field, because no stored field says it.
 
@@ -699,12 +701,12 @@ stored data:
 | published_at, first_seen_at | When the outlet published it, and when we first stored it (calls may use it only after this) | `news` | time | `2026-09-29T21:10:00Z`, `2026-09-29T22:47:05Z` |
 | enrichment.event_type | Category | news analyst (`news_enriched`) | `earnings`, `macro`, `product`, `legal`, `sector`, `analyst`, `ma`, `flows`, `other` | `product` |
 | enrichment.materiality, sentiment, relevance, novelty, urgency, priced_in | How much it matters, its tone and so on | same | levels, -1..1, 0-1 | `high`, `0.6` |
-| status | Verification status (DESIGN 3b) | `news_status.py` (exists) | `confirmed_primary`, `corroborated`, `single_source`, `unverified`, `rumour`, `promotional`, `contradicted` | `corroborated` |
+| status | Verification status (DESIGN 3b); empty for market-wide items, because verification is per company | `news_status.py` (exists) | `confirmed_primary`, `corroborated`, `single_source`, `unverified`, `rumour`, `promotional`, `contradicted` | `corroborated` |
 | status_as_of | Time the status refers to | `news_verified_asof` | time | `2026-09-30T11:15:00Z` |
 | independent_origins, primary_ids, cluster_id | Independent outlets confirming it; filings or exchange announcements behind it; its same-event group | `news_clusters` (exists) | count, ids | `2`, `[]` |
 | headline_history | Earlier headlines at the same link, with when each was seen | `news_updates` (exists) | list | "Nvidia said to win data-centre order" at `2026-09-29T22:47:05Z` |
 | market | The market whose news store holds it (each market collects its own feeds, so a Fed item appears in India only when India's feeds carried it) | `news` | `india`/`us` | `india` |
-| scope | `company` when the tagger found a primary watchlist company, else `market` (market-wide) | derived for pages | text | `market` |
+| scope | `company` when the tagger found a primary watchlist company, else `market` (market-wide); `tickers` can still hold companies only mentioned in passing, and a few market-wide items come from a company feed | derived for pages | text | `market` |
 | category, feed | The feed the item came from and its category (in the example: `macro`, `rates`, `global`, `geopolitics`, `flows`, `markets`, `general`, `company`) | `news` | text | `rates`, `gnews:Treasury yields` |
 | enrichment.geopolitical | The analyst marked it as geopolitical (stored items) | `news_enriched` | yes/no | `false` |
 | summary, summary_source | One or two lines under the headline: the first two stored key sentences of the read article (`article`); else the news analyst's summary when it is not the templated "<type> item on <ticker>" form (`analyst`); else empty (`none`, the page shows the headline alone). The article text itself is never stored | `news_articles`, `news_enriched` | text | India: "RBI raised the repo rate 25 bps to 5.5% and shifted to calibrated tight..." |
