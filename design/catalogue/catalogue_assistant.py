@@ -18,6 +18,7 @@ from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
 from marketbrief.presentation.dashboard import track
 from marketbrief.presentation.dashboard.assemble import gather_dashboard
+from marketbrief.warehouse import rm_track_record
 
 HERE = Path(__file__).resolve().parent
 CUTOFF = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
@@ -46,6 +47,7 @@ def example_calls(settled: list[dict], market: str) -> pd.DataFrame:
         actual = BARS[ticker][exit_day][3] / PREV_CLOSE_0929[ticker] - 1
         scored = calendar.next_session(cfg, date.fromisoformat(exit_day), include=False)
         rows.append({"id": trade["prediction_id"], "scored_at": pd.Timestamp(f"{scored}{MADE_AT[market]}"),
+                     "target_date": pd.Timestamp(exit_day),
                      "hit": actual > 0, "label_basis": "close_to_close", "horizon_label": "legacy_cc",
                      "horizon_days": horizon, "confidence": trade["prob_up"], "actual_return": actual})
     return pd.DataFrame(rows)
@@ -58,10 +60,11 @@ def track_records(settled: list[dict]) -> list[dict]:
         con = duckdb.connect()
         con.register("calls", example_calls(settled, market))
         con.execute("CREATE TABLE track_record AS SELECT * FROM calls")
-        out.append({"market": market, "as_of": AS_OF, "skill": data["skill"],
+        out.append({"market": market, "as_of": str(data["as_of"]), "skill": data["skill"],
                     "calls": track.calls_by_basis(con, CUTOFF), "ranges": data["track"]["ranges"],
                     "replay": data["track"]["replay"], "min_sample": data["track"]["min_sample"],
-                    "backtest": data["backtest"], "example_parts": ["calls"]})
+                    "backtest": data["backtest"], "example_parts": ["calls", "weekly"],
+                    "weekly": rm_track_record.weekly_series(con, CUTOFF)})
     return out
 
 
